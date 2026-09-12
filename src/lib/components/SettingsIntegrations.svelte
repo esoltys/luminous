@@ -14,11 +14,9 @@
     CheckIcon as Check,
     EyeIcon as Eye,
     EyeSlashIcon as EyeOff,
-    TagIcon as PicardIcon,
     WarningIcon as AlertTriangle,
     ArrowsClockwiseIcon as RefreshCw,
     FolderOpenIcon as FolderOpen,
-    BroadcastIcon as Broadcast,
     CircleNotchIcon as LoaderCircle,
     ArrowUpRightIcon as ArrowUpRight,
     HeartIcon as Heart,
@@ -102,31 +100,27 @@
 
 <!-- ListenBrainz Scrobbler Integration Card -->
 <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
-  <div class="pb-3 flex justify-between items-start">
-    <div class="flex items-center gap-3">
-      <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
-        <Broadcast class="w-5 h-5" />
-      </div>
+  <div class="pb-3 flex justify-between items-start gap-4">
+    <div class="flex items-center gap-3 min-w-0">
+      <img src="/listenbrainz-icon.png" alt="ListenBrainz" class="w-9 h-9 shrink-0 object-contain" />
       <div class="space-y-1 min-w-0">
-        <div class="flex items-center gap-2">
-          <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('listenbrainz.integrationTitle')}</h3>
-          {#if scrobblerStore.enabled && scrobblerStore.username}
-            <span class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-brand-accent/15 text-brand-text-primary border border-brand-accent/25 font-medium">
-              <Check class="w-3 h-3" />
-              {scrobblerStore.username}
-            </span>
-          {:else if scrobblerStore.enabled && scrobblerStore.paused}
-            <span class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 font-medium">
-              {i18n.t('listenbrainz.statusPaused')}
-            </span>
-          {/if}
-        </div>
+        <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('listenbrainz.integrationTitle')}</h3>
         <p class="text-xs text-brand-text-secondary leading-relaxed">
           <button onclick={() => openExternalUrl("https://listenbrainz.org")} class="text-brand-accent hover:underline">ListenBrainz</button>
           {i18n.t('listenbrainz.integrationDesc')}
         </p>
       </div>
     </div>
+    {#if scrobblerStore.enabled && scrobblerStore.username}
+      <span class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-brand-accent/15 text-brand-text-primary border border-brand-accent/25 font-medium shrink-0">
+        <Check class="w-3 h-3" />
+        {scrobblerStore.username}
+      </span>
+    {:else if scrobblerStore.enabled && scrobblerStore.paused}
+      <span class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 font-medium shrink-0">
+        {i18n.t('listenbrainz.statusPaused')}
+      </span>
+    {/if}
   </div>
 
   <div class="space-y-2 pt-2 border-t border-brand-border/60">
@@ -320,9 +314,7 @@
 <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
   <div class="pb-3 flex justify-between items-center">
     <div class="flex items-center gap-3">
-      <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
-        <PicardIcon class="w-5 h-5" />
-      </div>
+      <img src="/picard-icon.png" alt="Picard" class="w-9 h-9 shrink-0 object-contain" />
       <div class="space-y-1 min-w-0">
         <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('picard.integrationTitle')}</h3>
         <p class="text-xs text-brand-text-secondary leading-relaxed">
@@ -331,6 +323,18 @@
         </p>
       </div>
     </div>
+  </div>
+
+  <div class="flex items-center justify-between gap-4 py-1">
+    <div class="flex flex-col gap-0.5 min-w-0">
+      <span class="text-sm font-medium text-brand-text-primary">{i18n.t('picard.missingPlaylistLabel')}</span>
+      <p class="text-xs text-brand-text-secondary">{i18n.t('picard.missingPlaylistHint')}</p>
+    </div>
+    <Toggle
+      checked={picardStore.missingPlaylistEnabled}
+      onchange={(v) => picardStore.setMissingPlaylistEnabled(v)}
+      label={i18n.t('picard.missingPlaylistLabel')}
+    />
   </div>
 
   <div class="flex items-center gap-2 text-xs font-medium">

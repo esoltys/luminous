@@ -63,7 +63,8 @@ export function getPlaylistDisplayName(
   if (
     !playlist.dynamic_enabled ||
     isSmartPlaylistSpec(playlist.dynamic_spec) ||
-    playlist.dynamic_spec === "missingmeta"
+    playlist.dynamic_spec === "missingmeta" ||
+    playlist.dynamic_spec === "missingmbid"
   ) {
     return baseName;
   }

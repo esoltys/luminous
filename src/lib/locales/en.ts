@@ -471,7 +471,7 @@ export const en = {
     autoMostPlayed: "Most Played",
     autoHistory: "History",
     autoMissingMetadata: "Missing Metadata",
-    autoMissingMusicBrainz: "Missing MusicBrainz",
+    autoMissingMusicBrainz: "Missing MusicBrainz ID",
     updatedOn: "Updated {date}",
     saveAsCustomTooltip: "Save as Custom Playlist",
     activePlaylistTitle: "Playlists",
@@ -545,7 +545,7 @@ export const en = {
     decadeAutoPlaylist: "Decade",
     bpmAutoPlaylist: "BPM",
     missingMetadataAutoPlaylist: "Missing Metadata",
-    missingMusicBrainzAutoPlaylist: "Auto-Playlist • Missing MusicBrainz ID",
+    missingMusicBrainzAutoPlaylist: "Auto-Playlist",
     daypartAutoPlaylist: "Moment Mix",
     bpmDownTempo: "Down-Tempo BPM",
     bpmMidTempo: "Mid-Tempo BPM",
@@ -1153,7 +1153,9 @@ export const en = {
     customPathLabel: "Custom Path (optional)",
     customPathPlaceholder: "C:\\Program Files\\MusicBrainz Picard\\picard.exe",
     browseBtn: "Browse...",
-    recheckTooltip: "Re-check for Picard"
+    recheckTooltip: "Re-check for Picard",
+    missingPlaylistLabel: "Missing MusicBrainz ID Auto-Playlist",
+    missingPlaylistHint: "Show an auto-playlist of library tracks missing MusicBrainz IDs to easily tag them in Picard"
   },
   listenbrainz: {
     integrationTitle: "ListenBrainz Scrobbler",
