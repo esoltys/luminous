@@ -22,6 +22,7 @@
   import { playerStore } from "../stores/player.svelte";
   import { themeStore } from "../stores/theme.svelte";
   import { i18n } from "../stores/i18n.svelte";
+  import { picardStore } from "../stores/picard.svelte";
   import { getCoverArtUrl, type RecentSearchItem } from "../types";
   import { getPlaylistDisplayName } from "../utils/playlist";
   import CoverArt from "./CoverArt.svelte";
@@ -154,6 +155,7 @@
               ref: { kind: "missing_metadata", playlistId: p.id, updated: p.updated }
             });
           } else if (p.dynamic_spec === "missingmbid") {
+            if (!picardStore.missingPlaylistEnabled) continue;
             results.push({
               type: "auto",
               id: `auto:missing_musicbrainz:${p.id}`,

@@ -31,6 +31,7 @@
   import { isSmartPlaylistSpec } from "../utils/filterParser";
   import { getPlaylistDisplayName } from "../utils/playlist";
   import { scrobblerStore } from "../stores/scrobbler.svelte";
+  import { picardStore } from "../stores/picard.svelte";
   import { rememberScroll } from "../utils/scrollMemory";
 
   interface AutoDef {
@@ -170,7 +171,7 @@
         trackCount: missingMetadataAutoPlaylist.track_count,
       });
     }
-    if (scrobblerStore.enabled && missingMusicBrainzAutoPlaylist && missingMusicBrainzAutoPlaylist.track_count > 0) {
+    if (picardStore.missingPlaylistEnabled && missingMusicBrainzAutoPlaylist && missingMusicBrainzAutoPlaylist.track_count > 0) {
       defs.push({
         id: `auto:missing_musicbrainz:${missingMusicBrainzAutoPlaylist.id}`,
         kind: "missing_musicbrainz",

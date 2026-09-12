@@ -73,4 +73,26 @@ describe("SettingsIntegrations.svelte", () => {
     expect(await findByText("Send Now Playing status")).toBeInTheDocument();
     expect(await findByText("Synchronize track ratings")).toBeInTheDocument();
   });
+
+  it("renders Picard and ListenBrainz logos", async () => {
+    const { findByAltText } = render(SettingsIntegrations);
+
+    const picardImg = await findByAltText("Picard");
+    expect(picardImg).toHaveAttribute("src", "/picard-icon.png");
+
+    const lbImg = await findByAltText("ListenBrainz");
+    expect(lbImg).toHaveAttribute("src", "/listenbrainz-icon.png");
+  });
+
+  it("toggles the Missing MusicBrainz ID auto-playlist setting", async () => {
+    const { getByLabelText } = render(SettingsIntegrations);
+
+    const toggle = getByLabelText(/Missing MusicBrainz ID/i);
+    expect(toggle).toBeInTheDocument();
+    expect(toggle).toBeChecked();
+
+    await fireEvent.click(toggle);
+    await tick();
+    expect(toggle).not.toBeChecked();
+  });
 });

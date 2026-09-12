@@ -4,6 +4,7 @@ import type { Playlist, PlaylistItem, QueuePopulationMode, Song } from "../types
 import { applySongStats, type SongStatsPayload } from "../utils/stats";
 import { toastStore } from "./toast.svelte";
 import { i18n } from "./i18n.svelte";
+import { picardStore } from "./picard.svelte";
 import { getDaypartBucket } from "../utils/daypart";
 
 /** How often to check whether the Daypart Mix's local-time bucket has
@@ -33,7 +34,12 @@ class PlaylistsStore {
   /** Count of auto-playlists that currently have at least one song — used for
    * the sidebar's Auto badge, kept in sync with the Auto grid's own filtering. */
   visibleAutoPlaylistCount = $derived.by(() => {
-    const genreCount = this.playlists.filter((p) => p.dynamic_enabled && p.track_count > 0).length;
+    const genreCount = this.playlists.filter(
+      (p) =>
+        p.dynamic_enabled &&
+        p.track_count > 0 &&
+        (p.dynamic_spec !== "missingmbid" || picardStore.missingPlaylistEnabled)
+    ).length;
     return (
       genreCount +
       (this.favouritesCount > 0 ? 1 : 0) +

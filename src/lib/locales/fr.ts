@@ -1147,7 +1147,9 @@ export const fr = {
     customPathLabel: "Chemin personnalisé (facultatif)",
     customPathPlaceholder: "C:\\Program Files\\MusicBrainz Picard\\picard.exe",
     browseBtn: "Parcourir...",
-    recheckTooltip: "Revérifier la présence de Picard"
+    recheckTooltip: "Revérifier la présence de Picard",
+    missingPlaylistLabel: "Liste auto Identifiants MusicBrainz manquants",
+    missingPlaylistHint: "Afficher une liste de lecture automatique des morceaux sans identifiant MusicBrainz pour les taguer facilement dans Picard"
   },
   listenbrainz: {
     integrationTitle: "Scrobbler ListenBrainz",
