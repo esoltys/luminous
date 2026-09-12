@@ -1049,9 +1049,26 @@ impl Player {
         }
     }
 
+    /// `position_nanosec` is track-relative (0 at the start of the current
+    /// song, matching what the UI displays and what `Song::duration_secs()`
+    /// covers) — converted here to the audio engine's absolute-file-offset
+    /// convention by adding the current song's `beginning_nanosec` (0 for a
+    /// plain, non-CUE song, so this is a no-op for the common case).
     pub async fn seek_to(&self, position_nanosec: u64) -> Result<()> {
-        self.persist_position(position_nanosec);
-        self.audio.lock().await.seek_to(position_nanosec)
+        let absolute_ns = position_nanosec + self.current_song_beginning_nanosec();
+        self.persist_position(absolute_ns);
+        self.audio.lock().await.seek_to(absolute_ns)
+    }
+
+    /// The current song's CUE start offset within its physical file (0 for a
+    /// plain, non-CUE song) — the audio engine's `position_nanosec` is
+    /// absolute within that file, but everything the UI and play-stats logic
+    /// deal in is relative to the track's own start (#78).
+    pub fn current_song_beginning_nanosec(&self) -> u64 {
+        self.current_song
+            .as_ref()
+            .map(|s| s.beginning_nanosec.max(0) as u64)
+            .unwrap_or(0)
     }
 
     pub async fn set_volume(&mut self, vol: f32) -> Result<()> {
@@ -1687,7 +1704,9 @@ impl Player {
             current_song: self.current_song.clone(),
             playlist_id: self.current_playlist_id,
             playlist_item_uuid: self.current_item_uuid.clone(),
-            position_nanosec: audio.current_position_nanosec() as i64,
+            position_nanosec: audio
+                .current_position_nanosec()
+                .saturating_sub(self.current_song_beginning_nanosec()) as i64,
             volume: audio.current_volume(),
             shuffle_mode: self.shuffle_mode,
             repeat_mode: self.repeat_mode,

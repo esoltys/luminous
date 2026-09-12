@@ -34,6 +34,11 @@ pub struct SongDetails {
     pub rating: f32,
     pub compilation: bool,
     pub art_embedded: bool,
+    /// `true` when this song was cut from a CUE sheet (#78) — its tags live in
+    /// the .cue file, not the shared media file's own embedded tags, so the
+    /// tag editor should present it read-only rather than let a save silently
+    /// overwrite every other track cut from the same file.
+    pub is_cue_track: bool,
 }
 
 #[tauri::command]
@@ -44,7 +49,7 @@ pub async fn get_song_details(
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     conn.query_row(
         "SELECT id, path, title, titlesort, artist, artistsort, album, albumsort, album_artist, album_artist_sort, composer, composersort, genre, genresort, track, disc, year,
-                originalyear, grouping, bpm, initial_key, rating, compilation, art_embedded
+                originalyear, grouping, bpm, initial_key, rating, compilation, art_embedded, cue_path
          FROM songs WHERE id = ?1",
         rusqlite::params![song_id],
         |row| {
@@ -73,6 +78,7 @@ pub async fn get_song_details(
                 rating: row.get(21).unwrap_or(crate::stats::RATING_UNRATED),
                 compilation: row.get(22).unwrap_or(false),
                 art_embedded: row.get(23).unwrap_or(false),
+                is_cue_track: row.get::<_, Option<String>>(24)?.is_some(),
             })
         },
     )
@@ -111,13 +117,22 @@ pub async fn save_song_tags(
     let _watcher_pause_guard = WatcherPauseGuard::new(Arc::clone(&state.watcher_paused));
 
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
-    let (path_str, source, compilation): (String, i32, bool) = conn
+    let (path_str, source, compilation, cue_path): (String, i32, bool, Option<String>) = conn
         .query_row(
-            "SELECT path, source, compilation FROM songs WHERE id = ?1",
+            "SELECT path, source, compilation, cue_path FROM songs WHERE id = ?1",
             rusqlite::params![song_id],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
         )
         .map_err(|_| "Song not found in library".to_string())?;
+    // A CUE sheet track's tags live in the .cue file, not the shared media
+    // file's own embedded tags — writing here would silently overwrite every
+    // other track cut from the same file with just this one's values (#78).
+    // There's no CUE-sheet write-back yet, so refuse rather than corrupt.
+    if cue_path.is_some() {
+        return Err(
+            "This track's tags come from its CUE sheet and can't be edited yet.".to_string(),
+        );
+    }
     // WebDAV songs (source 11) have no local file to write lofty tags to —
     // there's no write-back to the remote server implemented, so the edit is
     // saved to Luminous's own DB only (the tag editor surfaces this to the

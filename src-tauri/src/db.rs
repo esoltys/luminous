@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 33;
+pub const CURRENT_SCHEMA_VERSION: i32 = 34;
 
 struct Migration {
     version: i32,
@@ -254,6 +254,11 @@ const MIGRATIONS: &[Migration] = &[
             }
             Ok(())
         },
+    },
+    Migration {
+        version: 34,
+        description: "relax songs.path from UNIQUE to UNIQUE(path, beginning_nanosec) for CUE sheet tracks (#78)",
+        apply: rebuild_songs_table_without_path_unique,
     },
 ];
 
@@ -979,6 +984,143 @@ ALTER TABLE songs ADD COLUMN dr_log_mtime INTEGER;
 ";
 
 // ---------------------------------------------------------------------------
+// Migration 34: relax `songs.path` from a plain UNIQUE column to a composite
+// UNIQUE(path, beginning_nanosec) index, so multiple CUE sheet tracks (#78)
+// can share one physical media file's path — differentiated by their INDEX 01
+// start offset. Plain (non-CUE) songs keep beginning_nanosec = 0, so their
+// uniqueness is unaffected.
+//
+// SQLite has no `ALTER TABLE ... DROP CONSTRAINT`, so this does the standard
+// SQLite table rebuild: create `songs_new` without the column-level UNIQUE,
+// copy every row across (`SELECT *`), drop the old table, and rename. Unlike
+// every other migration in this file, the new table's column list isn't a
+// fixed SQL string — it's built at runtime from `PRAGMA table_info(songs)`
+// (see `rebuild_songs_table_without_path_unique` below), so this migration
+// stays correct regardless of which other, unrelated `songs`-column
+// migrations happen to have already run on this database (a real scenario in
+// this codebase: parallel feature branches occasionally pick the same next
+// migration version number against a shared dev app-data folder, and
+// whichever runs first "claims" that version — a fixed column list here
+// would silently drop any column added by a same-numbered sibling migration
+// instead of preserving it). `PRAGMA table_info` never reports a column-level
+// UNIQUE (that's a separate index), so simply not re-declaring one is exactly
+// how this drops it.
+//
+// The whole rebuild is one transaction, so a crash mid-migration leaves the
+// original `songs` table untouched rather than half-renamed. `PRAGMA
+// foreign_keys` is toggled off/on around (not inside) that transaction, per
+// SQLite's rule that it can't change mid-transaction — other tables'
+// `REFERENCES songs(id)` stay valid across the rebuild since every row keeps
+// its original `id`, and SQLite re-syncs the AUTOINCREMENT sequence and the
+// `sqlite_sequence` name entry automatically on RENAME TO.
+// ---------------------------------------------------------------------------
+fn rebuild_songs_table_without_path_unique(conn: &rusqlite::Connection) -> Result<()> {
+    // Idempotency / interrupted-run safety: if a previous attempt already got
+    // as far as creating the new unique index, the rebuild already happened.
+    let already_done: bool = conn
+        .prepare(
+            "SELECT 1 FROM sqlite_master WHERE type='index' AND tbl_name='songs' AND name='idx_songs_path_begin'",
+        )?
+        .exists([])?;
+    if already_done {
+        return Ok(());
+    }
+
+    struct ColumnDef {
+        name: String,
+        ty: String,
+        notnull: bool,
+        dflt_value: Option<String>,
+        pk: bool,
+    }
+
+    let mut stmt = conn.prepare("SELECT cid, name, type, \"notnull\", dflt_value, pk FROM pragma_table_info('songs') ORDER BY cid")?;
+    let columns: Vec<ColumnDef> = stmt
+        .query_map([], |row| {
+            Ok(ColumnDef {
+                name: row.get(1)?,
+                ty: row.get(2)?,
+                notnull: row.get::<_, i64>(3)? != 0,
+                dflt_value: row.get(4)?,
+                pk: row.get::<_, i64>(5)? != 0,
+            })
+        })?
+        .collect::<rusqlite::Result<_>>()?;
+    drop(stmt);
+
+    let mut col_defs = Vec::with_capacity(columns.len());
+    for col in &columns {
+        let mut def = format!("{} {}", col.name, col.ty);
+        if col.pk {
+            // `id` is this table's only primary key column, and always has
+            // been AUTOINCREMENT — `pragma_table_info` reports `pk` but not
+            // AUTOINCREMENT, so that part is a known invariant, not derived.
+            def.push_str(" PRIMARY KEY AUTOINCREMENT");
+        } else if col.notnull {
+            def.push_str(" NOT NULL");
+        }
+        if let Some(d) = &col.dflt_value {
+            // `dflt_value` comes back with any wrapping parens already
+            // stripped for expression defaults (e.g. `strftime(...)` for
+            // `added`) but bare for literal defaults (e.g. `0`) — wrapping
+            // every default in parens is valid SQLite for both cases, so
+            // there's no need to tell them apart.
+            def.push_str(&format!(" DEFAULT ({d})"));
+        }
+        col_defs.push(def);
+    }
+    let create_songs_new = format!("CREATE TABLE songs_new ({})", col_defs.join(", "));
+
+    conn.execute_batch("PRAGMA foreign_keys=OFF;")?;
+    let rebuild = (|| -> Result<()> {
+        conn.execute_batch("BEGIN TRANSACTION;")?;
+        conn.execute_batch("DROP TABLE IF EXISTS songs_new;")?;
+        conn.execute_batch(&create_songs_new)?;
+        conn.execute_batch(
+            "INSERT INTO songs_new SELECT * FROM songs;
+             DROP TABLE songs;
+             ALTER TABLE songs_new RENAME TO songs;
+
+             CREATE UNIQUE INDEX IF NOT EXISTS idx_songs_path_begin ON songs(path, beginning_nanosec);
+             CREATE INDEX IF NOT EXISTS idx_songs_artist   ON songs(artist);
+             CREATE INDEX IF NOT EXISTS idx_songs_album    ON songs(album);
+             CREATE INDEX IF NOT EXISTS idx_songs_genre    ON songs(genre);
+             CREATE INDEX IF NOT EXISTS idx_songs_mtime    ON songs(mtime);
+             CREATE INDEX IF NOT EXISTS idx_songs_source   ON songs(source);
+
+             CREATE TRIGGER IF NOT EXISTS songs_ai AFTER INSERT ON songs BEGIN
+                 INSERT INTO songs_fts(rowid, title, artist, album, album_artist, composer, performer, genre)
+                 VALUES (new.id, new.title, new.artist, new.album, new.album_artist,
+                         new.composer, new.performer, new.genre);
+             END;
+
+             CREATE TRIGGER IF NOT EXISTS songs_ad AFTER DELETE ON songs BEGIN
+                 INSERT INTO songs_fts(songs_fts, rowid, title, artist, album, album_artist, composer, performer, genre)
+                 VALUES ('delete', old.id, old.title, old.artist, old.album, old.album_artist,
+                         old.composer, old.performer, old.genre);
+             END;
+
+             CREATE TRIGGER IF NOT EXISTS songs_au AFTER UPDATE ON songs BEGIN
+                 INSERT INTO songs_fts(songs_fts, rowid, title, artist, album, album_artist, composer, performer, genre)
+                 VALUES ('delete', old.id, old.title, old.artist, old.album, old.album_artist,
+                         old.composer, old.performer, old.genre);
+                 INSERT INTO songs_fts(rowid, title, artist, album, album_artist, composer, performer, genre)
+                 VALUES (new.id, new.title, new.artist, new.album, new.album_artist,
+                         new.composer, new.performer, new.genre);
+             END;",
+        )?;
+        conn.execute_batch("COMMIT;")?;
+        Ok(())
+    })();
+    if rebuild.is_err() {
+        let _ = conn.execute_batch("ROLLBACK;");
+    }
+    // Always try to restore enforcement, even if the rebuild failed.
+    conn.execute_batch("PRAGMA foreign_keys=ON;")?;
+    rebuild
+}
+
+// ---------------------------------------------------------------------------
 // Migration 18: tag_groups/tag_assignments — a persisted, curatable Genres
 // hierarchy (#545) layered on top of the existing `songs.genre` string
 // column. `songs.genre` remains the source of truth for which songs carry
@@ -1207,6 +1349,141 @@ mod tests {
             "reopening should have re-run migration 23 and healed the gap"
         );
 
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_migration_34_relaxes_path_uniqueness_for_cue_tracks() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_migration34_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&temp_dir).unwrap();
+        let db_path = temp_dir.join("luminous.db");
+
+        // Build the pre-migration-34 schema by replaying every earlier
+        // migration directly, exactly as `run_migrations` would have left a
+        // real database that was last opened before this migration existed.
+        {
+            let manager = SqliteConnectionManager::file(&db_path);
+            let pool = r2d2::Pool::builder().max_size(1).build(manager).unwrap();
+            let conn = pool.get().unwrap();
+            conn.execute_batch("PRAGMA foreign_keys=ON;").unwrap();
+            conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY);",
+            )
+            .unwrap();
+            for migration in MIGRATIONS.iter().filter(|m| m.version < 34) {
+                (migration.apply)(&conn).unwrap();
+                conn.execute(
+                    "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
+                    params![migration.version],
+                )
+                .unwrap();
+            }
+
+            // Simulate schema drift from an unrelated sibling migration that
+            // happened to run against this same database first (a real
+            // scenario: two feature branches independently bumped
+            // CURRENT_SCHEMA_VERSION to the same number against a shared dev
+            // app-data folder). The rebuild must preserve this column even
+            // though it's never mentioned in this migration's own code.
+            conn.execute_batch("ALTER TABLE songs ADD COLUMN unrelated_sibling_column TEXT;")
+                .unwrap();
+
+            conn.execute(
+                "INSERT INTO songs (path, title, unrelated_sibling_column) VALUES ('shared.flac', 'Whole File', 'kept')",
+                [],
+            )
+            .unwrap();
+            let webdav_song_id: i64 = conn.query_row(
+                "SELECT id FROM songs WHERE path = 'shared.flac'",
+                [],
+                |r| r.get(0),
+            ).unwrap();
+
+            // The pre-migration-33 schema must still enforce UNIQUE(path).
+            let dup = conn.execute(
+                "INSERT INTO songs (path, title, beginning_nanosec) VALUES ('shared.flac', 'Track 2', 5)",
+                [],
+            );
+            assert!(dup.is_err(), "old schema should still reject a bare duplicate path");
+
+            // A row with a foreign key into songs(id), to confirm the rebuild
+            // doesn't orphan or corrupt it.
+            conn.execute(
+                "INSERT INTO webdav_servers (id, name, url) VALUES (1, 'test', 'https://example.com')",
+                [],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO webdav_cache (server_id, remote_path, song_id) VALUES (1, '/shared.flac', ?1)",
+                params![webdav_song_id],
+            )
+            .unwrap();
+        }
+
+        // Reopening through the normal path runs (only) migration 33.
+        let db = Database::new(temp_dir.clone()).unwrap();
+        assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
+        let conn = db.pool.get().unwrap();
+
+        let (title, id, sibling_col): (String, i64, String) = conn
+            .query_row(
+                "SELECT title, id, unrelated_sibling_column FROM songs WHERE path = 'shared.flac' AND beginning_nanosec = 0",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(title, "Whole File");
+        assert_eq!(
+            sibling_col, "kept",
+            "a column added by an unrelated sibling migration must survive the rebuild"
+        );
+
+        let cached_song_id: i64 = conn
+            .query_row(
+                "SELECT song_id FROM webdav_cache WHERE remote_path = '/shared.flac'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            cached_song_id, id,
+            "foreign key into songs(id) must survive the table rebuild"
+        );
+
+        // The new schema must allow a CUE sibling: same path, different
+        // beginning_nanosec.
+        conn.execute(
+            "INSERT INTO songs (path, title, beginning_nanosec) VALUES ('shared.flac', 'Track 2', 5)",
+            [],
+        )
+        .unwrap();
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM songs WHERE path = 'shared.flac'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 2);
+
+        // But an exact duplicate (same path AND beginning_nanosec) is still rejected.
+        let dup2 = conn.execute(
+            "INSERT INTO songs (path, title, beginning_nanosec) VALUES ('shared.flac', 'Track 2 Again', 5)",
+            [],
+        );
+        assert!(
+            dup2.is_err(),
+            "new schema should still reject an exact (path, beginning_nanosec) duplicate"
+        );
+
+        drop(conn);
+        drop(db);
         let _ = std::fs::remove_dir_all(temp_dir);
     }
 
