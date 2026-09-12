@@ -129,7 +129,12 @@ impl PlaylistManager {
                 scanner.get_random_songs(DAYPART_RANDOM_FILL_LIMIT)
             } else {
                 let tag_manager = TagManager::new(self.db.clone());
-                tag_manager.get_songs_by_curated_tag(name, NO_SONG_LIMIT, mode)
+                let songs = tag_manager.get_songs_by_curated_tag(name, NO_SONG_LIMIT, mode)?;
+                if songs.is_empty() {
+                    scanner.get_random_songs(DAYPART_RANDOM_FILL_LIMIT)
+                } else {
+                    Ok(songs)
+                }
             }
         } else {
             let query = spec.replace(';', " ");
@@ -639,6 +644,39 @@ mod tests {
             tracks.len(),
             2,
             "tag: dispatch for a group includes its curated child's songs"
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_songs_for_spec_daypart_empty_tag_matches_falls_back_to_random_fill() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for i in 1..=5 {
+                conn.execute(
+                    "INSERT INTO songs (title, artist, genre, source, unavailable) VALUES (?1, 'A', 'Rock', 1, 0)",
+                    params![format!("Rock Song {i}")],
+                )
+                .unwrap();
+            }
+        }
+
+        let manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        // A genre tag that matches 0 songs in the library must fall back to random library fill
+        let songs = manager
+            .songs_for_spec(
+                "daypart:morning:2026-09-12:NonExistentGenre",
+                QueuePopulationMode::All,
+            )
+            .unwrap();
+
+        assert_eq!(
+            songs.len(),
+            5,
+            "an empty genre match in a daypart spec must fall back to random library fill rather than returning 0 songs"
         );
 
         let _ = std::fs::remove_dir_all(temp_dir);
