@@ -813,6 +813,7 @@ export const en = {
     readFailed: "Failed to read tags",
     locationField: "Location",
     remoteSourceNote: "This song is on a WebDAV server. Changes are saved in Luminous only — the file on the server won't be modified.",
+    cueTrackNote: "This track's tags come from its CUE sheet, not the file itself, so they can't be edited here yet.",
     albumArtistField: "Album Artist",
     albumArtistPlaceholder: "Add an album artist...",
     albumArtistTooltip: "Primary artist credited for the whole album, useful for compilations",

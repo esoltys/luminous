@@ -56,6 +56,11 @@
   // dedicated field since it's the same signal audio.rs/collection.rs
   // already key off of for "is this a remote source" checks.
   let isRemoteSource = $derived(/^https?:\/\//i.test(path));
+  // CUE sheet tracks (#78) share one physical file's embedded tags across
+  // every track cut from it, so there's nowhere to persist a per-track edit
+  // back to disk yet -- the backend rejects the save outright, so keep the
+  // editor read-only here instead of letting the user hit a failed save.
+  let isCueTrack = $state(false);
   // Compilation is an album-level property edited via AlbumTagEditor, not
   // here — this is read-only, just so a compilation's Album Artist shows
   // the same "Various Artists" pill here as it does there instead of an
@@ -106,6 +111,7 @@
         rating: number;
         compilation: boolean;
         art_embedded: boolean;
+        is_cue_track: boolean;
       }>("get_song_details", { songId });
 
       title = details.title;
@@ -131,6 +137,7 @@
       rating = details.rating;
       compilation = details.compilation;
       artEmbedded = details.art_embedded;
+      isCueTrack = details.is_cue_track;
     } catch (e: any) {
       console.error("Failed to load metadata:", e);
       errorMsg = e.toString();
@@ -261,6 +268,13 @@
             <div class="flex items-start gap-2.5 bg-brand-main border border-brand-border rounded-lg p-2.5 text-brand-text-secondary text-xs">
               <CloudIcon class="w-4 h-4 shrink-0 mt-0.5" />
               <span>{i18n.t('tagEditor.remoteSourceNote')}</span>
+            </div>
+          {/if}
+
+          {#if isCueTrack}
+            <div class="flex items-start gap-2.5 bg-brand-main border border-brand-border rounded-lg p-2.5 text-brand-text-secondary text-xs">
+              <Lock class="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{i18n.t('tagEditor.cueTrackNote')}</span>
             </div>
           {/if}
 
@@ -494,7 +508,7 @@
         <Button onclick={onClose} disabled={isSaving} variant="secondary" size="sm">
           {i18n.t('tagEditor.cancelBtn')}
         </Button>
-        <Button onclick={handleSave} disabled={isLoading || !!errorMsg || isSaving} variant="primary" size="sm">
+        <Button onclick={handleSave} disabled={isLoading || !!errorMsg || isSaving || isCueTrack} variant="primary" size="sm">
           {#if isSaving}
             <LoaderCircle class="w-3.5 h-3.5 animate-spin" />
             {i18n.t('tagEditor.updatingTags')}

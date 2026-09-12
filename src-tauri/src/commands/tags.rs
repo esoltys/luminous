@@ -170,6 +170,7 @@ struct SongFullMetadata {
     bpm: Option<f32>,
     initial_key: String,
     compilation: bool,
+    cue_path: Option<String>,
 }
 
 /// Reads each song via the canonical `SONG_SELECT_COLS`/`row_to_song` mapping
@@ -208,6 +209,7 @@ fn load_full_metadata(conn: &rusqlite::Connection, song_ids: &[i64]) -> Vec<Song
                 bpm: song.bpm,
                 initial_key: song.initial_key.unwrap_or_default(),
                 compilation: song.compilation,
+                cue_path: song.cue_path,
             });
         }
     }
@@ -244,7 +246,12 @@ async fn rewrite_genre_and_persist(
                 // change is saved to Luminous's own DB only (the tag editor surfaces
                 // this to the user). Attempting the write here would always fail and
                 // just spam the log with a warning that tells nobody anything new.
-                if item.source == crate::models::SongSource::WebDav {
+                // Same DB-only treatment as WebDAV: a CUE sheet track's tags
+                // live in the .cue file, not the shared media file's own
+                // embedded tags, and there's no CUE-sheet write-back yet.
+                // Writing here would silently overwrite every other track cut
+                // from the same file with just this one's values (#78).
+                if item.source == crate::models::SongSource::WebDav || item.cue_path.is_some() {
                     count += 1;
                     writes.push((item.id, new_genre));
                     continue;

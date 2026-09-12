@@ -256,32 +256,43 @@ impl CollectionScanner {
         Ok(marked)
     }
 
-    /// Merges `songs` rows that point to the same physical file (matched by
-    /// case-insensitive path) into one, keeping the row with the highest id
-    /// (the most recently upserted, reflecting current tags) and re-pointing
-    /// playlist membership and play history from the others before deleting
-    /// them. Rolls the discarded rows' rating/playcount/skipcount/lastplayed
-    /// into the survivor rather than just discarding them.
+    /// Merges `songs` rows that point to the same physical file *and* the same
+    /// CUE start offset (matched by case-insensitive path + `beginning_nanosec`)
+    /// into one, keeping the row with the highest id (the most recently
+    /// upserted, reflecting current tags) and re-pointing playlist membership
+    /// and play history from the others before deleting them. Rolls the
+    /// discarded rows' rating/playcount/skipcount/lastplayed into the survivor
+    /// rather than just discarding them.
     ///
-    /// These duplicates can only arise from a case-only rename on a
-    /// case-insensitive filesystem (Windows/macOS) slipping past
-    /// `reconcile_moved_songs` before that was fixed to compare against the
-    /// exact-cased paths a scan actually finds on disk — libraries scanned
-    /// before that fix can still carry the extra rows, hence this cleanup.
+    /// Grouping includes `beginning_nanosec` so that legitimate CUE sheet
+    /// siblings (#78) — multiple rows that intentionally share one physical
+    /// file's path, distinguished only by their CUE start offset — are never
+    /// mistaken for duplicates and collapsed into one.
+    ///
+    /// The path-only duplicates this actually targets can arise from a
+    /// case-only rename on a case-insensitive filesystem (Windows/macOS)
+    /// slipping past `reconcile_moved_songs` before that was fixed to compare
+    /// against the exact-cased paths a scan actually finds on disk —
+    /// libraries scanned before that fix can still carry the extra rows,
+    /// hence this cleanup.
     pub fn merge_duplicate_songs(&self) -> Result<usize> {
         let conn = self.db.pool.get()?;
 
-        let mut stmt = conn.prepare("SELECT id, path FROM songs WHERE path IS NOT NULL")?;
-        let rows: Vec<(i64, String)> = stmt
-            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+        let mut stmt = conn
+            .prepare("SELECT id, path, beginning_nanosec FROM songs WHERE path IS NOT NULL")?;
+        let rows: Vec<(i64, String, i64)> = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?
             .filter_map(|r| r.ok())
             .collect();
         drop(stmt);
 
-        let mut groups: std::collections::HashMap<String, Vec<i64>> =
+        let mut groups: std::collections::HashMap<(String, i64), Vec<i64>> =
             std::collections::HashMap::new();
-        for (id, path) in rows {
-            groups.entry(path.to_lowercase()).or_default().push(id);
+        for (id, path, beginning_nanosec) in rows {
+            groups
+                .entry((path.to_lowercase(), beginning_nanosec))
+                .or_default()
+                .push(id);
         }
 
         let mut merged = 0usize;
@@ -431,6 +442,7 @@ impl CollectionScanner {
         });
 
         let mut all_paths: Vec<PathBuf> = Vec::new();
+        let mut cue_paths: Vec<PathBuf> = Vec::new();
         for dir in &dirs {
             let walker = WalkDir::new(&dir.path)
                 .follow_links(true)
@@ -438,14 +450,34 @@ impl CollectionScanner {
                 .filter_entry(|e| e.file_name() != "Duplicates");
             for entry in walker.filter_map(|e| e.ok()) {
                 let path = entry.path().to_path_buf();
-                if path.is_file() && is_audio_file(&path) {
+                if !path.is_file() {
+                    continue;
+                }
+                if is_audio_file(&path) {
                     all_paths.push(path);
+                } else if is_cue_file(&path) {
+                    cue_paths.push(path);
                 }
             }
         }
 
-        let total = all_paths.len() as u64;
-        log::info!("Scan found {total} audio files (force={force})");
+        // Resolve CUE sheets (classic single-`FILE` case, #78) against the
+        // audio files just discovered, and claim their referenced media file
+        // so its standalone whole-file row is suppressed below in favor of
+        // one row per CUE track (see `sync_cue_tracks`).
+        let cue_jobs = resolve_cue_jobs(&cue_paths, &all_paths);
+        if !cue_jobs.is_empty() {
+            let claimed: std::collections::HashSet<&PathBuf> =
+                cue_jobs.iter().map(|j| &j.media_path).collect();
+            all_paths.retain(|p| !claimed.contains(p));
+        }
+
+        let total = (all_paths.len() + cue_jobs.len()) as u64;
+        log::info!(
+            "Scan found {total} audio track source(s) ({} plain file(s), {} CUE sheet(s)) (force={force})",
+            all_paths.len(),
+            cue_jobs.len()
+        );
 
         // Phase 2: read tags
         on_progress(ScanProgress {
@@ -543,6 +575,45 @@ impl CollectionScanner {
                             scanned,
                             total,
                             current_path: Some(path.to_string_lossy().to_string()),
+                            silent,
+                        });
+                    }
+                }
+                tx.commit()?;
+            }
+
+            // CUE-derived songs (#78) — a separate pass from the main per-file
+            // loop above because one CUE sheet fans out into N `songs` rows
+            // that all share its media file's `path`, so it can't go through
+            // `read_and_prepare_song`/`upsert_song`'s one-row-per-path shape.
+            if !cue_jobs.is_empty() {
+                let tx = conn.unchecked_transaction()?;
+                for job in &cue_jobs {
+                    let path_str = job.media_path.to_string_lossy().to_string();
+                    let combined_mtime = get_mtime(&job.media_path)
+                        .unwrap_or(0)
+                        .max(get_mtime(&job.cue_path).unwrap_or(0));
+
+                    if !force && known_mtimes.get(&path_str) == Some(&combined_mtime) {
+                        scanned += 1;
+                        continue;
+                    }
+
+                    match sync_cue_tracks(&tx, &cover_manager, job, combined_mtime) {
+                        Ok(()) => {}
+                        Err(e) => log::warn!(
+                            "Failed to parse CUE sheet {}: {e}",
+                            job.cue_path.display()
+                        ),
+                    }
+
+                    scanned += 1;
+                    if scanned.is_multiple_of(50) || scanned == total {
+                        on_progress(ScanProgress {
+                            phase: ScanPhase::ReadingTags,
+                            scanned,
+                            total,
+                            current_path: Some(job.cue_path.to_string_lossy().to_string()),
                             silent,
                         });
                     }
@@ -718,6 +789,13 @@ pub(crate) fn is_audio_file(path: &Path) -> bool {
     path.extension()
         .and_then(|e| e.to_str())
         .map(|e| AUDIO_EXTENSIONS.contains(&e.to_ascii_lowercase().as_str()))
+        .unwrap_or(false)
+}
+
+fn is_cue_file(path: &Path) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.eq_ignore_ascii_case("cue"))
         .unwrap_or(false)
 }
 
@@ -1118,6 +1196,147 @@ pub(crate) fn read_and_prepare_song(cover_manager: &CoverManager, path: &Path) -
     Ok(song)
 }
 
+// ---------------------------------------------------------------------------
+// CUE sheet support (#78) — classic single-media-file case only. A CUE sheet
+// with more than one `FILE` line (one physical file per track) is a
+// different, far more common shape in the wild — ordinary per-file tagged
+// rips that happen to ship a CUE alongside them — and is left to be scanned
+// as plain per-file tracks; see `cue::parse_single_file_cue`.
+// ---------------------------------------------------------------------------
+
+/// A CUE sheet resolved against the files an audio-directory walk actually
+/// found: `media_path` is the real, correctly-cased path of the file it
+/// claims (case-insensitive match against the CUE's own `FILE` line, since
+/// rips in the wild frequently disagree with the filesystem's exact casing).
+pub(crate) struct CueJob {
+    pub cue_path: PathBuf,
+    pub media_path: PathBuf,
+    pub sheet: crate::cue::CueSheet,
+}
+
+/// Parses every CUE sheet in `cue_paths` and resolves each classic
+/// single-`FILE` sheet's referenced media file against `audio_paths` (the
+/// audio files a scan already discovered) by case-insensitive path match.
+/// Sheets that fail to parse, aren't the classic single-file case, or whose
+/// media file wasn't itself found as an audio file are silently skipped —
+/// they're left to be scanned as ordinary standalone files.
+pub(crate) fn resolve_cue_jobs(cue_paths: &[PathBuf], audio_paths: &[PathBuf]) -> Vec<CueJob> {
+    let audio_by_lower: HashMap<String, &PathBuf> = audio_paths
+        .iter()
+        .map(|p| (p.to_string_lossy().to_lowercase(), p))
+        .collect();
+
+    let mut jobs = Vec::new();
+    for cue_path in cue_paths {
+        let Some(dir) = cue_path.parent() else {
+            continue;
+        };
+        let Ok(text) = std::fs::read_to_string(cue_path) else {
+            continue;
+        };
+        let Some(sheet) = crate::cue::parse_single_file_cue(&text) else {
+            continue;
+        };
+        let candidate = dir.join(&sheet.media_file);
+        let Some(media_path) = audio_by_lower.get(&candidate.to_string_lossy().to_lowercase())
+        else {
+            continue;
+        };
+        jobs.push(CueJob {
+            cue_path: cue_path.clone(),
+            media_path: (**media_path).clone(),
+            sheet,
+        });
+    }
+    jobs
+}
+
+/// Builds one `Song` per track in `job.sheet`, based on the media file's own
+/// whole-file tags (album art, genre, MusicBrainz IDs, ReplayGain, audio
+/// properties, etc. — all shared across every track cut from the same file)
+/// with per-track title/performer/track-number/offsets from the CUE sheet
+/// layered on top.
+fn build_cue_songs(cover_manager: &CoverManager, job: &CueJob, mtime: i64) -> Result<Vec<Song>> {
+    let base = read_and_prepare_song(cover_manager, &job.media_path)?;
+    let cue_path_str = job.cue_path.to_string_lossy().to_string();
+    let album = job.sheet.album_title.clone().or_else(|| base.album.clone());
+    let album_artist = job
+        .sheet
+        .album_performer
+        .clone()
+        .or_else(|| base.album_artist.clone());
+
+    let tracks = &job.sheet.tracks;
+    let mut songs = Vec::with_capacity(tracks.len());
+    for (i, track) in tracks.iter().enumerate() {
+        // The next track's INDEX 01 is this track's end boundary; the final
+        // track has none, so it plays to the end of the file (end_nanosec = 0
+        // means "no cutoff", consistent with plain, non-CUE songs).
+        let end_nanosec = tracks.get(i + 1).map(|next| next.start_nanosec).unwrap_or(0);
+        let length_nanosec = if end_nanosec > 0 {
+            Some(end_nanosec - track.start_nanosec)
+        } else {
+            base.length_nanosec
+                .map(|len| (len - track.start_nanosec).max(0))
+        };
+
+        songs.push(Song {
+            title: track
+                .title
+                .clone()
+                .or_else(|| Some(format!("Track {:02}", track.number))),
+            artist: track
+                .performer
+                .clone()
+                .or_else(|| album_artist.clone())
+                .or_else(|| base.artist.clone()),
+            album_artist: album_artist.clone(),
+            album: album.clone(),
+            track: Some(track.number),
+            beginning_nanosec: track.start_nanosec,
+            end_nanosec,
+            length_nanosec,
+            cue_path: Some(cue_path_str.clone()),
+            mtime: Some(mtime),
+            ..base.clone()
+        });
+    }
+    Ok(songs)
+}
+
+/// Re-parses `job`'s CUE sheet and upserts one row per track, deleting any
+/// previously-stored CUE track for this (media file, CUE sheet) pair whose
+/// start offset no longer appears in the freshly parsed sheet — e.g. the CUE
+/// was hand-edited to merge or drop a track since the last scan.
+fn sync_cue_tracks(
+    conn: &rusqlite::Connection,
+    cover_manager: &CoverManager,
+    job: &CueJob,
+    mtime: i64,
+) -> Result<()> {
+    let songs = build_cue_songs(cover_manager, job, mtime)?;
+    let path_str = job.media_path.to_string_lossy().to_string();
+    let cue_path_str = job.cue_path.to_string_lossy().to_string();
+
+    let starts: Vec<i64> = songs.iter().map(|s| s.beginning_nanosec).collect();
+    if !starts.is_empty() {
+        let placeholders = vec!["?"; starts.len()].join(",");
+        let sql = format!(
+            "DELETE FROM songs WHERE path = ? AND cue_path = ? AND beginning_nanosec NOT IN ({placeholders})"
+        );
+        let mut sql_params: Vec<&dyn rusqlite::ToSql> = vec![&path_str, &cue_path_str];
+        for start in &starts {
+            sql_params.push(start);
+        }
+        conn.execute(&sql, sql_params.as_slice())?;
+    }
+
+    for song in &songs {
+        upsert_song(conn, song)?;
+    }
+    Ok(())
+}
+
 pub(crate) fn read_and_upsert_song(
     conn: &rusqlite::Connection,
     cover_manager: &CoverManager,
@@ -1178,7 +1397,7 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
     conn.execute(
         &format!(
             "INSERT INTO songs ({}) VALUES ({})
-                  ON CONFLICT(path) DO UPDATE SET
+                  ON CONFLICT(path, beginning_nanosec) DO UPDATE SET
                     title=excluded.title, titlesort=excluded.titlesort,
                     artist=excluded.artist, artistsort=excluded.artistsort,
                     album=excluded.album, albumsort=excluded.albumsort,
@@ -1191,12 +1410,14 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
                     compilation=excluded.compilation,
                     grouping=excluded.grouping, bpm=excluded.bpm, initial_key=excluded.initial_key,
                     length_nanosec=excluded.length_nanosec,
+                    end_nanosec=excluded.end_nanosec,
                     bitrate=excluded.bitrate, samplerate=excluded.samplerate,
                     channels=excluded.channels, bitdepth=excluded.bitdepth,
                     filesize=excluded.filesize, mtime=excluded.mtime,
                     art_embedded=excluded.art_embedded,
                     art_automatic=excluded.art_automatic,
                     art_unset=excluded.art_unset,
+                    cue_path=excluded.cue_path,
                     filetype=excluded.filetype, source=excluded.source,
                     replaygain_track_gain=excluded.replaygain_track_gain,
                     replaygain_album_gain=excluded.replaygain_album_gain,
@@ -1242,6 +1463,8 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
             song.bpm,
             song.initial_key,
             song.length_nanosec,
+            song.beginning_nanosec,
+            song.end_nanosec,
             song.bitrate,
             song.samplerate,
             song.channels,
@@ -1251,6 +1474,7 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
             song.art_embedded,
             song.art_automatic,
             song.art_unset,
+            song.cue_path,
             song.replaygain_track_gain,
             song.replaygain_album_gain,
             song.is_vbr,
@@ -1360,8 +1584,9 @@ const SONG_INSERT_COLS: &str = "
     source, filetype, path, title, titlesort, artist, artistsort, album, albumsort, album_artist, album_artist_sort,
     composer, composersort, lyrics, comment, track, disc, year, originalyear, genre, genresort, compilation,
     grouping, bpm, initial_key,
-    length_nanosec, bitrate, samplerate, channels, bitdepth,
+    length_nanosec, beginning_nanosec, end_nanosec, bitrate, samplerate, channels, bitdepth,
     filesize, mtime, art_embedded, art_automatic, art_unset,
+    cue_path,
     replaygain_track_gain, replaygain_album_gain, is_vbr,
     musicbrainz_artist_id, musicbrainz_album_artist_id, musicbrainz_album_id,
     musicbrainz_release_group_id, musicbrainz_recording_id, musicbrainz_track_id,
@@ -1370,7 +1595,7 @@ const SONG_INSERT_COLS: &str = "
 ";
 
 const SONG_INSERT_PLACEHOLDERS: &str =
-    "?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33,?34,?35,?36,?37,?38,?39,?40,?41,?42,?43,?44,?45,?46,?47,?48,?49";
+    "?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33,?34,?35,?36,?37,?38,?39,?40,?41,?42,?43,?44,?45,?46,?47,?48,?49,?50,?51,?52";
 
 pub(crate) fn row_to_song(row: &rusqlite::Row) -> rusqlite::Result<Song> {
     row_to_song_at(row, 0)
@@ -2486,6 +2711,105 @@ mod tests {
             song.lyrics,
             Some("[00:05.00] Sidecar lyric line".to_string())
         );
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[tokio::test]
+    async fn test_scan_classic_cue_sheet_produces_one_row_per_track_and_suppresses_whole_file_row(
+    ) {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_cue_scan_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let _ = std::fs::create_dir_all(&temp_dir);
+
+        let audio_path = temp_dir.join("album.wav");
+        write_test_wav(&audio_path);
+
+        let cue_path = temp_dir.join("album.cue");
+        std::fs::write(
+            &cue_path,
+            concat!(
+                "PERFORMER \"Test Artist\"\n",
+                "TITLE \"Test Album\"\n",
+                "FILE \"album.wav\" WAVE\n",
+                "  TRACK 01 AUDIO\n",
+                "    TITLE \"First\"\n",
+                "    INDEX 01 00:00:00\n",
+                "  TRACK 02 AUDIO\n",
+                "    TITLE \"Second\"\n",
+                "    INDEX 01 00:05:00\n",
+            ),
+        )
+        .unwrap();
+
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let scanner = CollectionScanner::new(Arc::clone(&db));
+        scanner.add_directory(&temp_dir.to_string_lossy()).unwrap();
+
+        scanner
+            .scan_all_core(temp_dir.clone(), true, true, false, |_| {})
+            .await
+            .unwrap();
+
+        let conn = db.pool.get().unwrap();
+        let path_str = audio_path.to_string_lossy().to_string();
+        let mut stmt = conn
+            .prepare(
+                "SELECT title, track, beginning_nanosec, end_nanosec, cue_path, artist, album
+                 FROM songs WHERE path = ?1 ORDER BY beginning_nanosec",
+            )
+            .unwrap();
+        #[allow(clippy::type_complexity)]
+        let rows: Vec<(
+            Option<String>,
+            Option<i32>,
+            i64,
+            i64,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+        )> = stmt
+            .query_map(params![path_str], |r| {
+                Ok((
+                    r.get(0)?,
+                    r.get(1)?,
+                    r.get(2)?,
+                    r.get(3)?,
+                    r.get(4)?,
+                    r.get(5)?,
+                    r.get(6)?,
+                ))
+            })
+            .unwrap()
+            .filter_map(|r| r.ok())
+            .collect();
+
+        assert_eq!(
+            rows.len(),
+            2,
+            "expected exactly the two CUE tracks, no standalone whole-file row"
+        );
+
+        assert_eq!(rows[0].0.as_deref(), Some("First"));
+        assert_eq!(rows[0].1, Some(1));
+        assert_eq!(rows[0].2, 0);
+        assert_eq!(rows[0].3, 5_000_000_000); // next track's INDEX 01 (5s)
+        assert_eq!(
+            rows[0].4.as_deref(),
+            Some(cue_path.to_string_lossy().to_string().as_str())
+        );
+        assert_eq!(rows[0].5.as_deref(), Some("Test Artist"));
+        assert_eq!(rows[0].6.as_deref(), Some("Test Album"));
+
+        assert_eq!(rows[1].0.as_deref(), Some("Second"));
+        assert_eq!(rows[1].1, Some(2));
+        assert_eq!(rows[1].2, 5_000_000_000);
+        assert_eq!(rows[1].3, 0, "last track should play to EOF (no cutoff)");
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }

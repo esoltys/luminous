@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 32;
+pub const CURRENT_SCHEMA_VERSION: i32 = 33;
 
 struct Migration {
     version: i32,
@@ -241,6 +241,11 @@ const MIGRATIONS: &[Migration] = &[
             }
             Ok(())
         },
+    },
+    Migration {
+        version: 33,
+        description: "relax songs.path from UNIQUE to UNIQUE(path, beginning_nanosec) for CUE sheet tracks (#78)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_33)?),
     },
 ];
 
@@ -947,6 +952,141 @@ ALTER TABLE play_history ADD COLUMN duration_secs INTEGER NOT NULL DEFAULT 0;
 ";
 
 // ---------------------------------------------------------------------------
+// Migration 33: relax `songs.path` from a plain UNIQUE column to a composite
+// UNIQUE(path, beginning_nanosec) index, so multiple CUE sheet tracks (#78)
+// can share one physical media file's path — differentiated by their INDEX 01
+// start offset. Plain (non-CUE) songs keep beginning_nanosec = 0, so their
+// uniqueness is unaffected.
+//
+// SQLite has no `ALTER TABLE ... DROP CONSTRAINT`, so this does the standard
+// SQLite table rebuild: create `songs_new` without the column-level UNIQUE,
+// copy every row across positionally (`SELECT *`, since `songs_new` has the
+// exact same columns as the live `songs` table in the same order), drop the
+// old table, and rename. The whole rebuild is one transaction, so a crash
+// mid-migration leaves the original `songs` table untouched rather than
+// half-renamed. `PRAGMA foreign_keys` is toggled off/on around (not inside)
+// that transaction, per SQLite's rule that it can't change mid-transaction —
+// other tables' `REFERENCES songs(id)` stay valid across the rebuild since
+// every row keeps its original `id`, and SQLite re-syncs the AUTOINCREMENT
+// sequence and the `sqlite_sequence` name entry automatically on RENAME TO.
+// ---------------------------------------------------------------------------
+const MIGRATION_33: &str = "
+PRAGMA foreign_keys=OFF;
+DROP TABLE IF EXISTS songs_new;
+BEGIN TRANSACTION;
+CREATE TABLE songs_new (
+    id                                INTEGER PRIMARY KEY AUTOINCREMENT,
+    source                            INTEGER NOT NULL DEFAULT 0,
+    filetype                          INTEGER NOT NULL DEFAULT 0,
+    path                              TEXT,
+    url                               TEXT,
+    stream_url                        TEXT,
+    title                             TEXT,
+    titlesort                         TEXT,
+    artist                            TEXT,
+    artistsort                        TEXT,
+    album                             TEXT,
+    albumsort                         TEXT,
+    album_artist                      TEXT,
+    album_artist_sort                 TEXT,
+    composer                          TEXT,
+    composersort                      TEXT,
+    performer                         TEXT,
+    performersort                     TEXT,
+    grouping                          TEXT,
+    comment                           TEXT,
+    lyrics                            TEXT,
+    track                             INTEGER,
+    disc                              INTEGER,
+    year                              INTEGER,
+    originalyear                      INTEGER,
+    genre                             TEXT,
+    compilation                       BOOLEAN NOT NULL DEFAULT 0,
+    bpm                               REAL,
+    initial_key                       TEXT,
+    length_nanosec                    INTEGER,
+    beginning_nanosec                 INTEGER NOT NULL DEFAULT 0,
+    end_nanosec                       INTEGER NOT NULL DEFAULT 0,
+    bitrate                           INTEGER,
+    samplerate                        INTEGER,
+    bitdepth                          INTEGER,
+    channels                          INTEGER,
+    filesize                          INTEGER,
+    mtime                             INTEGER,
+    rating                            REAL NOT NULL DEFAULT -1,
+    playcount                         INTEGER NOT NULL DEFAULT 0,
+    skipcount                         INTEGER NOT NULL DEFAULT 0,
+    lastplayed                        INTEGER,
+    lastseen                          INTEGER,
+    art_embedded                      BOOLEAN NOT NULL DEFAULT 0,
+    art_automatic                     TEXT,
+    art_manual                        TEXT,
+    art_unset                         BOOLEAN NOT NULL DEFAULT 0,
+    cue_path                          TEXT,
+    musicbrainz_album_artist_id       TEXT,
+    musicbrainz_artist_id             TEXT,
+    musicbrainz_original_artist_id    TEXT,
+    musicbrainz_album_id              TEXT,
+    musicbrainz_original_album_id     TEXT,
+    musicbrainz_recording_id          TEXT,
+    musicbrainz_track_id              TEXT,
+    musicbrainz_disc_id               TEXT,
+    musicbrainz_release_group_id      TEXT,
+    musicbrainz_work_id               TEXT,
+    ebur128_integrated_loudness_lufs  REAL,
+    ebur128_loudness_range_lu         REAL,
+    artist_id                         TEXT,
+    album_id                          TEXT,
+    song_id                           TEXT,
+    added                             INTEGER DEFAULT (strftime('%s', 'now')),
+    unavailable                       BOOLEAN NOT NULL DEFAULT 0,
+    replaygain_track_gain             REAL,
+    replaygain_album_gain             REAL,
+    is_vbr                            BOOLEAN,
+    is_instrumental                   BOOLEAN NOT NULL DEFAULT 0,
+    genresort                         TEXT,
+    not_included                      BOOLEAN NOT NULL DEFAULT 0,
+    musicbrainz_release_type          TEXT,
+    musicbrainz_release_country       TEXT,
+    barcode                           TEXT,
+    catalog_number                    TEXT
+);
+INSERT INTO songs_new SELECT * FROM songs;
+DROP TABLE songs;
+ALTER TABLE songs_new RENAME TO songs;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_songs_path_begin ON songs(path, beginning_nanosec);
+CREATE INDEX IF NOT EXISTS idx_songs_artist   ON songs(artist);
+CREATE INDEX IF NOT EXISTS idx_songs_album    ON songs(album);
+CREATE INDEX IF NOT EXISTS idx_songs_genre    ON songs(genre);
+CREATE INDEX IF NOT EXISTS idx_songs_mtime    ON songs(mtime);
+CREATE INDEX IF NOT EXISTS idx_songs_source   ON songs(source);
+
+CREATE TRIGGER IF NOT EXISTS songs_ai AFTER INSERT ON songs BEGIN
+    INSERT INTO songs_fts(rowid, title, artist, album, album_artist, composer, performer, genre)
+    VALUES (new.id, new.title, new.artist, new.album, new.album_artist,
+            new.composer, new.performer, new.genre);
+END;
+
+CREATE TRIGGER IF NOT EXISTS songs_ad AFTER DELETE ON songs BEGIN
+    INSERT INTO songs_fts(songs_fts, rowid, title, artist, album, album_artist, composer, performer, genre)
+    VALUES ('delete', old.id, old.title, old.artist, old.album, old.album_artist,
+            old.composer, old.performer, old.genre);
+END;
+
+CREATE TRIGGER IF NOT EXISTS songs_au AFTER UPDATE ON songs BEGIN
+    INSERT INTO songs_fts(songs_fts, rowid, title, artist, album, album_artist, composer, performer, genre)
+    VALUES ('delete', old.id, old.title, old.artist, old.album, old.album_artist,
+            old.composer, old.performer, old.genre);
+    INSERT INTO songs_fts(rowid, title, artist, album, album_artist, composer, performer, genre)
+    VALUES (new.id, new.title, new.artist, new.album, new.album_artist,
+            new.composer, new.performer, new.genre);
+END;
+COMMIT;
+PRAGMA foreign_keys=ON;
+";
+
+// ---------------------------------------------------------------------------
 // Migration 18: tag_groups/tag_assignments — a persisted, curatable Genres
 // hierarchy (#545) layered on top of the existing `songs.genre` string
 // column. `songs.genre` remains the source of truth for which songs carry
@@ -1175,6 +1315,128 @@ mod tests {
             "reopening should have re-run migration 23 and healed the gap"
         );
 
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_migration_33_relaxes_path_uniqueness_for_cue_tracks() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_migration33_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&temp_dir).unwrap();
+        let db_path = temp_dir.join("luminous.db");
+
+        // Build the pre-migration-33 schema by replaying every earlier
+        // migration directly, exactly as `run_migrations` would have left a
+        // real database that was last opened before this migration existed.
+        {
+            let manager = SqliteConnectionManager::file(&db_path);
+            let pool = r2d2::Pool::builder().max_size(1).build(manager).unwrap();
+            let conn = pool.get().unwrap();
+            conn.execute_batch("PRAGMA foreign_keys=ON;").unwrap();
+            conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY);",
+            )
+            .unwrap();
+            for migration in MIGRATIONS.iter().filter(|m| m.version < 33) {
+                (migration.apply)(&conn).unwrap();
+                conn.execute(
+                    "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
+                    params![migration.version],
+                )
+                .unwrap();
+            }
+
+            conn.execute(
+                "INSERT INTO songs (path, title) VALUES ('shared.flac', 'Whole File')",
+                [],
+            )
+            .unwrap();
+            let webdav_song_id: i64 = conn.query_row(
+                "SELECT id FROM songs WHERE path = 'shared.flac'",
+                [],
+                |r| r.get(0),
+            ).unwrap();
+
+            // The pre-migration-33 schema must still enforce UNIQUE(path).
+            let dup = conn.execute(
+                "INSERT INTO songs (path, title, beginning_nanosec) VALUES ('shared.flac', 'Track 2', 5)",
+                [],
+            );
+            assert!(dup.is_err(), "old schema should still reject a bare duplicate path");
+
+            // A row with a foreign key into songs(id), to confirm the rebuild
+            // doesn't orphan or corrupt it.
+            conn.execute(
+                "INSERT INTO webdav_servers (id, name, url) VALUES (1, 'test', 'https://example.com')",
+                [],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO webdav_cache (server_id, remote_path, song_id) VALUES (1, '/shared.flac', ?1)",
+                params![webdav_song_id],
+            )
+            .unwrap();
+        }
+
+        // Reopening through the normal path runs (only) migration 33.
+        let db = Database::new(temp_dir.clone()).unwrap();
+        assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
+        let conn = db.pool.get().unwrap();
+
+        let (title, id): (String, i64) = conn
+            .query_row(
+                "SELECT title, id FROM songs WHERE path = 'shared.flac' AND beginning_nanosec = 0",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(title, "Whole File");
+
+        let cached_song_id: i64 = conn
+            .query_row(
+                "SELECT song_id FROM webdav_cache WHERE remote_path = '/shared.flac'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            cached_song_id, id,
+            "foreign key into songs(id) must survive the table rebuild"
+        );
+
+        // The new schema must allow a CUE sibling: same path, different
+        // beginning_nanosec.
+        conn.execute(
+            "INSERT INTO songs (path, title, beginning_nanosec) VALUES ('shared.flac', 'Track 2', 5)",
+            [],
+        )
+        .unwrap();
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM songs WHERE path = 'shared.flac'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 2);
+
+        // But an exact duplicate (same path AND beginning_nanosec) is still rejected.
+        let dup2 = conn.execute(
+            "INSERT INTO songs (path, title, beginning_nanosec) VALUES ('shared.flac', 'Track 2 Again', 5)",
+            [],
+        );
+        assert!(
+            dup2.is_err(),
+            "new schema should still reject an exact (path, beginning_nanosec) duplicate"
+        );
+
+        drop(conn);
+        drop(db);
         let _ = std::fs::remove_dir_all(temp_dir);
     }
 

@@ -845,6 +845,7 @@ export const fr = {
     readFailed: "Échec de la lecture des tags",
     locationField: "Emplacement",
     remoteSourceNote: "Ce morceau se trouve sur un serveur WebDAV. Les modifications ne sont enregistrées que dans Luminous — le fichier sur le serveur ne sera pas modifié.",
+    cueTrackNote: "Les tags de ce morceau proviennent de son fichier CUE, et non du fichier audio lui-même — ils ne peuvent pas encore être modifiés ici.",
     albumArtistField: "Artiste de l'album",
     albumArtistPlaceholder: "Ajouter un artiste de l'album...",
     albumArtistTooltip: "Artiste principal crédité pour l'album entier, utile pour les compilations",

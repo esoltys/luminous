@@ -16,6 +16,7 @@ pub mod collection;
 pub mod commands;
 pub mod context;
 pub mod covermanager;
+pub mod cue;
 pub mod db;
 pub mod equalizer;
 pub mod filter_parser;
