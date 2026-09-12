@@ -111,6 +111,7 @@
     switch (playerStore.loudnessSource) {
       case "analyzed": return i18n.t('playerBar.loudnessSourceAnalyzed', {}, 'R128 analysis');
       case "replay_gain": return i18n.t('playerBar.loudnessSourceReplayGain', {}, 'ReplayGain tag');
+      case "dynamic_range_log": return i18n.t('playerBar.loudnessSourceDynamicRangeLog', {}, 'DR Log');
       case "fallback": return i18n.t('playerBar.loudnessSourceFallback', {}, 'Fallback gain');
       default: return "";
     }
@@ -120,6 +121,21 @@
     const gain = playerStore.loudnessGainDb;
     if (gain === undefined) return "";
     return `${gain > 0 ? "+" : ""}${gain.toFixed(1)} dB`;
+  });
+
+  // Per-track DR/Peak/RMS parsed from a foobar2000 foo_dr.txt log (#57) —
+  // shown alongside Loudness since Peak/RMS feed that gain calculation as a
+  // last-resort fallback source.
+  let dynamicRangeText = $derived.by(() => {
+    if (!currentSong?.dynamic_range) return "";
+    const parts = [`DR${currentSong.dynamic_range}`];
+    if (currentSong.dynamic_range_peak != null) {
+      parts.push(i18n.t('playerBar.dynamicRangePeak', { value: currentSong.dynamic_range_peak.toFixed(1) }, `Peak ${currentSong.dynamic_range_peak.toFixed(1)} dB`));
+    }
+    if (currentSong.dynamic_range_rms != null) {
+      parts.push(i18n.t('playerBar.dynamicRangeRms', { value: currentSong.dynamic_range_rms.toFixed(1) }, `RMS ${currentSong.dynamic_range_rms.toFixed(1)} dB`));
+    }
+    return parts.join(" · ");
   });
 
   function lyricsStatusLabel(): string {
@@ -390,6 +406,12 @@
             <div class="flex items-start justify-between gap-3 text-xs">
               <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.loudnessLabel', {}, 'Loudness')}</span>
               <span class="text-brand-text-primary text-right break-words min-w-0">{loudnessSourceLabel()}{loudnessGainText ? ` · ${loudnessGainText}` : ""}</span>
+            </div>
+          {/if}
+          {#if currentSong.dynamic_range != null}
+            <div class="flex items-start justify-between gap-3 text-xs">
+              <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.dynamicRangeLabel', {}, 'Dynamic Range')}</span>
+              <span class="text-brand-text-primary text-right break-words min-w-0">{dynamicRangeText}</span>
             </div>
           {/if}
           <div class="flex items-start justify-between gap-3 text-xs">

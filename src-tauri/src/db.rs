@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 32;
+pub const CURRENT_SCHEMA_VERSION: i32 = 33;
 
 struct Migration {
     version: i32,
@@ -238,6 +238,19 @@ const MIGRATIONS: &[Migration] = &[
                 .exists([])?;
             if !has_duration_secs {
                 conn.execute_batch(MIGRATION_32)?;
+            }
+            Ok(())
+        },
+    },
+    Migration {
+        version: 33,
+        description: "dynamic range columns from foo_dr.txt DR Meter logs (#57)",
+        apply: |conn| {
+            let has_dynamic_range: bool = conn
+                .prepare("SELECT 1 FROM pragma_table_info('songs') WHERE name = 'dynamic_range'")?
+                .exists([])?;
+            if !has_dynamic_range {
+                conn.execute_batch(MIGRATION_33)?;
             }
             Ok(())
         },
@@ -944,6 +957,25 @@ ALTER TABLE webdav_servers ADD COLUMN color TEXT;
 // ---------------------------------------------------------------------------
 const MIGRATION_32: &str = "
 ALTER TABLE play_history ADD COLUMN duration_secs INTEGER NOT NULL DEFAULT 0;
+";
+
+// ---------------------------------------------------------------------------
+// Migration 33: dynamic range columns from foo_dr.txt DR Meter logs (#57).
+// `dynamic_range`/`_peak`/`_rms` are per-track figures matched from the log's
+// table; `dynamic_range_album` is the log's album-wide "Official DR value"
+// (or "Weighted" variant), duplicated onto every song in the folder since
+// there's no dedicated albums table (album-level fields like `album_artist`
+// already follow this convention). `dr_log_mtime` is scanner bookkeeping
+// only (not exposed to the frontend) — the modification time of the
+// `foo_dr.txt` this song's row was last parsed from, so `collection.rs` can
+// skip re-parsing a folder whose log hasn't changed since the last scan.
+// ---------------------------------------------------------------------------
+const MIGRATION_33: &str = "
+ALTER TABLE songs ADD COLUMN dynamic_range INTEGER;
+ALTER TABLE songs ADD COLUMN dynamic_range_peak REAL;
+ALTER TABLE songs ADD COLUMN dynamic_range_rms REAL;
+ALTER TABLE songs ADD COLUMN dynamic_range_album INTEGER;
+ALTER TABLE songs ADD COLUMN dr_log_mtime INTEGER;
 ";
 
 // ---------------------------------------------------------------------------

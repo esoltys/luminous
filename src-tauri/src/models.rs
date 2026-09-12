@@ -290,6 +290,16 @@ pub struct Song {
     pub replaygain_track_gain: Option<f64>,
     pub replaygain_album_gain: Option<f64>,
 
+    // Dynamic Range Meter log fallback (#57) — per-track DR rating, Peak,
+    // and RMS parsed from a foobar2000 `foo_dr.txt` sidecar. Peak/RMS serve
+    // as a last-resort loudness gain source when neither R128 analysis nor
+    // a ReplayGain tag is available. `dynamic_range_album` is the log's
+    // album-wide DR rating, duplicated onto every song in the folder.
+    pub dynamic_range: Option<i32>,
+    pub dynamic_range_peak: Option<f64>,
+    pub dynamic_range_rms: Option<f64>,
+    pub dynamic_range_album: Option<i32>,
+
     // Streaming service IDs
     pub artist_id: Option<String>,
     pub album_id: Option<String>,
@@ -661,7 +671,11 @@ pub enum LoudnessGainSource {
     Analyzed,
     /// Gain derived from a ReplayGain tag (no R128 analysis yet).
     ReplayGain,
-    /// Neither analysis nor a tag is available — the fixed fallback gain.
+    /// Gain derived from a foo_dr.txt DR Meter log's Peak/RMS (#57) — no
+    /// R128 analysis or ReplayGain tag is available.
+    DynamicRangeLog,
+    /// Neither analysis, a tag, nor a DR log is available — the fixed
+    /// fallback gain.
     Fallback,
 }
 
