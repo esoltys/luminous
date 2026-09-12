@@ -181,6 +181,12 @@
     return h > 0 ? `${h}h ${m}m` : `${m}m`;
   });
 
+  // Album-wide DR rating parsed from a foobar2000 foo_dr.txt log (#57),
+  // duplicated onto every song in the folder — any track carries it.
+  let albumDynamicRange = $derived.by(() =>
+    songs.find((s) => s.dynamic_range_album != null)?.dynamic_range_album,
+  );
+
   $effect(() => {
     const requested = albumName;
     loading = true;
@@ -452,6 +458,10 @@
           <span>{songs.length === 1 ? i18n.t('playlists.oneSong') : i18n.t('playlists.songsCount', { count: songs.length })}</span>
           <span>•</span>
           <span>{totalDurationLabel}</span>
+          {#if albumDynamicRange != null}
+            <span>•</span>
+            <span>{i18n.t('albumDetail.dynamicRange', { value: albumDynamicRange }, `Album DR: ${albumDynamicRange}`)}</span>
+          {/if}
           {#if albumItem}
             <span>•</span>
             <SongRating rating={albumItem.rating} onRate={rateAlbum} size="sm" />

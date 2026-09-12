@@ -111,6 +111,7 @@
     switch (playerStore.loudnessSource) {
       case "analyzed": return i18n.t('playerBar.loudnessSourceAnalyzed', {}, 'R128 analysis');
       case "replay_gain": return i18n.t('playerBar.loudnessSourceReplayGain', {}, 'ReplayGain tag');
+      case "dynamic_range_log": return i18n.t('playerBar.loudnessSourceDynamicRangeLog', {}, 'DR Log');
       case "fallback": return i18n.t('playerBar.loudnessSourceFallback', {}, 'Fallback gain');
       default: return "";
     }

@@ -87,13 +87,16 @@ pub struct GainResult {
 /// Compute the gain to apply for a track, given whatever loudness
 /// information is available and the user's settings. Priority: measured R128
 /// loudness -> ReplayGain tag (track/album per `settings.mode`, falling back
-/// to the other if the preferred one is missing) -> fixed fallback gain. The
-/// result is clamped to a sane range to guard against runaway gain from bad
-/// tags or measurements.
+/// to the other if the preferred one is missing) -> DR Meter log Peak/RMS
+/// (#57) -> fixed fallback gain. The result is clamped to a sane range to
+/// guard against runaway gain from bad tags or measurements.
+#[allow(clippy::too_many_arguments)]
 pub fn compute_gain(
     measured_lufs: Option<f64>,
     rg_track_gain: Option<f64>,
     rg_album_gain: Option<f64>,
+    dr_rms_db: Option<f64>,
+    dr_peak_db: Option<f64>,
     settings: &LoudnessSettings,
 ) -> GainResult {
     let target = settings.target_lufs as f64;
@@ -111,10 +114,17 @@ pub fn compute_gain(
             // ReplayGain tags are stored normalized to the -18 LUFS RG
             // reference; adjust by the difference to the user's target.
             Some(rg_db) => (rg_db + (target + 18.0), LoudnessGainSource::ReplayGain),
-            None => (
-                settings.fallback_gain_db as f64,
-                LoudnessGainSource::Fallback,
-            ),
+            None => match (dr_rms_db, dr_peak_db) {
+                // Aim for the target loudness from RMS, but never boost
+                // past the point where Peak would clip (0 dBFS headroom).
+                (Some(rms), Some(peak)) if rms.is_finite() && peak.is_finite() => {
+                    (f64::min(target - rms, -peak), LoudnessGainSource::DynamicRangeLog)
+                }
+                _ => (
+                    settings.fallback_gain_db as f64,
+                    LoudnessGainSource::Fallback,
+                ),
+            },
         }
     };
 
@@ -354,7 +364,7 @@ mod tests {
     fn measured_loudness_takes_priority() {
         let s = settings(-18.0, LoudnessMode::Track, -6.0);
         // Track measured at -12 LUFS needs -6 dB to reach -18 target.
-        let result = compute_gain(Some(-12.0), Some(3.0), None, &s);
+        let result = compute_gain(Some(-12.0), Some(3.0), None, None, None, &s);
         let expected = 10f32.powf(-6.0 / 20.0);
         assert!(
             (result.linear - expected).abs() < 1e-3,
@@ -368,7 +378,7 @@ mod tests {
     fn replaygain_tag_used_when_unanalyzed() {
         let s = settings(-18.0, LoudnessMode::Track, -6.0);
         // At the -18 LUFS reference (== target), RG gain applies unmodified.
-        let result = compute_gain(None, Some(-4.0), None, &s);
+        let result = compute_gain(None, Some(-4.0), None, None, None, &s);
         let expected = 10f32.powf(-4.0 / 20.0);
         assert!(
             (result.linear - expected).abs() < 1e-3,
@@ -383,7 +393,7 @@ mod tests {
         // Target is 4 dB louder than the RG reference (-18 -> -14), so the
         // effective gain shifts up by 4 dB.
         let s = settings(-14.0, LoudnessMode::Track, -6.0);
-        let result = compute_gain(None, Some(-4.0), None, &s);
+        let result = compute_gain(None, Some(-4.0), None, None, None, &s);
         let expected = 10f32.powf(0.0 / 20.0);
         assert!(
             (result.linear - expected).abs() < 1e-3,
@@ -395,7 +405,7 @@ mod tests {
     #[test]
     fn falls_back_when_nothing_available() {
         let s = settings(-18.0, LoudnessMode::Track, -6.0);
-        let result = compute_gain(None, None, None, &s);
+        let result = compute_gain(None, None, None, None, None, &s);
         let expected = 10f32.powf(-6.0 / 20.0);
         assert!(
             (result.linear - expected).abs() < 1e-3,
@@ -408,7 +418,7 @@ mod tests {
     #[test]
     fn analysis_failure_sentinel_is_ignored() {
         let s = settings(-18.0, LoudnessMode::Track, -6.0);
-        let result = compute_gain(Some(ANALYSIS_FAILED_SENTINEL), Some(-2.0), None, &s);
+        let result = compute_gain(Some(ANALYSIS_FAILED_SENTINEL), Some(-2.0), None, None, None, &s);
         let expected = 10f32.powf(-2.0 / 20.0);
         assert!(
             (result.linear - expected).abs() < 1e-3,
@@ -420,11 +430,48 @@ mod tests {
     #[test]
     fn album_mode_prefers_album_gain() {
         let s = settings(-18.0, LoudnessMode::Album, -6.0);
-        let result = compute_gain(None, Some(-4.0), Some(-2.0), &s);
+        let result = compute_gain(None, Some(-4.0), Some(-2.0), None, None, &s);
         let expected = 10f32.powf(-2.0 / 20.0);
         assert!(
             (result.linear - expected).abs() < 1e-3,
             "album mode should prefer album gain"
         );
+    }
+
+    #[test]
+    fn dr_log_used_when_no_analysis_or_replaygain() {
+        let s = settings(-18.0, LoudnessMode::Track, -6.0);
+        // RMS -17.46 dB needs -0.54 dB to reach -18 target; Peak -0.80 dB
+        // only allows +0.80 dB before clipping — RMS-driven gain wins here.
+        let result = compute_gain(None, None, None, Some(-17.46), Some(-0.80), &s);
+        let expected = 10f32.powf(-0.54 / 20.0);
+        assert!(
+            (result.linear - expected).abs() < 1e-3,
+            "gain was {}",
+            result.linear
+        );
+        assert_eq!(result.source, LoudnessGainSource::DynamicRangeLog);
+    }
+
+    #[test]
+    fn dr_log_gain_capped_by_peak_to_avoid_clipping() {
+        let s = settings(-14.0, LoudnessMode::Track, -6.0);
+        // Target-vs-RMS wants +8 dB, but Peak at -3 dB only leaves 3 dB of
+        // headroom before clipping — the smaller (Peak-derived) gain wins.
+        let result = compute_gain(None, None, None, Some(-22.0), Some(-3.0), &s);
+        let expected = 10f32.powf(3.0 / 20.0);
+        assert!(
+            (result.linear - expected).abs() < 1e-3,
+            "gain was {}",
+            result.linear
+        );
+        assert_eq!(result.source, LoudnessGainSource::DynamicRangeLog);
+    }
+
+    #[test]
+    fn dr_log_falls_back_to_fixed_gain_when_incomplete() {
+        let s = settings(-18.0, LoudnessMode::Track, -6.0);
+        let result = compute_gain(None, None, None, Some(-17.46), None, &s);
+        assert_eq!(result.source, LoudnessGainSource::Fallback);
     }
 }
