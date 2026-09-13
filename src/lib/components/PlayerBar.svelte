@@ -24,15 +24,15 @@
 
   // Responsive control trimming (issue #413, refined against real usage,
   // padding/seekbar fixed under #543): three named tiers as this floating
-  // bar narrows toward the app's 320px minWidth — Full (>=700px), Compact
-  // (400-700px), Minimal (<400px). Cover art, play/pause, and skip-next are
+  // bar narrows toward the app's 320px minWidth — Full (>=640px), Compact
+  // (400-640px), Minimal (<400px). Cover art, play/pause, and skip-next are
   // the constant core (shown in all three tiers); everything else drops out
   // in priority order: expand/shuffle/repeat/volume+mute/waveform seek bar
   // + time labels first (gone by Compact — the transport block takes the
   // freed space and sticks to the right edge via `ml-auto` rather than
   // re-centering in it), then prev (gone by Minimal). Horizontal padding on
   // the outer bar stays constant across all tiers so cover art never sits
-  // flush against the rounded edges. 400/700 are hand-tuned breakpoints
+  // flush against the rounded edges. 400/640 are hand-tuned breakpoints
   // specific to this bar, written as literal `min-[Npx]:` arbitrary-value
   // classes because Tailwind's class scanner can't resolve an interpolated
   // constants.ts value — don't try to centralize them.
@@ -273,8 +273,8 @@
   }
 </script>
 
-<footer transition:fly={{ y: 40, duration: 300, easing: cubicOut }} class="h-20 max-w-[1200px] mx-auto bg-brand-playerbar border border-brand-border rounded-[2rem] flex items-center justify-between gap-3 px-8 text-brand-text-secondary select-none {themeStore.isGlassTheme || isLinux ? 'glass-surface' : ''} {isLinux ? 'opaque-linux' : ''}">
-  <div data-walkthrough-target="player-bar-cover" class="flex items-center gap-3 flex-1 min-[700px]:w-1/3 min-[700px]:flex-none min-w-[90px] min-[400px]:min-w-[140px] min-[700px]:min-w-[200px] max-w-sm">
+<footer transition:fly={{ y: 40, duration: 300, easing: cubicOut }} class="h-20 max-w-[1200px] mx-auto bg-brand-playerbar border border-brand-border rounded-[2rem] flex items-center justify-between gap-3 px-5 min-[768px]:px-8 text-brand-text-secondary select-none {themeStore.isGlassTheme || isLinux ? 'glass-surface' : ''} {isLinux ? 'opaque-linux' : ''}">
+  <div data-walkthrough-target="player-bar-cover" class="flex items-center gap-3 min-w-0 flex-1 min-[768px]:w-1/3 min-[768px]:flex-none min-[768px]:min-w-[200px] max-w-sm">
     <button
       onclick={handleCoverClick}
       disabled={!playerStore.currentSong}
@@ -335,8 +335,8 @@
     </div>
   </div>
 
-  <div data-walkthrough-target="player-bar-controls" class="flex flex-col items-center gap-1.5 min-[400px]:min-w-[220px] min-[400px]:ml-auto min-[700px]:w-1/3 min-[700px]:flex-none min-[700px]:ml-0 max-w-[600px]">
-    <div class="flex items-center gap-3 min-[700px]:gap-5">
+  <div data-walkthrough-target="player-bar-controls" class="flex flex-col items-center gap-1.5 min-w-0 flex-1 min-[400px]:ml-auto min-[640px]:ml-0 min-[768px]:w-1/3 min-[768px]:flex-none max-w-[600px]">
+    <div class="flex items-center gap-3 min-[768px]:gap-5">
       {#if !windowLayoutStore.isRightPanelAutoHidden}
         <div transition:collapseFade={{ duration: 250 }} class="relative inline-flex items-center flex-shrink-0">
           {#if playerStore.shuffleMode !== 'off'}
@@ -460,9 +460,9 @@
     <div
       data-walkthrough-target="player-bar-toolbar"
       transition:fade={{ duration: 200 }}
-      class="flex flex-col items-center gap-1.5 w-1/3 min-w-[50px] min-[700px]:min-w-[200px] max-w-xs"
+      class="flex flex-col items-center gap-1.5 flex-shrink-0 min-[768px]:w-1/3 min-[768px]:min-w-[200px] max-w-xs"
     >
-      <div class="h-5 flex items-center gap-3 min-[700px]:gap-5">
+      <div class="h-5 flex items-center gap-3 min-[768px]:gap-5">
         <button
           onclick={openCurrentSongMenu}
           disabled={!playerStore.currentSong}

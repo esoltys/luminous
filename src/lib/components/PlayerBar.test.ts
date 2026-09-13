@@ -292,8 +292,8 @@ describe("PlayerBar.svelte", () => {
   });
 
   it("shows and hides controls matching Full, Compact, and Minimal tiers across breakpoints", () => {
-    // Tiers: Full (>=700px), Compact (400-700px), Minimal (<400px).
-    // Full tier (>=700px):
+    // Tiers: Full (>=640px), Compact (400-640px), Minimal (<400px).
+    // Full tier (>=640px):
     windowLayoutStore.viewportWidth = 1280;
     playerStore.currentSong = mockSong;
     playerStore.state = "playing";
@@ -324,7 +324,7 @@ describe("PlayerBar.svelte", () => {
 
     unmount();
 
-    // Compact tier (<700px):
+    // Compact tier (<640px):
     windowLayoutStore.viewportWidth = 600;
     const { getAllByTitle: getCompactAll, queryByTitle: queryCompactByTitle, container: compactContainer } = render(PlayerBar);
 

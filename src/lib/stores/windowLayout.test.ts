@@ -73,16 +73,22 @@ describe("CollectionStore - sidebar/right-panel layout and responsive breakpoint
     expect(windowLayoutStore.sidebarWidth).toBe(300);
     expect(windowLayoutStore.rightPanelOpen).toBe(true);
 
-    // Below 768px: right panel auto-hides. 700px is still Full tier for PlayerBar.
+    // Below 768px: right panel auto-hides. 700px and 640px are still Full tier for PlayerBar.
     windowLayoutStore.viewportWidth = 700;
     expect(windowLayoutStore.isSidebarAutoCollapsed).toBe(true);
     expect(windowLayoutStore.isRightPanelAutoHidden).toBe(true);
     expect(windowLayoutStore.isPlayerBarCompact).toBe(false);
     expect(windowLayoutStore.isImmersiveForced).toBe(false);
 
-    // Below 700px: PlayerBar transitions to Compact tier.
-    windowLayoutStore.viewportWidth = 699;
+    windowLayoutStore.viewportWidth = 640;
+    expect(windowLayoutStore.isPlayerBarCompact).toBe(false);
+    expect(windowLayoutStore.isImmersiveForced).toBe(false);
+
+    // Below 640px: PlayerBar transitions to Compact tier at the exact same breakpoint where Immersive Mode force-engages.
+    windowLayoutStore.viewportWidth = 639;
     expect(windowLayoutStore.isPlayerBarCompact).toBe(true);
+    expect(windowLayoutStore.isImmersiveForced).toBe(true);
+    expect(windowLayoutStore.effectiveImmersiveMode).toBe(true);
 
     // Small: immersive force-engages via the derived flag only.
     windowLayoutStore.viewportWidth = 500;
