@@ -8,6 +8,18 @@
 // snapshot.
 
 import { generateEllipseGradientSvg } from "./ellipseGradient";
+import exposeFontUrl from "../fonts/expose/expose-700.woff2?url";
+
+// The mark's colors are fixed brand values (matching static/luminous-mark.svg
+// and the app icon) — unlike the card's text, it doesn't adapt to the
+// light/dark card theme.
+const LUMINOUS_MARK_SVG = (size: number) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="${size}" height="${size}" style="flex-shrink:0;">` +
+    `<circle cx="100" cy="100" r="77" fill="none" stroke="#626FE8" stroke-width="14"/>` +
+    `<circle cx="100" cy="100" r="92" fill="none" stroke="#FFB648" stroke-width="8"/>` +
+    `<circle cx="100" cy="100" r="68" fill="#0A0A0D"/>` +
+    `<circle cx="152" cy="57" r="11" fill="#FFFFFF"/>` +
+  `</svg>`;
 
 export type ShareAspectRatio = "1:1" | "9:16" | "16:9" | "4:3" | "3:4";
 
@@ -37,6 +49,12 @@ export interface ShareCardOptions {
   metadataLine: string;
   tracks?: ShareCardTrack[];
   includeTrackList: boolean;
+  /** Base64 data URI of the Expose wordmark font, embedded as a self-contained
+   * @font-face so the footer renders in-brand once rasterized — foreignObject
+   * content only sees fonts declared inside the image itself, not the host
+   * document's stylesheets. Fetched automatically by rasterizeShareCard();
+   * omit (e.g. in tests) to fall back to the sans-serif stack. */
+  exposeFontDataUri?: string | null;
 }
 
 function escapeHtml(value: string): string {
@@ -85,7 +103,16 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
   // relative to how much taller the frame is than a baseline 3:4 (1.33:1).
   const elongation = height / width;
   const contentScale = isPortrait ? Math.min(1.5, Math.max(1, elongation / 1.33)) : 1;
-  const coverSize = Math.round(isPortrait ? width * 0.56 * contentScale : Math.min(width, height) * 0.46);
+  // Without a track list the text block is just three short lines, so the
+  // cover can claim a lot more of the frame than when it has to share space
+  // with a multi-column list — size each variant for what it's actually
+  // sitting next to rather than one flat ratio for both.
+  const willShowTrackList = !!(options.includeTrackList && options.tracks && options.tracks.length > 0);
+  const coverSize = Math.round(
+    isPortrait
+      ? width * (willShowTrackList ? 0.56 : 0.72) * contentScale
+      : Math.min(width, height) * (willShowTrackList ? 0.46 : 0.6)
+  );
 
   const background = generateEllipseGradientSvg({
     width,
@@ -97,7 +124,7 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
   const backgroundInner = background.replace(/^<svg[^>]*>/, "").replace(/<\/svg>$/, "");
 
   let trackListHtml = "";
-  if (options.includeTrackList && options.tracks && options.tracks.length > 0) {
+  if (willShowTrackList && options.tracks) {
     const { columns, maxVisible } = trackListLayout(dims, options.tracks.length);
     const visible = options.tracks.slice(0, maxVisible);
     const overflow = options.tracks.length - visible.length;
@@ -150,14 +177,21 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
           ${showTrackList ? trackListHtml : ""}
         </div>
       </div>
-      <div style="position:absolute;left:${cardPad}px;bottom:${cardPad}px;font-size:${Math.round(width * 0.014)}px;font-weight:700;letter-spacing:0.04em;color:${textSecondary};opacity:0.8;">LUMINOUS</div>
+      <div style="position:absolute;left:${cardPad}px;bottom:${cardPad}px;display:flex;align-items:center;gap:${Math.round(width * 0.008)}px;opacity:0.85;">
+        ${LUMINOUS_MARK_SVG(Math.round(width * 0.024))}
+        <span style="font-family:'Expose','Inter','Segoe UI',system-ui,sans-serif;font-size:${Math.round(width * 0.015)}px;font-weight:700;letter-spacing:0.04em;color:${textSecondary};">LUMINOUS</span>
+      </div>
     </div>
   `;
+
+  const fontFace = options.exposeFontDataUri
+    ? `<style>@font-face{font-family:'Expose';src:url(${options.exposeFontDataUri}) format('woff2');font-weight:700;font-style:normal;}</style>`
+    : "";
 
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">` +
       `<g>${backgroundInner}</g>` +
-      `<defs><linearGradient id="scrim" x1="0" y1="0" x2="0" y2="1">` +
+      `<defs>${fontFace}<linearGradient id="scrim" x1="0" y1="0" x2="0" y2="1">` +
         `<stop offset="0%" stop-color="${scrimFrom}"/>` +
         `<stop offset="100%" stop-color="${scrimTo}"/>` +
       `</linearGradient></defs>` +
@@ -194,8 +228,19 @@ export async function toDataUri(url: string): Promise<string | null> {
   }
 }
 
+let cachedExposeFontDataUri: Promise<string | null> | null = null;
+
+/** Fetches and caches the Expose wordmark font as a data URI (see ShareCardOptions.exposeFontDataUri). */
+function getExposeFontDataUri(): Promise<string | null> {
+  if (!cachedExposeFontDataUri) {
+    cachedExposeFontDataUri = toDataUri(exposeFontUrl);
+  }
+  return cachedExposeFontDataUri;
+}
+
 export async function rasterizeShareCard(options: ShareCardOptions, scale = 2): Promise<Blob | null> {
-  const { svg, width, height } = buildShareCardSvg(options);
+  const exposeFontDataUri = options.exposeFontDataUri ?? (await getExposeFontDataUri());
+  const { svg, width, height } = buildShareCardSvg({ ...options, exposeFontDataUri });
   const svgDataUri = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
   const img = await loadImage(svgDataUri);
   if (!img) return null;
