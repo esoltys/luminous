@@ -724,7 +724,7 @@
                     <SocialIcon platform="website" size={14} />
                   </div>
                   <div class="flex items-center gap-1 min-w-0 flex-1">
-                    <span class="text-xs font-medium text-brand-text-primary group-hover:text-brand-accent truncate transition-colors">
+                    <span class="text-xs font-medium text-brand-text-primary truncate transition-colors">
                       {formatDisplayLabel("website", profile?.website ?? "")}
                     </span>
                     <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
@@ -744,7 +744,7 @@
                     <SocialIcon platform={link.platform} size={14} />
                   </div>
                   <div class="flex items-center gap-1 min-w-0 flex-1">
-                    <span class="text-xs font-medium text-brand-text-primary group-hover:text-brand-accent truncate transition-colors">
+                    <span class="text-xs font-medium text-brand-text-primary truncate transition-colors">
                       {formatDisplayLabel(link.platform, link.handle_or_url)}
                     </span>
                     <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
@@ -765,7 +765,7 @@
                     <SocialIcon platform="fanart_tv" size={14} />
                   </div>
                   <div class="flex items-center gap-1 min-w-0 flex-1">
-                    <span class="text-xs font-medium text-brand-text-primary group-hover:text-brand-accent truncate transition-colors">
+                    <span class="text-xs font-medium text-brand-text-primary truncate transition-colors">
                       Fanart.tv
                     </span>
                     <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
