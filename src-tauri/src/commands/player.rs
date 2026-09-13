@@ -8,8 +8,8 @@ use tauri::State;
 /// Shared tail of every "replace the Queue and start playing" command:
 /// swap the Queue's contents for `song_ids`, then hand the fresh items to
 /// the player.
-async fn replace_queue_and_play(
-    state: &State<'_, AppState>,
+pub(crate) async fn replace_queue_and_play_state(
+    state: &AppState,
     song_ids: &[i64],
     start_index: usize,
     context: Option<PlayContext>,
@@ -25,6 +25,15 @@ async fn replace_queue_and_play(
         .play_playlist(items, start_index, queue_id, context)
         .await
         .map_err(|e| e.to_string())
+}
+
+async fn replace_queue_and_play(
+    state: &State<'_, AppState>,
+    song_ids: &[i64],
+    start_index: usize,
+    context: Option<PlayContext>,
+) -> Result<(), String> {
+    replace_queue_and_play_state(state.inner(), song_ids, start_index, context).await
 }
 
 /// Recursively collects audio files under a dropped directory, mirroring the
