@@ -462,11 +462,11 @@
       transition:fade={{ duration: 200 }}
       class="flex flex-col items-center gap-1.5 w-1/3 min-w-[50px] min-[700px]:min-w-[200px] max-w-xs"
     >
-      <div class="flex items-center gap-3 min-[700px]:gap-5">
+      <div class="h-5 flex items-center gap-3 min-[700px]:gap-5">
         <button
           onclick={openCurrentSongMenu}
           disabled={!playerStore.currentSong}
-          class="text-brand-text-secondary hover:text-brand-text-primary transition-colors disabled:opacity-40 disabled:pointer-events-none flex-shrink-0"
+          class="inline-flex items-center justify-center flex-shrink-0 text-brand-text-secondary hover:text-brand-text-primary transition-colors disabled:opacity-40 disabled:pointer-events-none"
           title={i18n.t('playerBar.menuTooltip', {}, 'Song menu')}
         >
           <Menu class="w-5 h-5" />
@@ -486,7 +486,7 @@
         {/if}
         <button
           onclick={navigateToQueue}
-          class="text-brand-text-secondary hover:text-brand-text-primary transition-colors flex-shrink-0"
+          class="inline-flex items-center justify-center flex-shrink-0 text-brand-text-secondary hover:text-brand-text-primary transition-colors"
           title={i18n.t('playerBar.queueTitle', {}, 'Queue')}
         >
           <Layers class="w-5 h-5" />
@@ -503,20 +503,20 @@
         {/if}
         <button
           onclick={() => windowLayoutStore.toggleMiniplayerMode()}
-          class="text-brand-text-secondary hover:text-brand-text-primary transition-colors flex-shrink-0"
+          class="inline-flex items-center justify-center flex-shrink-0 text-brand-text-secondary hover:text-brand-text-primary transition-colors"
           title={i18n.t('miniplayer.toggleTooltip', {}, 'Picture-in-Picture Mode (Ctrl+M)')}
         >
           <PictureInPicture class="w-5 h-5" />
         </button>
       </div>
 
-      <div class="flex items-center gap-2">
+      <div class="h-7 flex items-center gap-2">
         {#if !windowLayoutStore.isRightPanelAutoHidden}
           <div transition:collapseFade={{ duration: 250 }} class="w-24 h-7 block flex-shrink-0">
             <SpectrumVisualizer />
           </div>
         {/if}
-        <button onclick={toggleMute} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors" title={i18n.t('playerBar.volume')}>
+        <button onclick={toggleMute} class="inline-flex items-center justify-center text-brand-text-secondary hover:text-brand-text-primary transition-colors" title={i18n.t('playerBar.volume')}>
           {#if isMuted || playerStore.volume === 0}
             <VolumeX class="w-4 h-4" />
           {:else}
