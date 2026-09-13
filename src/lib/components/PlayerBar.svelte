@@ -225,6 +225,42 @@
     collectionStore.refreshLibrary();
     tagsStore.load();
   }
+
+  /**
+   * Smoothly fades opacity while collapsing horizontal width and absorbing flex gap,
+   * so sibling items glide closer together when an item disappears, and glide apart
+   * when it reappears.
+   */
+  function collapseFade(
+    node: HTMLElement,
+    { duration = 250, easing = cubicOut }: { duration?: number; easing?: (t: number) => number } = {}
+  ) {
+    const style = getComputedStyle(node);
+    const parentStyle = node.parentElement ? getComputedStyle(node.parentElement) : null;
+    const gap = parentStyle ? parseFloat(parentStyle.columnGap || parentStyle.gap) || 0 : 0;
+
+    const opacity = +style.opacity || 1;
+    const width = parseFloat(style.width) || node.getBoundingClientRect().width || 20;
+    const paddingLeft = parseFloat(style.paddingLeft) || 0;
+    const paddingRight = parseFloat(style.paddingRight) || 0;
+
+    return {
+      duration,
+      easing,
+      css: (t: number) => `
+        overflow: hidden;
+        opacity: ${t * opacity};
+        width: ${t * width}px;
+        min-width: 0;
+        max-width: ${t * width}px;
+        padding-left: ${t * paddingLeft}px;
+        padding-right: ${t * paddingRight}px;
+        margin-right: -${(1 - t) * gap}px;
+        white-space: nowrap;
+        pointer-events: ${t < 0.1 ? 'none' : 'auto'};
+      `,
+    };
+  }
 </script>
 
 <footer transition:fly={{ y: 40, duration: 300, easing: cubicOut }} class="h-20 max-w-[1200px] mx-auto bg-brand-playerbar border border-brand-border rounded-[2rem] flex items-center justify-between gap-3 px-8 text-brand-text-secondary select-none {themeStore.isGlassTheme || isLinux ? 'glass-surface' : ''} {isLinux ? 'opaque-linux' : ''}">
@@ -420,19 +456,19 @@
         <button
           onclick={openCurrentSongMenu}
           disabled={!playerStore.currentSong}
-          class="text-brand-text-secondary hover:text-brand-text-primary transition-colors disabled:opacity-40 disabled:pointer-events-none"
+          class="text-brand-text-secondary hover:text-brand-text-primary transition-colors disabled:opacity-40 disabled:pointer-events-none flex-shrink-0"
           title={i18n.t('playerBar.menuTooltip', {}, 'Song menu')}
         >
           <Menu class="w-5 h-5" />
         </button>
         {#if !windowLayoutStore.isRightPanelAutoHidden}
           <button
-            transition:fade={{ duration: 200 }}
+            transition:collapseFade={{ duration: 250 }}
             onclick={() => {
               windowLayoutStore.exitImmersiveMode();
               navigationStore.activeTab = "lyrics";
             }}
-            class="inline-flex transition-colors {navigationStore.activeTab === 'lyrics' ? 'text-brand-accent-text' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+            class="inline-flex items-center justify-center flex-shrink-0 transition-colors {navigationStore.activeTab === 'lyrics' ? 'text-brand-accent-text' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
             title={i18n.t('sidebar.lyrics')}
           >
             <Lyrics class="w-5 h-5" />
@@ -440,16 +476,16 @@
         {/if}
         <button
           onclick={navigateToQueue}
-          class="text-brand-text-secondary hover:text-brand-text-primary transition-colors"
+          class="text-brand-text-secondary hover:text-brand-text-primary transition-colors flex-shrink-0"
           title={i18n.t('playerBar.queueTitle', {}, 'Queue')}
         >
           <Layers class="w-5 h-5" />
         </button>
         {#if !windowLayoutStore.isRightPanelAutoHidden}
           <button
-            transition:fade={{ duration: 200 }}
+            transition:collapseFade={{ duration: 250 }}
             onclick={handleInfoClick}
-            class="inline-flex transition-colors {windowLayoutStore.rightPanelOpen ? 'text-brand-accent-text' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+            class="inline-flex items-center justify-center flex-shrink-0 transition-colors {windowLayoutStore.rightPanelOpen ? 'text-brand-accent-text' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
             title={i18n.t('topNav.toggleRightPanel')}
           >
             <Info class="w-5 h-5" />
@@ -457,7 +493,7 @@
         {/if}
         <button
           onclick={() => windowLayoutStore.toggleMiniplayerMode()}
-          class="text-brand-text-secondary hover:text-brand-text-primary transition-colors"
+          class="text-brand-text-secondary hover:text-brand-text-primary transition-colors flex-shrink-0"
           title={i18n.t('miniplayer.toggleTooltip', {}, 'Picture-in-Picture Mode (Ctrl+M)')}
         >
           <PictureInPicture class="w-5 h-5" />
@@ -466,7 +502,7 @@
 
       <div class="flex items-center gap-2">
         {#if !windowLayoutStore.isRightPanelAutoHidden}
-          <div transition:fade={{ duration: 200 }} class="w-24 h-7 block">
+          <div transition:collapseFade={{ duration: 250 }} class="w-24 h-7 block flex-shrink-0">
             <SpectrumVisualizer />
           </div>
         {/if}
