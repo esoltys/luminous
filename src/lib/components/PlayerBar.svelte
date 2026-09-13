@@ -408,16 +408,18 @@
       >
         <Menu class="w-5 h-5" />
       </button>
-      <button
-        onclick={() => {
-          windowLayoutStore.exitImmersiveMode();
-          navigationStore.activeTab = "lyrics";
-        }}
-        class="transition-colors {navigationStore.activeTab === 'lyrics' ? 'text-brand-accent-text' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-        title={i18n.t('sidebar.lyrics')}
-      >
-        <Lyrics class="w-5 h-5" />
-      </button>
+      {#if !windowLayoutStore.isRightPanelAutoHidden}
+        <button
+          onclick={() => {
+            windowLayoutStore.exitImmersiveMode();
+            navigationStore.activeTab = "lyrics";
+          }}
+          class="hidden md:inline-flex transition-colors {navigationStore.activeTab === 'lyrics' ? 'text-brand-accent-text' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+          title={i18n.t('sidebar.lyrics')}
+        >
+          <Lyrics class="w-5 h-5" />
+        </button>
+      {/if}
       <button
         onclick={navigateToQueue}
         class="text-brand-text-secondary hover:text-brand-text-primary transition-colors"
@@ -428,7 +430,7 @@
       {#if !windowLayoutStore.isRightPanelAutoHidden}
         <button
           onclick={handleInfoClick}
-          class="transition-colors {windowLayoutStore.rightPanelOpen ? 'text-brand-accent-text' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+          class="hidden md:inline-flex transition-colors {windowLayoutStore.rightPanelOpen ? 'text-brand-accent-text' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
           title={i18n.t('topNav.toggleRightPanel')}
         >
           <Info class="w-5 h-5" />

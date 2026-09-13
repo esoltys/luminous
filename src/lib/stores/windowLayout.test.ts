@@ -65,13 +65,19 @@ describe("CollectionStore - sidebar/right-panel layout and responsive breakpoint
     expect(windowLayoutStore.effectiveImmersiveMode).toBe(false);
     expect(windowLayoutStore.isPlaybarOnlyMode).toBe(false);
 
-    // Medium: sidebar/right-panel auto-collapse, real preferences untouched.
+    // Medium (between 768px and 1024px): sidebar auto-collapses, but right panel and playbar controls stay visible.
     windowLayoutStore.viewportWidth = 800;
     expect(windowLayoutStore.isSidebarAutoCollapsed).toBe(true);
-    expect(windowLayoutStore.isRightPanelAutoHidden).toBe(true);
+    expect(windowLayoutStore.isRightPanelAutoHidden).toBe(false);
     expect(windowLayoutStore.isImmersiveForced).toBe(false);
     expect(windowLayoutStore.sidebarWidth).toBe(300);
     expect(windowLayoutStore.rightPanelOpen).toBe(true);
+
+    // Below 768px: right panel auto-hides.
+    windowLayoutStore.viewportWidth = 700;
+    expect(windowLayoutStore.isSidebarAutoCollapsed).toBe(true);
+    expect(windowLayoutStore.isRightPanelAutoHidden).toBe(true);
+    expect(windowLayoutStore.isImmersiveForced).toBe(false);
 
     // Small: immersive force-engages via the derived flag only.
     windowLayoutStore.viewportWidth = 500;

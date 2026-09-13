@@ -492,16 +492,28 @@ describe("PlayerBar.svelte", () => {
     expect(getByTitle("Song menu")).toBeDisabled();
   });
 
-  it("hides the info-panel toggle at the same breakpoint that auto-hides the panel itself", () => {
+  it("hides the info and lyrics buttons at the same breakpoint that auto-hides the right panel and spectrum (< 768px)", () => {
     playerStore.currentSong = mockSong;
     windowLayoutStore.viewportWidth = 1280;
     expect(windowLayoutStore.isRightPanelAutoHidden).toBe(false);
-    const { queryByTitle } = render(PlayerBar);
+    const { queryByTitle, unmount } = render(PlayerBar);
     expect(queryByTitle("Show Info Panel (Ctrl+I)")).not.toBeNull();
+    expect(queryByTitle("Lyrics")).not.toBeNull();
+    unmount();
 
+    // 800px is >= 768px (md breakpoint): right panel is not auto-hidden, spectrum and all 5 buttons remain visible
     windowLayoutStore.viewportWidth = 800;
+    expect(windowLayoutStore.isRightPanelAutoHidden).toBe(false);
+    const { queryByTitle: queryByTitleMedium, unmount: unmountMedium } = render(PlayerBar);
+    expect(queryByTitleMedium("Show Info Panel (Ctrl+I)")).not.toBeNull();
+    expect(queryByTitleMedium("Lyrics")).not.toBeNull();
+    unmountMedium();
+
+    // 700px is < 768px: right panel auto-hides, Info and Lyrics buttons hide
+    windowLayoutStore.viewportWidth = 700;
     expect(windowLayoutStore.isRightPanelAutoHidden).toBe(true);
     const { queryByTitle: queryByTitleNarrow } = render(PlayerBar);
     expect(queryByTitleNarrow("Show Info Panel (Ctrl+I)")).toBeNull();
+    expect(queryByTitleNarrow("Lyrics")).toBeNull();
   });
 });
