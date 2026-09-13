@@ -501,7 +501,7 @@
           </div>
         {/each}
       </div>
-      <p class="text-xs text-brand-text-secondary border-t border-brand-border/60 pt-2">
+      <p class="text-xs text-brand-text-secondary px-1 -mt-2">
         {i18n.t('equalizer.isoStandard')}
       </p>
     {:else}
