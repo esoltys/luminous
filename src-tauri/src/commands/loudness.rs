@@ -15,7 +15,7 @@ pub async fn set_loudness_settings(
     state: State<'_, AppState>,
     mut settings: LoudnessSettings,
 ) -> Result<(), String> {
-    settings.target_lufs = settings.target_lufs.clamp(-24.0, -14.0);
+    settings.target_lufs = settings.target_lufs.clamp(-23.0, -9.0);
     settings.fallback_gain_db = settings.fallback_gain_db.clamp(-24.0, 0.0);
     crate::loudness::save_settings(&state.db, &settings).map_err(|e| e.to_string())?;
     state.player.lock().await.refresh_loudness_gain().await;

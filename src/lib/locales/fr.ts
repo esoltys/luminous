@@ -933,7 +933,8 @@ export const fr = {
     resetBands: "Réinitialiser les bandes",
     bass: "Grave",
     mid: "Médium",
-    treble: "Aigu"
+    treble: "Aigu",
+    isoStandard: "ISO 266:1997"
   },
   loudness: {
     title: "Normalisation du volume",

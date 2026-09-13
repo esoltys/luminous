@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 34;
+pub const CURRENT_SCHEMA_VERSION: i32 = 35;
 
 struct Migration {
     version: i32,
@@ -259,6 +259,11 @@ const MIGRATIONS: &[Migration] = &[
         version: 34,
         description: "relax songs.path from UNIQUE to UNIQUE(path, beginning_nanosec) for CUE sheet tracks (#78)",
         apply: rebuild_songs_table_without_path_unique,
+    },
+    Migration {
+        version: 35,
+        description: "update default target_lufs to -16.0 and drop unused crossfade keys (#946)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_35)?),
     },
 ];
 
@@ -1121,6 +1126,15 @@ fn rebuild_songs_table_without_path_unique(conn: &rusqlite::Connection) -> Resul
 }
 
 // ---------------------------------------------------------------------------
+// Migration 35: update default target_lufs from -18.0 to -16.0 (#946) and clean
+// up dead crossfade keys from app_state.
+// ---------------------------------------------------------------------------
+const MIGRATION_35: &str = "
+UPDATE loudness_settings SET target_lufs = -16.0 WHERE id = 1 AND target_lufs = -18.0;
+DELETE FROM app_state WHERE key IN ('crossfade_manual_enabled', 'crossfade_manual_duration_ms');
+";
+
+// ---------------------------------------------------------------------------
 // Migration 18: tag_groups/tag_assignments — a persisted, curatable Genres
 // hierarchy (#545) layered on top of the existing `songs.genre` string
 // column. `songs.genre` remains the source of truth for which songs carry
@@ -1703,6 +1717,50 @@ mod tests {
         assert_eq!(server_name, "My NAS");
         assert_eq!(remote_path, "/Music/track.flac");
         assert_eq!(size, 10_485_760);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_migration_35_target_lufs_and_crossfade_cleanup() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_migration35_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Database::new(temp_dir.clone()).unwrap();
+        assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
+
+        let conn = db.pool.get().unwrap();
+        let target_lufs: f64 = conn
+            .query_row(
+                "SELECT target_lufs FROM loudness_settings WHERE id = 1",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(target_lufs, -16.0);
+
+        // Simulate an upgrade scenario: insert an app_state row with old crossfade keys,
+        // re-run migration 35, and ensure they are removed.
+        conn.execute(
+            "INSERT INTO app_state (key, value) VALUES ('crossfade_manual_enabled', 'true'), ('crossfade_manual_duration_ms', '1000')",
+            [],
+        )
+        .unwrap();
+
+        conn.execute_batch(MIGRATION_35).unwrap();
+
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM app_state WHERE key IN ('crossfade_manual_enabled', 'crossfade_manual_duration_ms')",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 0);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

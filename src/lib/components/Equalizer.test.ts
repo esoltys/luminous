@@ -30,8 +30,6 @@ describe("Equalizer.svelte", () => {
   const defaultFadeSettings = {
     fade_pause_enabled: true,
     fade_pause_duration_ms: 300,
-    crossfade_manual_enabled: true,
-    crossfade_manual_duration_ms: 1000,
     crossfade_auto_enabled: false,
     crossfade_auto_duration_secs: 3.0,
     crossfade_suppress_same_album: true,
@@ -46,7 +44,7 @@ describe("Equalizer.svelte", () => {
       if (cmd === "get_loudness_settings") return defaultLoudness;
       if (cmd === "get_fade_settings") return defaultFadeSettings;
       if (cmd === "get_loudness_analysis_remaining") return 0;
-      if (cmd === "load_equalizer_preset") return { gains: [4, 3, 2, -1, -2, -1, 1, 2, 3, 4], parametric: [] };
+      if (cmd === "load_equalizer_preset") return { gains: [4, 3, 1, -1, -2, -1, 1, 3, 3.5, 3.5], parametric: [] };
       return null;
     });
   });
@@ -125,5 +123,12 @@ describe("Equalizer.svelte", () => {
     const headerContainer = titleEl.closest("div.flex.items-start.justify-between");
     expect(headerContainer).not.toBeNull();
     expect(headerContainer).not.toHaveClass("flex-wrap");
+  });
+
+  it("renders ISO 266:1997 footnote in 10-band graphic mode", async () => {
+    const { getByText } = render(Equalizer);
+    await waitFor(() => {
+      expect(getByText("ISO 266:1997")).toBeInTheDocument();
+    });
   });
 });

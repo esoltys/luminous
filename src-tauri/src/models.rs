@@ -644,7 +644,7 @@ impl Default for LoudnessSettings {
     fn default() -> Self {
         Self {
             enabled: false,
-            target_lufs: -18.0,
+            target_lufs: -16.0,
             mode: LoudnessMode::Track,
             fallback_gain_db: -6.0,
         }
@@ -687,8 +687,6 @@ pub enum LoudnessGainSource {
 pub struct FadeSettings {
     pub fade_pause_enabled: bool,
     pub fade_pause_duration_ms: u32,
-    pub crossfade_manual_enabled: bool,
-    pub crossfade_manual_duration_ms: u32,
     pub crossfade_auto_enabled: bool,
     pub crossfade_auto_duration_secs: f32,
     pub crossfade_suppress_same_album: bool,
@@ -699,8 +697,6 @@ impl Default for FadeSettings {
         Self {
             fade_pause_enabled: true,
             fade_pause_duration_ms: 300,
-            crossfade_manual_enabled: true,
-            crossfade_manual_duration_ms: 1000,
             crossfade_auto_enabled: false,
             crossfade_auto_duration_secs: 3.0,
             crossfade_suppress_same_album: true,

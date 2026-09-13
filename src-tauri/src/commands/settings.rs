@@ -303,14 +303,6 @@ pub fn get_fade_settings_from_db(
             .get("fade_pause_duration_ms")
             .and_then(|v| v.parse().ok())
             .unwrap_or(defaults.fade_pause_duration_ms),
-        crossfade_manual_enabled: map
-            .get("crossfade_manual_enabled")
-            .map(|v| v == "true")
-            .unwrap_or(defaults.crossfade_manual_enabled),
-        crossfade_manual_duration_ms: map
-            .get("crossfade_manual_duration_ms")
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(defaults.crossfade_manual_duration_ms),
         crossfade_auto_enabled: map
             .get("crossfade_auto_enabled")
             .map(|v| v == "true")
@@ -354,14 +346,6 @@ pub async fn set_fade_settings(
         (
             "fade_pause_duration_ms",
             settings.fade_pause_duration_ms.to_string(),
-        ),
-        (
-            "crossfade_manual_enabled",
-            settings.crossfade_manual_enabled.to_string(),
-        ),
-        (
-            "crossfade_manual_duration_ms",
-            settings.crossfade_manual_duration_ms.to_string(),
         ),
         (
             "crossfade_auto_enabled",
