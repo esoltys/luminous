@@ -11,6 +11,7 @@
   import Toggle from "./Toggle.svelte";
   import Select from "./Select.svelte";
   import Knob from "./Knob.svelte";
+  import { themeStore } from "../stores/theme.svelte";
 
   type EqMode = "graphic10" | "parametric20";
   interface ParametricBand {
@@ -345,6 +346,7 @@
           crossfade_suppress_same_album: crossfadeSuppressSameAlbum,
         },
       });
+      void themeStore.syncMorphDuration();
     } catch (e) {
       console.error("Failed to save fade settings:", e);
     }
@@ -387,16 +389,21 @@
     </div>
     <div class="flex items-center gap-4 flex-wrap">
 
-      <div class="flex items-center bg-brand-main border border-brand-border rounded-[2rem] p-0.5" role="group" aria-label={i18n.t('equalizer.modeLabel')}>
+      <div class="relative flex items-center bg-brand-main border border-brand-border rounded-[2rem] p-0.5" role="group" aria-label={i18n.t('equalizer.modeLabel')}>
+        <!-- Sliding background pill -->
+        <span
+          class="absolute top-0.5 bottom-0.5 left-0.5 w-[calc(50%-2px)] rounded-full bg-brand-accent shadow-sm pointer-events-none transition-transform duration-200 ease-out {mode === 'parametric20' ? 'translate-x-full' : 'translate-x-0'}"
+          aria-hidden="true"
+        ></span>
         <button
-          class="text-xs font-semibold px-4 py-1.5 rounded-full transition-colors {mode === 'graphic10' ? 'bg-brand-accent text-brand-accent-contrast shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+          class="relative z-10 flex-1 text-xs font-semibold px-4 py-1.5 rounded-full transition-colors duration-200 {mode === 'graphic10' ? 'text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
           onclick={() => handleModeChange("graphic10")}
           aria-pressed={mode === "graphic10"}
         >
           {i18n.t('equalizer.modeGraphic')}
         </button>
         <button
-          class="text-xs font-semibold px-4 py-1.5 rounded-full transition-colors {mode === 'parametric20' ? 'bg-brand-accent text-brand-accent-contrast shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+          class="relative z-10 flex-1 text-xs font-semibold px-4 py-1.5 rounded-full transition-colors duration-200 {mode === 'parametric20' ? 'text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
           onclick={() => handleModeChange("parametric20")}
           aria-pressed={mode === "parametric20"}
         >
@@ -607,9 +614,14 @@
 
         <div class="flex flex-col items-center justify-center gap-1.5 h-full">
           <span class="text-[10px] font-bold text-brand-text-secondary uppercase tracking-wider text-center">{i18n.t('loudness.mode')}</span>
-          <div class="flex items-center bg-brand-main border border-brand-border rounded-[2rem] p-0.5 mt-1 mx-auto w-full max-w-[200px]" role="group" aria-label={i18n.t('loudness.mode')}>
+          <div class="relative flex items-center bg-brand-main border border-brand-border rounded-[2rem] p-0.5 mt-1 mx-auto w-full max-w-[200px]" role="group" aria-label={i18n.t('loudness.mode')}>
+            <!-- Sliding background pill -->
+            <span
+              class="absolute top-0.5 bottom-0.5 left-0.5 w-[calc(50%-2px)] rounded-full bg-brand-accent shadow-sm pointer-events-none transition-transform duration-200 ease-out {loudnessMode === 'album' ? 'translate-x-full' : 'translate-x-0'} {!loudnessStore.enabled ? 'opacity-50' : ''}"
+              aria-hidden="true"
+            ></span>
             <button
-              class="flex-1 text-xs font-semibold px-4 py-1.5 rounded-full transition-colors {loudnessMode === 'track' ? 'bg-brand-accent text-brand-accent-contrast shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+              class="relative z-10 flex-1 text-xs font-semibold px-4 py-1.5 rounded-full transition-colors duration-200 {loudnessMode === 'track' ? 'text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
               onclick={() => handleLoudnessModeChange("track")}
               aria-pressed={loudnessMode === "track"}
               disabled={!loudnessStore.enabled}
@@ -617,7 +629,7 @@
               {i18n.t('loudness.modeTrack')}
             </button>
             <button
-              class="flex-1 text-xs font-semibold px-4 py-1.5 rounded-full transition-colors {loudnessMode === 'album' ? 'bg-brand-accent text-brand-accent-contrast shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+              class="relative z-10 flex-1 text-xs font-semibold px-4 py-1.5 rounded-full transition-colors duration-200 {loudnessMode === 'album' ? 'text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
               onclick={() => handleLoudnessModeChange("album")}
               aria-pressed={loudnessMode === "album"}
               disabled={!loudnessStore.enabled}

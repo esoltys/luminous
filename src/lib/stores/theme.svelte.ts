@@ -470,9 +470,33 @@ export class ThemeStore {
         }
       }
       this.applyActiveTheme();
+      void this.syncMorphDuration();
     } catch (e) {
       console.error("Failed to init ThemeStore:", e);
       this.applyActiveTheme();
+    }
+  }
+
+  /**
+   * Synchronizes the CSS theme morph transition duration with the
+   * player's active crossfade settings.
+   */
+  async syncMorphDuration() {
+    try {
+      const fadeSettings = await invoke<any>("get_fade_settings");
+      if (fadeSettings) {
+        let duration = 1.2;
+        if (fadeSettings.crossfade_auto_enabled && fadeSettings.crossfade_auto_duration_secs > 0) {
+          duration = fadeSettings.crossfade_auto_duration_secs;
+        } else if (fadeSettings.crossfade_manual_enabled && fadeSettings.crossfade_manual_duration_ms > 0) {
+          duration = fadeSettings.crossfade_manual_duration_ms / 1000;
+        }
+        if (typeof document !== "undefined") {
+          document.documentElement.style.setProperty("--theme-morph-duration", `${duration}s`);
+        }
+      }
+    } catch {
+      // ignore when IPC unavailable
     }
   }
 

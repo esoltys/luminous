@@ -26,6 +26,38 @@
   let mergeDialogNames = $state<string[] | null>(null);
   let deleteConfirmNames = $state<string[] | null>(null);
 
+  let genreViewElements = $state<Record<string, HTMLButtonElement>>({});
+  let genreIndicatorStyle = $state({ left: 4, width: 0, opacity: 0 });
+  let genreViewMounted = $state(false);
+
+  function updateGenreIndicator() {
+    const el = genreViewElements[prefs.genreViewMode];
+    if (el) {
+      genreIndicatorStyle = {
+        left: el.offsetLeft,
+        width: el.offsetWidth,
+        opacity: 1
+      };
+    }
+  }
+
+  onMount(() => {
+    const handleResize = () => updateGenreIndicator();
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+    };
+  });
+
+  $effect(() => {
+    if (genreViewElements[prefs.genreViewMode]) {
+      updateGenreIndicator();
+      if (!genreViewMounted) {
+        requestAnimationFrame(() => { genreViewMounted = true; });
+      }
+    }
+  });
+
   function toggleSelectMode() {
     selectMode = !selectMode;
     selected = new Set();
@@ -177,10 +209,15 @@
               <option value="count-false">▼ {i18n.t('songTags.sortSongCount', {}, 'Song Count')}</option>
             </Select>
           </div>
-          <div class="inline-flex items-center gap-0.5 bg-brand-sidebar border border-brand-border rounded-full p-1">
+          <div class="relative inline-flex items-center gap-0.5 bg-brand-sidebar border border-brand-border rounded-full p-1">
+            <!-- Sliding background indicator -->
+            <span
+              class="absolute top-1 bottom-1 left-1 w-7 h-7 rounded-full bg-brand-accent shadow-sm pointer-events-none transition-transform duration-200 ease-out {prefs.genreCardsViewMode === 'rows' ? 'translate-x-[30px]' : 'translate-x-0'}"
+              aria-hidden="true"
+            ></span>
             <button
               onclick={() => prefs.setGenreCardsViewMode("cards")}
-              class="flex items-center justify-center w-7 h-7 rounded-full transition-colors {prefs.genreCardsViewMode === 'cards' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+              class="relative z-10 flex items-center justify-center w-7 h-7 rounded-full transition-colors duration-200 {prefs.genreCardsViewMode === 'cards' ? 'text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
               title={i18n.t("collection.viewCards", {}, "Card view")}
               aria-label={i18n.t("collection.viewCards", {}, "Card view")}
               aria-pressed={prefs.genreCardsViewMode === "cards"}
@@ -189,7 +226,7 @@
             </button>
             <button
               onclick={() => prefs.setGenreCardsViewMode("rows")}
-              class="flex items-center justify-center w-7 h-7 rounded-full transition-colors {prefs.genreCardsViewMode === 'rows' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+              class="relative z-10 flex items-center justify-center w-7 h-7 rounded-full transition-colors duration-200 {prefs.genreCardsViewMode === 'rows' ? 'text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
               title={i18n.t("collection.viewRows", {}, "Row view")}
               aria-label={i18n.t("collection.viewRows", {}, "Row view")}
               aria-pressed={prefs.genreCardsViewMode === "rows"}
@@ -198,17 +235,25 @@
             </button>
           </div>
         {/if}
-        <div class="inline-flex items-center gap-0.5 bg-brand-sidebar border border-brand-border rounded-full p-1">
+        <div class="relative inline-flex items-center gap-0.5 bg-brand-sidebar border border-brand-border rounded-full p-1">
+          <!-- Sliding background indicator -->
+          <span
+            class="absolute top-1 bottom-1 bg-brand-accent rounded-full shadow-sm pointer-events-none {genreViewMounted ? 'transition-[left,width] duration-200 ease-out' : 'transition-none'}"
+            style="left: {genreIndicatorStyle.left}px; width: {genreIndicatorStyle.width}px; opacity: {genreIndicatorStyle.opacity};"
+            aria-hidden="true"
+          ></span>
           <button
+            bind:this={genreViewElements["genre"]}
             onclick={() => setViewMode("genre")}
-            class="px-3 h-7 rounded-full text-xs font-semibold transition-colors {prefs.genreViewMode === 'genre' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+            class="relative z-10 px-3 h-7 rounded-full text-xs font-semibold transition-colors duration-200 {prefs.genreViewMode === 'genre' ? 'text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
             aria-pressed={prefs.genreViewMode === "genre"}
           >
             {i18n.t("songTags.viewGenre", {}, "Genre")}
           </button>
           <button
+            bind:this={genreViewElements["tags"]}
             onclick={() => setViewMode("tags")}
-            class="px-3 h-7 rounded-full text-xs font-semibold transition-colors {prefs.genreViewMode === 'tags' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+            class="relative z-10 px-3 h-7 rounded-full text-xs font-semibold transition-colors duration-200 {prefs.genreViewMode === 'tags' ? 'text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
             aria-pressed={prefs.genreViewMode === "tags"}
           >
             {i18n.t("songTags.viewTags", {}, "Tags")}

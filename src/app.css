@@ -24,8 +24,97 @@
   --color-brand-gold: var(--color-accent-gold);
 }
 
+/* Interpolatable color properties for smooth dynamic theme morphing */
+@property --color-artwork-primary {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #2e3440;
+}
+@property --color-artwork-sidebar {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #242933;
+}
+@property --color-artwork-playerbar {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #2b303c;
+}
+@property --color-artwork-accent {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #88c0d0;
+}
+@property --color-artwork-accent-hover {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #8fbcbb;
+}
+@property --color-artwork-border {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #3b4252;
+}
+@property --bg-main {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #08090c;
+}
+@property --bg-sidebar {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #1c1f29;
+}
+@property --bg-playerbar {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #191b23;
+}
+@property --color-accent {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #6f7ea9;
+}
+@property --color-accent-hover {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #8c98ba;
+}
+@property --color-border {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #3d4255;
+}
+@property --glass-bg-sidebar {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: rgba(28, 31, 41, 0.5);
+}
+@property --glass-bg-playerbar {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: rgba(25, 27, 35, 0.5);
+}
+
 @layer base {
   :root {
+    --theme-morph-duration: 1.5s;
+    transition:
+      --color-artwork-primary var(--theme-morph-duration) ease,
+      --color-artwork-sidebar var(--theme-morph-duration) ease,
+      --color-artwork-playerbar var(--theme-morph-duration) ease,
+      --color-artwork-accent var(--theme-morph-duration) ease,
+      --color-artwork-accent-hover var(--theme-morph-duration) ease,
+      --color-artwork-border var(--theme-morph-duration) ease,
+      --bg-main var(--theme-morph-duration) ease,
+      --bg-sidebar var(--theme-morph-duration) ease,
+      --bg-playerbar var(--theme-morph-duration) ease,
+      --color-accent var(--theme-morph-duration) ease,
+      --color-accent-hover var(--theme-morph-duration) ease,
+      --color-border var(--theme-morph-duration) ease,
+      --glass-bg-sidebar var(--theme-morph-duration) ease,
+      --glass-bg-playerbar var(--theme-morph-duration) ease;
+
     /* Default theme colors (Luminous, dark variant) — overwritten by
        ThemeStore.applyActiveTheme() on load; this is only the first-paint
        fallback before JS runs. */
@@ -60,6 +149,12 @@
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     overflow: hidden;
     user-select: none;
+    transition: background-color var(--theme-morph-duration) ease, color var(--theme-morph-duration) ease;
+  }
+
+  aside,
+  main {
+    transition: background-color var(--theme-morph-duration) ease, border-color var(--theme-morph-duration) ease;
   }
 
   /* Desktop application cursor defaults: remove hand/pointer cursor everywhere */

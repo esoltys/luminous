@@ -413,10 +413,15 @@
           </div>
 
           <div class="flex items-center gap-2">
-            <div data-walkthrough-target="collection-view" class="inline-flex items-center gap-0.5 bg-brand-sidebar border border-brand-border rounded-full p-1">
+            <div data-walkthrough-target="collection-view" class="relative inline-flex items-center gap-0.5 bg-brand-sidebar border border-brand-border rounded-full p-1">
+              <!-- Sliding background indicator -->
+              <span
+                class="absolute top-1 bottom-1 left-1 w-7 h-7 rounded-full bg-brand-accent shadow-sm pointer-events-none transition-transform duration-200 ease-out {activeViewMode === 'rows' ? 'translate-x-[30px]' : 'translate-x-0'}"
+                aria-hidden="true"
+              ></span>
               <button
                 onclick={() => setActiveViewMode("cards")}
-                class="flex items-center justify-center w-7 h-7 rounded-full transition-colors {activeViewMode === 'cards' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+                class="relative z-10 flex items-center justify-center w-7 h-7 rounded-full transition-colors duration-200 {activeViewMode === 'cards' ? 'text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
                 title={i18n.t('collection.viewCards')}
                 aria-label={i18n.t('collection.viewCards')}
                 aria-pressed={activeViewMode === "cards"}
@@ -425,7 +430,7 @@
               </button>
               <button
                 onclick={() => setActiveViewMode("rows")}
-                class="flex items-center justify-center w-7 h-7 rounded-full transition-colors {activeViewMode === 'rows' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+                class="relative z-10 flex items-center justify-center w-7 h-7 rounded-full transition-colors duration-200 {activeViewMode === 'rows' ? 'text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
                 title={i18n.t('collection.viewRows')}
                 aria-label={i18n.t('collection.viewRows')}
                 aria-pressed={activeViewMode === "rows"}
