@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { fly, fade } from 'svelte/transition';
+  import { fly } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
@@ -61,22 +61,6 @@
 
 
 
-
-  // Delay the appearance of the compact transport PiP button until the full-tier
-  // toolbar and seekbar finish fading out (200ms), preventing duplicate PiP buttons
-  // or flashing beside the transport controls before the toolbar is hidden.
-  let isToolbarGone = $state(windowLayoutStore.isPlayerBarCompact);
-
-  $effect(() => {
-    if (!windowLayoutStore.isPlayerBarCompact) {
-      isToolbarGone = false;
-    } else {
-      const timer = setTimeout(() => {
-        isToolbarGone = true;
-      }, 200);
-      return () => clearTimeout(timer);
-    }
-  });
 
   let volumePercent = $derived(playerStore.volume * 100);
   let volumeSliderStyle = $derived(
@@ -429,9 +413,8 @@
         </div>
       {/if}
 
-      {#if windowLayoutStore.isPlayerBarCompact && isToolbarGone}
+      {#if windowLayoutStore.isPlayerBarCompact}
         <button
-          in:fade={{ duration: 150 }}
           onclick={() => windowLayoutStore.toggleMiniplayerMode()}
           class="text-brand-text-secondary hover:text-brand-accent-text transition-colors flex-shrink-0"
           title={i18n.t('miniplayer.toggleTooltip', {}, 'Picture-in-Picture Mode (Ctrl+M)')}
@@ -444,7 +427,6 @@
 
     {#if !windowLayoutStore.isPlayerBarCompact}
       <div
-        transition:fade={{ duration: 200 }}
         class="flex items-center gap-2.5 w-full text-[10px] text-brand-text-secondary/60"
       >
         <!-- Invisible spacer matching the mode-toggle button's footprint, so the
@@ -475,7 +457,6 @@
   {#if !windowLayoutStore.isPlayerBarCompact}
     <div
       data-walkthrough-target="player-bar-toolbar"
-      transition:fade={{ duration: 200 }}
       class="flex flex-col items-center gap-1.5 flex-shrink-0 min-[768px]:w-1/3 min-[768px]:min-w-[200px] max-w-xs"
     >
       <div class="h-5 flex items-center gap-3 min-[768px]:gap-5">
