@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { fly } from 'svelte/transition';
+  import { fly, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
@@ -410,6 +410,7 @@
       </button>
       {#if !windowLayoutStore.isRightPanelAutoHidden}
         <button
+          transition:fade={{ duration: 200 }}
           onclick={() => {
             windowLayoutStore.exitImmersiveMode();
             navigationStore.activeTab = "lyrics";
@@ -429,6 +430,7 @@
       </button>
       {#if !windowLayoutStore.isRightPanelAutoHidden}
         <button
+          transition:fade={{ duration: 200 }}
           onclick={handleInfoClick}
           class="hidden md:inline-flex transition-colors {windowLayoutStore.rightPanelOpen ? 'text-brand-accent-text' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
           title={i18n.t('topNav.toggleRightPanel')}
@@ -446,9 +448,11 @@
     </div>
 
     <div class="flex items-center gap-2">
-      <div class="w-24 h-7 hidden md:block">
-        <SpectrumVisualizer />
-      </div>
+      {#if !windowLayoutStore.isRightPanelAutoHidden}
+        <div transition:fade={{ duration: 200 }} class="w-24 h-7 hidden md:block">
+          <SpectrumVisualizer />
+        </div>
+      {/if}
       <button onclick={toggleMute} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors" title={i18n.t('playerBar.volume')}>
         {#if isMuted || playerStore.volume === 0}
           <VolumeX class="w-4 h-4" />
