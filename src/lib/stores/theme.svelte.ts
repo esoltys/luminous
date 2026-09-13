@@ -529,6 +529,12 @@ export class ThemeStore {
   async setColorSchemeMode(mode: "light" | "dark" | "system") {
     this.colorSchemeMode = mode;
     if (this.activeThemeId === "system") {
+      if (typeof document !== "undefined") {
+        document.documentElement.style.setProperty("--theme-morph-duration", "1.5s");
+        setTimeout(() => {
+          void this.syncMorphDuration();
+        }, 1600);
+      }
       this.applyActiveTheme();
     }
     await invoke("set_app_setting", { key: "color_scheme_mode", value: mode });
@@ -582,10 +588,10 @@ export class ThemeStore {
     if (PREDEFINED_THEMES.some(t => t.id === themeId) || this.customThemes.some(t => t.id === themeId)) {
       this.activeThemeId = themeId;
       if (typeof document !== "undefined") {
-        document.documentElement.style.setProperty("--theme-morph-duration", "0.35s");
+        document.documentElement.style.setProperty("--theme-morph-duration", "1.5s");
         setTimeout(() => {
           void this.syncMorphDuration();
-        }, 400);
+        }, 1600);
       }
       this.applyActiveTheme();
       await invoke("set_app_setting", { key: "active_theme_id", value: themeId });
