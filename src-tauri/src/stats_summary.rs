@@ -80,7 +80,8 @@ fn get_summary_at(conn: &Connection, range: StatsRange, now: i64) -> Result<Stat
 
 fn top_songs(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>> {
     let sql = format!(
-        "SELECT CAST(s.id AS TEXT), s.title, s.artist, COUNT(*) AS play_count, s.album
+        "SELECT CAST(s.id AS TEXT), s.title, s.artist, COUNT(*) AS play_count, s.album,
+                COALESCE(SUM(COALESCE(NULLIF(ph.duration_secs, 0), s.length_nanosec / 1000000000, 0)), 0) AS total_secs
          FROM play_history ph
          JOIN songs s ON s.id = ph.song_id
          WHERE ph.played_at >= ?1
@@ -90,18 +91,20 @@ fn top_songs(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>> {
                WHERE se.entity_type = 'song' AND se.entity_key = CAST(s.id AS TEXT)
            )
          GROUP BY s.id
-         ORDER BY play_count DESC, s.title COLLATE NOCASE ASC
+         ORDER BY total_secs DESC, play_count DESC, s.title COLLATE NOCASE ASC
          LIMIT ?2",
         lib = *LIBRARY_SOURCES_SQL
     );
     let mut stmt = conn.prepare(&sql)?;
     let rows = stmt
         .query_map(params![range_start, TOP_N], |row| {
+            let total_secs: i64 = row.get(5)?;
             Ok(StatsTopItem {
                 key: row.get(0)?,
                 label: row.get::<_, Option<String>>(1)?.unwrap_or_default(),
                 secondary: row.get(2)?,
                 play_count: row.get(3)?,
+                minutes: total_secs / 60,
                 excluded: false,
                 album: row.get(4)?,
             })
@@ -111,41 +114,38 @@ fn top_songs(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>> {
     Ok(rows)
 }
 
-/// Album play count is `MIN` of per-track play counts within range (a
-/// completionist metric — full front-to-back listens), deliberately
-/// different from the Home "Top Albums" chart's `SUM`-based engagement
-/// metric (`CollectionScanner::get_top_albums`). The two numbers will
-/// legitimately disagree for the same album/range — see #130's discussion.
+/// Top albums aggregated by total listening time (#951) across all tracks belonging
+/// to that album in the given range.
 fn top_albums(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>> {
     let sql = format!(
-        "SELECT s.album, MIN(COALESCE(s.album_artist, s.artist)), MIN(track_plays.plays) AS min_plays
-         FROM songs s
-         JOIN (
-             SELECT s2.id AS song_id, COUNT(*) AS plays
-             FROM play_history ph
-             JOIN songs s2 ON s2.id = ph.song_id
-             WHERE ph.played_at >= ?1
-             GROUP BY s2.id
-         ) track_plays ON track_plays.song_id = s.id
-         WHERE s.source IN ({lib}) AND s.unavailable = 0
+        "SELECT s.album,
+                MIN(COALESCE(NULLIF(s.album_artist, ''), s.artist, '')),
+                COUNT(*) AS play_count,
+                COALESCE(SUM(COALESCE(NULLIF(ph.duration_secs, 0), s.length_nanosec / 1000000000, 0)), 0) AS total_secs
+         FROM play_history ph
+         JOIN songs s ON s.id = ph.song_id
+         WHERE ph.played_at >= ?1
+           AND s.source IN ({lib}) AND s.unavailable = 0
            AND s.album IS NOT NULL AND s.album != ''
            AND NOT EXISTS (
                SELECT 1 FROM stats_exclusions se
                WHERE se.entity_type = 'album' AND se.entity_key = s.album COLLATE NOCASE
            )
-         GROUP BY s.album
-         ORDER BY min_plays DESC, s.album COLLATE NOCASE ASC
+         GROUP BY s.album COLLATE NOCASE
+         ORDER BY total_secs DESC, play_count DESC, s.album COLLATE NOCASE ASC
          LIMIT ?2",
         lib = *LIBRARY_SOURCES_SQL
     );
     let mut stmt = conn.prepare(&sql)?;
     let rows = stmt
         .query_map(params![range_start, TOP_N], |row| {
+            let total_secs: i64 = row.get(3)?;
             Ok(StatsTopItem {
                 key: row.get(0)?,
                 label: row.get(0)?,
                 secondary: row.get(1)?,
                 play_count: row.get(2)?,
+                minutes: total_secs / 60,
                 excluded: false,
                 album: None,
             })
@@ -158,7 +158,8 @@ fn top_albums(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>> 
 fn top_artists(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>> {
     let sql = format!(
         "SELECT COALESCE(NULLIF(s.album_artist, ''), s.artist, '') AS effective_artist,
-                COUNT(*) AS play_count
+                COUNT(*) AS play_count,
+                COALESCE(SUM(COALESCE(NULLIF(ph.duration_secs, 0), s.length_nanosec / 1000000000, 0)), 0) AS total_secs
          FROM play_history ph
          JOIN songs s ON s.id = ph.song_id
          WHERE ph.played_at >= ?1
@@ -170,18 +171,20 @@ fn top_artists(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>>
                  AND se.entity_key = COALESCE(NULLIF(s.album_artist, ''), s.artist, '') COLLATE NOCASE
            )
          GROUP BY effective_artist COLLATE NOCASE
-         ORDER BY play_count DESC, effective_artist COLLATE NOCASE ASC
+         ORDER BY total_secs DESC, play_count DESC, effective_artist COLLATE NOCASE ASC
          LIMIT ?2",
         lib = *LIBRARY_SOURCES_SQL
     );
     let mut stmt = conn.prepare(&sql)?;
     let rows = stmt
         .query_map(params![range_start, TOP_N], |row| {
+            let total_secs: i64 = row.get(2)?;
             Ok(StatsTopItem {
                 key: row.get(0)?,
                 label: row.get(0)?,
                 secondary: None,
                 play_count: row.get(1)?,
+                minutes: total_secs / 60,
                 excluded: false,
                 album: None,
             })
@@ -193,11 +196,12 @@ fn top_artists(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>>
 
 /// `songs.genre` is a `; `-delimited multi-value string (see
 /// `crate::models::parse_multi_value`/`crate::tags::TagManager`), so genre
-/// counting can't be a plain SQL `GROUP BY` — each play is attributed to
-/// every genre tag on its song, then tallied and ranked in Rust.
+/// counting can't be a plain SQL `GROUP BY` — each play's duration is attributed
+/// to every genre tag on its song, then summed and ranked by listening time in Rust (#951).
 fn top_genres(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>> {
     let sql = format!(
-        "SELECT s.genre
+        "SELECT s.genre,
+                COALESCE(NULLIF(ph.duration_secs, 0), s.length_nanosec / 1000000000, 0) AS duration_secs
          FROM play_history ph
          JOIN songs s ON s.id = ph.song_id
          WHERE ph.played_at >= ?1
@@ -206,33 +210,51 @@ fn top_genres(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>> 
         lib = *LIBRARY_SOURCES_SQL
     );
     let mut stmt = conn.prepare(&sql)?;
-    let genre_lists: Vec<String> = stmt
-        .query_map(params![range_start], |row| row.get(0))?
+    let genre_rows: Vec<(String, i64)> = stmt
+        .query_map(params![range_start], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+        })?
         .filter_map(|r| r.ok())
         .collect();
 
     let excluded_genres = excluded_keys(conn, "genre")?;
-    let mut counts: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
-    for raw in genre_lists {
+
+    #[derive(Default)]
+    struct GenreAccumulator {
+        play_count: i64,
+        total_secs: i64,
+    }
+
+    let mut counts: std::collections::HashMap<String, GenreAccumulator> =
+        std::collections::HashMap::new();
+    for (raw, duration_secs) in genre_rows {
         for genre in parse_multi_value(&raw) {
             if excluded_genres.contains(&genre.to_lowercase()) {
                 continue;
             }
-            *counts.entry(genre).or_insert(0) += 1;
+            let entry = counts.entry(genre).or_default();
+            entry.play_count += 1;
+            entry.total_secs += duration_secs;
         }
     }
 
-    let mut ranked: Vec<(String, i64)> = counts.into_iter().collect();
-    ranked.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+    let mut ranked: Vec<(String, GenreAccumulator)> = counts.into_iter().collect();
+    ranked.sort_by(|a, b| {
+        b.1.total_secs
+            .cmp(&a.1.total_secs)
+            .then_with(|| b.1.play_count.cmp(&a.1.play_count))
+            .then_with(|| a.0.cmp(&b.0))
+    });
     ranked.truncate(TOP_N as usize);
 
     Ok(ranked
         .into_iter()
-        .map(|(genre, play_count)| StatsTopItem {
+        .map(|(genre, acc)| StatsTopItem {
             key: genre.clone(),
             label: genre,
             secondary: None,
-            play_count,
+            play_count: acc.play_count,
+            minutes: acc.total_secs / 60,
             excluded: false,
             album: None,
         })
@@ -285,7 +307,7 @@ fn play_timestamps(conn: &Connection, range_start: i64) -> Result<Vec<i64>> {
 /// minutes.
 fn total_minutes(conn: &Connection, range_start: i64) -> Result<i64> {
     let sql = format!(
-        "SELECT COALESCE(SUM(ph.duration_secs), 0)
+        "SELECT COALESCE(SUM(COALESCE(NULLIF(ph.duration_secs, 0), s.length_nanosec / 1000000000, 0)), 0)
          FROM play_history ph
          JOIN songs s ON s.id = ph.song_id
          WHERE ph.played_at >= ?1
@@ -306,7 +328,7 @@ fn total_minutes(conn: &Connection, range_start: i64) -> Result<i64> {
 /// `play_timestamps` above (no server-side UTC-offset day math).
 pub fn listening_activity(conn: &Connection, since_unix: i64) -> Result<Vec<ListenEvent>> {
     let sql = format!(
-        "SELECT ph.played_at, ph.duration_secs
+        "SELECT ph.played_at, COALESCE(NULLIF(ph.duration_secs, 0), s.length_nanosec / 1000000000, 0)
          FROM play_history ph
          JOIN songs s ON s.id = ph.song_id
          WHERE ph.played_at >= ?1
@@ -433,23 +455,145 @@ mod tests {
     }
 
     #[test]
-    fn test_top_albums_uses_min_not_sum() {
+    fn test_top_albums_sums_album_plays_and_minutes() {
         let (db, dir) = test_db();
         let conn = db.pool.get().unwrap();
         let now = 1_700_000_000;
         let range_start = range_start_unix(StatsRange::SevenDays, now);
 
-        // Track 1 played 5x, track 2 played 1x — MIN should be 1, not SUM (6).
+        // Track 1 played 5x (120s each = 600s), track 2 played 1x (60s).
+        // Total plays = 6, total minutes = 660 / 60 = 11.
         let t1 = insert_song(&conn, "/t1.flac", "T1", "Artist", "Album", "Rock");
         let t2 = insert_song(&conn, "/t2.flac", "T2", "Artist", "Album", "Rock");
         for _ in 0..5 {
-            insert_play(&conn, t1, range_start + 10);
+            insert_play_with_duration(&conn, t1, range_start + 10, 120);
         }
-        insert_play(&conn, t2, range_start + 10);
+        insert_play_with_duration(&conn, t2, range_start + 10, 60);
 
         let albums = top_albums(&conn, range_start).unwrap();
         assert_eq!(albums.len(), 1);
+        assert_eq!(albums[0].play_count, 6);
+        assert_eq!(albums[0].minutes, 11);
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_top_artists_ranks_by_duration() {
+        let (db, dir) = test_db();
+        let conn = db.pool.get().unwrap();
+        let now = 1_700_000_000;
+        let range_start = range_start_unix(StatsRange::SevenDays, now);
+
+        // Artist A: 1 play of 600s (10 min).
+        // Artist B: 3 plays of 60s (3 min total).
+        let s_a = insert_song(&conn, "/a.flac", "Song A", "Artist A", "Album A", "Rock");
+        let s_b = insert_song(&conn, "/b.flac", "Song B", "Artist B", "Album B", "Pop");
+
+        insert_play_with_duration(&conn, s_a, range_start + 10, 600);
+        for _ in 0..3 {
+            insert_play_with_duration(&conn, s_b, range_start + 10, 60);
+        }
+
+        let artists = top_artists(&conn, range_start).unwrap();
+        assert_eq!(artists.len(), 2);
+        assert_eq!(artists[0].label, "Artist A");
+        assert_eq!(artists[0].minutes, 10);
+        assert_eq!(artists[0].play_count, 1);
+
+        assert_eq!(artists[1].label, "Artist B");
+        assert_eq!(artists[1].minutes, 3);
+        assert_eq!(artists[1].play_count, 3);
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_top_albums_ranks_by_duration() {
+        let (db, dir) = test_db();
+        let conn = db.pool.get().unwrap();
+        let now = 1_700_000_000;
+        let range_start = range_start_unix(StatsRange::SevenDays, now);
+
+        // Album A: 1 play of 600s (10 min).
+        // Album B: 4 plays of 60s (4 min total).
+        let s_a = insert_song(&conn, "/a.flac", "Song A", "Artist A", "Album A", "Rock");
+        let s_b = insert_song(&conn, "/b.flac", "Song B", "Artist B", "Album B", "Pop");
+
+        insert_play_with_duration(&conn, s_a, range_start + 10, 600);
+        for _ in 0..4 {
+            insert_play_with_duration(&conn, s_b, range_start + 10, 60);
+        }
+
+        let albums = top_albums(&conn, range_start).unwrap();
+        assert_eq!(albums.len(), 2);
+        assert_eq!(albums[0].label, "Album A");
+        assert_eq!(albums[0].minutes, 10);
         assert_eq!(albums[0].play_count, 1);
+
+        assert_eq!(albums[1].label, "Album B");
+        assert_eq!(albums[1].minutes, 4);
+        assert_eq!(albums[1].play_count, 4);
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_top_genres_ranks_by_duration() {
+        let (db, dir) = test_db();
+        let conn = db.pool.get().unwrap();
+        let now = 1_700_000_000;
+        let range_start = range_start_unix(StatsRange::SevenDays, now);
+
+        // Genre Rock: 1 play of 600s (10 min).
+        // Genre Pop: 3 plays of 60s (3 min total).
+        let s_rock = insert_song(&conn, "/rock.flac", "Rock Song", "Artist", "Album", "Rock");
+        let s_pop = insert_song(&conn, "/pop.flac", "Pop Song", "Artist", "Album", "Pop");
+
+        insert_play_with_duration(&conn, s_rock, range_start + 10, 600);
+        for _ in 0..3 {
+            insert_play_with_duration(&conn, s_pop, range_start + 10, 60);
+        }
+
+        let genres = top_genres(&conn, range_start).unwrap();
+        assert_eq!(genres.len(), 2);
+        assert_eq!(genres[0].label, "Rock");
+        assert_eq!(genres[0].minutes, 10);
+        assert_eq!(genres[0].play_count, 1);
+
+        assert_eq!(genres[1].label, "Pop");
+        assert_eq!(genres[1].minutes, 3);
+        assert_eq!(genres[1].play_count, 3);
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_top_songs_ranks_by_duration() {
+        let (db, dir) = test_db();
+        let conn = db.pool.get().unwrap();
+        let now = 1_700_000_000;
+        let range_start = range_start_unix(StatsRange::SevenDays, now);
+
+        // Song A: 1 play of 600s (10 min).
+        // Song B: 4 plays of 60s (4 min total).
+        let s_a = insert_song(&conn, "/a.flac", "Song A", "Artist A", "Album A", "Rock");
+        let s_b = insert_song(&conn, "/b.flac", "Song B", "Artist B", "Album B", "Pop");
+
+        insert_play_with_duration(&conn, s_a, range_start + 10, 600);
+        for _ in 0..4 {
+            insert_play_with_duration(&conn, s_b, range_start + 10, 60);
+        }
+
+        let songs = top_songs(&conn, range_start).unwrap();
+        assert_eq!(songs.len(), 2);
+        assert_eq!(songs[0].label, "Song A");
+        assert_eq!(songs[0].minutes, 10);
+        assert_eq!(songs[0].play_count, 1);
+
+        assert_eq!(songs[1].label, "Song B");
+        assert_eq!(songs[1].minutes, 4);
+        assert_eq!(songs[1].play_count, 4);
 
         let _ = std::fs::remove_dir_all(dir);
     }

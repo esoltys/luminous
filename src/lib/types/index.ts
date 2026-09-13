@@ -341,6 +341,7 @@ export interface StatsTopItem {
   /** Secondary line (e.g. artist for a song/album row); null for artist/genre rows. */
   secondary: string | null;
   play_count: number;
+  minutes: number;
   excluded: boolean;
   /** The song's album title, set only on top_songs rows — songs have no detail
    * page of their own, so clicking one navigates to this album instead. */
