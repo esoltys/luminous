@@ -12,6 +12,7 @@
 pub mod analyzer;
 pub mod audio;
 pub mod band_waveform;
+pub mod bridge;
 pub mod collection;
 pub mod commands;
 pub mod context;
@@ -933,6 +934,9 @@ pub fn run() {
                 Arc::clone(&managed_state.audio),
                 Arc::clone(&managed_state.player),
             );
+
+            // Spawn loopback HTTP bridge server for assistant and MCP playback control
+            crate::bridge::spawn_bridge_server(app.handle().clone());
 
             if let Err(e) = tray::init(app) {
                 log::warn!("Failed to initialize system tray: {e}");
