@@ -227,13 +227,22 @@
   }
 
   /**
+   * Custom transition for inline toolbar and transport elements when expanding or collapsing.
    * Smoothly fades opacity while collapsing horizontal width and absorbing flex gap,
    * so sibling items glide closer together when an item disappears, and glide apart
    * when it reappears.
    */
   function collapseFade(
     node: HTMLElement,
-    { duration = 250, easing = cubicOut }: { duration?: number; easing?: (t: number) => number } = {}
+    {
+      duration = 250,
+      easing = cubicOut,
+      marginSide = node.nextElementSibling ? 'right' : 'left',
+    }: {
+      duration?: number;
+      easing?: (t: number) => number;
+      marginSide?: 'left' | 'right';
+    } = {}
   ) {
     const style = getComputedStyle(node);
     const parentStyle = node.parentElement ? getComputedStyle(node.parentElement) : null;
@@ -243,6 +252,7 @@
     const width = parseFloat(style.width) || node.getBoundingClientRect().width || 20;
     const paddingLeft = parseFloat(style.paddingLeft) || 0;
     const paddingRight = parseFloat(style.paddingRight) || 0;
+    const marginProp = marginSide === 'left' ? 'margin-left' : 'margin-right';
 
     return {
       duration,
@@ -255,7 +265,7 @@
         max-width: ${t * width}px;
         padding-left: ${t * paddingLeft}px;
         padding-right: ${t * paddingRight}px;
-        margin-right: -${(1 - t) * gap}px;
+        ${marginProp}: -${(1 - t) * gap}px;
         white-space: nowrap;
         pointer-events: ${t < 0.1 ? 'none' : 'auto'};
       `,
@@ -327,8 +337,8 @@
 
   <div data-walkthrough-target="player-bar-controls" class="flex flex-col items-center gap-1.5 min-[400px]:min-w-[220px] min-[400px]:ml-auto min-[700px]:w-1/3 min-[700px]:flex-none min-[700px]:ml-0 max-w-[600px]">
     <div class="flex items-center gap-3 min-[700px]:gap-5">
-      {#if !windowLayoutStore.isPlayerBarCompact}
-        <div transition:fade={{ duration: 200 }} class="relative">
+      {#if !windowLayoutStore.isRightPanelAutoHidden}
+        <div transition:collapseFade={{ duration: 250 }} class="relative inline-flex items-center flex-shrink-0">
           {#if playerStore.shuffleMode !== 'off'}
             <button
               onclick={cycleShuffle}
@@ -378,8 +388,8 @@
         <SkipForward class="w-5 h-5 fill-current" />
       </button>
 
-      {#if !windowLayoutStore.isPlayerBarCompact}
-        <div transition:fade={{ duration: 200 }} class="relative">
+      {#if !windowLayoutStore.isRightPanelAutoHidden}
+        <div transition:collapseFade={{ duration: 250 }} class="relative inline-flex items-center flex-shrink-0">
           <button
             onclick={cycleRepeat}
             class="text-xs transition-colors hover:text-brand-text-primary flex items-center gap-1 p-1 {playerStore.repeatMode !== 'off' ? 'text-brand-accent-text font-bold' : 'text-brand-text-secondary/50'}"

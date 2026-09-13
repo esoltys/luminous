@@ -496,28 +496,34 @@ describe("PlayerBar.svelte", () => {
     expect(getByTitle("Song menu")).toBeDisabled();
   });
 
-  it("hides the info and lyrics buttons at the same breakpoint that auto-hides the right panel and spectrum (< 768px)", () => {
+  it("hides the info, lyrics, shuffle, and repeat buttons at the same breakpoint that auto-hides the right panel and spectrum (< 768px)", () => {
     playerStore.currentSong = mockSong;
     windowLayoutStore.viewportWidth = 1280;
     expect(windowLayoutStore.isRightPanelAutoHidden).toBe(false);
     const { queryByTitle, unmount } = render(PlayerBar);
     expect(queryByTitle("Show Info Panel (Ctrl+I)")).not.toBeNull();
     expect(queryByTitle("Lyrics")).not.toBeNull();
+    expect(queryByTitle(/shuffle/i)).not.toBeNull();
+    expect(queryByTitle(/repeat/i)).not.toBeNull();
     unmount();
 
-    // 800px is >= 768px (md breakpoint): right panel is not auto-hidden, spectrum and all 5 buttons remain visible
+    // 800px is >= 768px (md breakpoint): right panel is not auto-hidden, spectrum, info, lyrics, shuffle, and repeat remain visible
     windowLayoutStore.viewportWidth = 800;
     expect(windowLayoutStore.isRightPanelAutoHidden).toBe(false);
     const { queryByTitle: queryByTitleMedium, unmount: unmountMedium } = render(PlayerBar);
     expect(queryByTitleMedium("Show Info Panel (Ctrl+I)")).not.toBeNull();
     expect(queryByTitleMedium("Lyrics")).not.toBeNull();
+    expect(queryByTitleMedium(/shuffle/i)).not.toBeNull();
+    expect(queryByTitleMedium(/repeat/i)).not.toBeNull();
     unmountMedium();
 
-    // 700px is < 768px: right panel auto-hides, Info and Lyrics buttons hide
+    // 700px is < 768px: right panel auto-hides, Info, Lyrics, Shuffle, and Repeat buttons hide
     windowLayoutStore.viewportWidth = 700;
     expect(windowLayoutStore.isRightPanelAutoHidden).toBe(true);
     const { queryByTitle: queryByTitleNarrow } = render(PlayerBar);
     expect(queryByTitleNarrow("Show Info Panel (Ctrl+I)")).toBeNull();
     expect(queryByTitleNarrow("Lyrics")).toBeNull();
+    expect(queryByTitleNarrow(/shuffle/i)).toBeNull();
+    expect(queryByTitleNarrow(/repeat/i)).toBeNull();
   });
 });
