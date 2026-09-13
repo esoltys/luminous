@@ -581,6 +581,12 @@ export class ThemeStore {
   async setTheme(themeId: string) {
     if (PREDEFINED_THEMES.some(t => t.id === themeId) || this.customThemes.some(t => t.id === themeId)) {
       this.activeThemeId = themeId;
+      if (typeof document !== "undefined") {
+        document.documentElement.style.setProperty("--theme-morph-duration", "0.35s");
+        setTimeout(() => {
+          void this.syncMorphDuration();
+        }, 400);
+      }
       this.applyActiveTheme();
       await invoke("set_app_setting", { key: "active_theme_id", value: themeId });
     }
