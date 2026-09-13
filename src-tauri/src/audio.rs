@@ -49,6 +49,11 @@ use symphonia::core::{
 /// sibling-track continuation (#78).
 pub const PRELOAD_LEAD_NS: u64 = 8_000_000_000;
 
+/// Maximum linear amplitude allowed when dynamic processing (loudness normalization
+/// or equalizer) is active. Set to -1.0 dBTP (True Peak) ≈ 0.8912509 linear amplitude
+/// (10^(-1/20)) to prevent inter-sample clipping during digital-to-analog reconstruction.
+pub const TRUE_PEAK_CEILING: f32 = 0.891_250_9;
+
 fn apply_fade_ramp(fade_gain: &Arc<AtomicU32>, start_gain: f32, end_gain: f32, duration_ms: u32) {
     if duration_ms == 0 {
         fade_gain.store(end_gain.to_bits(), Ordering::Relaxed);
@@ -838,7 +843,9 @@ fn build_output(
                 }
 
                 // 2) Equalizer (preamp + band cascade; no-op when disabled)
+                let mut eq_applied = false;
                 if let Ok(mut eq) = eq_cpal.try_lock() {
+                    eq_applied = eq.enabled;
                     eq.process_interleaved(&mut output[..played]);
                 }
 
@@ -856,14 +863,17 @@ fn build_output(
                     }
                 }
 
-                // 5) Final clip guard. The equalizer clamps internally, but
-                // only while enabled — loudness normalization alone can push
-                // samples past full scale (positive R128/ReplayGain gain, up
-                // to the +12 dB clamp in `loudness::compute_gain`), so a
-                // limiter independent of the EQ toggle is needed here too.
-                if loudness != 1.0 {
+                // 5) Final clip guard and true-peak ceiling limiter.
+                // When loudness normalization or EQ is active, samples can be boosted
+                // significantly past full scale (loudness boost up to +12 dB, or EQ
+                // preamp up to +12 dB stacked on top of positive band gains).
+                // We enforce a true-peak ceiling (-1.0 dBTP = 0.8912509) to prevent inter-sample
+                // clipping during D/A reconstruction.
+                // When both loudness normalization and EQ are neutral/disabled, the signal
+                // passes through unaltered for bit-perfect output.
+                if loudness != 1.0 || eq_applied {
                     for sample in output[..played].iter_mut() {
-                        *sample = sample.clamp(-1.0, 1.0);
+                        *sample = sample.clamp(-TRUE_PEAK_CEILING, TRUE_PEAK_CEILING);
                     }
                 }
 

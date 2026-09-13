@@ -109,7 +109,7 @@ fn check_frequency_boost(w: &mut EqualizerWorld, _freq_str: String, boost_db_str
 
 #[when("I select the \"Rock\" equalizer preset")]
 fn select_rock_preset(w: &mut EqualizerWorld) {
-    let gains = [4.0, 3.0, 2.0, -1.0, -2.0, -1.0, 1.0, 2.0, 3.0, 4.0];
+    let gains = [4.0, 3.0, 1.0, -1.0, -2.0, -1.0, 1.0, 3.0, 3.5, 3.5];
     w.equalizer.load_preset(gains);
 }
 

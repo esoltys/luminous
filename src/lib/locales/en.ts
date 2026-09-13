@@ -901,7 +901,8 @@ export const en = {
     resetBands: "Reset Bands",
     bass: "Bass",
     mid: "Mid",
-    treble: "Treble"
+    treble: "Treble",
+    isoStandard: "ISO 266:1997"
   },
   loudness: {
     title: "Loudness Normalization",
