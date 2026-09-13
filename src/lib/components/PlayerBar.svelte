@@ -62,6 +62,22 @@
 
 
 
+  // Delay the appearance of the compact transport PiP button until the full-tier
+  // toolbar and seekbar finish fading out (200ms), preventing duplicate PiP buttons
+  // or flashing beside the transport controls before the toolbar is hidden.
+  let isToolbarGone = $state(windowLayoutStore.isPlayerBarCompact);
+
+  $effect(() => {
+    if (!windowLayoutStore.isPlayerBarCompact) {
+      isToolbarGone = false;
+    } else {
+      const timer = setTimeout(() => {
+        isToolbarGone = true;
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  });
+
   let volumePercent = $derived(playerStore.volume * 100);
   let volumeSliderStyle = $derived(
     `background: linear-gradient(to right, var(--color-accent) 0%, var(--color-accent) ${volumePercent}%, var(--color-border) ${volumePercent}%, var(--color-border) 100%)`
@@ -413,9 +429,9 @@
         </div>
       {/if}
 
-      {#if windowLayoutStore.isPlayerBarCompact}
+      {#if windowLayoutStore.isPlayerBarCompact && isToolbarGone}
         <button
-          transition:fade={{ duration: 200 }}
+          in:fade={{ duration: 150 }}
           onclick={() => windowLayoutStore.toggleMiniplayerMode()}
           class="text-brand-text-secondary hover:text-brand-accent-text transition-colors flex-shrink-0"
           title={i18n.t('miniplayer.toggleTooltip', {}, 'Picture-in-Picture Mode (Ctrl+M)')}
