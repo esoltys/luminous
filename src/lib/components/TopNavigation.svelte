@@ -314,7 +314,7 @@
   </div>
 
   <div bind:this={searchContainerRef} class="relative flex-1 max-w-2xl">
-    <form onsubmit={handleSearch} class="w-full flex items-center gap-3 bg-brand-main rounded-lg px-4 py-2 border border-brand-border focus-within:border-brand-accent transition-colors">
+    <form onsubmit={handleSearch} class="w-full flex items-center gap-3 bg-brand-main rounded-lg px-4 py-2 border border-brand-border focus-within:border-brand-accent focus-within:transition-colors duration-150">
       <Search class="w-4 h-4 text-brand-text-secondary flex-shrink-0" />
       <input
         bind:this={searchInput}

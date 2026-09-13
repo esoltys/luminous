@@ -58,12 +58,14 @@
     }
   }
 
+  let isUserEditingBuilder = $state(false);
+
   // Pre-fill theme builder with current active theme colors on mount and
   // updates — skipped while editing an existing custom theme, since that
   // case is seeded from the theme being edited instead (below).
   $effect(() => {
     const colors = themeStore.resolvedColors;
-    if (!editingThemeId) {
+    if (!editingThemeId && !isUserEditingBuilder) {
       customColors = { ...colors };
     }
   });
@@ -76,11 +78,12 @@
     if (editingTheme) {
       newThemeName = editingTheme.name;
       customColors = { ...editingTheme.colors };
+      isUserEditingBuilder = true;
     }
   });
 
   $effect(() => {
-    if (customColors) {
+    if (customColors && (isUserEditingBuilder || editingThemeId !== null)) {
       // deep read to trigger reactivity
       const _ = customColors["bg-main"] + customColors["bg-sidebar"] + customColors["bg-playerbar"] + customColors["color-accent"] + customColors["color-accent-hover"] + customColors["color-border"];
       themeStore.applyThemeColorsPreview(customColors);
@@ -107,6 +110,7 @@
         isCustom: true
       });
       editingThemeId = null;
+      isUserEditingBuilder = false;
     } else {
       const id = "custom-" + newThemeName.toLowerCase().replace(/[^a-z0-9]/g, "-");
       await themeStore.addCustomTheme({
@@ -116,6 +120,7 @@
         isCustom: true
       });
       newThemeName = "";
+      isUserEditingBuilder = false;
     }
   }
 
@@ -335,7 +340,7 @@
           <FolderInput class="w-3.5 h-3.5 text-brand-accent-text" /> {i18n.t('settings.importTheme')}
         </Button>
         {#if editingThemeId}
-          <Button onclick={() => { editingThemeId = null; themeStore.applyActiveTheme(); }} variant="secondary" size="sm">
+          <Button onclick={() => { editingThemeId = null; isUserEditingBuilder = false; themeStore.applyActiveTheme(); }} variant="secondary" size="sm">
             {i18n.t('settings.cancel')}
           </Button>
         {/if}

@@ -28,10 +28,13 @@ export const RIGHT_PANEL_MAX_WIDTH_PX = 480;
 /** Step size used by the keyboard-accessible resize handles for the sidebar/right panel. */
 export const PANEL_RESIZE_STEP_PX = 10;
 
-/** Window width below which the sidebar auto-collapses to its icon rail and the right panel auto-closes (routes/+layout.svelte, collection.svelte.ts). */
+/** Window width below which the sidebar auto-collapses to its icon rail (routes/+layout.svelte, collection.svelte.ts). */
 export const MEDIUM_BREAKPOINT_WIDTH_PX = 1024;
 
-/** Window width below which Immersive Mode force-engages, since sidebars no longer fit (routes/+layout.svelte, collection.svelte.ts). */
+/** Window width below which the right panel auto-hides and playbar spectrum/info/lyrics buttons hide, matching the md breakpoint (routes/+layout.svelte, PlayerBar.svelte). */
+export const RIGHT_PANEL_AUTO_HIDE_WIDTH_PX = 768;
+
+/** Window width below which Immersive Mode force-engages and PlayerBar transitions to Compact tier, since sidebars and full playdock no longer fit (routes/+layout.svelte, windowLayout.svelte.ts). */
 export const SMALL_BREAKPOINT_WIDTH_PX = 640;
 
 /** Window height below which the app collapses to showing only the PlayerBar (routes/+layout.svelte, collection.svelte.ts). */
