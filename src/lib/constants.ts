@@ -34,6 +34,9 @@ export const MEDIUM_BREAKPOINT_WIDTH_PX = 1024;
 /** Window width below which the right panel auto-hides and playbar spectrum/info/lyrics buttons hide, matching the md breakpoint (routes/+layout.svelte, PlayerBar.svelte). */
 export const RIGHT_PANEL_AUTO_HIDE_WIDTH_PX = 768;
 
+/** Window width below which the PlayerBar transitions to Compact tier (PlayerBar.svelte). */
+export const COMPACT_PLAYBAR_BREAKPOINT_WIDTH_PX = 700;
+
 /** Window width below which Immersive Mode force-engages, since sidebars no longer fit (routes/+layout.svelte, collection.svelte.ts). */
 export const SMALL_BREAKPOINT_WIDTH_PX = 640;
 

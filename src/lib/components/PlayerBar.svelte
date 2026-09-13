@@ -291,28 +291,30 @@
 
   <div data-walkthrough-target="player-bar-controls" class="flex flex-col items-center gap-1.5 min-[400px]:min-w-[220px] min-[400px]:ml-auto min-[700px]:w-1/3 min-[700px]:flex-none min-[700px]:ml-0 max-w-[600px]">
     <div class="flex items-center gap-3 min-[700px]:gap-5">
-      <div class="hidden min-[700px]:block relative">
-        {#if playerStore.shuffleMode !== 'off'}
+      {#if !windowLayoutStore.isPlayerBarCompact}
+        <div transition:fade={{ duration: 200 }} class="relative">
+          {#if playerStore.shuffleMode !== 'off'}
+            <button
+              onclick={cycleShuffle}
+              class="absolute right-full top-1/2 -translate-y-1/2 mr-1.5 text-[10px] font-semibold text-brand-accent-text hover:text-brand-text-primary transition-colors uppercase tracking-wide whitespace-nowrap"
+              title={`${i18n.t('playerBar.shuffle')}: ${shuffleModeLabel(playerStore.shuffleMode)} — ${shuffleModeDescription(playerStore.shuffleMode)}`}
+            >
+              {i18n.t('playerBar.shuffle')} {shuffleModeLabel(playerStore.shuffleMode)}
+            </button>
+          {/if}
           <button
             onclick={cycleShuffle}
-            class="absolute right-full top-1/2 -translate-y-1/2 mr-1.5 text-[10px] font-semibold text-brand-accent-text hover:text-brand-text-primary transition-colors uppercase tracking-wide whitespace-nowrap"
+            class="text-xs transition-colors hover:text-brand-text-primary flex items-center gap-1 p-1 {playerStore.shuffleMode !== 'off' ? 'text-brand-accent-text font-bold' : 'text-brand-text-secondary/50'}"
             title={`${i18n.t('playerBar.shuffle')}: ${shuffleModeLabel(playerStore.shuffleMode)} — ${shuffleModeDescription(playerStore.shuffleMode)}`}
           >
-            {i18n.t('playerBar.shuffle')} {shuffleModeLabel(playerStore.shuffleMode)}
+            {#if shuffleTypeIcon(playerStore.shuffleMode)}
+              {@const ShuffleTypeIcon = shuffleTypeIcon(playerStore.shuffleMode)}
+              <ShuffleTypeIcon class="w-4 h-4" />
+            {/if}
+            <Shuffle class="w-4 h-4" />
           </button>
-        {/if}
-        <button
-          onclick={cycleShuffle}
-          class="text-xs transition-colors hover:text-brand-text-primary flex items-center gap-1 p-1 {playerStore.shuffleMode !== 'off' ? 'text-brand-accent-text font-bold' : 'text-brand-text-secondary/50'}"
-          title={`${i18n.t('playerBar.shuffle')}: ${shuffleModeLabel(playerStore.shuffleMode)} — ${shuffleModeDescription(playerStore.shuffleMode)}`}
-        >
-          {#if shuffleTypeIcon(playerStore.shuffleMode)}
-            {@const ShuffleTypeIcon = shuffleTypeIcon(playerStore.shuffleMode)}
-            <ShuffleTypeIcon class="w-4 h-4" />
-          {/if}
-          <Shuffle class="w-4 h-4" />
-        </button>
-      </div>
+        </div>
+      {/if}
 
       <button onclick={() => playerStore.previous()} class="hidden min-[400px]:block text-brand-text-secondary hover:text-brand-text-primary transition-colors" title={i18n.t('playerBar.previous')}>
         <SkipBack class="w-5 h-5 fill-current" />
@@ -340,143 +342,159 @@
         <SkipForward class="w-5 h-5 fill-current" />
       </button>
 
-      <div class="hidden min-[700px]:block relative">
-        <button
-          onclick={cycleRepeat}
-          class="text-xs transition-colors hover:text-brand-text-primary flex items-center gap-1 p-1 {playerStore.repeatMode !== 'off' ? 'text-brand-accent-text font-bold' : 'text-brand-text-secondary/50'}"
-          title={`${i18n.t('playerBar.repeat')}: ${repeatModeLabel(playerStore.repeatMode)} — ${repeatModeDescription(playerStore.repeatMode)}`}
-        >
-          <Repeat class="w-4 h-4" />
-          {#if repeatTypeIcon(playerStore.repeatMode)}
-            {@const RepeatTypeIcon = repeatTypeIcon(playerStore.repeatMode)}
-            <RepeatTypeIcon class="w-4 h-4" />
-          {/if}
-        </button>
-        {#if playerStore.repeatMode !== 'off'}
+      {#if !windowLayoutStore.isPlayerBarCompact}
+        <div transition:fade={{ duration: 200 }} class="relative">
           <button
             onclick={cycleRepeat}
-            class="absolute left-full top-1/2 -translate-y-1/2 ml-1.5 text-[10px] font-semibold text-brand-accent-text hover:text-brand-text-primary transition-colors uppercase tracking-wide whitespace-nowrap"
+            class="text-xs transition-colors hover:text-brand-text-primary flex items-center gap-1 p-1 {playerStore.repeatMode !== 'off' ? 'text-brand-accent-text font-bold' : 'text-brand-text-secondary/50'}"
             title={`${i18n.t('playerBar.repeat')}: ${repeatModeLabel(playerStore.repeatMode)} — ${repeatModeDescription(playerStore.repeatMode)}`}
           >
-            {i18n.t('playerBar.repeat')} {repeatModeLabel(playerStore.repeatMode)}
+            <Repeat class="w-4 h-4" />
+            {#if repeatTypeIcon(playerStore.repeatMode)}
+              {@const RepeatTypeIcon = repeatTypeIcon(playerStore.repeatMode)}
+              <RepeatTypeIcon class="w-4 h-4" />
+            {/if}
           </button>
-        {/if}
-      </div>
-
-      <button
-        onclick={() => windowLayoutStore.toggleMiniplayerMode()}
-        class="min-[700px]:hidden text-brand-text-secondary hover:text-brand-accent-text transition-colors flex-shrink-0"
-        title={i18n.t('miniplayer.toggleTooltip', {}, 'Picture-in-Picture Mode (Ctrl+M)')}
-      >
-        <PictureInPicture class="w-4 h-4" />
-      </button>
-
-    </div>
-
-    <div class="hidden min-[700px]:flex items-center gap-2.5 w-full text-[10px] text-brand-text-secondary/60">
-      <!-- Invisible spacer matching the mode-toggle button's footprint, so the
-           waveform + timers stay centered instead of skewing left toward it. -->
-      <div class="w-4 h-4 flex-shrink-0" aria-hidden="true"></div>
-      <span>{formatDuration(playerStore.positionNanosec)}</span>
-      <div class="flex-1 flex flex-col gap-1">
-        <WaveformSeekBar />
-      </div>
-      <span>{formatDuration(playerStore.currentSong?.length_nanosec)}</span>
-      <button
-        onclick={() => prefs.toggleSeekBarMode()}
-        class="text-brand-text-secondary/50 hover:text-brand-text-primary transition-colors p-0.5 flex-shrink-0"
-        title={prefs.seekBarMode === 'waveform'
-          ? i18n.t('playerBar.seekbarModeWaveform', {}, 'Waveform mode — click to switch to frequency bands')
-          : i18n.t('playerBar.seekbarModeBands', {}, 'Frequency bands mode — click to switch to waveform')}
-      >
-        {#if prefs.seekBarMode === 'waveform'}
-          <AudioWaveform class="w-3 h-3" />
-        {:else}
-          <Palette class="w-3 h-3" />
-        {/if}
-      </button>
-    </div>
-  </div>
-
-  <div data-walkthrough-target="player-bar-toolbar" class="hidden min-[700px]:flex flex-col items-center gap-1.5 w-1/3 min-w-[50px] min-[700px]:min-w-[200px] max-w-xs">
-    <div class="flex items-center gap-3 min-[700px]:gap-5">
-      <button
-        onclick={openCurrentSongMenu}
-        disabled={!playerStore.currentSong}
-        class="text-brand-text-secondary hover:text-brand-text-primary transition-colors disabled:opacity-40 disabled:pointer-events-none"
-        title={i18n.t('playerBar.menuTooltip', {}, 'Song menu')}
-      >
-        <Menu class="w-5 h-5" />
-      </button>
-      {#if !windowLayoutStore.isRightPanelAutoHidden}
-        <button
-          transition:fade={{ duration: 200 }}
-          onclick={() => {
-            windowLayoutStore.exitImmersiveMode();
-            navigationStore.activeTab = "lyrics";
-          }}
-          class="hidden md:inline-flex transition-colors {navigationStore.activeTab === 'lyrics' ? 'text-brand-accent-text' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-          title={i18n.t('sidebar.lyrics')}
-        >
-          <Lyrics class="w-5 h-5" />
-        </button>
-      {/if}
-      <button
-        onclick={navigateToQueue}
-        class="text-brand-text-secondary hover:text-brand-text-primary transition-colors"
-        title={i18n.t('playerBar.queueTitle', {}, 'Queue')}
-      >
-        <Layers class="w-5 h-5" />
-      </button>
-      {#if !windowLayoutStore.isRightPanelAutoHidden}
-        <button
-          transition:fade={{ duration: 200 }}
-          onclick={handleInfoClick}
-          class="hidden md:inline-flex transition-colors {windowLayoutStore.rightPanelOpen ? 'text-brand-accent-text' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-          title={i18n.t('topNav.toggleRightPanel')}
-        >
-          <Info class="w-5 h-5" />
-        </button>
-      {/if}
-      <button
-        onclick={() => windowLayoutStore.toggleMiniplayerMode()}
-        class="text-brand-text-secondary hover:text-brand-text-primary transition-colors"
-        title={i18n.t('miniplayer.toggleTooltip', {}, 'Picture-in-Picture Mode (Ctrl+M)')}
-      >
-        <PictureInPicture class="w-5 h-5" />
-      </button>
-    </div>
-
-    <div class="flex items-center gap-2">
-      {#if !windowLayoutStore.isRightPanelAutoHidden}
-        <div transition:fade={{ duration: 200 }} class="w-24 h-7 hidden md:block">
-          <SpectrumVisualizer />
+          {#if playerStore.repeatMode !== 'off'}
+            <button
+              onclick={cycleRepeat}
+              class="absolute left-full top-1/2 -translate-y-1/2 ml-1.5 text-[10px] font-semibold text-brand-accent-text hover:text-brand-text-primary transition-colors uppercase tracking-wide whitespace-nowrap"
+              title={`${i18n.t('playerBar.repeat')}: ${repeatModeLabel(playerStore.repeatMode)} — ${repeatModeDescription(playerStore.repeatMode)}`}
+            >
+              {i18n.t('playerBar.repeat')} {repeatModeLabel(playerStore.repeatMode)}
+            </button>
+          {/if}
         </div>
       {/if}
-      <button onclick={toggleMute} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors" title={i18n.t('playerBar.volume')}>
-        {#if isMuted || playerStore.volume === 0}
-          <VolumeX class="w-4 h-4" />
-        {:else}
-          <Volume2 class="w-4 h-4" />
-        {/if}
-      </button>
-      <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.01"
-        value={playerStore.volume}
-        oninput={handleVolumeChange}
-        onchange={releaseVolumeFocus}
-        onpointerup={releaseVolumeFocus}
-        onkeyup={releaseVolumeFocus}
-        class="volume-slider w-20 h-1 rounded-lg outline-none"
-        style={volumeSliderStyle}
-        aria-label={i18n.t('playerBar.volumeSlider')}
-        title={i18n.t('playerBar.volumeWithValue', { value: Math.round(volumePercent) })}
-      />
+
+      {#if windowLayoutStore.isPlayerBarCompact}
+        <button
+          transition:fade={{ duration: 200 }}
+          onclick={() => windowLayoutStore.toggleMiniplayerMode()}
+          class="text-brand-text-secondary hover:text-brand-accent-text transition-colors flex-shrink-0"
+          title={i18n.t('miniplayer.toggleTooltip', {}, 'Picture-in-Picture Mode (Ctrl+M)')}
+        >
+          <PictureInPicture class="w-4 h-4" />
+        </button>
+      {/if}
+
     </div>
+
+    {#if !windowLayoutStore.isPlayerBarCompact}
+      <div
+        transition:fade={{ duration: 200 }}
+        class="flex items-center gap-2.5 w-full text-[10px] text-brand-text-secondary/60"
+      >
+        <!-- Invisible spacer matching the mode-toggle button's footprint, so the
+             waveform + timers stay centered instead of skewing left toward it. -->
+        <div class="w-4 h-4 flex-shrink-0" aria-hidden="true"></div>
+        <span>{formatDuration(playerStore.positionNanosec)}</span>
+        <div class="flex-1 flex flex-col gap-1">
+          <WaveformSeekBar />
+        </div>
+        <span>{formatDuration(playerStore.currentSong?.length_nanosec)}</span>
+        <button
+          onclick={() => prefs.toggleSeekBarMode()}
+          class="text-brand-text-secondary/50 hover:text-brand-text-primary transition-colors p-0.5 flex-shrink-0"
+          title={prefs.seekBarMode === 'waveform'
+            ? i18n.t('playerBar.seekbarModeWaveform', {}, 'Waveform mode — click to switch to frequency bands')
+            : i18n.t('playerBar.seekbarModeBands', {}, 'Frequency bands mode — click to switch to waveform')}
+        >
+          {#if prefs.seekBarMode === 'waveform'}
+            <AudioWaveform class="w-3 h-3" />
+          {:else}
+            <Palette class="w-3 h-3" />
+          {/if}
+        </button>
+      </div>
+    {/if}
   </div>
+
+  {#if !windowLayoutStore.isPlayerBarCompact}
+    <div
+      data-walkthrough-target="player-bar-toolbar"
+      transition:fade={{ duration: 200 }}
+      class="flex flex-col items-center gap-1.5 w-1/3 min-w-[50px] min-[700px]:min-w-[200px] max-w-xs"
+    >
+      <div class="flex items-center gap-3 min-[700px]:gap-5">
+        <button
+          onclick={openCurrentSongMenu}
+          disabled={!playerStore.currentSong}
+          class="text-brand-text-secondary hover:text-brand-text-primary transition-colors disabled:opacity-40 disabled:pointer-events-none"
+          title={i18n.t('playerBar.menuTooltip', {}, 'Song menu')}
+        >
+          <Menu class="w-5 h-5" />
+        </button>
+        {#if !windowLayoutStore.isRightPanelAutoHidden}
+          <button
+            transition:fade={{ duration: 200 }}
+            onclick={() => {
+              windowLayoutStore.exitImmersiveMode();
+              navigationStore.activeTab = "lyrics";
+            }}
+            class="inline-flex transition-colors {navigationStore.activeTab === 'lyrics' ? 'text-brand-accent-text' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+            title={i18n.t('sidebar.lyrics')}
+          >
+            <Lyrics class="w-5 h-5" />
+          </button>
+        {/if}
+        <button
+          onclick={navigateToQueue}
+          class="text-brand-text-secondary hover:text-brand-text-primary transition-colors"
+          title={i18n.t('playerBar.queueTitle', {}, 'Queue')}
+        >
+          <Layers class="w-5 h-5" />
+        </button>
+        {#if !windowLayoutStore.isRightPanelAutoHidden}
+          <button
+            transition:fade={{ duration: 200 }}
+            onclick={handleInfoClick}
+            class="inline-flex transition-colors {windowLayoutStore.rightPanelOpen ? 'text-brand-accent-text' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+            title={i18n.t('topNav.toggleRightPanel')}
+          >
+            <Info class="w-5 h-5" />
+          </button>
+        {/if}
+        <button
+          onclick={() => windowLayoutStore.toggleMiniplayerMode()}
+          class="text-brand-text-secondary hover:text-brand-text-primary transition-colors"
+          title={i18n.t('miniplayer.toggleTooltip', {}, 'Picture-in-Picture Mode (Ctrl+M)')}
+        >
+          <PictureInPicture class="w-5 h-5" />
+        </button>
+      </div>
+
+      <div class="flex items-center gap-2">
+        {#if !windowLayoutStore.isRightPanelAutoHidden}
+          <div transition:fade={{ duration: 200 }} class="w-24 h-7 block">
+            <SpectrumVisualizer />
+          </div>
+        {/if}
+        <button onclick={toggleMute} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors" title={i18n.t('playerBar.volume')}>
+          {#if isMuted || playerStore.volume === 0}
+            <VolumeX class="w-4 h-4" />
+          {:else}
+            <Volume2 class="w-4 h-4" />
+          {/if}
+        </button>
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.01"
+          value={playerStore.volume}
+          oninput={handleVolumeChange}
+          onchange={releaseVolumeFocus}
+          onpointerup={releaseVolumeFocus}
+          onkeyup={releaseVolumeFocus}
+          class="volume-slider w-20 h-1 rounded-lg outline-none"
+          style={volumeSliderStyle}
+          aria-label={i18n.t('playerBar.volumeSlider')}
+          title={i18n.t('playerBar.volumeWithValue', { value: Math.round(volumePercent) })}
+        />
+      </div>
+    </div>
+  {/if}
 </footer>
 
 {#if contextMenuState && playerStore.currentSong}

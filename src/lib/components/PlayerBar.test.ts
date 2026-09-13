@@ -291,47 +291,51 @@ describe("PlayerBar.svelte", () => {
     expect(exitImmersiveModeSpy).not.toHaveBeenCalled();
   });
 
-  it("marks controls with the Full/Compact/Minimal responsive classes matching their tier", () => {
-    // jsdom doesn't evaluate CSS media queries, so this checks the
-    // structural markup (the responsive classes are present on the right
-    // elements) rather than actual visibility at a given width — real
-    // breakpoint behavior is covered by manual verification. Tiers: Full
-    // (>=700px), Compact (400-700px), Minimal (<400px) — cover art, play/
-    // pause, and skip-next are the constant core shown in all three.
+  it("shows and hides controls matching Full, Compact, and Minimal tiers across breakpoints", () => {
+    // Tiers: Full (>=700px), Compact (400-700px), Minimal (<400px).
+    // Full tier (>=700px):
+    windowLayoutStore.viewportWidth = 1280;
     playerStore.currentSong = mockSong;
     playerStore.state = "playing";
-    const { getAllByTitle, getByTitle, container } = render(PlayerBar);
+    const { getAllByTitle, getByTitle, queryByTitle, container, unmount } = render(PlayerBar);
 
-    // Gone by Compact (Full-only): shuffle, repeat, the seek row, and the
-    // volume/mute controls in the right column — the transport block takes
-    // the freed space instead, sticking to the right edge via ml-auto. The
-    // miniplayer toggle itself must stay visible at every tier (issue: it
-    // should never disappear), so it has two instances that swap places at
-    // the 700px boundary: one alongside volume/mute (Full only) and one in
-    // the transport row (Compact/Minimal only, hidden again once the
-    // right-column instance takes over).
+    // Full tier has shuffle, repeat, seek row, right toolbar (with volume & miniplayer)
     const shuffleBtn = getAllByTitle(/shuffle/i).find(el => el.querySelector("svg"))!;
     const repeatBtn = getAllByTitle(/repeat/i).find(el => el.querySelector("svg"))!;
-    expect(shuffleBtn.closest(".hidden")).toHaveClass("min-[700px]:block");
-    expect(repeatBtn.closest(".hidden")).toHaveClass("min-[700px]:block");
+    expect(shuffleBtn).toBeInTheDocument();
+    expect(repeatBtn).toBeInTheDocument();
     const volumeSlider = container.querySelector('input[type="range"]');
-    expect(volumeSlider?.closest(".hidden")).toHaveClass("min-[700px]:flex");
-    const [transportToggle, rightColumnToggle] = getAllByTitle(/picture-in-picture/i);
-    expect(transportToggle).toHaveClass("min-[700px]:hidden");
-    expect(rightColumnToggle.closest(".hidden")).toHaveClass("min-[700px]:flex");
-    const rightColumn = Array.from(container.querySelectorAll("div")).find(d => d.className.includes("min-w-[50px]"))!;
-    expect(rightColumn).toHaveClass("hidden", "min-[700px]:flex");
+    expect(volumeSlider).toBeInTheDocument();
+    const rightColumn = container.querySelector('[data-walkthrough-target="player-bar-toolbar"]');
+    expect(rightColumn).toBeInTheDocument();
     const seekRow = Array.from(container.querySelectorAll("div")).find(d => d.className.includes("gap-2.5"))!;
-    expect(seekRow).toHaveClass("hidden", "min-[700px]:flex");
+    expect(seekRow).toBeInTheDocument();
 
-    // Gone by Minimal (Compact-and-up only): previous.
+    // In Full tier, only the right-column PiP toggle is rendered
+    expect(getAllByTitle(/picture-in-picture/i).length).toBe(1);
+
+    // Minimal-breakpoint class on previous:
     expect(getByTitle(/previous song/i)).toHaveClass("hidden", "min-[400px]:block");
 
-    // Never hidden (the constant core): cover art, play/pause, skip-next.
-    const coverButton = getByTitle("Immersive Mode");
-    expect(coverButton.closest(".hidden")).toBeNull();
-    expect(getByTitle(/^pause$/i)).not.toHaveClass("hidden");
-    expect(getByTitle(/next song/i)).not.toHaveClass("hidden");
+    // Core controls: cover art, play/pause, skip-next
+    expect(getByTitle("Immersive Mode")).toBeInTheDocument();
+    expect(getByTitle(/^pause$/i)).toBeInTheDocument();
+    expect(getByTitle(/next song/i)).toBeInTheDocument();
+
+    unmount();
+
+    // Compact tier (<700px):
+    windowLayoutStore.viewportWidth = 600;
+    const { getAllByTitle: getCompactAll, queryByTitle: queryCompactByTitle, container: compactContainer } = render(PlayerBar);
+
+    // Shuffle, repeat, seek row, and right toolbar unmounted in Compact tier
+    expect(queryCompactByTitle(/shuffle/i)).toBeNull();
+    expect(queryCompactByTitle(/repeat/i)).toBeNull();
+    expect(compactContainer.querySelector('input[type="range"]')).toBeNull();
+    expect(compactContainer.querySelector('[data-walkthrough-target="player-bar-toolbar"]')).toBeNull();
+
+    // Transport PiP toggle takes over in Compact tier so PiP mode is always accessible
+    expect(getCompactAll(/picture-in-picture/i).length).toBe(1);
   });
 
   it("handles mute toggle correctly", async () => {

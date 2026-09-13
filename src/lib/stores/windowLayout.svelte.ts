@@ -5,6 +5,7 @@ import {
   SIDEBAR_COLLAPSED_WIDTH_PX,
   MEDIUM_BREAKPOINT_WIDTH_PX,
   RIGHT_PANEL_AUTO_HIDE_WIDTH_PX,
+  COMPACT_PLAYBAR_BREAKPOINT_WIDTH_PX,
   SMALL_BREAKPOINT_WIDTH_PX,
   PLAYBAR_ONLY_HEIGHT_BREAKPOINT_PX,
   DETAIL_HEADER_COLLAPSE_HEIGHT_PX,
@@ -342,6 +343,10 @@ class WindowLayoutStore {
 
   get isRightPanelAutoHidden(): boolean {
     return this.viewportWidth < RIGHT_PANEL_AUTO_HIDE_WIDTH_PX;
+  }
+
+  get isPlayerBarCompact(): boolean {
+    return this.viewportWidth < COMPACT_PLAYBAR_BREAKPOINT_WIDTH_PX;
   }
 
   get isImmersiveForced(): boolean {
