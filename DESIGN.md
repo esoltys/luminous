@@ -268,8 +268,8 @@ These are the logo's own identity colors for marketing/social/app-icon-at-rest u
 
 ### Two artifacts
 
-- `luminous-mark.svg` — static, crisp, no blur or glow filters. Use for app icons, avatars, favicons, and anywhere the mark must render sharp at small sizes.
-- `luminous-mark-reactive.svg` — lush, heavier blur/glow baked in (bigger ambient glow, blurred rings, blurred burst halo). Use for hero/marketing placements and as the resting frame of the in-app audio-reactive element.
+- `luminous-mark.svg` — static, crisp, no blur or glow filters. Use for app icons, avatars, favicons, anywhere the mark must render sharp at small sizes, and as the resting state of the in-app audio-reactive element when playback is idle.
+- `luminous-mark-reactive.svg` — lush, heavier blur/glow baked in (bigger ambient glow, blurred rings, blurred burst halo). Use for hero/marketing placements and visualizer references.
 - Never blur the static mark or crisp up the reactive one — they're distinct assets for distinct contexts, not one file with a toggle.
 
 ### Usage rules
