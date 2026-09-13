@@ -10,10 +10,10 @@ import type { StatsSummary } from "../types";
 function makeSummary(range: StatsSummary["range"]): StatsSummary {
   return {
     range,
-    top_songs: [{ key: "1", label: "Song A", secondary: "Artist A", play_count: 5, excluded: false, album: "Album A" }],
-    top_albums: [{ key: "Album A", label: "Album A", secondary: "Artist A", play_count: 3, excluded: false, album: null }],
-    top_artists: [{ key: "Artist A", label: "Artist A", secondary: null, play_count: 5, excluded: false, album: null }],
-    top_genres: [{ key: "Rock", label: "Rock", secondary: null, play_count: 5, excluded: false, album: null }],
+    top_songs: [{ key: "1", label: "Song A", secondary: "Artist A", play_count: 5, minutes: 25, excluded: false, album: "Album A" }],
+    top_albums: [{ key: "Album A", label: "Album A", secondary: "Artist A", play_count: 3, minutes: 15, excluded: false, album: null }],
+    top_artists: [{ key: "Artist A", label: "Artist A", secondary: null, play_count: 5, minutes: 25, excluded: false, album: null }],
+    top_genres: [{ key: "Rock", label: "Rock", secondary: null, play_count: 5, minutes: 25, excluded: false, album: null }],
     play_timestamps: [1_700_000_000, 1_700_003_600],
     total_minutes: 42,
   };
@@ -49,6 +49,13 @@ describe("StatsView.svelte", () => {
   it("shows total minutes listened flush-right on the range row", async () => {
     const { getByText } = render(StatsView);
     await waitFor(() => expect(getByText("42 minutes listened")).toBeInTheDocument());
+  });
+
+  it("renders minutes played and play count tooltip for top items", async () => {
+    const { getByText, getAllByTitle } = render(StatsView);
+    await waitFor(() => expect(getByText("Song A")).toBeInTheDocument());
+    expect(getByText("15 min")).toBeInTheDocument();
+    expect(getAllByTitle("5 plays").length).toBeGreaterThanOrEqual(1);
   });
 
   it("refetches when the range switcher changes", async () => {

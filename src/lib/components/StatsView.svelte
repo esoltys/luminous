@@ -172,7 +172,16 @@
                         <div class="truncate text-xs text-brand-text-secondary">{item.secondary}</div>
                       {/if}
                     </div>
-                    <span class="text-xs text-brand-text-secondary shrink-0">{item.play_count}</span>
+                    <span
+                      class="text-xs text-brand-text-secondary shrink-0 tabular-nums"
+                      title={item.play_count === 1
+                        ? i18n.t("stats.playsCountOne", {}, "1 play")
+                        : i18n.t("stats.playsCount", { count: item.play_count }, `${item.play_count} plays`)}
+                    >
+                      {item.minutes === 0 && item.play_count > 0
+                        ? i18n.t("stats.minuteUnderOne", {}, "< 1 min")
+                        : i18n.t("stats.minuteCount", { count: item.minutes.toLocaleString() }, `${item.minutes.toLocaleString()} min`)}
+                    </span>
                   </li>
                 {/each}
               </ol>

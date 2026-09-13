@@ -60,7 +60,7 @@
   }
 </script>
 
-<div class="flex flex-col items-end gap-2">
+<div class="flex flex-col items-end gap-2 shrink-0">
   {#if events}
     <div class="flex gap-[3px]">
       {#each columns as column, colIndex (colIndex)}
@@ -71,7 +71,7 @@
         </div>
       {/each}
     </div>
-    <div class="flex items-center gap-4 text-xs text-brand-text-secondary">
+    <div class="flex items-center gap-4 text-xs text-brand-text-secondary whitespace-nowrap">
       <span>{i18n.t("stats.heatmapCurrentStreak", {}, "Current Streak")}: <span class="text-brand-text-primary font-medium">{streakLabel(streaks.current)}</span></span>
       <span>{i18n.t("stats.heatmapLongestStreak", {}, "Longest Streak")}: <span class="text-brand-text-primary font-medium">{streakLabel(streaks.longest)}</span></span>
     </div>

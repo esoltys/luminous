@@ -689,47 +689,85 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
       const rangeDays = range === "7d" ? 7 : range === "28d" ? 28 : 365;
       const inRange = listenHistory.filter((e) => e.played_at >= NOW_SEC - rangeDays * 86400);
 
-      const songCounts = new Map<string, { song: Song; count: number }>();
-      const albumCounts = new Map<string, { label: string; secondary: string | null; count: number }>();
-      const artistCounts = new Map<string, number>();
-      const genreCounts = new Map<string, number>();
+      const songCounts = new Map<string, { song: Song; count: number; duration_secs: number }>();
+      const albumCounts = new Map<string, { label: string; secondary: string | null; count: number; duration_secs: number }>();
+      const artistCounts = new Map<string, { count: number; duration_secs: number }>();
+      const genreCounts = new Map<string, { count: number; duration_secs: number }>();
       for (const e of inRange) {
         const song = e.song;
         const songKey = String(song.id);
-        songCounts.set(songKey, { song, count: (songCounts.get(songKey)?.count ?? 0) + 1 });
+        const songDur = e.duration_secs || song.duration || 0;
+        const curSong = songCounts.get(songKey);
+        songCounts.set(songKey, { song, count: (curSong?.count ?? 0) + 1, duration_secs: (curSong?.duration_secs ?? 0) + songDur });
         const artist = song.album_artist || song.artist;
         if (song.album) {
           const albumKey = `${song.album}::${artist ?? ""}`;
           const existing = albumCounts.get(albumKey);
-          albumCounts.set(albumKey, { label: song.album, secondary: artist ?? null, count: (existing?.count ?? 0) + 1 });
+          albumCounts.set(albumKey, {
+            label: song.album,
+            secondary: artist ?? null,
+            count: (existing?.count ?? 0) + 1,
+            duration_secs: (existing?.duration_secs ?? 0) + songDur,
+          });
         }
-        if (artist) artistCounts.set(artist, (artistCounts.get(artist) ?? 0) + 1);
-        if (song.genre) genreCounts.set(song.genre, (genreCounts.get(song.genre) ?? 0) + 1);
+        if (artist) {
+          const curArtist = artistCounts.get(artist);
+          artistCounts.set(artist, { count: (curArtist?.count ?? 0) + 1, duration_secs: (curArtist?.duration_secs ?? 0) + songDur });
+        }
+        if (song.genre) {
+          const curGenre = genreCounts.get(song.genre);
+          genreCounts.set(song.genre, { count: (curGenre?.count ?? 0) + 1, duration_secs: (curGenre?.duration_secs ?? 0) + songDur });
+        }
       }
 
       const top_songs: StatsTopItem[] = [...songCounts.entries()]
-        .sort((a, b) => b[1].count - a[1].count)
+        .sort((a, b) => b[1].duration_secs - a[1].duration_secs || b[1].count - a[1].count)
         .slice(0, 10)
         .map(([key, v]) => ({
           key,
           label: v.song.title ?? "Untitled",
           secondary: v.song.artist ?? null,
           play_count: v.count,
+          minutes: Math.round(v.duration_secs / 60),
           excluded: false,
           album: v.song.album ?? null,
         }));
       const top_albums: StatsTopItem[] = [...albumCounts.entries()]
-        .sort((a, b) => b[1].count - a[1].count)
+        .sort((a, b) => b[1].duration_secs - a[1].duration_secs || b[1].count - a[1].count)
         .slice(0, 10)
-        .map(([key, v]) => ({ key, label: v.label, secondary: v.secondary, play_count: v.count, excluded: false, album: null }));
+        .map(([key, v]) => ({
+          key,
+          label: v.label,
+          secondary: v.secondary,
+          play_count: v.count,
+          minutes: Math.round(v.duration_secs / 60),
+          excluded: false,
+          album: null,
+        }));
       const top_artists: StatsTopItem[] = [...artistCounts.entries()]
-        .sort((a, b) => b[1] - a[1])
+        .sort((a, b) => b[1].duration_secs - a[1].duration_secs || b[1].count - a[1].count)
         .slice(0, 10)
-        .map(([key, count]) => ({ key, label: key, secondary: null, play_count: count, excluded: false, album: null }));
+        .map(([key, v]) => ({
+          key,
+          label: key,
+          secondary: null,
+          play_count: v.count,
+          minutes: Math.round(v.duration_secs / 60),
+          excluded: false,
+          album: null,
+        }));
       const top_genres: StatsTopItem[] = [...genreCounts.entries()]
-        .sort((a, b) => b[1] - a[1])
+        .sort((a, b) => b[1].duration_secs - a[1].duration_secs || b[1].count - a[1].count)
         .slice(0, 10)
-        .map(([key, count]) => ({ key, label: key, secondary: null, play_count: count, excluded: false, album: null }));
+        .map(([key, v]) => ({
+          key,
+          label: key,
+          secondary: null,
+          play_count: v.count,
+          minutes: Math.round(v.duration_secs / 60),
+          excluded: false,
+          album: null,
+        }));
 
       const total_minutes = Math.round(inRange.reduce((acc, e) => acc + e.duration_secs, 0) / 60);
 

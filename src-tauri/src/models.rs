@@ -859,8 +859,8 @@ pub struct TopAlbumItem {
     pub movement: String,
 }
 
-/// One ranked entry in a Personal Stats Top 10 list (#130) — a song, album,
-/// artist, or genre and its play count within the selected range.
+/// One ranked entry in a Personal Stats Top 10 list (#130, #951) — a song, album,
+/// artist, or genre, its total minutes listened, and its play count within the selected range.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StatsTopItem {
     /// Identity used for exclusion lookups/toggles: song id as a string,
@@ -871,6 +871,7 @@ pub struct StatsTopItem {
     /// artist/genre rows, which have no secondary line of their own.
     pub secondary: Option<String>,
     pub play_count: i64,
+    pub minutes: i64,
     pub excluded: bool,
     /// The song's album title, set only on `top_songs` rows — songs have no
     /// detail page of their own, so clicking one navigates to this album
