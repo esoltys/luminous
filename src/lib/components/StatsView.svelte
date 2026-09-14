@@ -2,6 +2,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import LoadingSpinner from "./LoadingSpinner.svelte";
   import ListeningHeatmap from "./ListeningHeatmap.svelte";
+  import TimeOfDayGraphic from "./TimeOfDayGraphic.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { rememberScroll } from "../utils/scrollMemory";
   import { playerStore } from "../stores/player.svelte";
@@ -160,19 +161,27 @@
         <h2 class="text-sm font-semibold text-brand-text-primary mb-3">
           {i18n.t("stats.listeningClock", {}, "Time of Day")}
         </h2>
-        <div class="grid grid-cols-4 gap-4">
-          {#each CLOCK_BUCKETS as bucket (bucket.key)}
-            <div class="flex flex-col items-center gap-2">
-              <div class="w-full h-24 flex items-end bg-brand-main rounded-md overflow-hidden">
-                <div
-                  class="w-full bg-brand-accent transition-all"
-                  style="height: {((clockCounts[bucket.key] ?? 0) / maxClockCount) * 100}%"
-                ></div>
+        <div class="max-w-[820px] mx-auto">
+          <TimeOfDayGraphic
+            counts={clockCounts}
+            max={maxClockCount}
+            labels={{
+              morning: CLOCK_BUCKETS[0].label(),
+              afternoon: CLOCK_BUCKETS[1].label(),
+              evening: CLOCK_BUCKETS[2].label(),
+              latenight: CLOCK_BUCKETS[3].label()
+            }}
+          />
+          <div class="grid grid-cols-4 gap-4 mt-2">
+            {#each CLOCK_BUCKETS as bucket (bucket.key)}
+              <div class="flex flex-col items-center gap-0.5">
+                <span class="text-xs text-brand-text-secondary text-center">{bucket.label()}</span>
+                <span class="text-xs text-brand-text-primary font-medium">
+                  {i18n.t("stats.minuteCount", { count: clockCounts[bucket.key] ?? 0 }, `${clockCounts[bucket.key] ?? 0} min`)}
+                </span>
               </div>
-              <span class="text-xs text-brand-text-secondary text-center">{bucket.label()}</span>
-              <span class="text-xs text-brand-text-primary font-medium">{clockCounts[bucket.key] ?? 0}</span>
-            </div>
-          {/each}
+            {/each}
+          </div>
         </div>
       </div>
     {/if}
