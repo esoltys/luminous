@@ -12,9 +12,18 @@
     artistAlbums: AlbumItem[];
     artistSongs?: Song[];
     onclick?: (e: MouseEvent) => void;
+    prefix?: import("svelte").Snippet;
+    suffix?: import("svelte").Snippet;
   }
 
-  let { artist, artistAlbums, artistSongs = [], onclick: customClick }: Props = $props();
+  let {
+    artist,
+    artistAlbums,
+    artistSongs = [],
+    onclick: customClick,
+    prefix,
+    suffix,
+  }: Props = $props();
 
   // Same front-cover selection ArtistCard uses for its CoverStack (index 0 is
   // the front/topmost tile), so the row's single cover always matches it.
@@ -48,9 +57,13 @@
   tabindex="0"
   onclick={(e) => customClick?.(e)}
   onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); customClick?.(e as unknown as MouseEvent); } }}
-  class="group grid grid-cols-[auto_1fr_auto] grid-rows-[auto_auto] items-center gap-x-3 gap-y-0.5 px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 select-none"
+  class="group flex items-center gap-3 px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 select-none cursor-pointer w-full"
 >
-  <div class="row-span-2 relative overflow-hidden">
+  {#if prefix}
+    {@render prefix()}
+  {/if}
+
+  <div class="relative shrink-0 overflow-hidden">
     {#if artistPortraitUrl}
       <div class="w-11 h-11 relative overflow-hidden bg-brand-sidebar border border-brand-border shrink-0">
         <img
@@ -70,15 +83,22 @@
     {/if}
   </div>
 
-  <p class="col-span-2 min-w-0 truncate text-sm font-semibold text-brand-text-primary">{artist.name || i18n.t('collection.unknownArtist')}</p>
-
-  <div class="min-w-0">
-    {#if hasGenre}
-      <GenreChips genre={artist.genre} />
-    {:else}
-      <p class="truncate text-xs text-brand-text-secondary font-medium">{i18n.t('artistDetail.unknownGenre')}</p>
-    {/if}
+  <div class="min-w-0 flex-1 flex flex-col gap-0.5">
+    <div class="flex items-center justify-between gap-2">
+      <p class="truncate text-sm font-semibold text-brand-text-primary min-w-0">{artist.name || i18n.t('collection.unknownArtist')}</p>
+    </div>
+    <div class="min-w-0">
+      {#if hasGenre}
+        <GenreChips genre={artist.genre} />
+      {:else}
+        <p class="truncate text-xs text-brand-text-secondary font-medium">{i18n.t('artistDetail.unknownGenre')}</p>
+      {/if}
+    </div>
   </div>
 
-  <p class="text-xs text-brand-text-secondary font-medium tabular-nums truncate text-right">{i18n.t('playlists.songsCount', { count: artist.song_count })}</p>
+  <p class="text-xs text-brand-text-secondary font-medium tabular-nums truncate shrink-0 text-right">{i18n.t('playlists.songsCount', { count: artist.song_count })}</p>
+
+  {#if suffix}
+    {@render suffix()}
+  {/if}
 </div>

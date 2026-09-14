@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { HomeItem, Song, Playlist, AlbumItem, TopAlbumChartInfo } from "../types";
+  import type { HomeItem, Song, Playlist, AlbumItem } from "../types";
   import { playerStore } from "../stores/player.svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
@@ -12,23 +12,14 @@
   import FavouriteCornerFlag from "./FavouriteCornerFlag.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
   import { i18n } from "../stores/i18n.svelte";
-  import { prefs } from "../stores/prefs.svelte";
   import { getPlaylistDisplayName } from "../utils/playlist";
-  import { formatChartWeekRange } from "../utils/date";
-  import {
-    CaretRightIcon as ChevronRight,
-    TrendUpIcon as TrendingUp,
-    TrendDownIcon as TrendingDown,
-    MinusIcon as Minus
-  } from "phosphor-svelte";
+  import { CaretRightIcon as ChevronRight } from "phosphor-svelte";
 
   interface Props {
     title?: string;
     items: HomeItem[];
-    /** "rank" shows a 01-05 numeral + track duration; "added" shows a relative
-     * added date; "chart" shows each album's weekly chart rank, a movement
-     * indicator, and a peak-rank/weeks-on-chart stat (Home "Top Albums", #662). */
-    variant: "rank" | "added" | "chart";
+    /** "rank" shows a 01-05 numeral; "added" shows a relative added date. */
+    variant: "rank" | "added";
     /** When provided, the title becomes a clickable button that navigates to
      * the category's full expanded view (see #169). */
     onHeaderClick?: () => void;
@@ -86,25 +77,7 @@
   }
 
   function rankFor(item: HomeItem, index: number): number {
-    if (variant === "chart" && item.type === "album" && item.chart) return item.chart.rank;
     return index + 1;
-  }
-
-  function movementLabel(movement: "new" | "rising" | "falling" | "steady"): string {
-    if (movement === "new") return i18n.t("home.chartNew");
-    if (movement === "rising") return i18n.t("home.chartRising");
-    if (movement === "falling") return i18n.t("home.chartFalling");
-    return i18n.t("home.chartSteady");
-  }
-
-  function peakLabel(chart: TopAlbumChartInfo): string {
-    return i18n.t("home.chartPeak", { peak: chart.peak_rank });
-  }
-
-  function weeksOnChartLabel(chart: TopAlbumChartInfo): string {
-    return chart.weeks_on_chart === 1
-      ? i18n.t("home.chartWeek")
-      : i18n.t("home.chartWeeksCount", { weeks: chart.weeks_on_chart });
   }
 
   // Mirrors ArtistDetailView's openPlaylist: genre/decade auto-playlists open
@@ -160,17 +133,11 @@
       class="group flex items-center gap-1 text-xl font-semibold text-brand-text-primary hover:text-brand-accent-text transition-colors"
     >
       {title}
-      {#if variant === "chart"}
-        <span class="text-sm font-normal text-brand-text-secondary">{formatChartWeekRange(prefs.weekStart)}</span>
-      {/if}
       <ChevronRight class="w-5 h-5 opacity-0 group-hover:opacity-100 transition-opacity" />
     </button>
   {:else if title}
     <h2 class="flex items-center gap-2 text-xl font-semibold text-brand-text-primary">
       {title}
-      {#if variant === "chart"}
-        <span class="text-sm font-normal text-brand-text-secondary">{formatChartWeekRange(prefs.weekStart)}</span>
-      {/if}
     </h2>
   {/if}
 
@@ -186,29 +153,11 @@
         onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openItem(item); } }}
         class="group flex items-center gap-3 px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 select-none"
       >
-        {#if variant === "rank" || variant === "chart"}
+        {#if variant === "rank"}
           <div class="w-14 shrink-0 flex flex-col items-center gap-0.5">
             <span class="text-center text-sm font-bold text-brand-text-secondary tabular-nums">
               {String(rankFor(item, i)).padStart(2, "0")}
             </span>
-            {#if variant === "chart" && item.type === "album" && item.chart}
-              {@const chart = item.chart}
-              <span
-                class="flex items-center justify-center text-brand-text-primary"
-                aria-label={movementLabel(chart.movement)}
-                title={movementLabel(chart.movement)}
-              >
-                {#if chart.movement === "new"}
-                  <span class="text-[8px] font-bold uppercase tracking-wide whitespace-nowrap">{i18n.t('home.chartNew')}</span>
-                {:else if chart.movement === "rising"}
-                  <TrendingUp class="w-3 h-3" />
-                {:else if chart.movement === "falling"}
-                  <TrendingDown class="w-3 h-3" />
-                {:else}
-                  <Minus class="w-3 h-3" />
-                {/if}
-              </span>
-            {/if}
           </div>
         {/if}
 
@@ -238,7 +187,7 @@
         </div>
 
         {#if item.type === "album" || item.type === "song"}
-          <div class="min-w-0 flex-1 flex flex-col gap-0.5 {variant === 'chart' ? 'leading-tight' : ''}">
+          <div class="min-w-0 flex-1 flex flex-col gap-0.5">
             <div class="flex items-center justify-between gap-2">
               <p class="truncate text-sm font-semibold text-brand-text-primary min-w-0">{titleFor(item)}</p>
               <span class="text-xs text-brand-text-secondary font-medium tabular-nums shrink-0">{yearFor(item)}</span>
@@ -253,13 +202,6 @@
                 {/if}
               </span>
             </div>
-            {#if variant === "chart" && item.type === "album" && item.chart}
-              {@const chart = item.chart}
-              <div class="flex items-center justify-between gap-2">
-                <span class="text-xs text-brand-text-secondary font-medium tabular-nums shrink-0">{peakLabel(chart)}</span>
-                <span class="text-xs text-brand-text-secondary font-medium tabular-nums shrink-0">{weeksOnChartLabel(chart)}</span>
-              </div>
-            {/if}
           </div>
         {:else}
           <div class="min-w-0 flex-1 flex flex-col gap-0.5">
