@@ -1042,9 +1042,17 @@ pub struct ArtistProfile {
 }
 
 /// An external platform or web link associated with an album release (#950).
+///
+/// `handle_or_url` accepts the JSON key `url` as an alias (#990): external
+/// writers of `album_profiles.links` (e.g. the luminous-mcp integration) use
+/// a richer shape with a `url` field plus extra `title`/`category` fields
+/// that aren't part of this struct - the alias keeps that data readable
+/// without a migration, and unrecognized extra fields are simply ignored by
+/// serde's default (non-`deny_unknown_fields`) behavior.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 pub struct AlbumLink {
     pub platform: String,
+    #[serde(alias = "url")]
     pub handle_or_url: String,
 }
 

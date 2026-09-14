@@ -1584,7 +1584,10 @@ pub fn get_album_profile_conn(conn: &rusqlite::Connection, album: &str) -> Resul
         let website: Option<String> = row.get(3)?;
         let links_json: String = row.get(4)?;
 
-        let links: Vec<AlbumLink> = serde_json::from_str(&links_json).unwrap_or_default();
+        let links: Vec<AlbumLink> = serde_json::from_str(&links_json).unwrap_or_else(|e| {
+            log::warn!("Failed to parse album_profiles.links for '{album_key}': {e}");
+            Vec::new()
+        });
 
         Ok(AlbumProfile {
             album_key,
@@ -1648,7 +1651,10 @@ pub fn get_all_album_profiles_conn(conn: &rusqlite::Connection) -> Result<Vec<Al
             let website: Option<String> = row.get(3)?;
             let links_json: String = row.get(4)?;
 
-            let links: Vec<AlbumLink> = serde_json::from_str(&links_json).unwrap_or_default();
+            let links: Vec<AlbumLink> = serde_json::from_str(&links_json).unwrap_or_else(|e| {
+                log::warn!("Failed to parse album_profiles.links for '{album_key}': {e}");
+                Vec::new()
+            });
 
             Ok(AlbumProfile {
                 album_key,
@@ -3254,6 +3260,54 @@ mod tests {
         let all = get_all_album_profiles_conn(&conn).unwrap();
         assert_eq!(all.len(), 1);
         assert_eq!(all[0].album_key, "Come On Over");
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// Regression test for #990: an external writer of `album_profiles.links`
+    /// (e.g. luminous-mcp's `update_album_profile` tool) uses `url` instead of
+    /// `handle_or_url`, plus extra `title`/`category` fields this struct
+    /// doesn't have. That link shape must still deserialize - previously the
+    /// whole array silently dropped to empty via `.unwrap_or_default()`.
+    #[test]
+    fn test_album_profile_links_from_external_writer_shape() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_album_ext_links_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Database::new(temp_dir.clone()).unwrap();
+        let conn = db.pool.get().unwrap();
+
+        conn.execute(
+            "INSERT INTO album_profiles (album_key, artist_key, description, website, links) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                "Of Kingdom and Crown",
+                Some("Machine Head"),
+                None::<String>,
+                None::<String>,
+                r#"[
+                    {"platform":"Spotify","title":"Stream on Spotify","url":"https://open.spotify.com/album/6duwuU8xgK7ShKMCrUxfBi","category":"store"},
+                    {"platform":"Live-Metal.com","title":"Live-Metal.com Review","url":"https://live-metal.com/review","category":"review"}
+                ]"#,
+            ],
+        )
+        .unwrap();
+
+        let loaded = get_album_profile_conn(&conn, "Of Kingdom and Crown").unwrap();
+        assert_eq!(loaded.links.len(), 2);
+        assert_eq!(loaded.links[0].platform, "Spotify");
+        assert_eq!(
+            loaded.links[0].handle_or_url,
+            "https://open.spotify.com/album/6duwuU8xgK7ShKMCrUxfBi"
+        );
+        assert_eq!(loaded.links[1].platform, "Live-Metal.com");
+        assert_eq!(
+            loaded.links[1].handle_or_url,
+            "https://live-metal.com/review"
+        );
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
