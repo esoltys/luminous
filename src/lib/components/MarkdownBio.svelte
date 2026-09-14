@@ -24,12 +24,63 @@
   let paragraphEl = $state<HTMLParagraphElement | null>(null);
 
   interface BioSegment {
-    type: "text" | "link";
+    type: "text" | "link" | "bold" | "italic";
     content: string;
     url?: string;
   }
 
-  // Parses markdown links [title](url) and autolinks bare URLs (https://...)
+  // Splits a plain-text chunk (already known to contain no links/URLs) into
+  // text/bold/italic segments. Bold (**text**) is extracted first so its
+  // pair of asterisks can't be mistaken for two single-asterisk italic
+  // markers.
+  function parseInlineFormatting(chunk: string): BioSegment[] {
+    if (!chunk) return [];
+
+    const segments: BioSegment[] = [];
+    const boldRegex = /\*\*([^\n*]+?)\*\*/g;
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = boldRegex.exec(chunk)) !== null) {
+      if (match.index > lastIndex) {
+        segments.push(...parseItalic(chunk.slice(lastIndex, match.index)));
+      }
+      segments.push({ type: "bold", content: match[1] });
+      lastIndex = boldRegex.lastIndex;
+    }
+
+    if (lastIndex < chunk.length) {
+      segments.push(...parseItalic(chunk.slice(lastIndex)));
+    }
+
+    return segments;
+  }
+
+  function parseItalic(chunk: string): BioSegment[] {
+    if (!chunk) return [];
+
+    const segments: BioSegment[] = [];
+    const italicRegex = /\*([^\n*]+?)\*/g;
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = italicRegex.exec(chunk)) !== null) {
+      if (match.index > lastIndex) {
+        segments.push({ type: "text", content: chunk.slice(lastIndex, match.index) });
+      }
+      segments.push({ type: "italic", content: match[1] });
+      lastIndex = italicRegex.lastIndex;
+    }
+
+    if (lastIndex < chunk.length) {
+      segments.push({ type: "text", content: chunk.slice(lastIndex) });
+    }
+
+    return segments;
+  }
+
+  // Parses markdown links [title](url), autolinks bare URLs (https://...),
+  // and bold/italic emphasis (**bold**, *italic*).
   // Supports balanced parentheses in URLs (e.g. Wikipedia disambiguation URLs)
   function parseBioText(raw: string): BioSegment[] {
     if (!raw) return [];
@@ -74,10 +125,7 @@
     while ((urlMatch = urlRegex.exec(chunk)) !== null) {
       const matchStart = urlMatch.index;
       if (matchStart > lastIndex) {
-        segments.push({
-          type: "text",
-          content: chunk.slice(lastIndex, matchStart),
-        });
+        segments.push(...parseInlineFormatting(chunk.slice(lastIndex, matchStart)));
       }
 
       let url = urlMatch[1];
@@ -109,10 +157,7 @@
     }
 
     if (lastIndex < chunk.length) {
-      segments.push({
-        type: "text",
-        content: chunk.slice(lastIndex),
-      });
+      segments.push(...parseInlineFormatting(chunk.slice(lastIndex)));
     }
   }
 
@@ -170,6 +215,10 @@
             <span>{segment.content}</span>
             <ExternalLink class="w-3 h-3 inline-block opacity-70 shrink-0" />
           </button>
+        {:else if segment.type === "bold"}
+          <strong class="font-semibold">{segment.content}</strong>
+        {:else if segment.type === "italic"}
+          <em>{segment.content}</em>
         {:else}
           <span>{segment.content}</span>
         {/if}
