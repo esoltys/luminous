@@ -592,6 +592,27 @@
     }
   }
 
+  let scrollContainerEl = $state<HTMLDivElement | undefined>(undefined);
+
+  // Consumes navigationStore.pendingScrollToCurrentSong (set by the playbar's
+  // Queue button) once this view is showing the queue with its tracks loaded,
+  // scrolling the now-playing row into view instead of leaving the user at
+  // whatever position rememberScroll restored.
+  $effect(() => {
+    if (!navigationStore.pendingScrollToCurrentSong) return;
+    if (!isQueue || !scrollContainerEl) return;
+    const uuid = playerStore.playlistItemUuid;
+    const tracks = playlistsStore.activePlaylistTracks;
+    if (tracks.length === 0) return;
+    const index = uuid
+      ? tracks.findIndex((t) => t.uuid === uuid)
+      : tracks.findIndex((t) => t.song && playerStore.currentSong && t.song.id === playerStore.currentSong.id);
+    navigationStore.pendingScrollToCurrentSong = false;
+    if (index === -1) return;
+    const row = scrollContainerEl.querySelector<HTMLElement>(`[data-song-row][data-index="${index}"]`);
+    row?.scrollIntoView({ block: "center" });
+  });
+
   let currentCoverUrl = $derived.by(() => {
     const song = playerStore.currentSong;
     if (!song) return null;
@@ -638,6 +659,7 @@
 
   {#if activePlaylist}
     <div
+      bind:this={scrollContainerEl}
       class="flex-1 flex flex-col min-h-0 relative z-10 overflow-y-auto"
       use:rememberScroll={`playlist:${playlistsStore.activePlaylistId}`}
     >

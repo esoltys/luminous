@@ -208,6 +208,7 @@
     const queuePl = await playlistsStore.requireQueue();
     playlistsStore.selectPlaylist(queuePl.id);
     navigationStore.viewPlaylist(queuePl.id);
+    navigationStore.requestScrollToCurrentSong();
   }
 
   function handleInfoClick() {
