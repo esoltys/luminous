@@ -1228,9 +1228,8 @@ export const en = {
     showTimeLabel: "Show elapsed and remaining time",
     showTimeHint: "Display a live track progress timer in Discord",
     recheckTooltip: "Check Discord connection",
-    customClientIdLabel: "Custom Application Client ID (optional)",
-    customClientIdPlaceholder: "Enter a custom Discord application ID",
-    resetClientIdBtn: "Reset to Default"
+    applicationIdLabel: "Application ID",
+    applicationIdHint: "Registered public application identifier used for Rich Presence"
   },
   smartPlaylistBuilder: {
     fallbackName: "Smart Playlist",

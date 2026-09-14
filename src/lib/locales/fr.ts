@@ -1227,9 +1227,8 @@ export const fr = {
     showTimeLabel: "Afficher le temps écoulé et restant",
     showTimeHint: "Afficher une barre de progression en temps réel sur Discord",
     recheckTooltip: "Vérifier la connexion à Discord",
-    customClientIdLabel: "Identifiant client d'application personnalisé (facultatif)",
-    customClientIdPlaceholder: "Saisir un identifiant d'application Discord",
-    resetClientIdBtn: "Rétablir la valeur par défaut"
+    applicationIdLabel: "Identifiant d'application",
+    applicationIdHint: "Identifiant public d'application enregistré auprès de Discord"
   },
   smartPlaylistBuilder: {
     fallbackName: "Liste intelligente",

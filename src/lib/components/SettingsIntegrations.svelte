@@ -393,34 +393,14 @@
         />
       </div>
 
-      <div class="flex flex-col gap-1.5 pt-2">
-        <label for="discord-client-id-input" class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider">
-          {i18n.t('discord.customClientIdLabel')}
-        </label>
-        <div class="flex items-center gap-2">
-          <div class="max-w-md flex-1">
-            <Input
-              id="discord-client-id-input"
-              type="text"
-              value={scrobblerStore.discordClientId}
-              onchange={(e) => {
-                const target = e.target as HTMLInputElement;
-                scrobblerStore.setDiscordClientId(target.value.trim());
-              }}
-              placeholder={i18n.t('discord.customClientIdPlaceholder')}
-              class="w-full"
-            />
-          </div>
-          {#if scrobblerStore.discordClientId !== DEFAULT_DISCORD_CLIENT_ID}
-            <Button
-              onclick={() => scrobblerStore.resetDiscordClientId()}
-              variant="secondary"
-              size="sm"
-            >
-              {i18n.t('discord.resetClientIdBtn')}
-            </Button>
-          {/if}
+      <div class="flex items-center justify-between gap-4 py-1 pt-2 border-t border-brand-border/60">
+        <div class="flex flex-col gap-0.5 min-w-0">
+          <span class="text-xs font-medium text-brand-text-primary">{i18n.t('discord.applicationIdLabel')}</span>
+          <p class="text-xs text-brand-text-secondary">{i18n.t('discord.applicationIdHint')}</p>
         </div>
+        <span class="font-mono text-xs bg-brand-surface px-2.5 py-1 rounded-md border border-brand-border text-brand-text-secondary select-all">
+          {DEFAULT_DISCORD_CLIENT_ID}
+        </span>
       </div>
     </div>
   {/if}

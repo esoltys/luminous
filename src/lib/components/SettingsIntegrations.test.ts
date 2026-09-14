@@ -75,6 +75,7 @@ describe("SettingsIntegrations.svelte", () => {
     expect(scrobblerStore.discordEnabled).toBe(true);
     expect(await findByText("Show album name")).toBeInTheDocument();
     expect(await findByText("Show elapsed and remaining time")).toBeInTheDocument();
+    expect(await findByText("1548913001715990610")).toBeInTheDocument();
   });
 
   it("hides Enable toggle until user token is validated, then enables scrobbling", async () => {
