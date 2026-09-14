@@ -4,7 +4,6 @@
     PlusIcon as Plus,
     TrashIcon as Trash2,
     GlobeIcon as Globe,
-    TagIcon,
     LinkIcon,
     UserIcon as User,
     MicrophoneStageIcon as Mic,
@@ -19,19 +18,26 @@
   import { portal } from "../utils/portal";
   import SocialIcon from "./SocialIcon.svelte";
   import { SOCIAL_PLATFORMS, getPlatformInfo, type SocialPlatformInfo } from "../utils/artistSocials";
+  import { parseMultiValue } from "../utils/multiValue";
   import type { ArtistProfile, ArtistSocialLink } from "../types";
 
   let {
     artistName,
+    genre,
     isOpen = $bindable(false),
     onClose,
     onSaved,
   }: {
     artistName: string;
+    /** This artist's embedded (file) genre, `; `-delimited -- used only to
+        flag tags below that already duplicate a genre. */
+    genre?: string | null;
     isOpen?: boolean;
     onClose: () => void;
     onSaved?: (profile: ArtistProfile) => void;
   } = $props();
+
+  let genreNames = $derived(new Set(parseMultiValue(genre ?? "").map((g) => g.toLowerCase())));
 
   let website = $state("");
   let bio = $state("");
@@ -183,10 +189,10 @@
         <!-- Tags Manager -->
         <div class="flex flex-col gap-2">
           <label for="artist-tags-input" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider flex items-center gap-1.5">
-            <TagIcon class="w-3.5 h-3.5 text-brand-accent" />
+            <Mic class="w-3.5 h-3.5 text-brand-accent" />
             {i18n.t("artistProfileEditor.tags", {}, "Tags")}
           </label>
-          <p class="text-[10px] text-brand-text-secondary/70 -mt-1">
+          <p class="text-xs text-brand-text-secondary/70 -mt-1">
             {i18n.t("artistProfileEditor.tagsNote")}
           </p>
 
@@ -194,9 +200,13 @@
           {#if tags.length > 0}
             <div class="flex flex-wrap gap-1.5">
               {#each tags as tag, idx (tag)}
-                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-brand-accent/15 text-brand-text-primary border border-brand-accent/25">
+                {@const isGenreDupe = genreNames.has(tag.toLowerCase())}
+                <span
+                  class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-brand-accent/15 text-brand-text-primary border border-brand-accent/25"
+                  title={isGenreDupe ? i18n.t("artistProfileEditor.tagDupesGenreTooltip", { tag }, `"${tag}" is already a genre tag -- no need to add it here`) : undefined}
+                >
                   <Mic class="w-3 h-3 shrink-0 opacity-70" />
-                  <span>{tag}</span>
+                  <span class={isGenreDupe ? "line-through opacity-60" : ""}>{tag}</span>
                   <button
                     type="button"
                     onclick={() => handleRemoveTag(idx)}

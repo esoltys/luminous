@@ -351,8 +351,17 @@
   }
 
   let rawGenre = $derived(deriveArtistGenres(songs));
-  let genreLabel = $derived(rawGenre ? undefined : i18n.t('artistDetail.unknownGenre'));
-  let hasChips = $derived(hasTags || Boolean(rawGenre?.trim()));
+  // Header shows curated artist tags only, not the file-embedded genre --
+  // that's already covered by the Genres page and every album/song beneath
+  // this artist, so repeating it here is just noise. A tag that also exists
+  // as an embedded genre is excluded since it isn't "artist only" anymore.
+  let artistOnlyTags = $derived.by(() => {
+    const tags = artistProfile?.tags;
+    if (!tags?.length) return tags;
+    const genreNames = new Set(parseMultiValue(rawGenre).map((g) => g.toLowerCase()));
+    return tags.filter((t) => !genreNames.has(t.trim().toLowerCase()));
+  });
+  let hasChips = $derived((artistOnlyTags?.length ?? 0) > 0);
 
   let totalDurationLabel = $derived.by(() => {
     const totalNs = songs.reduce((sum, s) => sum + (s.length_nanosec ?? 0), 0);
@@ -578,16 +587,11 @@
     {#if !windowLayoutStore.isDetailHeaderCollapsed}
       {#if hasChips}
         <GenreChips
-          genre={rawGenre}
-          curatedTags={artistProfile?.tags}
+          curatedTags={artistOnlyTags}
           onCuratedTagClick={handleTagClick}
           curatedTagTitle={(tag) => `Filter artists tagged "${tag}"`}
           variant="full"
         />
-      {:else}
-        <div class="text-xs text-brand-text-secondary italic">
-          <span>{genreLabel}</span>
-        </div>
       {/if}
     {/if}
 
@@ -892,6 +896,7 @@
 
 <ArtistProfileEditor
   {artistName}
+  genre={rawGenre}
   isOpen={isEditorOpen}
   onClose={() => { isEditorOpen = false; }}
 />

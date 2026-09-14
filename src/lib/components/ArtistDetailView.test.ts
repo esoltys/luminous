@@ -117,7 +117,11 @@ describe("ArtistDetailView", () => {
     expect(invokeMock).toHaveBeenCalledWith("open_in_picard", { songIds: [10, 11] });
   });
 
-  it("renders genre chips when artist has songs with multi-value genres", async () => {
+  it("never renders embedded genre chips in the header, even with multi-value genres", async () => {
+    // The header used to mirror each song's embedded genre as its own chip
+    // row, but that's redundant with the Genres page and every album/song
+    // beneath this artist -- the header now shows curated artist-only tags
+    // only, so with no artist profile there's nothing to show here at all.
     collectionStore.artistProfiles = {};
     const invokeMock = vi.mocked(invoke);
     invokeMock.mockImplementation((cmd: string, args?: any) => {
@@ -135,50 +139,15 @@ describe("ArtistDetailView", () => {
 
     render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
 
-    // "Country", "Pop", "Rock" should be rendered as chips
-    const countryChip = await screen.findByTitle("Browse Country");
-    expect(countryChip).toBeTruthy();
-    expect(screen.getByTitle("Browse Pop")).toBeTruthy();
-    expect(screen.getByTitle("Browse Rock")).toBeTruthy();
-
-    // Verify genre container is distinct from the metadata container with songs count
-    const genreContainer = countryChip.closest("div.flex.flex-wrap.gap-1");
-    expect(genreContainer).toBeTruthy();
-
-    const songsText = screen.getByText(/2 songs/i);
+    const songsText = await screen.findByText(/2 songs/i);
     expect(songsText).toBeTruthy();
-    expect(genreContainer?.contains(songsText)).toBe(false);
 
-    const metadataRow = songsText.closest("div.flex.flex-wrap.items-center");
-    expect(metadataRow).toBeTruthy();
-    expect(metadataRow?.firstElementChild).toBe(songsText);
-
-    await fireEvent.click(countryChip);
-    expect(navigationStore.selectedAutoPlaylist?.genre).toBe("Country");
-    expect(navigationStore.activeTab).toBe("playlists");
+    expect(screen.queryByTitle("Browse Country")).toBeNull();
+    expect(screen.queryByTitle("Browse Pop")).toBeNull();
+    expect(screen.queryByTitle("Browse Rock")).toBeNull();
   });
 
-  it("renders Unknown genre when artist songs have no genre", async () => {
-    collectionStore.artistProfiles = {};
-    const invokeMock = vi.mocked(invoke);
-    invokeMock.mockImplementation((cmd: string, args?: any) => {
-      if (cmd === "get_songs_by_artist") {
-        return Promise.resolve([
-          { id: 1, title: "Song 1", artist: "Shania Twain", genre: "", length_nanosec: 180_000_000_000 } as any,
-        ]);
-      }
-      if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
-      if (cmd === "get_compilations_by_artist") return Promise.resolve([]);
-      if (cmd === "get_artist_profile") return Promise.resolve(null as any);
-      return Promise.resolve();
-    });
-
-    render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
-
-    expect(await screen.findByText("Unknown genre")).toBeTruthy();
-  });
-
-  it("renders unified genre chips with curated tags first and deduped file genres", async () => {
+  it("shows only artist-only curated tags in the header, hiding ones that duplicate an embedded genre", async () => {
     collectionStore.artistProfiles = {
       "shania twain": {
         artist_key: "Shania Twain",
@@ -204,15 +173,17 @@ describe("ArtistDetailView", () => {
 
     render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
 
-    // Curated tags first: "Country Pop", "Canadian"
+    // "Country Pop" isn't an embedded genre, so it's artist-only and shown.
     expect(await screen.findByTitle('Filter artists tagged "Country Pop"')).toBeTruthy();
-    expect(screen.getByTitle('Filter artists tagged "Canadian"')).toBeTruthy();
 
-    // File genres follow with "Canadian" deduped: "Country", "Pop"
-    expect(screen.getByTitle("Browse Country")).toBeTruthy();
-    expect(screen.getByTitle("Browse Pop")).toBeTruthy();
+    // "Canadian" duplicates an embedded genre, so it's excluded from the header.
+    expect(screen.queryByTitle('Filter artists tagged "Canadian"')).toBeNull();
 
-    // Clicking curated tag sets artist-tag search query
+    // Embedded file genres never render here -- that's the Genres page's job.
+    expect(screen.queryByTitle("Browse Country")).toBeNull();
+    expect(screen.queryByTitle("Browse Pop")).toBeNull();
+
+    // Clicking the artist-only tag sets artist-tag search query
     const curatedTag = screen.getByTitle('Filter artists tagged "Country Pop"');
     await fireEvent.click(curatedTag);
     expect(collectionStore.searchQuery).toBe("artist-tag:Country Pop");
@@ -220,36 +191,37 @@ describe("ArtistDetailView", () => {
     expect(navigationStore.activeSubTab).toBe("artists");
   });
 
-  it("shows every header genre chip with no overflow limit when artist has many genres", async () => {
+  it("shows every artist-only tag chip with no overflow limit when an artist has many", async () => {
     // Regression test: header chips used to cap at 4 with a "+N" overflow
     // badge (#817) -- there's room to show them all, so that cap was removed.
+    collectionStore.artistProfiles = {
+      nightwish: {
+        artist_key: "Nightwish",
+        tags: ["Symphonic Metal", "Gothic Metal", "Power Metal", "Heavy Metal", "Pop Rock", "Finnish"],
+        social_links: [],
+      },
+    };
     const invokeMock = vi.mocked(invoke);
     invokeMock.mockImplementation((cmd: string, args?: any) => {
       if (cmd === "get_songs_by_artist") {
         return Promise.resolve([
-          {
-            id: 1,
-            title: "Song 1",
-            artist: "Nightwish",
-            genre: "Metal; Symphonic Metal; Gothic Metal; Power Metal; Heavy Metal; Pop Rock",
-            length_nanosec: 180_000_000_000,
-          } as any,
+          { id: 1, title: "Song 1", artist: "Nightwish", genre: "Metal", length_nanosec: 180_000_000_000 } as any,
         ]);
       }
       if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
       if (cmd === "get_compilations_by_artist") return Promise.resolve([]);
-      if (cmd === "get_artist_profile") return Promise.resolve(null as any);
+      if (cmd === "get_artist_profile") return Promise.resolve(collectionStore.artistProfiles["nightwish"]);
       return Promise.resolve();
     });
 
     render(ArtistDetailView, { props: { artistName: "Nightwish" } });
 
-    expect(await screen.findByTitle("Browse Gothic Metal")).toBeTruthy();
-    expect(screen.getByTitle("Browse Heavy Metal")).toBeTruthy();
-    expect(screen.getByTitle("Browse Metal")).toBeTruthy();
-    expect(screen.getByTitle("Browse Pop Rock")).toBeTruthy();
-    expect(screen.getByTitle("Browse Power Metal")).toBeTruthy();
-    expect(screen.getByTitle("Browse Symphonic Metal")).toBeTruthy();
+    expect(await screen.findByTitle('Filter artists tagged "Gothic Metal"')).toBeTruthy();
+    expect(screen.getByTitle('Filter artists tagged "Heavy Metal"')).toBeTruthy();
+    expect(screen.getByTitle('Filter artists tagged "Symphonic Metal"')).toBeTruthy();
+    expect(screen.getByTitle('Filter artists tagged "Pop Rock"')).toBeTruthy();
+    expect(screen.getByTitle('Filter artists tagged "Power Metal"')).toBeTruthy();
+    expect(screen.getByTitle('Filter artists tagged "Finnish"')).toBeTruthy();
     expect(screen.queryByText("+2")).toBeNull();
   });
 
