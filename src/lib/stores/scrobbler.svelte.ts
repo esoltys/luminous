@@ -3,7 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 
 type DiscordStatus = "connected" | "disconnected" | "not_running";
 
-export const DEFAULT_DISCORD_CLIENT_ID = "1349887723725590558";
+export const DEFAULT_DISCORD_CLIENT_ID = "1548913001715990610";
 
 interface ScrobblerSettings {
   listenbrainz_enabled: boolean;

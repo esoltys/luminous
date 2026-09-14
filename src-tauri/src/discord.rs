@@ -14,7 +14,7 @@ use tokio::net::windows::named_pipe::{ClientOptions, NamedPipeClient};
 #[cfg(unix)]
 use tokio::net::UnixStream;
 
-pub const DEFAULT_DISCORD_CLIENT_ID: &str = "1349887723725590558";
+pub const DEFAULT_DISCORD_CLIENT_ID: &str = "1548913001715990610";
 
 /// Cross-platform IPC stream abstraction for Discord RPC.
 pub enum IpcStream {

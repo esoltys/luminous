@@ -135,6 +135,6 @@ describe("scrobblerStore", () => {
     expect(scrobblerStore.discordClientId).toBe("999888777");
 
     scrobblerStore.resetDiscordClientId();
-    expect(scrobblerStore.discordClientId).toBe("1349887723725590558");
+    expect(scrobblerStore.discordClientId).toBe("1548913001715990610");
   });
 });

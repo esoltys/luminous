@@ -17,7 +17,7 @@ vi.mock("@tauri-apps/api/core", () => ({
         scrobble_paused: false,
         min_duration_secs: 30,
         discord_enabled: false,
-        discord_client_id: "1349887723725590558",
+        discord_client_id: "1548913001715990610",
         discord_show_album: true,
         discord_show_time: true,
       });
