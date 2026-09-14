@@ -54,6 +54,15 @@
 
 {#if normalized === "website"}
   <Globe {size} class={className} />
+{:else if normalized === "listenbrainz"}
+  <img
+    src="/listenbrainz-icon.svg"
+    alt="ListenBrainz"
+    width={size}
+    height={size}
+    class={className}
+    aria-hidden="true"
+  />
 {:else if brandIcon}
   <svg
     width={size}

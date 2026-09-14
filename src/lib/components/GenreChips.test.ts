@@ -148,5 +148,48 @@ describe("GenreChips.svelte", () => {
       // Unknown chip falls back to no inline style (using default class colors)
       expect(synthwaveChip.getAttribute("style")).toBeNull();
     });
+
+    it("renders curated tags first, followed by deduped file genres", async () => {
+      const onCuratedSpy = vi.fn();
+      const viewSpy = vi.spyOn(navigationStore, "viewGenreTag");
+
+      const { getAllByRole, getByTitle } = render(GenreChips, {
+        props: {
+          curatedTags: ["Indie Rock", "Post-Punk"],
+          genre: "post-punk; Alternative; Indie Rock; Synthwave",
+          onCuratedTagClick: onCuratedSpy,
+          curatedTagTitle: (tag: string) => `Filter tag: ${tag}`,
+          variant: "full",
+        },
+      });
+
+      const buttons = getAllByRole("button");
+      // Order: curated tags first ("Indie Rock", "Post-Punk"), then remaining file genres ("Alternative", "Synthwave")
+      expect(buttons.map((b) => b.textContent?.trim())).toEqual([
+        "Indie Rock",
+        "Post-Punk",
+        "Alternative",
+        "Synthwave",
+      ]);
+
+      // Curated tag has custom title
+      const indieChip = getByTitle("Filter tag: Indie Rock");
+      expect(indieChip).toBeInTheDocument();
+
+      // File genre has standard browse title
+      const altChip = getByTitle("Browse Alternative");
+      expect(altChip).toBeInTheDocument();
+
+      // Clicking curated tag triggers onCuratedTagClick
+      await fireEvent.click(indieChip);
+      expect(onCuratedSpy).toHaveBeenCalledWith("Indie Rock");
+      expect(viewSpy).not.toHaveBeenCalled();
+
+      // Clicking file genre triggers navigationStore.viewGenreTag
+      await fireEvent.click(altChip);
+      expect(viewSpy).toHaveBeenCalledWith("Alternative");
+
+      viewSpy.mockRestore();
+    });
   });
 });

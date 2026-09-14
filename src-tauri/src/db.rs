@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 35;
+pub const CURRENT_SCHEMA_VERSION: i32 = 36;
 
 struct Migration {
     version: i32,
@@ -264,6 +264,11 @@ const MIGRATIONS: &[Migration] = &[
         version: 35,
         description: "update default target_lufs to -16.0 and drop unused crossfade keys (#946)",
         apply: |conn| Ok(conn.execute_batch(MIGRATION_35)?),
+    },
+    Migration {
+        version: 36,
+        description: "album_profiles table for album curation, notes, and external links (#950)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_36)?),
     },
 ];
 
@@ -1132,6 +1137,22 @@ fn rebuild_songs_table_without_path_unique(conn: &rusqlite::Connection) -> Resul
 const MIGRATION_35: &str = "
 UPDATE loudness_settings SET target_lufs = -16.0 WHERE id = 1 AND target_lufs = -18.0;
 DELETE FROM app_state WHERE key IN ('crossfade_manual_enabled', 'crossfade_manual_duration_ms');
+";
+
+// ---------------------------------------------------------------------------
+// Migration 36: album_profiles — customizable album description/liner notes,
+// website, curated tags, and release-specific external links (#950).
+// Keyed by album name matching songs.album.
+// ---------------------------------------------------------------------------
+const MIGRATION_36: &str = "
+CREATE TABLE IF NOT EXISTS album_profiles (
+    album_key TEXT PRIMARY KEY,
+    artist_key TEXT,
+    description TEXT,
+    website TEXT,
+    tags TEXT NOT NULL DEFAULT '[]',
+    links TEXT NOT NULL DEFAULT '[]'
+);
 ";
 
 // ---------------------------------------------------------------------------

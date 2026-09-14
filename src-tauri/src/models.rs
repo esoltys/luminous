@@ -995,6 +995,24 @@ pub struct ArtistProfile {
     pub bio: Option<String>,
 }
 
+/// An external platform or web link associated with an album release (#950).
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct AlbumLink {
+    pub platform: String,
+    pub handle_or_url: String,
+}
+
+/// Full customizable profile and liner notes for an album (#950).
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct AlbumProfile {
+    pub album_key: String,
+    pub artist_key: Option<String>,
+    pub description: Option<String>,
+    pub website: Option<String>,
+    pub tags: Vec<String>,
+    pub links: Vec<AlbumLink>,
+}
+
 /// A Luminous-native song tag (#224), independent of the embedded
 /// `songs.genre` column. `song_count` is the number of songs currently
 /// carrying this tag, at any position.

@@ -9,6 +9,7 @@
 // below only covers the case where this file is loaded completely standalone.
 import type {
   AlbumItem,
+  AlbumProfile,
   ArtistItem,
   ArtistProfile,
   FileType,
@@ -69,6 +70,7 @@ interface MockLibrary {
   albums: AlbumItem[];
   artists: ArtistItem[];
   artistProfiles?: ArtistProfile[];
+  albumProfiles?: AlbumProfile[];
   /** Persisted Genres curation hierarchy (#545), read straight from the real
    * tag_groups/tag_assignments tables — undefined for the bundled fixture. */
   tagGroups?: MockTagGroup[];
@@ -183,6 +185,7 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     albums: [],
     artists: [],
     artistProfiles: [],
+    albumProfiles: [],
     playlists: [],
     playlistTracks: {},
     lyrics: "",
@@ -190,6 +193,7 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
   // Mutable so set_artist_profile below can save edits made through the
   // mocked ArtistProfileEditor during manual dev-server testing.
   let artistProfiles: ArtistProfile[] = library.artistProfiles ?? [];
+  let albumProfiles: AlbumProfile[] = library.albumProfiles ?? [];
   const featured = window.__LUMINOUS_MOCK_FEATURED__ ?? {};
   const featuredSong = featured.song ?? library.songs[0];
 
@@ -946,6 +950,17 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     set_artist_profile: (args) => {
       const profile = args.profile as ArtistProfile;
       artistProfiles = [...artistProfiles.filter((p) => p.artist_key !== profile.artist_key), profile];
+      return profile;
+    },
+
+    get_album_profile: (args) => {
+      const album = args.album as string;
+      return albumProfiles.find((p) => p.album_key.toLowerCase() === album?.toLowerCase()) ?? null;
+    },
+    get_all_album_profiles: () => albumProfiles,
+    set_album_profile: (args) => {
+      const profile = args.profile as AlbumProfile;
+      albumProfiles = [...albumProfiles.filter((p) => p.album_key !== profile.album_key), profile];
       return profile;
     },
 

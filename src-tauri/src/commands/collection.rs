@@ -1,7 +1,8 @@
 use crate::{
     collection::CollectionScanner,
     models::{
-        ArtistProfile, HomeItem, LibraryStats, MusicDirectory, PruneResult, Song, TopAlbumItem,
+        AlbumProfile, ArtistProfile, HomeItem, LibraryStats, MusicDirectory, PruneResult, Song,
+        TopAlbumItem,
     },
     AppState,
 };
@@ -299,6 +300,36 @@ pub async fn get_all_artist_profiles(
 ) -> Result<Vec<ArtistProfile>, String> {
     let scanner = CollectionScanner::new(state.db.clone());
     scanner.get_all_artist_profiles().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_album_profile(
+    album: String,
+    state: State<'_, AppState>,
+) -> Result<AlbumProfile, String> {
+    let scanner = CollectionScanner::new(state.db.clone());
+    scanner
+        .get_album_profile(&album)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn set_album_profile(
+    profile: AlbumProfile,
+    state: State<'_, AppState>,
+) -> Result<AlbumProfile, String> {
+    let scanner = CollectionScanner::new(state.db.clone());
+    scanner
+        .set_album_profile(&profile)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_all_album_profiles(
+    state: State<'_, AppState>,
+) -> Result<Vec<AlbumProfile>, String> {
+    let scanner = CollectionScanner::new(state.db.clone());
+    scanner.get_all_album_profiles().map_err(|e| e.to_string())
 }
 
 /// Marks (or unmarks) one or more songs "Not included" (#104): excluded from

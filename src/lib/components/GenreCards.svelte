@@ -352,7 +352,7 @@
             onpointerdown={(e) => handleChipPointerDown(e, child.name, group.name)}
             onclick={() => { if (selectMode) onToggleSelect(child.name); }}
             oncontextmenu={(e) => openContextMenu(e, child.name, false)}
-            class="inline-flex items-center gap-1 pl-2 pr-1.5 py-0.5 rounded-full border-2 bg-brand-accent/15 text-brand-text-primary text-xs font-medium select-none touch-none transition-[opacity,box-shadow,transform] {selectMode ? 'cursor-pointer' : 'genre-drag-handle'} {!selectMode && draggedChip?.name === child.name ? 'is-dragging' : ''} {draggedChip?.name === child.name ? 'opacity-40' : ''} {dropTarget?.kind === 'chip' && dropTarget.chip === child.name ? 'ring-4 ring-brand-accent scale-110' : selected.has(child.name) ? 'ring-2 ring-brand-accent' : ''}"
+            class="inline-flex items-center gap-1 pl-2 pr-1.5 py-0.5 rounded-full border-2 bg-[color-mix(in_srgb,var(--color-brand-accent)_15%,var(--color-brand-sidebar))] text-brand-text-primary text-xs font-medium select-none touch-none transition-[opacity,box-shadow,transform] {selectMode ? 'cursor-pointer' : 'genre-drag-handle'} {!selectMode && draggedChip?.name === child.name ? 'is-dragging' : ''} {draggedChip?.name === child.name ? 'opacity-40' : ''} {dropTarget?.kind === 'chip' && dropTarget.chip === child.name ? 'ring-4 ring-brand-accent scale-110' : selected.has(child.name) ? 'ring-2 ring-brand-accent' : ''}"
             style={`border-color: ${genreColorHsl(group.color_index)};`}
           >
             {#if selectMode}
@@ -394,7 +394,7 @@
 
 {#if ghostInfo && pointerPos}
   <div
-    class="fixed z-50 pointer-events-none px-3 py-1.5 rounded-full border-2 bg-brand-accent/15 text-brand-text-primary text-xs font-semibold shadow-2xl -translate-y-1/2"
+    class="fixed z-50 pointer-events-none px-3 py-1.5 rounded-full border-2 bg-[color-mix(in_srgb,var(--color-brand-accent)_15%,var(--color-brand-sidebar))] text-brand-text-primary text-xs font-semibold shadow-2xl -translate-y-1/2"
     style={`left: ${pointerPos.x + 16}px; top: ${pointerPos.y}px; border-color: ${genreColorHsl(ghostInfo.colorIndex)};`}
   >
     {ghostInfo.label}

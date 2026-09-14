@@ -6,7 +6,8 @@
     MusicNotesIcon as Music,
     ClockIcon as Clock,
     ArrowSquareOutIcon as ExternalLink,
-    ArrowsClockwiseIcon as RefreshCw
+    ArrowsClockwiseIcon as RefreshCw,
+    CaretDownIcon as CaretDown
   } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { lyricsStatus } from "../utils/lyrics";
@@ -45,23 +46,6 @@
   let contextData = $state<SongContextEnrichment | null>(null);
   let isLoadingContext = $state(false);
   let contextErrorMsg = $state("");
-  let bioExpanded = $state(false);
-  let bioParagraphEl = $state<HTMLParagraphElement | undefined>();
-  let bioIsTruncated = $state(false);
-
-  // Only show "Read more" when the clamp actually hides text — measured
-  // once per bio while still clamped (bioExpanded resets to false on every
-  // song/tab load), since a fixed character threshold would be wrong for
-  // this panel's user-resizable width.
-  $effect(() => {
-    const text = contextData?.wikipedia_extract;
-    const el = bioParagraphEl;
-    if (!text || !el) {
-      bioIsTruncated = false;
-      return;
-    }
-    bioIsTruncated = el.scrollHeight > el.clientHeight + 1;
-  });
 
   // A request-id guard, since switching tracks quickly can otherwise let an
   // earlier, slower fetch resolve after a newer one and overwrite
@@ -69,7 +53,6 @@
   let contextRequestId = 0;
 
   async function loadContext(songId: number | undefined, forceRefresh = false) {
-    bioExpanded = false;
     const requestId = ++contextRequestId;
     if (!songId) {
       contextData = null;
@@ -317,26 +300,33 @@
           </div>
         {:else}
           {#if contextData?.wikipedia_extract}
-            <div class="space-y-1.5 text-xs">
-              {#if contextData.wikipedia_page_url}
-                <button
-                  type="button"
-                  onclick={() => contextData?.wikipedia_page_url && openExternalUrl(contextData.wikipedia_page_url)}
-                  class="group relative inline-flex items-center gap-1 text-brand-text-secondary/60 hover:text-brand-accent transition-colors cursor-pointer"
-                >
-                  <span class="underline decoration-brand-text-secondary/40 group-hover:decoration-brand-accent transition-colors">{i18n.t('playerBar.wikipediaSectionLabel', {}, 'Wikipedia')}</span>
-                  <ExternalLink class="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                </button>
-              {:else}
-                <span class="text-brand-text-secondary/60">{i18n.t('playerBar.wikipediaSectionLabel', {}, 'Wikipedia')}</span>
-              {/if}
-              <p bind:this={bioParagraphEl} class="text-brand-text-secondary leading-relaxed {bioExpanded ? '' : 'line-clamp-3'}">{contextData.wikipedia_extract}</p>
-              {#if bioIsTruncated || bioExpanded}
-                <button type="button" onclick={() => bioExpanded = !bioExpanded} class="text-brand-accent hover:underline">
-                  {bioExpanded ? i18n.t('playerBar.contextReadLess', {}, 'Read less') : i18n.t('playerBar.contextReadMore', {}, 'Read more')}
-                </button>
-              {/if}
-            </div>
+            <details
+              open
+              class="group border border-brand-border/60 rounded-lg bg-brand-sidebar/40 overflow-hidden"
+            >
+              <summary class="flex items-center justify-between px-3 py-2 text-xs font-semibold text-brand-text-secondary cursor-pointer select-none hover:text-brand-text-primary transition-colors">
+                <div class="flex items-center gap-1 min-w-0">
+                  <span>{i18n.t('playerBar.wikipediaSectionLabel', {}, 'Wikipedia')}</span>
+                  {#if contextData.wikipedia_page_url}
+                    <button
+                      type="button"
+                      onclick={(e) => {
+                        e.stopPropagation();
+                        if (contextData?.wikipedia_page_url) openExternalUrl(contextData.wikipedia_page_url);
+                      }}
+                      class="inline-flex items-center text-brand-text-secondary/60 hover:text-brand-accent transition-colors ml-0.5 p-0.5"
+                      title={i18n.t('playerBar.wikipediaSectionLabel', {}, 'Wikipedia')}
+                    >
+                      <ExternalLink class="w-3 h-3" />
+                    </button>
+                  {/if}
+                </div>
+                <CaretDown class="w-3.5 h-3.5 text-brand-text-secondary/70 group-open:rotate-180 transition-transform shrink-0" />
+              </summary>
+              <div class="px-3 pb-3 pt-1 border-t border-brand-border/40 text-xs">
+                <p class="text-brand-text-secondary leading-relaxed whitespace-pre-line">{contextData.wikipedia_extract}</p>
+              </div>
+            </details>
           {/if}
 
           {#if listenbrainzRows.length > 0}

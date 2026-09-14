@@ -23,6 +23,7 @@
   import HorizontalScrollRow from "./HorizontalScrollRow.svelte";
   import PlayShuffleButtons from "./PlayShuffleButtons.svelte";
   import ArtistProfileEditor from "./ArtistProfileEditor.svelte";
+  import MarkdownBio from "./MarkdownBio.svelte";
   import SocialIcon from "./SocialIcon.svelte";
   import SongSelectionToolbar from "./SongSelectionToolbar.svelte";
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
@@ -35,7 +36,8 @@
     PushPinIcon as Pin,
     PushPinSlashIcon as PinOff,
     DotsThreeIcon as MoreHorizontal,
-    ChartBarIcon as BarChart2
+    ChartBarIcon as BarChart2,
+    CaretDownIcon as CaretDown
   } from "phosphor-svelte";
   const ExternalLink = OpenInPicard;
   import type { Song, Playlist, AlbumItem, PlayContext, ArtistProfile, ExtendedArtworkResponse, SongContextEnrichment } from "../types";
@@ -124,69 +126,6 @@
   let bioIsFromWikipedia = $derived(!artistProfile?.bio && !!contextData?.wikipedia_extract);
   let hasBio = $derived(!!effectiveBio);
   let hasProfileContent = $derived(hasWebsite || hasBio || hasSocials);
-
-  let profileCardEl = $state<HTMLDivElement | undefined>();
-  let linksColEl = $state<HTMLDivElement | undefined>();
-  let bioParagraphEl = $state<HTMLParagraphElement | undefined>();
-  let bioNeedsClamp = $state(false);
-  let clampedLines = $state(6);
-
-  function measureBio() {
-    const text = effectiveBio;
-    const el = bioParagraphEl;
-    if (!text || !el) {
-      bioNeedsClamp = false;
-      return;
-    }
-
-    // Baseline height is ~6 lines of text-xs leading-relaxed (~130px)
-    const baselineHeight = 130;
-    const lineHeight = 20;
-
-    // Available height in profile card: when rendered side-by-side in md:flex-row (>= 768px),
-    // the card already expands to the height of the Links column, so the bio can occupy
-    // that height without taking any extra vertical space.
-    const cardEl = profileCardEl;
-    const linksEl = linksColEl;
-    const isSideBySide = !!cardEl && cardEl.clientWidth >= 768 && !!linksEl;
-    const linksHeight = isSideBySide && linksEl ? linksEl.offsetHeight : 0;
-    const availableHeight = Math.max(baselineHeight, linksHeight);
-
-    // scrollHeight reflects the full natural height of the text content even when clamped
-    const naturalHeight = el.scrollHeight;
-
-    // Only clamp if the bio genuinely overflows the available height
-    if (naturalHeight > availableHeight + 10) {
-      bioNeedsClamp = true;
-      clampedLines = Math.max(3, Math.floor(availableHeight / lineHeight));
-    } else {
-      bioNeedsClamp = false;
-    }
-  }
-
-  $effect(() => {
-    const _bio = effectiveBio;
-    const _el = bioParagraphEl;
-    const _links = linksColEl;
-    const _card = profileCardEl;
-    if (!_bio || !_el) {
-      bioNeedsClamp = false;
-      return;
-    }
-
-    measureBio();
-
-    if (typeof ResizeObserver !== "undefined" && _card) {
-      const observer = new ResizeObserver(() => {
-        measureBio();
-      });
-      observer.observe(_card);
-      if (_links) observer.observe(_links);
-      return () => {
-        observer.disconnect();
-      };
-    }
-  });
 
   // Locally-discovered artist visuals (#98/#761) — portrait/logo/fanart,
   // fetched on demand per artist since scanning every artist's folder
@@ -413,6 +352,7 @@
 
   let rawGenre = $derived(deriveArtistGenres(songs));
   let genreLabel = $derived(rawGenre ? undefined : i18n.t('artistDetail.unknownGenre'));
+  let hasChips = $derived(hasTags || Boolean(rawGenre?.trim()));
 
   let totalDurationLabel = $derived.by(() => {
     const totalNs = songs.reduce((sum, s) => sum + (s.length_nanosec ?? 0), 0);
@@ -572,14 +512,6 @@
           <span>•</span>
           <span>{totalDurationLabel}</span>
         </div>
-
-        {#if rawGenre}
-          <GenreChips genre={rawGenre} variant="full" limit={4} />
-        {:else}
-          <div class="text-xs text-brand-text-primary font-medium">
-            <span>{genreLabel}</span>
-          </div>
-        {/if}
         {/if}
 
         <div class="flex flex-wrap items-center gap-3 {windowLayoutStore.isDetailHeaderCollapsed ? '' : 'mt-3'} select-none">
@@ -643,139 +575,131 @@
   </div>
 
   <div class="px-6 pt-6 flex flex-col gap-8">
-    <!-- Tags Pills — kept outside/above the profile card so they read as
-         top-level artist identity, not a sub-item of "About". -->
-    {#if hasTags && !windowLayoutStore.isDetailHeaderCollapsed}
-      <div class="flex flex-wrap gap-1.5 sm:gap-2">
-        {#each artistProfile?.tags ?? [] as tag (tag)}
-          <button
-            type="button"
-            onclick={() => handleTagClick(tag)}
-            class="px-2.5 sm:px-3 py-1 bg-brand-accent/10 hover:bg-brand-accent/25 hover:border-brand-accent/40 text-brand-text-primary rounded-full text-xs font-medium border border-brand-border/60 transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
-            title={`Filter artists tagged "${tag}"`}
-          >
-            <span>{tag}</span>
-          </button>
-        {/each}
-      </div>
+    {#if !windowLayoutStore.isDetailHeaderCollapsed}
+      {#if hasChips}
+        <GenreChips
+          genre={rawGenre}
+          curatedTags={artistProfile?.tags}
+          onCuratedTagClick={handleTagClick}
+          curatedTagTitle={(tag) => `Filter artists tagged "${tag}"`}
+          variant="full"
+          limit={4}
+        />
+      {:else}
+        <div class="text-xs text-brand-text-secondary italic">
+          <span>{genreLabel}</span>
+        </div>
+      {/if}
     {/if}
 
     <!-- Artist Profile Card (About & Links) -->
     {#if hasProfileContent && !windowLayoutStore.isDetailHeaderCollapsed}
       {@const profile = artistProfile}
-      <div
-        bind:this={profileCardEl}
-        class="border border-brand-border rounded-xl bg-brand-sidebar/40 backdrop-blur-md p-4 sm:p-5 md:p-6 shadow-xs flex flex-col md:flex-row gap-5 md:gap-6 justify-between transition-all"
+      <details
+        open={windowLayoutStore.isOverviewExpanded}
+        ontoggle={(e) => windowLayoutStore.setOverviewExpanded(e.currentTarget.open)}
+        class="group border border-brand-border rounded-xl bg-brand-sidebar/40 backdrop-blur-md overflow-hidden shadow-xs transition-all"
       >
-        <!-- About Column (Left) -->
-        <div class="flex-1 flex flex-col gap-3 min-w-0">
-          <!-- Bio -->
-          {#if hasBio}
-            {@const bioText = effectiveBio ?? ""}
-            <div class="text-xs text-brand-text-secondary leading-relaxed">
-              {#if bioIsFromWikipedia}
-                <button
-                  type="button"
-                  onclick={() => contextData?.wikipedia_page_url && handleOpenUrl(contextData.wikipedia_page_url)}
-                  class="group relative inline-flex items-center gap-1 mb-1 text-[11px] font-semibold text-brand-text-secondary/70 hover:text-brand-accent transition-colors cursor-pointer"
-                >
-                  <span class="underline decoration-brand-text-secondary/40 group-hover:decoration-brand-accent">{i18n.t('playerBar.wikipediaSectionLabel', {}, 'Wikipedia')}</span>
-                  <ExternalLink class="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                </button>
-              {/if}
-              <p
-                bind:this={bioParagraphEl}
-                style={bioNeedsClamp && !isBioExpanded
-                  ? `display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: ${clampedLines}; overflow: hidden;`
-                  : undefined}
-                class="whitespace-pre-line"
-              >
-                {bioText}
-              </p>
-              {#if bioNeedsClamp}
-                <button
-                  type="button"
-                  onclick={() => { isBioExpanded = !isBioExpanded; }}
-                  class="mt-1 text-xs font-semibold text-brand-accent hover:underline inline-flex items-center gap-0.5 cursor-pointer"
-                >
-                  {isBioExpanded ? i18n.t("artistDetail.showLess", {}, "Show less") : i18n.t("artistDetail.showMore", {}, "Show more")}
-                </button>
-              {/if}
+        <summary class="flex items-center justify-between px-4 py-2.5 sm:px-5 sm:py-3 text-xs font-semibold text-brand-text-secondary cursor-pointer select-none hover:text-brand-text-primary transition-colors">
+          <span>{i18n.t('artistDetail.overview', {}, 'Overview')}</span>
+          <CaretDown class="w-3.5 h-3.5 text-brand-text-secondary/70 group-open:rotate-180 transition-transform" />
+        </summary>
+        <div class="p-4 sm:p-5 md:p-6 border-t border-brand-border/60 flex flex-col md:flex-row gap-5 md:gap-6 justify-between">
+          <!-- About Column (Left) -->
+          <div class="flex-1 flex flex-col gap-3 min-w-0">
+            <!-- Bio -->
+            {#if hasBio}
+              {@const bioText = effectiveBio ?? ""}
+              <div class="text-xs text-brand-text-secondary leading-relaxed">
+                {#if bioIsFromWikipedia}
+                  <button
+                    type="button"
+                    onclick={() => contextData?.wikipedia_page_url && handleOpenUrl(contextData.wikipedia_page_url)}
+                    class="group relative inline-flex items-center gap-1 mb-1 text-[11px] font-semibold text-brand-text-secondary/70 hover:text-brand-accent transition-colors cursor-pointer"
+                  >
+                    <span class="underline decoration-brand-text-secondary/40 group-hover:decoration-brand-accent">{i18n.t('playerBar.wikipediaSectionLabel', {}, 'Wikipedia')}</span>
+                    <ExternalLink class="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </button>
+                {/if}
+                <MarkdownBio
+                  text={bioText}
+                  disableClamp={true}
+                />
+              </div>
+            {/if}
+          </div>
+
+          <!-- Links Column (Right) -->
+          {#if hasWebsite || hasSocials}
+            <div
+              class="md:w-60 lg:w-72 shrink-0 border-t border-brand-border/40 pt-4 md:border-t-0 md:border-l md:border-brand-border/60 md:pt-0 md:pl-6 flex flex-col gap-3"
+            >
+              <div class="grid grid-cols-1 sm:grid-cols-2 md:flex md:flex-col gap-2.5">
+                <!-- Primary Website Link -->
+                {#if hasWebsite}
+                  {@const siteUrl = resolveSocialUrl("website", profile?.website ?? "")}
+                  <button
+                    type="button"
+                    onclick={() => handleOpenUrl(siteUrl)}
+                    class="flex items-center gap-2.5 sm:gap-3 group text-left transition-colors cursor-pointer min-w-0"
+                  >
+                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-brand-main/60 border border-brand-border flex items-center justify-center text-brand-text-secondary group-hover:text-brand-accent group-hover:border-brand-accent/40 transition-colors shrink-0 shadow-2xs">
+                      <SocialIcon platform="website" size={14} />
+                    </div>
+                    <div class="flex items-center gap-1 min-w-0 flex-1">
+                      <span class="text-xs font-medium text-brand-text-primary truncate transition-colors">
+                        {formatDisplayLabel("website", profile?.website ?? "")}
+                      </span>
+                      <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                    </div>
+                  </button>
+                {/if}
+
+                <!-- Social Links -->
+                {#each profile?.social_links ?? [] as link, idx (idx)}
+                  {@const resolvedUrl = resolveSocialUrl(link.platform, link.handle_or_url)}
+                  <button
+                    type="button"
+                    onclick={() => handleOpenUrl(resolvedUrl)}
+                    class="flex items-center gap-2.5 sm:gap-3 group text-left transition-colors cursor-pointer min-w-0"
+                  >
+                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-brand-main/60 border border-brand-border flex items-center justify-center text-brand-text-secondary group-hover:text-brand-accent group-hover:border-brand-accent/40 transition-colors shrink-0 shadow-2xs">
+                      <SocialIcon platform={link.platform} size={14} />
+                    </div>
+                    <div class="flex items-center gap-1 min-w-0 flex-1">
+                      <span class="text-xs font-medium text-brand-text-primary truncate transition-colors">
+                        {formatDisplayLabel(link.platform, link.handle_or_url)}
+                      </span>
+                      <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                    </div>
+                  </button>
+                {/each}
+
+                <!-- Derived Fanart.tv link (#98/#761) — computed from the
+                     MusicBrainz link's MBID above, not a stored/user-editable
+                     social link, so it isn't part of the {#each} above. -->
+                {#if fanartTvUrl}
+                  <button
+                    type="button"
+                    onclick={() => handleOpenUrl(fanartTvUrl)}
+                    class="flex items-center gap-2.5 sm:gap-3 group text-left transition-colors cursor-pointer min-w-0"
+                  >
+                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-brand-main/60 border border-brand-border flex items-center justify-center text-brand-text-secondary group-hover:text-brand-accent group-hover:border-brand-accent/40 transition-colors shrink-0 shadow-2xs">
+                      <SocialIcon platform="fanart_tv" size={14} />
+                    </div>
+                    <div class="flex items-center gap-1 min-w-0 flex-1">
+                      <span class="text-xs font-medium text-brand-text-primary truncate transition-colors">
+                        Fanart.tv
+                      </span>
+                      <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                    </div>
+                  </button>
+                {/if}
+              </div>
             </div>
           {/if}
         </div>
-
-        <!-- Links Column (Right) -->
-        {#if hasWebsite || hasSocials}
-          <div
-            bind:this={linksColEl}
-            class="md:w-60 lg:w-72 shrink-0 border-t border-brand-border/40 pt-4 md:border-t-0 md:border-l md:border-brand-border/60 md:pt-0 md:pl-6 flex flex-col gap-3"
-          >
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:flex md:flex-col gap-2.5">
-              <!-- Primary Website Link -->
-              {#if hasWebsite}
-                {@const siteUrl = resolveSocialUrl("website", profile?.website ?? "")}
-                <button
-                  type="button"
-                  onclick={() => handleOpenUrl(siteUrl)}
-                  class="flex items-center gap-2.5 sm:gap-3 group text-left transition-colors cursor-pointer min-w-0"
-                >
-                  <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-brand-main/60 border border-brand-border flex items-center justify-center text-brand-text-secondary group-hover:text-brand-accent group-hover:border-brand-accent/40 transition-colors shrink-0 shadow-2xs">
-                    <SocialIcon platform="website" size={14} />
-                  </div>
-                  <div class="flex items-center gap-1 min-w-0 flex-1">
-                    <span class="text-xs font-medium text-brand-text-primary truncate transition-colors">
-                      {formatDisplayLabel("website", profile?.website ?? "")}
-                    </span>
-                    <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-                  </div>
-                </button>
-              {/if}
-
-              <!-- Social Links -->
-              {#each profile?.social_links ?? [] as link, idx (idx)}
-                {@const resolvedUrl = resolveSocialUrl(link.platform, link.handle_or_url)}
-                <button
-                  type="button"
-                  onclick={() => handleOpenUrl(resolvedUrl)}
-                  class="flex items-center gap-2.5 sm:gap-3 group text-left transition-colors cursor-pointer min-w-0"
-                >
-                  <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-brand-main/60 border border-brand-border flex items-center justify-center text-brand-text-secondary group-hover:text-brand-accent group-hover:border-brand-accent/40 transition-colors shrink-0 shadow-2xs">
-                    <SocialIcon platform={link.platform} size={14} />
-                  </div>
-                  <div class="flex items-center gap-1 min-w-0 flex-1">
-                    <span class="text-xs font-medium text-brand-text-primary truncate transition-colors">
-                      {formatDisplayLabel(link.platform, link.handle_or_url)}
-                    </span>
-                    <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-                  </div>
-                </button>
-              {/each}
-
-              <!-- Derived Fanart.tv link (#98/#761) — computed from the
-                   MusicBrainz link's MBID above, not a stored/user-editable
-                   social link, so it isn't part of the {#each} above. -->
-              {#if fanartTvUrl}
-                <button
-                  type="button"
-                  onclick={() => handleOpenUrl(fanartTvUrl)}
-                  class="flex items-center gap-2.5 sm:gap-3 group text-left transition-colors cursor-pointer min-w-0"
-                >
-                  <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-brand-main/60 border border-brand-border flex items-center justify-center text-brand-text-secondary group-hover:text-brand-accent group-hover:border-brand-accent/40 transition-colors shrink-0 shadow-2xs">
-                    <SocialIcon platform="fanart_tv" size={14} />
-                  </div>
-                  <div class="flex items-center gap-1 min-w-0 flex-1">
-                    <span class="text-xs font-medium text-brand-text-primary truncate transition-colors">
-                      Fanart.tv
-                    </span>
-                    <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-                  </div>
-                </button>
-              {/if}
-            </div>
-          </div>
-        {/if}
-      </div>
+      </details>
     {/if}
     {#if sets.length > 0}
       <HorizontalScrollRow title={i18n.t('artistDetail.setsFilter', { count: sets.length })}>
