@@ -1468,6 +1468,47 @@ pub fn get_artist_profile_conn(conn: &rusqlite::Connection, artist: &str) -> Res
     }
 }
 
+/// Renames every occurrence of a tag in *other* artists' profiles that
+/// matches `tag` case-insensitively but not exactly, to `tag`'s casing.
+/// Tags are otherwise freeform per-artist strings with no shared canonical
+/// row, so without this, saving "Canadian" on one artist while another
+/// already has "canadian" would leave the same tag split across two cases
+/// in the library-wide tag list (see `get_library_artist_tags`).
+fn canonicalize_artist_tag_casing(
+    conn: &rusqlite::Connection,
+    current_artist_key: &str,
+    tag: &str,
+) -> Result<()> {
+    let mut stmt = conn.prepare(
+        "SELECT artist_key, tags FROM artist_profiles WHERE artist_key <> ?1 COLLATE NOCASE",
+    )?;
+    let rows: Vec<(String, String)> = stmt
+        .query_map(params![current_artist_key], |row| {
+            Ok((row.get(0)?, row.get(1)?))
+        })?
+        .collect::<rusqlite::Result<_>>()?;
+
+    for (artist_key, tags_json) in rows {
+        let mut tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
+        let mut changed = false;
+        for t in tags.iter_mut() {
+            if t != tag && t.to_lowercase() == tag.to_lowercase() {
+                *t = tag.to_string();
+                changed = true;
+            }
+        }
+        if changed {
+            let new_tags_json = serde_json::to_string(&tags)?;
+            conn.execute(
+                "UPDATE artist_profiles SET tags = ?1 WHERE artist_key = ?2",
+                params![new_tags_json, artist_key],
+            )?;
+        }
+    }
+
+    Ok(())
+}
+
 /// Upsert an artist profile into SQLite (#473).
 pub fn set_artist_profile_conn(
     conn: &rusqlite::Connection,
@@ -1492,6 +1533,10 @@ pub fn set_artist_profile_conn(
             profile.bio
         ],
     )?;
+
+    for tag in &profile.tags {
+        canonicalize_artist_tag_casing(conn, &profile.artist_key, tag)?;
+    }
 
     Ok(profile.clone())
 }
@@ -3083,6 +3128,62 @@ mod tests {
         let all = get_all_artist_profiles_conn(&conn).unwrap();
         assert_eq!(all.len(), 1);
         assert_eq!(all[0].artist_key, "Shania Twain");
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_artist_tag_casing_propagates_across_artists() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_artist_tag_casing_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Database::new(temp_dir.clone()).unwrap();
+        let conn = db.pool.get().unwrap();
+
+        set_artist_profile_conn(
+            &conn,
+            &ArtistProfile {
+                artist_key: "Shania Twain".to_string(),
+                website: None,
+                tags: vec!["canadian".to_string()],
+                social_links: vec![],
+                bio: None,
+            },
+        )
+        .unwrap();
+        set_artist_profile_conn(
+            &conn,
+            &ArtistProfile {
+                artist_key: "Alanis Morissette".to_string(),
+                website: None,
+                tags: vec!["canadian".to_string(), "rock".to_string()],
+                social_links: vec![],
+                bio: None,
+            },
+        )
+        .unwrap();
+
+        // Re-saving "Shania Twain" with "Canadian" (different case) should
+        // not just update her own row, but re-case every other artist's
+        // matching tag too, so the library-wide tag list has one casing.
+        set_artist_profile_conn(
+            &conn,
+            &ArtistProfile {
+                artist_key: "Shania Twain".to_string(),
+                website: None,
+                tags: vec!["Canadian".to_string()],
+                social_links: vec![],
+                bio: None,
+            },
+        )
+        .unwrap();
+
+        let alanis = get_artist_profile_conn(&conn, "Alanis Morissette").unwrap();
+        assert_eq!(alanis.tags, vec!["Canadian", "rock"]);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
