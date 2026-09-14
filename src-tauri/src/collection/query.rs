@@ -13,7 +13,7 @@ use crate::models::{
     Playlist, QueuePopulationMode, Song, TopAlbumItem, LIBRARY_SOURCES_SQL,
 };
 use anyhow::Result;
-use rusqlite::{params, ToSql};
+use rusqlite::{params, OptionalExtension, ToSql};
 
 impl CollectionScanner {
     /// Full-text + field search across the library.
@@ -921,6 +921,42 @@ impl CollectionScanner {
     pub fn get_all_album_profiles(&self) -> Result<Vec<AlbumProfile>> {
         let conn = self.db.pool.get()?;
         get_all_album_profiles_conn(&conn)
+    }
+
+    /// Resolve a representative song's file path for an artist, used to
+    /// locate the artist-level directory for `artist.md`/`artist.jpg` (#98) —
+    /// same query `get_extended_artwork_for_artist` uses for artwork.
+    pub fn get_representative_song_path_for_artist(&self, artist: &str) -> Result<Option<String>> {
+        let conn = self.db.pool.get()?;
+        let path = conn
+            .query_row(
+                "SELECT path FROM songs
+                 WHERE (album_artist = ?1 COLLATE NOCASE OR artist = ?1 COLLATE NOCASE)
+                   AND path IS NOT NULL
+                 LIMIT 1",
+                params![artist],
+                |row| row.get::<_, Option<String>>(0),
+            )
+            .optional()?
+            .flatten();
+        Ok(path)
+    }
+
+    /// Resolve a representative song's file path for an album, used to
+    /// locate the album directory for `album.md`/`cover.jpg`.
+    pub fn get_representative_song_path_for_album(&self, album: &str) -> Result<Option<String>> {
+        let conn = self.db.pool.get()?;
+        let path = conn
+            .query_row(
+                "SELECT path FROM songs
+                 WHERE album = ?1 COLLATE NOCASE AND path IS NOT NULL
+                 LIMIT 1",
+                params![album],
+                |row| row.get::<_, Option<String>>(0),
+            )
+            .optional()?
+            .flatten();
+        Ok(path)
     }
 
     pub fn get_library_stats(&self) -> Result<LibraryStats> {
