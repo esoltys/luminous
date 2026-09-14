@@ -9,10 +9,10 @@
     WarningIcon as AlertTriangle,
     LockIcon as Lock,
     ImageBrokenIcon as ImageOff,
-    CloudIcon
+    CloudIcon,
+    FolderOpenIcon as FolderOpen
   } from "phosphor-svelte";
   import { collectionStore } from "../stores/collection.svelte";
-  import { tagsStore } from "../stores/tags.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import SongRating from "./SongRating.svelte";
@@ -26,6 +26,7 @@
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
   import ChipInput from "./ChipInput.svelte";
+  import PlainChipInput from "./PlainChipInput.svelte";
 
   interface Props {
     songId: number;
@@ -200,6 +201,20 @@
     }
   }
 
+  let isOpeningFolder = $state(false);
+
+  async function handleOpenFolder() {
+    isOpeningFolder = true;
+    try {
+      await invoke("open_song_folder", { songIds: [songId] });
+    } catch (e: any) {
+      console.error("Failed to open containing folder:", e);
+      toastStore.show(i18n.t('tagEditor.openFolderFailedPrefix', {}, 'Failed to open folder: ') + e.toString(), "error");
+    } finally {
+      isOpeningFolder = false;
+    }
+  }
+
   async function handleClearArt() {
     isClearingArt = true;
     try {
@@ -218,11 +233,6 @@
   }
 
   onMount(loadMetadata);
-  onMount(() => {
-    // Best-effort preload for the genre field's autocomplete — a failure
-    // here shouldn't block or break the editor itself.
-    if (!tagsStore.loaded) tagsStore.load().catch(() => {});
-  });
 
   function handleKeydown(e: KeyboardEvent) {
     if (e.key === "Enter") {
@@ -259,9 +269,22 @@
         </div>
       {:else}
         <div class="flex flex-col gap-4">
-          <div class="flex flex-col gap-1 bg-brand-main border border-brand-border rounded-lg p-2.5">
-            <span class="text-[9px] font-bold text-brand-text-secondary/60 uppercase font-mono">{i18n.t('tagEditor.locationField')}</span>
-            <span class="text-[10px] text-brand-text-secondary break-all select-text font-mono">{path}</span>
+          <div class="flex items-center gap-3">
+            <div class="flex-1 flex flex-col gap-1 min-w-0">
+              <span class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">{i18n.t('tagEditor.locationField')}</span>
+              <span class="text-xs text-brand-text-secondary break-all select-text">{path}</span>
+            </div>
+            {#if !isRemoteSource}
+              <Button
+                onclick={handleOpenFolder}
+                disabled={isSaving || isOpeningFolder}
+                variant="secondary"
+                size="sm"
+              >
+                <FolderOpen class="w-3.5 h-3.5" />
+                {i18n.t('tagEditor.openFolderBtn', {}, 'Open Folder')}
+              </Button>
+            {/if}
           </div>
 
           {#if isRemoteSource}
@@ -278,13 +301,13 @@
             </div>
           {/if}
 
-          <div class="flex items-center gap-3 bg-brand-main border border-brand-border rounded-lg p-2.5">
+          <div class="flex items-center gap-3">
             {#key coverArtVersion}
               <CoverArt {songId} sizeClass="w-12 h-12 rounded" />
             {/key}
-            <div class="flex-1 flex flex-col gap-0.5 min-w-0">
-              <span class="text-[9px] font-bold text-brand-text-secondary/60 uppercase font-mono">{i18n.t('tagEditor.artworkField')}</span>
-              <span class="text-[10px] text-brand-text-secondary font-mono">
+            <div class="flex-1 flex flex-col gap-1 min-w-0">
+              <span class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">{i18n.t('tagEditor.artworkField')}</span>
+              <span class="text-xs text-brand-text-secondary">
                 {artEmbedded ? i18n.t('tagEditor.artworkEmbedded') : i18n.t('tagEditor.artworkNotEmbedded')}
               </span>
             </div>
@@ -424,13 +447,12 @@
               />
             </FormField>
 
-            <FormField label={i18n.t('tagEditor.genreField')} for="tag-genre" span2 tooltip={i18n.t('tagEditor.genreTooltip', {}, 'Drag chips to reorder — the first value is treated as the main genre in the Genres tab, the rest as subgenres of it.')}>
-              <ChipInput
+            <FormField label={i18n.t('tagEditor.genreField')} for="tag-genre" span2 tooltip={i18n.t('tagEditor.genreTooltip', {}, 'The first value is treated as the main genre in the Genres tab, the rest as subgenres of it.')}>
+              <PlainChipInput
                 id="tag-genre"
                 bind:value={genre}
                 disabled={isSaving}
                 placeholder={i18n.t('tagEditor.genrePlaceholder')}
-                suggestions={tagsStore.allTags.map((t) => t.name)}
                 class="w-full"
               />
             </FormField>
@@ -460,7 +482,7 @@
 
             <!-- Rating (library-only, saves immediately) -->
             <div class="flex flex-col gap-1.5">
-              <span class="text-[10px] font-bold text-brand-text-secondary/80 uppercase tracking-wide">{i18n.t('rating.label')}</span>
+              <span class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">{i18n.t('rating.label')}</span>
               <SongRating {rating} onRate={handleRate} size="md" />
             </div>
 

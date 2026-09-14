@@ -3,6 +3,7 @@ use crate::models;
 use crate::AppState;
 use std::sync::Arc;
 use tauri::State;
+use tauri_plugin_opener::OpenerExt;
 
 #[derive(serde::Serialize)]
 pub struct SongDetails {
@@ -551,4 +552,38 @@ pub async fn clear_album_cover_art(
     tx.commit().map_err(|e| e.to_string())?;
 
     Ok(cleared.len() as u32)
+}
+
+/// Opens the containing folder of the first of `song_ids` that has a local
+/// file (in the OS file manager), for the Song/Album Details "Open Folder"
+/// action. Songs sharing an album normally share one folder, so the first
+/// hit is enough -- this mirrors `open_in_picard`'s song-id-to-parent-dir
+/// resolution rather than trusting a raw path from the frontend.
+#[tauri::command]
+pub async fn open_song_folder(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    song_ids: Vec<i64>,
+) -> Result<(), String> {
+    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
+    let dir = song_ids.iter().find_map(|id| {
+        let path: Option<String> = conn
+            .query_row("SELECT path FROM songs WHERE id = ?1", [id], |row| {
+                row.get(0)
+            })
+            .ok();
+        path.as_deref()
+            .map(std::path::Path::new)
+            .and_then(|p| p.parent())
+            .map(|p| p.to_path_buf())
+    });
+    drop(conn);
+
+    let Some(dir) = dir else {
+        return Err("No local files found for the selected songs".to_string());
+    };
+
+    app.opener()
+        .open_path(dir.to_string_lossy().to_string(), None::<&str>)
+        .map_err(|e| e.to_string())
 }

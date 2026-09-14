@@ -1127,6 +1127,7 @@ pub fn run() {
             commands::tageditor::save_album_tags,
             commands::tageditor::clear_song_cover_art,
             commands::tageditor::clear_album_cover_art,
+            commands::tageditor::open_song_folder,
             // MusicBrainz Picard bridge commands (#367)
             commands::picard::open_in_picard,
             commands::picard::get_picard_path,

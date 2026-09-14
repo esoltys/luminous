@@ -800,7 +800,8 @@ export const fr = {
 
   chipInput: {
     removeItem: "Supprimer {value}",
-    dragToReorder: "Glisser pour réorganiser"
+    dragToReorder: "Glisser pour réorganiser",
+    add: "Ajouter"
   },
 
   songTags: {
@@ -851,7 +852,7 @@ export const fr = {
     originalYearTooltip: "Année de la sortie originale, s'il s'agit d'une réédition ou d'un remaster",
     genreField: "Genre",
     genrePlaceholder: "Ajouter un genre...",
-    genreTooltip: "Glissez les tags pour les réorganiser — la première valeur est traitée comme le genre principal dans l'onglet Genres, les autres comme ses sous-genres.",
+    genreTooltip: "La première valeur est traitée comme le genre principal dans l'onglet Genres, les autres comme ses sous-genres.",
     cancelBtn: "Annuler",
     saveBtn: "Enregistrer",
     saveBtnShort: "Enregistrer",
@@ -859,6 +860,8 @@ export const fr = {
     readingTags: "Lecture des tags...",
     readFailed: "Échec de la lecture des tags",
     locationField: "Emplacement",
+    openFolderBtn: "Ouvrir le dossier",
+    openFolderFailedPrefix: "Échec de l'ouverture du dossier : ",
     remoteSourceNote: "Ce morceau se trouve sur un serveur WebDAV. Les modifications ne sont enregistrées que dans Luminous — le fichier sur le serveur ne sera pas modifié.",
     cueTrackNote: "Les tags de ce morceau proviennent de son fichier CUE, et non du fichier audio lui-même — ils ne peuvent pas encore être modifiés ici.",
     albumArtistField: "Artiste de l'album",
@@ -885,13 +888,16 @@ export const fr = {
   },
   albumTagEditor: {
     title: "Modifier les tags de l'album",
+    locationField: "Emplacement",
+    openFolderBtn: "Ouvrir le dossier",
+    openFolderFailedPrefix: "Échec de l'ouverture du dossier : ",
     remoteSourceNote: "Cet album se trouve sur un serveur WebDAV. Les modifications ne sont enregistrées que dans Luminous — les fichiers sur le serveur ne seront pas modifiés.",
     albumField: "Titre de l'album",
     albumArtistField: "Artiste de l'album",
     albumArtistPlaceholder: "Ajouter un artiste de l'album...",
     genreField: "Genre",
     genrePlaceholder: "Ajouter un genre...",
-    genreTooltip: "Glissez les tags pour les réorganiser — la première valeur est traitée comme le genre principal dans l'onglet Genres, les autres comme ses sous-genres.",
+    genreTooltip: "La première valeur est traitée comme le genre principal dans l'onglet Genres, les autres comme ses sous-genres.",
     compilationField: "Compilation (marquer comme Artistes divers)",
     yearField: "Année de sortie",
     discField: "N° de disque",
