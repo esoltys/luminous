@@ -538,7 +538,7 @@
               </div>
             {:else}
               {#if commonPrefix}
-                <div class="px-3 py-1 bg-brand-sidebar/80 border-b border-brand-border/40 text-[10px] text-brand-text-secondary font-mono flex items-center gap-1.5 shrink-0" title={commonPrefix}>
+                <div class="px-3 py-1 bg-brand-sidebar/80 border-b border-brand-border/40 text-[10px] text-brand-text-secondary flex items-center gap-1.5 shrink-0" title={commonPrefix}>
                   <span class="font-semibold text-brand-accent-text shrink-0">{i18n.t("organizer.commonBasePath")}</span>
                   <span class="truncate text-brand-text-primary">{commonPrefix}</span>
                 </div>
@@ -546,7 +546,7 @@
 
               <div class="flex-1 min-h-0 overflow-x-auto overflow-y-hidden">
                 <div style="min-width: {96 + fromColWidth + 24 + toColWidth + 20}px;" class="h-full flex flex-col">
-                  <div class="h-7 px-3 flex items-center bg-brand-sidebar/95 border-b border-brand-border/60 text-[10px] font-semibold text-brand-text-secondary uppercase tracking-wider select-none shrink-0 font-mono">
+                  <div class="h-7 px-3 flex items-center bg-brand-sidebar/95 border-b border-brand-border/60 text-[10px] font-semibold text-brand-text-secondary uppercase tracking-wider select-none shrink-0">
                     <div class="w-24 shrink-0">{i18n.t("organizer.colStatus")}</div>
 
                     <div class="flex items-center shrink-0 pr-1" style="width: {fromColWidth}px;">
@@ -588,7 +588,7 @@
                         {@const displayFrom = getDisplayPath(item.from_path, commonPrefix)}
                         {@const displayTo = getDisplayPath(item.to_path, commonPrefix)}
                         <div
-                          class="h-9 px-3 flex items-center border-b border-brand-border/20 text-[11px] font-mono hover:bg-brand-accent/10 transition-colors whitespace-nowrap"
+                          class="h-9 px-3 flex items-center border-b border-brand-border/20 text-[11px] hover:bg-brand-accent/10 transition-colors whitespace-nowrap"
                         >
                           <div class="w-24 shrink-0">
                             {#if st === "ok"}

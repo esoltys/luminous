@@ -199,11 +199,11 @@
           </div>
         {/if}
 
-        <div class="flex items-center gap-3 bg-brand-main border border-brand-border rounded-lg p-2.5">
+        <div class="flex items-center gap-3">
           <CoverArt songId={songIds[0]} artEmbedded={hasEmbeddedArt} artAutomatic={initialArtAutomatic} artManual={initialArtManual} sizeClass="w-12 h-12 rounded" />
-          <div class="flex-1 flex flex-col gap-0.5 min-w-0">
-            <span class="text-[9px] font-bold text-brand-text-secondary/60 uppercase font-mono">{i18n.t('albumTagEditor.artworkField')}</span>
-            <span class="text-[10px] text-brand-text-secondary font-mono">
+          <div class="flex-1 flex flex-col gap-1 min-w-0">
+            <span class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">{i18n.t('albumTagEditor.artworkField')}</span>
+            <span class="text-xs text-brand-text-secondary">
               {hasEmbeddedArt ? i18n.t('albumTagEditor.artworkEmbedded') : i18n.t('albumTagEditor.artworkNotEmbedded')}
             </span>
           </div>

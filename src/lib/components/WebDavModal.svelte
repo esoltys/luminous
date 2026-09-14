@@ -142,7 +142,7 @@
 
     <form onsubmit={handleSubmit} class="p-6 flex-1 overflow-y-auto flex flex-col gap-4">
       <div class="space-y-1.5">
-        <label for="webdav-name" class="block text-xs font-semibold text-brand-text-secondary">
+        <label for="webdav-name" class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
           {i18n.t("settings.webdavName")}
         </label>
         <Input
@@ -154,7 +154,7 @@
       </div>
 
       <div class="space-y-1.5">
-        <label for="webdav-url" class="block text-xs font-semibold text-brand-text-secondary">
+        <label for="webdav-url" class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
           {i18n.t("settings.webdavUrl")}
         </label>
         <Input
@@ -167,7 +167,7 @@
 
       <div class="grid grid-cols-2 gap-3">
         <div class="space-y-1.5">
-          <label for="webdav-username" class="block text-xs font-semibold text-brand-text-secondary">
+          <label for="webdav-username" class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
             {i18n.t("settings.webdavUsername")}
           </label>
           <Input
@@ -178,7 +178,7 @@
         </div>
 
         <div class="space-y-1.5">
-          <label for="webdav-password" class="block text-xs font-semibold text-brand-text-secondary">
+          <label for="webdav-password" class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
             {i18n.t("settings.webdavPassword")}
           </label>
           <Input
@@ -191,7 +191,7 @@
       </div>
 
       <div class="space-y-1.5">
-        <label for="webdav-remote-path" class="block text-xs font-semibold text-brand-text-secondary">
+        <label for="webdav-remote-path" class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
           {i18n.t("settings.webdavRemotePath")}
         </label>
         <Input
@@ -203,7 +203,7 @@
 
       <!-- Live Preview -->
       <div class="bg-brand-main/40 border border-brand-border/50 rounded-xl p-4 flex items-center justify-between gap-4">
-        <span class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider">
+        <span class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
           {i18n.t("settings.folderPreview")}
         </span>
         <div>
@@ -213,7 +213,7 @@
 
       <!-- Nickname -->
       <div class="space-y-1.5">
-        <label for="webdav-nickname" class="block text-xs font-semibold text-brand-text-secondary">
+        <label for="webdav-nickname" class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
           {i18n.t("settings.folderNickname")}
         </label>
         <Input
@@ -225,7 +225,7 @@
 
       <!-- Icon Selection -->
       <div>
-        <span class="block text-xs font-semibold text-brand-text-secondary mb-2">
+        <span class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider mb-2">
           {i18n.t("settings.folderIcon")}
         </span>
         <div class="grid grid-cols-5 gap-2">
@@ -250,7 +250,7 @@
 
       <!-- Color Selection -->
       <div>
-        <span class="block text-xs font-semibold text-brand-text-secondary mb-2">
+        <span class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider mb-2">
           {i18n.t("settings.folderColor")}
         </span>
         <ColorPicker choices={BADGE_COLOR_CHOICES} value={selectedColor} onChange={(v) => { selectedColor = v; }} />

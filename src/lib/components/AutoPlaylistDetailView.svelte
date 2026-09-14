@@ -952,7 +952,7 @@
 
     <form onsubmit={(e) => { e.preventDefault(); confirmSaveAsCustomPlaylist(); }} class="flex flex-col gap-4 p-6 bg-brand-sidebar">
       <div class="flex flex-col gap-1.5">
-        <label for="save-playlist-name-input" class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider">
+        <label for="save-playlist-name-input" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
           {i18n.t("playlists.saveQueueNameLabel", {}, "Playlist Name")}
         </label>
         <Input
