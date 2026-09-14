@@ -994,6 +994,7 @@ export const fr = {
     editArtist: "Modifier",
     editArtistDetails: "Modifier les détails de l'artiste",
     editArtistTooltip: "Modifier les détails de l'artiste, site web, tags et liens",
+    refresh: "Actualiser",
     refreshTooltip: "Réanalyser les visuels locaux et actualiser la biographie",
     refreshSuccess: "Visuels et biographie de l'artiste actualisés",
     refreshError: "Échec de l'actualisation de l'artiste",
@@ -1073,6 +1074,7 @@ export const fr = {
     overview: "Aperçu",
     editAlbumDetails: "Modifier l'album",
     editInfoTooltip: "Modifier les infos de l'album",
+    refresh: "Actualiser",
     refreshTooltip: "Actualiser les métadonnées et la pochette de cet album",
     refreshSuccess: "Métadonnées et pochette de l'album actualisées",
     refreshError: "Échec de l'actualisation de l'album"

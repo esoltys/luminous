@@ -533,13 +533,6 @@
             disabled={loading || songs.length === 0}
           />
           <IconActionButton
-            onclick={handleRescanArtist}
-            disabled={loading || collectionStore.isScanning || refreshing}
-            title={i18n.t('artistDetail.refreshTooltip')}
-          >
-            {#snippet icon()}<RefreshCw class="w-4 h-4 {refreshing || collectionStore.isScanning ? 'animate-spin' : ''}" />{/snippet}
-          </IconActionButton>
-          <IconActionButton
             onclick={() => pinnedStore.toggle("artist", artistName)}
             title={pinnedStore.isPinned("artist", artistName)
               ? i18n.t("artistDetail.unpinHome")
@@ -873,6 +866,13 @@
       icon={Edit3}
       label={i18n.t("artistDetail.editArtistDetails", {}, "Edit Artist Details")}
       onclick={() => { isEditorOpen = true; overflowMenuPos = null; }}
+    />
+    <ContextMenuItem
+      icon={RefreshCw}
+      label={i18n.t("artistDetail.refresh", {}, "Refresh")}
+      title={i18n.t('artistDetail.refreshTooltip')}
+      onclick={() => { handleRescanArtist(); overflowMenuPos = null; }}
+      disabled={loading || collectionStore.isScanning || refreshing}
     />
     <ContextMenuItem
       icon={OpenInPicard}
