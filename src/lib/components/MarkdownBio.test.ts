@@ -32,6 +32,30 @@ describe("MarkdownBio.svelte", () => {
     expect(link.getAttribute("title")).toBe("https://en.wikipedia.org/wiki/Gunship_(band)");
   });
 
+  it("renders **bold** text as <strong>", () => {
+    render(MarkdownBio, { props: { text: "This is **very** important." } });
+    const strong = screen.getByText("very");
+    expect(strong.tagName).toBe("STRONG");
+  });
+
+  it("renders *italic* text as <em>", () => {
+    render(MarkdownBio, { props: { text: "This is *quite* nice." } });
+    const em = screen.getByText("quite");
+    expect(em.tagName).toBe("EM");
+  });
+
+  it("renders bold and italic alongside a markdown link", () => {
+    render(MarkdownBio, {
+      props: {
+        text: "**Bold** intro with *italic* flair and a [link](https://example.com).",
+      },
+    });
+
+    expect(screen.getByText("Bold").tagName).toBe("STRONG");
+    expect(screen.getByText("italic").tagName).toBe("EM");
+    expect(screen.getByRole("button", { name: /link/i })).toBeTruthy();
+  });
+
   it("does not render inline show more buttons when disableClamp is true", () => {
     render(MarkdownBio, {
       props: {

@@ -74,6 +74,52 @@ describe("ArtistProfileEditor", () => {
     expect(screen.queryByText("canadian")).toBeNull();
   });
 
+  it("preserves the case the user typed instead of lowercasing tags", async () => {
+    render(ArtistProfileEditor, {
+      props: {
+        artistName: "Shania Twain",
+        isOpen: true,
+        onClose: vi.fn(),
+      },
+    });
+
+    const tagInput = screen.getByPlaceholderText(/Add a tag/i);
+    await fireEvent.input(tagInput, { target: { value: "Canadian" } });
+    await fireEvent.keyDown(tagInput, { key: "Enter" });
+
+    expect(screen.getByText("Canadian")).toBeTruthy();
+    expect(screen.queryByText("canadian")).toBeNull();
+  });
+
+  it("re-cases an existing tag in place when re-typed with different casing", async () => {
+    collectionStore.artistProfiles = {
+      "shania twain": {
+        artist_key: "Shania Twain",
+        website: null,
+        tags: ["canadian"],
+        social_links: [],
+        bio: null,
+      },
+    };
+
+    render(ArtistProfileEditor, {
+      props: {
+        artistName: "Shania Twain",
+        isOpen: true,
+        onClose: vi.fn(),
+      },
+    });
+
+    const tagInput = screen.getByPlaceholderText(/Add a tag/i);
+    await fireEvent.input(tagInput, { target: { value: "Canadian" } });
+    await fireEvent.keyDown(tagInput, { key: "Enter" });
+
+    expect(screen.getByText("Canadian")).toBeTruthy();
+    expect(screen.queryByText("canadian")).toBeNull();
+    // Re-casing replaces the existing pill rather than adding a duplicate
+    expect(screen.getAllByTitle(/Remove tag/i).length).toBe(1);
+  });
+
   it("adds and removes social links", async () => {
     render(ArtistProfileEditor, {
       props: {

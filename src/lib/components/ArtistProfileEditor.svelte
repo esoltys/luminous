@@ -62,10 +62,16 @@
   function handleAddTag() {
     const raw = newTagInput.trim().replace(/^,+|,+$/g, "");
     if (!raw) return;
-    const parts = raw.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+    const parts = raw.split(",").map((s) => s.trim()).filter(Boolean);
     for (const part of parts) {
-      if (!tags.some((t) => t.toLowerCase() === part)) {
+      const existingIndex = tags.findIndex((t) => t.toLowerCase() === part.toLowerCase());
+      if (existingIndex === -1) {
         tags = [...tags, part];
+      } else if (tags[existingIndex] !== part) {
+        // Re-typing an existing tag in a different case re-cases it here;
+        // the backend then propagates that case to every other artist's
+        // matching tag (see canonicalize_artist_tag_casing in query.rs).
+        tags = tags.map((t, i) => (i === existingIndex ? part : t));
       }
     }
     newTagInput = "";
