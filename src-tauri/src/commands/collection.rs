@@ -460,7 +460,10 @@ fn build_artist_md_content(profile: &ArtistProfile) -> Option<String> {
 }
 
 /// Same as `build_artist_md_content`, for `album.md` (#950's `description`/
-/// `links` fields).
+/// `links` fields). No "## Tags" section here, unlike the artist version —
+/// an album has no curated tag list of its own to mirror (#962 removed
+/// `album_profiles.tags`; the embedded `songs.genre` tag is the only tag
+/// list an album has, and it's already on disk in each track's own file).
 fn build_album_md_content(profile: &AlbumProfile) -> Option<String> {
     let mut sections: Vec<String> = Vec::new();
     if let Some(description) = profile.description.as_deref() {
@@ -469,7 +472,6 @@ fn build_album_md_content(profile: &AlbumProfile) -> Option<String> {
             sections.push(trimmed.to_string());
         }
     }
-    sections.extend(format_tags_section(&profile.tags));
     let links: Vec<(&str, &str)> = profile
         .links
         .iter()
@@ -784,13 +786,14 @@ mod tests {
     }
 
     #[test]
-    fn test_build_album_md_content_appends_tags_then_website_and_links() {
+    fn test_build_album_md_content_appends_website_and_links_but_no_tags_section() {
+        // #962: albums have no curated tag list of their own to mirror
+        // anymore -- only the embedded genre tag, already on disk per-file.
         let profile = AlbumProfile {
             album_key: "Come On Over".to_string(),
             artist_key: Some("Shania Twain".to_string()),
             description: Some("Iconic 1997 studio album.".to_string()),
             website: Some("https://shaniatwain.com/music/come-on-over".to_string()),
-            tags: vec!["country pop".to_string()],
             links: vec![AlbumLink {
                 platform: "discogs".to_string(),
                 handle_or_url: "https://www.discogs.com/master/132556".to_string(),
@@ -800,7 +803,7 @@ mod tests {
         let content = build_album_md_content(&profile).unwrap();
         assert_eq!(
             content,
-            "Iconic 1997 studio album.\n\n## Tags\n- country pop\n\n## Links\n\
+            "Iconic 1997 studio album.\n\n## Links\n\
              - [Website](https://shaniatwain.com/music/come-on-over)\n\
              - [Discogs](https://www.discogs.com/master/132556)"
         );
