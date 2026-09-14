@@ -5,6 +5,8 @@ import RightPanel from "./RightPanel.svelte";
 import { playerStore } from "../stores/player.svelte";
 import type { Song } from "../types";
 
+import { invoke } from "@tauri-apps/api/core";
+
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockResolvedValue(null),
 }));
@@ -244,5 +246,30 @@ describe("RightPanel.svelte", () => {
 
     expect(getByText("File Path:")).toBeInTheDocument();
     expect(getByText("/music/test.flac")).toBeInTheDocument();
+  });
+
+  it("renders Wikipedia bio extract in an open details accordion on the Information tab", async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_song_context") {
+        return {
+          wikipedia_extract: "Test Wikipedia Bio Extract",
+          wikipedia_page_url: "https://en.wikipedia.org/wiki/Test_Artist",
+          critiquebrainz_rating: null,
+          critiquebrainz_review_links: [],
+        };
+      }
+      return null;
+    });
+
+    playerStore.currentSong = mockSong;
+    const { getByText, findByText } = render(RightPanel);
+    await fireEvent.click(getByText("Information"));
+
+    const bioText = await findByText("Test Wikipedia Bio Extract");
+    expect(bioText).toBeInTheDocument();
+
+    const detailsEl = bioText.closest("details");
+    expect(detailsEl).toBeTruthy();
+    expect(detailsEl?.hasAttribute("open")).toBe(true);
   });
 });

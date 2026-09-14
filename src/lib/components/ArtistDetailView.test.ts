@@ -44,6 +44,7 @@ describe("ArtistDetailView", () => {
     // Extended-artwork cache is on the singleton store — must not leak
     // between tests (#98/#761).
     collectionStore.extendedArtworkByArtist = {};
+    windowLayoutStore.setOverviewExpanded(true);
   });
 
   it("renders artist name and action buttons including overflow menu", async () => {
@@ -117,6 +118,7 @@ describe("ArtistDetailView", () => {
   });
 
   it("renders genre chips when artist has songs with multi-value genres", async () => {
+    collectionStore.artistProfiles = {};
     const invokeMock = vi.mocked(invoke);
     invokeMock.mockImplementation((cmd: string, args?: any) => {
       if (cmd === "get_songs_by_artist") {
@@ -157,6 +159,7 @@ describe("ArtistDetailView", () => {
   });
 
   it("renders Unknown genre when artist songs have no genre", async () => {
+    collectionStore.artistProfiles = {};
     const invokeMock = vi.mocked(invoke);
     invokeMock.mockImplementation((cmd: string, args?: any) => {
       if (cmd === "get_songs_by_artist") {
@@ -173,6 +176,48 @@ describe("ArtistDetailView", () => {
     render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
 
     expect(await screen.findByText("Unknown genre")).toBeTruthy();
+  });
+
+  it("renders unified genre chips with curated tags first and deduped file genres", async () => {
+    collectionStore.artistProfiles = {
+      "shania twain": {
+        artist_key: "Shania Twain",
+        website: "https://www.shaniatwain.com",
+        tags: ["Country Pop", "Canadian"],
+        social_links: [],
+      },
+    };
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockImplementation((cmd: string, args?: any) => {
+      if (cmd === "get_songs_by_artist") {
+        return Promise.resolve([
+          { id: 1, title: "Song 1", artist: "Shania Twain", genre: "Country; Canadian; Pop", length_nanosec: 180_000_000_000 } as any,
+        ]);
+      }
+      if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
+      if (cmd === "get_compilations_by_artist") return Promise.resolve([]);
+      if (cmd === "get_artist_profile") {
+        return Promise.resolve(collectionStore.artistProfiles["shania twain"]);
+      }
+      return Promise.resolve();
+    });
+
+    render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
+
+    // Curated tags first: "Country Pop", "Canadian"
+    expect(await screen.findByTitle('Filter artists tagged "Country Pop"')).toBeTruthy();
+    expect(screen.getByTitle('Filter artists tagged "Canadian"')).toBeTruthy();
+
+    // File genres follow with "Canadian" deduped: "Country", "Pop"
+    expect(screen.getByTitle("Browse Country")).toBeTruthy();
+    expect(screen.getByTitle("Browse Pop")).toBeTruthy();
+
+    // Clicking curated tag sets artist-tag search query
+    const curatedTag = screen.getByTitle('Filter artists tagged "Country Pop"');
+    await fireEvent.click(curatedTag);
+    expect(collectionStore.searchQuery).toBe("artist-tag:Country Pop");
+    expect(navigationStore.activeTab).toBe("collection");
+    expect(navigationStore.activeSubTab).toBe("artists");
   });
 
   it("limits header genre chips to 4 and shows overflow badge when artist has many genres (#817)", async () => {
@@ -286,10 +331,10 @@ describe("ArtistDetailView", () => {
     });
   });
 
-  describe("biography 'Show more' truncation", () => {
+  describe("biography accordion", () => {
     const longBio = "Shania Twain is a Canadian singer and songwriter. She has sold over 100 million records, making her the best-selling female artist in country music history and one of the best-selling music artists of all time. Her success garnered her several titles including the Queen of Country Pop.";
 
-    it("does not show 'Show more' when the bio text is not truncated even if length > 200", async () => {
+    it("renders bio and links in an Overview accordion without inline show more buttons", async () => {
       const invokeMock = vi.mocked(invoke);
       invokeMock.mockImplementation((cmd: string, args?: any) => {
         if (cmd === "get_songs_by_artist") return Promise.resolve([]);
@@ -319,12 +364,13 @@ describe("ArtistDetailView", () => {
       render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
       await new Promise((resolve) => setTimeout(resolve, 50));
 
+      expect(screen.getByText("Overview")).toBeTruthy();
       expect(screen.getByText(longBio)).toBeTruthy();
       expect(screen.queryByRole("button", { name: "Show more" })).toBeNull();
       expect(screen.queryByRole("button", { name: "Show less" })).toBeNull();
     });
 
-    it("shows 'Show more' when bio text is truncated, and toggles expansion on click", async () => {
+    it("collapses and expands the Overview accordion", async () => {
       const invokeMock = vi.mocked(invoke);
       invokeMock.mockImplementation((cmd: string, args?: any) => {
         if (cmd === "get_songs_by_artist") return Promise.resolve([]);
@@ -351,93 +397,19 @@ describe("ArtistDetailView", () => {
         },
       };
 
-      // Mock scrollHeight to exceed the available room baseline (~140px)
-      Object.defineProperty(HTMLParagraphElement.prototype, "scrollHeight", {
-        configurable: true,
-        get: () => 300,
-      });
+      render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
-      try {
-        render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
-        await new Promise((resolve) => setTimeout(resolve, 50));
+      const overviewHeader = screen.getByText("Overview");
+      const detailsEl = overviewHeader.closest("details");
+      expect(detailsEl).toBeTruthy();
+      expect(detailsEl?.hasAttribute("open")).toBe(true);
 
-        const showMoreBtn = screen.getByRole("button", { name: "Show more" });
-        expect(showMoreBtn).toBeTruthy();
-
-        await fireEvent.click(showMoreBtn);
-
-        const showLessBtn = screen.getByRole("button", { name: "Show less" });
-        expect(showLessBtn).toBeTruthy();
-
-        await fireEvent.click(showLessBtn);
-        expect(screen.getByRole("button", { name: "Show more" })).toBeTruthy();
-      } finally {
-        delete (HTMLParagraphElement.prototype as any).scrollHeight;
-      }
+      // Closing the accordion updates the global layout store
+      windowLayoutStore.setOverviewExpanded(false);
+      expect(windowLayoutStore.isOverviewExpanded).toBe(false);
     });
-
-    it("does not show 'Show more' when bio fits within the available height of the Links column", async () => {
-      const invokeMock = vi.mocked(invoke);
-      invokeMock.mockImplementation((cmd: string, args?: any) => {
-        if (cmd === "get_songs_by_artist") return Promise.resolve([]);
-        if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
-        if (cmd === "get_compilations_by_artist") return Promise.resolve([]);
-        if (cmd === "get_artist_profile") {
-          return Promise.resolve({
-            artist_key: "Shania Twain",
-            website: "https://www.shaniatwain.com",
-            tags: ["country"],
-            social_links: [
-              { platform: "threads", handle_or_url: "shaniatwain" },
-              { platform: "instagram", handle_or_url: "shaniatwain" },
-            ],
-            bio: longBio,
-          });
-        }
-        return Promise.resolve();
-      });
-      collectionStore.artistProfiles = {
-        "shania twain": {
-          artist_key: "Shania Twain",
-          website: "https://www.shaniatwain.com",
-          tags: ["country"],
-          social_links: [
-            { platform: "threads", handle_or_url: "shaniatwain" },
-            { platform: "instagram", handle_or_url: "shaniatwain" },
-          ],
-          bio: longBio,
-        },
-      };
-
-      // Bio is 160px, but card width is >= 768 and links column is 220px tall
-      Object.defineProperty(HTMLParagraphElement.prototype, "scrollHeight", {
-        configurable: true,
-        get: () => 160,
-      });
-      Object.defineProperty(HTMLDivElement.prototype, "clientWidth", {
-        configurable: true,
-        get() {
-          return 800;
-        },
-      });
-      Object.defineProperty(HTMLDivElement.prototype, "offsetHeight", {
-        configurable: true,
-        get() {
-          return 220;
-        },
-      });
-
-      try {
-        render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
-        await new Promise((resolve) => setTimeout(resolve, 50));
-
-        expect(screen.queryByRole("button", { name: "Show more" })).toBeNull();
-        expect(screen.queryByRole("button", { name: "Show less" })).toBeNull();
-      } finally {
-        delete (HTMLParagraphElement.prototype as any).scrollHeight;
-        delete (HTMLDivElement.prototype as any).clientWidth;
-      }
-    });
+  });
 
     it("hides tags and bio/profile section while keeping action buttons visible when detail header is collapsed", async () => {
       const originalHeight = windowLayoutStore.viewportHeight;
@@ -465,7 +437,4 @@ describe("ArtistDetailView", () => {
         windowLayoutStore.viewportHeight = originalHeight;
       }
     });
-  });
 });
-
-

@@ -406,6 +406,20 @@ export interface ArtistProfile {
   fanart_uri?: string | null;
 }
 
+export interface AlbumLink {
+  platform: string;
+  handle_or_url: string;
+}
+
+export interface AlbumProfile {
+  album_key: string;
+  artist_key?: string | null;
+  description?: string | null;
+  website?: string | null;
+  tags: string[];
+  links: AlbumLink[];
+}
+
 /**
  * Category within the Standardized Artwork Hierarchy (#98) — mirrors
  * `ArtworkCategory::as_str()` in `covermanager.rs` exactly. Don't rename a

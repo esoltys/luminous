@@ -9,8 +9,8 @@ use super::{
     SONG_SELECT_COLS_QUALIFIED, SONG_SELECT_COL_COUNT,
 };
 use crate::models::{
-    AlbumItem, ArtistProfile, ArtistSocialLink, HomeItem, LibraryStats, Playlist,
-    QueuePopulationMode, Song, TopAlbumItem, LIBRARY_SOURCES_SQL,
+    AlbumItem, AlbumLink, AlbumProfile, ArtistProfile, ArtistSocialLink, HomeItem, LibraryStats,
+    Playlist, QueuePopulationMode, Song, TopAlbumItem, LIBRARY_SOURCES_SQL,
 };
 use anyhow::Result;
 use rusqlite::{params, ToSql};
@@ -904,6 +904,25 @@ impl CollectionScanner {
         get_all_artist_profiles_conn(&conn)
     }
 
+    /// Retrieve the customizable profile (description, website, tags, links)
+    /// for an album (#950). Returns empty/default profile if none saved yet.
+    pub fn get_album_profile(&self, album: &str) -> Result<AlbumProfile> {
+        let conn = self.db.pool.get()?;
+        get_album_profile_conn(&conn, album)
+    }
+
+    /// Save or update an album's customizable profile (#950).
+    pub fn set_album_profile(&self, profile: &AlbumProfile) -> Result<AlbumProfile> {
+        let conn = self.db.pool.get()?;
+        set_album_profile_conn(&conn, profile)
+    }
+
+    /// Retrieve all custom album profiles in the library (#950).
+    pub fn get_all_album_profiles(&self) -> Result<Vec<AlbumProfile>> {
+        let conn = self.db.pool.get()?;
+        get_all_album_profiles_conn(&conn)
+    }
+
     pub fn get_library_stats(&self) -> Result<LibraryStats> {
         let conn = self.db.pool.get()?;
         let sql = format!(
@@ -1430,6 +1449,108 @@ pub fn get_all_artist_profiles_conn(conn: &rusqlite::Connection) -> Result<Vec<A
                 tags,
                 social_links,
                 bio,
+            })
+        })?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    Ok(profiles)
+}
+
+/// Retrieve customizable profile and liner notes for an album from SQLite (#950).
+pub fn get_album_profile_conn(conn: &rusqlite::Connection, album: &str) -> Result<AlbumProfile> {
+    let mut stmt = conn.prepare(
+        "SELECT album_key, artist_key, description, website, tags, links FROM album_profiles WHERE album_key = ?1 COLLATE NOCASE",
+    )?;
+    let result = stmt.query_row(params![album], |row| {
+        let album_key: String = row.get(0)?;
+        let artist_key: Option<String> = row.get(1)?;
+        let description: Option<String> = row.get(2)?;
+        let website: Option<String> = row.get(3)?;
+        let tags_json: String = row.get(4)?;
+        let links_json: String = row.get(5)?;
+
+        let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
+        let links: Vec<AlbumLink> = serde_json::from_str(&links_json).unwrap_or_default();
+
+        Ok(AlbumProfile {
+            album_key,
+            artist_key,
+            description,
+            website,
+            tags,
+            links,
+        })
+    });
+
+    match result {
+        Ok(profile) => Ok(profile),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(AlbumProfile {
+            album_key: album.to_string(),
+            artist_key: None,
+            description: None,
+            website: None,
+            tags: Vec::new(),
+            links: Vec::new(),
+        }),
+        Err(e) => Err(e.into()),
+    }
+}
+
+/// Upsert an album profile into SQLite (#950).
+pub fn set_album_profile_conn(
+    conn: &rusqlite::Connection,
+    profile: &AlbumProfile,
+) -> Result<AlbumProfile> {
+    let tags_json = serde_json::to_string(&profile.tags)?;
+    let links_json = serde_json::to_string(&profile.links)?;
+
+    conn.execute(
+        "INSERT INTO album_profiles (album_key, artist_key, description, website, tags, links)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+         ON CONFLICT(album_key) DO UPDATE SET
+            artist_key = excluded.artist_key,
+            description = excluded.description,
+            website = excluded.website,
+            tags = excluded.tags,
+            links = excluded.links",
+        params![
+            profile.album_key,
+            profile.artist_key,
+            profile.description,
+            profile.website,
+            tags_json,
+            links_json
+        ],
+    )?;
+
+    Ok(profile.clone())
+}
+
+/// Retrieve all saved album profiles in SQLite (#950).
+pub fn get_all_album_profiles_conn(conn: &rusqlite::Connection) -> Result<Vec<AlbumProfile>> {
+    let mut stmt = conn.prepare(
+        "SELECT album_key, artist_key, description, website, tags, links FROM album_profiles ORDER BY album_key COLLATE NOCASE",
+    )?;
+    let profiles = stmt
+        .query_map([], |row| {
+            let album_key: String = row.get(0)?;
+            let artist_key: Option<String> = row.get(1)?;
+            let description: Option<String> = row.get(2)?;
+            let website: Option<String> = row.get(3)?;
+            let tags_json: String = row.get(4)?;
+            let links_json: String = row.get(5)?;
+
+            let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
+            let links: Vec<AlbumLink> = serde_json::from_str(&links_json).unwrap_or_default();
+
+            Ok(AlbumProfile {
+                album_key,
+                artist_key,
+                description,
+                website,
+                tags,
+                links,
             })
         })?
         .filter_map(|r| r.ok())
@@ -2902,6 +3023,79 @@ mod tests {
         let all = get_all_artist_profiles_conn(&conn).unwrap();
         assert_eq!(all.len(), 1);
         assert_eq!(all[0].artist_key, "Shania Twain");
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_album_profile_crud() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_album_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Database::new(temp_dir.clone()).unwrap();
+        let conn = db.pool.get().unwrap();
+
+        // Initially unconfigured album returns default profile
+        let initial = get_album_profile_conn(&conn, "Come On Over").unwrap();
+        assert_eq!(initial.album_key, "Come On Over");
+        assert_eq!(initial.artist_key, None);
+        assert_eq!(initial.description, None);
+        assert_eq!(initial.website, None);
+        assert!(initial.tags.is_empty());
+        assert!(initial.links.is_empty());
+
+        // Save album profile
+        let profile = AlbumProfile {
+            album_key: "Come On Over".to_string(),
+            artist_key: Some("Shania Twain".to_string()),
+            description: Some(
+                "Iconic 1997 studio album recorded with producer Mutt Lange. [Wikipedia](https://en.wikipedia.org/wiki/Come_On_Over)".to_string(),
+            ),
+            website: Some("https://shaniatwain.com/music/come-on-over".to_string()),
+            tags: vec!["country pop".to_string(), "blockbuster".to_string()],
+            links: vec![
+                AlbumLink {
+                    platform: "bandcamp".to_string(),
+                    handle_or_url: "https://shaniatwain.bandcamp.com/album/come-on-over".to_string(),
+                },
+                AlbumLink {
+                    platform: "discogs".to_string(),
+                    handle_or_url: "https://www.discogs.com/master/132556-Shania-Twain-Come-On-Over".to_string(),
+                },
+            ],
+        };
+
+        set_album_profile_conn(&conn, &profile).unwrap();
+
+        // Retrieve saved profile (case-insensitive key match)
+        let loaded = get_album_profile_conn(&conn, "come on over").unwrap();
+        assert_eq!(loaded.album_key, "Come On Over");
+        assert_eq!(loaded.artist_key, Some("Shania Twain".to_string()));
+        assert_eq!(
+            loaded.description,
+            Some("Iconic 1997 studio album recorded with producer Mutt Lange. [Wikipedia](https://en.wikipedia.org/wiki/Come_On_Over)".to_string())
+        );
+        assert_eq!(
+            loaded.website,
+            Some("https://shaniatwain.com/music/come-on-over".to_string())
+        );
+        assert_eq!(loaded.tags, vec!["country pop", "blockbuster"]);
+        assert_eq!(loaded.links.len(), 2);
+        assert_eq!(loaded.links[0].platform, "bandcamp");
+        assert_eq!(
+            loaded.links[0].handle_or_url,
+            "https://shaniatwain.bandcamp.com/album/come-on-over"
+        );
+        assert_eq!(loaded.links[1].platform, "discogs");
+
+        // Get all album profiles
+        let all = get_all_album_profiles_conn(&conn).unwrap();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].album_key, "Come On Over");
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

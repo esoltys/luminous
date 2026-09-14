@@ -91,7 +91,7 @@ vi.mock("@tauri-apps/api/core", () => {
       if (cmd === "get_library_snapshot") {
         return { songs: [], albums: [], artists: [] };
       }
-      if (cmd === "get_all_artist_profiles") {
+      if (cmd === "get_all_artist_profiles" || cmd === "get_all_album_profiles") {
         return [];
       }
       if (cmd === "get_directories") {
