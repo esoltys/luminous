@@ -274,15 +274,41 @@ pub async fn get_top_albums(
         .map_err(|e| e.to_string())
 }
 
+/// Extracts just the prose portion of a sidecar file's content: everything
+/// before the first `## `-prefixed Markdown heading (`## Tags`, `## Links`)
+/// that `build_artist_md_content`/`build_album_md_content` append. Without
+/// this, reading back a file we wrote ourselves would fold the rendered
+/// Tags/Links sections into the plain-text bio/description field, corrupting
+/// it the moment only tags or links (no bio) were saved — the whole file
+/// content (e.g. `"## Tags\n- canadian"`) would get adopted as the bio.
+fn extract_bio_prose(content: &str) -> Option<String> {
+    let mut prose_sections: Vec<&str> = Vec::new();
+    for section in content.split("\n\n") {
+        if section.trim_start().starts_with("## ") {
+            break;
+        }
+        prose_sections.push(section);
+    }
+    let joined = prose_sections.join("\n\n");
+    let trimmed = joined.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
+}
+
 /// Reads an artist/album's bio/description sidecar file, if the
-/// corresponding song folder can be resolved and the file exists.
+/// corresponding song folder can be resolved and the file exists — returning
+/// only its prose portion (see `extract_bio_prose`).
 fn read_bio_sidecar(
     song_path: Option<String>,
     resolve_dir: impl Fn(&Path) -> Option<std::path::PathBuf>,
     filename: &str,
 ) -> Option<String> {
     let dir = resolve_dir(Path::new(&song_path?))?;
-    biomanager::read_bio(&dir, filename)
+    let content = biomanager::read_bio(&dir, filename)?;
+    extract_bio_prose(&content)
 }
 
 /// Writes `content` out to its `artist.md`/`album.md` sidecar file (or
@@ -426,6 +452,17 @@ pub async fn get_artist_profile(
         .get_artist_profile(&artist)
         .map_err(|e| e.to_string())?;
 
+    // Self-heal a bio value polluted by an earlier bug where the whole
+    // sidecar file — including its generated "## Tags"/"## Links" sections —
+    // was adopted as the bio text instead of just its prose.
+    let cleaned_bio = profile.bio.as_deref().and_then(extract_bio_prose);
+    if cleaned_bio != profile.bio {
+        profile.bio = cleaned_bio;
+        if let Ok(saved) = scanner.set_artist_profile(&profile) {
+            profile = saved;
+        }
+    }
+
     if profile.bio.is_none() {
         let song_path = scanner
             .get_representative_song_path_for_artist(&artist)
@@ -490,6 +527,16 @@ pub async fn get_album_profile(
     let mut profile = scanner
         .get_album_profile(&album)
         .map_err(|e| e.to_string())?;
+
+    // Self-heal a description value polluted by an earlier bug — see the
+    // matching comment in `get_artist_profile`.
+    let cleaned_description = profile.description.as_deref().and_then(extract_bio_prose);
+    if cleaned_description != profile.description {
+        profile.description = cleaned_description;
+        if let Ok(saved) = scanner.set_album_profile(&profile) {
+            profile = saved;
+        }
+    }
 
     if profile.description.is_none() {
         let song_path = scanner
@@ -604,6 +651,37 @@ pub async fn get_songs_missing_metadata(
 mod tests {
     use super::*;
     use crate::models::{AlbumLink, ArtistSocialLink};
+
+    #[test]
+    fn test_extract_bio_prose_none_for_tags_only_content() {
+        // Regression: saving tags with no bio wrote "## Tags\n- canadian" to
+        // the sidecar file; reading it back must not treat that as the bio.
+        assert_eq!(extract_bio_prose("## Tags\n- canadian"), None);
+    }
+
+    #[test]
+    fn test_extract_bio_prose_strips_trailing_generated_sections() {
+        assert_eq!(
+            extract_bio_prose("A real bio.\n\n## Tags\n- canadian\n\n## Links\n- [Website](https://example.com)"),
+            Some("A real bio.".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_bio_prose_returns_plain_prose_unchanged() {
+        assert_eq!(
+            extract_bio_prose("Just a bio, no sections."),
+            Some("Just a bio, no sections.".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_bio_prose_multi_paragraph_prose_is_preserved() {
+        assert_eq!(
+            extract_bio_prose("Paragraph one.\n\nParagraph two.\n\n## Tags\n- rock"),
+            Some("Paragraph one.\n\nParagraph two.".to_string())
+        );
+    }
 
     #[test]
     fn test_build_artist_md_content_none_when_profile_is_empty() {
