@@ -72,3 +72,78 @@ describe("SongTable.svelte — Album column (#428)", () => {
     expect(getByText("Test Album")).toBeInTheDocument();
   });
 });
+
+describe("SongTable.svelte — Last Played column", () => {
+  const baseSong: Song = {
+    id: 1,
+    source: "local_file",
+    filetype: "MP3",
+    path: "/music/test.mp3",
+    title: "Test Track",
+    artist: "Test Artist",
+    album: "Test Album",
+    album_artist: "",
+    composer: "",
+    genre: "",
+    track: 1,
+    disc: 1,
+    year: 2024,
+    compilation: false,
+    length_nanosec: 180_000_000_000,
+    beginning_nanosec: 0,
+    end_nanosec: 180_000_000_000,
+    rating: 0,
+    playcount: 0,
+    skipcount: 0,
+    art_embedded: false,
+    art_unset: false,
+    unavailable: false,
+  };
+
+  beforeEach(() => {
+    collectionStore.visibleColumns.lastplayed = true;
+  });
+
+  function renderTable(rows: SongTableRow[]) {
+    return render(SongTable, {
+      props: {
+        rows,
+        mode: "track",
+        leadingColumnWidth: "3rem",
+        colDefaults: {},
+        sortField: "title",
+        sortAsc: true,
+        onToggleSort: () => {},
+        onRowDoubleClick: () => {},
+        onRowContextMenu: () => {},
+        onRate: () => {},
+        onEditTags: () => {},
+      },
+    });
+  }
+
+  it("renders an em-dash for a song with no last played timestamp", () => {
+    const song: Song = { ...baseSong, lastplayed: undefined };
+    const { getByText } = renderTable([{ key: "1", song }]);
+
+    expect(getByText("—")).toBeInTheDocument();
+  });
+
+  it("renders relative time for a recently played song", () => {
+    const nowSec = Math.floor(Date.now() / 1000);
+    const song: Song = { ...baseSong, lastplayed: nowSec - 15 * 60 }; // 15 mins ago
+    const { getByText } = renderTable([{ key: "1", song }]);
+
+    expect(getByText("15 minutes ago")).toBeInTheDocument();
+  });
+
+  it("renders absolute date for a song played over 6 days ago", () => {
+    const tenDaysAgoSec = Math.floor(Date.now() / 1000) - 10 * 24 * 3600;
+    const song: Song = { ...baseSong, lastplayed: tenDaysAgoSec };
+    const expectedDate = new Date(tenDaysAgoSec * 1000).toLocaleDateString();
+    const { getByText } = renderTable([{ key: "1", song }]);
+
+    expect(getByText(expectedDate)).toBeInTheDocument();
+  });
+});
+
