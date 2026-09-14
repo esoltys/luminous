@@ -3,7 +3,7 @@ use crate::{
     collection::CollectionScanner,
     models::{
         AlbumProfile, ArtistProfile, HomeItem, LibraryStats, MusicDirectory, PruneResult, Song,
-        TopAlbumItem,
+        Tag, TopAlbumItem,
     },
     AppState,
 };
@@ -636,6 +636,16 @@ pub async fn get_all_album_profiles(
 ) -> Result<Vec<AlbumProfile>, String> {
     let scanner = CollectionScanner::new(state.db.clone());
     scanner.get_all_album_profiles().map_err(|e| e.to_string())
+}
+
+/// Every artist tag in the library with its song count, for the Genres
+/// page's browsable-only "Artist Tags" section (see `get_artist_tag_counts`
+/// doc comment for why artist tags don't get a full mergeable/colorable
+/// hierarchy entry like genre does).
+#[tauri::command]
+pub async fn get_artist_tags_overview(state: State<'_, AppState>) -> Result<Vec<Tag>, String> {
+    let scanner = CollectionScanner::new(state.db.clone());
+    scanner.get_artist_tag_counts().map_err(|e| e.to_string())
 }
 
 /// Marks (or unmarks) one or more songs "Not included" (#104): excluded from

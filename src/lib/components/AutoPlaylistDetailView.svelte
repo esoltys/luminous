@@ -211,8 +211,16 @@
   });
 
   $effect(() => {
-    if (kind === "genre" && tagsStore.hierarchy.length === 0) {
+    // Both hierarchy and artist tags are needed for either kind, not just
+    // their own: a tag that's both a genre and an artist tag (#962/#956
+    // follow-up) unions songs from both systems when you browse it from
+    // either entry point, so whichever kind loads this view first still
+    // needs the *other* system's data to know a cross-match exists.
+    if ((kind === "genre" || kind === "artist_tag") && tagsStore.hierarchy.length === 0) {
       tagsStore.loadHierarchy().catch((e) => console.error("Failed to load tag hierarchy:", e));
+    }
+    if (kind === "genre" || kind === "artist_tag") {
+      tagsStore.ensureArtistTagsLoaded();
     }
   });
 
@@ -268,6 +276,58 @@
     return invoke<Song[]>("get_songs_by_curated_tag", { tagName: g ?? "", limit: 500 });
   }
 
+  function mergeSongsById(a: Song[], b: Song[]): Song[] {
+    const seen = new Set(a.map((s) => s.id));
+    const merged = [...a];
+    for (const s of b) {
+      if (!seen.has(s.id)) {
+        merged.push(s);
+        seen.add(s.id);
+      }
+    }
+    return merged;
+  }
+
+  /** A tag name can exist as both a genre (embedded `songs.genre`) and an
+   * artist tag (curated, DB-only) at once -- e.g. "Folk" tagged on Danheim
+   * the artist and also present as a track's own genre elsewhere. Browsing
+   * either one should surface the union of both, not just whichever system
+   * you clicked through from (#962/#956 follow-up). */
+  async function unionWithOtherSystem(
+    k: typeof kind,
+    g: typeof genre,
+    at: typeof artistTag,
+    primary: Song[]
+  ): Promise<Song[]> {
+    if (k === "genre" && g) {
+      const lower = g.toLowerCase();
+      if (tagsStore.artistTags.some((t) => t.name.toLowerCase() === lower)) {
+        try {
+          const extra = await invoke<Song[]>("get_songs_by_artist_tag", { tag: g, limit: 500 });
+          return mergeSongsById(primary, extra);
+        } catch (e) {
+          console.error("Failed to union in artist-tag songs for genre view:", e);
+        }
+      }
+    } else if (k === "artist_tag" && at) {
+      const lower = at.toLowerCase();
+      const isAlsoGenre = tagsStore.hierarchy.some(
+        (group) =>
+          group.name.toLowerCase() === lower ||
+          group.children.some((c) => c.name.toLowerCase() === lower)
+      );
+      if (isAlsoGenre) {
+        try {
+          const extra = await invoke<Song[]>("get_songs_by_curated_tag", { tagName: at, limit: 500 });
+          return mergeSongsById(primary, extra);
+        } catch (e) {
+          console.error("Failed to union in genre songs for artist-tag view:", e);
+        }
+      }
+    }
+    return primary;
+  }
+
   // Track backing playlist track_count reactively so refills trigger an instant re-fetch in the UI
   let backingTrackCount = $derived.by(() => {
     if (playlistId === undefined) return 0;
@@ -285,6 +345,7 @@
     const count = backingTrackCount;
     loading = true;
     fetchSongs(k, g, at, d, b, pid)
+      .then((fetchedSongs) => unionWithOtherSystem(k, g, at, fetchedSongs))
       .then((fetchedSongs) => {
         if (kind !== k || genre !== g || artistTag !== at || decade !== d || bpm !== b || playlistId !== pid) return;
         songs = fetchedSongs;

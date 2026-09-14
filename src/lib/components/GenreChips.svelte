@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { MicrophoneStageIcon as Mic } from "phosphor-svelte";
   import { parseMultiValue } from "../utils/multiValue";
   import { navigationStore } from "../stores/navigation.svelte";
   import { i18n } from "../stores/i18n.svelte";
@@ -127,6 +128,9 @@
       class="{getChipClass(items[0].label)} gap-1 min-w-0 max-w-full {className}"
       style={getChipStyle(items[0].label)}
     >
+      {#if items[0].isCurated}
+        <Mic class="w-3 h-3 shrink-0 opacity-70" />
+      {/if}
       <span class="truncate min-w-0">{items[0].label}</span>
       {#if items.length > 1}
         <span class="opacity-70 shrink-0 text-[0.85em]">+{items.length - 1}</span>
@@ -139,9 +143,12 @@
           type="button"
           onclick={(e) => handleItemClick(e, item)}
           title={getItemTitle(item)}
-          class="{getChipClass(item.label)} max-w-64 cursor-pointer"
+          class="{getChipClass(item.label)} gap-1 max-w-64 cursor-pointer"
           style={getChipStyle(item.label)}
         >
+          {#if item.isCurated}
+            <Mic class="w-3 h-3 shrink-0 opacity-70" />
+          {/if}
           <span class="truncate">{item.label}</span>
         </button>
       {/each}

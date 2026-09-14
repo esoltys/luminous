@@ -583,7 +583,6 @@
           onCuratedTagClick={handleTagClick}
           curatedTagTitle={(tag) => `Filter artists tagged "${tag}"`}
           variant="full"
-          limit={4}
         />
       {:else}
         <div class="text-xs text-brand-text-secondary italic">

@@ -1,11 +1,11 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { onMount } from "svelte";
   import {
     XIcon as X,
     PlusIcon as Plus,
     TrashIcon as Trash2,
     GlobeIcon as Globe,
+    TagIcon,
     LinkIcon,
     DiscIcon as Disc,
     FloppyDiskIcon as Save,
@@ -22,10 +22,10 @@
   import CoverArt from "./CoverArt.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import { collectionStore } from "../stores/collection.svelte";
-  import { tagsStore } from "../stores/tags.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { portal } from "../utils/portal";
+  import { parseMultiValue, joinMultiValue } from "../utils/multiValue";
   import SocialIcon from "./SocialIcon.svelte";
   import { ALBUM_LINK_PLATFORMS, getPlatformInfo } from "../utils/artistSocials";
   import type { AlbumProfile, AlbumLink } from "../types";
@@ -100,6 +100,39 @@
   // svelte-ignore state_referenced_locally
   let genresort = $state(initialGenreSort ?? "");
 
+  // Genre chips, styled and behaving like Artist Details' Tags field (plain
+  // add/remove, no drag-reorder, no autocomplete) rather than the drag-to-
+  // reorder ChipInput the old standalone AlbumTagEditor used. Order is now
+  // just insertion order -- the first chip added is still treated as the
+  // main genre in the Genres tab, the rest as subgenres of it.
+  let genreChips = $derived(parseMultiValue(genre));
+  let newGenreInput = $state("");
+
+  function handleAddGenreChip() {
+    const raw = newGenreInput.trim().replace(/^,+|,+$/g, "");
+    if (!raw) return;
+    const parts = raw.split(",").map((s) => s.trim()).filter(Boolean);
+    let next = [...genreChips];
+    for (const part of parts) {
+      if (!next.some((c) => c.toLowerCase() === part.toLowerCase())) {
+        next = [...next, part];
+      }
+    }
+    genre = joinMultiValue(next);
+    newGenreInput = "";
+  }
+
+  function handleGenreKeydown(e: KeyboardEvent) {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      handleAddGenreChip();
+    }
+  }
+
+  function handleRemoveGenreChip(index: number) {
+    genre = joinMultiValue(genreChips.filter((_, i) => i !== index));
+  }
+
   let isSaving = $state(false);
 
   // WebDAV songs (#682) have no local file Luminous can write lofty tags to,
@@ -109,12 +142,6 @@
   let isRemoteSource = $derived.by(() => {
     const sample = collectionStore.songs.find((s) => s.id === songIds[0]);
     return !!sample?.path && /^https?:\/\//i.test(sample.path);
-  });
-
-  onMount(() => {
-    // Best-effort preload for the genre field's autocomplete — a failure
-    // here shouldn't block or break the editor itself.
-    if (!tagsStore.loaded) tagsStore.load().catch(() => {});
   });
 
   // Sync state when opened or the underlying album changes
@@ -274,7 +301,7 @@
         <div class="flex items-center gap-2.5 min-w-0">
           <Disc class="w-5 h-5 text-brand-accent shrink-0" />
           <h2 id="album-editor-title" class="text-base sm:text-lg font-bold text-brand-text-primary truncate">
-            {i18n.t("albumProfileEditor.title", {}, "Edit Album Details")}: <span class="text-brand-accent font-semibold">{albumName}</span>
+            {i18n.t("albumProfileEditor.title", {}, "Edit Album Details")}: <span class="text-brand-text-primary font-semibold">{albumName}</span>
           </h2>
         </div>
         <button
@@ -360,16 +387,52 @@
               {i18n.t('albumTagEditor.compilationField')}
             </label>
 
-            <FormField label={i18n.t('albumTagEditor.genreField')} for="album-tag-genre" span2 tooltip={i18n.t('albumTagEditor.genreTooltip', {}, 'Drag chips to reorder — the first value is treated as the main genre in the Genres tab, the rest as subgenres of it.')}>
-              <ChipInput
-                id="album-tag-genre"
-                bind:value={genre}
-                disabled={isSaving}
-                placeholder={i18n.t('albumTagEditor.genrePlaceholder')}
-                suggestions={tagsStore.allTags.map((t) => t.name)}
-                class="w-full"
-              />
-            </FormField>
+            <div class="col-span-2 flex flex-col gap-2">
+              <label for="album-tag-genre-input" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider flex items-center gap-1.5">
+                <TagIcon class="w-3.5 h-3.5 text-brand-accent" />
+                {i18n.t('albumTagEditor.genreField')}
+              </label>
+
+              {#if genreChips.length > 0}
+                <div class="flex flex-wrap gap-1.5">
+                  {#each genreChips as chip, idx (chip)}
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-brand-accent/15 text-brand-text-primary border border-brand-accent/25">
+                      <span>{chip}</span>
+                      <button
+                        type="button"
+                        onclick={() => handleRemoveGenreChip(idx)}
+                        disabled={isSaving}
+                        class="hover:text-red-400 focus:outline-none cursor-pointer disabled:opacity-40"
+                        title={i18n.t("albumProfileEditor.removeTagTooltip", { tag: chip }, `Remove ${chip}`)}
+                      >
+                        <X class="w-3 h-3" />
+                      </button>
+                    </span>
+                  {/each}
+                </div>
+              {/if}
+
+              <div class="flex items-center gap-2">
+                <input
+                  id="album-tag-genre-input"
+                  type="text"
+                  bind:value={newGenreInput}
+                  onkeydown={handleGenreKeydown}
+                  disabled={isSaving}
+                  placeholder={i18n.t('albumTagEditor.genrePlaceholder')}
+                  class="flex-1 px-3 py-1.5 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary placeholder:text-brand-text-secondary/50 text-xs focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent transition-colors"
+                />
+                <button
+                  type="button"
+                  onclick={handleAddGenreChip}
+                  disabled={!newGenreInput.trim() || isSaving}
+                  class="shrink-0 text-xs font-medium text-brand-text-primary hover:underline disabled:opacity-40 disabled:hover:no-underline flex items-center gap-1 cursor-pointer"
+                >
+                  <Plus class="w-3.5 h-3.5" />
+                  {i18n.t("albumProfileEditor.addTagBtn", {}, "Add")}
+                </button>
+              </div>
+            </div>
 
             <FormField label={i18n.t('albumTagEditor.yearField')} for="album-tag-year">
               <Input
@@ -463,7 +526,7 @@
             <button
               type="button"
               onclick={handleAddLink}
-              class="text-xs font-medium text-brand-accent hover:underline flex items-center gap-1 cursor-pointer"
+              class="text-xs font-medium text-brand-text-primary hover:underline flex items-center gap-1 cursor-pointer"
             >
               <Plus class="w-3.5 h-3.5" />
               {i18n.t("albumProfileEditor.addLinkBtn", {}, "Add Link")}

@@ -1,8 +1,7 @@
 # Artist/Album Bio Sidecar Files
 
-Artist bios (#473) and album descriptions (#950) are mirrored to `artist.md`/`album.md`
-files that live next to your music — the same folder convention `artist.jpg`/`cover.jpg`
-already use (#98):
+Artist bios and album descriptions are mirrored to `artist.md`/`album.md` files that live
+next to your music — the same folder convention `artist.jpg`/`cover.jpg` already use:
 
 - `album.md` sits in the album folder, next to `cover.jpg`.
 - `artist.md` sits one folder up, next to `artist.jpg`.

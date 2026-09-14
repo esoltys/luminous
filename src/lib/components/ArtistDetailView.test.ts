@@ -220,7 +220,9 @@ describe("ArtistDetailView", () => {
     expect(navigationStore.activeSubTab).toBe("artists");
   });
 
-  it("limits header genre chips to 4 and shows overflow badge when artist has many genres (#817)", async () => {
+  it("shows every header genre chip with no overflow limit when artist has many genres", async () => {
+    // Regression test: header chips used to cap at 4 with a "+N" overflow
+    // badge (#817) -- there's room to show them all, so that cap was removed.
     const invokeMock = vi.mocked(invoke);
     invokeMock.mockImplementation((cmd: string, args?: any) => {
       if (cmd === "get_songs_by_artist") {
@@ -246,12 +248,9 @@ describe("ArtistDetailView", () => {
     expect(screen.getByTitle("Browse Heavy Metal")).toBeTruthy();
     expect(screen.getByTitle("Browse Metal")).toBeTruthy();
     expect(screen.getByTitle("Browse Pop Rock")).toBeTruthy();
-
-    expect(screen.queryByTitle("Browse Power Metal")).toBeNull();
-    expect(screen.queryByTitle("Browse Symphonic Metal")).toBeNull();
-    const badge = screen.getByText("+2");
-    expect(badge).toBeTruthy();
-    expect(badge.getAttribute("title")).toBe("Power Metal, Symphonic Metal");
+    expect(screen.getByTitle("Browse Power Metal")).toBeTruthy();
+    expect(screen.getByTitle("Browse Symphonic Metal")).toBeTruthy();
+    expect(screen.queryByText("+2")).toBeNull();
   });
 
   describe("extended artist artwork (#98/#761)", () => {
