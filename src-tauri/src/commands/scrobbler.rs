@@ -65,3 +65,10 @@ pub async fn sync_favourites_to_listenbrainz(
 ) -> Result<crate::scrobbler::SyncFavouritesResult, String> {
     state.scrobbler.sync_favourites().await
 }
+
+#[tauri::command]
+pub async fn get_discord_status(
+    state: State<'_, AppState>,
+) -> Result<crate::discord::DiscordStatus, String> {
+    Ok(state.scrobbler.get_discord_status().await)
+}

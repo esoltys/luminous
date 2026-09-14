@@ -10,6 +10,7 @@ import type {
   ScanProgress,
   BatchProgress,
   AlbumItem,
+  AlbumProfile,
   ArtistItem,
   ArtistProfile,
   ExtendedArtworkResponse,
@@ -121,6 +122,7 @@ class CollectionStore {
   albums = $state<AlbumItem[]>([]);
   artists = $state<ArtistItem[]>([]);
   artistProfiles = $state<Record<string, ArtistProfile>>({});
+  albumProfiles = $state<Record<string, AlbumProfile>>({});
   /** On-demand extended-artwork cache (#98/#759), keyed by song id — unlike
    * `artistProfiles`, this is never bulk-loaded: scanning every song's album
    * folder eagerly would be far too expensive, so entries are fetched lazily
@@ -604,16 +606,18 @@ class CollectionStore {
     this.songs = snapshot.songs;
     this.albums = snapshot.albums;
     this.artists = snapshot.artists;
-    await this.loadArtistProfiles();
+    await Promise.all([this.loadArtistProfiles(), this.loadAlbumProfiles()]);
   }
 
   async loadArtistProfiles() {
     try {
       const profiles = await invoke<ArtistProfile[]>("get_all_artist_profiles");
       const map: Record<string, ArtistProfile> = {};
-      for (const p of profiles) {
-        if (p.artist_key) {
-          map[p.artist_key.toLowerCase()] = p;
+      if (Array.isArray(profiles)) {
+        for (const p of profiles) {
+          if (p.artist_key) {
+            map[p.artist_key.toLowerCase()] = p;
+          }
         }
       }
       this.artistProfiles = map;
@@ -633,6 +637,39 @@ class CollectionStore {
       this.artistProfiles = {
         ...this.artistProfiles,
         [saved.artist_key.toLowerCase()]: saved,
+      };
+    }
+    return saved;
+  }
+
+  async loadAlbumProfiles() {
+    try {
+      const profiles = await invoke<AlbumProfile[]>("get_all_album_profiles");
+      const map: Record<string, AlbumProfile> = {};
+      if (Array.isArray(profiles)) {
+        for (const p of profiles) {
+          if (p.album_key) {
+            map[p.album_key.toLowerCase()] = p;
+          }
+        }
+      }
+      this.albumProfiles = map;
+    } catch (err) {
+      console.error("Failed to load album profiles:", err);
+    }
+  }
+
+  getAlbumProfile(albumName: string | null | undefined): AlbumProfile | undefined {
+    if (!albumName) return undefined;
+    return this.albumProfiles[albumName.toLowerCase()];
+  }
+
+  async saveAlbumProfile(profile: AlbumProfile): Promise<AlbumProfile> {
+    const saved = await invoke<AlbumProfile>("set_album_profile", { profile });
+    if (saved?.album_key) {
+      this.albumProfiles = {
+        ...this.albumProfiles,
+        [saved.album_key.toLowerCase()]: saved,
       };
     }
     return saved;

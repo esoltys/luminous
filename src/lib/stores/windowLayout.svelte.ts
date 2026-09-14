@@ -14,6 +14,11 @@ class WindowLayoutStore {
   // Layout panel states
   sidebarOpen = $state<boolean>(true);
   rightPanelOpen = $state<boolean>(true);
+  isOverviewExpanded = $state<boolean>(
+    typeof window !== "undefined"
+      ? localStorage.getItem("layout_isOverviewExpanded") !== "false"
+      : true
+  );
   sidebarWidth = $state<number>(256);
   lastExpandedSidebarWidth = $state<number>(256);
   rightPanelWidth = $state<number>(288);
@@ -382,6 +387,17 @@ class WindowLayoutStore {
     if (typeof window !== "undefined") {
       localStorage.setItem("layout_rightPanelWidth", width.toString());
     }
+  }
+
+  setOverviewExpanded(expanded: boolean) {
+    this.isOverviewExpanded = expanded;
+    if (typeof window !== "undefined") {
+      localStorage.setItem("layout_isOverviewExpanded", expanded ? "true" : "false");
+    }
+  }
+
+  toggleOverviewExpanded() {
+    this.setOverviewExpanded(!this.isOverviewExpanded);
   }
 }
 

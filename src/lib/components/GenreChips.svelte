@@ -12,9 +12,20 @@
     resolveGenreColorIndex,
   } from "../utils/genrePalette";
 
+  interface ChipItem {
+    label: string;
+    isCurated: boolean;
+  }
+
   interface Props {
     /** Raw `; `-delimited `genre` column value (song, album, or otherwise). */
     genre?: string | null;
+    /** Curated profile tags to display first before file genres */
+    curatedTags?: string[];
+    /** Custom click handler when a curated tag is clicked. If omitted, falls back to navigationStore.viewGenreTag. */
+    onCuratedTagClick?: (tag: string) => void;
+    /** Optional tooltip function for curated tags. */
+    curatedTagTitle?: (tag: string) => string;
     /** "compact" (default) shows only the main (first) value plus a "+N"
         indicator, for narrow contexts like table columns. "full" shows every
         value as its own chip, for wide contexts like detail-view headers. */
@@ -25,12 +36,47 @@
     class?: string;
   }
 
-  let { genre, variant = "compact", limit, class: className = "" }: Props = $props();
+  let {
+    genre,
+    curatedTags,
+    onCuratedTagClick,
+    curatedTagTitle,
+    variant = "compact",
+    limit,
+    class: className = "",
+  }: Props = $props();
 
-  let values = $derived(parseMultiValue(genre || ""));
-  let displayedValues = $derived(limit && limit > 0 ? values.slice(0, limit) : values);
-  let remainingCount = $derived(values.length - displayedValues.length);
-  let remainingValues = $derived(remainingCount > 0 ? values.slice(displayedValues.length) : []);
+  let items = $derived.by<ChipItem[]>(() => {
+    const list: ChipItem[] = [];
+    const seen = new Set<string>();
+
+    if (curatedTags) {
+      for (const tag of curatedTags) {
+        const trimmed = tag.trim();
+        if (trimmed && !seen.has(trimmed.toLowerCase())) {
+          seen.add(trimmed.toLowerCase());
+          list.push({ label: trimmed, isCurated: true });
+        }
+      }
+    }
+
+    if (genre) {
+      const parsed = parseMultiValue(genre);
+      for (const g of parsed) {
+        const trimmed = g.trim();
+        if (trimmed && !seen.has(trimmed.toLowerCase())) {
+          seen.add(trimmed.toLowerCase());
+          list.push({ label: trimmed, isCurated: false });
+        }
+      }
+    }
+
+    return list;
+  });
+
+  let displayedItems = $derived(limit && limit > 0 ? items.slice(0, limit) : items);
+  let remainingCount = $derived(items.length - displayedItems.length);
+  let remainingItems = $derived(remainingCount > 0 ? items.slice(displayedItems.length) : []);
 
   $effect(() => {
     tagsStore.ensureHierarchyLoaded();
@@ -42,7 +88,7 @@
   function getChipStyle(value: string): string | undefined {
     const colorIndex = resolveGenreColorIndex(tagsStore.hierarchy, value);
     if (colorIndex === undefined) return undefined;
-    return `background-color: color-mix(in srgb, ${genreColorHsl(colorIndex)} 38%, transparent); border-color: color-mix(in srgb, ${genreColorHslFg(colorIndex)} 70%, transparent); color: ${genreColorHslFg(colorIndex)};`;
+    return `background-color: color-mix(in srgb, ${genreColorHsl(colorIndex)} 38%, var(--color-brand-sidebar)); border-color: color-mix(in srgb, ${genreColorHslFg(colorIndex)} 70%, var(--color-brand-sidebar)); color: ${genreColorHslFg(colorIndex)};`;
   }
 
   function getChipClass(value: string): string {
@@ -52,46 +98,57 @@
     if (colorIndex !== undefined) {
       return base;
     }
-    return `${base} bg-brand-accent/15 text-brand-text-primary border-brand-accent/25 hover:bg-brand-accent/25 hover:border-brand-accent/50`;
+    return `${base} bg-[color-mix(in_srgb,var(--color-brand-accent)_15%,var(--color-brand-sidebar))] text-brand-text-primary border-[color-mix(in_srgb,var(--color-brand-accent)_40%,var(--color-brand-sidebar))] hover:border-brand-accent/60`;
   }
 
-  function goToTag(e: MouseEvent, value: string) {
+  function getItemTitle(item: ChipItem): string {
+    if (item.isCurated && curatedTagTitle) {
+      return curatedTagTitle(item.label);
+    }
+    return i18n.t('songTags.goToGenreTooltip', { genre: item.label }, `Browse ${item.label}`);
+  }
+
+  function handleItemClick(e: MouseEvent, item: ChipItem) {
     e.stopPropagation();
-    navigationStore.viewGenreTag(value);
+    if (item.isCurated && onCuratedTagClick) {
+      onCuratedTagClick(item.label);
+    } else {
+      navigationStore.viewGenreTag(item.label);
+    }
   }
 </script>
 
-{#if values.length > 0}
+{#if items.length > 0}
   {#if variant === "compact"}
     <button
       type="button"
-      onclick={(e) => goToTag(e, values[0])}
-      title={i18n.t('songTags.goToGenreTooltip', { genre: values[0] }, `Browse ${values[0]}`)}
-      class="{getChipClass(values[0])} gap-1 min-w-0 max-w-full {className}"
-      style={getChipStyle(values[0])}
+      onclick={(e) => handleItemClick(e, items[0])}
+      title={getItemTitle(items[0])}
+      class="{getChipClass(items[0].label)} gap-1 min-w-0 max-w-full {className}"
+      style={getChipStyle(items[0].label)}
     >
-      <span class="truncate min-w-0">{values[0]}</span>
-      {#if values.length > 1}
-        <span class="opacity-70 shrink-0 text-[0.85em]">+{values.length - 1}</span>
+      <span class="truncate min-w-0">{items[0].label}</span>
+      {#if items.length > 1}
+        <span class="opacity-70 shrink-0 text-[0.85em]">+{items.length - 1}</span>
       {/if}
     </button>
   {:else}
     <div class="flex flex-wrap gap-1 {className}">
-      {#each displayedValues as value (value)}
+      {#each displayedItems as item (item.label)}
         <button
           type="button"
-          onclick={(e) => goToTag(e, value)}
-          title={i18n.t('songTags.goToGenreTooltip', { genre: value }, `Browse ${value}`)}
-          class="{getChipClass(value)} max-w-64"
-          style={getChipStyle(value)}
+          onclick={(e) => handleItemClick(e, item)}
+          title={getItemTitle(item)}
+          class="{getChipClass(item.label)} max-w-64 cursor-pointer"
+          style={getChipStyle(item.label)}
         >
-          <span class="truncate">{value}</span>
+          <span class="truncate">{item.label}</span>
         </button>
       {/each}
       {#if remainingCount > 0}
         <span
-          class="inline-flex items-center px-2 py-1 rounded-full bg-brand-sidebar/80 text-brand-text-secondary border border-brand-border/60 text-xs font-medium select-none shrink-0"
-          title={remainingValues.join(", ")}
+          class="inline-flex items-center px-2 py-1 rounded-full bg-brand-sidebar text-brand-text-secondary border border-brand-border text-xs font-medium select-none shrink-0"
+          title={remainingItems.map(i => i.label).join(", ")}
         >
           +{remainingCount}
         </span>

@@ -35,9 +35,14 @@
     PushPinSlashIcon as PinOff,
     DotsThreeIcon as MoreHorizontal,
     ArrowSquareOutIcon as OpenInPicard,
-    ShareNetworkIcon as Share
+    ArrowSquareOutIcon as ExternalLink,
+    ShareNetworkIcon as Share,
+    CaretDownIcon as CaretDown
   } from "phosphor-svelte";
   import ShareModal from "./ShareModal.svelte";
+  import AlbumProfileEditor from "./AlbumProfileEditor.svelte";
+  import MarkdownBio from "./MarkdownBio.svelte";
+  import SocialIcon from "./SocialIcon.svelte";
   import type { Song, AlbumItem, PlayContext } from "../types";
   import { getCoverArtUrl, resolveArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
@@ -46,6 +51,11 @@
   import { compareSongs } from "../utils/songSort";
   import { rememberScroll } from "../utils/scrollMemory";
   import { openInPicard } from "../utils/picard";
+  import {
+    resolveSocialUrl,
+    formatDisplayLabel,
+    deriveListenbrainzAlbumUrl,
+  } from "../utils/artistSocials";
 
   let { albumName }: { albumName: string } = $props();
 
@@ -188,6 +198,44 @@
     const m = totalMinutes % 60;
     return h > 0 ? `${h}h ${m}m` : `${m}m`;
   });
+
+  let isEditorOpen = $state(false);
+  let albumProfile = $derived(collectionStore.getAlbumProfile(albumName));
+  let hasDescription = $derived(!!albumProfile?.description?.trim());
+  let hasTags = $derived(!!albumProfile?.tags && albumProfile.tags.length > 0);
+  let hasWebsite = $derived(!!albumProfile?.website?.trim());
+  let hasLinks = $derived(!!albumProfile?.links && albumProfile.links.length > 0);
+  let hasChips = $derived(hasTags || Boolean(rawGenre?.trim()));
+
+  // Derived ListenBrainz album URL (#950): derived from representative songs
+  // that have a MusicBrainz release group or release ID.
+  let listenbrainzUrl = $derived.by(() => {
+    const representative = songs.find(
+      (s) => s.musicbrainz_release_group_id || s.musicbrainz_album_id
+    );
+    return deriveListenbrainzAlbumUrl(representative);
+  });
+
+  let hasProfileContent = $derived(
+    hasDescription || hasWebsite || hasLinks || !!listenbrainzUrl
+  );
+
+  async function handleOpenUrl(url: string) {
+    if (!url) return;
+    try {
+      const { openUrl } = await import("@tauri-apps/plugin-opener");
+      await openUrl(url);
+    } catch {
+      window.open(url, "_blank");
+    }
+  }
+
+  function handleTagClick(tag: string) {
+    collectionStore.searchQuery = `album-tag:${tag}`;
+    navigationStore.selectedAlbumName = null;
+    navigationStore.activeTab = "collection";
+    navigationStore.activeSubTab = "albums";
+  }
 
   $effect(() => {
     const requested = albumName;
@@ -465,14 +513,6 @@
             <SongRating rating={albumItem.rating} onRate={rateAlbum} size="sm" />
           {/if}
         </div>
-
-        {#if rawGenre}
-          <GenreChips genre={rawGenre} variant="full" limit={4} class="mt-1.5" />
-        {:else}
-          <div class="text-xs text-brand-text-primary font-medium mt-1.5">
-            <span>{genreLabel}</span>
-          </div>
-        {/if}
         {/if}
 
         <div class="flex flex-wrap items-center gap-3 {windowLayoutStore.isDetailHeaderCollapsed ? '' : 'mt-3'} select-none">
@@ -554,6 +594,118 @@
   </div>
 
   <div class="relative z-10 px-6 py-6 flex flex-col gap-6" class:pb-28={!!playerStore.currentSong}>
+    {#if !windowLayoutStore.isDetailHeaderCollapsed}
+      {#if hasChips}
+        <GenreChips
+          genre={rawGenre}
+          curatedTags={albumProfile?.tags}
+          onCuratedTagClick={handleTagClick}
+          curatedTagTitle={(tag) => `Filter albums tagged "${tag}"`}
+          variant="full"
+          limit={4}
+        />
+      {:else}
+        <div class="text-xs text-brand-text-secondary italic">
+          <span>{genreLabel}</span>
+        </div>
+      {/if}
+    {/if}
+
+    <!-- Album Profile Card (Liner Notes & Release Links) -->
+    {#if hasProfileContent && !windowLayoutStore.isDetailHeaderCollapsed}
+      <details
+        open={windowLayoutStore.isOverviewExpanded}
+        ontoggle={(e) => windowLayoutStore.setOverviewExpanded(e.currentTarget.open)}
+        class="group border border-brand-border rounded-xl bg-brand-sidebar/95 backdrop-blur-xl overflow-hidden shadow-md transition-all"
+      >
+        <summary class="flex items-center justify-between px-4 py-2.5 sm:px-5 sm:py-3 text-xs font-semibold text-brand-text-secondary cursor-pointer select-none hover:text-brand-text-primary transition-colors">
+          <span>{i18n.t('albumDetail.overview', {}, 'Overview')}</span>
+          <CaretDown class="w-3.5 h-3.5 text-brand-text-secondary/70 group-open:rotate-180 transition-transform" />
+        </summary>
+        <div class="p-4 sm:p-5 md:p-6 border-t border-brand-border/60 flex flex-col md:flex-row gap-5 md:gap-6 justify-between">
+          <!-- Liner Notes / Description (Left) -->
+          <div class="flex-1 flex flex-col gap-3 min-w-0">
+            {#if hasDescription}
+              <div class="text-xs text-brand-text-secondary leading-relaxed">
+                <MarkdownBio
+                  text={albumProfile?.description}
+                  disableClamp={true}
+                />
+              </div>
+            {/if}
+          </div>
+
+          <!-- Release Links (Right) -->
+          {#if hasWebsite || hasLinks || listenbrainzUrl}
+            <div
+              class="md:w-60 lg:w-72 shrink-0 border-t border-brand-border/40 pt-4 md:border-t-0 md:border-l md:border-brand-border/60 md:pt-0 md:pl-6 flex flex-col gap-3"
+            >
+              <div class="grid grid-cols-1 sm:grid-cols-2 md:flex md:flex-col gap-2.5">
+                <!-- Official Website / Store Link -->
+                {#if hasWebsite}
+                  {@const siteUrl = resolveSocialUrl("website", albumProfile?.website ?? "")}
+                  <button
+                    type="button"
+                    onclick={() => handleOpenUrl(siteUrl)}
+                    class="flex items-center gap-2.5 sm:gap-3 group text-left transition-colors cursor-pointer min-w-0"
+                  >
+                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-brand-main/60 border border-brand-border flex items-center justify-center text-brand-text-secondary group-hover:text-brand-accent group-hover:border-brand-accent/40 transition-colors shrink-0 shadow-2xs">
+                      <SocialIcon platform="website" size={14} />
+                    </div>
+                    <div class="flex items-center gap-1 min-w-0 flex-1">
+                      <span class="text-xs font-medium text-brand-text-primary truncate transition-colors">
+                        {formatDisplayLabel("website", albumProfile?.website ?? "")}
+                      </span>
+                      <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                    </div>
+                  </button>
+                {/if}
+
+                <!-- Curated Release Links -->
+                {#each albumProfile?.links ?? [] as link (link.platform + link.handle_or_url)}
+                  {@const fullUrl = resolveSocialUrl(link.platform, link.handle_or_url)}
+                  <button
+                    type="button"
+                    onclick={() => handleOpenUrl(fullUrl)}
+                    class="flex items-center gap-2.5 sm:gap-3 group text-left transition-colors cursor-pointer min-w-0"
+                  >
+                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-brand-main/60 border border-brand-border flex items-center justify-center text-brand-text-secondary group-hover:text-brand-accent group-hover:border-brand-accent/40 transition-colors shrink-0 shadow-2xs">
+                      <SocialIcon platform={link.platform} size={14} />
+                    </div>
+                    <div class="flex items-center gap-1 min-w-0 flex-1">
+                      <span class="text-xs font-medium text-brand-text-primary truncate transition-colors">
+                        {formatDisplayLabel(link.platform, link.handle_or_url)}
+                      </span>
+                      <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                    </div>
+                  </button>
+                {/each}
+
+                <!-- Derived ListenBrainz Album Link (#950) -->
+                {#if listenbrainzUrl}
+                  <button
+                    type="button"
+                    onclick={() => handleOpenUrl(listenbrainzUrl)}
+                    class="flex items-center gap-2.5 sm:gap-3 group text-left transition-colors cursor-pointer min-w-0"
+                  >
+                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-brand-main/60 border border-brand-border flex items-center justify-center text-brand-text-secondary group-hover:text-brand-accent group-hover:border-brand-accent/40 transition-colors shrink-0 shadow-2xs">
+                      <SocialIcon platform="listenbrainz" size={14} />
+                    </div>
+                    <div class="flex items-center gap-1 min-w-0 flex-1">
+                      <span class="text-xs font-medium text-brand-text-primary truncate transition-colors">
+                        ListenBrainz
+                      </span>
+                      <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                    </div>
+                  </button>
+                {/if}
+              </div>
+            </div>
+          {/if}
+        </div>
+      </details>
+    {/if}
+
     <div class="border border-brand-border rounded-lg bg-brand-sidebar/50 backdrop-blur-xl shadow-2xl overflow-hidden table-surface-blur">
       <SongTable
         rows={tableRows}
@@ -643,6 +795,11 @@
   >
     <ContextMenuItem
       icon={Edit3}
+      label={i18n.t("albumDetail.editAlbumDetails", {}, "Edit Album Details")}
+      onclick={() => { isEditorOpen = true; overflowMenuPos = null; }}
+    />
+    <ContextMenuItem
+      icon={Edit3}
       label={i18n.t("albumDetail.editInfoTooltip")}
       onclick={() => { openAlbumTagEditor(); overflowMenuPos = null; }}
       disabled={loading || songs.length === 0}
@@ -669,4 +826,11 @@
 {#if showShareModal}
   <ShareModal {albumName} onClose={() => { showShareModal = false; }} />
 {/if}
+
+<AlbumProfileEditor
+  {albumName}
+  {artistName}
+  isOpen={isEditorOpen}
+  onClose={() => { isEditorOpen = false; }}
+/>
 

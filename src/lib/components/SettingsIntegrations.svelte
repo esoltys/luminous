@@ -2,7 +2,7 @@
   import { i18n } from "../stores/i18n.svelte";
   import { prefs } from "../stores/prefs.svelte";
   import { picardStore } from "../stores/picard.svelte";
-  import { scrobblerStore } from "../stores/scrobbler.svelte";
+  import { scrobblerStore, DEFAULT_DISCORD_CLIENT_ID } from "../stores/scrobbler.svelte";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-dialog";
@@ -20,7 +20,8 @@
     CircleNotchIcon as LoaderCircle,
     ArrowUpRightIcon as ArrowUpRight,
     HeartIcon as Heart,
-    BookOpenIcon as Globe
+    BookOpenIcon as Globe,
+    DiscordLogoIcon as DiscordLogo
   } from "phosphor-svelte";
 
   let showListenBrainzToken = $state(false);
@@ -307,6 +308,101 @@
         </Button>
       </div>
     {/if}
+  {/if}
+</div>
+
+<!-- Discord Rich Presence Card -->
+<div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
+  <div class="pb-3 flex justify-between items-center border-b border-brand-border/60">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg bg-[#5865F2]/15 flex items-center justify-center text-[#5865F2] shrink-0">
+        <DiscordLogo class="w-5 h-5" weight="fill" />
+      </div>
+      <div class="space-y-1 min-w-0">
+        <div class="flex items-center gap-2 flex-wrap">
+          <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('discord.integrationTitle')}</h3>
+          {#if scrobblerStore.discordEnabled}
+            {#if scrobblerStore.discordStatus === 'connected'}
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                {i18n.t('discord.statusConnected')}
+              </span>
+            {:else if scrobblerStore.discordStatus === 'not_running'}
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                <AlertTriangle class="w-3 h-3" />
+                {i18n.t('discord.statusNotRunning')}
+              </span>
+            {:else}
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-brand-surface text-brand-text-secondary">
+                {i18n.t('discord.statusDisconnected')}
+              </span>
+            {/if}
+            <button
+              onclick={() => scrobblerStore.checkDiscordStatus()}
+              disabled={scrobblerStore.isCheckingDiscord}
+              class="text-brand-text-secondary hover:text-brand-accent-text transition-colors disabled:opacity-50"
+              title={i18n.t('discord.recheckTooltip')}
+            >
+              <RefreshCw class="w-3.5 h-3.5 {scrobblerStore.isCheckingDiscord ? 'animate-spin' : ''}" />
+            </button>
+          {/if}
+        </div>
+        <p class="text-xs text-brand-text-secondary leading-relaxed">
+          <span class="text-brand-text-primary font-medium">Discord Rich Presence</span>
+          {" "}{i18n.t('discord.integrationDesc')}
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="flex items-center justify-between gap-4 py-1">
+    <div class="flex flex-col gap-0.5 min-w-0">
+      <span class="text-sm font-medium text-brand-text-primary">{i18n.t('discord.enableLabel')}</span>
+      <p class="text-xs text-brand-text-secondary">{i18n.t('discord.enableHint')}</p>
+    </div>
+    <Toggle
+      checked={scrobblerStore.discordEnabled}
+      onchange={(v) => scrobblerStore.setDiscordEnabled(v)}
+      label={i18n.t('discord.enableLabel')}
+    />
+  </div>
+
+  {#if scrobblerStore.discordEnabled}
+    <div class="space-y-3 pt-3 border-t border-brand-border/60">
+      <div class="flex items-center justify-between gap-4 py-1">
+        <div class="flex flex-col gap-0.5 min-w-0">
+          <span class="text-sm font-medium text-brand-text-primary">{i18n.t('discord.showAlbumLabel')}</span>
+          <p class="text-xs text-brand-text-secondary">{i18n.t('discord.showAlbumHint')}</p>
+        </div>
+        <Toggle
+          checked={scrobblerStore.discordShowAlbum}
+          onchange={(v) => scrobblerStore.setDiscordShowAlbum(v)}
+          label={i18n.t('discord.showAlbumLabel')}
+        />
+      </div>
+
+      <div class="flex items-center justify-between gap-4 py-1">
+        <div class="flex flex-col gap-0.5 min-w-0">
+          <span class="text-sm font-medium text-brand-text-primary">{i18n.t('discord.showTimeLabel')}</span>
+          <p class="text-xs text-brand-text-secondary">{i18n.t('discord.showTimeHint')}</p>
+        </div>
+        <Toggle
+          checked={scrobblerStore.discordShowTime}
+          onchange={(v) => scrobblerStore.setDiscordShowTime(v)}
+          label={i18n.t('discord.showTimeLabel')}
+        />
+      </div>
+
+      <div class="flex items-center justify-between gap-4 py-1 pt-2 border-t border-brand-border/60">
+        <div class="flex flex-col gap-0.5 min-w-0">
+          <span class="text-xs font-medium text-brand-text-primary">{i18n.t('discord.applicationIdLabel')}</span>
+          <p class="text-xs text-brand-text-secondary">{i18n.t('discord.applicationIdHint')}</p>
+        </div>
+        <span class="font-mono text-xs bg-brand-surface px-2.5 py-1 rounded-md border border-brand-border text-brand-text-secondary select-all">
+          {DEFAULT_DISCORD_CLIENT_ID}
+        </span>
+      </div>
+    </div>
   {/if}
 </div>
 
