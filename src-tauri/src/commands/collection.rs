@@ -64,6 +64,52 @@ pub async fn scan_directories(
         .map_err(|e| e.to_string())
 }
 
+/// Force re-reads embedded tags from disk for exactly these songs and
+/// reconciles the DB to match, bypassing the mtime-skip a normal (non-force)
+/// scan uses. Unlike the whole-library `scan_directories`, this is scoped to
+/// a specific set of tracks, so a view like the album detail page can offer
+/// a fast "resync from disk" action instead of only reloading whatever the
+/// DB already has (which a plain library snapshot reload can't distinguish
+/// from a genuine on-disk change — see #956). WebDAV songs (no local file)
+/// and CUE-derived songs (tags live in the .cue sheet, not embedded — #78)
+/// are skipped, same as the tag editor's other bulk-write paths.
+#[tauri::command]
+pub async fn rescan_songs(
+    app: AppHandle,
+    song_ids: Vec<i64>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let scanner = CollectionScanner::new(state.db.clone());
+
+    let paths: Vec<std::path::PathBuf> = {
+        let conn = state.db.pool.get().map_err(|e| e.to_string())?;
+        let sql = format!(
+            "SELECT {} FROM songs WHERE id = ?1",
+            crate::collection::SONG_SELECT_COLS
+        );
+        song_ids
+            .iter()
+            .filter_map(|id| {
+                conn.query_row(&sql, [id], crate::collection::row_to_song)
+                    .ok()
+            })
+            .filter(|song| {
+                song.source != crate::models::SongSource::WebDav && song.cue_path.is_none()
+            })
+            .filter_map(|song| song.path)
+            .map(std::path::PathBuf::from)
+            .collect()
+    };
+
+    scanner
+        .rescan_paths(&app, paths)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let _ = app.emit("library-changed", ());
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn prune_missing_songs(state: State<'_, AppState>) -> Result<PruneResult, String> {
     let scanner = CollectionScanner::new(state.db.clone());
@@ -343,7 +389,10 @@ pub async fn get_songs_missing_musicbrainz_id(
 ) -> Result<Vec<Song>, String> {
     let scanner = CollectionScanner::new(state.db.clone());
     scanner
-        .get_songs_missing_musicbrainz_id(limit.unwrap_or(-1), crate::models::QueuePopulationMode::All)
+        .get_songs_missing_musicbrainz_id(
+            limit.unwrap_or(-1),
+            crate::models::QueuePopulationMode::All,
+        )
         .map_err(|e| e.to_string())
 }
 

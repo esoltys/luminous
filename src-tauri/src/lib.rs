@@ -983,6 +983,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             // Collection commands
             commands::collection::scan_directories,
+            commands::collection::rescan_songs,
             commands::collection::prune_missing_songs,
             commands::collection::add_directory,
             commands::collection::remove_directory,

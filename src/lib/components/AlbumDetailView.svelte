@@ -61,7 +61,15 @@
     if (refreshing || collectionStore.isScanning) return;
     refreshing = true;
     try {
-      await collectionStore.startScan(true);
+      // Force re-read this album's own tracks from disk rather than kicking
+      // off a whole-library scan: `startScan` doesn't await the scan's
+      // actual completion (it just fires `scan_directories` and returns),
+      // so the old code here reloaded the DB snapshot before the rescan had
+      // reached this album's files, making Refresh a no-op for exactly the
+      // "another install/tool edited this file" case it exists for (#956).
+      // `rescan_songs` is awaited end-to-end and bypasses the mtime-skip a
+      // normal scan uses, so it always reflects what's actually on disk.
+      await invoke("rescan_songs", { songIds: songs.map((s) => s.id) });
       await collectionStore.refreshLibrary();
       const fetchedSongs = await invoke<Song[]>("get_songs_by_album", { album: albumName });
       let filtered = [...fetchedSongs];
