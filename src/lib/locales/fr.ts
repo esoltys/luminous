@@ -814,7 +814,7 @@ export const fr = {
     editSongTooltip: "Modifier la chanson",
     editAlbumTooltip: "Modifier l'album",
     goToGenreTooltip: "Parcourir {genre}",
-    artistTagsSectionTitle: "Tags d'artiste ({count})",
+    artistTagsSectionTitle: "Tags exclusifs à l'artiste ({count})",
     goToArtistTagTooltip: "Parcourir {tag}",
     noGenre: "Sans genre",
     changeColorTooltip: "Changer la couleur",

@@ -1097,7 +1097,7 @@ export const en = {
     editSongTooltip: "Edit Song",
     editAlbumTooltip: "Edit Album",
     goToGenreTooltip: "Browse {genre}",
-    artistTagsSectionTitle: "Artist Tags ({count})",
+    artistTagsSectionTitle: "Artist Only Tags ({count})",
     goToArtistTagTooltip: "Browse {tag}",
     noGenre: "No Genre",
     changeColorTooltip: "Change color",

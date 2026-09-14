@@ -27,6 +27,11 @@
   let mergeDialogNames = $state<string[] | null>(null);
   let deleteConfirmNames = $state<string[] | null>(null);
 
+  let artistOnlyTags = $derived.by(() => {
+    const genreNames = new Set(tagsStore.allTags.map((t) => t.name.toLowerCase()));
+    return tagsStore.artistTags.filter((t) => !genreNames.has(t.name.toLowerCase()));
+  });
+
   let genreViewElements = $state<Record<string, HTMLButtonElement>>({});
   let genreIndicatorStyle = $state({ left: 4, width: 0, opacity: 0 });
   let genreViewMounted = $state(false);
@@ -295,13 +300,13 @@
       </div>
     {/if}
 
-    {#if tagsStore.artistTags.length > 0}
+    {#if artistOnlyTags.length > 0}
       <div class="mb-4">
         <div class="text-xs text-brand-text-secondary font-medium mb-2">
-          {i18n.t("songTags.artistTagsSectionTitle", { count: tagsStore.artistTags.length }, `Artist Tags (${tagsStore.artistTags.length})`)}
+          {i18n.t("songTags.artistTagsSectionTitle", { count: artistOnlyTags.length }, `Artist Only Tags (${artistOnlyTags.length})`)}
         </div>
         <div class="flex flex-wrap gap-1.5">
-          {#each tagsStore.artistTags as tag (tag.name)}
+          {#each artistOnlyTags as tag (tag.name)}
             <button
               type="button"
               onclick={() => openArtistTag(tag.name)}
