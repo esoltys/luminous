@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 36;
+pub const CURRENT_SCHEMA_VERSION: i32 = 37;
 
 struct Migration {
     version: i32,
@@ -269,6 +269,19 @@ const MIGRATIONS: &[Migration] = &[
         version: 36,
         description: "album_profiles table for album curation, notes, and external links (#950)",
         apply: |conn| Ok(conn.execute_batch(MIGRATION_36)?),
+    },
+    Migration {
+        version: 37,
+        description: "drop album_profiles.tags -- consolidated into the single embedded songs.genre tag list (#962)",
+        apply: |conn| {
+            let has_tags: bool = conn
+                .prepare("SELECT 1 FROM pragma_table_info('album_profiles') WHERE name = 'tags'")?
+                .exists([])?;
+            if has_tags {
+                conn.execute_batch(MIGRATION_37)?;
+            }
+            Ok(())
+        },
     },
 ];
 
@@ -1153,6 +1166,23 @@ CREATE TABLE IF NOT EXISTS album_profiles (
     tags TEXT NOT NULL DEFAULT '[]',
     links TEXT NOT NULL DEFAULT '[]'
 );
+";
+
+// ---------------------------------------------------------------------------
+// Migration 37: drop album_profiles.tags (#962) — album detail view had two
+// independent, disagreeing tag lists: this curated DB-only column (editable
+// via the album profile editor) and the embedded `songs.genre` ID3 tag
+// (editable via the album tag editor), silently merged for display in the
+// header's genre chip row so neither editor's own field matched what was
+// shown. The two editors are consolidated into one, backed solely by the
+// embedded genre tag — the only list that's ever actually written to disk —
+// so there's exactly one source of truth. Any tags a user had already saved
+// here are not migrated forward into `songs.genre`: this table shipped only
+// on the still-unreleased 2.0 line, so no released version ever wrote real
+// user data into it.
+// ---------------------------------------------------------------------------
+const MIGRATION_37: &str = "
+ALTER TABLE album_profiles DROP COLUMN tags;
 ";
 
 // ---------------------------------------------------------------------------

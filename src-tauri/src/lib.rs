@@ -1007,6 +1007,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             // Collection commands
             commands::collection::scan_directories,
+            commands::collection::rescan_songs,
             commands::collection::prune_missing_songs,
             commands::collection::add_directory,
             commands::collection::remove_directory,
@@ -1035,6 +1036,7 @@ pub fn run() {
             commands::collection::get_album_profile,
             commands::collection::set_album_profile,
             commands::collection::get_all_album_profiles,
+            commands::collection::get_artist_tags_overview,
             commands::collection::set_songs_not_included,
             commands::collection::get_songs_missing_musicbrainz_id,
             commands::collection::get_songs_missing_metadata,

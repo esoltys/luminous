@@ -351,8 +351,20 @@
   }
 
   let rawGenre = $derived(deriveArtistGenres(songs));
-  let genreLabel = $derived(rawGenre ? undefined : i18n.t('artistDetail.unknownGenre'));
-  let hasChips = $derived(hasTags || Boolean(rawGenre?.trim()));
+  // Header shows curated artist tags only, not the file-embedded genre --
+  // that's already covered by the Genres page and every album/song beneath
+  // this artist, so repeating it here is just noise. A tag is excluded if
+  // it duplicates any genre *anywhere in the library* (not just this
+  // artist's own songs) -- matching the "Artist Only Tags" filter on the
+  // Genres page -- since a name like "Electronic" is still a real genre
+  // even if this particular artist's own files don't happen to use it.
+  let artistOnlyTags = $derived.by(() => {
+    const tags = artistProfile?.tags;
+    if (!tags?.length) return tags;
+    const genreNames = new Set(tagsStore.allTags.map((t) => t.name.toLowerCase()));
+    return tags.filter((t) => !genreNames.has(t.trim().toLowerCase()));
+  });
+  let hasChips = $derived((artistOnlyTags?.length ?? 0) > 0);
 
   let totalDurationLabel = $derived.by(() => {
     const totalNs = songs.reduce((sum, s) => sum + (s.length_nanosec ?? 0), 0);
@@ -578,17 +590,11 @@
     {#if !windowLayoutStore.isDetailHeaderCollapsed}
       {#if hasChips}
         <GenreChips
-          genre={rawGenre}
-          curatedTags={artistProfile?.tags}
+          curatedTags={artistOnlyTags}
           onCuratedTagClick={handleTagClick}
           curatedTagTitle={(tag) => `Filter artists tagged "${tag}"`}
           variant="full"
-          limit={4}
         />
-      {:else}
-        <div class="text-xs text-brand-text-secondary italic">
-          <span>{genreLabel}</span>
-        </div>
       {/if}
     {/if}
 

@@ -3,7 +3,7 @@ use crate::{
     collection::CollectionScanner,
     models::{
         AlbumProfile, ArtistProfile, HomeItem, LibraryStats, MusicDirectory, PruneResult, Song,
-        TopAlbumItem,
+        Tag, TopAlbumItem,
     },
     AppState,
 };
@@ -65,6 +65,52 @@ pub async fn scan_directories(
         .scan_all(app, force.unwrap_or(false), false)
         .await
         .map_err(|e| e.to_string())
+}
+
+/// Force re-reads embedded tags from disk for exactly these songs and
+/// reconciles the DB to match, bypassing the mtime-skip a normal (non-force)
+/// scan uses. Unlike the whole-library `scan_directories`, this is scoped to
+/// a specific set of tracks, so a view like the album detail page can offer
+/// a fast "resync from disk" action instead of only reloading whatever the
+/// DB already has (which a plain library snapshot reload can't distinguish
+/// from a genuine on-disk change — see #956). WebDAV songs (no local file)
+/// and CUE-derived songs (tags live in the .cue sheet, not embedded — #78)
+/// are skipped, same as the tag editor's other bulk-write paths.
+#[tauri::command]
+pub async fn rescan_songs(
+    app: AppHandle,
+    song_ids: Vec<i64>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let scanner = CollectionScanner::new(state.db.clone());
+
+    let paths: Vec<std::path::PathBuf> = {
+        let conn = state.db.pool.get().map_err(|e| e.to_string())?;
+        let sql = format!(
+            "SELECT {} FROM songs WHERE id = ?1",
+            crate::collection::SONG_SELECT_COLS
+        );
+        song_ids
+            .iter()
+            .filter_map(|id| {
+                conn.query_row(&sql, [id], crate::collection::row_to_song)
+                    .ok()
+            })
+            .filter(|song| {
+                song.source != crate::models::SongSource::WebDav && song.cue_path.is_none()
+            })
+            .filter_map(|song| song.path)
+            .map(std::path::PathBuf::from)
+            .collect()
+    };
+
+    scanner
+        .rescan_paths(&app, paths)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let _ = app.emit("library-changed", ());
+    Ok(())
 }
 
 #[tauri::command]
@@ -414,7 +460,10 @@ fn build_artist_md_content(profile: &ArtistProfile) -> Option<String> {
 }
 
 /// Same as `build_artist_md_content`, for `album.md` (#950's `description`/
-/// `links` fields).
+/// `links` fields). No "## Tags" section here, unlike the artist version —
+/// an album has no curated tag list of its own to mirror (#962 removed
+/// `album_profiles.tags`; the embedded `songs.genre` tag is the only tag
+/// list an album has, and it's already on disk in each track's own file).
 fn build_album_md_content(profile: &AlbumProfile) -> Option<String> {
     let mut sections: Vec<String> = Vec::new();
     if let Some(description) = profile.description.as_deref() {
@@ -423,7 +472,6 @@ fn build_album_md_content(profile: &AlbumProfile) -> Option<String> {
             sections.push(trimmed.to_string());
         }
     }
-    sections.extend(format_tags_section(&profile.tags));
     let links: Vec<(&str, &str)> = profile
         .links
         .iter()
@@ -590,6 +638,16 @@ pub async fn get_all_album_profiles(
     scanner.get_all_album_profiles().map_err(|e| e.to_string())
 }
 
+/// Every artist tag in the library with its song count, for the Genres
+/// page's browsable-only "Artist Tags" section (see `get_artist_tag_counts`
+/// doc comment for why artist tags don't get a full mergeable/colorable
+/// hierarchy entry like genre does).
+#[tauri::command]
+pub async fn get_artist_tags_overview(state: State<'_, AppState>) -> Result<Vec<Tag>, String> {
+    let scanner = CollectionScanner::new(state.db.clone());
+    scanner.get_artist_tag_counts().map_err(|e| e.to_string())
+}
+
 /// Marks (or unmarks) one or more songs "Not included" (#104): excluded from
 /// auto/smart-playlist generation and Auto-Play refill, but still fully
 /// visible and playable in Album/Artist views. Fires a `song-stats-changed`
@@ -632,7 +690,10 @@ pub async fn get_songs_missing_musicbrainz_id(
 ) -> Result<Vec<Song>, String> {
     let scanner = CollectionScanner::new(state.db.clone());
     scanner
-        .get_songs_missing_musicbrainz_id(limit.unwrap_or(-1), crate::models::QueuePopulationMode::All)
+        .get_songs_missing_musicbrainz_id(
+            limit.unwrap_or(-1),
+            crate::models::QueuePopulationMode::All,
+        )
         .map_err(|e| e.to_string())
 }
 
@@ -735,13 +796,14 @@ mod tests {
     }
 
     #[test]
-    fn test_build_album_md_content_appends_tags_then_website_and_links() {
+    fn test_build_album_md_content_appends_website_and_links_but_no_tags_section() {
+        // #962: albums have no curated tag list of their own to mirror
+        // anymore -- only the embedded genre tag, already on disk per-file.
         let profile = AlbumProfile {
             album_key: "Come On Over".to_string(),
             artist_key: Some("Shania Twain".to_string()),
             description: Some("Iconic 1997 studio album.".to_string()),
             website: Some("https://shaniatwain.com/music/come-on-over".to_string()),
-            tags: vec!["country pop".to_string()],
             links: vec![AlbumLink {
                 platform: "discogs".to_string(),
                 handle_or_url: "https://www.discogs.com/master/132556".to_string(),
@@ -751,7 +813,7 @@ mod tests {
         let content = build_album_md_content(&profile).unwrap();
         assert_eq!(
             content,
-            "Iconic 1997 studio album.\n\n## Tags\n- country pop\n\n## Links\n\
+            "Iconic 1997 studio album.\n\n## Links\n\
              - [Website](https://shaniatwain.com/music/come-on-over)\n\
              - [Discogs](https://www.discogs.com/master/132556)"
         );

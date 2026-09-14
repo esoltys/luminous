@@ -393,6 +393,9 @@ class CollectionStore {
         tagsStore.load().catch((err) => {
           console.error("Failed to refresh tags after library change:", err);
         });
+        tagsStore.loadArtistTags().catch((err) => {
+          console.error("Failed to refresh artist tags after library change:", err);
+        });
         invoke("refresh_playback_queue").catch((err) => {
           console.error("Failed to refresh playback queue after library change:", err);
         });

@@ -266,6 +266,29 @@ class NavigationStore {
     });
   }
 
+  /** Opens an artist tag's auto-playlist detail view — the browsable-only
+   * counterpart to `viewGenreTag` for curated artist tags (#962/#956
+   * follow-up). Resolves the tag's materialized playlist row if one exists
+   * (`dynamic_spec === "artisttag:"+tag`); below the auto-playlist song
+   * threshold it has none yet, so `playlistId` stays undefined and
+   * AutoPlaylistDetailView falls back to a direct `get_songs_by_artist_tag`
+   * query. */
+  viewArtistTag(tag: string) {
+    collectionStore.searchQuery = "";
+    collectionStore.searchResults = [];
+    this.selectedArtistName = null;
+    this.selectedAlbumName = null;
+    const playlist = playlistsStore.playlists.find(
+      (p) => p.dynamic_enabled && p.dynamic_spec === `artisttag:${tag}`
+    );
+    this.viewAutoPlaylist({
+      kind: "artist_tag",
+      artistTag: tag,
+      playlistId: playlist?.id,
+      updated: playlist?.updated,
+    });
+  }
+
   viewArtist(name: string) {
     collectionStore.searchQuery = "";
     collectionStore.searchResults = [];

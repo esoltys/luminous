@@ -15,7 +15,6 @@
   import FavouriteCornerFlag from "./FavouriteCornerFlag.svelte";
   import BoxSetDiscIcons from "./BoxSetDiscIcons.svelte";
   import TagEditor from "./TagEditor.svelte";
-  import AlbumTagEditor from "./AlbumTagEditor.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
   import GenreChips from "./GenreChips.svelte";
   import { tagsStore } from "../stores/tags.svelte";
@@ -63,7 +62,6 @@
   let loading = $state(true);
   let refreshing = $state(false);
   let editingSongId = $state<number | null>(null);
-  let showAlbumTagEditor = $state(false);
   let contextMenuState = $state<{ x: number; y: number; song: Song } | null>(null);
   let showShareModal = $state(false);
 
@@ -71,7 +69,15 @@
     if (refreshing || collectionStore.isScanning) return;
     refreshing = true;
     try {
-      await collectionStore.startScan(true);
+      // Force re-read this album's own tracks from disk rather than kicking
+      // off a whole-library scan: `startScan` doesn't await the scan's
+      // actual completion (it just fires `scan_directories` and returns),
+      // so the old code here reloaded the DB snapshot before the rescan had
+      // reached this album's files, making Refresh a no-op for exactly the
+      // "another install/tool edited this file" case it exists for (#956).
+      // `rescan_songs` is awaited end-to-end and bypasses the mtime-skip a
+      // normal scan uses, so it always reflects what's actually on disk.
+      await invoke("rescan_songs", { songIds: songs.map((s) => s.id) });
       await collectionStore.refreshLibrary();
       const fetchedSongs = await invoke<Song[]>("get_songs_by_album", { album: albumName });
       let filtered = [...fetchedSongs];
@@ -194,10 +200,9 @@
   let isEditorOpen = $state(false);
   let albumProfile = $derived(collectionStore.getAlbumProfile(albumName));
   let hasDescription = $derived(!!albumProfile?.description?.trim());
-  let hasTags = $derived(!!albumProfile?.tags && albumProfile.tags.length > 0);
   let hasWebsite = $derived(!!albumProfile?.website?.trim());
   let hasLinks = $derived(!!albumProfile?.links && albumProfile.links.length > 0);
-  let hasChips = $derived(hasTags || Boolean(rawGenre?.trim()));
+  let hasChips = $derived(Boolean(rawGenre?.trim()));
 
   // Derived ListenBrainz album URL (#950): derived from representative songs
   // that have a MusicBrainz release group or release ID.
@@ -220,13 +225,6 @@
     } catch {
       window.open(url, "_blank");
     }
-  }
-
-  function handleTagClick(tag: string) {
-    collectionStore.searchQuery = `album-tag:${tag}`;
-    navigationStore.selectedAlbumName = null;
-    navigationStore.activeTab = "collection";
-    navigationStore.activeSubTab = "albums";
   }
 
   $effect(() => {
@@ -364,12 +362,7 @@
     openInPicard(songs.map((s) => s.id));
   }
 
-  function openAlbumTagEditor() {
-    if (songs.length === 0) return;
-    showAlbumTagEditor = true;
-  }
-
-  async function handleTagEditorSaved() {
+  async function handleTagEditorSaved(isAlbumEdit: boolean = false) {
     collectionStore.refreshLibrary();
     tagsStore.load();
     loading = true;
@@ -381,7 +374,7 @@
     // so the album-name effect refetches under the new name. A single-song
     // edit only ever touches one track, so it's left to the normal refetch
     // below, which naturally drops that song if it moved to a different album.
-    if (showAlbumTagEditor && songs[0]?.id !== undefined) {
+    if (isAlbumEdit && songs[0]?.id !== undefined) {
       try {
         const details = await invoke<{ album: string }>("get_song_details", { songId: songs[0].id });
         if (details.album && details.album !== albumName) {
@@ -590,9 +583,6 @@
       {#if hasChips}
         <GenreChips
           genre={rawGenre}
-          curatedTags={albumProfile?.tags}
-          onCuratedTagClick={handleTagClick}
-          curatedTagTitle={(tag) => `Filter albums tagged "${tag}"`}
           variant="full"
           limit={4}
         />
@@ -731,26 +721,6 @@
   />
 {/if}
 
-{#if showAlbumTagEditor && songs.length > 0}
-  <AlbumTagEditor
-    songIds={songs.map((s) => s.id)}
-    initialAlbum={songs[0].album}
-    initialAlbumSort={songs[0].albumsort}
-    initialAlbumArtist={songs[0].album_artist || songs[0].artist}
-    initialAlbumArtistSort={songs[0].album_artist_sort || songs[0].artistsort}
-    initialGenre={songs[0].genre}
-    initialGenreSort={songs[0].genresort}
-    initialYear={songs[0].year}
-    initialDisc={songs[0].disc}
-    initialCompilation={songs[0].compilation}
-    hasEmbeddedArt={songs.some((s) => s.art_embedded)}
-    initialArtAutomatic={albumItem?.art_automatic}
-    initialArtManual={albumItem?.art_manual}
-    onClose={() => { showAlbumTagEditor = false; }}
-    onSave={handleTagEditorSaved}
-  />
-{/if}
-
 {#if contextMenuState}
   {@const song = contextMenuState.song}
   <SongContextMenu
@@ -791,12 +761,7 @@
       icon={Edit3}
       label={i18n.t("albumDetail.editAlbumDetails", {}, "Edit Album Details")}
       onclick={() => { isEditorOpen = true; overflowMenuPos = null; }}
-    />
-    <ContextMenuItem
-      icon={Edit3}
-      label={i18n.t("albumDetail.editInfoTooltip")}
-      onclick={() => { openAlbumTagEditor(); overflowMenuPos = null; }}
-      disabled={loading || songs.length === 0}
+      disabled={loading}
     />
     <ContextMenuItem
       icon={OpenInPicard}
@@ -821,10 +786,26 @@
   <ShareModal {albumName} onClose={() => { showShareModal = false; }} />
 {/if}
 
-<AlbumProfileEditor
-  {albumName}
-  {artistName}
-  isOpen={isEditorOpen}
-  onClose={() => { isEditorOpen = false; }}
-/>
+{#if isEditorOpen && songs.length > 0}
+  <AlbumProfileEditor
+    {albumName}
+    {artistName}
+    songIds={songs.map((s) => s.id)}
+    initialAlbum={songs[0].album}
+    initialAlbumSort={songs[0].albumsort}
+    initialAlbumArtist={songs[0].album_artist || songs[0].artist}
+    initialAlbumArtistSort={songs[0].album_artist_sort || songs[0].artistsort}
+    initialGenre={songs[0].genre}
+    initialGenreSort={songs[0].genresort}
+    initialYear={songs[0].year}
+    initialDisc={songs[0].disc}
+    initialCompilation={songs[0].compilation}
+    hasEmbeddedArt={songs.some((s) => s.art_embedded)}
+    initialArtAutomatic={albumItem?.art_automatic}
+    initialArtManual={albumItem?.art_manual}
+    isOpen={isEditorOpen}
+    onClose={() => { isEditorOpen = false; }}
+    onSaved={() => handleTagEditorSaved(true)}
+  />
+{/if}
 

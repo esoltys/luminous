@@ -125,7 +125,9 @@ impl CollectionScanner {
     /// List all watched directories.
     pub fn get_directories(&self) -> Result<Vec<MusicDirectory>> {
         let conn = self.db.pool.get()?;
-        let mut stmt = conn.prepare("SELECT id, path, subdirs, nickname, icon, color FROM directories ORDER BY path")?;
+        let mut stmt = conn.prepare(
+            "SELECT id, path, subdirs, nickname, icon, color FROM directories ORDER BY path",
+        )?;
         let dirs = stmt
             .query_map([], |row| {
                 let path: String = row.get(1)?;
@@ -396,8 +398,8 @@ impl CollectionScanner {
     pub fn merge_duplicate_songs(&self) -> Result<usize> {
         let conn = self.db.pool.get()?;
 
-        let mut stmt = conn
-            .prepare("SELECT id, path, beginning_nanosec FROM songs WHERE path IS NOT NULL")?;
+        let mut stmt =
+            conn.prepare("SELECT id, path, beginning_nanosec FROM songs WHERE path IS NOT NULL")?;
         let rows: Vec<(i64, String, i64)> = stmt
             .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?
             .filter_map(|r| r.ok())
@@ -517,6 +519,70 @@ impl CollectionScanner {
             let _ = app_for_progress.emit("scan-progress", progress);
         })
         .await
+    }
+
+    /// Force re-reads embedded tags for exactly these files, bypassing the
+    /// mtime-skip `scan_all`/`scan_all_core` use for a normal (non-`force`)
+    /// scan. A file whose mtime already matches what's on record — e.g. it
+    /// was edited by a different Luminous install or another tool sharing
+    /// the same music folder, or manually — is otherwise invisible to any
+    /// rescan short of a full `force` one. This gives targeted callers (like
+    /// the album detail view's Refresh action, #956) a way to reconcile a
+    /// specific set of files from disk into the DB without paying for a
+    /// full-library rescan. Thin Tauri-facing wrapper around
+    /// `rescan_paths_core` — see that method for the actual logic.
+    pub async fn rescan_paths(&self, app: &AppHandle, paths: Vec<PathBuf>) -> Result<()> {
+        let _watcher_pause_guard = app
+            .try_state::<crate::AppState>()
+            .map(|state| WatcherPauseGuard::new(Arc::clone(&state.watcher_paused)));
+
+        let app_data_dir = crate::paths::resolve_app_data_dir(app);
+        self.rescan_paths_core(app_data_dir, paths).await
+    }
+
+    /// Core of `rescan_paths`, decoupled from Tauri's `AppHandle` (the
+    /// covers-cache directory is passed in) so it's directly callable from
+    /// tests without mocking a Tauri app — see `scan_all_core`'s doc comment
+    /// for the same rationale.
+    pub async fn rescan_paths_core(
+        &self,
+        app_data_dir: PathBuf,
+        paths: Vec<PathBuf>,
+    ) -> Result<()> {
+        if paths.is_empty() {
+            return Ok(());
+        }
+
+        let cover_manager = CoverManager::new(Arc::clone(&self.db), app_data_dir);
+
+        let results: Vec<(PathBuf, Result<Song>)> =
+            tauri::async_runtime::spawn_blocking(move || {
+                paths
+                    .into_iter()
+                    .map(|path| {
+                        let result = read_and_prepare_song(&cover_manager, &path);
+                        (path, result)
+                    })
+                    .collect()
+            })
+            .await
+            .context("rescan_paths task panicked")?;
+
+        let conn = self.db.pool.get()?;
+        let tx = conn.unchecked_transaction()?;
+        for (path, result) in results {
+            match result {
+                Ok(song) => {
+                    if let Err(e) = upsert_song(&tx, &song) {
+                        log::warn!("Failed to save rescanned tags for {}: {e}", path.display());
+                    }
+                }
+                Err(e) => log::warn!("Failed to read tags for {}: {e}", path.display()),
+            }
+        }
+        tx.commit()?;
+
+        Ok(())
     }
 
     /// Core of `scan_all`, decoupled from Tauri's `AppHandle` (progress
@@ -719,10 +785,9 @@ impl CollectionScanner {
 
                     match sync_cue_tracks(&tx, &cover_manager, job, combined_mtime) {
                         Ok(()) => {}
-                        Err(e) => log::warn!(
-                            "Failed to parse CUE sheet {}: {e}",
-                            job.cue_path.display()
-                        ),
+                        Err(e) => {
+                            log::warn!("Failed to parse CUE sheet {}: {e}", job.cue_path.display())
+                        }
                     }
 
                     scanned += 1;
@@ -937,11 +1002,17 @@ pub(crate) fn get_mtime(path: &Path) -> Option<i64> {
 /// case-insensitively since foobar2000 writes it with whatever casing the
 /// user's OS/plugin defaults to.
 fn find_dr_log(dir: &Path) -> Option<PathBuf> {
-    std::fs::read_dir(dir).ok()?.filter_map(|e| e.ok()).find_map(|entry| {
-        let path = entry.path();
-        let is_match = path.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.eq_ignore_ascii_case("foo_dr.txt"));
-        (path.is_file() && is_match).then_some(path)
-    })
+    std::fs::read_dir(dir)
+        .ok()?
+        .filter_map(|e| e.ok())
+        .find_map(|entry| {
+            let path = entry.path();
+            let is_match = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.eq_ignore_ascii_case("foo_dr.txt"));
+            (path.is_file() && is_match).then_some(path)
+        })
 }
 
 fn detect_filetype(path: &Path) -> FileType {
@@ -1407,7 +1478,10 @@ fn build_cue_songs(cover_manager: &CoverManager, job: &CueJob, mtime: i64) -> Re
         // The next track's INDEX 01 is this track's end boundary; the final
         // track has none, so it plays to the end of the file (end_nanosec = 0
         // means "no cutoff", consistent with plain, non-CUE songs).
-        let end_nanosec = tracks.get(i + 1).map(|next| next.start_nanosec).unwrap_or(0);
+        let end_nanosec = tracks
+            .get(i + 1)
+            .map(|next| next.start_nanosec)
+            .unwrap_or(0);
         let length_nanosec = if end_nanosec > 0 {
             Some(end_nanosec - track.start_nanosec)
         } else {
@@ -1994,6 +2068,82 @@ mod tests {
 
         let song = read_tags(&path).expect("read_tags should succeed");
         assert_eq!(song.genre.as_deref(), Some("Rock; Jazz Fusion; Live"));
+    }
+
+    #[tokio::test]
+    async fn test_rescan_paths_core_reconciles_out_of_band_genre_edit() {
+        // Regression test for #956: a normal scan skips a file whose mtime
+        // already matches what's on record, so an edit made by another
+        // Luminous install (or any other tool) sharing the same music
+        // folder is invisible to it. `rescan_paths_core` must always
+        // re-read the files it's explicitly given, with no mtime check.
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let path = temp_dir.path().join("song.wav");
+        write_test_wav(&path);
+        crate::tageditor::write_tags(
+            &path,
+            &crate::tageditor::TagWriteRequest {
+                title: "Title",
+                artist: "Artist",
+                album: "Album",
+                genre: "Synthwave; Retrowave",
+                ..Default::default()
+            },
+        )
+        .expect("write_tags should succeed");
+
+        let db = Arc::new(Database::new(temp_dir.path().to_path_buf()).unwrap());
+        let scanner = CollectionScanner::new(Arc::clone(&db));
+        scanner
+            .add_directory(&temp_dir.path().to_string_lossy())
+            .unwrap();
+        scanner
+            .scan_all_core(temp_dir.path().to_path_buf(), true, true, false, |_| {})
+            .await
+            .unwrap();
+
+        let genre_after_scan: String = db
+            .pool
+            .get()
+            .unwrap()
+            .query_row(
+                "SELECT genre FROM songs WHERE path = ?1",
+                params![path.to_string_lossy()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(genre_after_scan, "Synthwave; Retrowave");
+
+        // Simulate an out-of-band edit (another install/tool) changing the
+        // embedded genre without Luminous's own write path being involved.
+        crate::tageditor::write_tags(
+            &path,
+            &crate::tageditor::TagWriteRequest {
+                title: "Title",
+                artist: "Artist",
+                album: "Album",
+                genre: "Synthwave; Electronic",
+                ..Default::default()
+            },
+        )
+        .expect("write_tags should succeed");
+
+        scanner
+            .rescan_paths_core(temp_dir.path().to_path_buf(), vec![path.clone()])
+            .await
+            .unwrap();
+
+        let genre_after_rescan: String = db
+            .pool
+            .get()
+            .unwrap()
+            .query_row(
+                "SELECT genre FROM songs WHERE path = ?1",
+                params![path.to_string_lossy()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(genre_after_rescan, "Synthwave; Electronic");
     }
 
     #[test]
@@ -2935,8 +3085,8 @@ Official DR value: DR13\n",
     }
 
     #[tokio::test]
-    async fn test_scan_classic_cue_sheet_produces_one_row_per_track_and_suppresses_whole_file_row(
-    ) {
+    async fn test_scan_classic_cue_sheet_produces_one_row_per_track_and_suppresses_whole_file_row()
+    {
         let temp_dir = std::env::temp_dir().join(format!(
             "luminous_cue_scan_test_{}",
             std::time::SystemTime::now()

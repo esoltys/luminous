@@ -24,6 +24,24 @@ class TagsStore {
   hierarchy = $state<TagGroup[]>([]);
   private hierarchyLoadStarted = false;
 
+  /** Artist tags (curated, DB-only, `artist_profiles.tags` — #962/#956
+   * follow-up), browsable alongside genre in the Genres page but never part
+   * of `hierarchy`: an artist tag has no embedded file to write to, so it
+   * can't be merged/renamed/reparented/colored the way a genre tag can. */
+  artistTags = $state<Tag[]>([]);
+  private artistTagsLoadStarted = false;
+
+  async loadArtistTags() {
+    const result = await invoke<Tag[]>("get_artist_tags_overview");
+    this.artistTags = Array.isArray(result) ? result : [];
+  }
+
+  ensureArtistTagsLoaded() {
+    if (this.artistTagsLoadStarted) return;
+    this.artistTagsLoadStarted = true;
+    this.loadArtistTags().catch((e) => console.error("Failed to load artist tags:", e));
+  }
+
   /** Call from the Genres tab's onMount (and unlisten on unmount, same as
    * its existing "library-changed" listener) to keep `hierarchy` in sync
    * with backend reconciliation (new/vanished tag names) without the user

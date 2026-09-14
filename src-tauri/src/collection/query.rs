@@ -10,7 +10,7 @@ use super::{
 };
 use crate::models::{
     AlbumItem, AlbumLink, AlbumProfile, ArtistProfile, ArtistSocialLink, HomeItem, LibraryStats,
-    Playlist, QueuePopulationMode, Song, TopAlbumItem, LIBRARY_SOURCES_SQL,
+    Playlist, QueuePopulationMode, Song, Tag, TopAlbumItem, LIBRARY_SOURCES_SQL,
 };
 use anyhow::Result;
 use rusqlite::{params, OptionalExtension, ToSql};
@@ -656,6 +656,40 @@ impl CollectionScanner {
         )?;
         let tags = stmt
             .query_map([], |row| row.get(0))?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(tags)
+    }
+
+    /// Every artist tag in the library with how many songs (by artists
+    /// carrying that tag) it currently matches — the browsable-only
+    /// counterpart to the embedded-genre `TagManager::get_tag_hierarchy` for
+    /// the Genres page (#962/#956 follow-up): artist tags are curated,
+    /// DB-only metadata with no file to write to, so unlike genre they never
+    /// get their own mergeable/renameable/colorable hierarchy entry here —
+    /// just a name and a count to browse by.
+    pub fn get_artist_tag_counts(&self) -> Result<Vec<Tag>> {
+        let conn = self.db.pool.get()?;
+        let sql = format!(
+            "SELECT json_each.value AS tag, COUNT(DISTINCT songs.id) AS song_count
+             FROM artist_profiles, json_each(artist_profiles.tags)
+             JOIN songs ON COALESCE(NULLIF(songs.album_artist, ''), songs.artist)
+                 = artist_profiles.artist_key COLLATE NOCASE
+             WHERE songs.source IN ({lib})
+               AND songs.unavailable = 0
+               AND songs.not_included = 0
+             GROUP BY tag COLLATE NOCASE
+             ORDER BY tag COLLATE NOCASE",
+            lib = *LIBRARY_SOURCES_SQL
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let tags = stmt
+            .query_map([], |row| {
+                Ok(Tag {
+                    name: row.get(0)?,
+                    song_count: row.get(1)?,
+                })
+            })?
             .filter_map(|r| r.ok())
             .collect();
         Ok(tags)
@@ -1496,17 +1530,15 @@ pub fn get_all_artist_profiles_conn(conn: &rusqlite::Connection) -> Result<Vec<A
 /// Retrieve customizable profile and liner notes for an album from SQLite (#950).
 pub fn get_album_profile_conn(conn: &rusqlite::Connection, album: &str) -> Result<AlbumProfile> {
     let mut stmt = conn.prepare(
-        "SELECT album_key, artist_key, description, website, tags, links FROM album_profiles WHERE album_key = ?1 COLLATE NOCASE",
+        "SELECT album_key, artist_key, description, website, links FROM album_profiles WHERE album_key = ?1 COLLATE NOCASE",
     )?;
     let result = stmt.query_row(params![album], |row| {
         let album_key: String = row.get(0)?;
         let artist_key: Option<String> = row.get(1)?;
         let description: Option<String> = row.get(2)?;
         let website: Option<String> = row.get(3)?;
-        let tags_json: String = row.get(4)?;
-        let links_json: String = row.get(5)?;
+        let links_json: String = row.get(4)?;
 
-        let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
         let links: Vec<AlbumLink> = serde_json::from_str(&links_json).unwrap_or_default();
 
         Ok(AlbumProfile {
@@ -1514,7 +1546,6 @@ pub fn get_album_profile_conn(conn: &rusqlite::Connection, album: &str) -> Resul
             artist_key,
             description,
             website,
-            tags,
             links,
         })
     });
@@ -1526,7 +1557,6 @@ pub fn get_album_profile_conn(conn: &rusqlite::Connection, album: &str) -> Resul
             artist_key: None,
             description: None,
             website: None,
-            tags: Vec::new(),
             links: Vec::new(),
         }),
         Err(e) => Err(e.into()),
@@ -1538,24 +1568,21 @@ pub fn set_album_profile_conn(
     conn: &rusqlite::Connection,
     profile: &AlbumProfile,
 ) -> Result<AlbumProfile> {
-    let tags_json = serde_json::to_string(&profile.tags)?;
     let links_json = serde_json::to_string(&profile.links)?;
 
     conn.execute(
-        "INSERT INTO album_profiles (album_key, artist_key, description, website, tags, links)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+        "INSERT INTO album_profiles (album_key, artist_key, description, website, links)
+         VALUES (?1, ?2, ?3, ?4, ?5)
          ON CONFLICT(album_key) DO UPDATE SET
             artist_key = excluded.artist_key,
             description = excluded.description,
             website = excluded.website,
-            tags = excluded.tags,
             links = excluded.links",
         params![
             profile.album_key,
             profile.artist_key,
             profile.description,
             profile.website,
-            tags_json,
             links_json
         ],
     )?;
@@ -1566,7 +1593,7 @@ pub fn set_album_profile_conn(
 /// Retrieve all saved album profiles in SQLite (#950).
 pub fn get_all_album_profiles_conn(conn: &rusqlite::Connection) -> Result<Vec<AlbumProfile>> {
     let mut stmt = conn.prepare(
-        "SELECT album_key, artist_key, description, website, tags, links FROM album_profiles ORDER BY album_key COLLATE NOCASE",
+        "SELECT album_key, artist_key, description, website, links FROM album_profiles ORDER BY album_key COLLATE NOCASE",
     )?;
     let profiles = stmt
         .query_map([], |row| {
@@ -1574,10 +1601,8 @@ pub fn get_all_album_profiles_conn(conn: &rusqlite::Connection) -> Result<Vec<Al
             let artist_key: Option<String> = row.get(1)?;
             let description: Option<String> = row.get(2)?;
             let website: Option<String> = row.get(3)?;
-            let tags_json: String = row.get(4)?;
-            let links_json: String = row.get(5)?;
+            let links_json: String = row.get(4)?;
 
-            let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
             let links: Vec<AlbumLink> = serde_json::from_str(&links_json).unwrap_or_default();
 
             Ok(AlbumProfile {
@@ -1585,7 +1610,6 @@ pub fn get_all_album_profiles_conn(conn: &rusqlite::Connection) -> Result<Vec<Al
                 artist_key,
                 description,
                 website,
-                tags,
                 links,
             })
         })?
@@ -3081,7 +3105,6 @@ mod tests {
         assert_eq!(initial.artist_key, None);
         assert_eq!(initial.description, None);
         assert_eq!(initial.website, None);
-        assert!(initial.tags.is_empty());
         assert!(initial.links.is_empty());
 
         // Save album profile
@@ -3092,7 +3115,6 @@ mod tests {
                 "Iconic 1997 studio album recorded with producer Mutt Lange. [Wikipedia](https://en.wikipedia.org/wiki/Come_On_Over)".to_string(),
             ),
             website: Some("https://shaniatwain.com/music/come-on-over".to_string()),
-            tags: vec!["country pop".to_string(), "blockbuster".to_string()],
             links: vec![
                 AlbumLink {
                     platform: "bandcamp".to_string(),
@@ -3119,7 +3141,6 @@ mod tests {
             loaded.website,
             Some("https://shaniatwain.com/music/come-on-over".to_string())
         );
-        assert_eq!(loaded.tags, vec!["country pop", "blockbuster"]);
         assert_eq!(loaded.links.len(), 2);
         assert_eq!(loaded.links[0].platform, "bandcamp");
         assert_eq!(
@@ -3132,6 +3153,69 @@ mod tests {
         let all = get_all_album_profiles_conn(&conn).unwrap();
         assert_eq!(all.len(), 1);
         assert_eq!(all[0].album_key, "Come On Over");
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_get_artist_tag_counts_joins_songs_by_effective_artist() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_artist_tag_counts_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let scanner = CollectionScanner::new(db.clone());
+        let conn = db.pool.get().unwrap();
+
+        let insert_song = |path: &str, artist: &str, album_artist: Option<&str>| {
+            let song = Song {
+                path: Some(path.to_string()),
+                title: Some("Track".to_string()),
+                artist: Some(artist.to_string()),
+                album_artist: album_artist.map(|s| s.to_string()),
+                source: SongSource::LocalFile,
+                filetype: FileType::Mp3,
+                unavailable: false,
+                ..Default::default()
+            };
+            upsert_song(&conn, &song).unwrap();
+        };
+
+        // Two Danheim tracks (one crediting album_artist, one plain artist)
+        // and one Gunship track, tagged with a different (unrelated) genre.
+        insert_song("path/danheim1.mp3", "Danheim", Some("Danheim"));
+        insert_song("path/danheim2.mp3", "Danheim", None);
+        insert_song("path/gunship.mp3", "Gunship", None);
+
+        set_artist_profile_conn(
+            &conn,
+            &ArtistProfile {
+                artist_key: "Danheim".to_string(),
+                tags: vec!["Nordic Folk".to_string(), "Viking Music".to_string()],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        set_artist_profile_conn(
+            &conn,
+            &ArtistProfile {
+                artist_key: "Gunship".to_string(),
+                tags: vec!["Synthwave".to_string()],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let counts = scanner.get_artist_tag_counts().unwrap();
+        let by_name: std::collections::HashMap<&str, i64> =
+            counts.iter().map(|t| (t.name.as_str(), t.song_count)).collect();
+
+        assert_eq!(by_name.get("Nordic Folk"), Some(&2));
+        assert_eq!(by_name.get("Viking Music"), Some(&2));
+        assert_eq!(by_name.get("Synthwave"), Some(&1));
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

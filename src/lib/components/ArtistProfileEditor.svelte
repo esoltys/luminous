@@ -4,14 +4,14 @@
     PlusIcon as Plus,
     TrashIcon as Trash2,
     GlobeIcon as Globe,
-    TagIcon,
     LinkIcon,
-    UserIcon as User,
+    MicrophoneStageIcon as Mic,
     FloppyDiskIcon as Save,
     CircleNotchIcon as LoaderCircle
   } from "phosphor-svelte";
   import Button from "./Button.svelte";
   import { collectionStore } from "../stores/collection.svelte";
+  import { tagsStore } from "../stores/tags.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { portal } from "../utils/portal";
@@ -30,6 +30,15 @@
     onClose: () => void;
     onSaved?: (profile: ArtistProfile) => void;
   } = $props();
+
+  // Flags a tag pill below that duplicates a genre *anywhere in the
+  // library*, not just this artist's own files -- matching the "Artist Only
+  // Tags" filter on the Genres page, since a name like "Electronic" is
+  // still a real genre even if this artist's own songs don't use it.
+  $effect(() => {
+    if (!tagsStore.loaded) tagsStore.load().catch((e) => console.error("Failed to load tags overview:", e));
+  });
+  let genreNames = $derived(new Set(tagsStore.allTags.map((t) => t.name.toLowerCase())));
 
   let website = $state("");
   let bio = $state("");
@@ -105,6 +114,7 @@
       };
 
       const saved = await collectionStore.saveArtistProfile(profile);
+      tagsStore.loadArtistTags().catch((e) => console.error("Failed to refresh artist tags:", e));
       onSaved?.(saved);
       onClose();
     } catch (err) {
@@ -147,9 +157,9 @@
       <!-- Header -->
       <div class="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-brand-border bg-brand-sidebar/80 shrink-0">
         <div class="flex items-center gap-2.5 min-w-0 mr-2">
-          <User class="w-5 h-5 text-brand-accent shrink-0" />
+          <Mic class="w-5 h-5 text-brand-accent shrink-0" />
           <h2 id="artist-editor-title" class="text-base sm:text-lg font-bold text-brand-text-primary truncate">
-            {i18n.t("artistProfileEditor.title", {}, "Edit Artist Details")}: <span class="text-brand-accent font-semibold">{artistName}</span>
+            {i18n.t("artistProfileEditor.title", {}, "Edit Artist Details")}: <span class="text-brand-text-primary font-semibold">{artistName}</span>
           </h2>
         </div>
         <button
@@ -180,16 +190,26 @@
         <!-- Tags Manager -->
         <div class="flex flex-col gap-2">
           <label for="artist-tags-input" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider flex items-center gap-1.5">
-            <TagIcon class="w-3.5 h-3.5 text-brand-accent" />
+            <Mic class="w-3.5 h-3.5 text-brand-accent" />
             {i18n.t("artistProfileEditor.tags", {}, "Tags")}
           </label>
+          <p class="text-xs text-brand-text-secondary/70 -mt-1">
+            {i18n.t("artistProfileEditor.tagsNote")}
+          </p>
 
           <!-- Current Tags Pills -->
           {#if tags.length > 0}
             <div class="flex flex-wrap gap-1.5">
               {#each tags as tag, idx (tag)}
-                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-brand-accent/15 text-brand-text-primary border border-brand-accent/25">
-                  <span>{tag}</span>
+                {@const isGenreDupe = genreNames.has(tag.toLowerCase())}
+                <span
+                  class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-brand-accent/15 text-brand-text-primary border border-brand-accent/25"
+                  title={isGenreDupe ? i18n.t("artistProfileEditor.tagDupesGenreTooltip", { tag }, `"${tag}" is already a genre tag -- no need to add it here`) : undefined}
+                >
+                  {#if !isGenreDupe}
+                    <Mic class="w-3 h-3 shrink-0 opacity-70" />
+                  {/if}
+                  <span class={isGenreDupe ? "line-through opacity-60" : ""}>{tag}</span>
                   <button
                     type="button"
                     onclick={() => handleRemoveTag(idx)}
@@ -217,7 +237,7 @@
               type="button"
               onclick={handleAddTag}
               disabled={!newTagInput.trim()}
-              class="px-3 py-1.5 bg-brand-accent/10 hover:bg-brand-accent/20 disabled:opacity-40 text-brand-accent text-xs font-medium rounded-lg border border-brand-accent/20 transition-colors flex items-center gap-1"
+              class="shrink-0 text-xs font-medium text-brand-text-primary hover:underline disabled:opacity-40 disabled:hover:no-underline flex items-center gap-1 cursor-pointer"
             >
               <Plus class="w-3.5 h-3.5" />
               {i18n.t("artistProfileEditor.addTagBtn", {}, "Add")}
@@ -250,7 +270,7 @@
             <button
               type="button"
               onclick={handleAddSocialLink}
-              class="text-xs font-medium text-brand-accent hover:underline flex items-center gap-1"
+              class="text-xs font-medium text-brand-text-primary hover:underline flex items-center gap-1"
             >
               <Plus class="w-3.5 h-3.5" />
               {i18n.t("artistProfileEditor.addLinkBtn", {}, "Add Link")}

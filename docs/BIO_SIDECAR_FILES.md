@@ -1,8 +1,7 @@
 # Artist/Album Bio Sidecar Files
 
-Artist bios (#473) and album descriptions (#950) are mirrored to `artist.md`/`album.md`
-files that live next to your music — the same folder convention `artist.jpg`/`cover.jpg`
-already use (#98):
+Artist bios and album descriptions are mirrored to `artist.md`/`album.md` files that live
+next to your music — the same folder convention `artist.jpg`/`cover.jpg` already use:
 
 - `album.md` sits in the album folder, next to `cover.jpg`.
 - `artist.md` sits one folder up, next to `artist.jpg`.
@@ -24,8 +23,9 @@ instance picks it up automatically. If a `.md` file already exists but the datab
 no bio cached yet, Luminous adopts it the next time you view that artist/album.
 
 Each file mirrors the whole profile, not just the prose — the bio/description paragraph,
-followed by a `## Tags` list (if any tags are set) and a `## Links` list for the website
-and social/external links.
+followed by a `## Links` list for the website and social/external links. `artist.md` also
+gets a `## Tags` list (if any tags are set); `album.md` doesn't — an album has no curated
+tag list of its own, only the embedded genre tag already stored in each track's own file.
 
 ## Example `artist.md`
 
@@ -51,10 +51,6 @@ Empath is Devin Townsend's tenth solo studio album, released in 2019. It draws
 together nearly every style he's worked in — ambient, extreme metal, orchestral,
 and pop — into a single, deliberately unclassifiable record.
 
-## Tags
-- progressive metal
-- experimental
-
 ## Links
 - [Website](https://hevydevy.com/empath)
 - [Bandcamp](https://devintownsend.bandcamp.com/album/empath)
@@ -67,5 +63,6 @@ and pop — into a single, deliberately unclassifiable record.
 - Clearing a profile down to nothing (no bio, no tags, no links) deletes the `.md`
   file rather than leaving a stale one behind.
 - Hand-editing a `.md` file works too — only the text *before* the first `## `
-  heading is read back as the bio/description; anything under `## Tags`/`## Links`
-  is Luminous's own generated section and isn't parsed back into structured data.
+  heading is read back as the bio/description; anything under `## Tags` (`artist.md`
+  only) or `## Links` is Luminous's own generated section and isn't parsed back into
+  structured data.

@@ -3,7 +3,8 @@
     TagIcon,
     CheckSquareIcon as CheckSquare,
     SquaresFourIcon as LayoutGrid,
-    RowsIcon as Rows3
+    RowsIcon as Rows3,
+    MicrophoneStageIcon as Mic
   } from "phosphor-svelte";
   import { genreColorHsl } from "../utils/genrePalette";
   import { onMount } from "svelte";
@@ -25,6 +26,11 @@
 
   let mergeDialogNames = $state<string[] | null>(null);
   let deleteConfirmNames = $state<string[] | null>(null);
+
+  let artistOnlyTags = $derived.by(() => {
+    const genreNames = new Set(tagsStore.allTags.map((t) => t.name.toLowerCase()));
+    return tagsStore.artistTags.filter((t) => !genreNames.has(t.name.toLowerCase()));
+  });
 
   let genreViewElements = $state<Record<string, HTMLButtonElement>>({});
   let genreIndicatorStyle = $state({ left: 4, width: 0, opacity: 0 });
@@ -117,10 +123,18 @@
     let unlistenHierarchy: (() => void) | undefined;
     tagsStore.listenForHierarchyChanges().then((fn) => { unlistenHierarchy = fn; });
     tagsStore.loadHierarchy().catch((e) => console.error("Failed to load tag hierarchy:", e));
+    tagsStore.loadArtistTags().catch((e) => console.error("Failed to load artist tags:", e));
     return () => {
       unlistenHierarchy?.();
     };
   });
+
+  /** Artist tag card/chip click — the browsable-only counterpart to
+   * `openMainTag` for curated artist tags (#962/#956 follow-up). Shown
+   * ahead of genre cards/chips in this view, per its own section below. */
+  function openArtistTag(tagName: string) {
+    navigationStore.viewArtistTag(tagName);
+  }
 
   // Every card/chip/tag click routes straight through to
   // AutoPlaylistDetailView (#548) — the Genres tab no longer has its own
@@ -286,7 +300,29 @@
       </div>
     {/if}
 
-    {#if tagsStore.allTags.length === 0 && tagsStore.noGenreCount === 0}
+    {#if artistOnlyTags.length > 0}
+      <div class="mb-4">
+        <div class="text-xs text-brand-text-secondary font-medium mb-2">
+          {i18n.t("songTags.artistTagsSectionTitle", { count: artistOnlyTags.length }, `Artist Only Tags (${artistOnlyTags.length})`)}
+        </div>
+        <div class="flex flex-wrap gap-1.5">
+          {#each artistOnlyTags as tag (tag.name)}
+            <button
+              type="button"
+              onclick={() => openArtistTag(tag.name)}
+              class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border-2 border-brand-border bg-brand-sidebar text-brand-text-primary text-xs font-medium select-none transition-colors hover:border-brand-accent/60 cursor-pointer"
+              title={i18n.t("songTags.goToArtistTagTooltip", { tag: tag.name }, `Browse ${tag.name}`)}
+            >
+              <Mic class="w-3 h-3 shrink-0 opacity-70" />
+              <span>{tag.name}</span>
+              <span class="opacity-70 text-[0.85em]">{tag.song_count}</span>
+            </button>
+          {/each}
+        </div>
+      </div>
+    {/if}
+
+    {#if tagsStore.allTags.length === 0 && tagsStore.noGenreCount === 0 && tagsStore.artistTags.length === 0}
       <div class="py-16">
         <EmptyState
           icon={TagIcon}
