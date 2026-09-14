@@ -12,6 +12,7 @@
 pub mod analyzer;
 pub mod audio;
 pub mod band_waveform;
+pub mod biomanager;
 pub mod bridge;
 pub mod collection;
 pub mod commands;
