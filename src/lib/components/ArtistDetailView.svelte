@@ -604,11 +604,11 @@
       <details
         open={windowLayoutStore.isOverviewExpanded}
         ontoggle={(e) => windowLayoutStore.setOverviewExpanded(e.currentTarget.open)}
-        class="group border border-brand-border rounded-xl bg-brand-sidebar/40 backdrop-blur-md overflow-hidden shadow-xs transition-all @container"
+        class="group/overview border border-brand-border rounded-xl bg-brand-sidebar/40 backdrop-blur-md overflow-hidden shadow-xs transition-all @container"
       >
         <summary class="flex items-center justify-between px-4 py-2.5 sm:px-5 sm:py-3 text-xs font-semibold text-brand-text-secondary cursor-pointer select-none hover:text-brand-text-primary transition-colors">
           <span>{i18n.t('artistDetail.overview', {}, 'Overview')}</span>
-          <CaretDown class="w-3.5 h-3.5 text-brand-text-secondary/70 group-open:rotate-180 transition-transform" />
+          <CaretDown class="w-3.5 h-3.5 text-brand-text-secondary/70 group-open/overview:rotate-180 transition-transform" />
         </summary>
         <div class="p-4 sm:p-5 md:p-6 border-t border-brand-border/60 flex flex-col @2xl:flex-row gap-5 md:gap-6 justify-between">
           <!-- About Column (Left) -->
