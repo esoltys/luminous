@@ -14,6 +14,8 @@
     onclick?: (e: MouseEvent) => void;
     ondblclick?: (e: MouseEvent) => void;
     oncontextmenu?: (e: MouseEvent) => void;
+    prefix?: import("svelte").Snippet;
+    suffix?: import("svelte").Snippet;
   }
 
   let {
@@ -21,6 +23,8 @@
     onclick: customClick,
     ondblclick: customDblClick,
     oncontextmenu: customContextMenu,
+    prefix,
+    suffix,
   }: Props = $props();
 
   function handleClick(e: MouseEvent) {
@@ -54,8 +58,12 @@
   ondblclick={handleDblClick}
   oncontextmenu={(e) => customContextMenu?.(e)}
   onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleClick(e as unknown as MouseEvent); } }}
-  class="group flex items-center gap-3 px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 select-none"
+  class="group flex items-center gap-3 px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 select-none cursor-pointer w-full"
 >
+  {#if prefix}
+    {@render prefix()}
+  {/if}
+
   <div class="relative shrink-0 overflow-hidden">
     <CoverArt
       songId={album.sample_song_id ?? undefined}
@@ -76,7 +84,11 @@
     </div>
     <div class="flex items-center justify-between gap-2">
       <p class="truncate text-xs text-brand-text-secondary font-medium min-w-0">{album.artist || i18n.t('collection.variousArtists')}</p>
-      <span class="shrink-0"><SongRating rating={album.rating} onRate={rateAlbum} size="sm" /></span>
+      <span class="shrink-0" onclick={(e) => e.stopPropagation()}><SongRating rating={album.rating} onRate={rateAlbum} size="sm" /></span>
     </div>
   </div>
+
+  {#if suffix}
+    {@render suffix()}
+  {/if}
 </div>

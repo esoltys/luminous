@@ -13,6 +13,19 @@ pub async fn get_stats_summary(
     crate::stats_summary::get_summary(&conn, range).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub async fn get_top_albums_summary(
+    range: String,
+    limit: Option<i64>,
+    state: State<'_, AppState>,
+) -> Result<Vec<crate::models::StatsTopItem>, String> {
+    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
+    let range = StatsRange::parse(&range).ok_or_else(|| format!("invalid range: {range}"))?;
+    let range_start = crate::stats_summary::range_start_unix(range, chrono::Utc::now().timestamp());
+    crate::stats_summary::top_albums_with_limit(&conn, range_start, limit.unwrap_or(10))
+        .map_err(|e| e.to_string())
+}
+
 /// Raw listen events for the past `days` days, for the daily listening
 /// heatmap (#890) to bucket into local calendar days client-side.
 #[tauri::command]

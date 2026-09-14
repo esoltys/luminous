@@ -78,10 +78,19 @@ fn get_summary_at(conn: &Connection, range: StatsRange, now: i64) -> Result<Stat
     })
 }
 
-fn top_songs(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>> {
+pub fn top_songs(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>> {
+    top_songs_with_limit(conn, range_start, TOP_N)
+}
+
+pub fn top_songs_with_limit(
+    conn: &Connection,
+    range_start: i64,
+    limit: i64,
+) -> Result<Vec<StatsTopItem>> {
     let sql = format!(
-        "SELECT CAST(s.id AS TEXT), s.title, s.artist, COUNT(*) AS play_count, s.album,
-                COALESCE(SUM(COALESCE(NULLIF(ph.duration_secs, 0), s.length_nanosec / 1000000000, 0)), 0) AS total_secs
+        "SELECT s.id, s.title, s.artist, COUNT(*) AS play_count, s.album,
+                COALESCE(SUM(COALESCE(NULLIF(ph.duration_secs, 0), s.length_nanosec / 1000000000, 0)), 0) AS total_secs,
+                s.art_embedded, s.art_automatic, s.art_manual, s.year, s.rating
          FROM play_history ph
          JOIN songs s ON s.id = ph.song_id
          WHERE ph.played_at >= ?1
@@ -97,16 +106,24 @@ fn top_songs(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>> {
     );
     let mut stmt = conn.prepare(&sql)?;
     let rows = stmt
-        .query_map(params![range_start, TOP_N], |row| {
+        .query_map(params![range_start, limit], |row| {
+            let song_id: i64 = row.get(0)?;
             let total_secs: i64 = row.get(5)?;
             Ok(StatsTopItem {
-                key: row.get(0)?,
+                key: song_id.to_string(),
                 label: row.get::<_, Option<String>>(1)?.unwrap_or_default(),
                 secondary: row.get(2)?,
                 play_count: row.get(3)?,
                 minutes: total_secs / 60,
                 excluded: false,
                 album: row.get(4)?,
+                song_id: Some(song_id),
+                sample_song_id: None,
+                art_embedded: row.get::<_, bool>(6)?,
+                art_automatic: row.get(7)?,
+                art_manual: row.get(8)?,
+                year: row.get(9)?,
+                rating: row.get::<_, Option<f32>>(10)?.unwrap_or(crate::stats::RATING_UNRATED),
             })
         })?
         .filter_map(|r| r.ok())
@@ -116,12 +133,57 @@ fn top_songs(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>> {
 
 /// Top albums aggregated by total listening time (#951) across all tracks belonging
 /// to that album in the given range.
-fn top_albums(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>> {
+pub fn top_albums(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>> {
+    top_albums_with_limit(conn, range_start, TOP_N)
+}
+
+pub fn top_albums_with_limit(
+    conn: &Connection,
+    range_start: i64,
+    limit: i64,
+) -> Result<Vec<StatsTopItem>> {
     let sql = format!(
         "SELECT s.album,
                 MIN(COALESCE(NULLIF(s.album_artist, ''), s.artist, '')),
                 COUNT(*) AS play_count,
-                COALESCE(SUM(COALESCE(NULLIF(ph.duration_secs, 0), s.length_nanosec / 1000000000, 0)), 0) AS total_secs
+                COALESCE(SUM(COALESCE(NULLIF(ph.duration_secs, 0), s.length_nanosec / 1000000000, 0)), 0) AS total_secs,
+                (
+                    SELECT s_sample.id
+                    FROM songs s_sample
+                    WHERE s_sample.album = s.album
+                      AND s_sample.source IN ({lib}) AND s_sample.unavailable = 0
+                    ORDER BY (s_sample.art_manual IS NOT NULL OR s_sample.art_automatic IS NOT NULL OR s_sample.art_embedded = 1) DESC,
+                             s_sample.disc ASC, s_sample.track ASC, s_sample.id ASC
+                    LIMIT 1
+                ) AS sample_song_id,
+                (
+                    SELECT s_sample.art_embedded
+                    FROM songs s_sample
+                    WHERE s_sample.album = s.album
+                      AND s_sample.source IN ({lib}) AND s_sample.unavailable = 0
+                    ORDER BY (s_sample.art_manual IS NOT NULL OR s_sample.art_automatic IS NOT NULL OR s_sample.art_embedded = 1) DESC,
+                             s_sample.disc ASC, s_sample.track ASC, s_sample.id ASC
+                    LIMIT 1
+                ) AS art_embedded,
+                (
+                    SELECT s_sample.art_automatic
+                    FROM songs s_sample
+                    WHERE s_sample.album = s.album
+                      AND s_sample.source IN ({lib}) AND s_sample.unavailable = 0
+                    ORDER BY (s_sample.art_manual IS NOT NULL OR s_sample.art_automatic IS NOT NULL OR s_sample.art_embedded = 1) DESC,
+                             s_sample.disc ASC, s_sample.track ASC, s_sample.id ASC
+                    LIMIT 1
+                ) AS art_automatic,
+                (
+                    SELECT s_sample.art_manual
+                    FROM songs s_sample
+                    WHERE s_sample.album = s.album
+                      AND s_sample.source IN ({lib}) AND s_sample.unavailable = 0
+                    ORDER BY (s_sample.art_manual IS NOT NULL OR s_sample.art_automatic IS NOT NULL OR s_sample.art_embedded = 1) DESC,
+                             s_sample.disc ASC, s_sample.track ASC, s_sample.id ASC
+                    LIMIT 1
+                ) AS art_manual,
+                MIN(s.year) AS year
          FROM play_history ph
          JOIN songs s ON s.id = ph.song_id
          WHERE ph.played_at >= ?1
@@ -137,21 +199,34 @@ fn top_albums(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>> 
         lib = *LIBRARY_SOURCES_SQL
     );
     let mut stmt = conn.prepare(&sql)?;
-    let rows = stmt
-        .query_map(params![range_start, TOP_N], |row| {
+    let mut rows: Vec<StatsTopItem> = stmt
+        .query_map(params![range_start, limit], |row| {
+            let album_name: String = row.get(0)?;
             let total_secs: i64 = row.get(3)?;
             Ok(StatsTopItem {
-                key: row.get(0)?,
-                label: row.get(0)?,
+                key: album_name.clone(),
+                label: album_name,
                 secondary: row.get(1)?,
                 play_count: row.get(2)?,
                 minutes: total_secs / 60,
                 excluded: false,
                 album: None,
+                song_id: None,
+                sample_song_id: row.get(4)?,
+                art_embedded: row.get::<_, Option<bool>>(5)?.unwrap_or(false),
+                art_automatic: row.get(6)?,
+                art_manual: row.get(7)?,
+                year: row.get(8)?,
+                rating: crate::stats::RATING_UNRATED,
             })
         })?
         .filter_map(|r| r.ok())
         .collect();
+
+    for item in &mut rows {
+        item.rating = crate::stats::get_album_rating(conn, &item.key).unwrap_or(crate::stats::RATING_UNRATED);
+    }
+
     Ok(rows)
 }
 
@@ -179,15 +254,14 @@ fn top_artists(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>>
     let rows = stmt
         .query_map(params![range_start, TOP_N], |row| {
             let total_secs: i64 = row.get(2)?;
-            Ok(StatsTopItem {
-                key: row.get(0)?,
-                label: row.get(0)?,
-                secondary: None,
-                play_count: row.get(1)?,
-                minutes: total_secs / 60,
-                excluded: false,
-                album: None,
-            })
+            Ok(StatsTopItem::new(
+                row.get(0)?,
+                row.get(0)?,
+                None,
+                row.get(1)?,
+                total_secs / 60,
+                None,
+            ))
         })?
         .filter_map(|r| r.ok())
         .collect();
@@ -249,14 +323,15 @@ fn top_genres(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>> 
 
     Ok(ranked
         .into_iter()
-        .map(|(genre, acc)| StatsTopItem {
-            key: genre.clone(),
-            label: genre,
-            secondary: None,
-            play_count: acc.play_count,
-            minutes: acc.total_secs / 60,
-            excluded: false,
-            album: None,
+        .map(|(genre, acc)| {
+            StatsTopItem::new(
+                genre.clone(),
+                genre,
+                None,
+                acc.play_count,
+                acc.total_secs / 60,
+                None,
+            )
         })
         .collect())
 }
@@ -698,6 +773,41 @@ mod tests {
         .unwrap();
 
         assert_eq!(total_minutes(&conn, range_start).unwrap(), 2);
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_top_albums_and_songs_populate_art_and_ratings() {
+        let (db, dir) = test_db();
+        let conn = db.pool.get().unwrap();
+        let now = 1_700_000_000;
+        let range_start = range_start_unix(StatsRange::SevenDays, now);
+
+        let song_id = insert_song(&conn, "/art.flac", "Art Song", "Art Artist", "Art Album", "Rock");
+        conn.execute(
+            "UPDATE songs SET art_embedded = 1, art_manual = 'cover.jpg', year = 2024, rating = 4.5 WHERE id = ?1",
+            params![song_id],
+        ).unwrap();
+        crate::stats::set_album_rating(&conn, "Art Album", 5.0).unwrap();
+
+        insert_play_with_duration(&conn, song_id, range_start + 10, 180);
+
+        let songs = top_songs(&conn, range_start).unwrap();
+        assert_eq!(songs.len(), 1);
+        assert_eq!(songs[0].song_id, Some(song_id));
+        assert_eq!(songs[0].art_embedded, true);
+        assert_eq!(songs[0].art_manual.as_deref(), Some("cover.jpg"));
+        assert_eq!(songs[0].year, Some(2024));
+        assert_eq!(songs[0].rating, 4.5);
+
+        let albums = top_albums(&conn, range_start).unwrap();
+        assert_eq!(albums.len(), 1);
+        assert_eq!(albums[0].sample_song_id, Some(song_id));
+        assert_eq!(albums[0].art_embedded, true);
+        assert_eq!(albums[0].art_manual.as_deref(), Some("cover.jpg"));
+        assert_eq!(albums[0].year, Some(2024));
+        assert_eq!(albums[0].rating, 5.0);
 
         let _ = std::fs::remove_dir_all(dir);
     }

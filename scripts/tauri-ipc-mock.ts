@@ -735,19 +735,36 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
           minutes: Math.round(v.duration_secs / 60),
           excluded: false,
           album: v.song.album ?? null,
+          song_id: v.song.id,
+          sample_song_id: null,
+          art_embedded: v.song.art_embedded,
+          art_automatic: v.song.art_automatic,
+          art_manual: v.song.art_manual,
+          year: v.song.year ?? null,
+          rating: v.song.rating ?? -1,
         }));
       const top_albums: StatsTopItem[] = [...albumCounts.entries()]
         .sort((a, b) => b[1].duration_secs - a[1].duration_secs || b[1].count - a[1].count)
         .slice(0, 10)
-        .map(([key, v]) => ({
-          key,
-          label: v.label,
-          secondary: v.secondary,
-          play_count: v.count,
-          minutes: Math.round(v.duration_secs / 60),
-          excluded: false,
-          album: null,
-        }));
+        .map(([key, v]) => {
+          const sample = library.songs.find((s) => s.album === v.label);
+          return {
+            key,
+            label: v.label,
+            secondary: v.secondary,
+            play_count: v.count,
+            minutes: Math.round(v.duration_secs / 60),
+            excluded: false,
+            album: null,
+            song_id: null,
+            sample_song_id: sample?.id ?? null,
+            art_embedded: sample?.art_embedded ?? false,
+            art_automatic: sample?.art_automatic ?? null,
+            art_manual: sample?.art_manual ?? null,
+            year: sample?.year ?? null,
+            rating: -1,
+          };
+        });
       const top_artists: StatsTopItem[] = [...artistCounts.entries()]
         .sort((a, b) => b[1].duration_secs - a[1].duration_secs || b[1].count - a[1].count)
         .slice(0, 10)
@@ -909,6 +926,11 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     },
     get_featured_albums: (args) =>
       [...library.albums].slice(0, (args.limit as number) || 5).map((album) => ({ type: "album", album })),
+
+    get_top_albums_summary: (args) => {
+      const summary = (handlers.get_stats_summary as (a: unknown) => StatsSummary)({ range: args.range });
+      return summary.top_albums.slice(0, (args.limit as number) || 10);
+    },
 
     get_albums: () => library.albums,
     get_artists: () => library.artists,

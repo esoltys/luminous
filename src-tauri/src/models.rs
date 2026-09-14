@@ -877,6 +877,52 @@ pub struct StatsTopItem {
     /// detail page of their own, so clicking one navigates to this album
     /// instead. `None` for every other row kind.
     pub album: Option<String>,
+    #[serde(default)]
+    pub song_id: Option<i64>,
+    #[serde(default)]
+    pub sample_song_id: Option<i64>,
+    #[serde(default)]
+    pub art_embedded: bool,
+    #[serde(default)]
+    pub art_automatic: Option<String>,
+    #[serde(default)]
+    pub art_manual: Option<String>,
+    #[serde(default)]
+    pub year: Option<i32>,
+    #[serde(default = "default_rating")]
+    pub rating: f32,
+}
+
+impl StatsTopItem {
+    pub fn new(
+        key: String,
+        label: String,
+        secondary: Option<String>,
+        play_count: i64,
+        minutes: i64,
+        album: Option<String>,
+    ) -> Self {
+        Self {
+            key,
+            label,
+            secondary,
+            play_count,
+            minutes,
+            excluded: false,
+            album,
+            song_id: None,
+            sample_song_id: None,
+            art_embedded: false,
+            art_automatic: None,
+            art_manual: None,
+            year: None,
+            rating: crate::stats::RATING_UNRATED,
+        }
+    }
+}
+
+fn default_rating() -> f32 {
+    crate::stats::RATING_UNRATED
 }
 
 /// Personal Stats summary for one range (#130) — top 10 songs/albums/artists/
