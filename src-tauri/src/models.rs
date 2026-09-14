@@ -1002,14 +1002,15 @@ pub struct AlbumLink {
     pub handle_or_url: String,
 }
 
-/// Full customizable profile and liner notes for an album (#950).
+/// Full customizable profile and liner notes for an album (#950). Tags are
+/// deliberately not part of this profile — the album's only tag list is the
+/// embedded `songs.genre` ID3 tag, edited via `save_album_tags` (#962).
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 pub struct AlbumProfile {
     pub album_key: String,
     pub artist_key: Option<String>,
     pub description: Option<String>,
     pub website: Option<String>,
-    pub tags: Vec<String>,
     pub links: Vec<AlbumLink>,
 }
 

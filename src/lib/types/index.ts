@@ -416,7 +416,6 @@ export interface AlbumProfile {
   artist_key?: string | null;
   description?: string | null;
   website?: string | null;
-  tags: string[];
   links: AlbumLink[];
 }
 

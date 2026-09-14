@@ -1039,9 +1039,6 @@ export const fr = {
     websitePlaceholder: "https://artiste.com/album ou www.artiste.com/album",
     description: "Description et notes de pochette",
     descriptionPlaceholder: "Ajouter des notes de pochette, contexte d'enregistrement ou critiques (liens Markdown pris en charge e.g. [Critique](https://...))...",
-    tags: "Tags de l'album",
-    tagInputPlaceholder: "Ajouter un tag et appuyer sur Entrée...",
-    addTagBtn: "Ajouter",
     links: "Liens de l'album",
     addLinkBtn: "Ajouter un lien",
     noLinks: "Aucun lien ajouté pour le moment. Cliquez sur « Ajouter un lien » pour joindre des pages Bandcamp, Discogs, critiques ou streaming.",
@@ -1051,9 +1048,8 @@ export const fr = {
     save: "Enregistrer",
     saving: "Enregistrement en cours...",
     cancel: "Annuler",
-    savedSuccess: "Profil de l'album mis à jour",
-    savedError: "Échec de l'enregistrement du profil de l'album",
-    removeTagTooltip: "Supprimer le tag {tag}",
+    savedSuccess: "Détails de l'album mis à jour",
+    savedError: "Échec de l'enregistrement des détails de l'album",
     removeLinkTooltip: "Supprimer le lien"
   },
   albumDetail: {

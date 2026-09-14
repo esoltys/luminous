@@ -1460,17 +1460,15 @@ pub fn get_all_artist_profiles_conn(conn: &rusqlite::Connection) -> Result<Vec<A
 /// Retrieve customizable profile and liner notes for an album from SQLite (#950).
 pub fn get_album_profile_conn(conn: &rusqlite::Connection, album: &str) -> Result<AlbumProfile> {
     let mut stmt = conn.prepare(
-        "SELECT album_key, artist_key, description, website, tags, links FROM album_profiles WHERE album_key = ?1 COLLATE NOCASE",
+        "SELECT album_key, artist_key, description, website, links FROM album_profiles WHERE album_key = ?1 COLLATE NOCASE",
     )?;
     let result = stmt.query_row(params![album], |row| {
         let album_key: String = row.get(0)?;
         let artist_key: Option<String> = row.get(1)?;
         let description: Option<String> = row.get(2)?;
         let website: Option<String> = row.get(3)?;
-        let tags_json: String = row.get(4)?;
-        let links_json: String = row.get(5)?;
+        let links_json: String = row.get(4)?;
 
-        let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
         let links: Vec<AlbumLink> = serde_json::from_str(&links_json).unwrap_or_default();
 
         Ok(AlbumProfile {
@@ -1478,7 +1476,6 @@ pub fn get_album_profile_conn(conn: &rusqlite::Connection, album: &str) -> Resul
             artist_key,
             description,
             website,
-            tags,
             links,
         })
     });
@@ -1490,7 +1487,6 @@ pub fn get_album_profile_conn(conn: &rusqlite::Connection, album: &str) -> Resul
             artist_key: None,
             description: None,
             website: None,
-            tags: Vec::new(),
             links: Vec::new(),
         }),
         Err(e) => Err(e.into()),
@@ -1502,24 +1498,21 @@ pub fn set_album_profile_conn(
     conn: &rusqlite::Connection,
     profile: &AlbumProfile,
 ) -> Result<AlbumProfile> {
-    let tags_json = serde_json::to_string(&profile.tags)?;
     let links_json = serde_json::to_string(&profile.links)?;
 
     conn.execute(
-        "INSERT INTO album_profiles (album_key, artist_key, description, website, tags, links)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+        "INSERT INTO album_profiles (album_key, artist_key, description, website, links)
+         VALUES (?1, ?2, ?3, ?4, ?5)
          ON CONFLICT(album_key) DO UPDATE SET
             artist_key = excluded.artist_key,
             description = excluded.description,
             website = excluded.website,
-            tags = excluded.tags,
             links = excluded.links",
         params![
             profile.album_key,
             profile.artist_key,
             profile.description,
             profile.website,
-            tags_json,
             links_json
         ],
     )?;
@@ -1530,7 +1523,7 @@ pub fn set_album_profile_conn(
 /// Retrieve all saved album profiles in SQLite (#950).
 pub fn get_all_album_profiles_conn(conn: &rusqlite::Connection) -> Result<Vec<AlbumProfile>> {
     let mut stmt = conn.prepare(
-        "SELECT album_key, artist_key, description, website, tags, links FROM album_profiles ORDER BY album_key COLLATE NOCASE",
+        "SELECT album_key, artist_key, description, website, links FROM album_profiles ORDER BY album_key COLLATE NOCASE",
     )?;
     let profiles = stmt
         .query_map([], |row| {
@@ -1538,10 +1531,8 @@ pub fn get_all_album_profiles_conn(conn: &rusqlite::Connection) -> Result<Vec<Al
             let artist_key: Option<String> = row.get(1)?;
             let description: Option<String> = row.get(2)?;
             let website: Option<String> = row.get(3)?;
-            let tags_json: String = row.get(4)?;
-            let links_json: String = row.get(5)?;
+            let links_json: String = row.get(4)?;
 
-            let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
             let links: Vec<AlbumLink> = serde_json::from_str(&links_json).unwrap_or_default();
 
             Ok(AlbumProfile {
@@ -1549,7 +1540,6 @@ pub fn get_all_album_profiles_conn(conn: &rusqlite::Connection) -> Result<Vec<Al
                 artist_key,
                 description,
                 website,
-                tags,
                 links,
             })
         })?
@@ -3045,7 +3035,6 @@ mod tests {
         assert_eq!(initial.artist_key, None);
         assert_eq!(initial.description, None);
         assert_eq!(initial.website, None);
-        assert!(initial.tags.is_empty());
         assert!(initial.links.is_empty());
 
         // Save album profile
@@ -3056,7 +3045,6 @@ mod tests {
                 "Iconic 1997 studio album recorded with producer Mutt Lange. [Wikipedia](https://en.wikipedia.org/wiki/Come_On_Over)".to_string(),
             ),
             website: Some("https://shaniatwain.com/music/come-on-over".to_string()),
-            tags: vec!["country pop".to_string(), "blockbuster".to_string()],
             links: vec![
                 AlbumLink {
                     platform: "bandcamp".to_string(),
@@ -3083,7 +3071,6 @@ mod tests {
             loaded.website,
             Some("https://shaniatwain.com/music/come-on-over".to_string())
         );
-        assert_eq!(loaded.tags, vec!["country pop", "blockbuster"]);
         assert_eq!(loaded.links.len(), 2);
         assert_eq!(loaded.links[0].platform, "bandcamp");
         assert_eq!(

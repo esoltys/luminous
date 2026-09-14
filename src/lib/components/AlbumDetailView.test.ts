@@ -190,24 +190,27 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     expect(metadataRow?.firstElementChild).toBe(headerYear);
   });
 
-  it("opens overflow menu with Edit album info and Open in Picard", async () => {
+  it("opens overflow menu with a single Edit Album Details entry and Open in Picard", async () => {
     picardStore.path = "/mock/picard";
-    const { getByTitle, getByText, queryByText } = render(AlbumDetailView, {
+    const { getByTitle, getByText, queryByText, getAllByText } = render(AlbumDetailView, {
       props: { albumName: mockAlbumName },
     });
 
     await new Promise((resolve) => setTimeout(resolve, 50));
 
-    expect(queryByText("Edit album info")).toBeNull();
     expect(queryByText("Open in Picard")).toBeNull();
 
     const moreBtn = getByTitle("More actions");
     await fireEvent.click(moreBtn);
     await new Promise((resolve) => setTimeout(resolve, 50));
 
-    const editItem = getByText("Edit album info");
+    // Regression test for #962: there used to be two near-identical "Edit
+    // Album..." entries here (one writing embedded genre, one writing a
+    // separate curated tag list) that silently disagreed with each other.
+    // Now there's exactly one.
+    const editItems = getAllByText("Edit Album Details");
+    expect(editItems.length).toBe(1);
     const picardItem = getByText("Open in Picard");
-    expect(editItem).toBeInTheDocument();
     expect(picardItem).toBeInTheDocument();
 
     await fireEvent.click(picardItem);

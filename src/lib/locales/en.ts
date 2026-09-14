@@ -1007,9 +1007,6 @@ export const en = {
     websitePlaceholder: "https://artist.com/album or www.artist.com/album",
     description: "Description & Liner Notes",
     descriptionPlaceholder: "Add album background, liner notes, recording details, or reviews (Markdown links supported e.g. [Review](https://...))...",
-    tags: "Album Tags",
-    tagInputPlaceholder: "Add an album tag and press Enter...",
-    addTagBtn: "Add",
     links: "Release & Source Links",
     addLinkBtn: "Add Link",
     noLinks: "No release links added yet. Click \"Add Link\" to attach Bandcamp, Discogs, reviews, or streaming links.",
@@ -1019,9 +1016,8 @@ export const en = {
     save: "Save",
     saving: "Saving...",
     cancel: "Cancel",
-    savedSuccess: "Album profile updated",
-    savedError: "Failed to save album profile",
-    removeTagTooltip: "Remove tag {tag}",
+    savedSuccess: "Album details updated",
+    savedError: "Failed to save album details",
     removeLinkTooltip: "Remove link"
   },
   albumDetail: {
