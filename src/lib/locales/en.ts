@@ -803,7 +803,8 @@ export const en = {
 
   chipInput: {
     removeItem: "Remove {value}",
-    dragToReorder: "Drag to reorder"
+    dragToReorder: "Drag to reorder",
+    add: "Add"
   },
   tagEditor: {
     title: "Edit Song Tags",
@@ -817,7 +818,7 @@ export const en = {
     originalYearTooltip: "Year of the original release, if this is a reissue or remaster",
     genreField: "Genre",
     genrePlaceholder: "Add a genre...",
-    genreTooltip: "Drag chips to reorder — the first value is treated as the main genre in the Genres tab, the rest as subgenres of it.",
+    genreTooltip: "The first value is treated as the main genre in the Genres tab, the rest as subgenres of it.",
     cancelBtn: "Cancel",
     saveBtn: "Save Tags",
     saveBtnShort: "Save",
@@ -825,6 +826,8 @@ export const en = {
     readingTags: "Reading tags...",
     readFailed: "Failed to read tags",
     locationField: "Location",
+    openFolderBtn: "Open Folder",
+    openFolderFailedPrefix: "Failed to open folder: ",
     remoteSourceNote: "This song is on a WebDAV server. Changes are saved in Luminous only — the file on the server won't be modified.",
     cueTrackNote: "This track's tags come from its CUE sheet, not the file itself, so they can't be edited here yet.",
     albumArtistField: "Album Artist",
@@ -851,13 +854,16 @@ export const en = {
   },
   albumTagEditor: {
     title: "Edit Album Tags",
+    locationField: "Location",
+    openFolderBtn: "Open Folder",
+    openFolderFailedPrefix: "Failed to open folder: ",
     remoteSourceNote: "This album is on a WebDAV server. Changes are saved in Luminous only — the files on the server won't be modified.",
     albumField: "Album Title",
     albumArtistField: "Album Artist",
     albumArtistPlaceholder: "Add an album artist...",
     genreField: "Genre",
     genrePlaceholder: "Add a genre...",
-    genreTooltip: "Drag chips to reorder — the first value is treated as the main genre in the Genres tab, the rest as subgenres of it.",
+    genreTooltip: "The first value is treated as the main genre in the Genres tab, the rest as subgenres of it.",
     compilationField: "Compilation (mark as Various Artists)",
     yearField: "Release Year",
     discField: "Disc #",
