@@ -217,6 +217,11 @@ impl DiscordManager {
     }
 
     /// Ensure an active handshake with the Discord IPC endpoint.
+    pub async fn connect(&mut self, client_id: &str) -> Result<(), String> {
+        self.ensure_connected(client_id).await
+    }
+
+    /// Ensure an active handshake with the Discord IPC endpoint.
     async fn ensure_connected(&mut self, client_id: &str) -> Result<(), String> {
         let trimmed_id = client_id.trim();
         let target_id = if trimmed_id.is_empty() {

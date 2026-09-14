@@ -241,11 +241,13 @@ class ScrobblerStore {
     }
   }
 
-  setDiscordEnabled(val: boolean) {
+  async setDiscordEnabled(val: boolean) {
     this.discordEnabled = val;
-    this.saveSettings();
+    await this.saveSettings();
     if (val) {
-      this.checkDiscordStatus();
+      await this.checkDiscordStatus();
+    } else {
+      this.discordStatus = "disconnected";
     }
   }
 

@@ -248,12 +248,20 @@ impl ScrobblerManager {
         let mut s = self.settings.lock().await;
         *s = new_settings.clone();
 
-        if !new_settings.discord_enabled || new_settings.scrobble_paused {
+        if new_settings.discord_enabled && !new_settings.scrobble_paused {
+            let discord = Arc::clone(&self.discord);
+            let client_id = new_settings.discord_client_id.clone();
+            tauri::async_runtime::spawn(async move {
+                let mut d = discord.lock().await;
+                let _ = d.connect(&client_id).await;
+            });
+        } else {
             let discord = Arc::clone(&self.discord);
             let client_id = new_settings.discord_client_id.clone();
             tauri::async_runtime::spawn(async move {
                 let mut d = discord.lock().await;
                 let _ = d.clear_activity(&client_id).await;
+                d.disconnect();
             });
         }
 
@@ -469,7 +477,7 @@ impl ScrobblerManager {
         let mut d = self.discord.lock().await;
         let settings = self.get_settings().await;
         if settings.discord_enabled && !settings.scrobble_paused && d.status() != crate::discord::DiscordStatus::Connected {
-            let _ = d.clear_activity(&settings.discord_client_id).await;
+            let _ = d.connect(&settings.discord_client_id).await;
         }
         d.status()
     }
