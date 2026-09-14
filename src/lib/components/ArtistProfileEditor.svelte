@@ -5,7 +5,6 @@
     TrashIcon as Trash2,
     GlobeIcon as Globe,
     LinkIcon,
-    UserIcon as User,
     MicrophoneStageIcon as Mic,
     FloppyDiskIcon as Save,
     CircleNotchIcon as LoaderCircle
@@ -18,26 +17,28 @@
   import { portal } from "../utils/portal";
   import SocialIcon from "./SocialIcon.svelte";
   import { SOCIAL_PLATFORMS, getPlatformInfo, type SocialPlatformInfo } from "../utils/artistSocials";
-  import { parseMultiValue } from "../utils/multiValue";
   import type { ArtistProfile, ArtistSocialLink } from "../types";
 
   let {
     artistName,
-    genre,
     isOpen = $bindable(false),
     onClose,
     onSaved,
   }: {
     artistName: string;
-    /** This artist's embedded (file) genre, `; `-delimited -- used only to
-        flag tags below that already duplicate a genre. */
-    genre?: string | null;
     isOpen?: boolean;
     onClose: () => void;
     onSaved?: (profile: ArtistProfile) => void;
   } = $props();
 
-  let genreNames = $derived(new Set(parseMultiValue(genre ?? "").map((g) => g.toLowerCase())));
+  // Flags a tag pill below that duplicates a genre *anywhere in the
+  // library*, not just this artist's own files -- matching the "Artist Only
+  // Tags" filter on the Genres page, since a name like "Electronic" is
+  // still a real genre even if this artist's own songs don't use it.
+  $effect(() => {
+    if (!tagsStore.loaded) tagsStore.load().catch((e) => console.error("Failed to load tags overview:", e));
+  });
+  let genreNames = $derived(new Set(tagsStore.allTags.map((t) => t.name.toLowerCase())));
 
   let website = $state("");
   let bio = $state("");
@@ -156,7 +157,7 @@
       <!-- Header -->
       <div class="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-brand-border bg-brand-sidebar/80 shrink-0">
         <div class="flex items-center gap-2.5 min-w-0 mr-2">
-          <User class="w-5 h-5 text-brand-accent shrink-0" />
+          <Mic class="w-5 h-5 text-brand-accent shrink-0" />
           <h2 id="artist-editor-title" class="text-base sm:text-lg font-bold text-brand-text-primary truncate">
             {i18n.t("artistProfileEditor.title", {}, "Edit Artist Details")}: <span class="text-brand-text-primary font-semibold">{artistName}</span>
           </h2>
@@ -205,7 +206,9 @@
                   class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-brand-accent/15 text-brand-text-primary border border-brand-accent/25"
                   title={isGenreDupe ? i18n.t("artistProfileEditor.tagDupesGenreTooltip", { tag }, `"${tag}" is already a genre tag -- no need to add it here`) : undefined}
                 >
-                  <Mic class="w-3 h-3 shrink-0 opacity-70" />
+                  {#if !isGenreDupe}
+                    <Mic class="w-3 h-3 shrink-0 opacity-70" />
+                  {/if}
                   <span class={isGenreDupe ? "line-through opacity-60" : ""}>{tag}</span>
                   <button
                     type="button"

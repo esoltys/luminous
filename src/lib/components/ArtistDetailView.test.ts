@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/svelte";
+import { render, screen, fireEvent, waitFor } from "@testing-library/svelte";
 import ArtistDetailView from "./ArtistDetailView.svelte";
 import { collectionStore } from "../stores/collection.svelte";
 import { navigationStore } from "../stores/navigation.svelte";
@@ -168,6 +168,16 @@ describe("ArtistDetailView", () => {
       if (cmd === "get_artist_profile") {
         return Promise.resolve(collectionStore.artistProfiles["shania twain"]);
       }
+      if (cmd === "get_tags_overview") {
+        // "Canadian" is a real genre elsewhere in the library, even though
+        // it isn't part of the mocked getter above -- the filter checks
+        // against every genre in the library, not just this artist's songs.
+        return Promise.resolve({
+          tags: [{ name: "Country", song_count: 1 }, { name: "Pop", song_count: 1 }, { name: "Canadian", song_count: 5 }],
+          graph: [],
+          no_genre_count: 0,
+        });
+      }
       return Promise.resolve();
     });
 
@@ -176,8 +186,11 @@ describe("ArtistDetailView", () => {
     // "Country Pop" isn't an embedded genre, so it's artist-only and shown.
     expect(await screen.findByTitle('Filter artists tagged "Country Pop"')).toBeTruthy();
 
-    // "Canadian" duplicates an embedded genre, so it's excluded from the header.
-    expect(screen.queryByTitle('Filter artists tagged "Canadian"')).toBeNull();
+    // "Canadian" duplicates a genre elsewhere in the library, so it's
+    // excluded from the header once the global tag list has loaded.
+    await waitFor(() => {
+      expect(screen.queryByTitle('Filter artists tagged "Canadian"')).toBeNull();
+    });
 
     // Embedded file genres never render here -- that's the Genres page's job.
     expect(screen.queryByTitle("Browse Country")).toBeNull();

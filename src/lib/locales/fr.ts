@@ -1017,7 +1017,7 @@ export const fr = {
     websitePlaceholder: "https://www.artiste.com ou www.artiste.com",
     bio: "À propos / Biographie",
     bioPlaceholder: "Ajouter une biographie ou des notes pour cet artiste...",
-    tags: "Tags",
+    tags: "Tags exclusifs à l'artiste",
     tagsNote: "Ajoutez des tags pour ce que le genre ne couvre pas déjà — non écrit dans vos fichiers.",
     tagDupesGenreTooltip: "« {tag} » est déjà un tag de genre — inutile de l'ajouter ici",
     tagInputPlaceholder: "Ajouter un tag et appuyer sur Entrée...",

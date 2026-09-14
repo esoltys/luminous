@@ -353,12 +353,15 @@
   let rawGenre = $derived(deriveArtistGenres(songs));
   // Header shows curated artist tags only, not the file-embedded genre --
   // that's already covered by the Genres page and every album/song beneath
-  // this artist, so repeating it here is just noise. A tag that also exists
-  // as an embedded genre is excluded since it isn't "artist only" anymore.
+  // this artist, so repeating it here is just noise. A tag is excluded if
+  // it duplicates any genre *anywhere in the library* (not just this
+  // artist's own songs) -- matching the "Artist Only Tags" filter on the
+  // Genres page -- since a name like "Electronic" is still a real genre
+  // even if this particular artist's own files don't happen to use it.
   let artistOnlyTags = $derived.by(() => {
     const tags = artistProfile?.tags;
     if (!tags?.length) return tags;
-    const genreNames = new Set(parseMultiValue(rawGenre).map((g) => g.toLowerCase()));
+    const genreNames = new Set(tagsStore.allTags.map((t) => t.name.toLowerCase()));
     return tags.filter((t) => !genreNames.has(t.trim().toLowerCase()));
   });
   let hasChips = $derived((artistOnlyTags?.length ?? 0) > 0);
@@ -896,7 +899,6 @@
 
 <ArtistProfileEditor
   {artistName}
-  genre={rawGenre}
   isOpen={isEditorOpen}
   onClose={() => { isEditorOpen = false; }}
 />

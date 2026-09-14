@@ -983,7 +983,7 @@ export const en = {
     websitePlaceholder: "https://www.artist.com or www.artist.com",
     bio: "About / Biography",
     bioPlaceholder: "Add a bio or background notes for this artist...",
-    tags: "Tags",
+    tags: "Artist Only Tags",
     tagsNote: "Add tags for anything genre doesn't already cover — not written to your files.",
     tagDupesGenreTooltip: "\"{tag}\" is already a genre tag — no need to add it here",
     tagInputPlaceholder: "Add a tag and press Enter...",
