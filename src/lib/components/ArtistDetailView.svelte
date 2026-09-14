@@ -598,18 +598,18 @@
       <details
         open={windowLayoutStore.isOverviewExpanded}
         ontoggle={(e) => windowLayoutStore.setOverviewExpanded(e.currentTarget.open)}
-        class="group border border-brand-border rounded-xl bg-brand-sidebar/40 backdrop-blur-md overflow-hidden shadow-xs transition-all"
+        class="group border border-brand-border rounded-xl bg-brand-sidebar/40 backdrop-blur-md overflow-hidden shadow-xs transition-all @container"
       >
         <summary class="flex items-center justify-between px-4 py-2.5 sm:px-5 sm:py-3 text-xs font-semibold text-brand-text-secondary cursor-pointer select-none hover:text-brand-text-primary transition-colors">
           <span>{i18n.t('artistDetail.overview', {}, 'Overview')}</span>
           <CaretDown class="w-3.5 h-3.5 text-brand-text-secondary/70 group-open:rotate-180 transition-transform" />
         </summary>
-        <div class="p-4 sm:p-5 md:p-6 border-t border-brand-border/60 flex flex-col md:flex-row gap-5 md:gap-6 justify-between">
+        <div class="p-4 sm:p-5 md:p-6 border-t border-brand-border/60 flex flex-col @2xl:flex-row gap-5 md:gap-6 justify-between">
           <!-- About Column (Left) -->
-          <div class="flex-1 flex flex-col gap-3 min-w-0">
-            <!-- Bio -->
-            {#if hasBio}
-              {@const bioText = effectiveBio ?? ""}
+          {#if hasBio}
+            {@const bioText = effectiveBio ?? ""}
+            <div class="flex-1 flex flex-col gap-3 min-w-0">
+              <!-- Bio -->
               <div class="text-xs text-brand-text-secondary leading-relaxed">
                 {#if bioIsFromWikipedia}
                   <button
@@ -626,15 +626,17 @@
                   disableClamp={true}
                 />
               </div>
-            {/if}
-          </div>
+            </div>
+          {/if}
 
-          <!-- Links Column (Right) -->
+          <!-- Links Column (Right or Below) -->
           {#if hasWebsite || hasSocials}
             <div
-              class="md:w-60 lg:w-72 shrink-0 border-t border-brand-border/40 pt-4 md:border-t-0 md:border-l md:border-brand-border/60 md:pt-0 md:pl-6 flex flex-col gap-3"
+              class={hasBio
+                ? "@2xl:w-60 @3xl:w-72 shrink-0 border-t border-brand-border/40 pt-4 @2xl:border-t-0 @2xl:border-l @2xl:border-brand-border/60 @2xl:pt-0 @2xl:pl-6 flex flex-col gap-3"
+                : "w-full flex flex-col gap-3"}
             >
-              <div class="grid grid-cols-1 sm:grid-cols-2 md:flex md:flex-col gap-2.5">
+              <div class="grid grid-cols-1 @sm:grid-cols-2 {hasBio ? '@2xl:flex @2xl:flex-col' : '@md:grid-cols-3 @xl:grid-cols-4'} gap-2.5">
                 <!-- Primary Website Link -->
                 {#if hasWebsite}
                   {@const siteUrl = resolveSocialUrl("website", profile?.website ?? "")}
