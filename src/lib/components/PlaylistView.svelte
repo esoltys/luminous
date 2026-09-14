@@ -50,7 +50,6 @@
   import PlaylistContextMenu from "./PlaylistContextMenu.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import Modal from "./Modal.svelte";
-  import ColumnSelector from "./ColumnSelector.svelte";
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
   import IconActionButton from "./IconActionButton.svelte";
@@ -782,7 +781,6 @@
                 {/snippet}
               </IconActionButton>
             {/if}
-            <ColumnSelector align="left" iconOnly />
           </div>
 
           {#if !windowLayoutStore.isDetailHeaderCollapsed}

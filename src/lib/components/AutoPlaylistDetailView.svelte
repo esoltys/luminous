@@ -18,7 +18,6 @@
   import SongSelectionToolbar from "./SongSelectionToolbar.svelte";
   import PlayShuffleButtons from "./PlayShuffleButtons.svelte";
   import IconActionButton from "./IconActionButton.svelte";
-  import ColumnSelector from "./ColumnSelector.svelte";
   import Input from "./Input.svelte";
   import ContextMenu from "./ContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
@@ -652,7 +651,6 @@
               {/if}
             {/snippet}
           </IconActionButton>
-          <ColumnSelector align="left" iconOnly />
         </div>
 
         <div class="flex flex-wrap items-center gap-2.5 mt-2.5 select-none relative z-40">

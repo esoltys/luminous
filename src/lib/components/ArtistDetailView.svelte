@@ -18,7 +18,6 @@
   import SongContextMenu from "./SongContextMenu.svelte";
   import { tagsStore } from "../stores/tags.svelte";
   import TagEditor from "./TagEditor.svelte";
-  import ColumnSelector from "./ColumnSelector.svelte";
   import IconActionButton from "./IconActionButton.svelte";
   import HorizontalScrollRow from "./HorizontalScrollRow.svelte";
   import PlayShuffleButtons from "./PlayShuffleButtons.svelte";
@@ -546,9 +545,6 @@
               {/if}
             {/snippet}
           </IconActionButton>
-          {#if singleSongs.length > 0}
-            <ColumnSelector align="left" iconOnly />
-          {/if}
           <button
             onclick={toggleOverflowMenu}
             title={i18n.t("playlists.moreActionsTooltip", {}, "More actions")}
