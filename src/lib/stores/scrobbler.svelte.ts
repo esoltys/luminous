@@ -1,6 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
+type DiscordStatus = "connected" | "disconnected" | "not_running";
+
+export const DEFAULT_DISCORD_CLIENT_ID = "1548913001715990610";
+
 interface ScrobblerSettings {
   listenbrainz_enabled: boolean;
   listenbrainz_token: string;
@@ -9,6 +13,10 @@ interface ScrobblerSettings {
   scrobble_ratings: boolean;
   scrobble_paused: boolean;
   min_duration_secs: number;
+  discord_enabled: boolean;
+  discord_client_id: string;
+  discord_show_album: boolean;
+  discord_show_time: boolean;
 }
 
 interface ScrobbleCacheStatus {
@@ -32,6 +40,14 @@ class ScrobblerStore {
   ratingsEnabled = $state(true);
   paused = $state(false);
   minDurationSecs = $state(30);
+
+  // Discord Rich Presence state (#958)
+  discordEnabled = $state(false);
+  discordClientId = $state(DEFAULT_DISCORD_CLIENT_ID);
+  discordShowAlbum = $state(true);
+  discordShowTime = $state(true);
+  discordStatus = $state<DiscordStatus>("disconnected");
+  isCheckingDiscord = $state(false);
 
   pendingCount = $state(0);
   lastError = $state<string | null>(null);
@@ -60,6 +76,10 @@ class ScrobblerStore {
       this.ratingsEnabled = settings.scrobble_ratings;
       this.paused = settings.scrobble_paused;
       this.minDurationSecs = settings.min_duration_secs;
+      this.discordEnabled = settings.discord_enabled;
+      this.discordClientId = settings.discord_client_id || DEFAULT_DISCORD_CLIENT_ID;
+      this.discordShowAlbum = settings.discord_show_album;
+      this.discordShowTime = settings.discord_show_time;
     } catch (e) {
       console.error("Failed to load scrobbler settings:", e);
     }
@@ -74,12 +94,19 @@ class ScrobblerStore {
         this.ratingsEnabled = s.scrobble_ratings;
         this.paused = s.scrobble_paused;
         this.minDurationSecs = s.min_duration_secs;
+        this.discordEnabled = s.discord_enabled;
+        this.discordClientId = s.discord_client_id || DEFAULT_DISCORD_CLIENT_ID;
+        this.discordShowAlbum = s.discord_show_album;
+        this.discordShowTime = s.discord_show_time;
       });
     } catch (e) {
       console.error("Failed to register scrobbler-settings-changed listener:", e);
     }
 
     await this.refreshCacheStatus();
+    if (this.discordEnabled) {
+      await this.checkDiscordStatus();
+    }
   }
 
   async saveSettings() {
@@ -91,6 +118,10 @@ class ScrobblerStore {
       scrobble_ratings: this.ratingsEnabled,
       scrobble_paused: this.paused,
       min_duration_secs: this.minDurationSecs,
+      discord_enabled: this.discordEnabled,
+      discord_client_id: this.discordClientId,
+      discord_show_album: this.discordShowAlbum,
+      discord_show_time: this.discordShowTime,
     };
 
     try {
@@ -195,6 +226,48 @@ class ScrobblerStore {
 
   setPaused(val: boolean) {
     this.paused = val;
+    this.saveSettings();
+  }
+
+  async checkDiscordStatus() {
+    this.isCheckingDiscord = true;
+    try {
+      this.discordStatus = await invoke<DiscordStatus>("get_discord_status");
+    } catch (e) {
+      console.error("Failed to check Discord status:", e);
+      this.discordStatus = "disconnected";
+    } finally {
+      this.isCheckingDiscord = false;
+    }
+  }
+
+  async setDiscordEnabled(val: boolean) {
+    this.discordEnabled = val;
+    await this.saveSettings();
+    if (val) {
+      await this.checkDiscordStatus();
+    } else {
+      this.discordStatus = "disconnected";
+    }
+  }
+
+  setDiscordClientId(val: string) {
+    this.discordClientId = val;
+    this.saveSettings();
+  }
+
+  setDiscordShowAlbum(val: boolean) {
+    this.discordShowAlbum = val;
+    this.saveSettings();
+  }
+
+  setDiscordShowTime(val: boolean) {
+    this.discordShowTime = val;
+    this.saveSettings();
+  }
+
+  resetDiscordClientId() {
+    this.discordClientId = DEFAULT_DISCORD_CLIENT_ID;
     this.saveSettings();
   }
 }
