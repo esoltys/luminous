@@ -14,9 +14,9 @@ function diffDaysFromNow(timestampSec: number): number {
 }
 
 // Today / Yesterday / "N days ago" through 6 days, then falls back to the
-// absolute date — used for the Date Added column, where older entries read
-// better as a real date than as "3 weeks ago". Today's entries drill down
-// further into minutes/hours ago rather than just reading "Today".
+// absolute date — used for the Date Added and Last Played columns, where older
+// entries read better as a real date than as "3 weeks ago". Today's entries drill
+// down further into minutes/hours ago rather than just reading "Today".
 export function formatDateAdded(timestampSec: number | undefined | null): string {
   if (!timestampSec) return "—";
   const diffDays = diffDaysFromNow(timestampSec);

@@ -58,7 +58,7 @@
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
   import { portal } from "../utils/portal";
-  import { formatSampleRate, formatBitDepth, formatChannels, formatFileSize, formatDate, formatDuration } from "../utils/formatters";
+  import { formatSampleRate, formatBitDepth, formatChannels, formatFileSize, formatDuration } from "../utils/formatters";
   import { formatDateAdded } from "../utils/date";
   import { CONTEXT_MENU_WIDTH_PX } from "../constants";
   import { compareSongs } from "../utils/songSort";
@@ -274,7 +274,7 @@
     if (vc.rating) values.push(song.rating);
     if (vc.playcount) values.push(song.playcount);
     if (vc.skipcount) values.push(song.skipcount);
-    if (vc.lastplayed) values.push(formatDate(song.lastplayed));
+    if (vc.lastplayed) values.push(formatDateAdded(song.lastplayed));
     if (vc.added) values.push(formatDateAdded(song.added));
     if (vc.duration) values.push(formatDuration(song.length_nanosec));
     if (vc.path) values.push(song.path);

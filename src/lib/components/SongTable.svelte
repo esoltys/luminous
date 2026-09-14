@@ -21,7 +21,7 @@
   import { navigationStore } from "../stores/navigation.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { i18n } from "../stores/i18n.svelte";
-  import { formatDate, formatFileSize, formatSampleRate, formatBitDepth, formatChannels, formatDuration } from "../utils/formatters";
+  import { formatFileSize, formatSampleRate, formatBitDepth, formatChannels, formatDuration } from "../utils/formatters";
   import { formatDateAdded } from "../utils/date";
   import { formatTrackNumber } from "../utils/artist";
   import { parseMultiValue } from "../utils/multiValue";
@@ -552,7 +552,7 @@
     </div>
   {:else if col.key === "lastplayed"}
     <div class="text-center {secondaryColor(song)} text-xs whitespace-nowrap">
-      {formatDate(song.lastplayed)}
+      {formatDateAdded(song.lastplayed)}
     </div>
   {:else if col.key === "added"}
     <div class="text-center {secondaryColor(song)} text-xs whitespace-nowrap">
