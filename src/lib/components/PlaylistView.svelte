@@ -1031,19 +1031,21 @@
           <span>{i18n.t("playlists.useAbsolutePaths")}</span>
         </label>
       </div>
-      <div class="flex justify-end gap-2 pt-2">
-        <button
+      <div class="flex justify-end gap-3 pt-2">
+        <Button
           onclick={() => { showExportOptionsModal = false; }}
-          class="px-3 py-1.5 rounded text-xs font-medium text-brand-text-secondary hover:bg-brand-main transition-colors"
+          variant="secondary"
+          size="sm"
         >
           {i18n.t("playlists.cancelBtn")}
-        </button>
-        <button
+        </Button>
+        <Button
           onclick={triggerExport}
-          class="px-3 py-1.5 rounded text-xs font-medium bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast transition-colors"
+          variant="primary"
+          size="sm"
         >
           {i18n.t("playlists.exportBtn")}
-        </button>
+        </Button>
       </div>
     </div>
   </div>
@@ -1063,7 +1065,7 @@
 
     <form onsubmit={(e) => { e.preventDefault(); confirmSaveQueueAsCustomPlaylist(); }} class="flex flex-col gap-4 p-6 bg-brand-sidebar">
       <div class="flex flex-col gap-1.5">
-        <label for="save-queue-name-input" class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider">
+        <label for="save-queue-name-input" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
           {i18n.t("playlists.saveQueueNameLabel", {}, "Playlist Name")}
         </label>
         <Input
