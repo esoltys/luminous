@@ -32,7 +32,6 @@
   import AlbumRowCard from "./AlbumRowCard.svelte";
   import ArtistRowCard from "./ArtistRowCard.svelte";
   import Select from "./Select.svelte";
-  import ColumnSelector from "./ColumnSelector.svelte";
   import LibraryWelcome from "./LibraryWelcome.svelte";
   import SearchEmptyState from "./SearchEmptyState.svelte";
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
@@ -354,7 +353,6 @@
         </div>
 
         <div class="flex items-center gap-2">
-          <ColumnSelector align="right" iconOnly />
           <div class="relative">
             <Select
               value={`${sortField}-${sortAsc}`}

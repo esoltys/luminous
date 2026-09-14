@@ -22,7 +22,6 @@
   import PlayShuffleButtons from "./PlayShuffleButtons.svelte";
   import IconActionButton from "./IconActionButton.svelte";
   import LinkButton from "./LinkButton.svelte";
-  import ColumnSelector from "./ColumnSelector.svelte";
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
   import ContextMenu from "./ContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
@@ -542,7 +541,6 @@
           >
             {#snippet icon()}<Share class="w-4 h-4" />{/snippet}
           </IconActionButton>
-          <ColumnSelector align="left" iconOnly />
           <button
             onclick={toggleOverflowMenu}
             title={i18n.t("playlists.moreActionsTooltip", {}, "More actions")}
