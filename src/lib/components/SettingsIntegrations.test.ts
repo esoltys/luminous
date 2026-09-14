@@ -16,7 +16,14 @@ vi.mock("@tauri-apps/api/core", () => ({
         scrobble_ratings: true,
         scrobble_paused: false,
         min_duration_secs: 30,
+        discord_enabled: false,
+        discord_client_id: "1349887723725590558",
+        discord_show_album: true,
+        discord_show_time: true,
       });
+    }
+    if (cmd === "get_discord_status") {
+      return Promise.resolve("connected");
     }
     if (cmd === "get_scrobble_cache_status") {
       return Promise.resolve({
@@ -44,12 +51,30 @@ describe("SettingsIntegrations.svelte", () => {
     vi.clearAllMocks();
   });
 
-  it("renders all three integration cards: Online Data Sources, ListenBrainz, and Picard", async () => {
+  it("renders all integration cards: Online Data Sources, ListenBrainz, Discord, and Picard", async () => {
     const { findByText, findByRole } = render(SettingsIntegrations);
 
     expect(await findByText("Online Data Sources")).toBeInTheDocument();
     expect(await findByText("ListenBrainz Scrobbler")).toBeInTheDocument();
+    expect(await findByRole("heading", { name: "Discord Rich Presence" })).toBeInTheDocument();
     expect(await findByRole("heading", { name: "MusicBrainz Picard" })).toBeInTheDocument();
+  });
+
+  it("toggles Discord Rich Presence and shows sub-options when enabled", async () => {
+    scrobblerStore.discordEnabled = false;
+
+    const { getByLabelText, findByText } = render(SettingsIntegrations);
+
+    const toggle = getByLabelText("Enable Discord Rich Presence");
+    expect(toggle).toBeInTheDocument();
+    expect(toggle).not.toBeChecked();
+
+    await fireEvent.click(toggle);
+    await tick();
+
+    expect(scrobblerStore.discordEnabled).toBe(true);
+    expect(await findByText("Show album name")).toBeInTheDocument();
+    expect(await findByText("Show elapsed and remaining time")).toBeInTheDocument();
   });
 
   it("hides Enable toggle until user token is validated, then enables scrobbling", async () => {

@@ -107,4 +107,34 @@ describe("scrobblerStore", () => {
     expect(scrobblerStore.syncFavouritesResult?.skipped_no_mbid).toBe(2);
     expect(scrobblerStore.syncFavouritesError).toBeNull();
   });
+
+  it("updates discord settings and checks status", async () => {
+    vi.mocked(invoke).mockImplementation((cmd: string) => {
+      if (cmd === "set_scrobbler_settings") {
+        return Promise.resolve(null);
+      }
+      if (cmd === "get_discord_status") {
+        return Promise.resolve("connected");
+      }
+      return Promise.resolve(null);
+    });
+
+    scrobblerStore.setDiscordEnabled(true);
+    expect(scrobblerStore.discordEnabled).toBe(true);
+
+    await scrobblerStore.checkDiscordStatus();
+    expect(scrobblerStore.discordStatus).toBe("connected");
+
+    scrobblerStore.setDiscordShowAlbum(false);
+    expect(scrobblerStore.discordShowAlbum).toBe(false);
+
+    scrobblerStore.setDiscordShowTime(false);
+    expect(scrobblerStore.discordShowTime).toBe(false);
+
+    scrobblerStore.setDiscordClientId("999888777");
+    expect(scrobblerStore.discordClientId).toBe("999888777");
+
+    scrobblerStore.resetDiscordClientId();
+    expect(scrobblerStore.discordClientId).toBe("1349887723725590558");
+  });
 });

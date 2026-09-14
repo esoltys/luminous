@@ -1214,6 +1214,23 @@ export const fr = {
     syncingFavouritesBtn: "Synchronisation...",
     syncFavouritesSuccess: "{synced} sur {total} favori(s) synchronisé(s) ({skipped} ignoré(s) sans identifiant MusicBrainz)"
   },
+  discord: {
+    integrationTitle: "Discord Rich Presence",
+    integrationDesc: "affiche le morceau en cours de lecture et votre statut d'écoute directement sur votre profil Discord via communication inter-processus locale (IPC).",
+    enableLabel: "Activer Discord Rich Presence",
+    enableHint: "Diffuser le morceau en cours et la progression de lecture sur Discord",
+    statusConnected: "Connecté à Discord",
+    statusDisconnected: "Déconnecté",
+    statusNotRunning: "Application de bureau Discord non détectée",
+    showAlbumLabel: "Afficher le nom de l'album",
+    showAlbumHint: "Inclure le titre de l'album avec l'artiste dans votre activité",
+    showTimeLabel: "Afficher le temps écoulé et restant",
+    showTimeHint: "Afficher une barre de progression en temps réel sur Discord",
+    recheckTooltip: "Vérifier la connexion à Discord",
+    customClientIdLabel: "Identifiant client d'application personnalisé (facultatif)",
+    customClientIdPlaceholder: "Saisir un identifiant d'application Discord",
+    resetClientIdBtn: "Rétablir la valeur par défaut"
+  },
   smartPlaylistBuilder: {
     fallbackName: "Liste intelligente",
     yearPrefixPre: "Avant {value}",

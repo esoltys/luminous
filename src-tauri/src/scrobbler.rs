@@ -27,6 +27,11 @@ pub struct ScrobblerSettings {
     pub scrobble_ratings: bool,
     pub scrobble_paused: bool,
     pub min_duration_secs: u32,
+    // Discord Rich Presence settings (#958)
+    pub discord_enabled: bool,
+    pub discord_client_id: String,
+    pub discord_show_album: bool,
+    pub discord_show_time: bool,
 }
 
 impl Default for ScrobblerSettings {
@@ -39,6 +44,10 @@ impl Default for ScrobblerSettings {
             scrobble_ratings: true,
             scrobble_paused: false,
             min_duration_secs: 30,
+            discord_enabled: false,
+            discord_client_id: crate::discord::DEFAULT_DISCORD_CLIENT_ID.to_string(),
+            discord_show_album: true,
+            discord_show_time: true,
         }
     }
 }
@@ -138,12 +147,13 @@ struct FeedbackRequest {
     score: i32,
 }
 
-/// Central manager orchestrating ListenBrainz API calls and the offline cache.
+/// Central manager orchestrating ListenBrainz API calls, offline cache, and Discord Rich Presence.
 pub struct ScrobblerManager {
     db: Arc<Database>,
     client: Client,
     settings: Arc<Mutex<ScrobblerSettings>>,
     paused: Arc<std::sync::atomic::AtomicBool>,
+    discord: Arc<Mutex<crate::discord::DiscordManager>>,
 }
 
 impl ScrobblerManager {
@@ -156,12 +166,14 @@ impl ScrobblerManager {
 
         let initial_settings = Self::load_settings_from_db(&db);
         let paused = Arc::new(std::sync::atomic::AtomicBool::new(initial_settings.scrobble_paused));
+        let discord = Arc::new(Mutex::new(crate::discord::DiscordManager::new()));
 
         Self {
             db,
             client,
             settings: Arc::new(Mutex::new(initial_settings)),
             paused,
+            discord,
         }
     }
 
@@ -170,7 +182,7 @@ impl ScrobblerManager {
         let mut settings = ScrobblerSettings::default();
         if let Ok(conn) = db.pool.get() {
             let mut stmt = conn
-                .prepare("SELECT key, value FROM app_state WHERE key LIKE 'scrobbler_%' OR key LIKE 'listenbrainz_%'")
+                .prepare("SELECT key, value FROM app_state WHERE key LIKE 'scrobbler_%' OR key LIKE 'listenbrainz_%' OR key LIKE 'discord_%'")
                 .ok();
             if let Some(mut stmt) = stmt.take() {
                 let rows = stmt
@@ -192,6 +204,14 @@ impl ScrobblerManager {
                                     settings.min_duration_secs = n;
                                 }
                             }
+                            "discord_enabled" => settings.discord_enabled = v == "true" || v == "1",
+                            "discord_client_id" => {
+                                if !v.trim().is_empty() {
+                                    settings.discord_client_id = v;
+                                }
+                            }
+                            "discord_show_album" => settings.discord_show_album = v != "false" && v != "0",
+                            "discord_show_time" => settings.discord_show_time = v != "false" && v != "0",
                             _ => {}
                         }
                     }
@@ -212,6 +232,10 @@ impl ScrobblerManager {
                 ("scrobbler_ratings", new_settings.scrobble_ratings.to_string()),
                 ("scrobbler_paused", new_settings.scrobble_paused.to_string()),
                 ("scrobbler_min_duration_secs", new_settings.min_duration_secs.to_string()),
+                ("discord_enabled", new_settings.discord_enabled.to_string()),
+                ("discord_client_id", new_settings.discord_client_id.clone()),
+                ("discord_show_album", new_settings.discord_show_album.to_string()),
+                ("discord_show_time", new_settings.discord_show_time.to_string()),
             ];
             for (k, v) in pairs {
                 let _ = conn.execute(
@@ -222,7 +246,17 @@ impl ScrobblerManager {
         }
         self.paused.store(new_settings.scrobble_paused, std::sync::atomic::Ordering::Relaxed);
         let mut s = self.settings.lock().await;
-        *s = new_settings;
+        *s = new_settings.clone();
+
+        if !new_settings.discord_enabled || new_settings.scrobble_paused {
+            let discord = Arc::clone(&self.discord);
+            let client_id = new_settings.discord_client_id.clone();
+            tauri::async_runtime::spawn(async move {
+                let mut d = discord.lock().await;
+                let _ = d.clear_activity(&client_id).await;
+            });
+        }
+
         Ok(())
     }
 
@@ -235,6 +269,9 @@ impl ScrobblerManager {
         s.scrobble_paused = !s.scrobble_paused;
         let new_paused = s.scrobble_paused;
         let _ = self.save_settings(s).await;
+        if new_paused {
+            self.clear_discord().await;
+        }
         new_paused
     }
 
@@ -291,6 +328,150 @@ impl ScrobblerManager {
         }
 
         Ok(username)
+    }
+
+    /// Update or clear Discord Rich Presence based on playback state.
+    pub async fn update_discord(
+        &self,
+        song: Option<&Song>,
+        is_playing: bool,
+        position_nanosec: i64,
+    ) {
+        let settings = self.get_settings().await;
+        if !settings.discord_enabled || settings.scrobble_paused {
+            let discord = Arc::clone(&self.discord);
+            let client_id = settings.discord_client_id.clone();
+            tauri::async_runtime::spawn(async move {
+                let mut d = discord.lock().await;
+                let _ = d.clear_activity(&client_id).await;
+            });
+            return;
+        }
+
+        let song = match song {
+            Some(s) => s,
+            None => {
+                let discord = Arc::clone(&self.discord);
+                let client_id = settings.discord_client_id.clone();
+                tauri::async_runtime::spawn(async move {
+                    let mut d = discord.lock().await;
+                    let _ = d.clear_activity(&client_id).await;
+                });
+                return;
+            }
+        };
+
+        let artist = song.artist.as_deref().unwrap_or("Unknown Artist");
+        let title = song.title.as_deref().unwrap_or("Unknown Track");
+        let album = song.album.as_deref();
+
+        let state_str = if is_playing {
+            if settings.discord_show_album {
+                if let Some(alb) = album {
+                    if !alb.trim().is_empty() {
+                        format!("by {} • {}", artist, alb)
+                    } else {
+                        format!("by {}", artist)
+                    }
+                } else {
+                    format!("by {}", artist)
+                }
+            } else {
+                format!("by {}", artist)
+            }
+        } else {
+            // Paused state (Option A)
+            format!("by {} (Paused)", artist)
+        };
+
+        let timestamps = if is_playing && settings.discord_show_time {
+            let now = chrono::Utc::now().timestamp() as u64;
+            let pos_secs = (position_nanosec.max(0) as u64) / 1_000_000_000;
+            let start = now.saturating_sub(pos_secs);
+            let end = song
+                .length_nanosec
+                .filter(|&ns| ns > 0)
+                .map(|ns| start + ((ns as u64) / 1_000_000_000));
+            Some(crate::discord::DiscordTimestamps {
+                start: Some(start),
+                end,
+            })
+        } else {
+            None
+        };
+
+        let large_text = if let Some(alb) = album {
+            if !alb.trim().is_empty() {
+                crate::discord::truncate_activity_str(alb)
+            } else {
+                "Luminous Music Player".into()
+            }
+        } else {
+            "Luminous Music Player".into()
+        };
+
+        let (small_image, small_text) = if is_playing {
+            (Some("play".into()), Some("Playing".into()))
+        } else {
+            (Some("pause".into()), Some("Paused".into()))
+        };
+
+        let activity = crate::discord::DiscordActivity {
+            details: Some(crate::discord::truncate_activity_str(title)),
+            state: Some(crate::discord::truncate_activity_str(&state_str)),
+            timestamps,
+            assets: Some(crate::discord::DiscordAssets {
+                large_image: Some("luminous_logo".into()),
+                large_text: Some(large_text),
+                small_image,
+                small_text,
+            }),
+        };
+
+        let discord = Arc::clone(&self.discord);
+        let client_id = settings.discord_client_id.clone();
+        tauri::async_runtime::spawn(async move {
+            let mut d = discord.lock().await;
+            if let Err(e) = d.set_activity(&client_id, Some(activity)).await {
+                log::debug!("Discord presence update: {e}");
+            }
+        });
+    }
+
+    /// Clear Discord Rich Presence activity.
+    pub async fn clear_discord(&self) {
+        let settings = self.get_settings().await;
+        let discord = Arc::clone(&self.discord);
+        let client_id = settings.discord_client_id.clone();
+        tauri::async_runtime::spawn(async move {
+            let mut d = discord.lock().await;
+            let _ = d.clear_activity(&client_id).await;
+        });
+    }
+
+    /// Called when playback state changes between playing and paused.
+    pub async fn on_playback_state_changed(
+        &self,
+        song: Option<&Song>,
+        is_playing: bool,
+        position_nanosec: i64,
+    ) {
+        self.update_discord(song, is_playing, position_nanosec).await;
+    }
+
+    /// Called when playback has completely stopped.
+    pub async fn on_playback_stopped(&self) {
+        self.clear_discord().await;
+    }
+
+    /// Query the current Discord connection status.
+    pub async fn get_discord_status(&self) -> crate::discord::DiscordStatus {
+        let mut d = self.discord.lock().await;
+        let settings = self.get_settings().await;
+        if settings.discord_enabled && !settings.scrobble_paused && d.status() != crate::discord::DiscordStatus::Connected {
+            let _ = d.clear_activity(&settings.discord_client_id).await;
+        }
+        d.status()
     }
 
     /// Submit a "Playing Now" listen to ListenBrainz when track playback starts.
@@ -815,5 +996,24 @@ mod tests {
         let parsed_invalid: ValidateTokenResponse = serde_json::from_str(json_invalid).unwrap();
         assert!(!parsed_invalid.valid);
         assert_eq!(parsed_invalid.user_name, None);
+    }
+
+    #[test]
+    fn test_discord_settings_defaults_and_serialization() {
+        let settings = ScrobblerSettings::default();
+        assert!(!settings.discord_enabled);
+        assert_eq!(settings.discord_client_id, crate::discord::DEFAULT_DISCORD_CLIENT_ID);
+        assert!(settings.discord_show_album);
+        assert!(settings.discord_show_time);
+
+        let json = serde_json::to_string(&settings).unwrap();
+        assert!(json.contains("\"discord_enabled\":false"));
+        assert!(json.contains("\"discord_show_album\":true"));
+        assert!(json.contains("\"discord_show_time\":true"));
+        assert!(json.contains(&format!("\"discord_client_id\":\"{}\"", crate::discord::DEFAULT_DISCORD_CLIENT_ID)));
+
+        let deserialized: ScrobblerSettings = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.discord_enabled, settings.discord_enabled);
+        assert_eq!(deserialized.discord_client_id, settings.discord_client_id);
     }
 }

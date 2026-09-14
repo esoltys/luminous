@@ -19,6 +19,7 @@ pub mod context;
 pub mod covermanager;
 pub mod cue;
 pub mod db;
+pub mod discord;
 pub mod dr_parser;
 pub mod equalizer;
 pub mod filter_parser;
@@ -377,9 +378,14 @@ fn spawn_audio_event_loop(
                     match event {
                         crate::audio::AudioEvent::Playing { .. } => {
                             p.reset_playback_errors();
+                            let state = p.get_state().await;
                             if let Some(ref song) = p.current_song {
                                 if let Some(app_state) = app.try_state::<AppState>() {
                                     app_state.scrobbler.on_now_playing(song).await;
+                                    app_state
+                                        .scrobbler
+                                        .on_playback_state_changed(Some(song), true, state.position_nanosec)
+                                        .await;
                                 }
                             }
                             let _ = app.emit(
@@ -388,16 +394,24 @@ fn spawn_audio_event_loop(
                                     "song": p.current_song.clone()
                                 }),
                             );
-                            let state = p.get_state().await;
                             crate::media_session::mirror_state(&app, &state).await;
                             let _ = app.emit("playback-state", state);
                         }
                         crate::audio::AudioEvent::Paused => {
                             let state = p.get_state().await;
+                            if let Some(app_state) = app.try_state::<AppState>() {
+                                app_state
+                                    .scrobbler
+                                    .on_playback_state_changed(p.current_song.as_ref(), false, state.position_nanosec)
+                                    .await;
+                            }
                             crate::media_session::mirror_state(&app, &state).await;
                             let _ = app.emit("playback-state", state);
                         }
                         crate::audio::AudioEvent::Stopped => {
+                            if let Some(app_state) = app.try_state::<AppState>() {
+                                app_state.scrobbler.on_playback_stopped().await;
+                            }
                             let state = p.get_state().await;
                             crate::media_session::mirror_state(&app, &state).await;
                             let _ = app.emit("playback-state", state);
@@ -405,6 +419,11 @@ fn spawn_audio_event_loop(
                         crate::audio::AudioEvent::TrackFinished { .. } => {
                             let _ = p.on_track_finished().await;
                             let state = p.get_state().await;
+                            if state.state != crate::models::PlayState::Playing {
+                                if let Some(app_state) = app.try_state::<AppState>() {
+                                    app_state.scrobbler.on_playback_stopped().await;
+                                }
+                            }
                             crate::media_session::mirror_state(&app, &state).await;
                             let _ = app.emit("playback-state", state);
                         }
@@ -417,9 +436,14 @@ fn spawn_audio_event_loop(
                         }
                         crate::audio::AudioEvent::TrackTransitioned { song_id, .. } => {
                             let _ = p.on_gapless_transition(song_id).await;
+                            let state = p.get_state().await;
                             if let Some(ref song) = p.current_song {
                                 if let Some(app_state) = app.try_state::<AppState>() {
                                     app_state.scrobbler.on_now_playing(song).await;
+                                    app_state
+                                        .scrobbler
+                                        .on_playback_state_changed(Some(song), true, state.position_nanosec)
+                                        .await;
                                 }
                             }
                             let _ = app.emit(
@@ -428,7 +452,6 @@ fn spawn_audio_event_loop(
                                     "song": p.current_song.clone()
                                 }),
                             );
-                            let state = p.get_state().await;
                             crate::media_session::mirror_state(&app, &state).await;
                             let _ = app.emit("playback-state", state);
                         }
@@ -1144,6 +1167,7 @@ pub fn run() {
             commands::scrobbler::flush_scrobble_cache,
             commands::scrobbler::toggle_scrobble_pause,
             commands::scrobbler::sync_favourites_to_listenbrainz,
+            commands::scrobbler::get_discord_status,
             // Stats commands
             commands::stats::set_song_rating,
             commands::stats::set_album_rating,
