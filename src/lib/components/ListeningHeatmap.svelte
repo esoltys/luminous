@@ -1,16 +1,21 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { FlameIcon, QuestionIcon } from "phosphor-svelte";
+  import { FlameIcon, QuestionIcon, StarIcon } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { prefs } from "../stores/prefs.svelte";
   import type { ListenEvent } from "../types";
   import { bucketDailyMinutes, buildHeatmapGrid, computeStreaks, localDateKey, type HeatmapCell } from "../utils/listeningHeatmap";
 
-  // 14 weeks (~3 months) — "a couple months wide" per #890 — plus enough
-  // history for a meaningful longest-streak calculation without pulling a
-  // user's entire listening history on every Stats view load.
-  const WEEKS = 14;
-  const LOOKBACK_DAYS = WEEKS * 7;
+  // Cells are a fixed size; the number of weeks shown grows or shrinks with
+  // the grid's measured width instead of stretching cells to fill it (which
+  // made them oversized/blocky on wide windows). MAX_WEEKS bounds both how
+  // much history is fetched and how far the grid can extend on very wide
+  // windows; MIN_WEEKS is the fallback before the first width measurement.
+  const CELL_PX = 13;
+  const GAP_PX = 3;
+  const MIN_WEEKS = 8;
+  const MAX_WEEKS = 52;
+  const LOOKBACK_DAYS = MAX_WEEKS * 7;
 
   // Cell background intensity per HeatmapCell.level, expressed as opacity
   // steps of the active theme's accent color (`--color-brand-accent`) rather
@@ -21,6 +26,8 @@
 
   let events = $state<ListenEvent[] | null>(null);
   let hovered = $state<HeatmapCell | null>(null);
+  let gridEl = $state<HTMLDivElement | undefined>(undefined);
+  let gridWidth = $state(0);
 
   async function load() {
     try {
@@ -35,12 +42,47 @@
     load();
   });
 
+  $effect(() => {
+    if (!gridEl) return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) gridWidth = entry.contentRect.width;
+    });
+    observer.observe(gridEl);
+    return () => observer.disconnect();
+  });
+
+  // How many weeks fit in the measured grid width at CELL_PX, clamped to
+  // [MIN_WEEKS, MAX_WEEKS].
+  let visibleWeeks = $derived(
+    gridWidth > 0
+      ? Math.min(MAX_WEEKS, Math.max(MIN_WEEKS, Math.floor((gridWidth + GAP_PX) / (CELL_PX + GAP_PX))))
+      : MIN_WEEKS
+  );
+
   let dailyMinutes = $derived(events ? bucketDailyMinutes(events) : new Map<string, number>());
   // `buildHeatmapGrid` returns rows (day-of-week) x columns (week); rendered
-  // here as columns of 7 stacked cells, so transpose before drawing.
-  let rows = $derived(buildHeatmapGrid(dailyMinutes, WEEKS, prefs.weekStart));
-  let columns = $derived(Array.from({ length: WEEKS }, (_, col) => rows.map((row) => row[col])));
+  // here as columns of 7 stacked cells, so transpose before drawing. Always
+  // built at MAX_WEEKS so streak math sees the full fetched history; only
+  // the rendered `columns` below are trimmed to what currently fits.
+  let rows = $derived(buildHeatmapGrid(dailyMinutes, MAX_WEEKS, prefs.weekStart));
+  let allColumns = $derived(Array.from({ length: MAX_WEEKS }, (_, col) => rows.map((row) => row[col])));
+  let columns = $derived(allColumns.slice(allColumns.length - visibleWeeks));
   let streaks = $derived(computeStreaks(dailyMinutes));
+
+  // The single highest-minutes day gets a star marker (a "special day"
+  // callout, not a leaderboard/trophy — see AGENTS.md's icon-semantics
+  // convention). No star when there's no listening at all yet.
+  let peakDate = $derived.by(() => {
+    let best: string | null = null;
+    let bestMinutes = 0;
+    for (const [date, minutes] of dailyMinutes) {
+      if (minutes > bestMinutes) {
+        best = date;
+        bestMinutes = minutes;
+      }
+    }
+    return best;
+  });
 
   // Grid always includes today's cell (`buildHeatmapGrid` pads out to the
   // end of the current week), so the status line can default to it without
@@ -118,33 +160,45 @@
       </div>
     </div>
 
-    <div class="flex gap-3 mt-4 max-w-md mx-auto">
-      <div class="flex flex-col gap-[3px] text-[10px] text-brand-text-secondary/70 leading-none shrink-0">
+    <div class="flex gap-3 mt-4">
+      <div class="flex flex-col text-[10px] text-brand-text-secondary/70 leading-none shrink-0">
         <div class="invisible mb-1" aria-hidden="true">&nbsp;</div>
-        {#each dayLabels as label, i (i)}
-          <div class="w-3 h-[11px] flex items-center">{label}</div>
-        {/each}
+        <div class="flex flex-col gap-[3px]">
+          {#each dayLabels as label, i (i)}
+            <div class="w-3 h-[13px] flex items-center">{label}</div>
+          {/each}
+        </div>
       </div>
-      <div role="group" aria-label={i18n.t("stats.heatmapTitle", {}, "Listening Streak")} class="flex-1 min-w-0" onmouseleave={() => (hovered = null)}>
+      <div
+        bind:this={gridEl}
+        role="group"
+        aria-label={i18n.t("stats.heatmapTitle", {}, "Listening Streak")}
+        class="flex-1 min-w-0 overflow-hidden"
+        onmouseleave={() => (hovered = null)}
+      >
         <div class="flex gap-[3px] text-[10px] text-brand-text-secondary/70 leading-none mb-1">
           {#each monthLabels as label, colIndex (colIndex)}
-            <div class="flex-1 min-w-0">{label}</div>
+            <div class="w-[13px] shrink-0">{label}</div>
           {/each}
         </div>
         <div class="flex gap-[3px]">
           {#each columns as column, colIndex (colIndex)}
-            <div class="flex flex-col gap-[3px] flex-1 min-w-0">
+            <div class="flex flex-col gap-[3px] shrink-0">
               {#each column as cell (cell.date)}
                 <button
                   type="button"
-                  class="w-full aspect-square rounded-sm"
+                  class="flex items-center justify-center w-[13px] h-[13px] rounded-sm"
                   style={cellStyle(cell)}
                   disabled={cell.future}
                   aria-label={cell.future ? undefined : cellLabel(cell)}
                   onmouseenter={() => !cell.future && (hovered = cell)}
                   onfocus={() => !cell.future && (hovered = cell)}
                   onclick={() => !cell.future && (hovered = cell)}
-                ></button>
+                >
+                  {#if cell.date === peakDate}
+                    <StarIcon weight="fill" class="w-[9px] h-[9px] text-brand-text-primary drop-shadow-[0_0_1px_rgba(0,0,0,0.8)]" />
+                  {/if}
+                </button>
               {/each}
             </div>
           {/each}
@@ -158,7 +212,7 @@
         <span>{i18n.t("stats.heatmapLegendLess", {}, "Less")}</span>
         {#each LEVEL_OPACITY as opacity (opacity)}
           <div
-            class="w-[11px] h-[11px] rounded-sm"
+            class="w-[13px] h-[13px] rounded-sm"
             style={opacity === 0
               ? "background-color: color-mix(in srgb, var(--color-brand-accent) 12%, transparent);"
               : `background-color: color-mix(in srgb, var(--color-brand-accent) ${opacity}%, transparent);`}
