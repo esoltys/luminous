@@ -14,7 +14,7 @@
       <LoadingSpinner label={i18n.t('help.loading', {}, "Loading user guide...")} />
     </div>
   {/if}
-  <div class="absolute top-4 right-4 z-20">
+  <div class="absolute top-4 right-6 z-20">
     <Button onclick={() => walkthroughStore.start()} variant="secondary" size="sm">
       <Compass class="w-3.5 h-3.5" />
       {i18n.t('walkthrough.restartTour', {}, 'Restart Feature Walkthrough')}
