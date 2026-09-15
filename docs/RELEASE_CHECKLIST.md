@@ -35,14 +35,8 @@ manual.
 - [ ] `cargo test` (from `src-tauri/`) — Rust unit tests + BDD suites
 - [ ] `cargo clippy --all-targets` (from `src-tauri/`) — no warnings at all, not just no
       new ones; fix any pre-existing warnings you encounter rather than leaving them
-- [ ] Run the smoke test — real audio device, real playback, tags, playlists, equalizer:
-  ```bash
-  cargo test --test smoke_test -- --ignored --nocapture
-  ```
-  (run from `src-tauri/`)
-- [ ] Manually exercise the app from a dev build (`bun run tauri dev`): import/scan a
-      folder, play/pause/seek/volume, create a playlist, edit tags, check the equalizer,
-      and anything specific to what changed this release.
+- [ ] Do the manual QA walkthrough in [docs/TESTING.md](TESTING.md) (real-hardware smoke
+      test + dev-build exercise), plus anything specific to what changed this release.
 - [ ] Check the [Security Audit](../.github/workflows/audit.yml) and
       [CodeQL](../.github/workflows/codeql.yml) workflows are green on `main`.
 
