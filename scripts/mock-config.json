@@ -230,7 +230,8 @@
       "filename": "organize.png",
       "tab": "organize",
       "action": "click-organize-custom-template",
-      "viewportHeight": 1100
+      "sidebarWidth": 220,
+      "viewportHeight": 1600
     },
     {
       "name": "song-tag-editor",
