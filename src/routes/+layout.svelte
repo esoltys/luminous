@@ -200,9 +200,31 @@
       });
 
     window.addEventListener('keydown', handleGlobalHotkeys);
+
+    // Forwards uncaught JS errors/rejections to the backend crash log (#684)
+    // — without this, a frontend crash a user hits when not running from a
+    // terminal leaves no trace anywhere for a bug report to point to.
+    const handleWindowError = (e: ErrorEvent) => {
+      void invoke('log_frontend_error', {
+        message: e.message || String(e.error),
+        stack: e.error?.stack,
+      }).catch(() => {});
+    };
+    const handleUnhandledRejection = (e: PromiseRejectionEvent) => {
+      const reason = e.reason;
+      void invoke('log_frontend_error', {
+        message: reason instanceof Error ? reason.message : String(reason),
+        stack: reason instanceof Error ? reason.stack : undefined,
+      }).catch(() => {});
+    };
+    window.addEventListener('error', handleWindowError);
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
     return () => {
       window.removeEventListener('keydown', handleGlobalHotkeys);
       window.removeEventListener('focus', handleWindowFocus);
+      window.removeEventListener('error', handleWindowError);
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
       stopShiftPolling();
       dragDropUnlisten?.();
       focusUnlisten?.();
