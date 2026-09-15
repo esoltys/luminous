@@ -7,6 +7,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-dialog";
   import { openExternalUrl } from "../utils/openExternalUrl";
+  import { isWindows } from "../platform";
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
   import Toggle from "./Toggle.svelte";
@@ -43,7 +44,7 @@
     const selected = await open({
       multiple: false,
       title: i18n.t("picard.browseBtn"),
-      filters: [{ name: "Picard executable", extensions: ["exe"] }],
+      filters: isWindows ? [{ name: "Picard executable", extensions: ["exe"] }] : undefined,
     });
     if (selected && typeof selected === "string") {
       picardCustomPath = selected;
@@ -464,7 +465,7 @@
           type="text"
           bind:value={picardCustomPath}
           onchange={handlePicardCustomPathChange}
-          placeholder={i18n.t('picard.customPathPlaceholder')}
+          placeholder={i18n.t(isWindows ? 'picard.customPathPlaceholder' : 'picard.customPathPlaceholderLinux')}
           class="w-full"
         />
       </div>

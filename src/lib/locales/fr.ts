@@ -1205,6 +1205,7 @@ export const fr = {
     notFound: "Introuvable — installez-le depuis picard.musicbrainz.org, ou définissez un chemin personnalisé ci-dessous.",
     customPathLabel: "Chemin personnalisé (facultatif)",
     customPathPlaceholder: "C:\\Program Files\\MusicBrainz Picard\\picard.exe",
+    customPathPlaceholderLinux: "/var/lib/flatpak/exports/bin/org.musicbrainz.Picard",
     browseBtn: "Parcourir...",
     recheckTooltip: "Revérifier la présence de Picard",
     missingPlaylistLabel: "Liste auto Identifiants MusicBrainz manquants",
