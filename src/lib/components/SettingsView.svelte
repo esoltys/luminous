@@ -8,12 +8,11 @@
   import SettingsGeneral from "./SettingsGeneral.svelte";
   import SettingsFolders from "./SettingsFolders.svelte";
   import SettingsIntegrations from "./SettingsIntegrations.svelte";
-  import SettingsTools from "./SettingsTools.svelte";
   import SettingsThemes from "./SettingsThemes.svelte";
   import SettingsAbout from "./SettingsAbout.svelte";
   import Equalizer from "./Equalizer.svelte";
 
-  let settingsTab = $state<"general" | "folders" | "integrations" | "tools" | "themes" | "equalizer" | "about">("general");
+  let settingsTab = $state<"general" | "folders" | "integrations" | "themes" | "equalizer" | "about">("general");
   let isTabInitialized = $state(false);
 
   let tabElements = $state<Record<string, HTMLButtonElement>>({});
@@ -37,7 +36,7 @@
         const settings = await invoke<Record<string, string>>("get_all_app_settings");
         if (settings && settings.active_settings_tab) {
           const savedTab = settings.active_settings_tab;
-          if (savedTab === "general" || savedTab === "folders" || savedTab === "integrations" || savedTab === "tools" || savedTab === "themes" || savedTab === "equalizer" || savedTab === "about") {
+          if (savedTab === "general" || savedTab === "folders" || savedTab === "integrations" || savedTab === "themes" || savedTab === "equalizer" || savedTab === "about") {
             settingsTab = savedTab;
           }
         }
@@ -121,15 +120,6 @@
         {i18n.t('settings.tabIntegrations')}
       </button>
       <button
-        bind:this={tabElements["tools"]}
-        onclick={() => { settingsTab = "tools"; }}
-        role="tab"
-        aria-selected={settingsTab === 'tools'}
-        class="relative z-10 px-4 py-1.5 rounded-xl font-semibold transition-colors duration-200 {settingsTab === 'tools' ? 'text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-      >
-        {i18n.t('settings.tabTools')}
-      </button>
-      <button
         bind:this={tabElements["themes"]}
         onclick={() => { settingsTab = "themes"; }}
         role="tab"
@@ -167,8 +157,6 @@
         <SettingsFolders />
       {:else if settingsTab === "integrations"}
         <SettingsIntegrations />
-      {:else if settingsTab === "tools"}
-        <SettingsTools />
       {:else if settingsTab === "themes"}
         <SettingsThemes />
       {:else if settingsTab === "equalizer"}

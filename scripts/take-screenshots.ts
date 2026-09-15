@@ -280,7 +280,10 @@ async function main() {
         language: "${language}",
         // Otherwise +layout.svelte auto-starts the first-launch Walkthrough
         // tour, whose popover would cover every capture (see #897).
-        walkthrough_completed: "true"
+        walkthrough_completed: "true",
+        // Otherwise the first-run Welcome screen covers every capture behind
+        // its full-screen overlay before the Walkthrough tour even starts.
+        welcome_seen: "true"
       };
       window.mockPlaybackPositionSec = ${positionSeconds};
       window.localStorage.setItem("layout_immersiveMode", "${isImmersive ? 'true' : 'false'}");
@@ -469,12 +472,13 @@ async function main() {
       await page.getByRole("button", { name: t(language, "settings.tabIntegrations"), exact: true }).click();
       await page.waitForTimeout(400);
     },
-    "click-settings-tools": async (page, _featured, language) => {
-      await page.getByRole("button", { name: t(language, "settings.tabTools"), exact: true }).click();
-      await page.waitForTimeout(400);
-      // Swap in a template that actually changes the mock library's paths
-      // (the default template already matches how the mock data is laid
-      // out, so every row would show "Unchanged" otherwise).
+    "click-organize-custom-template": async (page, _featured, language) => {
+      // Switch the Template Pattern section to "Custom" to reveal the
+      // free-text field, then swap in a template that actually changes the
+      // mock library's paths (the default preset already matches how the
+      // mock data is laid out, so every row would show "Unchanged" otherwise).
+      await page.getByRole("button", { name: t(language, "organizer.presetCustom"), exact: true }).click();
+      await page.waitForTimeout(300);
       const templateInput = page.locator("#template-input");
       await templateInput.fill("%albumartist/{%album/}{Disc %disc/}{%track }%title");
       await page.waitForTimeout(600);
