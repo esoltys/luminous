@@ -48,15 +48,18 @@
   let todayCell = $derived(rows.flat().find((cell) => cell.date === localDateKey(new Date())) ?? null);
   let displayCell = $derived(hovered ?? todayCell);
 
-  // Sparse day-of-week labels (every other row) to avoid crowding the
-  // 11px cells; which literal weekdays land on odd rows depends on the
-  // "Start the week with" preference, so this isn't always Mon/Wed/Fri.
+  // Sparse day-of-week labels, always Mon/Wed/Fri regardless of which row
+  // that lands on for the current "Start the week with" preference — picked
+  // by actual calendar weekday (`getDay()`), not row parity, so the letters
+  // stay put whether the grid starts on Sunday or Monday.
+  const LABELED_WEEKDAYS = new Set([1, 3, 5]); // Mon, Wed, Fri
   let dayLabels = $derived(
-    rows.map((row, rowIndex) => {
-      if (rowIndex % 2 === 0) return "";
+    rows.map((row) => {
       const cell = row[row.length - 1];
       if (!cell) return "";
-      return dateFromKey(cell.date).toLocaleDateString(i18n.currentLocale, { weekday: "narrow" });
+      const date = dateFromKey(cell.date);
+      if (!LABELED_WEEKDAYS.has(date.getDay())) return "";
+      return date.toLocaleDateString(i18n.currentLocale, { weekday: "narrow" });
     })
   );
 
@@ -116,7 +119,8 @@
     </div>
 
     <div class="flex gap-3 mt-4">
-      <div class="flex flex-col gap-[3px] pt-4 text-[10px] text-brand-text-secondary/70 leading-none">
+      <div class="flex flex-col gap-[3px] text-[10px] text-brand-text-secondary/70 leading-none">
+        <div class="invisible mb-1" aria-hidden="true">&nbsp;</div>
         {#each dayLabels as label, i (i)}
           <div class="w-3 h-[11px] flex items-center">{label}</div>
         {/each}
