@@ -16,6 +16,7 @@ pub mod collection;
 pub mod commands;
 pub mod covermanager;
 pub mod db;
+pub mod diagnostics;
 pub mod equalizer;
 pub mod filter_parser;
 pub mod install_format;
@@ -640,6 +641,10 @@ pub fn run() {
             }
         }))
         .setup(|app| {
+            if let Ok(app_data_dir) = app.path().app_data_dir() {
+                diagnostics::install_panic_hook(app_data_dir);
+            }
+
             let db = Arc::new(
                 Database::new(app.path().app_data_dir().expect("no app data dir"))
                     .expect("failed to initialize database"),
@@ -946,6 +951,8 @@ pub fn run() {
             commands::settings::set_fade_settings,
             commands::settings::get_minimize_to_tray_enabled,
             commands::settings::set_minimize_to_tray_enabled,
+            commands::diagnostics::log_frontend_error,
+            commands::diagnostics::export_diagnostics,
             install_format::get_install_format,
             // Stats commands
             commands::stats::set_song_rating,
