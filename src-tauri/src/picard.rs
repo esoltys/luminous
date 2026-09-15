@@ -67,7 +67,29 @@ pub fn find_picard(custom_path: Option<&str>) -> Option<PathBuf> {
 
     #[cfg(not(windows))]
     {
-        which_on_path("picard")
+        if let Some(p) = which_on_path("picard") {
+            return Some(p);
+        }
+
+        // picard.musicbrainz.org's own Linux install instructions lead with
+        // Flatpak, which doesn't put a `picard` binary on PATH — it exports
+        // a wrapper script named after the app ID instead (which itself
+        // invokes `flatpak run org.musicbrainz.Picard`, so it can be spawned
+        // exactly like any other executable). Check that exported name on
+        // PATH first, then the well-known export directories directly in
+        // case the user's PATH doesn't include them.
+        if let Some(p) = which_on_path("org.musicbrainz.Picard") {
+            return Some(p);
+        }
+        let mut flatpak_candidates = vec![PathBuf::from(
+            "/var/lib/flatpak/exports/bin/org.musicbrainz.Picard",
+        )];
+        if let Ok(home) = std::env::var("HOME") {
+            flatpak_candidates.push(PathBuf::from(format!(
+                "{home}/.local/share/flatpak/exports/bin/org.musicbrainz.Picard"
+            )));
+        }
+        flatpak_candidates.into_iter().find(|p| p.is_file())
     }
 }
 

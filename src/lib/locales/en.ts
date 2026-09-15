@@ -1206,6 +1206,7 @@ export const en = {
     notFound: "Not found — install it from picard.musicbrainz.org, or set a custom path below.",
     customPathLabel: "Custom Path (optional)",
     customPathPlaceholder: "C:\\Program Files\\MusicBrainz Picard\\picard.exe",
+    customPathPlaceholderLinux: "/var/lib/flatpak/exports/bin/org.musicbrainz.Picard",
     browseBtn: "Browse...",
     recheckTooltip: "Re-check for Picard",
     missingPlaylistLabel: "Missing MusicBrainz ID Auto-Playlist",
