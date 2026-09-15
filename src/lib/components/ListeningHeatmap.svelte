@@ -83,9 +83,7 @@
 
   function cellLabel(cell: HeatmapCell): string {
     const date = dateFromKey(cell.date).toLocaleDateString(i18n.currentLocale, { weekday: "short", month: "short", day: "numeric" });
-    if (cell.minutes <= 0) return i18n.t("stats.heatmapStatusNoListening", { date }, `${date} — no listening`);
-    if (cell.minutes === 1) return i18n.t("stats.heatmapStatusOneMinute", { date }, `${date} — 1 minute listened`);
-    return i18n.t("stats.heatmapStatusMinutes", { minutes: cell.minutes, date }, `${date} — ${cell.minutes} minutes listened`);
+    return i18n.t("stats.heatmapStatus", { date, minutes: cell.minutes }, `${date} — ${cell.minutes} min`);
   }
 
   function streakLabel(days: number): string {
@@ -93,7 +91,7 @@
   }
 </script>
 
-<div class="bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 w-72 shrink-0">
+<div class="bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 w-1/2 shrink-0">
   <div class="flex items-center justify-between gap-2">
     <h2 class="text-sm font-semibold text-brand-text-primary">{i18n.t("stats.heatmapTitle", {}, "Listening Streak")}</h2>
     <span title={i18n.t("stats.heatmapHelp", {}, "This calendar shows how many days in a row you've listened to music. Each square is one day — darker squares mean more minutes listened that day. Hover or tap a square to see its date.")} class="inline-flex cursor-help">

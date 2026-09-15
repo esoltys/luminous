@@ -687,9 +687,7 @@ export const fr = {
     heatmapLongestStreak: "Plus longue série",
     heatmapStreakOneDay: "1 jour",
     heatmapStreakDays: "{count} jours",
-    heatmapStatusNoListening: "{date} — aucune écoute",
-    heatmapStatusOneMinute: "{date} — 1 minute écoutée",
-    heatmapStatusMinutes: "{date} — {minutes} minutes écoutées",
+    heatmapStatus: "{date} — {minutes} min",
     heatmapLegendLess: "Moins",
     heatmapLegendMore: "Plus"
   },
