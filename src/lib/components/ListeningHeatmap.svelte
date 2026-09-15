@@ -94,7 +94,7 @@
   }
 </script>
 
-<div class="bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 w-1/2 shrink-0">
+<div class="bg-brand-sidebar border border-brand-border/60 rounded-xl p-4">
   <div class="flex items-center justify-between gap-2">
     <h2 class="text-sm font-semibold text-brand-text-primary">{i18n.t("stats.heatmapTitle", {}, "Listening Streak")}</h2>
     <span title={i18n.t("stats.heatmapHelp", {}, "This calendar shows how many days in a row you've listened to music. Each square is one day — darker squares mean more minutes listened that day. Hover or tap a square to see its date.")} class="inline-flex cursor-help">
@@ -119,25 +119,25 @@
     </div>
 
     <div class="flex gap-3 mt-4">
-      <div class="flex flex-col gap-[3px] text-[10px] text-brand-text-secondary/70 leading-none">
+      <div class="flex flex-col gap-[3px] text-[10px] text-brand-text-secondary/70 leading-none shrink-0">
         <div class="invisible mb-1" aria-hidden="true">&nbsp;</div>
         {#each dayLabels as label, i (i)}
           <div class="w-3 h-[11px] flex items-center">{label}</div>
         {/each}
       </div>
-      <div role="group" aria-label={i18n.t("stats.heatmapTitle", {}, "Listening Streak")} onmouseleave={() => (hovered = null)}>
+      <div role="group" aria-label={i18n.t("stats.heatmapTitle", {}, "Listening Streak")} class="flex-1 min-w-0" onmouseleave={() => (hovered = null)}>
         <div class="flex gap-[3px] text-[10px] text-brand-text-secondary/70 leading-none mb-1">
           {#each monthLabels as label, colIndex (colIndex)}
-            <div class="w-[11px]">{label}</div>
+            <div class="flex-1 min-w-0">{label}</div>
           {/each}
         </div>
         <div class="flex gap-[3px]">
           {#each columns as column, colIndex (colIndex)}
-            <div class="flex flex-col gap-[3px]">
+            <div class="flex flex-col gap-[3px] flex-1 min-w-0">
               {#each column as cell (cell.date)}
                 <button
                   type="button"
-                  class="w-[11px] h-[11px] rounded-sm"
+                  class="w-full aspect-square rounded-sm"
                   style={cellStyle(cell)}
                   disabled={cell.future}
                   aria-label={cell.future ? undefined : cellLabel(cell)}
