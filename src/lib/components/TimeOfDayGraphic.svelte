@@ -25,7 +25,7 @@
   );
 </script>
 
-<svg viewBox="0 0 {W} {H}" class="w-full h-auto block rounded-lg" preserveAspectRatio="xMidYMid slice" role="img" aria-label={labels.morning}>
+<svg viewBox="0 0 {W} {H}" class="w-full h-auto block rounded-lg overflow-visible" preserveAspectRatio="xMidYMid slice" role="img" aria-label={labels.morning}>
   <defs>
     <linearGradient id="tod-sky-morning" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#aecbdb" />
