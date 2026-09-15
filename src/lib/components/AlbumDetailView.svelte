@@ -22,7 +22,6 @@
   import PlayShuffleButtons from "./PlayShuffleButtons.svelte";
   import IconActionButton from "./IconActionButton.svelte";
   import LinkButton from "./LinkButton.svelte";
-  import ColumnSelector from "./ColumnSelector.svelte";
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
   import ContextMenu from "./ContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
@@ -516,13 +515,6 @@
             {#snippet icon()}<Plus class="w-4 h-4" />{/snippet}
           </IconActionButton>
           <IconActionButton
-            onclick={handleRefreshAlbum}
-            disabled={loading || collectionStore.isScanning || refreshing}
-            title={i18n.t('albumDetail.refreshTooltip')}
-          >
-            {#snippet icon()}<RefreshCw class="w-4 h-4 {refreshing || collectionStore.isScanning ? 'animate-spin' : ''}" />{/snippet}
-          </IconActionButton>
-          <IconActionButton
             onclick={() => pinnedStore.toggle("album", albumName)}
             title={pinnedStore.isPinned("album", albumName)
               ? i18n.t("playlists.contextMenuUnpinHome")
@@ -542,7 +534,6 @@
           >
             {#snippet icon()}<Share class="w-4 h-4" />{/snippet}
           </IconActionButton>
-          <ColumnSelector align="left" iconOnly />
           <button
             onclick={toggleOverflowMenu}
             title={i18n.t("playlists.moreActionsTooltip", {}, "More actions")}
@@ -762,6 +753,13 @@
       label={i18n.t("albumDetail.editAlbumDetails", {}, "Edit Album Details")}
       onclick={() => { isEditorOpen = true; overflowMenuPos = null; }}
       disabled={loading}
+    />
+    <ContextMenuItem
+      icon={RefreshCw}
+      label={i18n.t("albumDetail.refresh", {}, "Refresh")}
+      title={i18n.t('albumDetail.refreshTooltip')}
+      onclick={() => { handleRefreshAlbum(); overflowMenuPos = null; }}
+      disabled={loading || collectionStore.isScanning || refreshing}
     />
     <ContextMenuItem
       icon={OpenInPicard}

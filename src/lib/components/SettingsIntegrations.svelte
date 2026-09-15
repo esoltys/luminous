@@ -7,6 +7,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-dialog";
   import { openExternalUrl } from "../utils/openExternalUrl";
+  import { isWindows } from "../platform";
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
   import Toggle from "./Toggle.svelte";
@@ -43,7 +44,7 @@
     const selected = await open({
       multiple: false,
       title: i18n.t("picard.browseBtn"),
-      filters: [{ name: "Picard executable", extensions: ["exe"] }],
+      filters: isWindows ? [{ name: "Picard executable", extensions: ["exe"] }] : undefined,
     });
     if (selected && typeof selected === "string") {
       picardCustomPath = selected;
@@ -126,7 +127,7 @@
 
   <div class="space-y-2 pt-2 border-t border-brand-border/60">
     <div class="flex items-center justify-between">
-      <label for="listenbrainz-token-input" class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider">
+      <label for="listenbrainz-token-input" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
         {i18n.t('listenbrainz.userTokenLabel')}
       </label>
       <button
@@ -398,7 +399,7 @@
           <span class="text-xs font-medium text-brand-text-primary">{i18n.t('discord.applicationIdLabel')}</span>
           <p class="text-xs text-brand-text-secondary">{i18n.t('discord.applicationIdHint')}</p>
         </div>
-        <span class="font-mono text-xs bg-brand-surface px-2.5 py-1 rounded-md border border-brand-border text-brand-text-secondary select-all">
+        <span class="text-xs bg-brand-surface px-2.5 py-1 rounded-md border border-brand-border text-brand-text-secondary select-all">
           {DEFAULT_DISCORD_CLIENT_ID}
         </span>
       </div>
@@ -454,7 +455,7 @@
   </div>
 
   <div class="flex flex-col gap-1.5">
-    <label for="picard-custom-path-input" class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider">
+    <label for="picard-custom-path-input" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
       {i18n.t('picard.customPathLabel')}
     </label>
     <div class="flex items-center gap-2">
@@ -464,7 +465,7 @@
           type="text"
           bind:value={picardCustomPath}
           onchange={handlePicardCustomPathChange}
-          placeholder={i18n.t('picard.customPathPlaceholder')}
+          placeholder={i18n.t(isWindows ? 'picard.customPathPlaceholder' : 'picard.customPathPlaceholderLinux')}
           class="w-full"
         />
       </div>

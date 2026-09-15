@@ -1468,6 +1468,47 @@ pub fn get_artist_profile_conn(conn: &rusqlite::Connection, artist: &str) -> Res
     }
 }
 
+/// Renames every occurrence of a tag in *other* artists' profiles that
+/// matches `tag` case-insensitively but not exactly, to `tag`'s casing.
+/// Tags are otherwise freeform per-artist strings with no shared canonical
+/// row, so without this, saving "Canadian" on one artist while another
+/// already has "canadian" would leave the same tag split across two cases
+/// in the library-wide tag list (see `get_library_artist_tags`).
+fn canonicalize_artist_tag_casing(
+    conn: &rusqlite::Connection,
+    current_artist_key: &str,
+    tag: &str,
+) -> Result<()> {
+    let mut stmt = conn.prepare(
+        "SELECT artist_key, tags FROM artist_profiles WHERE artist_key <> ?1 COLLATE NOCASE",
+    )?;
+    let rows: Vec<(String, String)> = stmt
+        .query_map(params![current_artist_key], |row| {
+            Ok((row.get(0)?, row.get(1)?))
+        })?
+        .collect::<rusqlite::Result<_>>()?;
+
+    for (artist_key, tags_json) in rows {
+        let mut tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
+        let mut changed = false;
+        for t in tags.iter_mut() {
+            if t != tag && t.to_lowercase() == tag.to_lowercase() {
+                *t = tag.to_string();
+                changed = true;
+            }
+        }
+        if changed {
+            let new_tags_json = serde_json::to_string(&tags)?;
+            conn.execute(
+                "UPDATE artist_profiles SET tags = ?1 WHERE artist_key = ?2",
+                params![new_tags_json, artist_key],
+            )?;
+        }
+    }
+
+    Ok(())
+}
+
 /// Upsert an artist profile into SQLite (#473).
 pub fn set_artist_profile_conn(
     conn: &rusqlite::Connection,
@@ -1492,6 +1533,10 @@ pub fn set_artist_profile_conn(
             profile.bio
         ],
     )?;
+
+    for tag in &profile.tags {
+        canonicalize_artist_tag_casing(conn, &profile.artist_key, tag)?;
+    }
 
     Ok(profile.clone())
 }
@@ -1539,7 +1584,10 @@ pub fn get_album_profile_conn(conn: &rusqlite::Connection, album: &str) -> Resul
         let website: Option<String> = row.get(3)?;
         let links_json: String = row.get(4)?;
 
-        let links: Vec<AlbumLink> = serde_json::from_str(&links_json).unwrap_or_default();
+        let links: Vec<AlbumLink> = serde_json::from_str(&links_json).unwrap_or_else(|e| {
+            log::warn!("Failed to parse album_profiles.links for '{album_key}': {e}");
+            Vec::new()
+        });
 
         Ok(AlbumProfile {
             album_key,
@@ -1603,7 +1651,10 @@ pub fn get_all_album_profiles_conn(conn: &rusqlite::Connection) -> Result<Vec<Al
             let website: Option<String> = row.get(3)?;
             let links_json: String = row.get(4)?;
 
-            let links: Vec<AlbumLink> = serde_json::from_str(&links_json).unwrap_or_default();
+            let links: Vec<AlbumLink> = serde_json::from_str(&links_json).unwrap_or_else(|e| {
+                log::warn!("Failed to parse album_profiles.links for '{album_key}': {e}");
+                Vec::new()
+            });
 
             Ok(AlbumProfile {
                 album_key,
@@ -3088,6 +3139,62 @@ mod tests {
     }
 
     #[test]
+    fn test_artist_tag_casing_propagates_across_artists() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_artist_tag_casing_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Database::new(temp_dir.clone()).unwrap();
+        let conn = db.pool.get().unwrap();
+
+        set_artist_profile_conn(
+            &conn,
+            &ArtistProfile {
+                artist_key: "Shania Twain".to_string(),
+                website: None,
+                tags: vec!["canadian".to_string()],
+                social_links: vec![],
+                bio: None,
+            },
+        )
+        .unwrap();
+        set_artist_profile_conn(
+            &conn,
+            &ArtistProfile {
+                artist_key: "Alanis Morissette".to_string(),
+                website: None,
+                tags: vec!["canadian".to_string(), "rock".to_string()],
+                social_links: vec![],
+                bio: None,
+            },
+        )
+        .unwrap();
+
+        // Re-saving "Shania Twain" with "Canadian" (different case) should
+        // not just update her own row, but re-case every other artist's
+        // matching tag too, so the library-wide tag list has one casing.
+        set_artist_profile_conn(
+            &conn,
+            &ArtistProfile {
+                artist_key: "Shania Twain".to_string(),
+                website: None,
+                tags: vec!["Canadian".to_string()],
+                social_links: vec![],
+                bio: None,
+            },
+        )
+        .unwrap();
+
+        let alanis = get_artist_profile_conn(&conn, "Alanis Morissette").unwrap();
+        assert_eq!(alanis.tags, vec!["Canadian", "rock"]);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
     fn test_album_profile_crud() {
         let temp_dir = std::env::temp_dir().join(format!(
             "luminous_album_test_{}",
@@ -3153,6 +3260,54 @@ mod tests {
         let all = get_all_album_profiles_conn(&conn).unwrap();
         assert_eq!(all.len(), 1);
         assert_eq!(all[0].album_key, "Come On Over");
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// Regression test for #990: an external writer of `album_profiles.links`
+    /// (e.g. luminous-mcp's `update_album_profile` tool) uses `url` instead of
+    /// `handle_or_url`, plus extra `title`/`category` fields this struct
+    /// doesn't have. That link shape must still deserialize - previously the
+    /// whole array silently dropped to empty via `.unwrap_or_default()`.
+    #[test]
+    fn test_album_profile_links_from_external_writer_shape() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_album_ext_links_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Database::new(temp_dir.clone()).unwrap();
+        let conn = db.pool.get().unwrap();
+
+        conn.execute(
+            "INSERT INTO album_profiles (album_key, artist_key, description, website, links) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                "Of Kingdom and Crown",
+                Some("Machine Head"),
+                None::<String>,
+                None::<String>,
+                r#"[
+                    {"platform":"Spotify","title":"Stream on Spotify","url":"https://open.spotify.com/album/6duwuU8xgK7ShKMCrUxfBi","category":"store"},
+                    {"platform":"Live-Metal.com","title":"Live-Metal.com Review","url":"https://live-metal.com/review","category":"review"}
+                ]"#,
+            ],
+        )
+        .unwrap();
+
+        let loaded = get_album_profile_conn(&conn, "Of Kingdom and Crown").unwrap();
+        assert_eq!(loaded.links.len(), 2);
+        assert_eq!(loaded.links[0].platform, "Spotify");
+        assert_eq!(
+            loaded.links[0].handle_or_url,
+            "https://open.spotify.com/album/6duwuU8xgK7ShKMCrUxfBi"
+        );
+        assert_eq!(loaded.links[1].platform, "Live-Metal.com");
+        assert_eq!(
+            loaded.links[1].handle_or_url,
+            "https://live-metal.com/review"
+        );
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

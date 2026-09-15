@@ -346,6 +346,13 @@ export interface StatsTopItem {
   /** The song's album title, set only on top_songs rows — songs have no detail
    * page of their own, so clicking one navigates to this album instead. */
   album: string | null;
+  song_id?: number | null;
+  sample_song_id?: number | null;
+  art_embedded?: boolean;
+  art_automatic?: string | null;
+  art_manual?: string | null;
+  year?: number | null;
+  rating?: number;
 }
 
 /** Personal Stats summary for one range (#130). */
@@ -579,13 +586,8 @@ export function extractLocalArtworkPath(uri: string | null | undefined): string 
 
 export type HomeItem =
   | { type: "song"; song: Song }
-  | { type: "album"; album: AlbumItem; chart?: TopAlbumChartInfo }
+  | { type: "album"; album: AlbumItem }
   | { type: "playlist"; playlist: Playlist };
-
-/** Chart metadata attached to an Album {@link HomeItem} for `HomeRowList`'s
- * `variant="chart"` (the Home "Top Albums" row, #662) — carries the same
- * fields as {@link TopAlbumItem} minus the (redundant) nested `album`. */
-export type TopAlbumChartInfo = Omit<TopAlbumItem, "album">;
 
 /** A user-pinned Home-shelf entry (#222) — a superset of {@link HomeItem} that
  * also allows Artist, since pins are explicitly user-curated across all four

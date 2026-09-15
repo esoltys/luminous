@@ -5,7 +5,7 @@ import HomeView from "./HomeView.svelte";
 import { collectionStore } from "../stores/collection.svelte";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { HomeItem, AlbumItem, TopAlbumItem, ScanProgress } from "../types";
+import type { HomeItem, AlbumItem, StatsTopItem, ScanProgress } from "../types";
 
 function makeAlbum(overrides: Partial<AlbumItem> = {}): AlbumItem {
   return {
@@ -24,14 +24,18 @@ function makeAlbum(overrides: Partial<AlbumItem> = {}): AlbumItem {
   };
 }
 
-function makeTopAlbum(overrides: Partial<TopAlbumItem> = {}): TopAlbumItem {
+function makeStatsTopAlbum(overrides: Partial<StatsTopItem> = {}): StatsTopItem {
   return {
-    album: makeAlbum(),
-    rank: 1,
-    previous_rank: null,
-    peak_rank: 1,
-    weeks_on_chart: 1,
-    movement: "new",
+    key: "Full Moon Fever",
+    label: "Full Moon Fever",
+    secondary: "Tom Petty",
+    play_count: 12,
+    minutes: 45,
+    excluded: false,
+    album: null,
+    sample_song_id: 1,
+    year: 1989,
+    rating: -1,
     ...overrides,
   };
 }
@@ -49,13 +53,13 @@ vi.mock("@tauri-apps/api/event", () => ({
   }),
 }));
 
-let mockTopAlbums: TopAlbumItem[] = [];
+let mockTopAlbums: StatsTopItem[] = [];
 let mockRecentlyAdded: HomeItem[] = [];
 let mockFeaturedAlbums: HomeItem[] = [];
 
 vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn((cmd: string) => {
-    if (cmd === "get_top_albums") return Promise.resolve(mockTopAlbums);
+  invoke: vi.fn((cmd: string, args?: any) => {
+    if (cmd === "get_top_albums_summary") return Promise.resolve(mockTopAlbums);
     if (cmd === "get_recently_added") return Promise.resolve(mockRecentlyAdded);
     if (cmd === "get_featured_albums") return Promise.resolve(mockFeaturedAlbums);
     // collectionStore initializes itself on module load and expects this shape.
@@ -67,6 +71,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 describe("HomeView.svelte", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
     for (const key of Object.keys(listenCallbacks)) delete listenCallbacks[key];
     mockTopAlbums = [];
     mockRecentlyAdded = [];
@@ -82,11 +87,11 @@ describe("HomeView.svelte", () => {
     collectionStore.albums = [];
   });
 
-  it("fetches all three curated home queries on mount", async () => {
+  it("fetches all three curated home queries on mount with default 7d range", async () => {
     render(HomeView);
 
     await waitFor(() => {
-      expect(invoke).toHaveBeenCalledWith("get_top_albums", { limit: 10 });
+      expect(invoke).toHaveBeenCalledWith("get_top_albums_summary", { range: "7d", limit: 10 });
       expect(invoke).toHaveBeenCalledWith("get_recently_added", { limit: 12 });
       expect(invoke).toHaveBeenCalledWith("get_featured_albums", { limit: 5 });
     });
@@ -96,7 +101,7 @@ describe("HomeView.svelte", () => {
     render(HomeView);
 
     await waitFor(() => {
-      expect(screen.getByText("Welcome to Luminous")).toBeInTheDocument();
+      expect(screen.getByText("No Music Yet")).toBeInTheDocument();
     });
   });
 
@@ -108,7 +113,7 @@ describe("HomeView.svelte", () => {
     await waitFor(() => {
       expect(screen.getAllByText("Full Moon Fever").length).toBeGreaterThan(0);
     });
-    expect(screen.queryByText("Welcome to Luminous")).not.toBeInTheDocument();
+    expect(screen.queryByText("No Music Yet")).not.toBeInTheDocument();
   });
 
   it("shows the Explore Your Library row when there is no play history, and hides it once there is", async () => {
@@ -122,15 +127,32 @@ describe("HomeView.svelte", () => {
   });
 
   it("hides the Explore Your Library row in favor of Top 10 Albums once play history exists", async () => {
-    mockTopAlbums = [makeTopAlbum({ album: makeAlbum({ album: "Chart Topper" }) })];
+    mockTopAlbums = [makeStatsTopAlbum({ label: "Chart Topper", secondary: "Tom Petty" })];
     mockFeaturedAlbums = [{ type: "album", album: makeAlbum({ album: "Discover Me" }) }];
 
     render(HomeView);
 
     await waitFor(() => {
       expect(screen.getByText("Top 10 Albums")).toBeInTheDocument();
+      expect(screen.getByText("Chart Topper")).toBeInTheDocument();
     });
     expect(screen.queryByText("Explore Your Library")).not.toBeInTheDocument();
+  });
+
+  it("allows switching time range for Top 10 Albums", async () => {
+    mockTopAlbums = [makeStatsTopAlbum({ label: "Chart Topper", secondary: "Tom Petty" })];
+    render(HomeView);
+
+    await waitFor(() => {
+      expect(screen.getByText("Past 28 Days")).toBeInTheDocument();
+    });
+
+    vi.mocked(invoke).mockClear();
+    screen.getByText("Past 28 Days").click();
+
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("get_top_albums_summary", { range: "28d", limit: 10 });
+    });
   });
 
   it("refreshes curated data when a scan-progress 'done' event fires", async () => {
@@ -145,7 +167,7 @@ describe("HomeView.svelte", () => {
     listenCallbacks["scan-progress"]({ payload: doneEvent });
 
     await waitFor(() => {
-      expect(invoke).toHaveBeenCalledWith("get_top_albums", { limit: 10 });
+      expect(invoke).toHaveBeenCalledWith("get_top_albums_summary", { range: "7d", limit: 10 });
     });
   });
 
@@ -169,7 +191,7 @@ describe("HomeView.svelte", () => {
 
       const topAlbumsCalls = vi
         .mocked(invoke)
-        .mock.calls.filter(([cmd]) => cmd === "get_top_albums");
+        .mock.calls.filter(([cmd]) => cmd === "get_top_albums_summary");
       expect(topAlbumsCalls).toHaveLength(1);
     } finally {
       vi.useRealTimers();

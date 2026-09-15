@@ -784,6 +784,18 @@ impl Player {
     /// boundary for a step to be audible against.
     const LOUDNESS_REFRESH_RAMP_MS: u32 = 150;
 
+    /// Runs the (synchronous, rusqlite) loudness-settings read on a blocking
+    /// thread rather than the tokio worker calling this — both call sites run
+    /// while a caller holds `AppState.player`'s async mutex, so blocking the
+    /// worker here would stall every other IPC command waiting on that lock
+    /// for as long as the r2d2 pool takes to hand back a connection.
+    async fn load_loudness_settings(db: &Arc<Database>) -> Result<crate::models::LoudnessSettings> {
+        let db = db.clone();
+        tokio::task::spawn_blocking(move || crate::loudness::get_settings(&db))
+            .await
+            .map_err(|e| anyhow!("loudness settings task panicked: {e}"))?
+    }
+
     fn compute_loudness_gain(
         settings: &crate::models::LoudnessSettings,
         song: &Song,
@@ -810,7 +822,7 @@ impl Player {
     /// global and flipping it early would affect the still-draining previous
     /// track's tail.
     async fn apply_loudness_gain(&mut self, song: &Song) {
-        let settings = match crate::loudness::get_settings(&self._db) {
+        let settings = match Self::load_loudness_settings(&self._db).await {
             Ok(s) => s,
             Err(e) => {
                 log::warn!("Failed to load loudness settings: {e}");
@@ -833,7 +845,7 @@ impl Player {
         let Some(song) = self.current_song.clone() else {
             return;
         };
-        let settings = match crate::loudness::get_settings(&self._db) {
+        let settings = match Self::load_loudness_settings(&self._db).await {
             Ok(s) => s,
             Err(e) => {
                 log::warn!("Failed to load loudness settings: {e}");

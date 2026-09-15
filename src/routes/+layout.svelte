@@ -15,6 +15,7 @@
   import KeyboardShortcutsModal from '../lib/components/KeyboardShortcutsModal.svelte';
   import Toast from '../lib/components/Toast.svelte';
   import WalkthroughOverlay from '../lib/components/WalkthroughOverlay.svelte';
+  import WelcomeScreen from '../lib/components/WelcomeScreen.svelte';
   import { IconContext, MusicNotesIcon as Music, CloudArrowUpIcon as UploadCloud } from 'phosphor-svelte';
 
   import { i18n } from '../lib/stores/i18n.svelte';
@@ -25,6 +26,7 @@
   import { scrobblerStore } from '../lib/stores/scrobbler.svelte';
   import { toastStore } from '../lib/stores/toast.svelte';
   import { walkthroughStore } from '../lib/stores/walkthrough.svelte';
+  import { welcomeStore } from '../lib/stores/welcome.svelte';
   import { isLinux as platformIsLinux } from '../lib/platform';
   import { themeStore } from '../lib/stores/theme.svelte';
   import { generateEllipseGradientSvg } from '../lib/utils/ellipseGradient';
@@ -43,6 +45,14 @@
   } from '../lib/constants';
 
   let { children } = $props();
+
+  function handleWelcomeGetStarted() {
+    // Unconditional: this is an explicit user request to start the tour, not
+    // the auto-resume-on-launch path below — it should never be suppressed
+    // by a hasCompleted flag left over from a previous run.
+    welcomeStore.markSeen();
+    walkthroughStore.start();
+  }
   let isLinux = $state(false);
   let isShortcutsModalOpen = $state(false);
   let isDragActive = $state(false);
@@ -81,19 +91,43 @@
     void getCurrentWindow()?.setTitle?.(title)?.catch(() => {});
   });
 
+  // Auto-resumes the walkthrough in "resume" mode (see the onMount comment
+  // near welcomeStore.init()/walkthroughStore.init()) whenever a
+  // previously-unavailable step becomes reachable — most notably right when
+  // the user presses Play for the first time, so the player-bar/right-panel
+  // steps don't have to wait for a relaunch to be offered. Gated on
+  // collectionStore.statsLoaded (not the moment welcomeStore/walkthroughStore
+  // resolve) since those are single settings round-trips that finish well
+  // before a freshly-scanned library's stats do — checking earlier would see
+  // a stale total_songs === 0. The `isActive` guard keeps this from
+  // re-triggering while a resumed run is already showing, and it's
+  // otherwise self-limiting: once every currently-available step has been
+  // seen, hasPendingSteps goes false and this becomes a no-op until
+  // something new (more songs, playback) makes another step reachable.
+  $effect(() => {
+    if (walkthroughStore.isActive) return;
+    if (!welcomeStore.initialized || !welcomeStore.hasSeen) return;
+    if (!collectionStore.statsLoaded) return;
+    void playerStore.currentSong;
+    if (walkthroughStore.hasPendingSteps) {
+      walkthroughStore.start("resume");
+    }
+  });
+
   onMount(() => {
     isLinux = platformIsLinux;
     i18n.init();
     prefs.init();
-    // Auto-prompt the tour once, on first launch — skippable in one click via
-    // the overlay's Skip button or Escape, and the steps themselves already
-    // degrade gracefully against an empty library (see WalkthroughOverlay's
-    // target-resolution skip logic).
-    walkthroughStore.init().then(() => {
-      if (!walkthroughStore.hasCompleted) {
-        walkthroughStore.start();
-      }
-    });
+    // The very first launch shows WelcomeScreen instead of auto-popping the
+    // tour — its "Get Started" button is what starts the tour. Returning
+    // users who already passed the welcome gate auto-resume in "resume"
+    // mode, which only offers steps not yet seen (see walkthrough.svelte.ts)
+    // — so a step that was unreachable on an earlier, emptier run (e.g. the
+    // player-bar steps before anything ever played) gets offered once it
+    // becomes reachable, without re-showing ones already seen. Skippable in
+    // one click via the overlay's Skip button or Escape.
+    welcomeStore.init();
+    walkthroughStore.init();
     tagsStore.load().catch((err) => console.error('Failed to load tags:', err));
     updaterStore.init();
     picardStore.init();
@@ -245,9 +279,31 @@
       });
 
     window.addEventListener('keydown', handleGlobalHotkeys);
+
+    // Forwards uncaught JS errors/rejections to the backend crash log (#684)
+    // — without this, a frontend crash a user hits when not running from a
+    // terminal leaves no trace anywhere for a bug report to point to.
+    const handleWindowError = (e: ErrorEvent) => {
+      void invoke('log_frontend_error', {
+        message: e.message || String(e.error),
+        stack: e.error?.stack,
+      }).catch(() => {});
+    };
+    const handleUnhandledRejection = (e: PromiseRejectionEvent) => {
+      const reason = e.reason;
+      void invoke('log_frontend_error', {
+        message: reason instanceof Error ? reason.message : String(reason),
+        stack: reason instanceof Error ? reason.stack : undefined,
+      }).catch(() => {});
+    };
+    window.addEventListener('error', handleWindowError);
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
     return () => {
       window.removeEventListener('keydown', handleGlobalHotkeys);
       window.removeEventListener('focus', handleWindowFocus);
+      window.removeEventListener('error', handleWindowError);
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
       stopShiftPolling();
       dragDropUnlisten?.();
       focusUnlisten?.();
@@ -574,6 +630,10 @@
 
 {#if isShortcutsModalOpen}
   <KeyboardShortcutsModal onClose={() => (isShortcutsModalOpen = false)} />
+{/if}
+
+{#if welcomeStore.initialized && !welcomeStore.hasSeen}
+  <WelcomeScreen onGetStarted={handleWelcomeGetStarted} />
 {/if}
 
 <WalkthroughOverlay />

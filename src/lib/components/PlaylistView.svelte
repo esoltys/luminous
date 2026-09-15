@@ -50,7 +50,6 @@
   import PlaylistContextMenu from "./PlaylistContextMenu.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import Modal from "./Modal.svelte";
-  import ColumnSelector from "./ColumnSelector.svelte";
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
   import IconActionButton from "./IconActionButton.svelte";
@@ -592,6 +591,27 @@
     }
   }
 
+  let scrollContainerEl = $state<HTMLDivElement | undefined>(undefined);
+
+  // Consumes navigationStore.pendingScrollToCurrentSong (set by the playbar's
+  // Queue button) once this view is showing the queue with its tracks loaded,
+  // scrolling the now-playing row into view instead of leaving the user at
+  // whatever position rememberScroll restored.
+  $effect(() => {
+    if (!navigationStore.pendingScrollToCurrentSong) return;
+    if (!isQueue || !scrollContainerEl) return;
+    const uuid = playerStore.playlistItemUuid;
+    const tracks = playlistsStore.activePlaylistTracks;
+    if (tracks.length === 0) return;
+    const index = uuid
+      ? tracks.findIndex((t) => t.uuid === uuid)
+      : tracks.findIndex((t) => t.song && playerStore.currentSong && t.song.id === playerStore.currentSong.id);
+    navigationStore.pendingScrollToCurrentSong = false;
+    if (index === -1) return;
+    const row = scrollContainerEl.querySelector<HTMLElement>(`[data-song-row][data-index="${index}"]`);
+    row?.scrollIntoView({ block: "center" });
+  });
+
   let currentCoverUrl = $derived.by(() => {
     const song = playerStore.currentSong;
     if (!song) return null;
@@ -638,6 +658,7 @@
 
   {#if activePlaylist}
     <div
+      bind:this={scrollContainerEl}
       class="flex-1 flex flex-col min-h-0 relative z-10 overflow-y-auto"
       use:rememberScroll={`playlist:${playlistsStore.activePlaylistId}`}
     >
@@ -760,7 +781,6 @@
                 {/snippet}
               </IconActionButton>
             {/if}
-            <ColumnSelector align="left" iconOnly />
           </div>
 
           {#if !windowLayoutStore.isDetailHeaderCollapsed}
@@ -1031,19 +1051,21 @@
           <span>{i18n.t("playlists.useAbsolutePaths")}</span>
         </label>
       </div>
-      <div class="flex justify-end gap-2 pt-2">
-        <button
+      <div class="flex justify-end gap-3 pt-2">
+        <Button
           onclick={() => { showExportOptionsModal = false; }}
-          class="px-3 py-1.5 rounded text-xs font-medium text-brand-text-secondary hover:bg-brand-main transition-colors"
+          variant="secondary"
+          size="sm"
         >
           {i18n.t("playlists.cancelBtn")}
-        </button>
-        <button
+        </Button>
+        <Button
           onclick={triggerExport}
-          class="px-3 py-1.5 rounded text-xs font-medium bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast transition-colors"
+          variant="primary"
+          size="sm"
         >
           {i18n.t("playlists.exportBtn")}
-        </button>
+        </Button>
       </div>
     </div>
   </div>
@@ -1063,7 +1085,7 @@
 
     <form onsubmit={(e) => { e.preventDefault(); confirmSaveQueueAsCustomPlaylist(); }} class="flex flex-col gap-4 p-6 bg-brand-sidebar">
       <div class="flex flex-col gap-1.5">
-        <label for="save-queue-name-input" class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider">
+        <label for="save-queue-name-input" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
           {i18n.t("playlists.saveQueueNameLabel", {}, "Playlist Name")}
         </label>
         <Input

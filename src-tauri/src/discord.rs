@@ -112,12 +112,27 @@ pub async fn connect_discord_ipc() -> std::io::Result<IpcStream> {
     }
     #[cfg(unix)]
     {
-        let dirs = [
-            std::env::var("XDG_RUNTIME_DIR").ok(),
-            std::env::var("TMPDIR").ok(),
-            Some("/tmp".to_string()),
-        ];
-        for dir in dirs.into_iter().flatten() {
+        let xdg_runtime_dir = std::env::var("XDG_RUNTIME_DIR").ok();
+
+        // A bare `$XDG_RUNTIME_DIR/discord-ipc-*` only covers a natively
+        // (deb/rpm/tarball) installed Discord. Flatpak and Snap sandbox each
+        // app into its own private subdirectory of the runtime dir instead
+        // of sharing the top-level socket namespace, so a Flatpak- or
+        // Snap-installed Discord (both common on Linux, and Flatpak is the
+        // distro-agnostic install path Discord's own download page
+        // recommends) never shows up there.
+        let mut dirs: Vec<String> = Vec::new();
+        if let Some(ref runtime_dir) = xdg_runtime_dir {
+            dirs.push(runtime_dir.clone());
+            dirs.push(format!("{runtime_dir}/app/com.discordapp.Discord"));
+            dirs.push(format!("{runtime_dir}/snap.discord"));
+        }
+        if let Ok(tmpdir) = std::env::var("TMPDIR") {
+            dirs.push(tmpdir);
+        }
+        dirs.push("/tmp".to_string());
+
+        for dir in dirs {
             for i in 0..10 {
                 let path = format!("{}/discord-ipc-{}", dir, i);
                 if let Ok(stream) = UnixStream::connect(&path).await {

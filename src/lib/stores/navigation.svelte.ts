@@ -320,6 +320,16 @@ class NavigationStore {
     this.selectedPlaylistId = null;
     this.selectedAutoPlaylist = ref;
   }
+
+  /** One-shot signal (not persisted) telling the playlist detail view to scroll
+   * the currently playing song into view once it renders — set when the
+   * playbar's Queue button navigates there, so the user lands on their place
+   * in the queue instead of the top. Consumed and cleared by the view. */
+  pendingScrollToCurrentSong = $state(false);
+
+  requestScrollToCurrentSong() {
+    this.pendingScrollToCurrentSong = true;
+  }
 }
 
 export const navigationStore = new NavigationStore();

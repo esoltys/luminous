@@ -20,6 +20,7 @@ pub mod context;
 pub mod covermanager;
 pub mod cue;
 pub mod db;
+pub mod diagnostics;
 pub mod discord;
 pub mod dr_parser;
 pub mod equalizer;
@@ -264,6 +265,39 @@ fn restore_equalizer_from_db(db: &Database, audio_engine: &AudioEngine) {
             }
         }
     }
+}
+
+/// Watches for Tokio scheduler delay: sleeps for a nominal 20ms (chosen to
+/// match a typical audio-frame window, since that's the granularity where a
+/// scheduling stall would first become audible) and compares it against the
+/// actual elapsed time. A large overshoot means the runtime's worker threads
+/// were too busy/blocked to poll this task promptly — the same condition
+/// that would delay IPC command handlers waiting on `AppState`'s locks.
+/// This is a cheap, dependency-free first signal for "is the runtime
+/// actually falling behind" per issue #1002 — not a replacement for proper
+/// tokio-console instrumentation, which needs a `tokio_unstable` build-wide
+/// cfg flag and is a separate decision.
+fn spawn_scheduler_latency_monitor() {
+    const PROBE_INTERVAL: std::time::Duration = std::time::Duration::from_millis(20);
+    const WARN_THRESHOLD: std::time::Duration = std::time::Duration::from_millis(40);
+
+    tauri::async_runtime::spawn(async move {
+        loop {
+            let start = std::time::Instant::now();
+            tokio::time::sleep(PROBE_INTERVAL).await;
+            let elapsed = start.elapsed();
+            if let Some(overshoot) = elapsed.checked_sub(PROBE_INTERVAL) {
+                if overshoot > WARN_THRESHOLD {
+                    log::warn!(
+                        "Tokio scheduler delay detected: {}ms probe took {}ms (overshoot {}ms) — IPC commands and UI ticks may be lagging",
+                        PROBE_INTERVAL.as_millis(),
+                        elapsed.as_millis(),
+                        overshoot.as_millis()
+                    );
+                }
+            }
+        }
+    });
 }
 
 /// Spawns the ~30 FPS spectrum-emission loop that pushes `spectrum-data`
@@ -589,42 +623,18 @@ fn register_media_shortcuts(app: &tauri::App) {
     }
 }
 
-/// Installs a panic hook that appends the panic message, location, and a
-/// backtrace to `panic.log` in `log_dir`, then falls through to the default
-/// hook so the message still reaches stderr as before. Without this, a
-/// panic in a non-terminal launch (the normal desktop case) leaves no trace
-/// anywhere — the process just dies (#684).
-fn install_panic_hook(log_dir: std::path::PathBuf) {
-    let default_hook = std::panic::take_hook();
-    std::panic::set_hook(Box::new(move |info| {
-        default_hook(info);
-
-        if let Err(e) = std::fs::create_dir_all(&log_dir) {
-            log::error!("Failed to create log dir for panic log: {e}");
-            return;
-        }
-
-        let backtrace = std::backtrace::Backtrace::force_capture();
-        let entry = format!(
-            "[{}] {}\n{}\n\n",
-            chrono::Local::now().to_rfc3339(),
-            info,
-            backtrace
-        );
-
-        if let Err(e) = std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(log_dir.join("panic.log"))
-            .and_then(|mut f| std::io::Write::write_all(&mut f, entry.as_bytes()))
-        {
-            log::error!("Failed to write panic log: {e}");
-        }
-    }));
-}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Opt-in Tokio task/scheduler introspection (see docs/PERFORMANCE.md).
+    // Must run before Tauri creates its async runtime, since it installs the
+    // `tracing` subscriber that records every task's spawn/poll events —
+    // anything spawned before this line wouldn't be visible in `tokio-console`.
+    // Off by default: the `tokio-console` feature and its `tokio_unstable`
+    // cfg flag are dev/debug-only and never part of a release build.
+    #[cfg(feature = "tokio-console")]
+    console_subscriber::init();
+
     // Without this, every log::info!/warn!/error! call across the backend
     // (including reconcile-failure diagnostics) is a silent no-op — `log`
     // is just a facade and needs a registered backend to actually emit
@@ -777,8 +787,8 @@ pub fn run() {
             }
         }))
         .setup(|app| {
-            if let Ok(log_dir) = app.path().app_log_dir() {
-                install_panic_hook(log_dir);
+            if let Ok(app_data_dir) = app.path().app_data_dir() {
+                diagnostics::install_panic_hook(app_data_dir);
             }
 
             let db = Arc::new(
@@ -868,6 +878,9 @@ pub fn run() {
 
             // Spawn real-time visualizer spectrum emission loop (Tokio)
             spawn_visualizer_loop(app.handle().clone(), Arc::clone(&audio));
+
+            // Spawn scheduler-delay watchdog (Tokio) — see #1002.
+            spawn_scheduler_latency_monitor();
 
             let args: Vec<String> = std::env::args().collect();
             let startup_path = if args.len() > 1 {
@@ -1162,6 +1175,8 @@ pub fn run() {
             commands::settings::set_minimize_to_tray_enabled,
             commands::settings::get_autostart_enabled,
             commands::settings::set_autostart_enabled,
+            commands::diagnostics::log_frontend_error,
+            commands::diagnostics::export_diagnostics,
             install_format::get_install_format,
             // Scrobbler commands (#83)
             commands::scrobbler::get_scrobbler_settings,
@@ -1176,6 +1191,7 @@ pub fn run() {
             commands::stats::set_song_rating,
             commands::stats::set_album_rating,
             commands::stats::get_stats_summary,
+            commands::stats::get_top_albums_summary,
             commands::stats::get_listening_activity,
             commands::stats::get_stats_exclusions,
             commands::stats::set_stats_excluded,

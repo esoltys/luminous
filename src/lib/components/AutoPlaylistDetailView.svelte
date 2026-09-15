@@ -18,7 +18,6 @@
   import SongSelectionToolbar from "./SongSelectionToolbar.svelte";
   import PlayShuffleButtons from "./PlayShuffleButtons.svelte";
   import IconActionButton from "./IconActionButton.svelte";
-  import ColumnSelector from "./ColumnSelector.svelte";
   import Input from "./Input.svelte";
   import ContextMenu from "./ContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
@@ -652,7 +651,6 @@
               {/if}
             {/snippet}
           </IconActionButton>
-          <ColumnSelector align="left" iconOnly />
         </div>
 
         <div class="flex flex-wrap items-center gap-2.5 mt-2.5 select-none relative z-40">
@@ -952,7 +950,7 @@
 
     <form onsubmit={(e) => { e.preventDefault(); confirmSaveAsCustomPlaylist(); }} class="flex flex-col gap-4 p-6 bg-brand-sidebar">
       <div class="flex flex-col gap-1.5">
-        <label for="save-playlist-name-input" class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider">
+        <label for="save-playlist-name-input" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
           {i18n.t("playlists.saveQueueNameLabel", {}, "Playlist Name")}
         </label>
         <Input

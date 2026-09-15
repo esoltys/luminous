@@ -98,8 +98,14 @@
     </div>
   {/if}
 
-  <div bind:this={scrollContainer} class="flex gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 carousel-scroll">
-    {@render children()}
+  <div
+    class="carousel-fade"
+    class:fade-left={canScrollLeft}
+    class:fade-right={canScrollRight}
+  >
+    <div bind:this={scrollContainer} class="flex gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 carousel-scroll">
+      {@render children()}
+    </div>
   </div>
 </div>
 
@@ -110,5 +116,33 @@
   }
   .carousel-scroll::-webkit-scrollbar {
     display: none;
+  }
+
+  .carousel-fade {
+    --fade-width: 2.5rem;
+  }
+  .carousel-fade.fade-left {
+    -webkit-mask-image: linear-gradient(to right, transparent, black var(--fade-width));
+    mask-image: linear-gradient(to right, transparent, black var(--fade-width));
+  }
+  .carousel-fade.fade-right {
+    -webkit-mask-image: linear-gradient(to left, transparent, black var(--fade-width));
+    mask-image: linear-gradient(to left, transparent, black var(--fade-width));
+  }
+  .carousel-fade.fade-left.fade-right {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent,
+      black var(--fade-width),
+      black calc(100% - var(--fade-width)),
+      transparent
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      black var(--fade-width),
+      black calc(100% - var(--fade-width)),
+      transparent
+    );
   }
 </style>

@@ -70,8 +70,17 @@ export const en = {
     emptyState: "Start adding music to see your personalized collections"
   },
   emptyLibrary: {
-    title: "Welcome to Luminous",
+    title: "No Music Yet",
     text: "Your music library is currently empty. Check out Help in the sidebar to get started, or add a folder to begin scanning your music."
+  },
+  welcome: {
+    title: "Welcome to Luminous",
+    subtitle: "A high-performance home for the music you already own.",
+    getStarted: "Get Started",
+    legalPrefix: "By continuing, you agree to our",
+    termsOfService: "Terms of Service",
+    and: "and",
+    privacyPolicy: "Privacy Policy"
   },
   dbNewerThanApp: {
     title: "Database From a Newer Version",
@@ -249,6 +258,10 @@ export const en = {
     minimizeToTrayHint: "Closing the window hides Luminous to the system tray instead of quitting.",
     launchAtLoginLabel: "Launch at login",
     launchAtLoginHint: "Starts Luminous automatically when you sign in.",
+    exportDiagnosticsLabel: "Export Diagnostics",
+    exportDiagnosticsHint: "Save a log file of recent crashes and errors to attach to a bug report.",
+    exportDiagnosticsSuccess: "Diagnostics exported",
+    exportDiagnosticsError: "Failed to export diagnostics",
     appAndUpdatesTitle: "Application & Updates",
     updateCheckNowBtn: "Check for Updates",
     updateChecking: "Checking...",
@@ -507,7 +520,7 @@ export const en = {
     removeUnavailableBtn: "Remove {count} unavailable",
     fileNotFoundTooltip: "File not found on disk",
     fileNotFoundText: "File not found",
-    importPlaylistBtn: "Import",
+    importPlaylistBtn: "Import Playlist",
     exportPlaylistBtn: "Export Playlist",
     importPlaylistTooltip: "Import playlist file (*.m3u, *.m3u8, *.pls, *.xspf)",
     exportPlaylistTooltip: "Export active playlist to file",
@@ -960,6 +973,7 @@ export const en = {
     editArtist: "Edit",
     editArtistDetails: "Edit Artist Details",
     editArtistTooltip: "Edit artist details, website, tags, and links",
+    refresh: "Refresh",
     refreshTooltip: "Rescan for local artwork and refresh bio",
     refreshSuccess: "Artist artwork and bio refreshed",
     refreshError: "Failed to refresh artist",
@@ -1039,6 +1053,7 @@ export const en = {
     overview: "Overview",
     editAlbumDetails: "Edit Album Details",
     editInfoTooltip: "Edit album info",
+    refresh: "Refresh",
     refreshTooltip: "Rescan metadata and artwork for this album",
     refreshSuccess: "Album metadata and artwork refreshed",
     refreshError: "Failed to refresh album metadata",
@@ -1198,6 +1213,7 @@ export const en = {
     notFound: "Not found — install it from picard.musicbrainz.org, or set a custom path below.",
     customPathLabel: "Custom Path (optional)",
     customPathPlaceholder: "C:\\Program Files\\MusicBrainz Picard\\picard.exe",
+    customPathPlaceholderLinux: "/var/lib/flatpak/exports/bin/org.musicbrainz.Picard",
     browseBtn: "Browse...",
     recheckTooltip: "Re-check for Picard",
     missingPlaylistLabel: "Missing MusicBrainz ID Auto-Playlist",

@@ -165,14 +165,14 @@
 
       <div class="flex items-center justify-between gap-x-3 gap-y-2 flex-wrap">
         <div class="flex items-center gap-1.5" role="tablist" aria-label={i18n.t('walkthrough.progress', {}, 'Walkthrough progress')}>
-          {#each walkthroughStore.steps as step, i (step.id)}
+          {#each walkthroughStore.availableSteps as step, i (step.id)}
             <span
-              class="h-1.5 rounded-full transition-all {i === walkthroughStore.currentStepIndex ? 'w-4 bg-brand-accent' : 'w-1.5 bg-brand-border'}"
+              class="h-1.5 rounded-full transition-all {i === walkthroughStore.currentAvailableIndex ? 'w-4 bg-brand-accent' : 'w-1.5 bg-brand-border'}"
             ></span>
           {/each}
         </div>
         <div class="flex items-center gap-2">
-          {#if walkthroughStore.currentStepIndex > 0}
+          {#if walkthroughStore.currentAvailableIndex > 0}
             <button
               onclick={() => walkthroughStore.prev()}
               class="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-main/80 transition-colors"
@@ -185,10 +185,10 @@
             onclick={() => walkthroughStore.next()}
             class="flex items-center gap-1 px-4 py-1.5 rounded-full text-xs font-semibold bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast transition-colors"
           >
-            {walkthroughStore.currentStepIndex === walkthroughStore.totalSteps - 1
+            {walkthroughStore.currentAvailableIndex === walkthroughStore.availableSteps.length - 1
               ? i18n.t('walkthrough.finish', {}, 'Finish')
               : i18n.t('walkthrough.next', {}, 'Next')}
-            {#if walkthroughStore.currentStepIndex < walkthroughStore.totalSteps - 1}
+            {#if walkthroughStore.currentAvailableIndex < walkthroughStore.availableSteps.length - 1}
               <ChevronRight class="w-3.5 h-3.5" />
             {/if}
           </button>

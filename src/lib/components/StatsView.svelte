@@ -2,6 +2,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import LoadingSpinner from "./LoadingSpinner.svelte";
   import ListeningHeatmap from "./ListeningHeatmap.svelte";
+  import TimeOfDayGraphic from "./TimeOfDayGraphic.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { rememberScroll } from "../utils/scrollMemory";
   import { playerStore } from "../stores/player.svelte";
@@ -10,6 +11,7 @@
   import { bucketListeningClock } from "../utils/listeningClock";
   import type { DaypartBucket } from "../utils/daypart";
   import { navigationStore } from "../stores/navigation.svelte";
+  import TopTenList from "./TopTenList.svelte";
 
   const VALID_RANGES: StatsRange[] = ["7d", "28d", "1y"];
   function loadSavedRange(): StatsRange {
@@ -61,11 +63,11 @@
   });
 
   // Same order as the sidebar's Collection sub-tabs (Artists, Albums, Songs, Genres).
-  const SECTIONS: { key: keyof StatsSummary; title: () => string }[] = [
-    { key: "top_artists", title: () => i18n.t("stats.topArtists", {}, "Top Artists") },
-    { key: "top_albums", title: () => i18n.t("stats.topAlbums", {}, "Top Albums") },
-    { key: "top_songs", title: () => i18n.t("stats.topSongs", {}, "Top Songs") },
-    { key: "top_genres", title: () => i18n.t("stats.topGenres", {}, "Top Genres") }
+  const SECTIONS: { key: keyof StatsSummary; kind: "artist" | "album" | "song" | "genre"; title: () => string }[] = [
+    { key: "top_artists", kind: "artist", title: () => i18n.t("stats.topArtists", {}, "Top Artists") },
+    { key: "top_albums", kind: "album", title: () => i18n.t("stats.topAlbums", {}, "Top Albums") },
+    { key: "top_songs", kind: "song", title: () => i18n.t("stats.topSongs", {}, "Top Songs") },
+    { key: "top_genres", kind: "genre", title: () => i18n.t("stats.topGenres", {}, "Top Genres") }
   ];
 
   function itemsFor(key: keyof StatsSummary): StatsTopItem[] {
@@ -143,49 +145,14 @@
         {i18n.t("stats.empty", {}, "No listening history for this range yet.")}
       </div>
     {:else}
-      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+      <div class="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-4 gap-6">
         {#each SECTIONS as section (section.key)}
           <div class="bg-brand-sidebar border border-brand-border/60 rounded-xl p-4">
-            <h2 class="text-sm font-semibold text-brand-text-primary mb-3">{section.title()}</h2>
-            {#if itemsFor(section.key).length === 0}
-              <p class="text-xs text-brand-text-secondary">{i18n.t("stats.noData", {}, "No data for this range.")}</p>
-            {:else}
-              <ol class="space-y-2">
-                {#each itemsFor(section.key) as item, i (item.key)}
-                  {@const clickable = section.key !== "top_songs" || !!item.album}
-                  <!-- svelte-ignore a11y_click_events_have_key_events -->
-                  <!-- svelte-ignore a11y_no_static_element_interactions -->
-                  <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-                  <li
-                    role={clickable ? "button" : undefined}
-                    tabindex={clickable ? 0 : undefined}
-                    onclick={clickable ? () => openItem(section.key, item) : undefined}
-                    onkeydown={clickable
-                      ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openItem(section.key, item); } }
-                      : undefined}
-                    class="flex items-center gap-2 text-sm rounded-md -mx-1 px-1 py-0.5 transition-colors {clickable ? 'cursor-pointer hover:bg-brand-accent/10' : ''}"
-                  >
-                    <span class="text-xs text-brand-text-secondary w-4 shrink-0">{i + 1}</span>
-                    <div class="min-w-0 flex-1">
-                      <div class="truncate text-brand-text-primary">{item.label}</div>
-                      {#if item.secondary}
-                        <div class="truncate text-xs text-brand-text-secondary">{item.secondary}</div>
-                      {/if}
-                    </div>
-                    <span
-                      class="text-xs text-brand-text-secondary shrink-0 tabular-nums"
-                      title={item.play_count === 1
-                        ? i18n.t("stats.playsCountOne", {}, "1 play")
-                        : i18n.t("stats.playsCount", { count: item.play_count }, `${item.play_count} plays`)}
-                    >
-                      {item.minutes === 0 && item.play_count > 0
-                        ? i18n.t("stats.minuteUnderOne", {}, "< 1 min")
-                        : i18n.t("stats.minuteCount", { count: item.minutes.toLocaleString() }, `${item.minutes.toLocaleString()} min`)}
-                    </span>
-                  </li>
-                {/each}
-              </ol>
-            {/if}
+            <TopTenList
+              title={section.title()}
+              items={itemsFor(section.key)}
+              kind={section.kind}
+            />
           </div>
         {/each}
       </div>
@@ -194,19 +161,27 @@
         <h2 class="text-sm font-semibold text-brand-text-primary mb-3">
           {i18n.t("stats.listeningClock", {}, "Time of Day")}
         </h2>
-        <div class="grid grid-cols-4 gap-4">
-          {#each CLOCK_BUCKETS as bucket (bucket.key)}
-            <div class="flex flex-col items-center gap-2">
-              <div class="w-full h-24 flex items-end bg-brand-main rounded-md overflow-hidden">
-                <div
-                  class="w-full bg-brand-accent transition-all"
-                  style="height: {((clockCounts[bucket.key] ?? 0) / maxClockCount) * 100}%"
-                ></div>
+        <div class="max-w-[820px] mx-auto">
+          <TimeOfDayGraphic
+            counts={clockCounts}
+            max={maxClockCount}
+            labels={{
+              morning: CLOCK_BUCKETS[0].label(),
+              afternoon: CLOCK_BUCKETS[1].label(),
+              evening: CLOCK_BUCKETS[2].label(),
+              latenight: CLOCK_BUCKETS[3].label()
+            }}
+          />
+          <div class="grid grid-cols-4 gap-4 mt-2">
+            {#each CLOCK_BUCKETS as bucket (bucket.key)}
+              <div class="flex flex-col items-center gap-0.5">
+                <span class="text-xs text-brand-text-secondary text-center">{bucket.label()}</span>
+                <span class="text-xs text-brand-text-primary font-medium">
+                  {i18n.t("stats.minuteCount", { count: clockCounts[bucket.key] ?? 0 }, `${clockCounts[bucket.key] ?? 0} min`)}
+                </span>
               </div>
-              <span class="text-xs text-brand-text-secondary text-center">{bucket.label()}</span>
-              <span class="text-xs text-brand-text-primary font-medium">{clockCounts[bucket.key] ?? 0}</span>
-            </div>
-          {/each}
+            {/each}
+          </div>
         </div>
       </div>
     {/if}

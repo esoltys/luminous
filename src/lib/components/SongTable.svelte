@@ -38,6 +38,7 @@
   import NowPlayingBars from "./NowPlayingBars.svelte";
   import EmptyState from "./EmptyState.svelte";
   import LibraryBadge from "./LibraryBadge.svelte";
+  import ColumnSelector from "./ColumnSelector.svelte";
   import {
     PlayIcon as Play,
     PlusIcon as Plus,
@@ -154,6 +155,13 @@
   // the same amount so both grids compute identical track widths.
   let bodyContainer = $state<HTMLDivElement | undefined>(undefined);
   let scrollbarWidth = $state(0);
+
+  let columnSelector = $state<ReturnType<typeof ColumnSelector> | undefined>(undefined);
+
+  function handleHeaderContextMenu(e: MouseEvent) {
+    e.preventDefault();
+    columnSelector?.openAt(e.clientX, e.clientY);
+  }
 
   $effect(() => {
     if (!virtualized || !bodyContainer) return;
@@ -679,8 +687,9 @@
   </div>
 {/snippet}
 
+<ColumnSelector bind:this={columnSelector} hideTrigger />
 <div class="sticky top-0 z-10 flex flex-col rounded-t-lg bg-brand-sidebar border-b border-brand-border text-xs text-brand-text-secondary uppercase tracking-wider font-semibold select-none">
-  <div role="row" class="grid items-center py-3 px-4" style="{gridColsStyle}{virtualized ? `; padding-right: calc(1rem + ${scrollbarWidth}px)` : ''}">
+  <div role="row" tabindex="-1" oncontextmenu={handleHeaderContextMenu} class="grid items-center py-3 px-4" style="{gridColsStyle}{virtualized ? `; padding-right: calc(1rem + ${scrollbarWidth}px)` : ''}">
     {#if mode === "position" && positionSortField}
       <SortableHeader
         active={sortField === positionSortField}
