@@ -438,7 +438,7 @@ export const fr = {
     removeUnavailableBtn: "Retirer {count} indisponibles",
     fileNotFoundTooltip: "Fichier introuvable sur le disque",
     fileNotFoundText: "Introuvable",
-    importPlaylistBtn: "Importer",
+    importPlaylistBtn: "Importer une liste",
     exportPlaylistBtn: "Exporter la liste",
     importPlaylistTooltip: "Importer un fichier de liste (*.m3u, *.m3u8, *.pls, *.xspf)",
     exportPlaylistTooltip: "Exporter la liste active vers un fichier",
