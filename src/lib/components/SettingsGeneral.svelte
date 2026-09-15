@@ -4,7 +4,9 @@
   import { updaterStore, MICROSOFT_STORE_URL } from "../stores/updater.svelte";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
+  import { save } from "@tauri-apps/plugin-dialog";
   import { openExternalUrl } from "../utils/openExternalUrl";
+  import { toastStore } from "../stores/toast.svelte";
   import Toggle from "./Toggle.svelte";
   import Select from "./Select.svelte";
   import Button from "./Button.svelte";
@@ -110,6 +112,36 @@
       setTimeout(() => { versionCopied = false; }, COPY_FEEDBACK_DURATION_MS);
     } catch (e) {
       console.error("Failed to copy version to clipboard:", e);
+    }
+  }
+
+  let exportingDiagnostics = $state(false);
+
+  async function exportDiagnostics() {
+    if (exportingDiagnostics) return;
+    exportingDiagnostics = true;
+    try {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const exportPath = await save({
+        title: i18n.t("settings.exportDiagnosticsLabel", {}, "Export Diagnostics"),
+        defaultPath: `luminous-diagnostics-${timestamp}.txt`,
+        filters: [{ name: "Text", extensions: ["txt"] }],
+      });
+      if (exportPath && typeof exportPath === "string") {
+        await invoke("export_diagnostics", { exportPath });
+        toastStore.show(
+          i18n.t("settings.exportDiagnosticsSuccess", {}, "Diagnostics exported"),
+          "success"
+        );
+      }
+    } catch (err) {
+      console.error("Failed to export diagnostics:", err);
+      toastStore.show(
+        i18n.t("settings.exportDiagnosticsError", {}, "Failed to export diagnostics"),
+        "error"
+      );
+    } finally {
+      exportingDiagnostics = false;
     }
   }
 
@@ -248,6 +280,16 @@
       onchange={(v) => prefs.setAutostart(v)}
       label={i18n.t('settings.launchAtLoginLabel')}
     />
+  </div>
+
+  <div class="flex items-center justify-between gap-4 py-4">
+    <div class="flex flex-col gap-0.5 min-w-0">
+      <span class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.exportDiagnosticsLabel', {}, 'Export Diagnostics')}</span>
+      <p class="text-xs text-brand-text-secondary">{i18n.t('settings.exportDiagnosticsHint', {}, 'Save a log file of recent crashes and errors to attach to a bug report.')}</p>
+    </div>
+    <Button onclick={exportDiagnostics} disabled={exportingDiagnostics} class="shrink-0 text-xs px-3.5 py-1.5">
+      {i18n.t('settings.exportDiagnosticsLabel', {}, 'Export Diagnostics')}
+    </Button>
   </div>
 </div>
 

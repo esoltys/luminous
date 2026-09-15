@@ -20,6 +20,7 @@ pub mod context;
 pub mod covermanager;
 pub mod cue;
 pub mod db;
+pub mod diagnostics;
 pub mod discord;
 pub mod dr_parser;
 pub mod equalizer;
@@ -622,39 +623,6 @@ fn register_media_shortcuts(app: &tauri::App) {
     }
 }
 
-/// Installs a panic hook that appends the panic message, location, and a
-/// backtrace to `panic.log` in `log_dir`, then falls through to the default
-/// hook so the message still reaches stderr as before. Without this, a
-/// panic in a non-terminal launch (the normal desktop case) leaves no trace
-/// anywhere — the process just dies (#684).
-fn install_panic_hook(log_dir: std::path::PathBuf) {
-    let default_hook = std::panic::take_hook();
-    std::panic::set_hook(Box::new(move |info| {
-        default_hook(info);
-
-        if let Err(e) = std::fs::create_dir_all(&log_dir) {
-            log::error!("Failed to create log dir for panic log: {e}");
-            return;
-        }
-
-        let backtrace = std::backtrace::Backtrace::force_capture();
-        let entry = format!(
-            "[{}] {}\n{}\n\n",
-            chrono::Local::now().to_rfc3339(),
-            info,
-            backtrace
-        );
-
-        if let Err(e) = std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(log_dir.join("panic.log"))
-            .and_then(|mut f| std::io::Write::write_all(&mut f, entry.as_bytes()))
-        {
-            log::error!("Failed to write panic log: {e}");
-        }
-    }));
-}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -819,8 +787,8 @@ pub fn run() {
             }
         }))
         .setup(|app| {
-            if let Ok(log_dir) = app.path().app_log_dir() {
-                install_panic_hook(log_dir);
+            if let Ok(app_data_dir) = app.path().app_data_dir() {
+                diagnostics::install_panic_hook(app_data_dir);
             }
 
             let db = Arc::new(
@@ -1207,6 +1175,8 @@ pub fn run() {
             commands::settings::set_minimize_to_tray_enabled,
             commands::settings::get_autostart_enabled,
             commands::settings::set_autostart_enabled,
+            commands::diagnostics::log_frontend_error,
+            commands::diagnostics::export_diagnostics,
             install_format::get_install_format,
             // Scrobbler commands (#83)
             commands::scrobbler::get_scrobbler_settings,
