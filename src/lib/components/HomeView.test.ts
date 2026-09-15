@@ -101,7 +101,7 @@ describe("HomeView.svelte", () => {
     render(HomeView);
 
     await waitFor(() => {
-      expect(screen.getByText("Welcome to Luminous")).toBeInTheDocument();
+      expect(screen.getByText("No Music Yet")).toBeInTheDocument();
     });
   });
 
@@ -113,7 +113,7 @@ describe("HomeView.svelte", () => {
     await waitFor(() => {
       expect(screen.getAllByText("Full Moon Fever").length).toBeGreaterThan(0);
     });
-    expect(screen.queryByText("Welcome to Luminous")).not.toBeInTheDocument();
+    expect(screen.queryByText("No Music Yet")).not.toBeInTheDocument();
   });
 
   it("shows the Explore Your Library row when there is no play history, and hides it once there is", async () => {

@@ -7,6 +7,7 @@
   import { i18n } from "../stores/i18n.svelte";
   import { updaterStore } from "../stores/updater.svelte";
   import { tagsStore } from "../stores/tags.svelte";
+  import { walkthroughStore } from "../stores/walkthrough.svelte";
   import {
     BooksIcon as Library,
     PlaylistIcon as ListMusic,
@@ -89,7 +90,11 @@
       {/if}
     </button>
 
-    {#if !collectionStore.statsLoaded || collectionStore.stats.total_songs > 0}
+    <!-- Collection/Playlists/Lyrics/Stats stay hidden until the library has
+         songs — except during the walkthrough, whose "sidebar" step
+         narrates all of them, so an empty-library first-run tour would
+         otherwise describe nav items the user can't see. -->
+    {#if !collectionStore.statsLoaded || collectionStore.stats.total_songs > 0 || walkthroughStore.isActive}
     <div class="w-full flex flex-col {isCollapsed ? 'items-center' : ''}">
       <button
         onclick={selectCollectionTab}

@@ -69,8 +69,17 @@ export const fr = {
     emptyState: "Commencez à ajouter de la musique pour voir vos collections personnalisées"
   },
   emptyLibrary: {
-    title: "Bienvenue dans Luminous",
+    title: "Aucune musique pour l'instant",
     text: "Votre bibliothèque musicale est actuellement vide. Consultez l'Aide dans la barre latérale pour commencer, ou ajoutez un dossier pour analyser votre musique."
+  },
+  welcome: {
+    title: "Bienvenue dans Luminous",
+    subtitle: "Un espace performant pour la musique que vous possédez déjà.",
+    getStarted: "Commencer",
+    legalPrefix: "En continuant, vous acceptez nos",
+    termsOfService: "Conditions d'utilisation",
+    and: "et notre",
+    privacyPolicy: "Politique de confidentialité"
   },
   dbNewerThanApp: {
     title: "Base de données d'une version plus récente",

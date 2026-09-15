@@ -38,6 +38,10 @@
       {i18n.t('sidebar.settings')}
     </Button>
   {:else}
+    <!-- The very first launch (before the tour has ever been completed) shows
+         the full-screen WelcomeScreen instead — this stays a plain, non-
+         "Welcome"-branded empty state so it doesn't duplicate that greeting
+         for returning users whose library later empties out (folders removed). -->
     <h3 class="text-base font-semibold text-brand-text-primary mb-1.5 text-balance">{i18n.t('emptyLibrary.title')}</h3>
     <p class="text-xs text-brand-text-secondary mb-5 leading-relaxed text-pretty">{i18n.t('emptyLibrary.text')}</p>
     <div class="flex items-center gap-2">
