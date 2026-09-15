@@ -996,7 +996,11 @@ export const fr = {
     "nordic-blue": "Bleu nordique",
     "retro-amber": "Ambre rétro",
     metallic: "Métallique",
-    sabrina: "Sabrina"
+    sabrina: "Sabrina",
+    "terminal-green": "Vert terminal",
+    driftwood: "Bois flotté",
+    foxglove: "Digitale",
+    mothman: "Mothman"
   },
   artistDetail: {
     backToArtists: "Voir les artistes",
