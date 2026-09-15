@@ -682,13 +682,17 @@ export const en = {
     includeInStats: "Include in Stats",
     excludedToast: "Excluded {name} from Stats",
     includedToast: "Included {name} in Stats again",
-    heatmapCurrentStreak: "Current Streak",
-    heatmapLongestStreak: "Longest Streak",
+    heatmapTitle: "Listening Streak",
+    heatmapHelp: "This calendar shows how many days in a row you've listened to music. Each square is one day — darker squares mean more minutes listened that day. Hover or tap a square to see its date.",
+    heatmapCurrentStreak: "Current streak",
+    heatmapLongestStreak: "Longest streak",
     heatmapStreakOneDay: "1 day",
     heatmapStreakDays: "{count} days",
-    heatmapTooltipNoListening: "No listening on {date}",
-    heatmapTooltipOneMinute: "1 minute on {date}",
-    heatmapTooltipMinutes: "{minutes} minutes on {date}"
+    heatmapStatusNoListening: "{date} — no listening",
+    heatmapStatusOneMinute: "{date} — 1 minute listened",
+    heatmapStatusMinutes: "{date} — {minutes} minutes listened",
+    heatmapLegendLess: "Less",
+    heatmapLegendMore: "More"
   },
   help: {
     loading: "Loading user guide..."

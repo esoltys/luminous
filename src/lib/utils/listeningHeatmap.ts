@@ -20,7 +20,10 @@ export interface StreakInfo {
   longest: number;
 }
 
-function localDateKey(date: Date): string {
+/** Local calendar date as YYYY-MM-DD. Exported so callers (e.g. the streak
+ * card) can locate a specific day's cell — "today" — in a built grid without
+ * duplicating this logic. */
+export function localDateKey(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
   const d = String(date.getDate()).padStart(2, "0");

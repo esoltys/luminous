@@ -681,13 +681,17 @@ export const fr = {
     includeInStats: "Inclure dans les statistiques",
     excludedToast: "{name} exclu des statistiques",
     includedToast: "{name} de nouveau inclus dans les statistiques",
+    heatmapTitle: "Série d'écoute",
+    heatmapHelp: "Ce calendrier montre combien de jours d'affilée vous avez écouté de la musique. Chaque case représente un jour — plus la case est foncée, plus vous avez écouté de minutes ce jour-là. Survolez ou touchez une case pour voir sa date.",
     heatmapCurrentStreak: "Série en cours",
     heatmapLongestStreak: "Plus longue série",
     heatmapStreakOneDay: "1 jour",
     heatmapStreakDays: "{count} jours",
-    heatmapTooltipNoListening: "Aucune écoute le {date}",
-    heatmapTooltipOneMinute: "1 minute le {date}",
-    heatmapTooltipMinutes: "{minutes} minutes le {date}"
+    heatmapStatusNoListening: "{date} — aucune écoute",
+    heatmapStatusOneMinute: "{date} — 1 minute écoutée",
+    heatmapStatusMinutes: "{date} — {minutes} minutes écoutées",
+    heatmapLegendLess: "Moins",
+    heatmapLegendMore: "Plus"
   },
   help: {
     loading: "Chargement du guide d'utilisation..."
