@@ -280,7 +280,10 @@ async function main() {
         language: "${language}",
         // Otherwise +layout.svelte auto-starts the first-launch Walkthrough
         // tour, whose popover would cover every capture (see #897).
-        walkthrough_completed: "true"
+        walkthrough_completed: "true",
+        // Otherwise the first-run Welcome screen covers every capture behind
+        // its full-screen overlay before the Walkthrough tour even starts.
+        welcome_seen: "true"
       };
       window.mockPlaybackPositionSec = ${positionSeconds};
       window.localStorage.setItem("layout_immersiveMode", "${isImmersive ? 'true' : 'false'}");

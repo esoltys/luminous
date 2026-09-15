@@ -528,6 +528,7 @@
         <button
           type="button"
           onclick={() => selectPreset(preset.id)}
+          aria-label={i18n.t(preset.labelKey)}
           class="text-left bg-brand-main/50 border-2 rounded-xl p-3 transition-colors duration-200 hover:border-brand-accent/40 {templatePreset === preset.id ? 'border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border/60'}"
         >
           <span class="font-semibold text-sm text-brand-text-primary block">{i18n.t(preset.labelKey)}</span>
@@ -537,6 +538,7 @@
       <button
         type="button"
         onclick={() => selectPreset("custom")}
+        aria-label={i18n.t("organizer.presetCustom")}
         class="text-left bg-brand-main/50 border-2 rounded-xl p-3 transition-colors duration-200 hover:border-brand-accent/40 {templatePreset === 'custom' ? 'border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border/60'}"
       >
         <span class="font-semibold text-sm text-brand-text-primary block">{i18n.t("organizer.presetCustom")}</span>
