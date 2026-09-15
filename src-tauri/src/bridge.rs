@@ -1,12 +1,21 @@
+use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::Semaphore;
 
 use crate::models::{PlayContext, PlayState, PlaybackState, RepeatMode, ShuffleMode, Song};
 use crate::AppState;
 
 pub const DEFAULT_BRIDGE_PORT: u16 = 21849;
 pub const BRIDGE_HOST: &str = "127.0.0.1";
+
+/// Caps how many bridge connections are handled at once. The bridge is
+/// loopback-only and each connection is short-lived (one request/response),
+/// so this is a generous ceiling meant to stop a runaway or misbehaving
+/// local client from spawning an unbounded number of tasks — not a tuned
+/// capacity limit.
+const MAX_CONCURRENT_BRIDGE_CONNECTIONS: usize = 64;
 
 #[derive(serde::Serialize)]
 pub struct BridgeTrack {
@@ -451,11 +460,30 @@ pub fn spawn_bridge_server(app: AppHandle) {
             }
         };
 
+        let connection_limit = Arc::new(Semaphore::new(MAX_CONCURRENT_BRIDGE_CONNECTIONS));
+
         loop {
             match listener.accept().await {
                 Ok((stream, _addr)) => {
+                    // Spawn unconditionally and acquire the permit *inside*
+                    // the task, not here — acquiring before spawning would
+                    // block this accept loop itself once the limit is hit,
+                    // which stalls every subsequent connection (including
+                    // ones that have nothing to do with the backlog) rather
+                    // than just delaying this one. A burst past
+                    // MAX_CONCURRENT_BRIDGE_CONNECTIONS reproduces this: the
+                    // whole bridge server stops accepting new connections
+                    // until the earlier ones drain.
                     let app_clone = app.clone();
-                    tokio::spawn(handle_connection(stream, app_clone));
+                    let limit = Arc::clone(&connection_limit);
+                    tokio::spawn(async move {
+                        let Ok(_permit) = limit.acquire_owned().await else {
+                            // Semaphore is only ever closed by dropping it,
+                            // which doesn't happen while the server is alive.
+                            return;
+                        };
+                        handle_connection(stream, app_clone).await;
+                    });
                 }
                 Err(e) => {
                     log::debug!("Bridge listener accept error: {}", e);
