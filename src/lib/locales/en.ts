@@ -1134,6 +1134,7 @@ export const en = {
     sectionTemplatePattern: "Template Pattern",
     sectionDestinationOptions: "Destination & Options",
     presetDefault: "Default",
+    presetAlternative: "Alternative",
     presetCustom: "Custom",
     presetCustomHint: "Write your own pattern",
     templateSampleOutputLabel: "Sample Output",

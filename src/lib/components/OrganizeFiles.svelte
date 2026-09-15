@@ -82,12 +82,13 @@
     return escaped.replace(/([/\\])/g, '<span class="text-brand-text-secondary font-bold px-0.5">$1</span>');
   }
 
-  // Template presets — only "Default" ships for now, mirroring how
-  // SettingsThemes.svelte offers predefined presets plus a "Custom" option
-  // that reveals a free-text field. The picker structure below makes adding
-  // more presets later a matter of extending TEMPLATE_PRESETS.
+  // Template presets, mirroring how SettingsThemes.svelte offers predefined
+  // presets plus a "Custom" option that reveals a free-text field. The
+  // picker structure below makes adding more presets later a matter of
+  // extending TEMPLATE_PRESETS.
   const TEMPLATE_PRESETS = [
-    { id: "default", template: DEFAULT_TEMPLATE },
+    { id: "default", labelKey: "organizer.presetDefault", template: DEFAULT_TEMPLATE },
+    { id: "alternative", labelKey: "organizer.presetAlternative", template: "%artist/%album (%year)/{CD %disc/}%track-%artist-%title" },
   ] as const;
   type TemplatePresetId = (typeof TEMPLATE_PRESETS)[number]["id"] | "custom";
 
@@ -128,6 +129,10 @@
     { albumArtist: "Radiohead", artist: "Radiohead", album: "OK Computer", year: 1997, genre: "Alternative Rock", track: 1, title: "Airbag" },
     { albumArtist: "Radiohead", artist: "Radiohead", album: "OK Computer", year: 1997, genre: "Alternative Rock", track: 2, title: "Paranoid Android" },
     { albumArtist: "Daft Punk", artist: "Daft Punk", album: "Discovery", year: 2001, genre: "Electronic", track: 1, title: "One More Time" },
+    // A multi-disc album so the preview demonstrates the conditional
+    // {CD %disc/} / {%disc-} blocks splitting into per-disc folders/prefixes.
+    { albumArtist: "Pink Floyd", artist: "Pink Floyd", album: "The Wall", year: 1979, genre: "Rock", disc: 1, track: 1, title: "In The Flesh?" },
+    { albumArtist: "Pink Floyd", artist: "Pink Floyd", album: "The Wall", year: 1979, genre: "Rock", disc: 2, track: 1, title: "Hey You" },
   ];
 
   /** A lightweight, display-only mirror of the backend's expand_template
@@ -518,14 +523,14 @@
 
 {#snippet templateSection()}
   <div class="space-y-4">
-    <div class="grid grid-cols-2 gap-3">
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
       {#each TEMPLATE_PRESETS as preset (preset.id)}
         <button
           type="button"
           onclick={() => selectPreset(preset.id)}
           class="text-left bg-brand-main/50 border-2 rounded-xl p-3 transition-colors duration-200 hover:border-brand-accent/40 {templatePreset === preset.id ? 'border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border/60'}"
         >
-          <span class="font-semibold text-sm text-brand-text-primary block">{i18n.t("organizer.presetDefault")}</span>
+          <span class="font-semibold text-sm text-brand-text-primary block">{i18n.t(preset.labelKey)}</span>
           <code class="text-[10px] text-brand-text-secondary font-mono truncate block mt-1">{preset.template}</code>
         </button>
       {/each}
@@ -621,7 +626,16 @@
       {/if}
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+    <div class="flex flex-col gap-3">
+      <div class="flex items-center justify-between gap-2 text-brand-text-secondary">
+        <span>{i18n.t("organizer.moveExtraFiles")}</span>
+        <Toggle
+          checked={moveExtraFiles}
+          onchange={(v) => { moveExtraFiles = v; }}
+          label={i18n.t("organizer.moveExtraFiles")}
+        />
+      </div>
+
       <div class="flex items-center justify-between gap-2 text-brand-text-secondary">
         <span>{i18n.t("organizer.replaceSpaces")}</span>
         <Toggle
@@ -637,15 +651,6 @@
           checked={asciiOnly}
           onchange={(v) => { asciiOnly = v; }}
           label={i18n.t("organizer.asciiOnly")}
-        />
-      </div>
-
-      <div class="flex items-center justify-between gap-2 text-brand-text-secondary">
-        <span>{i18n.t("organizer.moveExtraFiles")}</span>
-        <Toggle
-          checked={moveExtraFiles}
-          onchange={(v) => { moveExtraFiles = v; }}
-          label={i18n.t("organizer.moveExtraFiles")}
         />
       </div>
     </div>
@@ -696,6 +701,12 @@
             </span>
           {/if}
         </div>
+        {#if commonPrefix}
+          <div class="flex items-center gap-1.5 min-w-0" title={commonPrefix}>
+            <span class="font-semibold text-brand-accent-text shrink-0">{i18n.t("organizer.commonBasePath")}</span>
+            <span class="truncate text-brand-text-secondary">{commonPrefix}</span>
+          </div>
+        {/if}
       </div>
     </div>
 
@@ -713,16 +724,9 @@
           <span>{i18n.t("organizer.noChangingFilesMatch")}</span>
         </div>
       {:else}
-        {#if commonPrefix}
-          <div class="px-3 py-1 bg-brand-sidebar/80 border-b border-brand-border/40 text-[10px] text-brand-text-secondary font-mono flex items-center gap-1.5 shrink-0" title={commonPrefix}>
-            <span class="font-semibold text-brand-accent-text shrink-0">{i18n.t("organizer.commonBasePath")}</span>
-            <span class="truncate text-brand-text-primary">{commonPrefix}</span>
-          </div>
-        {/if}
-
         <div class="flex-1 min-h-0 overflow-x-auto overflow-y-hidden">
           <div style="min-width: {96 + fromColWidth + 24 + toColWidth + 20}px;" class="h-full flex flex-col">
-            <div class="h-7 px-3 flex items-center bg-brand-sidebar/95 border-b border-brand-border/60 text-[10px] font-semibold text-brand-text-secondary uppercase tracking-wider select-none shrink-0 font-mono">
+            <div class="h-7 px-3 flex items-center bg-brand-sidebar/95 border-b border-brand-border/60 text-[10px] font-semibold text-brand-text-secondary uppercase tracking-wider select-none shrink-0">
               <div class="w-24 shrink-0">{i18n.t("organizer.colStatus")}</div>
 
               <div class="flex items-center shrink-0 pr-1" style="width: {fromColWidth}px;">
@@ -764,7 +768,7 @@
                   {@const displayFrom = getDisplayPath(item.from_path, commonPrefix)}
                   {@const displayTo = getDisplayPath(item.to_path, commonPrefix)}
                   <div
-                    class="h-9 px-3 flex items-center border-b border-brand-border/20 text-[11px] font-mono hover:bg-brand-accent/10 transition-colors whitespace-nowrap"
+                    class="h-9 px-3 flex items-center border-b border-brand-border/20 text-[11px] hover:bg-brand-accent/10 transition-colors whitespace-nowrap"
                   >
                     <div class="w-24 shrink-0">
                       {#if st === "ok"}

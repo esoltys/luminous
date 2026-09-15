@@ -1133,6 +1133,7 @@ export const fr = {
     sectionTemplatePattern: "Modèle de nom",
     sectionDestinationOptions: "Destination et options",
     presetDefault: "Par défaut",
+    presetAlternative: "Alternative",
     presetCustom: "Personnalisé",
     presetCustomHint: "Écrivez votre propre modèle",
     templateSampleOutputLabel: "Aperçu de rendu",
