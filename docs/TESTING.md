@@ -1,0 +1,72 @@
+# Testing
+
+Manual and dev-time testing notes. For automated test commands (Vitest, `cargo test`, BDD
+suites), see [AGENTS.md](../AGENTS.md#testing). For "this broke, here's the fix" entries, see
+[docs/TROUBLESHOOTING.md](TROUBLESHOOTING.md).
+
+## Manual QA walkthrough
+
+- **Exercise the app from a dev build** (`bun run tauri dev`): import/scan a folder,
+  play/pause/seek/volume, create a playlist, edit tags, check the equalizer, and anything
+  specific to whatever you changed.
+- **Real-hardware smoke test** — real audio device, real playback, tags, playlists, equalizer:
+  ```bash
+  cargo test --test smoke_test -- --ignored --nocapture
+  ```
+  (run from `src-tauri/`)
+
+## Re-testing the first-run welcome screen / walkthrough tour
+
+Both are gated by one-off flags in the `app_state` table of your dev database (`welcome_seen`,
+`walkthrough_completed`) — once set they won't show again on relaunch. Clear them with:
+
+```bash
+sqlite3 <path-to-luminous.db> "DELETE FROM app_state WHERE key IN ('welcome_seen', 'walkthrough_completed');"
+```
+
+The db lives at `%APPDATA%\org.luminous.music\luminous.db` on Windows,
+`~/.local/share/org.luminous.music/luminous.db` on Linux (respects `LUMINOUS_DATA_DIR` if set —
+see `src-tauri/src/paths.rs`).
+
+## Windows UI automation
+
+- **Windows e2e smoke test (`bun run test:e2e:windows`, `e2e/run-smoke.ts`)**: drives the real
+  built app (real Rust backend, real IPC, real SQLite) through
+  [`tauri-driver`](https://github.com/tauri-apps/tauri-driver) + `msedgedriver`, as opposed to
+  the IPC-mocked `take-screenshots.ts`. One-time setup: `cargo install tauri-driver --locked`,
+  then download the `msedgedriver` build matching your installed WebView2 Runtime version
+  (`(Get-ItemProperty "HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}").pv`
+  in PowerShell gives the version; download
+  `https://msedgedriver.microsoft.com/<version>/edgedriver_win64.zip` and drop
+  `msedgedriver.exe` into `~/.cargo/bin` — already on `PATH` from the `cargo install` above, and
+  machine-wide rather than tied to one worktree). The script builds the app itself via
+  `tauri build --debug --no-bundle` (skips the slow installer step, just compiles the binary) —
+  both flags matter. It has to go through the `tauri` CLI specifically, not a plain
+  `cargo build`: only the CLI's build pipeline embeds `frontendDist` into the binary, otherwise
+  it loads `devUrl` (`http://localhost:1420`) and shows a blank/network-error page since this
+  test runs no dev server there to load from. And it has to be a **debug**-profile build, not
+  release: `build_prevent_default_plugin()` in `lib.rs` enables
+  `tauri-plugin-prevent-default`'s full flag set only in release builds
+  (`cfg!(debug_assertions)` false), which disables WebView2 devtools/accelerator keys — and that
+  blocks the CDP channel `msedgedriver` needs to control the page, so the window just hangs at
+  `about:blank` forever (and can eventually report "tab crashed"). `--debug` keeps devtools
+  enabled by carving `DEV_TOOLS` out of that flag set. Each run points the app at a fresh temp
+  directory via `LUMINOUS_DATA_DIR` (see `src-tauri/src/paths.rs`) so it never reads or writes
+  your real library/database — never unset that env var when experimenting with this harness
+  manually.
+- **`bunx tsx scripts/inspect-app.ts` (dev-time app inspection, not a CI test)**: same one-time
+  setup as the e2e smoke test above. Gives an agent (or a human) a way to launch the real app
+  and visually inspect it while working on an issue — `start [--real]`, `click --css "<sel>"` /
+  `click --text "<text>"`, `hover --css "<sel>"` / `hover --text "<text>"` (moves the pointer via
+  the WebDriver Actions API so `:hover`/group-hover CSS actually engages, unlike a plain click —
+  no separate "unhover"; start a fresh session or hover a neutral element to clear it),
+  `type --css "<sel>" "<text>"`, `screenshot <path>` (add `--css "<sel>"` / `--text "<text>"` to
+  crop to just that element via the driver's own element-screenshot endpoint — no manual
+  devicePixelRatio math, and much easier to confirm pixel-level detail like a hover outline than
+  eyeballing a full-page shot), `source`, `url`, `stop`. Each subcommand is a separate process;
+  session state persists to `.inspect-session.json` (gitignored) between calls. `--real` points
+  it at your actual library instead of an isolated temp dir — use it only for read-only visual
+  comparisons, never for clicks that mutate state.
+
+  For known failure modes of these two tools (flaky `--real` sessions, blank/crashing windows
+  under GPU/session isolation), see [docs/TROUBLESHOOTING.md](TROUBLESHOOTING.md).
