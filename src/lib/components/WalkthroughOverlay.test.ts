@@ -4,6 +4,8 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/svelte";
 import WalkthroughOverlay from "./WalkthroughOverlay.svelte";
 import { walkthroughStore } from "../stores/walkthrough.svelte";
 import { i18n } from "../stores/i18n.svelte";
+import { collectionStore } from "../stores/collection.svelte";
+import { playerStore } from "../stores/player.svelte";
 
 /** Every step's real anchor lives in a different app component — stub one
  * target element per step id directly on document.body so the overlay can
@@ -21,13 +23,19 @@ describe("WalkthroughOverlay.svelte", () => {
     i18n.currentLocale = "en";
     walkthroughStore.isActive = false;
     walkthroughStore.currentStepIndex = 0;
-    walkthroughStore.hasCompleted = false;
+    walkthroughStore.seenStepIds = new Set();
+    // Every step's isAvailable() check needs a populated library + active
+    // playback so this suite can exercise the full step sequence — the
+    // availability-gated skip behavior itself is covered in walkthrough.test.ts.
+    collectionStore.stats.total_songs = 5;
+    playerStore.currentSong = { id: 1 } as any;
     mountAllTargets();
   });
 
   afterEach(() => {
     document.querySelectorAll("[data-walkthrough-target]").forEach((el) => el.remove());
     walkthroughStore.isActive = false;
+    playerStore.currentSong = undefined;
   });
 
   it("renders nothing when the tour isn't active", () => {
@@ -74,7 +82,7 @@ describe("WalkthroughOverlay.svelte", () => {
     await fireEvent.click(screen.getByLabelText("Skip"));
 
     expect(walkthroughStore.isActive).toBe(false);
-    expect(walkthroughStore.hasCompleted).toBe(true);
+    expect(walkthroughStore.seenStepIds.has("sidebar")).toBe(true);
   });
 
   it("Escape skips the tour", async () => {
@@ -97,6 +105,6 @@ describe("WalkthroughOverlay.svelte", () => {
     }
 
     expect(walkthroughStore.isActive).toBe(false);
-    expect(walkthroughStore.hasCompleted).toBe(true);
+    expect(walkthroughStore.hasPendingSteps).toBe(false);
   });
 });
