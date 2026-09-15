@@ -266,6 +266,39 @@ fn restore_equalizer_from_db(db: &Database, audio_engine: &AudioEngine) {
     }
 }
 
+/// Watches for Tokio scheduler delay: sleeps for a nominal 20ms (chosen to
+/// match a typical audio-frame window, since that's the granularity where a
+/// scheduling stall would first become audible) and compares it against the
+/// actual elapsed time. A large overshoot means the runtime's worker threads
+/// were too busy/blocked to poll this task promptly — the same condition
+/// that would delay IPC command handlers waiting on `AppState`'s locks.
+/// This is a cheap, dependency-free first signal for "is the runtime
+/// actually falling behind" per issue #1002 — not a replacement for proper
+/// tokio-console instrumentation, which needs a `tokio_unstable` build-wide
+/// cfg flag and is a separate decision.
+fn spawn_scheduler_latency_monitor() {
+    const PROBE_INTERVAL: std::time::Duration = std::time::Duration::from_millis(20);
+    const WARN_THRESHOLD: std::time::Duration = std::time::Duration::from_millis(40);
+
+    tauri::async_runtime::spawn(async move {
+        loop {
+            let start = std::time::Instant::now();
+            tokio::time::sleep(PROBE_INTERVAL).await;
+            let elapsed = start.elapsed();
+            if let Some(overshoot) = elapsed.checked_sub(PROBE_INTERVAL) {
+                if overshoot > WARN_THRESHOLD {
+                    log::warn!(
+                        "Tokio scheduler delay detected: {}ms probe took {}ms (overshoot {}ms) — IPC commands and UI ticks may be lagging",
+                        PROBE_INTERVAL.as_millis(),
+                        elapsed.as_millis(),
+                        overshoot.as_millis()
+                    );
+                }
+            }
+        }
+    });
+}
+
 /// Spawns the ~30 FPS spectrum-emission loop that pushes `spectrum-data`
 /// events to the frontend while the spectrum visualizer is enabled and
 /// something is playing.
@@ -625,6 +658,15 @@ fn install_panic_hook(log_dir: std::path::PathBuf) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Opt-in Tokio task/scheduler introspection (see docs/PERFORMANCE.md).
+    // Must run before Tauri creates its async runtime, since it installs the
+    // `tracing` subscriber that records every task's spawn/poll events —
+    // anything spawned before this line wouldn't be visible in `tokio-console`.
+    // Off by default: the `tokio-console` feature and its `tokio_unstable`
+    // cfg flag are dev/debug-only and never part of a release build.
+    #[cfg(feature = "tokio-console")]
+    console_subscriber::init();
+
     // Without this, every log::info!/warn!/error! call across the backend
     // (including reconcile-failure diagnostics) is a silent no-op — `log`
     // is just a facade and needs a registered backend to actually emit
@@ -868,6 +910,9 @@ pub fn run() {
 
             // Spawn real-time visualizer spectrum emission loop (Tokio)
             spawn_visualizer_loop(app.handle().clone(), Arc::clone(&audio));
+
+            // Spawn scheduler-delay watchdog (Tokio) — see #1002.
+            spawn_scheduler_latency_monitor();
 
             let args: Vec<String> = std::env::args().collect();
             let startup_path = if args.len() > 1 {
