@@ -47,7 +47,7 @@ find_db_path() {
   local candidates=(
     "$HOME/.local/share/org.luminous.music/luminous.db"
     "$HOME/Library/Application Support/org.luminous.music/luminous.db"
-    "${APPDATA:-}/org.luminous.music/luminous.db"
+    "${APPDATA:-}/39231EricJamesSoltys.LuminousMusicPlayer/luminous.db"
   )
   for p in "${candidates[@]}"; do
     if [ -n "$p" ] && [ -f "$p" ]; then

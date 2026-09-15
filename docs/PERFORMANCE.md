@@ -91,6 +91,13 @@ cargo install tokio-console  # once, the separate viewer CLI
 RUSTFLAGS="--cfg tokio_unstable" bun run tauri dev -- --features tokio-console
 ```
 
+On Windows, the `VAR=value cmd` inline-env syntax above only works in a POSIX shell (Git Bash,
+WSL). In PowerShell, set the variable as a separate statement first:
+
+```powershell
+$env:RUSTFLAGS="--cfg tokio_unstable"; bun run tauri dev -- --features tokio-console
+```
+
 This project uses the JS-side Tauri CLI (`bun run tauri`, see `package.json`), not the
 `cargo-tauri` crate — `cargo tauri dev` won't work here unless `cargo install tauri-cli` has been
 run separately. `bun run tauri dev` shells out to `cargo build`/`cargo run` for the Rust side, so
@@ -139,6 +146,17 @@ them. `bridge-flood` doesn't need this — it doesn't touch playback at all.
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-09-15 | 2.0.0 | Linux (CachyOS, WebKitGTK) | `skip-tracks 50` | 3 | 0.607s, 0.693s, 0.626s | 2 (both during crossfade/cover-art work, not the loudness DB read) |
 | 2026-09-15 | 2.0.0 | Linux (CachyOS, WebKitGTK) | `bridge-flood 200` | 3 | 0.256s, 0.289s, 0.273s | 0 |
+| 2026-09-15 | 2.0.0 | Windows 11 | `skip-tracks 50` | 3 | 2.905s, 2.640s, 2.717s | 0 |
+| 2026-09-15 | 2.0.0 | Windows 11 | `bridge-flood 200` | 3 | 2.420s, 2.173s, 2.124s | 0 |
+
+**Windows vs. Linux**: zero scheduler-delay warnings on Windows across all 6 runs (even better than
+Linux's 2), so no evidence of scheduler contention on this platform either. Wall times are
+consistently higher than Linux's for both scenarios (`skip-tracks 50` ~2.6-2.9s vs. ~0.6-0.7s;
+`bridge-flood 200` ~2.1-2.4s vs. ~0.26-0.29s) — this tracks with the two runs being on different
+machines with different libraries (2,375 tracks on Windows vs. 99 on Linux, see the memory baseline
+table above) and isn't itself a scheduler-latency signal; the watchdog and warning count are the
+relevant metric here, not raw wall time, since the script's HTTP/DB round-trip overhead dominates
+wall time on both platforms.
 
 **What this is, and isn't**: this was run against the current (post-fix) code only — this branch
 already has the `spawn_blocking` and connection-semaphore fixes applied, so it's not a true
