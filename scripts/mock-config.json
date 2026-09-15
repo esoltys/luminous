@@ -226,11 +226,11 @@
       "viewportHeight": 850
     },
     {
-      "name": "settings-organize",
-      "filename": "settings-organize.png",
-      "tab": "settings",
-      "action": "click-settings-tools",
-      "viewportHeight": 1000
+      "name": "organize",
+      "filename": "organize.png",
+      "tab": "organize",
+      "action": "click-organize-custom-template",
+      "viewportHeight": 1100
     },
     {
       "name": "song-tag-editor",
