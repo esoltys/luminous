@@ -118,7 +118,7 @@
       </div>
     </div>
 
-    <div class="flex gap-3 mt-4">
+    <div class="flex gap-3 mt-4 max-w-md mx-auto">
       <div class="flex flex-col gap-[3px] text-[10px] text-brand-text-secondary/70 leading-none shrink-0">
         <div class="invisible mb-1" aria-hidden="true">&nbsp;</div>
         {#each dayLabels as label, i (i)}
