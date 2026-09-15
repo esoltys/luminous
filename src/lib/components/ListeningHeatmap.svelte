@@ -93,7 +93,7 @@
   }
 </script>
 
-<div class="bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 shrink-0">
+<div class="bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 w-72 shrink-0">
   <div class="flex items-center justify-between gap-2">
     <h2 class="text-sm font-semibold text-brand-text-primary">{i18n.t("stats.heatmapTitle", {}, "Listening Streak")}</h2>
     <span title={i18n.t("stats.heatmapHelp", {}, "This calendar shows how many days in a row you've listened to music. Each square is one day — darker squares mean more minutes listened that day. Hover or tap a square to see its date.")} class="inline-flex cursor-help">
@@ -151,7 +151,7 @@
     </div>
 
     <div class="flex items-center justify-between gap-4 mt-3 pt-3 border-t border-brand-border/60">
-      <span class="text-xs text-brand-text-secondary truncate">{displayCell ? cellLabel(displayCell) : ""}</span>
+      <span class="text-xs text-brand-text-secondary truncate min-w-0">{displayCell ? cellLabel(displayCell) : ""}</span>
       <div class="flex items-center gap-1.5 text-[10px] text-brand-text-secondary/70 shrink-0">
         <span>{i18n.t("stats.heatmapLegendLess", {}, "Less")}</span>
         {#each LEVEL_OPACITY as opacity (opacity)}
