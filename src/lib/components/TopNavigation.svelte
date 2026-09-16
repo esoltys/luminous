@@ -22,6 +22,7 @@
   import { playerStore } from "../stores/player.svelte";
   import { themeStore } from "../stores/theme.svelte";
   import { i18n } from "../stores/i18n.svelte";
+  import { picardStore } from "../stores/picard.svelte";
   import { getCoverArtUrl, type RecentSearchItem } from "../types";
   import { getPlaylistDisplayName } from "../utils/playlist";
   import CoverArt from "./CoverArt.svelte";
@@ -126,6 +127,49 @@
               label: getPlaylistDisplayName(p),
               subtitle: `${i18n.t("playlists.autoPlaylistLabel", {}, "Auto-Playlist")} • Decade`,
               ref: { kind: "decade", decade, playlistId: p.id, updated: p.updated }
+            });
+          } else if (p.dynamic_spec?.startsWith("bpmrange:")) {
+            const bpm = p.dynamic_spec.replace(/^bpmrange:/, "");
+            results.push({
+              type: "auto",
+              id: `auto:bpm:${p.id}`,
+              label: getPlaylistDisplayName(p),
+              subtitle: `${i18n.t("playlists.autoPlaylistLabel", {}, "Auto-Playlist")} • BPM`,
+              ref: { kind: "bpm", bpm, playlistId: p.id, updated: p.updated }
+            });
+          } else if (p.dynamic_spec?.startsWith("artisttag:")) {
+            const artistTag = p.dynamic_spec.replace(/^artisttag:/, "");
+            results.push({
+              type: "auto",
+              id: `auto:artist_tag:${p.id}`,
+              label: getPlaylistDisplayName(p),
+              subtitle: `${i18n.t("playlists.autoPlaylistLabel", {}, "Auto-Playlist")} • Artist Tag`,
+              ref: { kind: "artist_tag", artistTag, playlistId: p.id, updated: p.updated }
+            });
+          } else if (p.dynamic_spec === "missingmeta") {
+            results.push({
+              type: "auto",
+              id: `auto:missing_metadata:${p.id}`,
+              label: getPlaylistDisplayName(p),
+              subtitle: `${i18n.t("playlists.autoPlaylistLabel", {}, "Auto-Playlist")} • Missing Metadata`,
+              ref: { kind: "missing_metadata", playlistId: p.id, updated: p.updated }
+            });
+          } else if (p.dynamic_spec === "missingmbid") {
+            if (!picardStore.missingPlaylistEnabled) continue;
+            results.push({
+              type: "auto",
+              id: `auto:missing_musicbrainz:${p.id}`,
+              label: getPlaylistDisplayName(p),
+              subtitle: i18n.t("playlists.missingMusicBrainzAutoPlaylist", {}, "Auto-Playlist"),
+              ref: { kind: "missing_musicbrainz", playlistId: p.id, updated: p.updated }
+            });
+          } else if (p.dynamic_spec?.startsWith("daypart:")) {
+            results.push({
+              type: "auto",
+              id: `auto:daypart:${p.id}`,
+              label: getPlaylistDisplayName(p),
+              subtitle: `${i18n.t("playlists.autoPlaylistLabel", {}, "Auto-Playlist")} • Daypart Mix`,
+              ref: { kind: "daypart", playlistId: p.id, updated: p.updated }
             });
           } else {
             const genre = p.dynamic_spec?.replace(/^tag:/, "") ?? p.name;
@@ -235,7 +279,7 @@
 
 <svelte:window on:keydown={handleKeyDown} on:mouseup={handleMouseUp} on:mousedown={handleWindowMouseDown} />
 
-<header in:fade={{ duration: 600 }} class="w-full h-20 bg-brand-sidebar flex items-center px-6 gap-6 z-50 overflow-visible {themeStore.isGlassTheme ? 'glass-surface' : ''}">
+<header data-walkthrough-target="top-navigation" in:fade={{ duration: 600 }} class="w-full h-20 bg-brand-sidebar flex items-center px-6 gap-6 z-50 overflow-visible {themeStore.isGlassTheme ? 'glass-surface' : ''}">
   <div class="flex items-center gap-2">
     {#if !windowLayoutStore.isSidebarAutoCollapsed}
       <button
@@ -270,7 +314,7 @@
   </div>
 
   <div bind:this={searchContainerRef} class="relative flex-1 max-w-2xl">
-    <form onsubmit={handleSearch} class="w-full flex items-center gap-3 bg-brand-main rounded-lg px-4 py-2 border border-brand-border focus-within:border-brand-accent transition-colors">
+    <form onsubmit={handleSearch} class="w-full flex items-center gap-3 bg-brand-main rounded-lg px-4 py-2 border border-brand-border focus-within:border-brand-accent focus-within:transition-colors duration-150">
       <Search class="w-4 h-4 text-brand-text-secondary flex-shrink-0" />
       <input
         bind:this={searchInput}
@@ -399,8 +443,23 @@
                     class="search-result-item group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-accent"
                   >
                     <div class="flex items-center gap-3 min-w-0 flex-1">
-                      <div class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden">
-                        <User class="w-4 h-4 text-brand-text-secondary" />
+                      <div class="w-8 h-8 flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border overflow-hidden">
+                        {#if artist.name}
+                          {#await collectionStore.getExtendedArtworkForArtist(artist.name)}
+                            <User class="w-4 h-4 text-brand-text-secondary" />
+                          {:then artwork}
+                            {@const portraitUrl = getCoverArtUrl(artwork.artist_portrait_uri)}
+                            {#if portraitUrl}
+                              <img src={portraitUrl} alt={artist.name} class="w-full h-full object-cover" />
+                            {:else}
+                              <User class="w-4 h-4 text-brand-text-secondary" />
+                            {/if}
+                          {:catch}
+                            <User class="w-4 h-4 text-brand-text-secondary" />
+                          {/await}
+                        {:else}
+                          <User class="w-4 h-4 text-brand-text-secondary" />
+                        {/if}
                       </div>
                       <div class="flex flex-col min-w-0 flex-1">
                         <span class="text-sm font-medium text-brand-text-primary truncate group-hover:text-brand-accent-text transition-colors">
@@ -603,18 +662,44 @@
                 class="search-result-item group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-accent"
               >
                 <div class="flex items-center gap-3 min-w-0 flex-1">
-                  {#if item.artUrl}
+                  {#if item.kind === 'artist'}
+                    {#await collectionStore.getExtendedArtworkForArtist(item.title)}
+                      <div class="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden rounded-full">
+                        <User class="w-4 h-4 text-brand-text-secondary" />
+                      </div>
+                    {:then artwork}
+                      {@const portraitUrl = getCoverArtUrl(artwork.artist_portrait_uri)}
+                      {#if portraitUrl}
+                        <div class="w-9 h-9 flex-shrink-0 overflow-hidden bg-brand-sidebar border border-brand-border">
+                          <img src={portraitUrl} alt={item.title} class="w-full h-full object-cover" />
+                        </div>
+                      {:else if item.artUrl}
+                        <CoverArt
+                          songId={typeof item.entityId === 'number' ? item.entityId : undefined}
+                          artManual={item.artUrl}
+                          artAutomatic={item.artUrl}
+                          sizeClass="w-9 h-9 rounded-full"
+                        />
+                      {:else}
+                        <div class="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden rounded-full">
+                          <User class="w-4 h-4 text-brand-text-secondary" />
+                        </div>
+                      {/if}
+                    {:catch}
+                      <div class="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden rounded-full">
+                        <User class="w-4 h-4 text-brand-text-secondary" />
+                      </div>
+                    {/await}
+                  {:else if item.artUrl}
                     <CoverArt
                       songId={typeof item.entityId === 'number' ? item.entityId : undefined}
                       artManual={item.artUrl}
                       artAutomatic={item.artUrl}
-                      sizeClass="w-9 h-9 {item.kind === 'artist' ? 'rounded-full' : ''}"
+                      sizeClass="w-9 h-9"
                     />
                   {:else}
-                    <div class="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden {item.kind === 'artist' ? 'rounded-full' : ''}">
-                      {#if item.kind === 'artist'}
-                        <User class="w-4 h-4 text-brand-text-secondary" />
-                      {:else if item.kind === 'album'}
+                    <div class="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden">
+                      {#if item.kind === 'album'}
                         <Disc class="w-4 h-4 text-brand-text-secondary" />
                       {:else if item.kind === 'playlist'}
                         <ListMusic class="w-4 h-4 text-brand-text-secondary" />

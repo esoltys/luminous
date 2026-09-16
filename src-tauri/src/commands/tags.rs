@@ -1,5 +1,5 @@
 use crate::{
-    collection::WatcherPauseGuard,
+    collection::{SelfWriteTracker, WatcherPauseGuard},
     models::{GenreGroup, QueuePopulationMode, Song, Tag, TagGroup},
     tags::TagManager,
     AppState,
@@ -150,6 +150,7 @@ pub async fn reorder_tag_in_group(
 struct SongFullMetadata {
     id: i64,
     path: String,
+    source: crate::models::SongSource,
     title: String,
     titlesort: Option<String>,
     artist: String,
@@ -164,12 +165,12 @@ struct SongFullMetadata {
     track: Option<u32>,
     disc: Option<u32>,
     year: Option<u32>,
+    originalyear: Option<u32>,
     grouping: String,
     bpm: Option<f32>,
     initial_key: String,
     compilation: bool,
-    acoustid_id: Option<String>,
-    acoustid_fingerprint: Option<String>,
+    cue_path: Option<String>,
 }
 
 /// Reads each song via the canonical `SONG_SELECT_COLS`/`row_to_song` mapping
@@ -188,6 +189,7 @@ fn load_full_metadata(conn: &rusqlite::Connection, song_ids: &[i64]) -> Vec<Song
             out.push(SongFullMetadata {
                 id: song.id,
                 path: song.path.unwrap_or_default(),
+                source: song.source,
                 title: song.title.unwrap_or_default(),
                 titlesort: song.titlesort,
                 artist: song.artist.unwrap_or_default(),
@@ -202,12 +204,12 @@ fn load_full_metadata(conn: &rusqlite::Connection, song_ids: &[i64]) -> Vec<Song
                 track: song.track.map(|t| t as u32),
                 disc: song.disc.map(|d| d as u32),
                 year: song.year.map(|y| y as u32),
+                originalyear: song.originalyear.map(|y| y as u32),
                 grouping: song.grouping.unwrap_or_default(),
                 bpm: song.bpm,
                 initial_key: song.initial_key.unwrap_or_default(),
                 compilation: song.compilation,
-                acoustid_id: song.acoustid_id,
-                acoustid_fingerprint: song.acoustid_fingerprint,
+                cue_path: song.cue_path,
             });
         }
     }
@@ -222,10 +224,16 @@ fn load_full_metadata(conn: &rusqlite::Connection, song_ids: &[i64]) -> Vec<Song
 /// whose on-disk write succeeded.
 async fn rewrite_genre_and_persist(
     conn: r2d2::PooledConnection<r2d2_sqlite::SqliteConnectionManager>,
+    self_writes: &Arc<SelfWriteTracker>,
     song_ids: &[i64],
     rewrite_genre: impl Fn(&str) -> String + Send + 'static,
 ) -> Result<u32, String> {
     let metas = load_full_metadata(&conn, song_ids);
+
+    // See tageditor's save_song_tags — close the timing race the coarse
+    // watcher-pause guard can't (#514) by tracking every path about to be
+    // rewritten.
+    self_writes.mark_written(metas.iter().map(|m| std::path::PathBuf::from(&m.path)));
 
     let (updated_count, writes): (u32, Vec<(i64, String)>) =
         tauri::async_runtime::spawn_blocking(move || {
@@ -233,6 +241,21 @@ async fn rewrite_genre_and_persist(
             let mut writes = Vec::with_capacity(metas.len());
             for item in &metas {
                 let new_genre = rewrite_genre(&item.genre);
+                // WebDAV songs (source 11) have no local file to write lofty tags to,
+                // and there's no write-back to the remote server implemented — the
+                // change is saved to Luminous's own DB only (the tag editor surfaces
+                // this to the user). Attempting the write here would always fail and
+                // just spam the log with a warning that tells nobody anything new.
+                // Same DB-only treatment as WebDAV: a CUE sheet track's tags
+                // live in the .cue file, not the shared media file's own
+                // embedded tags, and there's no CUE-sheet write-back yet.
+                // Writing here would silently overwrite every other track cut
+                // from the same file with just this one's values (#78).
+                if item.source == crate::models::SongSource::WebDav || item.cue_path.is_some() {
+                    count += 1;
+                    writes.push((item.id, new_genre));
+                    continue;
+                }
                 let path = std::path::PathBuf::from(&item.path);
                 let write_res = crate::tageditor::write_tags(
                     &path,
@@ -251,12 +274,11 @@ async fn rewrite_genre_and_persist(
                         track: item.track,
                         disc: item.disc,
                         year: item.year,
+                        originalyear: item.originalyear,
                         grouping: &item.grouping,
                         bpm: item.bpm,
                         initial_key: &item.initial_key,
                         compilation: item.compilation,
-                        acoustid_id: item.acoustid_id.as_deref(),
-                        acoustid_fingerprint: item.acoustid_fingerprint.as_deref(),
                     },
                 );
                 match write_res {
@@ -313,10 +335,11 @@ pub async fn merge_tags(
 
     let from_c = from.clone();
     let into_c = into.clone();
-    let updated_count = rewrite_genre_and_persist(conn, &song_ids, move |genre| {
-        TagManager::rewrite_genre_for_merge(genre, &from_c, &into_c)
-    })
-    .await?;
+    let updated_count =
+        rewrite_genre_and_persist(conn, &state.self_writes, &song_ids, move |genre| {
+            TagManager::rewrite_genre_for_merge(genre, &from_c, &into_c)
+        })
+        .await?;
 
     manager
         .apply_merge_hierarchy(&from, &into)
@@ -351,10 +374,11 @@ pub async fn delete_tags(
     let song_ids: Vec<i64> = affected.iter().map(|(id, _, _)| *id).collect();
 
     let names_c = names.clone();
-    let updated_count = rewrite_genre_and_persist(conn, &song_ids, move |genre| {
-        TagManager::rewrite_genre_for_delete(genre, &names_c)
-    })
-    .await?;
+    let updated_count =
+        rewrite_genre_and_persist(conn, &state.self_writes, &song_ids, move |genre| {
+            TagManager::rewrite_genre_for_delete(genre, &names_c)
+        })
+        .await?;
 
     manager
         .apply_delete_hierarchy(&names)

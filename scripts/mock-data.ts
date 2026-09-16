@@ -363,7 +363,7 @@ export const FALLBACK_ARTIST_PROFILES: ArtistProfile[] = [
   },
 ];
 
-export const FEATURED_YOU_WRECK_ME_LYRICS = `[00:00.00] Tom Petty - You Wreck Me
+const FEATURED_YOU_WRECK_ME_LYRICS = `[00:00.00] Tom Petty - You Wreck Me
 [00:12.00] Tonight we're gonna run
 [00:15.50] Have ourselves some fun
 [00:19.00] Hope we don't get caught
@@ -388,29 +388,6 @@ export const FEATURED_YOU_WRECK_ME_LYRICS = `[00:00.00] Tom Petty - You Wreck Me
 [01:28.00] You break me in two
 [01:31.50] But you move me, honey
 [01:35.00] Yes you do`;
-
-export function getFallbackLyricsForTrack(title?: string, artist?: string): string {
-  const cleanTitle = (title || "Track").trim();
-  const cleanArtist = (artist || "Artist").trim();
-
-  if (cleanTitle.toLowerCase() === "you wreck me" || cleanTitle.toLowerCase().includes("wreck me")) {
-    return FEATURED_YOU_WRECK_ME_LYRICS;
-  }
-
-  return `[00:00.00] ${cleanArtist} - ${cleanTitle}
-[00:08.00] Sound of the rhythm in the quiet room
-[00:14.00] Watching the light fading into afternoon
-[00:22.00] Echoes of frequencies across the wire
-[00:29.00] Lighting up the sparks of a steady fire
-[00:37.00] Step by step we are moving through the beat
-[00:44.00] Every single waveform crisp and clean
-[00:52.00] Keeping the balance through the line and sound
-[01:01.00] Best melody that can ever be found
-[01:10.00] Oh yeah, feeling the rhythm carry through
-[01:18.00] Every single moment belonging to you
-[01:27.00] Resonating harmonic and strong
-[01:35.00] Right where we belong`;
-}
 
 export const FALLBACK_LYRICS = FEATURED_YOU_WRECK_ME_LYRICS;
 

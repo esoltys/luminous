@@ -160,9 +160,31 @@
   ) {
     const isPlaceholder = isLoadingWaveform || waveformData.length === 0;
     const data = isPlaceholder ? Array(150).fill(0) : waveformData;
-    const numBars = data.length;
     const barGap = width < NARROW_WIDTH_BREAKPOINT_PX ? 0.5 : 1.0;
-    const barWidth = Math.max(1, (width - (numBars - 1) * barGap) / numBars);
+    const minBarWidth = 1.0;
+
+    // Determine how many bars can cleanly fit in `width` without overflowing or truncating.
+    const maxBarsFit = Math.floor((width + barGap) / (minBarWidth + barGap));
+    const numBars = Math.min(data.length, Math.max(10, maxBarsFit));
+
+    // Downsample using peak-hold if container width is too narrow for all data points
+    let bars: number[];
+    if (numBars < data.length) {
+      bars = new Array(numBars);
+      for (let j = 0; j < numBars; j++) {
+        const start = Math.floor((j * data.length) / numBars);
+        const end = Math.max(start + 1, Math.floor(((j + 1) * data.length) / numBars));
+        let maxVal = 0;
+        for (let k = start; k < end && k < data.length; k++) {
+          if (data[k] > maxVal) maxVal = data[k];
+        }
+        bars[j] = maxVal;
+      }
+    } else {
+      bars = data;
+    }
+
+    const barWidth = Math.max(0.5, (width - (numBars - 1) * barGap) / numBars);
 
     const gradPlayed = ctx.createLinearGradient(0, height, 0, 0);
     gradPlayed.addColorStop(0, accentColor);
@@ -179,7 +201,7 @@
         ctx.fillStyle = accentColor;
         ctx.globalAlpha = 0.4 + 0.35 * Math.sin(pulseAngle + (i / numBars) * Math.PI * 3);
       } else {
-        val = data[i] / 255.0;
+        val = bars[i] / 255.0;
         const barPct = i / numBars;
         if (barPct <= progressPct) {
           ctx.globalAlpha = 1.0;
@@ -325,6 +347,15 @@
     const _wave = waveformData;
     const _bands = bandData;
     draw();
+  });
+
+  $effect(() => {
+    if (typeof ResizeObserver === "undefined" || !containerEl) return;
+    const observer = new ResizeObserver(() => {
+      draw();
+    });
+    observer.observe(containerEl);
+    return () => observer.disconnect();
   });
 
   // Handle seek actions (click / drag)

@@ -98,6 +98,7 @@ pub struct Player {
     /// Position at which we trigger the scrobble (50% of track length).
     scrobble_point_nanosec: Option<u64>,
     scrobbled: bool,
+    scrobbler: Option<Arc<crate::scrobbler::ScrobblerManager>>,
 
     /// Consecutive playback failures since the last successful `Playing`
     /// event — see `MAX_CONSECUTIVE_PLAYBACK_ERRORS`.
@@ -323,6 +324,7 @@ impl Player {
             queue: std::collections::VecDeque::new(),
             scrobble_point_nanosec,
             scrobbled: false,
+            scrobbler: None,
             consecutive_playback_errors: 0,
         };
 
@@ -357,6 +359,11 @@ impl Player {
         } else {
             false
         }
+    }
+
+    /// Attach the scrobbler service manager to receive scrobble notifications.
+    pub fn set_scrobbler(&mut self, scrobbler: Arc<crate::scrobbler::ScrobblerManager>) {
+        self.scrobbler = Some(scrobbler);
     }
 
     /// Load a playlist into the player and start playing the given index.
@@ -777,6 +784,18 @@ impl Player {
     /// boundary for a step to be audible against.
     const LOUDNESS_REFRESH_RAMP_MS: u32 = 150;
 
+    /// Runs the (synchronous, rusqlite) loudness-settings read on a blocking
+    /// thread rather than the tokio worker calling this — both call sites run
+    /// while a caller holds `AppState.player`'s async mutex, so blocking the
+    /// worker here would stall every other IPC command waiting on that lock
+    /// for as long as the r2d2 pool takes to hand back a connection.
+    async fn load_loudness_settings(db: &Arc<Database>) -> Result<crate::models::LoudnessSettings> {
+        let db = db.clone();
+        tokio::task::spawn_blocking(move || crate::loudness::get_settings(&db))
+            .await
+            .map_err(|e| anyhow!("loudness settings task panicked: {e}"))?
+    }
+
     fn compute_loudness_gain(
         settings: &crate::models::LoudnessSettings,
         song: &Song,
@@ -786,6 +805,8 @@ impl Player {
                 song.ebur128_integrated_loudness_lufs,
                 song.replaygain_track_gain,
                 song.replaygain_album_gain,
+                song.dynamic_range_rms,
+                song.dynamic_range_peak,
                 settings,
             );
             (result.linear, result.source, Some(result.gain_db))
@@ -801,7 +822,7 @@ impl Player {
     /// global and flipping it early would affect the still-draining previous
     /// track's tail.
     async fn apply_loudness_gain(&mut self, song: &Song) {
-        let settings = match crate::loudness::get_settings(&self._db) {
+        let settings = match Self::load_loudness_settings(&self._db).await {
             Ok(s) => s,
             Err(e) => {
                 log::warn!("Failed to load loudness settings: {e}");
@@ -824,7 +845,7 @@ impl Player {
         let Some(song) = self.current_song.clone() else {
             return;
         };
-        let settings = match crate::loudness::get_settings(&self._db) {
+        let settings = match Self::load_loudness_settings(&self._db).await {
             Ok(s) => s,
             Err(e) => {
                 log::warn!("Failed to load loudness settings: {e}");
@@ -984,11 +1005,18 @@ impl Player {
 
         let mut flagged_unavailable = false;
         if let Some(song) = &self.current_song {
-            let missing_on_disk = song
-                .path
-                .as_deref()
-                .map(|p| !std::path::Path::new(p).exists())
-                .unwrap_or(false);
+            // WebDAV songs (source 11) have HTTP URLs as their path — `Path::exists()`
+            // always returns false for them, so a transient network/auth failure would
+            // otherwise get misread as "confirmed missing" and hide the song from every
+            // library view (which all filter on `unavailable = 0`). They're managed by
+            // the WebDAV sync instead, mirroring the same exemption in
+            // `find_missing_song_ids` (see collection.rs).
+            let missing_on_disk = song.source != crate::models::SongSource::WebDav
+                && song
+                    .path
+                    .as_deref()
+                    .map(|p| !std::path::Path::new(p).exists())
+                    .unwrap_or(false);
             if missing_on_disk {
                 if let Ok(conn) = self._db.pool.get() {
                     flagged_unavailable = conn
@@ -1033,9 +1061,26 @@ impl Player {
         }
     }
 
+    /// `position_nanosec` is track-relative (0 at the start of the current
+    /// song, matching what the UI displays and what `Song::duration_secs()`
+    /// covers) — converted here to the audio engine's absolute-file-offset
+    /// convention by adding the current song's `beginning_nanosec` (0 for a
+    /// plain, non-CUE song, so this is a no-op for the common case).
     pub async fn seek_to(&self, position_nanosec: u64) -> Result<()> {
-        self.persist_position(position_nanosec);
-        self.audio.lock().await.seek_to(position_nanosec)
+        let absolute_ns = position_nanosec + self.current_song_beginning_nanosec();
+        self.persist_position(absolute_ns);
+        self.audio.lock().await.seek_to(absolute_ns)
+    }
+
+    /// The current song's CUE start offset within its physical file (0 for a
+    /// plain, non-CUE song) — the audio engine's `position_nanosec` is
+    /// absolute within that file, but everything the UI and play-stats logic
+    /// deal in is relative to the track's own start (#78).
+    pub fn current_song_beginning_nanosec(&self) -> u64 {
+        self.current_song
+            .as_ref()
+            .map(|s| s.beginning_nanosec.max(0) as u64)
+            .unwrap_or(0)
     }
 
     pub async fn set_volume(&mut self, vol: f32) -> Result<()> {
@@ -1110,7 +1155,10 @@ impl Player {
             }
         }
 
-        // Walk backwards from current, skipping unavailable items
+        // Walk backwards from current, skipping unavailable items. Mirrors
+        // `get_next_index`'s boundary behavior: only wrap past the start
+        // under `RepeatMode::Playlist` — otherwise Previous at the first
+        // track is a no-op instead of jumping to the last track.
         if let Some(current) = self.current_index {
             let len = self.playlist_items.len();
             if len == 0 {
@@ -1118,8 +1166,10 @@ impl Player {
             }
             let mut candidate = if current > 0 {
                 current - 1
-            } else {
+            } else if self.repeat_mode == RepeatMode::Playlist {
                 len.saturating_sub(1)
+            } else {
+                return Ok(());
             };
             for _ in 0..len {
                 if self.is_playable_at(candidate) {
@@ -1591,35 +1641,17 @@ impl Player {
         }
     }
 
-    /// The current playlist's items in "up next" order: from the current
-    /// track through the end of `shuffle_order`, which holds identity order
-    /// `[0, 1, 2, ...]` when shuffle is off — so this works the same way
-    /// regardless of shuffle mode. Doesn't wrap around to before the current
-    /// track.
+    /// The current playlist's items in actual playback order: `shuffle_order`
+    /// holds identity order `[0, 1, 2, ...]` when shuffle is off, so this
+    /// works the same way regardless of shuffle mode. Includes every item —
+    /// already-played and upcoming — since `current_index` only marks a
+    /// position within this order, not a cutoff; a Queue row must stay
+    /// visible after it plays (#888/#902).
     pub fn get_playlist_tracks_in_playback_order(&self) -> Vec<PlaylistItem> {
-        let len = self.playlist_items.len();
-        if len == 0 {
-            return Vec::new();
-        }
-
-        let start_pos = self.current_index.unwrap_or(0);
-        let mut result = Vec::new();
-
-        if start_pos < self.shuffle_order.len() {
-            for &real_idx in &self.shuffle_order[start_pos..] {
-                if let Some(item) = self.playlist_items.get(real_idx) {
-                    result.push(item.clone());
-                }
-            }
-        } else {
-            for &real_idx in &self.shuffle_order {
-                if let Some(item) = self.playlist_items.get(real_idx) {
-                    result.push(item.clone());
-                }
-            }
-        }
-
-        result
+        self.shuffle_order
+            .iter()
+            .filter_map(|&real_idx| self.playlist_items.get(real_idx).cloned())
+            .collect()
     }
 
     pub fn set_repeat_mode(&mut self, mode: RepeatMode) {
@@ -1684,7 +1716,9 @@ impl Player {
             current_song: self.current_song.clone(),
             playlist_id: self.current_playlist_id,
             playlist_item_uuid: self.current_item_uuid.clone(),
-            position_nanosec: audio.current_position_nanosec() as i64,
+            position_nanosec: audio
+                .current_position_nanosec()
+                .saturating_sub(self.current_song_beginning_nanosec()) as i64,
             volume: audio.current_volume(),
             shuffle_mode: self.shuffle_mode,
             repeat_mode: self.repeat_mode,
@@ -1705,9 +1739,18 @@ impl Player {
         }
         self.scrobbled = true;
         log::debug!("Scrobble point reached at {}ns", position_nanosec);
-        // TODO: dispatch to online scrobbler services here once scrobbling lands
+
+        if let (Some(scrobbler), Some(song)) = (&self.scrobbler, &self.current_song) {
+            let scrobbler = Arc::clone(scrobbler);
+            let song = song.clone();
+            let listened_at = chrono::Utc::now().timestamp();
+            tokio::spawn(async move {
+                scrobbler.on_scrobble_point(&song, listened_at).await;
+            });
+        }
 
         let song_id = self.current_song.as_ref()?.id;
+        let duration_secs = self.current_song.as_ref()?.duration_secs().round() as i64;
         match self._db.pool.get() {
             Ok(conn) => match stats::record_play(&conn, song_id) {
                 Ok(()) => {
@@ -1715,7 +1758,9 @@ impl Player {
                         .current_play_context
                         .clone()
                         .unwrap_or(PlayContext::Song);
-                    if let Err(e) = stats::record_play_context(&conn, &context, song_id) {
+                    if let Err(e) =
+                        stats::record_play_context(&conn, &context, song_id, duration_secs)
+                    {
                         log::warn!("Failed to record play context for song {song_id}: {e}");
                     }
                     Some(stats::stats_payload(&conn, song_id))
@@ -1767,6 +1812,41 @@ mod tests {
             std::env::temp_dir().join(format!("luminous_player_test_{}", uuid::Uuid::new_v4()));
         let db = Database::new(temp_dir.clone()).unwrap();
         (db, temp_dir)
+    }
+
+    #[tokio::test]
+    async fn note_playback_error_never_flags_webdav_songs_unavailable() {
+        let (db, _temp_dir) = setup_test_db();
+        let db_arc = Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            conn.execute(
+                "INSERT INTO songs (id, source, path, title) VALUES (99, 11, 'http://127.0.0.1:8080/song.mp3', 'Remote Song')",
+                [],
+            )
+            .unwrap();
+        }
+
+        let audio = Arc::new(Mutex::new(AudioEngine::new()));
+        let mut player = Player::new(db_arc.clone(), audio.clone());
+        player.current_song = Some(crate::models::Song {
+            id: 99,
+            source: crate::models::SongSource::WebDav,
+            path: Some("http://127.0.0.1:8080/song.mp3".to_string()),
+            ..Default::default()
+        });
+
+        let outcome = player.note_playback_error();
+        assert!(!outcome.flagged_unavailable);
+
+        let conn = db_arc.pool.get().unwrap();
+        let unavailable: i64 = conn
+            .query_row("SELECT unavailable FROM songs WHERE id = 99", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(unavailable, 0);
     }
 
     #[tokio::test]
@@ -1994,6 +2074,68 @@ mod tests {
         player.previous_track().await.unwrap();
         assert_eq!(player.current_song.as_ref().unwrap().id, 1);
         assert_eq!(player.current_index, Some(0));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// Pressing Previous at the very first track must not wrap around to the
+    /// last track — it should stay put, mirroring `get_next_index`'s
+    /// boundary behavior for Next. Wrapping unconditionally here silently
+    /// jumped playback to the end of the queue, which then triggered the
+    /// frontend's natural-completion handling (clearing the Queue) far
+    /// earlier than the user expected.
+    #[tokio::test]
+    async fn test_previous_track_does_not_wrap_at_start_without_repeat() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for id in 1..=3i64 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (id, path, title, artist, album, length_nanosec) VALUES ({id}, '/fake/path{id}.mp3', 'Track {id}', 'Artist', 'Album', 180000000000)"
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+        }
+
+        let audio = Arc::new(Mutex::new(AudioEngine::new()));
+        let mut player = Player::new(db_arc.clone(), audio.clone());
+
+        let items = (1..=3i64)
+            .map(|id| {
+                let conn = db_arc.pool.get().unwrap();
+                let sql = format!(
+                    "SELECT {} FROM songs WHERE id = ?1",
+                    crate::collection::SONG_SELECT_COLS
+                );
+                let song = conn
+                    .query_row(&sql, rusqlite::params![id], crate::collection::row_to_song)
+                    .unwrap();
+                PlaylistItem::new_song(0, 0, song)
+            })
+            .collect::<Vec<_>>();
+
+        // Start on the first track (index 0).
+        player.play_playlist(items, 0, 0, None).await.unwrap();
+        assert_eq!(player.current_index, Some(0));
+
+        player.previous_track().await.unwrap();
+        assert_eq!(
+            player.current_index,
+            Some(0),
+            "previous at the start of the queue must not wrap to the last track"
+        );
+        assert_eq!(player.current_song.as_ref().unwrap().id, 1);
+
+        // With RepeatMode::Playlist, wrapping to the last track is intended.
+        player.set_repeat_mode(RepeatMode::Playlist);
+        player.previous_track().await.unwrap();
+        assert_eq!(player.current_index, Some(2));
+        assert_eq!(player.current_song.as_ref().unwrap().id, 3);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
@@ -2401,6 +2543,59 @@ mod tests {
         // Shuffle order should be: Song 1 (0), Song 4 (2), Song 5 (3), Song 3 (1) -> vec![0, 2, 3, 1]
         assert_eq!(player.shuffle_order, vec![0, 2, 3, 1]);
         assert_eq!(player.current_index, Some(0));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[tokio::test]
+    async fn test_get_playlist_tracks_in_playback_order_includes_already_played_items() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for id in 1..=3i64 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (id, path, title, artist, album, length_nanosec) VALUES ({id}, '/fake/path{id}.mp3', 'Track {id}', 'Artist', 'Album', 180000000000)"
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+        }
+
+        let audio = Arc::new(Mutex::new(AudioEngine::new()));
+        let mut player = Player::new(db_arc.clone(), audio.clone());
+
+        let items = (1..=3i64)
+            .map(|id| {
+                let conn = db_arc.pool.get().unwrap();
+                let sql = format!(
+                    "SELECT {} FROM songs WHERE id = ?1",
+                    crate::collection::SONG_SELECT_COLS
+                );
+                let song = conn
+                    .query_row(&sql, rusqlite::params![id], crate::collection::row_to_song)
+                    .unwrap();
+                PlaylistItem::new_song(0, 0, song)
+            })
+            .collect::<Vec<_>>();
+
+        player
+            .play_playlist(items.clone(), 0, 0, None)
+            .await
+            .unwrap();
+
+        // Simulate having advanced past the first two tracks (#902): they must
+        // still be returned, not sliced away just because current_index moved.
+        player.current_index = Some(2);
+
+        let result = player.get_playlist_tracks_in_playback_order();
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0].uuid, items[0].uuid);
+        assert_eq!(result[1].uuid, items[1].uuid);
+        assert_eq!(result[2].uuid, items[2].uuid);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

@@ -39,7 +39,7 @@ const EXTENSION_BY_MIME: Record<string, string> = {
  * resolves, corrupt tags, etc). Never throws; a failure here should just
  * mean "no art", not abort the whole mock library load.
  */
-export async function resolveEmbeddedArt(song: Song): Promise<string | undefined> {
+async function resolveEmbeddedArt(song: Song): Promise<string | undefined> {
   if (!song.path || !existsSync(song.path)) return undefined;
 
   for (const ext of ["jpg", "png"]) {

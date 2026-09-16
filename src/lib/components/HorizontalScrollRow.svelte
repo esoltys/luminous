@@ -6,10 +6,13 @@
   interface Props {
     title?: string;
     headerExtra?: Snippet;
+    /** When provided, the title becomes a clickable button that navigates to
+     * the category's full expanded view (see #169). */
+    onHeaderClick?: () => void;
     children: Snippet;
   }
 
-  let { title, headerExtra, children }: Props = $props();
+  let { title, headerExtra, onHeaderClick, children }: Props = $props();
 
   const SCROLL_END_BUFFER_PX = 10;
   const SCROLL_STEP_PX = 600; // approximate 3 card-widths including gap
@@ -55,7 +58,16 @@
   {#if title || headerExtra || canScrollLeft || canScrollRight}
     <div class="flex items-center justify-between min-h-[32px]">
       <div class="flex items-center gap-4">
-        {#if title}
+        {#if title && onHeaderClick}
+          <button
+            type="button"
+            onclick={onHeaderClick}
+            class="group flex items-center gap-1 text-xl font-semibold text-brand-text-primary hover:text-brand-accent-text transition-colors"
+          >
+            {title}
+            <ChevronRight class="w-5 h-5 opacity-0 group-hover:opacity-100 transition-opacity" />
+          </button>
+        {:else if title}
           <h2 class="text-xl font-semibold text-brand-text-primary">{title}</h2>
         {/if}
         {#if headerExtra}
@@ -86,8 +98,14 @@
     </div>
   {/if}
 
-  <div bind:this={scrollContainer} class="flex gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 carousel-scroll">
-    {@render children()}
+  <div
+    class="carousel-fade"
+    class:fade-left={canScrollLeft}
+    class:fade-right={canScrollRight}
+  >
+    <div bind:this={scrollContainer} class="flex gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 carousel-scroll">
+      {@render children()}
+    </div>
   </div>
 </div>
 
@@ -98,5 +116,33 @@
   }
   .carousel-scroll::-webkit-scrollbar {
     display: none;
+  }
+
+  .carousel-fade {
+    --fade-width: 2.5rem;
+  }
+  .carousel-fade.fade-left {
+    -webkit-mask-image: linear-gradient(to right, transparent, black var(--fade-width));
+    mask-image: linear-gradient(to right, transparent, black var(--fade-width));
+  }
+  .carousel-fade.fade-right {
+    -webkit-mask-image: linear-gradient(to left, transparent, black var(--fade-width));
+    mask-image: linear-gradient(to left, transparent, black var(--fade-width));
+  }
+  .carousel-fade.fade-left.fade-right {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent,
+      black var(--fade-width),
+      black calc(100% - var(--fade-width)),
+      transparent
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      black var(--fade-width),
+      black calc(100% - var(--fade-width)),
+      transparent
+    );
   }
 </style>

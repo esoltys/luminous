@@ -10,8 +10,8 @@
     id?: string;
     disabled?: boolean;
     placeholder?: string;
-    /** Mirrors Input.svelte's `highlighted` — e.g. to flag a field just
-        changed by an AcoustID lookup, until edited or re-looked-up. */
+    /** Mirrors Input.svelte's `highlighted` — flags a field as just changed
+        by some external action, until edited by the user. */
     highlighted?: boolean;
     class?: string;
     /** Fires on every draft keystroke, before a chip is committed — e.g. to

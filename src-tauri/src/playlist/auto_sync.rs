@@ -4,9 +4,11 @@
 
 use super::{PlaylistManager, NO_SONG_LIMIT};
 use crate::collection::CollectionScanner;
-use crate::models::QueuePopulationMode;
+use crate::models::{QueuePopulationMode, LIBRARY_SOURCES_SQL};
 use crate::tags::TagManager;
 use anyhow::Result;
+use chrono::Timelike;
+use rand::seq::IndexedRandom;
 use rusqlite::params;
 use std::collections::HashSet;
 use uuid::Uuid;
@@ -14,7 +16,7 @@ use uuid::Uuid;
 /// Minimum number of matching library songs required before a genre/decade
 /// auto-playlist is created. Once created, an auto-playlist is populated
 /// with every matching song (see [`NO_SONG_LIMIT`]), not just this many.
-const MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST: i64 = 25;
+pub(super) const MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST: i64 = 25;
 
 /// Fixed BPM buckets for the BPM auto-playlist category: (display name, min
 /// BPM inclusive, max BPM inclusive — `None` means "or higher"). Unlike
@@ -38,6 +40,32 @@ fn format_bpm_range_spec(min: f64, max: Option<f64>) -> String {
     }
 }
 
+/// The four fixed Daypart Mix buckets (#223): local-hour ranges deliberately
+/// mirror `HomeView.svelte`'s `getTimeOfDayGreeting()` (05-11 / 12-16 /
+/// 17-20 / else) so the Home greeting and the Daypart Mix card always agree
+/// on "what part of the day is it" — if one changes, the other must too.
+/// Pure/hour-only so boundary edges (04:59 vs 05:00, etc.) are directly
+/// unit-testable without touching the wall clock.
+fn daypart_bucket_for_hour(hour: u32) -> (&'static str, &'static str) {
+    match hour {
+        5..=11 => ("morning", "Morning Mix"),
+        12..=16 => ("afternoon", "Afternoon Mix"),
+        17..=20 => ("evening", "Evening Mix"),
+        _ => ("latenight", "Late Night Mix"),
+    }
+}
+
+/// Bucket id, display name, and local calendar date (the `dynamic_spec`
+/// reroll cache key — see [`PlaylistManager::sync_daypart_auto_playlist`])
+/// for a given local timestamp. Takes `now` as a parameter rather than
+/// calling `Local::now()` internally so tests can inject arbitrary times.
+fn daypart_bucket_and_date(
+    now: chrono::DateTime<chrono::Local>,
+) -> (&'static str, &'static str, String) {
+    let (bucket, name) = daypart_bucket_for_hour(now.hour());
+    (bucket, name, now.date_naive().to_string())
+}
+
 impl PlaylistManager {
     /// Runs all three auto-playlist syncs (genre, decade, BPM) in one call —
     /// the frontend used to invoke these as three separate IPC round trips
@@ -47,6 +75,9 @@ impl PlaylistManager {
         self.sync_decade_auto_playlists()?;
         self.sync_bpm_auto_playlists()?;
         self.sync_artist_tag_auto_playlists()?;
+        self.sync_missing_metadata_auto_playlist()?;
+        self.sync_missing_musicbrainz_auto_playlist()?;
+        self.sync_daypart_auto_playlist()?;
         Ok(())
     }
 
@@ -507,6 +538,380 @@ impl PlaylistManager {
 
         Ok(())
     }
+
+    /// Regenerates the single "Missing Metadata" auto-playlist (#367) — a
+    /// system-managed `playlists` row with `dynamic_enabled = 1` and
+    /// `dynamic_spec = "missingmeta"` — if missing or its `updated`
+    /// timestamp is more than 24h old. Unlike genre/decade/BPM/artist-tag
+    /// auto-playlists there is exactly one row and no
+    /// `MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST` gate: the point is to surface
+    /// library health issues even when only one song is affected. The row
+    /// is created unconditionally (even at 0 matches) so it never has to
+    /// wait for a first offending song; the frontend hides the card when
+    /// `track_count == 0`, the same convention used for genre/decade/BPM at
+    /// 0 songs.
+    pub fn sync_missing_metadata_auto_playlist(&self) -> Result<()> {
+        const STALE_AFTER_SECS: i64 = 24 * 60 * 60;
+        const SPEC: &str = "missingmeta";
+        const NAME: &str = "Missing Metadata";
+
+        let scanner = CollectionScanner::new(self.db.clone());
+        let conn = self.db.pool.get()?;
+        let now = chrono::Utc::now().timestamp();
+
+        let existing_row: Option<(i64, i64, i64, String)> = conn
+            .query_row(
+                "SELECT p.id, COALESCE(p.updated, 0), COUNT(pi.id), COALESCE(p.population_mode, 'all')
+                 FROM playlists p
+                 LEFT JOIN playlist_items pi ON pi.playlist_id = p.id
+                 WHERE p.dynamic_enabled = 1 AND p.dynamic_spec = ?1
+                 GROUP BY p.id",
+                params![SPEC],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .ok();
+        let mode = existing_row
+            .as_ref()
+            .map(|(_, _, _, m)| QueuePopulationMode::from(m.as_str()))
+            .unwrap_or_default();
+
+        let needs_generation = match existing_row {
+            None => true,
+            Some((_, updated, count, _)) => count == 0 || now - updated > STALE_AFTER_SECS,
+        };
+        if !needs_generation {
+            return Ok(());
+        }
+
+        let songs = scanner.get_songs_missing_core_tags(NO_SONG_LIMIT, mode)?;
+
+        let playlist_id = match existing_row {
+            Some((id, _, _, _)) => {
+                conn.execute(
+                    "UPDATE playlists SET updated = ?1 WHERE id = ?2",
+                    params![now, id],
+                )?;
+                conn.execute(
+                    "DELETE FROM playlist_items WHERE playlist_id = ?1",
+                    params![id],
+                )?;
+                id
+            }
+            None => {
+                conn.execute(
+                    "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, created, updated) VALUES (?1, 1, ?2, ?3, ?3)",
+                    params![NAME, SPEC, now],
+                )?;
+                conn.last_insert_rowid()
+            }
+        };
+
+        for (position, song) in songs.iter().enumerate() {
+            conn.execute(
+                "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type) VALUES (?1, ?2, ?3, ?4, 0)",
+                params![playlist_id, song.id, position as i32, Uuid::new_v4().to_string()],
+            )?;
+        }
+
+        Ok(())
+    }
+
+    /// Regenerates the "Missing MusicBrainz ID" auto-playlist (#83) — a
+    /// system-managed `playlists` row with `dynamic_enabled = 1` and
+    /// `dynamic_spec = "missingmbid"` — if missing, empty, or its `updated`
+    /// timestamp is more than 24h old.
+    /// Surfaced in the UI when scrobbling is enabled so users can easily
+    /// identify tracks that cannot be scrobbled or loved on ListenBrainz due
+    /// to missing MusicBrainz recording IDs.
+    pub fn sync_missing_musicbrainz_auto_playlist(&self) -> Result<()> {
+        const STALE_AFTER_SECS: i64 = 24 * 60 * 60;
+        const SPEC: &str = "missingmbid";
+        const NAME: &str = "Missing MusicBrainz ID";
+
+        let scanner = CollectionScanner::new(self.db.clone());
+        let conn = self.db.pool.get()?;
+        let now = chrono::Utc::now().timestamp();
+
+        let existing_row: Option<(i64, i64, i64, String)> = conn
+            .query_row(
+                "SELECT p.id, COALESCE(p.updated, 0), COUNT(pi.id), COALESCE(p.population_mode, 'all')
+                 FROM playlists p
+                 LEFT JOIN playlist_items pi ON pi.playlist_id = p.id
+                 WHERE p.dynamic_enabled = 1 AND p.dynamic_spec = ?1
+                 GROUP BY p.id",
+                params![SPEC],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .ok();
+
+        if let Some((id, _, _, _)) = existing_row {
+            conn.execute(
+                "UPDATE playlists SET name = ?1 WHERE id = ?2 AND name != ?1",
+                params![NAME, id],
+            )?;
+        }
+
+        let mode = existing_row
+            .as_ref()
+            .map(|(_, _, _, m)| QueuePopulationMode::from(m.as_str()))
+            .unwrap_or_default();
+
+        let needs_generation = match existing_row {
+            None => true,
+            Some((_, updated, count, _)) => count == 0 || now - updated > STALE_AFTER_SECS,
+        };
+        if !needs_generation {
+            return Ok(());
+        }
+
+        let songs = scanner.get_songs_missing_musicbrainz_id(NO_SONG_LIMIT, mode)?;
+
+        let playlist_id = match existing_row {
+            Some((id, _, _, _)) => {
+                conn.execute(
+                    "UPDATE playlists SET name = ?1, updated = ?2 WHERE id = ?3",
+                    params![NAME, now, id],
+                )?;
+                conn.execute(
+                    "DELETE FROM playlist_items WHERE playlist_id = ?1",
+                    params![id],
+                )?;
+                id
+            }
+            None => {
+                conn.execute(
+                    "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, created, updated) VALUES (?1, 1, ?2, ?3, ?3)",
+                    params![NAME, SPEC, now],
+                )?;
+                conn.last_insert_rowid()
+            }
+        };
+
+        for (position, song) in songs.iter().enumerate() {
+            conn.execute(
+                "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type) VALUES (?1, ?2, ?3, ?4, 0)",
+                params![playlist_id, song.id, position as i32, Uuid::new_v4().to_string()],
+            )?;
+        }
+
+        Ok(())
+    }
+
+    /// Picks a genre grouping for the Daypart Mix (#223) by walking the
+    /// curated Genre hierarchy (`TagManager::get_tag_hierarchy`, #548): pick
+    /// a random node — a top-level group or one of its curated children —
+    /// and resolve it to a name with enough songs to be worth a mix.
+    ///
+    /// A picked child under the 25-song minimum on its own (e.g. "Soft
+    /// Rock" with 10 songs) walks up to its parent group instead (e.g.
+    /// "Rock" with 408) rather than falling straight to a library-wide
+    /// shuffle — the parent's rollup already includes every curated child,
+    /// so this still reads as a coherent, related-genre mix. Returns `None`
+    /// (the random-fill fallback marker) when there's no curated hierarchy
+    /// at all, or the resolved grouping is still under the threshold even
+    /// at the parent level (a small/sparse library).
+    fn pick_daypart_genre_grouping(&self) -> Result<Option<String>> {
+        let tag_manager = TagManager::new(self.db.clone());
+        // Self-contained and idempotent, same rationale as
+        // `sync_genre_auto_playlists` — don't rely on `sync_genre_auto_playlists`
+        // having already run earlier in the same `sync_all_auto_playlists()`
+        // call (or the async `library-changed` listener) to have populated
+        // `tag_groups`/`tag_assignments` first.
+        tag_manager.reconcile_hierarchy()?;
+        let hierarchy = tag_manager.get_tag_hierarchy()?;
+
+        enum Candidate<'a> {
+            Group {
+                name: &'a str,
+                song_count: i64,
+            },
+            Child {
+                name: &'a str,
+                song_count: i64,
+                parent_name: &'a str,
+                parent_count: i64,
+            },
+        }
+
+        let mut candidates: Vec<Candidate> = Vec::new();
+        for group in &hierarchy {
+            if group.song_count >= MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST {
+                candidates.push(Candidate::Group {
+                    name: &group.name,
+                    song_count: group.song_count,
+                });
+            }
+            for child in &group.children {
+                if child.song_count >= MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST
+                    || group.song_count >= MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST
+                {
+                    candidates.push(Candidate::Child {
+                        name: &child.name,
+                        song_count: child.song_count,
+                        parent_name: &group.name,
+                        parent_count: group.song_count,
+                    });
+                }
+            }
+        }
+
+        let Some(picked) = candidates.choose(&mut rand::rng()) else {
+            return Ok(None);
+        };
+
+        let (resolved_name, resolved_count) = match picked {
+            Candidate::Group { name, song_count } => (*name, *song_count),
+            Candidate::Child {
+                name,
+                song_count,
+                parent_name,
+                parent_count,
+            } => {
+                if *song_count >= MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST {
+                    (*name, *song_count)
+                } else {
+                    (*parent_name, *parent_count)
+                }
+            }
+        };
+
+        if resolved_count < MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST {
+            return Ok(None);
+        }
+        Ok(Some(resolved_name.to_string()))
+    }
+
+    /// Regenerates the single "Daypart Mix" auto-playlist (#223) — a
+    /// system-managed `playlists` row with `dynamic_enabled = 1` and
+    /// `dynamic_spec = "daypart:<bucket>:<local-date>:<resolved-name>"`.
+    /// Unlike every other auto-playlist category, there is exactly ONE row
+    /// for all four dayparts (Morning/Afternoon/Evening/Late Night) — the
+    /// same row's `name` and `dynamic_spec` are rewritten in place as the
+    /// local-time bucket changes, rather than materializing one row per
+    /// bucket. This is what lets a Home-page pin (keyed on `Playlist.id`,
+    /// not on `dynamic_spec`) survive every boundary crossing untouched.
+    ///
+    /// Reroll timing: the genre grouping is only re-picked when the row's
+    /// stored `bucket:date` prefix no longer matches today's real local
+    /// bucket/date (see [`daypart_bucket_and_date`]) — repeated calls within
+    /// the same bucket on the same calendar day are a no-op, so this is safe
+    /// to call from every `sync_all_auto_playlists()` call site (startup,
+    /// `finish_scan`, manual refresh, and the frontend's periodic
+    /// boundary-check timer) without thrashing the selection.
+    ///
+    /// Playback continuity (confirmed design decision, #223): this does a
+    /// full delete+reinsert of `playlist_items` — the same full-rewrite
+    /// shape every other `sync_*_auto_playlists` function already uses —
+    /// and deliberately does NOT touch `AppState::player`'s in-memory queue.
+    /// A currently-playing session is therefore never interrupted, skipped,
+    /// or reordered by a boundary crossing; it simply keeps playing its
+    /// already-loaded songs; the DB becomes correct immediately, and a
+    /// long-running live queue only catches up the next time the playlist
+    /// is loaded/replayed. This is deliberate, not an oversight: hot-
+    /// relabeling an in-progress queue's upcoming tracks was considered and
+    /// rejected as unnecessary complexity for a rare edge case.
+    pub fn sync_daypart_auto_playlist(&self) -> Result<()> {
+        const SPEC_PREFIX: &str = "daypart:";
+
+        let (bucket, bucket_name, today) = daypart_bucket_and_date(chrono::Local::now());
+
+        let conn = self.db.pool.get()?;
+        let now = chrono::Utc::now().timestamp();
+
+        let existing_row: Option<(i64, Option<String>, String, i64)> = conn
+            .query_row(
+                "SELECT p.id, p.dynamic_spec, COALESCE(p.population_mode, 'all'),
+                        (SELECT COUNT(*) FROM playlist_items pi WHERE pi.playlist_id = p.id)
+                 FROM playlists p
+                 WHERE p.dynamic_enabled = 1 AND p.dynamic_spec LIKE 'daypart:%'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .ok();
+
+        let total_library_songs: i64 = conn
+            .query_row(
+                &format!(
+                    "SELECT COUNT(*) FROM songs WHERE source IN ({lib}) AND unavailable = 0 AND not_included = 0",
+                    lib = *LIBRARY_SOURCES_SQL
+                ),
+                [],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+
+        if let Some((_, Some(spec), _, track_count)) = &existing_row {
+            let healthy_min = total_library_songs.min(MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST);
+            if *track_count >= healthy_min && (healthy_min == 0 || *track_count > 0) {
+                let mut parts = spec.strip_prefix(SPEC_PREFIX).unwrap_or("").splitn(3, ':');
+                let stored_bucket = parts.next().unwrap_or("");
+                let stored_date = parts.next().unwrap_or("");
+                if stored_bucket == bucket && stored_date == today {
+                    // Already correct for today's bucket and healthy — no reroll, no rewrite.
+                    return Ok(());
+                }
+            }
+        }
+
+        let mode = existing_row
+            .as_ref()
+            .map(|(_, _, m, _)| QueuePopulationMode::from(m.as_str()))
+            .unwrap_or_default();
+
+        let resolved_name = self.pick_daypart_genre_grouping()?.unwrap_or_default();
+        let mut new_spec = format!("{SPEC_PREFIX}{bucket}:{today}:{resolved_name}");
+        let mut songs = self.songs_for_spec(&new_spec, mode)?;
+
+        // Fallback: if the picked genre didn't clear the minimum threshold,
+        // fall back to random fill across the library (#223).
+        if songs.len() < MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST as usize {
+            let fallback_spec = format!("{SPEC_PREFIX}{bucket}:{today}:");
+            let fallback_songs = self.songs_for_spec(&fallback_spec, mode)?;
+            if fallback_songs.len() >= songs.len() {
+                new_spec = fallback_spec;
+                songs = fallback_songs;
+            }
+        }
+
+        // Creation gate: only skip creating a brand-new row if this pass
+        // didn't find enough songs (mirrors genre/decade/BPM's "need an
+        // existing row OR >= threshold songs" gate). An existing row is
+        // always updated in place regardless of the new count — same
+        // tolerance genre/decade/BPM already have once created.
+        if existing_row.is_none() && songs.len() < MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST as usize {
+            return Ok(());
+        }
+
+        let playlist_id = match &existing_row {
+            Some((id, _, _, _)) => {
+                conn.execute(
+                    "UPDATE playlists SET name = ?1, dynamic_spec = ?2, updated = ?3 WHERE id = ?4",
+                    params![bucket_name, new_spec, now, id],
+                )?;
+                conn.execute(
+                    "DELETE FROM playlist_items WHERE playlist_id = ?1",
+                    params![id],
+                )?;
+                *id
+            }
+            None => {
+                conn.execute(
+                    "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, created, updated) VALUES (?1, 1, ?2, ?3, ?3)",
+                    params![bucket_name, new_spec, now],
+                )?;
+                conn.last_insert_rowid()
+            }
+        };
+
+        for (position, song) in songs.iter().enumerate() {
+            conn.execute(
+                "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type) VALUES (?1, ?2, ?3, ?4, 0)",
+                params![playlist_id, song.id, position as i32, Uuid::new_v4().to_string()],
+            )?;
+        }
+
+        Ok(())
+    }
 }
 
 /// Converts a lowercase or normalized tag string into Title Case (e.g. "canadian" -> "Canadian", "prog-rock" -> "Prog-Rock").
@@ -535,13 +940,7 @@ mod tests {
     use crate::db::Database;
 
     fn setup_test_db() -> (Database, std::path::PathBuf) {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_playlist_auto_sync_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir = tempfile::tempdir().unwrap().keep();
         let db = Database::new(temp_dir.clone()).unwrap();
         (db, temp_dir)
     }
@@ -987,6 +1386,633 @@ mod tests {
                 .any(|p| p.dynamic_spec.as_deref() == Some("artisttag:canadian")),
             "artisttag:canadian must be pruned when 0 songs remain"
         );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_sync_missing_metadata_auto_playlist() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            // Complete — should not appear.
+            conn.execute(
+                "INSERT INTO songs (title, artist, album, source, unavailable) VALUES ('Complete Song', 'Artist', 'Album', 1, 0)",
+                [],
+            )
+            .unwrap();
+            // Missing artist (empty string, not NULL).
+            conn.execute(
+                "INSERT INTO songs (title, artist, album, source, unavailable) VALUES ('No Artist', '', 'Album', 1, 0)",
+                [],
+            )
+            .unwrap();
+            // Missing album (NULL).
+            conn.execute(
+                "INSERT INTO songs (title, artist, source, unavailable) VALUES ('No Album', 'Artist', 1, 0)",
+                [],
+            )
+            .unwrap();
+        }
+
+        let manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        // Unlike genre/decade/BPM/artist-tag, this must be created even with
+        // only a couple of matching songs — no 25-song threshold gate.
+        manager.sync_missing_metadata_auto_playlist().unwrap();
+
+        let playlists = manager.get_playlists().unwrap();
+        let pl = playlists
+            .iter()
+            .find(|p| p.dynamic_spec.as_deref() == Some("missingmeta"))
+            .expect("Missing Metadata auto-playlist should always be created, even below any song-count threshold");
+        assert_eq!(pl.name, "Missing Metadata");
+
+        let tracks = manager.get_playlist_tracks(pl.id).unwrap();
+        let titles: Vec<_> = tracks
+            .iter()
+            .map(|t| t.song.as_ref().unwrap().title.clone().unwrap())
+            .collect();
+        assert_eq!(titles.len(), 2);
+        assert!(titles.contains(&"No Artist".to_string()));
+        assert!(titles.contains(&"No Album".to_string()));
+        assert!(!titles.contains(&"Complete Song".to_string()));
+
+        // Fixing the tags and reconciling should drop the songs out again.
+        db_arc
+            .pool
+            .get()
+            .unwrap()
+            .execute(
+                "UPDATE songs SET artist = 'Artist' WHERE title = 'No Artist'",
+                [],
+            )
+            .unwrap();
+        let mut manager = manager;
+        let deltas = manager.reconcile_dynamic_playlists().unwrap();
+        assert!(deltas.iter().any(|d| d.playlist_id == pl.id));
+        let tracks = manager.get_playlist_tracks(pl.id).unwrap();
+        assert_eq!(tracks.len(), 1);
+        assert_eq!(
+            tracks[0].song.as_ref().unwrap().title.as_deref(),
+            Some("No Album")
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_sync_missing_musicbrainz_auto_playlist() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            // Complete with MBID — should not appear.
+            conn.execute(
+                "INSERT INTO songs (title, artist, album, source, unavailable, musicbrainz_recording_id) VALUES ('Song With MBID', 'Artist', 'Album', 1, 0, 'mbid-123')",
+                [],
+            )
+            .unwrap();
+            // Missing MBID (NULL).
+            conn.execute(
+                "INSERT INTO songs (title, artist, album, source, unavailable) VALUES ('Song Without MBID', 'Artist', 'Album', 1, 0)",
+                [],
+            )
+            .unwrap();
+            // Empty MBID string.
+            conn.execute(
+                "INSERT INTO songs (title, artist, album, source, unavailable, musicbrainz_recording_id) VALUES ('Song With Empty MBID', 'Artist', 'Album', 1, 0, '   ')",
+                [],
+            )
+            .unwrap();
+        }
+
+        let manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        manager.sync_missing_musicbrainz_auto_playlist().unwrap();
+
+        let playlists = manager.get_playlists().unwrap();
+        let pl = playlists
+            .iter()
+            .find(|p| p.dynamic_spec.as_deref() == Some("missingmbid"))
+            .expect("Missing MusicBrainz auto-playlist should be created");
+        assert_eq!(pl.name, "Missing MusicBrainz ID");
+
+        let tracks = manager.get_playlist_tracks(pl.id).unwrap();
+        let titles: Vec<_> = tracks
+            .iter()
+            .map(|t| t.song.as_ref().unwrap().title.clone().unwrap())
+            .collect();
+        assert_eq!(titles.len(), 2);
+        assert!(titles.contains(&"Song Without MBID".to_string()));
+        assert!(titles.contains(&"Song With Empty MBID".to_string()));
+        assert!(!titles.contains(&"Song With MBID".to_string()));
+
+        // Tagging with MBID and reconciling should drop it from the playlist
+        db_arc
+            .pool
+            .get()
+            .unwrap()
+            .execute(
+                "UPDATE songs SET musicbrainz_recording_id = 'mbid-456' WHERE title = 'Song Without MBID'",
+                [],
+            )
+            .unwrap();
+        let mut manager = manager;
+        let deltas = manager.reconcile_dynamic_playlists().unwrap();
+        assert!(deltas.iter().any(|d| d.playlist_id == pl.id));
+        let tracks = manager.get_playlist_tracks(pl.id).unwrap();
+        assert_eq!(tracks.len(), 1);
+        assert_eq!(
+            tracks[0].song.as_ref().unwrap().title.as_deref(),
+            Some("Song With Empty MBID")
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    // -----------------------------------------------------------------------
+    // Daypart Mix auto-playlist (#223)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_daypart_bucket_for_hour_matches_home_greeting_boundaries() {
+        assert_eq!(daypart_bucket_for_hour(5).0, "morning");
+        assert_eq!(daypart_bucket_for_hour(11).0, "morning");
+        assert_eq!(daypart_bucket_for_hour(12).0, "afternoon");
+        assert_eq!(daypart_bucket_for_hour(16).0, "afternoon");
+        assert_eq!(daypart_bucket_for_hour(17).0, "evening");
+        assert_eq!(daypart_bucket_for_hour(20).0, "evening");
+        assert_eq!(daypart_bucket_for_hour(21).0, "latenight");
+        assert_eq!(daypart_bucket_for_hour(4).0, "latenight");
+        assert_eq!(daypart_bucket_for_hour(0).0, "latenight");
+    }
+
+    #[test]
+    fn test_sync_daypart_creates_singleton_row_with_bucket_name() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for i in 1..=30 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (title, genre, source, unavailable) VALUES ('Rock Song {}', 'Rock', 1, 0)",
+                        i
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+        }
+
+        let manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        manager.sync_daypart_auto_playlist().unwrap();
+
+        let playlists = manager.get_playlists().unwrap();
+        let daypart_playlists: Vec<_> = playlists
+            .iter()
+            .filter(|p| {
+                p.dynamic_enabled
+                    && p.dynamic_spec
+                        .as_deref()
+                        .unwrap_or("")
+                        .starts_with("daypart:")
+            })
+            .collect();
+
+        assert_eq!(
+            daypart_playlists.len(),
+            1,
+            "exactly one Daypart Mix row must exist, never one per bucket"
+        );
+        assert!(daypart_playlists[0].name.ends_with("Mix"));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_sync_daypart_does_not_reroll_within_same_bucket_and_date() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for i in 1..=30 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (title, genre, source, unavailable) VALUES ('Rock Song {}', 'Rock', 1, 0)",
+                        i
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+        }
+
+        let manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        manager.sync_daypart_auto_playlist().unwrap();
+
+        let playlists = manager.get_playlists().unwrap();
+        let first = playlists
+            .iter()
+            .find(|p| {
+                p.dynamic_spec
+                    .as_deref()
+                    .unwrap_or("")
+                    .starts_with("daypart:")
+            })
+            .unwrap()
+            .clone();
+
+        // Repeated calls within the same bucket/date must be a complete
+        // no-op (same `updated` timestamp, same spec) — this is what keeps
+        // every other `sync_all_auto_playlists()` call site (finish_scan,
+        // manual refresh, mount) from thrashing the genre selection.
+        manager.sync_daypart_auto_playlist().unwrap();
+        manager.sync_daypart_auto_playlist().unwrap();
+
+        let playlists_after = manager.get_playlists().unwrap();
+        let after = playlists_after
+            .iter()
+            .find(|p| {
+                p.dynamic_spec
+                    .as_deref()
+                    .unwrap_or("")
+                    .starts_with("daypart:")
+            })
+            .unwrap();
+
+        assert_eq!(first.id, after.id);
+        assert_eq!(first.dynamic_spec, after.dynamic_spec);
+        assert_eq!(first.updated, after.updated);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_sync_daypart_renames_and_repopulates_same_row_across_bucket_change() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for i in 1..=30 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (title, genre, source, unavailable) VALUES ('Rock Song {}', 'Rock', 1, 0)",
+                        i
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+        }
+
+        let manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        manager.sync_daypart_auto_playlist().unwrap();
+
+        let playlists = manager.get_playlists().unwrap();
+        let before = playlists
+            .iter()
+            .find(|p| {
+                p.dynamic_spec
+                    .as_deref()
+                    .unwrap_or("")
+                    .starts_with("daypart:")
+            })
+            .unwrap()
+            .clone();
+
+        // Simulate a boundary crossing by directly rewriting the stored spec
+        // to an earlier bucket/date than "now" would ever compute, so the
+        // next sync is forced to treat it as stale and regenerate — same
+        // effect as time actually advancing, without depending on the wall
+        // clock in the test.
+        const STALE_SPEC: &str = "daypart:latenight:2000-01-01:Rock";
+        {
+            let conn = db_arc.pool.get().unwrap();
+            conn.execute(
+                "UPDATE playlists SET dynamic_spec = ?1 WHERE id = ?2",
+                params![STALE_SPEC, before.id],
+            )
+            .unwrap();
+        }
+
+        manager.sync_daypart_auto_playlist().unwrap();
+
+        let playlists_after = manager.get_playlists().unwrap();
+        let after = playlists_after
+            .iter()
+            .find(|p| {
+                p.dynamic_spec
+                    .as_deref()
+                    .unwrap_or("")
+                    .starts_with("daypart:")
+            })
+            .unwrap();
+
+        assert_eq!(
+            before.id, after.id,
+            "boundary crossing must rewrite the SAME row, never create a second one"
+        );
+        assert_ne!(
+            after.dynamic_spec.as_deref(),
+            Some(STALE_SPEC),
+            "the stale bucket/date must trigger a regen with a fresh spec, not be left as-is"
+        );
+        assert_eq!(
+            playlists_after
+                .iter()
+                .filter(|p| p
+                    .dynamic_spec
+                    .as_deref()
+                    .unwrap_or("")
+                    .starts_with("daypart:"))
+                .count(),
+            1,
+            "still exactly one Daypart Mix row after the boundary crossing"
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_sync_daypart_falls_back_to_parent_group_when_child_below_threshold() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            // 10 "Soft Rock" songs (curated as a child of "Rock") — below the
+            // 25-song minimum on its own.
+            for i in 1..=10 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (title, genre, source, unavailable) VALUES ('Soft Rock Song {}', 'Rock; Soft Rock', 1, 0)",
+                        i
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+            // 398 more plain "Rock" songs, so the "Rock" group rolls up to
+            // 408 total — the owner's own Soft Rock (10) / Rock (408) example.
+            for i in 1..=398 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (title, genre, source, unavailable) VALUES ('Rock Song {}', 'Rock', 1, 0)",
+                        i
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+        }
+
+        let manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        // Only one curated grouping exists ("Rock" / "Soft Rock"), so the
+        // random pick is deterministic regardless of which node it lands on:
+        // "Rock" resolves directly, and "Soft Rock" (10 songs) must walk up
+        // to "Rock" (408) rather than falling to a random-library-fill.
+        manager.sync_daypart_auto_playlist().unwrap();
+
+        let playlists = manager.get_playlists().unwrap();
+        let daypart_pl = playlists
+            .iter()
+            .find(|p| {
+                p.dynamic_spec
+                    .as_deref()
+                    .unwrap_or("")
+                    .starts_with("daypart:")
+            })
+            .expect("Daypart Mix should be created");
+
+        assert!(
+            daypart_pl
+                .dynamic_spec
+                .as_deref()
+                .unwrap()
+                .ends_with(":Rock"),
+            "must resolve to the parent group \"Rock\", not the undersized child \"Soft Rock\": got {:?}",
+            daypart_pl.dynamic_spec
+        );
+        assert_eq!(
+            manager.get_playlist_tracks(daypart_pl.id).unwrap().len(),
+            408
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_sync_daypart_falls_back_to_random_fill_when_no_grouping_clears_threshold() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            // Two curated groups, each with only 15 songs (below 25) and no
+            // children to roll up into — total library is 30, well above 25,
+            // but no single grouping clears the threshold on its own.
+            for i in 1..=15 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (title, genre, source, unavailable) VALUES ('Jazz Song {}', 'Jazz', 1, 0)",
+                        i
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+            for i in 1..=15 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (title, genre, source, unavailable) VALUES ('Blues Song {}', 'Blues', 1, 0)",
+                        i
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+        }
+
+        let manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        manager.sync_daypart_auto_playlist().unwrap();
+
+        let playlists = manager.get_playlists().unwrap();
+        let daypart_pl = playlists
+            .iter()
+            .find(|p| {
+                p.dynamic_spec
+                    .as_deref()
+                    .unwrap_or("")
+                    .starts_with("daypart:")
+            })
+            .expect("Daypart Mix should still be created via random-fill fallback");
+
+        assert!(
+            daypart_pl.dynamic_spec.as_deref().unwrap().ends_with(':'),
+            "empty trailing name marks the random-fill fallback: got {:?}",
+            daypart_pl.dynamic_spec
+        );
+        assert_eq!(
+            manager.get_playlist_tracks(daypart_pl.id).unwrap().len(),
+            30,
+            "random-fill should include the whole (small) library"
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_sync_daypart_skips_creation_when_library_too_small() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for i in 1..=10 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (title, genre, source, unavailable) VALUES ('Song {}', 'Rock', 1, 0)",
+                        i
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+        }
+
+        let manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        manager.sync_daypart_auto_playlist().unwrap();
+
+        let playlists = manager.get_playlists().unwrap();
+        assert!(
+            !playlists.iter().any(|p| p
+                .dynamic_spec
+                .as_deref()
+                .unwrap_or("")
+                .starts_with("daypart:")),
+            "a library with only 10 songs total must not get a Daypart Mix"
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_sync_daypart_tolerant_once_created_below_threshold() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for i in 1..=30 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (title, genre, source, unavailable) VALUES ('Rock Song {}', 'Rock', 1, 0)",
+                        i
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+        }
+
+        let manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        manager.sync_daypart_auto_playlist().unwrap();
+        let playlists = manager.get_playlists().unwrap();
+        let daypart_pl = playlists
+            .iter()
+            .find(|p| {
+                p.dynamic_spec
+                    .as_deref()
+                    .unwrap_or("")
+                    .starts_with("daypart:")
+            })
+            .unwrap();
+        let id = daypart_pl.id;
+
+        // Force a "stale" spec (as in the boundary-change test above) but
+        // shrink the library below the threshold first — once created, a
+        // reroll landing below 25 songs must still update in place, not
+        // delete the row (same tolerance genre/decade/BPM already have).
+        {
+            let conn = db_arc.pool.get().unwrap();
+            conn.execute(
+                "UPDATE playlists SET dynamic_spec = 'daypart:latenight:2000-01-01:Rock' WHERE id = ?1",
+                params![id],
+            )
+            .unwrap();
+            conn.execute(
+                "DELETE FROM songs WHERE id NOT IN (SELECT id FROM songs LIMIT 5)",
+                [],
+            )
+            .unwrap();
+        }
+
+        manager.sync_daypart_auto_playlist().unwrap();
+
+        let playlists_after = manager.get_playlists().unwrap();
+        assert!(
+            playlists_after.iter().any(|p| p.id == id),
+            "Daypart Mix must not be deleted just because a reroll landed below 25 songs"
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_sync_daypart_heals_empty_playlist_in_same_bucket() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for i in 1..=30 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (title, genre, source, unavailable) VALUES ('Rock Song {}', 'Rock', 1, 0)",
+                        i
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+        }
+
+        let manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        manager.sync_daypart_auto_playlist().unwrap();
+
+        let playlists = manager.get_playlists().unwrap();
+        let daypart_pl = playlists
+            .iter()
+            .find(|p| {
+                p.dynamic_spec
+                    .as_deref()
+                    .unwrap_or("")
+                    .starts_with("daypart:")
+            })
+            .unwrap();
+        let id = daypart_pl.id;
+        assert_eq!(manager.get_playlist_tracks(id).unwrap().len(), 30);
+
+        // Simulate playlist becoming empty in the same bucket (e.g., retagged songs)
+        {
+            let conn = db_arc.pool.get().unwrap();
+            conn.execute(
+                "DELETE FROM playlist_items WHERE playlist_id = ?1",
+                params![id],
+            )
+            .unwrap();
+        }
+        assert_eq!(manager.get_playlist_tracks(id).unwrap().len(), 0);
+
+        // Calling sync_daypart_auto_playlist in the same bucket must heal the empty playlist
+        manager.sync_daypart_auto_playlist().unwrap();
+        assert_eq!(manager.get_playlist_tracks(id).unwrap().len(), 30);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

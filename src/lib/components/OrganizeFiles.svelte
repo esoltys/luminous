@@ -12,7 +12,8 @@
     CheckIcon as Check,
     WarningIcon as AlertTriangle,
     ArrowsClockwiseIcon as RefreshCw,
-    StackIcon as Layers
+    StackIcon as Layers,
+    MusicNotesIcon as Music
   } from "phosphor-svelte";
   import { VirtualList } from "svelte-virtual-list-ts";
   import Toggle from "./Toggle.svelte";
@@ -81,13 +82,143 @@
     return escaped.replace(/([/\\])/g, '<span class="text-brand-text-secondary font-bold px-0.5">$1</span>');
   }
 
-  let template = $state(DEFAULT_TEMPLATE);
+  // Template presets, mirroring how SettingsThemes.svelte offers predefined
+  // presets plus a "Custom" option that reveals a free-text field. The
+  // picker structure below makes adding more presets later a matter of
+  // extending TEMPLATE_PRESETS.
+  const TEMPLATE_PRESETS = [
+    { id: "default", labelKey: "organizer.presetDefault", template: DEFAULT_TEMPLATE },
+    { id: "alternative", labelKey: "organizer.presetAlternative", template: "%artist/%album (%year)/{CD %disc/}%track-%artist-%title" },
+  ] as const;
+  type TemplatePresetId = (typeof TEMPLATE_PRESETS)[number]["id"] | "custom";
+
+  let templatePreset = $state<TemplatePresetId>("default");
+  let customTemplate = $state(DEFAULT_TEMPLATE);
+  let template = $derived(
+    templatePreset === "custom"
+      ? customTemplate
+      : (TEMPLATE_PRESETS.find((p) => p.id === templatePreset)?.template ?? DEFAULT_TEMPLATE)
+  );
+
+  function selectPreset(id: TemplatePresetId) {
+    if (id === "custom" && templatePreset !== "custom") {
+      // Seed the free-text field with whatever pattern was active so
+      // switching to Custom starts from something rather than blank.
+      customTemplate = template;
+    }
+    templatePreset = id;
+  }
+
+  function insertChip(chipText: string) {
+    customTemplate = customTemplate + chipText;
+  }
+
+  // Compact sample data for the live tree preview (artist → album → tracks).
+  // Purely illustrative — never sent to the backend.
+  interface PreviewSample {
+    albumArtist: string;
+    artist: string;
+    album: string;
+    year: number;
+    genre: string;
+    disc?: number;
+    track: number;
+    title: string;
+  }
+  const PREVIEW_SAMPLES: PreviewSample[] = [
+    { albumArtist: "Radiohead", artist: "Radiohead", album: "OK Computer", year: 1997, genre: "Alternative Rock", track: 1, title: "Airbag" },
+    { albumArtist: "Radiohead", artist: "Radiohead", album: "OK Computer", year: 1997, genre: "Alternative Rock", track: 2, title: "Paranoid Android" },
+    { albumArtist: "Daft Punk", artist: "Daft Punk", album: "Discovery", year: 2001, genre: "Electronic", track: 1, title: "One More Time" },
+    // A multi-disc album so the preview demonstrates the conditional
+    // {CD %disc/} / {%disc-} blocks splitting into per-disc folders/prefixes.
+    { albumArtist: "Pink Floyd", artist: "Pink Floyd", album: "The Wall", year: 1979, genre: "Rock", disc: 1, track: 1, title: "In The Flesh?" },
+    { albumArtist: "Pink Floyd", artist: "Pink Floyd", album: "The Wall", year: 1979, genre: "Rock", disc: 2, track: 1, title: "Hey You" },
+  ];
+
+  /** A lightweight, display-only mirror of the backend's expand_template
+   * (src-tauri/src/organizer.rs) — conditional {…} blocks plus %variable
+   * substitution — used only to render the sample tree preview below. */
+  function expandTemplatePreview(tpl: string, s: PreviewSample): string {
+    let expanded = tpl;
+    for (let guard = 0; guard < 20; guard++) {
+      const start = expanded.indexOf("{");
+      if (start === -1) break;
+      const end = expanded.indexOf("}", start);
+      if (end === -1) break;
+      const block = expanded.slice(start + 1, end);
+
+      const hasDisc = block.includes("%disc") && !!s.disc && s.disc > 0;
+      const hasYear = block.includes("%year") && !!s.year;
+      const hasGenre = block.includes("%genre") && !!s.genre;
+      const hasAlbumArtist = block.includes("%albumartist") && !!s.albumArtist;
+      const hasAlbum = block.includes("%album") && !block.includes("%albumartist") && !!s.album;
+      const hasArtist = block.includes("%artist") && !block.includes("%albumartist") && !!s.artist;
+      const hasTrack = (block.includes("%track") || block.includes("%rawtrack")) && !!s.track;
+      const shouldRender = hasDisc || hasYear || hasGenre || hasAlbumArtist || hasAlbum || hasArtist || hasTrack;
+
+      expanded = expanded.slice(0, start) + (shouldRender ? block : "") + expanded.slice(end + 1);
+    }
+
+    const track2 = String(s.track).padStart(2, "0");
+    const track3 = String(s.track).padStart(3, "0");
+    expanded = expanded
+      .split("%albumartist").join(s.albumArtist)
+      .split("%artist").join(s.artist)
+      .split("%album").join(s.album)
+      .split("%disc").join(String(s.disc ?? 1))
+      .split("%track3").join(track3)
+      .split("%rawtrack").join(String(s.track))
+      .split("%track").join(track2)
+      .split("%title").join(s.title)
+      .split("%year").join(String(s.year))
+      .split("%genre").join(s.genre);
+    return expanded;
+  }
+
+  interface PreviewTreeNode {
+    name: string;
+    isFile: boolean;
+    children: PreviewTreeNode[];
+  }
+
+  function buildPreviewTree(template: string): PreviewTreeNode[] {
+    const roots: PreviewTreeNode[] = [];
+    for (const sample of PREVIEW_SAMPLES) {
+      const expanded = expandTemplatePreview(template, sample);
+      const parts = expanded.split(/[/\\]/).filter((p) => p.trim() !== "");
+      if (parts.length === 0) continue;
+
+      let siblings = roots;
+      parts.forEach((part, idx) => {
+        const isFile = idx === parts.length - 1;
+        const name = isFile ? `${part}.mp3` : part;
+        let node = siblings.find((n) => n.name === name && n.isFile === isFile);
+        if (!node) {
+          node = { name, isFile, children: [] };
+          siblings.push(node);
+        }
+        siblings = node.children;
+      });
+    }
+    return roots;
+  }
+
+  let previewTree = $derived(buildPreviewTree(template));
+
   let scope = $state<"selection" | "library">("library");
   let replaceSpaces = $state(false);
   let asciiOnly = $state(false);
   let cleanEmptyDirs = $state(true);
   let moveExtraFiles = $state(true);
-  let destinationDir = $state<string>("");
+
+  // Destination is a two-way toggle: reorganize files in place under their
+  // original library folder(s), or consolidate everything under one custom
+  // folder. customDestinationDir is kept separate from the derived
+  // destinationDir so switching back to "original" and back to "custom"
+  // doesn't lose whatever path the user had typed/browsed to.
+  let destinationMode = $state<"original" | "custom">("original");
+  let customDestinationDir = $state<string>("");
+  let destinationDir = $derived(destinationMode === "custom" ? customDestinationDir : "");
 
   $effect(() => {
     if (effectiveOpen) {
@@ -120,13 +251,10 @@
     return "error";
   }
 
-  let showOnlyChanging = $state(true);
-
-  let displayedItems = $derived(
-    showOnlyChanging
-      ? items.filter((i) => getItemStatus(i) !== "unchanged")
-      : items
-  );
+  // Only changing files are ever worth reviewing here — there's no real use
+  // case for scrolling through thousands of unchanged rows just to confirm
+  // they're unchanged, so this filtering is permanent rather than a toggle.
+  let displayedItems = $derived(items.filter((i) => getItemStatus(i) !== "unchanged"));
 
   let commonPrefix = $derived.by(() => {
     const allPaths: string[] = [];
@@ -229,10 +357,6 @@
     }
   }
 
-  function insertChip(chipText: string) {
-    template = template + chipText;
-  }
-
   async function selectDestinationDir() {
     try {
       const selected = await open({
@@ -241,7 +365,7 @@
         title: i18n.t("organizer.destinationDirLabel"),
       });
       if (selected && typeof selected === "string") {
-        destinationDir = selected;
+        customDestinationDir = selected;
       }
     } catch (e) {
       console.error("Failed to select destination folder:", e);
@@ -357,295 +481,353 @@
   });
 </script>
 
-{#snippet body()}
-        {#if songIds.length > 0}
-          <div class="flex items-center justify-between bg-brand-sidebar/40 p-3 rounded-xl border border-brand-border/30">
-            <span class="font-semibold text-brand-text-primary">{i18n.t("organizer.scopeLabel")}</span>
-            <div class="flex items-center gap-1.5 bg-brand-sidebar p-1 rounded-lg border border-brand-border/50">
-              <button
-                onclick={() => { scope = "selection"; }}
-                class="px-3 py-1 rounded-md transition-colors {scope === 'selection' ? 'bg-brand-accent text-brand-accent-contrast font-bold shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-              >
-                {i18n.t("organizer.scopeSelection", { count: songIds.length })}
-              </button>
-              <button
-                onclick={() => { scope = "library"; }}
-                class="px-3 py-1 rounded-md transition-colors {scope === 'library' ? 'bg-brand-accent text-brand-accent-contrast font-bold shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-              >
-                {i18n.t("organizer.scopeLibrary", { count: items.length })}
-              </button>
-            </div>
+{#snippet scopeToggle()}
+  {#if songIds.length > 0}
+    <div class="flex items-center justify-between bg-brand-sidebar/40 p-3 rounded-xl border border-brand-border/30">
+      <span class="font-semibold text-brand-text-primary">{i18n.t("organizer.scopeLabel")}</span>
+      <div class="flex items-center gap-1.5 bg-brand-sidebar p-1 rounded-lg border border-brand-border/50">
+        <button
+          onclick={() => { scope = "selection"; }}
+          class="px-3 py-1 rounded-md transition-colors {scope === 'selection' ? 'bg-brand-accent text-brand-accent-contrast font-bold shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+        >
+          {i18n.t("organizer.scopeSelection", { count: songIds.length })}
+        </button>
+        <button
+          onclick={() => { scope = "library"; }}
+          class="px-3 py-1 rounded-md transition-colors {scope === 'library' ? 'bg-brand-accent text-brand-accent-contrast font-bold shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+        >
+          {i18n.t("organizer.scopeLibrary", { count: items.length })}
+        </button>
+      </div>
+    </div>
+  {/if}
+{/snippet}
+
+{#snippet previewTreeNode(node: PreviewTreeNode)}
+  <div class="flex items-center gap-1.5 py-0.5 {node.isFile ? 'text-brand-text-secondary' : 'text-brand-text-primary font-medium'}">
+    {#if node.isFile}
+      <Music class="w-3 h-3 shrink-0 text-brand-text-secondary/70" />
+    {:else}
+      <Folder class="w-3 h-3 shrink-0 text-brand-accent-text/80" />
+    {/if}
+    <span class="truncate font-mono text-[11px]">{node.name}</span>
+  </div>
+  {#if node.children.length > 0}
+    <div class="pl-4 border-l border-brand-border/40 ml-1.5">
+      {#each node.children as child (child.name + child.isFile)}
+        {@render previewTreeNode(child)}
+      {/each}
+    </div>
+  {/if}
+{/snippet}
+
+{#snippet templateSection()}
+  <div class="space-y-4">
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {#each TEMPLATE_PRESETS as preset (preset.id)}
+        <button
+          type="button"
+          onclick={() => selectPreset(preset.id)}
+          aria-label={i18n.t(preset.labelKey)}
+          class="text-left bg-brand-main/50 border-2 rounded-xl p-3 transition-colors duration-200 hover:border-brand-accent/40 {templatePreset === preset.id ? 'border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border/60'}"
+        >
+          <span class="font-semibold text-sm text-brand-text-primary block">{i18n.t(preset.labelKey)}</span>
+          <code class="text-[10px] text-brand-text-secondary font-mono truncate block mt-1">{preset.template}</code>
+        </button>
+      {/each}
+      <button
+        type="button"
+        onclick={() => selectPreset("custom")}
+        aria-label={i18n.t("organizer.presetCustom")}
+        class="text-left bg-brand-main/50 border-2 rounded-xl p-3 transition-colors duration-200 hover:border-brand-accent/40 {templatePreset === 'custom' ? 'border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border/60'}"
+      >
+        <span class="font-semibold text-sm text-brand-text-primary block">{i18n.t("organizer.presetCustom")}</span>
+        <span class="text-[10px] text-brand-text-secondary block mt-1">{i18n.t("organizer.presetCustomHint")}</span>
+      </button>
+    </div>
+
+    {#if templatePreset === "custom"}
+      <div>
+        <label for="template-input" class="font-semibold text-brand-text-primary block mb-1.5">
+          {i18n.t("organizer.templateLabel")}
+        </label>
+
+        <!-- Plain, directly-editable input — bordered like the destination folder input below so it reads as editable -->
+        <input
+          id="template-input"
+          type="text"
+          bind:value={customTemplate}
+          class="w-full px-3.5 py-2.5 rounded-xl bg-brand-sidebar/80 border border-brand-border/80 focus:outline-none focus:border-brand-accent text-brand-text-primary caret-brand-accent font-mono text-xs leading-normal tracking-normal transition-colors min-h-[40px]"
+          spellcheck="false"
+        />
+
+        <div class="flex flex-wrap items-center gap-1.5 pt-1">
+          <span class="text-[11px] text-brand-text-secondary mr-1">{i18n.t("organizer.placeholders")}:</span>
+          {#each VARIABLE_CHIPS as chip}
+            <button
+              type="button"
+              onclick={() => insertChip(chip.label)}
+              class="px-2 py-0.5 rounded-lg text-[11px] font-mono transition-colors border bg-brand-sidebar hover:bg-brand-accent/15 border-brand-border/80 text-brand-text-primary hover:text-brand-accent-text font-medium"
+              title={chip.desc}
+            >
+              {chip.label === '/' ? '/ (Folder)' : chip.label}
+            </button>
+          {/each}
+        </div>
+      </div>
+    {/if}
+
+    <div>
+      <span class="text-[11px] text-brand-text-secondary font-semibold uppercase tracking-wider">{i18n.t("organizer.templateSampleOutputLabel")}</span>
+      <div class="mt-1.5 bg-brand-main/50 border border-brand-border/60 rounded-xl p-3 max-h-40 overflow-y-auto">
+        {#each previewTree as node (node.name + node.isFile)}
+          {@render previewTreeNode(node)}
+        {/each}
+      </div>
+    </div>
+  </div>
+{/snippet}
+
+{#snippet destinationSection()}
+  <div class="space-y-4">
+    <div>
+      <span class="block font-semibold text-brand-text-primary mb-1.5">{i18n.t("organizer.destinationDirLabel")}</span>
+      <div class="flex items-center gap-1.5 bg-brand-sidebar p-1 rounded-lg border border-brand-border/50 w-full">
+        <button
+          type="button"
+          onclick={() => { destinationMode = "original"; }}
+          class="flex-1 px-3 py-1.5 rounded-md transition-colors text-xs {destinationMode === 'original' ? 'bg-brand-accent text-brand-accent-contrast font-bold shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+        >
+          {i18n.t("organizer.destinationDefault")}
+        </button>
+        <button
+          type="button"
+          onclick={() => { destinationMode = "custom"; }}
+          class="flex-1 px-3 py-1.5 rounded-md transition-colors text-xs {destinationMode === 'custom' ? 'bg-brand-accent text-brand-accent-contrast font-bold shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+        >
+          {i18n.t("organizer.destinationCustom")}
+        </button>
+      </div>
+
+      {#if destinationMode === "custom"}
+        <div class="flex items-center gap-2 mt-2">
+          <input
+            id="dest-dir-input"
+            type="text"
+            bind:value={customDestinationDir}
+            placeholder={i18n.t("organizer.destinationDirLabel")}
+            class="flex-1 px-3 py-1.5 bg-brand-sidebar/80 border border-brand-border/80 rounded-xl text-brand-text-primary text-xs focus:outline-none focus:border-brand-accent transition-colors truncate"
+          />
+          <button
+            onclick={selectDestinationDir}
+            class="px-3 py-1.5 bg-brand-sidebar border border-brand-border/80 hover:bg-brand-accent/15 hover:text-brand-accent-text text-brand-text-primary rounded-xl transition-colors font-medium"
+          >
+            {i18n.t("organizer.browse")}
+          </button>
+        </div>
+      {/if}
+    </div>
+
+    <div class="flex flex-col gap-3">
+      <div class="flex items-center justify-between gap-2 text-brand-text-secondary">
+        <span>{i18n.t("organizer.moveExtraFiles")}</span>
+        <Toggle
+          checked={moveExtraFiles}
+          onchange={(v) => { moveExtraFiles = v; }}
+          label={i18n.t("organizer.moveExtraFiles")}
+        />
+      </div>
+
+      <div class="flex items-center justify-between gap-2 text-brand-text-secondary">
+        <span>{i18n.t("organizer.replaceSpaces")}</span>
+        <Toggle
+          checked={replaceSpaces}
+          onchange={(v) => { replaceSpaces = v; }}
+          label={i18n.t("organizer.replaceSpaces")}
+        />
+      </div>
+
+      <div class="flex items-center justify-between gap-2 text-brand-text-secondary">
+        <span>{i18n.t("organizer.asciiOnly")}</span>
+        <Toggle
+          checked={asciiOnly}
+          onchange={(v) => { asciiOnly = v; }}
+          label={i18n.t("organizer.asciiOnly")}
+        />
+      </div>
+    </div>
+  </div>
+{/snippet}
+
+{#snippet previewSection()}
+  <div class="space-y-2">
+    <div class="flex flex-col gap-1.5">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-medium text-brand-text-primary flex items-center gap-2">
+          <span>{i18n.t("organizer.previewTitle")}</span>
+        </h3>
+        <Button
+          onclick={fetchPreview}
+          variant="secondary"
+          size="sm"
+          disabled={isLoading}
+          title={i18n.t("organizer.refreshPreviewTooltip")}
+          class="gap-1.5"
+        >
+          <RefreshCw class="w-3.5 h-3.5 {isLoading ? 'animate-spin text-brand-accent-text' : ''}" />
+          {i18n.t("organizer.refreshPreviewTooltip")}
+        </Button>
+      </div>
+
+      <div class="flex flex-col gap-2 text-xs">
+        <div class="flex items-center gap-3">
+          <span class="text-brand-accent-text font-medium">
+            {i18n.t("organizer.summaryReady", { count: readyCount })}
+          </span>
+          <span class="text-brand-text-secondary">
+            {i18n.t("organizer.summaryUnchanged", { count: unchangedCount })}
+          </span>
+          {#if missingTagCount > 0}
+            <span class="text-amber-400 font-medium">
+              {i18n.t("organizer.summaryMissingTags", { count: missingTagCount })}
+            </span>
+          {/if}
+          {#if collisionCount > 0}
+            <span class="text-rose-400 font-medium">
+              {collisionCount === 1 ? i18n.t("organizer.summaryCollisionOne") : i18n.t("organizer.summaryCollisions", { count: collisionCount })}
+            </span>
+          {/if}
+          {#if errorCount > 0}
+            <span class="text-rose-400 font-medium">
+              {i18n.t("organizer.summaryErrors", { count: errorCount })}
+            </span>
+          {/if}
+        </div>
+        {#if commonPrefix}
+          <div class="flex items-center gap-1.5 min-w-0" title={commonPrefix}>
+            <span class="font-semibold text-brand-accent-text shrink-0">{i18n.t("organizer.commonBasePath")}</span>
+            <span class="truncate text-brand-text-secondary">{commonPrefix}</span>
           </div>
         {/if}
+      </div>
+    </div>
 
-        <div>
-          <div class="flex items-center justify-between mb-1.5">
-            <label for="template-input" class="font-semibold text-brand-text-primary">
-              {i18n.t("organizer.templateLabel")}
-            </label>
-            <button
-              onclick={() => { template = DEFAULT_TEMPLATE; }}
-              class="text-[11px] text-brand-accent-text hover:underline"
-            >
-              {i18n.t("organizer.defaultPattern")}
-            </button>
-          </div>
-
-          <!-- Plain, directly-editable input — bordered like the destination folder input below so it reads as editable -->
-          <input
-            id="template-input"
-            type="text"
-            bind:value={template}
-            class="w-full px-3.5 py-2.5 rounded-xl bg-brand-sidebar/80 border border-brand-border/80 focus:outline-none focus:border-brand-accent text-brand-text-primary caret-brand-accent font-mono text-xs leading-normal tracking-normal transition-colors min-h-[40px]"
-            spellcheck="false"
-          />
-
-          <div class="flex flex-wrap items-center gap-1.5 pt-1">
-            <span class="text-[11px] text-brand-text-secondary mr-1">{i18n.t("organizer.placeholders")}:</span>
-            {#each VARIABLE_CHIPS as chip}
-              <button
-                type="button"
-                onclick={() => insertChip(chip.label)}
-                class="px-2 py-0.5 rounded-lg text-[11px] font-mono transition-colors border bg-brand-sidebar hover:bg-brand-accent/15 border-brand-border/80 text-brand-text-primary hover:text-brand-accent-text font-medium"
-                title={chip.desc}
-              >
-                {chip.label === '/' ? '/ (Folder)' : chip.label}
-              </button>
-            {/each}
-          </div>
+    <div class="h-64 border border-brand-border/60 rounded-xl overflow-hidden bg-brand-sidebar/40 flex flex-col">
+      {#if items.length === 0}
+        <div class="h-full flex items-center justify-center text-brand-text-secondary">
+          {#if isLoading}
+            <RefreshCw class="w-5 h-5 text-brand-accent-text animate-spin" />
+          {:else}
+            <span>{i18n.t("organizer.noTracksToOrganize")}</span>
+          {/if}
         </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
-          <div class="md:col-span-2">
-            <label for="dest-dir-input" class="block font-semibold text-brand-text-primary mb-1.5">
-              {i18n.t("organizer.destinationDirLabel")}
-            </label>
-            <div class="flex items-center gap-2">
-              <input
-                id="dest-dir-input"
-                type="text"
-                bind:value={destinationDir}
-                placeholder={i18n.t("organizer.destinationDefault")}
-                class="flex-1 px-3 py-1.5 bg-brand-sidebar/80 border border-brand-border/80 rounded-xl text-brand-text-primary text-xs focus:outline-none focus:border-brand-accent transition-colors truncate"
-              />
-              <button
-                onclick={selectDestinationDir}
-                class="px-3 py-1.5 bg-brand-sidebar border border-brand-border/80 hover:bg-brand-accent/15 hover:text-brand-accent-text text-brand-text-primary rounded-xl transition-colors font-medium"
-              >
-                {i18n.t("organizer.browse")}
-              </button>
-            </div>
-          </div>
-
-          <div class="flex flex-col gap-3">
-            <div class="flex items-center justify-between gap-2 text-brand-text-secondary">
-              <span>{i18n.t("organizer.replaceSpaces")}</span>
-              <Toggle
-                checked={replaceSpaces}
-                onchange={(v) => { replaceSpaces = v; }}
-                label={i18n.t("organizer.replaceSpaces")}
-              />
-            </div>
-
-            <div class="flex items-center justify-between gap-2 text-brand-text-secondary">
-              <span>{i18n.t("organizer.asciiOnly")}</span>
-              <Toggle
-                checked={asciiOnly}
-                onchange={(v) => { asciiOnly = v; }}
-                label={i18n.t("organizer.asciiOnly")}
-              />
-            </div>
-
-            <div class="flex items-center justify-between gap-2 text-brand-text-secondary">
-              <span>{i18n.t("organizer.moveExtraFiles")}</span>
-              <Toggle
-                checked={moveExtraFiles}
-                onchange={(v) => { moveExtraFiles = v; }}
-                label={i18n.t("organizer.moveExtraFiles")}
-              />
-            </div>
-          </div>
+      {:else if displayedItems.length === 0}
+        <div class="h-full flex items-center justify-center text-brand-text-secondary">
+          <span>{i18n.t("organizer.noChangingFilesMatch")}</span>
         </div>
+      {:else}
+        <div class="flex-1 min-h-0 overflow-x-auto overflow-y-hidden">
+          <div style="min-width: {96 + fromColWidth + 24 + toColWidth + 20}px;" class="h-full flex flex-col">
+            <div class="h-7 px-3 flex items-center bg-brand-sidebar/95 border-b border-brand-border/60 text-[10px] font-semibold text-brand-text-secondary uppercase tracking-wider select-none shrink-0">
+              <div class="w-24 shrink-0">{i18n.t("organizer.colStatus")}</div>
 
-        <div class="space-y-2 pt-2">
-          <div class="flex flex-col gap-1.5">
-            <div class="flex items-center justify-between">
-              <h3 class="text-sm font-medium text-brand-text-primary flex items-center gap-2">
-                <span>{i18n.t("organizer.previewTitle")}</span>
-              </h3>
-              <Button
-                onclick={fetchPreview}
-                variant="secondary"
-                size="sm"
-                disabled={isLoading}
-                title={i18n.t("organizer.refreshPreviewTooltip")}
-                class="gap-1.5"
-              >
-                <RefreshCw class="w-3.5 h-3.5 {isLoading ? 'animate-spin text-brand-accent-text' : ''}" />
-                {i18n.t("organizer.refreshPreviewTooltip")}
-              </Button>
-            </div>
-
-            <div class="flex flex-col gap-2 text-xs">
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div class="flex items-center justify-between gap-2 text-brand-text-secondary">
-                  <span>{i18n.t("organizer.onlyChanging")}</span>
-                  <Toggle
-                    checked={showOnlyChanging}
-                    onchange={(v) => { showOnlyChanging = v; }}
-                    label={i18n.t("organizer.onlyChanging")}
-                  />
-                </div>
+              <div class="flex items-center shrink-0 pr-1" style="width: {fromColWidth}px;">
+                <span class="truncate flex-1">{i18n.t("organizer.colSource")}</span>
+                <button
+                  type="button"
+                  aria-label={i18n.t("organizer.resizeOriginalColumn")}
+                  onmousedown={(e) => startResize("from", e)}
+                  ondblclick={autoFitColumns}
+                  class="w-3 h-5 hover:bg-brand-accent/30 cursor-col-resize flex items-center justify-center group shrink-0 bg-transparent border-0 p-0"
+                  title={i18n.t("organizer.resizeColumnHint")}
+                >
+                  <div class="w-0.5 h-3 bg-brand-border group-hover:bg-brand-accent"></div>
+                </button>
               </div>
-              <div class="flex items-center gap-3">
-                <span class="text-brand-accent-text font-medium">
-                  {i18n.t("organizer.summaryReady", { count: readyCount })}
-                </span>
-                <span class="text-brand-text-secondary">
-                  {i18n.t("organizer.summaryUnchanged", { count: unchangedCount })}
-                </span>
-                {#if missingTagCount > 0}
-                  <span class="text-amber-400 font-medium">
-                    {i18n.t("organizer.summaryMissingTags", { count: missingTagCount })}
-                  </span>
-                {/if}
-                {#if collisionCount > 0}
-                  <span class="text-rose-400 font-medium">
-                    {collisionCount === 1 ? i18n.t("organizer.summaryCollisionOne") : i18n.t("organizer.summaryCollisions", { count: collisionCount })}
-                  </span>
-                {/if}
-                {#if errorCount > 0}
-                  <span class="text-rose-400 font-medium">
-                    {i18n.t("organizer.summaryErrors", { count: errorCount })}
-                  </span>
-                {/if}
+
+              <div class="w-6 text-center shrink-0 text-brand-text-secondary">→</div>
+
+              <div class="flex items-center shrink-0 pl-1" style="width: {toColWidth}px;">
+                <span class="truncate flex-1">{i18n.t("organizer.colDestination")}</span>
+                <button
+                  type="button"
+                  aria-label={i18n.t("organizer.resizeTargetColumn")}
+                  onmousedown={(e) => startResize("to", e)}
+                  ondblclick={autoFitColumns}
+                  class="w-3 h-5 hover:bg-brand-accent/30 cursor-col-resize flex items-center justify-center group shrink-0 bg-transparent border-0 p-0"
+                  title={i18n.t("organizer.resizeColumnHint")}
+                >
+                  <div class="w-0.5 h-3 bg-brand-border group-hover:bg-brand-accent"></div>
+                </button>
               </div>
             </div>
-          </div>
 
-          <div class="h-64 border border-brand-border/60 rounded-xl overflow-hidden bg-brand-sidebar/40 flex flex-col">
-            {#if items.length === 0}
-              <div class="h-full flex items-center justify-center text-brand-text-secondary">
-                {#if isLoading}
-                  <RefreshCw class="w-5 h-5 text-brand-accent-text animate-spin" />
-                {:else}
-                  <span>{i18n.t("organizer.noTracksToOrganize")}</span>
-                {/if}
-              </div>
-            {:else if displayedItems.length === 0}
-              <div class="h-full flex items-center justify-center text-brand-text-secondary">
-                <span>{i18n.t("organizer.noChangingFilesMatch")}</span>
-              </div>
-            {:else}
-              {#if commonPrefix}
-                <div class="px-3 py-1 bg-brand-sidebar/80 border-b border-brand-border/40 text-[10px] text-brand-text-secondary font-mono flex items-center gap-1.5 shrink-0" title={commonPrefix}>
-                  <span class="font-semibold text-brand-accent-text shrink-0">{i18n.t("organizer.commonBasePath")}</span>
-                  <span class="truncate text-brand-text-primary">{commonPrefix}</span>
-                </div>
-              {/if}
-
-              <div class="flex-1 min-h-0 overflow-x-auto overflow-y-hidden">
-                <div style="min-width: {96 + fromColWidth + 24 + toColWidth + 20}px;" class="h-full flex flex-col">
-                  <div class="h-7 px-3 flex items-center bg-brand-sidebar/95 border-b border-brand-border/60 text-[10px] font-semibold text-brand-text-secondary uppercase tracking-wider select-none shrink-0 font-mono">
-                    <div class="w-24 shrink-0">{i18n.t("organizer.colStatus")}</div>
-
-                    <div class="flex items-center shrink-0 pr-1" style="width: {fromColWidth}px;">
-                      <span class="truncate flex-1">{i18n.t("organizer.colSource")}</span>
-                      <button
-                        type="button"
-                        aria-label={i18n.t("organizer.resizeOriginalColumn")}
-                        onmousedown={(e) => startResize("from", e)}
-                        ondblclick={autoFitColumns}
-                        class="w-3 h-5 hover:bg-brand-accent/30 cursor-col-resize flex items-center justify-center group shrink-0 bg-transparent border-0 p-0"
-                        title={i18n.t("organizer.resizeColumnHint")}
-                      >
-                        <div class="w-0.5 h-3 bg-brand-border group-hover:bg-brand-accent"></div>
-                      </button>
+            <div class="flex-1 min-h-0">
+              <VirtualList items={displayedItems} height="100%" itemHeight={36}>
+                {#snippet children(rawRow: any)}
+                  {@const item = getItemObj(rawRow)}
+                  {@const st = getItemStatus(item)}
+                  {@const displayFrom = getDisplayPath(item.from_path, commonPrefix)}
+                  {@const displayTo = getDisplayPath(item.to_path, commonPrefix)}
+                  <div
+                    class="h-9 px-3 flex items-center border-b border-brand-border/20 text-[11px] hover:bg-brand-accent/10 transition-colors whitespace-nowrap"
+                  >
+                    <div class="w-24 shrink-0">
+                      {#if st === "ok"}
+                        <span class="px-2 py-0.5 rounded bg-brand-accent/15 text-brand-accent-text border border-brand-accent/30">
+                          {i18n.t("organizer.statusOk")}
+                        </span>
+                      {:else if st === "unchanged"}
+                        <span class="px-2 py-0.5 rounded bg-brand-sidebar border border-brand-border/60 text-brand-text-secondary">
+                          {i18n.t("organizer.statusUnchanged")}
+                        </span>
+                      {:else if st === "collision"}
+                        <span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/40" title={item.error_message || i18n.t("organizer.statusCollision")}>
+                          {i18n.t("organizer.statusCollision")}
+                        </span>
+                      {:else if st === "missing_tag"}
+                        <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40" title={item.error_message || i18n.t("organizer.statusMissingTag")}>
+                          {i18n.t("organizer.statusMissingTag")}
+                        </span>
+                      {:else}
+                        <span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/40" title={item.error_message || i18n.t("organizer.statusError")}>
+                          {i18n.t("organizer.statusError")}
+                        </span>
+                      {/if}
                     </div>
 
-                    <div class="w-6 text-center shrink-0 text-brand-text-secondary">→</div>
+                    <div
+                      class="px-2 overflow-x-auto scrollbar-none shrink-0 {item.from_path ? 'text-brand-text-secondary' : 'text-rose-400 font-medium'}"
+                      style="width: {fromColWidth}px;"
+                      title={item.from_path}
+                    >
+                      {@html highlightPathHtml(displayFrom || i18n.t("organizer.noPathRecorded"))}
+                    </div>
 
-                    <div class="flex items-center shrink-0 pl-1" style="width: {toColWidth}px;">
-                      <span class="truncate flex-1">{i18n.t("organizer.colDestination")}</span>
-                      <button
-                        type="button"
-                        aria-label={i18n.t("organizer.resizeTargetColumn")}
-                        onmousedown={(e) => startResize("to", e)}
-                        ondblclick={autoFitColumns}
-                        class="w-3 h-5 hover:bg-brand-accent/30 cursor-col-resize flex items-center justify-center group shrink-0 bg-transparent border-0 p-0"
-                        title={i18n.t("organizer.resizeColumnHint")}
-                      >
-                        <div class="w-0.5 h-3 bg-brand-border group-hover:bg-brand-accent"></div>
-                      </button>
+                    <div class="w-6 text-center text-brand-text-secondary shrink-0">→</div>
+
+                    <div
+                      class="px-2 overflow-x-auto scrollbar-none shrink-0 {st === 'ok' ? 'text-brand-text-primary font-medium' : st === 'collision' || st === 'error' ? 'text-rose-400 font-semibold' : 'text-brand-text-primary'}"
+                      style="width: {toColWidth}px;"
+                      title={item.error_message ? `${item.to_path ? item.to_path + ' — ' : ''}${item.error_message}` : item.to_path}
+                    >
+                      {#if st === 'error' || st === 'collision' || (item.error_message && st !== 'missing_tag')}
+                        <span class="text-rose-400 font-medium">
+                          {item.error_message ? item.error_message : (displayTo || i18n.t("organizer.unknownError"))}
+                        </span>
+                      {:else}
+                        {@html highlightPathHtml(displayTo)}
+                      {/if}
                     </div>
                   </div>
-
-                  <div class="flex-1 min-h-0">
-                    <VirtualList items={displayedItems} height="100%" itemHeight={36}>
-                      {#snippet children(rawRow: any)}
-                        {@const item = getItemObj(rawRow)}
-                        {@const st = getItemStatus(item)}
-                        {@const displayFrom = getDisplayPath(item.from_path, commonPrefix)}
-                        {@const displayTo = getDisplayPath(item.to_path, commonPrefix)}
-                        <div
-                          class="h-9 px-3 flex items-center border-b border-brand-border/20 text-[11px] font-mono hover:bg-brand-accent/10 transition-colors whitespace-nowrap"
-                        >
-                          <div class="w-24 shrink-0">
-                            {#if st === "ok"}
-                              <span class="px-2 py-0.5 rounded bg-brand-accent/15 text-brand-accent-text border border-brand-accent/30">
-                                {i18n.t("organizer.statusOk")}
-                              </span>
-                            {:else if st === "unchanged"}
-                              <span class="px-2 py-0.5 rounded bg-brand-sidebar border border-brand-border/60 text-brand-text-secondary">
-                                {i18n.t("organizer.statusUnchanged")}
-                              </span>
-                            {:else if st === "collision"}
-                              <span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/40" title={item.error_message || i18n.t("organizer.statusCollision")}>
-                                {i18n.t("organizer.statusCollision")}
-                              </span>
-                            {:else if st === "missing_tag"}
-                              <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40" title={item.error_message || i18n.t("organizer.statusMissingTag")}>
-                                {i18n.t("organizer.statusMissingTag")}
-                              </span>
-                            {:else}
-                              <span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/40" title={item.error_message || i18n.t("organizer.statusError")}>
-                                {i18n.t("organizer.statusError")}
-                              </span>
-                            {/if}
-                          </div>
-
-                          <div
-                            class="px-2 overflow-x-auto scrollbar-none shrink-0 {item.from_path ? 'text-brand-text-secondary' : 'text-rose-400 font-medium'}"
-                            style="width: {fromColWidth}px;"
-                            title={item.from_path}
-                          >
-                            {@html highlightPathHtml(displayFrom || i18n.t("organizer.noPathRecorded"))}
-                          </div>
-
-                          <div class="w-6 text-center text-brand-text-secondary shrink-0">→</div>
-
-                          <div
-                            class="px-2 overflow-x-auto scrollbar-none shrink-0 {st === 'ok' ? 'text-brand-text-primary font-medium' : st === 'collision' || st === 'error' ? 'text-rose-400 font-semibold' : 'text-brand-text-primary'}"
-                            style="width: {toColWidth}px;"
-                            title={item.error_message ? `${item.to_path ? item.to_path + ' — ' : ''}${item.error_message}` : item.to_path}
-                          >
-                            {#if st === 'error' || st === 'collision' || (item.error_message && st !== 'missing_tag')}
-                              <span class="text-rose-400 font-medium">
-                                {item.error_message ? item.error_message : (displayTo || i18n.t("organizer.unknownError"))}
-                              </span>
-                            {:else}
-                              {@html highlightPathHtml(displayTo)}
-                            {/if}
-                          </div>
-                        </div>
-                      {/snippet}
-                    </VirtualList>
-                  </div>
-                </div>
-              </div>
-            {/if}
+                {/snippet}
+              </VirtualList>
+            </div>
           </div>
         </div>
+      {/if}
+    </div>
+  </div>
 {/snippet}
 
 {#snippet applyButton()}
@@ -683,35 +865,31 @@
 
 {#if effectiveOpen}
   {#if embedded}
-    <!-- Inline panel — no backdrop/portal/close button, sits directly in the page -->
-    <div class="w-full bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4 text-brand-text-primary">
-      <div class="pb-3 flex justify-between items-center">
-        <div class="flex items-center gap-3">
-          <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
-            <Folder class="w-5 h-5" />
-          </div>
-          <div class="space-y-1 min-w-0">
-            <h3 class="font-bold text-sm text-brand-text-primary">
-              {i18n.t("organizer.title")}
-            </h3>
-            <p class="text-xs text-brand-text-secondary leading-relaxed">
-              {i18n.t("organizer.subtitle")}
-            </p>
-          </div>
-        </div>
+    <!-- Three visually distinct sections: Template Pattern, Destination & Options, Preview -->
+    <div class="space-y-4 text-xs">
+      {@render scopeToggle()}
+
+      <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4 text-brand-text-primary">
+        <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t("organizer.sectionTemplatePattern")}</h3>
+        {@render templateSection()}
       </div>
 
-      <div class="space-y-4 text-xs">
-        {@render body()}
+      <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4 text-brand-text-primary">
+        <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t("organizer.sectionDestinationOptions")}</h3>
+        {@render destinationSection()}
       </div>
 
-      <div class="pt-4 border-t border-brand-border/40 flex items-center justify-between">
-        <div class="text-xs text-brand-text-secondary">
-          {@render collisionWarning()}
-        </div>
-        <div class="flex items-center gap-3">
-          {@render actionMessages()}
-          {@render applyButton()}
+      <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4 text-brand-text-primary">
+        {@render previewSection()}
+
+        <div class="pt-4 border-t border-brand-border/40 flex items-center justify-between">
+          <div class="text-xs text-brand-text-secondary">
+            {@render collisionWarning()}
+          </div>
+          <div class="flex items-center gap-3">
+            {@render actionMessages()}
+            {@render applyButton()}
+          </div>
         </div>
       </div>
     </div>
@@ -749,8 +927,22 @@
           </button>
         </div>
 
-        <div class="p-6 space-y-4 overflow-y-auto flex-1 text-xs">
-          {@render body()}
+        <div class="p-6 space-y-5 overflow-y-auto flex-1 text-xs">
+          {@render scopeToggle()}
+
+          <div>
+            <h3 class="font-bold text-sm text-brand-text-primary mb-3">{i18n.t("organizer.sectionTemplatePattern")}</h3>
+            {@render templateSection()}
+          </div>
+
+          <div class="pt-2 border-t border-brand-border/40">
+            <h3 class="font-bold text-sm text-brand-text-primary mb-3 pt-3">{i18n.t("organizer.sectionDestinationOptions")}</h3>
+            {@render destinationSection()}
+          </div>
+
+          <div class="pt-2 border-t border-brand-border/40 pt-3">
+            {@render previewSection()}
+          </div>
         </div>
 
         <div class="px-6 py-4 border-t border-brand-border/40 flex items-center justify-between shrink-0 bg-brand-sidebar/50">

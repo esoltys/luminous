@@ -30,11 +30,13 @@
   } from "phosphor-svelte";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
   import { getPlaylistDisplayName } from "../utils/playlist";
+  import { scrobblerStore } from "../stores/scrobbler.svelte";
+  import { picardStore } from "../stores/picard.svelte";
   import { rememberScroll } from "../utils/scrollMemory";
 
   interface AutoDef {
     id: string;
-    kind: "favourites" | "recently_added" | "history" | "genre" | "decade" | "bpm" | "artist_tag";
+    kind: "favourites" | "recently_added" | "most_played" | "history" | "genre" | "decade" | "bpm" | "artist_tag" | "missing_metadata" | "missing_musicbrainz" | "daypart";
     genre?: string;
     artistTag?: string;
     decade?: string;
@@ -100,6 +102,23 @@
       .filter((p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("bpmrange:"))
       .sort((a, b) => BPM_BUCKET_ORDER.indexOf(a.name) - BPM_BUCKET_ORDER.indexOf(b.name))
   );
+  // Missing Metadata (#367) is a singleton diagnostic auto-playlist, not a
+  // per-value category like genre/decade/BPM/artist tag.
+  let missingMetadataAutoPlaylist = $derived(
+    playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec === "missingmeta")
+  );
+  // Missing MusicBrainz (#83) is surfaced when scrobbling is enabled, identifying
+  // songs that lack MusicBrainz recording IDs.
+  let missingMusicBrainzAutoPlaylist = $derived(
+    playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec === "missingmbid")
+  );
+  // Daypart Mix (#223) is also a singleton, but unlike missing-metadata its
+  // dynamic_spec changes content (bucket/date/genre) every time the daypart
+  // boundary crosses — matched by prefix, not exact spec, so the same row
+  // (and any Home pin keyed on its id) is found across every crossing.
+  let daypartMixPlaylist = $derived(
+    playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("daypart:"))
+  );
   let customPlaylists = $derived.by(() => {
     // Include non-dynamic playlists + user-created Smart playlists
     const list = playlistsStore.playlists.filter((p) => !p.dynamic_enabled || isSmartPlaylistSpec(p.dynamic_spec));
@@ -128,12 +147,50 @@
         trackCount: playlistsStore.recentlyAddedCount,
       });
     }
+    if (playlistsStore.mostPlayedCount > 0) {
+      defs.push({
+        id: "auto:most_played",
+        kind: "most_played",
+        label: i18n.t("playlists.autoMostPlayed"),
+        trackCount: playlistsStore.mostPlayedCount,
+      });
+    }
     defs.push({
       id: "auto:history",
       kind: "history",
       label: i18n.t("playlists.autoHistory"),
       trackCount: playlistsStore.historyCount,
     });
+    if (missingMetadataAutoPlaylist && missingMetadataAutoPlaylist.track_count > 0) {
+      defs.push({
+        id: `auto:missing_metadata:${missingMetadataAutoPlaylist.id}`,
+        kind: "missing_metadata",
+        label: getPlaylistDisplayName(missingMetadataAutoPlaylist),
+        playlistId: missingMetadataAutoPlaylist.id,
+        updated: missingMetadataAutoPlaylist.updated,
+        trackCount: missingMetadataAutoPlaylist.track_count,
+      });
+    }
+    if (picardStore.missingPlaylistEnabled && missingMusicBrainzAutoPlaylist && missingMusicBrainzAutoPlaylist.track_count > 0) {
+      defs.push({
+        id: `auto:missing_musicbrainz:${missingMusicBrainzAutoPlaylist.id}`,
+        kind: "missing_musicbrainz",
+        label: getPlaylistDisplayName(missingMusicBrainzAutoPlaylist),
+        playlistId: missingMusicBrainzAutoPlaylist.id,
+        updated: missingMusicBrainzAutoPlaylist.updated,
+        trackCount: missingMusicBrainzAutoPlaylist.track_count,
+      });
+    }
+    if (daypartMixPlaylist && daypartMixPlaylist.track_count > 0) {
+      defs.push({
+        id: `auto:daypart:${daypartMixPlaylist.id}`,
+        kind: "daypart",
+        label: getPlaylistDisplayName(daypartMixPlaylist),
+        playlistId: daypartMixPlaylist.id,
+        updated: daypartMixPlaylist.updated,
+        trackCount: daypartMixPlaylist.track_count,
+      });
+    }
     for (const p of decadeAutoPlaylists) {
       if (p.track_count > 0) {
         const dec = p.dynamic_spec?.replace(/^decade:/, "") ?? p.name;
@@ -280,7 +337,13 @@
             ? { kind: "decade", decade: def.decade, playlistId: def.playlistId, updated: def.updated }
             : def.kind === "bpm"
               ? { kind: "bpm", bpm: def.bpm, playlistId: def.playlistId, updated: def.updated }
-              : { kind: def.kind }
+              : def.kind === "missing_metadata"
+                ? { kind: "missing_metadata", playlistId: def.playlistId, updated: def.updated }
+                : def.kind === "missing_musicbrainz"
+                  ? { kind: "missing_musicbrainz", playlistId: def.playlistId, updated: def.updated }
+                  : def.kind === "daypart"
+                    ? { kind: "daypart", playlistId: def.playlistId, updated: def.updated }
+                    : { kind: def.kind }
     );
   }
 
@@ -363,10 +426,15 @@
             >
               <RefreshCw class="w-4 h-4 {isRefreshingAll ? 'animate-spin' : ''}" />
             </button>
-            <div class="inline-flex items-center gap-0.5 bg-brand-sidebar border border-brand-border rounded-full p-1">
+            <div class="relative inline-flex items-center gap-0.5 bg-brand-sidebar border border-brand-border rounded-full p-1">
+              <!-- Sliding background indicator -->
+              <span
+                class="absolute top-1 bottom-1 left-1 w-7 h-7 rounded-full bg-brand-accent shadow-sm pointer-events-none transition-transform duration-200 ease-out {activeViewMode === 'rows' ? 'translate-x-[30px]' : 'translate-x-0'}"
+                aria-hidden="true"
+              ></span>
               <button
                 onclick={() => setActiveViewMode("cards")}
-                class="flex items-center justify-center w-7 h-7 rounded-full transition-colors {activeViewMode === 'cards' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+                class="relative z-10 flex items-center justify-center w-7 h-7 rounded-full transition-colors duration-200 {activeViewMode === 'cards' ? 'text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
                 title={i18n.t('collection.viewCards')}
                 aria-label={i18n.t('collection.viewCards')}
                 aria-pressed={activeViewMode === "cards"}
@@ -375,7 +443,7 @@
               </button>
               <button
                 onclick={() => setActiveViewMode("rows")}
-                class="flex items-center justify-center w-7 h-7 rounded-full transition-colors {activeViewMode === 'rows' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+                class="relative z-10 flex items-center justify-center w-7 h-7 rounded-full transition-colors duration-200 {activeViewMode === 'rows' ? 'text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
                 title={i18n.t('collection.viewRows')}
                 aria-label={i18n.t('collection.viewRows')}
                 aria-pressed={activeViewMode === "rows"}

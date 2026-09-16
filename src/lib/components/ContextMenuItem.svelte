@@ -10,14 +10,16 @@
     /** Highlights the item as a destructive action (e.g. Remove/Delete). */
     destructive?: boolean;
     disabled?: boolean;
+    title?: string;
   }
 
-  let { icon: Icon, label, onclick, accent = false, destructive = false, disabled = false }: Props = $props();
+  let { icon: Icon, label, onclick, accent = false, destructive = false, disabled = false, title }: Props = $props();
 </script>
 
 <button
   onclick={disabled ? undefined : onclick}
   {disabled}
+  {title}
   class="w-full text-left px-3 py-1.5 flex items-center gap-2.5 transition-colors {disabled
     ? 'opacity-40 cursor-not-allowed text-brand-text-secondary'
     : destructive

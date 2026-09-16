@@ -39,4 +39,14 @@ describe("SettingsView.svelte", () => {
 
     expect(invoke).toHaveBeenCalledWith("set_app_setting", { key: "active_settings_tab", value: "themes" });
   });
+
+  it("persists active tab as integrations when clicking Integrations tab", async () => {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const { findByText, getByText } = render(SettingsView);
+    await findByText(/v0\.75\.0/);
+
+    await fireEvent.click(getByText("Integrations"));
+
+    expect(invoke).toHaveBeenCalledWith("set_app_setting", { key: "active_settings_tab", value: "integrations" });
+  });
 });

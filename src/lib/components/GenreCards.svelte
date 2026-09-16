@@ -3,12 +3,15 @@
   import { tagsStore } from "../stores/tags.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
-  import { GENRE_PALETTE_HUES, genreColorHsl, genreColorHslBright, genreColorHslDark } from "../utils/genrePalette";
+  import { genreColorHsl, genreColorHslBright, genreColorHslDark, getGenreColorChoices } from "../utils/genrePalette";
   import { portal } from "../utils/portal";
   import { themeStore } from "../stores/theme.svelte";
   import { isLightColor } from "../utils/colorUtils";
   import GenreContextMenu from "./GenreContextMenu.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
+  import ColorPicker from "./ColorPicker.svelte";
+
+  const genreColorChoices = getGenreColorChoices();
 
   /** Subgenre chip text/border must read clearly against the chip's own pale
    * fill, which tracks the active theme: bright text only works on a dark
@@ -349,8 +352,8 @@
             onpointerdown={(e) => handleChipPointerDown(e, child.name, group.name)}
             onclick={() => { if (selectMode) onToggleSelect(child.name); }}
             oncontextmenu={(e) => openContextMenu(e, child.name, false)}
-            class="inline-flex items-center gap-1 pl-2 pr-1.5 py-1 rounded-full border text-xs font-medium select-none touch-none transition-[opacity,box-shadow,transform] {selectMode ? 'cursor-pointer' : 'genre-drag-handle'} {!selectMode && draggedChip?.name === child.name ? 'is-dragging' : ''} {draggedChip?.name === child.name ? 'opacity-40' : ''} {dropTarget?.kind === 'chip' && dropTarget.chip === child.name ? 'ring-4 ring-brand-accent scale-110' : selected.has(child.name) ? 'ring-2 ring-brand-accent' : ''}"
-            style={`background-color: color-mix(in srgb, ${genreColorHsl(group.color_index)} 38%, transparent); border-color: color-mix(in srgb, ${genreColorHslFg(group.color_index)} 70%, transparent); color: ${genreColorHslFg(group.color_index)};`}
+            class="inline-flex items-center gap-1 pl-2 pr-1.5 py-0.5 rounded-full border-2 bg-[color-mix(in_srgb,var(--color-brand-accent)_15%,var(--color-brand-sidebar))] text-brand-text-primary text-xs font-medium select-none touch-none transition-[opacity,box-shadow,transform] {selectMode ? 'cursor-pointer' : 'genre-drag-handle'} {!selectMode && draggedChip?.name === child.name ? 'is-dragging' : ''} {draggedChip?.name === child.name ? 'opacity-40' : ''} {dropTarget?.kind === 'chip' && dropTarget.chip === child.name ? 'ring-4 ring-brand-accent scale-110' : selected.has(child.name) ? 'ring-2 ring-brand-accent' : ''}"
+            style={`border-color: ${genreColorHsl(group.color_index)};`}
           >
             {#if selectMode}
               <input
@@ -391,8 +394,8 @@
 
 {#if ghostInfo && pointerPos}
   <div
-    class="fixed z-50 pointer-events-none px-3 py-1.5 rounded-full border text-xs font-semibold shadow-2xl -translate-y-1/2"
-    style={`left: ${pointerPos.x + 16}px; top: ${pointerPos.y}px; background-color: color-mix(in srgb, ${genreColorHsl(ghostInfo.colorIndex)} 40%, var(--color-brand-sidebar)); color: color-mix(in srgb, ${genreColorHsl(ghostInfo.colorIndex)} 90%, var(--color-brand-text-primary)); border-color: color-mix(in srgb, ${genreColorHsl(ghostInfo.colorIndex)} 60%, transparent);`}
+    class="fixed z-50 pointer-events-none px-3 py-1.5 rounded-full border-2 bg-[color-mix(in_srgb,var(--color-brand-accent)_15%,var(--color-brand-sidebar))] text-brand-text-primary text-xs font-semibold shadow-2xl -translate-y-1/2"
+    style={`left: ${pointerPos.x + 16}px; top: ${pointerPos.y}px; border-color: ${genreColorHsl(ghostInfo.colorIndex)};`}
   >
     {ghostInfo.label}
   </div>
@@ -403,18 +406,16 @@
   <div
     use:portal
     bind:this={colorPopoverEl}
-    class="fixed z-50 grid grid-cols-5 gap-1.5 p-2 rounded-lg bg-brand-main border border-brand-border shadow-2xl"
+    class="fixed z-50 p-2 rounded-lg bg-brand-main border border-brand-border shadow-2xl"
     style={`left: ${colorPopoverPos.x}px; top: ${colorPopoverPos.y}px;`}
   >
-    {#each GENRE_PALETTE_HUES as _, i (i)}
-      <button
-        type="button"
-        onclick={() => { tagsStore.setGroupColor(colorPopoverFor!, i); colorPopoverFor = null; }}
-        class="w-5 h-5 rounded-full border-2 {group?.color_index === i ? 'border-brand-text-primary' : 'border-transparent'}"
-        style="background-color: {genreColorHsl(i)}"
-        aria-label={`${i}`}
-      ></button>
-    {/each}
+    <ColorPicker
+      choices={genreColorChoices}
+      value={group ? String(group.color_index) : null}
+      onChange={(v) => { tagsStore.setGroupColor(colorPopoverFor!, Number(v)); colorPopoverFor = null; }}
+      size="sm"
+      columns={5}
+    />
   </div>
 {/if}
 

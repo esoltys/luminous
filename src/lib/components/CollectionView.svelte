@@ -32,12 +32,12 @@
   import AlbumRowCard from "./AlbumRowCard.svelte";
   import ArtistRowCard from "./ArtistRowCard.svelte";
   import Select from "./Select.svelte";
-  import ColumnSelector from "./ColumnSelector.svelte";
   import LibraryWelcome from "./LibraryWelcome.svelte";
   import SearchEmptyState from "./SearchEmptyState.svelte";
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
   import { SONG_TABLE_COLUMNS } from "../utils/songColumns";
   import { rememberScroll } from "../utils/scrollMemory";
+  import { openInPicard } from "../utils/picard";
 
   // activeSubTab and activeTab are managed globally via collectionStore
 
@@ -183,12 +183,12 @@
     typeof window !== "undefined" ? localStorage.getItem("sort_album_asc") !== "false" : true
   );
 
-  let artistSortField = $state<"name" | "genre" | "song_count">(
+  let artistSortField = $state<"name" | "genre" | "song_count" | "total_playcount">(
     (() => {
       if (typeof window === "undefined") return "name";
       const saved = localStorage.getItem("sort_artist_field");
       if (saved === "album_count") return "genre";
-      return (saved as "name" | "genre" | "song_count") || "name";
+      return (saved as "name" | "genre" | "song_count" | "total_playcount") || "name";
     })()
   );
   let artistSortAsc = $state(
@@ -265,11 +265,11 @@
   // Default column widths (px or fr) — used when no saved width exists for a column.
   const COLLECTION_COL_DEFAULTS: Partial<Record<keyof typeof collectionStore.visibleColumns, string>> = {
     track: "48px", title: "2fr", artist: "1.5fr", album: "1.5fr",
-    composer: "1.5fr", album_artist: "1.5fr", format: "64px", year: "60px",
+    composer: "1.5fr", album_artist: "1.5fr", format: "64px", year: "60px", originalyear: "60px",
     genre: "1.2fr", grouping: "1.2fr", bpm: "60px", initial_key: "60px",
     bitrate: "70px", samplerate: "75px", bitdepth: "65px", channels: "70px",
     filesize: "75px", rating: "96px", playcount: "70px", skipcount: "70px",
-    lastplayed: "90px", added: "90px", duration: "80px", path: "2fr", actions: "80px",
+    lastplayed: "90px", added: "90px", duration: "80px", path: "2fr", library: "130px", actions: "80px",
   };
 
   function toggleSort(field: keyof Song) {
@@ -294,8 +294,9 @@
     let songs = await invoke<Song[]>("get_songs_by_album", {
       album: albumName,
     });
-    if (songs.length > 0) {
-      const songIds = songs.map((s) => s.id);
+    const playable = songs.filter((s) => !s.not_included);
+    if (playable.length > 0) {
+      const songIds = playable.map((s) => s.id);
       playerStore.playSongs(songIds, 0);
     }
   }
@@ -352,7 +353,6 @@
         </div>
 
         <div class="flex items-center gap-2">
-          <ColumnSelector align="right" iconOnly />
           <div class="relative">
             <Select
               value={`${sortField}-${sortAsc}`}
@@ -411,10 +411,15 @@
           </div>
 
           <div class="flex items-center gap-2">
-            <div class="inline-flex items-center gap-0.5 bg-brand-sidebar border border-brand-border rounded-full p-1">
+            <div data-walkthrough-target="collection-view" class="relative inline-flex items-center gap-0.5 bg-brand-sidebar border border-brand-border rounded-full p-1">
+              <!-- Sliding background indicator -->
+              <span
+                class="absolute top-1 bottom-1 left-1 w-7 h-7 rounded-full bg-brand-accent shadow-sm pointer-events-none transition-transform duration-200 ease-out {activeViewMode === 'rows' ? 'translate-x-[30px]' : 'translate-x-0'}"
+                aria-hidden="true"
+              ></span>
               <button
                 onclick={() => setActiveViewMode("cards")}
-                class="flex items-center justify-center w-7 h-7 rounded-full transition-colors {activeViewMode === 'cards' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+                class="relative z-10 flex items-center justify-center w-7 h-7 rounded-full transition-colors duration-200 {activeViewMode === 'cards' ? 'text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
                 title={i18n.t('collection.viewCards')}
                 aria-label={i18n.t('collection.viewCards')}
                 aria-pressed={activeViewMode === "cards"}
@@ -423,7 +428,7 @@
               </button>
               <button
                 onclick={() => setActiveViewMode("rows")}
-                class="flex items-center justify-center w-7 h-7 rounded-full transition-colors {activeViewMode === 'rows' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+                class="relative z-10 flex items-center justify-center w-7 h-7 rounded-full transition-colors duration-200 {activeViewMode === 'rows' ? 'text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
                 title={i18n.t('collection.viewRows')}
                 aria-label={i18n.t('collection.viewRows')}
                 aria-pressed={activeViewMode === "rows"}
@@ -460,7 +465,7 @@
                   value={`${artistSortField}-${artistSortAsc}`}
                   onchange={(e) => {
                     const [field, asc] = e.currentTarget.value.split("-");
-                    artistSortField = field as "name" | "genre" | "song_count";
+                    artistSortField = field as "name" | "genre" | "song_count" | "total_playcount";
                     artistSortAsc = asc === "true";
                   }}
                   class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
@@ -471,6 +476,8 @@
                   <option value="genre-false">▼ {i18n.t('collection.tableHeaderGenre')}</option>
                   <option value="song_count-true">▲ {i18n.t('collection.sortLabelSongs')}</option>
                   <option value="song_count-false">▼ {i18n.t('collection.sortLabelSongs')}</option>
+                  <option value="total_playcount-true">▲ {i18n.t('collection.sortLabelPopularity')}</option>
+                  <option value="total_playcount-false">▼ {i18n.t('collection.sortLabelPopularity')}</option>
                 </Select>
               </div>
             {/if}
@@ -517,7 +524,7 @@
       <div class="pt-2">
         {#if navigationStore.activeSubTab === "albums"}
         {#if activeViewMode === "rows"}
-          <div class="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2">
+          <div class="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-2">
             {#each sortedAlbums as album}
               <AlbumRowCard
                 {album}
@@ -540,7 +547,7 @@
         {/if}
         {:else if navigationStore.activeSubTab === "artists"}
         {#if activeViewMode === "rows"}
-          <div class="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2">
+          <div class="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-2">
             {#each sortedArtists as artist}
               {@const artistAlbums = getArtistAlbumsFor(artist.name)}
               {@const artistSongs = getArtistSongsFor(artist.name)}
@@ -608,6 +615,7 @@
     onGoToArtist={() => navigationStore.viewArtist(song.album_artist?.trim() || song.artist || "")}
     onGoToAlbum={() => navigationStore.viewAlbum(song.album || "")}
     onEditTags={() => openTagEditor(song.id)}
+    onOpenInPicard={() => openInPicard(selectedKeys.size > 1 ? Array.from(selectedKeys, Number) : [song.id])}
     onClose={() => { contextMenuState = null; }}
   />
 {/if}
@@ -622,9 +630,10 @@
     onPlay={() => handlePlayAlbum(album.album || "")}
     onAddToPlaylist={async () => {
       let songs = await invoke<Song[]>("get_songs_by_album", { album: album.album || "" });
-      if (songs.length > 0) {
+      const playable = songs.filter((s) => !s.not_included);
+      if (playable.length > 0) {
         await playlistsStore.addSongsToActiveTarget(
-          songs.map(s => s.id),
+          playable.map(s => s.id),
           album.album || i18n.t("collection.unknownAlbum")
         );
       }

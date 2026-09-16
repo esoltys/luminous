@@ -1,4 +1,4 @@
-use crate::models::LoudnessSettings;
+use crate::models::{LoudnessSettings, LOCAL_SOURCES_SQL};
 use crate::AppState;
 use tauri::State;
 
@@ -15,7 +15,7 @@ pub async fn set_loudness_settings(
     state: State<'_, AppState>,
     mut settings: LoudnessSettings,
 ) -> Result<(), String> {
-    settings.target_lufs = settings.target_lufs.clamp(-24.0, -14.0);
+    settings.target_lufs = settings.target_lufs.clamp(-23.0, -9.0);
     settings.fallback_gain_db = settings.fallback_gain_db.clamp(-24.0, 0.0);
     crate::loudness::save_settings(&state.db, &settings).map_err(|e| e.to_string())?;
     state.player.lock().await.refresh_loudness_gain().await;
@@ -28,9 +28,12 @@ pub async fn set_loudness_settings(
 pub async fn get_loudness_analysis_remaining(state: State<'_, AppState>) -> Result<i64, String> {
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     conn.query_row(
-        "SELECT COUNT(*) FROM songs
-         WHERE source IN (1, 2) AND unavailable = 0 AND path IS NOT NULL
+        &format!(
+            "SELECT COUNT(*) FROM songs
+         WHERE source IN ({lib}) AND unavailable = 0 AND path IS NOT NULL
            AND ebur128_integrated_loudness_lufs IS NULL",
+            lib = *LOCAL_SOURCES_SQL
+        ),
         [],
         |row| row.get(0),
     )

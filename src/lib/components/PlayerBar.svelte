@@ -16,20 +16,24 @@
   import WaveformSeekBar from "./WaveformSeekBar.svelte";
   import SpectrumVisualizer from "./SpectrumVisualizer.svelte";
   import LinkButton from "./LinkButton.svelte";
-
-  const isLinux = typeof navigator !== 'undefined' && navigator.userAgent.includes('Linux');
+  import SongContextMenu from "./SongContextMenu.svelte";
+  import TagEditor from "./TagEditor.svelte";
+  import { tagsStore } from "../stores/tags.svelte";
+  import { openInPicard } from "../utils/picard";
+  import { isLinux } from "../platform";
+  import MothmanSprite from "./MothmanSprite.svelte";
 
   // Responsive control trimming (issue #413, refined against real usage,
   // padding/seekbar fixed under #543): three named tiers as this floating
-  // bar narrows toward the app's 320px minWidth — Full (>=700px), Compact
-  // (400-700px), Minimal (<400px). Cover art, play/pause, and skip-next are
+  // bar narrows toward the app's 320px minWidth — Full (>=640px), Compact
+  // (400-640px), Minimal (<400px). Cover art, play/pause, and skip-next are
   // the constant core (shown in all three tiers); everything else drops out
   // in priority order: expand/shuffle/repeat/volume+mute/waveform seek bar
   // + time labels first (gone by Compact — the transport block takes the
   // freed space and sticks to the right edge via `ml-auto` rather than
   // re-centering in it), then prev (gone by Minimal). Horizontal padding on
   // the outer bar stays constant across all tiers so cover art never sits
-  // flush against the rounded edges. 400/700 are hand-tuned breakpoints
+  // flush against the rounded edges. 400/640 are hand-tuned breakpoints
   // specific to this bar, written as literal `min-[Npx]:` arbitrary-value
   // classes because Tailwind's class scanner can't resolve an interpolated
   // constants.ts value — don't try to centralize them.
@@ -50,7 +54,10 @@
     MicrophoneStageIcon as Mic2,
     PlaylistIcon as ListMusic,
     MusicNotesIcon as Music,
-    InfoIcon as Info
+    InfoIcon as Info,
+    ListIcon as Menu,
+    SubtitlesIcon as Lyrics,
+    StackIcon as Layers
   } from "phosphor-svelte";
 
 
@@ -170,62 +177,109 @@
     }
   }
 
-  // True only when the user is already looking at the Queue itself (not
-  // immersive, on the Playlists tab's custom-playlists sub-tab, with the
-  // Queue playlist selected) — distinguishes "viewing the Queue" from
-  // "viewing any other collection/playlist", which the cover-art click
-  // handler below needs in order to pick the right next state (#523).
-  let isViewingQueue = $derived.by(() => {
-    if (windowLayoutStore.immersiveMode) return false;
-    const queuePl = playlistsStore.queuePlaylist;
-    if (!queuePl) return false;
-    return (
-      navigationStore.activeTab === 'playlists' &&
-      navigationStore.playlistsSubTab === 'custom' &&
-      navigationStore.selectedPlaylistId === queuePl.id
-    );
-  });
+  let coverTitle = $derived(
+    playerStore.currentSong ? i18n.t('playerBar.immersiveTitle', {}, 'Immersive Mode') : ""
+  );
 
-  let coverTitle = $derived.by(() => {
-    if (!playerStore.currentSong) return "";
-    return isViewingQueue
-      ? i18n.t('playerBar.immersiveTitle', {}, 'Immersive Mode')
-      : i18n.t('playerBar.queueTitle', {}, 'Queue');
-  });
-
-  async function navigateToQueue() {
-    const queuePl = await playlistsStore.requireQueue();
-    playlistsStore.selectPlaylist(queuePl.id);
-    navigationStore.viewPlaylist(queuePl.id);
-  }
-
-  // Three-state navigation flow (#523): from any collection/playlist view,
-  // clicking goes to the Queue; from the Queue, it flips into Immersive
-  // Mode; from Immersive Mode, it flips back to the Queue.
-  async function handleCoverClick(e: MouseEvent) {
+  // Cover art now only toggles Immersive View (#876) — navigating to the
+  // Queue is the dedicated Queue button's job.
+  function handleCoverClick(e: MouseEvent) {
     if (!playerStore.currentSong) return;
     e.stopPropagation();
 
     // While the window is too narrow to show the front face at all
-    // (isImmersiveForced), immersive is engaged regardless of what this
-    // toggles — clicking through to "exit and view Queue" would silently
-    // clear the user's own immersiveMode preference for a screen they can't
-    // actually reach yet, so leave it alone until the window widens back out.
+    // (isImmersiveForced), immersive is already engaged regardless of what
+    // this toggles, so leave it alone until the window widens back out.
     if (windowLayoutStore.isImmersiveForced) return;
 
+    windowLayoutStore.toggleImmersiveMode();
+  }
+
+  // New playbar button row (#876): Menu/Lyrics/Queue/Info/Miniplayer.
+  let contextMenuState = $state<{ x: number; y: number } | null>(null);
+  let editingSongId = $state<number | null>(null);
+
+  function openCurrentSongMenu(e: MouseEvent) {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    contextMenuState = { x: rect.left, y: rect.top };
+  }
+
+  async function navigateToQueue() {
+    windowLayoutStore.exitImmersiveMode();
+    const queuePl = await playlistsStore.requireQueue();
+    playlistsStore.selectPlaylist(queuePl.id);
+    navigationStore.viewPlaylist(queuePl.id);
+    navigationStore.requestScrollToCurrentSong();
+  }
+
+  function handleInfoClick() {
     if (windowLayoutStore.immersiveMode) {
       windowLayoutStore.exitImmersiveMode();
-      await navigateToQueue();
-    } else if (isViewingQueue) {
-      windowLayoutStore.toggleImmersiveMode();
+      if (!windowLayoutStore.rightPanelOpen) {
+        windowLayoutStore.toggleRightPanel();
+      }
     } else {
-      await navigateToQueue();
+      windowLayoutStore.toggleRightPanel();
     }
+  }
+
+  function handleTagEditorSaved() {
+    collectionStore.refreshLibrary();
+    tagsStore.load();
+  }
+
+  /**
+   * Custom transition for inline toolbar and transport elements when expanding or collapsing.
+   * Smoothly fades opacity while collapsing horizontal width and absorbing flex gap,
+   * so sibling items glide closer together when an item disappears, and glide apart
+   * when it reappears.
+   */
+  function collapseFade(
+    node: HTMLElement,
+    {
+      duration = 250,
+      easing = cubicOut,
+      marginSide = node.nextElementSibling ? 'right' : 'left',
+    }: {
+      duration?: number;
+      easing?: (t: number) => number;
+      marginSide?: 'left' | 'right';
+    } = {}
+  ) {
+    const style = getComputedStyle(node);
+    const parentStyle = node.parentElement ? getComputedStyle(node.parentElement) : null;
+    const gap = parentStyle ? parseFloat(parentStyle.columnGap || parentStyle.gap) || 0 : 0;
+
+    const opacity = +style.opacity || 1;
+    const width = parseFloat(style.width) || node.getBoundingClientRect().width || 20;
+    const paddingLeft = parseFloat(style.paddingLeft) || 0;
+    const paddingRight = parseFloat(style.paddingRight) || 0;
+    const marginProp = marginSide === 'left' ? 'margin-left' : 'margin-right';
+
+    return {
+      duration,
+      easing,
+      css: (t: number) => `
+        overflow: hidden;
+        opacity: ${t * opacity};
+        width: ${t * width}px;
+        min-width: 0;
+        max-width: ${t * width}px;
+        padding-left: ${t * paddingLeft}px;
+        padding-right: ${t * paddingRight}px;
+        ${marginProp}: -${(1 - t) * gap}px;
+        white-space: nowrap;
+        pointer-events: ${t < 0.1 ? 'none' : 'auto'};
+      `,
+    };
   }
 </script>
 
-<footer transition:fly={{ y: 40, duration: 300, easing: cubicOut }} class="h-20 max-w-[1200px] mx-auto bg-brand-playerbar border border-brand-border rounded-[2rem] flex items-center justify-between gap-3 px-8 text-brand-text-secondary select-none {themeStore.isGlassTheme || isLinux ? 'glass-surface' : ''} {isLinux ? 'opaque-linux' : ''}">
-  <div class="flex items-center gap-3 flex-1 min-[700px]:w-1/3 min-[700px]:flex-none min-w-[90px] min-[400px]:min-w-[140px] min-[700px]:min-w-[200px] max-w-sm">
+<footer transition:fly={{ y: 40, duration: 300, easing: cubicOut }} class="relative h-20 max-w-[1200px] mx-auto bg-brand-playerbar border border-brand-border rounded-[2rem] flex items-center justify-between gap-3 px-5 min-[768px]:px-8 text-brand-text-secondary select-none {themeStore.isGlassTheme || isLinux ? 'glass-surface' : ''} {isLinux ? 'opaque-linux' : ''}">
+  {#if themeStore.activeThemeId === 'mothman'}
+    <MothmanSprite isPlaying={playerStore.state === 'playing'} />
+  {/if}
+  <div data-walkthrough-target="player-bar-cover" class="flex items-center gap-3 min-w-0 flex-1 min-[768px]:w-1/3 min-[768px]:flex-none min-[768px]:min-w-[200px] max-w-sm">
     <button
       onclick={handleCoverClick}
       disabled={!playerStore.currentSong}
@@ -253,22 +307,26 @@
           />
         {/if}
       </div>
-      {#if playerStore.currentSong?.album}
+      {#if playerStore.currentSong?.album?.trim()}
         <LinkButton
-          onclick={(e) => { e.stopPropagation(); navigationStore.viewAlbum(playerStore.currentSong?.album || ""); }}
+          onclick={(e) => {
+            e.stopPropagation();
+            windowLayoutStore.exitImmersiveMode();
+            navigationStore.viewAlbum(playerStore.currentSong?.album || "");
+          }}
           class="text-xs text-brand-text-secondary/70 truncate"
           title={i18n.t('collection.filterByAlbum', { album: playerStore.currentSong.album })}
         >
           {playerStore.currentSong.album}
         </LinkButton>
-      {:else if playerStore.currentSong}
-        <span class="text-xs text-brand-text-secondary/70 truncate">
-          {i18n.t('collection.unknownAlbum')}
-        </span>
       {/if}
       {#if playerStore.currentSong?.artist}
         <LinkButton
-          onclick={(e) => { e.stopPropagation(); navigationStore.viewArtist(playerStore.currentSong?.album_artist?.trim() || playerStore.currentSong?.artist || ""); }}
+          onclick={(e) => {
+            e.stopPropagation();
+            windowLayoutStore.exitImmersiveMode();
+            navigationStore.viewArtist(playerStore.currentSong?.album_artist?.trim() || playerStore.currentSong?.artist || "");
+          }}
           class="text-xs text-brand-text-secondary/70 truncate"
           title={i18n.t('collection.filterByArtist', { artist: playerStore.currentSong.artist })}
         >
@@ -282,30 +340,32 @@
     </div>
   </div>
 
-  <div class="flex flex-col items-center gap-1.5 min-[400px]:min-w-[220px] min-[400px]:ml-auto min-[700px]:w-1/3 min-[700px]:flex-none min-[700px]:ml-0 max-w-[600px]">
-    <div class="flex items-center gap-3 min-[700px]:gap-5">
-      <div class="hidden min-[700px]:block relative">
-        {#if playerStore.shuffleMode !== 'off'}
+  <div data-walkthrough-target="player-bar-controls" class="flex flex-col items-center gap-1.5 min-w-0 flex-1 min-[400px]:ml-auto min-[640px]:ml-0 min-[768px]:w-1/3 min-[768px]:flex-none max-w-[600px]">
+    <div class="flex items-center gap-3 min-[768px]:gap-5">
+      {#if !windowLayoutStore.isRightPanelAutoHidden}
+        <div transition:collapseFade={{ duration: 250 }} class="relative inline-flex items-center flex-shrink-0">
+          {#if playerStore.shuffleMode !== 'off'}
+            <button
+              onclick={cycleShuffle}
+              class="absolute right-full top-1/2 -translate-y-1/2 mr-1.5 text-[10px] font-semibold text-brand-accent-text hover:text-brand-text-primary transition-colors uppercase tracking-wide whitespace-nowrap"
+              title={`${i18n.t('playerBar.shuffle')}: ${shuffleModeLabel(playerStore.shuffleMode)} — ${shuffleModeDescription(playerStore.shuffleMode)}`}
+            >
+              {i18n.t('playerBar.shuffle')} {shuffleModeLabel(playerStore.shuffleMode)}
+            </button>
+          {/if}
           <button
             onclick={cycleShuffle}
-            class="absolute right-full top-1/2 -translate-y-1/2 mr-1.5 text-[10px] font-semibold text-brand-accent-text hover:text-brand-text-primary transition-colors uppercase tracking-wide whitespace-nowrap"
+            class="text-xs transition-colors hover:text-brand-text-primary flex items-center gap-1 p-1 {playerStore.shuffleMode !== 'off' ? 'text-brand-accent-text font-bold' : 'text-brand-text-secondary/50'}"
             title={`${i18n.t('playerBar.shuffle')}: ${shuffleModeLabel(playerStore.shuffleMode)} — ${shuffleModeDescription(playerStore.shuffleMode)}`}
           >
-            {i18n.t('playerBar.shuffle')} {shuffleModeLabel(playerStore.shuffleMode)}
+            {#if shuffleTypeIcon(playerStore.shuffleMode)}
+              {@const ShuffleTypeIcon = shuffleTypeIcon(playerStore.shuffleMode)}
+              <ShuffleTypeIcon class="w-4 h-4" />
+            {/if}
+            <Shuffle class="w-4 h-4" />
           </button>
-        {/if}
-        <button
-          onclick={cycleShuffle}
-          class="text-xs transition-colors hover:text-brand-text-primary flex items-center gap-1 p-1 {playerStore.shuffleMode !== 'off' ? 'text-brand-accent-text font-bold' : 'text-brand-text-secondary/50'}"
-          title={`${i18n.t('playerBar.shuffle')}: ${shuffleModeLabel(playerStore.shuffleMode)} — ${shuffleModeDescription(playerStore.shuffleMode)}`}
-        >
-          {#if shuffleTypeIcon(playerStore.shuffleMode)}
-            {@const ShuffleTypeIcon = shuffleTypeIcon(playerStore.shuffleMode)}
-            <ShuffleTypeIcon class="w-4 h-4" />
-          {/if}
-          <Shuffle class="w-4 h-4" />
-        </button>
-      </div>
+        </div>
+      {/if}
 
       <button onclick={() => playerStore.previous()} class="hidden min-[400px]:block text-brand-text-secondary hover:text-brand-text-primary transition-colors" title={i18n.t('playerBar.previous')}>
         <SkipBack class="w-5 h-5 fill-current" />
@@ -333,110 +393,181 @@
         <SkipForward class="w-5 h-5 fill-current" />
       </button>
 
-      <div class="hidden min-[700px]:block relative">
-        <button
-          onclick={cycleRepeat}
-          class="text-xs transition-colors hover:text-brand-text-primary flex items-center gap-1 p-1 {playerStore.repeatMode !== 'off' ? 'text-brand-accent-text font-bold' : 'text-brand-text-secondary/50'}"
-          title={`${i18n.t('playerBar.repeat')}: ${repeatModeLabel(playerStore.repeatMode)} — ${repeatModeDescription(playerStore.repeatMode)}`}
-        >
-          <Repeat class="w-4 h-4" />
-          {#if repeatTypeIcon(playerStore.repeatMode)}
-            {@const RepeatTypeIcon = repeatTypeIcon(playerStore.repeatMode)}
-            <RepeatTypeIcon class="w-4 h-4" />
-          {/if}
-        </button>
-        {#if playerStore.repeatMode !== 'off'}
+      {#if !windowLayoutStore.isRightPanelAutoHidden}
+        <div transition:collapseFade={{ duration: 250 }} class="relative inline-flex items-center flex-shrink-0">
           <button
             onclick={cycleRepeat}
-            class="absolute left-full top-1/2 -translate-y-1/2 ml-1.5 text-[10px] font-semibold text-brand-accent-text hover:text-brand-text-primary transition-colors uppercase tracking-wide whitespace-nowrap"
+            class="text-xs transition-colors hover:text-brand-text-primary flex items-center gap-1 p-1 {playerStore.repeatMode !== 'off' ? 'text-brand-accent-text font-bold' : 'text-brand-text-secondary/50'}"
             title={`${i18n.t('playerBar.repeat')}: ${repeatModeLabel(playerStore.repeatMode)} — ${repeatModeDescription(playerStore.repeatMode)}`}
           >
-            {i18n.t('playerBar.repeat')} {repeatModeLabel(playerStore.repeatMode)}
+            <Repeat class="w-4 h-4" />
+            {#if repeatTypeIcon(playerStore.repeatMode)}
+              {@const RepeatTypeIcon = repeatTypeIcon(playerStore.repeatMode)}
+              <RepeatTypeIcon class="w-4 h-4" />
+            {/if}
           </button>
-        {/if}
-      </div>
-
-      <button
-        onclick={() => windowLayoutStore.toggleMiniplayerMode()}
-        class="min-[700px]:hidden text-brand-text-secondary hover:text-brand-accent-text transition-colors flex-shrink-0"
-        title={i18n.t('miniplayer.toggleTooltip', {}, 'Picture-in-Picture Mode (Ctrl+M)')}
-      >
-        <PictureInPicture class="w-4 h-4" />
-      </button>
-
-    </div>
-
-    <div class="hidden min-[700px]:flex items-center gap-2.5 w-full text-[10px] text-brand-text-secondary/60">
-      <!-- Invisible spacer matching the mode-toggle button's footprint, so the
-           waveform + timers stay centered instead of skewing left toward it. -->
-      <div class="w-4 h-4 flex-shrink-0" aria-hidden="true"></div>
-      <span>{formatDuration(playerStore.positionNanosec)}</span>
-      <div class="flex-1 flex flex-col gap-1">
-        <WaveformSeekBar />
-      </div>
-      <span>{formatDuration(playerStore.currentSong?.length_nanosec)}</span>
-      <button
-        onclick={() => prefs.toggleSeekBarMode()}
-        class="text-brand-text-secondary/50 hover:text-brand-text-primary transition-colors p-0.5 flex-shrink-0"
-        title={prefs.seekBarMode === 'waveform'
-          ? i18n.t('playerBar.seekbarModeWaveform', {}, 'Waveform mode — click to switch to frequency bands')
-          : i18n.t('playerBar.seekbarModeBands', {}, 'Frequency bands mode — click to switch to waveform')}
-      >
-        {#if prefs.seekBarMode === 'waveform'}
-          <AudioWaveform class="w-3 h-3" />
-        {:else}
-          <Palette class="w-3 h-3" />
-        {/if}
-      </button>
-    </div>
-  </div>
-
-  <div class="hidden min-[700px]:flex items-center justify-end gap-1.5 min-[700px]:gap-3 w-1/3 min-w-[50px] min-[700px]:min-w-[200px] max-w-xs">
-    <div class="w-24 h-7 mr-2 hidden md:block">
-      <SpectrumVisualizer />
-    </div>
-    <button onclick={toggleMute} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors" title={i18n.t('playerBar.volume')}>
-      {#if isMuted || playerStore.volume === 0}
-        <VolumeX class="w-4 h-4" />
-      {:else}
-        <Volume2 class="w-4 h-4" />
+          {#if playerStore.repeatMode !== 'off'}
+            <button
+              onclick={cycleRepeat}
+              class="absolute left-full top-1/2 -translate-y-1/2 ml-1.5 text-[10px] font-semibold text-brand-accent-text hover:text-brand-text-primary transition-colors uppercase tracking-wide whitespace-nowrap"
+              title={`${i18n.t('playerBar.repeat')}: ${repeatModeLabel(playerStore.repeatMode)} — ${repeatModeDescription(playerStore.repeatMode)}`}
+            >
+              {i18n.t('playerBar.repeat')} {repeatModeLabel(playerStore.repeatMode)}
+            </button>
+          {/if}
+        </div>
       {/if}
-    </button>
-    <input
-      type="range"
-      min="0"
-      max="1"
-      step="0.01"
-      value={playerStore.volume}
-      oninput={handleVolumeChange}
-      onchange={releaseVolumeFocus}
-      onpointerup={releaseVolumeFocus}
-      onkeyup={releaseVolumeFocus}
-      class="volume-slider hidden min-[700px]:block w-20 h-1 rounded-lg outline-none"
-      style={volumeSliderStyle}
-      aria-label={i18n.t('playerBar.volumeSlider')}
-      title={i18n.t('playerBar.volumeWithValue', { value: Math.round(volumePercent) })}
-    />
-    <div class="hidden min-[700px]:flex flex-col items-center justify-center gap-1 flex-shrink-0">
-      {#if !windowLayoutStore.isRightPanelAutoHidden}
+
+      {#if windowLayoutStore.isPlayerBarCompact}
         <button
-          onclick={() => windowLayoutStore.toggleRightPanel()}
-          class="text-brand-text-secondary hover:text-brand-accent-text transition-colors p-1.5 rounded hover:bg-brand-main/60 {windowLayoutStore.rightPanelOpen ? 'text-brand-accent-text' : ''}"
-          title={i18n.t('topNav.toggleRightPanel')}
+          onclick={() => windowLayoutStore.toggleMiniplayerMode()}
+          class="text-brand-text-secondary hover:text-brand-accent-text transition-colors flex-shrink-0"
+          title={i18n.t('miniplayer.toggleTooltip', {}, 'Picture-in-Picture Mode (Ctrl+M)')}
         >
-          <Info class="w-5 h-5" />
+          <PictureInPicture class="w-4 h-4" />
         </button>
       {/if}
-      <button
-        onclick={() => windowLayoutStore.toggleMiniplayerMode()}
-        class="text-brand-text-secondary hover:text-brand-accent-text transition-colors p-1.5 rounded hover:bg-brand-main/60"
-        title={i18n.t('miniplayer.toggleTooltip', {}, 'Picture-in-Picture Mode (Ctrl+M)')}
-      >
-        <PictureInPicture class="w-4.5 h-4.5" />
-      </button>
+
     </div>
+
+    {#if !windowLayoutStore.isPlayerBarCompact}
+      <div
+        class="flex items-center gap-2.5 w-full text-[10px] text-brand-text-secondary/60"
+      >
+        <!-- Invisible spacer matching the mode-toggle button's footprint, so the
+             waveform + timers stay centered instead of skewing left toward it. -->
+        <div class="w-4 h-4 flex-shrink-0" aria-hidden="true"></div>
+        <span>{formatDuration(playerStore.positionNanosec)}</span>
+        <div class="flex-1 flex flex-col gap-1">
+          <WaveformSeekBar />
+        </div>
+        <span>{formatDuration(playerStore.currentSong?.length_nanosec)}</span>
+        <button
+          onclick={() => prefs.toggleSeekBarMode()}
+          class="text-brand-text-secondary/50 hover:text-brand-text-primary transition-colors p-0.5 flex-shrink-0"
+          title={prefs.seekBarMode === 'waveform'
+            ? i18n.t('playerBar.seekbarModeWaveform', {}, 'Waveform mode — click to switch to frequency bands')
+            : i18n.t('playerBar.seekbarModeBands', {}, 'Frequency bands mode — click to switch to waveform')}
+        >
+          {#if prefs.seekBarMode === 'waveform'}
+            <AudioWaveform class="w-3 h-3" />
+          {:else}
+            <Palette class="w-3 h-3" />
+          {/if}
+        </button>
+      </div>
+    {/if}
   </div>
+
+  {#if !windowLayoutStore.isPlayerBarCompact}
+    <div
+      data-walkthrough-target="player-bar-toolbar"
+      class="flex flex-col items-center gap-1.5 flex-shrink-0 min-[768px]:w-1/3 min-[768px]:min-w-[200px] max-w-xs"
+    >
+      <div class="h-5 flex items-center gap-3 min-[768px]:gap-5">
+        <button
+          onclick={openCurrentSongMenu}
+          disabled={!playerStore.currentSong}
+          class="inline-flex items-center justify-center flex-shrink-0 text-brand-text-secondary hover:text-brand-text-primary transition-colors disabled:opacity-40 disabled:pointer-events-none"
+          title={i18n.t('playerBar.menuTooltip', {}, 'Song menu')}
+        >
+          <Menu class="w-5 h-5" />
+        </button>
+        {#if !windowLayoutStore.isRightPanelAutoHidden}
+          <button
+            transition:collapseFade={{ duration: 250 }}
+            onclick={() => {
+              windowLayoutStore.exitImmersiveMode();
+              navigationStore.activeTab = "lyrics";
+            }}
+            class="inline-flex items-center justify-center flex-shrink-0 transition-colors {navigationStore.activeTab === 'lyrics' ? 'text-brand-accent-text' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+            title={i18n.t('sidebar.lyrics')}
+          >
+            <Lyrics class="w-5 h-5" />
+          </button>
+        {/if}
+        <button
+          onclick={navigateToQueue}
+          class="inline-flex items-center justify-center flex-shrink-0 text-brand-text-secondary hover:text-brand-text-primary transition-colors"
+          title={i18n.t('playerBar.queueTitle', {}, 'Queue')}
+        >
+          <Layers class="w-5 h-5" />
+        </button>
+        {#if !windowLayoutStore.isRightPanelAutoHidden}
+          <button
+            transition:collapseFade={{ duration: 250 }}
+            onclick={handleInfoClick}
+            class="inline-flex items-center justify-center flex-shrink-0 transition-colors {windowLayoutStore.rightPanelOpen ? 'text-brand-accent-text' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+            title={i18n.t('topNav.toggleRightPanel')}
+          >
+            <Info class="w-5 h-5" />
+          </button>
+        {/if}
+        <button
+          onclick={() => windowLayoutStore.toggleMiniplayerMode()}
+          class="inline-flex items-center justify-center flex-shrink-0 text-brand-text-secondary hover:text-brand-text-primary transition-colors"
+          title={i18n.t('miniplayer.toggleTooltip', {}, 'Picture-in-Picture Mode (Ctrl+M)')}
+        >
+          <PictureInPicture class="w-5 h-5" />
+        </button>
+      </div>
+
+      <div class="h-7 flex items-center gap-2">
+        {#if !windowLayoutStore.isRightPanelAutoHidden}
+          <div transition:collapseFade={{ duration: 250 }} class="w-24 h-7 block flex-shrink-0">
+            <SpectrumVisualizer />
+          </div>
+        {/if}
+        <button onclick={toggleMute} class="inline-flex items-center justify-center text-brand-text-secondary hover:text-brand-text-primary transition-colors" title={i18n.t('playerBar.volume')}>
+          {#if isMuted || playerStore.volume === 0}
+            <VolumeX class="w-4 h-4" />
+          {:else}
+            <Volume2 class="w-4 h-4" />
+          {/if}
+        </button>
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.01"
+          value={playerStore.volume}
+          oninput={handleVolumeChange}
+          onchange={releaseVolumeFocus}
+          onpointerup={releaseVolumeFocus}
+          onkeyup={releaseVolumeFocus}
+          class="volume-slider w-20 h-1 rounded-lg outline-none"
+          style={volumeSliderStyle}
+          aria-label={i18n.t('playerBar.volumeSlider')}
+          title={i18n.t('playerBar.volumeWithValue', { value: Math.round(volumePercent) })}
+        />
+      </div>
+    </div>
+  {/if}
 </footer>
+
+{#if contextMenuState && playerStore.currentSong}
+  {@const song = playerStore.currentSong}
+  <SongContextMenu
+    x={contextMenuState.x}
+    y={contextMenuState.y}
+    {song}
+    onPlay={() => playerStore.playSong(song.id)}
+    onAddToPlaylist={() => playlistsStore.addSongsToActiveTarget([song.id], song.title || "Song")}
+    onGoToArtist={song.artist ? () => { windowLayoutStore.exitImmersiveMode(); navigationStore.viewArtist(song.album_artist?.trim() || song.artist || ""); } : undefined}
+    onGoToAlbum={song.album ? () => { windowLayoutStore.exitImmersiveMode(); navigationStore.viewAlbum(song.album || ""); } : undefined}
+    onEditTags={() => { windowLayoutStore.exitImmersiveMode(); editingSongId = song.id; }}
+    onOpenInPicard={() => openInPicard([song.id])}
+    onClose={() => { contextMenuState = null; }}
+  />
+{/if}
+
+{#if editingSongId !== null}
+  <TagEditor
+    songId={editingSongId}
+    onClose={() => { editingSongId = null; }}
+    onSave={handleTagEditorSaved}
+  />
+{/if}
 
 <style>
   /* Accent glow: only the PlayDock gets it, not the other glass panels —

@@ -4,6 +4,7 @@ import {
   SIDEBAR_MIN_WIDTH_PX,
   SIDEBAR_COLLAPSED_WIDTH_PX,
   MEDIUM_BREAKPOINT_WIDTH_PX,
+  RIGHT_PANEL_AUTO_HIDE_WIDTH_PX,
   SMALL_BREAKPOINT_WIDTH_PX,
   PLAYBAR_ONLY_HEIGHT_BREAKPOINT_PX,
   DETAIL_HEADER_COLLAPSE_HEIGHT_PX,
@@ -13,6 +14,11 @@ class WindowLayoutStore {
   // Layout panel states
   sidebarOpen = $state<boolean>(true);
   rightPanelOpen = $state<boolean>(true);
+  isOverviewExpanded = $state<boolean>(
+    typeof window !== "undefined"
+      ? localStorage.getItem("layout_isOverviewExpanded") !== "false"
+      : true
+  );
   sidebarWidth = $state<number>(256);
   lastExpandedSidebarWidth = $state<number>(256);
   rightPanelWidth = $state<number>(288);
@@ -340,7 +346,11 @@ class WindowLayoutStore {
   }
 
   get isRightPanelAutoHidden(): boolean {
-    return this.viewportWidth < MEDIUM_BREAKPOINT_WIDTH_PX;
+    return this.viewportWidth < RIGHT_PANEL_AUTO_HIDE_WIDTH_PX;
+  }
+
+  get isPlayerBarCompact(): boolean {
+    return this.viewportWidth < SMALL_BREAKPOINT_WIDTH_PX;
   }
 
   get isImmersiveForced(): boolean {
@@ -377,6 +387,17 @@ class WindowLayoutStore {
     if (typeof window !== "undefined") {
       localStorage.setItem("layout_rightPanelWidth", width.toString());
     }
+  }
+
+  setOverviewExpanded(expanded: boolean) {
+    this.isOverviewExpanded = expanded;
+    if (typeof window !== "undefined") {
+      localStorage.setItem("layout_isOverviewExpanded", expanded ? "true" : "false");
+    }
+  }
+
+  toggleOverviewExpanded() {
+    this.setOverviewExpanded(!this.isOverviewExpanded);
   }
 }
 

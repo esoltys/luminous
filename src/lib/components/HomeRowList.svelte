@@ -13,15 +13,19 @@
   import SongContextMenu from "./SongContextMenu.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { getPlaylistDisplayName } from "../utils/playlist";
+  import { CaretRightIcon as ChevronRight } from "phosphor-svelte";
 
   interface Props {
     title?: string;
     items: HomeItem[];
-    /** "rank" shows a 01-05 numeral + track duration; "added" shows a relative added date. */
+    /** "rank" shows a 01-05 numeral; "added" shows a relative added date. */
     variant: "rank" | "added";
+    /** When provided, the title becomes a clickable button that navigates to
+     * the category's full expanded view (see #169). */
+    onHeaderClick?: () => void;
   }
 
-  let { title, items, variant }: Props = $props();
+  let { title, items, variant, onHeaderClick }: Props = $props();
 
   let contextMenuState = $state<{ x: number; y: number; song: Song } | null>(null);
 
@@ -72,6 +76,10 @@
     return "";
   }
 
+  function rankFor(item: HomeItem, index: number): number {
+    return index + 1;
+  }
+
   // Mirrors ArtistDetailView's openPlaylist: genre/decade auto-playlists open
   // in AutoPlaylistDetailView, custom playlists (including Smart Playlists)
   // in the regular PlaylistView.
@@ -117,12 +125,23 @@
   }
 </script>
 
-<div class="space-y-4">
-  {#if title}
-    <h2 class="text-xl font-semibold text-brand-text-primary">{title}</h2>
+<div class="h-full flex flex-col gap-4">
+  {#if title && onHeaderClick}
+    <button
+      type="button"
+      onclick={onHeaderClick}
+      class="group flex items-center gap-1 text-xl font-semibold text-brand-text-primary hover:text-brand-accent-text transition-colors"
+    >
+      {title}
+      <ChevronRight class="w-5 h-5 opacity-0 group-hover:opacity-100 transition-opacity" />
+    </button>
+  {:else if title}
+    <h2 class="flex items-center gap-2 text-xl font-semibold text-brand-text-primary">
+      {title}
+    </h2>
   {/if}
 
-  <div class="flex flex-col gap-2">
+  <div class="flex-1 flex flex-col gap-2">
     {#each items as item, i (keyFor(item))}
       <!-- svelte-ignore a11y_click_events_have_key_events -->
       <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -135,9 +154,11 @@
         class="group flex items-center gap-3 px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 select-none"
       >
         {#if variant === "rank"}
-          <span class="w-5 shrink-0 text-center text-sm font-bold text-brand-text-secondary tabular-nums">
-            {String(i + 1).padStart(2, "0")}
-          </span>
+          <div class="w-14 shrink-0 flex flex-col items-center gap-0.5">
+            <span class="text-center text-sm font-bold text-brand-text-secondary tabular-nums">
+              {String(rankFor(item, i)).padStart(2, "0")}
+            </span>
+          </div>
         {/if}
 
         <div class="relative shrink-0 overflow-hidden">

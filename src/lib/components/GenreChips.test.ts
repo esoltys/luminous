@@ -1,0 +1,195 @@
+import "@testing-library/jest-dom";
+import { describe, it, expect, vi } from "vitest";
+import { render, fireEvent } from "@testing-library/svelte";
+import GenreChips from "./GenreChips.svelte";
+import { navigationStore } from "../stores/navigation.svelte";
+import { tagsStore } from "../stores/tags.svelte";
+
+describe("GenreChips.svelte", () => {
+  it("renders nothing when genre is null or empty", () => {
+    const { container: container1 } = render(GenreChips, { props: { genre: null } });
+    expect(container1.textContent?.trim()).toBe("");
+
+    const { container: container2 } = render(GenreChips, { props: { genre: "" } });
+    expect(container2.textContent?.trim()).toBe("");
+  });
+
+  describe("compact variant (default)", () => {
+    it("renders single genre without overflow count", () => {
+      const { getByText, queryByText } = render(GenreChips, {
+        props: { genre: "Metal" },
+      });
+
+      expect(getByText("Metal")).toBeInTheDocument();
+      expect(queryByText("+")).toBeNull();
+    });
+
+    it("renders primary genre with +N overflow count when multiple genres exist", () => {
+      const { getByText } = render(GenreChips, {
+        props: { genre: "Metal; Symphonic Metal; Gothic Metal" },
+      });
+
+      expect(getByText("Metal")).toBeInTheDocument();
+      expect(getByText("+2")).toBeInTheDocument();
+    });
+
+    it("navigates to genre tag on click", async () => {
+      const viewSpy = vi.spyOn(navigationStore, "viewGenreTag");
+      const { getByRole } = render(GenreChips, {
+        props: { genre: "Rock; Pop" },
+      });
+
+      const button = getByRole("button");
+      await fireEvent.click(button);
+
+      expect(viewSpy).toHaveBeenCalledWith("Rock");
+      viewSpy.mockRestore();
+    });
+  });
+
+  describe("full variant", () => {
+    it("renders all genre chips when no limit is specified", () => {
+      const { getByText, queryByText } = render(GenreChips, {
+        props: {
+          genre: "Metal; Symphonic Metal; Gothic Metal; Power Metal; Heavy Metal",
+          variant: "full",
+        },
+      });
+
+      expect(getByText("Metal")).toBeInTheDocument();
+      expect(getByText("Symphonic Metal")).toBeInTheDocument();
+      expect(getByText("Gothic Metal")).toBeInTheDocument();
+      expect(getByText("Power Metal")).toBeInTheDocument();
+      expect(getByText("Heavy Metal")).toBeInTheDocument();
+      expect(queryByText(/^\+/)).toBeNull();
+    });
+
+    it("renders all chips without overflow badge when count <= limit", () => {
+      const { getByText, queryByText } = render(GenreChips, {
+        props: {
+          genre: "Rock; Pop; Jazz",
+          variant: "full",
+          limit: 4,
+        },
+      });
+
+      expect(getByText("Rock")).toBeInTheDocument();
+      expect(getByText("Pop")).toBeInTheDocument();
+      expect(getByText("Jazz")).toBeInTheDocument();
+      expect(queryByText(/^\+/)).toBeNull();
+    });
+
+    it("limits displayed chips and renders +N badge when count > limit", () => {
+      const { getByText, queryByText } = render(GenreChips, {
+        props: {
+          genre: "Metal; Symphonic Metal; Gothic Metal; Power Metal; Heavy Metal; Pop Rock",
+          variant: "full",
+          limit: 4,
+        },
+      });
+
+      expect(getByText("Metal")).toBeInTheDocument();
+      expect(getByText("Symphonic Metal")).toBeInTheDocument();
+      expect(getByText("Gothic Metal")).toBeInTheDocument();
+      expect(getByText("Power Metal")).toBeInTheDocument();
+
+      // Exceeded chips should NOT be individual buttons
+      expect(queryByText("Heavy Metal")).toBeNull();
+      expect(queryByText("Pop Rock")).toBeNull();
+
+      // Overflow badge with +2 and title showing hidden genres
+      const overflowBadge = getByText("+2");
+      expect(overflowBadge).toBeInTheDocument();
+      expect(overflowBadge.getAttribute("title")).toBe("Heavy Metal, Pop Rock");
+    });
+
+    it("navigates to specific genre tag when an individual chip is clicked", async () => {
+      const viewSpy = vi.spyOn(navigationStore, "viewGenreTag");
+      const { getByTitle } = render(GenreChips, {
+        props: {
+          genre: "Metal; Symphonic Metal",
+          variant: "full",
+        },
+      });
+
+      const symphonicChip = getByTitle("Browse Symphonic Metal");
+      await fireEvent.click(symphonicChip);
+
+      expect(viewSpy).toHaveBeenCalledWith("Symphonic Metal");
+      viewSpy.mockRestore();
+    });
+
+    it("applies curated genre hierarchy styling when genre is found in hierarchy", () => {
+      tagsStore.hierarchy = [
+        {
+          name: "Rock",
+          color_index: 3,
+          song_count: 50,
+          children: [{ name: "Indie Rock", song_count: 10 }],
+        },
+      ];
+
+      const { getByTitle } = render(GenreChips, {
+        props: {
+          genre: "Rock; Indie Rock; Synthwave",
+          variant: "full",
+        },
+      });
+
+      const rockChip = getByTitle("Browse Rock");
+      const indieChip = getByTitle("Browse Indie Rock");
+      const synthwaveChip = getByTitle("Browse Synthwave");
+
+      // Curated chips have inline style with color-mix
+      expect(rockChip.getAttribute("style")).toContain("background-color: color-mix");
+      expect(rockChip.getAttribute("style")).toContain("border-color: color-mix");
+      expect(indieChip.getAttribute("style")).toContain("background-color: color-mix");
+
+      // Unknown chip falls back to no inline style (using default class colors)
+      expect(synthwaveChip.getAttribute("style")).toBeNull();
+    });
+
+    it("renders curated tags first, followed by deduped file genres", async () => {
+      const onCuratedSpy = vi.fn();
+      const viewSpy = vi.spyOn(navigationStore, "viewGenreTag");
+
+      const { getAllByRole, getByTitle } = render(GenreChips, {
+        props: {
+          curatedTags: ["Indie Rock", "Post-Punk"],
+          genre: "post-punk; Alternative; Indie Rock; Synthwave",
+          onCuratedTagClick: onCuratedSpy,
+          curatedTagTitle: (tag: string) => `Filter tag: ${tag}`,
+          variant: "full",
+        },
+      });
+
+      const buttons = getAllByRole("button");
+      // Order: curated tags first ("Indie Rock", "Post-Punk"), then remaining file genres ("Alternative", "Synthwave")
+      expect(buttons.map((b) => b.textContent?.trim())).toEqual([
+        "Indie Rock",
+        "Post-Punk",
+        "Alternative",
+        "Synthwave",
+      ]);
+
+      // Curated tag has custom title
+      const indieChip = getByTitle("Filter tag: Indie Rock");
+      expect(indieChip).toBeInTheDocument();
+
+      // File genre has standard browse title
+      const altChip = getByTitle("Browse Alternative");
+      expect(altChip).toBeInTheDocument();
+
+      // Clicking curated tag triggers onCuratedTagClick
+      await fireEvent.click(indieChip);
+      expect(onCuratedSpy).toHaveBeenCalledWith("Indie Rock");
+      expect(viewSpy).not.toHaveBeenCalled();
+
+      // Clicking file genre triggers navigationStore.viewGenreTag
+      await fireEvent.click(altChip);
+      expect(viewSpy).toHaveBeenCalledWith("Alternative");
+
+      viewSpy.mockRestore();
+    });
+  });
+});

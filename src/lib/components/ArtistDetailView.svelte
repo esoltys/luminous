@@ -5,6 +5,8 @@
   import { windowLayoutStore } from "../stores/windowLayout.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
+  import { pinnedStore } from "../stores/pinned.svelte";
+  import { statsExclusionsStore } from "../stores/statsExclusions.svelte";
   import { shuffleArray } from "../utils/shuffle";
   import { formatDuration } from "../utils/formatters";
   import CoverArt from "./CoverArt.svelte";
@@ -16,23 +18,39 @@
   import SongContextMenu from "./SongContextMenu.svelte";
   import { tagsStore } from "../stores/tags.svelte";
   import TagEditor from "./TagEditor.svelte";
-  import ColumnSelector from "./ColumnSelector.svelte";
+  import IconActionButton from "./IconActionButton.svelte";
   import HorizontalScrollRow from "./HorizontalScrollRow.svelte";
   import PlayShuffleButtons from "./PlayShuffleButtons.svelte";
   import ArtistProfileEditor from "./ArtistProfileEditor.svelte";
+  import MarkdownBio from "./MarkdownBio.svelte";
   import SocialIcon from "./SocialIcon.svelte";
   import SongSelectionToolbar from "./SongSelectionToolbar.svelte";
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
-  import { PencilSimpleIcon as Edit3, ArrowSquareOutIcon as ExternalLink } from "phosphor-svelte";
-  import type { Song, Playlist, AlbumItem, PlayContext, ArtistProfile } from "../types";
-  import { resolveSocialUrl, formatDisplayLabel } from "../utils/artistSocials";
+  import ContextMenu from "./ContextMenu.svelte";
+  import ContextMenuItem from "./ContextMenuItem.svelte";
+  import {
+    PencilSimpleIcon as Edit3,
+    ArrowSquareOutIcon as OpenInPicard,
+    ArrowsClockwiseIcon as RefreshCw,
+    PushPinIcon as Pin,
+    PushPinSlashIcon as PinOff,
+    DotsThreeIcon as MoreHorizontal,
+    ChartBarIcon as BarChart2,
+    CaretDownIcon as CaretDown
+  } from "phosphor-svelte";
+  const ExternalLink = OpenInPicard;
+  import type { Song, Playlist, AlbumItem, PlayContext, ArtistProfile, ExtendedArtworkResponse, SongContextEnrichment } from "../types";
+  import { getCoverArtUrl } from "../types";
+  import { resolveSocialUrl, formatDisplayLabel, deriveFanartTvUrl } from "../utils/artistSocials";
   import { getArtistAlbums, classifyRelease } from "../utils/artist";
   import { songsToCoverStack } from "../utils/covers";
   import { parseMultiValue, joinMultiValue } from "../utils/multiValue";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
   import { i18n } from "../stores/i18n.svelte";
+  import { picardStore } from "../stores/picard.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { rememberScroll } from "../utils/scrollMemory";
+  import { openInPicard } from "../utils/picard";
   import { compareSongs } from "../utils/songSort";
 
   let { artistName }: { artistName: string } = $props();
@@ -41,20 +59,95 @@
   let playlists = $state<Playlist[]>([]);
   let compilations = $state<AlbumItem[]>([]);
   let loading = $state(true);
+  let refreshing = $state(false);
 
   let albumContextMenuState = $state<{ x: number; y: number; album: AlbumItem } | null>(null);
   let singleContextMenuState = $state<{ x: number; y: number; song: Song } | null>(null);
+
+  // "Not included" tracks stay visible/individually playable but drop out of
+  // the whole-artist Play/Shuffle Play actions (#104).
+  let playableSongs = $derived(songs.filter((s) => !s.not_included));
   let editingSongId = $state<number | null>(null);
   let isEditorOpen = $state(false);
   let isBioExpanded = $state(false);
   let selectedKeys = $state<Set<string>>(new Set());
 
+  let overflowMenuPos = $state<{ x: number; y: number } | null>(null);
+
+  function toggleOverflowMenu(e: MouseEvent) {
+    if (overflowMenuPos) {
+      overflowMenuPos = null;
+    } else {
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      overflowMenuPos = { x: rect.left, y: rect.bottom + 4 };
+    }
+  }
+
+  function handleOpenAllInPicard() {
+    if (songs.length === 0) return;
+    openInPicard(songs.map((s) => s.id));
+  }
+
   let artistProfile = $derived(collectionStore.getArtistProfile(artistName));
   let hasWebsite = $derived(!!artistProfile?.website);
   let hasTags = $derived((artistProfile?.tags?.length ?? 0) > 0);
-  let hasBio = $derived(!!artistProfile?.bio);
   let hasSocials = $derived((artistProfile?.social_links?.length ?? 0) > 0);
-  let hasProfileContent = $derived(hasWebsite || hasTags || hasBio || hasSocials);
+
+  // Fetched MusicBrainz/Wikipedia context (#23), keyed off a track by
+  // this artist with a MusicBrainz ID (or first song) — neither ArtistProfile
+  // nor a dedicated artist entity carry a MusicBrainz ID of their own,
+  // so the backend resolves it from a song row.
+  let contextData = $state<SongContextEnrichment | null>(null);
+  $effect(() => {
+    const songWithMb = songs.find((s) => s.musicbrainz_artist_id || s.musicbrainz_album_artist_id);
+    const id = songWithMb?.id || songs[0]?.id;
+    if (!id) {
+      contextData = null;
+      return;
+    }
+    let cancelled = false;
+    invoke<SongContextEnrichment>("get_song_context", { songId: id })
+      .then((data) => {
+        if (!cancelled) contextData = data;
+      })
+      .catch(() => {
+        if (!cancelled) contextData = null;
+      });
+    return () => {
+      cancelled = true;
+    };
+  });
+
+  // The user's own bio (personal curation) always wins over the fetched
+  // Wikipedia extract — fetched data only fills the gap when nothing local
+  // exists, per the canonical-lookup-vs-personal-curation split in AGENTS.md.
+  let effectiveBio = $derived(artistProfile?.bio || contextData?.wikipedia_extract);
+  let bioIsFromWikipedia = $derived(!artistProfile?.bio && !!contextData?.wikipedia_extract);
+  let hasBio = $derived(!!effectiveBio);
+  let hasProfileContent = $derived(hasWebsite || hasBio || hasSocials);
+
+  // Locally-discovered artist visuals (#98/#761) — portrait/logo/fanart,
+  // fetched on demand per artist since scanning every artist's folder
+  // eagerly would be far too expensive (see #758's design notes).
+  let artistArtwork = $state<ExtendedArtworkResponse | null>(null);
+  $effect(() => {
+    const name = artistName;
+    let cancelled = false;
+    collectionStore.getExtendedArtworkForArtist(name).then((result) => {
+      if (!cancelled) artistArtwork = result;
+    });
+    return () => {
+      cancelled = true;
+    };
+  });
+  let artistPortraitUrl = $derived(getCoverArtUrl(artistArtwork?.artist_portrait_uri));
+  let bandLogoUrl = $derived(getCoverArtUrl(artistArtwork?.band_logo_uri));
+  let fanartBannerUrl = $derived(getCoverArtUrl(artistArtwork?.fanart_uri));
+
+  // Derived, read-only fanart.tv link (#98/#761) from the user-entered
+  // MusicBrainz social link's MBID — not a fetch, just a computed URL, same
+  // as any other link in this section.
+  let fanartTvUrl = $derived(deriveFanartTvUrl(artistProfile?.social_links));
 
   function handleTagClick(tag: string) {
     collectionStore.searchQuery = `artist-tag:${tag}`;
@@ -104,6 +197,37 @@
   async function refetchSongs() {
     const fetchedSongs = await invoke<Song[]>("get_songs_by_artist", { artist: artistName });
     songs = Array.isArray(fetchedSongs) ? fetchedSongs : [];
+  }
+
+  // Rescans the library for this artist's local portrait/band logo/fanart
+  // banner (#761) and re-fetches its MusicBrainz/Wikipedia context (#23),
+  // bypassing both caches — mirrors AlbumDetailView's handleRefreshAlbum.
+  // Fixes #867: a portrait/logo/banner added, replaced, or removed on disk
+  // otherwise never refreshes since both lookups are cached for the session.
+  async function handleRescanArtist() {
+    if (refreshing || collectionStore.isScanning) return;
+    refreshing = true;
+    try {
+      await collectionStore.startScan(true);
+      await collectionStore.refreshLibrary();
+      await refetchSongs();
+      const songWithMb = songs.find((s) => s.musicbrainz_artist_id || s.musicbrainz_album_artist_id);
+      const contextSongId = songWithMb?.id ?? songs[0]?.id;
+      const [artwork, context] = await Promise.all([
+        collectionStore.getExtendedArtworkForArtist(artistName, true),
+        contextSongId
+          ? invoke<SongContextEnrichment>("get_song_context", { songId: contextSongId, forceRefresh: true }).catch(() => null)
+          : Promise.resolve(null)
+      ]);
+      artistArtwork = artwork;
+      if (context) contextData = context;
+      toastStore.show(i18n.t("artistDetail.refreshSuccess", {}, "Artist artwork and bio refreshed"));
+    } catch (err) {
+      console.error("Failed to refresh artist:", err);
+      toastStore.show(i18n.t("artistDetail.refreshError", {}, "Failed to refresh artist"));
+    } finally {
+      refreshing = false;
+    }
   }
 
   async function handleTagEditorSaved() {
@@ -174,6 +298,8 @@
 
   $effect(() => {
     const requested = artistName;
+    contextData = null;
+    isBioExpanded = false;
     // Track collectionStore.songs so artist details update when the library changes (e.g. new albums added)
     const _libraryVersion = collectionStore.songs;
     loading = true;
@@ -224,7 +350,20 @@
   }
 
   let rawGenre = $derived(deriveArtistGenres(songs));
-  let genreLabel = $derived(rawGenre ? undefined : i18n.t('artistDetail.unknownGenre'));
+  // Header shows curated artist tags only, not the file-embedded genre --
+  // that's already covered by the Genres page and every album/song beneath
+  // this artist, so repeating it here is just noise. A tag is excluded if
+  // it duplicates any genre *anywhere in the library* (not just this
+  // artist's own songs) -- matching the "Artist Only Tags" filter on the
+  // Genres page -- since a name like "Electronic" is still a real genre
+  // even if this particular artist's own files don't happen to use it.
+  let artistOnlyTags = $derived.by(() => {
+    const tags = artistProfile?.tags;
+    if (!tags?.length) return tags;
+    const genreNames = new Set(tagsStore.allTags.map((t) => t.name.toLowerCase()));
+    return tags.filter((t) => !genreNames.has(t.trim().toLowerCase()));
+  });
+  let hasChips = $derived((artistOnlyTags?.length ?? 0) > 0);
 
   let totalDurationLabel = $derived.by(() => {
     const totalNs = songs.reduce((sum, s) => sum + (s.length_nanosec ?? 0), 0);
@@ -247,25 +386,25 @@
     songs.length === 1 ? i18n.t("playlists.oneSong") : i18n.t("playlists.songsCount", { count: songs.length })
   );
 
-  // Some artists have no proper album releases at all (every track is a loose
-  // single with no album tag), so getArtistAlbums() returns nothing and the
-  // Albums/Singles/Popular filters all end up empty. Fall back to showing the
-  // artist's individual songs directly rather than an empty "no releases" state.
-  // Mutually exclusive with `singles` (albums.length is 0 whenever this is
-  // populated), so combining the two counts is safe.
+  // Songs with no album tag at all are excluded from get_albums() entirely
+  // (it requires a non-empty album), so they'd never surface via `albums`/
+  // `singles`. Surface each such song individually as its own "loose
+  // single" — computed directly from this artist's songs rather than gated
+  // on "this artist has zero proper albums", which used to make every
+  // blank-album song vanish the moment the artist had even one real album
+  // elsewhere (its `albums.length` going from 0 to 1 turned this fallback
+  // off entirely, even though the loose songs and real albums are disjoint
+  // sets and can coexist).
   let looseSongs = $derived(
-    albums.length === 0 ? [...songs].sort((a, b) => (a.title || "").localeCompare(b.title || "")) : []
+    songs.filter((s) => !s.album).sort((a, b) => (a.title || "").localeCompare(b.title || ""))
   );
 
   // Grouped singles are AlbumItems (track_count === 1), but they render as a
   // song table alongside loose singles — resolve each back to its one song.
-  let singleSongs = $derived(
-    singles.length > 0
-      ? singles
-          .map((a) => songs.find((s) => s.album === a.album))
-          .filter((s): s is Song => s !== undefined)
-      : looseSongs
-  );
+  let singleSongs = $derived([
+    ...singles.map((a) => songs.find((s) => s.album === a.album)).filter((s): s is Song => s !== undefined),
+    ...looseSongs,
+  ]);
 
   let sortedSingleSongs = $derived.by(() => {
     if (singleSortField === "track") {
@@ -281,11 +420,11 @@
   // Default column widths (px or fr) — used when no saved width exists for a column.
   const ARTIST_COL_DEFAULTS: Partial<Record<keyof typeof collectionStore.visibleColumns, string>> = {
     track: "48px", title: "2fr", artist: "1.5fr", album: "1.5fr",
-    composer: "1.5fr", album_artist: "1.5fr", format: "64px", year: "60px",
+    composer: "1.5fr", album_artist: "1.5fr", format: "64px", year: "60px", originalyear: "60px",
     genre: "1.2fr", grouping: "1.2fr", bpm: "60px", initial_key: "60px",
     bitrate: "70px", samplerate: "75px", bitdepth: "65px", channels: "70px",
     filesize: "75px", rating: "96px", playcount: "70px", skipcount: "70px",
-    lastplayed: "90px", added: "90px", duration: "80px", path: "2fr", actions: "80px",
+    lastplayed: "90px", added: "90px", duration: "80px", path: "2fr", library: "130px", actions: "80px",
   };
 
   let singleDiscCount = $derived(singleSongs.reduce((max, s) => Math.max(max, s.disc ?? 1), 1));
@@ -325,11 +464,20 @@
     navigationStore.viewPlaylist(playlist.id);
   }
 
+  async function handleToggleStatsExcluded() {
+    const excluded = !statsExclusionsStore.isExcluded("artist", artistName);
+    await statsExclusionsStore.setExcluded("artist", artistName, excluded);
+    const message = excluded
+      ? i18n.t("stats.excludedToast", { name: artistName })
+      : i18n.t("stats.includedToast", { name: artistName });
+    toastStore.show(message);
+  }
+
   async function handlePlayAll() {
-    if (songs.length === 0) return;
+    if (playableSongs.length === 0) return;
     const queuePl = await playlistsStore.requireQueue();
     await playerStore.setShuffleMode("off");
-    await playerStore.playSongs(songs.map((s) => s.id), 0, queuePl?.id, undefined, "Queue");
+    await playerStore.playSongs(playableSongs.map((s) => s.id), 0, queuePl?.id, undefined, "Queue");
     if (queuePl) {
       playlistsStore.selectPlaylist(queuePl.id);
       navigationStore.viewPlaylist(queuePl.id);
@@ -337,9 +485,9 @@
   }
 
   async function handleShufflePlay() {
-    if (songs.length === 0) return;
+    if (playableSongs.length === 0) return;
     const queuePl = await playlistsStore.requireQueue();
-    const shuffledIds = shuffleArray(songs.map((s) => s.id));
+    const shuffledIds = shuffleArray(playableSongs.map((s) => s.id));
     await playerStore.setShuffleMode("off");
     await playerStore.playSongs(shuffledIds, 0, queuePl?.id, undefined, "Queue");
     if (queuePl) {
@@ -351,152 +499,204 @@
 
 <div class="flex-1 flex flex-col overflow-y-auto bg-brand-main text-brand-text-secondary h-full" use:rememberScroll={`artist-detail:${artistName}`}>
   <div class="relative z-30 w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 {windowLayoutStore.isDetailHeaderCollapsed ? 'py-3' : 'pt-6 pb-6'}">
+    {#if fanartBannerUrl && !windowLayoutStore.isDetailHeaderCollapsed}
+      <div class="absolute inset-0 z-0 overflow-hidden pointer-events-none" aria-hidden="true">
+        <img src={fanartBannerUrl} alt="" class="w-full h-full object-cover opacity-25" />
+        <div class="absolute inset-0 bg-gradient-to-t from-brand-main via-brand-main/70 to-brand-main/30"></div>
+      </div>
+    {/if}
     <div class="flex items-start justify-between gap-6 relative z-10">
-      <div class="flex flex-col justify-end gap-1.5 max-w-xl">
+      <div class="flex flex-col justify-end gap-1.5 min-w-0 max-w-xl">
         {#if !windowLayoutStore.isDetailHeaderCollapsed}
-        <h1 class="text-3xl sm:text-4xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5">{artistName}</h1>
+        {#if bandLogoUrl}
+          <img
+            src={bandLogoUrl}
+            alt={artistName}
+            class="h-10 sm:h-12 w-auto max-w-full object-contain object-left"
+          />
+        {:else}
+          <h1 class="text-3xl sm:text-4xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5">{artistName}</h1>
+        {/if}
 
-        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-secondary font-medium">
-          {#if rawGenre}
-            <GenreChips genre={rawGenre} variant="full" />
-          {:else}
-            <span>{genreLabel}</span>
-          {/if}
-          <span>•</span>
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-primary font-medium">
           <span>{songsText}</span>
           <span>•</span>
           <span>{totalDurationLabel}</span>
         </div>
         {/if}
 
-        <div class="flex flex-wrap items-center gap-3 mt-3">
+        <div class="flex flex-wrap items-center gap-3 {windowLayoutStore.isDetailHeaderCollapsed ? '' : 'mt-3'} select-none">
           <PlayShuffleButtons
             onPlayAll={handlePlayAll}
             onShufflePlay={handleShufflePlay}
             disabled={loading || songs.length === 0}
           />
-          <button
-            type="button"
-            onclick={() => { isEditorOpen = true; }}
-            class="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-brand-sidebar/80 hover:bg-brand-sidebar text-brand-text-primary border border-brand-border hover:border-brand-accent/40 shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
-            title={i18n.t("artistDetail.editArtistTooltip", {}, "Edit artist details, website, tags, and links")}
+          <IconActionButton
+            onclick={() => pinnedStore.toggle("artist", artistName)}
+            title={pinnedStore.isPinned("artist", artistName)
+              ? i18n.t("artistDetail.unpinHome")
+              : i18n.t("artistDetail.pinHome")}
           >
-            <Edit3 class="w-3.5 h-3.5 text-brand-accent" />
-            <span>{i18n.t("artistDetail.editArtist", {}, "Edit")}</span>
+            {#snippet icon()}
+              {#if pinnedStore.isPinned("artist", artistName)}
+                <PinOff class="w-4 h-4" />
+              {:else}
+                <Pin class="w-4 h-4" />
+              {/if}
+            {/snippet}
+          </IconActionButton>
+          <button
+            onclick={toggleOverflowMenu}
+            title={i18n.t("playlists.moreActionsTooltip", {}, "More actions")}
+            class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors shadow-xs cursor-pointer"
+          >
+            <MoreHorizontal class="w-4 h-4" />
           </button>
-          {#if singleSongs.length > 0}
-            <ColumnSelector align="left" iconOnly />
-          {/if}
         </div>
       </div>
 
-      {#if !windowLayoutStore.isDetailHeaderCollapsed && headerCovers.length > 0}
+      {#if !windowLayoutStore.isDetailHeaderCollapsed && (artistPortraitUrl || headerCovers.length > 0)}
         <div class="relative w-48 h-36 hidden sm:block shrink-0 flex items-center justify-end">
-          <CoverStack covers={headerCovers} direction="left" sizeClass="w-28 h-28" />
+          {#if artistPortraitUrl}
+            <div class="flex items-center justify-end w-full h-full my-auto select-none">
+              <div class="w-28 h-28 overflow-hidden relative bg-brand-sidebar border border-brand-border">
+                <img
+                  src={artistPortraitUrl}
+                  alt={artistName}
+                  class="w-full h-full object-cover"
+                />
+              </div>
+            </div>
+          {:else}
+            <CoverStack covers={headerCovers} direction="left" sizeClass="w-28 h-28" />
+          {/if}
         </div>
       {/if}
     </div>
   </div>
 
   <div class="px-6 pt-6 flex flex-col gap-8">
-    <!-- Artist Profile Card (About & Links) -->
-    {#if hasProfileContent && artistProfile}
-      {@const profile = artistProfile}
-      <div class="border border-brand-border rounded-xl bg-brand-sidebar/40 backdrop-blur-md p-4 sm:p-5 md:p-6 shadow-xs flex flex-col md:flex-row gap-5 md:gap-6 justify-between transition-all">
-        <!-- About Column (Left) -->
-        <div class="flex-1 flex flex-col gap-3 min-w-0">
-          <h2 class="text-sm sm:text-base font-bold text-brand-text-primary font-heading">
-            {i18n.t("artistDetail.about", {}, "About")}
-          </h2>
+    {#if !windowLayoutStore.isDetailHeaderCollapsed}
+      {#if hasChips}
+        <GenreChips
+          curatedTags={artistOnlyTags}
+          onCuratedTagClick={handleTagClick}
+          curatedTagTitle={(tag) => `Filter artists tagged "${tag}"`}
+          variant="full"
+        />
+      {/if}
+    {/if}
 
-          <!-- Tags Pills -->
-          {#if hasTags}
-            <div class="flex flex-wrap gap-1.5 sm:gap-2">
-              {#each profile?.tags ?? [] as tag (tag)}
-                <button
-                  type="button"
-                  onclick={() => handleTagClick(tag)}
-                  class="px-2.5 sm:px-3 py-1 bg-brand-accent/10 hover:bg-brand-accent/25 hover:border-brand-accent/40 text-brand-text-primary rounded-full text-xs font-medium border border-brand-border/60 transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
-                  title={`Filter artists tagged "${tag}"`}
-                >
-                  <span>{tag}</span>
-                </button>
-              {/each}
+    <!-- Artist Profile Card (About & Links) -->
+    {#if hasProfileContent && !windowLayoutStore.isDetailHeaderCollapsed}
+      {@const profile = artistProfile}
+      <details
+        open={windowLayoutStore.isOverviewExpanded}
+        ontoggle={(e) => windowLayoutStore.setOverviewExpanded(e.currentTarget.open)}
+        class="group/overview border border-brand-border rounded-xl bg-brand-sidebar/40 backdrop-blur-md overflow-hidden shadow-xs transition-all @container"
+      >
+        <summary class="flex items-center justify-between px-4 py-2.5 sm:px-5 sm:py-3 text-xs font-semibold text-brand-text-secondary cursor-pointer select-none hover:text-brand-text-primary transition-colors">
+          <span>{i18n.t('artistDetail.overview', {}, 'Overview')}</span>
+          <CaretDown class="w-3.5 h-3.5 text-brand-text-secondary/70 group-open/overview:rotate-180 transition-transform" />
+        </summary>
+        <div class="p-4 sm:p-5 md:p-6 border-t border-brand-border/60 flex flex-col @2xl:flex-row gap-5 md:gap-6 justify-between">
+          <!-- About Column (Left) -->
+          {#if hasBio}
+            {@const bioText = effectiveBio ?? ""}
+            <div class="flex-1 flex flex-col gap-3 min-w-0">
+              <!-- Bio -->
+              <div class="text-xs text-brand-text-secondary leading-relaxed">
+                {#if bioIsFromWikipedia}
+                  <button
+                    type="button"
+                    onclick={() => contextData?.wikipedia_page_url && handleOpenUrl(contextData.wikipedia_page_url)}
+                    class="group/wiki relative inline-flex items-center gap-1 mb-1 text-[11px] font-semibold text-brand-text-secondary/70 hover:text-brand-accent transition-colors cursor-pointer"
+                  >
+                    <span class="underline decoration-brand-text-secondary/40 group-hover/wiki:decoration-brand-accent">{i18n.t('playerBar.wikipediaSectionLabel', {}, 'Wikipedia')}</span>
+                    <ExternalLink class="w-3 h-3 opacity-0 group-hover/wiki:opacity-100 transition-opacity" />
+                  </button>
+                {/if}
+                <MarkdownBio
+                  text={bioText}
+                  disableClamp={true}
+                />
+              </div>
             </div>
           {/if}
 
-          <!-- Bio -->
-          {#if hasBio}
-            {@const bioText = profile?.bio ?? ""}
-            {@const isLongBio = bioText.length > 200}
-            <div class="text-xs text-brand-text-secondary leading-relaxed">
-              <p class="{!isBioExpanded && isLongBio ? 'line-clamp-2 sm:line-clamp-3' : ''} whitespace-pre-line">
-                {bioText}
-              </p>
-              {#if isLongBio}
-                <button
-                  type="button"
-                  onclick={() => { isBioExpanded = !isBioExpanded; }}
-                  class="mt-1 text-xs font-semibold text-brand-accent hover:underline inline-flex items-center gap-0.5 cursor-pointer"
-                >
-                  {isBioExpanded ? i18n.t("artistDetail.showLess", {}, "Show less") : i18n.t("artistDetail.showMore", {}, "Show more")}
-                </button>
-              {/if}
+          <!-- Links Column (Right or Below) -->
+          {#if hasWebsite || hasSocials}
+            <div
+              class={hasBio
+                ? "@2xl:w-60 @3xl:w-72 shrink-0 border-t border-brand-border/40 pt-4 @2xl:border-t-0 @2xl:border-l @2xl:border-brand-border/60 @2xl:pt-0 @2xl:pl-6 flex flex-col gap-3"
+                : "w-full flex flex-col gap-3"}
+            >
+              <div class="grid grid-cols-1 @sm:grid-cols-2 {hasBio ? '@2xl:flex @2xl:flex-col' : '@md:grid-cols-3 @xl:grid-cols-4'} gap-2.5">
+                <!-- Primary Website Link -->
+                {#if hasWebsite}
+                  {@const siteUrl = resolveSocialUrl("website", profile?.website ?? "")}
+                  <button
+                    type="button"
+                    onclick={() => handleOpenUrl(siteUrl)}
+                    class="flex items-center gap-2.5 sm:gap-3 group text-left transition-colors cursor-pointer min-w-0"
+                  >
+                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-brand-main/60 border border-brand-border flex items-center justify-center text-brand-text-secondary group-hover:text-brand-accent group-hover:border-brand-accent/40 transition-colors shrink-0 shadow-2xs">
+                      <SocialIcon platform="website" size={14} />
+                    </div>
+                    <div class="flex items-center gap-1 min-w-0 flex-1">
+                      <span class="text-xs font-medium text-brand-text-primary truncate transition-colors">
+                        {formatDisplayLabel("website", profile?.website ?? "")}
+                      </span>
+                      <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                    </div>
+                  </button>
+                {/if}
+
+                <!-- Social Links -->
+                {#each profile?.social_links ?? [] as link, idx (idx)}
+                  {@const resolvedUrl = resolveSocialUrl(link.platform, link.handle_or_url)}
+                  <button
+                    type="button"
+                    onclick={() => handleOpenUrl(resolvedUrl)}
+                    class="flex items-center gap-2.5 sm:gap-3 group text-left transition-colors cursor-pointer min-w-0"
+                  >
+                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-brand-main/60 border border-brand-border flex items-center justify-center text-brand-text-secondary group-hover:text-brand-accent group-hover:border-brand-accent/40 transition-colors shrink-0 shadow-2xs">
+                      <SocialIcon platform={link.platform} size={14} />
+                    </div>
+                    <div class="flex items-center gap-1 min-w-0 flex-1">
+                      <span class="text-xs font-medium text-brand-text-primary truncate transition-colors">
+                        {formatDisplayLabel(link.platform, link.handle_or_url)}
+                      </span>
+                      <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                    </div>
+                  </button>
+                {/each}
+
+                <!-- Derived Fanart.tv link (#98/#761) — computed from the
+                     MusicBrainz link's MBID above, not a stored/user-editable
+                     social link, so it isn't part of the {#each} above. -->
+                {#if fanartTvUrl}
+                  <button
+                    type="button"
+                    onclick={() => handleOpenUrl(fanartTvUrl)}
+                    class="flex items-center gap-2.5 sm:gap-3 group text-left transition-colors cursor-pointer min-w-0"
+                  >
+                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-brand-main/60 border border-brand-border flex items-center justify-center text-brand-text-secondary group-hover:text-brand-accent group-hover:border-brand-accent/40 transition-colors shrink-0 shadow-2xs">
+                      <SocialIcon platform="fanart_tv" size={14} />
+                    </div>
+                    <div class="flex items-center gap-1 min-w-0 flex-1">
+                      <span class="text-xs font-medium text-brand-text-primary truncate transition-colors">
+                        Fanart.tv
+                      </span>
+                      <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                    </div>
+                  </button>
+                {/if}
+              </div>
             </div>
           {/if}
         </div>
-
-        <!-- Links Column (Right) -->
-        {#if hasWebsite || hasSocials}
-          <div class="md:w-60 lg:w-72 shrink-0 border-t border-brand-border/40 pt-4 md:border-t-0 md:border-l md:border-brand-border/60 md:pt-0 md:pl-6 flex flex-col gap-3">
-            <h2 class="text-xs font-bold text-brand-text-secondary uppercase tracking-wider">
-              {i18n.t("artistDetail.links", {}, "LINKS")}
-            </h2>
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:flex md:flex-col gap-2.5">
-              <!-- Primary Website Link -->
-              {#if hasWebsite}
-                {@const siteUrl = resolveSocialUrl("website", profile?.website ?? "")}
-                <button
-                  type="button"
-                  onclick={() => handleOpenUrl(siteUrl)}
-                  class="flex items-center gap-2.5 sm:gap-3 group text-left transition-colors cursor-pointer min-w-0"
-                >
-                  <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-brand-main/60 border border-brand-border flex items-center justify-center text-brand-text-secondary group-hover:text-brand-accent group-hover:border-brand-accent/40 transition-colors shrink-0 shadow-2xs">
-                    <SocialIcon platform="website" size={14} />
-                  </div>
-                  <div class="flex items-center gap-1 min-w-0 flex-1">
-                    <span class="text-xs font-medium text-brand-text-primary group-hover:text-brand-accent truncate transition-colors">
-                      {formatDisplayLabel("website", profile?.website ?? "")}
-                    </span>
-                    <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-                  </div>
-                </button>
-              {/if}
-
-              <!-- Social Links -->
-              {#each profile?.social_links ?? [] as link, idx (idx)}
-                {@const resolvedUrl = resolveSocialUrl(link.platform, link.handle_or_url)}
-                <button
-                  type="button"
-                  onclick={() => handleOpenUrl(resolvedUrl)}
-                  class="flex items-center gap-2.5 sm:gap-3 group text-left transition-colors cursor-pointer min-w-0"
-                >
-                  <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-brand-main/60 border border-brand-border flex items-center justify-center text-brand-text-secondary group-hover:text-brand-accent group-hover:border-brand-accent/40 transition-colors shrink-0 shadow-2xs">
-                    <SocialIcon platform={link.platform} size={14} />
-                  </div>
-                  <div class="flex items-center gap-1 min-w-0 flex-1">
-                    <span class="text-xs font-medium text-brand-text-primary group-hover:text-brand-accent truncate transition-colors">
-                      {formatDisplayLabel(link.platform, link.handle_or_url)}
-                    </span>
-                    <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-                  </div>
-                </button>
-              {/each}
-            </div>
-          </div>
-        {/if}
-      </div>
+      </details>
     {/if}
     {#if sets.length > 0}
       <HorizontalScrollRow title={i18n.t('artistDetail.setsFilter', { count: sets.length })}>
@@ -603,16 +803,18 @@
     artistName={album.artist || artistName}
     onPlay={async () => {
       let songs = await invoke<Song[]>("get_songs_by_album", { album: album.album || "" });
-      if (songs.length > 0) {
+      const playable = songs.filter((s) => !s.not_included);
+      if (playable.length > 0) {
         const context: PlayContext = { type: "album", album: album.album || "", albumArtist: album.artist || undefined };
-        playerStore.playSongs(songs.map(s => s.id), 0, undefined, context);
+        playerStore.playSongs(playable.map(s => s.id), 0, undefined, context);
       }
     }}
     onAddToPlaylist={async () => {
       let songs = await invoke<Song[]>("get_songs_by_album", { album: album.album || "" });
-      if (songs.length > 0) {
+      const playable = songs.filter((s) => !s.not_included);
+      if (playable.length > 0) {
         await playlistsStore.addSongsToActiveTarget(
-          songs.map(s => s.id),
+          playable.map(s => s.id),
           album.album || i18n.t("collection.unknownAlbum")
         );
       }
@@ -645,8 +847,44 @@
       }
     }}
     onEditTags={() => openTagEditor(song.id)}
+    onOpenInPicard={() => openInPicard(selectedKeys.size > 1 ? Array.from(selectedKeys, Number) : [song.id])}
     onClose={() => { singleContextMenuState = null; }}
   />
+{/if}
+
+{#if overflowMenuPos}
+  <ContextMenu
+    x={overflowMenuPos.x}
+    y={overflowMenuPos.y}
+    onClose={() => { overflowMenuPos = null; }}
+  >
+    <ContextMenuItem
+      icon={Edit3}
+      label={i18n.t("artistDetail.editArtistDetails", {}, "Edit Artist Details")}
+      onclick={() => { isEditorOpen = true; overflowMenuPos = null; }}
+    />
+    <ContextMenuItem
+      icon={RefreshCw}
+      label={i18n.t("artistDetail.refresh", {}, "Refresh")}
+      title={i18n.t('artistDetail.refreshTooltip')}
+      onclick={() => { handleRescanArtist(); overflowMenuPos = null; }}
+      disabled={loading || collectionStore.isScanning || refreshing}
+    />
+    <ContextMenuItem
+      icon={OpenInPicard}
+      label={i18n.t("picard.openAllInPicard")}
+      onclick={() => { handleOpenAllInPicard(); overflowMenuPos = null; }}
+      disabled={loading || songs.length === 0 || !picardStore.available}
+      title={picardStore.available ? undefined : i18n.t("picard.notFoundTooltip")}
+    />
+    <ContextMenuItem
+      icon={BarChart2}
+      label={statsExclusionsStore.isExcluded("artist", artistName)
+        ? i18n.t("stats.includeInStats")
+        : i18n.t("stats.excludeFromStats")}
+      onclick={() => { handleToggleStatsExcluded(); overflowMenuPos = null; }}
+    />
+  </ContextMenu>
 {/if}
 
 {#if editingSongId !== null}

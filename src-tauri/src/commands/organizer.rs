@@ -27,10 +27,12 @@ pub async fn apply_organize(
 ) -> Result<OrganizeResult, String> {
     let db = &state.db;
     let watcher_paused = &state.watcher_paused;
+    let self_writes = &state.self_writes;
 
     let res = organizer::execute_apply(
         db,
         watcher_paused,
+        self_writes,
         &items,
         clean_empty_dirs,
         move_extra_files,

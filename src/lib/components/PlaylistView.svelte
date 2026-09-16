@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { fade } from "svelte/transition";
   import { playlistsStore } from "../stores/playlists.svelte";
+  import { pinnedStore } from "../stores/pinned.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
@@ -23,28 +24,32 @@
     MusicNotesIcon as Music,
     ShuffleIcon as Shuffle,
     MagnifyingGlassIcon as Search,
-    RadioIcon as Radio,
+    BroadcastIcon as Radio,
     StackIcon as Layers,
     DotsThreeIcon as MoreHorizontal,
     EraserIcon as Eraser,
     SparkleIcon as Sparkles,
-    FolderPlusIcon as FolderPlus
+    FolderPlusIcon as FolderPlus,
+    PushPinIcon as Pin,
+    PushPinSlashIcon as PinOff
   } from "phosphor-svelte";
   import { resolveArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import type { PlaylistItem, Song } from "../types";
   import { parseSearchRules, isSmartPlaylistSpec } from "../utils/filterParser";
   import { rememberScroll } from "../utils/scrollMemory";
+  import { openInPicard } from "../utils/picard";
   import { invoke } from "@tauri-apps/api/core";
   import { open, save } from "@tauri-apps/plugin-dialog";
   import TagEditor from "./TagEditor.svelte";
+  import GenreChips from "./GenreChips.svelte";
+  import { parseMultiValue, joinMultiValue } from "../utils/multiValue";
   import { tagsStore } from "../stores/tags.svelte";
   import CoverArt from "./CoverArt.svelte";
   import CoverStack from "./CoverStack.svelte";
   import PlaylistContextMenu from "./PlaylistContextMenu.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import Modal from "./Modal.svelte";
-  import ColumnSelector from "./ColumnSelector.svelte";
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
   import IconActionButton from "./IconActionButton.svelte";
@@ -52,7 +57,7 @@
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
   import { portal } from "../utils/portal";
-  import { formatSampleRate, formatBitDepth, formatChannels, formatFileSize, formatDate, formatDuration } from "../utils/formatters";
+  import { formatSampleRate, formatBitDepth, formatChannels, formatFileSize, formatDuration } from "../utils/formatters";
   import { formatDateAdded } from "../utils/date";
   import { CONTEXT_MENU_WIDTH_PX } from "../constants";
   import { compareSongs } from "../utils/songSort";
@@ -61,11 +66,11 @@
   // Default column widths (px or fr) — used when no saved width exists for a column.
   const PLAYLIST_COL_DEFAULTS: Partial<Record<keyof typeof collectionStore.visibleColumns, string>> = {
     title: "2fr", artist: "1.5fr", album: "1.5fr",
-    composer: "1.5fr", album_artist: "1.5fr", format: "64px", year: "60px",
+    composer: "1.5fr", album_artist: "1.5fr", format: "64px", year: "60px", originalyear: "60px",
     genre: "1.2fr", grouping: "1.2fr", bpm: "60px", initial_key: "60px",
     bitrate: "70px", samplerate: "75px", bitdepth: "65px", channels: "70px",
     filesize: "75px", rating: "96px", playcount: "70px", skipcount: "70px",
-    lastplayed: "90px", added: "90px", duration: "80px", path: "2fr", actions: "80px",
+    lastplayed: "90px", added: "90px", duration: "80px", path: "2fr", library: "130px", actions: "80px",
   };
   import {
     COVER_STACK_OFFSET_X_PX,
@@ -268,7 +273,7 @@
     if (vc.rating) values.push(song.rating);
     if (vc.playcount) values.push(song.playcount);
     if (vc.skipcount) values.push(song.skipcount);
-    if (vc.lastplayed) values.push(formatDate(song.lastplayed));
+    if (vc.lastplayed) values.push(formatDateAdded(song.lastplayed));
     if (vc.added) values.push(formatDateAdded(song.added));
     if (vc.duration) values.push(formatDuration(song.length_nanosec));
     if (vc.path) values.push(song.path);
@@ -332,19 +337,25 @@
     return h > 0 ? `${h}h ${remM}m` : `${m}m`;
   });
 
-  let genreSummaryLabel = $derived.by(() => {
+  let rawGenre = $derived.by(() => {
     const counts = new Map<string, number>();
     for (const item of playlistsStore.activePlaylistTracks) {
-      const g = (item.song?.genre ?? "").trim();
-      if (g !== "") counts.set(g, (counts.get(g) ?? 0) + 1);
+      if (!item.song?.genre) continue;
+      for (const g of parseMultiValue(item.song.genre)) {
+        const trimmed = g.trim();
+        if (trimmed) {
+          counts.set(trimmed, (counts.get(trimmed) ?? 0) + 1);
+        }
+      }
     }
     if (counts.size === 0) return "";
-    if (counts.size > 2) return i18n.t("playlists.mixedGenre", {}, "Mixed");
-    const top = [...counts.entries()]
-      .sort((a, b) => b[1] - a[1])
+    const sorted = [...counts.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
       .map(([g]) => g);
-    return top.slice(0, 2).join(" / ");
+    return joinMultiValue(sorted);
   });
+
+  let genreLabel = $derived(rawGenre ? undefined : i18n.t("playlists.unknownGenre"));
 
   let duplicateUuids = $derived.by(() => {
     const seen = new Set<string>();
@@ -515,6 +526,18 @@
     }
   }
 
+  function openSelectedInPicard(fallbackSongId?: number) {
+    const selectedTracks = playlistsStore.activePlaylistTracks.filter(
+      (t) => selectedUuids.has(t.uuid) && t.song
+    );
+    const songIds = selectedTracks.length > 0
+      ? selectedTracks.map((t) => t.song!.id)
+      : fallbackSongId !== undefined
+        ? [fallbackSongId]
+        : [];
+    openInPicard(songIds);
+  }
+
   async function handlePlayAll() {
     if (!activePlaylist || playlistsStore.activePlaylistTracks.length === 0) return;
     const availableTracks = playlistsStore.activePlaylistTracks.filter((t) => t.song && !isItemUnavailable(t));
@@ -568,6 +591,27 @@
     }
   }
 
+  let scrollContainerEl = $state<HTMLDivElement | undefined>(undefined);
+
+  // Consumes navigationStore.pendingScrollToCurrentSong (set by the playbar's
+  // Queue button) once this view is showing the queue with its tracks loaded,
+  // scrolling the now-playing row into view instead of leaving the user at
+  // whatever position rememberScroll restored.
+  $effect(() => {
+    if (!navigationStore.pendingScrollToCurrentSong) return;
+    if (!isQueue || !scrollContainerEl) return;
+    const uuid = playerStore.playlistItemUuid;
+    const tracks = playlistsStore.activePlaylistTracks;
+    if (tracks.length === 0) return;
+    const index = uuid
+      ? tracks.findIndex((t) => t.uuid === uuid)
+      : tracks.findIndex((t) => t.song && playerStore.currentSong && t.song.id === playerStore.currentSong.id);
+    navigationStore.pendingScrollToCurrentSong = false;
+    if (index === -1) return;
+    const row = scrollContainerEl.querySelector<HTMLElement>(`[data-song-row][data-index="${index}"]`);
+    row?.scrollIntoView({ block: "center" });
+  });
+
   let currentCoverUrl = $derived.by(() => {
     const song = playerStore.currentSong;
     if (!song) return null;
@@ -614,11 +658,12 @@
 
   {#if activePlaylist}
     <div
+      bind:this={scrollContainerEl}
       class="flex-1 flex flex-col min-h-0 relative z-10 overflow-y-auto"
       use:rememberScroll={`playlist:${playlistsStore.activePlaylistId}`}
     >
     <div class="relative z-30 w-full overflow-hidden border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 {windowLayoutStore.isDetailHeaderCollapsed ? 'py-3' : 'pt-6 pb-6'} shrink-0">
-      <div class="flex items-stretch justify-between gap-6 relative z-10">
+      <div class="flex items-start justify-between gap-6 relative z-10">
         <div class="flex flex-col justify-end gap-1.5 min-w-0 flex-1">
           {#if !windowLayoutStore.isDetailHeaderCollapsed}
           {#if isEditingTitle}
@@ -657,27 +702,28 @@
             </div>
           {/if}
 
-          <div class="flex items-center gap-3 text-xs text-brand-text-secondary font-medium">
+          {#if !isSpecialPlaylist}
+            {#if rawGenre}
+              <GenreChips genre={rawGenre} variant="full" limit={4} />
+            {:else}
+              <div class="text-xs text-brand-text-primary font-medium">
+                <span>{genreLabel}</span>
+              </div>
+            {/if}
+          {/if}
+
+          <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-primary font-medium">
             <span>
-              {#if isSpecialPlaylist}
-                {playlistsStore.activePlaylistTracks.length === 1
-                  ? i18n.t("playlists.oneSong")
-                  : i18n.t("playlists.songsCount", { count: playlistsStore.activePlaylistTracks.length })}
-                • {totalRuntimeLabel}
-              {:else}
-                {i18n.t("playlists.statsLine", {
-                  genre: genreSummaryLabel || i18n.t("playlists.unknownGenre"),
-                  songs: playlistsStore.activePlaylistTracks.length === 1
-                    ? i18n.t("playlists.oneSong")
-                    : i18n.t("playlists.songsCount", { count: playlistsStore.activePlaylistTracks.length }),
-                  duration: totalRuntimeLabel,
-                })}
-              {/if}
+              {playlistsStore.activePlaylistTracks.length === 1
+                ? i18n.t("playlists.oneSong")
+                : i18n.t("playlists.songsCount", { count: playlistsStore.activePlaylistTracks.length })}
             </span>
+            <span>•</span>
+            <span>{totalRuntimeLabel}</span>
           </div>
           {/if}
 
-          <div class="flex flex-wrap items-center gap-3 mt-3">
+          <div class="flex flex-wrap items-center gap-3 {windowLayoutStore.isDetailHeaderCollapsed ? '' : 'mt-3'}">
             <Button
               onclick={handlePlayAll}
               disabled={playlistsStore.activePlaylistTracks.length === 0}
@@ -718,7 +764,23 @@
                 <span>{i18n.t("playlists.makeActiveBtn")}</span>
               </Button>
             {/if}
-            <ColumnSelector align="left" iconOnly />
+            {#if !isQueue && activePlaylist}
+              <IconActionButton
+                onclick={() => pinnedStore.toggle("playlist", String(activePlaylist!.id))}
+                title={pinnedStore.isPinned("playlist", String(activePlaylist.id))
+                  ? i18n.t("playlists.contextMenuUnpinHome")
+                  : i18n.t("playlists.contextMenuPinHome")}
+                class="shrink-0"
+              >
+                {#snippet icon()}
+                  {#if pinnedStore.isPinned("playlist", String(activePlaylist.id))}
+                    <PinOff class="w-4 h-4" />
+                  {:else}
+                    <Pin class="w-4 h-4" />
+                  {/if}
+                {/snippet}
+              </IconActionButton>
+            {/if}
           </div>
 
           {#if !windowLayoutStore.isDetailHeaderCollapsed}
@@ -795,21 +857,23 @@
             <Sparkles class="w-16 h-16 text-[#F59E0B]" />
           </div>
         {:else if topAlbums.length > 0}
-          <div class="relative self-stretch w-48 hidden sm:block shrink-0">
-            {#each topAlbums.slice(0, 6) as album, i (i)}
-              <div
-                class="absolute bottom-0 right-0 w-32 h-32 overflow-hidden border border-brand-border/60 shadow-xl transition-all duration-300"
-                style="z-index: {10 - i}; transform: translate({i * COVER_STACK_OFFSET_X_PX}px, {i * COVER_STACK_OFFSET_Y_PX}px) rotate({i * COVER_STACK_ROTATION_DEG}deg) scale({1 - i * COVER_STACK_SCALE_STEP}); opacity: {1 - i * COVER_STACK_OPACITY_STEP};"
-              >
-                <CoverArt
-                  songId={album.songId}
-                  artEmbedded={album.artEmbedded}
-                  artAutomatic={album.artAutomatic}
-                  artManual={album.artManual}
-                  sizeClass="w-full h-full"
-                />
-              </div>
-            {/each}
+          <div class="relative w-48 h-36 hidden sm:flex items-start justify-end shrink-0">
+            <div class="relative w-32 h-32 mt-5 mr-2">
+              {#each topAlbums.slice(0, 6) as album, i (i)}
+                <div
+                  class="absolute inset-0 overflow-hidden border border-brand-border/60 shadow-xl transition-all duration-300"
+                  style="z-index: {10 - i}; transform: translate({i * COVER_STACK_OFFSET_X_PX}px, {i * COVER_STACK_OFFSET_Y_PX}px) rotate({i * COVER_STACK_ROTATION_DEG}deg) scale({1 - i * COVER_STACK_SCALE_STEP}); opacity: {1 - i * COVER_STACK_OPACITY_STEP};"
+                >
+                  <CoverArt
+                    songId={album.songId}
+                    artEmbedded={album.artEmbedded}
+                    artAutomatic={album.artAutomatic}
+                    artManual={album.artManual}
+                    sizeClass="w-full h-full"
+                  />
+                </div>
+              {/each}
+            </div>
           </div>
         {/if}
         {/if}
@@ -893,6 +957,7 @@
     onGoToArtist={singleItem.song?.artist ? () => navigationStore.viewArtist(singleItem.song?.album_artist?.trim() || singleItem.song?.artist || "") : undefined}
     onGoToAlbum={singleItem.song?.album ? () => navigationStore.viewAlbum(singleItem.song?.album || "") : undefined}
     onEditTags={singleItem.song?.id && !isItemUnavailable(singleItem) ? () => openTagEditor(singleItem.song!.id) : undefined}
+    onOpenInPicard={singleItem.song?.id ? () => openSelectedInPicard(singleItem.song!.id) : undefined}
     onClose={() => { contextMenuState = null; }}
   />
 {/if}
@@ -986,19 +1051,21 @@
           <span>{i18n.t("playlists.useAbsolutePaths")}</span>
         </label>
       </div>
-      <div class="flex justify-end gap-2 pt-2">
-        <button
+      <div class="flex justify-end gap-3 pt-2">
+        <Button
           onclick={() => { showExportOptionsModal = false; }}
-          class="px-3 py-1.5 rounded text-xs font-medium text-brand-text-secondary hover:bg-brand-main transition-colors"
+          variant="secondary"
+          size="sm"
         >
           {i18n.t("playlists.cancelBtn")}
-        </button>
-        <button
+        </Button>
+        <Button
           onclick={triggerExport}
-          class="px-3 py-1.5 rounded text-xs font-medium bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast transition-colors"
+          variant="primary"
+          size="sm"
         >
           {i18n.t("playlists.exportBtn")}
-        </button>
+        </Button>
       </div>
     </div>
   </div>
@@ -1018,7 +1085,7 @@
 
     <form onsubmit={(e) => { e.preventDefault(); confirmSaveQueueAsCustomPlaylist(); }} class="flex flex-col gap-4 p-6 bg-brand-sidebar">
       <div class="flex flex-col gap-1.5">
-        <label for="save-queue-name-input" class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider">
+        <label for="save-queue-name-input" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
           {i18n.t("playlists.saveQueueNameLabel", {}, "Playlist Name")}
         </label>
         <Input

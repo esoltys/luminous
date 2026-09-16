@@ -1,6 +1,6 @@
 [package]
 name = "luminous"
-version = "1.8.0"
+version = "2.0.0"
 description = "A high-performance home for the music you already own"
 authors = ["Eric James Soltys <ericjamessoltys@outlook.com>"]
 edition = "2021"
@@ -33,6 +33,7 @@ tauri-plugin-notification = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
+tauri-plugin-autostart = "2"
 # Cross-restart window geometry persistence (Windows/macOS/X11-Linux — see
 # geometry_capture_supported() in commands/window.rs for why this can't help
 # on Wayland).
@@ -52,6 +53,10 @@ serde_json = "1"
 
 # --- Async runtime ---
 tokio = { version = "1", features = ["full"] }
+# Opt-in Tokio task/scheduler introspection for `tokio-console` — see the
+# "tokio-console" feature below and docs/PERFORMANCE.md. Never enabled in a
+# release build.
+console-subscriber = { version = "0.4", optional = true }
 
 # --- Database ---
 rusqlite = { version = "0.40", features = ["bundled"] }
@@ -79,15 +84,11 @@ bs1770 = "1"
 # --- File watching ---
 notify = { version = "8", features = ["serde"] }
 
-# --- OS "Now Playing" integration: SMTC (Windows), MPRIS2 (Linux), ---
-# --- MPNowPlayingInfoCenter (macOS) (#80) ---
-# `use_zbus` gives a pure-Rust D-Bus client on Linux, avoiding a build-time
-# dependency on libdbus-1-dev (the default `use_dbus` feature links libdbus).
-souvlaki = { version = "0.8", default-features = false, features = ["use_zbus"] }
-
-# --- HTTP client ---
+# --- HTTP client & WebDAV ---
 # Use rustls to avoid requiring libssl-dev system package
-reqwest = { version = "0.13", default-features = false, features = ["json", "stream", "form", "rustls"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "stream", "form", "rustls", "blocking"] }
+quick-xml = { version = "0.41", features = ["serialize"] }
+base64 = "0.22"
 
 # --- UUID for playlist item identity ---
 uuid = { version = "1", features = ["v4"] }
@@ -106,23 +107,66 @@ chrono = { version = "0.4", features = ["serde"] }
 parking_lot = "0.12"
 rand = "0.10"
 percent-encoding = "2"
-# Polls the OS for the live Shift-key state at drag-and-drop time. OS file
-# drags don't give the target window keyboard focus while hovering, so DOM
-# keydown/keyup never fire — this reads the physical key state directly
-# instead, independent of window focus.
-device_query = "4.0.1"
-
 # --- Data-parallel tag reading during library scan ---
 rayon = "1"
+
+[features]
+# Enables `tokio-console` task/scheduler introspection — see
+# docs/PERFORMANCE.md. Requires building with `RUSTFLAGS="--cfg
+# tokio_unstable"` (not set by default anywhere in this repo) since it relies
+# on Tokio APIs exempted from semver stability guarantees. Dev/debug use
+# only — never enable this for a release build.
+tokio-console = ["dep:console-subscriber"]
 
 # WebView2-only settings for tauri-plugin-prevent-default (zoom control,
 # browser accelerator keys) — the feature links webview2-com/windows, so it's
 # gated to the Windows target only.
 [target.'cfg(windows)'.dependencies]
 tauri-plugin-prevent-default = { version = "5", features = ["platform-windows"] }
+# Polls the live Shift-key state at drag-and-drop time via GetAsyncKeyState.
+windows-sys = { version = "0.59", features = ["Win32_UI_Input_KeyboardAndMouse"] }
+# --- OS "Now Playing" integration: SMTC (#576) ---
+# Registers our window with System Media Transport Controls via
+# `ISystemMediaTransportControlsInterop::GetForWindow` (Win32_System_WinRT),
+# the same interop mechanism the previous `souvlaki` dependency used
+# internally, without pulling in souvlaki's own legacy `windows 0.44` pin.
+windows = { version = "0.61", features = [
+    "Media_Control",
+    "Foundation",
+    "Storage_Streams",
+    "Win32_Foundation",
+    "Win32_System_Com",
+    "Win32_System_WinRT",
+    "Win32_System_Recovery",
+    "Win32_Storage_Packaging_Appx",
+    # --- Taskbar thumbnail toolbar + iconic (album art) preview (#852) ---
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_Graphics_Dwm",
+    "Win32_Graphics_Gdi",
+] }
+# Decodes/resizes cover art into the RGBA buffer used for the taskbar's
+# iconic thumbnail (#852). Already pulled in transitively by Tauri's
+# "image-png" feature (see Cargo.lock) — added directly here since taskbar.rs
+# calls into it itself rather than through Tauri.
+image = "0.25"
+# tauri-plugin-notification hardcodes the toast's AppUserModelID to the Tauri
+# `identifier` config value, which Windows only accepts for apps registered
+# under that exact AUMID — an MSIX/Store install's real AUMID is
+# `{PackageFamilyName}!{ApplicationId}`, so toasts sent through the plugin
+# are silently dropped by the OS for msix builds (#744). This is the same
+# crate the plugin uses internally (re-exported there as `winrt_notification`)
+# — used directly here, with the AUMID read at runtime via
+# GetCurrentApplicationUserModelId, only for the msix update-notification path.
+tauri-winrt-notification = "0.7"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = "0.2"
+# --- OS "Now Playing" integration: MPRIS2 (#576) ---
+# Hand-rolled org.mpris.MediaPlayer2(.Player) D-Bus interfaces via zbus's
+# pure-Rust client, replacing souvlaki's `use_zbus` backend.
+zbus = { version = "5", default-features = false, features = ["tokio"] }
+zvariant = "5"
 
 [dev-dependencies]
 cucumber = { version = "0.23", features = ["macros"] }

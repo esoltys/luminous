@@ -22,17 +22,23 @@ pub fn record_play(conn: &Connection, song_id: i64) -> Result<()> {
 
 /// Record what the user was inside (album/playlist/standalone song) when a
 /// listen completed, so "Recently Played" can reflect that context instead
-/// of a post-hoc heuristic.
-pub fn record_play_context(conn: &Connection, context: &PlayContext, song_id: i64) -> Result<()> {
+/// of a post-hoc heuristic. `duration_secs` is the song's length at play
+/// time, summed per calendar day by the daily listening heatmap (#890).
+pub fn record_play_context(
+    conn: &Connection,
+    context: &PlayContext,
+    song_id: i64,
+    duration_secs: i64,
+) -> Result<()> {
     let (context_type, playlist_id) = match context {
         PlayContext::Song => ("song", None),
         PlayContext::Album { .. } => ("album", None),
         PlayContext::Playlist { playlist_id } => ("playlist", Some(*playlist_id)),
     };
     conn.execute(
-        "INSERT INTO play_history (context_type, song_id, playlist_id, played_at)
-         VALUES (?1, ?2, ?3, strftime('%s','now'))",
-        params![context_type, song_id, playlist_id],
+        "INSERT INTO play_history (context_type, song_id, playlist_id, played_at, duration_secs)
+         VALUES (?1, ?2, ?3, strftime('%s','now'), ?4)",
+        params![context_type, song_id, playlist_id, duration_secs],
     )?;
     Ok(())
 }
@@ -118,6 +124,43 @@ pub fn get_album_rating(conn: &Connection, album: &str) -> Result<f32> {
     Ok(rating)
 }
 
+/// Every current Personal Stats exclusion (#130), as `(entity_type,
+/// entity_key)` pairs — loaded once by the frontend's exclusion store,
+/// mirroring how `PinnedStore` preloads `get_pinned_items` rather than
+/// checking pin state one item at a time.
+pub fn get_stats_exclusions(conn: &Connection) -> Result<Vec<(String, String)>> {
+    let mut stmt = conn.prepare("SELECT entity_type, entity_key FROM stats_exclusions")?;
+    let rows = stmt
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+        .filter_map(|r| r.ok())
+        .collect();
+    Ok(rows)
+}
+
+/// Set or clear a Personal Stats exclusion (#130) for a song/album/artist/
+/// genre, keyed the same way `stats_exclusions.entity_key` is queried in
+/// `crate::stats_summary` (song id as text, or the raw album/artist/genre
+/// string).
+pub fn set_stats_excluded(
+    conn: &Connection,
+    entity_type: &str,
+    entity_key: &str,
+    excluded: bool,
+) -> Result<()> {
+    if excluded {
+        conn.execute(
+            "INSERT OR IGNORE INTO stats_exclusions (entity_type, entity_key) VALUES (?1, ?2)",
+            params![entity_type, entity_key],
+        )?;
+    } else {
+        conn.execute(
+            "DELETE FROM stats_exclusions WHERE entity_type = ?1 AND entity_key = ?2",
+            params![entity_type, entity_key],
+        )?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -181,7 +224,7 @@ mod tests {
         .unwrap();
         let playlist_id = conn.last_insert_rowid();
 
-        record_play_context(&conn, &PlayContext::Song, id).unwrap();
+        record_play_context(&conn, &PlayContext::Song, id, 180).unwrap();
         record_play_context(
             &conn,
             &PlayContext::Album {
@@ -189,9 +232,10 @@ mod tests {
                 album_artist: Some("Test Artist".into()),
             },
             id,
+            180,
         )
         .unwrap();
-        record_play_context(&conn, &PlayContext::Playlist { playlist_id }, id).unwrap();
+        record_play_context(&conn, &PlayContext::Playlist { playlist_id }, id, 180).unwrap();
 
         let rows: Vec<(String, Option<i64>)> = conn
             .prepare(
@@ -211,6 +255,26 @@ mod tests {
                 ("playlist".to_string(), Some(playlist_id)),
             ]
         );
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_record_play_context_persists_duration_secs() {
+        let (db, dir) = test_db();
+        let conn = db.pool.get().unwrap();
+        let id = insert_song(&conn, "/tmp/duration.flac");
+
+        record_play_context(&conn, &PlayContext::Song, id, 245).unwrap();
+
+        let duration: i64 = conn
+            .query_row(
+                "SELECT duration_secs FROM play_history WHERE song_id = ?1",
+                params![id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(duration, 245);
 
         let _ = std::fs::remove_dir_all(dir);
     }

@@ -23,12 +23,12 @@ Feature: Graphic Equalizer
       | Band   | Gain (dB) |
       | 31.5Hz | +4.0      |
       | 63Hz   | +3.0      |
-      | 125Hz  | +2.0      |
+      | 125Hz  | +1.0      |
       | 250Hz  | -1.0      |
       | 500Hz  | -2.0      |
       | 1kHz   | -1.0      |
       | 2kHz   | +1.0      |
-      | 4kHz   | +2.0      |
-      | 8kHz   | +3.0      |
-      | 16kHz  | +4.0      |
+      | 4kHz   | +3.0      |
+      | 8kHz   | +3.5      |
+      | 16kHz  | +3.5      |
     And all biquad filter coefficients should recalculate

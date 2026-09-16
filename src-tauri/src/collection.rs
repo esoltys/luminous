@@ -3,9 +3,10 @@
 use crate::{
     covermanager::CoverManager,
     db::Database,
+    dr_parser,
     models::{
         self, FileType, MusicDirectory, PruneResult, QueuePopulationMode, ScanPhase, ScanProgress,
-        Song, SongSource,
+        Song, SongSource, LOCAL_SOURCES_SQL,
     },
 };
 use anyhow::{Context, Result};
@@ -47,7 +48,7 @@ mod query;
 mod reconcile;
 mod watcher;
 pub(crate) use reconcile::resolve_case_insensitive_path;
-pub use watcher::{start_watcher, WatcherPauseGuard};
+pub use watcher::{start_watcher, SelfWriteTracker, WatcherPauseGuard};
 
 #[derive(Debug)]
 pub struct CollectionScanner {
@@ -76,6 +77,9 @@ impl CollectionScanner {
             path: path.to_string(),
             subdirs: true,
             is_available: std::path::Path::new(path).exists(),
+            nickname: None,
+            icon: None,
+            color: None,
         })
     }
 
@@ -88,8 +92,11 @@ impl CollectionScanner {
         // Mark all songs under this directory as unavailable
         let mut to_mark = Vec::new();
         {
-            let mut stmt = tx
-                .prepare("SELECT id, path FROM songs WHERE source IN (1, 2) AND unavailable = 0")?;
+            let sql = format!(
+                "SELECT id, path FROM songs WHERE source IN ({lib}) AND unavailable = 0",
+                lib = *LOCAL_SOURCES_SQL
+            );
+            let mut stmt = tx.prepare(&sql)?;
             let rows = stmt.query_map([], |row| {
                 let id: i64 = row.get(0)?;
                 let p: String = row.get(1)?;
@@ -118,7 +125,9 @@ impl CollectionScanner {
     /// List all watched directories.
     pub fn get_directories(&self) -> Result<Vec<MusicDirectory>> {
         let conn = self.db.pool.get()?;
-        let mut stmt = conn.prepare("SELECT id, path, subdirs FROM directories ORDER BY path")?;
+        let mut stmt = conn.prepare(
+            "SELECT id, path, subdirs, nickname, icon, color FROM directories ORDER BY path",
+        )?;
         let dirs = stmt
             .query_map([], |row| {
                 let path: String = row.get(1)?;
@@ -128,11 +137,30 @@ impl CollectionScanner {
                     path,
                     subdirs: row.get(2)?,
                     is_available,
+                    nickname: row.get(3)?,
+                    icon: row.get(4)?,
+                    color: row.get(5)?,
                 })
             })?
             .filter_map(|r| r.ok())
             .collect();
         Ok(dirs)
+    }
+
+    /// Update metadata (nickname, icon, color) for a watched directory.
+    pub fn update_directory_metadata(
+        &self,
+        id: i64,
+        nickname: Option<String>,
+        icon: Option<String>,
+        color: Option<String>,
+    ) -> Result<()> {
+        let conn = self.db.pool.get()?;
+        conn.execute(
+            "UPDATE directories SET nickname = ?1, icon = ?2, color = ?3 WHERE id = ?4",
+            params![nickname, icon, color, id],
+        )?;
+        Ok(())
     }
     /// Returns ids of songs (from `path`) whose file no longer exists on disk, excluding
     /// any song that lives under a watched directory root which is currently unreachable.
@@ -178,6 +206,13 @@ impl CollectionScanner {
 
         let mut missing = Vec::new();
         for (id, path, source) in rows.flatten() {
+            // WebDAV songs (source 11) have HTTP URLs as their path — Path::exists()
+            // always returns false for them, so skip the filesystem check entirely.
+            // They're managed by the WebDAV sync and never pruned by this path.
+            if source == 11 {
+                continue;
+            }
+
             let p = Path::new(&path);
 
             // If the file is local (source 1 or 2) and not in any watched directory, it is orphaned.
@@ -224,32 +259,160 @@ impl CollectionScanner {
         Ok(marked)
     }
 
-    /// Merges `songs` rows that point to the same physical file (matched by
-    /// case-insensitive path) into one, keeping the row with the highest id
-    /// (the most recently upserted, reflecting current tags) and re-pointing
-    /// playlist membership and play history from the others before deleting
-    /// them. Rolls the discarded rows' rating/playcount/skipcount/lastplayed
-    /// into the survivor rather than just discarding them.
+    /// Finds a `foo_dr.txt` sidecar (case-insensitive) directly inside
+    /// `dir`, parses it, and backfills matched tracks' dynamic range fields
+    /// for every local album folder whose log is new or has changed since
+    /// the last scan (#57). Peak/RMS become a last-resort loudness gain
+    /// source (`loudness::compute_gain`) for tracks with neither R128
+    /// analysis nor a ReplayGain tag.
+    pub fn resolve_dynamic_range_logs(&self) -> Result<()> {
+        let conn = self.db.pool.get()?;
+
+        // One row per local, available song, grouped below by parent
+        // directory — cheaper than a query per folder for large libraries.
+        let mut stmt = conn.prepare(&format!(
+            "SELECT id, path, track, title, dr_log_mtime FROM songs
+             WHERE source IN ({lib}) AND unavailable = 0 AND path IS NOT NULL",
+            lib = *LOCAL_SOURCES_SQL
+        ))?;
+        let rows = stmt.query_map([], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, Option<i32>>(2)?,
+                row.get::<_, Option<String>>(3)?,
+                row.get::<_, Option<i64>>(4)?,
+            ))
+        })?;
+
+        struct SongRow {
+            id: i64,
+            path: PathBuf,
+            track: Option<i32>,
+            title: Option<String>,
+            dr_log_mtime: Option<i64>,
+        }
+
+        let mut by_dir: HashMap<PathBuf, Vec<SongRow>> = HashMap::new();
+        for row in rows.filter_map(|r| r.ok()) {
+            let (id, path_str, track, title, dr_log_mtime) = row;
+            let path = PathBuf::from(&path_str);
+            if let Some(dir) = path.parent() {
+                by_dir.entry(dir.to_path_buf()).or_default().push(SongRow {
+                    id,
+                    path,
+                    track,
+                    title,
+                    dr_log_mtime,
+                });
+            }
+        }
+        drop(stmt);
+
+        let mut updated_songs = 0usize;
+        let mut updated_folders = 0usize;
+
+        for (dir, songs) in by_dir {
+            let Some(log_path) = find_dr_log(&dir) else {
+                continue;
+            };
+            let Some(log_mtime) = get_mtime(&log_path) else {
+                continue;
+            };
+            // Already parsed against this exact log revision — skip. A song
+            // added to the folder since the last parse has no dr_log_mtime
+            // yet, so its NULL correctly forces a re-parse of the folder.
+            if songs.iter().all(|s| s.dr_log_mtime == Some(log_mtime)) {
+                continue;
+            }
+
+            let Ok(content) = std::fs::read_to_string(&log_path) else {
+                continue;
+            };
+            let log = dr_parser::parse(&content);
+
+            let candidates: Vec<dr_parser::SongCandidate> = songs
+                .iter()
+                .map(|s| dr_parser::SongCandidate {
+                    id: s.id,
+                    track_number: s.track,
+                    title: s.title.clone(),
+                    filename_stem: s
+                        .path
+                        .file_stem()
+                        .map(|s| s.to_string_lossy().to_string())
+                        .unwrap_or_default(),
+                })
+                .collect();
+            let matches = dr_parser::match_tracks(&log.tracks, &candidates);
+
+            let tx = conn.unchecked_transaction()?;
+            for (song_id, entry) in &matches {
+                tx.execute(
+                    "UPDATE songs SET dynamic_range = ?1, dynamic_range_peak = ?2, dynamic_range_rms = ?3 WHERE id = ?4",
+                    params![entry.dr, entry.peak_db, entry.rms_db, song_id],
+                )?;
+                updated_songs += 1;
+            }
+            // Album-wide DR and the "parsed against this log" marker apply
+            // to every song in the folder, whether or not its own track row
+            // was confidently matched.
+            for song in &songs {
+                tx.execute(
+                    "UPDATE songs SET dynamic_range_album = ?1, dr_log_mtime = ?2 WHERE id = ?3",
+                    params![log.album_dr, log_mtime, song.id],
+                )?;
+            }
+            tx.commit()?;
+            updated_folders += 1;
+        }
+
+        if updated_folders > 0 {
+            log::info!(
+                "Parsed {updated_folders} foo_dr.txt log(s), updated dynamic range for {updated_songs} song(s)"
+            );
+        }
+
+        Ok(())
+    }
+
+    /// Merges `songs` rows that point to the same physical file *and* the same
+    /// CUE start offset (matched by case-insensitive path + `beginning_nanosec`)
+    /// into one, keeping the row with the highest id (the most recently
+    /// upserted, reflecting current tags) and re-pointing playlist membership
+    /// and play history from the others before deleting them. Rolls the
+    /// discarded rows' rating/playcount/skipcount/lastplayed into the survivor
+    /// rather than just discarding them.
     ///
-    /// These duplicates can only arise from a case-only rename on a
-    /// case-insensitive filesystem (Windows/macOS) slipping past
-    /// `reconcile_moved_songs` before that was fixed to compare against the
-    /// exact-cased paths a scan actually finds on disk — libraries scanned
-    /// before that fix can still carry the extra rows, hence this cleanup.
+    /// Grouping includes `beginning_nanosec` so that legitimate CUE sheet
+    /// siblings (#78) — multiple rows that intentionally share one physical
+    /// file's path, distinguished only by their CUE start offset — are never
+    /// mistaken for duplicates and collapsed into one.
+    ///
+    /// The path-only duplicates this actually targets can arise from a
+    /// case-only rename on a case-insensitive filesystem (Windows/macOS)
+    /// slipping past `reconcile_moved_songs` before that was fixed to compare
+    /// against the exact-cased paths a scan actually finds on disk —
+    /// libraries scanned before that fix can still carry the extra rows,
+    /// hence this cleanup.
     pub fn merge_duplicate_songs(&self) -> Result<usize> {
         let conn = self.db.pool.get()?;
 
-        let mut stmt = conn.prepare("SELECT id, path FROM songs WHERE path IS NOT NULL")?;
-        let rows: Vec<(i64, String)> = stmt
-            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+        let mut stmt =
+            conn.prepare("SELECT id, path, beginning_nanosec FROM songs WHERE path IS NOT NULL")?;
+        let rows: Vec<(i64, String, i64)> = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?
             .filter_map(|r| r.ok())
             .collect();
         drop(stmt);
 
-        let mut groups: std::collections::HashMap<String, Vec<i64>> =
+        let mut groups: std::collections::HashMap<(String, i64), Vec<i64>> =
             std::collections::HashMap::new();
-        for (id, path) in rows {
-            groups.entry(path.to_lowercase()).or_default().push(id);
+        for (id, path, beginning_nanosec) in rows {
+            groups
+                .entry((path.to_lowercase(), beginning_nanosec))
+                .or_default()
+                .push(id);
         }
 
         let mut merged = 0usize;
@@ -350,12 +513,76 @@ impl CollectionScanner {
             .try_state::<crate::AppState>()
             .map(|state| WatcherPauseGuard::new(Arc::clone(&state.watcher_paused)));
 
-        let app_data_dir = app.path().app_data_dir().expect("no app data dir");
+        let app_data_dir = crate::paths::resolve_app_data_dir(&app);
         let app_for_progress = app.clone();
         self.scan_all_core(app_data_dir, force, silent, true, move |progress| {
             let _ = app_for_progress.emit("scan-progress", progress);
         })
         .await
+    }
+
+    /// Force re-reads embedded tags for exactly these files, bypassing the
+    /// mtime-skip `scan_all`/`scan_all_core` use for a normal (non-`force`)
+    /// scan. A file whose mtime already matches what's on record — e.g. it
+    /// was edited by a different Luminous install or another tool sharing
+    /// the same music folder, or manually — is otherwise invisible to any
+    /// rescan short of a full `force` one. This gives targeted callers (like
+    /// the album detail view's Refresh action, #956) a way to reconcile a
+    /// specific set of files from disk into the DB without paying for a
+    /// full-library rescan. Thin Tauri-facing wrapper around
+    /// `rescan_paths_core` — see that method for the actual logic.
+    pub async fn rescan_paths(&self, app: &AppHandle, paths: Vec<PathBuf>) -> Result<()> {
+        let _watcher_pause_guard = app
+            .try_state::<crate::AppState>()
+            .map(|state| WatcherPauseGuard::new(Arc::clone(&state.watcher_paused)));
+
+        let app_data_dir = crate::paths::resolve_app_data_dir(app);
+        self.rescan_paths_core(app_data_dir, paths).await
+    }
+
+    /// Core of `rescan_paths`, decoupled from Tauri's `AppHandle` (the
+    /// covers-cache directory is passed in) so it's directly callable from
+    /// tests without mocking a Tauri app — see `scan_all_core`'s doc comment
+    /// for the same rationale.
+    pub async fn rescan_paths_core(
+        &self,
+        app_data_dir: PathBuf,
+        paths: Vec<PathBuf>,
+    ) -> Result<()> {
+        if paths.is_empty() {
+            return Ok(());
+        }
+
+        let cover_manager = CoverManager::new(Arc::clone(&self.db), app_data_dir);
+
+        let results: Vec<(PathBuf, Result<Song>)> =
+            tauri::async_runtime::spawn_blocking(move || {
+                paths
+                    .into_iter()
+                    .map(|path| {
+                        let result = read_and_prepare_song(&cover_manager, &path);
+                        (path, result)
+                    })
+                    .collect()
+            })
+            .await
+            .context("rescan_paths task panicked")?;
+
+        let conn = self.db.pool.get()?;
+        let tx = conn.unchecked_transaction()?;
+        for (path, result) in results {
+            match result {
+                Ok(song) => {
+                    if let Err(e) = upsert_song(&tx, &song) {
+                        log::warn!("Failed to save rescanned tags for {}: {e}", path.display());
+                    }
+                }
+                Err(e) => log::warn!("Failed to read tags for {}: {e}", path.display()),
+            }
+        }
+        tx.commit()?;
+
+        Ok(())
     }
 
     /// Core of `scan_all`, decoupled from Tauri's `AppHandle` (progress
@@ -399,6 +626,7 @@ impl CollectionScanner {
         });
 
         let mut all_paths: Vec<PathBuf> = Vec::new();
+        let mut cue_paths: Vec<PathBuf> = Vec::new();
         for dir in &dirs {
             let walker = WalkDir::new(&dir.path)
                 .follow_links(true)
@@ -406,14 +634,34 @@ impl CollectionScanner {
                 .filter_entry(|e| e.file_name() != "Duplicates");
             for entry in walker.filter_map(|e| e.ok()) {
                 let path = entry.path().to_path_buf();
-                if path.is_file() && is_audio_file(&path) {
+                if !path.is_file() {
+                    continue;
+                }
+                if is_audio_file(&path) {
                     all_paths.push(path);
+                } else if is_cue_file(&path) {
+                    cue_paths.push(path);
                 }
             }
         }
 
-        let total = all_paths.len() as u64;
-        log::info!("Scan found {total} audio files (force={force})");
+        // Resolve CUE sheets (classic single-`FILE` case, #78) against the
+        // audio files just discovered, and claim their referenced media file
+        // so its standalone whole-file row is suppressed below in favor of
+        // one row per CUE track (see `sync_cue_tracks`).
+        let cue_jobs = resolve_cue_jobs(&cue_paths, &all_paths);
+        if !cue_jobs.is_empty() {
+            let claimed: std::collections::HashSet<&PathBuf> =
+                cue_jobs.iter().map(|j| &j.media_path).collect();
+            all_paths.retain(|p| !claimed.contains(p));
+        }
+
+        let total = (all_paths.len() + cue_jobs.len()) as u64;
+        log::info!(
+            "Scan found {total} audio track source(s) ({} plain file(s), {} CUE sheet(s)) (force={force})",
+            all_paths.len(),
+            cue_jobs.len()
+        );
 
         // Phase 2: read tags
         on_progress(ScanProgress {
@@ -517,6 +765,44 @@ impl CollectionScanner {
                 }
                 tx.commit()?;
             }
+
+            // CUE-derived songs (#78) — a separate pass from the main per-file
+            // loop above because one CUE sheet fans out into N `songs` rows
+            // that all share its media file's `path`, so it can't go through
+            // `read_and_prepare_song`/`upsert_song`'s one-row-per-path shape.
+            if !cue_jobs.is_empty() {
+                let tx = conn.unchecked_transaction()?;
+                for job in &cue_jobs {
+                    let path_str = job.media_path.to_string_lossy().to_string();
+                    let combined_mtime = get_mtime(&job.media_path)
+                        .unwrap_or(0)
+                        .max(get_mtime(&job.cue_path).unwrap_or(0));
+
+                    if !force && known_mtimes.get(&path_str) == Some(&combined_mtime) {
+                        scanned += 1;
+                        continue;
+                    }
+
+                    match sync_cue_tracks(&tx, &cover_manager, job, combined_mtime) {
+                        Ok(()) => {}
+                        Err(e) => {
+                            log::warn!("Failed to parse CUE sheet {}: {e}", job.cue_path.display())
+                        }
+                    }
+
+                    scanned += 1;
+                    if scanned.is_multiple_of(50) || scanned == total {
+                        on_progress(ScanProgress {
+                            phase: ScanPhase::ReadingTags,
+                            scanned,
+                            total,
+                            current_path: Some(job.cue_path.to_string_lossy().to_string()),
+                            silent,
+                        });
+                    }
+                }
+                tx.commit()?;
+            }
         }
 
         // Mark songs from these directories that no longer exist as unavailable.
@@ -528,11 +814,17 @@ impl CollectionScanner {
             log::error!("Failed to mark missing songs during scan: {e}");
         }
 
+        // Parse foo_dr.txt DR Meter logs (#57) and backfill dynamic range
+        // fields for tracks in folders whose log is new or has changed.
+        if let Err(e) = self.resolve_dynamic_range_logs() {
+            log::error!("Failed to resolve foo_dr.txt logs during scan: {e}");
+        }
+
         // Phase 3: Resolve missing album artwork (local & remote) and backfill visualizers
         log::info!("Starting artwork resolution for missing albums...");
         let mut albums_to_resolve = Vec::new();
         if let Ok(conn) = self.db.pool.get() {
-            if let Ok(mut stmt) = conn.prepare(
+            let sql = format!(
                 "SELECT
                     id,
                     path,
@@ -540,11 +832,13 @@ impl CollectionScanner {
                     album,
                     art_embedded
                  FROM songs
-                 WHERE source IN (1, 2)
+                 WHERE source IN ({lib})
                    AND album IS NOT NULL
                    AND (art_unset = 1 OR (art_automatic IS NULL AND art_manual IS NULL))
                  GROUP BY effective_artist, album",
-            ) {
+                lib = *LOCAL_SOURCES_SQL
+            );
+            if let Ok(mut stmt) = conn.prepare(&sql) {
                 if let Ok(mut rows) = stmt.query([]) {
                     while let Ok(Some(row)) = rows.next() {
                         if let (
@@ -687,6 +981,13 @@ pub(crate) fn is_audio_file(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
+fn is_cue_file(path: &Path) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.eq_ignore_ascii_case("cue"))
+        .unwrap_or(false)
+}
+
 pub(crate) fn get_mtime(path: &Path) -> Option<i64> {
     std::fs::metadata(path)
         .ok()?
@@ -695,6 +996,23 @@ pub(crate) fn get_mtime(path: &Path) -> Option<i64> {
         .duration_since(UNIX_EPOCH)
         .ok()
         .map(|d| d.as_secs() as i64)
+}
+
+/// Finds a `foo_dr.txt` DR Meter log directly inside `dir` (#57), matching
+/// case-insensitively since foobar2000 writes it with whatever casing the
+/// user's OS/plugin defaults to.
+fn find_dr_log(dir: &Path) -> Option<PathBuf> {
+    std::fs::read_dir(dir)
+        .ok()?
+        .filter_map(|e| e.ok())
+        .find_map(|entry| {
+            let path = entry.path();
+            let is_match = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.eq_ignore_ascii_case("foo_dr.txt"));
+            (path.is_file() && is_match).then_some(path)
+        })
 }
 
 fn detect_filetype(path: &Path) -> FileType {
@@ -1003,18 +1321,6 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
                 .map(|s| s.to_string());
         }
 
-        // AcoustID fingerprint match (written by Luminous's own AcoustID lookup
-        // flow in tageditor.rs, or by another tagger) — same dead-columns bug
-        // as the MusicBrainz IDs above (#752).
-        if song.acoustid_id.is_none() {
-            song.acoustid_id = tag.get_string(ItemKey::AcoustId).map(|s| s.to_string());
-        }
-        if song.acoustid_fingerprint.is_none() {
-            song.acoustid_fingerprint = tag
-                .get_string(ItemKey::AcoustIdFingerprint)
-                .map(|s| s.to_string());
-        }
-
         // Release metadata Picard writes alongside the MusicBrainz IDs, but
         // not IDs themselves (#752).
         if song.musicbrainz_release_type.is_none() {
@@ -1038,6 +1344,14 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
     }
 
     song.art_embedded = candidate_tags.iter().any(|t| !t.pictures().is_empty());
+
+    // Check for sidecar .lrc lyrics next to the audio file (#155).
+    // Sidecar .lrc files take precedence over embedded tags because they are
+    // typically high-confidence synced lyrics intentionally placed by the user.
+    if let Some(sidecar) = crate::lyrics::read_sidecar_lrc(path, song.title.as_deref(), song.track)
+    {
+        song.lyrics = Some(sidecar);
+    }
 
     Ok(song)
 }
@@ -1086,6 +1400,150 @@ pub(crate) fn read_and_prepare_song(cover_manager: &CoverManager, path: &Path) -
     }
 
     Ok(song)
+}
+
+// ---------------------------------------------------------------------------
+// CUE sheet support (#78) — classic single-media-file case only. A CUE sheet
+// with more than one `FILE` line (one physical file per track) is a
+// different, far more common shape in the wild — ordinary per-file tagged
+// rips that happen to ship a CUE alongside them — and is left to be scanned
+// as plain per-file tracks; see `cue::parse_single_file_cue`.
+// ---------------------------------------------------------------------------
+
+/// A CUE sheet resolved against the files an audio-directory walk actually
+/// found: `media_path` is the real, correctly-cased path of the file it
+/// claims (case-insensitive match against the CUE's own `FILE` line, since
+/// rips in the wild frequently disagree with the filesystem's exact casing).
+pub(crate) struct CueJob {
+    pub cue_path: PathBuf,
+    pub media_path: PathBuf,
+    pub sheet: crate::cue::CueSheet,
+}
+
+/// Parses every CUE sheet in `cue_paths` and resolves each classic
+/// single-`FILE` sheet's referenced media file against `audio_paths` (the
+/// audio files a scan already discovered) by case-insensitive path match.
+/// Sheets that fail to parse, aren't the classic single-file case, or whose
+/// media file wasn't itself found as an audio file are silently skipped —
+/// they're left to be scanned as ordinary standalone files.
+pub(crate) fn resolve_cue_jobs(cue_paths: &[PathBuf], audio_paths: &[PathBuf]) -> Vec<CueJob> {
+    let audio_by_lower: HashMap<String, &PathBuf> = audio_paths
+        .iter()
+        .map(|p| (p.to_string_lossy().to_lowercase(), p))
+        .collect();
+
+    let mut jobs = Vec::new();
+    for cue_path in cue_paths {
+        let Some(dir) = cue_path.parent() else {
+            continue;
+        };
+        let Ok(text) = std::fs::read_to_string(cue_path) else {
+            continue;
+        };
+        let Some(sheet) = crate::cue::parse_single_file_cue(&text) else {
+            continue;
+        };
+        let candidate = dir.join(&sheet.media_file);
+        let Some(media_path) = audio_by_lower.get(&candidate.to_string_lossy().to_lowercase())
+        else {
+            continue;
+        };
+        jobs.push(CueJob {
+            cue_path: cue_path.clone(),
+            media_path: (**media_path).clone(),
+            sheet,
+        });
+    }
+    jobs
+}
+
+/// Builds one `Song` per track in `job.sheet`, based on the media file's own
+/// whole-file tags (album art, genre, MusicBrainz IDs, ReplayGain, audio
+/// properties, etc. — all shared across every track cut from the same file)
+/// with per-track title/performer/track-number/offsets from the CUE sheet
+/// layered on top.
+fn build_cue_songs(cover_manager: &CoverManager, job: &CueJob, mtime: i64) -> Result<Vec<Song>> {
+    let base = read_and_prepare_song(cover_manager, &job.media_path)?;
+    let cue_path_str = job.cue_path.to_string_lossy().to_string();
+    let album = job.sheet.album_title.clone().or_else(|| base.album.clone());
+    let album_artist = job
+        .sheet
+        .album_performer
+        .clone()
+        .or_else(|| base.album_artist.clone());
+
+    let tracks = &job.sheet.tracks;
+    let mut songs = Vec::with_capacity(tracks.len());
+    for (i, track) in tracks.iter().enumerate() {
+        // The next track's INDEX 01 is this track's end boundary; the final
+        // track has none, so it plays to the end of the file (end_nanosec = 0
+        // means "no cutoff", consistent with plain, non-CUE songs).
+        let end_nanosec = tracks
+            .get(i + 1)
+            .map(|next| next.start_nanosec)
+            .unwrap_or(0);
+        let length_nanosec = if end_nanosec > 0 {
+            Some(end_nanosec - track.start_nanosec)
+        } else {
+            base.length_nanosec
+                .map(|len| (len - track.start_nanosec).max(0))
+        };
+
+        songs.push(Song {
+            title: track
+                .title
+                .clone()
+                .or_else(|| Some(format!("Track {:02}", track.number))),
+            artist: track
+                .performer
+                .clone()
+                .or_else(|| album_artist.clone())
+                .or_else(|| base.artist.clone()),
+            album_artist: album_artist.clone(),
+            album: album.clone(),
+            track: Some(track.number),
+            beginning_nanosec: track.start_nanosec,
+            end_nanosec,
+            length_nanosec,
+            cue_path: Some(cue_path_str.clone()),
+            mtime: Some(mtime),
+            ..base.clone()
+        });
+    }
+    Ok(songs)
+}
+
+/// Re-parses `job`'s CUE sheet and upserts one row per track, deleting any
+/// previously-stored CUE track for this (media file, CUE sheet) pair whose
+/// start offset no longer appears in the freshly parsed sheet — e.g. the CUE
+/// was hand-edited to merge or drop a track since the last scan.
+fn sync_cue_tracks(
+    conn: &rusqlite::Connection,
+    cover_manager: &CoverManager,
+    job: &CueJob,
+    mtime: i64,
+) -> Result<()> {
+    let songs = build_cue_songs(cover_manager, job, mtime)?;
+    let path_str = job.media_path.to_string_lossy().to_string();
+    let cue_path_str = job.cue_path.to_string_lossy().to_string();
+
+    let starts: Vec<i64> = songs.iter().map(|s| s.beginning_nanosec).collect();
+    if !starts.is_empty() {
+        let placeholders = vec!["?"; starts.len()].join(",");
+        let sql = format!(
+            "DELETE FROM songs WHERE path = ? AND cue_path = ? AND beginning_nanosec NOT IN ({placeholders})"
+        );
+        let mut sql_params: Vec<&dyn rusqlite::ToSql> = vec![&path_str, &cue_path_str];
+        for start in &starts {
+            sql_params.push(start);
+        }
+        conn.execute(&sql, sql_params.as_slice())?;
+    }
+
+    for song in &songs {
+        upsert_song(conn, song)?;
+    }
+    Ok(())
 }
 
 pub(crate) fn read_and_upsert_song(
@@ -1148,7 +1606,7 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
     conn.execute(
         &format!(
             "INSERT INTO songs ({}) VALUES ({})
-                  ON CONFLICT(path) DO UPDATE SET
+                  ON CONFLICT(path, beginning_nanosec) DO UPDATE SET
                     title=excluded.title, titlesort=excluded.titlesort,
                     artist=excluded.artist, artistsort=excluded.artistsort,
                     album=excluded.album, albumsort=excluded.albumsort,
@@ -1161,12 +1619,14 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
                     compilation=excluded.compilation,
                     grouping=excluded.grouping, bpm=excluded.bpm, initial_key=excluded.initial_key,
                     length_nanosec=excluded.length_nanosec,
+                    end_nanosec=excluded.end_nanosec,
                     bitrate=excluded.bitrate, samplerate=excluded.samplerate,
                     channels=excluded.channels, bitdepth=excluded.bitdepth,
                     filesize=excluded.filesize, mtime=excluded.mtime,
                     art_embedded=excluded.art_embedded,
                     art_automatic=excluded.art_automatic,
                     art_unset=excluded.art_unset,
+                    cue_path=excluded.cue_path,
                     filetype=excluded.filetype, source=excluded.source,
                     replaygain_track_gain=excluded.replaygain_track_gain,
                     replaygain_album_gain=excluded.replaygain_album_gain,
@@ -1178,8 +1638,6 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
                     musicbrainz_recording_id=excluded.musicbrainz_recording_id,
                     musicbrainz_track_id=excluded.musicbrainz_track_id,
                     musicbrainz_work_id=excluded.musicbrainz_work_id,
-                    acoustid_id=excluded.acoustid_id,
-                    acoustid_fingerprint=excluded.acoustid_fingerprint,
                     musicbrainz_release_type=excluded.musicbrainz_release_type,
                     musicbrainz_release_country=excluded.musicbrainz_release_country,
                     barcode=excluded.barcode,
@@ -1214,6 +1672,8 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
             song.bpm,
             song.initial_key,
             song.length_nanosec,
+            song.beginning_nanosec,
+            song.end_nanosec,
             song.bitrate,
             song.samplerate,
             song.channels,
@@ -1223,6 +1683,7 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
             song.art_embedded,
             song.art_automatic,
             song.art_unset,
+            song.cue_path,
             song.replaygain_track_gain,
             song.replaygain_album_gain,
             song.is_vbr,
@@ -1233,8 +1694,6 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
             song.musicbrainz_recording_id,
             song.musicbrainz_track_id,
             song.musicbrainz_work_id,
-            song.acoustid_id,
-            song.acoustid_fingerprint,
             song.musicbrainz_release_type,
             song.musicbrainz_release_country,
             song.barcode,
@@ -1295,11 +1754,12 @@ pub(crate) const SONG_SELECT_COLS: &str = "
     ebur128_integrated_loudness_lufs, ebur128_loudness_range_lu,
     unavailable,
     replaygain_track_gain, replaygain_album_gain,
-    is_vbr, is_instrumental, added,
+    is_vbr, is_instrumental, not_included, added,
     musicbrainz_artist_id, musicbrainz_album_artist_id, musicbrainz_album_id,
     musicbrainz_release_group_id, musicbrainz_recording_id, musicbrainz_track_id,
-    musicbrainz_work_id, acoustid_id, acoustid_fingerprint,
-    musicbrainz_release_type, musicbrainz_release_country, barcode, catalog_number
+    musicbrainz_work_id,
+    musicbrainz_release_type, musicbrainz_release_country, barcode, catalog_number,
+    dynamic_range, dynamic_range_peak, dynamic_range_rms, dynamic_range_album
 ";
 
 /// Same columns as `SONG_SELECT_COLS`, in the same order, qualified with the
@@ -1322,29 +1782,31 @@ pub(crate) const SONG_SELECT_COLS_QUALIFIED: &str =
     s.cue_path,
     s.ebur128_integrated_loudness_lufs, s.ebur128_loudness_range_lu,
     s.unavailable, s.replaygain_track_gain, s.replaygain_album_gain,
-    s.is_vbr, s.is_instrumental, s.added,
+    s.is_vbr, s.is_instrumental, s.not_included, s.added,
     s.musicbrainz_artist_id, s.musicbrainz_album_artist_id, s.musicbrainz_album_id,
     s.musicbrainz_release_group_id, s.musicbrainz_recording_id, s.musicbrainz_track_id,
-    s.musicbrainz_work_id, s.acoustid_id, s.acoustid_fingerprint,
-    s.musicbrainz_release_type, s.musicbrainz_release_country, s.barcode, s.catalog_number";
+    s.musicbrainz_work_id,
+    s.musicbrainz_release_type, s.musicbrainz_release_country, s.barcode, s.catalog_number,
+    s.dynamic_range, s.dynamic_range_peak, s.dynamic_range_rms, s.dynamic_range_album";
 
-pub(crate) const SONG_SELECT_COL_COUNT: usize = 70;
+pub(crate) const SONG_SELECT_COL_COUNT: usize = 73;
 
 const SONG_INSERT_COLS: &str = "
     source, filetype, path, title, titlesort, artist, artistsort, album, albumsort, album_artist, album_artist_sort,
     composer, composersort, lyrics, comment, track, disc, year, originalyear, genre, genresort, compilation,
     grouping, bpm, initial_key,
-    length_nanosec, bitrate, samplerate, channels, bitdepth,
+    length_nanosec, beginning_nanosec, end_nanosec, bitrate, samplerate, channels, bitdepth,
     filesize, mtime, art_embedded, art_automatic, art_unset,
+    cue_path,
     replaygain_track_gain, replaygain_album_gain, is_vbr,
     musicbrainz_artist_id, musicbrainz_album_artist_id, musicbrainz_album_id,
     musicbrainz_release_group_id, musicbrainz_recording_id, musicbrainz_track_id,
-    musicbrainz_work_id, acoustid_id, acoustid_fingerprint,
+    musicbrainz_work_id,
     musicbrainz_release_type, musicbrainz_release_country, barcode, catalog_number
 ";
 
 const SONG_INSERT_PLACEHOLDERS: &str =
-    "?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33,?34,?35,?36,?37,?38,?39,?40,?41,?42,?43,?44,?45,?46,?47,?48,?49,?50,?51";
+    "?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33,?34,?35,?36,?37,?38,?39,?40,?41,?42,?43,?44,?45,?46,?47,?48,?49,?50,?51,?52";
 
 pub(crate) fn row_to_song(row: &rusqlite::Row) -> rusqlite::Result<Song> {
     row_to_song_at(row, 0)
@@ -1417,20 +1879,23 @@ pub(crate) fn row_to_song_at(row: &rusqlite::Row, offset: usize) -> rusqlite::Re
         replaygain_album_gain: row.get(col(53))?,
         is_vbr: row.get(col(54))?,
         is_instrumental: row.get::<_, Option<bool>>(col(55))?.unwrap_or(false),
-        added: row.get(col(56))?,
-        musicbrainz_artist_id: row.get(col(57))?,
-        musicbrainz_album_artist_id: row.get(col(58))?,
-        musicbrainz_album_id: row.get(col(59))?,
-        musicbrainz_release_group_id: row.get(col(60))?,
-        musicbrainz_recording_id: row.get(col(61))?,
-        musicbrainz_track_id: row.get(col(62))?,
-        musicbrainz_work_id: row.get(col(63))?,
-        acoustid_id: row.get(col(64))?,
-        acoustid_fingerprint: row.get(col(65))?,
-        musicbrainz_release_type: row.get(col(66))?,
-        musicbrainz_release_country: row.get(col(67))?,
-        barcode: row.get(col(68))?,
-        catalog_number: row.get(col(69))?,
+        not_included: row.get::<_, Option<bool>>(col(56))?.unwrap_or(false),
+        added: row.get(col(57))?,
+        musicbrainz_artist_id: row.get(col(58))?,
+        musicbrainz_album_artist_id: row.get(col(59))?,
+        musicbrainz_album_id: row.get(col(60))?,
+        musicbrainz_release_group_id: row.get(col(61))?,
+        musicbrainz_recording_id: row.get(col(62))?,
+        musicbrainz_track_id: row.get(col(63))?,
+        musicbrainz_work_id: row.get(col(64))?,
+        musicbrainz_release_type: row.get(col(65))?,
+        musicbrainz_release_country: row.get(col(66))?,
+        barcode: row.get(col(67))?,
+        catalog_number: row.get(col(68))?,
+        dynamic_range: row.get(col(69))?,
+        dynamic_range_peak: row.get(col(70))?,
+        dynamic_range_rms: row.get(col(71))?,
+        dynamic_range_album: row.get(col(72))?,
         ..Default::default()
     })
 }
@@ -1605,6 +2070,82 @@ mod tests {
         assert_eq!(song.genre.as_deref(), Some("Rock; Jazz Fusion; Live"));
     }
 
+    #[tokio::test]
+    async fn test_rescan_paths_core_reconciles_out_of_band_genre_edit() {
+        // Regression test for #956: a normal scan skips a file whose mtime
+        // already matches what's on record, so an edit made by another
+        // Luminous install (or any other tool) sharing the same music
+        // folder is invisible to it. `rescan_paths_core` must always
+        // re-read the files it's explicitly given, with no mtime check.
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let path = temp_dir.path().join("song.wav");
+        write_test_wav(&path);
+        crate::tageditor::write_tags(
+            &path,
+            &crate::tageditor::TagWriteRequest {
+                title: "Title",
+                artist: "Artist",
+                album: "Album",
+                genre: "Synthwave; Retrowave",
+                ..Default::default()
+            },
+        )
+        .expect("write_tags should succeed");
+
+        let db = Arc::new(Database::new(temp_dir.path().to_path_buf()).unwrap());
+        let scanner = CollectionScanner::new(Arc::clone(&db));
+        scanner
+            .add_directory(&temp_dir.path().to_string_lossy())
+            .unwrap();
+        scanner
+            .scan_all_core(temp_dir.path().to_path_buf(), true, true, false, |_| {})
+            .await
+            .unwrap();
+
+        let genre_after_scan: String = db
+            .pool
+            .get()
+            .unwrap()
+            .query_row(
+                "SELECT genre FROM songs WHERE path = ?1",
+                params![path.to_string_lossy()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(genre_after_scan, "Synthwave; Retrowave");
+
+        // Simulate an out-of-band edit (another install/tool) changing the
+        // embedded genre without Luminous's own write path being involved.
+        crate::tageditor::write_tags(
+            &path,
+            &crate::tageditor::TagWriteRequest {
+                title: "Title",
+                artist: "Artist",
+                album: "Album",
+                genre: "Synthwave; Electronic",
+                ..Default::default()
+            },
+        )
+        .expect("write_tags should succeed");
+
+        scanner
+            .rescan_paths_core(temp_dir.path().to_path_buf(), vec![path.clone()])
+            .await
+            .unwrap();
+
+        let genre_after_rescan: String = db
+            .pool
+            .get()
+            .unwrap()
+            .query_row(
+                "SELECT genre FROM songs WHERE path = ?1",
+                params![path.to_string_lossy()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(genre_after_rescan, "Synthwave; Electronic");
+    }
+
     #[test]
     fn test_read_tags_end_to_end_multi_artist_album_artist_composer_round_trip() {
         let temp_dir = tempfile::tempdir().expect("temp dir");
@@ -1685,34 +2226,6 @@ mod tests {
             song.musicbrainz_album_artist_id.as_deref(),
             Some("album-artist-uuid")
         );
-    }
-
-    /// Unlike the three MusicBrainz release/release-group/track keys above,
-    /// `AcoustId`/`AcoustIdFingerprint` *are* on lofty's ID3v2 TXXX write
-    /// allowlist, so this exercises the full `write_tags()` -> `read_tags()`
-    /// round trip directly rather than hand-poking the tag (#752).
-    #[test]
-    fn test_write_tags_then_read_tags_acoustid_round_trip() {
-        let temp_dir = tempfile::tempdir().expect("temp dir");
-        let path = temp_dir.path().join("song.wav");
-        write_test_wav(&path);
-
-        crate::tageditor::write_tags(
-            &path,
-            &crate::tageditor::TagWriteRequest {
-                title: "Title",
-                artist: "Artist",
-                album: "Album",
-                acoustid_id: Some("acoustid-uuid"),
-                acoustid_fingerprint: Some("AQADtEmI"),
-                ..Default::default()
-            },
-        )
-        .expect("write_tags should succeed");
-
-        let song = read_tags(&path).expect("read_tags should succeed");
-        assert_eq!(song.acoustid_id.as_deref(), Some("acoustid-uuid"));
-        assert_eq!(song.acoustid_fingerprint.as_deref(), Some("AQADtEmI"));
     }
 
     /// `write_tags()` has no support for these (Luminous's tag editor doesn't
@@ -2436,6 +2949,84 @@ mod tests {
     }
 
     #[test]
+    fn test_resolve_dynamic_range_logs_parses_and_matches_by_track_number() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_dr_log_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let album_dir = temp_dir.join("album");
+        std::fs::create_dir_all(&album_dir).unwrap();
+
+        std::fs::write(
+            album_dir.join("foo_dr.txt"),
+            "foobar2000 2.24.1 / Dynamic Range Meter 1.1.1\n\
+DR         Peak         RMS     Duration Track\n\
+--------------------------------------------------------------------------------\n\
+DR14      -0.80 dB   -17.46 dB      4:16 01-Free Fallin'\n\
+DR13      -0.70 dB   -17.56 dB      2:58 02-I Won't Back Down\n\
+--------------------------------------------------------------------------------\n\
+Official DR value: DR13\n",
+        )
+        .unwrap();
+
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        {
+            let conn = db.pool.get().unwrap();
+            for (track, title) in [(1, "Free Fallin'"), (2, "I Won't Back Down")] {
+                let song = Song {
+                    path: Some(
+                        album_dir
+                            .join(format!("{track:02} - {title}.flac"))
+                            .to_string_lossy()
+                            .to_string(),
+                    ),
+                    title: Some(title.to_string()),
+                    track: Some(track),
+                    source: SongSource::LocalFile,
+                    filetype: FileType::Flac,
+                    unavailable: false,
+                    ..Default::default()
+                };
+                upsert_song(&conn, &song).unwrap();
+            }
+        }
+
+        let scanner = CollectionScanner::new(Arc::clone(&db));
+        scanner.resolve_dynamic_range_logs().unwrap();
+
+        let conn = db.pool.get().unwrap();
+        let (dr, peak, rms, album_dr): (i32, f64, f64, i32) = conn
+            .query_row(
+                "SELECT dynamic_range, dynamic_range_peak, dynamic_range_rms, dynamic_range_album
+                 FROM songs WHERE track = 1",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .unwrap();
+        assert_eq!(dr, 14);
+        assert_eq!(peak, -0.80);
+        assert_eq!(rms, -17.46);
+        assert_eq!(album_dr, 13);
+
+        // Re-running against the same unchanged log is a no-op fast path —
+        // shouldn't error, and values stay as-is.
+        scanner.resolve_dynamic_range_logs().unwrap();
+        let dr_again: i32 = conn
+            .query_row(
+                "SELECT dynamic_range FROM songs WHERE track = 1",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(dr_again, 14);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
     fn test_read_and_prepare_song_falls_back_to_folder_art() {
         let temp_dir = std::env::temp_dir().join(format!(
             "luminous_prep_song_art_test_{}",
@@ -2462,6 +3053,132 @@ mod tests {
             song.art_automatic.unwrap(),
             folder_art_path.to_string_lossy().to_string()
         );
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_read_tags_loads_sidecar_lrc() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_sidecar_lrc_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let _ = std::fs::create_dir_all(&temp_dir);
+
+        let audio_path = temp_dir.join("track.wav");
+        let lrc_path = temp_dir.join("track.lrc");
+
+        write_test_wav(&audio_path);
+        std::fs::write(&lrc_path, b"[00:05.00] Sidecar lyric line").unwrap();
+
+        let song = read_tags(&audio_path).unwrap();
+
+        assert_eq!(
+            song.lyrics,
+            Some("[00:05.00] Sidecar lyric line".to_string())
+        );
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[tokio::test]
+    async fn test_scan_classic_cue_sheet_produces_one_row_per_track_and_suppresses_whole_file_row()
+    {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_cue_scan_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let _ = std::fs::create_dir_all(&temp_dir);
+
+        let audio_path = temp_dir.join("album.wav");
+        write_test_wav(&audio_path);
+
+        let cue_path = temp_dir.join("album.cue");
+        std::fs::write(
+            &cue_path,
+            concat!(
+                "PERFORMER \"Test Artist\"\n",
+                "TITLE \"Test Album\"\n",
+                "FILE \"album.wav\" WAVE\n",
+                "  TRACK 01 AUDIO\n",
+                "    TITLE \"First\"\n",
+                "    INDEX 01 00:00:00\n",
+                "  TRACK 02 AUDIO\n",
+                "    TITLE \"Second\"\n",
+                "    INDEX 01 00:05:00\n",
+            ),
+        )
+        .unwrap();
+
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let scanner = CollectionScanner::new(Arc::clone(&db));
+        scanner.add_directory(&temp_dir.to_string_lossy()).unwrap();
+
+        scanner
+            .scan_all_core(temp_dir.clone(), true, true, false, |_| {})
+            .await
+            .unwrap();
+
+        let conn = db.pool.get().unwrap();
+        let path_str = audio_path.to_string_lossy().to_string();
+        let mut stmt = conn
+            .prepare(
+                "SELECT title, track, beginning_nanosec, end_nanosec, cue_path, artist, album
+                 FROM songs WHERE path = ?1 ORDER BY beginning_nanosec",
+            )
+            .unwrap();
+        #[allow(clippy::type_complexity)]
+        let rows: Vec<(
+            Option<String>,
+            Option<i32>,
+            i64,
+            i64,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+        )> = stmt
+            .query_map(params![path_str], |r| {
+                Ok((
+                    r.get(0)?,
+                    r.get(1)?,
+                    r.get(2)?,
+                    r.get(3)?,
+                    r.get(4)?,
+                    r.get(5)?,
+                    r.get(6)?,
+                ))
+            })
+            .unwrap()
+            .filter_map(|r| r.ok())
+            .collect();
+
+        assert_eq!(
+            rows.len(),
+            2,
+            "expected exactly the two CUE tracks, no standalone whole-file row"
+        );
+
+        assert_eq!(rows[0].0.as_deref(), Some("First"));
+        assert_eq!(rows[0].1, Some(1));
+        assert_eq!(rows[0].2, 0);
+        assert_eq!(rows[0].3, 5_000_000_000); // next track's INDEX 01 (5s)
+        assert_eq!(
+            rows[0].4.as_deref(),
+            Some(cue_path.to_string_lossy().to_string().as_str())
+        );
+        assert_eq!(rows[0].5.as_deref(), Some("Test Artist"));
+        assert_eq!(rows[0].6.as_deref(), Some("Test Album"));
+
+        assert_eq!(rows[1].0.as_deref(), Some("Second"));
+        assert_eq!(rows[1].1, Some(2));
+        assert_eq!(rows[1].2, 5_000_000_000);
+        assert_eq!(rows[1].3, 0, "last track should play to EOF (no cutoff)");
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }

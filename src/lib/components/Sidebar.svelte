@@ -7,12 +7,14 @@
   import { i18n } from "../stores/i18n.svelte";
   import { updaterStore } from "../stores/updater.svelte";
   import { tagsStore } from "../stores/tags.svelte";
+  import { walkthroughStore } from "../stores/walkthrough.svelte";
   import {
     BooksIcon as Library,
     PlaylistIcon as ListMusic,
     SparkleIcon as Sparkles,
     GearIcon as Settings,
-    FileTextIcon as FileText,
+    ChartBarIcon as BarChart2,
+    FolderIcon as Folder,
     HouseIcon as Home,
     MicrophoneStageIcon as Mic2,
     DiscIcon as DiscAlbum,
@@ -77,7 +79,7 @@
 </script>
 
 <aside style="width: {width}px;" class="bg-brand-sidebar flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0 overflow-hidden transition-[width] duration-200 ease-out {themeStore.isGlassTheme ? 'glass-surface' : ''}" class:transition-none={resizing}>
-  <nav class="{isCollapsed ? 'p-2' : 'p-4'} space-y-0.5 flex flex-col items-center">
+  <nav data-walkthrough-target="sidebar" class="{isCollapsed ? 'p-2' : 'p-4'} space-y-0.5 flex flex-col items-center">
     <button
       onclick={() => { navigationStore.activeTab = "home"; }}
       class="flex items-center gap-3 transition-all duration-150 {navigationStore.activeTab === 'home' ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
@@ -89,7 +91,11 @@
       {/if}
     </button>
 
-    {#if !collectionStore.statsLoaded || collectionStore.stats.total_songs > 0}
+    <!-- Collection/Playlists/Lyrics/Stats stay hidden until the library has
+         songs — except during the walkthrough, whose "sidebar" step
+         narrates all of them, so an empty-library first-run tour would
+         otherwise describe nav items the user can't see. -->
+    {#if !collectionStore.statsLoaded || collectionStore.stats.total_songs > 0 || walkthroughStore.isActive}
     <div class="w-full flex flex-col {isCollapsed ? 'items-center' : ''}">
       <button
         onclick={selectCollectionTab}
@@ -234,18 +240,30 @@
     </div>
 
     <button
-      onclick={() => { navigationStore.activeTab = "lyrics"; }}
-      class="flex items-center gap-3 transition-all duration-150 {navigationStore.activeTab === 'lyrics' ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
-      title={i18n.t('sidebar.lyrics')}
+      onclick={() => { navigationStore.activeTab = "organize"; }}
+      class="flex items-center gap-3 transition-all duration-150 {navigationStore.activeTab === 'organize' ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
+      title={i18n.t('sidebar.organize')}
     >
-      <FileText class={isCollapsed ? "w-5 h-5" : "w-4 h-4"} />
+      <Folder class={isCollapsed ? "w-5 h-5" : "w-4 h-4"} />
       {#if !isCollapsed}
-        <span class="truncate whitespace-nowrap">{i18n.t('sidebar.lyrics')}</span>
+        <span class="truncate whitespace-nowrap">{i18n.t('sidebar.organize')}</span>
+      {/if}
+    </button>
+
+    <button
+      onclick={() => { navigationStore.activeTab = "stats"; }}
+      class="flex items-center gap-3 transition-all duration-150 {navigationStore.activeTab === 'stats' ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
+      title={i18n.t('sidebar.stats')}
+    >
+      <BarChart2 class={isCollapsed ? "w-5 h-5" : "w-4 h-4"} />
+      {#if !isCollapsed}
+        <span class="truncate whitespace-nowrap">{i18n.t('sidebar.stats')}</span>
       {/if}
     </button>
     {/if}
 
     <button
+      data-walkthrough-target="library-folders"
       onclick={() => { navigationStore.activeTab = "settings"; }}
       class="relative flex items-center gap-3 transition-all duration-150 {navigationStore.activeTab === 'settings' ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
       title={showUpdateBadge ? `${i18n.t('sidebar.settings')} (${i18n.t('settings.updateAvailable', {}, 'Update available')})` : i18n.t('sidebar.settings')}

@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 24;
+pub const CURRENT_SCHEMA_VERSION: i32 = 37;
 
 struct Migration {
     version: i32,
@@ -135,14 +135,29 @@ const MIGRATIONS: &[Migration] = &[
         },
     },
     Migration {
-        // Several other in-flight worktrees on this machine already claim
-        // schema versions 21-23 for unrelated changes, and all worktrees'
-        // dev builds share one app-data DB (same tauri.conf.json
-        // `identifier`) — picking 21 here got silently skipped against that
-        // shared DB once one of those other builds ran first and recorded a
-        // higher version. 24 is clear of every sibling worktree's version as
-        // of this writing; whichever of these PRs merges to main first keeps
-        // its number, and the others get renumbered in a rebase.
+        version: 21,
+        description: "pinned_items table for user-curated Home shelf (#222)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_21)?),
+    },
+    Migration {
+        version: 22,
+        description: "album_chart_history table for the weekly Top Albums chart (#662)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_22)?),
+    },
+    Migration {
+        version: 23,
+        description: "not_included flag to exclude songs from auto/smart-playlist generation (#104)",
+        apply: |conn| {
+            let has_not_included: bool = conn
+                .prepare("SELECT 1 FROM pragma_table_info('songs') WHERE name = 'not_included'")?
+                .exists([])?;
+            if !has_not_included {
+                conn.execute_batch(MIGRATION_23)?;
+            }
+            Ok(())
+        },
+    },
+    Migration {
         version: 24,
         description: "release type/country/barcode/catalog number columns on songs table (#752)",
         apply: |conn| {
@@ -151,6 +166,119 @@ const MIGRATIONS: &[Migration] = &[
                 .exists([])?;
             if !has_release_type {
                 conn.execute_batch(MIGRATION_24)?;
+            }
+            Ok(())
+        },
+    },
+    Migration {
+        version: 25,
+        description: "nickname, icon, and color metadata columns on directories table (#124)",
+        apply: |conn| {
+            let has_nickname: bool = conn
+                .prepare("SELECT 1 FROM pragma_table_info('directories') WHERE name = 'nickname'")?
+                .exists([])?;
+            if !has_nickname {
+                conn.execute_batch(MIGRATION_25)?;
+            }
+            Ok(())
+        },
+    },
+    Migration {
+        version: 26,
+        description: "scrobble_cache table for offline scrobbles (#83)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_26)?),
+    },
+    Migration {
+        version: 27,
+        description: "play_history song_id index and stats_exclusions table for Personal Stats (#130)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_27)?),
+    },
+    Migration {
+        version: 28,
+        description: "context_enrichment/artist_context_enrichment cache tables for the Details pane (#23)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_28)?),
+    },
+    Migration {
+        version: 29,
+        description: "webdav_servers and webdav_cache tables for remote WebDAV library support (#682)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_29)?),
+    },
+    Migration {
+        version: 30,
+        description: "drop acoustid_id/acoustid_fingerprint/fingerprint columns — AcoustID support removed (#847)",
+        apply: |conn| {
+            let has_acoustid_id: bool = conn
+                .prepare("SELECT 1 FROM pragma_table_info('songs') WHERE name = 'acoustid_id'")?
+                .exists([])?;
+            if has_acoustid_id {
+                conn.execute_batch(MIGRATION_30)?;
+            }
+            Ok(())
+        },
+    },
+    Migration {
+        version: 31,
+        description: "nickname, icon, and color metadata columns on webdav_servers table",
+        apply: |conn| {
+            let has_nickname: bool = conn
+                .prepare("SELECT 1 FROM pragma_table_info('webdav_servers') WHERE name = 'nickname'")?
+                .exists([])?;
+            if !has_nickname {
+                conn.execute_batch(MIGRATION_31)?;
+            }
+            Ok(())
+        },
+    },
+    Migration {
+        version: 32,
+        description: "duration_secs column on play_history for the daily listening heatmap (#890)",
+        apply: |conn| {
+            let has_duration_secs: bool = conn
+                .prepare("SELECT 1 FROM pragma_table_info('play_history') WHERE name = 'duration_secs'")?
+                .exists([])?;
+            if !has_duration_secs {
+                conn.execute_batch(MIGRATION_32)?;
+            }
+            Ok(())
+        },
+    },
+    Migration {
+        version: 33,
+        description: "dynamic range columns from foo_dr.txt DR Meter logs (#57)",
+        apply: |conn| {
+            let has_dynamic_range: bool = conn
+                .prepare("SELECT 1 FROM pragma_table_info('songs') WHERE name = 'dynamic_range'")?
+                .exists([])?;
+            if !has_dynamic_range {
+                conn.execute_batch(MIGRATION_33)?;
+            }
+            Ok(())
+        },
+    },
+    Migration {
+        version: 34,
+        description: "relax songs.path from UNIQUE to UNIQUE(path, beginning_nanosec) for CUE sheet tracks (#78)",
+        apply: rebuild_songs_table_without_path_unique,
+    },
+    Migration {
+        version: 35,
+        description: "update default target_lufs to -16.0 and drop unused crossfade keys (#946)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_35)?),
+    },
+    Migration {
+        version: 36,
+        description: "album_profiles table for album curation, notes, and external links (#950)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_36)?),
+    },
+    Migration {
+        version: 37,
+        description: "drop album_profiles.tags -- consolidated into the single embedded songs.genre tag list (#962)",
+        apply: |conn| {
+            let has_tags: bool = conn
+                .prepare("SELECT 1 FROM pragma_table_info('album_profiles') WHERE name = 'tags'")?
+                .exists([])?;
+            if has_tags {
+                conn.execute_batch(MIGRATION_37)?;
             }
             Ok(())
         },
@@ -189,6 +317,7 @@ impl Database {
                 "PRAGMA journal_mode=WAL;
                      PRAGMA synchronous=NORMAL;
                      PRAGMA foreign_keys=ON;
+                     PRAGMA busy_timeout=5000;
                      PRAGMA cache_size=-32000;  -- 32 MB page cache
                      PRAGMA temp_store=MEMORY;",
             )
@@ -233,8 +362,19 @@ impl Database {
 
         log::info!("Database schema version: {version} (current: {CURRENT_SCHEMA_VERSION})");
 
+        // Check each migration's own recorded row rather than relying on MAX(version)
+        // being contiguous — an interrupted run in the past can leave a gap (e.g. a
+        // later migration's row present but an earlier one's missing), and MAX alone
+        // would then skip that earlier migration forever since it never re-evaluates
+        // versions below the max.
+        let mut applied_versions: std::collections::HashSet<i32> = {
+            let mut stmt = conn.prepare("SELECT version FROM schema_version")?;
+            let rows = stmt.query_map([], |row| row.get(0))?;
+            rows.collect::<rusqlite::Result<_>>()?
+        };
+
         for migration in MIGRATIONS {
-            if version < migration.version {
+            if !applied_versions.contains(&migration.version) {
                 log::info!(
                     "Running migration {}: {}",
                     migration.version,
@@ -245,6 +385,7 @@ impl Database {
                     "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
                     params![migration.version],
                 )?;
+                applied_versions.insert(migration.version);
             }
         }
 
@@ -644,6 +785,45 @@ const MIGRATION_20: &str = "
 ALTER TABLE songs ADD COLUMN genresort TEXT;
 ";
 
+const MIGRATION_21: &str = "
+CREATE TABLE IF NOT EXISTS pinned_items (
+    item_type TEXT NOT NULL,
+    ref_key   TEXT NOT NULL,
+    position  INTEGER NOT NULL DEFAULT 0,
+    pinned_at INTEGER NOT NULL,
+    PRIMARY KEY (item_type, ref_key)
+);
+";
+
+// ---------------------------------------------------------------------------
+// Migration 22: album_chart_history — weekly snapshot of the Home "Top
+// Albums" chart ranking (#662). Written lazily (no scheduler): each call to
+// `CollectionScanner::get_top_albums` upserts the current UTC calendar
+// week's rows, then reads prior weeks from this table to derive movement,
+// peak rank, and weeks-on-chart. `album_key` matches the raw album title
+// convention already used by `album_ratings` (see `stats::set_album_rating`).
+// ---------------------------------------------------------------------------
+const MIGRATION_22: &str = "
+CREATE TABLE IF NOT EXISTS album_chart_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    period_start INTEGER NOT NULL,
+    album_key TEXT NOT NULL,
+    rank INTEGER NOT NULL,
+    play_count INTEGER NOT NULL,
+    UNIQUE(period_start, album_key)
+);
+CREATE INDEX IF NOT EXISTS idx_album_chart_history_album_key ON album_chart_history(album_key);
+CREATE INDEX IF NOT EXISTS idx_album_chart_history_period ON album_chart_history(period_start DESC);
+";
+
+// ---------------------------------------------------------------------------
+// Migration 23: not_included flag (#104)
+// ---------------------------------------------------------------------------
+
+const MIGRATION_23: &str = "
+ALTER TABLE songs ADD COLUMN not_included BOOLEAN NOT NULL DEFAULT 0;
+";
+
 // ---------------------------------------------------------------------------
 // Migration 24: release type/country/barcode/catalog number columns (#752).
 // Adjacent to the MusicBrainz IDs but not IDs themselves — descriptive
@@ -654,6 +834,355 @@ ALTER TABLE songs ADD COLUMN musicbrainz_release_type TEXT;
 ALTER TABLE songs ADD COLUMN musicbrainz_release_country TEXT;
 ALTER TABLE songs ADD COLUMN barcode TEXT;
 ALTER TABLE songs ADD COLUMN catalog_number TEXT;
+";
+
+// ---------------------------------------------------------------------------
+// Migration 25: nickname, icon, and color columns on directories table (#124).
+// ---------------------------------------------------------------------------
+const MIGRATION_25: &str = "
+ALTER TABLE directories ADD COLUMN nickname TEXT;
+ALTER TABLE directories ADD COLUMN icon TEXT;
+ALTER TABLE directories ADD COLUMN color TEXT;
+";
+
+// ---------------------------------------------------------------------------
+// Migration 26: scrobble_cache table for offline scrobbles (#83).
+// ---------------------------------------------------------------------------
+const MIGRATION_26: &str = "
+CREATE TABLE IF NOT EXISTS scrobble_cache (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    service            TEXT NOT NULL DEFAULT 'listenbrainz',
+    artist             TEXT NOT NULL,
+    track              TEXT NOT NULL,
+    album              TEXT,
+    duration_ms        INTEGER,
+    track_number       INTEGER,
+    recording_mbid     TEXT,
+    release_mbid       TEXT,
+    artist_mbids       TEXT,
+    release_group_mbid TEXT,
+    track_mbid         TEXT,
+    listened_at        INTEGER NOT NULL,
+    attempts           INTEGER NOT NULL DEFAULT 0,
+    last_attempt       INTEGER,
+    last_error         TEXT,
+    created_at         INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+);
+CREATE INDEX IF NOT EXISTS idx_scrobble_cache_created ON scrobble_cache(created_at);
+";
+
+// ---------------------------------------------------------------------------
+// Migration 27: play_history.song_id index (aggregation joins for Personal
+// Stats previously had no index to use) and stats_exclusions — a generic
+// per-entity-kind exclusion table for the "Don't include in stats" flag
+// (#130). One table instead of per-entity boolean columns because most of
+// these entities (album/artist/genre) are denormalized text on `songs`, not
+// rows with their own primary key — `entity_key` follows the same raw-string
+// keying convention as `album_ratings.album_key`/`artist_profiles.artist_key`.
+// ---------------------------------------------------------------------------
+const MIGRATION_27: &str = "
+CREATE INDEX IF NOT EXISTS idx_play_history_song_id ON play_history(song_id);
+CREATE TABLE IF NOT EXISTS stats_exclusions (
+    entity_type TEXT NOT NULL,
+    entity_key TEXT NOT NULL,
+    PRIMARY KEY (entity_type, entity_key)
+);
+";
+
+// ---------------------------------------------------------------------------
+// Migration 28: context_enrichment/artist_context_enrichment — cached results
+// from the Details pane's external lookups (MusicBrainz ratings/genres/tags,
+// CritiqueBrainz reviews, Wikipedia bio), keyed on the MusicBrainz release
+// group / artist IDs already stored on `songs` (see MIGRATION_1/24). `fetched_at`
+// (unix seconds) is the first TTL column in this schema — read-time code treats
+// a row older than 30 days as stale and refetches, rather than an explicit
+// expiry mechanism here.
+// ---------------------------------------------------------------------------
+const MIGRATION_28: &str = "
+CREATE TABLE IF NOT EXISTS context_enrichment (
+    release_group_id TEXT PRIMARY KEY,
+    mb_rating REAL,
+    mb_rating_votes INTEGER,
+    mb_tags TEXT NOT NULL DEFAULT '[]',
+    mb_release_country TEXT,
+    critiquebrainz_rating REAL,
+    critiquebrainz_review_count INTEGER,
+    critiquebrainz_review_links TEXT NOT NULL DEFAULT '[]',
+    fetched_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS artist_context_enrichment (
+    artist_id TEXT PRIMARY KEY,
+    wikidata_id TEXT,
+    wikipedia_extract TEXT,
+    wikipedia_page_url TEXT,
+    wikipedia_thumbnail_url TEXT,
+    fetched_at INTEGER NOT NULL
+);
+";
+
+// ---------------------------------------------------------------------------
+// Migration 29: webdav_servers and webdav_cache — remote WebDAV library
+// storage, sync states, and file metadata cache (#682).
+// ---------------------------------------------------------------------------
+const MIGRATION_29: &str = "
+CREATE TABLE IF NOT EXISTS webdav_servers (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    name           TEXT NOT NULL,
+    url            TEXT NOT NULL,
+    username       TEXT,
+    password       TEXT,
+    remote_path    TEXT NOT NULL DEFAULT '/',
+    enabled        BOOLEAN NOT NULL DEFAULT 1,
+    sync_status    TEXT NOT NULL DEFAULT 'idle',
+    last_synced_at INTEGER,
+    created_at     INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+);
+
+CREATE TABLE IF NOT EXISTS webdav_cache (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    server_id      INTEGER NOT NULL REFERENCES webdav_servers(id) ON DELETE CASCADE,
+    remote_path    TEXT NOT NULL,
+    etag           TEXT,
+    size           INTEGER NOT NULL DEFAULT 0,
+    last_modified  TEXT,
+    song_id        INTEGER REFERENCES songs(id) ON DELETE SET NULL,
+    cached_at      INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+    UNIQUE(server_id, remote_path)
+);
+CREATE INDEX IF NOT EXISTS idx_webdav_cache_server ON webdav_cache(server_id);
+";
+
+// ---------------------------------------------------------------------------
+// Migration 30: AcoustID support removed (#847) — drop the fingerprint-
+// lookup columns. `fingerprint` (distinct from `acoustid_fingerprint`) was
+// dead weight even before this: declared in the schema and the `Song`
+// model but never populated or read anywhere.
+// ---------------------------------------------------------------------------
+
+const MIGRATION_30: &str = "
+ALTER TABLE songs DROP COLUMN acoustid_id;
+ALTER TABLE songs DROP COLUMN acoustid_fingerprint;
+ALTER TABLE songs DROP COLUMN fingerprint;
+";
+
+// ---------------------------------------------------------------------------
+// Migration 31: nickname, icon, and color metadata columns on webdav_servers
+// — aligns WebDAV server badges with the watched-folder badges added in
+// MIGRATION_25.
+// ---------------------------------------------------------------------------
+const MIGRATION_31: &str = "
+ALTER TABLE webdav_servers ADD COLUMN nickname TEXT;
+ALTER TABLE webdav_servers ADD COLUMN icon TEXT;
+ALTER TABLE webdav_servers ADD COLUMN color TEXT;
+";
+
+// ---------------------------------------------------------------------------
+// Migration 32: duration_secs column on play_history — the daily listening
+// heatmap (#890) needs each play's length to sum minutes-listened per day,
+// which play_history didn't previously record (only that a play happened).
+// Existing rows default to 0 and are simply undercounted; there's no way to
+// recover their original duration retroactively.
+// ---------------------------------------------------------------------------
+const MIGRATION_32: &str = "
+ALTER TABLE play_history ADD COLUMN duration_secs INTEGER NOT NULL DEFAULT 0;
+";
+
+// ---------------------------------------------------------------------------
+// Migration 33: dynamic range columns from foo_dr.txt DR Meter logs (#57).
+// `dynamic_range`/`_peak`/`_rms` are per-track figures matched from the log's
+// table; `dynamic_range_album` is the log's album-wide "Official DR value"
+// (or "Weighted" variant), duplicated onto every song in the folder since
+// there's no dedicated albums table (album-level fields like `album_artist`
+// already follow this convention). `dr_log_mtime` is scanner bookkeeping
+// only (not exposed to the frontend) — the modification time of the
+// `foo_dr.txt` this song's row was last parsed from, so `collection.rs` can
+// skip re-parsing a folder whose log hasn't changed since the last scan.
+// ---------------------------------------------------------------------------
+const MIGRATION_33: &str = "
+ALTER TABLE songs ADD COLUMN dynamic_range INTEGER;
+ALTER TABLE songs ADD COLUMN dynamic_range_peak REAL;
+ALTER TABLE songs ADD COLUMN dynamic_range_rms REAL;
+ALTER TABLE songs ADD COLUMN dynamic_range_album INTEGER;
+ALTER TABLE songs ADD COLUMN dr_log_mtime INTEGER;
+";
+
+// ---------------------------------------------------------------------------
+// Migration 34: relax `songs.path` from a plain UNIQUE column to a composite
+// UNIQUE(path, beginning_nanosec) index, so multiple CUE sheet tracks (#78)
+// can share one physical media file's path — differentiated by their INDEX 01
+// start offset. Plain (non-CUE) songs keep beginning_nanosec = 0, so their
+// uniqueness is unaffected.
+//
+// SQLite has no `ALTER TABLE ... DROP CONSTRAINT`, so this does the standard
+// SQLite table rebuild: create `songs_new` without the column-level UNIQUE,
+// copy every row across (`SELECT *`), drop the old table, and rename. Unlike
+// every other migration in this file, the new table's column list isn't a
+// fixed SQL string — it's built at runtime from `PRAGMA table_info(songs)`
+// (see `rebuild_songs_table_without_path_unique` below), so this migration
+// stays correct regardless of which other, unrelated `songs`-column
+// migrations happen to have already run on this database (a real scenario in
+// this codebase: parallel feature branches occasionally pick the same next
+// migration version number against a shared dev app-data folder, and
+// whichever runs first "claims" that version — a fixed column list here
+// would silently drop any column added by a same-numbered sibling migration
+// instead of preserving it). `PRAGMA table_info` never reports a column-level
+// UNIQUE (that's a separate index), so simply not re-declaring one is exactly
+// how this drops it.
+//
+// The whole rebuild is one transaction, so a crash mid-migration leaves the
+// original `songs` table untouched rather than half-renamed. `PRAGMA
+// foreign_keys` is toggled off/on around (not inside) that transaction, per
+// SQLite's rule that it can't change mid-transaction — other tables'
+// `REFERENCES songs(id)` stay valid across the rebuild since every row keeps
+// its original `id`, and SQLite re-syncs the AUTOINCREMENT sequence and the
+// `sqlite_sequence` name entry automatically on RENAME TO.
+// ---------------------------------------------------------------------------
+fn rebuild_songs_table_without_path_unique(conn: &rusqlite::Connection) -> Result<()> {
+    // Idempotency / interrupted-run safety: if a previous attempt already got
+    // as far as creating the new unique index, the rebuild already happened.
+    let already_done: bool = conn
+        .prepare(
+            "SELECT 1 FROM sqlite_master WHERE type='index' AND tbl_name='songs' AND name='idx_songs_path_begin'",
+        )?
+        .exists([])?;
+    if already_done {
+        return Ok(());
+    }
+
+    struct ColumnDef {
+        name: String,
+        ty: String,
+        notnull: bool,
+        dflt_value: Option<String>,
+        pk: bool,
+    }
+
+    let mut stmt = conn.prepare("SELECT cid, name, type, \"notnull\", dflt_value, pk FROM pragma_table_info('songs') ORDER BY cid")?;
+    let columns: Vec<ColumnDef> = stmt
+        .query_map([], |row| {
+            Ok(ColumnDef {
+                name: row.get(1)?,
+                ty: row.get(2)?,
+                notnull: row.get::<_, i64>(3)? != 0,
+                dflt_value: row.get(4)?,
+                pk: row.get::<_, i64>(5)? != 0,
+            })
+        })?
+        .collect::<rusqlite::Result<_>>()?;
+    drop(stmt);
+
+    let mut col_defs = Vec::with_capacity(columns.len());
+    for col in &columns {
+        let mut def = format!("{} {}", col.name, col.ty);
+        if col.pk {
+            // `id` is this table's only primary key column, and always has
+            // been AUTOINCREMENT — `pragma_table_info` reports `pk` but not
+            // AUTOINCREMENT, so that part is a known invariant, not derived.
+            def.push_str(" PRIMARY KEY AUTOINCREMENT");
+        } else if col.notnull {
+            def.push_str(" NOT NULL");
+        }
+        if let Some(d) = &col.dflt_value {
+            // `dflt_value` comes back with any wrapping parens already
+            // stripped for expression defaults (e.g. `strftime(...)` for
+            // `added`) but bare for literal defaults (e.g. `0`) — wrapping
+            // every default in parens is valid SQLite for both cases, so
+            // there's no need to tell them apart.
+            def.push_str(&format!(" DEFAULT ({d})"));
+        }
+        col_defs.push(def);
+    }
+    let create_songs_new = format!("CREATE TABLE songs_new ({})", col_defs.join(", "));
+
+    conn.execute_batch("PRAGMA foreign_keys=OFF;")?;
+    let rebuild = (|| -> Result<()> {
+        conn.execute_batch("BEGIN TRANSACTION;")?;
+        conn.execute_batch("DROP TABLE IF EXISTS songs_new;")?;
+        conn.execute_batch(&create_songs_new)?;
+        conn.execute_batch(
+            "INSERT INTO songs_new SELECT * FROM songs;
+             DROP TABLE songs;
+             ALTER TABLE songs_new RENAME TO songs;
+
+             CREATE UNIQUE INDEX IF NOT EXISTS idx_songs_path_begin ON songs(path, beginning_nanosec);
+             CREATE INDEX IF NOT EXISTS idx_songs_artist   ON songs(artist);
+             CREATE INDEX IF NOT EXISTS idx_songs_album    ON songs(album);
+             CREATE INDEX IF NOT EXISTS idx_songs_genre    ON songs(genre);
+             CREATE INDEX IF NOT EXISTS idx_songs_mtime    ON songs(mtime);
+             CREATE INDEX IF NOT EXISTS idx_songs_source   ON songs(source);
+
+             CREATE TRIGGER IF NOT EXISTS songs_ai AFTER INSERT ON songs BEGIN
+                 INSERT INTO songs_fts(rowid, title, artist, album, album_artist, composer, performer, genre)
+                 VALUES (new.id, new.title, new.artist, new.album, new.album_artist,
+                         new.composer, new.performer, new.genre);
+             END;
+
+             CREATE TRIGGER IF NOT EXISTS songs_ad AFTER DELETE ON songs BEGIN
+                 INSERT INTO songs_fts(songs_fts, rowid, title, artist, album, album_artist, composer, performer, genre)
+                 VALUES ('delete', old.id, old.title, old.artist, old.album, old.album_artist,
+                         old.composer, old.performer, old.genre);
+             END;
+
+             CREATE TRIGGER IF NOT EXISTS songs_au AFTER UPDATE ON songs BEGIN
+                 INSERT INTO songs_fts(songs_fts, rowid, title, artist, album, album_artist, composer, performer, genre)
+                 VALUES ('delete', old.id, old.title, old.artist, old.album, old.album_artist,
+                         old.composer, old.performer, old.genre);
+                 INSERT INTO songs_fts(rowid, title, artist, album, album_artist, composer, performer, genre)
+                 VALUES (new.id, new.title, new.artist, new.album, new.album_artist,
+                         new.composer, new.performer, new.genre);
+             END;",
+        )?;
+        conn.execute_batch("COMMIT;")?;
+        Ok(())
+    })();
+    if rebuild.is_err() {
+        let _ = conn.execute_batch("ROLLBACK;");
+    }
+    // Always try to restore enforcement, even if the rebuild failed.
+    conn.execute_batch("PRAGMA foreign_keys=ON;")?;
+    rebuild
+}
+
+// ---------------------------------------------------------------------------
+// Migration 35: update default target_lufs from -18.0 to -16.0 (#946) and clean
+// up dead crossfade keys from app_state.
+// ---------------------------------------------------------------------------
+const MIGRATION_35: &str = "
+UPDATE loudness_settings SET target_lufs = -16.0 WHERE id = 1 AND target_lufs = -18.0;
+DELETE FROM app_state WHERE key IN ('crossfade_manual_enabled', 'crossfade_manual_duration_ms');
+";
+
+// ---------------------------------------------------------------------------
+// Migration 36: album_profiles — customizable album description/liner notes,
+// website, curated tags, and release-specific external links (#950).
+// Keyed by album name matching songs.album.
+// ---------------------------------------------------------------------------
+const MIGRATION_36: &str = "
+CREATE TABLE IF NOT EXISTS album_profiles (
+    album_key TEXT PRIMARY KEY,
+    artist_key TEXT,
+    description TEXT,
+    website TEXT,
+    tags TEXT NOT NULL DEFAULT '[]',
+    links TEXT NOT NULL DEFAULT '[]'
+);
+";
+
+// ---------------------------------------------------------------------------
+// Migration 37: drop album_profiles.tags (#962) — album detail view had two
+// independent, disagreeing tag lists: this curated DB-only column (editable
+// via the album profile editor) and the embedded `songs.genre` ID3 tag
+// (editable via the album tag editor), silently merged for display in the
+// header's genre chip row so neither editor's own field matched what was
+// shown. The two editors are consolidated into one, backed solely by the
+// embedded genre tag — the only list that's ever actually written to disk —
+// so there's exactly one source of truth. Any tags a user had already saved
+// here are not migrated forward into `songs.genre`: this table shipped only
+// on the still-unreleased 2.0 line, so no released version ever wrote real
+// user data into it.
+// ---------------------------------------------------------------------------
+const MIGRATION_37: &str = "
+ALTER TABLE album_profiles DROP COLUMN tags;
 ";
 
 // ---------------------------------------------------------------------------
@@ -702,10 +1231,12 @@ CREATE TABLE IF NOT EXISTS tag_assignments (
 fn seed_tag_hierarchy(conn: &rusqlite::Connection) -> Result<()> {
     use std::collections::HashMap;
 
-    let mut stmt = conn.prepare(
+    let sql = format!(
         "SELECT genre FROM songs
-         WHERE source IN (1, 2) AND unavailable = 0 AND genre IS NOT NULL AND genre != ''",
-    )?;
+         WHERE source IN ({lib}) AND unavailable = 0 AND genre IS NOT NULL AND genre != ''",
+        lib = *crate::models::LIBRARY_SOURCES_SQL
+    );
+    let mut stmt = conn.prepare(&sql)?;
     let lists: Vec<Vec<String>> = stmt
         .query_map([], |row| row.get::<_, String>(0))?
         .filter_map(|r| r.ok())
@@ -844,6 +1375,184 @@ mod tests {
     }
 
     #[test]
+    fn test_reopen_heals_a_gap_left_by_an_interrupted_migration() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_migration_gap_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Database::new(temp_dir.clone()).unwrap();
+        assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
+
+        // Simulate an interrupted migration 23: its schema_version row never
+        // got written even though every migration around it did, and its
+        // column was never added — as would happen if the app crashed
+        // between `apply()` completing for a later migration and 23's own
+        // `INSERT INTO schema_version`. A MAX(version)-based runner would
+        // see 26 as the max and conclude 23 (< 26) already ran.
+        {
+            let conn = db.pool.get().unwrap();
+            conn.execute("DELETE FROM schema_version WHERE version = 23", [])
+                .unwrap();
+            conn.execute("ALTER TABLE songs DROP COLUMN not_included", [])
+                .unwrap();
+        }
+        drop(db);
+
+        let reopened = Database::new(temp_dir.clone()).unwrap();
+        assert_eq!(reopened.schema_version, CURRENT_SCHEMA_VERSION);
+        let conn = reopened.pool.get().unwrap();
+        let has_not_included: bool = conn
+            .prepare("SELECT 1 FROM pragma_table_info('songs') WHERE name = 'not_included'")
+            .unwrap()
+            .exists([])
+            .unwrap();
+        assert!(
+            has_not_included,
+            "reopening should have re-run migration 23 and healed the gap"
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_migration_34_relaxes_path_uniqueness_for_cue_tracks() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_migration34_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&temp_dir).unwrap();
+        let db_path = temp_dir.join("luminous.db");
+
+        // Build the pre-migration-34 schema by replaying every earlier
+        // migration directly, exactly as `run_migrations` would have left a
+        // real database that was last opened before this migration existed.
+        {
+            let manager = SqliteConnectionManager::file(&db_path);
+            let pool = r2d2::Pool::builder().max_size(1).build(manager).unwrap();
+            let conn = pool.get().unwrap();
+            conn.execute_batch("PRAGMA foreign_keys=ON;").unwrap();
+            conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY);",
+            )
+            .unwrap();
+            for migration in MIGRATIONS.iter().filter(|m| m.version < 34) {
+                (migration.apply)(&conn).unwrap();
+                conn.execute(
+                    "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
+                    params![migration.version],
+                )
+                .unwrap();
+            }
+
+            // Simulate schema drift from an unrelated sibling migration that
+            // happened to run against this same database first (a real
+            // scenario: two feature branches independently bumped
+            // CURRENT_SCHEMA_VERSION to the same number against a shared dev
+            // app-data folder). The rebuild must preserve this column even
+            // though it's never mentioned in this migration's own code.
+            conn.execute_batch("ALTER TABLE songs ADD COLUMN unrelated_sibling_column TEXT;")
+                .unwrap();
+
+            conn.execute(
+                "INSERT INTO songs (path, title, unrelated_sibling_column) VALUES ('shared.flac', 'Whole File', 'kept')",
+                [],
+            )
+            .unwrap();
+            let webdav_song_id: i64 = conn.query_row(
+                "SELECT id FROM songs WHERE path = 'shared.flac'",
+                [],
+                |r| r.get(0),
+            ).unwrap();
+
+            // The pre-migration-33 schema must still enforce UNIQUE(path).
+            let dup = conn.execute(
+                "INSERT INTO songs (path, title, beginning_nanosec) VALUES ('shared.flac', 'Track 2', 5)",
+                [],
+            );
+            assert!(dup.is_err(), "old schema should still reject a bare duplicate path");
+
+            // A row with a foreign key into songs(id), to confirm the rebuild
+            // doesn't orphan or corrupt it.
+            conn.execute(
+                "INSERT INTO webdav_servers (id, name, url) VALUES (1, 'test', 'https://example.com')",
+                [],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO webdav_cache (server_id, remote_path, song_id) VALUES (1, '/shared.flac', ?1)",
+                params![webdav_song_id],
+            )
+            .unwrap();
+        }
+
+        // Reopening through the normal path runs (only) migration 33.
+        let db = Database::new(temp_dir.clone()).unwrap();
+        assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
+        let conn = db.pool.get().unwrap();
+
+        let (title, id, sibling_col): (String, i64, String) = conn
+            .query_row(
+                "SELECT title, id, unrelated_sibling_column FROM songs WHERE path = 'shared.flac' AND beginning_nanosec = 0",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(title, "Whole File");
+        assert_eq!(
+            sibling_col, "kept",
+            "a column added by an unrelated sibling migration must survive the rebuild"
+        );
+
+        let cached_song_id: i64 = conn
+            .query_row(
+                "SELECT song_id FROM webdav_cache WHERE remote_path = '/shared.flac'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            cached_song_id, id,
+            "foreign key into songs(id) must survive the table rebuild"
+        );
+
+        // The new schema must allow a CUE sibling: same path, different
+        // beginning_nanosec.
+        conn.execute(
+            "INSERT INTO songs (path, title, beginning_nanosec) VALUES ('shared.flac', 'Track 2', 5)",
+            [],
+        )
+        .unwrap();
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM songs WHERE path = 'shared.flac'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 2);
+
+        // But an exact duplicate (same path AND beginning_nanosec) is still rejected.
+        let dup2 = conn.execute(
+            "INSERT INTO songs (path, title, beginning_nanosec) VALUES ('shared.flac', 'Track 2 Again', 5)",
+            [],
+        );
+        assert!(
+            dup2.is_err(),
+            "new schema should still reject an exact (path, beginning_nanosec) duplicate"
+        );
+
+        drop(conn);
+        drop(db);
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
     fn test_migration_19_discards_old_bare_genre_rows_but_keeps_others() {
         let temp_dir = std::env::temp_dir().join(format!(
             "luminous_migration19_test_{}",
@@ -932,6 +1641,177 @@ mod tests {
             orphaned_items, 0,
             "the discarded playlist's items must go with it"
         );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_migration_25_adds_directory_metadata_columns() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_migration25_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Database::new(temp_dir.clone()).unwrap();
+        assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
+
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO directories (path, subdirs, nickname, icon, color) VALUES (?1, 1, ?2, ?3, ?4)",
+            params!["/test/music", "My Library", "hard-drive", "#3b82f6"],
+        )
+        .unwrap();
+
+        let (nickname, icon, color): (Option<String>, Option<String>, Option<String>) = conn
+            .query_row(
+                "SELECT nickname, icon, color FROM directories WHERE path = '/test/music'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .unwrap();
+
+        assert_eq!(nickname.as_deref(), Some("My Library"));
+        assert_eq!(icon.as_deref(), Some("hard-drive"));
+        assert_eq!(color.as_deref(), Some("#3b82f6"));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_migration_28_context_enrichment_tables_round_trip() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_migration28_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Database::new(temp_dir.clone()).unwrap();
+        assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
+
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO context_enrichment (release_group_id, mb_rating, mb_rating_votes, mb_tags, critiquebrainz_rating, critiquebrainz_review_count, critiquebrainz_review_links, fetched_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params!["rg-123", 4.5_f64, 10_i64, r#"["black metal","norwegian"]"#, 3.8_f64, 2_i64, r#"[{"url":"https://critiquebrainz.org/review/x"}]"#, 1_700_000_000_i64],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO artist_context_enrichment (artist_id, wikidata_id, wikipedia_extract, wikipedia_page_url, fetched_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params!["artist-456", "Q12345", "An example artist bio.", "https://en.wikipedia.org/wiki/Example", 1_700_000_000_i64],
+        )
+        .unwrap();
+
+        let (mb_rating, mb_tags): (Option<f64>, String) = conn
+            .query_row(
+                "SELECT mb_rating, mb_tags FROM context_enrichment WHERE release_group_id = 'rg-123'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(mb_rating, Some(4.5));
+        assert_eq!(mb_tags, r#"["black metal","norwegian"]"#);
+
+        let wikidata_id: Option<String> = conn
+            .query_row(
+                "SELECT wikidata_id FROM artist_context_enrichment WHERE artist_id = 'artist-456'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(wikidata_id.as_deref(), Some("Q12345"));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_migration_29_webdav_tables_round_trip() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_migration29_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Database::new(temp_dir.clone()).unwrap();
+        assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
+
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO webdav_servers (name, url, username, remote_path) VALUES (?1, ?2, ?3, ?4)",
+            params![
+                "My NAS",
+                "http://nas.local:8080/remote.php/webdav",
+                "musicuser",
+                "/Music"
+            ],
+        )
+        .unwrap();
+
+        let server_id = conn.last_insert_rowid();
+
+        conn.execute(
+            "INSERT INTO webdav_cache (server_id, remote_path, etag, size, last_modified) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![server_id, "/Music/track.flac", "etag-12345", 10_485_760_i64, "Wed, 21 Oct 2025 07:28:00 GMT"],
+        )
+        .unwrap();
+
+        let (server_name, remote_path, size): (String, String, i64) = conn
+            .query_row(
+                "SELECT s.name, c.remote_path, c.size FROM webdav_servers s JOIN webdav_cache c ON s.id = c.server_id WHERE s.id = ?1",
+                params![server_id],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .unwrap();
+
+        assert_eq!(server_name, "My NAS");
+        assert_eq!(remote_path, "/Music/track.flac");
+        assert_eq!(size, 10_485_760);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_migration_35_target_lufs_and_crossfade_cleanup() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_migration35_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Database::new(temp_dir.clone()).unwrap();
+        assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
+
+        let conn = db.pool.get().unwrap();
+        let target_lufs: f64 = conn
+            .query_row(
+                "SELECT target_lufs FROM loudness_settings WHERE id = 1",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(target_lufs, -16.0);
+
+        // Simulate an upgrade scenario: insert an app_state row with old crossfade keys,
+        // re-run migration 35, and ensure they are removed.
+        conn.execute(
+            "INSERT INTO app_state (key, value) VALUES ('crossfade_manual_enabled', 'true'), ('crossfade_manual_duration_ms', '1000')",
+            [],
+        )
+        .unwrap();
+
+        conn.execute_batch(MIGRATION_35).unwrap();
+
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM app_state WHERE key IN ('crossfade_manual_enabled', 'crossfade_manual_duration_ms')",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 0);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

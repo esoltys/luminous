@@ -72,7 +72,7 @@ into Picard's territory; it's a different, complementary axis Picard was never m
 - `analyzer.rs` — real-time FFT spectrum processing
 - `lyrics.rs` — LRCLIB + Lyrics.ovh clients
 - `covermanager.rs` — embedded art extraction + iTunes API fallback
-- `tageditor.rs` — lofty tag reader/writer + AcoustID fingerprinting
+- `tageditor.rs` — lofty tag reader/writer
 - `commands/` — all `#[tauri::command]` IPC handlers (registry in `commands/mod.rs`)
 
 ## Package Manager
@@ -101,7 +101,9 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config libayatana-appind
 - **Type check / lint**: `bun run check`
 - **Frontend tests**: `bun run test:run` (Vitest)
 - **Backend tests**: `cd src-tauri && cargo test`
+- **Windows UI automation smoke test** (real backend/IPC/SQLite, Windows only): `bun run test:e2e:windows`. One-time setup needed — see [docs/TESTING.md](docs/TESTING.md).
 - **Release build**: `bun run tauri build`
+- **MSIX build (Windows)**: `bun run tauri:windows:build`, but only after `bun run tauri build` (or a `cargo build --release`) has produced the exe — and only with `CARGO_TARGET_DIR` set to the workspace-root `target/` dir, or it looks in the wrong place. See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
 
 ## Testing
 
@@ -147,6 +149,12 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config libayatana-appind
   ("Automatically scans..."). Match the imperative voice of the control's own label. This applies to
   `src/lib/locales/en.ts` hint/tooltip strings specifically — section headings and status/value labels
   are fine as descriptive text.
+
+- **i18n is not optional**: every new user-facing string key added to `src/lib/locales/en.ts` must be
+  added to `src/lib/locales/fr.ts` (with an actual French translation, not a copy of the English text)
+  in the same change. `i18n.t()` silently falls back to the English string when a key is missing from a
+  non-English locale, so a skipped `fr.ts` update won't fail CI or show up in testing — it just quietly
+  ships English text to French users. Don't rely on that fallback as a substitute for translating.
 
 ## Development Workflow
 
@@ -201,6 +209,17 @@ verify with the user, not a reason to skip telling them.
 - Keep `next` current by periodically merging `main` into it (`git merge origin/main`, no
   automated sync) — at minimum before starting a new round of 2.0 work, and always right before
   eventually merging `next` back into `main`.
+- If the prior main→next sync landed as a squash commit (single parent, not a real merge — check
+  with `git show --no-patch --format='%P' <sync-commit>`), a plain `git merge origin/main` will
+  walk the full pre-squash history and throw spurious conflicts in every file `next` has touched
+  since, even where `main` hasn't changed that file at all since the last sync. Before resolving
+  any conflict by hand, diff the file between the last real sync point and current `main`
+  (`git diff <last-sync-commit> origin/main -- <file>`) — if it's empty, the conflict is a git
+  artifact and it's safe to keep `next`'s side (`git checkout --ours -- <file>`); only do real
+  content-level resolution where `main` actually changed the file. Also double check `package.json`
+  / `Cargo.toml` / `Cargo.lock` / `tauri.conf.json` version fields after any merge like this — a
+  clean (non-conflicting) auto-merge can still silently revert `next`'s version forward to
+  `main`'s, since git applies the one-sided line change without knowing it's semantically wrong.
 - When the "2.0" Milestone's issues are done, `next` merges into `main` via PR and becomes the
   new baseline. A fresh `next` (or renamed successor) gets cut for whatever comes after that.
 - **Interim releases**: 2.0 work that's already done and stable doesn't have to wait for the

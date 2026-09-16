@@ -154,14 +154,14 @@ const NORDIC_BLUE_COLORS: ThemeColors = {
 };
 
 const METALLIC_COLORS: ThemeColors = {
-  "bg-main": "#000000",
-  "bg-sidebar": "#000010",
-  "bg-playerbar": "#000000",
-  "color-accent": "#775F37",
-  "color-accent-hover": "#8C8C8C",
+  "bg-main": "#101d1d",
+  "bg-sidebar": "#00020b",
+  "bg-playerbar": "#101d1d",
+  "color-accent": "#a18a47",
+  "color-accent-hover": "#b7a267",
   "color-text-primary": "#ffffff",
   "color-text-secondary": "#e2e8f0",
-  "color-border": "#808080"
+  "color-border": "#af9350"
 };
 
 const SABRINA_COLORS: ThemeColors = {
@@ -173,6 +173,56 @@ const SABRINA_COLORS: ThemeColors = {
   "color-text-primary": "#ffffff",
   "color-text-secondary": "#e2e8f0",
   "color-border": "#85674C"
+};
+
+const TERMINAL_GREEN_COLORS: ThemeColors = {
+  "bg-main": "#0f1f1d",
+  "bg-sidebar": "#091514",
+  "bg-playerbar": "#152a27",
+  "color-accent": "#10b981",
+  "color-accent-hover": "#34d399",
+  "color-text-primary": "#f0fdfa",
+  "color-text-secondary": "#99f6e4",
+  "color-border": "#1e3a35"
+};
+
+/**
+ * color-text-secondary is darkened slightly from the source palette's
+ * #5a6072 (L 0.118) to #565c6e (L 0.108) — the original fell just under
+ * WCAG AA (4.37:1) against bg-main/bg-playerbar's #ddd6d4 (4.5:1 required);
+ * this is the minimal HSL-lightness nudge needed to clear it.
+ */
+const DRIFTWOOD_COLORS: ThemeColors = {
+  "bg-main": "#ddd6d4",
+  "bg-sidebar": "#dfdfdf",
+  "bg-playerbar": "#ddd6d4",
+  "color-accent": "#a6a6a6",
+  "color-accent-hover": "#62361e",
+  "color-text-primary": "#16181d",
+  "color-text-secondary": "#565c6e",
+  "color-border": "#997766"
+};
+
+const FOXGLOVE_COLORS: ThemeColors = {
+  "bg-main": "#4a3948",
+  "bg-sidebar": "#602336",
+  "bg-playerbar": "#4a3948",
+  "color-accent": "#654e62",
+  "color-accent-hover": "#b4b7db",
+  "color-text-primary": "#ffffff",
+  "color-text-secondary": "#e2e8f0",
+  "color-border": "#783a46"
+};
+
+const MOTHMAN_COLORS: ThemeColors = {
+  "bg-main": "#2a535e",
+  "bg-sidebar": "#000308",
+  "bg-playerbar": "#2a535e",
+  "color-accent": "#c6133d",
+  "color-accent-hover": "#e2bd86",
+  "color-text-primary": "#ffffff",
+  "color-text-secondary": "#e2e8f0",
+  "color-border": "#904d46"
 };
 
 export const PREDEFINED_THEMES: Theme[] = [
@@ -219,6 +269,26 @@ export const PREDEFINED_THEMES: Theme[] = [
     id: "sabrina",
     name: "Sabrina",
     colors: { ...SABRINA_COLORS }
+  },
+  {
+    id: "terminal-green",
+    name: "Terminal Green",
+    colors: { ...TERMINAL_GREEN_COLORS }
+  },
+  {
+    id: "driftwood",
+    name: "Driftwood",
+    colors: { ...DRIFTWOOD_COLORS }
+  },
+  {
+    id: "foxglove",
+    name: "Foxglove",
+    colors: { ...FOXGLOVE_COLORS }
+  },
+  {
+    id: "mothman",
+    name: "Mothman",
+    colors: { ...MOTHMAN_COLORS }
   }
 ];
 
@@ -434,6 +504,15 @@ export class ThemeStore {
   customThemes = $state<Theme[]>([]);
   artworkColors = $state<ExtractedColors | null>(null);
   systemColorScheme = $state<"light" | "dark">("dark");
+  /**
+   * Sub-setting of the System theme (#692): "system" keeps following the OS
+   * preference (default), while "light"/"dark" pin the System theme's
+   * resolved scheme regardless of what the OS reports. Distinct from
+   * systemColorScheme, which always tracks the raw OS preference so it's
+   * still available to resolve against once the user switches back to
+   * "system".
+   */
+  colorSchemeMode = $state<"light" | "dark" | "system">("system");
 
   constructor() {}
 
@@ -456,11 +535,36 @@ export class ThemeStore {
             this.activeThemeId = themeId;
           }
         }
+        if (settings.color_scheme_mode === "light" || settings.color_scheme_mode === "dark" || settings.color_scheme_mode === "system") {
+          this.colorSchemeMode = settings.color_scheme_mode;
+        }
       }
       this.applyActiveTheme();
+      void this.syncMorphDuration();
     } catch (e) {
       console.error("Failed to init ThemeStore:", e);
       this.applyActiveTheme();
+    }
+  }
+
+  /**
+   * Synchronizes the CSS theme morph transition duration with the
+   * player's active crossfade settings.
+   */
+  async syncMorphDuration() {
+    try {
+      const fadeSettings = await invoke<any>("get_fade_settings");
+      if (fadeSettings) {
+        let duration = 1.2;
+        if (fadeSettings.crossfade_auto_enabled && fadeSettings.crossfade_auto_duration_secs > 0) {
+          duration = fadeSettings.crossfade_auto_duration_secs;
+        }
+        if (typeof document !== "undefined") {
+          document.documentElement.style.setProperty("--theme-morph-duration", `${duration}s`);
+        }
+      }
+    } catch {
+      // ignore when IPC unavailable
     }
   }
 
@@ -475,10 +579,33 @@ export class ThemeStore {
     this.systemColorScheme = mq.matches ? "dark" : "light";
     mq.addEventListener("change", (e) => {
       this.systemColorScheme = e.matches ? "dark" : "light";
-      if (this.activeThemeId === "system") {
+      if (this.activeThemeId === "system" && this.colorSchemeMode === "system") {
         this.applyActiveTheme();
       }
     });
+  }
+
+  /**
+   * The System theme's actual resolved scheme: the OS preference when
+   * colorSchemeMode is "system", or the pinned mode otherwise.
+   */
+  get effectiveColorScheme(): "light" | "dark" {
+    return this.colorSchemeMode === "system" ? this.systemColorScheme : this.colorSchemeMode;
+  }
+
+  /** Pins or unpins the System theme's Light/Dark resolution (#692). */
+  async setColorSchemeMode(mode: "light" | "dark" | "system") {
+    this.colorSchemeMode = mode;
+    if (this.activeThemeId === "system") {
+      if (typeof document !== "undefined") {
+        document.documentElement.style.setProperty("--theme-morph-duration", "1.5s");
+        setTimeout(() => {
+          void this.syncMorphDuration();
+        }, 1600);
+      }
+      this.applyActiveTheme();
+    }
+    await invoke("set_app_setting", { key: "color_scheme_mode", value: mode });
   }
 
   get isGlassTheme(): boolean {
@@ -507,7 +634,7 @@ export class ThemeStore {
   get resolvedColors(): ThemeColors {
     const theme = this.currentTheme;
     if (theme.id === "system") {
-      return this.systemColorScheme === "dark" ? LUMINOUS_DARK_COLORS : LUMINOUS_LIGHT_COLORS;
+      return this.effectiveColorScheme === "dark" ? LUMINOUS_DARK_COLORS : LUMINOUS_LIGHT_COLORS;
     }
     if (theme.id === "dynamic-artwork") {
       const artColors = this.artworkColors || getFallbackColors();
@@ -528,6 +655,12 @@ export class ThemeStore {
   async setTheme(themeId: string) {
     if (PREDEFINED_THEMES.some(t => t.id === themeId) || this.customThemes.some(t => t.id === themeId)) {
       this.activeThemeId = themeId;
+      if (typeof document !== "undefined") {
+        document.documentElement.style.setProperty("--theme-morph-duration", "1.5s");
+        setTimeout(() => {
+          void this.syncMorphDuration();
+        }, 1600);
+      }
       this.applyActiveTheme();
       await invoke("set_app_setting", { key: "active_theme_id", value: themeId });
     }
@@ -554,6 +687,32 @@ export class ThemeStore {
     if (this.activeThemeId === themeId) {
       await this.setTheme("system");
     }
+  }
+
+  async importTheme(filePath: string): Promise<Theme> {
+    const imported = await invoke<Theme>("import_theme", { filePath });
+    const requiredColors: (keyof ThemeColors)[] = [
+      "bg-main",
+      "bg-sidebar",
+      "bg-playerbar",
+      "color-accent",
+      "color-accent-hover",
+      "color-text-primary",
+      "color-text-secondary",
+      "color-border",
+    ];
+    for (const key of requiredColors) {
+      if (!imported.colors || typeof imported.colors[key] !== "string" || !imported.colors[key].trim()) {
+        throw new Error(`Missing or invalid color: ${key}`);
+      }
+    }
+    imported.isCustom = true;
+    await this.addCustomTheme(imported);
+    return imported;
+  }
+
+  async exportTheme(theme: Theme, exportPath: string): Promise<void> {
+    await invoke("export_theme", { theme, exportPath });
   }
 
   async updateArtworkColors(song: Song | undefined) {
@@ -692,10 +851,11 @@ export class ThemeStore {
     }
 
     const isLuminous = theme.id === "system";
-    // The System theme's live colors come from whichever OS-scheme palette
-    // is active, not the static preview colors on the theme entry.
+    // The System theme's live colors come from whichever scheme is
+    // effectively active (OS preference, or a pinned Light/Dark mode), not
+    // the static preview colors on the theme entry.
     const colors = isLuminous
-      ? (this.systemColorScheme === "dark" ? LUMINOUS_DARK_COLORS : LUMINOUS_LIGHT_COLORS)
+      ? (this.effectiveColorScheme === "dark" ? LUMINOUS_DARK_COLORS : LUMINOUS_LIGHT_COLORS)
       : theme.colors;
 
     // Heuristically derived, not hand-picked: text rendered directly on

@@ -71,7 +71,7 @@ luminous/
     │   ├── playlist.rs       # Playlist manager & Queue abstraction (auto-sync/dynamic/import-export/undo split into playlist/)
     │   ├── playlist_parsers.rs # M3U, M3U8, PLS, and XSPF import/export
     │   ├── stats.rs          # Play counts, ratings, and history tracking
-    │   ├── tageditor.rs      # lofty tag writer & AcoustID fingerprint generator
+    │   ├── tageditor.rs      # lofty tag reader & writer
     │   ├── tags.rs           # Genre/tag browsing over the existing songs.genre column
     │   ├── tray.rs           # System tray icon, menu, and minimize-to-tray behavior
     │   ├── waveform.rs       # Background audio peak analyzer
@@ -188,25 +188,6 @@ Luminous's `tauri.conf.json` has `bundle.createUpdaterArtifacts` set to `true`, 
     $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = "your-password"
     ```
 3. Run `bun run tauri build` as usual. Your own key won't match the `updater.pubkey` baked into `tauri.conf.json`, so a locally-built app can't verify updates signed by the official release key (and vice versa) — that's expected for local builds and only matters if you're testing the updater flow itself.
-
----
-
-### AcoustID / Chromaprint Setup (Optional)
-
-To enable AcoustID audio fingerprinting and automatic metadata lookup, you need both the `fpcalc` utility and a valid AcoustID API key:
-
-#### 1. Install `fpcalc`
-*   **Linux (Ubuntu/Debian)**:
-    ```bash
-    sudo apt install libchromaprint-tools
-    ```
-*   **Windows**:
-    Download the binary from the [AcoustID Website](https://acoustid.org/chromaprint), extract it, and add the folder containing `fpcalc.exe` to your system `PATH`. Alternatively, you can set the `FPCALC_PATH` environment variable pointing directly to the binary.
-
-#### 2. Get and Set an AcoustID API Key
-1. Register or log in to the [AcoustID Website](https://acoustid.org/).
-2. Go to the [My Applications](https://acoustid.org/my-applications) page and register Luminous as a new application to generate a free **Client API Key**.
-3. Set the key as the `ACOUSTID_API_KEY` environment variable before starting the application.
 
 ---
 

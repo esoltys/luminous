@@ -156,6 +156,56 @@ describe("Custom Theme Builder & ThemeStore", () => {
     expect(themeStore.activeThemeId).toBe("system");
   });
 
+  it("imports a custom theme and adds it to the store", async () => {
+    const importedTheme: Theme = {
+      id: "custom-imported-123",
+      name: "Imported Glow",
+      colors: { ...LUMINOUS_DARK_COLORS, "color-accent": "#10b981" },
+      isCustom: true
+    };
+
+    vi.mocked(invoke).mockResolvedValueOnce(importedTheme);
+
+    const result = await themeStore.importTheme("/path/to/theme.json");
+
+    expect(invoke).toHaveBeenCalledWith("import_theme", { filePath: "/path/to/theme.json" });
+    expect(result).toEqual(importedTheme);
+    expect(themeStore.customThemes).toContainEqual(importedTheme);
+    expect(themeStore.activeThemeId).toBe("custom-imported-123");
+  });
+
+  it("throws error when importing a theme with missing required colors", async () => {
+    const invalidTheme = {
+      id: "custom-invalid",
+      name: "Invalid Theme",
+      colors: {
+        "bg-main": "#000"
+      }
+    };
+
+    vi.mocked(invoke).mockResolvedValueOnce(invalidTheme as any);
+
+    await expect(themeStore.importTheme("/path/to/bad.json")).rejects.toThrow("Missing or invalid color");
+  });
+
+  it("exports a custom theme by invoking export_theme command", async () => {
+    const themeToExport: Theme = {
+      id: "export-me",
+      name: "Export Me",
+      colors: { ...LUMINOUS_DARK_COLORS },
+      isCustom: true
+    };
+
+    vi.mocked(invoke).mockResolvedValueOnce(undefined as any);
+
+    await themeStore.exportTheme(themeToExport, "/path/to/exported.json");
+
+    expect(invoke).toHaveBeenCalledWith("export_theme", {
+      theme: themeToExport,
+      exportPath: "/path/to/exported.json"
+    });
+  });
+
   it("resolves correct theme colors for system theme depending on systemColorScheme", () => {
     themeStore.activeThemeId = "system";
 
@@ -164,6 +214,71 @@ describe("Custom Theme Builder & ThemeStore", () => {
 
     themeStore.systemColorScheme = "light";
     expect(themeStore.resolvedColors).toEqual(LUMINOUS_LIGHT_COLORS);
+  });
+
+  describe("colorSchemeMode (#692)", () => {
+    it("defaults to system and follows systemColorScheme when unpinned", () => {
+      themeStore.activeThemeId = "system";
+      expect(themeStore.colorSchemeMode).toBe("system");
+
+      themeStore.systemColorScheme = "dark";
+      expect(themeStore.effectiveColorScheme).toBe("dark");
+      expect(themeStore.resolvedColors).toEqual(LUMINOUS_DARK_COLORS);
+
+      themeStore.systemColorScheme = "light";
+      expect(themeStore.effectiveColorScheme).toBe("light");
+      expect(themeStore.resolvedColors).toEqual(LUMINOUS_LIGHT_COLORS);
+    });
+
+    it("pinning to dark resolves LUMINOUS_DARK_COLORS regardless of the OS preference", async () => {
+      themeStore.activeThemeId = "system";
+      themeStore.systemColorScheme = "light";
+
+      await themeStore.setColorSchemeMode("dark");
+
+      expect(themeStore.effectiveColorScheme).toBe("dark");
+      expect(themeStore.resolvedColors).toEqual(LUMINOUS_DARK_COLORS);
+      expect(invoke).toHaveBeenCalledWith("set_app_setting", {
+        key: "color_scheme_mode",
+        value: "dark"
+      });
+    });
+
+    it("pinning to light resolves LUMINOUS_LIGHT_COLORS regardless of the OS preference", async () => {
+      themeStore.activeThemeId = "system";
+      themeStore.systemColorScheme = "dark";
+
+      await themeStore.setColorSchemeMode("light");
+
+      expect(themeStore.effectiveColorScheme).toBe("light");
+      expect(themeStore.resolvedColors).toEqual(LUMINOUS_LIGHT_COLORS);
+    });
+
+    it("setColorSchemeMode does not change activeThemeId away from system", async () => {
+      themeStore.activeThemeId = "system";
+      await themeStore.setColorSchemeMode("dark");
+      expect(themeStore.activeThemeId).toBe("system");
+    });
+
+    it("init() restores a persisted color_scheme_mode", async () => {
+      vi.mocked(invoke).mockResolvedValueOnce({
+        color_scheme_mode: "dark"
+      } as any);
+
+      await themeStore.init();
+
+      expect(themeStore.colorSchemeMode).toBe("dark");
+    });
+
+    it("ignores an invalid persisted color_scheme_mode", async () => {
+      vi.mocked(invoke).mockResolvedValueOnce({
+        color_scheme_mode: "not-a-real-mode"
+      } as any);
+
+      await themeStore.init();
+
+      expect(themeStore.colorSchemeMode).toBe("system");
+    });
   });
 
   it("resolves dynamic artwork colors with fallback when artworkColors is null", () => {

@@ -9,6 +9,7 @@
 // below only covers the case where this file is loaded completely standalone.
 import type {
   AlbumItem,
+  AlbumProfile,
   ArtistItem,
   ArtistProfile,
   FileType,
@@ -19,6 +20,8 @@ import type {
   RepeatMode,
   ShuffleMode,
   Song,
+  StatsRange,
+  StatsTopItem,
   Tag,
   TagCount,
   TagGroup,
@@ -67,6 +70,7 @@ interface MockLibrary {
   albums: AlbumItem[];
   artists: ArtistItem[];
   artistProfiles?: ArtistProfile[];
+  albumProfiles?: AlbumProfile[];
   /** Persisted Genres curation hierarchy (#545), read straight from the real
    * tag_groups/tag_assignments tables — undefined for the bundled fixture. */
   tagGroups?: MockTagGroup[];
@@ -181,6 +185,7 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     albums: [],
     artists: [],
     artistProfiles: [],
+    albumProfiles: [],
     playlists: [],
     playlistTracks: {},
     lyrics: "",
@@ -188,20 +193,65 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
   // Mutable so set_artist_profile below can save edits made through the
   // mocked ArtistProfileEditor during manual dev-server testing.
   let artistProfiles: ArtistProfile[] = library.artistProfiles ?? [];
+  let albumProfiles: AlbumProfile[] = library.albumProfiles ?? [];
   const featured = window.__LUMINOUS_MOCK_FEATURED__ ?? {};
   const featuredSong = featured.song ?? library.songs[0];
+
+  // Deterministic pseudo-random listening history for the Personal Stats
+  // screenshots (heatmap, top lists, time-of-day) — seeded so repeated
+  // `bun run take-screenshots` runs produce the same-looking capture instead
+  // of a different random shape every time. Not wired to any real backend
+  // stats table; get_listening_activity/get_stats_summary below just slice
+  // and aggregate this in-memory log the same way the real commands
+  // aggregate SQLite rows.
+  function mulberry32(seed: number): () => number {
+    return () => {
+      seed |= 0;
+      seed = (seed + 0x6d2b79f5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  interface MockListenEvent {
+    played_at: number;
+    duration_secs: number;
+    song: Song;
+  }
+
+  const NOW_SEC = Math.floor(Date.now() / 1000);
+  const LISTEN_HISTORY_DAYS = 400;
+  const listenHistory: MockListenEvent[] = (() => {
+    if (library.songs.length === 0) return [];
+    const rng = mulberry32(42);
+    const events: MockListenEvent[] = [];
+    for (let dayOffset = 0; dayOffset < LISTEN_HISTORY_DAYS; dayOffset++) {
+      if (rng() < 0.22) continue; // some days have no listening at all
+      const playsToday = 1 + Math.floor(rng() * 6);
+      for (let i = 0; i < playsToday; i++) {
+        const song = library.songs[Math.floor(rng() * library.songs.length)];
+        const secondsIntoDay = Math.floor(rng() * 86400);
+        events.push({
+          played_at: NOW_SEC - dayOffset * 86400 - secondsIntoDay,
+          duration_secs: Math.max(30, Math.floor((song.length_nanosec || 180_000_000_000) / 1_000_000_000)),
+          song,
+        });
+      }
+    }
+    return events.sort((a, b) => a.played_at - b.played_at);
+  })();
 
   const callbacks: Record<number, (data: unknown) => void> = {};
   let nextCallbackId = 1;
   const eventListeners: Record<string, number[]> = {};
 
   const EQ_PRESETS: Record<string, number[]> = {
-    Rock: [4.0, 3.0, 2.0, -1.0, -2.0, -1.0, 1.0, 2.0, 3.0, 4.0],
-    Pop: [-2.0, -1.0, 0.0, 2.0, 4.0, 4.0, 2.0, 0.0, -1.0, -2.0],
-    Classical: [5.0, 3.0, 2.0, 2.0, -1.0, -1.0, 0.0, 2.0, 3.0, 4.0],
-    Jazz: [3.0, 2.0, 1.0, 2.0, -1.0, -1.0, 0.0, 1.0, 2.0, 3.0],
-    "Bass Boost": [6.0, 5.0, 4.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-    "Vocal Boost": [-2.0, -2.0, -1.0, 1.0, 3.0, 4.0, 3.0, 1.0, -1.0, -2.0],
+    Rock: [4.0, 3.0, 1.0, -1.0, -2.0, -1.0, 1.0, 3.0, 3.5, 3.5],
+    Pop: [1.5, 2.5, 1.0, -1.0, -0.5, 1.0, 2.5, 3.0, 2.5, 2.0],
+    "Bass Boost": [9.0, 7.0, 4.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+    "Vocal Boost": [-3.0, -2.0, -1.0, 0.0, 2.0, 4.0, 4.5, 3.5, 1.0, -1.0],
+    Headphones: [2.0, 1.5, 0.5, 0.0, 0.0, 0.0, -0.5, -1.0, -0.5, 1.0],
   };
 
   function makeWaveform(): number[] {
@@ -554,7 +604,6 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
   const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
     get_all_app_settings: () => window.mockSettings,
     get_commit_hash: () => "048f421",
-    has_acoustid_env_key: () => true,
     geometry_capture_supported: () => true,
 
     preview_organize: (args) => {
@@ -590,11 +639,169 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
           ]
         : [],
 
+    list_webdav_servers: () => [],
+
+    get_scrobbler_settings: () => ({
+      listenbrainz_enabled: false,
+      listenbrainz_token: "",
+      listenbrainz_username: null,
+      scrobble_now_playing: true,
+      scrobble_ratings: true,
+      scrobble_paused: false,
+      min_duration_secs: 30,
+    }),
+    get_scrobble_cache_status: () => ({ pending_count: 0, last_error: null, last_attempt: null }),
+    get_autostart_enabled: () => false,
+
+    // Unmocked, these resolve to null — collection.svelte.ts caches whatever
+    // invoke() returns without validating it, so every caller (search
+    // dropdown, artist rows, album/song detail headers) then dereferences
+    // `.artist_portrait_uri` etc. on that null and crashes.
+    get_extended_artwork_for_artist: () => ({
+      count: 0,
+      primary_uri: null,
+      artist_portrait_uri: null,
+      band_logo_uri: null,
+      fanart_uri: null,
+      items: [],
+    }),
+    get_extended_artwork_for_song: () => ({
+      count: 0,
+      primary_uri: null,
+      artist_portrait_uri: null,
+      band_logo_uri: null,
+      fanart_uri: null,
+      items: [],
+    }),
+
     get_db_schema_status: () => ({
       db_version: 1,
       app_version: 1,
       db_newer_than_app: false,
     }),
+
+    get_listening_activity: (args) => {
+      const days = Number(args.days ?? 98);
+      const cutoff = NOW_SEC - days * 86400;
+      return listenHistory
+        .filter((e) => e.played_at >= cutoff)
+        .map((e) => ({ played_at: e.played_at, duration_secs: e.duration_secs }));
+    },
+
+    get_stats_summary: (args) => {
+      const range = (args.range as StatsRange) ?? "7d";
+      const rangeDays = range === "7d" ? 7 : range === "28d" ? 28 : 365;
+      const inRange = listenHistory.filter((e) => e.played_at >= NOW_SEC - rangeDays * 86400);
+
+      const songCounts = new Map<string, { song: Song; count: number; duration_secs: number }>();
+      const albumCounts = new Map<string, { label: string; secondary: string | null; count: number; duration_secs: number }>();
+      const artistCounts = new Map<string, { count: number; duration_secs: number }>();
+      const genreCounts = new Map<string, { count: number; duration_secs: number }>();
+      for (const e of inRange) {
+        const song = e.song;
+        const songKey = String(song.id);
+        const songDur = e.duration_secs || song.duration || 0;
+        const curSong = songCounts.get(songKey);
+        songCounts.set(songKey, { song, count: (curSong?.count ?? 0) + 1, duration_secs: (curSong?.duration_secs ?? 0) + songDur });
+        const artist = song.album_artist || song.artist;
+        if (song.album) {
+          const albumKey = `${song.album}::${artist ?? ""}`;
+          const existing = albumCounts.get(albumKey);
+          albumCounts.set(albumKey, {
+            label: song.album,
+            secondary: artist ?? null,
+            count: (existing?.count ?? 0) + 1,
+            duration_secs: (existing?.duration_secs ?? 0) + songDur,
+          });
+        }
+        if (artist) {
+          const curArtist = artistCounts.get(artist);
+          artistCounts.set(artist, { count: (curArtist?.count ?? 0) + 1, duration_secs: (curArtist?.duration_secs ?? 0) + songDur });
+        }
+        if (song.genre) {
+          const curGenre = genreCounts.get(song.genre);
+          genreCounts.set(song.genre, { count: (curGenre?.count ?? 0) + 1, duration_secs: (curGenre?.duration_secs ?? 0) + songDur });
+        }
+      }
+
+      const top_songs: StatsTopItem[] = [...songCounts.entries()]
+        .sort((a, b) => b[1].duration_secs - a[1].duration_secs || b[1].count - a[1].count)
+        .slice(0, 10)
+        .map(([key, v]) => ({
+          key,
+          label: v.song.title ?? "Untitled",
+          secondary: v.song.artist ?? null,
+          play_count: v.count,
+          minutes: Math.round(v.duration_secs / 60),
+          excluded: false,
+          album: v.song.album ?? null,
+          song_id: v.song.id,
+          sample_song_id: null,
+          art_embedded: v.song.art_embedded,
+          art_automatic: v.song.art_automatic,
+          art_manual: v.song.art_manual,
+          year: v.song.year ?? null,
+          rating: v.song.rating ?? -1,
+        }));
+      const top_albums: StatsTopItem[] = [...albumCounts.entries()]
+        .sort((a, b) => b[1].duration_secs - a[1].duration_secs || b[1].count - a[1].count)
+        .slice(0, 10)
+        .map(([key, v]) => {
+          const sample = library.songs.find((s) => s.album === v.label);
+          return {
+            key,
+            label: v.label,
+            secondary: v.secondary,
+            play_count: v.count,
+            minutes: Math.round(v.duration_secs / 60),
+            excluded: false,
+            album: null,
+            song_id: null,
+            sample_song_id: sample?.id ?? null,
+            art_embedded: sample?.art_embedded ?? false,
+            art_automatic: sample?.art_automatic ?? null,
+            art_manual: sample?.art_manual ?? null,
+            year: sample?.year ?? null,
+            rating: -1,
+          };
+        });
+      const top_artists: StatsTopItem[] = [...artistCounts.entries()]
+        .sort((a, b) => b[1].duration_secs - a[1].duration_secs || b[1].count - a[1].count)
+        .slice(0, 10)
+        .map(([key, v]) => ({
+          key,
+          label: key,
+          secondary: null,
+          play_count: v.count,
+          minutes: Math.round(v.duration_secs / 60),
+          excluded: false,
+          album: null,
+        }));
+      const top_genres: StatsTopItem[] = [...genreCounts.entries()]
+        .sort((a, b) => b[1].duration_secs - a[1].duration_secs || b[1].count - a[1].count)
+        .slice(0, 10)
+        .map(([key, v]) => ({
+          key,
+          label: key,
+          secondary: null,
+          play_count: v.count,
+          minutes: Math.round(v.duration_secs / 60),
+          excluded: false,
+          album: null,
+        }));
+
+      const total_minutes = Math.round(inRange.reduce((acc, e) => acc + e.duration_secs, 0) / 60);
+
+      return {
+        range,
+        top_songs,
+        top_albums,
+        top_artists,
+        top_genres,
+        play_timestamps: inRange.map((e) => e.played_at),
+        total_minutes,
+      };
+    },
 
     get_library_stats: () => ({
       total_songs: library.songs.length,
@@ -647,11 +854,82 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
       return groupSongsIntoHomeItems(sorted, (args.limit as number) || 10);
     },
 
+    get_most_played_songs: (args) =>
+      [...library.songs].sort((a, b) => (b.playcount || 0) - (a.playcount || 0)).slice(0, (args.limit as number) || 50),
+
+    // No exclusions in the mock fixture — matches the real command's shape
+    // ([song/artist key, kind] pairs) for a library with nothing excluded.
+    get_stats_exclusions: (): [string, string][] => [],
+
+    get_picard_path: (): string | null => null,
+
     get_recently_added: (args) => {
       const sorted = library.songs
         .filter((s) => s.added)
         .sort((a, b) => (b.added || 0) - (a.added || 0));
       return groupSongsIntoHomeItems(sorted, (args.limit as number) || 10);
+    },
+
+    // A representative Home > Pinned row for screenshots: the Daypart Mix
+    // ("Moment Mix", #223), Favourites, and one pinned artist — mirrors what
+    // a real user's Home would typically have pinned, rather than the empty
+    // row an unmocked get_pinned_items (null) silently produced before.
+    get_pinned_items: () => {
+      if (library.songs.length === 0) return [];
+      const favouritesCount = library.songs.filter((s) => (s.rating ?? -1) >= 4).length || 18;
+      const pinnedArtist = library.artists.find((a) => a.name === featured.artist) ?? library.artists[0];
+      return [
+        {
+          type: "auto_playlist",
+          // A "daypart" card needs a playlistId to take AutoPlaylistCard's
+          // cover-fetching branch at all — without one it falls through to
+          // the curated-tag branch instead and crashes building the cover
+          // stack from a null songs list. get_playlist_tracks below falls
+          // back to the first few mock songs for any id it doesn't
+          // recognize, so this sentinel id just needs to not collide with a
+          // real playlist's. It intentionally isn't added to
+          // library.playlists (that would also surface it in the Auto
+          // Playlists tab, changing an unrelated screenshot) — with no
+          // matching row there, both PinnedRow's and AutoPlaylistCard's own
+          // display-name lookups miss and fall back to the `genre` field
+          // below as the card's title text instead.
+          autoPlaylist: { kind: "daypart", playlistId: 999001, genre: "Morning Mix", trackCount: 32, updated: Math.floor(NOW_SEC) },
+        },
+        { type: "auto_playlist", autoPlaylist: { kind: "favourites", trackCount: favouritesCount } },
+        ...(pinnedArtist ? [{ type: "artist", artist: pinnedArtist }] : []),
+      ];
+    },
+
+    get_top_albums: (args) => {
+      const playcountByAlbum = new Map<string, number>();
+      for (const song of library.songs) {
+        if (!song.album) continue;
+        const key = `${song.album}::${song.album_artist || song.artist || ""}`;
+        playcountByAlbum.set(key, (playcountByAlbum.get(key) ?? 0) + (song.playcount || 0));
+      }
+      return [...library.albums]
+        .filter((a) => (playcountByAlbum.get(`${a.album}::${a.artist || ""}`) ?? 0) > 0)
+        .sort(
+          (a, b) =>
+            (playcountByAlbum.get(`${b.album}::${b.artist || ""}`) ?? 0) -
+            (playcountByAlbum.get(`${a.album}::${a.artist || ""}`) ?? 0)
+        )
+        .slice(0, (args.limit as number) || 10)
+        .map((album, i) => ({
+          album,
+          rank: i + 1,
+          previous_rank: i === 0 ? null : i,
+          peak_rank: i + 1,
+          weeks_on_chart: 1,
+          movement: i === 0 ? "new" : "steady",
+        }));
+    },
+    get_featured_albums: (args) =>
+      [...library.albums].slice(0, (args.limit as number) || 5).map((album) => ({ type: "album", album })),
+
+    get_top_albums_summary: (args) => {
+      const summary = (handlers.get_stats_summary as (a: unknown) => StatsSummary)({ range: args.range });
+      return summary.top_albums.slice(0, (args.limit as number) || 10);
     },
 
     get_albums: () => library.albums,
@@ -694,6 +972,17 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     set_artist_profile: (args) => {
       const profile = args.profile as ArtistProfile;
       artistProfiles = [...artistProfiles.filter((p) => p.artist_key !== profile.artist_key), profile];
+      return profile;
+    },
+
+    get_album_profile: (args) => {
+      const album = args.album as string;
+      return albumProfiles.find((p) => p.album_key.toLowerCase() === album?.toLowerCase()) ?? null;
+    },
+    get_all_album_profiles: () => albumProfiles,
+    set_album_profile: (args) => {
+      const profile = args.profile as AlbumProfile;
+      albumProfiles = [...albumProfiles.filter((p) => p.album_key !== profile.album_key), profile];
       return profile;
     },
 
@@ -934,7 +1223,6 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
   commands["get_ui_preferences"] = () => ({
     rating_style: "heart",
     seekbar_mode: "waveform",
-    acoustid_api_key: "",
     albums_view_mode: "cards",
     artists_view_mode: "cards",
     playlists_auto_view_mode: "cards",
@@ -957,8 +1245,8 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     "next_track", "previous_track", "seek_to", "set_volume", "set_shuffle_mode", "set_repeat_mode",
     "get_startup_file",
     "enter_miniplayer_mode", "exit_miniplayer_mode", "start_window_drag", "start_window_resize",
-    "move_window_to_preset", "get_window_geometry", "plugin:window|show",
-    "save_song_tags", "save_album_tags", "lookup_acoustid_tags",
+    "move_window_to_preset", "get_window_geometry", "plugin:window|show", "plugin:window|set_title",
+    "save_song_tags", "save_album_tags",
     // Genres curation (#545) — not exercised by any screenshot target, but
     // mocked so manual dev-server testing of GenreCards' drag/context-menu
     // actions doesn't log "unhandled command" warnings.

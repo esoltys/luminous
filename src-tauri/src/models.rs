@@ -5,6 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::sync::LazyLock;
 use uuid::Uuid;
 
 // ---------------------------------------------------------------------------
@@ -28,6 +29,7 @@ pub enum SongSource {
     RadioParadise = 8,
     Spotify = 9,
     RadioBrowser = 10,
+    WebDav = 11,
 }
 
 impl fmt::Display for SongSource {
@@ -49,10 +51,38 @@ impl From<i64> for SongSource {
             8 => Self::RadioParadise,
             9 => Self::Spotify,
             10 => Self::RadioBrowser,
+            11 => Self::WebDav,
             _ => Self::Unknown,
         }
     }
 }
+
+/// SQL `IN (...)` fragment listing the source IDs that make up the browsable
+/// library (local files, managed collection folders, and WebDAV mounts).
+/// Derived from `SongSource` discriminants so it can't silently drift from
+/// the enum. Interpolate into query strings, e.g. `format!("source IN ({})",
+/// *LIBRARY_SOURCES_SQL)`.
+pub(crate) static LIBRARY_SOURCES_SQL: LazyLock<String> = LazyLock::new(|| {
+    format!(
+        "{}, {}, {}",
+        SongSource::LocalFile as i32,
+        SongSource::Collection as i32,
+        SongSource::WebDav as i32,
+    )
+});
+
+/// SQL `IN (...)` fragment listing the source IDs backed by a local
+/// filesystem path (local files and managed collection folders). Excludes
+/// WebDAV — remote files can't be moved/renamed by filesystem operations
+/// like the Organize feature. Derived from `SongSource` discriminants so it
+/// can't silently drift from the enum.
+pub(crate) static LOCAL_SOURCES_SQL: LazyLock<String> = LazyLock::new(|| {
+    format!(
+        "{}, {}",
+        SongSource::LocalFile as i32,
+        SongSource::Collection as i32,
+    )
+});
 
 // ---------------------------------------------------------------------------
 // File type enum
@@ -232,11 +262,6 @@ pub struct Song {
     // CUE support
     pub cue_path: Option<String>,
 
-    // AcoustID / fingerprint
-    pub acoustid_id: Option<String>,
-    pub acoustid_fingerprint: Option<String>,
-    pub fingerprint: Option<String>,
-
     // MusicBrainz IDs
     pub musicbrainz_album_artist_id: Option<String>,
     pub musicbrainz_artist_id: Option<String>,
@@ -265,6 +290,16 @@ pub struct Song {
     pub replaygain_track_gain: Option<f64>,
     pub replaygain_album_gain: Option<f64>,
 
+    // Dynamic Range Meter log fallback (#57) — per-track DR rating, Peak,
+    // and RMS parsed from a foobar2000 `foo_dr.txt` sidecar. Peak/RMS serve
+    // as a last-resort loudness gain source when neither R128 analysis nor
+    // a ReplayGain tag is available. `dynamic_range_album` is the log's
+    // album-wide DR rating, duplicated onto every song in the folder.
+    pub dynamic_range: Option<i32>,
+    pub dynamic_range_peak: Option<f64>,
+    pub dynamic_range_rms: Option<f64>,
+    pub dynamic_range_album: Option<i32>,
+
     // Streaming service IDs
     pub artist_id: Option<String>,
     pub album_id: Option<String>,
@@ -276,6 +311,11 @@ pub struct Song {
 
     /// Set to `true` when marked as an instrumental track (suppresses online lyrics fetching).
     pub is_instrumental: bool,
+
+    /// Set to `true` when the user has marked this song "Not included" (#104) — it stays fully
+    /// visible and playable in Album/Artist views but is excluded from auto/smart-playlist
+    /// generation and Auto-Play refill.
+    pub not_included: bool,
 }
 
 impl Song {
@@ -604,7 +644,7 @@ impl Default for LoudnessSettings {
     fn default() -> Self {
         Self {
             enabled: false,
-            target_lufs: -18.0,
+            target_lufs: -16.0,
             mode: LoudnessMode::Track,
             fallback_gain_db: -6.0,
         }
@@ -631,7 +671,11 @@ pub enum LoudnessGainSource {
     Analyzed,
     /// Gain derived from a ReplayGain tag (no R128 analysis yet).
     ReplayGain,
-    /// Neither analysis nor a tag is available — the fixed fallback gain.
+    /// Gain derived from a foo_dr.txt DR Meter log's Peak/RMS (#57) — no
+    /// R128 analysis or ReplayGain tag is available.
+    DynamicRangeLog,
+    /// Neither analysis, a tag, nor a DR log is available — the fixed
+    /// fallback gain.
     Fallback,
 }
 
@@ -643,8 +687,6 @@ pub enum LoudnessGainSource {
 pub struct FadeSettings {
     pub fade_pause_enabled: bool,
     pub fade_pause_duration_ms: u32,
-    pub crossfade_manual_enabled: bool,
-    pub crossfade_manual_duration_ms: u32,
     pub crossfade_auto_enabled: bool,
     pub crossfade_auto_duration_secs: f32,
     pub crossfade_suppress_same_album: bool,
@@ -655,8 +697,6 @@ impl Default for FadeSettings {
         Self {
             fade_pause_enabled: true,
             fade_pause_duration_ms: 300,
-            crossfade_manual_enabled: true,
-            crossfade_manual_duration_ms: 1000,
             crossfade_auto_enabled: false,
             crossfade_auto_duration_secs: 3.0,
             crossfade_suppress_same_album: true,
@@ -676,6 +716,39 @@ pub struct MusicDirectory {
     pub subdirs: bool,
     #[serde(default)]
     pub is_available: bool,
+    pub nickname: Option<String>,
+    pub icon: Option<String>,
+    pub color: Option<String>,
+}
+
+/// A configured remote WebDAV server (#682).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct WebDavServer {
+    pub id: i64,
+    pub name: String,
+    pub url: String,
+    pub username: Option<String>,
+    #[serde(skip_serializing)]
+    pub password: Option<String>,
+    pub remote_path: String,
+    pub enabled: bool,
+    pub sync_status: String,
+    pub last_synced_at: Option<i64>,
+    pub created_at: i64,
+    pub nickname: Option<String>,
+    pub icon: Option<String>,
+    pub color: Option<String>,
+}
+
+/// Statistics returned after syncing a WebDAV server.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct WebDavSyncStats {
+    pub added: usize,
+    pub updated: usize,
+    pub removed: usize,
+    pub errors: usize,
 }
 
 /// Result of pruning missing/unavailable songs from the library.
@@ -765,6 +838,126 @@ pub struct AlbumItem {
     pub total_duration_nanosec: i64,
 }
 
+/// One album's entry in the Home "Top Albums" weekly chart (#662) — an
+/// `AlbumItem` plus its position and trend within the current UTC calendar
+/// week, derived from `album_chart_history` snapshots (see
+/// `CollectionScanner::get_top_albums`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TopAlbumItem {
+    pub album: AlbumItem,
+    pub rank: i32,
+    /// Rank in the prior UTC calendar week, or `None` if the album wasn't in
+    /// last week's top chart (shown as "new" rather than a numeric jump).
+    pub previous_rank: Option<i32>,
+    /// Best (lowest) rank this album has ever held across all recorded weeks,
+    /// including the current one.
+    pub peak_rank: i32,
+    /// Number of distinct weeks this album has appeared in the chart,
+    /// including the current one.
+    pub weeks_on_chart: i32,
+    /// "new" | "rising" | "falling" | "steady".
+    pub movement: String,
+}
+
+/// One ranked entry in a Personal Stats Top 10 list (#130, #951) — a song, album,
+/// artist, or genre, its total minutes listened, and its play count within the selected range.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StatsTopItem {
+    /// Identity used for exclusion lookups/toggles: song id as a string,
+    /// or the raw album/artist/genre text, matching `stats_exclusions.entity_key`.
+    pub key: String,
+    pub label: String,
+    /// Secondary line, e.g. the artist for a song or album row. `None` for
+    /// artist/genre rows, which have no secondary line of their own.
+    pub secondary: Option<String>,
+    pub play_count: i64,
+    pub minutes: i64,
+    pub excluded: bool,
+    /// The song's album title, set only on `top_songs` rows — songs have no
+    /// detail page of their own, so clicking one navigates to this album
+    /// instead. `None` for every other row kind.
+    pub album: Option<String>,
+    #[serde(default)]
+    pub song_id: Option<i64>,
+    #[serde(default)]
+    pub sample_song_id: Option<i64>,
+    #[serde(default)]
+    pub art_embedded: bool,
+    #[serde(default)]
+    pub art_automatic: Option<String>,
+    #[serde(default)]
+    pub art_manual: Option<String>,
+    #[serde(default)]
+    pub year: Option<i32>,
+    #[serde(default = "default_rating")]
+    pub rating: f32,
+}
+
+impl StatsTopItem {
+    pub fn new(
+        key: String,
+        label: String,
+        secondary: Option<String>,
+        play_count: i64,
+        minutes: i64,
+        album: Option<String>,
+    ) -> Self {
+        Self {
+            key,
+            label,
+            secondary,
+            play_count,
+            minutes,
+            excluded: false,
+            album,
+            song_id: None,
+            sample_song_id: None,
+            art_embedded: false,
+            art_automatic: None,
+            art_manual: None,
+            year: None,
+            rating: crate::stats::RATING_UNRATED,
+        }
+    }
+}
+
+fn default_rating() -> f32 {
+    crate::stats::RATING_UNRATED
+}
+
+/// Personal Stats summary for one range (#130) — top 10 songs/albums/artists/
+/// genres by play count, plus every play's raw timestamp in range so the
+/// frontend can bucket the "listening clock" histogram in local time.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StatsSummary {
+    /// "7d" | "28d" | "1y", echoing the requested range back to the caller.
+    pub range: String,
+    pub top_songs: Vec<StatsTopItem>,
+    /// Album play count is `MIN` of plays across an album's tracks (a
+    /// completionist metric — full listens front-to-back), not `SUM` like the
+    /// Home "Top Albums" chart's engagement metric — the two numbers are
+    /// deliberately different and will disagree for the same album/range.
+    pub top_albums: Vec<StatsTopItem>,
+    pub top_artists: Vec<StatsTopItem>,
+    pub top_genres: Vec<StatsTopItem>,
+    /// Unix-second timestamps of every in-range, non-excluded play, for
+    /// client-side local-time listening-clock bucketing.
+    pub play_timestamps: Vec<i64>,
+    /// Total minutes listened across every in-range, non-excluded play
+    /// (`SUM(play_history.duration_secs) / 60`), for the range header.
+    pub total_minutes: i64,
+}
+
+/// One completed listen's timing, for the daily listening heatmap (#890) to
+/// bucket into local calendar days and sum minutes played. Raw and
+/// unaggregated, same rationale as `StatsSummary::play_timestamps` — bucketing
+/// by calendar day must happen client-side in the viewer's local timezone.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ListenEvent {
+    pub played_at: i64,
+    pub duration_secs: i64,
+}
+
 /// Represents a dynamic item in the Home curation carousels (a Song, an Album, or a Playlist).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
@@ -772,6 +965,63 @@ pub enum HomeItem {
     Song { song: Box<Song> },
     Album { album: AlbumItem },
     Playlist { playlist: Playlist },
+}
+
+/// Represents an artist summary, typed equivalent of the ad-hoc JSON shape
+/// returned by `CollectionScanner::get_artists`/`get_top_artists` — used here
+/// so a pinned artist (see `PinnedItem`) has a concrete Rust type.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArtistItem {
+    pub name: Option<String>,
+    pub sort_artist: Option<String>,
+    pub album_count: i32,
+    pub song_count: i32,
+    pub total_playcount: Option<i32>,
+    pub genre: Option<String>,
+}
+
+/// A materialized or virtual auto-playlist referenced by a Home pin — mirrors
+/// the frontend's `AutoPlaylistRef` shape so `AutoPlaylistCard` can render a
+/// pinned auto-playlist without a second code path. Favourites/Recently
+/// Added/Most Played/History have no backing playlist row (`playlist_id`/
+/// `updated` are `None`); genre/decade/bpm/artist_tag are materialized rows,
+/// so those are populated from the matching `Playlist`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutoPlaylistItem {
+    pub kind: String,
+    pub genre: Option<String>,
+    pub artist_tag: Option<String>,
+    pub decade: Option<String>,
+    pub bpm: Option<String>,
+    pub playlist_id: Option<i64>,
+    pub updated: Option<i64>,
+    pub track_count: i32,
+}
+
+/// A user-pinned Home-shelf entry (#222) — a superset of `HomeItem` that also
+/// allows Artist, since pins (unlike the system-curated rank/added rows) are
+/// explicitly user-curated across all four browsable entity types.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum PinnedItem {
+    Song {
+        song: Box<Song>,
+    },
+    Album {
+        album: AlbumItem,
+    },
+    Artist {
+        artist: ArtistItem,
+    },
+    Playlist {
+        playlist: Playlist,
+    },
+    #[serde(rename = "auto_playlist")]
+    AutoPlaylist {
+        #[serde(rename = "autoPlaylist")]
+        auto_playlist: AutoPlaylistItem,
+    },
 }
 
 /// A social media or external platform link associated with an artist (#473).
@@ -789,6 +1039,33 @@ pub struct ArtistProfile {
     pub tags: Vec<String>,
     pub social_links: Vec<ArtistSocialLink>,
     pub bio: Option<String>,
+}
+
+/// An external platform or web link associated with an album release (#950).
+///
+/// `handle_or_url` accepts the JSON key `url` as an alias (#990): external
+/// writers of `album_profiles.links` (e.g. the luminous-mcp integration) use
+/// a richer shape with a `url` field plus extra `title`/`category` fields
+/// that aren't part of this struct - the alias keeps that data readable
+/// without a migration, and unrecognized extra fields are simply ignored by
+/// serde's default (non-`deny_unknown_fields`) behavior.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct AlbumLink {
+    pub platform: String,
+    #[serde(alias = "url")]
+    pub handle_or_url: String,
+}
+
+/// Full customizable profile and liner notes for an album (#950). Tags are
+/// deliberately not part of this profile — the album's only tag list is the
+/// embedded `songs.genre` ID3 tag, edited via `save_album_tags` (#962).
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct AlbumProfile {
+    pub album_key: String,
+    pub artist_key: Option<String>,
+    pub description: Option<String>,
+    pub website: Option<String>,
+    pub links: Vec<AlbumLink>,
 }
 
 /// A Luminous-native song tag (#224), independent of the embedded
@@ -933,5 +1210,34 @@ mod tests {
         };
 
         assert!(s1.is_same_album_or_cue_sibling(&s2));
+    }
+
+    // Regression test for a real bug: `#[serde(rename_all = "camelCase")]` on
+    // the `PinnedItem` enum only renames the variant tag, not the fields
+    // *inside* a struct variant — so `auto_playlist: AutoPlaylistItem` would
+    // silently serialize its key as `"auto_playlist"` while the frontend
+    // (types/index.ts) reads `item.autoPlaylist`, leaving it `undefined` and
+    // crashing `PinnedRow.svelte` on the very first render.
+    #[test]
+    fn pinned_item_auto_playlist_serializes_with_camel_case_type_and_field() {
+        let item = PinnedItem::AutoPlaylist {
+            auto_playlist: AutoPlaylistItem {
+                kind: "favourites".to_string(),
+                genre: None,
+                artist_tag: None,
+                decade: None,
+                bpm: None,
+                playlist_id: None,
+                updated: None,
+                track_count: 3,
+            },
+        };
+        let value = serde_json::to_value(&item).unwrap();
+        assert_eq!(value["type"], "auto_playlist");
+        assert!(
+            value.get("autoPlaylist").is_some(),
+            "expected a camelCase \"autoPlaylist\" key, got: {value}"
+        );
+        assert_eq!(value["autoPlaylist"]["trackCount"], 3);
     }
 }

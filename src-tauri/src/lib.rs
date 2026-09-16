@@ -12,11 +12,17 @@
 pub mod analyzer;
 pub mod audio;
 pub mod band_waveform;
+pub mod biomanager;
+pub mod bridge;
 pub mod collection;
 pub mod commands;
+pub mod context;
 pub mod covermanager;
+pub mod cue;
 pub mod db;
 pub mod diagnostics;
+pub mod discord;
+pub mod dr_parser;
 pub mod equalizer;
 pub mod filter_parser;
 pub mod install_format;
@@ -25,17 +31,27 @@ pub mod lyrics;
 pub mod media_session;
 pub mod models;
 pub mod organizer;
+pub mod paths;
+pub mod picard;
+pub mod pins;
 pub mod player;
 pub mod playlist;
 pub mod playlist_parsers;
+pub mod restart_manager;
+pub mod scrobbler;
 pub mod stats;
+pub mod stats_summary;
 pub mod tageditor;
 pub mod tags;
+#[cfg(target_os = "windows")]
+pub mod taskbar;
 pub mod tray;
 pub mod waveform;
+pub mod webdav;
 
 use std::sync::Arc;
 use tauri::{Emitter, Manager};
+use tauri_plugin_autostart::MacosLauncher;
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, ShortcutState};
 use tokio::sync::Mutex;
 
@@ -60,6 +76,8 @@ pub struct AppState {
     /// without one's release re-arming the watcher while the other is still
     /// writing.
     pub watcher_paused: Arc<std::sync::atomic::AtomicU32>,
+    /// Path-aware companion to `watcher_paused` — see `collection::SelfWriteTracker` (#514).
+    pub self_writes: Arc<collection::SelfWriteTracker>,
     pub startup_file: Mutex<Option<String>>,
     /// OS "Now Playing" integration handle (#80) — `None` when the platform
     /// integration failed to initialize (unsupported desktop, no session
@@ -71,6 +89,7 @@ pub struct AppState {
     /// needs this synchronously; kept in sync with the `app_state` row of
     /// the same name by `commands::settings::set_minimize_to_tray_enabled`.
     pub minimize_to_tray: Arc<std::sync::atomic::AtomicBool>,
+    pub scrobbler: Arc<scrobbler::ScrobblerManager>,
 }
 
 /// Suppresses stock webview browser chrome — reload/find/print keybindings and
@@ -163,6 +182,43 @@ fn with_webview2_occlusion_disabled(current: &str) -> String {
     }
 }
 
+/// Appends the Chromium switches that keep a minimized/hidden WebView2's
+/// renderer process from being deprioritized, to an existing
+/// `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` value, without duplicating any
+/// that are already present.
+///
+/// Regression test for #884: Chromium's own renderer-backgrounding drops a
+/// hidden/minimized page's renderer process to background OS scheduling
+/// priority (Windows 11 shows this as "Efficiency Mode" in Task Manager) and
+/// throttles its timers. Luminous's audio plays natively via CPAL, never
+/// through the DOM, so Chromium has no signal that the page still matters
+/// while minimized — and un-throttling after a long minimize isn't instant,
+/// leaving the window blank for up to a minute after restore. This is a
+/// distinct mechanism from `with_webview2_occlusion_disabled`'s
+/// `CalculateNativeWinOcclusion` (a rendering-pipeline feature): backgrounding
+/// is a process-priority/timer-throttling behavior that persists even with
+/// occlusion calculation disabled.
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+fn with_webview2_backgrounding_disabled(current: &str) -> String {
+    const SWITCHES: &[&str] = &[
+        "--disable-renderer-backgrounding",
+        "--disable-backgrounding-occluded-windows",
+        "--disable-background-timer-throttling",
+    ];
+    let mut result = current.to_string();
+    for switch in SWITCHES {
+        if !result.contains(switch) {
+            if result.is_empty() {
+                result = switch.to_string();
+            } else {
+                result.push(' ');
+                result.push_str(switch);
+            }
+        }
+    }
+    result
+}
+
 /// Reads persisted equalizer settings (linear + parametric) from the DB and
 /// applies them to a freshly-constructed `AudioEngine`, so playback starts
 /// with the user's last-saved EQ state instead of engine defaults.
@@ -209,6 +265,39 @@ fn restore_equalizer_from_db(db: &Database, audio_engine: &AudioEngine) {
             }
         }
     }
+}
+
+/// Watches for Tokio scheduler delay: sleeps for a nominal 20ms (chosen to
+/// match a typical audio-frame window, since that's the granularity where a
+/// scheduling stall would first become audible) and compares it against the
+/// actual elapsed time. A large overshoot means the runtime's worker threads
+/// were too busy/blocked to poll this task promptly — the same condition
+/// that would delay IPC command handlers waiting on `AppState`'s locks.
+/// This is a cheap, dependency-free first signal for "is the runtime
+/// actually falling behind" per issue #1002 — not a replacement for proper
+/// tokio-console instrumentation, which needs a `tokio_unstable` build-wide
+/// cfg flag and is a separate decision.
+fn spawn_scheduler_latency_monitor() {
+    const PROBE_INTERVAL: std::time::Duration = std::time::Duration::from_millis(20);
+    const WARN_THRESHOLD: std::time::Duration = std::time::Duration::from_millis(40);
+
+    tauri::async_runtime::spawn(async move {
+        loop {
+            let start = std::time::Instant::now();
+            tokio::time::sleep(PROBE_INTERVAL).await;
+            let elapsed = start.elapsed();
+            if let Some(overshoot) = elapsed.checked_sub(PROBE_INTERVAL) {
+                if overshoot > WARN_THRESHOLD {
+                    log::warn!(
+                        "Tokio scheduler delay detected: {}ms probe took {}ms (overshoot {}ms) — IPC commands and UI ticks may be lagging",
+                        PROBE_INTERVAL.as_millis(),
+                        elapsed.as_millis(),
+                        overshoot.as_millis()
+                    );
+                }
+            }
+        }
+    });
 }
 
 /// Spawns the ~30 FPS spectrum-emission loop that pushes `spectrum-data`
@@ -271,7 +360,13 @@ fn spawn_position_tick_loop(
             };
             if state == crate::models::PlayState::Playing {
                 let mut p = player.lock().await;
-                if let Some(stats) = p.on_position_update(pos) {
+                // `pos` is the audio engine's absolute position within the
+                // current file; the UI and play-stats logic below both deal
+                // in track-relative time (0 at the start of the song), which
+                // only differs from `pos` for a CUE sheet track (#78) — for
+                // a plain song `beginning_nanosec` is 0 and this is exact.
+                let relative_pos = pos.saturating_sub(p.current_song_beginning_nanosec());
+                if let Some(stats) = p.on_position_update(relative_pos) {
                     let _ = app_handle.emit("song-stats-changed", stats);
                 }
                 tick_counter = tick_counter.wrapping_add(1);
@@ -283,7 +378,7 @@ fn spawn_position_tick_loop(
                 let _ = app_handle.emit(
                     "playback-position",
                     serde_json::json!({
-                        "position_nanosec": pos
+                        "position_nanosec": relative_pos
                     }),
                 );
             }
@@ -318,22 +413,40 @@ fn spawn_audio_event_loop(
                     match event {
                         crate::audio::AudioEvent::Playing { .. } => {
                             p.reset_playback_errors();
+                            let state = p.get_state().await;
+                            if let Some(ref song) = p.current_song {
+                                if let Some(app_state) = app.try_state::<AppState>() {
+                                    app_state.scrobbler.on_now_playing(song).await;
+                                    app_state
+                                        .scrobbler
+                                        .on_playback_state_changed(Some(song), true, state.position_nanosec)
+                                        .await;
+                                }
+                            }
                             let _ = app.emit(
                                 "track-changed",
                                 serde_json::json!({
                                     "song": p.current_song.clone()
                                 }),
                             );
-                            let state = p.get_state().await;
                             crate::media_session::mirror_state(&app, &state).await;
                             let _ = app.emit("playback-state", state);
                         }
                         crate::audio::AudioEvent::Paused => {
                             let state = p.get_state().await;
+                            if let Some(app_state) = app.try_state::<AppState>() {
+                                app_state
+                                    .scrobbler
+                                    .on_playback_state_changed(p.current_song.as_ref(), false, state.position_nanosec)
+                                    .await;
+                            }
                             crate::media_session::mirror_state(&app, &state).await;
                             let _ = app.emit("playback-state", state);
                         }
                         crate::audio::AudioEvent::Stopped => {
+                            if let Some(app_state) = app.try_state::<AppState>() {
+                                app_state.scrobbler.on_playback_stopped().await;
+                            }
                             let state = p.get_state().await;
                             crate::media_session::mirror_state(&app, &state).await;
                             let _ = app.emit("playback-state", state);
@@ -341,6 +454,11 @@ fn spawn_audio_event_loop(
                         crate::audio::AudioEvent::TrackFinished { .. } => {
                             let _ = p.on_track_finished().await;
                             let state = p.get_state().await;
+                            if state.state != crate::models::PlayState::Playing {
+                                if let Some(app_state) = app.try_state::<AppState>() {
+                                    app_state.scrobbler.on_playback_stopped().await;
+                                }
+                            }
                             crate::media_session::mirror_state(&app, &state).await;
                             let _ = app.emit("playback-state", state);
                         }
@@ -353,13 +471,22 @@ fn spawn_audio_event_loop(
                         }
                         crate::audio::AudioEvent::TrackTransitioned { song_id, .. } => {
                             let _ = p.on_gapless_transition(song_id).await;
+                            let state = p.get_state().await;
+                            if let Some(ref song) = p.current_song {
+                                if let Some(app_state) = app.try_state::<AppState>() {
+                                    app_state.scrobbler.on_now_playing(song).await;
+                                    app_state
+                                        .scrobbler
+                                        .on_playback_state_changed(Some(song), true, state.position_nanosec)
+                                        .await;
+                                }
+                            }
                             let _ = app.emit(
                                 "track-changed",
                                 serde_json::json!({
                                     "song": p.current_song.clone()
                                 }),
                             );
-                            let state = p.get_state().await;
                             crate::media_session::mirror_state(&app, &state).await;
                             let _ = app.emit("playback-state", state);
                         }
@@ -496,8 +623,18 @@ fn register_media_shortcuts(app: &tauri::App) {
     }
 }
 
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Opt-in Tokio task/scheduler introspection (see docs/PERFORMANCE.md).
+    // Must run before Tauri creates its async runtime, since it installs the
+    // `tracing` subscriber that records every task's spawn/poll events —
+    // anything spawned before this line wouldn't be visible in `tokio-console`.
+    // Off by default: the `tokio-console` feature and its `tokio_unstable`
+    // cfg flag are dev/debug-only and never part of a release build.
+    #[cfg(feature = "tokio-console")]
+    console_subscriber::init();
+
     // Without this, every log::info!/warn!/error! call across the backend
     // (including reconcile-failure diagnostics) is a silent no-op — `log`
     // is just a facade and needs a registered backend to actually emit
@@ -525,16 +662,21 @@ pub fn run() {
     {
         let key = "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS";
         let current = std::env::var(key).unwrap_or_default();
-        std::env::set_var(key, with_webview2_occlusion_disabled(&current));
+        let current = with_webview2_occlusion_disabled(&current);
+        std::env::set_var(key, with_webview2_backgrounding_disabled(&current));
     }
 
     tauri::Builder::default()
         .register_uri_scheme_protocol("luminous-art", move |ctx, request| {
             let app_handle = ctx.app_handle();
-            let covers_dir = app_handle.path().app_data_dir().unwrap().join("covers");
+            let covers_dir = crate::paths::resolve_app_data_dir(app_handle).join("covers");
 
             let uri_str = request.uri().to_string();
             let mut trimmed = &uri_str[..];
+            // On Windows WebView2, requests are made to `http://luminous-art.localhost/`
+            // via the frontend rewrite in `getCoverArtUrl()`. wry intercepts the HTTP request
+            // and runs `revert_uri_work_around` which rewrites the URI to `luminous-art://localhost/`
+            // before calling this handler (see #715). We strip either prefix here.
             if let Some(t) = uri_str.strip_prefix("http://luminous-art.localhost/") {
                 trimmed = t;
             } else if let Some(t) = uri_str.strip_prefix("luminous-art://") {
@@ -611,6 +753,10 @@ pub fn run() {
         .plugin(tauri_plugin_positioner::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        // `MacosLauncher::LaunchAgent` is required by the plugin's cross-platform
+        // API but inert on the platforms Luminous actually ships (Windows/Linux) —
+        // it only takes effect on a macOS build, which this project doesn't target.
+        .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
         .plugin(build_prevent_default_plugin())
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             tray::restore_main_window(app);
@@ -646,9 +792,40 @@ pub fn run() {
             }
 
             let db = Arc::new(
-                Database::new(app.path().app_data_dir().expect("no app data dir"))
+                Database::new(crate::paths::resolve_app_data_dir(app))
                     .expect("failed to initialize database"),
             );
+
+            // Graceful Store (MSIX) update handling (#744): register for
+            // Restart Manager-driven relaunch, and fire a one-time "app
+            // updated" OS notification if the previous launch's persisted
+            // version differs from this one.
+            #[cfg(target_os = "windows")]
+            {
+                restart_manager::register_for_restart();
+
+                let info = crate::install_format::detect_install_format();
+                if let Ok(conn) = db.pool.get() {
+                    let stored: Option<String> = conn
+                        .query_row(
+                            "SELECT value FROM app_state WHERE key = 'launched_version'",
+                            [],
+                            |row| row.get(0),
+                        )
+                        .ok();
+                    let current = env!("CARGO_PKG_VERSION");
+                    log::debug!(
+                        "MSIX update-notification check: format={:?} stored={:?} current={:?}",
+                        info.format,
+                        stored,
+                        current
+                    );
+                    if restart_manager::should_notify_update(&info.format, stored.as_deref(), current)
+                    {
+                        restart_manager::show_update_notification(current);
+                    }
+                }
+            }
 
             let audio_engine = AudioEngine::new();
             restore_equalizer_from_db(&db, &audio_engine);
@@ -668,6 +845,12 @@ pub fn run() {
             }
 
             let player = Arc::new(Mutex::new(Player::new(Arc::clone(&db), Arc::clone(&audio))));
+            let scrobbler = Arc::new(scrobbler::ScrobblerManager::new(Arc::clone(&db)));
+            scrobbler.trigger_flush();
+            {
+                let mut p = player.blocking_lock();
+                p.set_scrobbler(Arc::clone(&scrobbler));
+            }
             let volume_before_mute = Arc::new(Mutex::new(1.0));
 
             let manager = PlaylistManager::new(Arc::clone(&db)).expect("failed to init playlists");
@@ -690,11 +873,14 @@ pub fn run() {
 
             let cover_manager = Arc::new(CoverManager::new(
                 Arc::clone(&db),
-                app.path().app_data_dir().expect("no app data dir"),
+                crate::paths::resolve_app_data_dir(app),
             ));
 
             // Spawn real-time visualizer spectrum emission loop (Tokio)
             spawn_visualizer_loop(app.handle().clone(), Arc::clone(&audio));
+
+            // Spawn scheduler-delay watchdog (Tokio) — see #1002.
+            spawn_scheduler_latency_monitor();
 
             let args: Vec<String> = std::env::args().collect();
             let startup_path = if args.len() > 1 {
@@ -722,7 +908,7 @@ pub fn run() {
 
             let watcher = Arc::new(parking_lot::Mutex::new(None));
 
-            // souvlaki needs an HWND on Windows to register SMTC for our window.
+            // SMTC needs an HWND on Windows to register for our window (#576).
             #[cfg(target_os = "windows")]
             let media_hwnd: Option<*mut std::ffi::c_void> = app
                 .get_webview_window("main")
@@ -734,11 +920,12 @@ pub fn run() {
             let media_session = media_session::spawn(app.handle().clone(), media_hwnd);
             if media_session.is_none() {
                 eprintln!(
-                    "[Luminous Backend] OS media session integration (SMTC/MPRIS2/Now Playing) unavailable; continuing without it."
+                    "[Luminous Backend] OS media session integration (SMTC/MPRIS2) unavailable; continuing without it."
                 );
             }
 
             let watcher_paused = Arc::new(std::sync::atomic::AtomicU32::new(0));
+            let self_writes = Arc::new(collection::SelfWriteTracker::new());
 
             let state = AppState {
                 db,
@@ -749,9 +936,11 @@ pub fn run() {
                 cover_manager,
                 watcher,
                 watcher_paused,
+                self_writes,
                 startup_file: Mutex::new(startup_path),
                 media_session,
                 minimize_to_tray,
+                scrobbler,
             };
 
             crate::collection::start_watcher(app.handle().clone(), &state);
@@ -783,9 +972,15 @@ pub fn run() {
                 Arc::clone(&managed_state.player),
             );
 
+            // Spawn loopback HTTP bridge server for assistant and MCP playback control
+            crate::bridge::spawn_bridge_server(app.handle().clone());
+
             if let Err(e) = tray::init(app) {
                 log::warn!("Failed to initialize system tray: {e}");
             }
+
+            #[cfg(target_os = "windows")]
+            taskbar::init(app);
 
             register_media_shortcuts(app);
 
@@ -825,10 +1020,12 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             // Collection commands
             commands::collection::scan_directories,
+            commands::collection::rescan_songs,
             commands::collection::prune_missing_songs,
             commands::collection::add_directory,
             commands::collection::remove_directory,
             commands::collection::get_directories,
+            commands::collection::update_directory_metadata,
             commands::collection::get_library_stats,
             commands::collection::search_songs,
             commands::collection::get_library_snapshot,
@@ -839,14 +1036,23 @@ pub fn run() {
             commands::collection::get_top_artists,
             commands::collection::get_favourite_songs,
             commands::collection::get_recently_added_songs,
+            commands::collection::get_most_played_songs,
             commands::collection::get_recently_played,
             commands::collection::get_recently_played_songs,
             commands::collection::clear_play_history,
-            commands::collection::get_most_frequently_played,
             commands::collection::get_recently_added,
+            commands::collection::get_featured_albums,
+            commands::collection::get_top_albums,
             commands::collection::get_artist_profile,
             commands::collection::set_artist_profile,
             commands::collection::get_all_artist_profiles,
+            commands::collection::get_album_profile,
+            commands::collection::set_album_profile,
+            commands::collection::get_all_album_profiles,
+            commands::collection::get_artist_tags_overview,
+            commands::collection::set_songs_not_included,
+            commands::collection::get_songs_missing_musicbrainz_id,
+            commands::collection::get_songs_missing_metadata,
             // Playback commands
             commands::player::play_song,
             commands::player::play_songs,
@@ -868,6 +1074,13 @@ pub fn run() {
             commands::player::refresh_playback_queue,
             commands::player::set_shuffle_mode,
             commands::player::set_repeat_mode,
+            // Pinned Home shelf commands (#222)
+            commands::pins::pin_item,
+            commands::pins::unpin_item,
+            commands::pins::get_pinned_items,
+            commands::pins::reorder_pinned_items,
+            // Social share card export (#97)
+            commands::share::save_share_card_image,
             // Playlist commands
             commands::playlist::validate_playlist_name,
             commands::playlist::create_playlist,
@@ -883,7 +1096,6 @@ pub fn run() {
             commands::playlist::add_to_playlist,
             commands::playlist::remove_from_playlist,
             commands::playlist::deduplicate_playlist,
-            commands::playlist::trim_playlist_before_uuid,
             commands::playlist::reorder_playlist_item,
             commands::playlist::reorder_playlist_item_by_uuid,
             commands::playlist::reorder_playlist_items,
@@ -900,6 +1112,9 @@ pub fn run() {
             // Cover Art commands
             commands::cover::get_cover_art_uri,
             commands::cover::fetch_remote_cover,
+            commands::cover::get_extended_artwork_for_song,
+            commands::cover::get_extended_artwork_for_artist,
+            commands::cover::open_artwork_path,
             // Visualizer commands
             commands::visualizer::get_waveform_data,
             commands::visualizer::get_band_waveform_data,
@@ -917,14 +1132,18 @@ pub fn run() {
             commands::lyrics::get_lyrics,
             commands::lyrics::save_lyrics,
             commands::lyrics::set_instrumental,
+            // Details pane context enrichment (#23)
+            commands::context::get_song_context,
             // Tag Editor commands
             commands::tageditor::get_song_details,
-            commands::tageditor::lookup_acoustid_tags,
-            commands::tageditor::has_acoustid_env_key,
             commands::tageditor::save_song_tags,
             commands::tageditor::save_album_tags,
             commands::tageditor::clear_song_cover_art,
             commands::tageditor::clear_album_cover_art,
+            commands::tageditor::open_song_folder,
+            // MusicBrainz Picard bridge commands (#367)
+            commands::picard::open_in_picard,
+            commands::picard::get_picard_path,
             // Genre/tag browsing commands (#224) — read the existing
             // songs.genre column above; editing goes through save_song_tags.
             commands::tags::get_songs_by_tag,
@@ -940,6 +1159,9 @@ pub fn run() {
             commands::tags::reorder_tag_in_group,
             commands::tags::merge_tags,
             commands::tags::delete_tags,
+            // Theme commands (#165)
+            commands::theme::import_theme,
+            commands::theme::export_theme,
             // Settings commands
             commands::settings::set_app_setting,
             commands::settings::get_all_app_settings,
@@ -951,15 +1173,38 @@ pub fn run() {
             commands::settings::set_fade_settings,
             commands::settings::get_minimize_to_tray_enabled,
             commands::settings::set_minimize_to_tray_enabled,
+            commands::settings::get_autostart_enabled,
+            commands::settings::set_autostart_enabled,
             commands::diagnostics::log_frontend_error,
             commands::diagnostics::export_diagnostics,
             install_format::get_install_format,
+            // Scrobbler commands (#83)
+            commands::scrobbler::get_scrobbler_settings,
+            commands::scrobbler::set_scrobbler_settings,
+            commands::scrobbler::validate_listenbrainz_token,
+            commands::scrobbler::get_scrobble_cache_status,
+            commands::scrobbler::flush_scrobble_cache,
+            commands::scrobbler::toggle_scrobble_pause,
+            commands::scrobbler::sync_favourites_to_listenbrainz,
+            commands::scrobbler::get_discord_status,
             // Stats commands
             commands::stats::set_song_rating,
             commands::stats::set_album_rating,
+            commands::stats::get_stats_summary,
+            commands::stats::get_top_albums_summary,
+            commands::stats::get_listening_activity,
+            commands::stats::get_stats_exclusions,
+            commands::stats::set_stats_excluded,
             // Organizer commands
             commands::organizer::preview_organize,
             commands::organizer::apply_organize,
+            // WebDAV commands (#682)
+            commands::webdav::list_webdav_servers,
+            commands::webdav::save_webdav_server,
+            commands::webdav::delete_webdav_server,
+            commands::webdav::test_webdav_connection,
+            commands::webdav::check_webdav_connection,
+            commands::webdav::sync_webdav_server,
             // Window & Miniplayer commands
             commands::window::geometry_capture_supported,
             commands::window::enter_miniplayer_mode,
@@ -1034,6 +1279,39 @@ mod startup_rendering_workaround_tests {
         assert_eq!(
             with_webview2_occlusion_disabled("--foo --disable-features=msWebOOUI --bar"),
             "--foo --disable-features=msWebOOUI,CalculateNativeWinOcclusion --bar"
+        );
+    }
+
+    #[test]
+    fn test_webview2_backgrounding_flags_added_to_empty_value() {
+        assert_eq!(
+            with_webview2_backgrounding_disabled(""),
+            "--disable-renderer-backgrounding --disable-backgrounding-occluded-windows --disable-background-timer-throttling"
+        );
+    }
+
+    #[test]
+    fn test_webview2_backgrounding_flags_appended_to_existing_args() {
+        assert_eq!(
+            with_webview2_backgrounding_disabled("--disable-features=CalculateNativeWinOcclusion"),
+            "--disable-features=CalculateNativeWinOcclusion --disable-renderer-backgrounding --disable-backgrounding-occluded-windows --disable-background-timer-throttling"
+        );
+    }
+
+    #[test]
+    fn test_webview2_backgrounding_flags_not_duplicated_if_already_present() {
+        let already_set = "--disable-renderer-backgrounding --disable-backgrounding-occluded-windows --disable-background-timer-throttling";
+        assert_eq!(
+            with_webview2_backgrounding_disabled(already_set),
+            already_set
+        );
+    }
+
+    #[test]
+    fn test_webview2_backgrounding_flags_only_add_missing_ones() {
+        assert_eq!(
+            with_webview2_backgrounding_disabled("--disable-renderer-backgrounding"),
+            "--disable-renderer-backgrounding --disable-backgrounding-occluded-windows --disable-background-timer-throttling"
         );
     }
 }

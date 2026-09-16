@@ -4,7 +4,7 @@
   import Sidebar from '../lib/components/Sidebar.svelte';
   import RightPanel from '../lib/components/RightPanel.svelte';
   import PlayerBar from '../lib/components/PlayerBar.svelte';
-  import { slide, fly } from 'svelte/transition';
+  import { slide, fly, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import { collectionStore } from '../lib/stores/collection.svelte';
   import { navigationStore } from '../lib/stores/navigation.svelte';
@@ -14,13 +14,23 @@
   import Miniplayer from '../lib/components/Miniplayer.svelte';
   import KeyboardShortcutsModal from '../lib/components/KeyboardShortcutsModal.svelte';
   import Toast from '../lib/components/Toast.svelte';
+  import WalkthroughOverlay from '../lib/components/WalkthroughOverlay.svelte';
+  import WelcomeScreen from '../lib/components/WelcomeScreen.svelte';
   import { IconContext, MusicNotesIcon as Music, CloudArrowUpIcon as UploadCloud } from 'phosphor-svelte';
 
   import { i18n } from '../lib/stores/i18n.svelte';
   import { prefs } from '../lib/stores/prefs.svelte';
   import { tagsStore } from '../lib/stores/tags.svelte';
   import { updaterStore } from '../lib/stores/updater.svelte';
+  import { picardStore } from '../lib/stores/picard.svelte';
+  import { scrobblerStore } from '../lib/stores/scrobbler.svelte';
   import { toastStore } from '../lib/stores/toast.svelte';
+  import { walkthroughStore } from '../lib/stores/walkthrough.svelte';
+  import { welcomeStore } from '../lib/stores/welcome.svelte';
+  import { isLinux as platformIsLinux } from '../lib/platform';
+  import { themeStore } from '../lib/stores/theme.svelte';
+  import { generateEllipseGradientSvg } from '../lib/utils/ellipseGradient';
+  import { formatWindowTitle } from '../lib/utils/formatters';
   import { onMount } from 'svelte';
   import { getCurrentWebview } from '@tauri-apps/api/webview';
   import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -35,6 +45,14 @@
   } from '../lib/constants';
 
   let { children } = $props();
+
+  function handleWelcomeGetStarted() {
+    // Unconditional: this is an explicit user request to start the tour, not
+    // the auto-resume-on-launch path below — it should never be suppressed
+    // by a hasCompleted flag left over from a previous run.
+    welcomeStore.markSeen();
+    walkthroughStore.start();
+  }
   let isLinux = $state(false);
   let isShortcutsModalOpen = $state(false);
   let isDragActive = $state(false);
@@ -47,12 +65,73 @@
     windowLayoutStore.isSidebarAutoCollapsed ? SIDEBAR_COLLAPSED_WIDTH_PX : windowLayoutStore.sidebarWidth
   );
 
+  // Immersive ambient background: a layered-ellipse SVG gradient tinted from
+  // the current song's extracted artwork colors, seeded by song id so it's
+  // stable while a track plays and only regenerates on track change. This
+  // replaced a `blur-3xl` full-window CoverArt layer that was skipped on
+  // Linux entirely (see #452) — WebKitGTK's compositor choked on a
+  // continuous CSS blur() over a scaled image. Pure SVG with no blur/
+  // backdrop-filter renders identically (and cheaply) on every platform, so
+  // the immersive view no longer needs a Linux-specific fallback here.
+  let immersiveAmbientSvg = $derived.by(() => {
+    const art = themeStore.artworkColors;
+    const colors = art ? [art.vibrant, art.darkVibrant, art.lightVibrant, art.muted].filter((c): c is string => !!c) : undefined;
+    return generateEllipseGradientSvg({ colors, seed: playerStore.currentSong?.id ?? 'immersive-empty' });
+  });
+
+  // Dynamically synchronize the OS window title with Now Playing track status (#29).
+  // When playing: "[Song Title] - [Artist] - Luminous" (or "[Song Title] - Luminous").
+  // When stopped/paused: reverts to "Luminous".
+  $effect(() => {
+    void i18n.currentLocale;
+    const title = formatWindowTitle(playerStore.currentSong, playerStore.state);
+    if (typeof document !== 'undefined') {
+      document.title = title;
+    }
+    void getCurrentWindow()?.setTitle?.(title)?.catch(() => {});
+  });
+
+  // Auto-resumes the walkthrough in "resume" mode (see the onMount comment
+  // near welcomeStore.init()/walkthroughStore.init()) whenever a
+  // previously-unavailable step becomes reachable — most notably right when
+  // the user presses Play for the first time, so the player-bar/right-panel
+  // steps don't have to wait for a relaunch to be offered. Gated on
+  // collectionStore.statsLoaded (not the moment welcomeStore/walkthroughStore
+  // resolve) since those are single settings round-trips that finish well
+  // before a freshly-scanned library's stats do — checking earlier would see
+  // a stale total_songs === 0. The `isActive` guard keeps this from
+  // re-triggering while a resumed run is already showing, and it's
+  // otherwise self-limiting: once every currently-available step has been
+  // seen, hasPendingSteps goes false and this becomes a no-op until
+  // something new (more songs, playback) makes another step reachable.
+  $effect(() => {
+    if (walkthroughStore.isActive) return;
+    if (!welcomeStore.initialized || !welcomeStore.hasSeen) return;
+    if (!collectionStore.statsLoaded) return;
+    void playerStore.currentSong;
+    if (walkthroughStore.hasPendingSteps) {
+      walkthroughStore.start("resume");
+    }
+  });
+
   onMount(() => {
-    isLinux = typeof navigator !== 'undefined' && navigator.userAgent.includes('Linux');
+    isLinux = platformIsLinux;
     i18n.init();
     prefs.init();
+    // The very first launch shows WelcomeScreen instead of auto-popping the
+    // tour — its "Get Started" button is what starts the tour. Returning
+    // users who already passed the welcome gate auto-resume in "resume"
+    // mode, which only offers steps not yet seen (see walkthrough.svelte.ts)
+    // — so a step that was unreachable on an earlier, emptier run (e.g. the
+    // player-bar steps before anything ever played) gets offered once it
+    // becomes reachable, without re-showing ones already seen. Skippable in
+    // one click via the overlay's Skip button or Escape.
+    welcomeStore.init();
+    walkthroughStore.init();
     tagsStore.load().catch((err) => console.error('Failed to load tags:', err));
     updaterStore.init();
+    picardStore.init();
+    scrobblerStore.init();
     void getCurrentWindow().show().catch(() => {});
 
     function handleGlobalHotkeys(e: KeyboardEvent) {
@@ -447,21 +526,19 @@
              ≈ 96px) that overlays the bottom of this face, so the content centers within the
              visible area above the dock rather than the full face height. -->
         <div class="flip-face flip-back overflow-hidden bg-brand-main flex flex-col items-center justify-center pt-8 px-4 min-[420px]:px-8 pb-32 select-none {!windowLayoutStore.effectiveImmersiveMode ? 'pointer-events-none' : 'pointer-events-auto'}">
-          <!-- Immersive Ambient Blurred Background: skipped on Linux, where the
-               `blur-3xl` filter over a full-window layer is expensive on
-               WebKitGTK's compositor and can let the translucent layer sample
-               the main UI underneath instead of the intended solid backdrop
-               (see #452) — the face's own `bg-brand-main` is fallback enough. -->
-          {#if playerStore.currentSong && !isLinux}
-            <div class="absolute inset-0 z-0 opacity-20 blur-3xl pointer-events-none scale-110">
-              <CoverArt
-                songId={playerStore.currentSong?.id}
-                artEmbedded={playerStore.currentSong?.art_embedded}
-                artAutomatic={playerStore.currentSong?.art_automatic}
-                artManual={playerStore.currentSong?.art_manual}
-                sizeClass="w-full h-full object-cover"
-              />
-            </div>
+          <!-- Immersive Ambient Background: a soft layered-ellipse SVG gradient
+               tinted from the current song's artwork colors (see
+               immersiveAmbientSvg above). Renders the same, cheaply, on every
+               platform — no CSS blur()/backdrop-filter involved. Keyed on
+               song id so a track change destroys the old layer and mounts a
+               new one; Svelte plays both transitions concurrently, giving a
+               genuine cross-dissolve rather than a hard cut. -->
+          {#if playerStore.currentSong}
+            {#key playerStore.currentSong.id}
+              <div class="absolute inset-0 z-0 opacity-30 pointer-events-none immersive-ambient" transition:fade={{ duration: 900 }}>
+                {@html immersiveAmbientSvg}
+              </div>
+            {/key}
           {/if}
 
           <!-- Center Container: Card and Details. Below md, the layout would
@@ -490,7 +567,7 @@
                     {i18n.t('playerBar.nowPlaying')}
                   </span>
                 </div>
-                <h1 class="mt-3 text-4xl md:text-6xl font-black text-brand-text-primary leading-[0.95] tracking-tight select-text">
+                <h1 class="mt-3 text-4xl md:text-6xl font-black text-brand-text-primary leading-[0.95] tracking-tight select-text text-balance">
                   {playerStore.currentSong.title || i18n.t('collection.unknownSong')}
                 </h1>
                 <p class="mt-3 text-lg md:text-xl text-brand-text-secondary select-text font-semibold">
@@ -555,10 +632,22 @@
   <KeyboardShortcutsModal onClose={() => (isShortcutsModalOpen = false)} />
 {/if}
 
+{#if welcomeStore.initialized && !welcomeStore.hasSeen}
+  <WelcomeScreen onGetStarted={handleWelcomeGetStarted} />
+{/if}
+
+<WalkthroughOverlay />
+
   <Toast />
 </IconContext>
 
 <style>
+  .immersive-ambient :global(svg) {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
   .flip-perspective {
     perspective: none;
   }

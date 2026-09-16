@@ -1,3 +1,5 @@
+import type { ArtistSocialLink } from "../types";
+
 export interface SocialPlatformInfo {
   id: string;
   label: string;
@@ -210,3 +212,112 @@ export function formatDisplayLabel(platformId: string, input: string): string {
 
   return info.label;
 }
+
+const MBID_PATTERN = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i;
+
+/**
+ * Derives a fanart.tv artist page link from a stored MusicBrainz social
+ * link's MBID (#98/#761) — fanart.tv keys its artist pages by the same
+ * MusicBrainz artist id. Not a fetch: it's the same "link" pattern already
+ * used for the user-entered MusicBrainz/Discogs/Wikipedia links above, just
+ * computed from an id we already have on hand instead of typed in by the
+ * user. Not registered in {@link SOCIAL_PLATFORMS} — it's a derived,
+ * read-only link, not something users pick from the "add link" editor.
+ * Returns null when there's no MusicBrainz link, or its value doesn't
+ * contain a recognizable MBID.
+ */
+export function deriveFanartTvUrl(socialLinks: ArtistSocialLink[] | undefined | null): string | null {
+  const mbLink = socialLinks?.find((l) => l.platform === "musicbrainz");
+  if (!mbLink?.handle_or_url) return null;
+  const match = mbLink.handle_or_url.match(MBID_PATTERN);
+  if (!match) return null;
+  return `https://fanart.tv/artist/${match[1].toLowerCase()}`;
+}
+
+/**
+ * Derives a ListenBrainz album/release page URL from a representative song's
+ * MusicBrainz release group or release ID (#950).
+ */
+export function deriveListenbrainzAlbumUrl(song: {
+  musicbrainz_release_group_id?: string | null;
+  musicbrainz_album_id?: string | null;
+} | null | undefined): string | null {
+  if (!song) return null;
+  const releaseGroupMbid = song.musicbrainz_release_group_id?.trim();
+  if (releaseGroupMbid && MBID_PATTERN.test(releaseGroupMbid)) {
+    return `https://listenbrainz.org/album/${releaseGroupMbid}/`;
+  }
+  const albumMbid = song.musicbrainz_album_id?.trim();
+  if (albumMbid && MBID_PATTERN.test(albumMbid)) {
+    return `https://listenbrainz.org/release/${albumMbid}/`;
+  }
+  return null;
+}
+
+/**
+ * Curated list of link platforms specifically relevant to album releases (#950).
+ * Prevents artist-level social channels (e.g. personal Instagram, Twitter, TikTok)
+ * from cluttering album liner notes.
+ */
+export const ALBUM_LINK_PLATFORMS: SocialPlatformInfo[] = [
+  {
+    id: "website",
+    label: "Official Page",
+    placeholder: "https://artist.com/album or www.artist.com/album",
+    example: "https://artist.com/music/album-name",
+  },
+  {
+    id: "bandcamp",
+    label: "Bandcamp",
+    placeholder: "https://artist.bandcamp.com/album/...",
+    example: "https://artist.bandcamp.com/album/album-name",
+  },
+  {
+    id: "discogs",
+    label: "Discogs",
+    placeholder: "https://www.discogs.com/release/... or .../master/...",
+    example: "https://www.discogs.com/master/12345-Album-Name",
+  },
+  {
+    id: "wikipedia",
+    label: "Wikipedia",
+    placeholder: "https://en.wikipedia.org/wiki/...",
+    example: "https://en.wikipedia.org/wiki/Album_Name",
+  },
+  {
+    id: "musicbrainz",
+    label: "MusicBrainz",
+    placeholder: "https://musicbrainz.org/release-group/...",
+    example: "https://musicbrainz.org/release-group/042c0697-3948-4720-bf43-690240aeac43",
+  },
+  {
+    id: "spotify",
+    label: "Spotify",
+    placeholder: "https://open.spotify.com/album/...",
+    example: "https://open.spotify.com/album/4Z8W4fKeB5YxbusRsdQVPb",
+  },
+  {
+    id: "apple_music",
+    label: "Apple Music",
+    placeholder: "https://music.apple.com/album/...",
+    example: "https://music.apple.com/us/album/album-name/123456",
+  },
+  {
+    id: "youtube",
+    label: "YouTube",
+    placeholder: "https://youtube.com/playlist?list=... or video URL",
+    example: "https://www.youtube.com/playlist?list=OLAK5uy_...",
+  },
+  {
+    id: "soundcloud",
+    label: "SoundCloud",
+    placeholder: "https://soundcloud.com/artist/sets/...",
+    example: "https://soundcloud.com/artist/sets/album-name",
+  },
+  {
+    id: "custom",
+    label: "Custom Link",
+    placeholder: "https://... (e.g. Pitchfork review, liner notes, blog)",
+    example: "https://pitchfork.com/reviews/albums/...",
+  },
+];

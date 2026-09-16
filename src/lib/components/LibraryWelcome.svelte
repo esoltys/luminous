@@ -3,6 +3,7 @@
   import { i18n } from "../stores/i18n.svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
+  import { walkthroughStore } from "../stores/walkthrough.svelte";
   import Button from "./Button.svelte";
 
   // A database last opened by a newer Luminous build looks identical to a
@@ -26,8 +27,8 @@
     {/if}
   </div>
   {#if dbNewer}
-    <h3 class="text-base font-semibold text-brand-text-primary mb-1.5">{i18n.t('dbNewerThanApp.title')}</h3>
-    <p class="text-xs text-brand-text-secondary mb-5 leading-relaxed">
+    <h3 class="text-base font-semibold text-brand-text-primary mb-1.5 text-balance">{i18n.t('dbNewerThanApp.title')}</h3>
+    <p class="text-xs text-brand-text-secondary mb-5 leading-relaxed text-pretty">
       {i18n.t('dbNewerThanApp.text', {
         dbVersion: collectionStore.dbSchemaStatus?.db_version,
         appVersion: collectionStore.dbSchemaStatus?.app_version,
@@ -37,8 +38,12 @@
       {i18n.t('sidebar.settings')}
     </Button>
   {:else}
-    <h3 class="text-base font-semibold text-brand-text-primary mb-1.5">{i18n.t('emptyLibrary.title')}</h3>
-    <p class="text-xs text-brand-text-secondary mb-5 leading-relaxed">{i18n.t('emptyLibrary.text')}</p>
+    <!-- The very first launch (before the tour has ever been completed) shows
+         the full-screen WelcomeScreen instead — this stays a plain, non-
+         "Welcome"-branded empty state so it doesn't duplicate that greeting
+         for returning users whose library later empties out (folders removed). -->
+    <h3 class="text-base font-semibold text-brand-text-primary mb-1.5 text-balance">{i18n.t('emptyLibrary.title')}</h3>
+    <p class="text-xs text-brand-text-secondary mb-5 leading-relaxed text-pretty">{i18n.t('emptyLibrary.text')}</p>
     <div class="flex items-center gap-2">
       <Button onclick={() => collectionStore.addDirectoryDialog()} variant="primary" size="sm">
         <FolderClosed class="w-3.5 h-3.5" />
@@ -46,6 +51,9 @@
       </Button>
       <Button onclick={() => { navigationStore.activeTab = 'help'; }} variant="secondary" size="sm">
         {i18n.t('sidebar.help')}
+      </Button>
+      <Button onclick={() => walkthroughStore.start()} variant="secondary" size="sm">
+        {i18n.t('walkthrough.takeTour', {}, 'Take a quick tour')}
       </Button>
     </div>
   {/if}

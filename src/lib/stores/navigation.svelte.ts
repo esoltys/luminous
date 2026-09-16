@@ -1,16 +1,29 @@
 import { collectionStore } from "./collection.svelte";
 import { playlistsStore } from "./playlists.svelte";
 
-export type ActiveTab = "home" | "collection" | "playlists" | "settings" | "lyrics" | "help";
+export type ActiveTab = "home" | "collection" | "playlists" | "settings" | "lyrics" | "stats" | "organize" | "help";
 export type ActiveSubTab = "songs" | "albums" | "artists" | "genres";
 
 /** Which grid is shown under the Playlists tab (mirrors `ActiveSubTab` for Collection). */
-export type PlaylistsSubTab = "auto" | "custom";
+type PlaylistsSubTab = "auto" | "custom";
 
 /** An auto-playlist reference (Favourites, Recently Added, genre, decade, BPM,
- * or the genre-less "No Genre" group), for the auto-playlist detail view. */
+ * Missing Metadata, or the genre-less "No Genre" group), for the auto-playlist
+ * detail view. */
 export interface AutoPlaylistRef {
-  kind: "favourites" | "recently_added" | "history" | "genre" | "decade" | "bpm" | "no_genre" | "artist_tag";
+  kind:
+    | "favourites"
+    | "recently_added"
+    | "most_played"
+    | "history"
+    | "genre"
+    | "decade"
+    | "bpm"
+    | "no_genre"
+    | "artist_tag"
+    | "missing_metadata"
+    | "missing_musicbrainz"
+    | "daypart";
   /** For kind "genre": the curated tag's plain name (#548) — a top-level
    * card name or a sub-genre chip name, resolved the same way either way
    * (see `viewGenreTag`). */
@@ -253,6 +266,29 @@ class NavigationStore {
     });
   }
 
+  /** Opens an artist tag's auto-playlist detail view — the browsable-only
+   * counterpart to `viewGenreTag` for curated artist tags (#962/#956
+   * follow-up). Resolves the tag's materialized playlist row if one exists
+   * (`dynamic_spec === "artisttag:"+tag`); below the auto-playlist song
+   * threshold it has none yet, so `playlistId` stays undefined and
+   * AutoPlaylistDetailView falls back to a direct `get_songs_by_artist_tag`
+   * query. */
+  viewArtistTag(tag: string) {
+    collectionStore.searchQuery = "";
+    collectionStore.searchResults = [];
+    this.selectedArtistName = null;
+    this.selectedAlbumName = null;
+    const playlist = playlistsStore.playlists.find(
+      (p) => p.dynamic_enabled && p.dynamic_spec === `artisttag:${tag}`
+    );
+    this.viewAutoPlaylist({
+      kind: "artist_tag",
+      artistTag: tag,
+      playlistId: playlist?.id,
+      updated: playlist?.updated,
+    });
+  }
+
   viewArtist(name: string) {
     collectionStore.searchQuery = "";
     collectionStore.searchResults = [];
@@ -283,6 +319,16 @@ class NavigationStore {
     this.playlistsSubTab = "auto";
     this.selectedPlaylistId = null;
     this.selectedAutoPlaylist = ref;
+  }
+
+  /** One-shot signal (not persisted) telling the playlist detail view to scroll
+   * the currently playing song into view once it renders — set when the
+   * playbar's Queue button navigates there, so the user lands on their place
+   * in the queue instead of the top. Consumed and cleared by the view. */
+  pendingScrollToCurrentSong = $state(false);
+
+  requestScrollToCurrentSong() {
+    this.pendingScrollToCurrentSong = true;
   }
 }
 

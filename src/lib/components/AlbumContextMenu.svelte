@@ -4,16 +4,28 @@
     PlusIcon as Plus,
     ListPlusIcon as ListPlus,
     MicrophoneStageIcon as Mic2,
-    StackIcon as Layers
+    StackIcon as Layers,
+    PushPinIcon as Pin,
+    PushPinSlashIcon as PinOff,
+    PencilSimpleIcon as Edit3,
+    ArrowSquareOutIcon as OpenInPicard,
+    ChartBarIcon as BarChart2,
+    ShareNetworkIcon as Share
   } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
+  import { pinnedStore } from "../stores/pinned.svelte";
+  import { statsExclusionsStore } from "../stores/statsExclusions.svelte";
+  import { picardStore } from "../stores/picard.svelte";
   import { toastStore } from "../stores/toast.svelte";
+  import { navigationStore } from "../stores/navigation.svelte";
+  import { openInPicard } from "../utils/picard";
   import { invoke } from "@tauri-apps/api/core";
   import type { Song } from "../types";
   import ContextMenu from "./ContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
+  import ShareModal from "./ShareModal.svelte";
 
   let {
     x,
@@ -24,6 +36,8 @@
     onAddToQueue,
     onAddToPlaylist,
     onGoToArtist,
+    onEditAlbum,
+    onOpenInPicard,
     onClose,
   }: {
     x: number;
@@ -34,14 +48,19 @@
     onAddToQueue?: () => void;
     onAddToPlaylist?: () => void;
     onGoToArtist?: () => void;
+    onEditAlbum?: () => void;
+    onOpenInPicard?: () => void;
     onClose: () => void;
   } = $props();
+
+  let showShareModal = $state(false);
 
   async function handleDefaultAddToQueue() {
     try {
       const songs = await invoke<Song[]>("get_songs_by_album", { album: albumName || "" });
-      if (songs.length > 0) {
-        const songIds = songs.map((s) => s.id);
+      const playable = songs.filter((s) => !s.not_included);
+      if (playable.length > 0) {
+        const songIds = playable.map((s) => s.id);
         await playlistsStore.addSongsToQueue(songIds);
         const name = albumName || i18n.t("collection.unknownAlbum");
         toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name }, `Added ${name} to Queue`));
@@ -49,6 +68,27 @@
     } catch (err) {
       console.error("Failed to add album to Queue:", err);
     }
+  }
+
+  async function handleDefaultOpenInPicard() {
+    try {
+      const songs = await invoke<Song[]>("get_songs_by_album", { album: albumName || "" });
+      if (songs.length > 0) {
+        await openInPicard(songs.map((s) => s.id));
+      }
+    } catch (err) {
+      console.error("Failed to open album in Picard:", err);
+    }
+  }
+
+  async function handleToggleStatsExcluded() {
+    const excluded = !statsExclusionsStore.isExcluded("album", albumName);
+    await statsExclusionsStore.setExcluded("album", albumName, excluded);
+    const name = albumName || i18n.t("collection.unknownAlbum");
+    const message = excluded
+      ? i18n.t("stats.excludedToast", { name })
+      : i18n.t("stats.includedToast", { name });
+    toastStore.show(message);
   }
 </script>
 
@@ -93,4 +133,58 @@
       onclick={() => { onGoToArtist?.(); onClose(); }}
     />
   {/if}
+
+  {#if albumName}
+    <ContextMenuDivider />
+    <ContextMenuItem
+      icon={Edit3}
+      label={i18n.t("albumDetail.editInfoTooltip")}
+      onclick={() => {
+        if (onEditAlbum) {
+          onEditAlbum();
+        } else {
+          navigationStore.viewAlbum(albumName);
+        }
+        onClose();
+      }}
+    />
+    <ContextMenuItem
+      icon={OpenInPicard}
+      label={i18n.t("picard.openInPicard")}
+      onclick={async () => {
+        if (onOpenInPicard) {
+          onOpenInPicard();
+        } else {
+          await handleDefaultOpenInPicard();
+        }
+        onClose();
+      }}
+      disabled={!picardStore.available}
+      title={picardStore.available ? undefined : i18n.t("picard.notFoundTooltip")}
+    />
+    <ContextMenuItem
+      icon={Share}
+      label={i18n.t("shareModal.menuItem")}
+      onclick={() => { showShareModal = true; }}
+    />
+    <ContextMenuDivider />
+    <ContextMenuItem
+      icon={pinnedStore.isPinned("album", albumName) ? PinOff : Pin}
+      label={pinnedStore.isPinned("album", albumName)
+        ? i18n.t("playlists.contextMenuUnpinHome")
+        : i18n.t("playlists.contextMenuPinHome")}
+      onclick={() => { pinnedStore.toggle("album", albumName); onClose(); }}
+    />
+    <ContextMenuItem
+      icon={BarChart2}
+      label={statsExclusionsStore.isExcluded("album", albumName)
+        ? i18n.t("stats.includeInStats")
+        : i18n.t("stats.excludeFromStats")}
+      onclick={() => { handleToggleStatsExcluded(); onClose(); }}
+    />
+  {/if}
 </ContextMenu>
+
+{#if showShareModal}
+  <ShareModal {albumName} onClose={() => { showShareModal = false; }} />
+{/if}

@@ -21,6 +21,7 @@ describe("TagEditor.svelte", () => {
     track: 3,
     disc: 1,
     year: 2020,
+    originalyear: null,
     grouping: "Original Grouping",
     bpm: 120,
     initial_key: "Cmaj",
@@ -33,19 +34,11 @@ describe("TagEditor.svelte", () => {
     vi.clearAllMocks();
     vi.mocked(invoke).mockImplementation(async (cmd: string) => {
       if (cmd === "get_song_details") return mockSongDetails;
-      if (cmd === "lookup_acoustid_tags") {
-        return {
-          title: "Fetched Title",
-          artist: "Fetched Artist",
-          album: "Fetched Album",
-          year: 2021,
-        };
-      }
       if (cmd === "save_song_tags") return null;
       if (cmd === "clear_song_cover_art") return null;
       if (cmd === "set_song_rating") return 5;
       if (cmd === "get_library_snapshot") return { songs: [], albums: [], artists: [] };
-      if (cmd === "get_all_artist_profiles") return [];
+      if (cmd === "get_all_artist_profiles" || cmd === "get_all_album_profiles") return [];
       if (cmd === "get_playlists") return [{ id: 1, name: "Queue", dynamic_enabled: false, created: 0, updated: 0, track_count: 0, is_queue: true }];
       return null;
     });
@@ -69,6 +62,41 @@ describe("TagEditor.svelte", () => {
     // input) labeled text field.
     expect(getByText("Original Artist")).toBeInTheDocument();
     expect(getByText("Original Composer")).toBeInTheDocument();
+  });
+
+  it("shows a remote-source note for a WebDAV song and not for a local one (#682)", async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_song_details") {
+        return { ...mockSongDetails, path: "http://user:pass@127.0.0.1:8080/Music/song.mp3" };
+      }
+      return null;
+    });
+    const { findByText } = render(TagEditor, { songId: 10, onClose: vi.fn() });
+    expect(
+      await findByText(/changes are saved in Luminous only/i)
+    ).toBeInTheDocument();
+  });
+
+  it("shows no remote-source note for a local song", async () => {
+    const { findByText, queryByText } = render(TagEditor, { songId: 10, onClose: vi.fn() });
+    await findByText("/music/rock/song.flac");
+    expect(queryByText(/changes are saved in Luminous only/i)).not.toBeInTheDocument();
+  });
+
+  it("hides the Clear Artwork button for a WebDAV song even with embedded art (#682)", async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_song_details") {
+        return {
+          ...mockSongDetails,
+          path: "http://user:pass@127.0.0.1:8080/Music/song.mp3",
+          art_embedded: true,
+        };
+      }
+      return null;
+    });
+    const { findByText, queryByRole } = render(TagEditor, { songId: 10, onClose: vi.fn() });
+    await findByText(/changes are saved in Luminous only/i);
+    expect(queryByRole("button", { name: /clear artwork/i })).not.toBeInTheDocument();
   });
 
   it("shows a read-only Various Artists pill instead of the Album Artist input when the song is part of a compilation", async () => {
@@ -221,23 +249,5 @@ describe("TagEditor.svelte", () => {
 
     // The modal itself stays open (unlike Save), so the user can keep editing.
     expect(onClose).not.toHaveBeenCalled();
-  });
-
-  it("handles AcoustID fingerprint lookup to suggest tags", async () => {
-    const onClose = vi.fn();
-    const { getByRole, getByLabelText } = render(TagEditor, { songId: 10, onClose });
-
-    await waitFor(() => {
-      expect(getByRole("button", { name: /lookup acoustid/i })).toBeInTheDocument();
-    });
-
-    const lookupBtn = getByRole("button", { name: /lookup acoustid/i });
-    await fireEvent.click(lookupBtn);
-
-    await waitFor(() => {
-      expect(invoke).toHaveBeenCalledWith("lookup_acoustid_tags", { songId: 10 });
-      const titleInput = getByLabelText("Song Title") as HTMLInputElement;
-      expect(titleInput.value).toBe("Fetched Title");
-    });
   });
 });

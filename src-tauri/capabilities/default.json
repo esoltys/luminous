@@ -6,12 +6,14 @@
   "permissions": [
     "core:default",
     "core:window:allow-show",
+    "core:window:allow-set-title",
     "opener:default",
     "dialog:default",
     "window-state:default",
     "positioner:default",
     "updater:default",
     "process:allow-restart",
+    "autostart:default",
     {
       "identifier": "fs:allow-read",
       "allow": [

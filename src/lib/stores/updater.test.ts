@@ -1,13 +1,15 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { updaterStore } from "./updater.svelte";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
+import { toastStore } from "./toast.svelte";
 
 function fakeUpdate(overrides: Partial<{ version: string }> = {}) {
   return {
     version: overrides.version ?? "1.2.3",
     currentVersion: "1.0.0",
-    downloadAndInstall: vi.fn().mockResolvedValue(undefined),
+    download: vi.fn().mockResolvedValue(undefined),
+    install: vi.fn().mockResolvedValue(undefined),
     close: vi.fn().mockResolvedValue(undefined),
   } as any;
 }
@@ -114,7 +116,7 @@ describe("UpdaterStore", () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(update.downloadAndInstall).toHaveBeenCalled();
+    expect(update.download).toHaveBeenCalled();
   });
 
   it("does not auto-install when the format does not support self-update", async () => {
@@ -126,22 +128,111 @@ describe("UpdaterStore", () => {
     await updaterStore.checkForUpdates();
     await Promise.resolve();
 
-    expect(update.downloadAndInstall).not.toHaveBeenCalled();
+    expect(update.download).not.toHaveBeenCalled();
   });
 
-  it("downloadAndInstall transitions to ready-to-restart on success", async () => {
+  it("checkForUpdates is a no-op while a download is in flight or ready to restart, so it can't discard pendingUpdate out from under a later restart click", async () => {
+    const update = fakeUpdate({ version: "2.0.0" });
+    vi.mocked(check).mockResolvedValueOnce(update);
+    await updaterStore.checkForUpdates();
+    await updaterStore.downloadAndInstall();
+    expect(updaterStore.installStatus).toBe("ready-to-restart");
+
+    vi.mocked(check).mockClear();
+    await updaterStore.checkForUpdates();
+
+    expect(check).not.toHaveBeenCalled();
+    expect(update.close).not.toHaveBeenCalled();
+    expect(updaterStore.installStatus).toBe("ready-to-restart");
+
+    await updaterStore.restartNow();
+    expect(update.install).toHaveBeenCalled();
+  });
+
+  it("downloadAndInstall downloads only (not install) and transitions to ready-to-restart on success", async () => {
     const update = fakeUpdate({ version: "2.0.0" });
     vi.mocked(check).mockResolvedValueOnce(update);
 
     await updaterStore.checkForUpdates();
     await updaterStore.downloadAndInstall();
 
+    expect(update.download).toHaveBeenCalled();
+    expect(update.install).not.toHaveBeenCalled();
     expect(updaterStore.installStatus).toBe("ready-to-restart");
+  });
+
+  describe("downloadAndInstall toast notification", () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("fires a persistent toast with a restart action on success", async () => {
+      const showSpy = vi.spyOn(toastStore, "show");
+      const update = fakeUpdate({ version: "2.0.0" });
+      vi.mocked(check).mockResolvedValueOnce(update);
+
+      await updaterStore.checkForUpdates();
+      await updaterStore.downloadAndInstall();
+
+      expect(showSpy).toHaveBeenCalledTimes(1);
+      const [, variant, durationMs, url, action] = showSpy.mock.calls[0];
+      expect(variant).toBe("success");
+      expect(durationMs).toBeUndefined();
+      expect(url).toBeUndefined();
+      expect(action).toEqual({ label: expect.any(String), onClick: expect.any(Function) });
+    });
+
+    it("wires the toast's restart action to restartNow(), which installs then relaunches", async () => {
+      const showSpy = vi.spyOn(toastStore, "show");
+      const update = fakeUpdate({ version: "2.0.0" });
+      vi.mocked(check).mockResolvedValueOnce(update);
+
+      await updaterStore.checkForUpdates();
+      await updaterStore.downloadAndInstall();
+
+      const action = showSpy.mock.calls[0][4];
+      action!.onClick();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(update.install).toHaveBeenCalled();
+      expect(relaunch).toHaveBeenCalled();
+    });
   });
 
   it("restartNow calls relaunch", async () => {
     await updaterStore.restartNow();
     expect(relaunch).toHaveBeenCalled();
+  });
+
+  it("restartNow installs the pending update before relaunching", async () => {
+    const update = fakeUpdate({ version: "2.0.0" });
+    vi.mocked(check).mockResolvedValueOnce(update);
+    await updaterStore.checkForUpdates();
+
+    await updaterStore.restartNow();
+
+    expect(update.install).toHaveBeenCalled();
+    expect(relaunch).toHaveBeenCalled();
+  });
+
+  it("restartNow surfaces a visible error instead of silently failing when install() rejects", async () => {
+    // e.g. `pendingUpdate` got replaced by a fresh, not-yet-downloaded Update
+    // object — the plugin's `install()` rejects with "called before download".
+    const update = fakeUpdate({ version: "2.0.0" });
+    update.install = vi.fn().mockRejectedValue(new Error("Update.install called before Update.download"));
+    vi.mocked(check).mockResolvedValueOnce(update);
+    await updaterStore.checkForUpdates();
+    const showSpy = vi.spyOn(toastStore, "show");
+
+    await updaterStore.restartNow();
+
+    expect(relaunch).not.toHaveBeenCalled();
+    expect(updaterStore.installStatus).toBe("error");
+    expect(updaterStore.errorMessage).toBe("Update.install called before Update.download");
+    expect(showSpy).toHaveBeenCalledWith(expect.any(String), "error");
+
+    showSpy.mockRestore();
   });
 
   it("records lastCheckedAt after a successful check", async () => {

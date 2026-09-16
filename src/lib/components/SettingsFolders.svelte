@@ -5,25 +5,107 @@
   import { onMount } from "svelte";
   import Toggle from "./Toggle.svelte";
   import Button from "./Button.svelte";
+  import LibraryBadge from "./LibraryBadge.svelte";
+  import FolderEditModal from "./FolderEditModal.svelte";
+  import WebDavModal from "./WebDavModal.svelte";
+  import type { MusicDirectory, WebDavServer } from "../types";
+  import { combineWebdavPath } from "../webdavDisplay";
+  import { invoke } from "@tauri-apps/api/core";
   import {
     FolderIcon as Folder,
     PlusIcon as Plus,
     TrashIcon as Trash2,
+    PencilSimpleIcon as Edit3,
     ArrowsClockwiseIcon as RefreshCw,
     ArrowCounterClockwiseIcon as RotateCcw,
     ClockIcon as Clock,
     PulseIcon as Activity,
-    WarningIcon as AlertTriangle
+    WarningIcon as AlertTriangle,
+    CloudIcon as Cloud,
+    CircleNotchIcon as LoaderCircle,
   } from "phosphor-svelte";
+
+  let editingDirectory = $state<MusicDirectory | null>(null);
+  let webdavServers = $state<WebDavServer[]>([]);
+  let isWebdavModalOpen = $state(false);
+  let editingWebdavServer = $state<WebDavServer | null>(null);
+  let syncingServerId = $state<number | null>(null);
+  let syncFeedback = $state<string | null>(null);
+  /** Live reachability per server id, refreshed whenever the list loads —
+   * `undefined` while the check is still in flight. This is a network call,
+   * unlike a watched folder's `is_available` (a cheap local `Path::exists()`
+   * recomputed on every fetch), so it runs async per-server rather than
+   * blocking the list render. */
+  let webdavConnected = $state<Record<number, boolean | undefined>>({});
+
+  async function loadWebdavServers() {
+    try {
+      webdavServers = await invoke<WebDavServer[]>("list_webdav_servers");
+      checkWebdavConnections();
+    } catch (e) {
+      console.error("Failed to load WebDAV servers:", e);
+    }
+  }
+
+  function checkWebdavConnections() {
+    for (const server of webdavServers) {
+      invoke<boolean>("check_webdav_connection", { id: server.id })
+        .then((ok) => { webdavConnected[server.id] = ok; })
+        .catch(() => { webdavConnected[server.id] = false; });
+    }
+  }
+
+  async function handleRemoveWebdavServer(server: WebDavServer) {
+    if (confirm(i18n.t("settings.confirmRemoveWebdavServer", { name: server.name }))) {
+      try {
+        await invoke("delete_webdav_server", { id: server.id });
+        await loadWebdavServers();
+      } catch (e) {
+        console.error("Failed to delete WebDAV server:", e);
+      }
+    }
+  }
+
+  async function handleSyncWebdavServer(server: WebDavServer) {
+    if (syncingServerId !== null) return;
+    syncingServerId = server.id;
+    syncFeedback = null;
+    try {
+      const stats = await invoke<{ added: number; updated: number; removed: number; errors: number }>(
+        "sync_webdav_server",
+        { id: server.id }
+      );
+      syncFeedback = i18n.t("settings.webdavSyncComplete", {
+        added: stats.added,
+        updated: stats.updated,
+        errors: stats.errors,
+      });
+      await loadWebdavServers();
+    } catch (e: any) {
+      console.error("Failed to sync WebDAV server:", e);
+      syncFeedback = String(e?.message || e);
+    } finally {
+      syncingServerId = null;
+    }
+  }
 
   onMount(() => {
     loudnessStore.init();
+    loadWebdavServers();
   });
 
   async function handleRemoveDirectory(path: string) {
     if (confirm(i18n.t('settings.confirmRemoveFolder', { path }))) {
       await collectionStore.removeDirectory(path);
     }
+  }
+
+  function getWebdavStatusText(server: WebDavServer): string {
+    if (server.syncStatus === "syncing") return i18n.t("settings.webdavStatusSyncing");
+    if (server.lastSyncedAt) {
+      return i18n.t("settings.webdavStatusSynced", { time: new Date(server.lastSyncedAt * 1000).toLocaleString() });
+    }
+    return i18n.t("settings.webdavStatusNeverSynced");
   }
 
   function getPhaseDisplayName(phase: string | undefined): string {
@@ -51,7 +133,7 @@
       </div>
       <div class="space-y-1 min-w-0">
         <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('settings.watchedFoldersTitle')}</h3>
-        <p class="text-xs text-brand-text-secondary leading-relaxed">{i18n.t('settings.watchedFoldersSubtitle', {}, 'Manage directories to scan for music files.')}</p>
+        <p class="text-xs text-brand-text-secondary leading-relaxed text-pretty">{i18n.t('settings.watchedFoldersSubtitle', {}, 'Manage directories to scan for music files.')}</p>
       </div>
     </div>
     <Button onclick={() => collectionStore.addDirectoryDialog()} variant="primary" size="sm">
@@ -69,10 +151,13 @@
   <div class="space-y-2">
     {#each collectionStore.directories as dir}
       <div class="flex items-center justify-between bg-brand-main/50 border border-brand-border/60 rounded-xl p-4 hover:border-brand-border transition-colors">
-        <div class="flex items-center gap-3.5 min-w-0">
-          <div class="min-w-0">
-            <p class="text-sm font-medium text-brand-text-primary truncate" title={dir.path}>{dir.path}</p>
-            <p class="text-xs mt-0.5" class:text-brand-text-secondary={dir.is_available !== false} class:text-red-400={dir.is_available === false}>
+        <div class="flex items-center gap-3.5 min-w-0 flex-1">
+          <div class="min-w-0 space-y-1">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <LibraryBadge directory={dir} size="sm" />
+              <p class="text-xs text-brand-text-secondary truncate" title={dir.path}>{dir.path}</p>
+            </div>
+            <p class="text-xs" class:text-brand-text-secondary={dir.is_available !== false} class:text-red-400={dir.is_available === false}>
               {#if dir.is_available === false}
                 <span class="flex items-center gap-1">
                   <AlertTriangle class="w-3 h-3" />
@@ -86,25 +171,182 @@
             </p>
           </div>
         </div>
-        <button
-          onclick={() => handleRemoveDirectory(dir.path)}
-          class="p-2 rounded-lg bg-brand-main hover:bg-red-950/20 text-brand-text-secondary hover:text-red-400 border border-brand-border hover:border-red-900/30 transition-colors"
-          title={i18n.t('settings.folderItemStopWatch')}
-        >
-          <Trash2 class="w-4 h-4 text-brand-accent-text" />
-        </button>
+        <div class="flex items-center gap-1.5 shrink-0 ml-3">
+          <button
+            onclick={() => collectionStore.startScan(false)}
+            disabled={collectionStore.isScanning}
+            class="p-2 rounded-lg bg-brand-main hover:bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary border border-brand-border hover:border-brand-accent/40 transition-colors disabled:opacity-50"
+            title={i18n.t('settings.folderSyncNowHint')}
+          >
+            {#if collectionStore.isScanning}
+              <LoaderCircle class="w-4 h-4 animate-spin text-brand-accent-text" />
+            {:else}
+              <RefreshCw class="w-4 h-4 text-brand-accent-text" />
+            {/if}
+          </button>
+          <button
+            onclick={() => { editingDirectory = dir; }}
+            class="p-2 rounded-lg bg-brand-main hover:bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary border border-brand-border hover:border-brand-accent/40 transition-colors"
+            title={i18n.t('settings.folderItemEdit', {}, 'Edit folder details')}
+          >
+            <Edit3 class="w-4 h-4" />
+          </button>
+          <button
+            onclick={() => handleRemoveDirectory(dir.path)}
+            class="p-2 rounded-lg bg-brand-main hover:bg-red-950/20 text-brand-text-secondary hover:text-red-400 border border-brand-border hover:border-red-900/30 transition-colors"
+            title={i18n.t('settings.folderItemStopWatch')}
+          >
+            <Trash2 class="w-4 h-4 text-brand-accent-text" />
+          </button>
+        </div>
       </div>
     {/each}
+
+    {#if editingDirectory}
+      <FolderEditModal
+        directory={editingDirectory}
+        onClose={() => { editingDirectory = null; }}
+      />
+    {/if}
 
     {#if collectionStore.directories.length === 0}
       <div class="border border-dashed border-brand-border rounded-xl py-12 text-center text-brand-text-secondary">
         <Folder class="w-12 h-12 mx-auto mb-2 text-brand-text-secondary/50" />
         <h4 class="font-semibold text-brand-text-primary mb-1">{i18n.t('settings.noFoldersTitle')}</h4>
-        <p class="text-xs text-brand-text-secondary mb-4">{i18n.t('settings.noFoldersText')}</p>
+        <p class="text-xs text-brand-text-secondary mb-4 text-pretty">{i18n.t('settings.noFoldersText')}</p>
       </div>
     {/if}
   </div>
 </div>
+
+<!-- WebDAV Remote Libraries (#682) -->
+<div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
+  <div class="pb-3 flex justify-between items-center">
+    <div class="flex items-center gap-3">
+      <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
+        <Cloud class="w-5 h-5" />
+      </div>
+      <div class="space-y-1 min-w-0">
+        <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('settings.webdavTitle')}</h3>
+        <p class="text-xs text-brand-text-secondary leading-relaxed text-pretty">{i18n.t('settings.webdavSubtitle')}</p>
+      </div>
+    </div>
+    <Button
+      onclick={() => {
+        editingWebdavServer = null;
+        isWebdavModalOpen = true;
+      }}
+      variant="primary"
+      size="sm"
+    >
+      <Plus class="w-4 h-4" /> {i18n.t('settings.addWebdavServer')}
+    </Button>
+  </div>
+
+  {#if syncFeedback}
+    <div class="p-3 bg-brand-main/60 border border-brand-border rounded-xl text-xs text-brand-text-secondary flex items-center justify-between">
+      <span>{syncFeedback}</span>
+      <button
+        onclick={() => { syncFeedback = null; }}
+        class="text-brand-text-secondary hover:text-brand-text-primary font-bold ml-2"
+      >
+        ✕
+      </button>
+    </div>
+  {/if}
+
+  <div class="space-y-2">
+    {#each webdavServers as server (server.id)}
+      <div class="flex items-center justify-between bg-brand-main/50 border border-brand-border/60 rounded-xl p-4 hover:border-brand-border transition-colors">
+        <div class="flex items-center gap-3.5 min-w-0 flex-1">
+          <div class="min-w-0 space-y-1">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <LibraryBadge
+                directory={{
+                  path: combineWebdavPath(server.url, server.remotePath),
+                  nickname: server.nickname,
+                  icon: server.icon,
+                  color: server.color,
+                  is_available: webdavConnected[server.id] !== false,
+                }}
+                size="sm"
+              />
+              <p class="text-xs text-brand-text-secondary truncate" title={combineWebdavPath(server.url, server.remotePath)}>
+                {combineWebdavPath(server.url, server.remotePath)}
+              </p>
+            </div>
+            <p class="text-xs" class:text-brand-text-secondary={webdavConnected[server.id] !== false} class:text-red-400={webdavConnected[server.id] === false}>
+              {#if webdavConnected[server.id] === false}
+                <span class="flex items-center gap-1">
+                  <AlertTriangle class="w-3 h-3" />
+                  {i18n.t('settings.webdavStatusDisconnected')}
+                </span>
+              {:else}
+                <span class="flex items-center gap-1">
+                  {#if server.syncStatus === "syncing"}
+                    <LoaderCircle class="w-3 h-3 animate-spin text-brand-accent-text" />
+                  {/if}
+                  {getWebdavStatusText(server)}
+                </span>
+              {/if}
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-1.5 shrink-0 ml-3">
+          <button
+            onclick={() => handleSyncWebdavServer(server)}
+            disabled={syncingServerId === server.id}
+            class="p-2 rounded-lg bg-brand-main hover:bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary border border-brand-border hover:border-brand-accent/40 transition-colors disabled:opacity-50"
+            title={i18n.t('settings.webdavSyncBtn')}
+          >
+            {#if syncingServerId === server.id}
+              <LoaderCircle class="w-4 h-4 animate-spin text-brand-accent-text" />
+            {:else}
+              <RefreshCw class="w-4 h-4 text-brand-accent-text" />
+            {/if}
+          </button>
+          <button
+            onclick={() => {
+              editingWebdavServer = server;
+              isWebdavModalOpen = true;
+            }}
+            class="p-2 rounded-lg bg-brand-main hover:bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary border border-brand-border hover:border-brand-accent/40 transition-colors"
+            title={i18n.t('settings.webdavItemEdit')}
+          >
+            <Edit3 class="w-4 h-4" />
+          </button>
+          <button
+            onclick={() => handleRemoveWebdavServer(server)}
+            class="p-2 rounded-lg bg-brand-main hover:bg-red-950/20 text-brand-text-secondary hover:text-red-400 border border-brand-border hover:border-red-900/30 transition-colors"
+            title={i18n.t('settings.confirmRemoveWebdavServer', { name: server.name })}
+          >
+            <Trash2 class="w-4 h-4 text-brand-accent-text" />
+          </button>
+        </div>
+      </div>
+    {/each}
+
+    {#if webdavServers.length === 0}
+      <div class="border border-dashed border-brand-border rounded-xl py-8 text-center text-brand-text-secondary">
+        <Cloud class="w-10 h-10 mx-auto mb-2 text-brand-text-secondary/50" />
+        <h4 class="font-semibold text-brand-text-primary mb-1 text-xs">{i18n.t('settings.webdavNoServersTitle')}</h4>
+        <p class="text-xs text-brand-text-secondary text-pretty">{i18n.t('settings.webdavNoServersText')}</p>
+      </div>
+    {/if}
+  </div>
+</div>
+
+{#if isWebdavModalOpen}
+  <WebDavModal
+    server={editingWebdavServer}
+    onClose={() => { isWebdavModalOpen = false; }}
+    onSaved={() => {
+      isWebdavModalOpen = false;
+      loadWebdavServers();
+    }}
+  />
+{/if}
 
 <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
   <div class="pb-3 flex items-center justify-between">
@@ -114,7 +356,7 @@
       </div>
       <div class="space-y-1 min-w-0">
         <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('settings.rescanTitle')}</h3>
-        <p class="text-xs text-brand-text-secondary leading-relaxed">{i18n.t('settings.rescanSubtitle')}</p>
+        <p class="text-xs text-brand-text-secondary leading-relaxed text-pretty">{i18n.t('settings.rescanSubtitle')}</p>
       </div>
     </div>
   </div>
@@ -166,7 +408,7 @@
     <div class="flex items-center justify-between gap-4">
       <div class="flex flex-col gap-0.5 min-w-0">
         <span class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.watchRealtimeLabel')}</span>
-        <p class="text-xs text-brand-text-secondary">{i18n.t('settings.watchRealtimeHint')}</p>
+        <p class="text-xs text-brand-text-secondary text-pretty">{i18n.t('settings.watchRealtimeHint')}</p>
       </div>
       <Toggle
         checked={collectionStore.watchFoldersRealtime}
@@ -178,7 +420,7 @@
     <div class="flex items-center justify-between gap-4">
       <div class="flex flex-col gap-0.5 min-w-0">
         <span class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.scanOnStartupLabel')}</span>
-        <p class="text-xs text-brand-text-secondary">{i18n.t('settings.scanOnStartupHint')}</p>
+        <p class="text-xs text-brand-text-secondary text-pretty">{i18n.t('settings.scanOnStartupHint')}</p>
       </div>
       <Toggle
         checked={collectionStore.scanOnStartup}

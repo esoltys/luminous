@@ -5,6 +5,8 @@ import RightPanel from "./RightPanel.svelte";
 import { playerStore } from "../stores/player.svelte";
 import type { Song } from "../types";
 
+import { invoke } from "@tauri-apps/api/core";
+
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockResolvedValue(null),
 }));
@@ -97,21 +99,21 @@ describe("RightPanel.svelte", () => {
     expect(getByText("5.1 Surround")).toBeInTheDocument();
   });
 
-  it("hides the MusicBrainz section when no MusicBrainz IDs are present", () => {
+  it("hides the MusicBrainz section on the Technical tab when no MusicBrainz IDs are present", () => {
     playerStore.currentSong = mockSong;
     const { queryByAltText } = render(RightPanel);
 
     expect(queryByAltText("MusicBrainz")).not.toBeInTheDocument();
   });
 
-  it("shows only the MusicBrainz fields present on the song, by name rather than raw ID", () => {
+  it("shows only the MusicBrainz fields present on the song on the Technical tab", () => {
     playerStore.currentSong = {
       ...mockSong,
       album_artist: "Other Artist",
       musicbrainz_artist_id: "artist-uuid",
       musicbrainz_album_artist_id: "album-artist-uuid",
     };
-    const { getByText, getByAltText, queryByText } = render(RightPanel);
+    const { getByAltText, getByText, queryByText } = render(RightPanel);
 
     expect(getByAltText("MusicBrainz")).toBeInTheDocument();
     expect(getByText("Test Artist")).toBeInTheDocument();
@@ -120,7 +122,7 @@ describe("RightPanel.svelte", () => {
     expect(queryByText("Release")).not.toBeInTheDocument();
   });
 
-  it("hides Album Artist when it's the same MusicBrainz entity as Artist", () => {
+  it("hides Album Artist when it's the same MusicBrainz entity as Artist on the Technical tab", () => {
     playerStore.currentSong = {
       ...mockSong,
       musicbrainz_artist_id: "same-uuid",
@@ -132,7 +134,7 @@ describe("RightPanel.svelte", () => {
     expect(queryByText("Album Artist")).not.toBeInTheDocument();
   });
 
-  it("falls back to the raw ID when no matching name field is available", () => {
+  it("falls back to the raw ID when no matching name field is available on the Technical tab", () => {
     playerStore.currentSong = {
       ...mockSong,
       title: "",
@@ -143,7 +145,7 @@ describe("RightPanel.svelte", () => {
     expect(getByText("recording-uuid")).toBeInTheDocument();
   });
 
-  it("opens the MusicBrainz entity page when a MusicBrainz row is clicked", async () => {
+  it("opens the MusicBrainz entity page when a MusicBrainz row is clicked on the Technical tab", async () => {
     playerStore.currentSong = {
       ...mockSong,
       musicbrainz_recording_id: "recording-uuid",
@@ -157,14 +159,14 @@ describe("RightPanel.svelte", () => {
     );
   });
 
-  it("shows release type/barcode/catalog # as plain text, title-casing the release type", () => {
+  it("shows release type/barcode/catalog # as plain text on the Technical tab", () => {
     playerStore.currentSong = {
       ...mockSong,
       musicbrainz_release_type: "album",
       barcode: "4988011329586",
       catalog_number: "PHCR-1144",
     };
-    const { getByText, getByAltText, queryByText } = render(RightPanel);
+    const { getByAltText, getByText, queryByText } = render(RightPanel);
 
     expect(getByAltText("MusicBrainz")).toBeInTheDocument();
     expect(getByText("Album")).toBeInTheDocument();
@@ -178,10 +180,96 @@ describe("RightPanel.svelte", () => {
       ...mockSong,
       barcode: "4988011329586",
     };
-    const { getByText, getByAltText, queryByText } = render(RightPanel);
+    const { getByAltText, getByText, queryByText } = render(RightPanel);
 
     expect(getByAltText("MusicBrainz")).toBeInTheDocument();
     expect(getByText("Barcode")).toBeInTheDocument();
     expect(queryByText("Artist")).not.toBeInTheDocument();
+  });
+
+  it("hides the ListenBrainz section on the Information tab when no MusicBrainz IDs are present", async () => {
+    playerStore.currentSong = mockSong;
+    const { getByText, queryByAltText } = render(RightPanel);
+    await fireEvent.click(getByText("Information"));
+
+    expect(queryByAltText("ListenBrainz")).not.toBeInTheDocument();
+  });
+
+  it("shows the ListenBrainz section on the Information tab and opens entity pages on click", async () => {
+    playerStore.currentSong = {
+      ...mockSong,
+      musicbrainz_artist_id: "artist-uuid",
+      musicbrainz_release_group_id: "4e8a42f9-d1be-469e-9ac9-ad72d0aa8c39",
+      musicbrainz_recording_id: "recording-uuid",
+    };
+    const { getByText, getByAltText } = render(RightPanel);
+    await fireEvent.click(getByText("Information"));
+
+    expect(getByAltText("ListenBrainz")).toBeInTheDocument();
+    expect(getByText("Test Artist")).toBeInTheDocument();
+    expect(getByText("Test Album")).toBeInTheDocument();
+    expect(getByText("Test Track Title")).toBeInTheDocument();
+
+    await fireEvent.click(getByText("Test Track Title"));
+    expect(openExternalUrlMock).toHaveBeenCalledWith(
+      "https://listenbrainz.org/recording/recording-uuid/"
+    );
+
+    await fireEvent.click(getByText("Test Album"));
+    expect(openExternalUrlMock).toHaveBeenCalledWith(
+      "https://listenbrainz.org/album/4e8a42f9-d1be-469e-9ac9-ad72d0aa8c39/"
+    );
+
+    await fireEvent.click(getByText("Test Artist"));
+    expect(openExternalUrlMock).toHaveBeenCalledWith(
+      "https://listenbrainz.org/artist/artist-uuid/"
+    );
+  });
+
+  it("opens the album page on ListenBrainz when clicking the ListenBrainz logo button", async () => {
+    playerStore.currentSong = {
+      ...mockSong,
+      musicbrainz_release_group_id: "4e8a42f9-d1be-469e-9ac9-ad72d0aa8c39",
+    };
+    const { getByText, getByAltText } = render(RightPanel);
+    await fireEvent.click(getByText("Information"));
+
+    await fireEvent.click(getByAltText("ListenBrainz"));
+    expect(openExternalUrlMock).toHaveBeenCalledWith(
+      "https://listenbrainz.org/album/4e8a42f9-d1be-469e-9ac9-ad72d0aa8c39/"
+    );
+  });
+
+  it("shows the File Path row on the Technicals tab", () => {
+    playerStore.currentSong = mockSong;
+    const { getByText } = render(RightPanel);
+
+    expect(getByText("File Path:")).toBeInTheDocument();
+    expect(getByText("/music/test.flac")).toBeInTheDocument();
+  });
+
+  it("renders Wikipedia bio extract in an open details accordion on the Information tab", async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_song_context") {
+        return {
+          wikipedia_extract: "Test Wikipedia Bio Extract",
+          wikipedia_page_url: "https://en.wikipedia.org/wiki/Test_Artist",
+          critiquebrainz_rating: null,
+          critiquebrainz_review_links: [],
+        };
+      }
+      return null;
+    });
+
+    playerStore.currentSong = mockSong;
+    const { getByText, findByText } = render(RightPanel);
+    await fireEvent.click(getByText("Information"));
+
+    const bioText = await findByText("Test Wikipedia Bio Extract");
+    expect(bioText).toBeInTheDocument();
+
+    const detailsEl = bioText.closest("details");
+    expect(detailsEl).toBeTruthy();
+    expect(detailsEl?.hasAttribute("open")).toBe(true);
   });
 });

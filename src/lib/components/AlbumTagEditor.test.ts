@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent, waitFor } from "@testing-library/svelte";
 import AlbumTagEditor from "./AlbumTagEditor.svelte";
 import { invoke } from "@tauri-apps/api/core";
+import { collectionStore } from "../stores/collection.svelte";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
@@ -11,6 +12,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 describe("AlbumTagEditor.svelte", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    collectionStore.songs = [];
     vi.mocked(invoke).mockImplementation(async (cmd: string) => {
       if (cmd === "save_album_tags") return 2;
       if (cmd === "clear_album_cover_art") return 2;
@@ -45,6 +47,42 @@ describe("AlbumTagEditor.svelte", () => {
     expect(getByText("Pop")).toBeInTheDocument();
     expect(yearInput.value).toBe("2024");
     expect(discInput.value).toBe("1");
+  });
+
+  it("shows a remote-source note when the album's sample track is a WebDAV song (#682)", async () => {
+    collectionStore.songs = [
+      { id: 101, path: "http://user:pass@127.0.0.1:8080/Music/song.mp3" } as any,
+    ];
+    const { findByText } = render(AlbumTagEditor, {
+      songIds: [101, 102],
+      onClose: vi.fn(),
+    });
+    expect(
+      await findByText(/changes are saved in Luminous only/i)
+    ).toBeInTheDocument();
+  });
+
+  it("shows no remote-source note for a local album", async () => {
+    collectionStore.songs = [{ id: 101, path: "/music/rock/song.flac" } as any];
+    const { queryByText, getByText } = render(AlbumTagEditor, {
+      songIds: [101, 102],
+      onClose: vi.fn(),
+    });
+    await vi.waitFor(() => expect(getByText("Cancel")).toBeInTheDocument());
+    expect(queryByText(/changes are saved in Luminous only/i)).not.toBeInTheDocument();
+  });
+
+  it("hides the Clear Embedded Artwork button for a WebDAV album even with embedded art (#682)", async () => {
+    collectionStore.songs = [
+      { id: 101, path: "http://user:pass@127.0.0.1:8080/Music/song.mp3" } as any,
+    ];
+    const { findByText, queryByRole } = render(AlbumTagEditor, {
+      songIds: [101, 102],
+      hasEmbeddedArt: true,
+      onClose: vi.fn(),
+    });
+    await findByText(/changes are saved in Luminous only/i);
+    expect(queryByRole("button", { name: /clear embedded artwork/i })).not.toBeInTheDocument();
   });
 
   it("calls onClose when cancel button is clicked", async () => {

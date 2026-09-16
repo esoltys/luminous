@@ -110,8 +110,7 @@
       "name": "home",
       "filename": "home.png",
       "tab": "home",
-      "sidebarWidth": 220,
-      "theme": "nordic-blue"
+      "sidebarWidth": 220
     },
     {
       "name": "lyrics",
@@ -220,11 +219,19 @@
       "tab": "settings"
     },
     {
-      "name": "settings-organize",
-      "filename": "settings-organize.png",
+      "name": "settings-integrations",
+      "filename": "settings-integrations.png",
       "tab": "settings",
-      "action": "click-settings-tools",
-      "viewportHeight": 1440
+      "action": "click-settings-integrations",
+      "viewportHeight": 850
+    },
+    {
+      "name": "organize",
+      "filename": "organize.png",
+      "tab": "organize",
+      "action": "click-organize-custom-template",
+      "sidebarWidth": 220,
+      "viewportHeight": 1600
     },
     {
       "name": "song-tag-editor",
@@ -239,6 +246,12 @@
       "filename": "songs.png",
       "tab": "collection",
       "subTab": "songs",
+      "sidebarWidth": 220
+    },
+    {
+      "name": "stats",
+      "filename": "stats.png",
+      "tab": "stats",
       "sidebarWidth": 220
     },
     {

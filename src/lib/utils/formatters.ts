@@ -1,3 +1,6 @@
+import type { PlayState } from "../types";
+import { i18n } from "../stores/i18n.svelte";
+
 export function formatDuration(ns: number | undefined): string {
   if (!ns) return "0:00";
   const sec = Math.floor(ns / 1_000_000_000);
@@ -39,5 +42,23 @@ export function formatChannels(ch?: number): string {
 export function toTitleCase(str: string): string {
   if (!str) return "";
   return str.replace(/\b\w+/g, (txt) => txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase());
+}
+
+export function formatWindowTitle(
+  song?: { title?: string | null; artist?: string | null } | null,
+  state?: PlayState
+): string {
+  if (state !== "playing" || !song) {
+    return "Luminous";
+  }
+
+  const rawTitle = song.title?.trim();
+  const rawArtist = song.artist?.trim();
+
+  const title = rawTitle || i18n.t("collection.unknownSong", {}, "Unknown Song");
+  if (rawArtist) {
+    return `${title} - ${rawArtist} - Luminous`;
+  }
+  return `${title} - Luminous`;
 }
 

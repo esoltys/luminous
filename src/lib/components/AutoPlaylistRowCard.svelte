@@ -6,7 +6,10 @@
     CalendarIcon as Calendar,
     MusicNotesIcon as Music,
     GaugeIcon as Gauge,
-    TagIcon as Tag
+    TagIcon as Tag,
+    TrendUpIcon as TrendingUp,
+    WarningIcon as AlertTriangle,
+    SunHorizonIcon as SunHorizon
   } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { formatRelativeDate } from "../utils/date";
@@ -16,7 +19,7 @@
 
   interface Props {
     label: string;
-    kind: "favourites" | "recently_added" | "history" | "genre" | "decade" | "bpm" | "artist_tag";
+    kind: "favourites" | "recently_added" | "most_played" | "history" | "genre" | "decade" | "bpm" | "artist_tag" | "missing_metadata" | "missing_musicbrainz" | "daypart";
     genre?: string;
     artistTag?: string;
     decade?: string;
@@ -30,7 +33,10 @@
   let { label, kind, genre, artistTag, decade, bpm, playlistId, updated, trackCount, onClick }: Props = $props();
 
   let displayLabel = $derived.by(() => {
-    if ((kind === "genre" || kind === "decade" || kind === "bpm" || kind === "artist_tag") && playlistId !== undefined) {
+    if (
+      (kind === "genre" || kind === "decade" || kind === "bpm" || kind === "artist_tag" || kind === "missing_metadata" || kind === "missing_musicbrainz" || kind === "daypart") &&
+      playlistId !== undefined
+    ) {
       const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
       if (pl) return getPlaylistDisplayName(pl);
     }
@@ -38,18 +44,26 @@
   });
 
   let subtitleLabel = $derived.by(() => {
+    if (kind === "missing_metadata") return i18n.t("playlists.missingMetadataAutoPlaylist");
+    if (kind === "missing_musicbrainz") return i18n.t("playlists.missingMusicBrainzAutoPlaylist");
+    if (kind === "daypart") return i18n.t("playlists.daypartAutoPlaylist");
     if (kind === "decade" || decade) return i18n.t("playlists.decadeAutoPlaylist");
     if (kind === "bpm") return i18n.t("playlists.bpmAutoPlaylist");
     if (kind === "artist_tag" || artistTag) return i18n.t("playlists.artistTagAutoPlaylist");
     if (kind === "genre" || genre) return i18n.t("playlists.genreAutoPlaylist");
     if (kind === "favourites") return i18n.t("playlists.favouritesAutoPlaylist");
     if (kind === "recently_added") return i18n.t("playlists.recentlyAddedAutoPlaylist");
+    if (kind === "most_played") return i18n.t("playlists.mostPlayedAutoPlaylist");
     if (kind === "history") return i18n.t("playlists.historyAutoPlaylist");
     return i18n.t("playlists.genreAutoPlaylist");
   });
 
   let updatedLabel = $derived.by(() => {
-    if ((kind !== "genre" && kind !== "decade" && kind !== "bpm" && kind !== "artist_tag") || updated === undefined) return null;
+    if (
+      (kind !== "genre" && kind !== "decade" && kind !== "bpm" && kind !== "artist_tag" && kind !== "missing_metadata" && kind !== "missing_musicbrainz" && kind !== "daypart") ||
+      updated === undefined
+    )
+      return null;
     return formatRelativeDate(updated);
   });
 </script>
@@ -71,14 +85,24 @@
             ? 'bg-[#E879F9]/15 border-[#E879F9]/30'
             : kind === 'favourites'
               ? 'bg-[#F43F5E]/15 border-[#F43F5E]/30'
-              : kind === 'history'
-                ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/30'
-                : 'bg-[#FACC15]/15 border-[#FACC15]/30'}"
+              : kind === 'most_played'
+                ? 'bg-[#DC2626]/15 border-[#DC2626]/30'
+                : kind === 'history'
+                  ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/30'
+                  : kind === 'missing_metadata'
+                    ? 'bg-amber-500/15 border-amber-500/30'
+                    : kind === 'missing_musicbrainz'
+                      ? 'bg-indigo-500/15 border-indigo-500/30'
+                      : kind === 'daypart'
+                        ? 'bg-[#2DD4BF]/15 border-[#2DD4BF]/30'
+                        : 'bg-[#FACC15]/15 border-[#FACC15]/30'}"
   >
     {#if kind === "favourites"}
       <Heart class="w-5 h-5 text-[#F43F5E] fill-current" />
     {:else if kind === "recently_added"}
       <Clock class="w-5 h-5 text-[#CA8A04]" />
+    {:else if kind === "most_played"}
+      <TrendingUp class="w-5 h-5 text-[#DC2626]" />
     {:else if kind === "history"}
       <Hourglass class="w-5 h-5 text-[#8B5CF6]" />
     {:else if kind === "decade"}
@@ -87,6 +111,12 @@
       <Tag class="w-5 h-5 text-[#FB923C]" />
     {:else if kind === "bpm"}
       <Gauge class="w-5 h-5 text-[#E879F9]" />
+    {:else if kind === "missing_metadata"}
+      <AlertTriangle class="w-5 h-5 text-amber-500" />
+    {:else if kind === "missing_musicbrainz"}
+      <img src="/picard-icon.png" alt="Picard" class="w-5 h-5 object-contain" />
+    {:else if kind === "daypart"}
+      <SunHorizon class="w-5 h-5 text-[#2DD4BF]" />
     {:else}
       <Music class="w-5 h-5 text-[#34D399]" />
     {/if}

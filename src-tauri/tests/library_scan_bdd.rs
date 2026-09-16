@@ -193,8 +193,12 @@ async fn skip_reparsing(w: &mut LibraryScanWorld, fixture_name: String) {
 
 #[tokio::main]
 async fn main() {
+    // with_default_cli() skips clap-parsing argv, so `cargo test <filter>` (which
+    // passes the filter string to every test binary, this one included) doesn't
+    // blow up on an "unexpected argument" cucumber's CLI doesn't recognize.
     LibraryScanWorld::cucumber()
         .max_concurrent_scenarios(4)
+        .with_default_cli()
         .run_and_exit("../features/library_scan.feature")
         .await;
 }

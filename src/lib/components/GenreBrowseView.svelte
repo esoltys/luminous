@@ -3,7 +3,8 @@
     TagIcon,
     CheckSquareIcon as CheckSquare,
     SquaresFourIcon as LayoutGrid,
-    RowsIcon as Rows3
+    RowsIcon as Rows3,
+    MicrophoneStageIcon as Mic
   } from "phosphor-svelte";
   import { genreColorHsl } from "../utils/genrePalette";
   import { onMount } from "svelte";
@@ -25,6 +26,43 @@
 
   let mergeDialogNames = $state<string[] | null>(null);
   let deleteConfirmNames = $state<string[] | null>(null);
+
+  let artistOnlyTags = $derived.by(() => {
+    const genreNames = new Set(tagsStore.allTags.map((t) => t.name.toLowerCase()));
+    return tagsStore.artistTags.filter((t) => !genreNames.has(t.name.toLowerCase()));
+  });
+
+  let genreViewElements = $state<Record<string, HTMLButtonElement>>({});
+  let genreIndicatorStyle = $state({ left: 4, width: 0, opacity: 0 });
+  let genreViewMounted = $state(false);
+
+  function updateGenreIndicator() {
+    const el = genreViewElements[prefs.genreViewMode];
+    if (el) {
+      genreIndicatorStyle = {
+        left: el.offsetLeft,
+        width: el.offsetWidth,
+        opacity: 1
+      };
+    }
+  }
+
+  onMount(() => {
+    const handleResize = () => updateGenreIndicator();
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+    };
+  });
+
+  $effect(() => {
+    if (genreViewElements[prefs.genreViewMode]) {
+      updateGenreIndicator();
+      if (!genreViewMounted) {
+        requestAnimationFrame(() => { genreViewMounted = true; });
+      }
+    }
+  });
 
   function toggleSelectMode() {
     selectMode = !selectMode;
@@ -85,10 +123,18 @@
     let unlistenHierarchy: (() => void) | undefined;
     tagsStore.listenForHierarchyChanges().then((fn) => { unlistenHierarchy = fn; });
     tagsStore.loadHierarchy().catch((e) => console.error("Failed to load tag hierarchy:", e));
+    tagsStore.loadArtistTags().catch((e) => console.error("Failed to load artist tags:", e));
     return () => {
       unlistenHierarchy?.();
     };
   });
+
+  /** Artist tag card/chip click — the browsable-only counterpart to
+   * `openMainTag` for curated artist tags (#962/#956 follow-up). Shown
+   * ahead of genre cards/chips in this view, per its own section below. */
+  function openArtistTag(tagName: string) {
+    navigationStore.viewArtistTag(tagName);
+  }
 
   // Every card/chip/tag click routes straight through to
   // AutoPlaylistDetailView (#548) — the Genres tab no longer has its own
@@ -177,10 +223,15 @@
               <option value="count-false">▼ {i18n.t('songTags.sortSongCount', {}, 'Song Count')}</option>
             </Select>
           </div>
-          <div class="inline-flex items-center gap-0.5 bg-brand-sidebar border border-brand-border rounded-full p-1">
+          <div class="relative inline-flex items-center gap-0.5 bg-brand-sidebar border border-brand-border rounded-full p-1">
+            <!-- Sliding background indicator -->
+            <span
+              class="absolute top-1 bottom-1 left-1 w-7 h-7 rounded-full bg-brand-accent shadow-sm pointer-events-none transition-transform duration-200 ease-out {prefs.genreCardsViewMode === 'rows' ? 'translate-x-[30px]' : 'translate-x-0'}"
+              aria-hidden="true"
+            ></span>
             <button
               onclick={() => prefs.setGenreCardsViewMode("cards")}
-              class="flex items-center justify-center w-7 h-7 rounded-full transition-colors {prefs.genreCardsViewMode === 'cards' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+              class="relative z-10 flex items-center justify-center w-7 h-7 rounded-full transition-colors duration-200 {prefs.genreCardsViewMode === 'cards' ? 'text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
               title={i18n.t("collection.viewCards", {}, "Card view")}
               aria-label={i18n.t("collection.viewCards", {}, "Card view")}
               aria-pressed={prefs.genreCardsViewMode === "cards"}
@@ -189,7 +240,7 @@
             </button>
             <button
               onclick={() => prefs.setGenreCardsViewMode("rows")}
-              class="flex items-center justify-center w-7 h-7 rounded-full transition-colors {prefs.genreCardsViewMode === 'rows' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+              class="relative z-10 flex items-center justify-center w-7 h-7 rounded-full transition-colors duration-200 {prefs.genreCardsViewMode === 'rows' ? 'text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
               title={i18n.t("collection.viewRows", {}, "Row view")}
               aria-label={i18n.t("collection.viewRows", {}, "Row view")}
               aria-pressed={prefs.genreCardsViewMode === "rows"}
@@ -198,17 +249,25 @@
             </button>
           </div>
         {/if}
-        <div class="inline-flex items-center gap-0.5 bg-brand-sidebar border border-brand-border rounded-full p-1">
+        <div class="relative inline-flex items-center gap-0.5 bg-brand-sidebar border border-brand-border rounded-full p-1">
+          <!-- Sliding background indicator -->
+          <span
+            class="absolute top-1 bottom-1 bg-brand-accent rounded-full shadow-sm pointer-events-none {genreViewMounted ? 'transition-[left,width] duration-200 ease-out' : 'transition-none'}"
+            style="left: {genreIndicatorStyle.left}px; width: {genreIndicatorStyle.width}px; opacity: {genreIndicatorStyle.opacity};"
+            aria-hidden="true"
+          ></span>
           <button
+            bind:this={genreViewElements["genre"]}
             onclick={() => setViewMode("genre")}
-            class="px-3 h-7 rounded-full text-xs font-semibold transition-colors {prefs.genreViewMode === 'genre' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+            class="relative z-10 px-3 h-7 rounded-full text-xs font-semibold transition-colors duration-200 {prefs.genreViewMode === 'genre' ? 'text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
             aria-pressed={prefs.genreViewMode === "genre"}
           >
             {i18n.t("songTags.viewGenre", {}, "Genre")}
           </button>
           <button
+            bind:this={genreViewElements["tags"]}
             onclick={() => setViewMode("tags")}
-            class="px-3 h-7 rounded-full text-xs font-semibold transition-colors {prefs.genreViewMode === 'tags' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+            class="relative z-10 px-3 h-7 rounded-full text-xs font-semibold transition-colors duration-200 {prefs.genreViewMode === 'tags' ? 'text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
             aria-pressed={prefs.genreViewMode === "tags"}
           >
             {i18n.t("songTags.viewTags", {}, "Tags")}
@@ -241,7 +300,29 @@
       </div>
     {/if}
 
-    {#if tagsStore.allTags.length === 0 && tagsStore.noGenreCount === 0}
+    {#if artistOnlyTags.length > 0}
+      <div class="mb-4">
+        <div class="text-xs text-brand-text-secondary font-medium mb-2">
+          {i18n.t("songTags.artistTagsSectionTitle", { count: artistOnlyTags.length }, `Artist Only Tags (${artistOnlyTags.length})`)}
+        </div>
+        <div class="flex flex-wrap gap-1.5">
+          {#each artistOnlyTags as tag (tag.name)}
+            <button
+              type="button"
+              onclick={() => openArtistTag(tag.name)}
+              class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border-2 border-brand-border bg-brand-sidebar text-brand-text-primary text-xs font-medium select-none transition-colors hover:border-brand-accent/60 cursor-pointer"
+              title={i18n.t("songTags.goToArtistTagTooltip", { tag: tag.name }, `Browse ${tag.name}`)}
+            >
+              <Mic class="w-3 h-3 shrink-0 opacity-70" />
+              <span>{tag.name}</span>
+              <span class="opacity-70 text-[0.85em]">{tag.song_count}</span>
+            </button>
+          {/each}
+        </div>
+      </div>
+    {/if}
+
+    {#if tagsStore.allTags.length === 0 && tagsStore.noGenreCount === 0 && tagsStore.artistTags.length === 0}
       <div class="py-16">
         <EmptyState
           icon={TagIcon}

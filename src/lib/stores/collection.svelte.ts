@@ -10,10 +10,13 @@ import type {
   ScanProgress,
   BatchProgress,
   AlbumItem,
+  AlbumProfile,
   ArtistItem,
   ArtistProfile,
+  ExtendedArtworkResponse,
   RecentSearchItem,
   QueuePopulationMode,
+  WebDavServer,
 } from "../types";
 import { applySongStats, type SongStatsPayload, applyAlbumStats, type AlbumStatsPayload } from "../utils/stats";
 import { navigationStore } from "./navigation.svelte";
@@ -41,14 +44,17 @@ export interface VisibleColumns {
   genre: boolean;
   grouping: boolean;
   initial_key: boolean;
+  musicbrainz_id: boolean;
   path: boolean;
   samplerate: boolean;
   year: boolean;
+  originalyear: boolean;
   // Luminous-derived columns
   actions: boolean;
   added: boolean;
   duration: boolean;
   lastplayed: boolean;
+  library: boolean;
   playcount: boolean;
   rating: boolean;
   skipcount: boolean;
@@ -60,13 +66,27 @@ export interface VisibleColumns {
  * their compile-time defaults.  A single shared map is used for all four table views
  * (Collection, AlbumDetail, Playlist, AutoPlaylist).
  */
-export type ColumnWidths = Partial<Record<keyof VisibleColumns, number>>;
+type ColumnWidths = Partial<Record<keyof VisibleColumns, number>>;
 
 /** Song-count milestones that trigger Milestone-tier celebrations. */
 const MILESTONE_THRESHOLDS = [100, 500, 1000, 2500, 5000, 10000];
 
+/** Fallback for a failed extended-artwork fetch (#98/#759) — an empty result
+ * rather than throwing, so callers (cover-stack badge, artist visuals) can
+ * treat "scan failed" the same as "nothing found" without their own
+ * try/catch. */
+const EMPTY_EXTENDED_ARTWORK: ExtendedArtworkResponse = {
+  count: 0,
+  primary_uri: null,
+  artist_portrait_uri: null,
+  band_logo_uri: null,
+  fanart_uri: null,
+  items: [],
+};
+
 class CollectionStore {
   directories = $state<MusicDirectory[]>([]);
+  webdavServers = $state<WebDavServer[]>([]);
   stats = $state<LibraryStats>({
     total_songs: 0,
     total_artists: 0,
@@ -102,6 +122,22 @@ class CollectionStore {
   albums = $state<AlbumItem[]>([]);
   artists = $state<ArtistItem[]>([]);
   artistProfiles = $state<Record<string, ArtistProfile>>({});
+  albumProfiles = $state<Record<string, AlbumProfile>>({});
+  /** On-demand extended-artwork cache (#98/#759), keyed by song id — unlike
+   * `artistProfiles`, this is never bulk-loaded: scanning every song's album
+   * folder eagerly would be far too expensive, so entries are fetched lazily
+   * by `getExtendedArtworkForSong()` and kept here so the same song showing
+   * up in multiple places (e.g. a cover-stack re-rendering) doesn't re-scan
+   * the filesystem every time. */
+  extendedArtworkBySong = $state<Record<number, ExtendedArtworkResponse>>({});
+  /** Same idea as {@link extendedArtworkBySong}, keyed by lowercased artist
+   * name (matching `artistProfiles`' key convention) via
+   * `getExtendedArtworkForArtist()`. */
+  extendedArtworkByArtist = $state<Record<string, ExtendedArtworkResponse>>({});
+  /** In-flight extended-artwork fetches, so concurrent callers for the same
+   * key (e.g. `ArtistCard` and `TopNavigation` rendering the same artist at
+   * once) share one backend call instead of each firing their own. */
+  private extendedArtworkFetches = new Map<string, Promise<ExtendedArtworkResponse>>();
   searchResults = $state<Song[]>([]);
   searchQuery = $state<string>("");
   searchLoading = $state<boolean>(false);
@@ -128,14 +164,17 @@ class CollectionStore {
         genre: false,
         grouping: false,
         initial_key: false,
+        musicbrainz_id: false,
         path: false,
         samplerate: false,
         year: true,
+        originalyear: false,
         // Luminous-derived columns
         actions: true,
         added: false,
         duration: true,
         lastplayed: false,
+        library: false,
         playcount: false,
         rating: true,
         skipcount: false,
@@ -238,6 +277,7 @@ class CollectionStore {
       }
 
       await this.refreshDirectories();
+      await this.refreshWebDavServers();
       await this.refreshDbSchemaStatus();
       await this.refreshStats();
       await this.refreshLibrary();
@@ -349,8 +389,12 @@ class CollectionStore {
         this.refreshStats();
         this.refreshLibrary();
         this.refreshDirectories();
+        this.refreshWebDavServers();
         tagsStore.load().catch((err) => {
           console.error("Failed to refresh tags after library change:", err);
+        });
+        tagsStore.loadArtistTags().catch((err) => {
+          console.error("Failed to refresh artist tags after library change:", err);
         });
         invoke("refresh_playback_queue").catch((err) => {
           console.error("Failed to refresh playback queue after library change:", err);
@@ -428,6 +472,108 @@ class CollectionStore {
     this.directories = await invoke("get_directories");
   }
 
+  async refreshWebDavServers() {
+    this.webdavServers = await invoke("list_webdav_servers");
+  }
+
+  async updateDirectoryMetadata(
+    id: number,
+    metadata: { nickname?: string | null; icon?: string | null; color?: string | null }
+  ) {
+    await invoke("update_directory_metadata", {
+      id,
+      nickname: metadata.nickname ?? null,
+      icon: metadata.icon ?? null,
+      color: metadata.color ?? null,
+    });
+    await this.refreshDirectories();
+  }
+
+  /**
+   * Resolves the watched directory for a given song file path by finding the
+   * longest matching directory root. Normalizes path separators and casing.
+   * Falls back to a synthesized directory-shaped badge for a WebDAV song
+   * (#682) — those live in `webdavServers`, not `directories`, since they're
+   * not local filesystem paths at all.
+   */
+  getDirectoryForPath(path: string | null | undefined): MusicDirectory | undefined {
+    if (!path) return undefined;
+    const normalized = path.replace(/\\/g, "/").toLowerCase();
+    let bestMatch: MusicDirectory | undefined = undefined;
+    let longestPrefix = 0;
+    for (const dir of this.directories) {
+      const dirNorm = dir.path.replace(/\\/g, "/").toLowerCase();
+      const prefix = dirNorm.endsWith("/") ? dirNorm : dirNorm + "/";
+      if (normalized.startsWith(prefix) || normalized === dirNorm) {
+        if (dir.path.length > longestPrefix) {
+          longestPrefix = dir.path.length;
+          bestMatch = dir;
+        }
+      }
+    }
+    if (bestMatch) return bestMatch;
+
+    return this.getWebDavServerForPath(path);
+  }
+
+  /**
+   * Resolves the WebDAV server a song's playback URL belongs to, for display
+   * as a "Library" badge. The stored URL carries embedded `user:pass@`
+   * credentials the server's own `url` field doesn't, so those are stripped
+   * before comparing. Returns a `MusicDirectory`-shaped object for reuse with
+   * `LibraryBadge` — negative `id` keeps it from colliding with a real
+   * watched-directory id; nothing acts on that id beyond display.
+   */
+  getWebDavServerForPath(path: string | null | undefined): MusicDirectory | undefined {
+    if (!path) return undefined;
+    const credentialFree = path.replace(/^(https?:\/\/)[^@/]*@/i, "$1");
+    const normalized = credentialFree.toLowerCase();
+    for (const server of this.webdavServers) {
+      const base = `${server.url.replace(/\/+$/, "")}/${server.remotePath.replace(/^\/+/, "")}`;
+      if (normalized.startsWith(base.toLowerCase())) {
+        return {
+          id: -server.id,
+          path: base,
+          subdirs: true,
+          nickname: server.name,
+          icon: "cloud",
+          is_available: server.syncStatus !== "error",
+        };
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * Resolves all distinct watched directories that contain songs for the specified album name.
+   */
+  getDirectoriesForAlbum(albumName: string | null | undefined): MusicDirectory[] {
+    if (!albumName) return [];
+    const matched = new Map<number, MusicDirectory>();
+    for (const song of this.songs) {
+      if (song.album === albumName && song.path) {
+        const dir = this.getDirectoryForPath(song.path);
+        if (dir) matched.set(dir.id, dir);
+      }
+    }
+    return Array.from(matched.values());
+  }
+
+  /**
+   * Resolves a representative watched directory for an album item, checking
+   * its sample song first, then falling back to an album-name lookup.
+   */
+  getDirectoryForAlbum(album: AlbumItem): MusicDirectory | undefined {
+    if (album.sample_song_id) {
+      const song = this.songs.find((s) => s.id === album.sample_song_id);
+      if (song?.path) {
+        return this.getDirectoryForPath(song.path);
+      }
+    }
+    const dirs = this.getDirectoriesForAlbum(album.album);
+    return dirs[0];
+  }
+
   /**
    * True when `path` lives under a watched directory that's currently
    * unreachable (disconnected USB drive, sleeping network share, etc).
@@ -463,16 +609,18 @@ class CollectionStore {
     this.songs = snapshot.songs;
     this.albums = snapshot.albums;
     this.artists = snapshot.artists;
-    await this.loadArtistProfiles();
+    await Promise.all([this.loadArtistProfiles(), this.loadAlbumProfiles()]);
   }
 
   async loadArtistProfiles() {
     try {
       const profiles = await invoke<ArtistProfile[]>("get_all_artist_profiles");
       const map: Record<string, ArtistProfile> = {};
-      for (const p of profiles) {
-        if (p.artist_key) {
-          map[p.artist_key.toLowerCase()] = p;
+      if (Array.isArray(profiles)) {
+        for (const p of profiles) {
+          if (p.artist_key) {
+            map[p.artist_key.toLowerCase()] = p;
+          }
         }
       }
       this.artistProfiles = map;
@@ -495,6 +643,117 @@ class CollectionStore {
       };
     }
     return saved;
+  }
+
+  async loadAlbumProfiles() {
+    try {
+      const profiles = await invoke<AlbumProfile[]>("get_all_album_profiles");
+      const map: Record<string, AlbumProfile> = {};
+      if (Array.isArray(profiles)) {
+        for (const p of profiles) {
+          if (p.album_key) {
+            map[p.album_key.toLowerCase()] = p;
+          }
+        }
+      }
+      this.albumProfiles = map;
+    } catch (err) {
+      console.error("Failed to load album profiles:", err);
+    }
+  }
+
+  getAlbumProfile(albumName: string | null | undefined): AlbumProfile | undefined {
+    if (!albumName) return undefined;
+    return this.albumProfiles[albumName.toLowerCase()];
+  }
+
+  async saveAlbumProfile(profile: AlbumProfile): Promise<AlbumProfile> {
+    const saved = await invoke<AlbumProfile>("set_album_profile", { profile });
+    if (saved?.album_key) {
+      this.albumProfiles = {
+        ...this.albumProfiles,
+        [saved.album_key.toLowerCase()]: saved,
+      };
+    }
+    return saved;
+  }
+
+  /** Cached extended-artwork lookup for a song's album (#98/#760) — returns
+   * the cached result if already fetched, otherwise scans on demand via
+   * `get_extended_artwork_for_song` and caches the result. Concurrent calls
+   * for the same `songId` share one in-flight request. Pass `force` to
+   * bypass the cache and re-scan — used by the album Rescan action (#867)
+   * to pick up cover/back/booklet art the user just added, replaced, or
+   * deleted on disk. */
+  async getExtendedArtworkForSong(songId: number, force = false): Promise<ExtendedArtworkResponse> {
+    const fetchKey = `song:${songId}`;
+
+    if (!force) {
+      const cached = this.extendedArtworkBySong[songId];
+      if (cached) return cached;
+
+      const inFlight = this.extendedArtworkFetches.get(fetchKey);
+      if (inFlight) return inFlight;
+    }
+
+    const promise = invoke<ExtendedArtworkResponse>("get_extended_artwork_for_song", { songId })
+      .then((result) => {
+        this.extendedArtworkBySong = { ...this.extendedArtworkBySong, [songId]: result };
+        return result;
+      })
+      .catch((err) => {
+        console.error("Failed to load extended artwork for song:", err);
+        return EMPTY_EXTENDED_ARTWORK;
+      })
+      .finally(() => {
+        this.extendedArtworkFetches.delete(fetchKey);
+      });
+
+    this.extendedArtworkFetches.set(fetchKey, promise);
+    return promise;
+  }
+
+  /** Cached extended-artwork lookup for an artist's portrait/logo/fanart
+   * (#98/#761) — same lazy-fetch-and-cache pattern as
+   * {@link getExtendedArtworkForSong}, keyed by lowercased artist name to
+   * match `artistProfiles`. Pass `force` to bypass the cache and re-scan —
+   * used by the artist Rescan action (#867) to pick up a portrait/logo/
+   * banner the user just added, replaced, or deleted on disk. */
+  async getExtendedArtworkForArtist(artistName: string | null | undefined, force = false): Promise<ExtendedArtworkResponse> {
+    if (!artistName) return EMPTY_EXTENDED_ARTWORK;
+    const key = artistName.toLowerCase();
+    const fetchKey = `artist:${key}`;
+
+    if (!force) {
+      const cached = this.extendedArtworkByArtist[key];
+      if (cached) return cached;
+
+      const inFlight = this.extendedArtworkFetches.get(fetchKey);
+      if (inFlight) return inFlight;
+    }
+
+    const promise = invoke<ExtendedArtworkResponse>("get_extended_artwork_for_artist", { artist: artistName })
+      .then((result) => {
+        this.extendedArtworkByArtist = { ...this.extendedArtworkByArtist, [key]: result };
+        return result;
+      })
+      .catch((err) => {
+        console.error("Failed to load extended artwork for artist:", err);
+        return EMPTY_EXTENDED_ARTWORK;
+      })
+      .finally(() => {
+        this.extendedArtworkFetches.delete(fetchKey);
+      });
+
+    this.extendedArtworkFetches.set(fetchKey, promise);
+    return promise;
+  }
+
+  /** Opens a discovered artwork file (a raw filesystem path, not a
+   * `luminous-art://` URI) in the OS's default image viewer — the "Open
+   * Images" hover action (#760). */
+  async openArtworkPath(path: string): Promise<void> {
+    await invoke("open_artwork_path", { path });
   }
 
   async addDirectory(path: string) {

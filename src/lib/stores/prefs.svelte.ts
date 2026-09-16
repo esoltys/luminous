@@ -1,17 +1,17 @@
 import { invoke } from "@tauri-apps/api/core";
 
 export type RatingStyle = "heart" | "stars";
-export type SeekBarMode = "waveform" | "bands";
+type SeekBarMode = "waveform" | "bands";
 export type CollectionViewMode = "cards" | "rows";
 export type GenreViewMode = "genre" | "tags";
 export type GenreSortField = "name" | "count";
+export type WeekStart = "sunday" | "monday";
 
 /** Shape of the backend's UiPreferences struct — the schema (keys, domains,
  * defaults) lives in Rust (commands/settings.rs); this store just mirrors it. */
 interface UiPreferences {
   rating_style: RatingStyle;
   seekbar_mode: SeekBarMode;
-  acoustid_api_key: string;
   albums_view_mode: CollectionViewMode;
   artists_view_mode: CollectionViewMode;
   playlists_auto_view_mode: CollectionViewMode;
@@ -20,12 +20,12 @@ interface UiPreferences {
   genre_cards_view_mode: CollectionViewMode;
   genre_sort_field: GenreSortField;
   genre_sort_asc: boolean;
+  week_start: WeekStart;
 }
 
 class PrefsStore {
   ratingStyle = $state<RatingStyle>("heart");
   seekBarMode = $state<SeekBarMode>("waveform");
-  acoustidApiKey = $state<string>("");
   albumsViewMode = $state<CollectionViewMode>("cards");
   artistsViewMode = $state<CollectionViewMode>("cards");
   playlistsAutoViewMode = $state<CollectionViewMode>("cards");
@@ -38,14 +38,16 @@ class PrefsStore {
    * display-only, doesn't touch the persisted drag-reorder sort_order. */
   genreSortField = $state<GenreSortField>("name");
   genreSortAsc = $state<boolean>(true);
+  weekStart = $state<WeekStart>("sunday");
   /** Off by default — closing the window quits unless explicitly opted in. */
   minimizeToTray = $state<boolean>(false);
+  /** Off by default; mirrors the OS's actual registration, queried fresh on init. */
+  autostartEnabled = $state<boolean>(false);
 
   async init() {
     const prefs = await invoke<UiPreferences>("get_ui_preferences");
     this.ratingStyle = prefs.rating_style;
     this.seekBarMode = prefs.seekbar_mode;
-    this.acoustidApiKey = prefs.acoustid_api_key;
     this.albumsViewMode = prefs.albums_view_mode;
     this.artistsViewMode = prefs.artists_view_mode;
     this.playlistsAutoViewMode = prefs.playlists_auto_view_mode;
@@ -54,7 +56,13 @@ class PrefsStore {
     this.genreCardsViewMode = prefs.genre_cards_view_mode;
     this.genreSortField = prefs.genre_sort_field;
     this.genreSortAsc = prefs.genre_sort_asc;
+    this.weekStart = prefs.week_start;
     this.minimizeToTray = await invoke<boolean>("get_minimize_to_tray_enabled");
+    try {
+      this.autostartEnabled = await invoke<boolean>("get_autostart_enabled");
+    } catch (e) {
+      console.error("Failed to read autostart state:", e);
+    }
   }
 
   /** Persist the whole current state — fire-and-forget on the backend. */
@@ -62,7 +70,6 @@ class PrefsStore {
     const prefs: UiPreferences = {
       rating_style: this.ratingStyle,
       seekbar_mode: this.seekBarMode,
-      acoustid_api_key: this.acoustidApiKey,
       albums_view_mode: this.albumsViewMode,
       artists_view_mode: this.artistsViewMode,
       playlists_auto_view_mode: this.playlistsAutoViewMode,
@@ -71,6 +78,7 @@ class PrefsStore {
       genre_cards_view_mode: this.genreCardsViewMode,
       genre_sort_field: this.genreSortField,
       genre_sort_asc: this.genreSortAsc,
+      week_start: this.weekStart,
     };
     invoke("set_ui_preferences", { prefs });
   }
@@ -82,11 +90,6 @@ class PrefsStore {
 
   toggleSeekBarMode() {
     this.seekBarMode = this.seekBarMode === "waveform" ? "bands" : "waveform";
-    this.save();
-  }
-
-  setAcoustidApiKey(key: string) {
-    this.acoustidApiKey = key;
     this.save();
   }
 
@@ -130,11 +133,30 @@ class PrefsStore {
     this.save();
   }
 
+  setWeekStart(start: WeekStart) {
+    this.weekStart = start;
+    this.save();
+  }
+
   /** Not part of `save()` — persisted via its own dedicated command so the
    * backend's `tray.rs` close handler picks up the change immediately. */
   setMinimizeToTray(enabled: boolean) {
     this.minimizeToTray = enabled;
     invoke("set_minimize_to_tray_enabled", { enabled });
+  }
+
+  /** Proxies straight to the OS via the plugin, which can fail (permissions,
+   * sandboxed install) — awaits the result and reverts the toggle rather than
+   * assuming success. */
+  async setAutostart(enabled: boolean) {
+    const previous = this.autostartEnabled;
+    this.autostartEnabled = enabled;
+    try {
+      await invoke("set_autostart_enabled", { enabled });
+    } catch (e) {
+      console.error("Failed to set autostart:", e);
+      this.autostartEnabled = previous;
+    }
   }
 }
 

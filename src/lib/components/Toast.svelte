@@ -8,11 +8,13 @@
     SparkleIcon as Sparkles,
     XIcon as X,
     ClipboardIcon as Clipboard,
-    CheckIcon as Check
+    CheckIcon as Check,
+    ArrowsClockwiseIcon as RefreshCw
   } from "phosphor-svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { portal } from "../utils/portal";
+  import Button from "./Button.svelte";
 
   const COPY_FEEDBACK_DURATION_MS = 1500;
   let copiedToastId = $state<number | null>(null);
@@ -96,14 +98,25 @@
         <button
           type="button"
           onclick={() => openExternalUrl(toast.url!)}
-          class="flex-1 text-left underline decoration-dotted underline-offset-2 hover:decoration-solid"
+          class="flex-1 text-left underline decoration-dotted underline-offset-2 hover:decoration-solid text-pretty"
         >
           {toast.text}
         </button>
       {:else}
-        <span class="flex-1">{toast.text}</span>
+        <span class="flex-1 text-pretty">{toast.text}</span>
       {/if}
       <div class="flex items-center gap-1 shrink-0">
+        {#if toast.action}
+          <Button
+            onclick={() => toast.action!.onClick()}
+            variant="primary"
+            size="sm"
+            class="shrink-0"
+          >
+            <RefreshCw class="w-3.5 h-3.5" />
+            {toast.action.label}
+          </Button>
+        {/if}
         {#if toast.variant === "error"}
           <button
             type="button"

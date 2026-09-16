@@ -1,5 +1,7 @@
 // Frontend TypeScript types matching Rust models in models.rs
 
+import { isWindows } from "../platform";
+
 export type SongSource =
   | "unknown"
   | "local_file"
@@ -11,7 +13,8 @@ export type SongSource =
   | "soma_fm"
   | "radio_paradise"
   | "spotify"
-  | "radio_browser";
+  | "radio_browser"
+  | "webdav";
 
 export type FileType =
   | "UNKNOWN"
@@ -103,11 +106,6 @@ export interface Song {
   // CUE support
   cue_path?: string;
 
-  // AcoustID / fingerprint
-  acoustid_id?: string;
-  acoustid_fingerprint?: string;
-  fingerprint?: string;
-
   // MusicBrainz IDs
   musicbrainz_album_artist_id?: string;
   musicbrainz_artist_id?: string;
@@ -134,6 +132,14 @@ export interface Song {
   replaygain_track_gain?: number;
   replaygain_album_gain?: number;
 
+  // Dynamic Range Meter log fallback (#57) — parsed from a foobar2000
+  // foo_dr.txt sidecar. dynamic_range_album is album-wide, duplicated onto
+  // every song in the folder.
+  dynamic_range?: number;
+  dynamic_range_peak?: number;
+  dynamic_range_rms?: number;
+  dynamic_range_album?: number;
+
   // Streaming service IDs
   artist_id?: string;
   album_id?: string;
@@ -143,6 +149,25 @@ export interface Song {
   unavailable: boolean;
   /** True when track is marked instrumental (online lyrics fetch bypassed). */
   is_instrumental?: boolean;
+  /** True when the user marked this song "Not included" — hidden from auto/smart playlists and Auto-Play refill, but still visible and playable in Album/Artist views. */
+  not_included?: boolean;
+}
+
+/** Result of `get_song_context` — cached live enrichment for the Details
+    pane's "Context & Bio" tab (MusicBrainz ratings/tags, CritiqueBrainz
+    reviews, Wikipedia bio). Every field is optional/empty-array-default
+    since each source degrades independently on the backend (#23). */
+export interface SongContextEnrichment {
+  mb_rating?: number;
+  mb_rating_votes?: number;
+  mb_tags: string[];
+  critiquebrainz_rating?: number;
+  critiquebrainz_review_count?: number;
+  critiquebrainz_review_links: string[];
+  wikipedia_extract?: string;
+  wikipedia_page_url?: string;
+  wikipedia_thumbnail_url?: string;
+  fetched_at?: number;
 }
 
 export type PlaylistItemType = "song" | "stream" | "streaming_service";
@@ -180,7 +205,7 @@ export type QueuePopulationMode = "all" | "favourites" | "familiar" | "discover"
 export type ShuffleMode = "off" | "all" | "inside_album" | "albums" | "artists";
 export type RepeatMode = "off" | "track" | "album" | "playlist" | "intro";
 export type PlayState = "stopped" | "playing" | "paused";
-export type LoudnessGainSource = "disabled" | "analyzed" | "replay_gain" | "fallback";
+export type LoudnessGainSource = "disabled" | "analyzed" | "replay_gain" | "dynamic_range_log" | "fallback";
 
 export interface PlaybackState {
   state: PlayState;
@@ -197,11 +222,42 @@ export interface PlaybackState {
   remaining_playlist_items?: number;
 }
 
-export interface MusicDirectory {
-  id: number;
+/** Shared shape for anything rendered as a `LibraryBadge` — a music source's
+ * nickname/icon/colour plus the path or address it represents. */
+export interface BadgeSource {
   path: string;
-  subdirs: boolean;
   is_available?: boolean;
+  nickname?: string | null;
+  icon?: string | null;
+  color?: string | null;
+}
+
+export interface MusicDirectory extends BadgeSource {
+  id: number;
+  subdirs: boolean;
+}
+
+export interface WebDavServer {
+  id: number;
+  name: string;
+  url: string;
+  username?: string | null;
+  password?: string | null;
+  remotePath: string;
+  enabled: boolean;
+  syncStatus: string;
+  lastSyncedAt?: number | null;
+  createdAt: number;
+  nickname?: string | null;
+  icon?: string | null;
+  color?: string | null;
+}
+
+export interface WebDavSyncStats {
+  added: number;
+  updated: number;
+  removed: number;
+  errors: number;
 }
 
 export type ScanPhase = "discovering" | "reading_tags" | "updating" | "done";
@@ -261,12 +317,82 @@ export interface AlbumItem {
   total_duration_nanosec: number;
 }
 
+/** One album's entry in the Home "Top Albums" weekly chart (#662). */
+export interface TopAlbumItem {
+  album: AlbumItem;
+  rank: number;
+  /** Rank in the prior UTC calendar week, or null if not in last week's chart ("new"). */
+  previous_rank: number | null;
+  /** Best (lowest) rank this album has ever held, including the current week. */
+  peak_rank: number;
+  /** Distinct weeks this album has appeared in the chart, including the current one. */
+  weeks_on_chart: number;
+  movement: "new" | "rising" | "falling" | "steady";
+}
+
+/** Personal Stats time window (#130). */
+export type StatsRange = "7d" | "28d" | "1y";
+
+/** One ranked entry in a Personal Stats Top 10 list. */
+export interface StatsTopItem {
+  /** Exclusion-lookup identity: song id as a string, or the raw album/artist/genre text. */
+  key: string;
+  label: string;
+  /** Secondary line (e.g. artist for a song/album row); null for artist/genre rows. */
+  secondary: string | null;
+  play_count: number;
+  minutes: number;
+  excluded: boolean;
+  /** The song's album title, set only on top_songs rows — songs have no detail
+   * page of their own, so clicking one navigates to this album instead. */
+  album: string | null;
+  song_id?: number | null;
+  sample_song_id?: number | null;
+  art_embedded?: boolean;
+  art_automatic?: string | null;
+  art_manual?: string | null;
+  year?: number | null;
+  rating?: number;
+}
+
+/** Personal Stats summary for one range (#130). */
+export interface StatsSummary {
+  range: StatsRange;
+  top_songs: StatsTopItem[];
+  /** MIN of plays across an album's tracks (completionist metric) — deliberately
+   * different from the Home "Top Albums" chart's SUM-based engagement metric. */
+  top_albums: StatsTopItem[];
+  top_artists: StatsTopItem[];
+  top_genres: StatsTopItem[];
+  /** Unix-second timestamps of every in-range, non-excluded play, for
+   * client-side local-time listening-clock bucketing. */
+  play_timestamps: number[];
+  /** Total minutes listened across every in-range, non-excluded play. */
+  total_minutes: number;
+}
+
+/** One completed listen's timing, for the daily listening heatmap to bucket
+ * into local calendar days and sum minutes played. */
+export interface ListenEvent {
+  played_at: number;
+  duration_secs: number;
+}
+
 export interface ArtistItem {
   name: string | null;
   sort_artist?: string | null;
   album_count: number;
   song_count: number;
+  total_playcount?: number;
   genre?: string | null;
+  /** Locally-discovered artist visuals (#98/#761) — not returned by
+   * `get_artists()`; populated on demand via
+   * `collectionStore.getExtendedArtworkForArtist()` (see `ExtendedArtworkResponse`),
+   * since scanning every artist's folder eagerly for a list view would be
+   * far too expensive. `undefined` means "not fetched yet", not "none found". */
+  portrait_uri?: string | null;
+  band_logo_uri?: string | null;
+  fanart_uri?: string | null;
 }
 
 export interface ArtistSocialLink {
@@ -280,6 +406,64 @@ export interface ArtistProfile {
   tags: string[];
   social_links: ArtistSocialLink[];
   bio?: string | null;
+  /** Same on-demand artist visuals as {@link ArtistItem} — see there for why
+   * these aren't populated by `get_artist_profile()`/`get_all_artist_profiles()`. */
+  portrait_uri?: string | null;
+  band_logo_uri?: string | null;
+  fanart_uri?: string | null;
+}
+
+export interface AlbumLink {
+  platform: string;
+  handle_or_url: string;
+}
+
+export interface AlbumProfile {
+  album_key: string;
+  artist_key?: string | null;
+  description?: string | null;
+  website?: string | null;
+  links: AlbumLink[];
+}
+
+/**
+ * Category within the Standardized Artwork Hierarchy (#98) — mirrors
+ * `ArtworkCategory::as_str()` in `covermanager.rs` exactly. Don't rename a
+ * value here without updating there.
+ */
+export type ExtendedArtworkCategory =
+  | "primary_cover"
+  | "back_cover"
+  | "disc_media"
+  | "booklet"
+  | "matrix"
+  | "artist_portrait"
+  | "band_logo"
+  | "fanart_banner"
+  | "subfolder";
+
+/** One discovered artwork file, as returned by `get_extended_artwork_for_song`/
+ * `get_extended_artwork_for_artist`. `uri` is a raw `luminous-art://` URI —
+ * resolve it with {@link getCoverArtUrl} before using it in an `<img>` src,
+ * same as any other cover art URI in this codebase. */
+export interface ExtendedArtworkItem {
+  category: ExtendedArtworkCategory;
+  uri: string;
+}
+
+/** Response shape for `get_extended_artwork_for_song`/`_for_artist` (#758).
+ * `items` carries every discovered file in hierarchy order; the `*_uri`
+ * fields pull out the ones most callers actually need without having to
+ * scan `items` themselves. `primary_uri` is the album cover-stack's
+ * thumbnail and "Open Images" target (#760); the artist fields feed
+ * `ArtistDetailView`/`ArtistCard`/`TopNavigation` (#761). */
+export interface ExtendedArtworkResponse {
+  count: number;
+  primary_uri: string | null;
+  artist_portrait_uri: string | null;
+  band_logo_uri: string | null;
+  fanart_uri: string | null;
+  items: ExtendedArtworkItem[];
 }
 
 /** A Luminous-native song tag (#224), independent of the embedded `Song.genre`. */
@@ -349,7 +533,13 @@ export function getCoverArtUrl(uri: string | null | undefined): string | null {
       }
       return `/fixtures/${cleanPath}`;
     }
-    const isWindows = typeof navigator !== "undefined" && navigator.userAgent.includes("Windows");
+    // On Windows, WebView2 does not intercept non-standard URI schemes (like luminous-art://)
+    // directly. Instead, wry sets up an AddWebResourceRequestedFilter for `http://luminous-art.*`
+    // (see custom_protocol_workaround.rs in wry). The webview must therefore request
+    // `http://luminous-art.localhost/...`. wry's handler intercepts this and internally
+    // reverts the URI back to `luminous-art://localhost/...` before invoking the Tauri
+    // protocol handler (which is why backend logs display `URI = luminous-art://...`).
+    // Do not remove this rewrite (see #715).
     if (isWindows) {
       return uri.replace("luminous-art://", "http://luminous-art.localhost/");
     }
@@ -376,10 +566,102 @@ export function resolveArtUrl(art: string | null | undefined): string | null {
   return getCoverArtUrl(`luminous-art://local/${art}`);
 }
 
+/**
+ * Extracts the raw filesystem path from a `luminous-art://local/...` URI —
+ * the reverse of `local_artwork_uri()` in covermanager.rs. Extended artwork
+ * URIs (#98) are always in this form, since `scan_extended_artwork` only
+ * ever returns absolute filesystem paths. Returns null for any other URI
+ * shape (e.g. a cached `luminous-art://album-....jpg` single-cover URI,
+ * which has no real folder path for the OS image viewer to open).
+ */
+export function extractLocalArtworkPath(uri: string | null | undefined): string | null {
+  if (!uri) return null;
+  const prefix = "luminous-art://local/";
+  if (!uri.startsWith(prefix)) return null;
+  // Not percent-decoded: `local_artwork_uri()` in covermanager.rs writes the
+  // path unencoded (see its doc comment), so this is the exact inverse —
+  // decoding here would wrongly throw on a path containing a literal '%'.
+  return uri.slice(prefix.length);
+}
+
 export type HomeItem =
   | { type: "song"; song: Song }
   | { type: "album"; album: AlbumItem }
   | { type: "playlist"; playlist: Playlist };
+
+/** A user-pinned Home-shelf entry (#222) — a superset of {@link HomeItem} that
+ * also allows Artist, since pins are explicitly user-curated across all four
+ * browsable entity types. */
+export type PinnedItemType = "song" | "album" | "artist" | "playlist" | "auto_playlist";
+
+/** A pinned auto-playlist (genre/decade/BPM/artist-tag/Favourites/Recently
+ * Added/Most Played/History) — enough of {@link AutoPlaylistRef}'s shape for
+ * `AutoPlaylistCard` to render it directly. Favourites/Recently Added/Most
+ * Played/History have no backing playlist row, so `playlistId`/`updated` are
+ * absent for those kinds. */
+export interface AutoPlaylistItem {
+  kind: "favourites" | "recently_added" | "most_played" | "history" | "genre" | "decade" | "bpm" | "artist_tag" | "missing_metadata" | "missing_musicbrainz" | "daypart";
+  genre?: string;
+  artistTag?: string;
+  decade?: string;
+  bpm?: string;
+  playlistId?: number;
+  updated?: number;
+  trackCount: number;
+}
+
+export type PinnedItem =
+  | { type: "song"; song: Song }
+  | { type: "album"; album: AlbumItem }
+  | { type: "artist"; artist: ArtistItem }
+  | { type: "playlist"; playlist: Playlist }
+  | { type: "auto_playlist"; autoPlaylist: AutoPlaylistItem };
+
+/** The stable ref_key for a pinned auto-playlist: the bare kind for
+ * Favourites/Recently Added/Most Played/History (no backing row to key on),
+ * or `kind:selector` for genre/decade/bpm/artist_tag — keyed by the selector
+ * value (genre name, decade, bpm spec, artist tag) rather than the
+ * materialized playlist's id, since that row can be dropped and recreated by
+ * a background sync while the selector stays stable. */
+export function autoPlaylistRefKeyFor(ref: {
+  kind: string;
+  genre?: string;
+  decade?: string;
+  bpm?: string;
+  artistTag?: string;
+}): string {
+  switch (ref.kind) {
+    case "genre":
+      return `genre:${ref.genre ?? ""}`;
+    case "decade":
+      return `decade:${ref.decade ?? ""}`;
+    case "bpm":
+      return `bpm:${ref.bpm ?? ""}`;
+    case "artist_tag":
+      return `artist_tag:${ref.artistTag ?? ""}`;
+    default:
+      return ref.kind;
+  }
+}
+
+/** The `(item_type, ref_key)` identity Luminous stores for a pin — song/playlist
+ * id as a string, bare album title, or effective-artist name. Shared by the
+ * pinned store and every pin/unpin entry point so they agree on how to key
+ * each item type. */
+export function pinnedRefKeyFor(item: PinnedItem): string {
+  switch (item.type) {
+    case "song":
+      return String(item.song.id);
+    case "album":
+      return item.album.album ?? "";
+    case "artist":
+      return item.artist.name ?? "";
+    case "playlist":
+      return String(item.playlist.id);
+    case "auto_playlist":
+      return autoPlaylistRefKeyFor(item.autoPlaylist);
+  }
+}
 
 // What the user was inside when a play started — lets "Recently Played"
 // show an Album/Playlist card instead of always collapsing to a Song.

@@ -9,11 +9,11 @@ use super::{
     SONG_SELECT_COLS_QUALIFIED, SONG_SELECT_COL_COUNT,
 };
 use crate::models::{
-    AlbumItem, ArtistProfile, ArtistSocialLink, HomeItem, LibraryStats, Playlist,
-    QueuePopulationMode, Song,
+    AlbumItem, AlbumLink, AlbumProfile, ArtistProfile, ArtistSocialLink, HomeItem, LibraryStats,
+    Playlist, QueuePopulationMode, Song, Tag, TopAlbumItem, LIBRARY_SOURCES_SQL,
 };
 use anyhow::Result;
-use rusqlite::{params, ToSql};
+use rusqlite::{params, OptionalExtension, ToSql};
 
 impl CollectionScanner {
     /// Full-text + field search across the library.
@@ -99,7 +99,10 @@ impl CollectionScanner {
 
         let parsed = crate::filter_parser::parse_query(query.trim());
 
-        let mut where_clauses = vec!["unavailable = 0".to_string()];
+        let mut where_clauses = vec![
+            "unavailable = 0".to_string(),
+            "not_included = 0".to_string(),
+        ];
         if !extra_where.is_empty() {
             where_clauses.push(extra_where.trim_start_matches(" AND ").to_string());
         }
@@ -154,10 +157,11 @@ impl CollectionScanner {
         let conn = self.db.pool.get()?;
         let sql = format!(
             "SELECT {} FROM songs
-             WHERE source IN (1, 2) AND unavailable = 0
+             WHERE source IN ({lib}) AND unavailable = 0
              ORDER BY COALESCE(album_artist_sort, album_artist), COALESCE(albumsort, album), disc, track
              LIMIT ?1 OFFSET ?2",
-            SONG_SELECT_COLS
+            SONG_SELECT_COLS,
+            lib = *LIBRARY_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
         let songs = stmt
@@ -172,10 +176,11 @@ impl CollectionScanner {
         let sql = format!(
             "SELECT {} FROM songs
              WHERE album = ?1
-               AND source IN (1, 2)
+               AND source IN ({lib})
                AND unavailable = 0
              ORDER BY disc, track",
-            SONG_SELECT_COLS
+            SONG_SELECT_COLS,
+            lib = *LIBRARY_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
         let songs = stmt
@@ -214,12 +219,13 @@ impl CollectionScanner {
         let sql = format!(
             "SELECT {} FROM songs
              WHERE ({} OR {})
-               AND source IN (1, 2)
+               AND source IN ({lib})
                AND unavailable = 0
              ORDER BY COALESCE(albumsort, album), disc, track",
             SONG_SELECT_COLS,
             multi_value_contains_sql("COALESCE(artist, '')", "?1"),
-            multi_value_contains_sql("COALESCE(album_artist, '')", "?1")
+            multi_value_contains_sql("COALESCE(album_artist, '')", "?1"),
+            lib = *LIBRARY_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
         let songs = stmt
@@ -255,7 +261,7 @@ impl CollectionScanner {
                 (
                     SELECT genre
                     FROM songs g
-                    WHERE g.album = songs.album AND g.source IN (1, 2) AND g.unavailable = 0
+                    WHERE g.album = songs.album AND g.source IN ({lib}) AND g.unavailable = 0
                       AND g.genre IS NOT NULL AND g.genre != ''
                     GROUP BY genre
                     ORDER BY COUNT(*) DESC, COALESCE(genresort, genre) ASC
@@ -268,14 +274,14 @@ impl CollectionScanner {
                 MAX(added) AS added,
                 COALESCE(SUM(length_nanosec), 0) AS total_duration_nanosec
              FROM songs
-             WHERE source IN (1, 2) AND unavailable = 0 AND album IS NOT NULL AND album != ''
+             WHERE source IN ({lib}) AND unavailable = 0 AND album IS NOT NULL AND album != ''
                AND album IN (
                  SELECT album FROM songs s2
-                 WHERE s2.source IN (1, 2) AND s2.unavailable = 0 AND {}
+                 WHERE s2.source IN ({lib}) AND s2.unavailable = 0 AND {}
                )
                AND album IN (
                  SELECT album FROM songs s3
-                 WHERE s3.source IN (1, 2) AND s3.unavailable = 0
+                 WHERE s3.source IN ({lib}) AND s3.unavailable = 0
                  GROUP BY album
                  -- Mirrors get_albums()'s various-artists fallback: a compilation
                  -- either has TCMP set, is explicitly credited to Various
@@ -294,7 +300,8 @@ impl CollectionScanner {
                )
              GROUP BY album
              ORDER BY COALESCE(MAX(albumsort), album)",
-            multi_value_contains_sql("s2.artist", "?1")
+            multi_value_contains_sql("s2.artist", "?1"),
+            lib = *LIBRARY_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
         let albums: Vec<serde_json::Value> = stmt
@@ -325,10 +332,12 @@ impl CollectionScanner {
         let sql = format!(
             "SELECT {} FROM songs
              WHERE rating = 5
-               AND source IN (1, 2)
+               AND source IN ({lib})
                AND unavailable = 0
+               AND not_included = 0
              ORDER BY COALESCE(album_artist_sort, album_artist), COALESCE(albumsort, album), disc, track",
-            SONG_SELECT_COLS
+            SONG_SELECT_COLS,
+            lib = *LIBRARY_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
         let songs = stmt
@@ -343,12 +352,42 @@ impl CollectionScanner {
         let conn = self.db.pool.get()?;
         let sql = format!(
             "SELECT {} FROM songs
-             WHERE source IN (1, 2)
+             WHERE source IN ({lib})
                AND unavailable = 0
+               AND not_included = 0
                AND added IS NOT NULL
              ORDER BY added DESC
              LIMIT ?1",
-            SONG_SELECT_COLS
+            SONG_SELECT_COLS,
+            lib = *LIBRARY_SOURCES_SQL
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let songs = stmt
+            .query_map(params![limit], row_to_song)?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(songs)
+    }
+
+    /// Songs ranked by total play count, most-played first, grouped strictly
+    /// by `song_id` (not by listening context) — matches
+    /// `get_recently_added_songs`'s shape. Backs both the Home screen's
+    /// "Most Played" preview and the "Most Played" auto-playlist, so the two
+    /// always agree (#169).
+    pub fn get_most_played_songs(&self, limit: i64) -> Result<Vec<Song>> {
+        let conn = self.db.pool.get()?;
+        let sql = format!(
+            "SELECT {SONG_SELECT_COLS_QUALIFIED}
+             FROM songs s
+             JOIN (
+                 SELECT song_id, COUNT(*) AS play_count
+                 FROM play_history
+                 GROUP BY song_id
+             ) ph ON ph.song_id = s.id
+             WHERE s.source IN ({lib}) AND s.unavailable = 0 AND s.not_included = 0
+             ORDER BY ph.play_count DESC, s.added DESC
+             LIMIT ?1",
+            lib = *LIBRARY_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
         let songs = stmt
@@ -362,14 +401,17 @@ impl CollectionScanner {
     /// auto-playlist per genre.
     pub fn get_library_genres(&self) -> Result<Vec<String>> {
         let conn = self.db.pool.get()?;
-        let mut stmt = conn.prepare(
+        let sql = format!(
             "SELECT DISTINCT genre FROM songs
-             WHERE source IN (1, 2)
+             WHERE source IN ({lib})
                AND unavailable = 0
+               AND not_included = 0
                AND genre IS NOT NULL
                AND genre != ''
              ORDER BY COALESCE(genresort, genre)",
-        )?;
+            lib = *LIBRARY_SOURCES_SQL
+        );
+        let mut stmt = conn.prepare(&sql)?;
         let genres = stmt
             .query_map([], |row| row.get::<_, String>(0))?
             .filter_map(|r| r.ok())
@@ -381,16 +423,19 @@ impl CollectionScanner {
     /// auto-playlist per decade.
     pub fn get_library_decades(&self) -> Result<Vec<String>> {
         let conn = self.db.pool.get()?;
-        let mut stmt = conn.prepare(
+        let sql = format!(
             "SELECT DISTINCT (COALESCE(year, originalyear) / 10 * 10) AS decade_start
              FROM songs
-             WHERE source IN (1, 2)
+             WHERE source IN ({lib})
                AND unavailable = 0
+               AND not_included = 0
                AND COALESCE(year, originalyear) IS NOT NULL
                AND COALESCE(year, originalyear) >= 1000
                AND COALESCE(year, originalyear) <= 9999
              ORDER BY decade_start ASC",
-        )?;
+            lib = *LIBRARY_SOURCES_SQL
+        );
+        let mut stmt = conn.prepare(&sql)?;
         let decades = stmt
             .query_map([], |row| {
                 let start: i32 = row.get(0)?;
@@ -419,12 +464,14 @@ impl CollectionScanner {
             "SELECT {} FROM songs
              WHERE COALESCE(year, originalyear) >= ?1
                AND COALESCE(year, originalyear) <= ?2
-               AND source IN (1, 2)
+               AND source IN ({lib})
                AND unavailable = 0
+               AND not_included = 0
                {extra_where}
              ORDER BY {order_by}
              LIMIT ?3",
-            SONG_SELECT_COLS
+            SONG_SELECT_COLS,
+            lib = *LIBRARY_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
         let songs = stmt
@@ -454,12 +501,14 @@ impl CollectionScanner {
             "SELECT {} FROM songs
              WHERE bpm >= ?1
                {upper_bound}
-               AND source IN (1, 2)
+               AND source IN ({lib})
                AND unavailable = 0
+               AND not_included = 0
                {extra_where}
              ORDER BY {order_by}
              LIMIT ?3",
-            SONG_SELECT_COLS
+            SONG_SELECT_COLS,
+            lib = *LIBRARY_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
         let songs = stmt
@@ -485,16 +534,113 @@ impl CollectionScanner {
                  SELECT artist_key FROM artist_profiles, json_each(artist_profiles.tags)
                  WHERE json_each.value = ?1 COLLATE NOCASE
              )
-               AND source IN (1, 2)
+               AND source IN ({lib})
                AND unavailable = 0
+               AND not_included = 0
                {extra_where}
              ORDER BY {order_by}
              LIMIT ?2",
-            SONG_SELECT_COLS
+            SONG_SELECT_COLS,
+            lib = *LIBRARY_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
         let songs = stmt
             .query_map(params![tag, limit], row_to_song)?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(songs)
+    }
+
+    /// Songs missing one or more core tags (title/artist/album — the minimum
+    /// set needed to identify a track), selected per `mode`'s bias, for the
+    /// "Missing Metadata" auto-playlist (#367). NULL and empty-string are
+    /// both treated as "missing" since tag reads/writes use either
+    /// convention depending on the column.
+    pub fn get_songs_missing_core_tags(
+        &self,
+        limit: i64,
+        mode: QueuePopulationMode,
+    ) -> Result<Vec<Song>> {
+        let conn = self.db.pool.get()?;
+        let (extra_where, order_by) = mode_query_fragments(mode);
+        let sql = format!(
+            "SELECT {} FROM songs
+             WHERE (
+                 title IS NULL OR TRIM(title) = ''
+                 OR artist IS NULL OR TRIM(artist) = ''
+                 OR album IS NULL OR TRIM(album) = ''
+             )
+               AND source IN ({lib})
+               AND unavailable = 0
+               AND not_included = 0
+               {extra_where}
+             ORDER BY {order_by}
+             LIMIT ?1",
+            SONG_SELECT_COLS,
+            lib = *LIBRARY_SOURCES_SQL
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let songs = stmt
+            .query_map(params![limit], row_to_song)?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(songs)
+    }
+
+    /// Diagnostic query backing the "Missing MusicBrainz ID" auto-playlist.
+    /// Surfaces songs that have not yet been tagged with a MusicBrainz Recording ID,
+    /// so users who enable scrobbling can easily identify and resolve them via Picard.
+    pub fn get_songs_missing_musicbrainz_id(
+        &self,
+        limit: i64,
+        mode: QueuePopulationMode,
+    ) -> Result<Vec<Song>> {
+        let conn = self.db.pool.get()?;
+        let (extra_where, order_by) = mode_query_fragments(mode);
+        let sql = format!(
+            "SELECT {} FROM songs
+             WHERE (
+                 musicbrainz_recording_id IS NULL OR TRIM(musicbrainz_recording_id) = ''
+             )
+               AND source IN ({lib})
+               AND unavailable = 0
+               AND not_included = 0
+               {extra_where}
+             ORDER BY {order_by}
+             LIMIT ?1",
+            SONG_SELECT_COLS,
+            lib = *LIBRARY_SOURCES_SQL
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let songs = stmt
+            .query_map(params![limit], row_to_song)?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(songs)
+    }
+
+    /// A random cross-section of the library — the fallback used by the
+    /// Daypart Mix auto-playlist (#223) when no single genre grouping has
+    /// enough songs on its own. Unlike every other query in this file, this
+    /// intentionally ignores population-mode bias in favor of a flat
+    /// `ORDER BY RANDOM()` (the same idiom `get_featured_albums` already
+    /// uses) — a "some songs from anywhere" fallback has nothing meaningful
+    /// to bias toward.
+    pub fn get_random_songs(&self, limit: i64) -> Result<Vec<Song>> {
+        let conn = self.db.pool.get()?;
+        let sql = format!(
+            "SELECT {} FROM songs
+             WHERE source IN ({lib})
+               AND unavailable = 0
+               AND not_included = 0
+             ORDER BY RANDOM()
+             LIMIT ?1",
+            SONG_SELECT_COLS,
+            lib = *LIBRARY_SOURCES_SQL
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let songs = stmt
+            .query_map(params![limit], row_to_song)?
             .filter_map(|r| r.ok())
             .collect();
         Ok(songs)
@@ -515,6 +661,40 @@ impl CollectionScanner {
         Ok(tags)
     }
 
+    /// Every artist tag in the library with how many songs (by artists
+    /// carrying that tag) it currently matches — the browsable-only
+    /// counterpart to the embedded-genre `TagManager::get_tag_hierarchy` for
+    /// the Genres page (#962/#956 follow-up): artist tags are curated,
+    /// DB-only metadata with no file to write to, so unlike genre they never
+    /// get their own mergeable/renameable/colorable hierarchy entry here —
+    /// just a name and a count to browse by.
+    pub fn get_artist_tag_counts(&self) -> Result<Vec<Tag>> {
+        let conn = self.db.pool.get()?;
+        let sql = format!(
+            "SELECT json_each.value AS tag, COUNT(DISTINCT songs.id) AS song_count
+             FROM artist_profiles, json_each(artist_profiles.tags)
+             JOIN songs ON COALESCE(NULLIF(songs.album_artist, ''), songs.artist)
+                 = artist_profiles.artist_key COLLATE NOCASE
+             WHERE songs.source IN ({lib})
+               AND songs.unavailable = 0
+               AND songs.not_included = 0
+             GROUP BY tag COLLATE NOCASE
+             ORDER BY tag COLLATE NOCASE",
+            lib = *LIBRARY_SOURCES_SQL
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let tags = stmt
+            .query_map([], |row| {
+                Ok(Tag {
+                    name: row.get(0)?,
+                    song_count: row.get(1)?,
+                })
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(tags)
+    }
+
     /// One aggregated entry per distinct `album` value across the whole
     /// library (untyped JSON, not a `Song`/`AlbumItem` — see the query below
     /// for the exact field set), each summarizing every track that shares
@@ -525,7 +705,7 @@ impl CollectionScanner {
         // but the same album title are consolidated into a single entry.
         // album_artist is taken as the shared value when all tracks agree on it;
         // if they differ (true various-artist albums), it comes back as NULL.
-        let mut stmt = conn.prepare(
+        let sql = format!(
             "SELECT
                 CASE
                     WHEN COUNT(DISTINCT NULLIF(album_artist, '')) = 1 THEN MAX(NULLIF(album_artist, ''))
@@ -542,7 +722,7 @@ impl CollectionScanner {
                 (
                     SELECT genre
                     FROM songs g
-                    WHERE g.album = songs.album AND g.source IN (1, 2) AND g.unavailable = 0
+                    WHERE g.album = songs.album AND g.source IN ({lib}) AND g.unavailable = 0
                       AND g.genre IS NOT NULL AND g.genre != ''
                     GROUP BY genre
                     ORDER BY COUNT(*) DESC, COALESCE(genresort, genre) ASC
@@ -557,10 +737,12 @@ impl CollectionScanner {
                 COALESCE(MAX(NULLIF(album_artist_sort, '')), MAX(NULLIF(artistsort, ''))) AS artist_sort,
                 MAX(NULLIF(albumsort, '')) AS albumsort
              FROM songs
-             WHERE source IN (1, 2) AND album IS NOT NULL AND album != '' AND unavailable = 0
+             WHERE source IN ({lib}) AND album IS NOT NULL AND album != '' AND unavailable = 0
              GROUP BY album
              ORDER BY COALESCE(MAX(album_artist_sort), MAX(artistsort), MAX(album_artist), MAX(artist)), COALESCE(MAX(albumsort), album)",
-        )?;
+            lib = *LIBRARY_SOURCES_SQL
+        );
+        let mut stmt = conn.prepare(&sql)?;
         let albums: Vec<serde_json::Value> = stmt
             .query_map([], |row| {
                 Ok(serde_json::json!({
@@ -596,24 +778,25 @@ impl CollectionScanner {
         // drift across files/albums for the same real-world artist (e.g. "The War On
         // Drugs" vs "The War on Drugs") doesn't show up as two separate cards — see
         // issue #295. `MIN(...)` picks one deterministic casing per group to display.
-        let mut stmt = conn.prepare(
+        let sql = format!(
             "WITH album_counts AS (
                 SELECT album, COUNT(*) AS track_count
                 FROM songs
-                WHERE source IN (1, 2) AND album IS NOT NULL AND album != '' AND unavailable = 0
+                WHERE source IN ({lib}) AND album IS NOT NULL AND album != '' AND unavailable = 0
                 GROUP BY album
              ),
              base AS (
-                SELECT s.id, s.album,
+                SELECT s.id, s.album, s.playcount,
                        COALESCE(NULLIF(s.album_artist, ''), s.artist, '') AS effective_artist,
                        COALESCE(NULLIF(s.album_artist_sort, ''), NULLIF(s.album_artist, ''), NULLIF(s.artistsort, ''), s.artist, '') AS sort_artist
                 FROM songs s
-                WHERE s.source IN (1, 2) AND s.unavailable = 0
+                WHERE s.source IN ({lib}) AND s.unavailable = 0
              ),
              grouped AS (
                 SELECT MIN(effective_artist) AS effective_artist,
                        MIN(sort_artist) AS sort_artist,
-                       COUNT(*) AS song_count
+                       COUNT(*) AS song_count,
+                       SUM(COALESCE(playcount, 0)) AS total_playcount
                 FROM base
                 GROUP BY effective_artist COLLATE NOCASE
              )
@@ -630,15 +813,18 @@ impl CollectionScanner {
                     SELECT genre
                     FROM songs sg
                     WHERE COALESCE(NULLIF(sg.album_artist, ''), sg.artist, '') = g.effective_artist COLLATE NOCASE
-                      AND sg.source IN (1, 2) AND sg.unavailable = 0 AND sg.genre IS NOT NULL AND sg.genre != ''
+                      AND sg.source IN ({lib}) AND sg.unavailable = 0 AND sg.genre IS NOT NULL AND sg.genre != ''
                     GROUP BY sg.genre
                     ORDER BY COUNT(*) DESC, COALESCE(sg.genresort, sg.genre) ASC
                     LIMIT 1
                 ) AS genre,
-                g.sort_artist
+                g.sort_artist,
+                g.total_playcount
              FROM grouped g
              ORDER BY g.sort_artist COLLATE NOCASE",
-        )?;
+            lib = *LIBRARY_SOURCES_SQL
+        );
+        let mut stmt = conn.prepare(&sql)?;
         let artists: Vec<serde_json::Value> = stmt
             .query_map([], |row| {
                 Ok(serde_json::json!({
@@ -647,6 +833,7 @@ impl CollectionScanner {
                     "song_count": row.get::<_, i32>(2)?,
                     "genre": row.get::<_, Option<String>>(3)?,
                     "sort_artist": row.get::<_, Option<String>>(4)?,
+                    "total_playcount": row.get::<_, i32>(5)?,
                 }))
             })?
             .filter_map(|r| r.ok())
@@ -655,17 +842,19 @@ impl CollectionScanner {
     }
 
     /// Artists ranked by total play count across their songs (ties broken
-    /// alphabetically). Artists with zero plays are excluded entirely —
-    /// this powers the Home "Top Artists" carousel, not a full artist
-    /// directory (see `get_artists` for that).
+    /// alphabetically). When the library has no play history at all (a
+    /// freshly scanned collection), falls back to ranking by song count
+    /// instead of excluding every artist — this powers the Home "Top
+    /// Artists" carousel, not a full artist directory (see `get_artists`
+    /// for that).
     pub fn get_top_artists(&self, limit: i64) -> Result<Vec<serde_json::Value>> {
         let conn = self.db.pool.get()?;
         // See get_artists() for why grouping is case-insensitive (issue #295).
-        let mut stmt = conn.prepare(
+        let sql = format!(
             "WITH album_counts AS (
                 SELECT album, COUNT(*) AS track_count
                 FROM songs
-                WHERE source IN (1, 2) AND album IS NOT NULL AND album != '' AND unavailable = 0
+                WHERE source IN ({lib}) AND album IS NOT NULL AND album != '' AND unavailable = 0
                 GROUP BY album
              ),
              base AS (
@@ -673,7 +862,10 @@ impl CollectionScanner {
                        COALESCE(NULLIF(s.album_artist, ''), s.artist, '') AS effective_artist,
                        COALESCE(NULLIF(s.album_artist_sort, ''), NULLIF(s.album_artist, ''), NULLIF(s.artistsort, ''), s.artist, '') AS sort_artist
                 FROM songs s
-                WHERE s.source IN (1, 2) AND s.unavailable = 0
+                WHERE s.source IN ({lib}) AND s.unavailable = 0
+             ),
+             totals AS (
+                SELECT SUM(COALESCE(playcount, 0)) AS lib_total_playcount FROM base
              ),
              grouped AS (
                 SELECT
@@ -683,7 +875,6 @@ impl CollectionScanner {
                     SUM(COALESCE(playcount, 0)) AS total_playcount
                 FROM base
                 GROUP BY effective_artist COLLATE NOCASE
-                HAVING SUM(COALESCE(playcount, 0)) > 0
              )
              SELECT
                 g.effective_artist,
@@ -699,21 +890,27 @@ impl CollectionScanner {
                     SELECT genre
                     FROM songs sg
                     WHERE COALESCE(NULLIF(sg.album_artist, ''), sg.artist, '') = g.effective_artist COLLATE NOCASE
-                      AND sg.source IN (1, 2) AND sg.unavailable = 0 AND sg.genre IS NOT NULL AND sg.genre != ''
+                      AND sg.source IN ({lib}) AND sg.unavailable = 0 AND sg.genre IS NOT NULL AND sg.genre != ''
                     GROUP BY sg.genre
                     ORDER BY COUNT(*) DESC, COALESCE(sg.genresort, sg.genre) ASC
                     LIMIT 1
                 ) AS genre
-             FROM grouped g
-             ORDER BY g.total_playcount DESC, g.sort_artist COLLATE NOCASE
+             FROM grouped g, totals t
+             ORDER BY
+                g.total_playcount DESC,
+                CASE WHEN t.lib_total_playcount = 0 THEN g.song_count END DESC,
+                g.sort_artist COLLATE NOCASE
              LIMIT ?1",
-        )?;
+            lib = *LIBRARY_SOURCES_SQL
+        );
+        let mut stmt = conn.prepare(&sql)?;
         let artists: Vec<serde_json::Value> = stmt
             .query_map(params![limit], |row| {
                 Ok(serde_json::json!({
                     "name": row.get::<_, Option<String>>(0)?,
                     "album_count": row.get::<_, i32>(1)?,
                     "song_count": row.get::<_, i32>(2)?,
+                    "total_playcount": row.get::<_, i32>(3)?,
                     "genre": row.get::<_, Option<String>>(4)?,
                 }))
             })?
@@ -741,27 +938,82 @@ impl CollectionScanner {
         get_all_artist_profiles_conn(&conn)
     }
 
+    /// Retrieve the customizable profile (description, website, tags, links)
+    /// for an album (#950). Returns empty/default profile if none saved yet.
+    pub fn get_album_profile(&self, album: &str) -> Result<AlbumProfile> {
+        let conn = self.db.pool.get()?;
+        get_album_profile_conn(&conn, album)
+    }
+
+    /// Save or update an album's customizable profile (#950).
+    pub fn set_album_profile(&self, profile: &AlbumProfile) -> Result<AlbumProfile> {
+        let conn = self.db.pool.get()?;
+        set_album_profile_conn(&conn, profile)
+    }
+
+    /// Retrieve all custom album profiles in the library (#950).
+    pub fn get_all_album_profiles(&self) -> Result<Vec<AlbumProfile>> {
+        let conn = self.db.pool.get()?;
+        get_all_album_profiles_conn(&conn)
+    }
+
+    /// Resolve a representative song's file path for an artist, used to
+    /// locate the artist-level directory for `artist.md`/`artist.jpg` (#98) —
+    /// same query `get_extended_artwork_for_artist` uses for artwork.
+    pub fn get_representative_song_path_for_artist(&self, artist: &str) -> Result<Option<String>> {
+        let conn = self.db.pool.get()?;
+        let path = conn
+            .query_row(
+                "SELECT path FROM songs
+                 WHERE (album_artist = ?1 COLLATE NOCASE OR artist = ?1 COLLATE NOCASE)
+                   AND path IS NOT NULL
+                 LIMIT 1",
+                params![artist],
+                |row| row.get::<_, Option<String>>(0),
+            )
+            .optional()?
+            .flatten();
+        Ok(path)
+    }
+
+    /// Resolve a representative song's file path for an album, used to
+    /// locate the album directory for `album.md`/`cover.jpg`.
+    pub fn get_representative_song_path_for_album(&self, album: &str) -> Result<Option<String>> {
+        let conn = self.db.pool.get()?;
+        let path = conn
+            .query_row(
+                "SELECT path FROM songs
+                 WHERE album = ?1 COLLATE NOCASE AND path IS NOT NULL
+                 LIMIT 1",
+                params![album],
+                |row| row.get::<_, Option<String>>(0),
+            )
+            .optional()?
+            .flatten();
+        Ok(path)
+    }
+
     pub fn get_library_stats(&self) -> Result<LibraryStats> {
         let conn = self.db.pool.get()?;
-        let stats = conn.query_row(
+        let sql = format!(
             "SELECT
                 COUNT(*) as total_songs,
                 COUNT(DISTINCT COALESCE(NULLIF(album_artist,''), artist)) as total_artists,
                 COUNT(DISTINCT album) as total_albums,
                 COALESCE(SUM(length_nanosec), 0) as total_duration,
                 COALESCE(SUM(filesize), 0) as total_filesize
-             FROM songs WHERE source IN (1, 2) AND unavailable = 0",
-            [],
-            |row| {
-                Ok(LibraryStats {
-                    total_songs: row.get(0)?,
-                    total_artists: row.get(1)?,
-                    total_albums: row.get(2)?,
-                    total_duration_nanosec: row.get(3)?,
-                    total_filesize_bytes: row.get(4)?,
-                })
-            },
-        )?;
+             FROM songs WHERE source IN ({lib}) AND unavailable = 0",
+            lib = *LIBRARY_SOURCES_SQL
+        );
+        let stats = conn.query_row(&sql, [], |row| {
+            Ok(LibraryStats {
+                total_songs: row.get(0)?,
+                total_artists: row.get(1)?,
+                total_albums: row.get(2)?,
+                total_duration_nanosec: row.get(3)?,
+                total_filesize_bytes: row.get(4)?,
+            })
+        })?;
         Ok(stats)
     }
 
@@ -781,9 +1033,10 @@ impl CollectionScanner {
                  FROM play_history
                  GROUP BY song_id
              ) ph ON s.id = ph.song_id
-             WHERE s.source IN (1, 2) AND s.unavailable = 0
+             WHERE s.source IN ({lib}) AND s.unavailable = 0
              ORDER BY ph.last_played_at DESC
-             LIMIT ?1"
+             LIMIT ?1",
+            lib = *LIBRARY_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
         let songs = stmt
@@ -816,7 +1069,7 @@ impl CollectionScanner {
             "SELECT {home_item_select_cols}, ph.context_type, ph.playlist_id
              FROM play_history ph
              JOIN songs s ON s.id = ph.song_id
-             WHERE s.source IN (1, 2) AND s.unavailable = 0
+             WHERE s.source IN ({lib}) AND s.unavailable = 0
                AND NOT (
                    ph.context_type = 'playlist'
                    AND ph.playlist_id IN (
@@ -824,7 +1077,8 @@ impl CollectionScanner {
                    )
                )
              ORDER BY ph.played_at DESC
-             LIMIT ?1"
+             LIMIT ?1",
+            lib = *LIBRARY_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
         let rows: Vec<(Song, i64, i64, String, Option<i64>)> = stmt
@@ -865,87 +1119,6 @@ impl CollectionScanner {
         ))
     }
 
-    /// Most frequently played, grouped the same way as `get_recently_played`
-    /// (Album/Playlist/Song by recorded context) but ordered by total play
-    /// count per context instead of recency.
-    pub fn get_most_frequently_played(&self, limit: i64) -> Result<Vec<HomeItem>> {
-        let conn = self.db.pool.get()?;
-        let sql = "
-            SELECT
-                ph.context_type,
-                ph.playlist_id,
-                COUNT(*) as play_count,
-                MAX(ph.played_at) as last_played,
-                MAX(ph.song_id) as representative_song_id
-            FROM play_history ph
-            JOIN songs s ON s.id = ph.song_id
-            WHERE s.source IN (1, 2) AND s.unavailable = 0
-              AND NOT (
-                  ph.context_type = 'playlist'
-                  AND ph.playlist_id IN (
-                      SELECT id FROM playlists WHERE dynamic_enabled = 0 AND LOWER(name) = 'queue'
-                  )
-              )
-            GROUP BY
-                ph.context_type,
-                CASE ph.context_type WHEN 'playlist' THEN ph.playlist_id END,
-                CASE ph.context_type WHEN 'album' THEN s.album END,
-                CASE ph.context_type WHEN 'album' THEN COALESCE(s.album_artist, s.artist) END,
-                CASE ph.context_type WHEN 'song' THEN ph.song_id END
-            ORDER BY play_count DESC, last_played DESC
-            LIMIT ?1
-        ";
-        let mut stmt = conn.prepare(sql)?;
-        struct AggRow {
-            context_type: String,
-            playlist_id: Option<i64>,
-            representative_song_id: i64,
-        }
-        let agg_rows: Vec<AggRow> = stmt
-            .query_map(params![limit], |row| {
-                Ok(AggRow {
-                    context_type: row.get(0)?,
-                    playlist_id: row.get(1)?,
-                    representative_song_id: row.get(4)?,
-                })
-            })?
-            .filter_map(|r| r.ok())
-            .collect();
-
-        let playlist_ids: Vec<i64> = {
-            use std::collections::HashSet;
-            agg_rows
-                .iter()
-                .filter(|r| r.context_type == "playlist")
-                .filter_map(|r| r.playlist_id)
-                .collect::<HashSet<_>>()
-                .into_iter()
-                .collect()
-        };
-        let playlists_by_id = get_playlists_by_ids(&conn, &playlist_ids)?;
-
-        let song_ids: Vec<i64> = agg_rows.iter().map(|r| r.representative_song_id).collect();
-        let songs_by_id = get_songs_by_ids(&conn, &song_ids)?;
-
-        let mut items: Vec<HomeItem> = agg_rows
-            .into_iter()
-            .filter_map(|row| {
-                let (song, album_track_count, album_disc_count) =
-                    songs_by_id.get(&row.representative_song_id)?.clone();
-                Some(home_item_for_context(
-                    &row.context_type,
-                    row.playlist_id,
-                    song,
-                    album_track_count,
-                    album_disc_count,
-                    &playlists_by_id,
-                ))
-            })
-            .collect();
-        attach_album_ratings(&conn, &mut items)?;
-        Ok(items)
-    }
-
     /// Recently added songs grouped into Album cards where an album's other
     /// tracks were also added together, or standalone Song cards otherwise —
     /// same grouping mechanism as `get_recently_played`, see its comments.
@@ -957,9 +1130,10 @@ impl CollectionScanner {
         let sql = format!(
             "SELECT {home_item_select_cols}
              FROM songs s
-             WHERE s.source IN (1, 2) AND s.unavailable = 0 AND s.added IS NOT NULL
+             WHERE s.source IN ({lib}) AND s.unavailable = 0 AND s.added IS NOT NULL
              ORDER BY s.added DESC
-             LIMIT ?1"
+             LIMIT ?1",
+            lib = *LIBRARY_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
         let songs_with_counts: Vec<(Song, i64, i64)> = stmt
@@ -975,7 +1149,218 @@ impl CollectionScanner {
         attach_album_ratings(&conn, &mut items)?;
         Ok(items)
     }
+
+    /// A shuffled sample of full albums in the library, for users with
+    /// little or no play history yet. Reuses the same Album grouping as
+    /// `get_recently_added`; only the ordering (random) and the album-only
+    /// filter differ. Reshuffles on every call by design — freshness over
+    /// stability across refreshes.
+    pub fn get_featured_albums(&self, limit: i64) -> Result<Vec<HomeItem>> {
+        let conn = self.db.pool.get()?;
+        // See get_recently_played's identical overfetch-then-group comment.
+        let query_limit = limit * 20;
+        let home_item_select_cols = home_item_select_cols();
+        let sql = format!(
+            "SELECT {home_item_select_cols}
+             FROM songs s
+             WHERE s.source IN ({lib}) AND s.unavailable = 0
+               AND s.album IS NOT NULL AND s.album != ''
+             ORDER BY RANDOM()
+             LIMIT ?1",
+            lib = *LIBRARY_SOURCES_SQL
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let songs_with_counts: Vec<(Song, i64, i64)> = stmt
+            .query_map(params![query_limit], |row| {
+                let song = row_to_song(row)?;
+                let count: i64 = row.get(SONG_SELECT_COL_COUNT)?;
+                let disc_count: i64 = row.get(SONG_SELECT_COL_COUNT + 1)?;
+                Ok((song, count, disc_count))
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
+        let mut items = group_songs_into_home_items(songs_with_counts, limit as usize);
+        attach_album_ratings(&conn, &mut items)?;
+        Ok(items)
+    }
+
+    /// Weekly "Top Albums" chart (#662): albums ranked by play count within
+    /// the current UTC calendar week (Monday 00:00 UTC through Sunday
+    /// 23:59:59 UTC), with movement (new/rising/falling/steady) against the
+    /// prior week, peak rank, and weeks-on-chart. Backed by a snapshot table
+    /// (`album_chart_history`, migration 22) written lazily on each call —
+    /// there's no scheduler in this codebase, so the current week's rows are
+    /// upserted here every time, which is idempotent and keeps the snapshot
+    /// current as new plays land during the week.
+    pub fn get_top_albums(&self, limit: i64) -> Result<Vec<TopAlbumItem>> {
+        self.get_top_albums_at(limit, chrono::Utc::now().timestamp())
+    }
+
+    /// `now`-parameterized core of `get_top_albums`, split out so tests can
+    /// drive multiple synthetic weeks deterministically.
+    fn get_top_albums_at(&self, limit: i64, now: i64) -> Result<Vec<TopAlbumItem>> {
+        let conn = self.db.pool.get()?;
+        let start_sunday: bool = conn
+            .query_row(
+                "SELECT value FROM app_state WHERE key = 'week_start'",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .map(|v| v == "sunday")
+            .unwrap_or(true);
+        let period_start = week_start_utc(now, start_sunday);
+
+        // Rank this week's albums by play count. Every result must be an
+        // Album card regardless of track count (unlike
+        // group_songs_into_home_items, which falls back to a Song card for
+        // single-track "albums"), so this dedups by album name directly
+        // instead of reusing that helper.
+        let query_limit = limit * 20;
+        let home_item_select_cols = home_item_select_cols();
+        let sql = format!(
+            "SELECT {home_item_select_cols}, wc.week_plays
+             FROM songs s
+             JOIN (
+                 SELECT s2.album AS album, COUNT(*) AS week_plays
+                 FROM play_history ph
+                 JOIN songs s2 ON s2.id = ph.song_id
+                 WHERE ph.played_at >= ?1
+                   AND s2.source IN ({lib}) AND s2.unavailable = 0
+                   AND s2.album IS NOT NULL AND s2.album != ''
+                 GROUP BY s2.album
+             ) wc ON wc.album = s.album
+             WHERE s.source IN ({lib}) AND s.unavailable = 0
+             ORDER BY wc.week_plays DESC, s.added DESC
+             LIMIT ?2",
+            lib = *LIBRARY_SOURCES_SQL
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let rows: Vec<(Song, i64, i64, i64)> = stmt
+            .query_map(params![period_start, query_limit], |row| {
+                let song = row_to_song(row)?;
+                let album_track_count: i64 = row.get(SONG_SELECT_COL_COUNT)?;
+                let album_disc_count: i64 = row.get(SONG_SELECT_COL_COUNT + 1)?;
+                let week_plays: i64 = row.get(SONG_SELECT_COL_COUNT + 2)?;
+                Ok((song, album_track_count, album_disc_count, week_plays))
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        let mut seen_albums = std::collections::HashSet::new();
+        let mut ranked: Vec<(AlbumItem, i64)> = Vec::new();
+        for (song, album_track_count, album_disc_count, week_plays) in rows {
+            if ranked.len() >= limit as usize {
+                break;
+            }
+            let Some(album_name) = song.album.clone() else {
+                continue;
+            };
+            if album_name.trim().is_empty() || !seen_albums.insert(album_name.clone()) {
+                continue;
+            }
+            let artist_name = song
+                .album_artist
+                .clone()
+                .or_else(|| song.artist.clone())
+                .unwrap_or_default();
+            ranked.push((
+                AlbumItem {
+                    artist: Some(artist_name),
+                    album: Some(album_name),
+                    year: song.year,
+                    track_count: album_track_count as i32,
+                    disc_count: album_disc_count as i32,
+                    art_embedded: song.art_embedded,
+                    art_automatic: song.art_automatic.clone(),
+                    art_manual: song.art_manual.clone(),
+                    genre: song.genre.clone(),
+                    sample_song_id: Some(song.id),
+                    rating: crate::stats::RATING_UNRATED,
+                    total_duration_nanosec: 0,
+                },
+                week_plays,
+            ));
+        }
+
+        // Upsert this week's snapshot before reading history, so a "new"
+        // entry's own row already counts toward its weeks-on-chart/peak-rank
+        // below.
+        for (i, (album, week_plays)) in ranked.iter().enumerate() {
+            let rank = (i + 1) as i32;
+            if let Some(ref name) = album.album {
+                conn.execute(
+                    "INSERT INTO album_chart_history (period_start, album_key, rank, play_count)
+                     VALUES (?1, ?2, ?3, ?4)
+                     ON CONFLICT(period_start, album_key)
+                     DO UPDATE SET rank = excluded.rank, play_count = excluded.play_count",
+                    params![period_start, name, rank, week_plays],
+                )?;
+            }
+        }
+
+        let previous_period_start = period_start - SECONDS_PER_WEEK;
+        let mut result = Vec::with_capacity(ranked.len());
+        for (i, (mut album, _week_plays)) in ranked.into_iter().enumerate() {
+            let rank = (i + 1) as i32;
+            let name = album.album.clone().unwrap_or_default();
+            album.rating = crate::stats::get_album_rating(&conn, &name)?;
+
+            let previous_rank: Option<i32> = conn
+                .query_row(
+                    "SELECT rank FROM album_chart_history WHERE period_start = ?1 AND album_key = ?2",
+                    params![previous_period_start, name],
+                    |r| r.get(0),
+                )
+                .ok();
+            let peak_rank: i32 = conn
+                .query_row(
+                    "SELECT MIN(rank) FROM album_chart_history WHERE album_key = ?1",
+                    params![name],
+                    |r| r.get(0),
+                )
+                .unwrap_or(rank);
+            let weeks_on_chart: i32 = conn
+                .query_row(
+                    "SELECT COUNT(DISTINCT period_start) FROM album_chart_history WHERE album_key = ?1",
+                    params![name],
+                    |r| r.get(0),
+                )
+                .unwrap_or(1);
+            let movement = match previous_rank {
+                None => "new",
+                Some(prev) if prev > rank => "rising",
+                Some(prev) if prev < rank => "falling",
+                _ => "steady",
+            }
+            .to_string();
+
+            result.push(TopAlbumItem {
+                album,
+                rank,
+                previous_rank,
+                peak_rank,
+                weeks_on_chart,
+                movement,
+            });
+        }
+        Ok(result)
+    }
 }
+
+/// Start (UTC unix timestamp, 00:00:00) of the calendar week containing
+/// `now`, rounding down to either the most recent Sunday or Monday depending
+/// on `start_sunday`. Pure integer arithmetic on the UTC unix timestamp — no
+/// DST to account for in UTC, so no need for chrono here. 1970-01-01 (day 0)
+/// was a Thursday, i.e. Monday-based weekday index 3 (Sunday-based index 4).
+fn week_start_utc(now: i64, start_sunday: bool) -> i64 {
+    const SECONDS_PER_DAY: i64 = 86_400;
+    let days_since_epoch = now.div_euclid(SECONDS_PER_DAY);
+    let epoch_offset = if start_sunday { 4 } else { 3 };
+    let weekday = (days_since_epoch + epoch_offset).rem_euclid(7);
+    (days_since_epoch - weekday) * SECONDS_PER_DAY
+}
+
+const SECONDS_PER_WEEK: i64 = 7 * 86_400;
 
 fn group_songs_into_home_items(
     songs_with_counts: Vec<(Song, i64, i64)>,
@@ -1083,6 +1468,47 @@ pub fn get_artist_profile_conn(conn: &rusqlite::Connection, artist: &str) -> Res
     }
 }
 
+/// Renames every occurrence of a tag in *other* artists' profiles that
+/// matches `tag` case-insensitively but not exactly, to `tag`'s casing.
+/// Tags are otherwise freeform per-artist strings with no shared canonical
+/// row, so without this, saving "Canadian" on one artist while another
+/// already has "canadian" would leave the same tag split across two cases
+/// in the library-wide tag list (see `get_library_artist_tags`).
+fn canonicalize_artist_tag_casing(
+    conn: &rusqlite::Connection,
+    current_artist_key: &str,
+    tag: &str,
+) -> Result<()> {
+    let mut stmt = conn.prepare(
+        "SELECT artist_key, tags FROM artist_profiles WHERE artist_key <> ?1 COLLATE NOCASE",
+    )?;
+    let rows: Vec<(String, String)> = stmt
+        .query_map(params![current_artist_key], |row| {
+            Ok((row.get(0)?, row.get(1)?))
+        })?
+        .collect::<rusqlite::Result<_>>()?;
+
+    for (artist_key, tags_json) in rows {
+        let mut tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
+        let mut changed = false;
+        for t in tags.iter_mut() {
+            if t != tag && t.to_lowercase() == tag.to_lowercase() {
+                *t = tag.to_string();
+                changed = true;
+            }
+        }
+        if changed {
+            let new_tags_json = serde_json::to_string(&tags)?;
+            conn.execute(
+                "UPDATE artist_profiles SET tags = ?1 WHERE artist_key = ?2",
+                params![new_tags_json, artist_key],
+            )?;
+        }
+    }
+
+    Ok(())
+}
+
 /// Upsert an artist profile into SQLite (#473).
 pub fn set_artist_profile_conn(
     conn: &rusqlite::Connection,
@@ -1107,6 +1533,10 @@ pub fn set_artist_profile_conn(
             profile.bio
         ],
     )?;
+
+    for tag in &profile.tags {
+        canonicalize_artist_tag_casing(conn, &profile.artist_key, tag)?;
+    }
 
     Ok(profile.clone())
 }
@@ -1134,6 +1564,104 @@ pub fn get_all_artist_profiles_conn(conn: &rusqlite::Connection) -> Result<Vec<A
                 tags,
                 social_links,
                 bio,
+            })
+        })?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    Ok(profiles)
+}
+
+/// Retrieve customizable profile and liner notes for an album from SQLite (#950).
+pub fn get_album_profile_conn(conn: &rusqlite::Connection, album: &str) -> Result<AlbumProfile> {
+    let mut stmt = conn.prepare(
+        "SELECT album_key, artist_key, description, website, links FROM album_profiles WHERE album_key = ?1 COLLATE NOCASE",
+    )?;
+    let result = stmt.query_row(params![album], |row| {
+        let album_key: String = row.get(0)?;
+        let artist_key: Option<String> = row.get(1)?;
+        let description: Option<String> = row.get(2)?;
+        let website: Option<String> = row.get(3)?;
+        let links_json: String = row.get(4)?;
+
+        let links: Vec<AlbumLink> = serde_json::from_str(&links_json).unwrap_or_else(|e| {
+            log::warn!("Failed to parse album_profiles.links for '{album_key}': {e}");
+            Vec::new()
+        });
+
+        Ok(AlbumProfile {
+            album_key,
+            artist_key,
+            description,
+            website,
+            links,
+        })
+    });
+
+    match result {
+        Ok(profile) => Ok(profile),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(AlbumProfile {
+            album_key: album.to_string(),
+            artist_key: None,
+            description: None,
+            website: None,
+            links: Vec::new(),
+        }),
+        Err(e) => Err(e.into()),
+    }
+}
+
+/// Upsert an album profile into SQLite (#950).
+pub fn set_album_profile_conn(
+    conn: &rusqlite::Connection,
+    profile: &AlbumProfile,
+) -> Result<AlbumProfile> {
+    let links_json = serde_json::to_string(&profile.links)?;
+
+    conn.execute(
+        "INSERT INTO album_profiles (album_key, artist_key, description, website, links)
+         VALUES (?1, ?2, ?3, ?4, ?5)
+         ON CONFLICT(album_key) DO UPDATE SET
+            artist_key = excluded.artist_key,
+            description = excluded.description,
+            website = excluded.website,
+            links = excluded.links",
+        params![
+            profile.album_key,
+            profile.artist_key,
+            profile.description,
+            profile.website,
+            links_json
+        ],
+    )?;
+
+    Ok(profile.clone())
+}
+
+/// Retrieve all saved album profiles in SQLite (#950).
+pub fn get_all_album_profiles_conn(conn: &rusqlite::Connection) -> Result<Vec<AlbumProfile>> {
+    let mut stmt = conn.prepare(
+        "SELECT album_key, artist_key, description, website, links FROM album_profiles ORDER BY album_key COLLATE NOCASE",
+    )?;
+    let profiles = stmt
+        .query_map([], |row| {
+            let album_key: String = row.get(0)?;
+            let artist_key: Option<String> = row.get(1)?;
+            let description: Option<String> = row.get(2)?;
+            let website: Option<String> = row.get(3)?;
+            let links_json: String = row.get(4)?;
+
+            let links: Vec<AlbumLink> = serde_json::from_str(&links_json).unwrap_or_else(|e| {
+                log::warn!("Failed to parse album_profiles.links for '{album_key}': {e}");
+                Vec::new()
+            });
+
+            Ok(AlbumProfile {
+                album_key,
+                artist_key,
+                description,
+                website,
+                links,
             })
         })?
         .filter_map(|r| r.ok())
@@ -1265,29 +1793,6 @@ fn get_playlists_by_ids(
     Ok(map)
 }
 
-fn get_songs_by_ids(
-    conn: &rusqlite::Connection,
-    ids: &[i64],
-) -> Result<std::collections::HashMap<i64, (Song, i64, i64)>> {
-    if ids.is_empty() {
-        return Ok(std::collections::HashMap::new());
-    }
-    let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
-    let home_item_select_cols = home_item_select_cols();
-    let sql = format!("SELECT {home_item_select_cols} FROM songs s WHERE s.id IN ({placeholders})");
-    let mut stmt = conn.prepare(&sql)?;
-    let map = stmt
-        .query_map(rusqlite::params_from_iter(ids.iter()), |row| {
-            let song = row_to_song(row)?;
-            let album_track_count: i64 = row.get(SONG_SELECT_COL_COUNT)?;
-            let album_disc_count: i64 = row.get(SONG_SELECT_COL_COUNT + 1)?;
-            Ok((song.id, (song, album_track_count, album_disc_count)))
-        })?
-        .filter_map(|r| r.ok())
-        .collect();
-    Ok(map)
-}
-
 /// SQL `WHERE`-clause fragment testing whether `column_expr` (assumed to be
 /// a `; `-delimited multi-value column like `artist`/`album_artist`, or a
 /// `COALESCE`/`NULLIF` expression over one) contains `param` — bound via
@@ -1313,16 +1818,17 @@ fn multi_value_contains_pattern(value: &str) -> String {
 
 /// `SONG_SELECT_COLS_QUALIFIED` plus correlated `album_track_count` and
 /// `album_disc_count` subqueries. Shared by the home-screen queries
-/// (`get_recently_played`, `get_most_frequently_played`, `get_recently_added`),
+/// (`get_recently_played`, `get_recently_added`),
 /// which all join on `songs s`.
 fn home_item_select_cols() -> String {
+    let lib = &*LIBRARY_SOURCES_SQL;
     format!(
         "{SONG_SELECT_COLS_QUALIFIED},
     (SELECT COUNT(*) FROM songs s2
-     WHERE s2.source IN (1, 2) AND s2.unavailable = 0 AND s2.album = s.album
+     WHERE s2.source IN ({lib}) AND s2.unavailable = 0 AND s2.album = s.album
     ) AS album_track_count,
     (SELECT COALESCE(MAX(COALESCE(s2.disc, 1)), 1) FROM songs s2
-     WHERE s2.source IN (1, 2) AND s2.unavailable = 0 AND s2.album = s.album
+     WHERE s2.source IN ({lib}) AND s2.unavailable = 0 AND s2.album = s.album
     ) AS album_disc_count"
     )
 }
@@ -1678,6 +2184,62 @@ mod tests {
         let _ = std::fs::remove_dir_all(temp_dir);
     }
 
+    /// Regression test for #169: the Artists tab's "Popularity" sort relies
+    /// on `get_artists()` exposing the same `total_playcount` aggregate as
+    /// `get_top_artists()`, so the two views agree on ranking.
+    #[test]
+    fn test_get_artists_exposes_total_playcount() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_artists_playcount_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        let seed = |path: &str, artist: &str, title: &str, playcount: i32| {
+            upsert_song(
+                &conn,
+                &Song {
+                    artist: Some(artist.to_string()),
+                    title: Some(title.to_string()),
+                    source: SongSource::LocalFile,
+                    path: Some(path.to_string()),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+            conn.execute(
+                "UPDATE songs SET playcount = ?1 WHERE path = ?2",
+                params![playcount, path],
+            )
+            .unwrap();
+        };
+
+        seed(r"C:\Music\Artist High\a.mp3", "Artist High", "A", 6);
+        seed(r"C:\Music\Artist High\b.mp3", "Artist High", "B", 4);
+        seed(r"C:\Music\Artist Low\a.mp3", "Artist Low", "A", 1);
+
+        let scanner = CollectionScanner::new(db.clone());
+        let artists = scanner.get_artists().unwrap();
+
+        let high = artists
+            .iter()
+            .find(|a| a["name"].as_str() == Some("Artist High"))
+            .unwrap();
+        assert_eq!(high["total_playcount"].as_i64(), Some(10));
+
+        let low = artists
+            .iter()
+            .find(|a| a["name"].as_str() == Some("Artist Low"))
+            .unwrap();
+        assert_eq!(low["total_playcount"].as_i64(), Some(1));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
     /// Regression test for #295: songs whose artist tag only differs in case
     /// (e.g. from albums organized/tagged at different times) must be merged
     /// into a single artist entry rather than shown as two separate artists.
@@ -1944,7 +2506,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_top_artists_ranks_by_playcount_and_excludes_zero_plays() {
+    fn test_get_top_artists_ranks_by_playcount_and_ranks_zero_plays_last() {
         let temp_dir = std::env::temp_dir().join(format!(
             "luminous_top_artists_test_{}",
             std::time::SystemTime::now()
@@ -1994,7 +2556,9 @@ mod tests {
             4,
         );
 
-        // Artist Unplayed: never played, must be excluded entirely.
+        // Artist Unplayed: never played. The library as a whole has play
+        // history (High/Low), so the zero-play fallback must NOT kick in —
+        // Unplayed is still included, but ranked last by total_playcount.
         seed(
             r"C:\Music\Artist Unplayed\track.mp3",
             "Artist Unplayed",
@@ -2009,10 +2573,124 @@ mod tests {
             .iter()
             .map(|a| a["name"].as_str().unwrap())
             .collect();
-        assert_eq!(names, vec!["Artist High", "Artist Low"]);
+        assert_eq!(names, vec!["Artist High", "Artist Low", "Artist Unplayed"]);
 
         let high = &top_artists[0];
         assert_eq!(high["song_count"].as_i64(), Some(2));
+        assert_eq!(high["total_playcount"].as_i64(), Some(10));
+
+        let low = &top_artists[1];
+        assert_eq!(low["total_playcount"].as_i64(), Some(2));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_get_most_played_songs_ranks_by_play_history_count() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_most_played_songs_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        let seed = |path: &str, title: &str| -> i64 {
+            upsert_song(
+                &conn,
+                &Song {
+                    artist: Some("Some Artist".to_string()),
+                    title: Some(title.to_string()),
+                    source: SongSource::LocalFile,
+                    path: Some(path.to_string()),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+            conn.query_row(
+                "SELECT id FROM songs WHERE path = ?1",
+                params![path],
+                |row| row.get(0),
+            )
+            .unwrap()
+        };
+
+        let record_play = |song_id: i64, played_at: i64| {
+            conn.execute(
+                "INSERT INTO play_history (context_type, song_id, played_at) VALUES ('song', ?1, ?2)",
+                params![song_id, played_at],
+            )
+            .unwrap();
+        };
+
+        let most_played_id = seed(r"C:\Music\a.mp3", "Most Played Song");
+        let less_played_id = seed(r"C:\Music\b.mp3", "Less Played Song");
+        let _unplayed_id = seed(r"C:\Music\c.mp3", "Unplayed Song");
+
+        for played_at in 0..3 {
+            record_play(most_played_id, played_at);
+        }
+        record_play(less_played_id, 0);
+
+        let scanner = CollectionScanner::new(db.clone());
+        let most_played = scanner.get_most_played_songs(10).unwrap();
+
+        // Only songs with at least one play appear, ranked by play count.
+        let titles: Vec<&str> = most_played
+            .iter()
+            .map(|s| s.title.as_deref().unwrap())
+            .collect();
+        assert_eq!(titles, vec!["Most Played Song", "Less Played Song"]);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_get_top_artists_falls_back_to_song_count_when_library_has_no_plays() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_top_artists_fallback_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        let seed = |path: &str, artist: &str, title: &str| {
+            upsert_song(
+                &conn,
+                &Song {
+                    artist: Some(artist.to_string()),
+                    title: Some(title.to_string()),
+                    source: SongSource::LocalFile,
+                    path: Some(path.to_string()),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        };
+
+        // A freshly-scanned library: no song anywhere has ever been played.
+        // Artist Big has more songs than Artist Small.
+        seed(r"C:\Music\Artist Big\a.mp3", "Artist Big", "Track A");
+        seed(r"C:\Music\Artist Big\b.mp3", "Artist Big", "Track B");
+        seed(r"C:\Music\Artist Small\a.mp3", "Artist Small", "Track A");
+
+        let scanner = CollectionScanner::new(db.clone());
+        let top_artists = scanner.get_top_artists(10).unwrap();
+
+        // Zero-play library: nothing gets excluded, and ranking falls back
+        // to song_count DESC instead of collapsing to alphabetical order.
+        let names: Vec<&str> = top_artists
+            .iter()
+            .map(|a| a["name"].as_str().unwrap())
+            .collect();
+        assert_eq!(names, vec!["Artist Big", "Artist Small"]);
+        assert_eq!(top_artists[0]["song_count"].as_i64(), Some(2));
+        assert_eq!(top_artists[1]["song_count"].as_i64(), Some(1));
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
@@ -2145,27 +2823,7 @@ mod tests {
             other => panic!("expected standalone Song last, got {other:?}"),
         }
 
-        // Most frequently played: play the standalone song two more times so it
-        // outranks the (2-play) album and (1-play) playlist contexts.
-        conn.execute(
-            "INSERT INTO play_history (context_type, song_id, playlist_id, played_at) VALUES ('song', ?1, NULL, 400)",
-            params![standalone_id],
-        )
-        .unwrap();
-        conn.execute(
-            "INSERT INTO play_history (context_type, song_id, playlist_id, played_at) VALUES ('song', ?1, NULL, 500)",
-            params![standalone_id],
-        )
-        .unwrap();
-
-        let frequent = scanner.get_most_frequently_played(10).unwrap();
-        assert_eq!(frequent.len(), 3);
-        match &frequent[0] {
-            HomeItem::Song { song } => assert_eq!(song.id, standalone_id),
-            other => panic!("expected most-played standalone Song first, got {other:?}"),
-        }
-
-        // Test exclusion of internal 'Queue' playlist from recently played & most frequently played
+        // Test exclusion of internal 'Queue' playlist from recently played
         conn.execute(
             "INSERT INTO playlists (name, dynamic_enabled) VALUES ('Queue', 0)",
             params![],
@@ -2190,26 +2848,6 @@ mod tests {
                 assert_ne!(playlist.id, queue_playlist_id);
             }
         }
-
-        // Verify that 'Queue' does not show up in most frequently played (still length 3)
-        let frequent_after_queue = scanner.get_most_frequently_played(10).unwrap();
-        assert_eq!(frequent_after_queue.len(), 3);
-        for item in &frequent_after_queue {
-            if let HomeItem::Playlist { playlist } = item {
-                assert_ne!(playlist.id, queue_playlist_id);
-            }
-        }
-
-        // Verify that plays with explicit album context are attributed to their album
-        for i in 0..15 {
-            conn.execute(
-                "INSERT INTO play_history (context_type, song_id, played_at) VALUES ('album', ?1, ?2)",
-                params![album_track_1, 2000 + i],
-            )
-            .unwrap();
-        }
-        let frequent_after_album = scanner.get_most_frequently_played(10).unwrap();
-        assert!(frequent_after_album.iter().any(|item| matches!(item, HomeItem::Album { album, .. } if album.album.as_deref() == Some("Album A"))));
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
@@ -2279,6 +2917,112 @@ mod tests {
             }
             other => panic!("expected Album item, got {other:?}"),
         }
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_get_featured_albums_returns_albums_without_play_history() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_featured_albums_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let scanner = CollectionScanner::new(db.clone());
+        let conn = db.pool.get().unwrap();
+
+        let insert_song = |path: &str, title: &str, artist: &str, album: Option<&str>| {
+            let song = Song {
+                source: SongSource::LocalFile,
+                path: Some(path.to_string()),
+                title: Some(title.to_string()),
+                artist: Some(artist.to_string()),
+                album: album.map(|a| a.to_string()),
+                added: Some(1000),
+                ..Default::default()
+            };
+            upsert_song(&conn, &song).unwrap();
+        };
+
+        // Two full albums (no play history — playcount defaults to 0/unset).
+        for i in 1..=3 {
+            insert_song(
+                &format!("path/album_a_{i}.mp3"),
+                &format!("A Track {i}"),
+                "Artist A",
+                Some("Album A"),
+            );
+        }
+        for i in 1..=3 {
+            insert_song(
+                &format!("path/album_b_{i}.mp3"),
+                &format!("B Track {i}"),
+                "Artist B",
+                Some("Album B"),
+            );
+        }
+        // A standalone single with no album tag — must be excluded.
+        insert_song("path/single.mp3", "Single Track", "Artist C", None);
+
+        let items = scanner.get_featured_albums(10).unwrap();
+        assert_eq!(items.len(), 2, "should surface both albums, no singles");
+        for item in &items {
+            match item {
+                HomeItem::Album { album } => {
+                    assert!(
+                        matches!(album.album.as_deref(), Some("Album A") | Some("Album B")),
+                        "unexpected album: {album:?}"
+                    );
+                }
+                other => panic!("expected Album item, got {other:?}"),
+            }
+        }
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_get_featured_albums_respects_limit() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_featured_albums_limit_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let scanner = CollectionScanner::new(db.clone());
+        let conn = db.pool.get().unwrap();
+
+        let insert_song = |path: &str, title: &str, artist: &str, album: &str| {
+            let song = Song {
+                source: SongSource::LocalFile,
+                path: Some(path.to_string()),
+                title: Some(title.to_string()),
+                artist: Some(artist.to_string()),
+                album: Some(album.to_string()),
+                added: Some(1000),
+                ..Default::default()
+            };
+            upsert_song(&conn, &song).unwrap();
+        };
+
+        for album_idx in 1..=5 {
+            for track_idx in 1..=2 {
+                insert_song(
+                    &format!("path/album_{album_idx}_track_{track_idx}.mp3"),
+                    &format!("Track {track_idx}"),
+                    "Various Artist",
+                    &format!("Album {album_idx}"),
+                );
+            }
+        }
+
+        let items = scanner.get_featured_albums(2).unwrap();
+        assert_eq!(items.len(), 2);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
@@ -2390,6 +3134,443 @@ mod tests {
         let all = get_all_artist_profiles_conn(&conn).unwrap();
         assert_eq!(all.len(), 1);
         assert_eq!(all[0].artist_key, "Shania Twain");
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_artist_tag_casing_propagates_across_artists() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_artist_tag_casing_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Database::new(temp_dir.clone()).unwrap();
+        let conn = db.pool.get().unwrap();
+
+        set_artist_profile_conn(
+            &conn,
+            &ArtistProfile {
+                artist_key: "Shania Twain".to_string(),
+                website: None,
+                tags: vec!["canadian".to_string()],
+                social_links: vec![],
+                bio: None,
+            },
+        )
+        .unwrap();
+        set_artist_profile_conn(
+            &conn,
+            &ArtistProfile {
+                artist_key: "Alanis Morissette".to_string(),
+                website: None,
+                tags: vec!["canadian".to_string(), "rock".to_string()],
+                social_links: vec![],
+                bio: None,
+            },
+        )
+        .unwrap();
+
+        // Re-saving "Shania Twain" with "Canadian" (different case) should
+        // not just update her own row, but re-case every other artist's
+        // matching tag too, so the library-wide tag list has one casing.
+        set_artist_profile_conn(
+            &conn,
+            &ArtistProfile {
+                artist_key: "Shania Twain".to_string(),
+                website: None,
+                tags: vec!["Canadian".to_string()],
+                social_links: vec![],
+                bio: None,
+            },
+        )
+        .unwrap();
+
+        let alanis = get_artist_profile_conn(&conn, "Alanis Morissette").unwrap();
+        assert_eq!(alanis.tags, vec!["Canadian", "rock"]);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_album_profile_crud() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_album_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Database::new(temp_dir.clone()).unwrap();
+        let conn = db.pool.get().unwrap();
+
+        // Initially unconfigured album returns default profile
+        let initial = get_album_profile_conn(&conn, "Come On Over").unwrap();
+        assert_eq!(initial.album_key, "Come On Over");
+        assert_eq!(initial.artist_key, None);
+        assert_eq!(initial.description, None);
+        assert_eq!(initial.website, None);
+        assert!(initial.links.is_empty());
+
+        // Save album profile
+        let profile = AlbumProfile {
+            album_key: "Come On Over".to_string(),
+            artist_key: Some("Shania Twain".to_string()),
+            description: Some(
+                "Iconic 1997 studio album recorded with producer Mutt Lange. [Wikipedia](https://en.wikipedia.org/wiki/Come_On_Over)".to_string(),
+            ),
+            website: Some("https://shaniatwain.com/music/come-on-over".to_string()),
+            links: vec![
+                AlbumLink {
+                    platform: "bandcamp".to_string(),
+                    handle_or_url: "https://shaniatwain.bandcamp.com/album/come-on-over".to_string(),
+                },
+                AlbumLink {
+                    platform: "discogs".to_string(),
+                    handle_or_url: "https://www.discogs.com/master/132556-Shania-Twain-Come-On-Over".to_string(),
+                },
+            ],
+        };
+
+        set_album_profile_conn(&conn, &profile).unwrap();
+
+        // Retrieve saved profile (case-insensitive key match)
+        let loaded = get_album_profile_conn(&conn, "come on over").unwrap();
+        assert_eq!(loaded.album_key, "Come On Over");
+        assert_eq!(loaded.artist_key, Some("Shania Twain".to_string()));
+        assert_eq!(
+            loaded.description,
+            Some("Iconic 1997 studio album recorded with producer Mutt Lange. [Wikipedia](https://en.wikipedia.org/wiki/Come_On_Over)".to_string())
+        );
+        assert_eq!(
+            loaded.website,
+            Some("https://shaniatwain.com/music/come-on-over".to_string())
+        );
+        assert_eq!(loaded.links.len(), 2);
+        assert_eq!(loaded.links[0].platform, "bandcamp");
+        assert_eq!(
+            loaded.links[0].handle_or_url,
+            "https://shaniatwain.bandcamp.com/album/come-on-over"
+        );
+        assert_eq!(loaded.links[1].platform, "discogs");
+
+        // Get all album profiles
+        let all = get_all_album_profiles_conn(&conn).unwrap();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].album_key, "Come On Over");
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// Regression test for #990: an external writer of `album_profiles.links`
+    /// (e.g. luminous-mcp's `update_album_profile` tool) uses `url` instead of
+    /// `handle_or_url`, plus extra `title`/`category` fields this struct
+    /// doesn't have. That link shape must still deserialize - previously the
+    /// whole array silently dropped to empty via `.unwrap_or_default()`.
+    #[test]
+    fn test_album_profile_links_from_external_writer_shape() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_album_ext_links_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Database::new(temp_dir.clone()).unwrap();
+        let conn = db.pool.get().unwrap();
+
+        conn.execute(
+            "INSERT INTO album_profiles (album_key, artist_key, description, website, links) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                "Of Kingdom and Crown",
+                Some("Machine Head"),
+                None::<String>,
+                None::<String>,
+                r#"[
+                    {"platform":"Spotify","title":"Stream on Spotify","url":"https://open.spotify.com/album/6duwuU8xgK7ShKMCrUxfBi","category":"store"},
+                    {"platform":"Live-Metal.com","title":"Live-Metal.com Review","url":"https://live-metal.com/review","category":"review"}
+                ]"#,
+            ],
+        )
+        .unwrap();
+
+        let loaded = get_album_profile_conn(&conn, "Of Kingdom and Crown").unwrap();
+        assert_eq!(loaded.links.len(), 2);
+        assert_eq!(loaded.links[0].platform, "Spotify");
+        assert_eq!(
+            loaded.links[0].handle_or_url,
+            "https://open.spotify.com/album/6duwuU8xgK7ShKMCrUxfBi"
+        );
+        assert_eq!(loaded.links[1].platform, "Live-Metal.com");
+        assert_eq!(
+            loaded.links[1].handle_or_url,
+            "https://live-metal.com/review"
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_get_artist_tag_counts_joins_songs_by_effective_artist() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_artist_tag_counts_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let scanner = CollectionScanner::new(db.clone());
+        let conn = db.pool.get().unwrap();
+
+        let insert_song = |path: &str, artist: &str, album_artist: Option<&str>| {
+            let song = Song {
+                path: Some(path.to_string()),
+                title: Some("Track".to_string()),
+                artist: Some(artist.to_string()),
+                album_artist: album_artist.map(|s| s.to_string()),
+                source: SongSource::LocalFile,
+                filetype: FileType::Mp3,
+                unavailable: false,
+                ..Default::default()
+            };
+            upsert_song(&conn, &song).unwrap();
+        };
+
+        // Two Danheim tracks (one crediting album_artist, one plain artist)
+        // and one Gunship track, tagged with a different (unrelated) genre.
+        insert_song("path/danheim1.mp3", "Danheim", Some("Danheim"));
+        insert_song("path/danheim2.mp3", "Danheim", None);
+        insert_song("path/gunship.mp3", "Gunship", None);
+
+        set_artist_profile_conn(
+            &conn,
+            &ArtistProfile {
+                artist_key: "Danheim".to_string(),
+                tags: vec!["Nordic Folk".to_string(), "Viking Music".to_string()],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        set_artist_profile_conn(
+            &conn,
+            &ArtistProfile {
+                artist_key: "Gunship".to_string(),
+                tags: vec!["Synthwave".to_string()],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let counts = scanner.get_artist_tag_counts().unwrap();
+        let by_name: std::collections::HashMap<&str, i64> =
+            counts.iter().map(|t| (t.name.as_str(), t.song_count)).collect();
+
+        assert_eq!(by_name.get("Nordic Folk"), Some(&2));
+        assert_eq!(by_name.get("Viking Music"), Some(&2));
+        assert_eq!(by_name.get("Synthwave"), Some(&1));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_week_start_utc_rounds_down_to_monday() {
+        // Wed 2024-01-10 12:00:00 UTC -> Mon 2024-01-08 00:00:00 UTC.
+        assert_eq!(week_start_utc(1_704_888_000, false), 1_704_672_000);
+        // Exactly a Monday midnight is its own week start.
+        assert_eq!(week_start_utc(1_704_672_000, false), 1_704_672_000);
+        // Sun 2024-01-14 23:59:59 UTC is still the same week as the above Monday.
+        assert_eq!(week_start_utc(1_705_276_799, false), 1_704_672_000);
+    }
+
+    #[test]
+    fn test_week_start_utc_rounds_down_to_sunday() {
+        // Sun 2024-01-07 00:00:00 UTC is its own (Sunday-based) week start.
+        assert_eq!(week_start_utc(1_704_585_600, true), 1_704_585_600);
+        // Wed 2024-01-10 12:00:00 UTC -> Sun 2024-01-07 00:00:00 UTC.
+        assert_eq!(week_start_utc(1_704_888_000, true), 1_704_585_600);
+        // Sat 2024-01-13 23:59:59 UTC is still the same Sunday-based week.
+        assert_eq!(week_start_utc(1_705_190_399, true), 1_704_585_600);
+    }
+
+    #[test]
+    fn test_get_top_albums_tracks_movement_peak_and_weeks_on_chart() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_top_albums_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+        // This test's timestamps are all Monday-aligned; pin week_start
+        // explicitly so it doesn't depend on the preference's default.
+        conn.execute(
+            "INSERT OR REPLACE INTO app_state (key, value) VALUES ('week_start', 'monday')",
+            [],
+        )
+        .unwrap();
+
+        let seed = |path: &str, album: &str| -> i64 {
+            upsert_song(
+                &conn,
+                &Song {
+                    artist: Some("Some Artist".to_string()),
+                    album: Some(album.to_string()),
+                    title: Some(path.to_string()),
+                    source: SongSource::LocalFile,
+                    path: Some(path.to_string()),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+            conn.query_row(
+                "SELECT id FROM songs WHERE path = ?1",
+                params![path],
+                |row| row.get(0),
+            )
+            .unwrap()
+        };
+
+        let record_play = |song_id: i64, played_at: i64| {
+            conn.execute(
+                "INSERT INTO play_history (context_type, song_id, played_at) VALUES ('song', ?1, ?2)",
+                params![song_id, played_at],
+            )
+            .unwrap();
+        };
+
+        let rising_id = seed(r"C:\Music\rising.mp3", "Rising Album");
+        let falling_id = seed(r"C:\Music\falling.mp3", "Falling Album");
+        let steady_id = seed(r"C:\Music\steady.mp3", "Steady Album");
+        let new_id = seed(r"C:\Music\brandnew.mp3", "Brand New Album");
+
+        let scanner = CollectionScanner::new(db.clone());
+
+        // Week 1 (Monday 2024-01-01 00:00:00 UTC): everything is "new".
+        let week1_now = 1_704_153_600 + 3600; // a bit into week 1
+        for _ in 0..1 {
+            record_play(rising_id, 1_704_153_600 + 10);
+        }
+        for _ in 0..5 {
+            record_play(falling_id, 1_704_153_600 + 20);
+        }
+        for _ in 0..3 {
+            record_play(steady_id, 1_704_153_600 + 30);
+        }
+        let week1 = scanner.get_top_albums_at(10, week1_now).unwrap();
+        let by_album = |items: &[TopAlbumItem], album: &str| -> TopAlbumItem {
+            items
+                .iter()
+                .find(|i| i.album.album.as_deref() == Some(album))
+                .unwrap()
+                .clone()
+        };
+        assert_eq!(by_album(&week1, "Falling Album").rank, 1);
+        assert_eq!(by_album(&week1, "Falling Album").movement, "new");
+        assert_eq!(by_album(&week1, "Falling Album").peak_rank, 1);
+        assert_eq!(by_album(&week1, "Falling Album").weeks_on_chart, 1);
+
+        // Week 2 (Monday 2024-01-08): rising overtakes falling, steady stays
+        // put, and a brand-new album enters the chart.
+        let week2_base = 1_704_672_000;
+        let week2_now = week2_base + 3600;
+        for _ in 0..10 {
+            record_play(rising_id, week2_base + 10);
+        }
+        for _ in 0..1 {
+            record_play(falling_id, week2_base + 20);
+        }
+        for _ in 0..3 {
+            record_play(steady_id, week2_base + 30);
+        }
+        for _ in 0..2 {
+            record_play(new_id, week2_base + 40);
+        }
+        let week2 = scanner.get_top_albums_at(10, week2_now).unwrap();
+
+        let rising = by_album(&week2, "Rising Album");
+        assert_eq!(rising.rank, 1);
+        assert_eq!(rising.previous_rank, Some(3));
+        assert_eq!(rising.movement, "rising");
+        assert_eq!(rising.peak_rank, 1);
+        assert_eq!(rising.weeks_on_chart, 2);
+
+        let falling = by_album(&week2, "Falling Album");
+        assert_eq!(falling.previous_rank, Some(1));
+        assert_eq!(falling.movement, "falling");
+        assert_eq!(falling.peak_rank, 1);
+        assert_eq!(falling.weeks_on_chart, 2);
+
+        let steady = by_album(&week2, "Steady Album");
+        assert_eq!(steady.previous_rank, Some(2));
+        assert_eq!(steady.rank, steady.previous_rank.unwrap());
+        assert_eq!(steady.movement, "steady");
+
+        let brand_new = by_album(&week2, "Brand New Album");
+        assert_eq!(brand_new.previous_rank, None);
+        assert_eq!(brand_new.movement, "new");
+        assert_eq!(brand_new.weeks_on_chart, 1);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// Songs marked "Not included" (#104) must be excluded from auto-playlist
+    /// generation — Favourites and per-decade auto-playlists here — even
+    /// though they still match the playlist's own criteria (5-star rating /
+    /// decade). They should remain fully queryable through plain library
+    /// reads like `get_songs_by_album` (not exercised here, but the
+    /// intentional asymmetry this test documents).
+    #[test]
+    fn test_not_included_songs_are_excluded_from_auto_playlist_queries() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_not_included_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let scanner = CollectionScanner::new(db.clone());
+        let conn = db.pool.get().unwrap();
+
+        conn.execute(
+            "INSERT INTO songs (title, source, unavailable, rating, not_included)
+             VALUES ('Favourite Kept', 1, 0, 5, 0)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO songs (title, source, unavailable, rating, not_included)
+             VALUES ('Favourite Excluded', 1, 0, 5, 1)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO songs (title, source, unavailable, year, not_included)
+             VALUES ('Decade Kept', 1, 0, 1985, 0)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO songs (title, source, unavailable, year, not_included)
+             VALUES ('Decade Excluded', 1, 0, 1985, 1)",
+            [],
+        )
+        .unwrap();
+
+        let favourites = scanner.get_favourite_songs().unwrap();
+        assert_eq!(favourites.len(), 1);
+        assert_eq!(favourites[0].title.as_deref(), Some("Favourite Kept"));
+
+        let decade_songs = scanner
+            .get_songs_by_decade("1980s", 100, crate::models::QueuePopulationMode::All)
+            .unwrap();
+        assert_eq!(decade_songs.len(), 1);
+        assert_eq!(decade_songs[0].title.as_deref(), Some("Decade Kept"));
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

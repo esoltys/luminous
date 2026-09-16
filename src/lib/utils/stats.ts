@@ -7,6 +7,7 @@ export interface SongStatsPayload {
   playcount?: number;
   skipcount?: number;
   lastplayed?: number | null;
+  not_included?: boolean;
 }
 
 /** Apply a stats event to a song object held in any view or store. */
@@ -15,6 +16,7 @@ export function applySongStats(song: Song, payload: SongStatsPayload) {
   if (typeof payload.playcount === "number") song.playcount = payload.playcount;
   if (typeof payload.skipcount === "number") song.skipcount = payload.skipcount;
   if (payload.lastplayed !== undefined) song.lastplayed = payload.lastplayed ?? undefined;
+  if (typeof payload.not_included === "boolean") song.not_included = payload.not_included;
 }
 
 /** Payload of the backend's `album-stats-changed` event. */

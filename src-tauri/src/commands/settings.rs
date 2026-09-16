@@ -39,7 +39,6 @@ pub async fn set_app_setting(
 pub struct UiPreferences {
     pub rating_style: String,
     pub seekbar_mode: String,
-    pub acoustid_api_key: String,
     pub albums_view_mode: String,
     pub artists_view_mode: String,
     pub playlists_auto_view_mode: String,
@@ -48,6 +47,7 @@ pub struct UiPreferences {
     pub genre_cards_view_mode: String,
     pub genre_sort_field: String,
     pub genre_sort_asc: bool,
+    pub week_start: String,
 }
 
 impl Default for UiPreferences {
@@ -55,7 +55,6 @@ impl Default for UiPreferences {
         Self {
             rating_style: "heart".into(),
             seekbar_mode: "waveform".into(),
-            acoustid_api_key: String::new(),
             albums_view_mode: "cards".into(),
             artists_view_mode: "cards".into(),
             playlists_auto_view_mode: "cards".into(),
@@ -64,6 +63,7 @@ impl Default for UiPreferences {
             genre_cards_view_mode: "cards".into(),
             genre_sort_field: "name".into(),
             genre_sort_asc: true,
+            week_start: "sunday".into(),
         }
     }
 }
@@ -77,11 +77,10 @@ impl UiPreferences {
         const VIEW: &[&str] = &["cards", "rows"];
         const GENRE_VIEW: &[&str] = &["genre", "tags"];
         const GENRE_SORT: &[&str] = &["name", "count"];
-        const ANY: &[&str] = &[];
+        const WEEK_START: &[&str] = &["sunday", "monday"];
         [
             ("rating_style", &mut self.rating_style, RATING),
             ("seekbar_mode", &mut self.seekbar_mode, SEEKBAR),
-            ("acoustid_api_key", &mut self.acoustid_api_key, ANY),
             ("albums_view_mode", &mut self.albums_view_mode, VIEW),
             ("artists_view_mode", &mut self.artists_view_mode, VIEW),
             (
@@ -101,6 +100,7 @@ impl UiPreferences {
                 VIEW,
             ),
             ("genre_sort_field", &mut self.genre_sort_field, GENRE_SORT),
+            ("week_start", &mut self.week_start, WEEK_START),
         ]
     }
 }
@@ -223,6 +223,31 @@ pub async fn set_minimize_to_tray_enabled(
     Ok(())
 }
 
+/// Source of truth is the OS registration itself (registry key / LaunchAgent /
+/// XDG autostart entry), read via the plugin's manager — no DB shadow copy,
+/// so this can never drift from what's actually installed on the system.
+#[tauri::command]
+pub fn get_autostart_enabled(app: tauri::AppHandle) -> Result<bool, String> {
+    use tauri_plugin_autostart::ManagerExt;
+    app.autolaunch().is_enabled().map_err(|e| e.to_string())
+}
+
+/// Unlike the fire-and-forget settings writes above, this can genuinely fail
+/// (sandboxed install, permissions, a relocated AppImage) — so it returns a
+/// real error the frontend awaits and reverts the toggle on, instead of
+/// assuming success.
+#[tauri::command]
+pub fn set_autostart_enabled(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
+    use tauri_plugin_autostart::ManagerExt;
+    let manager = app.autolaunch();
+    if enabled {
+        manager.enable()
+    } else {
+        manager.disable()
+    }
+    .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub fn get_commit_hash() -> String {
     option_env!("BUILD_COMMIT_HASH").unwrap_or("").to_string()
@@ -278,14 +303,6 @@ pub fn get_fade_settings_from_db(
             .get("fade_pause_duration_ms")
             .and_then(|v| v.parse().ok())
             .unwrap_or(defaults.fade_pause_duration_ms),
-        crossfade_manual_enabled: map
-            .get("crossfade_manual_enabled")
-            .map(|v| v == "true")
-            .unwrap_or(defaults.crossfade_manual_enabled),
-        crossfade_manual_duration_ms: map
-            .get("crossfade_manual_duration_ms")
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(defaults.crossfade_manual_duration_ms),
         crossfade_auto_enabled: map
             .get("crossfade_auto_enabled")
             .map(|v| v == "true")
@@ -329,14 +346,6 @@ pub async fn set_fade_settings(
         (
             "fade_pause_duration_ms",
             settings.fade_pause_duration_ms.to_string(),
-        ),
-        (
-            "crossfade_manual_enabled",
-            settings.crossfade_manual_enabled.to_string(),
-        ),
-        (
-            "crossfade_manual_duration_ms",
-            settings.crossfade_manual_duration_ms.to_string(),
         ),
         (
             "crossfade_auto_enabled",

@@ -59,9 +59,6 @@ vi.mock("@tauri-apps/api/core", () => {
           stop_after_current: false,
         };
       }
-      if (cmd === "has_acoustid_env_key") {
-        return false;
-      }
       if (cmd === "validate_playlist_name") {
         return { valid: true, reason: null };
       }
@@ -69,7 +66,6 @@ vi.mock("@tauri-apps/api/core", () => {
         return {
           rating_style: "heart",
           seekbar_mode: "waveform",
-          acoustid_api_key: "",
           albums_view_mode: "cards",
           artists_view_mode: "cards",
           playlists_auto_view_mode: "cards",
@@ -95,10 +91,13 @@ vi.mock("@tauri-apps/api/core", () => {
       if (cmd === "get_library_snapshot") {
         return { songs: [], albums: [], artists: [] };
       }
-      if (cmd === "get_all_artist_profiles") {
+      if (cmd === "get_all_artist_profiles" || cmd === "get_all_album_profiles") {
         return [];
       }
       if (cmd === "get_directories") {
+        return [];
+      }
+      if (cmd === "list_webdav_servers") {
         return [];
       }
       if (cmd === "get_library_stats") {

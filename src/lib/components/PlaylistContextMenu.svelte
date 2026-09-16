@@ -4,9 +4,11 @@
     TrashIcon as Trash2,
     MicrophoneStageIcon as Mic2,
     DiscIcon as DiscAlbum,
-    PencilSimpleIcon as Edit3
+    PencilSimpleIcon as Edit3,
+    ArrowSquareOutIcon as OpenInPicard
   } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
+  import { picardStore } from "../stores/picard.svelte";
   import ContextMenu from "./ContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
@@ -20,6 +22,7 @@
     onGoToArtist,
     onGoToAlbum,
     onEditTags,
+    onOpenInPicard,
     onClose,
   }: {
     x: number;
@@ -30,6 +33,7 @@
     onGoToArtist?: () => void;
     onGoToAlbum?: () => void;
     onEditTags?: () => void;
+    onOpenInPicard?: () => void;
     onClose: () => void;
   } = $props();
 </script>
@@ -73,6 +77,17 @@
         onclick={() => { onEditTags?.(); onClose(); }}
       />
     {/if}
+  {/if}
+
+  {#if onOpenInPicard}
+    <ContextMenuDivider />
+    <ContextMenuItem
+      icon={OpenInPicard}
+      label={i18n.t("picard.openInPicard")}
+      onclick={() => { onOpenInPicard?.(); onClose(); }}
+      disabled={!picardStore.available}
+      title={picardStore.available ? undefined : i18n.t("picard.notFoundTooltip")}
+    />
   {/if}
 
   <ContextMenuDivider />

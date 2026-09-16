@@ -22,6 +22,25 @@ class TagsStore {
 
   /** The persisted Genres curation hierarchy — one card per primary genre. */
   hierarchy = $state<TagGroup[]>([]);
+  private hierarchyLoadStarted = false;
+
+  /** Artist tags (curated, DB-only, `artist_profiles.tags` — #962/#956
+   * follow-up), browsable alongside genre in the Genres page but never part
+   * of `hierarchy`: an artist tag has no embedded file to write to, so it
+   * can't be merged/renamed/reparented/colored the way a genre tag can. */
+  artistTags = $state<Tag[]>([]);
+  private artistTagsLoadStarted = false;
+
+  async loadArtistTags() {
+    const result = await invoke<Tag[]>("get_artist_tags_overview");
+    this.artistTags = Array.isArray(result) ? result : [];
+  }
+
+  ensureArtistTagsLoaded() {
+    if (this.artistTagsLoadStarted) return;
+    this.artistTagsLoadStarted = true;
+    this.loadArtistTags().catch((e) => console.error("Failed to load artist tags:", e));
+  }
 
   /** Call from the Genres tab's onMount (and unlisten on unmount, same as
    * its existing "library-changed" listener) to keep `hierarchy` in sync
@@ -34,7 +53,20 @@ class TagsStore {
   }
 
   async loadHierarchy() {
-    this.hierarchy = await invoke<TagGroup[]>("get_tag_hierarchy");
+    const result = await invoke<TagGroup[]>("get_tag_hierarchy");
+    this.hierarchy = Array.isArray(result) ? result : [];
+  }
+
+  /** Kick off the initial hierarchy load at most once per session — genre
+   * chips across many widely-reused components (AlbumCard, PlaylistView,
+   * ArtistDetailView, ...) call this from an $effect on every mount, and an
+   * empty result (no genres curated yet) is a legitimate steady state, not
+   * a signal to keep retrying; live updates already flow through
+   * `listenForHierarchyChanges`'s "tags-changed" listener instead. */
+  ensureHierarchyLoaded() {
+    if (this.hierarchyLoadStarted) return;
+    this.hierarchyLoadStarted = true;
+    this.loadHierarchy().catch((e) => console.error("Failed to load tag hierarchy:", e));
   }
 
   async setGroupColor(name: string, colorIndex: number) {

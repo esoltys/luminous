@@ -1,9 +1,9 @@
 use crate::collection::WatcherPauseGuard;
 use crate::models;
-use crate::tageditor::SuggestedTags;
 use crate::AppState;
 use std::sync::Arc;
 use tauri::State;
+use tauri_plugin_opener::OpenerExt;
 
 #[derive(serde::Serialize)]
 pub struct SongDetails {
@@ -28,14 +28,18 @@ pub struct SongDetails {
     pub track: Option<u32>,
     pub disc: Option<u32>,
     pub year: Option<u32>,
+    pub originalyear: Option<u32>,
     pub grouping: String,
     pub bpm: Option<f32>,
     pub initial_key: String,
     pub rating: f32,
     pub compilation: bool,
     pub art_embedded: bool,
-    pub acoustid_id: Option<String>,
-    pub acoustid_fingerprint: Option<String>,
+    /// `true` when this song was cut from a CUE sheet (#78) — its tags live in
+    /// the .cue file, not the shared media file's own embedded tags, so the
+    /// tag editor should present it read-only rather than let a save silently
+    /// overwrite every other track cut from the same file.
+    pub is_cue_track: bool,
 }
 
 #[tauri::command]
@@ -46,7 +50,7 @@ pub async fn get_song_details(
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     conn.query_row(
         "SELECT id, path, title, titlesort, artist, artistsort, album, albumsort, album_artist, album_artist_sort, composer, composersort, genre, genresort, track, disc, year,
-                grouping, bpm, initial_key, rating, compilation, art_embedded, acoustid_id, acoustid_fingerprint
+                originalyear, grouping, bpm, initial_key, rating, compilation, art_embedded, cue_path
          FROM songs WHERE id = ?1",
         rusqlite::params![song_id],
         |row| {
@@ -68,63 +72,18 @@ pub async fn get_song_details(
                 track: row.get(14).ok(),
                 disc: row.get(15).ok(),
                 year: row.get(16).ok(),
-                grouping: row.get(17).unwrap_or_default(),
-                bpm: row.get(18).ok(),
-                initial_key: row.get(19).unwrap_or_default(),
-                rating: row.get(20).unwrap_or(crate::stats::RATING_UNRATED),
-                compilation: row.get(21).unwrap_or(false),
-                art_embedded: row.get(22).unwrap_or(false),
-                acoustid_id: row.get(23).ok(),
-                acoustid_fingerprint: row.get(24).ok(),
+                originalyear: row.get(17).ok(),
+                grouping: row.get(18).unwrap_or_default(),
+                bpm: row.get(19).ok(),
+                initial_key: row.get(20).unwrap_or_default(),
+                rating: row.get(21).unwrap_or(crate::stats::RATING_UNRATED),
+                compilation: row.get(22).unwrap_or(false),
+                art_embedded: row.get(23).unwrap_or(false),
+                is_cue_track: row.get::<_, Option<String>>(24)?.is_some(),
             })
         },
     )
     .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub async fn has_acoustid_env_key() -> Result<bool, String> {
-    Ok(std::env::var("ACOUSTID_API_KEY").is_ok())
-}
-
-#[tauri::command]
-pub async fn lookup_acoustid_tags(
-    state: State<'_, AppState>,
-    song_id: i64,
-) -> Result<SuggestedTags, String> {
-    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
-    let path_str: String = conn
-        .query_row(
-            "SELECT path FROM songs WHERE id = ?1",
-            rusqlite::params![song_id],
-            |row| row.get(0),
-        )
-        .map_err(|_| "Song not found in library".to_string())?;
-
-    let api_key: Option<String> = conn
-        .query_row(
-            "SELECT value FROM app_state WHERE key = 'acoustid_api_key'",
-            [],
-            |row| row.get(0),
-        )
-        .ok()
-        .filter(|s: &String| !s.trim().is_empty());
-
-    let path = std::path::PathBuf::from(path_str);
-
-    // 2. Generate fingerprint (blocking subprocess invocation)
-    let (fingerprint, duration_sec) =
-        tauri::async_runtime::spawn_blocking(move || crate::tageditor::generate_fingerprint(&path))
-            .await
-            .map_err(|e| e.to_string())?
-            .map_err(|e| e.to_string())?;
-
-    // 3. Query AcoustID web service lookup
-    let suggestions = crate::tageditor::lookup_acoustid(&fingerprint, duration_sec, api_key)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    Ok(suggestions)
 }
 
 #[tauri::command]
@@ -147,14 +106,10 @@ pub async fn save_song_tags(
     track: Option<u32>,
     disc: Option<u32>,
     year: Option<u32>,
+    originalyear: Option<u32>,
     grouping: String,
     bpm: Option<f32>,
     initial_key: String,
-    // Set only when the caller just ran a fresh AcoustID lookup (#752) — `None`
-    // means "no change," not "clear it," so an ordinary tag edit falls back to
-    // whatever's already on the song rather than wiping a prior match.
-    acoustid_id: Option<String>,
-    acoustid_fingerprint: Option<String>,
 ) -> Result<(), String> {
     // Written tags are an app-driven change Luminous already knows about, not
     // an external addition — without this, the realtime watcher would pick up
@@ -163,22 +118,36 @@ pub async fn save_song_tags(
     let _watcher_pause_guard = WatcherPauseGuard::new(Arc::clone(&state.watcher_paused));
 
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
-    let (path_str, compilation, existing_acoustid_id, existing_acoustid_fingerprint): (
-        String,
-        bool,
-        Option<String>,
-        Option<String>,
-    ) = conn
+    let (path_str, source, compilation, cue_path): (String, i32, bool, Option<String>) = conn
         .query_row(
-            "SELECT path, compilation, acoustid_id, acoustid_fingerprint FROM songs WHERE id = ?1",
+            "SELECT path, source, compilation, cue_path FROM songs WHERE id = ?1",
             rusqlite::params![song_id],
             |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
         )
         .map_err(|_| "Song not found in library".to_string())?;
-    let acoustid_id = acoustid_id.or(existing_acoustid_id);
-    let acoustid_fingerprint = acoustid_fingerprint.or(existing_acoustid_fingerprint);
+    // A CUE sheet track's tags live in the .cue file, not the shared media
+    // file's own embedded tags — writing here would silently overwrite every
+    // other track cut from the same file with just this one's values (#78).
+    // There's no CUE-sheet write-back yet, so refuse rather than corrupt.
+    if cue_path.is_some() {
+        return Err(
+            "This track's tags come from its CUE sheet and can't be edited yet.".to_string(),
+        );
+    }
+    // WebDAV songs (source 11) have no local file to write lofty tags to —
+    // there's no write-back to the remote server implemented, so the edit is
+    // saved to Luminous's own DB only (the tag editor surfaces this to the
+    // user). Attempting the on-disk write here would always fail and abort
+    // the whole save before the DB update below ever ran.
+    let is_webdav = source == models::SongSource::WebDav as i32;
 
     let path = std::path::PathBuf::from(path_str);
+    // Close the timing race the coarse guard above can't (#514): the OS's own
+    // change notification for this write may arrive after the guard's grace
+    // window elapses, so track the exact path too.
+    state
+        .self_writes
+        .mark_written(std::iter::once(path.clone()));
 
     // 2. Write metadata back to disk (blocking lofty write in threadpool)
     // The single-song tag editor has no compilation toggle (that's an
@@ -206,39 +175,38 @@ pub async fn save_song_tags(
     let genre_c = genre_str.clone();
     let grouping_c = grouping.clone();
     let initial_key_c = initial_key.clone();
-    let acoustid_id_c = acoustid_id.clone();
-    let acoustid_fingerprint_c = acoustid_fingerprint.clone();
 
-    tauri::async_runtime::spawn_blocking(move || {
-        crate::tageditor::write_tags(
-            &path_clone,
-            &crate::tageditor::TagWriteRequest {
-                title: &title_c,
-                titlesort: titlesort_c.as_deref(),
-                artist: &artist_c,
-                artistsort: artistsort_c.as_deref(),
-                album: &album_c,
-                albumsort: albumsort_c.as_deref(),
-                album_artist: &album_artist_c,
-                album_artist_sort: album_artist_sort_c.as_deref(),
-                composer: &composer_c,
-                composersort: composersort_c.as_deref(),
-                genre: &genre_c,
-                track,
-                disc,
-                year,
-                grouping: &grouping_c,
-                bpm,
-                initial_key: &initial_key_c,
-                compilation,
-                acoustid_id: acoustid_id_c.as_deref(),
-                acoustid_fingerprint: acoustid_fingerprint_c.as_deref(),
-            },
-        )
-    })
-    .await
-    .map_err(|e| e.to_string())?
-    .map_err(|e| format!("{e:#}"))?;
+    if !is_webdav {
+        tauri::async_runtime::spawn_blocking(move || {
+            crate::tageditor::write_tags(
+                &path_clone,
+                &crate::tageditor::TagWriteRequest {
+                    title: &title_c,
+                    titlesort: titlesort_c.as_deref(),
+                    artist: &artist_c,
+                    artistsort: artistsort_c.as_deref(),
+                    album: &album_c,
+                    albumsort: albumsort_c.as_deref(),
+                    album_artist: &album_artist_c,
+                    album_artist_sort: album_artist_sort_c.as_deref(),
+                    composer: &composer_c,
+                    composersort: composersort_c.as_deref(),
+                    genre: &genre_c,
+                    track,
+                    disc,
+                    year,
+                    originalyear,
+                    grouping: &grouping_c,
+                    bpm,
+                    initial_key: &initial_key_c,
+                    compilation,
+                },
+            )
+        })
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| format!("{e:#}"))?;
+    }
 
     // 3. Update SQLite database cache in-place
     conn.execute(
@@ -258,12 +226,11 @@ pub async fn save_song_tags(
             track = ?13,
             disc = ?14,
             year = ?15,
-            grouping = ?16,
-            bpm = ?17,
-            initial_key = ?18,
-            acoustid_id = ?19,
-            acoustid_fingerprint = ?20
-         WHERE id = ?21",
+            originalyear = ?16,
+            grouping = ?17,
+            bpm = ?18,
+            initial_key = ?19
+         WHERE id = ?20",
         rusqlite::params![
             title,
             titlesort,
@@ -280,11 +247,10 @@ pub async fn save_song_tags(
             track,
             disc,
             year,
+            originalyear,
             grouping,
             bpm,
             initial_key,
-            acoustid_id,
-            acoustid_fingerprint,
             song_id
         ],
     )
@@ -322,6 +288,7 @@ pub async fn save_album_tags(
     struct SongMetadata {
         id: i64,
         path: String,
+        source: i32,
         title: String,
         titlesort: Option<String>,
         artist: String,
@@ -329,35 +296,34 @@ pub async fn save_album_tags(
         composer: String,
         composersort: Option<String>,
         track: Option<u32>,
+        originalyear: Option<u32>,
         grouping: String,
         bpm: Option<f32>,
         initial_key: String,
-        acoustid_id: Option<String>,
-        acoustid_fingerprint: Option<String>,
     }
 
     let mut songs_data = Vec::with_capacity(song_ids.len());
     for &song_id in &song_ids {
         let res = conn.query_row(
-            "SELECT path, title, titlesort, artist, artistsort, composer, composersort, track, grouping, bpm, initial_key, acoustid_id, acoustid_fingerprint
+            "SELECT path, source, title, titlesort, artist, artistsort, composer, composersort, track, originalyear, grouping, bpm, initial_key
              FROM songs WHERE id = ?1",
             rusqlite::params![song_id],
             |row| {
                 Ok(SongMetadata {
                     id: song_id,
                     path: row.get(0)?,
-                    title: row.get(1).unwrap_or_default(),
-                    titlesort: row.get(2).ok(),
-                    artist: row.get(3).unwrap_or_default(),
-                    artistsort: row.get(4).ok(),
-                    composer: row.get(5).unwrap_or_default(),
-                    composersort: row.get(6).ok(),
-                    track: row.get(7).ok(),
-                    grouping: row.get(8).unwrap_or_default(),
-                    bpm: row.get(9).ok(),
-                    initial_key: row.get(10).unwrap_or_default(),
-                    acoustid_id: row.get(11).ok(),
-                    acoustid_fingerprint: row.get(12).ok(),
+                    source: row.get(1)?,
+                    title: row.get(2).unwrap_or_default(),
+                    titlesort: row.get(3).ok(),
+                    artist: row.get(4).unwrap_or_default(),
+                    artistsort: row.get(5).ok(),
+                    composer: row.get(6).unwrap_or_default(),
+                    composersort: row.get(7).ok(),
+                    track: row.get(8).ok(),
+                    originalyear: row.get(9).ok(),
+                    grouping: row.get(10).unwrap_or_default(),
+                    bpm: row.get(11).ok(),
+                    initial_key: row.get(12).unwrap_or_default(),
                 })
             },
         );
@@ -365,6 +331,12 @@ pub async fn save_album_tags(
             songs_data.push(meta);
         }
     }
+
+    // See save_song_tags — close the timing race the coarse guard above can't
+    // (#514) by tracking every path this batch is about to write.
+    state
+        .self_writes
+        .mark_written(songs_data.iter().map(|m| std::path::PathBuf::from(&m.path)));
 
     let album_c = album.clone();
     let albumsort_c = albumsort.clone();
@@ -381,6 +353,14 @@ pub async fn save_album_tags(
     let updated_count = tauri::async_runtime::spawn_blocking(move || {
         let mut count = 0u32;
         for item in songs_data {
+            // WebDAV songs (source 11) have no local file to write lofty tags to,
+            // and there's no write-back to the remote server implemented — the
+            // change is saved to Luminous's own DB only (the tag editor surfaces
+            // this to the user), same as save_song_tags/rewrite_genre_and_persist.
+            if item.source == models::SongSource::WebDav as i32 {
+                count += 1;
+                continue;
+            }
             let path = std::path::PathBuf::from(&item.path);
             let write_res = crate::tageditor::write_tags(
                 &path,
@@ -399,21 +379,17 @@ pub async fn save_album_tags(
                     track: item.track,
                     disc,
                     year,
+                    originalyear: item.originalyear,
                     grouping: &item.grouping,
                     bpm: item.bpm,
                     initial_key: &item.initial_key,
                     compilation,
-                    acoustid_id: item.acoustid_id.as_deref(),
-                    acoustid_fingerprint: item.acoustid_fingerprint.as_deref(),
                 },
             );
             match write_res {
                 Ok(_) => count += 1,
                 Err(ref e) => {
-                    log::warn!(
-                        "Failed to persist tags to disk for song {}: {e:#}",
-                        item.id
-                    );
+                    log::warn!("Failed to persist tags to disk for song {}: {e:#}", item.id);
                 }
             }
         }
@@ -467,20 +443,34 @@ pub async fn clear_song_cover_art(state: State<'_, AppState>, song_id: i64) -> R
     let _watcher_pause_guard = WatcherPauseGuard::new(Arc::clone(&state.watcher_paused));
 
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
-    let path_str: String = conn
+    let (path_str, source): (String, i32) = conn
         .query_row(
-            "SELECT path FROM songs WHERE id = ?1",
+            "SELECT path, source FROM songs WHERE id = ?1",
             rusqlite::params![song_id],
-            |row| row.get(0),
+            |row| Ok((row.get(0)?, row.get(1)?)),
         )
         .map_err(|_| "Song not found in library".to_string())?;
 
     let path = std::path::PathBuf::from(path_str);
-    let path_clone = path.clone();
-    tauri::async_runtime::spawn_blocking(move || crate::tageditor::clear_embedded_art(&path_clone))
+    // WebDAV songs (source 11) have no local file to clear an embedded
+    // picture from, and there's no write-back to the remote server
+    // implemented — same as tag edits (see save_song_tags), this is
+    // DB-only. The tag editor hides the Clear Artwork button for these
+    // songs; this guard is what keeps it from erroring if it's ever
+    // reached some other way.
+    if source != models::SongSource::WebDav as i32 {
+        // See save_song_tags — close the timing race the coarse guard above can't (#514).
+        state
+            .self_writes
+            .mark_written(std::iter::once(path.clone()));
+        let path_clone = path.clone();
+        tauri::async_runtime::spawn_blocking(move || {
+            crate::tageditor::clear_embedded_art(&path_clone)
+        })
         .await
         .map_err(|e| e.to_string())?
         .map_err(|e| format!("{e:#}"))?;
+    }
 
     let folder_art = state
         .cover_manager
@@ -512,25 +502,40 @@ pub async fn clear_album_cover_art(
 
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
 
-    let mut paths = Vec::with_capacity(song_ids.len());
+    let mut local_paths = Vec::with_capacity(song_ids.len());
+    let mut webdav_paths = Vec::new();
     for &song_id in &song_ids {
-        if let Ok(path_str) = conn.query_row(
-            "SELECT path FROM songs WHERE id = ?1",
+        if let Ok((path_str, source)) = conn.query_row(
+            "SELECT path, source FROM songs WHERE id = ?1",
             rusqlite::params![song_id],
-            |row| row.get::<_, String>(0),
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, i32>(1)?)),
         ) {
-            paths.push((song_id, std::path::PathBuf::from(path_str)));
+            let path = std::path::PathBuf::from(path_str);
+            // WebDAV songs (source 11) have no local file to clear an embedded
+            // picture from — DB-only, same as clear_song_cover_art above.
+            if source == models::SongSource::WebDav as i32 {
+                webdav_paths.push((song_id, path));
+            } else {
+                local_paths.push((song_id, path));
+            }
         }
     }
 
-    let cleared: Vec<(i64, std::path::PathBuf)> = tauri::async_runtime::spawn_blocking(move || {
-        paths
-            .into_iter()
-            .filter(|(_, path)| crate::tageditor::clear_embedded_art(path).is_ok())
-            .collect()
-    })
-    .await
-    .map_err(|e| e.to_string())?;
+    // See save_song_tags — close the timing race the coarse guard above can't (#514).
+    state
+        .self_writes
+        .mark_written(local_paths.iter().map(|(_, p)| p.clone()));
+
+    let mut cleared: Vec<(i64, std::path::PathBuf)> =
+        tauri::async_runtime::spawn_blocking(move || {
+            local_paths
+                .into_iter()
+                .filter(|(_, path)| crate::tageditor::clear_embedded_art(path).is_ok())
+                .collect()
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+    cleared.extend(webdav_paths);
 
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
     for (song_id, path) in &cleared {
@@ -547,4 +552,38 @@ pub async fn clear_album_cover_art(
     tx.commit().map_err(|e| e.to_string())?;
 
     Ok(cleared.len() as u32)
+}
+
+/// Opens the containing folder of the first of `song_ids` that has a local
+/// file (in the OS file manager), for the Song/Album Details "Open Folder"
+/// action. Songs sharing an album normally share one folder, so the first
+/// hit is enough -- this mirrors `open_in_picard`'s song-id-to-parent-dir
+/// resolution rather than trusting a raw path from the frontend.
+#[tauri::command]
+pub async fn open_song_folder(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    song_ids: Vec<i64>,
+) -> Result<(), String> {
+    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
+    let dir = song_ids.iter().find_map(|id| {
+        let path: Option<String> = conn
+            .query_row("SELECT path FROM songs WHERE id = ?1", [id], |row| {
+                row.get(0)
+            })
+            .ok();
+        path.as_deref()
+            .map(std::path::Path::new)
+            .and_then(|p| p.parent())
+            .map(|p| p.to_path_buf())
+    });
+    drop(conn);
+
+    let Some(dir) = dir else {
+        return Err("No local files found for the selected songs".to_string());
+    };
+
+    app.opener()
+        .open_path(dir.to_string_lossy().to_string(), None::<&str>)
+        .map_err(|e| e.to_string())
 }

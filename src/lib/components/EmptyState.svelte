@@ -25,12 +25,12 @@
 {#if card}
   <div class="flex flex-col items-center justify-center max-w-sm mx-auto p-6 bg-brand-sidebar/20 rounded-xl border border-dashed border-brand-border/60 select-none">
     <Icon class="w-12 h-12 text-brand-accent-text/40 mb-3 {pulse ? 'animate-pulse' : ''}" />
-    <h3 class="text-base font-semibold text-brand-text-primary mb-1">{title}</h3>
+    <h3 class="text-base font-semibold text-brand-text-primary mb-1 text-balance">{title}</h3>
     {#if subtitle}
-      <p class={subtitleClass}>{subtitle}</p>
+      <p class="{subtitleClass} text-pretty">{subtitle}</p>
     {/if}
   </div>
 {:else}
   <Icon class="w-12 h-12 text-brand-accent-text/40 mb-3 mx-auto {pulse ? 'animate-pulse' : ''}" />
-  <h3 class="text-sm font-semibold text-brand-text-primary mb-1">{title}</h3>
+  <h3 class="text-sm font-semibold text-brand-text-primary mb-1 text-balance">{title}</h3>
 {/if}

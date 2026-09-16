@@ -12,9 +12,11 @@
     size?: "sm" | "md";
     /** Renders just the icon in a round button, dropping the "Columns" label — for compact toolbars. */
     iconOnly?: boolean;
+    /** Suppresses the trigger button entirely — the menu is opened programmatically via `openAt()`, e.g. from a right-click handler. */
+    hideTrigger?: boolean;
   }
 
-  let { align = "right", size = "md", iconOnly = false }: Props = $props();
+  let { align = "right", size = "md", iconOnly = false, hideTrigger = false }: Props = $props();
 
   let showMenu = $state(false);
   let buttonEl = $state<HTMLButtonElement | undefined>(undefined);
@@ -53,6 +55,16 @@
     if (showMenu) updateMenuPosition();
   }
 
+  /** Opens the menu at an arbitrary viewport position — used when there's no trigger button, e.g. a right-click. */
+  export function openAt(x: number, y: number) {
+    const reserve = playerStore.currentSong ? PLAYERBAR_RESERVE_PX : PAGE_BOTTOM_MARGIN_PX;
+    const available = window.innerHeight - y - MENU_GAP_PX - reserve;
+    menuMaxHeight = Math.max(MENU_MIN_HEIGHT_PX, Math.min(MENU_MAX_HEIGHT_PX, available));
+    menuTop = y;
+    menuLeft = Math.max(8, Math.min(x, window.innerWidth - MENU_WIDTH_PX - 8));
+    showMenu = true;
+  }
+
   function handleWindowClick(e: MouseEvent) {
     if (showMenu) {
       const target = e.target as HTMLElement | null;
@@ -80,6 +92,8 @@
     { key: "genre",       label: "collection.columnGenre" },
     { key: "grouping",    label: "collection.columnGrouping" },
     { key: "initial_key", label: "collection.columnInitialKey" },
+    { key: "musicbrainz_id", label: "collection.columnMusicBrainzId" },
+    { key: "originalyear",label: "collection.columnOriginalYear" },
     { key: "path",        label: "collection.columnPath" },
     { key: "samplerate",  label: "collection.columnSampleRate" },
     { key: "title",       label: "collection.columnTitle" },
@@ -93,6 +107,7 @@
     { key: "added",     label: "collection.columnAdded" },
     { key: "duration",  label: "collection.columnDuration" },
     { key: "lastplayed",label: "collection.columnLastPlayed" },
+    { key: "library",   label: "collection.columnLibrary" },
     { key: "playcount", label: "collection.columnPlayCount" },
     { key: "rating",    label: "collection.columnRating" },
     { key: "skipcount", label: "collection.columnSkipCount" },
@@ -106,18 +121,20 @@
 <svelte:window onclick={handleWindowClick} onresize={() => showMenu && updateMenuPosition()} />
 
 <div class="relative column-selector-container shrink-0 z-40">
-  <button
-    bind:this={buttonEl}
-    onclick={toggleMenu}
-    class="flex items-center justify-center gap-2 border border-brand-border text-brand-text-secondary focus:outline-none transition-colors font-semibold rounded-full
-      {iconOnly
-        ? 'w-10 h-10 hover:text-brand-accent-text hover:bg-brand-sidebar shadow-xs'
-        : 'bg-brand-sidebar hover:bg-brand-main hover:text-brand-text-primary transition-all ' + (size === 'sm' ? 'px-2.5 h-7 text-[11px] gap-1.5' : 'px-5 py-2 text-sm')}"
-    title={i18n.t("collection.columnsBtn")}
-  >
-    <Columns class={iconOnly || size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
-    {#if !iconOnly}<span>{i18n.t("collection.columnsBtn")}</span>{/if}
-  </button>
+  {#if !hideTrigger}
+    <button
+      bind:this={buttonEl}
+      onclick={toggleMenu}
+      class="flex items-center justify-center gap-2 border border-brand-border text-brand-text-secondary focus:outline-none transition-colors font-semibold rounded-full
+        {iconOnly
+          ? 'w-10 h-10 hover:text-brand-accent-text hover:bg-brand-sidebar shadow-xs'
+          : 'bg-brand-sidebar hover:bg-brand-main hover:text-brand-text-primary transition-all ' + (size === 'sm' ? 'px-2.5 h-7 text-[11px] gap-1.5' : 'px-5 py-2 text-sm')}"
+      title={i18n.t("collection.columnsBtn")}
+    >
+      <Columns class={iconOnly || size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
+      {#if !iconOnly}<span>{i18n.t("collection.columnsBtn")}</span>{/if}
+    </button>
+  {/if}
 
   {#if showMenu}
     <div

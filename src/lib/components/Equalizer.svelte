@@ -11,6 +11,7 @@
   import Toggle from "./Toggle.svelte";
   import Select from "./Select.svelte";
   import Knob from "./Knob.svelte";
+  import { themeStore } from "../stores/theme.svelte";
 
   type EqMode = "graphic10" | "parametric20";
   interface ParametricBand {
@@ -47,7 +48,7 @@
   ];
 
   const presets = [
-    "Flat", "Rock", "Pop", "Classical", "Jazz",
+    "Flat", "Rock", "Pop",
     "Bass Boost", "Vocal Boost", "Headphones"
   ];
 
@@ -56,8 +57,6 @@
       "Flat": "flatPreset",
       "Pop": "popPreset",
       "Rock": "rockPreset",
-      "Classical": "classicalPreset",
-      "Jazz": "jazzPreset",
       "Bass Boost": "bassBoostPreset",
       "Vocal Boost": "vocalBoostPreset",
       "Treble Boost": "trebleBoostPreset",
@@ -81,13 +80,11 @@
   }
 
   function determinePresetName() {
-    const rockGains = [4.0, 3.0, 2.0, -1.0, -2.0, -1.0, 1.0, 2.0, 3.0, 4.0];
-    const popGains = [-2.0, -1.0, 0.0, 2.0, 4.0, 4.0, 2.0, 0.0, -1.0, -2.0];
-    const classicalGains = [5.0, 3.0, 2.0, 2.0, -1.0, -1.0, 0.0, 2.0, 3.0, 4.0];
-    const jazzGains = [3.0, 2.0, 1.0, 2.0, -1.0, -1.0, 0.0, 1.0, 2.0, 3.0];
-    const bassBoostGains = [6.0, 5.0, 4.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
-    const vocalBoostGains = [-2.0, -2.0, -1.0, 1.0, 3.0, 4.0, 3.0, 1.0, -1.0, -2.0];
-    const headphonesGains = [4.0, 2.0, 0.0, 2.0, 4.0, 4.0, 2.0, 0.0, 2.0, 4.0];
+    const rockGains = [4.0, 3.0, 1.0, -1.0, -2.0, -1.0, 1.0, 3.0, 3.5, 3.5];
+    const popGains = [1.5, 2.5, 1.0, -1.0, -0.5, 1.0, 2.5, 3.0, 2.5, 2.0];
+    const bassBoostGains = [9.0, 7.0, 4.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+    const vocalBoostGains = [-3.0, -2.0, -1.0, 0.0, 2.0, 4.0, 4.5, 3.5, 1.0, -1.0];
+    const headphonesGains = [2.0, 1.5, 0.5, 0.0, 0.0, 0.0, -0.5, -1.0, -0.5, 1.0];
     const flatGains = Array(10).fill(0.0);
 
     const matches = (a: number[], b: number[]) => a.every((v, i) => Math.abs(v - b[i]) < 0.1);
@@ -95,8 +92,6 @@
     if (matches(gains, flatGains)) activePreset = "Flat";
     else if (matches(gains, rockGains)) activePreset = "Rock";
     else if (matches(gains, popGains)) activePreset = "Pop";
-    else if (matches(gains, classicalGains)) activePreset = "Classical";
-    else if (matches(gains, jazzGains)) activePreset = "Jazz";
     else if (matches(gains, bassBoostGains)) activePreset = "Bass Boost";
     else if (matches(gains, vocalBoostGains)) activePreset = "Vocal Boost";
     else if (matches(gains, headphonesGains)) activePreset = "Headphones";
@@ -248,7 +243,7 @@
     fallback_gain_db: number;
   }
 
-  let targetLufs = $state(-18.0);
+  let targetLufs = $state(-16.0);
   let loudnessMode = $state<LoudnessMode>("track");
   let fallbackGainDb = $state(-6.0);
 
@@ -302,8 +297,6 @@
   interface FadeSettings {
     fade_pause_enabled: boolean;
     fade_pause_duration_ms: number;
-    crossfade_manual_enabled: boolean;
-    crossfade_manual_duration_ms: number;
     crossfade_auto_enabled: boolean;
     crossfade_auto_duration_secs: number;
     crossfade_suppress_same_album: boolean;
@@ -311,8 +304,6 @@
 
   let fadePauseEnabled = $state(true);
   let fadePauseDurationMs = $state(300);
-  let crossfadeManualEnabled = $state(true);
-  let crossfadeManualDurationMs = $state(1000);
   let crossfadeAutoEnabled = $state(false);
   let crossfadeAutoDurationSecs = $state(3.0);
   let crossfadeSuppressSameAlbum = $state(true);
@@ -322,8 +313,6 @@
       const settings = await invoke<FadeSettings>("get_fade_settings");
       fadePauseEnabled = settings.fade_pause_enabled;
       fadePauseDurationMs = settings.fade_pause_duration_ms;
-      crossfadeManualEnabled = settings.crossfade_manual_enabled;
-      crossfadeManualDurationMs = settings.crossfade_manual_duration_ms;
       crossfadeAutoEnabled = settings.crossfade_auto_enabled;
       crossfadeAutoDurationSecs = settings.crossfade_auto_duration_secs;
       crossfadeSuppressSameAlbum = settings.crossfade_suppress_same_album;
@@ -338,13 +327,12 @@
         settings: {
           fade_pause_enabled: fadePauseEnabled,
           fade_pause_duration_ms: fadePauseDurationMs,
-          crossfade_manual_enabled: crossfadeManualEnabled,
-          crossfade_manual_duration_ms: crossfadeManualDurationMs,
           crossfade_auto_enabled: crossfadeAutoEnabled,
           crossfade_auto_duration_secs: crossfadeAutoDurationSecs,
           crossfade_suppress_same_album: crossfadeSuppressSameAlbum,
         },
       });
+      void themeStore.syncMorphDuration();
     } catch (e) {
       console.error("Failed to save fade settings:", e);
     }
@@ -370,7 +358,7 @@
           <h3 class="font-bold text-sm text-brand-text-primary">
             {mode === "parametric20" ? i18n.t('equalizer.titleParametric') : i18n.t('equalizer.title')}
           </h3>
-          <p class="text-xs text-brand-text-secondary leading-relaxed">
+          <p class="text-xs text-brand-text-secondary leading-relaxed text-pretty">
             {mode === "parametric20" ? i18n.t('equalizer.subtitleParametric') : i18n.t('equalizer.subtitle')}
           </p>
         </div>
@@ -387,16 +375,21 @@
     </div>
     <div class="flex items-center gap-4 flex-wrap">
 
-      <div class="flex items-center bg-brand-main border border-brand-border rounded-[2rem] p-0.5" role="group" aria-label={i18n.t('equalizer.modeLabel')}>
+      <div class="relative flex items-center bg-brand-main border border-brand-border rounded-[2rem] p-0.5" role="group" aria-label={i18n.t('equalizer.modeLabel')}>
+        <!-- Sliding background pill -->
+        <span
+          class="absolute top-0.5 bottom-0.5 left-0.5 w-[calc(50%-2px)] rounded-full bg-brand-accent shadow-sm pointer-events-none transition-transform duration-200 ease-out {mode === 'parametric20' ? 'translate-x-full' : 'translate-x-0'}"
+          aria-hidden="true"
+        ></span>
         <button
-          class="text-xs font-semibold px-4 py-1.5 rounded-full transition-colors {mode === 'graphic10' ? 'bg-brand-accent text-brand-accent-contrast shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+          class="relative z-10 flex-1 whitespace-nowrap text-xs font-semibold px-4 py-1.5 rounded-full transition-colors duration-200 {mode === 'graphic10' ? 'text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
           onclick={() => handleModeChange("graphic10")}
           aria-pressed={mode === "graphic10"}
         >
           {i18n.t('equalizer.modeGraphic')}
         </button>
         <button
-          class="text-xs font-semibold px-4 py-1.5 rounded-full transition-colors {mode === 'parametric20' ? 'bg-brand-accent text-brand-accent-contrast shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+          class="relative z-10 flex-1 whitespace-nowrap text-xs font-semibold px-4 py-1.5 rounded-full transition-colors duration-200 {mode === 'parametric20' ? 'text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
           onclick={() => handleModeChange("parametric20")}
           aria-pressed={mode === "parametric20"}
         >
@@ -481,7 +474,7 @@
     {/if}
 
     {#if mode === "graphic10"}
-      <div class="grid grid-cols-5 md:grid-cols-10 gap-3 md:gap-5 h-64 md:h-72 items-center bg-brand-main/50 border border-brand-border/50 rounded-xl p-4 md:p-6">
+      <div class="grid grid-cols-5 md:grid-cols-10 gap-3 md:gap-5 min-h-64 h-auto md:h-72 items-center bg-brand-main/50 border border-brand-border/50 rounded-xl p-4 md:p-6">
         {#each gains as gain, idx}
           <div class="flex flex-col items-center justify-between h-full group">
             <span class="text-[10px] font-bold w-full text-center transition-colors {gain > 0 ? 'text-green-400/80' : gain < 0 ? 'text-red-400/80' : 'text-brand-text-secondary/70'}">
@@ -508,8 +501,11 @@
           </div>
         {/each}
       </div>
+      <p class="text-xs text-brand-text-secondary px-1 -mt-2">
+        {i18n.t('equalizer.isoStandard')}
+      </p>
     {:else}
-      <div class="grid grid-cols-10 md:grid-cols-[repeat(20,minmax(0,1fr))] gap-1 md:gap-1.5 h-64 md:h-72 items-center bg-brand-main/50 border border-brand-border/50 rounded-xl p-3 md:p-4">
+      <div class="grid grid-cols-10 md:grid-cols-[repeat(20,minmax(0,1fr))] gap-1 md:gap-1.5 min-h-64 h-auto md:h-72 items-center bg-brand-main/50 border border-brand-border/50 rounded-xl p-3 md:p-4">
         {#each parametric as band, idx}
           <div
             class="flex flex-col items-center justify-between h-full group rounded-md transition-colors {selectedBand === idx ? 'bg-brand-accent/10 ring-1 ring-brand-accent/50' : 'hover:bg-brand-sidebar/30'}"
@@ -578,7 +574,7 @@
           </div>
           <div class="space-y-1 min-w-0">
             <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('loudness.title')}</h3>
-            <p class="text-xs text-brand-text-secondary leading-relaxed">{i18n.t('loudness.subtitle')}</p>
+            <p class="text-xs text-brand-text-secondary leading-relaxed text-pretty">{i18n.t('loudness.subtitle')}</p>
           </div>
         </div>
         <div class="flex items-center gap-2 shrink-0">
@@ -593,8 +589,8 @@
       <div class="grid grid-cols-1 md:grid-cols-3 gap-12">
         <div class="flex flex-col items-center justify-center gap-1.5 h-full">
           <Knob
-            min={-36.0}
-            max={0.0}
+            min={-23.0}
+            max={-9.0}
             step={0.25}
             bind:value={targetLufs}
             oninput={handleTargetLufsChange}
@@ -607,9 +603,14 @@
 
         <div class="flex flex-col items-center justify-center gap-1.5 h-full">
           <span class="text-[10px] font-bold text-brand-text-secondary uppercase tracking-wider text-center">{i18n.t('loudness.mode')}</span>
-          <div class="flex items-center bg-brand-main border border-brand-border rounded-[2rem] p-0.5 mt-1 mx-auto w-full max-w-[200px]" role="group" aria-label={i18n.t('loudness.mode')}>
+          <div class="relative flex items-center bg-brand-main border border-brand-border rounded-[2rem] p-0.5 mt-1 mx-auto w-full max-w-[200px]" role="group" aria-label={i18n.t('loudness.mode')}>
+            <!-- Sliding background pill -->
+            <span
+              class="absolute top-0.5 bottom-0.5 left-0.5 w-[calc(50%-2px)] rounded-full bg-brand-accent shadow-sm pointer-events-none transition-transform duration-200 ease-out {loudnessMode === 'album' ? 'translate-x-full' : 'translate-x-0'} {!loudnessStore.enabled ? 'opacity-50' : ''}"
+              aria-hidden="true"
+            ></span>
             <button
-              class="flex-1 text-xs font-semibold px-4 py-1.5 rounded-full transition-colors {loudnessMode === 'track' ? 'bg-brand-accent text-brand-accent-contrast shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+              class="relative z-10 flex-1 text-xs font-semibold px-4 py-1.5 rounded-full transition-colors duration-200 {loudnessMode === 'track' ? 'text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
               onclick={() => handleLoudnessModeChange("track")}
               aria-pressed={loudnessMode === "track"}
               disabled={!loudnessStore.enabled}
@@ -617,7 +618,7 @@
               {i18n.t('loudness.modeTrack')}
             </button>
             <button
-              class="flex-1 text-xs font-semibold px-4 py-1.5 rounded-full transition-colors {loudnessMode === 'album' ? 'bg-brand-accent text-brand-accent-contrast shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+              class="relative z-10 flex-1 text-xs font-semibold px-4 py-1.5 rounded-full transition-colors duration-200 {loudnessMode === 'album' ? 'text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
               onclick={() => handleLoudnessModeChange("album")}
               aria-pressed={loudnessMode === "album"}
               disabled={!loudnessStore.enabled}
@@ -639,7 +640,7 @@
             suffix="dB"
             size={80}
           />
-          <span class="text-[11px] text-brand-text-secondary text-center mt-2 px-4">{i18n.t('loudness.fallbackGainHint')}</span>
+          <span class="text-[11px] text-brand-text-secondary text-center mt-2 px-4 text-pretty">{i18n.t('loudness.fallbackGainHint')}</span>
         </div>
       </div>
 
@@ -662,7 +663,7 @@
         </div>
         <div class="space-y-1 min-w-0">
           <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('fades.title')}</h3>
-          <p class="text-xs text-brand-text-secondary leading-relaxed">{i18n.t('fades.subtitle')}</p>
+          <p class="text-xs text-brand-text-secondary leading-relaxed text-pretty">{i18n.t('fades.subtitle')}</p>
         </div>
       </div>
 

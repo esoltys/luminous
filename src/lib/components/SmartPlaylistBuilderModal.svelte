@@ -259,8 +259,8 @@
           <Sparkles class="w-5 h-5" />
         </div>
         <div>
-          <h2 class="text-base font-bold text-brand-text-primary">{editing ? i18n.t("smartPlaylistBuilder.editTitle") : i18n.t("smartPlaylistBuilder.createTitle")}</h2>
-          <p class="text-xs text-brand-text-secondary/70">{i18n.t("smartPlaylistBuilder.subtitle")}</p>
+          <h2 class="text-base font-bold text-brand-text-primary text-balance">{editing ? i18n.t("smartPlaylistBuilder.editTitle") : i18n.t("smartPlaylistBuilder.createTitle")}</h2>
+          <p class="text-xs text-brand-text-secondary/70 text-pretty">{i18n.t("smartPlaylistBuilder.subtitle")}</p>
         </div>
       </div>
       <button
@@ -273,7 +273,7 @@
 
     <form onsubmit={handleSubmit} class="p-6 flex-1 overflow-y-auto flex flex-col gap-5">
       <div>
-        <label for="smart-playlist-name-input" class="block text-xs font-semibold text-brand-text-secondary uppercase tracking-wider mb-1.5">
+        <label for="smart-playlist-name-input" class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider mb-1.5">
           {i18n.t("smartPlaylistBuilder.nameLabel")}
         </label>
         <Input
@@ -289,7 +289,7 @@
 
       <div>
         <div class="flex items-center justify-between mb-2">
-          <span class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider flex items-center gap-1.5">
+          <span class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider flex items-center gap-1.5">
             <SlidersHorizontal class="w-3.5 h-3.5 text-brand-accent-text" />
             {i18n.t("smartPlaylistBuilder.matchingRules")}
           </span>

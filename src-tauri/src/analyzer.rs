@@ -180,8 +180,9 @@ pub fn decode_all_samples(path: &Path) -> Result<(Vec<f32>, u32)> {
         meta::MetadataOptions,
     };
 
-    let file = std::fs::File::open(path).context("failed to open audio file for offline decode")?;
-    let mss = MediaSourceStream::new(Box::new(file), Default::default());
+    let source = crate::audio::open_media_source(&path.to_string_lossy())
+        .map_err(|e| anyhow!("failed to open audio file for offline decode: {e}"))?;
+    let mss = MediaSourceStream::new(source, Default::default());
 
     let mut format = symphonia::default::get_probe()
         .probe(

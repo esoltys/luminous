@@ -1,0 +1,814 @@
+//! Personal Stats aggregation (#130) — range-filtered Top 10 artists/albums/
+//! songs/genres and listening-clock timestamps, computed live from
+//! `play_history` + `songs`. Deliberately does **not** touch
+//! `album_chart_history` (the Home "Top Albums" weekly chart's snapshot
+//! table, #662) — that table only tracks the top 10 albums per week, so
+//! summing across weeks would silently undercount anything that never
+//! cracked a weekly top 10. See issue #130's comment thread.
+
+use crate::models::{
+    parse_multi_value, ListenEvent, StatsSummary, StatsTopItem, LIBRARY_SOURCES_SQL,
+};
+use anyhow::Result;
+use rusqlite::{params, Connection};
+
+/// A Personal Stats time window.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StatsRange {
+    SevenDays,
+    TwentyEightDays,
+    OneYear,
+}
+
+impl StatsRange {
+    pub fn parse(raw: &str) -> Option<Self> {
+        match raw {
+            "7d" => Some(Self::SevenDays),
+            "28d" => Some(Self::TwentyEightDays),
+            "1y" => Some(Self::OneYear),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::SevenDays => "7d",
+            Self::TwentyEightDays => "28d",
+            Self::OneYear => "1y",
+        }
+    }
+
+    fn days(&self) -> i64 {
+        match self {
+            Self::SevenDays => 7,
+            Self::TwentyEightDays => 28,
+            Self::OneYear => 365,
+        }
+    }
+}
+
+const SECONDS_PER_DAY: i64 = 86_400;
+
+/// Start of a rolling range ending `now` — plain `now - N*86400` arithmetic,
+/// no calendar alignment needed (unlike the Monday-aligned weekly chart in
+/// `collection::query::week_start_utc`). Split out with an explicit `now`
+/// so tests can drive it deterministically.
+pub fn range_start_unix(range: StatsRange, now: i64) -> i64 {
+    now - range.days() * SECONDS_PER_DAY
+}
+
+const TOP_N: i64 = 10;
+
+/// Build a full Personal Stats summary for `range`, excluding any song,
+/// album, artist, or genre flagged in `stats_exclusions`.
+pub fn get_summary(conn: &Connection, range: StatsRange) -> Result<StatsSummary> {
+    get_summary_at(conn, range, chrono::Utc::now().timestamp())
+}
+
+fn get_summary_at(conn: &Connection, range: StatsRange, now: i64) -> Result<StatsSummary> {
+    let range_start = range_start_unix(range, now);
+    Ok(StatsSummary {
+        range: range.as_str().to_string(),
+        top_songs: top_songs(conn, range_start)?,
+        top_albums: top_albums(conn, range_start)?,
+        top_artists: top_artists(conn, range_start)?,
+        top_genres: top_genres(conn, range_start)?,
+        play_timestamps: play_timestamps(conn, range_start)?,
+        total_minutes: total_minutes(conn, range_start)?,
+    })
+}
+
+pub fn top_songs(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>> {
+    top_songs_with_limit(conn, range_start, TOP_N)
+}
+
+pub fn top_songs_with_limit(
+    conn: &Connection,
+    range_start: i64,
+    limit: i64,
+) -> Result<Vec<StatsTopItem>> {
+    let sql = format!(
+        "SELECT s.id, s.title, s.artist, COUNT(*) AS play_count, s.album,
+                COALESCE(SUM(COALESCE(NULLIF(ph.duration_secs, 0), s.length_nanosec / 1000000000, 0)), 0) AS total_secs,
+                s.art_embedded, s.art_automatic, s.art_manual, s.year, s.rating
+         FROM play_history ph
+         JOIN songs s ON s.id = ph.song_id
+         WHERE ph.played_at >= ?1
+           AND s.source IN ({lib}) AND s.unavailable = 0
+           AND NOT EXISTS (
+               SELECT 1 FROM stats_exclusions se
+               WHERE se.entity_type = 'song' AND se.entity_key = CAST(s.id AS TEXT)
+           )
+         GROUP BY s.id
+         ORDER BY total_secs DESC, play_count DESC, s.title COLLATE NOCASE ASC
+         LIMIT ?2",
+        lib = *LIBRARY_SOURCES_SQL
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt
+        .query_map(params![range_start, limit], |row| {
+            let song_id: i64 = row.get(0)?;
+            let total_secs: i64 = row.get(5)?;
+            Ok(StatsTopItem {
+                key: song_id.to_string(),
+                label: row.get::<_, Option<String>>(1)?.unwrap_or_default(),
+                secondary: row.get(2)?,
+                play_count: row.get(3)?,
+                minutes: total_secs / 60,
+                excluded: false,
+                album: row.get(4)?,
+                song_id: Some(song_id),
+                sample_song_id: None,
+                art_embedded: row.get::<_, bool>(6)?,
+                art_automatic: row.get(7)?,
+                art_manual: row.get(8)?,
+                year: row.get(9)?,
+                rating: row.get::<_, Option<f32>>(10)?.unwrap_or(crate::stats::RATING_UNRATED),
+            })
+        })?
+        .filter_map(|r| r.ok())
+        .collect();
+    Ok(rows)
+}
+
+/// Top albums aggregated by total listening time (#951) across all tracks belonging
+/// to that album in the given range.
+pub fn top_albums(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>> {
+    top_albums_with_limit(conn, range_start, TOP_N)
+}
+
+pub fn top_albums_with_limit(
+    conn: &Connection,
+    range_start: i64,
+    limit: i64,
+) -> Result<Vec<StatsTopItem>> {
+    let sql = format!(
+        "SELECT s.album,
+                MIN(COALESCE(NULLIF(s.album_artist, ''), s.artist, '')),
+                COUNT(*) AS play_count,
+                COALESCE(SUM(COALESCE(NULLIF(ph.duration_secs, 0), s.length_nanosec / 1000000000, 0)), 0) AS total_secs,
+                (
+                    SELECT s_sample.id
+                    FROM songs s_sample
+                    WHERE s_sample.album = s.album
+                      AND s_sample.source IN ({lib}) AND s_sample.unavailable = 0
+                    ORDER BY (s_sample.art_manual IS NOT NULL OR s_sample.art_automatic IS NOT NULL OR s_sample.art_embedded = 1) DESC,
+                             s_sample.disc ASC, s_sample.track ASC, s_sample.id ASC
+                    LIMIT 1
+                ) AS sample_song_id,
+                (
+                    SELECT s_sample.art_embedded
+                    FROM songs s_sample
+                    WHERE s_sample.album = s.album
+                      AND s_sample.source IN ({lib}) AND s_sample.unavailable = 0
+                    ORDER BY (s_sample.art_manual IS NOT NULL OR s_sample.art_automatic IS NOT NULL OR s_sample.art_embedded = 1) DESC,
+                             s_sample.disc ASC, s_sample.track ASC, s_sample.id ASC
+                    LIMIT 1
+                ) AS art_embedded,
+                (
+                    SELECT s_sample.art_automatic
+                    FROM songs s_sample
+                    WHERE s_sample.album = s.album
+                      AND s_sample.source IN ({lib}) AND s_sample.unavailable = 0
+                    ORDER BY (s_sample.art_manual IS NOT NULL OR s_sample.art_automatic IS NOT NULL OR s_sample.art_embedded = 1) DESC,
+                             s_sample.disc ASC, s_sample.track ASC, s_sample.id ASC
+                    LIMIT 1
+                ) AS art_automatic,
+                (
+                    SELECT s_sample.art_manual
+                    FROM songs s_sample
+                    WHERE s_sample.album = s.album
+                      AND s_sample.source IN ({lib}) AND s_sample.unavailable = 0
+                    ORDER BY (s_sample.art_manual IS NOT NULL OR s_sample.art_automatic IS NOT NULL OR s_sample.art_embedded = 1) DESC,
+                             s_sample.disc ASC, s_sample.track ASC, s_sample.id ASC
+                    LIMIT 1
+                ) AS art_manual,
+                MIN(s.year) AS year
+         FROM play_history ph
+         JOIN songs s ON s.id = ph.song_id
+         WHERE ph.played_at >= ?1
+           AND s.source IN ({lib}) AND s.unavailable = 0
+           AND s.album IS NOT NULL AND s.album != ''
+           AND NOT EXISTS (
+               SELECT 1 FROM stats_exclusions se
+               WHERE se.entity_type = 'album' AND se.entity_key = s.album COLLATE NOCASE
+           )
+         GROUP BY s.album COLLATE NOCASE
+         ORDER BY total_secs DESC, play_count DESC, s.album COLLATE NOCASE ASC
+         LIMIT ?2",
+        lib = *LIBRARY_SOURCES_SQL
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let mut rows: Vec<StatsTopItem> = stmt
+        .query_map(params![range_start, limit], |row| {
+            let album_name: String = row.get(0)?;
+            let total_secs: i64 = row.get(3)?;
+            Ok(StatsTopItem {
+                key: album_name.clone(),
+                label: album_name,
+                secondary: row.get(1)?,
+                play_count: row.get(2)?,
+                minutes: total_secs / 60,
+                excluded: false,
+                album: None,
+                song_id: None,
+                sample_song_id: row.get(4)?,
+                art_embedded: row.get::<_, Option<bool>>(5)?.unwrap_or(false),
+                art_automatic: row.get(6)?,
+                art_manual: row.get(7)?,
+                year: row.get(8)?,
+                rating: crate::stats::RATING_UNRATED,
+            })
+        })?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    for item in &mut rows {
+        item.rating = crate::stats::get_album_rating(conn, &item.key).unwrap_or(crate::stats::RATING_UNRATED);
+    }
+
+    Ok(rows)
+}
+
+fn top_artists(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>> {
+    let sql = format!(
+        "SELECT COALESCE(NULLIF(s.album_artist, ''), s.artist, '') AS effective_artist,
+                COUNT(*) AS play_count,
+                COALESCE(SUM(COALESCE(NULLIF(ph.duration_secs, 0), s.length_nanosec / 1000000000, 0)), 0) AS total_secs
+         FROM play_history ph
+         JOIN songs s ON s.id = ph.song_id
+         WHERE ph.played_at >= ?1
+           AND s.source IN ({lib}) AND s.unavailable = 0
+           AND COALESCE(NULLIF(s.album_artist, ''), s.artist, '') != ''
+           AND NOT EXISTS (
+               SELECT 1 FROM stats_exclusions se
+               WHERE se.entity_type = 'artist'
+                 AND se.entity_key = COALESCE(NULLIF(s.album_artist, ''), s.artist, '') COLLATE NOCASE
+           )
+         GROUP BY effective_artist COLLATE NOCASE
+         ORDER BY total_secs DESC, play_count DESC, effective_artist COLLATE NOCASE ASC
+         LIMIT ?2",
+        lib = *LIBRARY_SOURCES_SQL
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt
+        .query_map(params![range_start, TOP_N], |row| {
+            let total_secs: i64 = row.get(2)?;
+            Ok(StatsTopItem::new(
+                row.get(0)?,
+                row.get(0)?,
+                None,
+                row.get(1)?,
+                total_secs / 60,
+                None,
+            ))
+        })?
+        .filter_map(|r| r.ok())
+        .collect();
+    Ok(rows)
+}
+
+/// `songs.genre` is a `; `-delimited multi-value string (see
+/// `crate::models::parse_multi_value`/`crate::tags::TagManager`), so genre
+/// counting can't be a plain SQL `GROUP BY` — each play's duration is attributed
+/// to every genre tag on its song, then summed and ranked by listening time in Rust (#951).
+fn top_genres(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>> {
+    let sql = format!(
+        "SELECT s.genre,
+                COALESCE(NULLIF(ph.duration_secs, 0), s.length_nanosec / 1000000000, 0) AS duration_secs
+         FROM play_history ph
+         JOIN songs s ON s.id = ph.song_id
+         WHERE ph.played_at >= ?1
+           AND s.source IN ({lib}) AND s.unavailable = 0
+           AND s.genre IS NOT NULL AND s.genre != ''",
+        lib = *LIBRARY_SOURCES_SQL
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let genre_rows: Vec<(String, i64)> = stmt
+        .query_map(params![range_start], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+        })?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    let excluded_genres = excluded_keys(conn, "genre")?;
+
+    #[derive(Default)]
+    struct GenreAccumulator {
+        play_count: i64,
+        total_secs: i64,
+    }
+
+    let mut counts: std::collections::HashMap<String, GenreAccumulator> =
+        std::collections::HashMap::new();
+    for (raw, duration_secs) in genre_rows {
+        for genre in parse_multi_value(&raw) {
+            if excluded_genres.contains(&genre.to_lowercase()) {
+                continue;
+            }
+            let entry = counts.entry(genre).or_default();
+            entry.play_count += 1;
+            entry.total_secs += duration_secs;
+        }
+    }
+
+    let mut ranked: Vec<(String, GenreAccumulator)> = counts.into_iter().collect();
+    ranked.sort_by(|a, b| {
+        b.1.total_secs
+            .cmp(&a.1.total_secs)
+            .then_with(|| b.1.play_count.cmp(&a.1.play_count))
+            .then_with(|| a.0.cmp(&b.0))
+    });
+    ranked.truncate(TOP_N as usize);
+
+    Ok(ranked
+        .into_iter()
+        .map(|(genre, acc)| {
+            StatsTopItem::new(
+                genre.clone(),
+                genre,
+                None,
+                acc.play_count,
+                acc.total_secs / 60,
+                None,
+            )
+        })
+        .collect())
+}
+
+fn excluded_keys(
+    conn: &Connection,
+    entity_type: &str,
+) -> Result<std::collections::HashSet<String>> {
+    let mut stmt =
+        conn.prepare("SELECT entity_key FROM stats_exclusions WHERE entity_type = ?1")?;
+    let keys = stmt
+        .query_map(params![entity_type], |row| row.get::<_, String>(0))?
+        .filter_map(|r| r.ok())
+        .map(|k| k.to_lowercase())
+        .collect();
+    Ok(keys)
+}
+
+/// Raw `played_at` timestamps for every non-excluded, in-range play, for the
+/// frontend to bucket into a local-time listening clock. Bucketing happens
+/// client-side (`new Date(ts * 1000).getHours()`) rather than via a
+/// server-side UTC-offset param — simpler, no DST logic, and immune to
+/// stale-offset bugs if the user's timezone changes between listen-time and
+/// view-time.
+fn play_timestamps(conn: &Connection, range_start: i64) -> Result<Vec<i64>> {
+    let sql = format!(
+        "SELECT ph.played_at
+         FROM play_history ph
+         JOIN songs s ON s.id = ph.song_id
+         WHERE ph.played_at >= ?1
+           AND s.source IN ({lib}) AND s.unavailable = 0
+           AND NOT EXISTS (
+               SELECT 1 FROM stats_exclusions se
+               WHERE se.entity_type = 'song' AND se.entity_key = CAST(s.id AS TEXT)
+           )",
+        lib = *LIBRARY_SOURCES_SQL
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt
+        .query_map(params![range_start], |row| row.get(0))?
+        .filter_map(|r| r.ok())
+        .collect();
+    Ok(rows)
+}
+
+/// Total minutes listened across every in-range, non-excluded play — same
+/// exclusion/library filtering as `play_timestamps`, rounded down to whole
+/// minutes.
+fn total_minutes(conn: &Connection, range_start: i64) -> Result<i64> {
+    let sql = format!(
+        "SELECT COALESCE(SUM(COALESCE(NULLIF(ph.duration_secs, 0), s.length_nanosec / 1000000000, 0)), 0)
+         FROM play_history ph
+         JOIN songs s ON s.id = ph.song_id
+         WHERE ph.played_at >= ?1
+           AND s.source IN ({lib}) AND s.unavailable = 0
+           AND NOT EXISTS (
+               SELECT 1 FROM stats_exclusions se
+               WHERE se.entity_type = 'song' AND se.entity_key = CAST(s.id AS TEXT)
+           )",
+        lib = *LIBRARY_SOURCES_SQL
+    );
+    let total_secs: i64 = conn.query_row(&sql, params![range_start], |row| row.get(0))?;
+    Ok(total_secs / 60)
+}
+
+/// Raw `(played_at, duration_secs)` pairs for every non-excluded play since
+/// `since_unix`, for the daily listening heatmap (#890) to bucket into local
+/// calendar days and sum minutes played client-side — same rationale as
+/// `play_timestamps` above (no server-side UTC-offset day math).
+pub fn listening_activity(conn: &Connection, since_unix: i64) -> Result<Vec<ListenEvent>> {
+    let sql = format!(
+        "SELECT ph.played_at, COALESCE(NULLIF(ph.duration_secs, 0), s.length_nanosec / 1000000000, 0)
+         FROM play_history ph
+         JOIN songs s ON s.id = ph.song_id
+         WHERE ph.played_at >= ?1
+           AND s.source IN ({lib}) AND s.unavailable = 0
+           AND NOT EXISTS (
+               SELECT 1 FROM stats_exclusions se
+               WHERE se.entity_type = 'song' AND se.entity_key = CAST(s.id AS TEXT)
+           )",
+        lib = *LIBRARY_SOURCES_SQL
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt
+        .query_map(params![since_unix], |row| {
+            Ok(ListenEvent {
+                played_at: row.get(0)?,
+                duration_secs: row.get(1)?,
+            })
+        })?
+        .filter_map(|r| r.ok())
+        .collect();
+    Ok(rows)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::Database;
+
+    fn test_db() -> (Database, std::path::PathBuf) {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_stats_summary_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        (Database::new(temp_dir.clone()).unwrap(), temp_dir)
+    }
+
+    fn insert_song(
+        conn: &Connection,
+        path: &str,
+        title: &str,
+        artist: &str,
+        album: &str,
+        genre: &str,
+    ) -> i64 {
+        conn.execute(
+            "INSERT INTO songs (path, title, artist, album, genre, source, unavailable)
+             VALUES (?1, ?2, ?3, ?4, ?5, 1, 0)",
+            params![path, title, artist, album, genre],
+        )
+        .unwrap();
+        conn.last_insert_rowid()
+    }
+
+    fn insert_play(conn: &Connection, song_id: i64, played_at: i64) {
+        insert_play_with_duration(conn, song_id, played_at, 0);
+    }
+
+    fn insert_play_with_duration(
+        conn: &Connection,
+        song_id: i64,
+        played_at: i64,
+        duration_secs: i64,
+    ) {
+        conn.execute(
+            "INSERT INTO play_history (context_type, song_id, played_at, duration_secs) VALUES ('song', ?1, ?2, ?3)",
+            params![song_id, played_at, duration_secs],
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn test_range_start_unix() {
+        let now = 1_700_000_000;
+        assert_eq!(
+            range_start_unix(StatsRange::SevenDays, now),
+            now - 7 * SECONDS_PER_DAY
+        );
+        assert_eq!(
+            range_start_unix(StatsRange::TwentyEightDays, now),
+            now - 28 * SECONDS_PER_DAY
+        );
+        assert_eq!(
+            range_start_unix(StatsRange::OneYear, now),
+            now - 365 * SECONDS_PER_DAY
+        );
+    }
+
+    #[test]
+    fn test_stats_range_parse() {
+        assert_eq!(StatsRange::parse("7d"), Some(StatsRange::SevenDays));
+        assert_eq!(StatsRange::parse("28d"), Some(StatsRange::TwentyEightDays));
+        assert_eq!(StatsRange::parse("1y"), Some(StatsRange::OneYear));
+        assert_eq!(StatsRange::parse("bogus"), None);
+    }
+
+    #[test]
+    fn test_top_songs_excludes_out_of_range_and_flagged_songs() {
+        let (db, dir) = test_db();
+        let conn = db.pool.get().unwrap();
+        let now = 1_700_000_000;
+        let range_start = range_start_unix(StatsRange::SevenDays, now);
+
+        let in_range = insert_song(&conn, "/a.flac", "In Range", "Artist A", "Album A", "Rock");
+        let out_of_range = insert_song(&conn, "/b.flac", "Out", "Artist B", "Album B", "Pop");
+        let excluded = insert_song(&conn, "/c.flac", "Excluded", "Artist C", "Album C", "Jazz");
+
+        insert_play(&conn, in_range, range_start + 10);
+        insert_play(&conn, out_of_range, range_start - 10);
+        insert_play(&conn, excluded, range_start + 10);
+        conn.execute(
+            "INSERT INTO stats_exclusions (entity_type, entity_key) VALUES ('song', ?1)",
+            params![excluded.to_string()],
+        )
+        .unwrap();
+
+        let songs = top_songs(&conn, range_start).unwrap();
+        let labels: Vec<&str> = songs.iter().map(|s| s.label.as_str()).collect();
+        assert_eq!(labels, vec!["In Range"]);
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_top_albums_sums_album_plays_and_minutes() {
+        let (db, dir) = test_db();
+        let conn = db.pool.get().unwrap();
+        let now = 1_700_000_000;
+        let range_start = range_start_unix(StatsRange::SevenDays, now);
+
+        // Track 1 played 5x (120s each = 600s), track 2 played 1x (60s).
+        // Total plays = 6, total minutes = 660 / 60 = 11.
+        let t1 = insert_song(&conn, "/t1.flac", "T1", "Artist", "Album", "Rock");
+        let t2 = insert_song(&conn, "/t2.flac", "T2", "Artist", "Album", "Rock");
+        for _ in 0..5 {
+            insert_play_with_duration(&conn, t1, range_start + 10, 120);
+        }
+        insert_play_with_duration(&conn, t2, range_start + 10, 60);
+
+        let albums = top_albums(&conn, range_start).unwrap();
+        assert_eq!(albums.len(), 1);
+        assert_eq!(albums[0].play_count, 6);
+        assert_eq!(albums[0].minutes, 11);
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_top_artists_ranks_by_duration() {
+        let (db, dir) = test_db();
+        let conn = db.pool.get().unwrap();
+        let now = 1_700_000_000;
+        let range_start = range_start_unix(StatsRange::SevenDays, now);
+
+        // Artist A: 1 play of 600s (10 min).
+        // Artist B: 3 plays of 60s (3 min total).
+        let s_a = insert_song(&conn, "/a.flac", "Song A", "Artist A", "Album A", "Rock");
+        let s_b = insert_song(&conn, "/b.flac", "Song B", "Artist B", "Album B", "Pop");
+
+        insert_play_with_duration(&conn, s_a, range_start + 10, 600);
+        for _ in 0..3 {
+            insert_play_with_duration(&conn, s_b, range_start + 10, 60);
+        }
+
+        let artists = top_artists(&conn, range_start).unwrap();
+        assert_eq!(artists.len(), 2);
+        assert_eq!(artists[0].label, "Artist A");
+        assert_eq!(artists[0].minutes, 10);
+        assert_eq!(artists[0].play_count, 1);
+
+        assert_eq!(artists[1].label, "Artist B");
+        assert_eq!(artists[1].minutes, 3);
+        assert_eq!(artists[1].play_count, 3);
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_top_albums_ranks_by_duration() {
+        let (db, dir) = test_db();
+        let conn = db.pool.get().unwrap();
+        let now = 1_700_000_000;
+        let range_start = range_start_unix(StatsRange::SevenDays, now);
+
+        // Album A: 1 play of 600s (10 min).
+        // Album B: 4 plays of 60s (4 min total).
+        let s_a = insert_song(&conn, "/a.flac", "Song A", "Artist A", "Album A", "Rock");
+        let s_b = insert_song(&conn, "/b.flac", "Song B", "Artist B", "Album B", "Pop");
+
+        insert_play_with_duration(&conn, s_a, range_start + 10, 600);
+        for _ in 0..4 {
+            insert_play_with_duration(&conn, s_b, range_start + 10, 60);
+        }
+
+        let albums = top_albums(&conn, range_start).unwrap();
+        assert_eq!(albums.len(), 2);
+        assert_eq!(albums[0].label, "Album A");
+        assert_eq!(albums[0].minutes, 10);
+        assert_eq!(albums[0].play_count, 1);
+
+        assert_eq!(albums[1].label, "Album B");
+        assert_eq!(albums[1].minutes, 4);
+        assert_eq!(albums[1].play_count, 4);
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_top_genres_ranks_by_duration() {
+        let (db, dir) = test_db();
+        let conn = db.pool.get().unwrap();
+        let now = 1_700_000_000;
+        let range_start = range_start_unix(StatsRange::SevenDays, now);
+
+        // Genre Rock: 1 play of 600s (10 min).
+        // Genre Pop: 3 plays of 60s (3 min total).
+        let s_rock = insert_song(&conn, "/rock.flac", "Rock Song", "Artist", "Album", "Rock");
+        let s_pop = insert_song(&conn, "/pop.flac", "Pop Song", "Artist", "Album", "Pop");
+
+        insert_play_with_duration(&conn, s_rock, range_start + 10, 600);
+        for _ in 0..3 {
+            insert_play_with_duration(&conn, s_pop, range_start + 10, 60);
+        }
+
+        let genres = top_genres(&conn, range_start).unwrap();
+        assert_eq!(genres.len(), 2);
+        assert_eq!(genres[0].label, "Rock");
+        assert_eq!(genres[0].minutes, 10);
+        assert_eq!(genres[0].play_count, 1);
+
+        assert_eq!(genres[1].label, "Pop");
+        assert_eq!(genres[1].minutes, 3);
+        assert_eq!(genres[1].play_count, 3);
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_top_songs_ranks_by_duration() {
+        let (db, dir) = test_db();
+        let conn = db.pool.get().unwrap();
+        let now = 1_700_000_000;
+        let range_start = range_start_unix(StatsRange::SevenDays, now);
+
+        // Song A: 1 play of 600s (10 min).
+        // Song B: 4 plays of 60s (4 min total).
+        let s_a = insert_song(&conn, "/a.flac", "Song A", "Artist A", "Album A", "Rock");
+        let s_b = insert_song(&conn, "/b.flac", "Song B", "Artist B", "Album B", "Pop");
+
+        insert_play_with_duration(&conn, s_a, range_start + 10, 600);
+        for _ in 0..4 {
+            insert_play_with_duration(&conn, s_b, range_start + 10, 60);
+        }
+
+        let songs = top_songs(&conn, range_start).unwrap();
+        assert_eq!(songs.len(), 2);
+        assert_eq!(songs[0].label, "Song A");
+        assert_eq!(songs[0].minutes, 10);
+        assert_eq!(songs[0].play_count, 1);
+
+        assert_eq!(songs[1].label, "Song B");
+        assert_eq!(songs[1].minutes, 4);
+        assert_eq!(songs[1].play_count, 4);
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_top_genres_splits_multi_value_and_respects_exclusions() {
+        let (db, dir) = test_db();
+        let conn = db.pool.get().unwrap();
+        let now = 1_700_000_000;
+        let range_start = range_start_unix(StatsRange::SevenDays, now);
+
+        let song = insert_song(
+            &conn,
+            "/multi.flac",
+            "Multi",
+            "Artist",
+            "Album",
+            "Metal; Symphonic Metal",
+        );
+        insert_play(&conn, song, range_start + 10);
+        conn.execute(
+            "INSERT INTO stats_exclusions (entity_type, entity_key) VALUES ('genre', 'symphonic metal')",
+            params![],
+        )
+        .unwrap();
+
+        let genres = top_genres(&conn, range_start).unwrap();
+        let labels: Vec<&str> = genres.iter().map(|g| g.label.as_str()).collect();
+        assert_eq!(labels, vec!["Metal"]);
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_listening_activity_excludes_out_of_range_and_flagged_songs() {
+        let (db, dir) = test_db();
+        let conn = db.pool.get().unwrap();
+        let now = 1_700_000_000;
+        let range_start = range_start_unix(StatsRange::SevenDays, now);
+
+        let in_range = insert_song(&conn, "/d.flac", "In Range", "Artist D", "Album D", "Rock");
+        let out_of_range = insert_song(&conn, "/e.flac", "Out", "Artist E", "Album E", "Pop");
+        let excluded = insert_song(&conn, "/f.flac", "Excluded", "Artist F", "Album F", "Jazz");
+
+        insert_play_with_duration(&conn, in_range, range_start + 10, 200);
+        insert_play_with_duration(&conn, out_of_range, range_start - 10, 200);
+        insert_play_with_duration(&conn, excluded, range_start + 10, 200);
+        conn.execute(
+            "INSERT INTO stats_exclusions (entity_type, entity_key) VALUES ('song', ?1)",
+            params![excluded.to_string()],
+        )
+        .unwrap();
+
+        let events = listening_activity(&conn, range_start).unwrap();
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].played_at, range_start + 10);
+        assert_eq!(events[0].duration_secs, 200);
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_get_summary_at_returns_all_sections() {
+        let (db, dir) = test_db();
+        let conn = db.pool.get().unwrap();
+        let now = 1_700_000_000;
+        let range_start = range_start_unix(StatsRange::SevenDays, now);
+
+        let song = insert_song(&conn, "/s.flac", "Song", "Artist", "Album", "Rock");
+        insert_play_with_duration(&conn, song, range_start + 10, 180);
+
+        let summary = get_summary_at(&conn, StatsRange::SevenDays, now).unwrap();
+        assert_eq!(summary.range, "7d");
+        assert_eq!(summary.top_songs.len(), 1);
+        assert_eq!(summary.top_albums.len(), 1);
+        assert_eq!(summary.top_artists.len(), 1);
+        assert_eq!(summary.top_genres.len(), 1);
+        assert_eq!(summary.play_timestamps, vec![range_start + 10]);
+        assert_eq!(summary.total_minutes, 3);
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_total_minutes_excludes_out_of_range_and_flagged_songs() {
+        let (db, dir) = test_db();
+        let conn = db.pool.get().unwrap();
+        let now = 1_700_000_000;
+        let range_start = range_start_unix(StatsRange::SevenDays, now);
+
+        let in_range = insert_song(&conn, "/g.flac", "In Range", "Artist G", "Album G", "Rock");
+        let out_of_range = insert_song(&conn, "/h.flac", "Out", "Artist H", "Album H", "Pop");
+        let excluded = insert_song(&conn, "/i.flac", "Excluded", "Artist I", "Album I", "Jazz");
+
+        insert_play_with_duration(&conn, in_range, range_start + 10, 120);
+        insert_play_with_duration(&conn, out_of_range, range_start - 10, 600);
+        insert_play_with_duration(&conn, excluded, range_start + 10, 600);
+        conn.execute(
+            "INSERT INTO stats_exclusions (entity_type, entity_key) VALUES ('song', ?1)",
+            params![excluded.to_string()],
+        )
+        .unwrap();
+
+        assert_eq!(total_minutes(&conn, range_start).unwrap(), 2);
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_top_albums_and_songs_populate_art_and_ratings() {
+        let (db, dir) = test_db();
+        let conn = db.pool.get().unwrap();
+        let now = 1_700_000_000;
+        let range_start = range_start_unix(StatsRange::SevenDays, now);
+
+        let song_id = insert_song(&conn, "/art.flac", "Art Song", "Art Artist", "Art Album", "Rock");
+        conn.execute(
+            "UPDATE songs SET art_embedded = 1, art_manual = 'cover.jpg', year = 2024, rating = 4.5 WHERE id = ?1",
+            params![song_id],
+        ).unwrap();
+        crate::stats::set_album_rating(&conn, "Art Album", 5.0).unwrap();
+
+        insert_play_with_duration(&conn, song_id, range_start + 10, 180);
+
+        let songs = top_songs(&conn, range_start).unwrap();
+        assert_eq!(songs.len(), 1);
+        assert_eq!(songs[0].song_id, Some(song_id));
+        assert_eq!(songs[0].art_embedded, true);
+        assert_eq!(songs[0].art_manual.as_deref(), Some("cover.jpg"));
+        assert_eq!(songs[0].year, Some(2024));
+        assert_eq!(songs[0].rating, 4.5);
+
+        let albums = top_albums(&conn, range_start).unwrap();
+        assert_eq!(albums.len(), 1);
+        assert_eq!(albums[0].sample_song_id, Some(song_id));
+        assert_eq!(albums[0].art_embedded, true);
+        assert_eq!(albums[0].art_manual.as_deref(), Some("cover.jpg"));
+        assert_eq!(albums[0].year, Some(2024));
+        assert_eq!(albums[0].rating, 5.0);
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+}

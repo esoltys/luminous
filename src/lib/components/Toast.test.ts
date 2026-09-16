@@ -95,4 +95,22 @@ describe("Toast.svelte", () => {
 
     expect(screen.queryByLabelText("Copié dans le presse-papiers")).toBeInTheDocument();
   });
+
+  it("renders a toast action button and invokes its callback on click without dismissing the toast", async () => {
+    const onClick = vi.fn();
+    const id = toastStore.show("Update downloaded — restart to finish installing.", "success", undefined, undefined, {
+      label: "Restart to Update",
+      onClick,
+    });
+
+    render(Toast);
+
+    const actionBtn = screen.getByText("Restart to Update");
+    expect(actionBtn).toBeInTheDocument();
+
+    await fireEvent.click(actionBtn);
+
+    expect(onClick).toHaveBeenCalledTimes(1);
+    expect(toastStore.messages.find((m) => m.id === id)).toBeDefined();
+  });
 });

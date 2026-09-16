@@ -6,6 +6,7 @@ import { collectionStore } from "../stores/collection.svelte";
 import { navigationStore } from "../stores/navigation.svelte";
 import { playerStore } from "../stores/player.svelte";
 import { playlistsStore } from "../stores/playlists.svelte";
+import { picardStore } from "../stores/picard.svelte";
 import { invoke } from "@tauri-apps/api/core";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -140,4 +141,80 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     expect(addSongsSpy).toHaveBeenCalledWith([1, 2]);
     expect(invoke).toHaveBeenCalledWith("add_songs_to_queue", { songIds: [1, 2] });
   });
+
+  it("renders genre chips on their own line and begins year on the next line", async () => {
+    const songsWithGenreAndYear = [
+      {
+        id: 1,
+        title: "Song 1",
+        artist: "Krisu",
+        album: "Oxygen for a Dying World",
+        genre: "Electronic; Chill Out; Trip-Hop; Lounge",
+        year: 2024,
+        length_nanosec: 259_000_000_000,
+      },
+    ];
+
+    vi.mocked(invoke).mockImplementation((cmd: string) => {
+      if (cmd === "get_songs_by_album") {
+        return Promise.resolve(songsWithGenreAndYear);
+      }
+      return Promise.resolve([]);
+    });
+
+    const { getByText, getAllByText } = render(AlbumDetailView, {
+      props: { albumName: "Oxygen for a Dying World" },
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // Verify genre chips are rendered
+    const electronicChip = getByText("Electronic");
+    const chillOutChip = getByText("Chill Out");
+    expect(electronicChip).toBeInTheDocument();
+    expect(chillOutChip).toBeInTheDocument();
+
+    // Verify genre container is distinct from the metadata container with year
+    const genreContainer = electronicChip.closest("div.flex.flex-wrap.gap-1");
+    expect(genreContainer).not.toBeNull();
+
+    const yearElements = getAllByText("2024");
+    expect(yearElements.length).toBeGreaterThan(0);
+    const headerYear = yearElements[0];
+    expect(headerYear).toBeInTheDocument();
+    expect(genreContainer?.contains(headerYear)).toBe(false);
+
+    // The metadata row starts with the year
+    const metadataRow = headerYear.closest("div.flex.flex-wrap.items-center");
+    expect(metadataRow).not.toBeNull();
+    expect(metadataRow?.firstElementChild).toBe(headerYear);
+  });
+
+  it("opens overflow menu with a single Edit Album Details entry and Open in Picard", async () => {
+    picardStore.path = "/mock/picard";
+    const { getByTitle, getByText, queryByText, getAllByText } = render(AlbumDetailView, {
+      props: { albumName: mockAlbumName },
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(queryByText("Open in Picard")).toBeNull();
+
+    const moreBtn = getByTitle("More actions");
+    await fireEvent.click(moreBtn);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // Regression test for #962: there used to be two near-identical "Edit
+    // Album..." entries here (one writing embedded genre, one writing a
+    // separate curated tag list) that silently disagreed with each other.
+    // Now there's exactly one.
+    const editItems = getAllByText("Edit Album Details");
+    expect(editItems.length).toBe(1);
+    const picardItem = getByText("Open in Picard");
+    expect(picardItem).toBeInTheDocument();
+
+    await fireEvent.click(picardItem);
+    expect(invoke).toHaveBeenCalledWith("open_in_picard", { songIds: [1, 2] });
+  });
 });
+

@@ -2,7 +2,7 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Luminous Music Player",
   "mainBinaryName": "LuminousMusicPlayer",
-  "version": "1.8.0",
+  "version": "2.0.0",
   "identifier": "org.luminous.music",
   "build": {
     "beforeDevCommand": "bun run dev",
@@ -23,7 +23,7 @@
         "transparent": false,
         "center": true,
         "dragDropEnabled": true,
-        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,CalculateNativeWinOcclusion"
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,CalculateNativeWinOcclusion --disable-renderer-backgrounding --disable-backgrounding-occluded-windows --disable-background-timer-throttling"
       }
     ],
     "security": {

@@ -5,13 +5,20 @@
   import { onDestroy } from "svelte";
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
+  import { open, save } from "@tauri-apps/plugin-dialog";
   import {
     PaletteIcon as Palette,
     TrashIcon as Trash2,
     ArrowCounterClockwiseIcon as RotateCcw,
     SunIcon as Sun,
-    MoonIcon as Moon
+    MoonIcon as Moon,
+    SlidersHorizontalIcon as SlidersHorizontal,
+    FolderOpenIcon as FolderInput,
+    ExportIcon as FileOutput
   } from "phosphor-svelte";
+
+  const COLOR_SCHEME_MODES = ["light", "dark", "system"] as const;
+  type ColorSchemeMode = (typeof COLOR_SCHEME_MODES)[number];
 
   let editingThemeId = $state<string | null>(null);
 
@@ -35,7 +42,7 @@
   // use the current system scheme so its swatch matches what's on screen.
   function getPreviewColors(theme: Theme): ThemeColors {
     if (theme.id === "system") {
-      return themeStore.systemColorScheme === "dark" ? LUMINOUS_DARK_COLORS : LUMINOUS_LIGHT_COLORS;
+      return themeStore.effectiveColorScheme === "dark" ? LUMINOUS_DARK_COLORS : LUMINOUS_LIGHT_COLORS;
     }
     if (theme.id === "dynamic-artwork") {
       return themeStore.resolvedColors;
@@ -51,12 +58,14 @@
     }
   }
 
+  let isUserEditingBuilder = $state(false);
+
   // Pre-fill theme builder with current active theme colors on mount and
   // updates — skipped while editing an existing custom theme, since that
   // case is seeded from the theme being edited instead (below).
   $effect(() => {
     const colors = themeStore.resolvedColors;
-    if (!editingThemeId) {
+    if (!editingThemeId && !isUserEditingBuilder) {
       customColors = { ...colors };
     }
   });
@@ -69,11 +78,12 @@
     if (editingTheme) {
       newThemeName = editingTheme.name;
       customColors = { ...editingTheme.colors };
+      isUserEditingBuilder = true;
     }
   });
 
   $effect(() => {
-    if (customColors) {
+    if (customColors && (isUserEditingBuilder || editingThemeId !== null)) {
       // deep read to trigger reactivity
       const _ = customColors["bg-main"] + customColors["bg-sidebar"] + customColors["bg-playerbar"] + customColors["color-accent"] + customColors["color-accent-hover"] + customColors["color-border"];
       themeStore.applyThemeColorsPreview(customColors);
@@ -100,6 +110,7 @@
         isCustom: true
       });
       editingThemeId = null;
+      isUserEditingBuilder = false;
     } else {
       const id = "custom-" + newThemeName.toLowerCase().replace(/[^a-z0-9]/g, "-");
       await themeStore.addCustomTheme({
@@ -109,6 +120,41 @@
         isCustom: true
       });
       newThemeName = "";
+      isUserEditingBuilder = false;
+    }
+  }
+
+  async function handleImportTheme() {
+    try {
+      const selected = await open({
+        multiple: false,
+        title: i18n.t('settings.importTheme'),
+        filters: [{ name: "Theme (*.json)", extensions: ["json"] }],
+      });
+      if (selected && typeof selected === "string") {
+        const imported = await themeStore.importTheme(selected);
+        toastStore.show(i18n.t('settings.themeImportSuccess', { name: imported.name }));
+      }
+    } catch (err) {
+      console.error("Failed to import theme:", err);
+      toastStore.show(i18n.t('settings.themeImportError', { error: String(err) }));
+    }
+  }
+
+  async function handleExportTheme(theme: Theme) {
+    try {
+      const savePath = await save({
+        title: i18n.t('settings.exportTheme'),
+        defaultPath: `${theme.name}.json`,
+        filters: [{ name: "Theme (*.json)", extensions: ["json"] }],
+      });
+      if (savePath && typeof savePath === "string") {
+        await themeStore.exportTheme(theme, savePath);
+        toastStore.show(i18n.t('settings.themeExportSuccess', { name: theme.name }));
+      }
+    } catch (err) {
+      console.error("Failed to export theme:", err);
+      toastStore.show(i18n.t('settings.themeExportError', { error: String(err) }));
     }
   }
 </script>
@@ -132,24 +178,44 @@
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
       {#each DYNAMIC_THEMES as theme}
         {@const previewColors = getPreviewColors(theme)}
-        <button
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <div
           onclick={() => themeStore.setTheme(theme.id)}
+          role="button"
+          tabindex="0"
           class="bg-brand-main/50 border-2 rounded-xl p-4 flex flex-col items-start gap-3 text-left transition-colors duration-200 group hover:border-brand-accent/40 w-full relative {themeStore.activeThemeId === theme.id ? 'border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border/60'}"
         >
           <div class="flex items-center justify-between w-full">
             <span class="font-semibold text-sm text-brand-text-primary flex items-center gap-1.5">
-              {#if theme.id === 'system'}
-                <span title={themeStore.systemColorScheme === 'dark' ? i18n.t('settings.systemThemeDark') : i18n.t('settings.systemThemeLight')}>
-                  {#if themeStore.systemColorScheme === 'dark'}
-                    <Moon class="w-3.5 h-3.5 text-brand-text-secondary" />
-                  {:else}
-                    <Sun class="w-3.5 h-3.5 text-brand-text-secondary" />
-                  {/if}
-                </span>
-              {/if}
               {theme.isCustom ? theme.name : i18n.t('themes.' + theme.id, {}, theme.name)}
             </span>
           </div>
+          {#if theme.id === 'system'}
+            <div
+              role="group"
+              aria-label={i18n.t('settings.selectColorScheme', {}, 'Select Theme')}
+              class="flex items-center gap-0.5 w-full bg-brand-main/60 border border-brand-border/60 rounded-lg p-0.5"
+            >
+              {#each COLOR_SCHEME_MODES as mode (mode)}
+                <button
+                  type="button"
+                  onclick={(e) => { e.stopPropagation(); themeStore.setColorSchemeMode(mode); }}
+                  aria-pressed={themeStore.colorSchemeMode === mode}
+                  class="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-md text-[11px] font-semibold transition-colors {themeStore.colorSchemeMode === mode ? 'bg-brand-accent text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+                >
+                  {#if mode === 'light'}
+                    <Sun class="w-3.5 h-3.5" />
+                  {:else if mode === 'dark'}
+                    <Moon class="w-3.5 h-3.5" />
+                  {:else}
+                    <SlidersHorizontal class="w-3.5 h-3.5" />
+                  {/if}
+                  {i18n.t('settings.colorScheme' + mode.charAt(0).toUpperCase() + mode.slice(1))}
+                </button>
+              {/each}
+            </div>
+          {/if}
           <!-- Miniature colors preview matching 1-6 Theme Builder archetype order -->
           <div class="flex gap-0.5 w-full h-8 rounded-lg overflow-hidden border border-brand-border/40 bg-black/10">
             <div class="flex-1" style="background-color: {previewColors['bg-main']}" title={i18n.t('settings.mainViewLabel')}></div>
@@ -164,22 +230,22 @@
           {:else if theme.id === 'system'}
             <span class="text-xs text-brand-text-secondary leading-relaxed">{i18n.t('settings.systemFootnote', {}, 'Switches between light and dark to match your OS')}</span>
           {/if}
-        </button>
+        </div>
       {/each}
     </div>
   </div>
 
   <div>
     <h4 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase mb-3">{i18n.t('settings.predefinedThemes', {}, 'Predefined Themes')}</h4>
-    <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+    <div class="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4">
       {#each STATIC_PREDEFINED_THEMES as theme}
         {@const previewColors = getPreviewColors(theme)}
         <button
           onclick={() => themeStore.setTheme(theme.id)}
-          class="bg-brand-main/50 border-2 rounded-xl p-4 flex flex-col items-start gap-3 text-left transition-colors duration-200 group hover:border-brand-accent/40 w-full relative {themeStore.activeThemeId === theme.id ? 'border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border/60'}"
+          class="bg-brand-main/50 border-2 rounded-xl p-3.5 flex flex-col items-start gap-3 text-left transition-colors duration-200 group hover:border-brand-accent/40 w-full overflow-hidden relative {themeStore.activeThemeId === theme.id ? 'border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border/60'}"
         >
           <div class="flex items-center justify-between w-full">
-            <span class="font-semibold text-sm text-brand-text-primary flex items-center gap-1.5">
+            <span class="font-semibold text-sm text-brand-text-primary flex items-center gap-1.5 truncate">
               {theme.isCustom ? theme.name : i18n.t('themes.' + theme.id, {}, theme.name)}
             </span>
           </div>
@@ -199,8 +265,13 @@
 
   {#if themeStore.customThemes.length > 0}
     <div>
-      <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase mb-3">{i18n.t('settings.customThemes')}</h3>
-      <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase">{i18n.t('settings.customThemes')}</h3>
+        <Button onclick={handleImportTheme} variant="secondary" size="sm" class="h-7 text-xs">
+          <FolderInput class="w-3.5 h-3.5 text-brand-accent-text" /> {i18n.t('settings.importTheme')}
+        </Button>
+      </div>
+      <div class="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4">
         {#each themeStore.customThemes as theme}
           <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
           <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -208,7 +279,7 @@
             onclick={() => themeStore.setTheme(theme.id)}
             role="button"
             tabindex="0"
-            class="bg-brand-main/50 border-2 rounded-xl p-4 flex flex-col gap-3 text-left transition-colors w-full {themeStore.activeThemeId === theme.id ? 'border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border/60 hover:border-brand-border'}"
+            class="bg-brand-main/50 border-2 rounded-xl p-3.5 flex flex-col gap-3 text-left transition-colors w-full overflow-hidden {themeStore.activeThemeId === theme.id ? 'border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border/60 hover:border-brand-border'}"
           >
             <div class="flex items-center justify-between w-full">
               <span class="font-semibold text-sm text-brand-text-primary truncate">{theme.name}</span>
@@ -222,18 +293,27 @@
               <div class="flex-1" style="background-color: {theme.colors['color-accent-hover']}" title={i18n.t('settings.accentHoverLabel')}></div>
               <div class="flex-1" style="background-color: {theme.colors['color-border']}" title={i18n.t('settings.bordersLabel')}></div>
             </div>
-            <div class="flex gap-2">
+            <div class="flex items-center gap-1.5 w-full mt-auto">
               <button
                 onclick={(e) => { e.stopPropagation(); editingThemeId = theme.id; }}
-                class="flex-1 px-2 py-1 rounded text-xs font-semibold bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast transition-colors"
+                class="flex-1 min-w-0 py-1 px-1.5 rounded text-xs font-semibold bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast transition-colors truncate text-center"
                 title={i18n.t('settings.editTheme')}
               >
                 {i18n.t('settings.editThemeShort')}
               </button>
               <button
+                onclick={(e) => { e.stopPropagation(); handleExportTheme(theme); }}
+                class="p-1 shrink-0 rounded bg-brand-main hover:bg-brand-border text-brand-text-secondary hover:text-brand-text-primary border border-brand-border transition-colors flex items-center justify-center"
+                title={i18n.t('settings.exportTheme')}
+                aria-label={i18n.t('settings.exportTheme')}
+              >
+                <FileOutput class="w-3.5 h-3.5" />
+              </button>
+              <button
                 onclick={(e) => { e.stopPropagation(); themeStore.deleteCustomTheme(theme.id); }}
-                class="p-1 rounded bg-brand-main hover:bg-red-950/20 text-brand-text-secondary hover:text-red-400 border border-brand-border hover:border-red-900/30 transition-colors"
+                class="p-1 shrink-0 rounded bg-brand-main hover:bg-red-950/20 text-brand-text-secondary hover:text-red-400 border border-brand-border hover:border-red-900/30 transition-colors flex items-center justify-center"
                 title={i18n.t('settings.deleteTheme')}
+                aria-label={i18n.t('settings.deleteTheme')}
               >
                 <Trash2 class="w-3.5 h-3.5" />
               </button>
@@ -245,7 +325,7 @@
   {/if}
   </div>
 
-  <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
+  <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5 @container">
     <div class="flex items-center justify-between border-b border-brand-border pb-3">
       <div class="flex items-center gap-3">
         <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
@@ -255,15 +335,20 @@
           {editingTheme ? i18n.t('settings.editingThemeTitle', { name: editingTheme.name }) : i18n.t('settings.customThemeBuilderTitle')}
         </h4>
       </div>
-      {#if editingThemeId}
-        <Button onclick={() => { editingThemeId = null; themeStore.applyActiveTheme(); }} variant="secondary" size="sm">
-          {i18n.t('settings.cancel')}
+      <div class="flex items-center gap-2">
+        <Button onclick={handleImportTheme} variant="secondary" size="sm" class="h-8 text-xs">
+          <FolderInput class="w-3.5 h-3.5 text-brand-accent-text" /> {i18n.t('settings.importTheme')}
         </Button>
-      {/if}
+        {#if editingThemeId}
+          <Button onclick={() => { editingThemeId = null; isUserEditingBuilder = false; themeStore.applyActiveTheme(); }} variant="secondary" size="sm">
+            {i18n.t('settings.cancel')}
+          </Button>
+        {/if}
+      </div>
     </div>
 
     <div class="space-y-5">
-        <div class="flex flex-col md:flex-row gap-4 items-end justify-between">
+        <div class="flex flex-col sm:flex-row gap-4 sm:items-end justify-between">
           <div class="flex flex-col gap-1.5 flex-1 max-w-sm">
             <label for="theme-name-input" class="text-xs text-brand-text-secondary font-semibold">{i18n.t('settings.themeNameLabel')}</label>
             <Input
@@ -280,76 +365,76 @@
           </Button>
         </div>
 
-        <div class="grid grid-cols-2 md:grid-cols-3 gap-6 pt-2">
+        <div class="grid grid-cols-1 @md:grid-cols-2 @2xl:grid-cols-3 gap-x-6 gap-y-5 pt-2">
           <!-- Dark Muted (Main Background) -->
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-3 min-w-0">
             <div class="flex items-center rounded border border-brand-border bg-brand-main overflow-hidden shrink-0">
-              <input type="color" bind:value={customColors['bg-main']} class="w-9 h-9 bg-transparent border-none shrink-0" />
+              <input type="color" bind:value={customColors['bg-main']} class="w-9 h-9 bg-transparent border-none shrink-0 cursor-pointer" />
               <input type="text" bind:value={customColors['bg-main']} maxlength="7" class="w-16 h-9 px-2 text-[11px] bg-transparent text-brand-text-primary outline-none font-mono uppercase" />
             </div>
             <div class="flex flex-col min-w-0">
-              <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.mainViewLabel')}</span>
-              <span class="text-[10px] text-brand-text-secondary font-medium">{i18n.t('settings.mainViewDescription')}</span>
+              <span class="text-xs font-semibold text-brand-text-primary leading-snug">{i18n.t('settings.mainViewLabel')}</span>
+              <span class="text-[10px] text-brand-text-secondary font-medium leading-tight">{i18n.t('settings.mainViewDescription')}</span>
             </div>
           </div>
 
           <!-- Dark Vibrant (Sidebar Background) -->
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-3 min-w-0">
             <div class="flex items-center rounded border border-brand-border bg-brand-main overflow-hidden shrink-0">
-              <input type="color" bind:value={customColors['bg-sidebar']} class="w-9 h-9 bg-transparent border-none shrink-0" />
+              <input type="color" bind:value={customColors['bg-sidebar']} class="w-9 h-9 bg-transparent border-none shrink-0 cursor-pointer" />
               <input type="text" bind:value={customColors['bg-sidebar']} maxlength="7" class="w-16 h-9 px-2 text-[11px] bg-transparent text-brand-text-primary outline-none font-mono uppercase" />
             </div>
             <div class="flex flex-col min-w-0">
-              <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.sidebarLabel')}</span>
-              <span class="text-[10px] text-brand-text-secondary font-medium">{i18n.t('settings.sidebarDescription')}</span>
+              <span class="text-xs font-semibold text-brand-text-primary leading-snug">{i18n.t('settings.sidebarLabel')}</span>
+              <span class="text-[10px] text-brand-text-secondary font-medium leading-tight">{i18n.t('settings.sidebarDescription')}</span>
             </div>
           </div>
 
           <!-- Light Muted (Player Bar Background) -->
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-3 min-w-0">
             <div class="flex items-center rounded border border-brand-border bg-brand-main overflow-hidden shrink-0">
-              <input type="color" bind:value={customColors['bg-playerbar']} class="w-9 h-9 bg-transparent border-none shrink-0" />
+              <input type="color" bind:value={customColors['bg-playerbar']} class="w-9 h-9 bg-transparent border-none shrink-0 cursor-pointer" />
               <input type="text" bind:value={customColors['bg-playerbar']} maxlength="7" class="w-16 h-9 px-2 text-[11px] bg-transparent text-brand-text-primary outline-none font-mono uppercase" />
             </div>
             <div class="flex flex-col min-w-0">
-              <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.playerBarLabel')}</span>
-              <span class="text-[10px] text-brand-text-secondary font-medium">{i18n.t('settings.playerBarDescription')}</span>
+              <span class="text-xs font-semibold text-brand-text-primary leading-snug">{i18n.t('settings.playerBarLabel')}</span>
+              <span class="text-[10px] text-brand-text-secondary font-medium leading-tight">{i18n.t('settings.playerBarDescription')}</span>
             </div>
           </div>
 
           <!-- Vibrant (Accent Color) -->
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-3 min-w-0">
             <div class="flex items-center rounded border border-brand-border bg-brand-main overflow-hidden shrink-0">
-              <input type="color" bind:value={customColors['color-accent']} class="w-9 h-9 bg-transparent border-none shrink-0" />
+              <input type="color" bind:value={customColors['color-accent']} class="w-9 h-9 bg-transparent border-none shrink-0 cursor-pointer" />
               <input type="text" bind:value={customColors['color-accent']} maxlength="7" class="w-16 h-9 px-2 text-[11px] bg-transparent text-brand-text-primary outline-none font-mono uppercase" />
             </div>
             <div class="flex flex-col min-w-0">
-              <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.accentLabel')}</span>
-              <span class="text-[10px] text-brand-text-secondary font-medium">{i18n.t('settings.accentDescription')}</span>
+              <span class="text-xs font-semibold text-brand-text-primary leading-snug">{i18n.t('settings.accentLabel')}</span>
+              <span class="text-[10px] text-brand-text-secondary font-medium leading-tight">{i18n.t('settings.accentDescription')}</span>
             </div>
           </div>
 
           <!-- Light Vibrant (Accent Hover Color) -->
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-3 min-w-0">
             <div class="flex items-center rounded border border-brand-border bg-brand-main overflow-hidden shrink-0">
-              <input type="color" bind:value={customColors['color-accent-hover']} class="w-9 h-9 bg-transparent border-none shrink-0" />
+              <input type="color" bind:value={customColors['color-accent-hover']} class="w-9 h-9 bg-transparent border-none shrink-0 cursor-pointer" />
               <input type="text" bind:value={customColors['color-accent-hover']} maxlength="7" class="w-16 h-9 px-2 text-[11px] bg-transparent text-brand-text-primary outline-none font-mono uppercase" />
             </div>
             <div class="flex flex-col min-w-0">
-              <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.accentHoverLabel')}</span>
-              <span class="text-[10px] text-brand-text-secondary font-medium">{i18n.t('settings.accentHoverDescription')}</span>
+              <span class="text-xs font-semibold text-brand-text-primary leading-snug">{i18n.t('settings.accentHoverLabel')}</span>
+              <span class="text-[10px] text-brand-text-secondary font-medium leading-tight">{i18n.t('settings.accentHoverDescription')}</span>
             </div>
           </div>
 
           <!-- Muted (Border Color) -->
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-3 min-w-0">
             <div class="flex items-center rounded border border-brand-border bg-brand-main overflow-hidden shrink-0">
-              <input type="color" bind:value={customColors['color-border']} class="w-9 h-9 bg-transparent border-none shrink-0" />
+              <input type="color" bind:value={customColors['color-border']} class="w-9 h-9 bg-transparent border-none shrink-0 cursor-pointer" />
               <input type="text" bind:value={customColors['color-border']} maxlength="7" class="w-16 h-9 px-2 text-[11px] bg-transparent text-brand-text-primary outline-none font-mono uppercase" />
             </div>
             <div class="flex flex-col min-w-0">
-              <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.bordersLabel')}</span>
-              <span class="text-[10px] text-brand-text-secondary font-medium">{i18n.t('settings.bordersDescription')}</span>
+              <span class="text-xs font-semibold text-brand-text-primary leading-snug">{i18n.t('settings.bordersLabel')}</span>
+              <span class="text-[10px] text-brand-text-secondary font-medium leading-tight">{i18n.t('settings.bordersDescription')}</span>
             </div>
           </div>
         </div>

@@ -109,7 +109,7 @@ fn check_frequency_boost(w: &mut EqualizerWorld, _freq_str: String, boost_db_str
 
 #[when("I select the \"Rock\" equalizer preset")]
 fn select_rock_preset(w: &mut EqualizerWorld) {
-    let gains = [4.0, 3.0, 2.0, -1.0, -2.0, -1.0, 1.0, 2.0, 3.0, 4.0];
+    let gains = [4.0, 3.0, 1.0, -1.0, -2.0, -1.0, 1.0, 3.0, 3.5, 3.5];
     w.equalizer.load_preset(gains);
 }
 
@@ -152,8 +152,12 @@ fn all_coefficients_recalculate(w: &mut EqualizerWorld) {
 
 #[tokio::main]
 async fn main() {
+    // with_default_cli() skips clap-parsing argv, so `cargo test <filter>` (which
+    // passes the filter string to every test binary, this one included) doesn't
+    // blow up on an "unexpected argument" cucumber's CLI doesn't recognize.
     EqualizerWorld::cucumber()
         .max_concurrent_scenarios(4)
+        .with_default_cli()
         .run_and_exit("../features/equalizer.feature")
         .await;
 }

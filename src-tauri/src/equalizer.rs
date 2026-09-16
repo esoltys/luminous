@@ -309,13 +309,11 @@ impl EqualizerConfig {
 /// names fall back to flat.
 pub fn preset_gains(name: &str) -> [f32; 10] {
     match name.to_lowercase().as_str() {
-        "rock" => [4.0, 3.0, 2.0, -1.0, -2.0, -1.0, 1.0, 2.0, 3.0, 4.0],
-        "pop" => [-2.0, -1.0, 0.0, 2.0, 4.0, 4.0, 2.0, 0.0, -1.0, -2.0],
-        "classical" => [5.0, 3.0, 2.0, 2.0, -1.0, -1.0, 0.0, 2.0, 3.0, 4.0],
-        "jazz" => [3.0, 2.0, 1.0, 2.0, -1.0, -1.0, 0.0, 1.0, 2.0, 3.0],
-        "bass boost" | "bassboost" => [6.0, 5.0, 4.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-        "vocal boost" | "vocalboost" => [-2.0, -2.0, -1.0, 1.0, 3.0, 4.0, 3.0, 1.0, -1.0, -2.0],
-        "headphones" => [4.0, 2.0, 0.0, 2.0, 4.0, 4.0, 2.0, 0.0, 2.0, 4.0],
+        "rock" => [4.0, 3.0, 1.0, -1.0, -2.0, -1.0, 1.0, 3.0, 3.5, 3.5],
+        "pop" => [1.5, 2.5, 1.0, -1.0, -0.5, 1.0, 2.5, 3.0, 2.5, 2.0],
+        "bass boost" | "bassboost" => [9.0, 7.0, 4.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        "vocal boost" | "vocalboost" => [-3.0, -2.0, -1.0, 0.0, 2.0, 4.0, 4.5, 3.5, 1.0, -1.0],
+        "headphones" => [2.0, 1.5, 0.5, 0.0, 0.0, 0.0, -0.5, -1.0, -0.5, 1.0],
         _ => [0.0; 10], // Flat
     }
 }
@@ -511,9 +509,9 @@ impl Equalizer {
     /// Apply preamp + the active band cascade (graphic or parametric,
     /// whichever `mode` selects) to `output` in place, sample by sample —
     /// the EQ stage of the CPAL output callback's per-buffer DSP chain (see
-    /// `audio.rs`'s module doc). A no-op when `enabled` is false. Each
-    /// output sample is hard-clamped to `[-1.0, 1.0]` afterward as a safety
-    /// net against a high preamp/band gain combination clipping.
+    /// `audio.rs`'s module doc). A no-op when `enabled` is false.
+    /// Internal 32-bit float headroom is preserved; downstream limiter in
+    /// `audio.rs` enforces the true-peak ceiling before final output.
     pub fn process_interleaved(&mut self, output: &mut [f32]) {
         if !self.enabled {
             return;
@@ -535,7 +533,7 @@ impl Equalizer {
                 }
             }
 
-            *sample = out.clamp(-1.0, 1.0);
+            *sample = out;
         }
     }
 }

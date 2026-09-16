@@ -12,6 +12,11 @@ use anyhow::Result;
 use rusqlite::{params, OptionalExtension};
 use uuid::Uuid;
 
+/// Size of the random-fill fallback for a Daypart Mix (#223) whose picked
+/// genre grouping doesn't clear the auto-playlist minimum — a bounded
+/// "shuffle across the library" sample rather than every song at once.
+const DAYPART_RANDOM_FILL_LIMIT: i64 = 200;
+
 /// What a reconcile pass changed in one dynamic playlist.
 #[derive(Debug)]
 pub struct DynamicPlaylistDelta {
@@ -78,9 +83,16 @@ impl PlaylistManager {
     }
 
     /// Every library song matching a dynamic spec, in the order the spec's
-    /// population mode dictates. The single dispatch point for all four spec
-    /// kinds (decade:, bpmrange:, tag:, smart-rule query).
-    fn songs_for_spec(&self, spec: &str, mode: QueuePopulationMode) -> Result<Vec<Song>> {
+    /// population mode dictates. The single dispatch point for all spec
+    /// kinds (decade:, bpmrange:, artisttag:, missingmeta, tag:, daypart:,
+    /// smart-rule query). `pub(super)` so `auto_sync.rs`'s
+    /// `sync_daypart_auto_playlist` can materialize a freshly-resolved
+    /// `daypart:` spec through the same path every other category uses.
+    pub(super) fn songs_for_spec(
+        &self,
+        spec: &str,
+        mode: QueuePopulationMode,
+    ) -> Result<Vec<Song>> {
         let scanner = CollectionScanner::new(self.db.clone());
         if let Some(decade) = spec.strip_prefix("decade:") {
             scanner.get_songs_by_decade(decade, NO_SONG_LIMIT, mode)
@@ -91,12 +103,39 @@ impl PlaylistManager {
             scanner.get_songs_by_bpm_range(min, max, NO_SONG_LIMIT, mode)
         } else if let Some(tag) = spec.strip_prefix("artisttag:") {
             scanner.get_songs_by_artist_tag(tag, NO_SONG_LIMIT, mode)
+        } else if spec == "missingmeta" {
+            scanner.get_songs_missing_core_tags(NO_SONG_LIMIT, mode)
+        } else if spec == "missingmbid" {
+            scanner.get_songs_missing_musicbrainz_id(NO_SONG_LIMIT, mode)
         } else if let Some(name) = spec.strip_prefix("tag:") {
             // A system genre auto-playlist, keyed on a curated tag name
             // (#548) rather than a Smart Playlist rule spec (which always
             // contains a "field:" rule).
             let tag_manager = TagManager::new(self.db.clone());
             tag_manager.get_songs_by_curated_tag(name, NO_SONG_LIMIT, mode)
+        } else if let Some(rest) = spec.strip_prefix("daypart:") {
+            // "<bucket>:<date>:<resolved-name>" — bucket/date are only the
+            // reroll cache key `sync_daypart_auto_playlist` checks; here we
+            // only care about the already-resolved trailing name (empty
+            // means the random-fill fallback was chosen). This never
+            // re-picks anything itself, so calling this via
+            // `populate_dynamic_playlist`/reconcile does not reroll the mix.
+            let name = rest.splitn(3, ':').nth(2).unwrap_or("");
+            if name.is_empty() {
+                // Unlike a genre match (naturally bounded by how many songs
+                // carry that genre), "random songs from anywhere" has no
+                // natural size — cap it to a real mix-sized sample rather
+                // than shuffling the entire library into one playlist.
+                scanner.get_random_songs(DAYPART_RANDOM_FILL_LIMIT)
+            } else {
+                let tag_manager = TagManager::new(self.db.clone());
+                let songs = tag_manager.get_songs_by_curated_tag(name, NO_SONG_LIMIT, mode)?;
+                if songs.is_empty() {
+                    scanner.get_random_songs(DAYPART_RANDOM_FILL_LIMIT)
+                } else {
+                    Ok(songs)
+                }
+            }
         } else {
             let query = spec.replace(';', " ");
             scanner.search_songs_by_mode(&query, NO_SONG_LIMIT, mode)
@@ -312,15 +351,82 @@ mod tests {
     use crate::db::Database;
 
     fn setup_test_db() -> (Database, std::path::PathBuf) {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_playlist_dynamic_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir = tempfile::tempdir().unwrap().keep();
         let db = Database::new(temp_dir.clone()).unwrap();
         (db, temp_dir)
+    }
+
+    #[test]
+    fn test_songs_for_spec_daypart_prefix_dispatches_to_curated_tag_lookup() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for i in 1..=3 {
+                conn.execute(
+                    "INSERT INTO songs (title, artist, genre, source, unavailable) VALUES (?1, 'A', 'Jazz', 1, 0)",
+                    params![format!("Jazz Song {i}")],
+                )
+                .unwrap();
+            }
+            conn.execute(
+                "INSERT INTO songs (title, artist, genre, source, unavailable) VALUES ('Other', 'A', 'Blues', 1, 0)",
+                [],
+            )
+            .unwrap();
+        }
+
+        let manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        let daypart_songs = manager
+            .songs_for_spec("daypart:morning:2026-09-03:Jazz", QueuePopulationMode::All)
+            .unwrap();
+        let tag_songs = manager
+            .songs_for_spec("tag:Jazz", QueuePopulationMode::All)
+            .unwrap();
+
+        assert_eq!(daypart_songs.len(), 3);
+        let mut daypart_ids: Vec<_> = daypart_songs.iter().map(|s| s.id).collect();
+        let mut tag_ids: Vec<_> = tag_songs.iter().map(|s| s.id).collect();
+        daypart_ids.sort();
+        tag_ids.sort();
+        assert_eq!(
+            daypart_ids, tag_ids,
+            "a daypart: spec's trailing name must resolve to the same songs as a tag: spec (mode All orders randomly, so order isn't compared)"
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_songs_for_spec_daypart_empty_name_uses_random_fill() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for i in 1..=5 {
+                conn.execute(
+                    "INSERT INTO songs (title, artist, genre, source, unavailable) VALUES (?1, 'A', ?2, 1, 0)",
+                    params![
+                        format!("Song {i}"),
+                        if i % 2 == 0 { "Jazz" } else { "Blues" },
+                    ],
+                )
+                .unwrap();
+            }
+        }
+
+        let manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        let songs = manager
+            .songs_for_spec("daypart:morning:2026-09-03:", QueuePopulationMode::All)
+            .unwrap();
+
+        assert_eq!(
+            songs.len(),
+            5,
+            "empty trailing name marks the random-fill fallback — every available song, capped by DAYPART_RANDOM_FILL_LIMIT"
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
     }
 
     #[test]
@@ -538,6 +644,39 @@ mod tests {
             tracks.len(),
             2,
             "tag: dispatch for a group includes its curated child's songs"
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_songs_for_spec_daypart_empty_tag_matches_falls_back_to_random_fill() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for i in 1..=5 {
+                conn.execute(
+                    "INSERT INTO songs (title, artist, genre, source, unavailable) VALUES (?1, 'A', 'Rock', 1, 0)",
+                    params![format!("Rock Song {i}")],
+                )
+                .unwrap();
+            }
+        }
+
+        let manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        // A genre tag that matches 0 songs in the library must fall back to random library fill
+        let songs = manager
+            .songs_for_spec(
+                "daypart:morning:2026-09-12:NonExistentGenre",
+                QueuePopulationMode::All,
+            )
+            .unwrap();
+
+        assert_eq!(
+            songs.len(),
+            5,
+            "an empty genre match in a daypart spec must fall back to random library fill rather than returning 0 songs"
         );
 
         let _ = std::fs::remove_dir_all(temp_dir);

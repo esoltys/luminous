@@ -4,6 +4,14 @@ import type { Playlist, PlaylistItem, QueuePopulationMode, Song } from "../types
 import { applySongStats, type SongStatsPayload } from "../utils/stats";
 import { toastStore } from "./toast.svelte";
 import { i18n } from "./i18n.svelte";
+import { picardStore } from "./picard.svelte";
+import { getDaypartBucket } from "../utils/daypart";
+
+/** How often to check whether the Daypart Mix's local-time bucket has
+ * crossed a boundary while the app stays open (#223) — cheap since the
+ * backend sync is a no-op unless the bucket actually changed, so a modest
+ * interval is fine without needing second-level precision. */
+const DAYPART_BOUNDARY_CHECK_INTERVAL_MS = 60_000;
 
 class PlaylistsStore {
   playlists = $state<Playlist[]>([]);
@@ -20,16 +28,23 @@ class PlaylistsStore {
   /** Live song counts for the virtual (non-materialized) auto-playlists. */
   favouritesCount = $state(0);
   recentlyAddedCount = $state(0);
+  mostPlayedCount = $state(0);
   historyCount = $state(0);
 
   /** Count of auto-playlists that currently have at least one song — used for
    * the sidebar's Auto badge, kept in sync with the Auto grid's own filtering. */
   visibleAutoPlaylistCount = $derived.by(() => {
-    const genreCount = this.playlists.filter((p) => p.dynamic_enabled && p.track_count > 0).length;
+    const genreCount = this.playlists.filter(
+      (p) =>
+        p.dynamic_enabled &&
+        p.track_count > 0 &&
+        (p.dynamic_spec !== "missingmbid" || picardStore.missingPlaylistEnabled)
+    ).length;
     return (
       genreCount +
       (this.favouritesCount > 0 ? 1 : 0) +
       (this.recentlyAddedCount > 0 ? 1 : 0) +
+      (this.mostPlayedCount > 0 ? 1 : 0) +
       (this.historyCount > 0 ? 1 : 0)
     );
   });
@@ -130,6 +145,34 @@ class PlaylistsStore {
     } catch (err) {
       console.error("Failed to initialize PlaylistsStore:", err);
     }
+    this.startDaypartBoundaryWatch();
+  }
+
+  private lastKnownDaypartBucket = getDaypartBucket();
+  private daypartBoundaryTimer: ReturnType<typeof setInterval> | null = null;
+
+  /** Genre/decade/BPM/artist-tag auto-playlists only need to resync on a
+   * scan or an explicit refresh — the Daypart Mix (#223) also needs to
+   * resync at exact clock boundaries even while the app just sits open
+   * (e.g. left on the Home page across Morning -> Afternoon), which none of
+   * those call sites cover. `sync_all_auto_playlists` is cheap to call
+   * redundantly (the daypart sync is a same-bucket no-op otherwise), so
+   * this just re-checks the current bucket periodically and resyncs only
+   * when it actually changed — mirrors `updaterStore`'s own periodic-check
+   * timer for its own unrelated concern. */
+  private startDaypartBoundaryWatch() {
+    if (this.daypartBoundaryTimer) return;
+    this.daypartBoundaryTimer = setInterval(async () => {
+      const bucket = getDaypartBucket();
+      if (bucket === this.lastKnownDaypartBucket) return;
+      this.lastKnownDaypartBucket = bucket;
+      try {
+        await invoke("sync_all_auto_playlists");
+        await this.refreshPlaylists();
+      } catch (err) {
+        console.error("Failed to resync Daypart Mix on boundary change:", err);
+      }
+    }, DAYPART_BOUNDARY_CHECK_INTERVAL_MS);
   }
 
   async refreshPlaylists() {
@@ -140,13 +183,15 @@ class PlaylistsStore {
 
   async refreshAutoPlaylistCounts() {
     try {
-      const [favourites, recentlyAdded, history] = await Promise.all([
+      const [favourites, recentlyAdded, mostPlayed, history] = await Promise.all([
         invoke<Song[]>("get_favourite_songs"),
         invoke<Song[]>("get_recently_added_songs", { limit: 50 }),
+        invoke<Song[]>("get_most_played_songs", { limit: 50 }),
         invoke<Song[]>("get_recently_played_songs", { limit: 100 }),
       ]);
       this.favouritesCount = Array.isArray(favourites) ? favourites.length : 0;
       this.recentlyAddedCount = Array.isArray(recentlyAdded) ? recentlyAdded.length : 0;
+      this.mostPlayedCount = Array.isArray(mostPlayed) ? mostPlayed.length : 0;
       this.historyCount = Array.isArray(history) ? history.length : 0;
       await this.refreshPlaylists();
     } catch (err) {
@@ -239,25 +284,6 @@ class PlaylistsStore {
     }
     await invoke("rename_playlist", { id, name });
     await this.refreshPlaylists();
-  }
-
-  /** Removes every track ahead of `uuid` (in current DB order) from
-   * `playlistId`. Takes the target playlist id explicitly rather than
-   * re-resolving "the Queue" via `requireQueue()` — that lookup can
-   * disagree with whichever playlist the caller actually means (e.g. is
-   * already viewing). The backend resolves `uuid`'s position and removes
-   * it in one atomic call, so there's no gap for the Queue to change shape
-   * between reading a position and cutting it. */
-  async trimQueueBeforeUuid(playlistId: number, uuid: string) {
-    try {
-      await invoke("trim_playlist_before_uuid", { playlistId, uuid });
-      if (this.activePlaylistId === playlistId) {
-        await this.selectPlaylist(playlistId);
-      }
-      await this.refreshPlaylists();
-    } catch (err) {
-      console.error("Failed to trim Queue tracks before uuid:", err);
-    }
   }
 
   /** Add songs to the built-in Queue. The backend appends the DB rows and

@@ -1,6 +1,6 @@
 {
   "name": "luminous",
-  "version": "1.8.0",
+  "version": "2.0.0",
   "description": "A high-performance home for the music you already own",
   "author": "Eric James Soltys <ericjamessoltys@outlook.com>",
   "license": "MIT",
@@ -12,25 +12,27 @@
     "preview": "vite preview",
     "prepare": "svelte-kit sync",
     "install:git-hooks": "git config core.hooksPath .githooks",
-    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --tsgo",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --tsgo --fail-on-warnings && bun run knip",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --tsgo --watch",
+    "knip": "knip",
     "tauri": "NO_STRIP=true tauri",
-    "icon": "tauri icon app-icon.svg && bun run scripts/generate-msix-assets.ts",
+    "icon": "tauri icon app-icon.png && bun run scripts/generate-msix-assets.ts",
     "generate:msix-assets": "bun run scripts/generate-msix-assets.ts",
     "test": "vitest",
     "test:run": "vitest run",
     "test:perf": "vitest run --config vite.perf.config.js",
     "take-screenshots": "bunx tsx scripts/take-screenshots.ts",
+    "test:e2e:windows": "tauri build --debug --no-bundle && bunx tsx e2e/run-smoke.ts",
     "release": "bun run scripts/release.ts",
     "bump-version": "bun run scripts/bump-version.ts",
-    "tauri:windows:build": "tauri-windows-bundle build"
+    "tauri:windows:build": "tauri-windows-bundle build",
+    "measure-memory": "bun run scripts/measure-memory.ts"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2.7.3",
     "@tauri-apps/plugin-opener": "^2",
-    "@tauri-apps/plugin-positioner": "^2.3.4",
     "@tauri-apps/plugin-process": "^2",
     "@tauri-apps/plugin-updater": "^2",
     "phosphor-svelte": "^3.1.0",
@@ -39,6 +41,7 @@
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
+    "@choochmeque/tauri-windows-bundle": "^0.1.29",
     "@sveltejs/adapter-static": "^3.0.6",
     "@sveltejs/kit": "^2.70.3",
     "@sveltejs/vite-plugin-svelte": "^7.3.0",
@@ -47,15 +50,16 @@
     "@testing-library/svelte": "^5.4.2",
     "@types/node": "^26.4.1",
     "@typescript/native-preview": "^7.0.0-dev.20260707.2",
+    "image-js": "^1.7.0",
     "jsdom": "^30.0.1",
+    "knip": "^6.34.0",
     "music-metadata": "^11.15.0",
     "playwright": "^1.63.0",
     "svelte": "^5.57.0",
     "svelte-check": "^4.7.5",
     "typescript": "~6.0.3",
     "vite": "^8.2.2",
-    "vitest": "^4.1.11",
-    "@choochmeque/tauri-windows-bundle": "^0.1.29"
+    "vitest": "^4.1.11"
   },
   "overrides": {
     "postcss": "^8.5.18",
