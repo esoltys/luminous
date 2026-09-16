@@ -5,12 +5,16 @@
   import { rememberScroll } from "../utils/scrollMemory";
   import OrganizeFiles from "./OrganizeFiles.svelte";
   import Button from "./Button.svelte";
-  import { FolderIcon as Folder, EraserIcon as Eraser } from "phosphor-svelte";
+  import { EraserIcon as Eraser, ArrowsClockwiseIcon as RefreshCw, BroomIcon as Broom, StarIcon as Star } from "phosphor-svelte";
 
   const PRUNE_MESSAGE_DURATION_MS = 8000;
 
   let pruneMsg = $state<string | null>(null);
   let organizeRefreshKey = $state(0);
+  let organizeReadyCount = $state(0);
+  let organizeCanApply = $state(false);
+  let organizeIsApplying = $state(false);
+  let organizeApplyRequestKey = $state(0);
 
   async function handlePruneMissing() {
     const { deletedSongs, removedFolders, mergedDuplicates } = await collectionStore.pruneMissing();
@@ -30,18 +34,47 @@
 
 <div class="flex-1 flex flex-col h-full bg-brand-main text-brand-text-primary select-none overflow-hidden relative">
   <div class="flex-1 overflow-y-auto px-6 pb-12" class:pb-28={!!playerStore.currentSong} use:rememberScroll={"organize"}>
-    <div class="pt-8 pb-4 max-w-3xl mx-auto">
-      <h1 class="text-3xl font-heading font-bold text-brand-text-primary flex items-center gap-3">
-        <Folder class="w-7 h-7 text-brand-accent" />
-        {i18n.t("organizer.title")}
-      </h1>
-      <p class="text-sm text-brand-text-secondary mt-1">
-        {i18n.t("organizer.subtitle")}
-      </p>
+    <div class="pt-8 pb-4 max-w-3xl mx-auto flex items-start justify-between gap-4">
+      {#if organizeReadyCount === 0}
+        <span class="flex items-center gap-2 text-xl font-bold text-brand-accent-text whitespace-nowrap">
+          <span class="relative inline-flex shrink-0">
+            <span class="absolute inset-0 rounded-full anim-gold-ring"></span>
+            <Star weight="fill" class="w-5 h-5 anim-milestone-bounce" />
+          </span>
+          {i18n.t("organizer.nothingToOrganize")}
+        </span>
+      {:else}
+        <span class="flex items-center gap-2 text-xl font-bold text-brand-accent-text whitespace-nowrap">
+          <Broom class="w-5 h-5 shrink-0" />
+          {i18n.t("organizer.summaryReady", { count: organizeReadyCount })}
+        </span>
+      {/if}
+
+      <Button
+        variant="primary"
+        onclick={() => { organizeApplyRequestKey++; }}
+        disabled={!organizeCanApply || organizeIsApplying}
+      >
+        {#if organizeIsApplying}
+          <RefreshCw class="w-4 h-4 animate-spin" />
+          <span>{i18n.t("organizer.applying")}</span>
+        {:else}
+          <span>{i18n.t("organizer.applyButton")}</span>
+        {/if}
+      </Button>
     </div>
 
     <div class="max-w-3xl mx-auto space-y-4">
-      <OrganizeFiles embedded songIds={[]} initialScope="library" refreshKey={organizeRefreshKey} />
+      <OrganizeFiles
+        embedded
+        songIds={[]}
+        initialScope="library"
+        refreshKey={organizeRefreshKey}
+        bind:summaryReadyCount={organizeReadyCount}
+        bind:summaryCanApply={organizeCanApply}
+        bind:summaryIsApplying={organizeIsApplying}
+        applyRequestKey={organizeApplyRequestKey}
+      />
 
       <!-- Lightweight inline maintenance action — deliberately not its own bordered card. -->
       <div class="flex flex-wrap items-center gap-3 px-1">

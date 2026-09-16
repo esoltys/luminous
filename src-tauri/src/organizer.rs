@@ -35,7 +35,6 @@ pub enum OrganizePreviewStatus {
     Unchanged,
     Collision,
     MissingTag,
-    CrossDevice,
     Error,
 }
 
