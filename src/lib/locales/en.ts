@@ -683,7 +683,6 @@ export const en = {
     excludedToast: "Excluded {name} from Stats",
     includedToast: "Included {name} in Stats again",
     heatmapTitle: "Listening Streak",
-    heatmapHelp: "This calendar shows how many days in a row you've listened to music. Each square is one day — darker squares mean more minutes listened that day. Hover or tap a square to see its date.",
     heatmapCurrentStreak: "Current streak",
     heatmapLongestStreak: "Longest streak",
     heatmapStreakOneDay: "1 day",

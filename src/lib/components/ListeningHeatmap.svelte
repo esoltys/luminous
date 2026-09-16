@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { FlameIcon, QuestionIcon, StarIcon } from "phosphor-svelte";
+  import { FlameIcon, StarIcon } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { prefs } from "../stores/prefs.svelte";
   import type { ListenEvent, StatsRange } from "../types";
@@ -207,12 +207,7 @@
 </script>
 
 <div class="bg-brand-sidebar border border-brand-border/60 rounded-xl p-4">
-  <div class="flex items-center justify-between gap-2">
-    <h2 class="text-sm font-semibold text-brand-text-primary">{i18n.t("stats.heatmapTitle", {}, "Listening Streak")}</h2>
-    <span title={i18n.t("stats.heatmapHelp", {}, "This calendar shows how many days in a row you've listened to music. Each square is one day — darker squares mean more minutes listened that day. Hover or tap a square to see its date.")} class="inline-flex cursor-help">
-      <QuestionIcon class="w-4 h-4 text-brand-text-secondary/60 hover:text-brand-text-secondary" />
-    </span>
-  </div>
+  <h2 class="text-sm font-semibold text-brand-text-primary">{i18n.t("stats.heatmapTitle", {}, "Listening Streak")}</h2>
 
   {#if events}
     <div class="flex items-center gap-4 mt-3">
