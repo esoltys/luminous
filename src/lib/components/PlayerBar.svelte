@@ -21,6 +21,7 @@
   import { tagsStore } from "../stores/tags.svelte";
   import { openInPicard } from "../utils/picard";
   import { isLinux } from "../platform";
+  import MothmanSprite from "./MothmanSprite.svelte";
 
   // Responsive control trimming (issue #413, refined against real usage,
   // padding/seekbar fixed under #543): three named tiers as this floating
@@ -274,7 +275,10 @@
   }
 </script>
 
-<footer transition:fly={{ y: 40, duration: 300, easing: cubicOut }} class="h-20 max-w-[1200px] mx-auto bg-brand-playerbar border border-brand-border rounded-[2rem] flex items-center justify-between gap-3 px-5 min-[768px]:px-8 text-brand-text-secondary select-none {themeStore.isGlassTheme || isLinux ? 'glass-surface' : ''} {isLinux ? 'opaque-linux' : ''}">
+<footer transition:fly={{ y: 40, duration: 300, easing: cubicOut }} class="relative h-20 max-w-[1200px] mx-auto bg-brand-playerbar border border-brand-border rounded-[2rem] flex items-center justify-between gap-3 px-5 min-[768px]:px-8 text-brand-text-secondary select-none {themeStore.isGlassTheme || isLinux ? 'glass-surface' : ''} {isLinux ? 'opaque-linux' : ''}">
+  {#if themeStore.activeThemeId === 'mothman'}
+    <MothmanSprite isPlaying={playerStore.state === 'playing'} />
+  {/if}
   <div data-walkthrough-target="player-bar-cover" class="flex items-center gap-3 min-w-0 flex-1 min-[768px]:w-1/3 min-[768px]:flex-none min-[768px]:min-w-[200px] max-w-sm">
     <button
       onclick={handleCoverClick}
