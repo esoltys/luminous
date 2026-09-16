@@ -20,7 +20,10 @@ export interface StreakInfo {
   longest: number;
 }
 
-function localDateKey(date: Date): string {
+/** Local calendar date as YYYY-MM-DD. Exported so callers (e.g. the streak
+ * card) can locate a specific day's cell — "today" — in a built grid without
+ * duplicating this logic. */
+export function localDateKey(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
   const d = String(date.getDate()).padStart(2, "0");
@@ -94,6 +97,24 @@ export function buildHeatmapGrid(
   const rows: HeatmapCell[][] = Array.from({ length: 7 }, () => []);
   cells.forEach((cell, i) => rows[i % 7].push(cell));
   return rows;
+}
+
+/** Builds a flat, chronological list of the trailing `days` days ending
+ * today — a rolling window, unlike `buildHeatmapGrid`'s weekStart-aligned
+ * columns. Used for the 7-day bar chart view, which shows exactly "the past
+ * 7 days" (matching the Stats page's other Past-7-Days panels) rather than
+ * a calendar-aligned week. */
+export function buildLastNDays(dailyMinutes: Map<string, number>, days: number, today: Date = new Date()): HeatmapCell[] {
+  const todayStart = startOfDay(today);
+  const cells: HeatmapCell[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const date = new Date(todayStart);
+    date.setDate(date.getDate() - i);
+    const key = localDateKey(date);
+    const minutes = dailyMinutes.get(key) ?? 0;
+    cells.push({ date: key, minutes, level: intensityLevel(minutes), future: false });
+  }
+  return cells;
 }
 
 function countBackwardFrom(activeDays: Set<string>, start: Date): number {

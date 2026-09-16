@@ -681,13 +681,14 @@ export const fr = {
     includeInStats: "Inclure dans les statistiques",
     excludedToast: "{name} exclu des statistiques",
     includedToast: "{name} de nouveau inclus dans les statistiques",
+    heatmapTitle: "Série d'écoute",
     heatmapCurrentStreak: "Série en cours",
     heatmapLongestStreak: "Plus longue série",
     heatmapStreakOneDay: "1 jour",
     heatmapStreakDays: "{count} jours",
-    heatmapTooltipNoListening: "Aucune écoute le {date}",
-    heatmapTooltipOneMinute: "1 minute le {date}",
-    heatmapTooltipMinutes: "{minutes} minutes le {date}"
+    heatmapStatus: "{date} — {minutes} min",
+    heatmapLegendLess: "Moins",
+    heatmapLegendMore: "Plus"
   },
   help: {
     loading: "Chargement du guide d'utilisation..."

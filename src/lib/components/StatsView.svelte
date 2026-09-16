@@ -99,17 +99,45 @@
 <div class="flex-1 flex flex-col h-full bg-brand-main text-brand-text-primary select-none overflow-hidden relative">
   <div class="flex-1 overflow-y-auto px-6 pb-12" class:pb-28={!!playerStore.currentSong} use:rememberScroll={"stats"}>
     <div class="pt-8 pb-4">
-      <div class="flex items-start justify-between gap-6">
-        <div>
-          <h1 class="text-3xl font-heading font-bold text-brand-text-primary flex items-center gap-3">
-            <BarChart2 class="w-7 h-7 text-brand-accent" />
-            {i18n.t("stats.title", {}, "Stats")}
-          </h1>
-          <p class="text-sm text-brand-text-secondary mt-1">
-            {i18n.t("stats.subtitle", {}, "Your private listening insights — computed on-device, never shared.")}
-          </p>
+      <div>
+        <h1 class="text-3xl font-heading font-bold text-brand-text-primary flex items-center gap-3">
+          <BarChart2 class="w-7 h-7 text-brand-accent" />
+          {i18n.t("stats.title", {}, "Stats")}
+        </h1>
+        <p class="text-sm text-brand-text-secondary mt-1">
+          {i18n.t("stats.subtitle", {}, "Your private listening insights — computed on-device, never shared.")}
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+        <ListeningHeatmap {range} />
+        <div class="bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col">
+          <h2 class="text-sm font-semibold text-brand-text-primary mb-3 shrink-0">
+            {i18n.t("stats.listeningClock", {}, "Time of Day")}
+          </h2>
+          <div class="flex-1 min-h-0 flex flex-col justify-end">
+            <TimeOfDayGraphic
+              counts={clockCounts}
+              max={maxClockCount}
+              labels={{
+                morning: CLOCK_BUCKETS[0].label(),
+                afternoon: CLOCK_BUCKETS[1].label(),
+                evening: CLOCK_BUCKETS[2].label(),
+                latenight: CLOCK_BUCKETS[3].label()
+              }}
+            />
+          </div>
+          <div class="grid grid-cols-4 gap-4 mt-2 shrink-0">
+            {#each CLOCK_BUCKETS as bucket (bucket.key)}
+              <div class="flex flex-col items-center gap-0.5">
+                <span class="text-xs text-brand-text-secondary text-center">{bucket.label()}</span>
+                <span class="text-xs text-brand-text-primary font-medium">
+                  {i18n.t("stats.minuteCount", { count: clockCounts[bucket.key] ?? 0 }, `${clockCounts[bucket.key] ?? 0} min`)}
+                </span>
+              </div>
+            {/each}
+          </div>
         </div>
-        <ListeningHeatmap />
       </div>
 
       <div class="flex items-center justify-between gap-2 mt-4">
@@ -155,34 +183,6 @@
             />
           </div>
         {/each}
-      </div>
-
-      <div class="bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 mt-6">
-        <h2 class="text-sm font-semibold text-brand-text-primary mb-3">
-          {i18n.t("stats.listeningClock", {}, "Time of Day")}
-        </h2>
-        <div class="max-w-[820px] mx-auto">
-          <TimeOfDayGraphic
-            counts={clockCounts}
-            max={maxClockCount}
-            labels={{
-              morning: CLOCK_BUCKETS[0].label(),
-              afternoon: CLOCK_BUCKETS[1].label(),
-              evening: CLOCK_BUCKETS[2].label(),
-              latenight: CLOCK_BUCKETS[3].label()
-            }}
-          />
-          <div class="grid grid-cols-4 gap-4 mt-2">
-            {#each CLOCK_BUCKETS as bucket (bucket.key)}
-              <div class="flex flex-col items-center gap-0.5">
-                <span class="text-xs text-brand-text-secondary text-center">{bucket.label()}</span>
-                <span class="text-xs text-brand-text-primary font-medium">
-                  {i18n.t("stats.minuteCount", { count: clockCounts[bucket.key] ?? 0 }, `${clockCounts[bucket.key] ?? 0} min`)}
-                </span>
-              </div>
-            {/each}
-          </div>
-        </div>
       </div>
     {/if}
   </div>

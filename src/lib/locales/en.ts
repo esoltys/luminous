@@ -682,13 +682,14 @@ export const en = {
     includeInStats: "Include in Stats",
     excludedToast: "Excluded {name} from Stats",
     includedToast: "Included {name} in Stats again",
-    heatmapCurrentStreak: "Current Streak",
-    heatmapLongestStreak: "Longest Streak",
+    heatmapTitle: "Listening Streak",
+    heatmapCurrentStreak: "Current streak",
+    heatmapLongestStreak: "Longest streak",
     heatmapStreakOneDay: "1 day",
     heatmapStreakDays: "{count} days",
-    heatmapTooltipNoListening: "No listening on {date}",
-    heatmapTooltipOneMinute: "1 minute on {date}",
-    heatmapTooltipMinutes: "{minutes} minutes on {date}"
+    heatmapStatus: "{date} — {minutes} min",
+    heatmapLegendLess: "Less",
+    heatmapLegendMore: "More"
   },
   help: {
     loading: "Loading user guide..."
