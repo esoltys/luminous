@@ -110,7 +110,7 @@
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-        <ListeningHeatmap />
+        <ListeningHeatmap {range} />
         <div class="bg-brand-sidebar border border-brand-border/60 rounded-xl p-4">
           <h2 class="text-sm font-semibold text-brand-text-primary mb-3">
             {i18n.t("stats.listeningClock", {}, "Time of Day")}

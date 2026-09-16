@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { bucketDailyMinutes, buildHeatmapGrid, computeStreaks } from "./listeningHeatmap";
+import { bucketDailyMinutes, buildHeatmapGrid, buildLastNDays, computeStreaks } from "./listeningHeatmap";
 import type { ListenEvent } from "../types";
 
 function unixSecondsFor(date: Date): number {
@@ -79,6 +79,32 @@ describe("buildHeatmapGrid", () => {
     expect(byDate.get("2026-01-13")).toBe(2);
     expect(byDate.get("2026-01-12")).toBe(3);
     expect(byDate.get("2026-01-11")).toBe(4);
+  });
+});
+
+describe("buildLastNDays", () => {
+  it("returns a chronological rolling window ending today, none marked future", () => {
+    const days = buildLastNDays(new Map(), 7, new Date(2026, 0, 15));
+    expect(days).toHaveLength(7);
+    expect(days[0].date).toBe("2026-01-09");
+    expect(days[6].date).toBe("2026-01-15");
+    expect(days.every((d) => !d.future)).toBe(true);
+  });
+
+  it("is not aligned to any calendar week boundary", () => {
+    // 2026-01-15 is a Thursday; a 7-day rolling window ending on it starts
+    // on a Friday, not on the start-of-week day a heatmap grid would use.
+    const days = buildLastNDays(new Map(), 7, new Date(2026, 0, 15));
+    const [y, m, d] = days[0].date.split("-").map(Number);
+    expect(new Date(y, m - 1, d).getDay()).toBe(5); // Friday
+  });
+
+  it("looks up minutes and intensity per day", () => {
+    const dailyMinutes = new Map([["2026-01-15", 90]]);
+    const days = buildLastNDays(dailyMinutes, 3, new Date(2026, 0, 15));
+    const today = days.find((d) => d.date === "2026-01-15");
+    expect(today?.minutes).toBe(90);
+    expect(today?.level).toBe(3);
   });
 });
 

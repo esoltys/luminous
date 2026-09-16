@@ -99,6 +99,24 @@ export function buildHeatmapGrid(
   return rows;
 }
 
+/** Builds a flat, chronological list of the trailing `days` days ending
+ * today — a rolling window, unlike `buildHeatmapGrid`'s weekStart-aligned
+ * columns. Used for the 7-day bar chart view, which shows exactly "the past
+ * 7 days" (matching the Stats page's other Past-7-Days panels) rather than
+ * a calendar-aligned week. */
+export function buildLastNDays(dailyMinutes: Map<string, number>, days: number, today: Date = new Date()): HeatmapCell[] {
+  const todayStart = startOfDay(today);
+  const cells: HeatmapCell[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const date = new Date(todayStart);
+    date.setDate(date.getDate() - i);
+    const key = localDateKey(date);
+    const minutes = dailyMinutes.get(key) ?? 0;
+    cells.push({ date: key, minutes, level: intensityLevel(minutes), future: false });
+  }
+  return cells;
+}
+
 function countBackwardFrom(activeDays: Set<string>, start: Date): number {
   let count = 0;
   const cursor = new Date(start);
