@@ -13,7 +13,9 @@
     WarningIcon as AlertTriangle,
     ArrowsClockwiseIcon as RefreshCw,
     StackIcon as Layers,
-    MusicNotesIcon as Music
+    MusicNotesIcon as Music,
+    CopySimpleIcon as Duplicate,
+    XCircleIcon as ErrorIcon
   } from "phosphor-svelte";
   import { VirtualList } from "svelte-virtual-list-ts";
   import Toggle from "./Toggle.svelte";
@@ -30,7 +32,7 @@
     song_id: number;
     from_path: string;
     to_path: string;
-    status: "ok" | "unchanged" | "collision" | "missing_tag" | "cross_device" | "error";
+    status: "ok" | "unchanged" | "collision" | "missing_tag" | "error";
     error_message: string | null;
   }
 
@@ -40,6 +42,10 @@
     songIds = [],
     initialScope = "selection",
     refreshKey = 0,
+    summaryReadyCount = $bindable(0),
+    summaryCanApply = $bindable(false),
+    summaryIsApplying = $bindable(false),
+    applyRequestKey = 0,
     onClose,
     onSuccess,
   }: {
@@ -50,6 +56,12 @@
     initialScope?: "selection" | "library";
     /** Bump this to force the preview to refetch (e.g. after an external prune). */
     refreshKey?: number;
+    /** Embedded mode only: mirrors readyCount/canApply/isApplying so the host page can render its own Apply control. */
+    summaryReadyCount?: number;
+    summaryCanApply?: boolean;
+    summaryIsApplying?: boolean;
+    /** Embedded mode only: bump this from the host page to trigger handleApply. */
+    applyRequestKey?: number;
     onClose?: () => void;
     onSuccess?: () => void;
   } = $props();
@@ -241,12 +253,17 @@
     return raw as OrganizePreviewItem;
   }
 
-  function getItemStatus(item: OrganizePreviewItem): "ok" | "unchanged" | "collision" | "missing_tag" | "error" {
+  // The backend no longer skips colliding files — it auto-reroutes them into a
+  // "Duplicates" subfolder and reports them as "ok" with an explanatory
+  // error_message (see organizer.rs's "Routed to Duplicates" messages). The
+  // legacy "collision" status is kept here for forward compatibility but is
+  // no longer actually emitted.
+  function getItemStatus(item: OrganizePreviewItem): "ok" | "unchanged" | "duplicate" | "missing_tag" | "error" {
     const target = getItemObj(item);
     const s = String(target?.status || "").toLowerCase();
-    if (s === "ok") return "ok";
+    if (s === "collision") return "duplicate";
+    if (s === "ok") return target?.error_message ? "duplicate" : "ok";
     if (s === "unchanged") return "unchanged";
-    if (s === "collision") return "collision";
     if (s === "missing_tag" || s === "missingtag") return "missing_tag";
     return "error";
   }
@@ -288,6 +305,17 @@
       return "…" + fullPath.slice(prefix.length - 1);
     }
     return fullPath;
+  }
+
+  /** Shortens the backend's "Routed to Duplicates (collision with <full path>)"
+   * message down to just the colliding file's name — the full path is still
+   * available in the cell's title attribute on hover. */
+  function shortenDuplicateMessage(message: string | null): string {
+    if (!message) return "";
+    return message.replace(/\(collision with (.+)\)$/, (_match, collidingPath) => {
+      const name = collidingPath.split(/[/\\]/).pop() || collidingPath;
+      return `(collision with ${name})`;
+    });
   }
 
   let fromColWidth = $state(340);
@@ -333,14 +361,33 @@
     toColWidth = Math.min(COL_MAX_WIDTH_PX, Math.max(AUTO_FIT_MIN_TO_WIDTH_PX, maxTo));
   }
 
-  let collisionCount = $derived(items.filter((i) => getItemStatus(i) === "collision").length);
+  let collisionCount = $derived(items.filter((i) => getItemStatus(i) === "duplicate").length);
   let errorCount = $derived(items.filter((i) => getItemStatus(i) === "error").length);
   let missingTagCount = $derived(items.filter((i) => getItemStatus(i) === "missing_tag").length);
-  let readyCount = $derived(items.filter((i) => getItemStatus(i) === "ok" || getItemStatus(i) === "missing_tag").length);
-  let unchangedCount = $derived(items.filter((i) => getItemStatus(i) === "unchanged").length);
-  // Colliding items are already excluded from the apply payload below, so a
-  // collision only blocks itself — not the rest of the batch.
-  let canApply = $derived(readyCount > 0 && !isLoading && !isApplying);
+  let readyCount = $derived(items.filter((i) => getItemStatus(i) === "ok").length);
+  // Missing-tag and duplicate-routed items still get moved by handleApply (their backend
+  // status is "ok"/"missing_tag") — they just aren't counted in readyCount since the UI
+  // shows them as their own buckets.
+  let canApply = $derived((readyCount > 0 || collisionCount > 0 || missingTagCount > 0) && !isLoading && !isApplying);
+
+  $effect(() => {
+    summaryReadyCount = readyCount;
+    summaryCanApply = canApply;
+    summaryIsApplying = isApplying;
+  });
+
+  // -1 sentinel: skip the initial effect run so mounting doesn't fire an apply.
+  let lastAppliedRequestKey = $state(-1);
+  $effect(() => {
+    if (!embedded) return;
+    const key = applyRequestKey;
+    if (lastAppliedRequestKey === -1) {
+      lastAppliedRequestKey = key;
+    } else if (key !== lastAppliedRequestKey) {
+      lastAppliedRequestKey = key;
+      handleApply();
+    }
+  });
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -664,7 +711,7 @@
     <div class="flex flex-col gap-1.5">
       <div class="flex items-center justify-between">
         <h3 class="text-sm font-medium text-brand-text-primary flex items-center gap-2">
-          <span>{i18n.t("organizer.previewTitle")}</span>
+          <span>{i18n.t("organizer.statusSummary", { errors: errorCount, missingTags: missingTagCount, duplicates: collisionCount, ready: readyCount })}</span>
         </h3>
         <Button
           onclick={fetchPreview}
@@ -679,37 +726,6 @@
         </Button>
       </div>
 
-      <div class="flex flex-col gap-2 text-xs">
-        <div class="flex items-center gap-3">
-          <span class="text-brand-accent-text font-medium">
-            {i18n.t("organizer.summaryReady", { count: readyCount })}
-          </span>
-          <span class="text-brand-text-secondary">
-            {i18n.t("organizer.summaryUnchanged", { count: unchangedCount })}
-          </span>
-          {#if missingTagCount > 0}
-            <span class="text-amber-400 font-medium">
-              {i18n.t("organizer.summaryMissingTags", { count: missingTagCount })}
-            </span>
-          {/if}
-          {#if collisionCount > 0}
-            <span class="text-rose-400 font-medium">
-              {collisionCount === 1 ? i18n.t("organizer.summaryCollisionOne") : i18n.t("organizer.summaryCollisions", { count: collisionCount })}
-            </span>
-          {/if}
-          {#if errorCount > 0}
-            <span class="text-rose-400 font-medium">
-              {i18n.t("organizer.summaryErrors", { count: errorCount })}
-            </span>
-          {/if}
-        </div>
-        {#if commonPrefix}
-          <div class="flex items-center gap-1.5 min-w-0" title={commonPrefix}>
-            <span class="font-semibold text-brand-accent-text shrink-0">{i18n.t("organizer.commonBasePath")}</span>
-            <span class="truncate text-brand-text-secondary">{commonPrefix}</span>
-          </div>
-        {/if}
-      </div>
     </div>
 
     <div class="h-64 border border-brand-border/60 rounded-xl overflow-hidden bg-brand-sidebar/40 flex flex-col">
@@ -727,9 +743,9 @@
         </div>
       {:else}
         <div class="flex-1 min-h-0 overflow-x-auto overflow-y-hidden">
-          <div style="min-width: {96 + fromColWidth + 24 + toColWidth + 20}px;" class="h-full flex flex-col">
+          <div style="min-width: {56 + fromColWidth + 24 + toColWidth + 20}px;" class="h-full flex flex-col">
             <div class="h-7 px-3 flex items-center bg-brand-sidebar/95 border-b border-brand-border/60 text-[10px] font-semibold text-brand-text-secondary uppercase tracking-wider select-none shrink-0">
-              <div class="w-24 shrink-0">{i18n.t("organizer.colStatus")}</div>
+              <div class="w-14 shrink-0">{i18n.t("organizer.colStatus")}</div>
 
               <div class="flex items-center shrink-0 pr-1" style="width: {fromColWidth}px;">
                 <span class="truncate flex-1">{i18n.t("organizer.colSource")}</span>
@@ -772,26 +788,30 @@
                   <div
                     class="h-9 px-3 flex items-center border-b border-brand-border/20 text-[11px] hover:bg-brand-accent/10 transition-colors whitespace-nowrap"
                   >
-                    <div class="w-24 shrink-0">
+                    <div class="w-14 shrink-0">
                       {#if st === "ok"}
-                        <span class="px-2 py-0.5 rounded bg-brand-accent/15 text-brand-accent-text border border-brand-accent/30">
-                          {i18n.t("organizer.statusOk")}
+                        <span class="inline-flex items-center justify-center w-6 h-6 rounded bg-brand-accent/15 text-brand-accent-text border border-brand-accent/30" title={i18n.t("organizer.statusOk")}>
+                          <Check class="w-3.5 h-3.5" />
+                          <span class="sr-only">{i18n.t("organizer.statusOk")}</span>
                         </span>
                       {:else if st === "unchanged"}
                         <span class="px-2 py-0.5 rounded bg-brand-sidebar border border-brand-border/60 text-brand-text-secondary">
                           {i18n.t("organizer.statusUnchanged")}
                         </span>
-                      {:else if st === "collision"}
-                        <span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/40" title={item.error_message || i18n.t("organizer.statusCollision")}>
-                          {i18n.t("organizer.statusCollision")}
+                      {:else if st === "duplicate"}
+                        <span class="inline-flex items-center justify-center w-6 h-6 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40" title={item.error_message || i18n.t("organizer.statusCollision")}>
+                          <Duplicate class="w-3.5 h-3.5" />
+                          <span class="sr-only">{i18n.t("organizer.statusCollision")}</span>
                         </span>
                       {:else if st === "missing_tag"}
-                        <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40" title={item.error_message || i18n.t("organizer.statusMissingTag")}>
-                          {i18n.t("organizer.statusMissingTag")}
+                        <span class="inline-flex items-center justify-center w-6 h-6 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40" title={item.error_message || i18n.t("organizer.statusMissingTag")}>
+                          <AlertTriangle class="w-3.5 h-3.5" />
+                          <span class="sr-only">{i18n.t("organizer.statusMissingTag")}</span>
                         </span>
                       {:else}
-                        <span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/40" title={item.error_message || i18n.t("organizer.statusError")}>
-                          {i18n.t("organizer.statusError")}
+                        <span class="inline-flex items-center justify-center w-6 h-6 rounded bg-rose-500/20 text-rose-400 border border-rose-500/40" title={item.error_message || i18n.t("organizer.statusError")}>
+                          <ErrorIcon class="w-3.5 h-3.5" />
+                          <span class="sr-only">{i18n.t("organizer.statusError")}</span>
                         </span>
                       {/if}
                     </div>
@@ -807,13 +827,17 @@
                     <div class="w-6 text-center text-brand-text-secondary shrink-0">→</div>
 
                     <div
-                      class="px-2 overflow-x-auto scrollbar-none shrink-0 {st === 'ok' ? 'text-brand-text-primary font-medium' : st === 'collision' || st === 'error' ? 'text-rose-400 font-semibold' : 'text-brand-text-primary'}"
+                      class="px-2 overflow-x-auto scrollbar-none shrink-0 {st === 'ok' ? 'text-brand-text-primary font-medium' : st === 'error' ? 'text-rose-400 font-semibold' : st === 'duplicate' ? 'text-amber-400 font-medium' : 'text-brand-text-primary'}"
                       style="width: {toColWidth}px;"
                       title={item.error_message ? `${item.to_path ? item.to_path + ' — ' : ''}${item.error_message}` : item.to_path}
                     >
-                      {#if st === 'error' || st === 'collision' || (item.error_message && st !== 'missing_tag')}
+                      {#if st === 'error'}
                         <span class="text-rose-400 font-medium">
                           {item.error_message ? item.error_message : (displayTo || i18n.t("organizer.unknownError"))}
+                        </span>
+                      {:else if st === 'duplicate'}
+                        <span class="text-amber-400 font-medium">
+                          {item.error_message ? shortenDuplicateMessage(item.error_message) : displayTo}
                         </span>
                       {:else}
                         {@html highlightPathHtml(displayTo)}
@@ -845,15 +869,6 @@
   </Button>
 {/snippet}
 
-{#snippet collisionWarning()}
-  {#if collisionCount > 0}
-    <span class="text-amber-400 font-medium flex items-center gap-1.5">
-      <AlertTriangle class="w-3.5 h-3.5" />
-      {collisionCount === 1 ? i18n.t("organizer.collisionsSkippedOne") : i18n.t("organizer.collisionsSkipped", { count: collisionCount })}
-    </span>
-  {/if}
-{/snippet}
-
 {#snippet actionMessages()}
   {#if errorMessage}
     <div class="text-rose-400 flex items-center gap-2 font-medium text-xs">
@@ -865,9 +880,19 @@
 
 {#if effectiveOpen}
   {#if embedded}
-    <!-- Three visually distinct sections: Template Pattern, Destination & Options, Preview -->
+    <!-- Apply action lives in the host page header (top-right); this renders Preview, Template Pattern, Destination & Options -->
     <div class="space-y-4 text-xs">
       {@render scopeToggle()}
+
+      {#if errorMessage}
+        <div class="space-y-1.5">
+          {@render actionMessages()}
+        </div>
+      {/if}
+
+      <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4 text-brand-text-primary">
+        {@render previewSection()}
+      </div>
 
       <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4 text-brand-text-primary">
         <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t("organizer.sectionTemplatePattern")}</h3>
@@ -877,20 +902,6 @@
       <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4 text-brand-text-primary">
         <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t("organizer.sectionDestinationOptions")}</h3>
         {@render destinationSection()}
-      </div>
-
-      <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4 text-brand-text-primary">
-        {@render previewSection()}
-
-        <div class="pt-4 border-t border-brand-border/40 flex items-center justify-between">
-          <div class="text-xs text-brand-text-secondary">
-            {@render collisionWarning()}
-          </div>
-          <div class="flex items-center gap-3">
-            {@render actionMessages()}
-            {@render applyButton()}
-          </div>
-        </div>
       </div>
     </div>
   {:else}
@@ -945,11 +956,7 @@
           </div>
         </div>
 
-        <div class="px-6 py-4 border-t border-brand-border/40 flex items-center justify-between shrink-0 bg-brand-sidebar/50">
-          <div class="text-xs text-brand-text-secondary">
-            {@render collisionWarning()}
-          </div>
-
+        <div class="px-6 py-4 border-t border-brand-border/40 flex items-center justify-end shrink-0 bg-brand-sidebar/50">
           <div class="flex items-center gap-3">
             {@render actionMessages()}
             <button
