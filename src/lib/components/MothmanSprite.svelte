@@ -8,7 +8,7 @@
   //   3-7   flap_a..e    wing-flap flutter sequence
   //   8-10  peek_a..c    turns around to look behind, then back
   //   11    blink        eyes-closing transition into vibe/rest
-  //   12    vibe         headphones on, eyes closed
+  //   12    vibe         headphones on, eyes closed — paused-only, see PAUSED_FRAMES
   //   13    rest         curled up, sleeping
   //   14    leap         side-profile wings-raised hop, facing right
   //   15    recover      landing pose after the leap
@@ -22,10 +22,13 @@
   const DISPLAY_W = Math.round(DISPLAY_H * FRAME_ASPECT);
 
   const WALK_FRAMES = [0, 1, 2];
+  // Vibe (headphones) is excluded from ACTIONS on purpose: it must only show
+  // while playback is paused (see freeze()), never mid-wander, or the
+  // headphones flash on for a moment while the track is playing and read as
+  // a rendering error rather than an intentional pose.
   const ACTIONS: number[][] = [
     [3, 4, 5, 6, 7, 4], // flap: flutter through the wing-spread sequence
     [8, 9, 10, 9], // peek: turn around to look behind, then back
-    [11, 12, 12, 11], // vibe: close eyes, headphones on, then open
     [11, 13, 13, 11], // rest: close eyes, curl up to sleep, then open
     [14, 15], // leap: hop sideways, land
   ];
@@ -46,7 +49,9 @@
   const PAUSE_MIN_MS = 4000;
   const PAUSE_MAX_MS = 11000;
   const ACTION_CHANCE = 0.6;
-  const SIT_FRAME = 13; // "rest" pose, held while playback isn't active
+  // Poses held while playback is paused — picked randomly each time
+  // playback stops so it doesn't always land on the same one.
+  const PAUSED_FRAMES = [13, 12]; // rest (curled up) / vibe (headphones on)
 
   let { isPlaying = true }: { isPlaying?: boolean } = $props();
 
@@ -142,7 +147,7 @@
     clearInterval(frameTimer);
     clearTimeout(stateTimer);
     isRunning = false;
-    frame = SIT_FRAME;
+    frame = PAUSED_FRAMES[Math.floor(Math.random() * PAUSED_FRAMES.length)];
   }
 
   onMount(() => {
