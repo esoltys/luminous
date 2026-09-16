@@ -111,21 +111,23 @@
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
         <ListeningHeatmap {range} />
-        <div class="bg-brand-sidebar border border-brand-border/60 rounded-xl p-4">
-          <h2 class="text-sm font-semibold text-brand-text-primary mb-3">
+        <div class="bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col">
+          <h2 class="text-sm font-semibold text-brand-text-primary mb-3 shrink-0">
             {i18n.t("stats.listeningClock", {}, "Time of Day")}
           </h2>
-          <TimeOfDayGraphic
-            counts={clockCounts}
-            max={maxClockCount}
-            labels={{
-              morning: CLOCK_BUCKETS[0].label(),
-              afternoon: CLOCK_BUCKETS[1].label(),
-              evening: CLOCK_BUCKETS[2].label(),
-              latenight: CLOCK_BUCKETS[3].label()
-            }}
-          />
-          <div class="grid grid-cols-4 gap-4 mt-2">
+          <div class="flex-1 min-h-0 flex flex-col justify-end">
+            <TimeOfDayGraphic
+              counts={clockCounts}
+              max={maxClockCount}
+              labels={{
+                morning: CLOCK_BUCKETS[0].label(),
+                afternoon: CLOCK_BUCKETS[1].label(),
+                evening: CLOCK_BUCKETS[2].label(),
+                latenight: CLOCK_BUCKETS[3].label()
+              }}
+            />
+          </div>
+          <div class="grid grid-cols-4 gap-4 mt-2 shrink-0">
             {#each CLOCK_BUCKETS as bucket (bucket.key)}
               <div class="flex flex-col items-center gap-0.5">
                 <span class="text-xs text-brand-text-secondary text-center">{bucket.label()}</span>

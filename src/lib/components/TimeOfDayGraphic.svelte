@@ -25,7 +25,7 @@
   );
 </script>
 
-<svg viewBox="0 0 {W} {H}" class="w-full h-auto block rounded-lg overflow-visible" preserveAspectRatio="xMidYMid slice" role="img" aria-label={labels.morning}>
+<svg viewBox="0 0 {W} {H}" class="w-full h-auto block rounded-lg" preserveAspectRatio="xMidYMid meet" role="img" aria-label={labels.morning}>
   <defs>
     <linearGradient id="tod-sky-morning" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#aecbdb" />
@@ -142,11 +142,15 @@
     <line x1={BAND_W * 3} y1="0" x2={BAND_W * 3} y2={H} />
   </g>
 
-  <!-- fill line: brackets exactly how far each bucket's colour reaches -->
+  <!-- fill line: brackets exactly how far each bucket's colour reaches.
+       The outer edges (x=0, x=W) sit exactly on the viewBox boundary, so
+       without an inset half the 3px stroke there would render outside the
+       viewBox and get clipped — making Morning's left border and Late
+       Night's right border look half as thick as the internal dividers. -->
   {#each reveals as h, i}
     {@const y = Math.min(H - 1.5, Math.max(1.5, H - h))}
-    {@const xLeft = i * BAND_W}
-    {@const xRight = (i + 1) * BAND_W}
+    {@const xLeft = i === 0 ? 1.5 : i * BAND_W}
+    {@const xRight = i === reveals.length - 1 ? W - 1.5 : (i + 1) * BAND_W}
     <polyline
       points="{xLeft},{H} {xLeft},{y} {xRight},{y} {xRight},{H}"
       fill="none"
