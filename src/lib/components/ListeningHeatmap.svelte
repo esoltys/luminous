@@ -124,20 +124,16 @@
   );
   let displayCell = $derived(hovered ?? todayCell);
 
-  // Sparse day-of-week labels for the heatmap's sidebar, always Mon/Wed/Fri
-  // regardless of which row that lands on for the current "Start the week
-  // with" preference — picked by actual calendar weekday (`getDay()`), not
-  // row parity, so the letters stay put whether the grid starts on Sunday
-  // or Monday.
-  const LABELED_WEEKDAYS = new Set([1, 3, 5]); // Mon, Wed, Fri
+  // Full day-of-week abbreviations (Sun/Mon/…) for the heatmap's trailing
+  // sidebar, one per row — picked by actual calendar weekday (`getDay()`)
+  // off the most recent column, so the labels follow the current "Start
+  // the week with" preference regardless of which row they land on.
   let dayLabels = $derived(
     mode === "heatmap"
       ? rows.map((row) => {
           const cell = row[row.length - 1];
           if (!cell) return "";
-          const date = dateFromKey(cell.date);
-          if (!LABELED_WEEKDAYS.has(date.getDay())) return "";
-          return date.toLocaleDateString(i18n.currentLocale, { weekday: "narrow" });
+          return dateFromKey(cell.date).toLocaleDateString(i18n.currentLocale, { weekday: "short" });
         })
       : []
   );
@@ -229,7 +225,7 @@
       <div
         role="group"
         aria-label={i18n.t("stats.heatmapTitle", {}, "Listening Streak")}
-        class="flex items-stretch gap-2 mt-4 h-20"
+        class="flex items-stretch gap-2 mt-8 h-20"
         onmouseleave={() => (hovered = null)}
       >
         {#each barDays as cell (cell.date)}
@@ -246,8 +242,15 @@
                 {#if cell.date === peakDate}
                   <StarIcon
                     weight="fill"
-                    class="absolute -top-3 left-1/2 -translate-x-1/2 w-[10px] h-[10px] text-brand-text-primary drop-shadow-[0_0_1px_rgba(0,0,0,0.8)]"
+                    class="absolute top-1 left-1/2 -translate-x-1/2 w-[10px] h-[10px] text-brand-text-primary drop-shadow-[0_0_1px_rgba(0,0,0,0.8)]"
                   />
+                {/if}
+                {#if cell.minutes > 0}
+                  <span
+                    class="absolute -top-4 left-1/2 -translate-x-1/2 text-[10px] leading-none whitespace-nowrap text-brand-text-primary/70"
+                  >
+                    {i18n.t("stats.minuteCount", { count: cell.minutes }, `${cell.minutes} min`)}
+                  </span>
                 {/if}
               </div>
             </div>
@@ -275,7 +278,7 @@
               {#each week as cell (cell.date)}
                 <button
                   type="button"
-                  class="relative flex items-center justify-center aspect-square rounded-sm"
+                  class="relative flex flex-col items-center justify-center gap-0.5 aspect-square rounded-sm"
                   style={cellStyle(cell)}
                   disabled={cell.future}
                   aria-label={cell.future ? undefined : cellLabel(cell)}
@@ -284,7 +287,14 @@
                   onclick={() => !cell.future && (hovered = cell)}
                 >
                   {#if cell.date === peakDate}
-                    <StarIcon weight="fill" class="w-[55%] h-[55%] text-brand-text-primary drop-shadow-[0_0_1px_rgba(0,0,0,0.8)]" />
+                    <StarIcon weight="fill" class="w-[28%] h-[28%] text-brand-text-primary drop-shadow-[0_0_1px_rgba(0,0,0,0.8)]" />
+                  {:else if !cell.future}
+                    <span class="text-xs font-medium leading-none text-brand-text-primary/70">{dateFromKey(cell.date).getDate()}</span>
+                  {/if}
+                  {#if !cell.future && cell.minutes > 0}
+                    <span class="text-[9px] leading-none text-brand-text-primary/60">
+                      {i18n.t("stats.minuteCount", { count: cell.minutes }, `${cell.minutes} min`)}
+                    </span>
                   {/if}
                 </button>
               {/each}
@@ -293,15 +303,7 @@
         </div>
       </div>
     {:else}
-      <div class="flex gap-3 mt-4">
-        <div class="flex flex-col text-[10px] text-brand-text-secondary/70 leading-none shrink-0">
-          <div class="invisible mb-1" aria-hidden="true">&nbsp;</div>
-          <div class="flex flex-col gap-[3px]">
-            {#each dayLabels as label, i (i)}
-              <div class="w-3 h-[13px] flex items-center">{label}</div>
-            {/each}
-          </div>
-        </div>
+      <div class="flex gap-1 mt-4">
         <div
           bind:this={gridEl}
           role="group"
@@ -334,6 +336,14 @@
                   </button>
                 {/each}
               </div>
+            {/each}
+          </div>
+        </div>
+        <div class="flex flex-col text-[10px] text-brand-text-secondary/70 leading-none shrink-0">
+          <div class="invisible mb-1" aria-hidden="true">&nbsp;</div>
+          <div class="flex flex-col gap-[3px]">
+            {#each dayLabels as label, i (i)}
+              <div class="h-[13px] flex items-center whitespace-nowrap">{label}</div>
             {/each}
           </div>
         </div>
