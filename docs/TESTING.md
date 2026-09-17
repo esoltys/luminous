@@ -70,3 +70,29 @@ see `src-tauri/src/paths.rs`).
 
   For known failure modes of these two tools (flaky `--real` sessions, blank/crashing windows
   under GPU/session isolation), see [docs/TROUBLESHOOTING.md](TROUBLESHOOTING.md).
+
+## Remote devtools for headless/agent debugging
+
+An agent (or a developer without desktop access to the running window) can inspect the live
+webview's Console/DOM/Network state without driving the app through WebDriver. This is opt-in and
+debug-build-only — set `LUMINOUS_REMOTE_DEVTOOLS=1` before launching the dev server:
+
+```bash
+LUMINOUS_REMOTE_DEVTOOLS=1 bun run tauri dev
+```
+
+Then, from a browser (e.g. Claude's Browser pane — `mcp__Claude_Browser__navigate`), open
+`http://127.0.0.1:9222`:
+
+- **Linux (WebKitGTK)**: this lists inspectable views; open one to get the full Web Inspector
+  (Console/DOM/Network) as a normal webpage.
+- **Windows (WebView2)**: `http://127.0.0.1:9222/json` lists Chrome DevTools Protocol targets;
+  each has a `devtoolsFrontendUrl` that serves the Chrome DevTools UI over plain http.
+
+Nothing is exposed unless the env var is set, and it's a no-op in release builds regardless
+(`remote_devtools_enabled()` in `src-tauri/src/lib.rs`).
+
+**Limitation**: a browser attached to the inspector frontend sees *that page's own* console via
+its own tooling, not Luminous's — to read Luminous's actual console/network/DOM state, read the
+Console/DOM/Network panels rendered inside the inspector UI itself (e.g. via a page-text or
+screenshot read), not a structured log feed.

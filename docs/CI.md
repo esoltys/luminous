@@ -12,10 +12,9 @@ Microsoft Store submission is **not** part of this repo's pipeline — it lives 
 separate private repo `esoltys/luminous-store`, triggered manually against a published
 `luminous` release tag. See that repo's `README.md` for details.
 
-## What runs on pull requests (and pushes to `main`/`next`)
+## What runs on pull requests (and pushes to `main`)
 
-Both of these trigger on `pull_request` and `push` targeting `main` or `next`, plus a
-weekly `schedule`:
+Both of these trigger on `pull_request` and `push` targeting `main`, plus a weekly `schedule`:
 
 - **`audit.yml` — Security Audit**
   - `security_audit` job: runs `rustsec/audit-check@v2` against `Cargo.lock` to catch
@@ -95,8 +94,8 @@ independently, doesn't gate or get gated by the build).
 
 ```mermaid
 flowchart TD
-    PR["Pull request to main/next"]
-    PushMainNext["Push to main/next"]
+    PR["Pull request to main"]
+    PushMainNext["Push to main"]
     Schedule1["Schedule: weekly Sun 00:00"]
     Schedule2["Schedule: weekly Sat 21:43"]
     TagPush["Push tag v*"]
