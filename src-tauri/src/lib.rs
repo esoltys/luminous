@@ -219,6 +219,45 @@ fn with_webview2_backgrounding_disabled(current: &str) -> String {
     result
 }
 
+/// Loopback port both platforms' remote-devtools channels listen on when
+/// `LUMINOUS_REMOTE_DEVTOOLS` is set — see `remote_devtools_enabled()`. One
+/// fixed port keeps the instructions identical across OSes (navigate to
+/// `http://127.0.0.1:9222`) rather than needing per-platform documentation.
+const REMOTE_DEVTOOLS_PORT: u16 = 9222;
+
+/// Whether the opt-in remote-devtools channel (see `REMOTE_DEVTOOLS_PORT`)
+/// should be wired up for this run. Gated on both a debug build *and* an
+/// explicit env var so it can never ship enabled in a release build or
+/// surprise a user who didn't ask for an unauthenticated loopback inspector
+/// server — set `LUMINOUS_REMOTE_DEVTOOLS=1` before `bun run tauri dev` to
+/// turn it on.
+fn remote_devtools_enabled() -> bool {
+    cfg!(debug_assertions) && std::env::var_os("LUMINOUS_REMOTE_DEVTOOLS").is_some()
+}
+
+/// Appends WebView2's Chrome DevTools Protocol remote-debugging switch to an
+/// existing `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` value, without
+/// duplicating it if already present. Mirrors `with_webview2_occlusion_disabled`
+/// / `with_webview2_backgrounding_disabled`'s append-only pattern.
+///
+/// This is the Windows half of the opt-in remote-devtools channel gated by
+/// `remote_devtools_enabled()`: with the port open, `http://localhost:<port>/json`
+/// lists inspectable targets and each one's `devtoolsFrontendUrl` serves the
+/// full Chrome DevTools UI (Console/DOM/Network) as a plain webpage, which an
+/// agent without a GUI can load and read.
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+fn with_webview2_remote_debugging(current: &str, port: u16) -> String {
+    let flag = format!("--remote-debugging-port={}", port);
+    if current.contains("--remote-debugging-port=") {
+        return current.to_string();
+    }
+    if current.is_empty() {
+        flag
+    } else {
+        format!("{} {}", current, flag)
+    }
+}
+
 /// Reads persisted equalizer settings (linear + parametric) from the DB and
 /// applies them to a freshly-constructed `AudioEngine`, so playback starts
 /// with the user's last-saved EQ state instead of engine defaults.
@@ -653,6 +692,21 @@ pub fn run() {
         std::env::set_var(key, value);
     }
 
+    // Opt-in remote-devtools channel for agents without a GUI (e.g. Claude
+    // Code) to inspect the running webview — see `remote_devtools_enabled()`.
+    // `WEBKIT_INSPECTOR_HTTP_SERVER` (not `WEBKIT_INSPECTOR_SERVER`, which
+    // speaks WebKit's raw remote-inspector protocol over a websocket meant
+    // for another WebKit-based inspector client) is the variant that serves
+    // the Web Inspector frontend itself as plain HTTP, browsable from any
+    // browser.
+    #[cfg(target_os = "linux")]
+    if remote_devtools_enabled() {
+        std::env::set_var(
+            "WEBKIT_INSPECTOR_HTTP_SERVER",
+            format!("127.0.0.1:{}", REMOTE_DEVTOOLS_PORT),
+        );
+    }
+
     // On Windows, Chromium's CalculateNativeWinOcclusion feature puts the
     // WebView2 rendering pipeline into a suspended/discarded state when the
     // window is minimized or occluded for a period of time. Upon restore,
@@ -663,7 +717,13 @@ pub fn run() {
         let key = "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS";
         let current = std::env::var(key).unwrap_or_default();
         let current = with_webview2_occlusion_disabled(&current);
-        std::env::set_var(key, with_webview2_backgrounding_disabled(&current));
+        let current = with_webview2_backgrounding_disabled(&current);
+        let current = if remote_devtools_enabled() {
+            with_webview2_remote_debugging(&current, REMOTE_DEVTOOLS_PORT)
+        } else {
+            current
+        };
+        std::env::set_var(key, current);
     }
 
     tauri::Builder::default()
@@ -1312,6 +1372,37 @@ mod startup_rendering_workaround_tests {
         assert_eq!(
             with_webview2_backgrounding_disabled("--disable-renderer-backgrounding"),
             "--disable-renderer-backgrounding --disable-backgrounding-occluded-windows --disable-background-timer-throttling"
+        );
+    }
+
+    #[test]
+    fn test_webview2_remote_debugging_flag_added_to_empty_value() {
+        assert_eq!(
+            with_webview2_remote_debugging("", 9222),
+            "--remote-debugging-port=9222"
+        );
+    }
+
+    #[test]
+    fn test_webview2_remote_debugging_flag_appended_to_existing_args() {
+        assert_eq!(
+            with_webview2_remote_debugging("--disable-renderer-backgrounding", 9222),
+            "--disable-renderer-backgrounding --remote-debugging-port=9222"
+        );
+    }
+
+    #[test]
+    fn test_webview2_remote_debugging_flag_not_duplicated_if_already_present() {
+        let already_set = "--remote-debugging-port=9222";
+        assert_eq!(
+            with_webview2_remote_debugging(already_set, 9222),
+            already_set
+        );
+
+        let already_set_with_other = "--foo --remote-debugging-port=9222 --bar";
+        assert_eq!(
+            with_webview2_remote_debugging(already_set_with_other, 9222),
+            already_set_with_other
         );
     }
 }
