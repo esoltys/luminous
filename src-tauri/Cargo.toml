@@ -130,7 +130,7 @@ windows-sys = { version = "0.59", features = ["Win32_UI_Input_KeyboardAndMouse"]
 # `ISystemMediaTransportControlsInterop::GetForWindow` (Win32_System_WinRT),
 # the same interop mechanism the previous `souvlaki` dependency used
 # internally, without pulling in souvlaki's own legacy `windows 0.44` pin.
-windows = { version = "0.61", features = [
+windows = { version = "0.62", features = [
     "Media_Control",
     "Foundation",
     "Storage_Streams",
