@@ -158,7 +158,7 @@ image = "0.25"
 # crate the plugin uses internally (re-exported there as `winrt_notification`)
 # — used directly here, with the AUMID read at runtime via
 # GetCurrentApplicationUserModelId, only for the msix update-notification path.
-tauri-winrt-notification = "0.7"
+tauri-winrt-notification = "0.8"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = "0.2"
