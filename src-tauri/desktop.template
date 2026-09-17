@@ -5,7 +5,7 @@ Comment={{comment}}
 {{/if}}
 Exec={{exec}}
 StartupWMClass=org.luminous.music
-Icon={{icon}}
+Icon=org.luminous.music
 Name={{name}}
 Terminal=false
 Type=Application
