@@ -109,13 +109,36 @@
         </p>
       </div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+      <div class="flex items-center justify-between gap-2 mt-6">
+        <div class="flex items-center gap-2">
+          {#each RANGES as r (r.value)}
+            <button
+              onclick={() => {
+                range = r.value;
+                if (typeof window !== "undefined") localStorage.setItem("stats_range", r.value);
+              }}
+              class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors {range === r.value ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'}"
+            >
+              {r.label()}
+            </button>
+          {/each}
+        </div>
+        {#if summary}
+          <span class="text-sm font-medium text-brand-text-secondary shrink-0">
+            {summary.total_minutes === 1
+              ? i18n.t("stats.totalMinutesOne", {}, "1 minute listened")
+              : i18n.t("stats.totalMinutes", { count: summary.total_minutes }, `${summary.total_minutes} minutes listened`)}
+          </span>
+        {/if}
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4 items-start">
         <ListeningHeatmap {range} />
         <div class="bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col">
           <h2 class="text-sm font-semibold text-brand-text-primary mb-3 shrink-0">
             {i18n.t("stats.listeningClock", {}, "Time of Day")}
           </h2>
-          <div class="flex-1 min-h-0 flex flex-col justify-end">
+          <div class="flex flex-col">
             <TimeOfDayGraphic
               counts={clockCounts}
               max={maxClockCount}
@@ -138,29 +161,6 @@
             {/each}
           </div>
         </div>
-      </div>
-
-      <div class="flex items-center justify-between gap-2 mt-4">
-        <div class="flex items-center gap-2">
-          {#each RANGES as r (r.value)}
-            <button
-              onclick={() => {
-                range = r.value;
-                if (typeof window !== "undefined") localStorage.setItem("stats_range", r.value);
-              }}
-              class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors {range === r.value ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'}"
-            >
-              {r.label()}
-            </button>
-          {/each}
-        </div>
-        {#if summary}
-          <span class="text-sm font-medium text-brand-text-secondary shrink-0">
-            {summary.total_minutes === 1
-              ? i18n.t("stats.totalMinutesOne", {}, "1 minute listened")
-              : i18n.t("stats.totalMinutes", { count: summary.total_minutes }, `${summary.total_minutes} minutes listened`)}
-          </span>
-        {/if}
       </div>
     </div>
 
