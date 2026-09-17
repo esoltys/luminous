@@ -256,14 +256,12 @@
     },
     "linux": {
       "deb": {
-        "desktopTemplate": "desktop.template",
         "files": {
           "/usr/share/icons/hicolor": "icons/hicolor",
           "/usr/share/metainfo/org.luminous.music.metainfo.xml": "metainfo/org.luminous.music.metainfo.xml"
         }
       },
       "rpm": {
-        "desktopTemplate": "desktop.template",
         "files": {
           "/usr/share/icons/hicolor": "icons/hicolor",
           "/usr/share/metainfo/org.luminous.music.metainfo.xml": "metainfo/org.luminous.music.metainfo.xml"
