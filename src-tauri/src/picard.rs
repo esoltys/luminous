@@ -141,6 +141,9 @@ pub fn launch_picard(exe: &Path, paths: &[PathBuf]) -> Result<()> {
         return Err(anyhow!("No files to open in Picard"));
     }
 
+    #[cfg(not(windows))]
+    check_flatpak_filesystem_access(exe, paths)?;
+
     let mut chunks = chunk_paths_by_length(paths, MAX_COMMAND_LINE_CHARS).into_iter();
     let first = chunks
         .next()
@@ -191,6 +194,121 @@ fn chunk_paths_by_length(paths: &[PathBuf], max_chars: usize) -> Vec<Vec<&PathBu
         chunks.push(current);
     }
     chunks
+}
+
+/// If `exe` is a Flatpak app's exported launcher, and Picard's Flatpak
+/// sandbox doesn't grant access to one of `paths`, returns an error naming
+/// the blocked path and the `flatpak override` command to fix it — rather
+/// than letting the launch silently no-op. Confirmed by hand: launching the
+/// Flatpak build with a path outside its default grants (`home`,
+/// `xdg-music`, `/tmp`) sends the LOAD message to the running instance
+/// successfully (so `Command::spawn()` sees no error at all), and Picard
+/// itself just logs "No such file or directory" — never surfaced to the
+/// user, since Luminous doesn't watch Picard's process/output (see this
+/// module's doc comment).
+#[cfg(not(windows))]
+fn check_flatpak_filesystem_access(exe: &Path, paths: &[PathBuf]) -> Result<()> {
+    let Some(app_id) = flatpak_app_id(exe) else {
+        return Ok(());
+    };
+    let Some(roots) = flatpak_filesystem_roots(&app_id) else {
+        return Ok(()); // `flatpak info` unavailable, or grants full host access.
+    };
+
+    if let Some(blocked) = paths.iter().find(|p| !roots.iter().any(|r| p.starts_with(r))) {
+        return Err(anyhow!(
+            "MusicBrainz Picard is installed as a Flatpak, and its sandbox doesn't have access to {}. Grant access with:\n  flatpak override --user --filesystem=\"{}\" {app_id}\nor allow it to see your whole filesystem with:\n  flatpak override --user --filesystem=host {app_id}",
+            blocked.display(),
+            blocked.display(),
+        ));
+    }
+    Ok(())
+}
+
+/// Returns `exe`'s Flatpak app ID (e.g. `org.musicbrainz.Picard`) if it
+/// actually resolves to an installed Flatpak app, `None` otherwise (native
+/// install, or a custom path pointing outside Flatpak entirely).
+#[cfg(not(windows))]
+fn flatpak_app_id(exe: &Path) -> Option<String> {
+    let name = exe.file_name()?.to_str()?;
+    if !name.contains('.') {
+        return None; // Flatpak app IDs are reverse-DNS style; a bare binary name can't be one.
+    }
+    let status = Command::new("flatpak")
+        .args(["info", name])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .ok()?;
+    status.success().then(|| name.to_string())
+}
+
+/// Resolves a Flatpak app's `filesystems=` sandbox grants (from `flatpak
+/// info --show-permissions`) into real filesystem roots it can see. Returns
+/// `None` if the app has unrestricted host access (`filesystems=host` or
+/// `host:ro`/`host:rw`) or if permissions couldn't be read at all — both
+/// treated as "can't tell it's blocked", so callers don't false-positive.
+#[cfg(not(windows))]
+fn flatpak_filesystem_roots(app_id: &str) -> Option<Vec<PathBuf>> {
+    let output = Command::new("flatpak")
+        .args(["info", "--show-permissions", app_id])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&output.stdout);
+    let line = text.lines().find(|l| l.starts_with("filesystems="))?;
+    let home = std::env::var("HOME").ok().map(PathBuf::from);
+    parse_filesystem_grants(line, home.as_deref(), &|kind, fallback| {
+        xdg_user_dir(kind, fallback, home.as_deref())
+    })
+}
+
+/// Turns a `filesystems=a;b;c;` line from `flatpak info --show-permissions`
+/// into real filesystem roots, resolving `home`/`xdg-*` tokens against
+/// `home` (via `resolve_xdg` for the XDG ones, so tests can stub it out
+/// without invoking `xdg-user-dir`). Returns `None` for `host` access, same
+/// as the caller.
+#[cfg(not(windows))]
+fn parse_filesystem_grants(
+    line: &str,
+    home: Option<&Path>,
+    resolve_xdg: &dyn Fn(&str, &str) -> PathBuf,
+) -> Option<Vec<PathBuf>> {
+    let value = line.trim_start_matches("filesystems=");
+    let mut roots = Vec::new();
+    for token in value.split(';').map(str::trim).filter(|t| !t.is_empty()) {
+        let kind = token.split(':').next().unwrap_or(token);
+        match kind {
+            "host" => return None,
+            "home" => roots.extend(home.map(PathBuf::from)),
+            "xdg-music" => roots.push(resolve_xdg("MUSIC", "Music")),
+            "xdg-download" => roots.push(resolve_xdg("DOWNLOAD", "Downloads")),
+            "xdg-documents" => roots.push(resolve_xdg("DOCUMENTS", "Documents")),
+            "xdg-desktop" => roots.push(resolve_xdg("DESKTOP", "Desktop")),
+            _ if kind.starts_with('/') => roots.push(PathBuf::from(kind)),
+            _ => {} // Other portal-only grants (xdg-run, xdg-config/*, etc.) aren't music folder locations.
+        }
+    }
+    Some(roots)
+}
+
+/// Resolves an XDG user directory (e.g. the real `~/Music`, which the user
+/// may have relocated via `~/.config/user-dirs.dirs`) by asking
+/// `xdg-user-dir`, falling back to `$HOME/<fallback>` if that's unavailable.
+#[cfg(not(windows))]
+fn xdg_user_dir(name: &str, fallback: &str, home: Option<&Path>) -> PathBuf {
+    Command::new("xdg-user-dir")
+        .arg(name)
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| PathBuf::from(s.trim()))
+        .filter(|p| !p.as_os_str().is_empty())
+        .or_else(|| home.map(|h| h.join(fallback)))
+        .unwrap_or_else(|| PathBuf::from(fallback))
 }
 
 #[cfg(test)]
@@ -257,6 +375,44 @@ mod tests {
         let chunks = chunk_paths_by_length(std::slice::from_ref(&huge_path), 8000);
         assert_eq!(chunks.len(), 1);
         assert_eq!(chunks[0].len(), 1);
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn parse_filesystem_grants_resolves_home_and_absolute_paths() {
+        let roots = parse_filesystem_grants(
+            "filesystems=home;xdg-music;/tmp;",
+            Some(Path::new("/home/user")),
+            &|_, fallback| PathBuf::from("/home/user").join(fallback),
+        )
+        .unwrap();
+        assert_eq!(
+            roots,
+            vec![
+                PathBuf::from("/home/user"),
+                PathBuf::from("/home/user/Music"),
+                PathBuf::from("/tmp"),
+            ]
+        );
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn parse_filesystem_grants_returns_none_for_host_access() {
+        let roots = parse_filesystem_grants(
+            "filesystems=home;host;",
+            Some(Path::new("/home/user")),
+            &|_, fallback| PathBuf::from(fallback),
+        );
+        assert!(roots.is_none());
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn check_flatpak_filesystem_access_ignores_non_flatpak_exe() {
+        let exe = std::env::current_exe().unwrap();
+        let result = check_flatpak_filesystem_access(&exe, &[PathBuf::from("/var/tmp/music")]);
+        assert!(result.is_ok());
     }
 
     #[test]
