@@ -506,7 +506,7 @@ impl Read for HttpRangeReader {
 
         if !in_buffer {
             if let Err(e) = self.fill_buffer(self.position) {
-                return Err(std::io::Error::new(std::io::ErrorKind::Other, e));
+                return Err(std::io::Error::other(e));
             }
             if self.buffer.is_empty() {
                 return Ok(0);
@@ -614,9 +614,9 @@ impl ActiveTrack {
         let path = song
             .path
             .as_deref()
-            .or_else(|| song.stream_url.as_deref())
-            .or_else(|| song.url.as_deref())
-            .ok_or_else(|| "Song has no playable path or URL".to_string())?
+            .or(song.stream_url.as_deref())
+            .or(song.url.as_deref())
+            .ok_or("Song has no playable path or URL".to_string())?
             .to_owned();
 
         let source = open_media_source(&path)?;
@@ -1976,7 +1976,7 @@ mod tests {
         Mock::given(method("GET"))
             .and(path("/track.mp3"))
             .respond_with(|req: &wiremock::Request| {
-                if let Some(range) = req.headers.get(&wiremock::http::HeaderName::from_static("range")) {
+                if let Some(range) = req.headers.get(wiremock::http::HeaderName::from_static("range")) {
                     let range_str = range.to_str().unwrap();
                     if let Some(bytes_part) = range_str.strip_prefix("bytes=") {
                         let parts: Vec<&str> = bytes_part.split('-').collect();

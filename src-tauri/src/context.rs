@@ -97,12 +97,13 @@ impl<T: Clone + Send + 'static> FlightGroup<T> {
 pub static ARTIST_FLIGHT: LazyLock<FlightGroup<Result<Option<WikipediaSummary>, String>>> =
     LazyLock::new(FlightGroup::new);
 
-pub static RELEASE_GROUP_FLIGHT: LazyLock<
-    FlightGroup<(
-        Result<MusicBrainzReleaseGroupData, String>,
-        Result<CritiqueBrainzData, String>,
-    )>,
-> = LazyLock::new(FlightGroup::new);
+type ReleaseGroupFlightResult = (
+    Result<MusicBrainzReleaseGroupData, String>,
+    Result<CritiqueBrainzData, String>,
+);
+
+pub static RELEASE_GROUP_FLIGHT: LazyLock<FlightGroup<ReleaseGroupFlightResult>> =
+    LazyLock::new(FlightGroup::new);
 
 // ---------------------------------------------------------------------------
 // MusicBrainz rate limiting — MetaBrainz asks for roughly one request per
@@ -296,7 +297,7 @@ fn merge_tags(genres: Vec<MbTagOrGenre>, tags: Vec<MbTagOrGenre>, cap: usize) ->
             merged.push(tag);
         }
     }
-    merged.sort_by(|a, b| b.count.cmp(&a.count));
+    merged.sort_by_key(|b| std::cmp::Reverse(b.count));
     merged.into_iter().take(cap).map(|t| t.name).collect()
 }
 

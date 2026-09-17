@@ -1,12 +1,12 @@
 # CI/CD Pipeline
 
 This documents the actual GitHub Actions pipeline as it exists in `.github/workflows/`.
-There are three workflow files: `audit.yml`, `codeql.yml`, and `release.yml`. There is no
-separate lint/test/clippy workflow — those checks (`bun run check`, `bun run test:run`,
-`cargo test`, `cargo clippy`) are **not** run by GitHub Actions today; they're manual steps
-in [`docs/RELEASE_CHECKLIST.md`](./RELEASE_CHECKLIST.md) that a human runs locally before
-cutting a release. If you're expecting a CI job to catch a failing test or a clippy warning
-on your PR, it won't — only the two workflows below run on PRs.
+There are four workflow files: `ci.yml`, `audit.yml`, `codeql.yml`, and `release.yml`.
+`ci.yml` runs `bun run check` (svelte-check), `bun run test:run` (Vitest), `cargo test`, and
+`cargo clippy --all-targets -- -D warnings` on every PR — see below. The full local
+pre-release re-run of these plus a manual QA pass still lives in
+[`docs/RELEASE_CHECKLIST.md`](./RELEASE_CHECKLIST.md) as a belt-and-suspenders step before
+cutting a release, not because CI skips them.
 
 Microsoft Store submission is **not** part of this repo's pipeline — it lives in the
 separate private repo `esoltys/luminous-store`, triggered manually against a published
@@ -14,7 +14,21 @@ separate private repo `esoltys/luminous-store`, triggered manually against a pub
 
 ## What runs on pull requests (and pushes to `main`)
 
-Both of these trigger on `pull_request` and `push` targeting `main`, plus a weekly `schedule`:
+- **`ci.yml` — CI**
+  - `frontend_check` job: `bun run check` (svelte-check + TypeScript, `--fail-on-warnings`)
+    and `knip` (unused code/dependency detection).
+  - `frontend_test` job: `bun run test:run` (Vitest).
+  - `backend_test` job: `cargo test`, then `cargo clippy --all-targets -- -D warnings`
+    (from `src-tauri/`) — any clippy warning fails the PR, not just errors.
+  - `dependabot_regression_gate` job (Dependabot PRs only, `if: github.actor ==
+    'dependabot[bot]'`): a real production build (`bun run build`), the Vitest suite
+    against it, and `cargo test --locked` to catch a version bump that left `Cargo.lock`
+    inconsistent — regressions `frontend_test`/`backend_test` don't reproduce on their own.
+    Clippy isn't duplicated here since `backend_test` already covers every PR, Dependabot's
+    included.
+
+`audit.yml` and `codeql.yml` also trigger on `pull_request` and `push` targeting `main`,
+plus a weekly `schedule`:
 
 - **`audit.yml` — Security Audit**
   - `security_audit` job: runs `rustsec/audit-check@v2` against `Cargo.lock` to catch
@@ -101,9 +115,13 @@ flowchart TD
     TagPush["Push tag v*"]
     ManualDispatch1["Manual workflow_dispatch"]
 
+    CI["ci.yml\ncheck + test + clippy (+ Dependabot gate)"]
     Audit["audit.yml\nSecurity Audit + bun.lock check"]
     CodeQL["codeql.yml\nCodeQL Advanced"]
     Release["release.yml\nRelease Build (builds + drafts release)"]
+
+    PR --> CI
+    PushMainNext --> CI
 
     PR --> Audit
     PushMainNext --> Audit

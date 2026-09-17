@@ -85,16 +85,18 @@
 
     try {
       const saved = await invoke<WebDavServer>("save_webdav_server", {
-        id: server?.id ?? null,
-        name: name.trim(),
-        url: url.trim(),
-        username: username.trim() || null,
-        password: password ? password : null,
-        remotePath: remotePath.trim() || "/",
-        enabled,
-        nickname: nickname.trim() || null,
-        icon: selectedIcon,
-        color: selectedColor,
+        input: {
+          id: server?.id ?? null,
+          name: name.trim(),
+          url: url.trim(),
+          username: username.trim() || null,
+          password: password ? password : null,
+          remotePath: remotePath.trim() || "/",
+          enabled,
+          nickname: nickname.trim() || null,
+          icon: selectedIcon,
+          color: selectedColor,
+        },
       });
       onSaved(saved);
       onClose();

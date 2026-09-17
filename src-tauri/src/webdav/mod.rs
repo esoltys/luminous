@@ -258,7 +258,7 @@ impl WebDavClient {
 
         // Fallback: if title is missing, infer from filename
         if song.title.is_none() {
-            if let Some(filename) = url.split('/').last() {
+            if let Some(filename) = url.split('/').next_back() {
                 let name = filename.split('?').next().unwrap_or(filename);
                 if let Some(idx) = name.rfind('.') {
                     song.title = Some(name[..idx].to_string());

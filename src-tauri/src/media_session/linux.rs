@@ -316,11 +316,7 @@ impl PlatformMediaSession for LinuxMediaSession {
             // because clients are meant to interpolate normal playback
             // progression themselves). A delta bigger than a couple of
             // tick intervals is treated as a genuine seek/track-change.
-            let delta = if position > previous_position {
-                position - previous_position
-            } else {
-                previous_position - position
-            };
+            let delta = position.abs_diff(previous_position);
             delta > Duration::from_secs(2)
         };
         self.emit_property_changed("PlaybackStatus");
