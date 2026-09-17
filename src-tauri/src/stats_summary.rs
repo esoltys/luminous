@@ -796,7 +796,7 @@ mod tests {
         let songs = top_songs(&conn, range_start).unwrap();
         assert_eq!(songs.len(), 1);
         assert_eq!(songs[0].song_id, Some(song_id));
-        assert_eq!(songs[0].art_embedded, true);
+        assert!(songs[0].art_embedded);
         assert_eq!(songs[0].art_manual.as_deref(), Some("cover.jpg"));
         assert_eq!(songs[0].year, Some(2024));
         assert_eq!(songs[0].rating, 4.5);
@@ -804,7 +804,7 @@ mod tests {
         let albums = top_albums(&conn, range_start).unwrap();
         assert_eq!(albums.len(), 1);
         assert_eq!(albums[0].sample_song_id, Some(song_id));
-        assert_eq!(albums[0].art_embedded, true);
+        assert!(albums[0].art_embedded);
         assert_eq!(albums[0].art_manual.as_deref(), Some("cover.jpg"));
         assert_eq!(albums[0].year, Some(2024));
         assert_eq!(albums[0].rating, 5.0);

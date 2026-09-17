@@ -231,13 +231,11 @@ fn strip_disc_prefix(stem: &str) -> Option<&str> {
 
 fn extract_track_and_title_from_stem(stem: &str) -> (Option<i32>, Option<String>) {
     let effective_stem = strip_disc_prefix(stem).unwrap_or(stem);
-    let mut parts = effective_stem.splitn(2, |c: char| c == '-' || c == '_' || c == ' ');
+    let mut parts = effective_stem.splitn(2, ['-', '_', ' ']);
     if let Some(first) = parts.next() {
         if let Ok(num) = first.trim().parse::<i32>() {
             let title = parts.next().map(|t| {
-                t.trim_start_matches(|c: char| c == '-' || c == '_' || c == ' ')
-                    .trim()
-                    .to_string()
+                t.trim_start_matches(['-', '_', ' ']).trim().to_string()
             });
             return (Some(num), title);
         }
@@ -276,9 +274,7 @@ pub fn find_sidecar_lrc(
 
     if let Some(stripped) = strip_disc_prefix(stem) {
         candidate_stems.push(stripped.to_string());
-        let trimmed_leading = stripped
-            .trim_start_matches(|c: char| c == '-' || c == '_' || c == ' ')
-            .trim();
+        let trimmed_leading = stripped.trim_start_matches(['-', '_', ' ']).trim();
         if !trimmed_leading.is_empty() {
             candidate_stems.push(trimmed_leading.to_string());
         }
@@ -347,13 +343,13 @@ pub fn find_sidecar_lrc(
         let lrc_norm = normalize_stem(lrc_stem);
         let lrc_tokens: Vec<&str> = lrc_norm.split_whitespace().collect();
 
-        let track_matches = target_track_num.map_or(false, |trk| {
+        let track_matches = target_track_num.is_some_and(|trk| {
             let trk_2 = format!("{:02}", trk);
             let trk_1 = format!("{}", trk);
             lrc_tokens.iter().any(|&tok| tok == trk_2 || tok == trk_1)
         });
 
-        let title_matches = target_title_norm.as_ref().map_or(false, |norm_title| {
+        let title_matches = target_title_norm.as_ref().is_some_and(|norm_title| {
             if norm_title.is_empty() {
                 return false;
             }
@@ -688,7 +684,7 @@ mod tests {
         std::fs::write(&audio_path, b"dummy").unwrap();
 
         // Synced LRC with UTF-8 BOM
-        let bom_lrc = format!("\u{feff}[00:15.00] Synced line\n[00:20.00] Next line");
+        let bom_lrc = "\u{feff}[00:15.00] Synced line\n[00:20.00] Next line".to_string();
         std::fs::write(&lrc_path, bom_lrc.as_bytes()).unwrap();
         let read = read_sidecar_lrc(&audio_path, None, None);
         assert_eq!(

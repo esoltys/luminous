@@ -74,6 +74,10 @@ jobs:
         working-directory: src-tauri
         run: cargo test
 
+      - name: Run clippy
+        working-directory: src-tauri
+        run: cargo clippy --all-targets -- -D warnings
+
   # Extra gate for Dependabot PRs specifically, on top of the frontend_test/
   # backend_test jobs every PR already gets. Every historical dependency-
   # upgrade regression we've hit (lofty 0.21->0.25 silently dropping album
@@ -84,8 +88,8 @@ jobs:
   #     (catches minification-only regressions like #370)
   #   - Cargo.lock actually matching Cargo.toml post-bump (--locked catches a
   #     bump that left the lockfile inconsistent)
-  #   - clippy clean against the new dependency version (catches new
-  #     deprecations/behavior changes a bump can introduce)
+  # (clippy is covered by every PR via the backend_test job above, so it's
+  # not duplicated here.)
   # This is intentionally a separate, distinctly-named job (rather than
   # folded into frontend_test/backend_test) so it can be set as its own
   # required status check for a future Dependabot auto-merge policy, without
@@ -133,7 +137,3 @@ jobs:
       - name: Run cargo test (locked)
         working-directory: src-tauri
         run: cargo test --locked
-
-      - name: Run clippy
-        working-directory: src-tauri
-        run: cargo clippy --all-targets --locked -- -D warnings

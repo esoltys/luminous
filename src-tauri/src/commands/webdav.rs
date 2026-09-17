@@ -46,21 +46,41 @@ pub async fn list_webdav_servers(state: State<'_, AppState>) -> Result<Vec<WebDa
     Ok(servers)
 }
 
+/// Fields for [`save_webdav_server`], bundled into one struct so the command
+/// doesn't take a clippy-flagged number of individual arguments.
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveWebDavServerInput {
+    pub id: Option<i64>,
+    pub name: String,
+    pub url: String,
+    pub username: Option<String>,
+    pub password: Option<String>,
+    pub remote_path: Option<String>,
+    pub enabled: Option<bool>,
+    pub nickname: Option<String>,
+    pub icon: Option<String>,
+    pub color: Option<String>,
+}
+
 /// Save (create or update) a WebDAV server profile.
 #[tauri::command]
 pub async fn save_webdav_server(
-    id: Option<i64>,
-    name: String,
-    url: String,
-    username: Option<String>,
-    password: Option<String>,
-    remote_path: Option<String>,
-    enabled: Option<bool>,
-    nickname: Option<String>,
-    icon: Option<String>,
-    color: Option<String>,
+    input: SaveWebDavServerInput,
     state: State<'_, AppState>,
 ) -> Result<WebDavServer, String> {
+    let SaveWebDavServerInput {
+        id,
+        name,
+        url,
+        username,
+        password,
+        remote_path,
+        enabled,
+        nickname,
+        icon,
+        color,
+    } = input;
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     let remote_path_val = remote_path.unwrap_or_else(|| "/".to_string());
     let enabled_val = enabled.unwrap_or(true);
