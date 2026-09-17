@@ -26,7 +26,7 @@ into Picard's territory; it's a different, complementary axis Picard was never m
 
 - NEVER commit or push directly to `main`. All changes ship via PR, even release version bumps and docs-only edits.
 - Merging is allowed once — and only once — every check on the PR has actually finished, not just the required ones GitHub's branch-protection summary cares about. Do not treat the green "Able to merge this pull request" banner or the API's `mergeable: MERGEABLE` field as that signal on their own — both go green as soon as required checks pass while non-required checks (e.g. Backend Tests, CodeQL) can still be `in_progress`. Confirm via `gh pr checks <pr> --watch` (blocks until every check concludes) or `gh pr checks <pr>` showing zero `pending`/`in_progress` rows, then run `gh pr merge <pr>`. Tell the user once it's merged.
-- PR base branch depends on the target issue's milestone — see Branching Model below (2.0-milestone work targets `next`; everything else targets `main`).
+- PR base branch is `main` — see Branching Model below for when that changes (a future milestone integration branch, e.g. `3.0`).
 - Before creating a branch, confirm the base: `git fetch origin && git switch -c <branch> origin/<base>`.
 
 ## Destructive Operations
@@ -200,39 +200,33 @@ verify with the user, not a reason to skip telling them.
 
 ## Branching Model
 
-- **`main`** is the rolling 1.x release line. Milestone-1 fixes (and any 1.x feature work) land
-  here and ship as rolling releases (1.1, 1.25, 1.44, etc.) per `docs/RELEASE_CHECKLIST.md`.
-- **`next`** is the long-lived 2.0 feature-integration branch. New stories tracked under the
-  "2.0" GitHub Milestone (see Issue Priority Labels below) target PRs at `next`, not `main`.
-  `next` is a branch name — don't confuse it with the "2.0" Milestone used for issue triage;
-  they're two different things that happen to be about the same release.
-- Keep `next` current by periodically merging `main` into it (`git merge origin/main`, no
-  automated sync) — at minimum before starting a new round of 2.0 work, and always right before
-  eventually merging `next` back into `main`.
-- If the prior main→next sync landed as a squash commit (single parent, not a real merge — check
-  with `git show --no-patch --format='%P' <sync-commit>`), a plain `git merge origin/main` will
-  walk the full pre-squash history and throw spurious conflicts in every file `next` has touched
-  since, even where `main` hasn't changed that file at all since the last sync. Before resolving
-  any conflict by hand, diff the file between the last real sync point and current `main`
-  (`git diff <last-sync-commit> origin/main -- <file>`) — if it's empty, the conflict is a git
-  artifact and it's safe to keep `next`'s side (`git checkout --ours -- <file>`); only do real
-  content-level resolution where `main` actually changed the file. Also double check `package.json`
-  / `Cargo.toml` / `Cargo.lock` / `tauri.conf.json` version fields after any merge like this — a
-  clean (non-conflicting) auto-merge can still silently revert `next`'s version forward to
-  `main`'s, since git applies the one-sided line change without knowing it's semantically wrong.
-- When the "2.0" Milestone's issues are done, `next` merges into `main` via PR and becomes the
-  new baseline. A fresh `next` (or renamed successor) gets cut for whatever comes after that.
-- **Interim releases**: 2.0 work that's already done and stable doesn't have to wait for the
-  *entire* 2.0 Milestone to finish. It can ship early as a rolling 1.x release (e.g. "1.5") by
-  syncing `main` into `next`, merging `next` into `main` via PR, and rolling `main`'s
-  `package.json`/`Cargo.toml` version back down to the 1.x line (`next`'s own version, e.g.
-  `2.0.0`, stays as-is or gets bumped once `main` no longer matches it). `next` is **not**
-  retired by this — it keeps living as the home for whatever 2.0 issues are still open. On
-  GitHub, create a milestone matching the release (e.g. "1.5") and move the completed issues'
-  milestone from "2.0" to it; issues that are done but belong to a still-open epic can move
-  individually while the epic itself stays in "2.0" (split is fine pre-release, since nothing
-  user-facing observes the milestone). Repeat this pattern for future interim releases as more
-  2.0 work completes ahead of the full 2.0 cut.
+- **`main`** is the rolling release line, now on the 2.x series. `next` (the former 2.0
+  feature-integration branch) was merged into `main` and retired — 1.8.0 was the last 1.x
+  release. All feature and fix work, including what would previously have targeted `next`,
+  now targets `main` directly and ships as rolling 2.x releases per `docs/RELEASE_CHECKLIST.md`.
+- There is currently no long-lived integration branch. When the next major body of
+  work (breaking changes, a redesign, anything that needs to bake before release) warrants
+  isolating from the rolling release line again, cut a fresh branch named for the milestone
+  it's aiming at (e.g. `3.0`) rather than reusing the generic name `next` — the explicit
+  version number is easier to reason about when checking a PR's base or an issue's milestone.
+  Until that happens, don't create or target any integration branch other than `main`.
+- If/when such a branch exists again, the same mechanics that applied to `next` apply to it:
+  keep it current by periodically merging `main` into it; watch out for a prior sync that
+  landed as a squash commit (single parent, not a real merge — check with
+  `git show --no-patch --format='%P' <sync-commit>`), since a plain `git merge origin/main`
+  after one will walk the full pre-squash history and throw spurious conflicts in every file
+  the branch has touched since, even where `main` hasn't changed that file at all since the
+  last sync — before resolving any conflict by hand, diff the file between the last real sync
+  point and current `main` (`git diff <last-sync-commit> origin/main -- <file>`), and if it's
+  empty the conflict is a git artifact safe to resolve by keeping the integration branch's side
+  (`git checkout --ours -- <file>`); only do real content-level resolution where `main` actually
+  changed the file. Also double check `package.json` / `Cargo.toml` / `Cargo.lock` /
+  `tauri.conf.json` version fields after any merge like this in **either** direction — a clean
+  (non-conflicting) auto-merge can silently drag one branch's version onto the other, since git
+  applies the one-sided line change without knowing it's semantically wrong. This is exactly
+  how `main` ended up on `2.0.0` prematurely: a PR whose branch was cut from `next` got merged
+  into `main` instead of `next`, and every PR after it inherited that base — check a PR's actual
+  `baseRefName` (`gh pr view <n> --json baseRefName`) before merging, not just the branch name.
 
 ## Issue & PR Formatting
 
@@ -258,7 +252,7 @@ punt either to the user.
 - Proactively search and view GitHub issues using the `gh` command tool (e.g., `gh issue list` and `gh issue view <id>`) when asked to "fix a bug" or "work on a feature".
 - When working on a bug or feature, always work in a dedicated git worktree. Note that Claude uses its own worktree flow in `.claude/worktrees/`, while all other AI assistants and agents must place their dedicated worktree in the `.worktrees/` directory (e.g., `.worktrees/<feature-or-bug-name>`). Do not delete the worktree until the changes have been reviewed, merged, and approved for cleanup by the user.
 - As soon as you start working a tracked issue, set its Status to "In Progress" on the Project board (see [docs/ISSUE_PRIORITY.md](docs/ISSUE_PRIORITY.md) for the `gh project item-edit` command) — don't leave it sitting at "Todo" while work is underway.
-- Present the Walkthrough (`walkthrough.md`) to the user and wait for their explicit feedback and approval before opening or finalizing a PR. Do NOT run `bun run tauri dev` as a background task (it does not work as expected). Ask the user to run the dev server (`bun run tauri dev`) and check manually.
+- Present the Walkthrough (`walkthrough.md`) to the user and wait for their explicit feedback and approval before opening or finalizing a PR. Running `bun run tauri dev` directly is fine, but check first that another instance isn't already running (`ps aux | grep LuminousMusicPlayer`) — this repo uses `tauri-plugin-single-instance`, and launching a second one while the user has their own session up can tear down their running instance instead of just being rejected.
 - **Merge once every check has actually finished, not before.** This replaced an earlier blanket "never merge" rule after PRs were repeatedly merged while checks were still running — the CI gate is what matters, not withholding the merge action itself. After creating a PR, watch it with `gh pr checks <pr> --watch` (this blocks until every check concludes, pass or fail) rather than sampling `mergeable`/the GitHub UI banner, which both go green on required-checks-only and can be reported alongside still-`in_progress` non-required checks. Once everything has genuinely concluded and passed, run `gh pr merge <pr>` and tell the user it merged. If any check fails, stop and report it — do not merge, and do not retry the merge command hoping it clears. For a stack of dependent PRs, merge them in order (base before dependent) so each retargets cleanly as its predecessor's branch is deleted.
 - Once a PR has merged, confirm the corresponding issues closed and their Status set to "Done" on the Project board. On Windows, `git worktree remove` fails with "Permission denied" on the worktree the current session is running from (open file handles keep it locked) — hand the `git worktree remove`/`git branch -d` commands to the user to run themselves in that case instead of retrying.
 - **Creating Issues & Pull Requests**:
@@ -277,13 +271,10 @@ punt either to the user.
      a Priority using the scheme in [docs/ISSUE_PRIORITY.md](docs/ISSUE_PRIORITY.md) (which also
      has the `gh project item-add` / `item-edit` commands and field/option IDs). Do this for every
      bug or feature issue you create — don't leave the fields unset or punt them to the user.
-  8. Before opening a PR that closes/fixes an issue, check that issue's Milestone
-     (`gh issue view <id> --json milestone`): if it's "2.0", branch from and target the PR at
-     `next`, not `main` (see Branching Model above). Everything else targets `main`. Do this even
-     when a branch name was already assigned for the task — the assigned branch name doesn't
-     imply a base branch, and defaulting to `main` for 2.0 work is a real regression risk (it
-     ships unfinished 2.0 work early). If the issue's milestone changes after the PR is opened,
-     re-check whether the base branch still matches and retarget the PR if not.
+  8. Branch from and target the PR at `main`, unless a future milestone integration branch
+     exists and the issue's Milestone (`gh issue view <id> --json milestone`) says otherwise
+     (see Branching Model above) — don't assume the assigned branch name implies a different
+     base.
 - **Releases & Tagging**: When tagging a new release, only create and push a single semantic version tag matching the repository's convention (e.g., `vX.Y.Z` where X.Y.Z matches the project version in `package.json`/`Cargo.toml`) to avoid triggering duplicate build workflows in GitHub Actions.
 
 ## Git Hooks
