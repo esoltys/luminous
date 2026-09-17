@@ -1000,8 +1000,7 @@ export const fr = {
     sabrina: "Sabrina",
     "terminal-green": "Vert terminal",
     driftwood: "Bois flotté",
-    foxglove: "Digitale",
-    mothman: "Mothman"
+    foxglove: "Digitale"
   },
   artistDetail: {
     backToArtists: "Voir les artistes",

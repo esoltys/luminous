@@ -966,8 +966,7 @@ export const en = {
     sabrina: "Sabrina",
     "terminal-green": "Terminal Green",
     driftwood: "Driftwood",
-    foxglove: "Foxglove",
-    mothman: "Mothman"
+    foxglove: "Foxglove"
   },
   artistDetail: {
     backToArtists: "View Artists",

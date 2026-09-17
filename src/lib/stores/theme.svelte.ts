@@ -214,17 +214,6 @@ const FOXGLOVE_COLORS: ThemeColors = {
   "color-border": "#783a46"
 };
 
-const MOTHMAN_COLORS: ThemeColors = {
-  "bg-main": "#2a535e",
-  "bg-sidebar": "#000308",
-  "bg-playerbar": "#2a535e",
-  "color-accent": "#c6133d",
-  "color-accent-hover": "#e2bd86",
-  "color-text-primary": "#ffffff",
-  "color-text-secondary": "#e2e8f0",
-  "color-border": "#904d46"
-};
-
 export const PREDEFINED_THEMES: Theme[] = [
   {
     id: "dynamic-artwork",
@@ -284,11 +273,6 @@ export const PREDEFINED_THEMES: Theme[] = [
     id: "foxglove",
     name: "Foxglove",
     colors: { ...FOXGLOVE_COLORS }
-  },
-  {
-    id: "mothman",
-    name: "Mothman",
-    colors: { ...MOTHMAN_COLORS }
   }
 ];
 
