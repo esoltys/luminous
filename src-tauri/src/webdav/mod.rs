@@ -327,7 +327,7 @@ pub fn parse_propfind_response(xml: &str) -> Result<Vec<WebDavItem>> {
     loop {
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(e)) => {
-                let name = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
+                let name = e.local_name().as_ref().to_string();
                 current_tag = name.to_ascii_lowercase();
                 text_buf.clear();
 
@@ -345,7 +345,7 @@ pub fn parse_propfind_response(xml: &str) -> Result<Vec<WebDavItem>> {
                 }
             }
             Ok(Event::Empty(e)) => {
-                let name = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
+                let name = e.local_name().as_ref().to_string();
                 let tag_lower = name.to_ascii_lowercase();
                 if inside_resourcetype && tag_lower == "collection" {
                     current_is_dir = true;
@@ -353,21 +353,19 @@ pub fn parse_propfind_response(xml: &str) -> Result<Vec<WebDavItem>> {
             }
             Ok(Event::Text(e)) => {
                 if inside_response {
-                    // `decode()` handles the document's byte encoding only — entity
+                    // Text content arrives pre-decoded as `&str` — entity
                     // references arrive separately as `GeneralRef` events (below).
-                    if let Ok(decoded) = e.decode() {
-                        text_buf.push_str(&decoded);
-                    }
+                    text_buf.push_str(&e);
                 }
             }
             Ok(Event::GeneralRef(e)) => {
                 if inside_response {
                     if let Ok(Some(ch)) = e.resolve_char_ref() {
                         text_buf.push(ch);
-                    } else if let Ok(name) = e.decode() {
+                    } else {
                         // The five predefined XML entities — a DTD-less WebDAV
                         // PROPFIND response can't define any others.
-                        match name.as_ref() {
+                        match e.as_ref() {
                             "amp" => text_buf.push('&'),
                             "lt" => text_buf.push('<'),
                             "gt" => text_buf.push('>'),
@@ -379,7 +377,7 @@ pub fn parse_propfind_response(xml: &str) -> Result<Vec<WebDavItem>> {
                 }
             }
             Ok(Event::End(e)) => {
-                let name = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
+                let name = e.local_name().as_ref().to_string();
                 let tag_lower = name.to_ascii_lowercase();
 
                 if inside_response {
