@@ -56,7 +56,7 @@ export const en = {
     greetingNight: "Good Night",
     loading: "Loading your collection...",
     topArtists: "Top Artists",
-    topAlbums: "Top 10 Albums",
+    topAlbums: "Top Albums This Week",
     chartNew: "New",
     chartRising: "Rising",
     chartFalling: "Falling",

@@ -131,6 +131,50 @@ describe("TopTenList.svelte", () => {
     expect(navigationStore.selectedArtistName).toBe("Queen");
   });
 
+  it("hides the duration column when showDuration is false", () => {
+    const items: StatsTopItem[] = [
+      {
+        key: "1",
+        label: "Song One",
+        secondary: "Artist One",
+        play_count: 10,
+        minutes: 32,
+        excluded: false,
+        album: "Album One",
+        song_id: 101,
+        art_embedded: false,
+        year: 2021,
+        rating: 5,
+      },
+    ];
+
+    const { queryByText } = render(TopTenList, {
+      props: {
+        items,
+        kind: "song",
+        showDuration: false,
+      },
+    });
+
+    expect(queryByText("32 min")).not.toBeInTheDocument();
+  });
+
+  it("calls onHeaderClick when the title is clicked", async () => {
+    const onHeaderClick = vi.fn();
+
+    const { getByText } = render(TopTenList, {
+      props: {
+        title: "Top Albums",
+        items: [],
+        kind: "album",
+        onHeaderClick,
+      },
+    });
+
+    await fireEvent.click(getByText("Top Albums"));
+    expect(onHeaderClick).toHaveBeenCalledOnce();
+  });
+
   it("renders custom emptyText when items array is empty", () => {
     const { getByText } = render(TopTenList, {
       props: {
