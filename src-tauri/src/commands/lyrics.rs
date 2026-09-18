@@ -9,17 +9,14 @@ pub async fn get_lyrics(
     force_refresh: Option<bool>,
 ) -> Result<String, String> {
     let force_refresh = force_refresh.unwrap_or(false);
-    eprintln!("[Luminous Backend] get_lyrics called for song_id: {song_id}, force_refresh: {force_refresh}");
+    log::debug!("get_lyrics called for song_id: {song_id}, force_refresh: {force_refresh}");
 
     let lyrics_manager = LyricsManager::new();
     let result = get_lyrics_for_song(&state.db, &lyrics_manager, song_id, force_refresh).await;
 
     match &result {
-        Ok(lyrics) => eprintln!(
-            "[Luminous Backend] get_lyrics resolved (len: {})",
-            lyrics.len()
-        ),
-        Err(e) => eprintln!("[Luminous Backend] get_lyrics failed: {e}"),
+        Ok(lyrics) => log::debug!("get_lyrics resolved (len: {})", lyrics.len()),
+        Err(e) => log::warn!("get_lyrics failed: {e}"),
     }
     result
 }

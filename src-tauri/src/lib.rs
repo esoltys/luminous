@@ -444,7 +444,7 @@ fn spawn_audio_event_loop(
 
             let rx = rx.lock().unwrap();
             for event in rx.iter() {
-                eprintln!("[Luminous Backend] Received event: {:?}", event);
+                log::trace!("Received audio event: {:?}", event);
                 let app = app_handle.clone();
                 let player = player.clone();
                 tauri::async_runtime::block_on(async move {
@@ -530,7 +530,7 @@ fn spawn_audio_event_loop(
                             let _ = app.emit("playback-state", state);
                         }
                         crate::audio::AudioEvent::Error { message } => {
-                            eprintln!("[Luminous Backend] ERROR from audio engine: {}", message);
+                            log::error!("Audio engine error: {}", message);
 
                             if p.try_heal_and_retry_current_track().await {
                                 // Stale-cased path (Linux/case-sensitive
@@ -641,10 +641,7 @@ fn register_media_shortcuts(app: &tauri::App) {
                     };
 
                     if let Err(err) = result {
-                        eprintln!(
-                            "[Luminous Backend] Failed to handle media key {:?}: {}",
-                            key, err
-                        );
+                        log::warn!("Failed to handle media key {:?}: {}", key, err);
                     } else {
                         let playback_state = player.get_state().await;
                         crate::media_session::mirror_state(&app_handle, &playback_state).await;
@@ -654,7 +651,7 @@ fn register_media_shortcuts(app: &tauri::App) {
             })
         {
             log::debug!(
-                "[Luminous Backend] Global shortcut registration skipped for '{}': {}",
+                "Global shortcut registration skipped for '{}': {}",
                 shortcut_str,
                 err
             );
@@ -677,10 +674,20 @@ pub fn run() {
     // Without this, every log::info!/warn!/error! call across the backend
     // (including reconcile-failure diagnostics) is a silent no-op — `log`
     // is just a facade and needs a registered backend to actually emit
-    // anywhere. Defaults to `info` so normal operation stays quiet; set
-    // `RUST_LOG=debug` (or per-module, e.g. `RUST_LOG=luminous_lib::tags=debug`)
-    // to see more when running `bun run tauri dev` from a terminal.
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    // anywhere. `RUST_LOG` (standard env_logger override, e.g.
+    // `RUST_LOG=debug` or per-module `RUST_LOG=luminous_lib::tags=debug`)
+    // always wins when set. Otherwise `--verbose`/`-v` (or `LUMINOUS_VERBOSE=1`)
+    // keeps every level for the whole run; without it, startup logs at `info`
+    // so the terminal shows what's happening while the app comes up, then
+    // drops to `warn`-and-up once `.setup()` finishes below — steady-state
+    // chatter (e.g. the luminous-art:// protocol handler firing on every
+    // cover art request) stays out of the terminal unless something breaks.
+    let rust_log_explicit = std::env::var("RUST_LOG").is_ok();
+    let verbose = std::env::var("LUMINOUS_VERBOSE").is_ok()
+        || std::env::args().any(|a| a == "--verbose" || a == "-v");
+    let default_filter = if verbose { "debug" } else { "info" };
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(default_filter))
+        .init();
 
     // The AppImage bundles its own WebKitGTK (built on the CI runner), which
     // can be substantially older than the host's system WebKitGTK. Older
@@ -764,8 +771,8 @@ pub fn run() {
                 covers_dir.join(decoded)
             };
 
-            eprintln!(
-                "[Luminous Backend] Custom protocol: URI = {}, Resolved path = {:?} (exists: {})",
+            log::trace!(
+                "Custom protocol: URI = {}, Resolved path = {:?} (exists: {})",
                 uri_str,
                 file_path,
                 file_path.exists()
@@ -845,7 +852,7 @@ pub fn run() {
                 let _ = app.emit("open-file-request", opened_paths);
             }
         }))
-        .setup(|app| {
+        .setup(move |app| {
             if let Ok(app_data_dir) = app.path().app_data_dir() {
                 diagnostics::install_panic_hook(app_data_dir);
             }
@@ -978,8 +985,8 @@ pub fn run() {
 
             let media_session = media_session::spawn(app.handle().clone(), media_hwnd);
             if media_session.is_none() {
-                eprintln!(
-                    "[Luminous Backend] OS media session integration (SMTC/MPRIS2) unavailable; continuing without it."
+                log::info!(
+                    "OS media session integration (SMTC/MPRIS2) unavailable; continuing without it."
                 );
             }
 
@@ -1072,6 +1079,15 @@ pub fn run() {
                 app.listen("library-changed", move |_| {
                     tauri::async_runtime::spawn(tags::reconcile_hierarchy_and_notify(handle.clone()));
                 });
+            }
+
+            // Startup is done: everything above (DB/migrations, playlist
+            // bootstrap, watcher, tray, bridge server) has had a chance to
+            // log at `info`. Drop to `warn`-and-up for the rest of the run
+            // unless the user asked for full verbosity via `RUST_LOG` or
+            // `--verbose`/`LUMINOUS_VERBOSE`.
+            if !rust_log_explicit && !verbose {
+                log::set_max_level(log::LevelFilter::Warn);
             }
 
             Ok(())
