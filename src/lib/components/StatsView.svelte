@@ -6,7 +6,6 @@
   import { i18n } from "../stores/i18n.svelte";
   import { rememberScroll } from "../utils/scrollMemory";
   import { playerStore } from "../stores/player.svelte";
-  import { ChartBarIcon as BarChart2 } from "phosphor-svelte";
   import type { StatsRange, StatsSummary, StatsTopItem } from "../types";
   import { bucketListeningClock } from "../utils/listeningClock";
   import type { DaypartBucket } from "../utils/daypart";
@@ -98,18 +97,8 @@
 
 <div class="flex-1 flex flex-col h-full bg-brand-main text-brand-text-primary select-none overflow-hidden relative">
   <div class="flex-1 overflow-y-auto px-6 pb-12" class:pb-28={!!playerStore.currentSong} use:rememberScroll={"stats"}>
-    <div class="pt-8 pb-4">
-      <div>
-        <h1 class="text-3xl font-heading font-bold text-brand-text-primary flex items-center gap-3">
-          <BarChart2 class="w-7 h-7 text-brand-accent" />
-          {i18n.t("stats.title", {}, "Stats")}
-        </h1>
-        <p class="text-sm text-brand-text-secondary mt-1">
-          {i18n.t("stats.subtitle", {}, "Your private listening insights — computed on-device, never shared.")}
-        </p>
-      </div>
-
-      <div class="flex items-center justify-between gap-2 mt-6">
+    <div class="pt-4 pb-4">
+      <div class="flex items-center justify-between gap-2">
         <div class="flex items-center gap-2">
           {#each RANGES as r (r.value)}
             <button
@@ -135,7 +124,7 @@
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4 items-start">
         <ListeningHeatmap {range} />
         <div class="bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col">
-          <h2 class="text-sm font-semibold text-brand-text-primary mb-3 shrink-0">
+          <h2 class="text-xl font-semibold text-brand-text-primary mb-3 shrink-0">
             {i18n.t("stats.listeningClock", {}, "Time of Day")}
           </h2>
           <div class="flex flex-col">
