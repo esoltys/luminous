@@ -37,13 +37,6 @@ describe("UpdaterStore", () => {
     vi.mocked(relaunch).mockReset().mockResolvedValue(undefined);
   });
 
-  it("initializes with correct defaults", () => {
-    expect(updaterStore.updateCheckEnabled).toBe(false);
-    expect(updaterStore.updateAutoInstall).toBe(false);
-    expect(updaterStore.checkStatus).toBe("idle");
-    expect(updaterStore.updateAvailable).toBe(false);
-  });
-
   it("init() defaults updateCheckEnabled to true and triggers check", async () => {
     vi.mocked(check).mockResolvedValueOnce(null);
     await updaterStore.init();

@@ -76,13 +76,24 @@ fn write_wav_with_embedded_art(path: &std::path::Path) {
         .expect("failed to write fixture tag");
 }
 
+/// Real synthetic audio files (see `scripts/generate_test_fixtures.sh`).
+const FIXTURES_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/audio");
+
 #[given("I have a song in the library")]
 fn song_in_library(w: &mut TagEditorWorld) {
+    let song_path = w.temp_dir.path().join("song_alpha.mp3");
+    std::fs::copy(
+        PathBuf::from(FIXTURES_DIR).join("song_alpha.mp3"),
+        &song_path,
+    )
+    .expect("failed to copy fixture");
+    w.song_path = Some(song_path.clone());
+
     let conn = w.db.pool.get().expect("db conn failed");
     conn.execute(
-        "INSERT OR REPLACE INTO songs (id, title, artist, album, source, filetype, unavailable)
-         VALUES (?1, 'Yellow', 'Coldplay', 'Parachutes', 1, 1, 0)",
-        rusqlite::params![w.song_id],
+        "INSERT OR REPLACE INTO songs (id, path, title, artist, album, source, filetype, unavailable)
+         VALUES (?1, ?2, 'Yellow', 'Coldplay', 'Parachutes', 1, 1, 0)",
+        rusqlite::params![w.song_id, song_path.to_string_lossy()],
     )
     .unwrap();
 }
@@ -102,6 +113,21 @@ fn change_artist(w: &mut TagEditorWorld, artist: String) {
 
 #[when("I click \"Save Tags\"")]
 fn click_save_tags(w: &mut TagEditorWorld) {
+    // Real lofty write to the real file on disk, mirroring what the
+    // `save_tags` Tauri command does, so this scenario ("saving back to
+    // audio file") actually exercises the write path instead of only the DB.
+    let path = w.song_path.clone().expect("song_path not set");
+    luminous_lib::tageditor::write_tags(
+        &path,
+        &luminous_lib::tageditor::TagWriteRequest {
+            title: &w.new_title,
+            artist: &w.new_artist,
+            album: "Parachutes",
+            ..Default::default()
+        },
+    )
+    .expect("write_tags should succeed against a real audio file");
+
     let conn = w.db.pool.get().expect("db conn failed");
     conn.execute(
         "UPDATE songs SET title = ?1, artist = ?2 WHERE id = ?3",
@@ -122,6 +148,17 @@ fn db_updated(w: &mut TagEditorWorld) {
         .expect("song not found");
     assert_eq!(title, w.new_title);
     assert_eq!(artist, w.new_artist);
+
+    // Also confirm the tags were actually written back to the audio file on
+    // disk (lofty read-back), not just the database.
+    use lofty::file::TaggedFileExt;
+    use lofty::probe::Probe;
+    use lofty::tag::Accessor;
+    let path = w.song_path.clone().expect("song_path not set");
+    let tagged_file = Probe::open(&path).unwrap().read().unwrap();
+    let tag = tagged_file.primary_tag().expect("no tag found on file");
+    assert_eq!(tag.title().as_deref(), Some(w.new_title.as_str()));
+    assert_eq!(tag.artist().as_deref(), Some(w.new_artist.as_str()));
 }
 
 #[then("the library views should immediately reflect the updated metadata")]

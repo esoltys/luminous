@@ -37,10 +37,10 @@ describe("I18nStore", () => {
 
   it("should translate keys with correct locale", () => {
     i18n.currentLocale = "en";
-    expect(i18n.t("sidebar.collection")).toBe("Collection");
+    expect(i18n.t("collection.noSongsTitle")).toBe("No songs found");
 
     i18n.currentLocale = "fr";
-    expect(i18n.t("sidebar.collection")).toBe("Collection"); // Wait, Collection is the same in EN and FR! Let's use folders
+    expect(i18n.t("collection.noSongsTitle")).toBe("Aucune chanson trouvée");
   });
 
   it("should support different translations", () => {

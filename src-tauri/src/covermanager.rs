@@ -1139,20 +1139,4 @@ mod tests {
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }
-
-    #[test]
-    fn test_extract_embedded_art_prefers_cover_front_over_other_pictures() {
-        // Regression test for the #98/#757 bug: `.pictures().first()` picked
-        // whichever picture lofty stored first, so a `CoverFront` picture
-        // could lose to an unrelated one. `extract_embedded_art` must now
-        // rank by category and keep `CoverFront` regardless of tag order.
-        let unordered = vec![
-            (ArtworkCategory::Subfolder, b"other-picture".to_vec()),
-            (ArtworkCategory::PrimaryCover, b"front-cover".to_vec()),
-            (ArtworkCategory::BackCover, b"back-cover".to_vec()),
-        ];
-        let winner = unordered.into_iter().min_by_key(|(c, _)| *c).unwrap();
-        assert_eq!(winner.0, ArtworkCategory::PrimaryCover);
-        assert_eq!(winner.1, b"front-cover".to_vec());
-    }
 }

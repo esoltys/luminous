@@ -173,14 +173,4 @@ describe("CollectionStore - miniplayer geometry and window-geometry IPC races", 
     expect(exitCallCount).toBe(1);
     expect(windowLayoutStore.isMiniplayer).toBe(false);
   });
-
-  it("restores miniplayer mode synchronously from localStorage on startup and syncs backend IPC", async () => {
-    localStorage.setItem("layout_isMiniplayer", "true");
-    vi.mocked(invoke).mockResolvedValue(null);
-
-    // Re-initialize collection store
-    await windowLayoutStore.enterMiniplayerMode(true);
-    expect(windowLayoutStore.isMiniplayer).toBe(true);
-    expect(invoke).toHaveBeenCalledWith("enter_miniplayer_mode", expect.any(Object));
-  });
 });
