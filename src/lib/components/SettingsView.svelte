@@ -49,8 +49,8 @@
 </script>
 
 <div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full">
-  <div class="h-16 pl-6 pr-8 border-b border-brand-border flex items-center shrink-0">
-    <div class="flex items-center gap-2" role="tablist" aria-label={i18n.t('settings.title')}>
+  <div class="flex-1 overflow-y-scroll px-6 pb-6" class:pb-28={!!playerStore.currentSong} use:rememberScroll={`settings:${settingsTab}`}>
+    <div class="pt-4 pb-4 flex items-center gap-2" role="tablist" aria-label={i18n.t('settings.title')}>
       {#each TABS as tab (tab.value)}
         <button
           onclick={() => { settingsTab = tab.value; }}
@@ -62,9 +62,7 @@
         </button>
       {/each}
     </div>
-  </div>
 
-  <div class="flex-1 overflow-y-scroll p-6" class:pb-28={!!playerStore.currentSong} use:rememberScroll={`settings:${settingsTab}`}>
     <div class="max-w-3xl mx-auto space-y-6">
       {#if settingsTab === "general"}
         <SettingsGeneral />
