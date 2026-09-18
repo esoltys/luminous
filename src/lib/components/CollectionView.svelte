@@ -20,7 +20,7 @@
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { prefs, type CollectionViewMode } from "../stores/prefs.svelte";
-  import { getArtistAlbums, getArtistSongs, getArtistGradient } from "../utils/artist";
+  import { getArtistGradient } from "../utils/artist";
   import ArtistDetailView from "./ArtistDetailView.svelte";
   import AlbumDetailView from "./AlbumDetailView.svelte";
   import GenreBrowseView from "./GenreBrowseView.svelte";
@@ -83,12 +83,54 @@
     tagsStore.load();
   }
 
+  // Indexed once per collectionStore.albums/songs change instead of re-filtering
+  // the full arrays for every artist on every render (search keystroke, sort
+  // toggle, view switch) — see the same matching rules in getArtistAlbums/
+  // getArtistSongs, kept in sync here for O(1) per-artist lookup.
+  let artistAlbumsIndex = $derived.by(() => {
+    const map = new Map<string, AlbumItem[]>();
+    for (const a of collectionStore.albums) {
+      if (!a.artist) continue;
+      const key = a.artist.trim().toLowerCase();
+      let list = map.get(key);
+      if (!list) {
+        list = [];
+        map.set(key, list);
+      }
+      list.push(a);
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
+    }
+    return map;
+  });
+
+  let artistSongsIndex = $derived.by(() => {
+    const map = new Map<string, Song[]>();
+    for (const s of collectionStore.songs) {
+      const keys = new Set<string>();
+      if (s.album_artist) keys.add(s.album_artist.trim().toLowerCase());
+      if (s.artist) keys.add(s.artist.trim().toLowerCase());
+      for (const key of keys) {
+        let list = map.get(key);
+        if (!list) {
+          list = [];
+          map.set(key, list);
+        }
+        list.push(s);
+      }
+    }
+    return map;
+  });
+
   function getArtistAlbumsFor(name: string | null): AlbumItem[] {
-    return getArtistAlbums(collectionStore.albums, name);
+    if (!name) return [];
+    return artistAlbumsIndex.get(name.trim().toLowerCase()) ?? [];
   }
 
   function getArtistSongsFor(name: string | null): Song[] {
-    return getArtistSongs(collectionStore.songs, name);
+    if (!name) return [];
+    return artistSongsIndex.get(name.trim().toLowerCase()) ?? [];
   }
 
   // Albums and Artists each remember their own Cards/Rows view mode.
@@ -525,7 +567,7 @@
         {#if navigationStore.activeSubTab === "albums"}
         {#if activeViewMode === "rows"}
           <div class="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-2">
-            {#each sortedAlbums as album}
+            {#each sortedAlbums as album (album.artist + "|" + album.album)}
               <AlbumRowCard
                 {album}
                 oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
@@ -535,7 +577,7 @@
           </div>
         {:else}
           <div class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-6">
-            {#each sortedAlbums as album}
+            {#each sortedAlbums as album (album.artist + "|" + album.album)}
               <AlbumCard
                 {album}
                 widthClass="w-full"
