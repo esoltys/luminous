@@ -77,6 +77,12 @@ interface MockLibrary {
   playlists: Playlist[];
   playlistTracks: Record<number, Song[]>;
   lyrics: string;
+  /** Real `pinned_items` rows (Home > Pinned, #222) — undefined/empty for the
+   * bundled fixture, which has no equivalent persisted table. */
+  pinnedItems?: { item_type: string; ref_key: string; position: number }[];
+  /** Real `play_history` rows — undefined/empty for the bundled fixture,
+   * which falls back to a seeded synthetic listening history instead. */
+  playHistory?: { song_id: number; played_at: number }[];
 }
 
 type IpcCallback = (data?: unknown) => void;
@@ -189,7 +195,13 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     playlists: [],
     playlistTracks: {},
     lyrics: "",
+    pinnedItems: [],
+    playHistory: [],
   };
+  // The empty-library screenshot fixture (take-screenshots.ts) predates these
+  // two fields and may still omit them.
+  library.pinnedItems ??= [];
+  library.playHistory ??= [];
   // Mutable so set_artist_profile below can save edits made through the
   // mocked ArtistProfileEditor during manual dev-server testing.
   let artistProfiles: ArtistProfile[] = library.artistProfiles ?? [];
@@ -224,6 +236,23 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
   const LISTEN_HISTORY_DAYS = 400;
   const listenHistory: MockListenEvent[] = (() => {
     if (library.songs.length === 0) return [];
+    // Real play_history rows, when the mock is reading a real database —
+    // resolved against the (songLimit-capped) loaded songs, so a play of a
+    // song that fell outside the cap is dropped rather than crashing.
+    if (library.playHistory.length > 0) {
+      const songsById = new Map(library.songs.map((s) => [s.id, s]));
+      const events: MockListenEvent[] = [];
+      for (const row of library.playHistory) {
+        const song = songsById.get(row.song_id);
+        if (!song) continue;
+        events.push({
+          played_at: row.played_at,
+          duration_secs: Math.max(30, Math.floor((song.length_nanosec || 180_000_000_000) / 1_000_000_000)),
+          song,
+        });
+      }
+      return events.sort((a, b) => a.played_at - b.played_at);
+    }
     const rng = mulberry32(42);
     const events: MockListenEvent[] = [];
     for (let dayOffset = 0; dayOffset < LISTEN_HISTORY_DAYS; dayOffset++) {
@@ -605,6 +634,7 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     get_all_app_settings: () => window.mockSettings,
     get_commit_hash: () => "048f421",
     geometry_capture_supported: () => true,
+    is_remote_devtools_enabled: () => false,
 
     preview_organize: (args) => {
       const songIds = (args.songIds as number[] | undefined) ?? [];
@@ -870,34 +900,144 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
       return groupSongsIntoHomeItems(sorted, (args.limit as number) || 10);
     },
 
-    // A representative Home > Pinned row for screenshots: the Daypart Mix
-    // ("Moment Mix", #223), Favourites, and one pinned artist — mirrors what
-    // a real user's Home would typically have pinned, rather than the empty
-    // row an unmocked get_pinned_items (null) silently produced before.
+    // Resolves one pinned `auto_playlist` ref_key against live data —
+    // mirrors pins::resolve_auto_playlist in src-tauri/src/pins.rs. Virtual
+    // kinds (favourites/recently_added/most_played/history) have no backing
+    // playlist row and just recompute the same count the auto-playlist
+    // view/card would show; materialized kinds (genre/decade/bpm/artist_tag,
+    // plus the missing_metadata/missing_musicbrainz/daypart singletons) are
+    // real `playlists` rows keyed by their `dynamic_spec` column, which the
+    // mock already loads from the database.
     get_pinned_items: () => {
       if (library.songs.length === 0) return [];
-      const favouritesCount = library.songs.filter((s) => (s.rating ?? -1) >= 4).length || 18;
-      const pinnedArtist = library.artists.find((a) => a.name === featured.artist) ?? library.artists[0];
-      return [
-        {
-          type: "auto_playlist",
-          // A "daypart" card needs a playlistId to take AutoPlaylistCard's
-          // cover-fetching branch at all — without one it falls through to
-          // the curated-tag branch instead and crashes building the cover
-          // stack from a null songs list. get_playlist_tracks below falls
-          // back to the first few mock songs for any id it doesn't
-          // recognize, so this sentinel id just needs to not collide with a
-          // real playlist's. It intentionally isn't added to
-          // library.playlists (that would also surface it in the Auto
-          // Playlists tab, changing an unrelated screenshot) — with no
-          // matching row there, both PinnedRow's and AutoPlaylistCard's own
-          // display-name lookups miss and fall back to the `genre` field
-          // below as the card's title text instead.
-          autoPlaylist: { kind: "daypart", playlistId: 999001, genre: "Morning Mix", trackCount: 32, updated: Math.floor(NOW_SEC) },
-        },
-        { type: "auto_playlist", autoPlaylist: { kind: "favourites", trackCount: favouritesCount } },
-        ...(pinnedArtist ? [{ type: "artist", artist: pinnedArtist }] : []),
-      ];
+
+      if (library.pinnedItems.length === 0) {
+        // No pinned_items table (bundled fixture) or nothing pinned yet —
+        // fall back to a representative Home > Pinned row: the Daypart Mix
+        // ("Moment Mix", #223), Favourites, and one pinned artist, rather
+        // than the empty row an unresolved get_pinned_items would produce.
+        const favouritesCount = library.songs.filter((s) => (s.rating ?? -1) >= 4).length || 18;
+        const pinnedArtist = library.artists.find((a) => a.name === featured.artist) ?? library.artists[0];
+        return [
+          {
+            type: "auto_playlist",
+            // A "daypart" card needs a playlistId to take AutoPlaylistCard's
+            // cover-fetching branch at all — without one it falls through to
+            // the curated-tag branch instead and crashes building the cover
+            // stack from a null songs list. get_playlist_tracks below falls
+            // back to the first few mock songs for any id it doesn't
+            // recognize, so this sentinel id just needs to not collide with a
+            // real playlist's. It intentionally isn't added to
+            // library.playlists (that would also surface it in the Auto
+            // Playlists tab, changing an unrelated screenshot) — with no
+            // matching row there, both PinnedRow's and AutoPlaylistCard's own
+            // display-name lookups miss and fall back to the `genre` field
+            // below as the card's title text instead.
+            autoPlaylist: { kind: "daypart", playlistId: 999001, genre: "Morning Mix", trackCount: 32, updated: Math.floor(NOW_SEC) },
+          },
+          { type: "auto_playlist", autoPlaylist: { kind: "favourites", trackCount: favouritesCount } },
+          ...(pinnedArtist ? [{ type: "artist", artist: pinnedArtist }] : []),
+        ];
+      }
+
+      function resolveAutoPlaylist(refKey: string): { type: "auto_playlist"; autoPlaylist: Record<string, unknown> } | null {
+        const sepIdx = refKey.indexOf(":");
+        const kind = sepIdx === -1 ? refKey : refKey.slice(0, sepIdx);
+        const selector = sepIdx === -1 ? undefined : refKey.slice(sepIdx + 1);
+        const virtualItem = (trackCount: number) => ({
+          kind, genre: null, artistTag: null, decade: null, bpm: null, playlistId: null, updated: null, trackCount,
+        });
+        const materialized = (spec: string, extra: Record<string, unknown> = {}) => {
+          const p = library.playlists.find((pl) => pl.dynamic_enabled && pl.track_count > 0 && pl.dynamic_spec === spec);
+          if (!p) return null;
+          return {
+            type: "auto_playlist" as const,
+            autoPlaylist: {
+              kind, genre: null, artistTag: null, decade: null, bpm: null,
+              playlistId: p.id, updated: p.updated ?? null,
+              trackCount: p.track_count, ...extra,
+            },
+          };
+        };
+
+        switch (kind) {
+          case "favourites": {
+            const count = library.songs.filter((s) => s.rating === 5).length;
+            return count > 0 ? { type: "auto_playlist", autoPlaylist: virtualItem(count) } : null;
+          }
+          case "recently_added": {
+            const count = Math.min(50, library.songs.filter((s) => s.added != null).length);
+            return count > 0 ? { type: "auto_playlist", autoPlaylist: virtualItem(count) } : null;
+          }
+          case "most_played": {
+            const count = Math.min(50, new Set(library.playHistory.map((r) => r.song_id)).size);
+            return count > 0 ? { type: "auto_playlist", autoPlaylist: virtualItem(count) } : null;
+          }
+          case "history": {
+            const count = Math.min(100, new Set(library.playHistory.map((r) => r.song_id)).size);
+            return count > 0 ? { type: "auto_playlist", autoPlaylist: virtualItem(count) } : null;
+          }
+          case "missing_metadata":
+            return materialized("missingmeta");
+          case "missing_musicbrainz":
+            return materialized("missingmbid");
+          case "daypart": {
+            const p = library.playlists.find(
+              (pl) => pl.dynamic_enabled && pl.track_count > 0 && (pl.dynamic_spec ?? "").startsWith("daypart:")
+            );
+            if (!p) return null;
+            return {
+              type: "auto_playlist",
+              autoPlaylist: {
+                kind, genre: null, artistTag: null, decade: null, bpm: null,
+                playlistId: p.id, updated: p.updated ?? null, trackCount: p.track_count,
+              },
+            };
+          }
+          case "genre":
+            return materialized(`tag:${selector ?? ""}`, { genre: selector ?? null });
+          case "decade":
+            return materialized(`decade:${selector ?? ""}`, { decade: selector ?? null });
+          case "bpm":
+            return materialized(`bpmrange:${selector ?? ""}`, { bpm: selector ?? null });
+          case "artist_tag":
+            return materialized(`artisttag:${selector ?? ""}`, { artistTag: selector ?? null });
+          default:
+            return null;
+        }
+      }
+
+      const items: unknown[] = [];
+      for (const row of library.pinnedItems) {
+        switch (row.item_type) {
+          case "song": {
+            const song = library.songs.find((s) => s.id === Number(row.ref_key));
+            if (song) items.push({ type: "song", song });
+            break;
+          }
+          case "album": {
+            const album = library.albums.find((a) => a.album === row.ref_key);
+            if (album) items.push({ type: "album", album });
+            break;
+          }
+          case "artist": {
+            const artist = library.artists.find((a) => a.name.toLowerCase() === row.ref_key.toLowerCase());
+            if (artist) items.push({ type: "artist", artist });
+            break;
+          }
+          case "playlist": {
+            const playlist = library.playlists.find((p) => p.id === Number(row.ref_key));
+            if (playlist) items.push({ type: "playlist", playlist });
+            break;
+          }
+          case "auto_playlist": {
+            const resolved = resolveAutoPlaylist(row.ref_key);
+            if (resolved) items.push(resolved);
+            break;
+          }
+        }
+      }
+      return items;
     },
 
     get_top_albums: (args) => {
@@ -928,7 +1068,7 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
       [...library.albums].slice(0, (args.limit as number) || 5).map((album) => ({ type: "album", album })),
 
     get_top_albums_summary: (args) => {
-      const summary = (handlers.get_stats_summary as (a: unknown) => StatsSummary)({ range: args.range });
+      const summary = (commands.get_stats_summary as (a: unknown) => StatsSummary)({ range: args.range });
       return summary.top_albums.slice(0, (args.limit as number) || 10);
     },
 
@@ -958,6 +1098,28 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
 
     get_tags_overview: () => buildTagsOverview(),
     get_tag_hierarchy: () => buildTagHierarchy(),
+    // Mirrors get_artist_tag_counts' SQL (query.rs): one entry per artist-profile
+    // tag, counted by distinct songs whose artist/album_artist matches a profile
+    // carrying that tag.
+    get_artist_tags_overview: () => {
+      const songIdsByTag = new Map<string, Set<number>>();
+      for (const profile of artistProfiles) {
+        for (const tag of profile.tags ?? []) {
+          if (!songIdsByTag.has(tag)) songIdsByTag.set(tag, new Set());
+        }
+      }
+      for (const song of library.songs) {
+        const key = (song.album_artist || song.artist || "").toLowerCase();
+        const profile = artistProfiles.find((p) => p.artist_key.toLowerCase() === key);
+        for (const tag of profile?.tags ?? []) {
+          songIdsByTag.get(tag)?.add(song.id);
+        }
+      }
+      return Array.from(songIdsByTag.entries())
+        .map(([name, ids]) => ({ name, song_count: ids.size }))
+        .filter((tag) => tag.song_count > 0)
+        .sort((a, b) => a.name.localeCompare(b.name));
+    },
     // Not exercised by any screenshot target — mocked with a no-op count so
     // manual dev-server testing of GenreCards' merge/delete dialogs doesn't
     // log "unhandled command" warnings.
@@ -1007,6 +1169,15 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
         rating: song.rating ?? -1,
       };
     },
+
+    // The real command hits MusicBrainz/CritiqueBrainz/Wikipedia and caches
+    // the result — every field degrades independently on failure, so an
+    // all-empty response (as if nothing's cached yet) is a legitimate real
+    // state, not a fabricated one.
+    get_song_context: () => ({
+      mb_tags: [],
+      critiquebrainz_review_links: [],
+    }),
 
     get_playlists_by_artist: () => [],
     get_playlists: () => library.playlists,

@@ -2,7 +2,7 @@
   "//": "Configures bun run take-screenshots (see .claude/CLAUDE.md). For a personal override without touching this tracked file, use scripts/mock-config.local.json instead — it takes priority when present.",
   "//dbPath": "Optional. Auto-detected from the real app's Tauri app-data dir (e.g. %APPDATA%\\org.luminous.music\\luminous.db on Windows) if omitted. Set this to point at a different database instead.",
   "dbPath": "",
-  "songLimit": 2000,
+  "songLimit": 5000,
   "default": {
     "theme": "system",
     "sidebarOpen": true,
@@ -30,9 +30,9 @@
       "subTab": "albums",
       "action": "click-album",
       "theme": "dynamic-artwork",
-      "featuredSong": "Revel in Your Time",
-      "featuredArtist": "GUNSHIP",
-      "featuredAlbum": "GUNSHIP",
+      "featuredSong": "I Get Weak",
+      "featuredArtist": "Cannons",
+      "featuredAlbum": "Everything Glows",
       "sidebarWidth": 64,
       "rightPanelOpen": false,
       "positionSeconds": 81
@@ -58,7 +58,7 @@
       "tab": "collection",
       "subTab": "artists",
       "action": "click-artist",
-      "featuredArtist": "Shania Twain",
+      "featuredArtist": "Cannons",
       "sidebarWidth": 220
     },
     {
@@ -73,14 +73,6 @@
       "filename": "genres.png",
       "tab": "collection",
       "subTab": "genres",
-      "sidebarWidth": 220
-    },
-    {
-      "name": "genres-hierarchy",
-      "filename": "genres-hierarchy.png",
-      "tab": "collection",
-      "subTab": "genres",
-      "action": "right-click-genre-chip",
       "sidebarWidth": 220
     },
     {
@@ -117,8 +109,8 @@
       "filename": "lyrics.png",
       "tab": "lyrics",
       "theme": "dynamic-artwork",
-      "featuredSong": "Halloween",
-      "featuredArtist": "Phoebe Bridgers",
+      "featuredSong": "Bloodsport",
+      "featuredArtist": "The Warning",
       "sidebarWidth": 64,
       "rightPanelOpen": false,
       "positionSeconds": 163

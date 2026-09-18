@@ -168,6 +168,23 @@ export interface MockLibrary {
   source: "database" | "fallback";
   /** The db file actually used, when source is "database" — covers/ lives alongside it. */
   dbPath?: string;
+  /** Real `pinned_items` rows (Home > Pinned, #222) — empty for the bundled
+   * fixture, which has no equivalent persisted table. */
+  pinnedItems: PinnedItemRow[];
+  /** Real `play_history` rows — empty for the bundled fixture, which falls
+   * back to a seeded synthetic listening history instead. */
+  playHistory: PlayHistoryRow[];
+}
+
+export interface PinnedItemRow {
+  item_type: string;
+  ref_key: string;
+  position: number;
+}
+
+export interface PlayHistoryRow {
+  song_id: number;
+  played_at: number;
 }
 
 function readJsonConfig(configPath: string): MockConfig {
@@ -297,6 +314,8 @@ interface DbLibrary {
   playlistTracks: Record<number, Song[]>;
   artistProfiles: ArtistProfile[];
   tagGroups: MockTagGroup[];
+  pinnedItems: PinnedItemRow[];
+  playHistory: PlayHistoryRow[];
 }
 
 // Mirrors get_all_artist_profiles_conn() in src-tauri/src/collection/query.rs:
@@ -383,7 +402,30 @@ async function loadFromDatabase(dbPath: string, limit: number, silentIfMissing =
         console.warn("[Mock Library] Could not read tag_groups/tag_assignments tables:", (err as Error).message);
       }
 
-      return { songs, playlists, playlistTracks, artistProfiles, tagGroups };
+      // Home > Pinned (#222) — best-effort, mirrors pins::pinned_refs.
+      let pinnedItems: PinnedItemRow[] = [];
+      try {
+        pinnedItems = db
+          .prepare("SELECT item_type, ref_key, position FROM pinned_items ORDER BY position ASC")
+          .all() as unknown as PinnedItemRow[];
+      } catch (err) {
+        console.warn("[Mock Library] Could not read pinned_items table:", (err as Error).message);
+      }
+
+      // Real listening history for Stats — best-effort, mirrors the
+      // play_history table read by get_listening_activity/get_stats_summary.
+      // Capped well above a year of even heavy daily listening so the
+      // longest ("1y") Stats range still has real data to aggregate.
+      let playHistory: PlayHistoryRow[] = [];
+      try {
+        playHistory = db
+          .prepare("SELECT song_id, played_at FROM play_history ORDER BY played_at DESC LIMIT 50000")
+          .all() as unknown as PlayHistoryRow[];
+      } catch (err) {
+        console.warn("[Mock Library] Could not read play_history table:", (err as Error).message);
+      }
+
+      return { songs, playlists, playlistTracks, artistProfiles, tagGroups, pinnedItems, playHistory };
     } finally {
       db.close();
     }
@@ -437,6 +479,8 @@ export async function loadMockLibrary(config: MockConfig = loadMockConfig()): Pr
     lyrics: FALLBACK_LYRICS,
     source: fromDb ? "database" : "fallback",
     dbPath: fromDb ? dbPath : undefined,
+    pinnedItems: fromDb?.pinnedItems ?? [],
+    playHistory: fromDb?.playHistory ?? [],
   };
 }
 
@@ -450,15 +494,29 @@ export function resolveFeatured(
   library: MockLibrary,
   selection: { featuredSong?: string; featuredArtist?: string; featuredAlbum?: string }
 ): FeaturedSelection {
-  const song =
-    (selection.featuredSong && library.songs.find((s) => s.title === selection.featuredSong)) || library.songs[0];
-  const artist =
-    (selection.featuredArtist && library.artists.some((a) => a.name === selection.featuredArtist)
-      ? selection.featuredArtist
-      : library.artists[0]?.name) ?? undefined;
-  const album =
-    (selection.featuredAlbum && library.albums.some((a) => a.album === selection.featuredAlbum)
-      ? selection.featuredAlbum
-      : library.albums[0]?.album) ?? undefined;
+  const matchedSong = selection.featuredSong && library.songs.find((s) => s.title === selection.featuredSong);
+  if (selection.featuredSong && !matchedSong) {
+    console.warn(
+      `[mock-library] featuredSong "${selection.featuredSong}" not found in the loaded library (maybe cut off by songLimit?) — falling back to "${library.songs[0]?.title}".`
+    );
+  }
+  const song = matchedSong || library.songs[0];
+
+  const matchedArtist = selection.featuredArtist && library.artists.some((a) => a.name === selection.featuredArtist);
+  if (selection.featuredArtist && !matchedArtist) {
+    console.warn(
+      `[mock-library] featuredArtist "${selection.featuredArtist}" not found in the loaded library (maybe cut off by songLimit?) — falling back to "${library.artists[0]?.name}".`
+    );
+  }
+  const artist = (matchedArtist ? selection.featuredArtist : library.artists[0]?.name) ?? undefined;
+
+  const matchedAlbum = selection.featuredAlbum && library.albums.some((a) => a.album === selection.featuredAlbum);
+  if (selection.featuredAlbum && !matchedAlbum) {
+    console.warn(
+      `[mock-library] featuredAlbum "${selection.featuredAlbum}" not found in the loaded library (maybe cut off by songLimit?) — falling back to "${library.albums[0]?.album}".`
+    );
+  }
+  const album = (matchedAlbum ? selection.featuredAlbum : library.albums[0]?.album) ?? undefined;
+
   return { song, artist, album };
 }
