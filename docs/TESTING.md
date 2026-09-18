@@ -102,3 +102,25 @@ Nothing is exposed unless the env var is set, and it's a no-op in release builds
 its own tooling, not Luminous's — to read Luminous's actual console/network/DOM state, read the
 Console/DOM/Network panels rendered inside the inspector UI itself (e.g. via a page-text or
 screenshot read), not a structured log feed.
+
+### CLI monitoring and diagnostics (`scripts/monitor-cdp.ts`)
+
+For programmatic inspection without opening a browser, use the CDP monitoring script (`bun run monitor-cdp` or `bun run scripts/monitor-cdp.ts`):
+
+```bash
+# Check renderer health and event loop latency
+bun run monitor-cdp
+
+# Continuous watch mode (reports latency, document.title, and visibility state every 2s)
+bun run monitor-cdp --watch
+
+# Evaluate arbitrary JavaScript inside the running WebView2
+bun run monitor-cdp --eval "document.title"
+bun run monitor-cdp --eval "document.querySelectorAll('canvas').length"
+
+# Test window minimization, background responsiveness, and restoration
+bun run monitor-cdp --minimize --duration 15
+```
+
+This verifies that the WebView2 renderer thread does not lock up during background playback, window occlusion, or minimization (#1052).
+
