@@ -259,13 +259,13 @@
       </div>
 
       {#if testSuccess === true}
-        <div class="flex items-center gap-2 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-400">
-          <CheckCircle class="w-4 h-4 shrink-0" />
+        <div class="flex items-start gap-2 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-400">
+          <CheckCircle class="w-4 h-4 shrink-0 translate-y-[calc((1lh-1rem)/2)]" />
           <span>{i18n.t("settings.webdavTestSuccess")}</span>
         </div>
       {:else if testSuccess === false}
-        <div class="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-400">
-          <WarningCircle class="w-4 h-4 shrink-0" />
+        <div class="flex items-start gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-400">
+          <WarningCircle class="w-4 h-4 shrink-0 translate-y-[calc((1lh-1rem)/2)]" />
           <span>{i18n.t("settings.webdavTestFailed", { error: testError || "" })}</span>
         </div>
       {/if}

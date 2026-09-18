@@ -70,7 +70,7 @@
     <div
       in:fly={{ x: 24, duration: 200 }}
       out:fade={{ duration: 150 }}
-      class="pointer-events-auto flex items-center gap-2.5 px-4 py-2.5 rounded-xl border shadow-2xl backdrop-blur-md text-sm font-semibold max-w-md
+      class="pointer-events-auto flex items-start gap-2.5 px-4 py-2.5 rounded-xl border shadow-2xl backdrop-blur-md text-sm font-semibold max-w-md
         {toast.variant === 'error'
           ? 'bg-[#1f1013] border-red-500/50 text-red-400 anim-warn-shake'
           : toast.variant === 'warning'
@@ -80,19 +80,19 @@
               : 'bg-brand-sidebar border-brand-border text-brand-text-primary'}"
     >
       {#if toast.variant === "error" || toast.variant === "warning"}
-        <AlertTriangle class="w-4 h-4 shrink-0" />
+        <AlertTriangle class="w-4 h-4 shrink-0 translate-y-[calc((1lh-1rem)/2)]" />
       {:else if toast.variant === "success"}
-        <span class="relative inline-flex w-4 h-4 shrink-0 items-center justify-center">
+        <span class="relative inline-flex w-4 h-4 shrink-0 items-center justify-center translate-y-[calc((1lh-1rem)/2)]">
           <span class="absolute inset-0 rounded-full anim-glow-ring"></span>
           <CheckCircle2 class="w-4 h-4 text-brand-accent-text anim-check-pop" />
         </span>
       {:else if toast.variant === "milestone"}
-        <span class="relative inline-flex w-5 h-5 shrink-0 items-center justify-center">
+        <span class="relative inline-flex w-5 h-5 shrink-0 items-center justify-center translate-y-[calc((1lh-1.25rem)/2)]">
           <span class="absolute inset-0 rounded-full anim-gold-ring"></span>
           <CheckCheck class="w-5 h-5 text-brand-gold anim-milestone-bounce" />
         </span>
       {:else}
-        <Info class="w-4 h-4 shrink-0 text-brand-accent-text" />
+        <Info class="w-4 h-4 shrink-0 text-brand-accent-text translate-y-[calc((1lh-1rem)/2)]" />
       {/if}
       {#if toast.url}
         <button
@@ -105,7 +105,7 @@
       {:else}
         <span class="flex-1 text-pretty">{toast.text}</span>
       {/if}
-      <div class="flex items-center gap-1 shrink-0">
+      <div class="flex items-center gap-1 shrink-0 self-center">
         {#if toast.action}
           <Button
             onclick={() => toast.action!.onClick()}
