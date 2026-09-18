@@ -1,7 +1,6 @@
 <script lang="ts">
   import { playerStore } from "../stores/player.svelte";
   import { i18n } from "../stores/i18n.svelte";
-  import { GearIcon as Settings } from "phosphor-svelte";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { rememberScroll } from "../utils/scrollMemory";
@@ -15,20 +14,14 @@
   let settingsTab = $state<"general" | "folders" | "integrations" | "themes" | "equalizer" | "about">("general");
   let isTabInitialized = $state(false);
 
-  let tabElements = $state<Record<string, HTMLButtonElement>>({});
-  let indicatorStyle = $state({ left: 0, width: 0, opacity: 0 });
-  let indicatorMounted = $state(false);
-
-  function updateIndicator() {
-    const el = tabElements[settingsTab];
-    if (el) {
-      indicatorStyle = {
-        left: el.offsetLeft,
-        width: el.offsetWidth,
-        opacity: 1
-      };
-    }
-  }
+  const TABS: { value: typeof settingsTab; label: () => string }[] = [
+    { value: "general", label: () => i18n.t('settings.tabGeneral') },
+    { value: "folders", label: () => i18n.t('settings.tabFolders') },
+    { value: "integrations", label: () => i18n.t('settings.tabIntegrations') },
+    { value: "themes", label: () => i18n.t('settings.tabThemes') },
+    { value: "equalizer", label: () => i18n.t('settings.tabEqualizer') },
+    { value: "about", label: () => i18n.t('settings.tabAbout') }
+  ];
 
   onMount(() => {
     (async () => {
@@ -46,12 +39,6 @@
         isTabInitialized = true;
       }
     })();
-
-    const handleResize = () => updateIndicator();
-    window.addEventListener("resize", handleResize);
-    return () => {
-      window.removeEventListener("resize", handleResize);
-    };
   });
 
   $effect(() => {
@@ -59,93 +46,21 @@
       invoke("set_app_setting", { key: "active_settings_tab", value: settingsTab });
     }
   });
-
-  $effect(() => {
-    // Re-measure when tab changes or element mounts
-    if (tabElements[settingsTab]) {
-      updateIndicator();
-      if (!indicatorMounted) {
-        requestAnimationFrame(() => {
-          indicatorMounted = true;
-        });
-      }
-    }
-  });
 </script>
 
 <div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full">
-  <div class="h-16 pl-6 pr-8 border-b border-brand-border flex items-center justify-between shrink-0">
-    <div class="flex items-center gap-3">
-      <Settings class="w-5 h-5 text-brand-accent-text" />
-      <h2 class="text-base font-bold text-brand-text-primary">{i18n.t('settings.title')}</h2>
-    </div>
-
-    <div
-      class="relative flex bg-brand-sidebar border border-brand-border rounded-xl p-0.5 text-xs shadow-sm"
-      role="tablist"
-      aria-label={i18n.t('settings.title')}
-    >
-      <!-- Sliding Active Indicator Pill with matching rounded-xl corner radius -->
-      <div
-        class="absolute top-0.5 bottom-0.5 bg-brand-accent rounded-xl shadow-md pointer-events-none {indicatorMounted ? 'transition-[left,width] duration-200 ease-out' : 'transition-none'}"
-        style="left: {indicatorStyle.left}px; width: {indicatorStyle.width}px; opacity: {indicatorStyle.opacity};"
-        aria-hidden="true"
-      ></div>
-
-      <button
-        bind:this={tabElements["general"]}
-        onclick={() => { settingsTab = "general"; }}
-        role="tab"
-        aria-selected={settingsTab === 'general'}
-        class="relative z-10 px-4 py-1.5 rounded-xl font-semibold transition-colors duration-200 {settingsTab === 'general' ? 'text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-      >
-        {i18n.t('settings.tabGeneral')}
-      </button>
-      <button
-        bind:this={tabElements["folders"]}
-        onclick={() => { settingsTab = "folders"; }}
-        role="tab"
-        aria-selected={settingsTab === 'folders'}
-        class="relative z-10 px-4 py-1.5 rounded-xl font-semibold transition-colors duration-200 {settingsTab === 'folders' ? 'text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-      >
-        {i18n.t('settings.tabFolders')}
-      </button>
-      <button
-        bind:this={tabElements["integrations"]}
-        onclick={() => { settingsTab = "integrations"; }}
-        role="tab"
-        aria-selected={settingsTab === 'integrations'}
-        class="relative z-10 px-4 py-1.5 rounded-xl font-semibold transition-colors duration-200 {settingsTab === 'integrations' ? 'text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-      >
-        {i18n.t('settings.tabIntegrations')}
-      </button>
-      <button
-        bind:this={tabElements["themes"]}
-        onclick={() => { settingsTab = "themes"; }}
-        role="tab"
-        aria-selected={settingsTab === 'themes'}
-        class="relative z-10 px-4 py-1.5 rounded-xl font-semibold transition-colors duration-200 {settingsTab === 'themes' ? 'text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-      >
-        {i18n.t('settings.tabThemes')}
-      </button>
-      <button
-        bind:this={tabElements["equalizer"]}
-        onclick={() => { settingsTab = "equalizer"; }}
-        role="tab"
-        aria-selected={settingsTab === 'equalizer'}
-        class="relative z-10 px-4 py-1.5 rounded-xl font-semibold transition-colors duration-200 {settingsTab === 'equalizer' ? 'text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-      >
-        {i18n.t('settings.tabEqualizer')}
-      </button>
-      <button
-        bind:this={tabElements["about"]}
-        onclick={() => { settingsTab = "about"; }}
-        role="tab"
-        aria-selected={settingsTab === 'about'}
-        class="relative z-10 px-4 py-1.5 rounded-xl font-semibold transition-colors duration-200 {settingsTab === 'about' ? 'text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-      >
-        {i18n.t('settings.tabAbout')}
-      </button>
+  <div class="h-16 pl-6 pr-8 border-b border-brand-border flex items-center shrink-0">
+    <div class="flex items-center gap-2" role="tablist" aria-label={i18n.t('settings.title')}>
+      {#each TABS as tab (tab.value)}
+        <button
+          onclick={() => { settingsTab = tab.value; }}
+          role="tab"
+          aria-selected={settingsTab === tab.value}
+          class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors {settingsTab === tab.value ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'}"
+        >
+          {tab.label()}
+        </button>
+      {/each}
     </div>
   </div>
 
