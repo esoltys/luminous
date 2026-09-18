@@ -41,6 +41,16 @@ use std::time::Duration;
 use tauri::{Manager, WebviewWindow};
 use tauri_plugin_positioner::{Position, WindowExt};
 
+/// Lets the frontend mark a remote-devtools debug session visibly (window
+/// title) so it isn't mistaken for a normal instance — the WebView2/WRY
+/// native title tracks `document.title`, so this can't be set once from the
+/// Rust side in `setup()`: the page's own `<title>` in `app.html` wins the
+/// race once it finishes loading.
+#[tauri::command]
+pub fn is_remote_devtools_enabled() -> bool {
+    crate::remote_devtools_enabled()
+}
+
 #[tauri::command]
 pub fn geometry_capture_supported() -> bool {
     #[cfg(target_os = "linux")]

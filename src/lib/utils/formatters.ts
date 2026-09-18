@@ -46,10 +46,11 @@ export function toTitleCase(str: string): string {
 
 export function formatWindowTitle(
   song?: { title?: string | null; artist?: string | null } | null,
-  state?: PlayState
+  state?: PlayState,
+  appName = "Luminous"
 ): string {
   if (state !== "playing" || !song) {
-    return "Luminous";
+    return appName;
   }
 
   const rawTitle = song.title?.trim();
@@ -57,8 +58,8 @@ export function formatWindowTitle(
 
   const title = rawTitle || i18n.t("collection.unknownSong", {}, "Unknown Song");
   if (rawArtist) {
-    return `${title} - ${rawArtist} - Luminous`;
+    return `${title} - ${rawArtist} - ${appName}`;
   }
-  return `${title} - Luminous`;
+  return `${title} - ${appName}`;
 }
 

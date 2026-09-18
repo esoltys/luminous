@@ -231,7 +231,7 @@ const REMOTE_DEVTOOLS_PORT: u16 = 9222;
 /// surprise a user who didn't ask for an unauthenticated loopback inspector
 /// server — set `LUMINOUS_REMOTE_DEVTOOLS=1` before `bun run tauri dev` to
 /// turn it on.
-fn remote_devtools_enabled() -> bool {
+pub(crate) fn remote_devtools_enabled() -> bool {
     cfg!(debug_assertions) && std::env::var_os("LUMINOUS_REMOTE_DEVTOOLS").is_some()
 }
 
@@ -1265,6 +1265,7 @@ pub fn run() {
             commands::webdav::check_webdav_connection,
             commands::webdav::sync_webdav_server,
             // Window & Miniplayer commands
+            commands::window::is_remote_devtools_enabled,
             commands::window::geometry_capture_supported,
             commands::window::enter_miniplayer_mode,
             commands::window::exit_miniplayer_mode,

@@ -58,6 +58,11 @@
   let isDragActive = $state(false);
   let isShiftHeld = $state(false);
   let isResizingSidebar = $state(false);
+  // "Luminous Debug" when LUMINOUS_REMOTE_DEVTOOLS is set backend-side, so a
+  // remote-devtools session is never mistaken for a normal instance in the
+  // titlebar/taskbar — the Rust setup() hook can't set this once itself
+  // because the $effect below re-asserts the title on every playback change.
+  let windowTitleAppName = $state("Luminous");
 
   // Visual-only override: never touches the stored sidebarWidth preference,
   // so widening the window back out restores exactly the width the user had.
@@ -84,7 +89,7 @@
   // When stopped/paused: reverts to "Luminous".
   $effect(() => {
     void i18n.currentLocale;
-    const title = formatWindowTitle(playerStore.currentSong, playerStore.state);
+    const title = formatWindowTitle(playerStore.currentSong, playerStore.state, windowTitleAppName);
     if (typeof document !== 'undefined') {
       document.title = title;
     }
@@ -133,6 +138,11 @@
     picardStore.init();
     scrobblerStore.init();
     void getCurrentWindow().show().catch(() => {});
+    invoke<boolean>('is_remote_devtools_enabled')
+      .then((enabled) => {
+        if (enabled) windowTitleAppName = 'Luminous Debug';
+      })
+      .catch(() => {});
 
     function handleGlobalHotkeys(e: KeyboardEvent) {
       if (!(e.ctrlKey || e.metaKey)) return;
