@@ -103,6 +103,25 @@
   let barDays = $derived(mode === "bar" ? buildLastNDays(dailyMinutes, BAR_DAYS) : []);
   let barMax = $derived(Math.max(1, ...barDays.map((d) => d.minutes)));
 
+  // Bars should grow up from zero whenever the bar chart itself newly
+  // appears (switching into the 7d range, or landing on Stats already there)
+  // rather than snapping straight to their final heights. `barsReady` tracks
+  // "the bar chart is actually on screen" (data loaded + range is 7d);
+  // flipping `barsRevealed` false then true a frame later re-triggers the
+  // CSS height transition below each time that happens.
+  let barsReady = $derived(!!events && mode === "bar");
+  let barsRevealed = $state(false);
+
+  $effect(() => {
+    if (!barsReady) {
+      barsRevealed = false;
+      return;
+    }
+    barsRevealed = false;
+    const raf = requestAnimationFrame(() => { barsRevealed = true; });
+    return () => cancelAnimationFrame(raf);
+  });
+
   // `buildHeatmapGrid` returns rows (day-of-week) x columns (week). The
   // heatmap view renders `columns` as vertical stacks; the calendar view
   // renders each entry in `columns` as a horizontal week row instead — same
@@ -238,7 +257,10 @@
             onclick={() => (hovered = cell)}
           >
             <div class="flex-1 w-full flex items-end">
-              <div class="relative w-full rounded-t-sm" style="height: {barHeightPercent(cell)}%; {cellStyle(cell)}">
+              <div
+                class="relative w-full rounded-t-sm transition-[height] duration-500 ease-out"
+                style="height: {barsRevealed ? barHeightPercent(cell) : 0}%; {cellStyle(cell)}"
+              >
                 {#if cell.date === peakDate}
                   <StarIcon
                     weight="fill"

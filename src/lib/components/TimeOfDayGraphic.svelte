@@ -23,6 +23,32 @@
       return Math.max(0, Math.min(1, ratio)) * H;
     })
   );
+
+  // The reveal height drives both the mask rects and the outline polyline
+  // below, and SVG's `points` attribute can't be CSS-transitioned — so
+  // animate the underlying numbers in JS (eased tween) rather than relying
+  // on a CSS transition, keeping the mask and outline in sync. Starts from
+  // zero on mount and re-tweens from wherever it currently sits any time
+  // `reveals` changes (e.g. switching the Stats range), rather than only
+  // animating the first time.
+  let displayReveals = $state<number[]>(BUCKETS.map(() => 0));
+
+  $effect(() => {
+    const target = reveals;
+    const start = displayReveals;
+    const startTime = performance.now();
+    const duration = 550;
+    let frame: number;
+
+    function tick(now: number) {
+      const t = Math.min(1, (now - startTime) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      displayReveals = start.map((s, i) => s + (target[i] - s) * eased);
+      if (t < 1) frame = requestAnimationFrame(tick);
+    }
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  });
 </script>
 
 <svg viewBox="0 0 {W} {H}" class="w-full h-auto block rounded-lg" preserveAspectRatio="xMidYMid meet" role="img" aria-label={labels.morning}>
@@ -73,7 +99,7 @@
 
     <mask id="tod-reveal-mask" maskUnits="userSpaceOnUse" x="0" y="0" width={W} height={H}>
       <rect x="0" y="0" width={W} height={H} fill="black" />
-      {#each reveals as h, i}
+      {#each displayReveals as h, i}
         <rect x={i * BAND_W} y={H - h} width={BAND_W} height={h} fill="white" />
       {/each}
     </mask>
@@ -147,10 +173,10 @@
        without an inset half the 3px stroke there would render outside the
        viewBox and get clipped — making Morning's left border and Late
        Night's right border look half as thick as the internal dividers. -->
-  {#each reveals as h, i}
+  {#each displayReveals as h, i}
     {@const y = Math.min(H - 1.5, Math.max(1.5, H - h))}
     {@const xLeft = i === 0 ? 1.5 : i * BAND_W}
-    {@const xRight = i === reveals.length - 1 ? W - 1.5 : (i + 1) * BAND_W}
+    {@const xRight = i === displayReveals.length - 1 ? W - 1.5 : (i + 1) * BAND_W}
     <polyline
       points="{xLeft},{H} {xLeft},{y} {xRight},{y} {xRight},{H}"
       fill="none"

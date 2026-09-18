@@ -34,7 +34,7 @@
 
 <div class="flex-1 flex flex-col h-full bg-brand-main text-brand-text-primary select-none overflow-hidden relative">
   <div class="flex-1 overflow-y-auto px-6 pb-12" class:pb-28={!!playerStore.currentSong} use:rememberScroll={"organize"}>
-    <div class="pt-8 pb-4 max-w-3xl mx-auto flex items-start justify-between gap-4">
+    <div class="pt-8 pb-4 flex items-start justify-between gap-4">
       {#if organizeReadyCount === 0}
         <span class="flex items-center gap-2 text-xl font-bold text-brand-accent-text whitespace-nowrap">
           <span class="relative inline-flex shrink-0">
@@ -64,7 +64,7 @@
       </Button>
     </div>
 
-    <div class="max-w-3xl mx-auto space-y-4">
+    <div class="space-y-4">
       <OrganizeFiles
         embedded
         songIds={[]}
@@ -77,7 +77,7 @@
       />
 
       <!-- Lightweight inline maintenance action — deliberately not its own bordered card. -->
-      <div class="flex flex-wrap items-center gap-3 px-1">
+      <div class="max-w-3xl mx-auto flex flex-wrap items-center gap-3 px-1">
         <Button onclick={handlePruneMissing} disabled={collectionStore.isScanning} variant="secondary" size="sm">
           <Eraser class="w-4 h-4" />
           {i18n.t('settings.pruneMissingBtn')}
