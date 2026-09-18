@@ -129,11 +129,20 @@ describe("ArtistProfileEditor", () => {
       },
     });
 
+    expect(screen.queryByTitle(/Remove link/i)).toBeNull();
+
     const addLinkBtn = screen.getByRole("button", { name: /Add Link/i });
     await fireEvent.click(addLinkBtn);
 
-    const inputs = screen.getAllByRole("textbox");
-    expect(inputs.length).toBeGreaterThan(1);
+    const inputsAfterAdd = screen.getAllByRole("textbox");
+    expect(inputsAfterAdd.length).toBeGreaterThan(1);
+    const removeBtn = screen.getByTitle(/Remove link/i);
+    expect(removeBtn).toBeInTheDocument();
+
+    await fireEvent.click(removeBtn);
+
+    expect(screen.queryByTitle(/Remove link/i)).toBeNull();
+    expect(screen.getAllByRole("textbox").length).toBe(inputsAfterAdd.length - 1);
   });
 
   it("saves profile and calls onClose", async () => {

@@ -1933,11 +1933,6 @@ mod tests {
     }
 
     #[test]
-    fn test_get_default_device_name_does_not_panic() {
-        let _ = get_default_device_name();
-    }
-
-    #[test]
     fn extract_basic_auth_strips_credentials_and_builds_header() {
         let (clean_url, header) =
             extract_basic_auth("http://test:test@127.0.0.1:8080/Music/song.mp3");

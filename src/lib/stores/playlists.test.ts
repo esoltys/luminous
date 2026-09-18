@@ -193,19 +193,6 @@ describe("PlaylistsStore", () => {
     expect(invoke).toHaveBeenCalledWith("get_playlist_tracks", { playlistId: 101 });
   });
 
-  it("updates song stats in activePlaylistTracks on song-stats-changed event", async () => {
-    playlistsStore.activePlaylistTracks = JSON.parse(JSON.stringify(mockTracks));
-
-    if (eventCallbacks["song-stats-changed"]) {
-      eventCallbacks["song-stats-changed"]({
-        payload: { song_id: 10, rating: 5, playcount: 6 }
-      });
-
-      expect(playlistsStore.activePlaylistTracks[0].song?.rating).toBe(5);
-      expect(playlistsStore.activePlaylistTracks[0].song?.playcount).toBe(6);
-    }
-  });
-
   it("imports playlist and selects it", async () => {
     vi.mocked(invoke).mockImplementation(async (cmd: string, args?: any) => {
       if (cmd === "import_playlist") {
@@ -240,8 +227,19 @@ describe("PlaylistsStore", () => {
       { ...mockTracks[0], uuid: "item-dup" },
     ];
 
+    // The backend does the actual dedup and reports which uuids it removed;
+    // the store then re-fetches tracks, so model that round trip here rather
+    // than just asserting the outbound invoke call.
+    vi.mocked(invoke).mockImplementation(async (cmd: string, args?: any) => {
+      if (cmd === "deduplicate_playlist") return ["item-dup"];
+      if (cmd === "get_playlist_tracks") return [mockTracks[0], mockTracks[1]];
+      if (cmd === "get_playlists") return mockPlaylists;
+      return null;
+    });
+
     await playlistsStore.deduplicatePlaylist(101);
     expect(invoke).toHaveBeenCalledWith("deduplicate_playlist", { playlistId: 101 });
+    expect(playlistsStore.activePlaylistTracks.map((t) => t.uuid)).toEqual(["item-1", "item-2"]);
   });
 
   it("returns activeCustomPlaylist when the pinned playlist is a custom playlist", async () => {

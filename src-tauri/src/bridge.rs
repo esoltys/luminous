@@ -594,6 +594,13 @@ mod tests {
         let json = r#"{"event":"playlists-changed","data":{"playlist_id":99}}"#;
         let payload: EventPayload = serde_json::from_str(json).expect("valid event payload");
         assert_eq!(payload.event, "playlists-changed");
-        assert!(payload.data.is_some());
+        let data = payload.data.expect("data present");
+        assert_eq!(data.get("playlist_id").and_then(|v| v.as_i64()), Some(99));
+
+        let json_no_data = r#"{"event":"library-changed"}"#;
+        let payload_no_data: EventPayload =
+            serde_json::from_str(json_no_data).expect("valid event payload without data");
+        assert_eq!(payload_no_data.event, "library-changed");
+        assert!(payload_no_data.data.is_none());
     }
 }

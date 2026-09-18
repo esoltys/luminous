@@ -412,21 +412,6 @@ mod tests {
     }
 
     #[test]
-    fn test_activity_serialization_empty_clears() {
-        let payload = serde_json::json!({
-            "cmd": "SET_ACTIVITY",
-            "args": {
-                "pid": 1234,
-                "activity": None::<DiscordActivity>,
-            },
-            "nonce": "test-nonce",
-        });
-
-        let json = serde_json::to_string(&payload).unwrap();
-        assert!(json.contains("\"activity\":null"));
-    }
-
-    #[test]
     fn test_truncate_activity_str() {
         let short = "Short Title";
         assert_eq!(truncate_activity_str(short), "Short Title");

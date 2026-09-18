@@ -116,24 +116,30 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
   });
 
   it("handles directory scanning and scan-progress event with force option", async () => {
+    // The store's constructor already called its private init() once at
+    // module-import time (before this describe's beforeEach reconfigured the
+    // `listen` mock to capture callbacks), so eventCallbacks["scan-progress"]
+    // wouldn't otherwise be populated. Re-run init() under this test's mocks
+    // to register the listener where we can actually capture and drive it.
+    await (collectionStore as any).init();
+    expect(eventCallbacks["scan-progress"]).toBeDefined();
+
     vi.mocked(invoke).mockResolvedValueOnce(undefined as any);
     await collectionStore.startScan(true);
     expect(collectionStore.isScanning).toBe(true);
     expect(invoke).toHaveBeenCalledWith("scan_directories", { force: true });
 
-    if (eventCallbacks["scan-progress"]) {
-      eventCallbacks["scan-progress"]({
-        payload: { phase: "reading_tags", current_path: "song.mp3", scanned: 5, total: 10 }
-      });
-      expect(collectionStore.scanProgress?.scanned).toBe(5);
-      expect(collectionStore.isScanning).toBe(true);
+    eventCallbacks["scan-progress"]({
+      payload: { phase: "reading_tags", current_path: "song.mp3", scanned: 5, total: 10 }
+    });
+    expect(collectionStore.scanProgress?.scanned).toBe(5);
+    expect(collectionStore.isScanning).toBe(true);
 
-      eventCallbacks["scan-progress"]({
-        payload: { phase: "done", current_path: "", scanned: 10, total: 10 }
-      });
-      expect(collectionStore.isScanning).toBe(false);
-      expect(collectionStore.lastScanTime).not.toBeNull();
-    }
+    eventCallbacks["scan-progress"]({
+      payload: { phase: "done", current_path: "", scanned: 10, total: 10 }
+    });
+    expect(collectionStore.isScanning).toBe(false);
+    expect(collectionStore.lastScanTime).not.toBeNull();
   });
 
   it("handles pruneMissing songs call", async () => {

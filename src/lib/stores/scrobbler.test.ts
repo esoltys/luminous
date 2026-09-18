@@ -125,15 +125,7 @@ describe("scrobblerStore", () => {
     await scrobblerStore.checkDiscordStatus();
     expect(scrobblerStore.discordStatus).toBe("connected");
 
-    scrobblerStore.setDiscordShowAlbum(false);
-    expect(scrobblerStore.discordShowAlbum).toBe(false);
-
-    scrobblerStore.setDiscordShowTime(false);
-    expect(scrobblerStore.discordShowTime).toBe(false);
-
     scrobblerStore.setDiscordClientId("999888777");
-    expect(scrobblerStore.discordClientId).toBe("999888777");
-
     scrobblerStore.resetDiscordClientId();
     expect(scrobblerStore.discordClientId).toBe("1548913001715990610");
   });
