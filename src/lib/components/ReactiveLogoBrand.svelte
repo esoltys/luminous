@@ -56,6 +56,7 @@
 
     try {
       unlisten = await listen<number[]>("spectrum-data", (event) => {
+        if (typeof document !== "undefined" && document.hidden) return;
         if (!isPulsingEnabled) {
           bassIntensity = 0;
           midIntensity = 0;

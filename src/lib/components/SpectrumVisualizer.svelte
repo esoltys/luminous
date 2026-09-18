@@ -22,6 +22,7 @@
   }
 
   function draw() {
+    if (typeof document !== "undefined" && document.hidden) return;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
@@ -29,6 +30,7 @@
     const dpr = window.devicePixelRatio || 1;
     const width = canvas.clientWidth;
     const height = canvas.clientHeight;
+    if (width === 0 || height === 0) return;
 
     if (canvas.width !== width * dpr || canvas.height !== height * dpr) {
       canvas.width = width * dpr;
@@ -78,12 +80,23 @@
     draw();
   });
 
+  function handleVisibilityChange() {
+    if (typeof document !== "undefined" && !document.hidden) {
+      draw();
+    }
+  }
+
   onMount(async () => {
     acquireSpectrum();
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+    }
     try {
       unlisten = await listen<number[]>("spectrum-data", (event) => {
         spectrumData = event.payload;
-        draw();
+        if (typeof document === "undefined" || !document.hidden) {
+          draw();
+        }
       });
     } catch (e) {
       console.error("Failed to initialize spectrum visualizer:", e);
@@ -92,6 +105,9 @@
 
   onDestroy(() => {
     releaseSpectrum();
+    if (typeof document !== "undefined") {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    }
     if (unlisten) {
       unlisten();
     }
