@@ -116,6 +116,7 @@
   }
 
   function draw() {
+    if (typeof document !== "undefined" && document.hidden) return;
     if (!canvas || !containerEl) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
@@ -123,6 +124,7 @@
     const dpr = window.devicePixelRatio || 1;
     const width = containerEl.clientWidth || 300;
     const height = CANVAS_BAR_HEIGHT_PX;
+    if (width === 0) return;
 
     if (canvas.width !== width * dpr || canvas.height !== height * dpr) {
       canvas.width = width * dpr;
@@ -347,6 +349,19 @@
     const _wave = waveformData;
     const _bands = bandData;
     draw();
+  });
+
+  $effect(() => {
+    if (typeof document === "undefined") return;
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        draw();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   });
 
   $effect(() => {

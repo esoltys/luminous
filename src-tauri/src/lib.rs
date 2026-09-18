@@ -347,6 +347,19 @@ fn spawn_visualizer_loop(app_handle: tauri::AppHandle, audio: Arc<Mutex<AudioEng
         let mut interval = tokio::time::interval(std::time::Duration::from_millis(33)); // ~30 FPS
         loop {
             interval.tick().await;
+
+            // When the main window is minimized or hidden, skip calculating spectrum and emitting IPC.
+            // When minimized, Chromium disables compositor frame commits. Continuous Canvas2D drawing
+            // would pile up uncommitted PaintOpBuffers in Skia, leading to severe memory ballooning
+            // and an unresponsive renderer thread upon restore (#1052).
+            let is_minimized_or_hidden = app_handle
+                .get_webview_window("main")
+                .map(|w| w.is_minimized().unwrap_or(false) || !w.is_visible().unwrap_or(true))
+                .unwrap_or(false);
+            if is_minimized_or_hidden {
+                continue;
+            }
+
             let (enabled, spectrum) = {
                 let engine = audio.lock().await;
                 let enabled = engine
@@ -425,6 +438,37 @@ fn spawn_position_tick_loop(
     });
 }
 
+/// Keeps the native OS window title in sync with the current track directly
+/// from the backend, ensuring taskbar and titlebar stay accurate even when
+/// the frontend window is minimized or occluded (#892, #1052).
+fn sync_window_title(app: &tauri::AppHandle, song: Option<&crate::models::Song>, is_playing: bool) {
+    if let Some(w) = app.get_webview_window("main") {
+        let app_name = if crate::remote_devtools_enabled() {
+            "Luminous Debug"
+        } else {
+            "Luminous"
+        };
+        let title = match (song, is_playing) {
+            (Some(s), true) => {
+                let song_title = s.title.as_deref().unwrap_or("").trim();
+                let display_title = if song_title.is_empty() {
+                    "Unknown Song"
+                } else {
+                    song_title
+                };
+                let artist = s.artist.as_deref().unwrap_or("").trim();
+                if artist.is_empty() {
+                    format!("{display_title} - {app_name}")
+                } else {
+                    format!("{display_title} - {artist} - {app_name}")
+                }
+            }
+            _ => app_name.to_string(),
+        };
+        let _ = w.set_title(&title);
+    }
+}
+
 /// Spawns the OS thread that drains `AudioEngine`'s event channel and turns
 /// each `AudioEvent` into player-state transitions, OS media-session
 /// mirroring, and frontend events. A blocking OS thread rather than a Tokio
@@ -458,10 +502,15 @@ fn spawn_audio_event_loop(
                                     app_state.scrobbler.on_now_playing(song).await;
                                     app_state
                                         .scrobbler
-                                        .on_playback_state_changed(Some(song), true, state.position_nanosec)
+                                        .on_playback_state_changed(
+                                            Some(song),
+                                            true,
+                                            state.position_nanosec,
+                                        )
                                         .await;
                                 }
                             }
+                            sync_window_title(&app, p.current_song.as_ref(), true);
                             let _ = app.emit(
                                 "track-changed",
                                 serde_json::json!({
@@ -476,9 +525,14 @@ fn spawn_audio_event_loop(
                             if let Some(app_state) = app.try_state::<AppState>() {
                                 app_state
                                     .scrobbler
-                                    .on_playback_state_changed(p.current_song.as_ref(), false, state.position_nanosec)
+                                    .on_playback_state_changed(
+                                        p.current_song.as_ref(),
+                                        false,
+                                        state.position_nanosec,
+                                    )
                                     .await;
                             }
+                            sync_window_title(&app, p.current_song.as_ref(), false);
                             crate::media_session::mirror_state(&app, &state).await;
                             let _ = app.emit("playback-state", state);
                         }
@@ -487,17 +541,20 @@ fn spawn_audio_event_loop(
                                 app_state.scrobbler.on_playback_stopped().await;
                             }
                             let state = p.get_state().await;
+                            sync_window_title(&app, None, false);
                             crate::media_session::mirror_state(&app, &state).await;
                             let _ = app.emit("playback-state", state);
                         }
                         crate::audio::AudioEvent::TrackFinished { .. } => {
                             let _ = p.on_track_finished().await;
                             let state = p.get_state().await;
-                            if state.state != crate::models::PlayState::Playing {
+                            let is_playing = state.state == crate::models::PlayState::Playing;
+                            if !is_playing {
                                 if let Some(app_state) = app.try_state::<AppState>() {
                                     app_state.scrobbler.on_playback_stopped().await;
                                 }
                             }
+                            sync_window_title(&app, p.current_song.as_ref(), is_playing);
                             crate::media_session::mirror_state(&app, &state).await;
                             let _ = app.emit("playback-state", state);
                         }
@@ -516,10 +573,15 @@ fn spawn_audio_event_loop(
                                     app_state.scrobbler.on_now_playing(song).await;
                                     app_state
                                         .scrobbler
-                                        .on_playback_state_changed(Some(song), true, state.position_nanosec)
+                                        .on_playback_state_changed(
+                                            Some(song),
+                                            true,
+                                            state.position_nanosec,
+                                        )
                                         .await;
                                 }
                             }
+                            sync_window_title(&app, p.current_song.as_ref(), true);
                             let _ = app.emit(
                                 "track-changed",
                                 serde_json::json!({
@@ -658,7 +720,6 @@ fn register_media_shortcuts(app: &tauri::App) {
         }
     }
 }
-
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -822,7 +883,10 @@ pub fn run() {
         // `MacosLauncher::LaunchAgent` is required by the plugin's cross-platform
         // API but inert on the platforms Luminous actually ships (Windows/Linux) —
         // it only takes effect on a macOS build, which this project doesn't target.
-        .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
+        .plugin(tauri_plugin_autostart::init(
+            MacosLauncher::LaunchAgent,
+            None,
+        ))
         .plugin(build_prevent_default_plugin())
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             tray::restore_main_window(app);
@@ -886,8 +950,11 @@ pub fn run() {
                         stored,
                         current
                     );
-                    if restart_manager::should_notify_update(&info.format, stored.as_deref(), current)
-                    {
+                    if restart_manager::should_notify_update(
+                        &info.format,
+                        stored.as_deref(),
+                        current,
+                    ) {
                         restart_manager::show_update_notification(current);
                     }
                 }
@@ -905,8 +972,7 @@ pub fn run() {
                     [],
                     |row| row.get::<_, String>(0),
                 ) {
-                    minimize_to_tray
-                        .store(value == "true", std::sync::atomic::Ordering::Relaxed);
+                    minimize_to_tray.store(value == "true", std::sync::atomic::Ordering::Relaxed);
                 }
             }
 
@@ -1077,7 +1143,9 @@ pub fn run() {
                 use tauri::Listener;
                 let handle = app.handle().clone();
                 app.listen("library-changed", move |_| {
-                    tauri::async_runtime::spawn(tags::reconcile_hierarchy_and_notify(handle.clone()));
+                    tauri::async_runtime::spawn(tags::reconcile_hierarchy_and_notify(
+                        handle.clone(),
+                    ));
                 });
             }
 
