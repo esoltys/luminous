@@ -36,6 +36,17 @@
   let searchDropdownRef: HTMLDivElement | undefined = $state();
   let isSearchFocused = $state(false);
 
+  // Typing fires a real IPC round-trip (search_songs, FTS5) per keystroke —
+  // debounce it so a fast typist doesn't queue up one backend query per
+  // character. Enter/clear/recent-search selection call search() directly
+  // and bypass this.
+  const SEARCH_DEBOUNCE_MS = 200;
+  let searchDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+  function debouncedSearch(query: string) {
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(() => collectionStore.search(query), SEARCH_DEBOUNCE_MS);
+  }
+
   function focusFirstSearchResult() {
     const first = searchDropdownRef?.querySelector<HTMLElement>(".search-result-item");
     first?.focus();
@@ -232,6 +243,7 @@
 
   function handleSearch(e: Event) {
     e.preventDefault();
+    clearTimeout(searchDebounceTimer);
     const q = collectionStore.searchQuery.trim();
     if (q) {
       collectionStore.addRecentSearch({
@@ -270,6 +282,7 @@
   }
 
   function clearSearch() {
+    clearTimeout(searchDebounceTimer);
     collectionStore.searchQuery = "";
     collectionStore.search("");
   }
@@ -322,7 +335,7 @@
         onfocus={() => { isSearchFocused = true; }}
         oninput={(e) => {
           isSearchFocused = true;
-          collectionStore.search((e.target as HTMLInputElement).value);
+          debouncedSearch((e.target as HTMLInputElement).value);
         }}
         onkeydown={handleSearchInputKeyDown}
         type="text"
