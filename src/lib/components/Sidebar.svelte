@@ -14,7 +14,7 @@
     SparkleIcon as Sparkles,
     GearIcon as Settings,
     ChartBarIcon as BarChart2,
-    FolderIcon as Folder,
+    BroomIcon as Broom,
     HouseIcon as Home,
     MicrophoneStageIcon as Mic2,
     DiscIcon as DiscAlbum,
@@ -85,7 +85,7 @@
       class="flex items-center gap-3 transition-all duration-150 {navigationStore.activeTab === 'home' ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
       title={i18n.t('sidebar.home')}
     >
-      <Home class={isCollapsed ? "w-5 h-5" : "w-4 h-4"} />
+      <Home class={isCollapsed ? "w-5 h-5" : "w-4 h-4 icon-align"} />
       {#if !isCollapsed}
         <span class="truncate whitespace-nowrap">{i18n.t('sidebar.home')}</span>
       {/if}
@@ -111,7 +111,7 @@
         {:else if isCollapsed && navigationStore.activeTab === 'collection' && navigationStore.activeSubTab === 'genres'}
           <Tag class="w-5 h-5" />
         {:else}
-          <Library class={isCollapsed ? "w-5 h-5" : "w-4 h-4"} />
+          <Library class={isCollapsed ? "w-5 h-5" : "w-4 h-4 icon-align"} />
         {/if}
         {#if !isCollapsed}
           <span class="truncate whitespace-nowrap">{i18n.t('sidebar.collection')}</span>
@@ -119,13 +119,13 @@
       </button>
 
       {#if !isCollapsed}
-        <div class="pl-4 pr-1 py-0.5 space-y-0 border-l-2 border-brand-accent/30 ml-4 my-0.5">
+        <div class="pl-4 pr-1 py-0.5 space-y-0 border-l-2 border-brand-accent/30 ml-[18px] my-0.5">
           <button
             onclick={() => { navigationStore.activeTab = "collection"; navigationStore.activeSubTab = "artists"; navigationStore.selectedArtistName = null; navigationStore.selectedAlbumName = null; }}
             class="w-full flex items-center justify-between px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab === 'collection' && navigationStore.activeSubTab === 'artists' && !navigationStore.selectedArtistName && !navigationStore.selectedAlbumName ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
           >
             <div class="flex items-center gap-2 truncate">
-              <Mic2 class="w-3.5 h-3.5" />
+              <Mic2 class="w-3.5 h-3.5 icon-align" />
               <span class="truncate">{i18n.t('sidebar.artists')}</span>
             </div>
             <span class="text-[10px] text-brand-text-secondary/60 ml-1">
@@ -138,7 +138,7 @@
             class="w-full flex items-center justify-between px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab === 'collection' && navigationStore.activeSubTab === 'albums' && !navigationStore.selectedArtistName && !navigationStore.selectedAlbumName ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
           >
             <div class="flex items-center gap-2 truncate">
-              <DiscAlbum class="w-3.5 h-3.5" />
+              <DiscAlbum class="w-3.5 h-3.5 icon-align" />
               <span class="truncate">{i18n.t('sidebar.albums')}</span>
             </div>
             <span class="text-[10px] text-brand-text-secondary/60 ml-1">
@@ -151,7 +151,7 @@
             class="w-full flex items-center justify-between px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab === 'collection' && navigationStore.activeSubTab === 'songs' && !navigationStore.selectedArtistName && !navigationStore.selectedAlbumName ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
           >
             <div class="flex items-center gap-2 truncate">
-              <Music class="w-3.5 h-3.5" />
+              <Music class="w-3.5 h-3.5 icon-align" />
               <span class="truncate">{i18n.t('sidebar.songs')}</span>
             </div>
             <span class="text-[10px] text-brand-text-secondary/60 ml-1">
@@ -164,7 +164,7 @@
             class="w-full flex items-center justify-between px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab === 'collection' && navigationStore.activeSubTab === 'genres' && !navigationStore.selectedArtistName && !navigationStore.selectedAlbumName ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
           >
             <div class="flex items-center gap-2 truncate">
-              <Tag class="w-3.5 h-3.5" />
+              <Tag class="w-3.5 h-3.5 icon-align" />
               <span class="truncate">{i18n.t('sidebar.genres')}</span>
             </div>
             <span class="text-[10px] text-brand-text-secondary/60 ml-1">
@@ -184,7 +184,7 @@
         {#if isCollapsed && navigationStore.activeTab === 'playlists' && navigationStore.playlistsSubTab === 'auto'}
           <Sparkles class="w-5 h-5" />
         {:else}
-          <ListMusic class={isCollapsed ? "w-5 h-5" : "w-4 h-4"} />
+          <ListMusic class={isCollapsed ? "w-5 h-5" : "w-4 h-4 icon-align"} />
         {/if}
         {#if !isCollapsed}
           <span class="truncate whitespace-nowrap">{i18n.t('sidebar.playlists')}</span>
@@ -192,13 +192,13 @@
       </button>
 
       {#if !isCollapsed}
-        <div class="pl-4 pr-1 py-0.5 space-y-0 border-l-2 border-brand-accent/30 ml-4 my-0.5">
+        <div class="pl-4 pr-1 py-0.5 space-y-0 border-l-2 border-brand-accent/30 ml-[18px] my-0.5">
           <button
             onclick={() => openPlaylistsSubTab("auto")}
             class="w-full flex items-center justify-between px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab === 'playlists' && navigationStore.playlistsSubTab === 'auto' && !navigationStore.selectedPlaylistId && !navigationStore.selectedAutoPlaylist ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
           >
             <div class="flex items-center gap-2 truncate">
-              <Sparkles class="w-3.5 h-3.5" />
+              <Sparkles class="w-3.5 h-3.5 icon-align" />
               <span class="truncate">{i18n.t('sidebar.playlistsAuto')}</span>
             </div>
             <span class="text-[10px] text-brand-text-secondary/60 ml-1">
@@ -211,7 +211,7 @@
             class="w-full flex items-center justify-between px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab === 'playlists' && navigationStore.playlistsSubTab === 'custom' && !navigationStore.selectedPlaylistId && !navigationStore.selectedAutoPlaylist ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
           >
             <div class="flex items-center gap-2 truncate">
-              <ListMusic class="w-3.5 h-3.5" />
+              <ListMusic class="w-3.5 h-3.5 icon-align" />
               <span class="truncate">{i18n.t('sidebar.playlistsCustom')}</span>
             </div>
             <span class="text-[10px] text-brand-text-secondary/60 ml-1">
@@ -228,7 +228,7 @@
             class="w-full flex items-center justify-between px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab === 'playlists' && navigationStore.selectedPlaylistId && playlistsStore.playlists.find((p) => p.id === navigationStore.selectedPlaylistId)?.name?.toLowerCase() === 'queue' ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
           >
             <div class="flex items-center gap-2 truncate">
-              <Layers class="w-3.5 h-3.5" />
+              <Layers class="w-3.5 h-3.5 icon-align" />
               <span class="truncate">{i18n.t('playerBar.queueTitle', {}, 'Queue')}</span>
             </div>
             <span class="text-[10px] text-brand-text-secondary/60 ml-1">
@@ -244,7 +244,7 @@
       class="flex items-center gap-3 transition-all duration-150 {navigationStore.activeTab === 'organize' ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
       title={i18n.t('sidebar.organize')}
     >
-      <Folder class={isCollapsed ? "w-5 h-5" : "w-4 h-4"} />
+      <Broom class={isCollapsed ? "w-5 h-5" : "w-4 h-4 icon-align"} />
       {#if !isCollapsed}
         <span class="truncate whitespace-nowrap">{i18n.t('sidebar.organize')}</span>
       {/if}
@@ -255,7 +255,7 @@
       class="flex items-center gap-3 transition-all duration-150 {navigationStore.activeTab === 'stats' ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
       title={i18n.t('sidebar.stats')}
     >
-      <BarChart2 class={isCollapsed ? "w-5 h-5" : "w-4 h-4"} />
+      <BarChart2 class={isCollapsed ? "w-5 h-5" : "w-4 h-4 icon-align"} />
       {#if !isCollapsed}
         <span class="truncate whitespace-nowrap">{i18n.t('sidebar.stats')}</span>
       {/if}
@@ -268,7 +268,7 @@
       class="relative flex items-center gap-3 transition-all duration-150 {navigationStore.activeTab === 'settings' ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
       title={showUpdateBadge ? `${i18n.t('sidebar.settings')} (${i18n.t('settings.updateAvailable', {}, 'Update available')})` : i18n.t('sidebar.settings')}
     >
-      <Settings class={isCollapsed ? "w-5 h-5" : "w-4 h-4"} />
+      <Settings class={isCollapsed ? "w-5 h-5" : "w-4 h-4 icon-align"} />
 
       {#if !isCollapsed}
         <span class="truncate whitespace-nowrap flex-1 text-left">{i18n.t('sidebar.settings')}</span>
@@ -289,7 +289,7 @@
       class="flex items-center gap-3 transition-all duration-150 {navigationStore.activeTab === 'help' ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
       title={i18n.t('sidebar.help')}
     >
-      <HelpCircle class={isCollapsed ? "w-5 h-5" : "w-4 h-4"} />
+      <HelpCircle class={isCollapsed ? "w-5 h-5" : "w-4 h-4 icon-align"} />
       {#if !isCollapsed}
         <span class="truncate whitespace-nowrap">{i18n.t('sidebar.help')}</span>
       {/if}
@@ -303,6 +303,14 @@
 </aside>
 
 <style>
+  /* Icons sit in a flex row centered against label text, but text's visible
+     glyphs sit lower than its line box center (line-height leading above/below
+     cap height isn't symmetric), so a geometrically-centered icon reads as too
+     high. Nudge down by half the leading to match the text's optical center. */
+  :global(.icon-align) {
+    margin-top: calc((1lh - 1em) / 2);
+  }
+
   aside.glass-surface {
     position: relative;
     -webkit-backdrop-filter: blur(20px) saturate(180%) !important;

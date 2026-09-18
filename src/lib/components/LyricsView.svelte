@@ -7,7 +7,8 @@
     FloppyDiskIcon as Save,
     XIcon as X,
     ArrowsClockwiseIcon as RefreshCw,
-    MusicNotesIcon as Music2
+    MusicNotesIcon as Music2,
+    SubtitlesIcon as Lyrics
   } from "phosphor-svelte";
   import LoadingSpinner from "./LoadingSpinner.svelte";
   import Button from "./Button.svelte";
@@ -241,7 +242,7 @@
 <div class="flex-1 flex flex-col h-full bg-brand-main text-brand-text-primary select-none overflow-hidden relative">
   <div class="h-16 flex items-center justify-between px-8 border-b border-brand-border bg-brand-main/40 backdrop-blur-md shrink-0">
     <div class="flex items-center gap-3">
-      <FileText class="w-6 h-6 text-brand-accent-text" />
+      <Lyrics class="w-6 h-6 text-brand-accent-text" />
       <div>
         <h2 class="text-sm font-bold truncate max-w-xs md:max-w-md text-brand-text-primary py-0.5 leading-snug">
           {playerStore.currentSong ? playerStore.currentSong.title : i18n.t('playerBar.notPlaying')}
