@@ -180,8 +180,8 @@
     </div>
 
     {#if scrobblerStore.validationError}
-      <div class="flex items-center gap-2 text-xs text-amber-500 pt-1">
-        <AlertTriangle class="w-3.5 h-3.5 shrink-0" />
+      <div class="flex items-start gap-2 text-xs text-amber-500 pt-1">
+        <AlertTriangle class="w-3.5 h-3.5 shrink-0 translate-y-[calc((1lh-0.875rem)/2)]" />
         <span>{scrobblerStore.validationError}</span>
       </div>
     {/if}
