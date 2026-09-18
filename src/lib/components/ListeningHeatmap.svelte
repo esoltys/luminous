@@ -222,7 +222,7 @@
 </script>
 
 <div class="bg-brand-sidebar border border-brand-border/60 rounded-xl p-4">
-  <h2 class="text-sm font-semibold text-brand-text-primary">{i18n.t("stats.heatmapTitle", {}, "Listening Streak")}</h2>
+  <h2 class="text-xl font-semibold text-brand-text-primary">{i18n.t("stats.heatmapTitle", {}, "Listening Streak")}</h2>
 
   {#if events}
     <div class="flex items-center gap-4 mt-3">

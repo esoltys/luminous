@@ -124,7 +124,7 @@
 
 @layer base {
   :root {
-    --theme-morph-duration: 1.5s;
+    --theme-morph-duration: 1.2s;
     transition:
       --color-artwork-primary var(--theme-morph-duration) ease,
       --color-artwork-sidebar var(--theme-morph-duration) ease,

@@ -524,31 +524,9 @@ export class ThemeStore {
         }
       }
       this.applyActiveTheme();
-      void this.syncMorphDuration();
     } catch (e) {
       console.error("Failed to init ThemeStore:", e);
       this.applyActiveTheme();
-    }
-  }
-
-  /**
-   * Synchronizes the CSS theme morph transition duration with the
-   * player's active crossfade settings.
-   */
-  async syncMorphDuration() {
-    try {
-      const fadeSettings = await invoke<any>("get_fade_settings");
-      if (fadeSettings) {
-        let duration = 1.2;
-        if (fadeSettings.crossfade_auto_enabled && fadeSettings.crossfade_auto_duration_secs > 0) {
-          duration = fadeSettings.crossfade_auto_duration_secs;
-        }
-        if (typeof document !== "undefined") {
-          document.documentElement.style.setProperty("--theme-morph-duration", `${duration}s`);
-        }
-      }
-    } catch {
-      // ignore when IPC unavailable
     }
   }
 
@@ -581,12 +559,6 @@ export class ThemeStore {
   async setColorSchemeMode(mode: "light" | "dark" | "system") {
     this.colorSchemeMode = mode;
     if (this.activeThemeId === "system") {
-      if (typeof document !== "undefined") {
-        document.documentElement.style.setProperty("--theme-morph-duration", "1.5s");
-        setTimeout(() => {
-          void this.syncMorphDuration();
-        }, 1600);
-      }
       this.applyActiveTheme();
     }
     await invoke("set_app_setting", { key: "color_scheme_mode", value: mode });
@@ -639,12 +611,6 @@ export class ThemeStore {
   async setTheme(themeId: string) {
     if (PREDEFINED_THEMES.some(t => t.id === themeId) || this.customThemes.some(t => t.id === themeId)) {
       this.activeThemeId = themeId;
-      if (typeof document !== "undefined") {
-        document.documentElement.style.setProperty("--theme-morph-duration", "1.5s");
-        setTimeout(() => {
-          void this.syncMorphDuration();
-        }, 1600);
-      }
       this.applyActiveTheme();
       await invoke("set_app_setting", { key: "active_theme_id", value: themeId });
     }

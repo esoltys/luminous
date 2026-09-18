@@ -81,6 +81,12 @@ debug-build-only — set `LUMINOUS_REMOTE_DEVTOOLS=1` before launching the dev s
 LUMINOUS_REMOTE_DEVTOOLS=1 bun run tauri dev
 ```
 
+PowerShell doesn't support that inline `VAR=value` prefix — set the env var first, then run the command:
+
+```powershell
+$env:LUMINOUS_REMOTE_DEVTOOLS = "1"; bun run tauri dev
+```
+
 Then, from a browser (e.g. Claude's Browser pane — `mcp__Claude_Browser__navigate`), open
 `http://127.0.0.1:9222`:
 

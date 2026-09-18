@@ -11,7 +11,6 @@
   import Toggle from "./Toggle.svelte";
   import Select from "./Select.svelte";
   import Knob from "./Knob.svelte";
-  import { themeStore } from "../stores/theme.svelte";
 
   type EqMode = "graphic10" | "parametric20";
   interface ParametricBand {
@@ -332,7 +331,6 @@
           crossfade_suppress_same_album: crossfadeSuppressSameAlbum,
         },
       });
-      void themeStore.syncMorphDuration();
     } catch (e) {
       console.error("Failed to save fade settings:", e);
     }
