@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/svelte";
 import HomeView from "./HomeView.svelte";
 import { collectionStore } from "../stores/collection.svelte";
+import { navigationStore } from "../stores/navigation.svelte";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { HomeItem, AlbumItem, StatsTopItem, ScanProgress } from "../types";
@@ -92,7 +93,7 @@ describe("HomeView.svelte", () => {
 
     await waitFor(() => {
       expect(invoke).toHaveBeenCalledWith("get_top_albums_summary", { range: "7d", limit: 10 });
-      expect(invoke).toHaveBeenCalledWith("get_recently_added", { limit: 12 });
+      expect(invoke).toHaveBeenCalledWith("get_recently_added", { limit: 10 });
       expect(invoke).toHaveBeenCalledWith("get_featured_albums", { limit: 5 });
     });
   });
@@ -126,33 +127,30 @@ describe("HomeView.svelte", () => {
     });
   });
 
-  it("hides the Explore Your Library row in favor of Top 10 Albums once play history exists", async () => {
+  it("hides the Explore Your Library row in favor of Top Albums This Week once play history exists", async () => {
     mockTopAlbums = [makeStatsTopAlbum({ label: "Chart Topper", secondary: "Tom Petty" })];
     mockFeaturedAlbums = [{ type: "album", album: makeAlbum({ album: "Discover Me" }) }];
 
     render(HomeView);
 
     await waitFor(() => {
-      expect(screen.getByText("Top 10 Albums")).toBeInTheDocument();
+      expect(screen.getByText("Top Albums This Week")).toBeInTheDocument();
       expect(screen.getByText("Chart Topper")).toBeInTheDocument();
     });
     expect(screen.queryByText("Explore Your Library")).not.toBeInTheDocument();
   });
 
-  it("allows switching time range for Top 10 Albums", async () => {
+  it("navigates to the Stats view when the Top Albums This Week heading is clicked", async () => {
     mockTopAlbums = [makeStatsTopAlbum({ label: "Chart Topper", secondary: "Tom Petty" })];
     render(HomeView);
 
     await waitFor(() => {
-      expect(screen.getByText("Past 28 Days")).toBeInTheDocument();
+      expect(screen.getByText("Top Albums This Week")).toBeInTheDocument();
     });
 
-    vi.mocked(invoke).mockClear();
-    screen.getByText("Past 28 Days").click();
+    screen.getByText("Top Albums This Week").click();
 
-    await waitFor(() => {
-      expect(invoke).toHaveBeenCalledWith("get_top_albums_summary", { range: "28d", limit: 10 });
-    });
+    expect(navigationStore.activeTab).toBe("stats");
   });
 
   it("refreshes curated data when a scan-progress 'done' event fires", async () => {

@@ -13,42 +13,13 @@
   import { rememberScroll } from "../utils/scrollMemory";
   import { getDaypartBucket } from "../utils/daypart";
 
-  const VALID_RANGES: StatsRange[] = ["7d", "28d", "1y"];
-  function loadSavedHomeRange(): StatsRange {
-    if (typeof window === "undefined") return "7d";
-    const saved = localStorage.getItem("home_top_albums_range");
-    return VALID_RANGES.includes(saved as StatsRange) ? (saved as StatsRange) : "7d";
-  }
+  const TOP_ALBUMS_RANGE: StatsRange = "7d";
 
-  let topAlbumsRange = $state<StatsRange>(loadSavedHomeRange());
   let topAlbums = $state<StatsTopItem[]>([]);
   let recentlyAdded = $state<HomeItem[]>([]);
   let featuredAlbums = $state<HomeItem[]>([]);
   let isLoading = $state(true);
   let libraryChangedDebounce: ReturnType<typeof setTimeout> | undefined;
-
-  const RANGES: { value: StatsRange; label: () => string }[] = [
-    { value: "7d", label: () => i18n.t("stats.range7d", {}, "Past 7 Days") },
-    { value: "28d", label: () => i18n.t("stats.range28d", {}, "Past 28 Days") },
-    { value: "1y", label: () => i18n.t("stats.range1y", {}, "Past Year") }
-  ];
-
-  async function loadTopAlbums(range: StatsRange) {
-    try {
-      topAlbums = await invoke<StatsTopItem[]>("get_top_albums_summary", { range, limit: 10 });
-    } catch (err) {
-      console.error("Failed to load top albums summary:", err);
-      topAlbums = [];
-    }
-  }
-
-  function setTopAlbumsRange(newRange: StatsRange) {
-    topAlbumsRange = newRange;
-    if (typeof window !== "undefined") {
-      localStorage.setItem("home_top_albums_range", newRange);
-    }
-    loadTopAlbums(newRange);
-  }
 
   /** Polled rather than computed once, so the greeting (and the Daypart Mix
    * pin's implicit "current bucket") actually flips while the user sits on
@@ -71,8 +42,8 @@
     isLoading = true;
     try {
       const [top, added, featured] = await Promise.all([
-        invoke<StatsTopItem[]>("get_top_albums_summary", { range: topAlbumsRange, limit: 10 }),
-        invoke<HomeItem[]>("get_recently_added", { limit: 12 }),
+        invoke<StatsTopItem[]>("get_top_albums_summary", { range: TOP_ALBUMS_RANGE, limit: 10 }),
+        invoke<HomeItem[]>("get_recently_added", { limit: 10 }),
         invoke<HomeItem[]>("get_featured_albums", { limit: 5 }),
       ]);
       topAlbums = top;
@@ -134,20 +105,9 @@
               items={topAlbums}
               kind="album"
               secondaryFallback={i18n.t('collection.variousArtists')}
-            >
-              {#snippet headerAction()}
-                <div class="flex items-center gap-1.5">
-                  {#each RANGES as r (r.value)}
-                    <button
-                      onclick={() => setTopAlbumsRange(r.value)}
-                      class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors {topAlbumsRange === r.value ? 'bg-brand-accent text-brand-accent-contrast shadow-sm shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'}"
-                    >
-                      {r.label()}
-                    </button>
-                  {/each}
-                </div>
-              {/snippet}
-            </TopTenList>
+              showDuration={false}
+              onHeaderClick={() => { navigationStore.activeTab = "stats"; }}
+            />
           {:else if featuredAlbums.length > 0}
             <HomeRowList title={i18n.t('home.exploreLibrary')} items={featuredAlbums} variant="added" />
           {/if}

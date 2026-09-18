@@ -12,17 +12,22 @@
   import ArtistRowCard from "./ArtistRowCard.svelte";
   import { getArtistAlbums, getArtistSongs } from "../utils/artist";
   import { i18n } from "../stores/i18n.svelte";
+  import { CaretRightIcon as ChevronRight } from "phosphor-svelte";
 
   interface Props {
     title?: string;
     items: StatsTopItem[];
     kind: "album" | "song" | "artist" | "genre";
-    headerAction?: import("svelte").Snippet;
     emptyText?: string;
     secondaryFallback?: string;
+    /** Hides the plays/minutes trailing column, for compact contexts (e.g. Home). */
+    showDuration?: boolean;
+    /** When provided, the title becomes a clickable button that navigates to
+     * the full expanded view. */
+    onHeaderClick?: () => void;
   }
 
-  let { title, items, kind, headerAction, emptyText, secondaryFallback }: Props = $props();
+  let { title, items, kind, emptyText, secondaryFallback, showDuration = true, onHeaderClick }: Props = $props();
 
   let contextMenuState = $state<{ x: number; y: number; song: Song } | null>(null);
 
@@ -98,17 +103,17 @@
 {/snippet}
 
 <div class="h-full flex flex-col gap-4">
-  {#if title || headerAction}
-    <div class="flex items-center justify-between gap-2 min-h-8">
-      {#if title}
-        <h2 class="text-xl font-semibold text-brand-text-primary">{title}</h2>
-      {:else}
-        <div></div>
-      {/if}
-      {#if headerAction}
-        {@render headerAction()}
-      {/if}
-    </div>
+  {#if title && onHeaderClick}
+    <button
+      type="button"
+      onclick={onHeaderClick}
+      class="group flex items-center gap-1 text-xl font-semibold text-brand-text-primary hover:text-brand-accent-text transition-colors"
+    >
+      {title}
+      <ChevronRight class="w-5 h-5 opacity-0 group-hover:opacity-100 transition-opacity" />
+    </button>
+  {:else if title}
+    <h2 class="text-xl font-semibold text-brand-text-primary">{title}</h2>
   {/if}
 
   <div class="flex-1 flex flex-col gap-2">
@@ -222,7 +227,9 @@
           {/if}
         </div>
 
-        {@render durationSnippet(item)}
+        {#if showDuration}
+          {@render durationSnippet(item)}
+        {/if}
       </div>
     {/each}
 
