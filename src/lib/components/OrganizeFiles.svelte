@@ -882,24 +882,30 @@
   {#if embedded}
     <!-- Apply action lives in the host page header (top-right); this renders Preview, Template Pattern, Destination & Options -->
     <div class="space-y-4 text-xs">
-      {@render scopeToggle()}
+      {#if songIds.length > 0}
+        <div class="max-w-3xl mx-auto">
+          {@render scopeToggle()}
+        </div>
+      {/if}
 
       {#if errorMessage}
-        <div class="space-y-1.5">
+        <div class="max-w-3xl mx-auto space-y-1.5">
           {@render actionMessages()}
         </div>
       {/if}
 
+      <!-- Unlike the sections below, this one isn't capped to max-w-3xl —
+           the file list benefits from the extra width on wide windows. -->
       <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4 text-brand-text-primary">
         {@render previewSection()}
       </div>
 
-      <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4 text-brand-text-primary">
+      <div class="max-w-3xl mx-auto bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4 text-brand-text-primary">
         <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t("organizer.sectionTemplatePattern")}</h3>
         {@render templateSection()}
       </div>
 
-      <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4 text-brand-text-primary">
+      <div class="max-w-3xl mx-auto bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4 text-brand-text-primary">
         <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t("organizer.sectionDestinationOptions")}</h3>
         {@render destinationSection()}
       </div>
