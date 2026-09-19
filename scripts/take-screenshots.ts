@@ -436,12 +436,12 @@ async function main() {
         }
       }, featured.album ?? featured.song?.album);
       await page.waitForTimeout(500);
-      // "Edit album info" lives behind the "More actions" overflow menu (#97) —
+      // "Edit Album Details" lives behind the "More actions" overflow menu (#97) —
       // it's a role="menuitem" button with no title attribute of its own, so
       // it has to be opened first and found by name rather than getByTitle.
       await page.getByTitle(t(language, "playlists.moreActionsTooltip"), { exact: true }).click();
       await page.waitForTimeout(300);
-      await page.getByRole("menuitem", { name: t(language, "albumDetail.editInfoTooltip"), exact: true }).click();
+      await page.getByRole("menuitem", { name: t(language, "albumDetail.editAlbumDetails"), exact: true }).click();
       await page.waitForTimeout(400);
     },
     "click-themes": async (page, _featured, language) => {
@@ -455,21 +455,21 @@ async function main() {
       // Locator click auto-waits for the button to be actionable — more
       // reliable than a fixed-delay evaluate() when the settings sub-tabs
       // haven't finished rendering yet.
-      await page.getByRole("button", { name: t(language, "settings.tabEqualizer"), exact: true }).click();
+      await page.getByRole("tab", { name: t(language, "settings.tabEqualizer"), exact: true }).click();
       await page.waitForTimeout(400);
     },
     "click-equalizer-parametric": async (page, _featured, language) => {
-      await page.getByRole("button", { name: t(language, "settings.tabEqualizer"), exact: true }).click();
+      await page.getByRole("tab", { name: t(language, "settings.tabEqualizer"), exact: true }).click();
       await page.waitForTimeout(400);
       await page.getByRole("button", { name: t(language, "equalizer.modeParametric"), exact: true }).click();
       await page.waitForTimeout(400);
     },
     "click-settings-folders": async (page, _featured, language) => {
-      await page.getByRole("button", { name: t(language, "settings.tabFolders"), exact: true }).click();
+      await page.getByRole("tab", { name: t(language, "settings.tabFolders"), exact: true }).click();
       await page.waitForTimeout(400);
     },
     "click-settings-integrations": async (page, _featured, language) => {
-      await page.getByRole("button", { name: t(language, "settings.tabIntegrations"), exact: true }).click();
+      await page.getByRole("tab", { name: t(language, "settings.tabIntegrations"), exact: true }).click();
       await page.waitForTimeout(400);
     },
     "click-organize-custom-template": async (page, _featured, language) => {
@@ -484,7 +484,7 @@ async function main() {
       await page.waitForTimeout(600);
     },
     "click-settings-about": async (page, _featured, language) => {
-      await page.getByRole("button", { name: t(language, "settings.tabAbout"), exact: true }).click();
+      await page.getByRole("tab", { name: t(language, "settings.tabAbout"), exact: true }).click();
       await page.waitForTimeout(400);
     },
     "click-bands-toggle": async (page, _featured, language) => {
@@ -539,8 +539,10 @@ async function main() {
     },
     "type-search-key": async (page, _featured, language) => {
       // Reveal the Key column so the table behind the search dropdown shows
-      // initial_key values matching the "key:d" query.
-      await page.getByTitle(t(language, "collection.columnsBtn")).click();
+      // initial_key values matching the "key:d" query. The column menu has no
+      // visible trigger button anymore (see #0f22bafb) — it opens via
+      // right-click on the table header row.
+      await page.locator('[role="row"][tabindex="-1"]').first().click({ button: "right" });
       await page.waitForTimeout(200);
       await page.getByRole("checkbox", { name: t(language, "collection.columnInitialKey"), exact: true }).click();
       await page.waitForTimeout(150);

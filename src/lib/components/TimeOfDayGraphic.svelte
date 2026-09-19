@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import type { DaypartBucket } from "../utils/daypart";
 
   interface Props {
@@ -35,13 +36,19 @@
 
   $effect(() => {
     const target = reveals;
-    const start = displayReveals;
+    // Read via untrack: displayReveals is also written below on every tick,
+    // and tracking it here would make the effect depend on its own writes,
+    // restarting the tween (with a fresh startTime later than the
+    // already-scheduled rAF timestamp) on every single frame — producing a
+    // negative elapsed time, a negative eased value, and negative rect
+    // heights.
+    const start = untrack(() => displayReveals);
     const startTime = performance.now();
     const duration = 550;
     let frame: number;
 
     function tick(now: number) {
-      const t = Math.min(1, (now - startTime) / duration);
+      const t = Math.max(0, Math.min(1, (now - startTime) / duration));
       const eased = 1 - Math.pow(1 - t, 3);
       displayReveals = start.map((s, i) => s + (target[i] - s) * eased);
       if (t < 1) frame = requestAnimationFrame(tick);
