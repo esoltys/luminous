@@ -747,8 +747,19 @@ pub fn run() {
     let verbose = std::env::var("LUMINOUS_VERBOSE").is_ok()
         || std::env::args().any(|a| a == "--verbose" || a == "-v");
     let default_filter = if verbose { "debug" } else { "info" };
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(default_filter))
-        .init();
+    let mut logger_builder =
+        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(default_filter));
+    if !rust_log_explicit {
+        // Malformed/spliced MP3s (common with ad-stitched podcasts, mp3-joiner
+        // output, etc.) make symphonia's decoder start mid-bitstream, which it
+        // handles by zeroing the affected granule and logging at `warn` — this
+        // is already-recovered, inherent-to-the-source-file noise, not
+        // something the user or Luminous can act on, so keep it out of the
+        // logs unless someone explicitly asked for codec-level debugging via
+        // `RUST_LOG`.
+        logger_builder.filter_module("symphonia_bundle_mp3::layer3", log::LevelFilter::Error);
+    }
+    logger_builder.init();
 
     // The AppImage bundles its own WebKitGTK (built on the CI runner), which
     // can be substantially older than the host's system WebKitGTK. Older
