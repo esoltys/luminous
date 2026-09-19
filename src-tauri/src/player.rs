@@ -1405,30 +1405,31 @@ impl Player {
         }
     }
 
-    /// Called when the audio engine reports a track has finished.
+    /// Called when the audio engine reports a track has finished. Commits
+    /// `peek_next_natural`'s decision with a real `Play` call — the same
+    /// decision `on_gapless_transition` commits silently and
+    /// `prepare_gapless_next` preloads — so there is exactly one place that
+    /// decides what plays next, not an independently-matched copy of it.
     pub async fn on_track_finished(&mut self) -> Result<()> {
         if self.stop_after_current {
             self.stop_after_current = false;
             return self.stop().await;
         }
 
-        match self.repeat_mode {
-            RepeatMode::Track => {
-                if let Some(idx) = self.current_index {
-                    return self.play_at_index(idx).await;
+        if let Some(target) = self.peek_next_natural() {
+            match target.kind {
+                GaplessTargetKind::Replay => {
+                    if let Some(idx) = self.current_index {
+                        return self.play_at_index(idx).await;
+                    }
+                }
+                GaplessTargetKind::Index(candidate) => {
+                    return self.play_at_index(candidate).await;
+                }
+                GaplessTargetKind::Queue => {
+                    return self.next_track().await;
                 }
             }
-            RepeatMode::Playlist => {
-                let next = self.get_next_index();
-                let idx = next.unwrap_or(0); // wrap around
-                return self.play_at_index(idx).await;
-            }
-            RepeatMode::Album => {
-                if let Some(idx) = self.get_next_index() {
-                    return self.play_at_index(idx).await;
-                }
-            }
-            _ => {}
         }
 
         self.next_track().await
