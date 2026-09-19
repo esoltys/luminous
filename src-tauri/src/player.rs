@@ -1416,10 +1416,62 @@ impl Player {
                 let idx = next.unwrap_or(0); // wrap around
                 return self.play_at_index(idx).await;
             }
+            RepeatMode::Album => {
+                if let Some(idx) = self.get_next_index() {
+                    return self.play_at_index(idx).await;
+                }
+            }
             _ => {}
         }
 
         self.next_track().await
+    }
+
+    /// The key `ShuffleMode::Albums`/`InsideAlbum` group tracks under, also
+    /// reused by `RepeatMode::Album` to find "the current album"'s tracks —
+    /// a single source of truth so both features agree on what counts as
+    /// the same album. Falls back to the item's own uuid when the song has
+    /// no (or blank) album tag, so an ungrouped track forms a group of one
+    /// rather than colliding with other untagged tracks.
+    fn album_key(item: &PlaylistItem) -> String {
+        if let Some(ref song) = item.song {
+            if let Some(ref album) = song.album {
+                if !album.trim().is_empty() {
+                    return album.to_lowercase();
+                }
+            }
+        }
+        item.uuid.clone()
+    }
+
+    /// The next virtual index within the current track's album, wrapping
+    /// back to the album's first (virtual-order) track after its last —
+    /// `RepeatMode::Album`'s "loop the current album indefinitely". A
+    /// single-track album (or an ungrouped track, its own group of one)
+    /// loops back to itself, mirroring `RepeatMode::Track`'s replay.
+    fn next_album_index(&self) -> Option<usize> {
+        let total = self.virtual_len();
+        if total == 0 {
+            return None;
+        }
+        let current_virtual = self.current_index?;
+        let current_real = self.resolve_item_index(current_virtual)?;
+        let key = Self::album_key(self.playlist_items.get(current_real)?);
+
+        let album_virtual_indices: Vec<usize> = (0..total)
+            .filter(|&v| {
+                self.resolve_item_index(v)
+                    .and_then(|r| self.playlist_items.get(r))
+                    .map(|item| Self::album_key(item) == key)
+                    .unwrap_or(false)
+            })
+            .collect();
+
+        let pos = album_virtual_indices
+            .iter()
+            .position(|&v| v == current_virtual)?;
+        let next_pos = (pos + 1) % album_virtual_indices.len();
+        Some(album_virtual_indices[next_pos])
     }
 
     /// Compute the next playback index based on mode.
@@ -1430,6 +1482,10 @@ impl Player {
         }
 
         let current = self.current_index?;
+
+        if self.repeat_mode == RepeatMode::Album {
+            return self.next_album_index();
+        }
 
         let next = current + 1;
         if next < total {
@@ -1544,17 +1600,6 @@ impl Player {
             None
         };
 
-        let get_album_key = |item: &PlaylistItem| -> String {
-            if let Some(ref song) = item.song {
-                if let Some(ref album) = song.album {
-                    if !album.trim().is_empty() {
-                        return album.to_lowercase();
-                    }
-                }
-            }
-            item.uuid.clone()
-        };
-
         let get_artist_key = |item: &PlaylistItem| -> String {
             if let Some(ref song) = item.song {
                 if let Some(ref artist) = song.artist {
@@ -1588,7 +1633,7 @@ impl Player {
                     len,
                     current_real_idx,
                     &mut rng,
-                    get_album_key,
+                    Self::album_key,
                     false, // keep album order as-is
                     true,  // shuffle each album's own track order
                 ));
@@ -1598,7 +1643,7 @@ impl Player {
                     len,
                     current_real_idx,
                     &mut rng,
-                    get_album_key,
+                    Self::album_key,
                     true,  // shuffle which album comes next
                     false, // keep each album's own track order
                 ));
@@ -2387,6 +2432,90 @@ mod tests {
             player.current_song.as_ref().unwrap().id,
             1,
             "advancing past the last track with RepeatMode::Playlist must wrap to the first"
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// Regression coverage for #1070: `RepeatMode::Album` used to fall
+    /// through the `_ => {}`/`_ => None` catch-all in every repeat-mode
+    /// match, behaving identically to `Off` despite being reachable and
+    /// advertised in the UI ("Loop the current album indefinitely"). Songs
+    /// 1/3 are "Album A" and 2/4 are "Album B", interleaved in playlist
+    /// order — this proves advancing stays scoped to the current album's
+    /// own tracks (not just "the next track" or "the whole playlist"), and
+    /// wraps back to the album's first track rather than stopping or
+    /// spilling into the other album.
+    #[tokio::test]
+    async fn test_repeat_album_stays_within_album_and_wraps() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for id in 1..=4i64 {
+                let album = if id % 2 == 1 { "Album A" } else { "Album B" };
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (id, path, title, artist, album, length_nanosec) VALUES ({id}, '/fake/path{id}.mp3', 'Track {id}', 'Artist', '{album}', 180000000000)"
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+        }
+
+        let audio = Arc::new(Mutex::new(AudioEngine::new()));
+        let mut player = Player::new(db_arc.clone(), audio.clone());
+
+        let items = (1..=4i64)
+            .map(|id| {
+                let conn = db_arc.pool.get().unwrap();
+                let sql = format!(
+                    "SELECT {} FROM songs WHERE id = ?1",
+                    crate::collection::SONG_SELECT_COLS
+                );
+                let song = conn
+                    .query_row(&sql, rusqlite::params![id], crate::collection::row_to_song)
+                    .unwrap();
+                PlaylistItem::new_song(0, 0, song)
+            })
+            .collect::<Vec<_>>();
+
+        player.set_repeat_mode(RepeatMode::Album);
+        player
+            .play_playlist(items.clone(), 0, 0, None)
+            .await
+            .unwrap();
+        assert_eq!(player.current_song.as_ref().unwrap().id, 1);
+
+        // Manual skip (get_next_index) must stay within Album A, skipping
+        // over song 2 (Album B) to reach song 3.
+        player.next_track().await.unwrap();
+        assert_eq!(
+            player.current_song.as_ref().unwrap().id,
+            3,
+            "RepeatMode::Album must advance to the next track within the same album, \
+             skipping over tracks that belong to a different album"
+        );
+
+        // Past Album A's last track, must wrap back to its first rather
+        // than stopping or continuing into Album B.
+        player.next_track().await.unwrap();
+        assert_eq!(
+            player.current_song.as_ref().unwrap().id,
+            1,
+            "RepeatMode::Album must wrap back to the album's first track, not stop or \
+             spill into the next album"
+        );
+
+        // Natural track-end (on_track_finished) must produce the same
+        // album-scoped advance as manual skip.
+        player.on_track_finished().await.unwrap();
+        assert_eq!(
+            player.current_song.as_ref().unwrap().id,
+            3,
+            "on_track_finished must also stay within the current album under RepeatMode::Album"
         );
 
         let _ = std::fs::remove_dir_all(temp_dir);
