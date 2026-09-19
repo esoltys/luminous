@@ -25,6 +25,7 @@
 use crate::models::{PlayState, Song};
 use anyhow::{anyhow, Result};
 use cpal::traits::StreamTrait;
+use parking_lot::Mutex;
 use ringbuf::{
     traits::{Consumer, Observer, Producer, Split},
     HeapRb,
@@ -33,7 +34,7 @@ use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 use std::sync::{
     atomic::{AtomicU32, AtomicU64, Ordering},
-    mpsc, Arc, Mutex,
+    mpsc, Arc,
 };
 use symphonia::core::{
     codecs::audio::{AudioDecoder, AudioDecoderOptions},
@@ -220,7 +221,8 @@ impl AudioEngine {
     }
 
     pub fn cue(&self, song: Box<Song>, start_nanosec: u64) -> Result<()> {
-        if let Ok(mut s) = self.play_state.lock() {
+        {
+            let mut s = self.play_state.lock();
             *s = crate::models::PlayState::Paused;
         }
         self.position_nanosec
@@ -334,10 +336,7 @@ impl AudioEngine {
     }
 
     pub fn current_state(&self) -> PlayState {
-        self.play_state
-            .lock()
-            .map(|s| *s)
-            .unwrap_or(PlayState::Stopped)
+        *self.play_state.lock()
     }
 }
 
@@ -768,7 +767,8 @@ fn build_output(
     let target_sample_rate = config.sample_rate;
     let target_channels = config.channels;
 
-    if let Ok(mut eq) = equalizer.lock() {
+    {
+        let mut eq = equalizer.lock();
         eq.update_format(target_sample_rate, target_channels as usize);
     }
 
@@ -810,7 +810,7 @@ fn build_output(
                 let mut played = 0;
 
                 // Non-blocking try_lock ensures CPAL callback never stalls
-                if let Ok(mut consumer) = shared_consumer_reader.try_lock() {
+                if let Some(mut consumer) = shared_consumer_reader.try_lock() {
                     for sample in output.iter_mut() {
                         if let Some(s) = consumer.try_pop() {
                             *sample = s;
@@ -839,7 +839,7 @@ fn build_output(
 
                 // 2) Equalizer (preamp + band cascade; no-op when disabled)
                 let mut eq_applied = false;
-                if let Ok(mut eq) = eq_cpal.try_lock() {
+                if let Some(mut eq) = eq_cpal.try_lock() {
                     eq_applied = eq.enabled;
                     eq.process_interleaved(&mut output[..played]);
                 }
@@ -1073,7 +1073,8 @@ fn decode_thread(
                             target_channels as usize,
                         ) {
                             Ok(_) => {
-                                if let Ok(mut consumer) = out.consumer.lock() {
+                                {
+                                    let mut consumer = out.consumer.lock();
                                     while consumer.try_pop().is_some() {}
                                 }
                                 let start_samples = samples_for_ns(
@@ -1083,7 +1084,8 @@ fn decode_thread(
                                 );
                                 out.played_samples.store(start_samples, Ordering::Relaxed);
                                 let _ = out.stream.pause();
-                                if let Ok(mut s) = play_state.lock() {
+                                {
+                                    let mut s = play_state.lock();
                                     *s = PlayState::Paused;
                                 }
                                 position.store(r.start_nanosec, Ordering::Relaxed);
@@ -1113,7 +1115,8 @@ fn decode_thread(
                         }
                         paused_req = None;
                         position.store(0, Ordering::Relaxed);
-                        if let Ok(mut s) = play_state.lock() {
+                        {
+                            let mut s = play_state.lock();
                             *s = PlayState::Stopped;
                         }
                         let _ = event_tx.send(AudioEvent::Stopped);
@@ -1137,7 +1140,8 @@ fn decode_thread(
                     }
                     paused_req = None;
                     position.store(0, Ordering::Relaxed);
-                    if let Ok(mut s) = play_state.lock() {
+                    {
+                        let mut s = play_state.lock();
                         *s = PlayState::Stopped;
                     }
                     let _ = event_tx.send(AudioEvent::Stopped);
@@ -1195,7 +1199,8 @@ fn decode_thread(
 
         // Clear whatever was left in the buffer from the previous track and
         // reset the played-sample counter for this track's start offset.
-        if let Ok(mut consumer) = out.consumer.lock() {
+        {
+            let mut consumer = out.consumer.lock();
             while consumer.try_pop().is_some() {}
         }
         let start_samples = samples_for_ns(current.start_ns, target_sample_rate, target_channels);
@@ -1208,7 +1213,8 @@ fn decode_thread(
             continue;
         }
 
-        if let Ok(mut s) = play_state.lock() {
+        {
+            let mut s = play_state.lock();
             *s = PlayState::Playing;
         }
         position.store(current.start_ns, Ordering::Relaxed);
@@ -1360,7 +1366,8 @@ fn check_and_rebuild_output(
                         );
                     }
 
-                    if let Ok(mut consumer) = new_out.consumer.lock() {
+                    {
+                        let mut consumer = new_out.consumer.lock();
                         while consumer.try_pop().is_some() {}
                     }
                     let start_samples = samples_for_ns(
@@ -1407,7 +1414,8 @@ fn handle_decode_command(
     match cmd {
         Ok(AudioCommand::Pause) => {
             let _ = out.stream.pause();
-            if let Ok(mut s) = play_state.lock() {
+            {
+                let mut s = play_state.lock();
                 *s = PlayState::Paused;
             }
             let _ = event_tx.send(AudioEvent::Paused);
@@ -1427,7 +1435,8 @@ fn handle_decode_command(
             apply_fade_ramp(fade_gain, 1.0, 0.0, dur_ms);
             let _ = out.stream.pause();
             fade_gain.store(1.0f32.to_bits(), Ordering::Relaxed);
-            if let Ok(mut s) = play_state.lock() {
+            {
+                let mut s = play_state.lock();
                 *s = PlayState::Paused;
             }
             let _ = event_tx.send(AudioEvent::Paused);
@@ -1443,7 +1452,8 @@ fn handle_decode_command(
         }
         Ok(AudioCommand::Stop) => {
             let _ = out.stream.pause();
-            if let Ok(mut s) = play_state.lock() {
+            {
+                let mut s = play_state.lock();
                 *s = PlayState::Stopped;
             }
             let _ = event_tx.send(AudioEvent::Stopped);
@@ -1453,7 +1463,8 @@ fn handle_decode_command(
             apply_fade_ramp(fade_gain, 1.0, 0.0, dur_ms);
             let _ = out.stream.pause();
             fade_gain.store(1.0f32.to_bits(), Ordering::Relaxed);
-            if let Ok(mut s) = play_state.lock() {
+            {
+                let mut s = play_state.lock();
                 *s = PlayState::Stopped;
             }
             let _ = event_tx.send(AudioEvent::Stopped);
@@ -1512,7 +1523,8 @@ fn handle_decode_command(
             }
 
             // Clear the buffer after seek to avoid stale audio
-            if let Ok(mut consumer) = out.consumer.lock() {
+            {
+                let mut consumer = out.consumer.lock();
                 while consumer.try_pop().is_some() {}
             }
             let target_samples = samples_for_ns(
@@ -1673,7 +1685,8 @@ fn handle_eof(
             song_id: session.current.song.id,
         });
         let _ = out.stream.pause();
-        if let Ok(mut s) = play_state.lock() {
+        {
+            let mut s = play_state.lock();
             *s = PlayState::Stopped;
         }
         EofOutcome::BreakDecode

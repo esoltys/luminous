@@ -35,7 +35,7 @@ fn save_eq_settings(db: &crate::db::Database, eq: &Equalizer) {
 #[tauri::command]
 pub async fn get_equalizer_state(state: State<'_, AppState>) -> Result<EqualizerConfig, String> {
     let engine = state.audio.lock().await;
-    let eq = engine.equalizer.lock().map_err(|e| e.to_string())?;
+    let eq = engine.equalizer.lock();
     Ok(EqualizerConfig::snapshot(&eq))
 }
 
@@ -47,7 +47,7 @@ pub async fn apply_equalizer_config(
     config: EqualizerConfig,
 ) -> Result<EqualizerConfig, String> {
     let engine = state.audio.lock().await;
-    let mut eq = engine.equalizer.lock().map_err(|e| e.to_string())?;
+    let mut eq = engine.equalizer.lock();
     let canonical = eq.apply(&config);
     save_eq_settings(&state.db, &eq);
     Ok(canonical)
@@ -56,7 +56,7 @@ pub async fn apply_equalizer_config(
 #[tauri::command]
 pub async fn reset_parametric_bands(state: State<'_, AppState>) -> Result<EqualizerConfig, String> {
     let engine = state.audio.lock().await;
-    let mut eq = engine.equalizer.lock().map_err(|e| e.to_string())?;
+    let mut eq = engine.equalizer.lock();
     eq.load_parametric(crate::equalizer::default_parametric_bands());
     save_eq_settings(&state.db, &eq);
     Ok(EqualizerConfig::snapshot(&eq))
@@ -68,7 +68,7 @@ pub async fn load_equalizer_preset(
     preset_name: String,
 ) -> Result<EqualizerConfig, String> {
     let engine = state.audio.lock().await;
-    let mut eq = engine.equalizer.lock().map_err(|e| e.to_string())?;
+    let mut eq = engine.equalizer.lock();
 
     let gains = crate::equalizer::preset_gains(&preset_name);
 

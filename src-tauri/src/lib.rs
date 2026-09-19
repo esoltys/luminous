@@ -285,7 +285,8 @@ fn restore_equalizer_from_db(db: &Database, audio_engine: &AudioEngine) {
                     }
                 }
             }
-            if let Ok(mut eq) = audio_engine.equalizer.lock() {
+            {
+                let mut eq = audio_engine.equalizer.lock();
                 eq.enabled = enabled;
                 eq.preamp = preamp;
                 eq.load_preset(gains);
@@ -486,7 +487,7 @@ fn spawn_audio_event_loop(
                 engine.event_rx.clone()
             };
 
-            let rx = rx.lock().unwrap();
+            let rx = rx.lock();
             for event in rx.iter() {
                 log::trace!("Received audio event: {:?}", event);
                 let app = app_handle.clone();
