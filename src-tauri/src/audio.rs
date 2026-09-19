@@ -211,13 +211,17 @@ impl AudioEngine {
         }
     }
 
-    pub fn play(&self, song: Box<Song>, start_nanosec: u64) -> Result<()> {
+    fn send_cmd(&self, cmd: AudioCommand) -> Result<()> {
         self.cmd_tx
-            .send(AudioCommand::Play(PlayRequest {
-                song,
-                start_nanosec,
-            }))
+            .send(cmd)
             .map_err(|_| anyhow!("audio thread shut down"))
+    }
+
+    pub fn play(&self, song: Box<Song>, start_nanosec: u64) -> Result<()> {
+        self.send_cmd(AudioCommand::Play(PlayRequest {
+            song,
+            start_nanosec,
+        }))
     }
 
     pub fn cue(&self, song: Box<Song>, start_nanosec: u64) -> Result<()> {
@@ -227,21 +231,17 @@ impl AudioEngine {
         }
         self.position_nanosec
             .store(start_nanosec, Ordering::Relaxed);
-        self.cmd_tx
-            .send(AudioCommand::Cue(PlayRequest {
-                song,
-                start_nanosec,
-            }))
-            .map_err(|_| anyhow!("audio thread shut down"))
+        self.send_cmd(AudioCommand::Cue(PlayRequest {
+            song,
+            start_nanosec,
+        }))
     }
 
     pub fn preload_next(&self, song: Box<Song>, start_nanosec: u64) -> Result<()> {
-        self.cmd_tx
-            .send(AudioCommand::PreloadNext(PlayRequest {
-                song,
-                start_nanosec,
-            }))
-            .map_err(|_| anyhow!("audio thread shut down"))
+        self.send_cmd(AudioCommand::PreloadNext(PlayRequest {
+            song,
+            start_nanosec,
+        }))
     }
 
     pub fn preload_next_with_crossfade(
@@ -250,63 +250,45 @@ impl AudioEngine {
         start_nanosec: u64,
         crossfade_secs: f32,
     ) -> Result<()> {
-        self.cmd_tx
-            .send(AudioCommand::PreloadNextCrossfade(
-                PlayRequest {
-                    song,
-                    start_nanosec,
-                },
-                crossfade_secs,
-            ))
-            .map_err(|_| anyhow!("audio thread shut down"))
+        self.send_cmd(AudioCommand::PreloadNextCrossfade(
+            PlayRequest {
+                song,
+                start_nanosec,
+            },
+            crossfade_secs,
+        ))
     }
 
     pub fn clear_preload(&self) -> Result<()> {
-        self.cmd_tx
-            .send(AudioCommand::ClearPreload)
-            .map_err(|_| anyhow!("audio thread shut down"))
+        self.send_cmd(AudioCommand::ClearPreload)
     }
 
     pub fn pause(&self) -> Result<()> {
-        self.cmd_tx
-            .send(AudioCommand::Pause)
-            .map_err(|_| anyhow!("audio thread shut down"))
+        self.send_cmd(AudioCommand::Pause)
     }
 
     pub fn pause_with_fade(&self, fade_ms: u32) -> Result<()> {
-        self.cmd_tx
-            .send(AudioCommand::PauseWithFade(fade_ms))
-            .map_err(|_| anyhow!("audio thread shut down"))
+        self.send_cmd(AudioCommand::PauseWithFade(fade_ms))
     }
 
     pub fn resume(&self) -> Result<()> {
-        self.cmd_tx
-            .send(AudioCommand::Resume)
-            .map_err(|_| anyhow!("audio thread shut down"))
+        self.send_cmd(AudioCommand::Resume)
     }
 
     pub fn resume_with_fade(&self, fade_ms: u32) -> Result<()> {
-        self.cmd_tx
-            .send(AudioCommand::ResumeWithFade(fade_ms))
-            .map_err(|_| anyhow!("audio thread shut down"))
+        self.send_cmd(AudioCommand::ResumeWithFade(fade_ms))
     }
 
     pub fn stop(&self) -> Result<()> {
-        self.cmd_tx
-            .send(AudioCommand::Stop)
-            .map_err(|_| anyhow!("audio thread shut down"))
+        self.send_cmd(AudioCommand::Stop)
     }
 
     pub fn stop_with_fade(&self, fade_ms: u32) -> Result<()> {
-        self.cmd_tx
-            .send(AudioCommand::StopWithFade(fade_ms))
-            .map_err(|_| anyhow!("audio thread shut down"))
+        self.send_cmd(AudioCommand::StopWithFade(fade_ms))
     }
 
     pub fn seek_to(&self, position_nanosec: u64) -> Result<()> {
-        self.cmd_tx
-            .send(AudioCommand::SeekTo(position_nanosec))
-            .map_err(|_| anyhow!("audio thread shut down"))
+        self.send_cmd(AudioCommand::SeekTo(position_nanosec))
     }
 
     pub fn set_volume(&self, vol: f32) -> Result<()> {
