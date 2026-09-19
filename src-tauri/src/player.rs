@@ -856,7 +856,7 @@ impl Player {
         self.current_loudness_source = source;
         self.current_loudness_gain_db = gain_db;
 
-        let handle = self.audio.lock().await.loudness_gain.clone();
+        let handle = self.audio.lock().await.loudness_gain_handle();
         let start_gain = f32::from_bits(handle.load(std::sync::atomic::Ordering::Relaxed));
         if (target_gain - start_gain).abs() < f32::EPSILON {
             return;

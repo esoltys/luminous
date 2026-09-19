@@ -35,8 +35,7 @@ fn save_eq_settings(db: &crate::db::Database, eq: &Equalizer) {
 #[tauri::command]
 pub async fn get_equalizer_state(state: State<'_, AppState>) -> Result<EqualizerConfig, String> {
     let engine = state.audio.lock().await;
-    let eq = engine.equalizer.lock();
-    Ok(EqualizerConfig::snapshot(&eq))
+    Ok(engine.with_equalizer(|eq| EqualizerConfig::snapshot(eq)))
 }
 
 /// The one EQ mutation entry point: the frontend edits a config and applies
@@ -47,19 +46,21 @@ pub async fn apply_equalizer_config(
     config: EqualizerConfig,
 ) -> Result<EqualizerConfig, String> {
     let engine = state.audio.lock().await;
-    let mut eq = engine.equalizer.lock();
-    let canonical = eq.apply(&config);
-    save_eq_settings(&state.db, &eq);
-    Ok(canonical)
+    Ok(engine.with_equalizer(|eq| {
+        let canonical = eq.apply(&config);
+        save_eq_settings(&state.db, eq);
+        canonical
+    }))
 }
 
 #[tauri::command]
 pub async fn reset_parametric_bands(state: State<'_, AppState>) -> Result<EqualizerConfig, String> {
     let engine = state.audio.lock().await;
-    let mut eq = engine.equalizer.lock();
-    eq.load_parametric(crate::equalizer::default_parametric_bands());
-    save_eq_settings(&state.db, &eq);
-    Ok(EqualizerConfig::snapshot(&eq))
+    Ok(engine.with_equalizer(|eq| {
+        eq.load_parametric(crate::equalizer::default_parametric_bands());
+        save_eq_settings(&state.db, eq);
+        EqualizerConfig::snapshot(eq)
+    }))
 }
 
 #[tauri::command]
@@ -68,18 +69,18 @@ pub async fn load_equalizer_preset(
     preset_name: String,
 ) -> Result<EqualizerConfig, String> {
     let engine = state.audio.lock().await;
-    let mut eq = engine.equalizer.lock();
-
     let gains = crate::equalizer::preset_gains(&preset_name);
 
-    // Always update the graphic gains so the preset is intact if the user
-    // switches back to 10-band; additionally map it onto the parametric bands
-    // when that mode is active so the same named presets work there too.
-    eq.load_preset(gains);
-    if eq.mode == crate::equalizer::EqMode::Parametric20 {
-        eq.load_preset_into_parametric(gains);
-    }
-    save_eq_settings(&state.db, &eq);
-
-    Ok(EqualizerConfig::snapshot(&eq))
+    Ok(engine.with_equalizer(|eq| {
+        // Always update the graphic gains so the preset is intact if the
+        // user switches back to 10-band; additionally map it onto the
+        // parametric bands when that mode is active so the same named
+        // presets work there too.
+        eq.load_preset(gains);
+        if eq.mode == crate::equalizer::EqMode::Parametric20 {
+            eq.load_preset_into_parametric(gains);
+        }
+        save_eq_settings(&state.db, eq);
+        EqualizerConfig::snapshot(eq)
+    }))
 }

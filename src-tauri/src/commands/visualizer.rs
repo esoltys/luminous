@@ -75,8 +75,6 @@ pub async fn get_band_waveform_data(
 #[tauri::command]
 pub async fn set_spectrum_enabled(state: State<'_, AppState>, enabled: bool) -> Result<(), String> {
     let engine = state.audio.lock().await;
-    engine
-        .spectrum_enabled
-        .store(enabled, std::sync::atomic::Ordering::Relaxed);
+    engine.set_spectrum_enabled(enabled);
     Ok(())
 }

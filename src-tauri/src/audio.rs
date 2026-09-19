@@ -152,20 +152,20 @@ struct AudioShared {
 
 pub struct AudioEngine {
     cmd_tx: mpsc::SyncSender<AudioCommand>,
-    pub event_rx: Arc<Mutex<mpsc::Receiver<AudioEvent>>>,
+    event_rx: Arc<Mutex<mpsc::Receiver<AudioEvent>>>,
     pub position_nanosec: Arc<AtomicU64>,
     pub volume: Arc<AtomicU32>,
     pub play_state: Arc<Mutex<PlayState>>,
-    pub visualizer_buf: Arc<crate::analyzer::AudioVisualizerBuffer>,
-    pub spectrum_enabled: Arc<std::sync::atomic::AtomicBool>,
+    visualizer_buf: Arc<crate::analyzer::AudioVisualizerBuffer>,
+    spectrum_enabled: Arc<std::sync::atomic::AtomicBool>,
     /// Actual output device sample rate, updated once the CPAL stream is
     /// built. The spectrum analyzer needs this to convert FFT bin indices
     /// to real Hz instead of assuming a fixed rate.
-    pub output_sample_rate: Arc<AtomicU32>,
-    pub equalizer: Arc<Mutex<crate::equalizer::Equalizer>>,
+    output_sample_rate: Arc<AtomicU32>,
+    equalizer: Arc<Mutex<crate::equalizer::Equalizer>>,
     /// Per-track loudness-normalization multiplier (#77). f32 bits in an
     /// atomic so the audio callback reads it without locking. 1.0 = neutral.
-    pub loudness_gain: Arc<AtomicU32>,
+    loudness_gain: Arc<AtomicU32>,
     /// Fade-envelope multiplier slot (#79). 1.0 = neutral.
     pub fade_gain: Arc<AtomicU32>,
 }
@@ -327,6 +327,44 @@ impl AudioEngine {
 
     pub fn current_state(&self) -> PlayState {
         *self.play_state.lock()
+    }
+
+    /// One controlled escape hatch for equalizer mutation/inspection —
+    /// centralizes locking instead of callers reaching into the field.
+    pub fn with_equalizer<R>(&self, f: impl FnOnce(&mut crate::equalizer::Equalizer) -> R) -> R {
+        let mut eq = self.equalizer.lock();
+        f(&mut eq)
+    }
+
+    pub fn spectrum_enabled(&self) -> bool {
+        self.spectrum_enabled.load(Ordering::Relaxed)
+    }
+
+    pub fn set_spectrum_enabled(&self, enabled: bool) {
+        self.spectrum_enabled.store(enabled, Ordering::Relaxed);
+    }
+
+    /// Compute a spectrum snapshot from the current visualizer buffer at the
+    /// engine's actual output sample rate. Returns `None` before the output
+    /// stream has been built (sample rate not yet known to be accurate).
+    pub fn spectrum_snapshot(&self, fft_size: usize) -> Vec<f32> {
+        let sample_rate = self.output_sample_rate.load(Ordering::Relaxed);
+        crate::analyzer::calculate_spectrum(&self.visualizer_buf, fft_size, sample_rate)
+    }
+
+    /// A cheaply-cloneable handle to the event receiver. Callers lock it
+    /// themselves and block on `Receiver::iter()` on their own thread —
+    /// cloning the handle (rather than blocking here) lets the caller drop
+    /// its `AudioEngine` lock before entering that blocking loop.
+    pub fn events(&self) -> Arc<Mutex<mpsc::Receiver<AudioEvent>>> {
+        Arc::clone(&self.event_rx)
+    }
+
+    /// A cheaply-cloneable handle to the loudness-gain atomic, for
+    /// subsystems that need shared cross-thread read/write access (e.g.
+    /// ramping it smoothly rather than stepping it via `set_loudness_gain`).
+    pub fn loudness_gain_handle(&self) -> Arc<AtomicU32> {
+        Arc::clone(&self.loudness_gain)
     }
 }
 
