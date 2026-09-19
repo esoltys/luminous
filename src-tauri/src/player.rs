@@ -1301,10 +1301,17 @@ impl Player {
             });
         }
 
+        // RepeatMode::Album scopes the *natural* advance to the current
+        // album's own tracks (wrapping within it) — but this must not reach
+        // manual skip (get_next_index, also used by next_track): a track
+        // with no/blank album tag is its own group of one, so scoping
+        // manual Next the same way would make it appear to do nothing.
         // RepeatMode::Playlist wraps to the first track when nothing else is
         // playing yet (current_index is None); every other mode simply has
         // nothing left to advance to at that point.
-        let idx = if self.repeat_mode == RepeatMode::Playlist {
+        let idx = if self.repeat_mode == RepeatMode::Album {
+            self.next_album_index()?
+        } else if self.repeat_mode == RepeatMode::Playlist {
             self.get_next_index().unwrap_or(0)
         } else {
             self.get_next_index()?
@@ -1465,10 +1472,6 @@ impl Player {
         }
 
         let current = self.current_index?;
-
-        if self.repeat_mode == RepeatMode::Album {
-            return self.next_album_index();
-        }
 
         let next = current + 1;
         if next < total {
@@ -2406,10 +2409,12 @@ mod tests {
     /// match, behaving identically to `Off` despite being reachable and
     /// advertised in the UI ("Loop the current album indefinitely"). Songs
     /// 1/3 are "Album A" and 2/4 are "Album B", interleaved in playlist
-    /// order — this proves advancing stays scoped to the current album's
-    /// own tracks (not just "the next track" or "the whole playlist"), and
-    /// wraps back to the album's first track rather than stopping or
-    /// spilling into the other album.
+    /// order — this proves *natural* advance (on_track_finished) stays
+    /// scoped to the current album's own tracks (not just "the next track"
+    /// or "the whole playlist"), and wraps back to the album's first track
+    /// rather than stopping or spilling into the other album. Manual skip
+    /// is intentionally NOT scoped this way — see the follow-up regression
+    /// test below (a real bug this exact confusion caused).
     #[tokio::test]
     async fn test_repeat_album_stays_within_album_and_wraps() {
         let (db, temp_dir) = setup_test_db();
@@ -2453,9 +2458,9 @@ mod tests {
             .unwrap();
         assert_eq!(player.current_song.as_ref().unwrap().id, 1);
 
-        // Manual skip (get_next_index) must stay within Album A, skipping
-        // over song 2 (Album B) to reach song 3.
-        player.next_track().await.unwrap();
+        // Natural track-end must stay within Album A, skipping over song 2
+        // (Album B) to reach song 3.
+        player.on_track_finished().await.unwrap();
         assert_eq!(
             player.current_song.as_ref().unwrap().id,
             3,
@@ -2465,7 +2470,7 @@ mod tests {
 
         // Past Album A's last track, must wrap back to its first rather
         // than stopping or continuing into Album B.
-        player.next_track().await.unwrap();
+        player.on_track_finished().await.unwrap();
         assert_eq!(
             player.current_song.as_ref().unwrap().id,
             1,
@@ -2473,14 +2478,71 @@ mod tests {
              spill into the next album"
         );
 
-        // Natural track-end (on_track_finished) must produce the same
-        // album-scoped advance as manual skip.
-        player.on_track_finished().await.unwrap();
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// Regression coverage for a real bug caught in manual testing: an
+    /// earlier version of the #1070 fix scoped `get_next_index` itself to
+    /// the current album, which meant manual skip (`next_track`) inherited
+    /// that scoping too. For a track with no/blank album tag (its own
+    /// group of one via `album_key`'s uuid fallback) — or a genuine
+    /// single-track album — that made pressing Next appear to do nothing:
+    /// it kept "advancing" to the same track. Manual skip must always
+    /// advance linearly through the whole playlist regardless of repeat
+    /// mode, exactly like `RepeatMode::Track` already does (repeat only
+    /// governs natural track-end, never user-initiated navigation).
+    #[tokio::test]
+    async fn test_repeat_album_does_not_confine_manual_skip() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for id in 1..=3i64 {
+                // No album tag at all — each track is its own group of one
+                // under `album_key`'s uuid fallback, the exact case that
+                // triggered the bug.
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (id, path, title, artist, length_nanosec) VALUES ({id}, '/fake/path{id}.mp3', 'Track {id}', 'Artist', 180000000000)"
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+        }
+
+        let audio = Arc::new(Mutex::new(AudioEngine::new()));
+        let mut player = Player::new(db_arc.clone(), audio.clone());
+
+        let items = (1..=3i64)
+            .map(|id| {
+                let conn = db_arc.pool.get().unwrap();
+                let sql = format!(
+                    "SELECT {} FROM songs WHERE id = ?1",
+                    crate::collection::SONG_SELECT_COLS
+                );
+                let song = conn
+                    .query_row(&sql, rusqlite::params![id], crate::collection::row_to_song)
+                    .unwrap();
+                PlaylistItem::new_song(0, 0, song)
+            })
+            .collect::<Vec<_>>();
+
+        player.set_repeat_mode(RepeatMode::Album);
+        player.play_playlist(items, 0, 0, None).await.unwrap();
+        assert_eq!(player.current_song.as_ref().unwrap().id, 1);
+
+        player.next_track().await.unwrap();
         assert_eq!(
             player.current_song.as_ref().unwrap().id,
-            3,
-            "on_track_finished must also stay within the current album under RepeatMode::Album"
+            2,
+            "manual skip must always advance to the next track, even when the current \
+             track's \"album\" is just itself under RepeatMode::Album"
         );
+
+        player.next_track().await.unwrap();
+        assert_eq!(player.current_song.as_ref().unwrap().id, 3);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
