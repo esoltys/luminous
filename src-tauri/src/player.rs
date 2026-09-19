@@ -909,19 +909,7 @@ impl Player {
         self.current_loudness_gain_db = gain_db;
 
         let handle = self.audio.lock().await.loudness_gain_handle();
-        let start_gain = f32::from_bits(handle.load(std::sync::atomic::Ordering::Relaxed));
-        if (target_gain - start_gain).abs() < f32::EPSILON {
-            return;
-        }
-        const STEPS: u32 = 15;
-        let step_dur =
-            std::time::Duration::from_millis((Self::LOUDNESS_REFRESH_RAMP_MS / STEPS) as u64);
-        for i in 1..=STEPS {
-            let t = i as f32 / STEPS as f32;
-            let g = start_gain + (target_gain - start_gain) * t;
-            handle.store(g.to_bits(), std::sync::atomic::Ordering::Relaxed);
-            tokio::time::sleep(step_dur).await;
-        }
+        crate::audio::ramp_gain(&handle, target_gain, Self::LOUDNESS_REFRESH_RAMP_MS).await;
     }
 
     /// Sync `is_instrumental` into this song's in-memory copies (current

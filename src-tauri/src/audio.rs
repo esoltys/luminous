@@ -55,18 +55,60 @@ pub const PRELOAD_LEAD_NS: u64 = 8_000_000_000;
 /// (10^(-1/20)) to prevent inter-sample clipping during digital-to-analog reconstruction.
 pub const TRUE_PEAK_CEILING: f32 = 0.891_250_9;
 
+/// Step count and per-step sleep duration for a gain ramp spread over
+/// `duration_ms` in ~10ms increments. Shared by `apply_fade_ramp`
+/// (decode-thread, `std::thread::sleep`) and `ramp_gain` (async callers,
+/// `tokio::time::sleep`) — only the sleep primitive differs between them.
+fn ramp_steps(duration_ms: u32) -> (u32, std::time::Duration) {
+    let steps = (duration_ms / 10).max(1);
+    let step_dur = std::time::Duration::from_millis((duration_ms / steps) as u64);
+    (steps, step_dur)
+}
+
+/// Linear interpolation from `start_gain` to `end_gain` at step `i` of
+/// `steps` total (`i == steps` yields exactly `end_gain`).
+fn ramp_gain_at_step(start_gain: f32, end_gain: f32, steps: u32, i: u32) -> f32 {
+    let t = i as f32 / steps as f32;
+    start_gain + (end_gain - start_gain) * t
+}
+
 fn apply_fade_ramp(fade_gain: &Arc<AtomicU32>, start_gain: f32, end_gain: f32, duration_ms: u32) {
     if duration_ms == 0 {
         fade_gain.store(end_gain.to_bits(), Ordering::Relaxed);
         return;
     }
-    let steps = (duration_ms / 10).max(1);
-    let step_dur = std::time::Duration::from_millis((duration_ms / steps) as u64);
+    let (steps, step_dur) = ramp_steps(duration_ms);
     for i in 0..=steps {
-        let t = i as f32 / steps as f32;
-        let g = start_gain + (end_gain - start_gain) * t;
+        let g = ramp_gain_at_step(start_gain, end_gain, steps, i);
         fade_gain.store(g.to_bits(), Ordering::Relaxed);
         std::thread::sleep(step_dur);
+    }
+}
+
+/// Ramp a gain atomic smoothly from its current value to `target` over
+/// `duration_ms`, for a caller already on an async task (e.g.
+/// `Player::refresh_loudness_gain`, which uses this on `AudioEngine`'s
+/// `loudness_gain` handle after a mid-playback settings change — unlike a
+/// track-start's instant `set_loudness_gain`, stepping the level hard here
+/// would be an audible click/zipper in the middle of continuous audio).
+/// Shares its step math with `apply_fade_ramp`; uses `tokio::time::sleep`
+/// instead of blocking the decode thread, and operates on a handle
+/// (`AudioEngine::loudness_gain_handle`) rather than the engine itself so
+/// the caller isn't holding `AudioEngine`'s lock for the ramp's duration.
+pub async fn ramp_gain(handle: &Arc<AtomicU32>, target: f32, duration_ms: u32) {
+    let start = f32::from_bits(handle.load(Ordering::Relaxed));
+    if (target - start).abs() < f32::EPSILON {
+        return;
+    }
+    if duration_ms == 0 {
+        handle.store(target.to_bits(), Ordering::Relaxed);
+        return;
+    }
+    let (steps, step_dur) = ramp_steps(duration_ms);
+    for i in 0..=steps {
+        let g = ramp_gain_at_step(start, target, steps, i);
+        handle.store(g.to_bits(), Ordering::Relaxed);
+        tokio::time::sleep(step_dur).await;
     }
 }
 
