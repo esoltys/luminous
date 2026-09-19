@@ -10,7 +10,7 @@
 Luminous is a fast, local-first player for your own audio library — no streaming, no subscriptions, no cloud. Just your files, indexed, searchable, and beautifully played. Built with **Rust**, **Tauri v2**, **TypeScript**, and **Svelte 5 (Runes)**.
 
  🏠 **[Luminous Homepage](https://esoltys.dev/luminous/)** — downloads, screenshots, and feature overview
- 
+
 💬 **[Luminous Discussions](https://github.com/esoltys/luminous/discussions)** - announcements, general discussion, Q&A, Show and Tell
 
 ⭐ **[Issues](https://github.com/esoltys/luminous/issues)** - file a bug report or a feature request
@@ -24,13 +24,11 @@ Luminous is a fast, local-first player for your own audio library — no streami
 - **Windows**: get it from the **[Microsoft Store](https://apps.microsoft.com/detail/9PNQ2NFSQ7XW)** (recommended — installs and updates automatically), or grab `Luminous_{version}_x64-setup.exe` (or the `.msix`) from the **[Releases page](https://github.com/esoltys/luminous/releases/latest)** for a manual/sideloaded install.
 - **Linux**: download the `.deb` or `.rpm` for your distro from the **[Releases page](https://github.com/esoltys/luminous/releases/latest)** and install it as usual.
 
-> **No AppImage right now.** Tauri's AppImage bundling links against WebKitGTK/Mesa/EGL libraries baked in at build time, and on many host systems that collides with the system's own graphics stack, producing a window that opens fully blank (`Could not create default EGL display: EGL_BAD_PARAMETER`) — this is an [upstream](https://github.com/tauri-apps/tauri/issues/11988) [Tauri/WebKitGTK](https://girishjoshi.io/post/tauri-2.0-appimage-egl-issue-on-wayland/) bug, not something app code can work around, and the only real fix (an experimental, unreleased Tauri bundler branch) isn't stable enough to ship. Use the `.deb`/`.rpm` above, or build your own AppImage locally with `bun run tauri build -b appimage` (see [Building Luminous](#building-luminous)) — a locally built one links against your own system libraries and doesn't hit this.
-
 ---
 
 ## Architecture
 
-> **"Isn't this just a web wrapper?"** Not in the Electron sense. Tauri renders the UI in the OS's own webview (WebView2 on Windows, WebKit on Linux/macOS) instead of bundling a full Chromium, so there's no shipped browser engine inflating the binary or idling in RAM. And the UI is the only part that's web tech — audio decoding/output, DSP, the library scanner, and the SQLite index all run as native Rust off the UI thread, driving the frontend through events rather than the other way around. See below for how the two sides split.
+"Isn't this just a web wrapper?" Not in the Electron sense. Tauri renders the UI in the OS's own webview (WebView2 on Windows, WebKit on Linux/macOS) instead of bundling a full Chromium, so there's no shipped browser engine inflating the binary or idling in RAM. And the UI is the only part that's web tech — audio decoding/output, DSP, the library scanner, and the SQLite index all run as native Rust off the UI thread, driving the frontend through events rather than the other way around. See below for how the two sides split.
 
 Luminous splits cleanly along the Tauri boundary: a Svelte 5 frontend handles UI, state, and rendering, while a Rust backend owns everything performance- or system-sensitive — audio decoding and playback, the SQLite-backed library index, file scanning, and OS media integration. The two sides talk over Tauri's IPC layer, with the frontend invoking commands and the backend emitting events for things like playback position, scan progress, and now-playing metadata. Keeping decoding, DSP, and disk I/O in Rust off the UI thread is what lets a multi-thousand-track library scan, gapless-playback, and real-time visualizers stay smooth at once.
 
