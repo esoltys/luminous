@@ -2659,6 +2659,207 @@ mod tests {
         let _ = std::fs::remove_dir_all(temp_dir);
     }
 
+    /// Coverage for #1077: none of the file's tests previously touched
+    /// gapless handover at all. Exercises the happy path —
+    /// `prepare_gapless_next` preloading, then `on_gapless_transition`
+    /// committing it — confirming index/scrobble/persistence bookkeeping
+    /// lands correctly without a real `Play` call (the audio never stops
+    /// for a gapless commit).
+    #[tokio::test]
+    async fn test_gapless_transition_commits_index_and_scrobble_bookkeeping() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for id in 1..=3i64 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (id, path, title, artist, album, length_nanosec) VALUES ({id}, '/fake/path{id}.mp3', 'Track {id}', 'Artist', 'Album', 180000000000)"
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+        }
+
+        let audio = Arc::new(Mutex::new(AudioEngine::new()));
+        let mut player = Player::new(db_arc.clone(), audio.clone());
+
+        let sql = format!(
+            "SELECT {} FROM songs WHERE id = ?1",
+            crate::collection::SONG_SELECT_COLS
+        );
+        let items = (1..=3i64)
+            .map(|id| {
+                let conn = db_arc.pool.get().unwrap();
+                let song = conn
+                    .query_row(&sql, rusqlite::params![id], crate::collection::row_to_song)
+                    .unwrap();
+                PlaylistItem::new_song(0, 0, song)
+            })
+            .collect::<Vec<_>>();
+
+        player.set_repeat_mode(RepeatMode::Off);
+        player.play_playlist(items, 0, 0, None).await.unwrap();
+        assert_eq!(player.current_song.as_ref().unwrap().id, 1);
+
+        player.prepare_gapless_next().await.unwrap();
+
+        // Song 2 is what peek_next_natural should have preloaded.
+        player.on_gapless_transition(2).await.unwrap();
+
+        assert_eq!(player.current_song.as_ref().unwrap().id, 2);
+        assert_eq!(player.current_index, Some(1));
+        assert!(
+            player.played_indices.contains(&1),
+            "on_gapless_transition must record the new index in played_indices, matching \
+             play_at_index's bookkeeping"
+        );
+        assert!(
+            !player.scrobbled,
+            "a freshly-started track must not already be scrobbled"
+        );
+        assert_eq!(
+            player.scrobble_point_nanosec,
+            Some(90_000_000_000),
+            "scrobble point must be recomputed for the new song (50% of its 180s length)"
+        );
+
+        let conn = db_arc.pool.get().unwrap();
+        let persisted_song_id: String = conn
+            .query_row(
+                "SELECT value FROM app_state WHERE key = 'last_song_id'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(persisted_song_id, "2");
+        let persisted_position: String = conn
+            .query_row(
+                "SELECT value FROM app_state WHERE key = 'last_position_nanosec'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            persisted_position, "0",
+            "a gapless commit persists position 0 — the new track just started"
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// Coverage for #1077: `on_gapless_transition`'s doc comment promises a
+    /// self-healing fallback to `on_track_finished` when the preloaded
+    /// track no longer matches what should play (e.g. mode/queue changed
+    /// after the preload was armed) — previously untested.
+    #[tokio::test]
+    async fn test_gapless_transition_mismatch_falls_back_to_on_track_finished() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for id in 1..=3i64 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (id, path, title, artist, album, length_nanosec) VALUES ({id}, '/fake/path{id}.mp3', 'Track {id}', 'Artist', 'Album', 180000000000)"
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+        }
+
+        let audio = Arc::new(Mutex::new(AudioEngine::new()));
+        let mut player = Player::new(db_arc.clone(), audio.clone());
+
+        let sql = format!(
+            "SELECT {} FROM songs WHERE id = ?1",
+            crate::collection::SONG_SELECT_COLS
+        );
+        let items = (1..=3i64)
+            .map(|id| {
+                let conn = db_arc.pool.get().unwrap();
+                let song = conn
+                    .query_row(&sql, rusqlite::params![id], crate::collection::row_to_song)
+                    .unwrap();
+                PlaylistItem::new_song(0, 0, song)
+            })
+            .collect::<Vec<_>>();
+
+        player.set_repeat_mode(RepeatMode::Off);
+        player.play_playlist(items, 0, 0, None).await.unwrap();
+        assert_eq!(player.current_song.as_ref().unwrap().id, 1);
+
+        // A song id that doesn't match what peek_next_natural would return
+        // (song 2) — the preload no longer matches playback context.
+        player.on_gapless_transition(999).await.unwrap();
+
+        assert_eq!(
+            player.current_song.as_ref().unwrap().id,
+            2,
+            "a song-id mismatch must self-heal via on_track_finished's normal advance, not \
+             leave playback stuck or desynced"
+        );
+        assert_eq!(player.current_index, Some(1));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// Coverage for #1077: scrobble-point computation and the `scrobbled`
+    /// flag were previously untested. `on_position_update` must record the
+    /// listen exactly once when the position first crosses the 50%-length
+    /// scrobble point, and do nothing before or after that first crossing.
+    #[tokio::test]
+    async fn test_scrobble_point_reached_records_once() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            conn.execute(
+                "INSERT INTO songs (id, path, title, artist, album, length_nanosec) VALUES (1, '/fake/path1.mp3', 'Track 1', 'Artist', 'Album', 180000000000)",
+                [],
+            )
+            .unwrap();
+        }
+
+        let audio = Arc::new(Mutex::new(AudioEngine::new()));
+        let mut player = Player::new(db_arc.clone(), audio.clone());
+
+        let sql = format!(
+            "SELECT {} FROM songs WHERE id = ?1",
+            crate::collection::SONG_SELECT_COLS
+        );
+        let song = {
+            let conn = db_arc.pool.get().unwrap();
+            conn.query_row(&sql, rusqlite::params![1i64], crate::collection::row_to_song)
+                .unwrap()
+        };
+        player
+            .play_playlist(vec![PlaylistItem::new_song(0, 0, song)], 0, 0, None)
+            .await
+            .unwrap();
+
+        assert_eq!(player.scrobble_point_nanosec, Some(90_000_000_000));
+        assert!(!player.scrobbled);
+
+        // Below the scrobble point: no-op, not yet scrobbled.
+        assert!(player.on_position_update(50_000_000_000).is_none());
+        assert!(!player.scrobbled);
+
+        // At the scrobble point: records once.
+        assert!(player.on_position_update(90_000_000_000).is_some());
+        assert!(player.scrobbled);
+
+        // Already scrobbled: must not double-record even well past the point.
+        assert!(player.on_position_update(120_000_000_000).is_none());
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
     /// Regression coverage for the shuffle_grouped extraction (#577 item
     /// 14): `Albums` must keep each album's own track order intact and only
     /// reorder which album comes next, while `InsideAlbum` must do the
