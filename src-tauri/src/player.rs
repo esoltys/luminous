@@ -939,31 +939,30 @@ impl Player {
         }
     }
 
+    /// `Some(ms)` when pause/resume/stop transitions should fade over `ms`
+    /// milliseconds, `None` when they should apply instantly — the one
+    /// decision `pause`, `resume`, and `stop` each otherwise re-derived from
+    /// the same DB settings independently.
+    async fn fade_duration_ms(&self) -> Option<u32> {
+        let settings =
+            crate::commands::settings::get_fade_settings_from_db(&self._db).unwrap_or_default();
+        (settings.fade_pause_enabled && settings.fade_pause_duration_ms > 0)
+            .then_some(settings.fade_pause_duration_ms)
+    }
+
     pub async fn pause(&self) -> Result<()> {
         let pos = self.audio.lock().await.current_position_nanosec();
         self.persist_position(pos);
-        let settings =
-            crate::commands::settings::get_fade_settings_from_db(&self._db).unwrap_or_default();
-        if settings.fade_pause_enabled && settings.fade_pause_duration_ms > 0 {
-            self.audio
-                .lock()
-                .await
-                .pause_with_fade(settings.fade_pause_duration_ms)
-        } else {
-            self.audio.lock().await.pause()
+        match self.fade_duration_ms().await {
+            Some(ms) => self.audio.lock().await.pause_with_fade(ms),
+            None => self.audio.lock().await.pause(),
         }
     }
 
     pub async fn resume(&self) -> Result<()> {
-        let settings =
-            crate::commands::settings::get_fade_settings_from_db(&self._db).unwrap_or_default();
-        if settings.fade_pause_enabled && settings.fade_pause_duration_ms > 0 {
-            self.audio
-                .lock()
-                .await
-                .resume_with_fade(settings.fade_pause_duration_ms)
-        } else {
-            self.audio.lock().await.resume()
+        match self.fade_duration_ms().await {
+            Some(ms) => self.audio.lock().await.resume_with_fade(ms),
+            None => self.audio.lock().await.resume(),
         }
     }
 
@@ -1089,15 +1088,9 @@ impl Player {
         self.current_playlist_id = None;
         self.persist_current_song();
         self.persist_position(0);
-        let settings =
-            crate::commands::settings::get_fade_settings_from_db(&self._db).unwrap_or_default();
-        if settings.fade_pause_enabled && settings.fade_pause_duration_ms > 0 {
-            self.audio
-                .lock()
-                .await
-                .stop_with_fade(settings.fade_pause_duration_ms)
-        } else {
-            self.audio.lock().await.stop()
+        match self.fade_duration_ms().await {
+            Some(ms) => self.audio.lock().await.stop_with_fade(ms),
+            None => self.audio.lock().await.stop(),
         }
     }
 
