@@ -57,6 +57,85 @@ enum GaplessTargetKind {
     Queue,
 }
 
+// ---------------------------------------------------------------------------
+// Restart-persistence helpers — `Player` owns 8 `app_state` keys (volume,
+// shuffle_mode, repeat_mode, last_song_id, last_playlist_id, last_item_uuid,
+// last_position_nanosec, last_adhoc_song_ids). These give `Player::new`'s
+// restore block and the various persist_*/set_* writers one shared place for
+// the raw SQL shape and the enum<->string mapping, mirroring the field↔key
+// pattern `commands/settings.rs::UiPreferences::fields()` uses for its own
+// app_state keys — the shapes differ enough (`Option<i64>`, a JSON-encoded
+// `Vec<i64>`, two non-string enums) that a single literal table doesn't fit,
+// so this is the same idea expressed as small typed helpers instead.
+// ---------------------------------------------------------------------------
+
+fn app_state_get(conn: &rusqlite::Connection, key: &str) -> Option<String> {
+    conn.query_row(
+        "SELECT value FROM app_state WHERE key = ?1",
+        rusqlite::params![key],
+        |row| row.get(0),
+    )
+    .ok()
+}
+
+fn app_state_get_parsed<T: std::str::FromStr>(conn: &rusqlite::Connection, key: &str) -> Option<T> {
+    app_state_get(conn, key).and_then(|s| s.parse::<T>().ok())
+}
+
+fn app_state_set(conn: &rusqlite::Connection, key: &str, value: &str) {
+    let _ = conn.execute(
+        "INSERT OR REPLACE INTO app_state (key, value) VALUES (?1, ?2)",
+        rusqlite::params![key, value],
+    );
+}
+
+fn app_state_clear(conn: &rusqlite::Connection, key: &str) {
+    let _ = conn.execute(
+        "DELETE FROM app_state WHERE key = ?1",
+        rusqlite::params![key],
+    );
+}
+
+fn shuffle_mode_to_key(mode: ShuffleMode) -> &'static str {
+    match mode {
+        ShuffleMode::Off => "off",
+        ShuffleMode::All => "all",
+        ShuffleMode::InsideAlbum => "inside_album",
+        ShuffleMode::Albums => "albums",
+        ShuffleMode::Artists => "artists",
+    }
+}
+
+fn shuffle_mode_from_key(key: &str) -> ShuffleMode {
+    match key {
+        "all" => ShuffleMode::All,
+        "inside_album" => ShuffleMode::InsideAlbum,
+        "albums" => ShuffleMode::Albums,
+        "artists" => ShuffleMode::Artists,
+        _ => ShuffleMode::Off,
+    }
+}
+
+fn repeat_mode_to_key(mode: RepeatMode) -> &'static str {
+    match mode {
+        RepeatMode::Off => "off",
+        RepeatMode::Track => "track",
+        RepeatMode::Album => "album",
+        RepeatMode::Playlist => "playlist",
+        RepeatMode::Intro => "intro",
+    }
+}
+
+fn repeat_mode_from_key(key: &str) -> RepeatMode {
+    match key {
+        "track" => RepeatMode::Track,
+        "album" => RepeatMode::Album,
+        "playlist" => RepeatMode::Playlist,
+        "intro" => RepeatMode::Intro,
+        _ => RepeatMode::Off,
+    }
+}
+
 pub struct Player {
     _db: Arc<Database>,
     audio: Arc<Mutex<AudioEngine>>,
@@ -124,93 +203,45 @@ impl Player {
 
         // Query database settings on startup
         if let Ok(conn) = db.pool.get() {
-            if let Ok(v_str) = conn.query_row(
-                "SELECT value FROM app_state WHERE key = 'volume'",
-                [],
-                |row| row.get::<_, String>(0),
-            ) {
-                if let Ok(v) = v_str.parse::<f32>() {
-                    volume = v.clamp(0.0, 1.0);
-                    if let Ok(engine) = audio.try_lock() {
-                        let _ = engine.set_volume(volume);
-                    }
+            if let Some(v) = app_state_get_parsed::<f32>(&conn, "volume") {
+                volume = v.clamp(0.0, 1.0);
+                if let Ok(engine) = audio.try_lock() {
+                    let _ = engine.set_volume(volume);
                 }
             }
-            if let Ok(s_str) = conn.query_row(
-                "SELECT value FROM app_state WHERE key = 'shuffle_mode'",
-                [],
-                |row| row.get::<_, String>(0),
-            ) {
-                shuffle_mode = match s_str.as_str() {
-                    "all" => ShuffleMode::All,
-                    "inside_album" => ShuffleMode::InsideAlbum,
-                    "albums" => ShuffleMode::Albums,
-                    "artists" => ShuffleMode::Artists,
-                    _ => ShuffleMode::Off,
-                };
+            if let Some(s) = app_state_get(&conn, "shuffle_mode") {
+                shuffle_mode = shuffle_mode_from_key(&s);
             }
-            if let Ok(r_str) = conn.query_row(
-                "SELECT value FROM app_state WHERE key = 'repeat_mode'",
-                [],
-                |row| row.get::<_, String>(0),
-            ) {
-                repeat_mode = match r_str.as_str() {
-                    "track" => RepeatMode::Track,
-                    "album" => RepeatMode::Album,
-                    "playlist" => RepeatMode::Playlist,
-                    "intro" => RepeatMode::Intro,
-                    _ => RepeatMode::Off,
-                };
+            if let Some(s) = app_state_get(&conn, "repeat_mode") {
+                repeat_mode = repeat_mode_from_key(&s);
             }
 
             // Restore last played song & position
-            if let Ok(s_str) = conn.query_row(
-                "SELECT value FROM app_state WHERE key = 'last_song_id'",
-                [],
-                |row| row.get::<_, String>(0),
-            ) {
-                if let Ok(song_id) = s_str.parse::<i64>() {
-                    let sql = format!(
-                        "SELECT {} FROM songs WHERE id = ?1 AND unavailable = 0",
-                        crate::collection::SONG_SELECT_COLS
-                    );
-                    if let Ok(song) = conn.query_row(
-                        &sql,
-                        rusqlite::params![song_id],
-                        crate::collection::row_to_song,
-                    ) {
-                        restored_song = Some(song);
-                    }
+            if let Some(song_id) = app_state_get_parsed::<i64>(&conn, "last_song_id") {
+                let sql = format!(
+                    "SELECT {} FROM songs WHERE id = ?1 AND unavailable = 0",
+                    crate::collection::SONG_SELECT_COLS
+                );
+                if let Ok(song) = conn.query_row(
+                    &sql,
+                    rusqlite::params![song_id],
+                    crate::collection::row_to_song,
+                ) {
+                    restored_song = Some(song);
                 }
             }
 
             if let Some(ref song) = restored_song {
-                if let Ok(p_str) = conn.query_row(
-                    "SELECT value FROM app_state WHERE key = 'last_playlist_id'",
-                    [],
-                    |row| row.get::<_, String>(0),
-                ) {
-                    if let Ok(pid) = p_str.parse::<i64>() {
-                        restored_playlist_id = Some(pid);
-                    }
+                if let Some(pid) = app_state_get_parsed::<i64>(&conn, "last_playlist_id") {
+                    restored_playlist_id = Some(pid);
                 }
 
-                if let Ok(uuid) = conn.query_row(
-                    "SELECT value FROM app_state WHERE key = 'last_item_uuid'",
-                    [],
-                    |row| row.get::<_, String>(0),
-                ) {
+                if let Some(uuid) = app_state_get(&conn, "last_item_uuid") {
                     restored_item_uuid = Some(uuid);
                 }
 
-                if let Ok(pos_str) = conn.query_row(
-                    "SELECT value FROM app_state WHERE key = 'last_position_nanosec'",
-                    [],
-                    |row| row.get::<_, String>(0),
-                ) {
-                    if let Ok(pos) = pos_str.parse::<u64>() {
-                        restored_position_ns = pos;
-                    }
+                if let Some(pos) = app_state_get_parsed::<u64>(&conn, "last_position_nanosec") {
+                    restored_position_ns = pos;
                 }
 
                 if let Some(pid) = restored_playlist_id {
@@ -239,11 +270,7 @@ impl Player {
                         // playlist). Its track order only lives in the
                         // `last_adhoc_song_ids` snapshot; without it we'd only
                         // know the single current song and nothing to advance to.
-                        if let Ok(ids_json) = conn.query_row(
-                            "SELECT value FROM app_state WHERE key = 'last_adhoc_song_ids'",
-                            [],
-                            |row| row.get::<_, String>(0),
-                        ) {
+                        if let Some(ids_json) = app_state_get(&conn, "last_adhoc_song_ids") {
                             if let Ok(song_ids) = serde_json::from_str::<Vec<i64>>(&ids_json) {
                                 let sql = format!(
                                     "SELECT {} FROM songs WHERE id = ?1 AND unavailable = 0",
@@ -713,16 +740,10 @@ impl Player {
                     .filter_map(|i| i.song.as_ref().map(|s| s.id))
                     .collect();
                 if let Ok(json) = serde_json::to_string(&song_ids) {
-                    let _ = conn.execute(
-                        "INSERT OR REPLACE INTO app_state (key, value) VALUES ('last_adhoc_song_ids', ?1)",
-                        rusqlite::params![json],
-                    );
+                    app_state_set(&conn, "last_adhoc_song_ids", &json);
                 }
             } else {
-                let _ = conn.execute(
-                    "DELETE FROM app_state WHERE key = 'last_adhoc_song_ids'",
-                    [],
-                );
+                app_state_clear(&conn, "last_adhoc_song_ids");
             }
         }
     }
@@ -735,31 +756,19 @@ impl Player {
     /// while a track just keeps playing.
     pub fn persist_current_song(&self) {
         if let Ok(conn) = self._db.pool.get() {
-            if let Some(song) = &self.current_song {
-                let _ = conn.execute(
-                    "INSERT OR REPLACE INTO app_state (key, value) VALUES ('last_song_id', ?1)",
-                    rusqlite::params![song.id.to_string()],
-                );
-            } else {
-                let _ = conn.execute("DELETE FROM app_state WHERE key = 'last_song_id'", []);
+            match &self.current_song {
+                Some(song) => app_state_set(&conn, "last_song_id", &song.id.to_string()),
+                None => app_state_clear(&conn, "last_song_id"),
             }
 
-            if let Some(pid) = self.current_playlist_id {
-                let _ = conn.execute(
-                    "INSERT OR REPLACE INTO app_state (key, value) VALUES ('last_playlist_id', ?1)",
-                    rusqlite::params![pid.to_string()],
-                );
-            } else {
-                let _ = conn.execute("DELETE FROM app_state WHERE key = 'last_playlist_id'", []);
+            match self.current_playlist_id {
+                Some(pid) => app_state_set(&conn, "last_playlist_id", &pid.to_string()),
+                None => app_state_clear(&conn, "last_playlist_id"),
             }
 
-            if let Some(uuid) = &self.current_item_uuid {
-                let _ = conn.execute(
-                    "INSERT OR REPLACE INTO app_state (key, value) VALUES ('last_item_uuid', ?1)",
-                    rusqlite::params![uuid],
-                );
-            } else {
-                let _ = conn.execute("DELETE FROM app_state WHERE key = 'last_item_uuid'", []);
+            match &self.current_item_uuid {
+                Some(uuid) => app_state_set(&conn, "last_item_uuid", uuid),
+                None => app_state_clear(&conn, "last_item_uuid"),
             }
         }
     }
@@ -770,9 +779,10 @@ impl Player {
     /// intentionally cheap (one `INSERT OR REPLACE`) since it runs often.
     pub fn persist_position(&self, position_nanosec: u64) {
         if let Ok(conn) = self._db.pool.get() {
-            let _ = conn.execute(
-                "INSERT OR REPLACE INTO app_state (key, value) VALUES ('last_position_nanosec', ?1)",
-                rusqlite::params![position_nanosec.to_string()],
+            app_state_set(
+                &conn,
+                "last_position_nanosec",
+                &position_nanosec.to_string(),
             );
         }
     }
@@ -1088,10 +1098,7 @@ impl Player {
         let audio = self.audio.lock().await;
         let _ = audio.set_volume(self.volume);
         if let Ok(conn) = self._db.pool.get() {
-            let _ = conn.execute(
-                "INSERT OR REPLACE INTO app_state (key, value) VALUES ('volume', ?1)",
-                rusqlite::params![self.volume.to_string()],
-            );
+            app_state_set(&conn, "volume", &self.volume.to_string());
         }
         Ok(())
     }
@@ -1671,18 +1678,8 @@ impl Player {
     pub fn set_shuffle_mode(&mut self, mode: ShuffleMode) {
         self.shuffle_mode = mode;
         self.rebuild_shuffle_order();
-        let mode_str = match mode {
-            ShuffleMode::Off => "off",
-            ShuffleMode::All => "all",
-            ShuffleMode::InsideAlbum => "inside_album",
-            ShuffleMode::Albums => "albums",
-            ShuffleMode::Artists => "artists",
-        };
         if let Ok(conn) = self._db.pool.get() {
-            let _ = conn.execute(
-                "INSERT OR REPLACE INTO app_state (key, value) VALUES ('shuffle_mode', ?1)",
-                rusqlite::params![mode_str],
-            );
+            app_state_set(&conn, "shuffle_mode", shuffle_mode_to_key(mode));
         }
     }
 
@@ -1701,18 +1698,8 @@ impl Player {
 
     pub fn set_repeat_mode(&mut self, mode: RepeatMode) {
         self.repeat_mode = mode;
-        let mode_str = match mode {
-            RepeatMode::Off => "off",
-            RepeatMode::Track => "track",
-            RepeatMode::Album => "album",
-            RepeatMode::Playlist => "playlist",
-            RepeatMode::Intro => "intro",
-        };
         if let Ok(conn) = self._db.pool.get() {
-            let _ = conn.execute(
-                "INSERT OR REPLACE INTO app_state (key, value) VALUES ('repeat_mode', ?1)",
-                rusqlite::params![mode_str],
-            );
+            app_state_set(&conn, "repeat_mode", repeat_mode_to_key(mode));
         }
     }
 
