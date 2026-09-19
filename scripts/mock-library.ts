@@ -176,13 +176,13 @@ export interface MockLibrary {
   playHistory: PlayHistoryRow[];
 }
 
-export interface PinnedItemRow {
+interface PinnedItemRow {
   item_type: string;
   ref_key: string;
   position: number;
 }
 
-export interface PlayHistoryRow {
+interface PlayHistoryRow {
   song_id: number;
   played_at: number;
 }
