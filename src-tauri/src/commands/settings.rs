@@ -273,56 +273,11 @@ pub fn get_db_schema_status(state: State<'_, crate::AppState>) -> DbSchemaStatus
     }
 }
 
-pub fn get_fade_settings_from_db(
-    db: &crate::db::Database,
-) -> Result<crate::models::FadeSettings, String> {
-    let conn = db.pool.get().map_err(|e| e.to_string())?;
-    let mut stmt = conn
-        .prepare(
-            "SELECT key, value FROM app_state WHERE key LIKE 'fade_%' OR key LIKE 'crossfade_%'",
-        )
-        .map_err(|e| e.to_string())?;
-    let rows = stmt
-        .query_map([], |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-        })
-        .map_err(|e| e.to_string())?;
-
-    let mut map = HashMap::new();
-    for (k, v) in rows.flatten() {
-        map.insert(k, v);
-    }
-
-    let defaults = crate::models::FadeSettings::default();
-    Ok(crate::models::FadeSettings {
-        fade_pause_enabled: map
-            .get("fade_pause_enabled")
-            .map(|v| v == "true")
-            .unwrap_or(defaults.fade_pause_enabled),
-        fade_pause_duration_ms: map
-            .get("fade_pause_duration_ms")
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(defaults.fade_pause_duration_ms),
-        crossfade_auto_enabled: map
-            .get("crossfade_auto_enabled")
-            .map(|v| v == "true")
-            .unwrap_or(defaults.crossfade_auto_enabled),
-        crossfade_auto_duration_secs: map
-            .get("crossfade_auto_duration_secs")
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(defaults.crossfade_auto_duration_secs),
-        crossfade_suppress_same_album: map
-            .get("crossfade_suppress_same_album")
-            .map(|v| v == "true")
-            .unwrap_or(defaults.crossfade_suppress_same_album),
-    })
-}
-
 #[tauri::command]
 pub async fn get_fade_settings(
     state: State<'_, AppState>,
 ) -> Result<crate::models::FadeSettings, String> {
-    get_fade_settings_from_db(&state.db)
+    crate::fade::get_fade_settings_from_db(&state.db)
 }
 
 /// Fire-and-forget for the same reason as [`set_app_setting`] — always `Ok`.

@@ -945,7 +945,7 @@ impl Player {
     /// the same DB settings independently.
     async fn fade_duration_ms(&self) -> Option<u32> {
         let settings =
-            crate::commands::settings::get_fade_settings_from_db(&self._db).unwrap_or_default();
+            crate::fade::get_fade_settings_from_db(&self._db).unwrap_or_default();
         (settings.fade_pause_enabled && settings.fade_pause_duration_ms > 0)
             .then_some(settings.fade_pause_duration_ms)
     }
@@ -1335,7 +1335,7 @@ impl Player {
         let start_ns = target.song.beginning_nanosec.max(0) as u64;
 
         let fade_settings =
-            crate::commands::settings::get_fade_settings_from_db(&self._db).unwrap_or_default();
+            crate::fade::get_fade_settings_from_db(&self._db).unwrap_or_default();
 
         let is_same_album = if let Some(current) = &self.current_song {
             current.is_same_album_or_cue_sibling(&target.song)

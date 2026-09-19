@@ -24,6 +24,7 @@ pub mod diagnostics;
 pub mod discord;
 pub mod dr_parser;
 pub mod equalizer;
+pub mod fade;
 pub mod filter_parser;
 pub mod install_format;
 pub mod loudness;
