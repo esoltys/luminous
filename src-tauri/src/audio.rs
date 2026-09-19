@@ -82,8 +82,7 @@ pub enum AudioCommand {
     ResumeWithFade(u32),
     Stop,
     StopWithFade(u32),
-    SeekTo(u64),    // target position in nanoseconds
-    SetVolume(f32), // 0.0–1.0
+    SeekTo(u64), // target position in nanoseconds
     /// Prime the next track for a gapless transition after the current one.
     PreloadNext(PlayRequest),
     /// Prime the next track for an auto-crossfade transition (#79).
@@ -138,7 +137,7 @@ pub struct AudioEngine {
     cmd_tx: mpsc::SyncSender<AudioCommand>,
     pub event_rx: Arc<Mutex<mpsc::Receiver<AudioEvent>>>,
     pub position_nanosec: Arc<AtomicU64>,
-    pub volume: Arc<Mutex<f32>>,
+    pub volume: Arc<AtomicU32>,
     pub play_state: Arc<Mutex<PlayState>>,
     pub visualizer_buf: Arc<crate::analyzer::AudioVisualizerBuffer>,
     pub spectrum_enabled: Arc<std::sync::atomic::AtomicBool>,
@@ -159,7 +158,7 @@ impl AudioEngine {
         let (cmd_tx, cmd_rx) = mpsc::sync_channel::<AudioCommand>(64);
         let (event_tx, event_rx) = mpsc::channel::<AudioEvent>();
         let position = Arc::new(AtomicU64::new(0));
-        let volume = Arc::new(Mutex::new(1.0f32));
+        let volume = Arc::new(AtomicU32::new(1.0f32.to_bits()));
         let play_state = Arc::new(Mutex::new(PlayState::Stopped));
         let visualizer_buf = Arc::new(crate::analyzer::AudioVisualizerBuffer::new(4096));
         let spectrum_enabled = Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -310,12 +309,8 @@ impl AudioEngine {
 
     pub fn set_volume(&self, vol: f32) -> Result<()> {
         let vol = vol.clamp(0.0, 1.0);
-        if let Ok(mut v) = self.volume.lock() {
-            *v = vol;
-        }
-        self.cmd_tx
-            .send(AudioCommand::SetVolume(vol))
-            .map_err(|_| anyhow!("audio thread shut down"))
+        self.volume.store(vol.to_bits(), Ordering::Relaxed);
+        Ok(())
     }
 
     /// Set the per-track loudness-normalization multiplier (#77).
@@ -335,7 +330,7 @@ impl AudioEngine {
     }
 
     pub fn current_volume(&self) -> f32 {
-        self.volume.lock().map(|v| *v).unwrap_or(1.0)
+        f32::from_bits(self.volume.load(Ordering::Relaxed))
     }
 
     pub fn current_state(&self) -> PlayState {
@@ -744,7 +739,7 @@ fn get_default_device_name() -> Option<String> {
 #[allow(clippy::too_many_arguments)]
 fn build_output(
     position: &Arc<AtomicU64>,
-    volume: &Arc<Mutex<f32>>,
+    volume: &Arc<AtomicU32>,
     visualizer_buf: &Arc<crate::analyzer::AudioVisualizerBuffer>,
     equalizer: &Arc<Mutex<crate::equalizer::Equalizer>>,
     loudness_gain: &Arc<AtomicU32>,
@@ -809,7 +804,7 @@ fn build_output(
         .build_output_stream(
             config,
             move |output: &mut [f32], _| {
-                let vol = vol_ref.lock().map(|v| *v).unwrap_or(1.0);
+                let vol = f32::from_bits(vol_ref.load(Ordering::Relaxed));
                 let loudness = f32::from_bits(loudness_cpal.load(Ordering::Relaxed));
                 let fade = f32::from_bits(fade_cpal.load(Ordering::Relaxed));
                 let mut played = 0;
@@ -939,7 +934,7 @@ fn build_output(
 #[allow(clippy::too_many_arguments)]
 fn build_output_on_fresh_thread(
     position: &Arc<AtomicU64>,
-    volume: &Arc<Mutex<f32>>,
+    volume: &Arc<AtomicU32>,
     visualizer_buf: &Arc<crate::analyzer::AudioVisualizerBuffer>,
     equalizer: &Arc<Mutex<crate::equalizer::Equalizer>>,
     loudness_gain: &Arc<AtomicU32>,
@@ -1022,7 +1017,7 @@ fn decode_thread(
     cmd_rx: mpsc::Receiver<AudioCommand>,
     event_tx: mpsc::Sender<AudioEvent>,
     position: Arc<AtomicU64>,
-    volume: Arc<Mutex<f32>>,
+    volume: Arc<AtomicU32>,
     play_state: Arc<Mutex<PlayState>>,
     visualizer_buf: Arc<crate::analyzer::AudioVisualizerBuffer>,
     output_sample_rate: Arc<AtomicU32>,
@@ -1124,12 +1119,6 @@ fn decode_thread(
                         let _ = event_tx.send(AudioEvent::Stopped);
                         continue;
                     }
-                    Ok(AudioCommand::SetVolume(v)) => {
-                        if let Ok(mut vol) = volume.lock() {
-                            *vol = v.clamp(0.0, 1.0);
-                        }
-                        continue;
-                    }
                     Ok(_) => continue, // Ignore other commands when stopped
                     Err(_) => break,   // Channel disconnected
                 }
@@ -1142,11 +1131,6 @@ fn decode_thread(
         loop {
             match cmd_rx.try_recv() {
                 Ok(AudioCommand::Play(newer)) => req = newer,
-                Ok(AudioCommand::SetVolume(v)) => {
-                    if let Ok(mut vol) = volume.lock() {
-                        *vol = v.clamp(0.0, 1.0);
-                    }
-                }
                 Ok(AudioCommand::Stop) | Ok(AudioCommand::StopWithFade(_)) => {
                     if let Some(out) = output.as_ref() {
                         let _ = out.stream.pause();
@@ -1264,7 +1248,6 @@ fn decode_thread(
                 out,
                 &mut session,
                 &play_state,
-                &volume,
                 &fade_gain,
                 &position,
                 &event_tx,
@@ -1303,7 +1286,7 @@ fn check_and_rebuild_output(
     output: &mut Option<AudioOutput>,
     session: &mut DecodeSession,
     position: &Arc<AtomicU64>,
-    volume: &Arc<Mutex<f32>>,
+    volume: &Arc<AtomicU32>,
     visualizer_buf: &Arc<crate::analyzer::AudioVisualizerBuffer>,
     equalizer: &Arc<Mutex<crate::equalizer::Equalizer>>,
     loudness_gain: &Arc<AtomicU32>,
@@ -1416,7 +1399,6 @@ fn handle_decode_command(
     out: &mut AudioOutput,
     session: &mut DecodeSession,
     play_state: &Arc<Mutex<PlayState>>,
-    volume: &Arc<Mutex<f32>>,
     fade_gain: &Arc<AtomicU32>,
     position: &Arc<AtomicU64>,
     event_tx: &mpsc::Sender<AudioEvent>,
@@ -1541,12 +1523,6 @@ fn handle_decode_command(
             out.played_samples.store(target_samples, Ordering::Relaxed);
             session.pushed_samples = target_samples;
             position.store(target_ns, Ordering::Relaxed);
-            CmdOutcome::Continue
-        }
-        Ok(AudioCommand::SetVolume(v)) => {
-            if let Ok(mut vol) = volume.lock() {
-                *vol = v.clamp(0.0, 1.0);
-            }
             CmdOutcome::Continue
         }
         Ok(AudioCommand::PreloadNext(preq)) => {
