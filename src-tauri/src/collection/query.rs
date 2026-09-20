@@ -1341,6 +1341,7 @@ impl CollectionScanner {
                 peak_rank,
                 weeks_on_chart,
                 movement,
+                period_start,
             });
         }
         Ok(result)

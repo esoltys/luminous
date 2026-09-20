@@ -175,6 +175,45 @@ describe("TopTenList.svelte", () => {
     expect(onHeaderClick).toHaveBeenCalledOnce();
   });
 
+  it("shows a movement indicator title for chart items but not for items without movement data", () => {
+    const items: StatsTopItem[] = [
+      {
+        key: "album_1",
+        label: "Rising Album",
+        secondary: "Some Artist",
+        play_count: 0,
+        minutes: 0,
+        excluded: false,
+        album: null,
+        sample_song_id: 1,
+        movement: "rising",
+        previous_rank: 3,
+        peak_rank: 1,
+        weeks_on_chart: 2,
+      },
+      {
+        key: "album_2",
+        label: "Ordinary Album",
+        secondary: "Another Artist",
+        play_count: 5,
+        minutes: 10,
+        excluded: false,
+        album: null,
+        sample_song_id: 2,
+      },
+    ];
+
+    const { container } = render(TopTenList, {
+      props: {
+        items,
+        kind: "album",
+      },
+    });
+
+    const movementColumns = container.querySelectorAll("[title*='Rising']");
+    expect(movementColumns).toHaveLength(1);
+  });
+
   it("renders custom emptyText when items array is empty", () => {
     const { getByText } = render(TopTenList, {
       props: {

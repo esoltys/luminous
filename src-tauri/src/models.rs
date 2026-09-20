@@ -857,6 +857,10 @@ pub struct TopAlbumItem {
     pub weeks_on_chart: i32,
     /// "new" | "rising" | "falling" | "steady".
     pub movement: String,
+    /// Unix timestamp (UTC midnight) of this chart week's first day, per the
+    /// `week_start` setting — lets the UI show the week's actual date range
+    /// (e.g. "Sep 14 - Sep 20") next to a "This Week" label.
+    pub period_start: i64,
 }
 
 /// One ranked entry in a Personal Stats Top 10 list (#130, #951) — a song, album,
