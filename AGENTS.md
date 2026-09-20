@@ -260,18 +260,22 @@ punt either to the user.
   2. Inspect `.github/PULL_REQUEST_TEMPLATE.md` when preparing or creating Pull Requests.
   3. Perform a codebase search or analysis to fill out the template's sections (Description, Root Cause Analysis, Affected Components & Code Locations, Proposed Solution) accurately.
   4. Write the issue or PR body to a temporary scratch file in the workspace or the artifacts scratch directory.
-  5. Create the issue using the GitHub CLI:
+  5. Pick the milestone: never file a new issue against a Closed milestone. Unless the user
+     specifies one, default to the open milestone with the highest version number (`gh api
+     repos/esoltys/luminous/milestones -q '.[] | select(.state=="open") | .title'` — at the time
+     of writing that's `3.0`) rather than asking which milestone to use each time.
+  6. Create the issue using the GitHub CLI:
      - For bugs: `gh issue create --title "<Title>" --body-file "<PathToScratchFile>" --label "bug" --milestone "<Milestone>"`
      - For features: `gh issue create --title "<Title>" --body-file "<PathToScratchFile>" --milestone "<Milestone>"` (no label needed)
      - For epics: `gh issue create --title "Epic: <Title>" --body-file "<PathToScratchFile>" --milestone "<Milestone>"` (no label needed). After creating the epic, link its sub-issues with `gh issue edit <epic-id> --add-sub-issue <id1>,<id2>...`. Never list sub-issues in the issue description body (GitHub automatically shows them below the description when added as sub-issues). If there are no related issues, leave the `## Related` section out entirely.
      - Never add `--label P1`/`P2`/`P3`/`P4` (see Issue Priority above) — priority is a Project
        field, not a label.
-  6. Verify the created issue by running `gh issue view <id>`.
-  7. Add the issue to the "Luminous Music Player" Project board, set Status to "Todo", and assign
+  7. Verify the created issue by running `gh issue view <id>`.
+  8. Add the issue to the "Luminous Music Player" Project board, set Status to "Todo", and assign
      a Priority using the scheme in [docs/ISSUE_PRIORITY.md](docs/ISSUE_PRIORITY.md) (which also
      has the `gh project item-add` / `item-edit` commands and field/option IDs). Do this for every
      bug or feature issue you create — don't leave the fields unset or punt them to the user.
-  8. Branch from and target the PR at `main`, unless a future milestone integration branch
+  9. Branch from and target the PR at `main`, unless a future milestone integration branch
      exists and the issue's Milestone (`gh issue view <id> --json milestone`) says otherwise
      (see Branching Model above) — don't assume the assigned branch name implies a different
      base.
