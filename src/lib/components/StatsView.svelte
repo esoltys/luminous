@@ -162,16 +162,18 @@
         {i18n.t("stats.empty", {}, "No listening history for this range yet.")}
       </div>
     {:else}
-      <div class="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-4 gap-6">
-        {#each SECTIONS as section (section.key)}
-          <div class="bg-brand-sidebar border border-brand-border/60 rounded-xl p-4">
-            <TopTenList
-              title={section.title()}
-              items={itemsFor(section.key)}
-              kind={section.kind}
-            />
-          </div>
-        {/each}
+      <div class="@container">
+        <div class="grid grid-cols-1 @min-[784px]:grid-cols-2 @min-[1188px]:grid-cols-3 @min-[1392px]:grid-cols-4 gap-6">
+          {#each SECTIONS as section (section.key)}
+            <div class="bg-brand-sidebar border border-brand-border/60 rounded-xl p-4">
+              <TopTenList
+                title={section.title()}
+                items={itemsFor(section.key)}
+                kind={section.kind}
+              />
+            </div>
+          {/each}
+        </div>
       </div>
     {/if}
   </div>
