@@ -25,6 +25,7 @@
 use crate::models::{PlayState, Song};
 use anyhow::{anyhow, Result};
 use cpal::traits::StreamTrait;
+use parking_lot::Mutex;
 use ringbuf::{
     traits::{Consumer, Observer, Producer, Split},
     HeapRb,
@@ -33,7 +34,7 @@ use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 use std::sync::{
     atomic::{AtomicU32, AtomicU64, Ordering},
-    mpsc, Arc, Mutex,
+    mpsc, Arc,
 };
 use symphonia::core::{
     codecs::audio::{AudioDecoder, AudioDecoderOptions},
@@ -54,18 +55,60 @@ pub const PRELOAD_LEAD_NS: u64 = 8_000_000_000;
 /// (10^(-1/20)) to prevent inter-sample clipping during digital-to-analog reconstruction.
 pub const TRUE_PEAK_CEILING: f32 = 0.891_250_9;
 
+/// Step count and per-step sleep duration for a gain ramp spread over
+/// `duration_ms` in ~10ms increments. Shared by `apply_fade_ramp`
+/// (decode-thread, `std::thread::sleep`) and `ramp_gain` (async callers,
+/// `tokio::time::sleep`) — only the sleep primitive differs between them.
+fn ramp_steps(duration_ms: u32) -> (u32, std::time::Duration) {
+    let steps = (duration_ms / 10).max(1);
+    let step_dur = std::time::Duration::from_millis((duration_ms / steps) as u64);
+    (steps, step_dur)
+}
+
+/// Linear interpolation from `start_gain` to `end_gain` at step `i` of
+/// `steps` total (`i == steps` yields exactly `end_gain`).
+fn ramp_gain_at_step(start_gain: f32, end_gain: f32, steps: u32, i: u32) -> f32 {
+    let t = i as f32 / steps as f32;
+    start_gain + (end_gain - start_gain) * t
+}
+
 fn apply_fade_ramp(fade_gain: &Arc<AtomicU32>, start_gain: f32, end_gain: f32, duration_ms: u32) {
     if duration_ms == 0 {
         fade_gain.store(end_gain.to_bits(), Ordering::Relaxed);
         return;
     }
-    let steps = (duration_ms / 10).max(1);
-    let step_dur = std::time::Duration::from_millis((duration_ms / steps) as u64);
+    let (steps, step_dur) = ramp_steps(duration_ms);
     for i in 0..=steps {
-        let t = i as f32 / steps as f32;
-        let g = start_gain + (end_gain - start_gain) * t;
+        let g = ramp_gain_at_step(start_gain, end_gain, steps, i);
         fade_gain.store(g.to_bits(), Ordering::Relaxed);
         std::thread::sleep(step_dur);
+    }
+}
+
+/// Ramp a gain atomic smoothly from its current value to `target` over
+/// `duration_ms`, for a caller already on an async task (e.g.
+/// `Player::refresh_loudness_gain`, which uses this on `AudioEngine`'s
+/// `loudness_gain` handle after a mid-playback settings change — unlike a
+/// track-start's instant `set_loudness_gain`, stepping the level hard here
+/// would be an audible click/zipper in the middle of continuous audio).
+/// Shares its step math with `apply_fade_ramp`; uses `tokio::time::sleep`
+/// instead of blocking the decode thread, and operates on a handle
+/// (`AudioEngine::loudness_gain_handle`) rather than the engine itself so
+/// the caller isn't holding `AudioEngine`'s lock for the ramp's duration.
+pub async fn ramp_gain(handle: &Arc<AtomicU32>, target: f32, duration_ms: u32) {
+    let start = f32::from_bits(handle.load(Ordering::Relaxed));
+    if (target - start).abs() < f32::EPSILON {
+        return;
+    }
+    if duration_ms == 0 {
+        handle.store(target.to_bits(), Ordering::Relaxed);
+        return;
+    }
+    let (steps, step_dur) = ramp_steps(duration_ms);
+    for i in 0..=steps {
+        let g = ramp_gain_at_step(start, target, steps, i);
+        handle.store(g.to_bits(), Ordering::Relaxed);
+        tokio::time::sleep(step_dur).await;
     }
 }
 
@@ -82,8 +125,7 @@ pub enum AudioCommand {
     ResumeWithFade(u32),
     Stop,
     StopWithFade(u32),
-    SeekTo(u64),    // target position in nanoseconds
-    SetVolume(f32), // 0.0–1.0
+    SeekTo(u64), // target position in nanoseconds
     /// Prime the next track for a gapless transition after the current one.
     PreloadNext(PlayRequest),
     /// Prime the next track for an auto-crossfade transition (#79).
@@ -131,25 +173,41 @@ pub enum AudioEvent {
 }
 
 // ---------------------------------------------------------------------------
+// Shared audio-graph handles — bundled so the decode/output plumbing threads
+// a single value instead of 6-10 individual Arcs through every layer.
+// ---------------------------------------------------------------------------
+
+struct AudioShared {
+    position: Arc<AtomicU64>,
+    volume: Arc<AtomicU32>,
+    play_state: Arc<Mutex<PlayState>>,
+    visualizer_buf: Arc<crate::analyzer::AudioVisualizerBuffer>,
+    output_sample_rate: Arc<AtomicU32>,
+    equalizer: Arc<Mutex<crate::equalizer::Equalizer>>,
+    loudness_gain: Arc<AtomicU32>,
+    fade_gain: Arc<AtomicU32>,
+}
+
+// ---------------------------------------------------------------------------
 // AudioEngine — public handle
 // ---------------------------------------------------------------------------
 
 pub struct AudioEngine {
     cmd_tx: mpsc::SyncSender<AudioCommand>,
-    pub event_rx: Arc<Mutex<mpsc::Receiver<AudioEvent>>>,
+    event_rx: Arc<Mutex<mpsc::Receiver<AudioEvent>>>,
     pub position_nanosec: Arc<AtomicU64>,
-    pub volume: Arc<Mutex<f32>>,
+    pub volume: Arc<AtomicU32>,
     pub play_state: Arc<Mutex<PlayState>>,
-    pub visualizer_buf: Arc<crate::analyzer::AudioVisualizerBuffer>,
-    pub spectrum_enabled: Arc<std::sync::atomic::AtomicBool>,
+    visualizer_buf: Arc<crate::analyzer::AudioVisualizerBuffer>,
+    spectrum_enabled: Arc<std::sync::atomic::AtomicBool>,
     /// Actual output device sample rate, updated once the CPAL stream is
     /// built. The spectrum analyzer needs this to convert FFT bin indices
     /// to real Hz instead of assuming a fixed rate.
-    pub output_sample_rate: Arc<AtomicU32>,
-    pub equalizer: Arc<Mutex<crate::equalizer::Equalizer>>,
+    output_sample_rate: Arc<AtomicU32>,
+    equalizer: Arc<Mutex<crate::equalizer::Equalizer>>,
     /// Per-track loudness-normalization multiplier (#77). f32 bits in an
     /// atomic so the audio callback reads it without locking. 1.0 = neutral.
-    pub loudness_gain: Arc<AtomicU32>,
+    loudness_gain: Arc<AtomicU32>,
     /// Fade-envelope multiplier slot (#79). 1.0 = neutral.
     pub fade_gain: Arc<AtomicU32>,
 }
@@ -159,7 +217,7 @@ impl AudioEngine {
         let (cmd_tx, cmd_rx) = mpsc::sync_channel::<AudioCommand>(64);
         let (event_tx, event_rx) = mpsc::channel::<AudioEvent>();
         let position = Arc::new(AtomicU64::new(0));
-        let volume = Arc::new(Mutex::new(1.0f32));
+        let volume = Arc::new(AtomicU32::new(1.0f32.to_bits()));
         let play_state = Arc::new(Mutex::new(PlayState::Stopped));
         let visualizer_buf = Arc::new(crate::analyzer::AudioVisualizerBuffer::new(4096));
         let spectrum_enabled = Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -168,31 +226,23 @@ impl AudioEngine {
         let loudness_gain = Arc::new(AtomicU32::new(1.0f32.to_bits()));
         let fade_gain = Arc::new(AtomicU32::new(1.0f32.to_bits()));
 
-        let pos_clone = Arc::clone(&position);
-        let vol_clone = Arc::clone(&volume);
-        let state_clone = Arc::clone(&play_state);
-        let vis_clone = Arc::clone(&visualizer_buf);
-        let sample_rate_clone = Arc::clone(&output_sample_rate);
-        let eq_clone = Arc::clone(&equalizer);
-        let loudness_clone = Arc::clone(&loudness_gain);
-        let fade_clone = Arc::clone(&fade_gain);
+        let shared = Arc::new(AudioShared {
+            position: Arc::clone(&position),
+            volume: Arc::clone(&volume),
+            play_state: Arc::clone(&play_state),
+            visualizer_buf: Arc::clone(&visualizer_buf),
+            output_sample_rate: Arc::clone(&output_sample_rate),
+            equalizer: Arc::clone(&equalizer),
+            loudness_gain: Arc::clone(&loudness_gain),
+            fade_gain: Arc::clone(&fade_gain),
+        });
+        let shared_clone = Arc::clone(&shared);
 
         // Spawn a plain OS thread — no Send requirement on cpal::Stream
         std::thread::Builder::new()
             .name("luminous-audio".to_string())
             .spawn(move || {
-                decode_thread(
-                    cmd_rx,
-                    event_tx,
-                    pos_clone,
-                    vol_clone,
-                    state_clone,
-                    vis_clone,
-                    sample_rate_clone,
-                    eq_clone,
-                    loudness_clone,
-                    fade_clone,
-                );
+                decode_thread(cmd_rx, event_tx, shared_clone);
             })
             .expect("failed to spawn audio thread");
 
@@ -211,36 +261,37 @@ impl AudioEngine {
         }
     }
 
-    pub fn play(&self, song: Box<Song>, start_nanosec: u64) -> Result<()> {
+    fn send_cmd(&self, cmd: AudioCommand) -> Result<()> {
         self.cmd_tx
-            .send(AudioCommand::Play(PlayRequest {
-                song,
-                start_nanosec,
-            }))
+            .send(cmd)
             .map_err(|_| anyhow!("audio thread shut down"))
     }
 
+    pub fn play(&self, song: Box<Song>, start_nanosec: u64) -> Result<()> {
+        self.send_cmd(AudioCommand::Play(PlayRequest {
+            song,
+            start_nanosec,
+        }))
+    }
+
     pub fn cue(&self, song: Box<Song>, start_nanosec: u64) -> Result<()> {
-        if let Ok(mut s) = self.play_state.lock() {
+        {
+            let mut s = self.play_state.lock();
             *s = crate::models::PlayState::Paused;
         }
         self.position_nanosec
             .store(start_nanosec, Ordering::Relaxed);
-        self.cmd_tx
-            .send(AudioCommand::Cue(PlayRequest {
-                song,
-                start_nanosec,
-            }))
-            .map_err(|_| anyhow!("audio thread shut down"))
+        self.send_cmd(AudioCommand::Cue(PlayRequest {
+            song,
+            start_nanosec,
+        }))
     }
 
     pub fn preload_next(&self, song: Box<Song>, start_nanosec: u64) -> Result<()> {
-        self.cmd_tx
-            .send(AudioCommand::PreloadNext(PlayRequest {
-                song,
-                start_nanosec,
-            }))
-            .map_err(|_| anyhow!("audio thread shut down"))
+        self.send_cmd(AudioCommand::PreloadNext(PlayRequest {
+            song,
+            start_nanosec,
+        }))
     }
 
     pub fn preload_next_with_crossfade(
@@ -249,73 +300,51 @@ impl AudioEngine {
         start_nanosec: u64,
         crossfade_secs: f32,
     ) -> Result<()> {
-        self.cmd_tx
-            .send(AudioCommand::PreloadNextCrossfade(
-                PlayRequest {
-                    song,
-                    start_nanosec,
-                },
-                crossfade_secs,
-            ))
-            .map_err(|_| anyhow!("audio thread shut down"))
+        self.send_cmd(AudioCommand::PreloadNextCrossfade(
+            PlayRequest {
+                song,
+                start_nanosec,
+            },
+            crossfade_secs,
+        ))
     }
 
     pub fn clear_preload(&self) -> Result<()> {
-        self.cmd_tx
-            .send(AudioCommand::ClearPreload)
-            .map_err(|_| anyhow!("audio thread shut down"))
+        self.send_cmd(AudioCommand::ClearPreload)
     }
 
     pub fn pause(&self) -> Result<()> {
-        self.cmd_tx
-            .send(AudioCommand::Pause)
-            .map_err(|_| anyhow!("audio thread shut down"))
+        self.send_cmd(AudioCommand::Pause)
     }
 
     pub fn pause_with_fade(&self, fade_ms: u32) -> Result<()> {
-        self.cmd_tx
-            .send(AudioCommand::PauseWithFade(fade_ms))
-            .map_err(|_| anyhow!("audio thread shut down"))
+        self.send_cmd(AudioCommand::PauseWithFade(fade_ms))
     }
 
     pub fn resume(&self) -> Result<()> {
-        self.cmd_tx
-            .send(AudioCommand::Resume)
-            .map_err(|_| anyhow!("audio thread shut down"))
+        self.send_cmd(AudioCommand::Resume)
     }
 
     pub fn resume_with_fade(&self, fade_ms: u32) -> Result<()> {
-        self.cmd_tx
-            .send(AudioCommand::ResumeWithFade(fade_ms))
-            .map_err(|_| anyhow!("audio thread shut down"))
+        self.send_cmd(AudioCommand::ResumeWithFade(fade_ms))
     }
 
     pub fn stop(&self) -> Result<()> {
-        self.cmd_tx
-            .send(AudioCommand::Stop)
-            .map_err(|_| anyhow!("audio thread shut down"))
+        self.send_cmd(AudioCommand::Stop)
     }
 
     pub fn stop_with_fade(&self, fade_ms: u32) -> Result<()> {
-        self.cmd_tx
-            .send(AudioCommand::StopWithFade(fade_ms))
-            .map_err(|_| anyhow!("audio thread shut down"))
+        self.send_cmd(AudioCommand::StopWithFade(fade_ms))
     }
 
     pub fn seek_to(&self, position_nanosec: u64) -> Result<()> {
-        self.cmd_tx
-            .send(AudioCommand::SeekTo(position_nanosec))
-            .map_err(|_| anyhow!("audio thread shut down"))
+        self.send_cmd(AudioCommand::SeekTo(position_nanosec))
     }
 
     pub fn set_volume(&self, vol: f32) -> Result<()> {
         let vol = vol.clamp(0.0, 1.0);
-        if let Ok(mut v) = self.volume.lock() {
-            *v = vol;
-        }
-        self.cmd_tx
-            .send(AudioCommand::SetVolume(vol))
-            .map_err(|_| anyhow!("audio thread shut down"))
+        self.volume.store(vol.to_bits(), Ordering::Relaxed);
+        Ok(())
     }
 
     /// Set the per-track loudness-normalization multiplier (#77).
@@ -335,14 +364,49 @@ impl AudioEngine {
     }
 
     pub fn current_volume(&self) -> f32 {
-        self.volume.lock().map(|v| *v).unwrap_or(1.0)
+        f32::from_bits(self.volume.load(Ordering::Relaxed))
     }
 
     pub fn current_state(&self) -> PlayState {
-        self.play_state
-            .lock()
-            .map(|s| *s)
-            .unwrap_or(PlayState::Stopped)
+        *self.play_state.lock()
+    }
+
+    /// One controlled escape hatch for equalizer mutation/inspection —
+    /// centralizes locking instead of callers reaching into the field.
+    pub fn with_equalizer<R>(&self, f: impl FnOnce(&mut crate::equalizer::Equalizer) -> R) -> R {
+        let mut eq = self.equalizer.lock();
+        f(&mut eq)
+    }
+
+    pub fn spectrum_enabled(&self) -> bool {
+        self.spectrum_enabled.load(Ordering::Relaxed)
+    }
+
+    pub fn set_spectrum_enabled(&self, enabled: bool) {
+        self.spectrum_enabled.store(enabled, Ordering::Relaxed);
+    }
+
+    /// Compute a spectrum snapshot from the current visualizer buffer at the
+    /// engine's actual output sample rate. Returns `None` before the output
+    /// stream has been built (sample rate not yet known to be accurate).
+    pub fn spectrum_snapshot(&self, fft_size: usize) -> Vec<f32> {
+        let sample_rate = self.output_sample_rate.load(Ordering::Relaxed);
+        crate::analyzer::calculate_spectrum(&self.visualizer_buf, fft_size, sample_rate)
+    }
+
+    /// A cheaply-cloneable handle to the event receiver. Callers lock it
+    /// themselves and block on `Receiver::iter()` on their own thread —
+    /// cloning the handle (rather than blocking here) lets the caller drop
+    /// its `AudioEngine` lock before entering that blocking loop.
+    pub fn events(&self) -> Arc<Mutex<mpsc::Receiver<AudioEvent>>> {
+        Arc::clone(&self.event_rx)
+    }
+
+    /// A cheaply-cloneable handle to the loudness-gain atomic, for
+    /// subsystems that need shared cross-thread read/write access (e.g.
+    /// ramping it smoothly rather than stepping it via `set_loudness_gain`).
+    pub fn loudness_gain_handle(&self) -> Arc<AtomicU32> {
+        Arc::clone(&self.loudness_gain)
     }
 }
 
@@ -741,15 +805,7 @@ fn get_default_device_name() -> Option<String> {
     Some(device.to_string())
 }
 
-#[allow(clippy::too_many_arguments)]
-fn build_output(
-    position: &Arc<AtomicU64>,
-    volume: &Arc<Mutex<f32>>,
-    visualizer_buf: &Arc<crate::analyzer::AudioVisualizerBuffer>,
-    equalizer: &Arc<Mutex<crate::equalizer::Equalizer>>,
-    loudness_gain: &Arc<AtomicU32>,
-    fade_gain: &Arc<AtomicU32>,
-) -> Result<AudioOutput, String> {
+fn build_output(shared: &Arc<AudioShared>) -> Result<AudioOutput, String> {
     use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
     let host = cpal::default_host();
@@ -773,7 +829,8 @@ fn build_output(
     let target_sample_rate = config.sample_rate;
     let target_channels = config.channels;
 
-    if let Ok(mut eq) = equalizer.lock() {
+    {
+        let mut eq = shared.equalizer.lock();
         eq.update_format(target_sample_rate, target_channels as usize);
     }
 
@@ -790,12 +847,12 @@ fn build_output(
 
     let played_samples = Arc::new(AtomicU64::new(0));
     let played_samples_cpal = Arc::clone(&played_samples);
-    let vol_ref = Arc::clone(volume);
-    let position_cpal = Arc::clone(position);
-    let visualizer_buf_cpal = Arc::clone(visualizer_buf);
-    let eq_cpal = Arc::clone(equalizer);
-    let loudness_cpal = Arc::clone(loudness_gain);
-    let fade_cpal = Arc::clone(fade_gain);
+    let vol_ref = Arc::clone(&shared.volume);
+    let position_cpal = Arc::clone(&shared.position);
+    let visualizer_buf_cpal = Arc::clone(&shared.visualizer_buf);
+    let eq_cpal = Arc::clone(&shared.equalizer);
+    let loudness_cpal = Arc::clone(&shared.loudness_gain);
+    let fade_cpal = Arc::clone(&shared.fade_gain);
 
     // Pre-allocated scratch for the visualizer's mono downmix — the output
     // callback must never allocate. Sized for the whole ring buffer, far
@@ -809,13 +866,13 @@ fn build_output(
         .build_output_stream(
             config,
             move |output: &mut [f32], _| {
-                let vol = vol_ref.lock().map(|v| *v).unwrap_or(1.0);
+                let vol = f32::from_bits(vol_ref.load(Ordering::Relaxed));
                 let loudness = f32::from_bits(loudness_cpal.load(Ordering::Relaxed));
                 let fade = f32::from_bits(fade_cpal.load(Ordering::Relaxed));
                 let mut played = 0;
 
                 // Non-blocking try_lock ensures CPAL callback never stalls
-                if let Ok(mut consumer) = shared_consumer_reader.try_lock() {
+                if let Some(mut consumer) = shared_consumer_reader.try_lock() {
                     for sample in output.iter_mut() {
                         if let Some(s) = consumer.try_pop() {
                             *sample = s;
@@ -844,7 +901,7 @@ fn build_output(
 
                 // 2) Equalizer (preamp + band cascade; no-op when disabled)
                 let mut eq_applied = false;
-                if let Ok(mut eq) = eq_cpal.try_lock() {
+                if let Some(mut eq) = eq_cpal.try_lock() {
                     eq_applied = eq.enabled;
                     eq.process_interleaved(&mut output[..played]);
                 }
@@ -936,34 +993,14 @@ fn build_output(
 /// handed back to the caller. Bounded by a timeout so a wedged WASAPI call on
 /// the scratch thread can't hang `decode_thread` — see the wedge risk
 /// documented on `AudioOutput` above.
-#[allow(clippy::too_many_arguments)]
-fn build_output_on_fresh_thread(
-    position: &Arc<AtomicU64>,
-    volume: &Arc<Mutex<f32>>,
-    visualizer_buf: &Arc<crate::analyzer::AudioVisualizerBuffer>,
-    equalizer: &Arc<Mutex<crate::equalizer::Equalizer>>,
-    loudness_gain: &Arc<AtomicU32>,
-    fade_gain: &Arc<AtomicU32>,
-) -> Result<AudioOutput, String> {
-    let position = Arc::clone(position);
-    let volume = Arc::clone(volume);
-    let visualizer_buf = Arc::clone(visualizer_buf);
-    let equalizer = Arc::clone(equalizer);
-    let loudness_gain = Arc::clone(loudness_gain);
-    let fade_gain = Arc::clone(fade_gain);
+fn build_output_on_fresh_thread(shared: &Arc<AudioShared>) -> Result<AudioOutput, String> {
+    let shared = Arc::clone(shared);
 
     let (tx, rx) = mpsc::channel();
     let spawned = std::thread::Builder::new()
         .name("luminous-audio-rebuild".into())
         .spawn(move || {
-            let result = build_output(
-                &position,
-                &volume,
-                &visualizer_buf,
-                &equalizer,
-                &loudness_gain,
-                &fade_gain,
-            );
+            let result = build_output(&shared);
             let _ = tx.send(result);
         });
 
@@ -1017,18 +1054,10 @@ enum DecodeStepOutcome {
     BreakDecode,
 }
 
-#[allow(clippy::too_many_arguments)]
 fn decode_thread(
     cmd_rx: mpsc::Receiver<AudioCommand>,
     event_tx: mpsc::Sender<AudioEvent>,
-    position: Arc<AtomicU64>,
-    volume: Arc<Mutex<f32>>,
-    play_state: Arc<Mutex<PlayState>>,
-    visualizer_buf: Arc<crate::analyzer::AudioVisualizerBuffer>,
-    output_sample_rate: Arc<AtomicU32>,
-    equalizer: Arc<Mutex<crate::equalizer::Equalizer>>,
-    loudness_gain: Arc<AtomicU32>,
-    fade_gain: Arc<AtomicU32>,
+    shared: Arc<AudioShared>,
 ) {
     // The persistent output stream/ring buffer — built lazily on the first
     // track this thread ever plays, then kept alive for every subsequent
@@ -1049,16 +1078,11 @@ fn decode_thread(
                     }
                     Ok(AudioCommand::Cue(r)) => {
                         if output.is_none() {
-                            match build_output_on_fresh_thread(
-                                &position,
-                                &volume,
-                                &visualizer_buf,
-                                &equalizer,
-                                &loudness_gain,
-                                &fade_gain,
-                            ) {
+                            match build_output_on_fresh_thread(&shared) {
                                 Ok(o) => {
-                                    output_sample_rate.store(o.sample_rate, Ordering::Relaxed);
+                                    shared
+                                        .output_sample_rate
+                                        .store(o.sample_rate, Ordering::Relaxed);
                                     output = Some(o);
                                 }
                                 Err(message) => {
@@ -1078,7 +1102,8 @@ fn decode_thread(
                             target_channels as usize,
                         ) {
                             Ok(_) => {
-                                if let Ok(mut consumer) = out.consumer.lock() {
+                                {
+                                    let mut consumer = out.consumer.lock();
                                     while consumer.try_pop().is_some() {}
                                 }
                                 let start_samples = samples_for_ns(
@@ -1088,10 +1113,11 @@ fn decode_thread(
                                 );
                                 out.played_samples.store(start_samples, Ordering::Relaxed);
                                 let _ = out.stream.pause();
-                                if let Ok(mut s) = play_state.lock() {
+                                {
+                                    let mut s = shared.play_state.lock();
                                     *s = PlayState::Paused;
                                 }
-                                position.store(r.start_nanosec, Ordering::Relaxed);
+                                shared.position.store(r.start_nanosec, Ordering::Relaxed);
                                 paused_req = Some(r);
                                 let _ = event_tx.send(AudioEvent::Paused);
                             }
@@ -1103,7 +1129,7 @@ fn decode_thread(
                     }
                     Ok(AudioCommand::Resume) | Ok(AudioCommand::ResumeWithFade(_)) => {
                         if let Some(r) = paused_req.take() {
-                            let cur_pos = position.load(Ordering::Relaxed);
+                            let cur_pos = shared.position.load(Ordering::Relaxed);
                             PlayRequest {
                                 song: r.song,
                                 start_nanosec: cur_pos,
@@ -1117,17 +1143,12 @@ fn decode_thread(
                             let _ = out.stream.pause();
                         }
                         paused_req = None;
-                        position.store(0, Ordering::Relaxed);
-                        if let Ok(mut s) = play_state.lock() {
+                        shared.position.store(0, Ordering::Relaxed);
+                        {
+                            let mut s = shared.play_state.lock();
                             *s = PlayState::Stopped;
                         }
                         let _ = event_tx.send(AudioEvent::Stopped);
-                        continue;
-                    }
-                    Ok(AudioCommand::SetVolume(v)) => {
-                        if let Ok(mut vol) = volume.lock() {
-                            *vol = v.clamp(0.0, 1.0);
-                        }
                         continue;
                     }
                     Ok(_) => continue, // Ignore other commands when stopped
@@ -1142,18 +1163,14 @@ fn decode_thread(
         loop {
             match cmd_rx.try_recv() {
                 Ok(AudioCommand::Play(newer)) => req = newer,
-                Ok(AudioCommand::SetVolume(v)) => {
-                    if let Ok(mut vol) = volume.lock() {
-                        *vol = v.clamp(0.0, 1.0);
-                    }
-                }
                 Ok(AudioCommand::Stop) | Ok(AudioCommand::StopWithFade(_)) => {
                     if let Some(out) = output.as_ref() {
                         let _ = out.stream.pause();
                     }
                     paused_req = None;
-                    position.store(0, Ordering::Relaxed);
-                    if let Ok(mut s) = play_state.lock() {
+                    shared.position.store(0, Ordering::Relaxed);
+                    {
+                        let mut s = shared.play_state.lock();
                         *s = PlayState::Stopped;
                     }
                     let _ = event_tx.send(AudioEvent::Stopped);
@@ -1173,16 +1190,11 @@ fn decode_thread(
         // and re-touching COM on `decode_thread`'s own long-lived OS thread a
         // second time risks the same RPC_E_CHANGED_MODE wedge #624 fixed.
         if output.is_none() {
-            match build_output_on_fresh_thread(
-                &position,
-                &volume,
-                &visualizer_buf,
-                &equalizer,
-                &loudness_gain,
-                &fade_gain,
-            ) {
+            match build_output_on_fresh_thread(&shared) {
                 Ok(o) => {
-                    output_sample_rate.store(o.sample_rate, Ordering::Relaxed);
+                    shared
+                        .output_sample_rate
+                        .store(o.sample_rate, Ordering::Relaxed);
                     output = Some(o);
                 }
                 Err(message) => {
@@ -1211,7 +1223,8 @@ fn decode_thread(
 
         // Clear whatever was left in the buffer from the previous track and
         // reset the played-sample counter for this track's start offset.
-        if let Ok(mut consumer) = out.consumer.lock() {
+        {
+            let mut consumer = out.consumer.lock();
             while consumer.try_pop().is_some() {}
         }
         let start_samples = samples_for_ns(current.start_ns, target_sample_rate, target_channels);
@@ -1224,10 +1237,11 @@ fn decode_thread(
             continue;
         }
 
-        if let Ok(mut s) = play_state.lock() {
+        {
+            let mut s = shared.play_state.lock();
             *s = PlayState::Playing;
         }
-        position.store(current.start_ns, Ordering::Relaxed);
+        shared.position.store(current.start_ns, Ordering::Relaxed);
         let _ = event_tx.send(AudioEvent::Playing { song_id });
 
         let mut session = DecodeSession {
@@ -1241,18 +1255,7 @@ fn decode_thread(
         };
 
         'decode: loop {
-            match check_and_rebuild_output(
-                &mut output,
-                &mut session,
-                &position,
-                &volume,
-                &visualizer_buf,
-                &equalizer,
-                &loudness_gain,
-                &fade_gain,
-                &output_sample_rate,
-                &event_tx,
-            ) {
+            match check_and_rebuild_output(&mut output, &mut session, &shared, &event_tx) {
                 DeviceCheckOutcome::Ok => {}
                 DeviceCheckOutcome::BreakDecode => break 'decode,
             }
@@ -1263,10 +1266,7 @@ fn decode_thread(
                 cmd_rx.try_recv(),
                 out,
                 &mut session,
-                &play_state,
-                &volume,
-                &fade_gain,
-                &position,
+                &shared,
                 &event_tx,
                 &mut paused_req,
             ) {
@@ -1278,9 +1278,9 @@ fn decode_thread(
                 }
             }
 
-            advance_transition_and_preload_signal(out, &mut session, &position, &event_tx);
+            advance_transition_and_preload_signal(out, &mut session, &shared.position, &event_tx);
 
-            match handle_eof(out, &mut session, &play_state, &event_tx) {
+            match handle_eof(out, &mut session, &shared.play_state, &event_tx) {
                 EofOutcome::NotEof => {}
                 EofOutcome::ContinueDecode => continue 'decode,
                 EofOutcome::BreakDecode => break 'decode,
@@ -1298,17 +1298,10 @@ fn decode_thread(
 /// Drives step 1 of one `'decode` iteration: the periodic (~500ms throttled)
 /// default-output-device change / stream-error check, rebuilding `output`
 /// and reseeking `session.current`/`session.next` onto it when needed.
-#[allow(clippy::too_many_arguments)]
 fn check_and_rebuild_output(
     output: &mut Option<AudioOutput>,
     session: &mut DecodeSession,
-    position: &Arc<AtomicU64>,
-    volume: &Arc<Mutex<f32>>,
-    visualizer_buf: &Arc<crate::analyzer::AudioVisualizerBuffer>,
-    equalizer: &Arc<Mutex<crate::equalizer::Equalizer>>,
-    loudness_gain: &Arc<AtomicU32>,
-    fade_gain: &Arc<AtomicU32>,
-    output_sample_rate: &Arc<AtomicU32>,
+    shared: &Arc<AudioShared>,
     event_tx: &mpsc::Sender<AudioEvent>,
 ) -> DeviceCheckOutcome {
     let now = std::time::Instant::now();
@@ -1333,22 +1326,17 @@ fn check_and_rebuild_output(
                 stream_errored
             );
 
-            let cur_pos = position.load(Ordering::Relaxed);
+            let cur_pos = shared.position.load(Ordering::Relaxed);
             if let Some(old_out) = output.as_ref() {
                 let _ = old_out.stream.pause();
             }
             *output = None;
 
-            match build_output_on_fresh_thread(
-                position,
-                volume,
-                visualizer_buf,
-                equalizer,
-                loudness_gain,
-                fade_gain,
-            ) {
+            match build_output_on_fresh_thread(shared) {
                 Ok(new_out) => {
-                    output_sample_rate.store(new_out.sample_rate, Ordering::Relaxed);
+                    shared
+                        .output_sample_rate
+                        .store(new_out.sample_rate, Ordering::Relaxed);
                     session.target_sample_rate = new_out.sample_rate;
                     session.target_channels = new_out.channels;
 
@@ -1377,7 +1365,8 @@ fn check_and_rebuild_output(
                         );
                     }
 
-                    if let Ok(mut consumer) = new_out.consumer.lock() {
+                    {
+                        let mut consumer = new_out.consumer.lock();
                         while consumer.try_pop().is_some() {}
                     }
                     let start_samples = samples_for_ns(
@@ -1410,22 +1399,22 @@ fn check_and_rebuild_output(
 
 /// Drives step 2 of one `'decode` iteration: handle exactly one
 /// `AudioCommand` variant received via `try_recv()` (or none pending).
-#[allow(clippy::too_many_arguments)]
 fn handle_decode_command(
     cmd: Result<AudioCommand, mpsc::TryRecvError>,
     out: &mut AudioOutput,
     session: &mut DecodeSession,
-    play_state: &Arc<Mutex<PlayState>>,
-    volume: &Arc<Mutex<f32>>,
-    fade_gain: &Arc<AtomicU32>,
-    position: &Arc<AtomicU64>,
+    shared: &Arc<AudioShared>,
     event_tx: &mpsc::Sender<AudioEvent>,
     paused_req: &mut Option<PlayRequest>,
 ) -> CmdOutcome {
+    let play_state = &shared.play_state;
+    let fade_gain = &shared.fade_gain;
+    let position = &shared.position;
     match cmd {
         Ok(AudioCommand::Pause) => {
             let _ = out.stream.pause();
-            if let Ok(mut s) = play_state.lock() {
+            {
+                let mut s = play_state.lock();
                 *s = PlayState::Paused;
             }
             let _ = event_tx.send(AudioEvent::Paused);
@@ -1445,7 +1434,8 @@ fn handle_decode_command(
             apply_fade_ramp(fade_gain, 1.0, 0.0, dur_ms);
             let _ = out.stream.pause();
             fade_gain.store(1.0f32.to_bits(), Ordering::Relaxed);
-            if let Ok(mut s) = play_state.lock() {
+            {
+                let mut s = play_state.lock();
                 *s = PlayState::Paused;
             }
             let _ = event_tx.send(AudioEvent::Paused);
@@ -1461,7 +1451,8 @@ fn handle_decode_command(
         }
         Ok(AudioCommand::Stop) => {
             let _ = out.stream.pause();
-            if let Ok(mut s) = play_state.lock() {
+            {
+                let mut s = play_state.lock();
                 *s = PlayState::Stopped;
             }
             let _ = event_tx.send(AudioEvent::Stopped);
@@ -1471,7 +1462,8 @@ fn handle_decode_command(
             apply_fade_ramp(fade_gain, 1.0, 0.0, dur_ms);
             let _ = out.stream.pause();
             fade_gain.store(1.0f32.to_bits(), Ordering::Relaxed);
-            if let Ok(mut s) = play_state.lock() {
+            {
+                let mut s = play_state.lock();
                 *s = PlayState::Stopped;
             }
             let _ = event_tx.send(AudioEvent::Stopped);
@@ -1530,7 +1522,8 @@ fn handle_decode_command(
             }
 
             // Clear the buffer after seek to avoid stale audio
-            if let Ok(mut consumer) = out.consumer.lock() {
+            {
+                let mut consumer = out.consumer.lock();
                 while consumer.try_pop().is_some() {}
             }
             let target_samples = samples_for_ns(
@@ -1541,12 +1534,6 @@ fn handle_decode_command(
             out.played_samples.store(target_samples, Ordering::Relaxed);
             session.pushed_samples = target_samples;
             position.store(target_ns, Ordering::Relaxed);
-            CmdOutcome::Continue
-        }
-        Ok(AudioCommand::SetVolume(v)) => {
-            if let Ok(mut vol) = volume.lock() {
-                *vol = v.clamp(0.0, 1.0);
-            }
             CmdOutcome::Continue
         }
         Ok(AudioCommand::PreloadNext(preq)) => {
@@ -1697,7 +1684,8 @@ fn handle_eof(
             song_id: session.current.song.id,
         });
         let _ = out.stream.pause();
-        if let Ok(mut s) = play_state.lock() {
+        {
+            let mut s = play_state.lock();
             *s = PlayState::Stopped;
         }
         EofOutcome::BreakDecode

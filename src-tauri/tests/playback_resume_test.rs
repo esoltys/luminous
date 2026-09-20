@@ -63,7 +63,7 @@ async fn test_playback_resume_on_startup() {
         audio
             .lock()
             .await
-            .loudness_gain
+            .loudness_gain_handle()
             .load(std::sync::atomic::Ordering::Relaxed),
     );
     assert_eq!(engine_loudness, 1.0);
@@ -122,7 +122,7 @@ async fn test_playback_resume_with_volume_and_analyzed_loudness() {
         audio
             .lock()
             .await
-            .loudness_gain
+            .loudness_gain_handle()
             .load(std::sync::atomic::Ordering::Relaxed),
     );
     assert!((engine_loudness - 0.5011872).abs() < 1e-4);
@@ -168,7 +168,7 @@ async fn test_playback_resume_with_fallback_loudness() {
         audio
             .lock()
             .await
-            .loudness_gain
+            .loudness_gain_handle()
             .load(std::sync::atomic::Ordering::Relaxed),
     );
     assert!((engine_loudness - 0.5011872).abs() < 1e-4);

@@ -24,6 +24,7 @@ pub mod diagnostics;
 pub mod discord;
 pub mod dr_parser;
 pub mod equalizer;
+pub mod fade;
 pub mod filter_parser;
 pub mod install_format;
 pub mod loudness;
@@ -285,7 +286,7 @@ fn restore_equalizer_from_db(db: &Database, audio_engine: &AudioEngine) {
                     }
                 }
             }
-            if let Ok(mut eq) = audio_engine.equalizer.lock() {
+            audio_engine.with_equalizer(|eq| {
                 eq.enabled = enabled;
                 eq.preamp = preamp;
                 eq.load_preset(gains);
@@ -301,7 +302,7 @@ fn restore_equalizer_from_db(db: &Database, audio_engine: &AudioEngine) {
                 if mode_str == "parametric20" {
                     eq.set_mode(crate::equalizer::EqMode::Parametric20);
                 }
-            }
+            });
         }
     }
 }
@@ -362,19 +363,10 @@ fn spawn_visualizer_loop(app_handle: tauri::AppHandle, audio: Arc<Mutex<AudioEng
 
             let (enabled, spectrum) = {
                 let engine = audio.lock().await;
-                let enabled = engine
-                    .spectrum_enabled
-                    .load(std::sync::atomic::Ordering::Relaxed);
+                let enabled = engine.spectrum_enabled();
                 let state = engine.current_state();
                 let spectrum = if enabled && state == crate::models::PlayState::Playing {
-                    let sample_rate = engine
-                        .output_sample_rate
-                        .load(std::sync::atomic::Ordering::Relaxed);
-                    Some(crate::analyzer::calculate_spectrum(
-                        &engine.visualizer_buf,
-                        1024,
-                        sample_rate,
-                    ))
+                    Some(engine.spectrum_snapshot(1024))
                 } else {
                     None
                 };
@@ -483,10 +475,10 @@ fn spawn_audio_event_loop(
         .spawn(move || {
             let rx = {
                 let engine = tauri::async_runtime::block_on(async { audio.lock().await });
-                engine.event_rx.clone()
+                engine.events()
             };
 
-            let rx = rx.lock().unwrap();
+            let rx = rx.lock();
             for event in rx.iter() {
                 log::trace!("Received audio event: {:?}", event);
                 let app = app_handle.clone();

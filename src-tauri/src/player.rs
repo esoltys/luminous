@@ -57,6 +57,85 @@ enum GaplessTargetKind {
     Queue,
 }
 
+// ---------------------------------------------------------------------------
+// Restart-persistence helpers — `Player` owns 8 `app_state` keys (volume,
+// shuffle_mode, repeat_mode, last_song_id, last_playlist_id, last_item_uuid,
+// last_position_nanosec, last_adhoc_song_ids). These give `Player::new`'s
+// restore block and the various persist_*/set_* writers one shared place for
+// the raw SQL shape and the enum<->string mapping, mirroring the field↔key
+// pattern `commands/settings.rs::UiPreferences::fields()` uses for its own
+// app_state keys — the shapes differ enough (`Option<i64>`, a JSON-encoded
+// `Vec<i64>`, two non-string enums) that a single literal table doesn't fit,
+// so this is the same idea expressed as small typed helpers instead.
+// ---------------------------------------------------------------------------
+
+fn app_state_get(conn: &rusqlite::Connection, key: &str) -> Option<String> {
+    conn.query_row(
+        "SELECT value FROM app_state WHERE key = ?1",
+        rusqlite::params![key],
+        |row| row.get(0),
+    )
+    .ok()
+}
+
+fn app_state_get_parsed<T: std::str::FromStr>(conn: &rusqlite::Connection, key: &str) -> Option<T> {
+    app_state_get(conn, key).and_then(|s| s.parse::<T>().ok())
+}
+
+fn app_state_set(conn: &rusqlite::Connection, key: &str, value: &str) {
+    let _ = conn.execute(
+        "INSERT OR REPLACE INTO app_state (key, value) VALUES (?1, ?2)",
+        rusqlite::params![key, value],
+    );
+}
+
+fn app_state_clear(conn: &rusqlite::Connection, key: &str) {
+    let _ = conn.execute(
+        "DELETE FROM app_state WHERE key = ?1",
+        rusqlite::params![key],
+    );
+}
+
+fn shuffle_mode_to_key(mode: ShuffleMode) -> &'static str {
+    match mode {
+        ShuffleMode::Off => "off",
+        ShuffleMode::All => "all",
+        ShuffleMode::InsideAlbum => "inside_album",
+        ShuffleMode::Albums => "albums",
+        ShuffleMode::Artists => "artists",
+    }
+}
+
+fn shuffle_mode_from_key(key: &str) -> ShuffleMode {
+    match key {
+        "all" => ShuffleMode::All,
+        "inside_album" => ShuffleMode::InsideAlbum,
+        "albums" => ShuffleMode::Albums,
+        "artists" => ShuffleMode::Artists,
+        _ => ShuffleMode::Off,
+    }
+}
+
+fn repeat_mode_to_key(mode: RepeatMode) -> &'static str {
+    match mode {
+        RepeatMode::Off => "off",
+        RepeatMode::Track => "track",
+        RepeatMode::Album => "album",
+        RepeatMode::Playlist => "playlist",
+        RepeatMode::Intro => "intro",
+    }
+}
+
+fn repeat_mode_from_key(key: &str) -> RepeatMode {
+    match key {
+        "track" => RepeatMode::Track,
+        "album" => RepeatMode::Album,
+        "playlist" => RepeatMode::Playlist,
+        "intro" => RepeatMode::Intro,
+        _ => RepeatMode::Off,
+    }
+}
+
 pub struct Player {
     _db: Arc<Database>,
     audio: Arc<Mutex<AudioEngine>>,
@@ -124,93 +203,45 @@ impl Player {
 
         // Query database settings on startup
         if let Ok(conn) = db.pool.get() {
-            if let Ok(v_str) = conn.query_row(
-                "SELECT value FROM app_state WHERE key = 'volume'",
-                [],
-                |row| row.get::<_, String>(0),
-            ) {
-                if let Ok(v) = v_str.parse::<f32>() {
-                    volume = v.clamp(0.0, 1.0);
-                    if let Ok(engine) = audio.try_lock() {
-                        let _ = engine.set_volume(volume);
-                    }
+            if let Some(v) = app_state_get_parsed::<f32>(&conn, "volume") {
+                volume = v.clamp(0.0, 1.0);
+                if let Ok(engine) = audio.try_lock() {
+                    let _ = engine.set_volume(volume);
                 }
             }
-            if let Ok(s_str) = conn.query_row(
-                "SELECT value FROM app_state WHERE key = 'shuffle_mode'",
-                [],
-                |row| row.get::<_, String>(0),
-            ) {
-                shuffle_mode = match s_str.as_str() {
-                    "all" => ShuffleMode::All,
-                    "inside_album" => ShuffleMode::InsideAlbum,
-                    "albums" => ShuffleMode::Albums,
-                    "artists" => ShuffleMode::Artists,
-                    _ => ShuffleMode::Off,
-                };
+            if let Some(s) = app_state_get(&conn, "shuffle_mode") {
+                shuffle_mode = shuffle_mode_from_key(&s);
             }
-            if let Ok(r_str) = conn.query_row(
-                "SELECT value FROM app_state WHERE key = 'repeat_mode'",
-                [],
-                |row| row.get::<_, String>(0),
-            ) {
-                repeat_mode = match r_str.as_str() {
-                    "track" => RepeatMode::Track,
-                    "album" => RepeatMode::Album,
-                    "playlist" => RepeatMode::Playlist,
-                    "intro" => RepeatMode::Intro,
-                    _ => RepeatMode::Off,
-                };
+            if let Some(s) = app_state_get(&conn, "repeat_mode") {
+                repeat_mode = repeat_mode_from_key(&s);
             }
 
             // Restore last played song & position
-            if let Ok(s_str) = conn.query_row(
-                "SELECT value FROM app_state WHERE key = 'last_song_id'",
-                [],
-                |row| row.get::<_, String>(0),
-            ) {
-                if let Ok(song_id) = s_str.parse::<i64>() {
-                    let sql = format!(
-                        "SELECT {} FROM songs WHERE id = ?1 AND unavailable = 0",
-                        crate::collection::SONG_SELECT_COLS
-                    );
-                    if let Ok(song) = conn.query_row(
-                        &sql,
-                        rusqlite::params![song_id],
-                        crate::collection::row_to_song,
-                    ) {
-                        restored_song = Some(song);
-                    }
+            if let Some(song_id) = app_state_get_parsed::<i64>(&conn, "last_song_id") {
+                let sql = format!(
+                    "SELECT {} FROM songs WHERE id = ?1 AND unavailable = 0",
+                    crate::collection::SONG_SELECT_COLS
+                );
+                if let Ok(song) = conn.query_row(
+                    &sql,
+                    rusqlite::params![song_id],
+                    crate::collection::row_to_song,
+                ) {
+                    restored_song = Some(song);
                 }
             }
 
             if let Some(ref song) = restored_song {
-                if let Ok(p_str) = conn.query_row(
-                    "SELECT value FROM app_state WHERE key = 'last_playlist_id'",
-                    [],
-                    |row| row.get::<_, String>(0),
-                ) {
-                    if let Ok(pid) = p_str.parse::<i64>() {
-                        restored_playlist_id = Some(pid);
-                    }
+                if let Some(pid) = app_state_get_parsed::<i64>(&conn, "last_playlist_id") {
+                    restored_playlist_id = Some(pid);
                 }
 
-                if let Ok(uuid) = conn.query_row(
-                    "SELECT value FROM app_state WHERE key = 'last_item_uuid'",
-                    [],
-                    |row| row.get::<_, String>(0),
-                ) {
+                if let Some(uuid) = app_state_get(&conn, "last_item_uuid") {
                     restored_item_uuid = Some(uuid);
                 }
 
-                if let Ok(pos_str) = conn.query_row(
-                    "SELECT value FROM app_state WHERE key = 'last_position_nanosec'",
-                    [],
-                    |row| row.get::<_, String>(0),
-                ) {
-                    if let Ok(pos) = pos_str.parse::<u64>() {
-                        restored_position_ns = pos;
-                    }
+                if let Some(pos) = app_state_get_parsed::<u64>(&conn, "last_position_nanosec") {
+                    restored_position_ns = pos;
                 }
 
                 if let Some(pid) = restored_playlist_id {
@@ -239,11 +270,7 @@ impl Player {
                         // playlist). Its track order only lives in the
                         // `last_adhoc_song_ids` snapshot; without it we'd only
                         // know the single current song and nothing to advance to.
-                        if let Ok(ids_json) = conn.query_row(
-                            "SELECT value FROM app_state WHERE key = 'last_adhoc_song_ids'",
-                            [],
-                            |row| row.get::<_, String>(0),
-                        ) {
+                        if let Some(ids_json) = app_state_get(&conn, "last_adhoc_song_ids") {
                             if let Ok(song_ids) = serde_json::from_str::<Vec<i64>>(&ids_json) {
                                 let sql = format!(
                                     "SELECT {} FROM songs WHERE id = ?1 AND unavailable = 0",
@@ -622,6 +649,65 @@ impl Player {
         }
     }
 
+    /// The single "start a track" sequence shared by `play_at_index`,
+    /// `next_track`'s queue branch, and `on_gapless_transition`'s commit —
+    /// scrobble point, current song/uuid/(index or queue-pop), loudness
+    /// gain, waveform preload, and restart persistence. `kind` mirrors
+    /// `peek_next_natural`'s already-decided target (#1072); `real_play`
+    /// issues an actual `AudioEngine::play` call, skipped for gapless
+    /// commits where the audio is already playing (position is persisted as
+    /// 0 in that case, matching a track that just started).
+    async fn start_track(
+        &mut self,
+        song: Song,
+        uuid: Option<String>,
+        kind: GaplessTargetKind,
+        real_play: bool,
+    ) -> Result<()> {
+        let start_ns = song.beginning_nanosec.max(0) as u64;
+
+        self.scrobble_point_nanosec = song.length_nanosec.map(|ns| (ns as u64) / 2);
+        self.scrobbled = false;
+
+        match kind {
+            GaplessTargetKind::Replay => {
+                // current_song/uuid/index are already correct.
+            }
+            GaplessTargetKind::Index(candidate) => {
+                self.current_song = Some(song.clone());
+                self.current_item_uuid = uuid;
+                self.current_index = Some(candidate);
+                if !self.played_indices.contains(&candidate) {
+                    self.played_indices.push(candidate);
+                }
+            }
+            GaplessTargetKind::Queue => {
+                // Drop unplayable fronts, then the item that's starting.
+                while let Some(front) = self.queue.front() {
+                    if Self::is_item_playable(front) {
+                        break;
+                    }
+                    self.queue.pop_front();
+                }
+                self.queue.pop_front();
+                self.current_song = Some(song.clone());
+                self.current_item_uuid = uuid;
+            }
+        }
+
+        self.apply_loudness_gain(&song).await;
+        self.preload_upcoming_waveforms();
+        self.persist_current_song();
+        self.persist_position(if real_play { start_ns } else { 0 });
+
+        if real_play {
+            let audio = self.audio.lock().await;
+            audio.play(Box::new(song), start_ns)
+        } else {
+            Ok(())
+        }
+    }
+
     /// Play the item at the given index (in virtual/shuffle order).
     /// If the item is unavailable, auto-advances to the next playable track.
     async fn play_at_index(&mut self, index: usize) -> Result<()> {
@@ -643,27 +729,10 @@ impl Player {
             .song
             .clone()
             .ok_or(anyhow!("playlist item has no song"))?;
-        let start_ns = song.beginning_nanosec.max(0) as u64;
+        let uuid = Some(item.uuid.clone());
 
-        // Set scrobble point at 50% of track length
-        self.scrobble_point_nanosec = song.length_nanosec.map(|ns| (ns as u64) / 2);
-        self.scrobbled = false;
-
-        self.current_song = Some(song.clone());
-        self.current_item_uuid = Some(item.uuid.clone());
-        self.current_index = Some(candidate);
-
-        if !self.played_indices.contains(&candidate) {
-            self.played_indices.push(candidate);
-        }
-
-        self.persist_current_song();
-        self.persist_position(start_ns);
-
-        self.apply_loudness_gain(&song).await;
-        self.preload_upcoming_waveforms();
-        let audio = self.audio.lock().await;
-        audio.play(Box::new(song), start_ns)
+        self.start_track(song, uuid, GaplessTargetKind::Index(candidate), true)
+            .await
     }
 
     /// Proactively pre-generates waveform visualizer data for the current song
@@ -713,16 +782,10 @@ impl Player {
                     .filter_map(|i| i.song.as_ref().map(|s| s.id))
                     .collect();
                 if let Ok(json) = serde_json::to_string(&song_ids) {
-                    let _ = conn.execute(
-                        "INSERT OR REPLACE INTO app_state (key, value) VALUES ('last_adhoc_song_ids', ?1)",
-                        rusqlite::params![json],
-                    );
+                    app_state_set(&conn, "last_adhoc_song_ids", &json);
                 }
             } else {
-                let _ = conn.execute(
-                    "DELETE FROM app_state WHERE key = 'last_adhoc_song_ids'",
-                    [],
-                );
+                app_state_clear(&conn, "last_adhoc_song_ids");
             }
         }
     }
@@ -735,31 +798,19 @@ impl Player {
     /// while a track just keeps playing.
     pub fn persist_current_song(&self) {
         if let Ok(conn) = self._db.pool.get() {
-            if let Some(song) = &self.current_song {
-                let _ = conn.execute(
-                    "INSERT OR REPLACE INTO app_state (key, value) VALUES ('last_song_id', ?1)",
-                    rusqlite::params![song.id.to_string()],
-                );
-            } else {
-                let _ = conn.execute("DELETE FROM app_state WHERE key = 'last_song_id'", []);
+            match &self.current_song {
+                Some(song) => app_state_set(&conn, "last_song_id", &song.id.to_string()),
+                None => app_state_clear(&conn, "last_song_id"),
             }
 
-            if let Some(pid) = self.current_playlist_id {
-                let _ = conn.execute(
-                    "INSERT OR REPLACE INTO app_state (key, value) VALUES ('last_playlist_id', ?1)",
-                    rusqlite::params![pid.to_string()],
-                );
-            } else {
-                let _ = conn.execute("DELETE FROM app_state WHERE key = 'last_playlist_id'", []);
+            match self.current_playlist_id {
+                Some(pid) => app_state_set(&conn, "last_playlist_id", &pid.to_string()),
+                None => app_state_clear(&conn, "last_playlist_id"),
             }
 
-            if let Some(uuid) = &self.current_item_uuid {
-                let _ = conn.execute(
-                    "INSERT OR REPLACE INTO app_state (key, value) VALUES ('last_item_uuid', ?1)",
-                    rusqlite::params![uuid],
-                );
-            } else {
-                let _ = conn.execute("DELETE FROM app_state WHERE key = 'last_item_uuid'", []);
+            match &self.current_item_uuid {
+                Some(uuid) => app_state_set(&conn, "last_item_uuid", uuid),
+                None => app_state_clear(&conn, "last_item_uuid"),
             }
         }
     }
@@ -770,9 +821,10 @@ impl Player {
     /// intentionally cheap (one `INSERT OR REPLACE`) since it runs often.
     pub fn persist_position(&self, position_nanosec: u64) {
         if let Ok(conn) = self._db.pool.get() {
-            let _ = conn.execute(
-                "INSERT OR REPLACE INTO app_state (key, value) VALUES ('last_position_nanosec', ?1)",
-                rusqlite::params![position_nanosec.to_string()],
+            app_state_set(
+                &conn,
+                "last_position_nanosec",
+                &position_nanosec.to_string(),
             );
         }
     }
@@ -856,20 +908,8 @@ impl Player {
         self.current_loudness_source = source;
         self.current_loudness_gain_db = gain_db;
 
-        let handle = self.audio.lock().await.loudness_gain.clone();
-        let start_gain = f32::from_bits(handle.load(std::sync::atomic::Ordering::Relaxed));
-        if (target_gain - start_gain).abs() < f32::EPSILON {
-            return;
-        }
-        const STEPS: u32 = 15;
-        let step_dur =
-            std::time::Duration::from_millis((Self::LOUDNESS_REFRESH_RAMP_MS / STEPS) as u64);
-        for i in 1..=STEPS {
-            let t = i as f32 / STEPS as f32;
-            let g = start_gain + (target_gain - start_gain) * t;
-            handle.store(g.to_bits(), std::sync::atomic::Ordering::Relaxed);
-            tokio::time::sleep(step_dur).await;
-        }
+        let handle = self.audio.lock().await.loudness_gain_handle();
+        crate::audio::ramp_gain(&handle, target_gain, Self::LOUDNESS_REFRESH_RAMP_MS).await;
     }
 
     /// Sync `is_instrumental` into this song's in-memory copies (current
@@ -899,31 +939,30 @@ impl Player {
         }
     }
 
+    /// `Some(ms)` when pause/resume/stop transitions should fade over `ms`
+    /// milliseconds, `None` when they should apply instantly — the one
+    /// decision `pause`, `resume`, and `stop` each otherwise re-derived from
+    /// the same DB settings independently.
+    async fn fade_duration_ms(&self) -> Option<u32> {
+        let settings =
+            crate::fade::get_fade_settings_from_db(&self._db).unwrap_or_default();
+        (settings.fade_pause_enabled && settings.fade_pause_duration_ms > 0)
+            .then_some(settings.fade_pause_duration_ms)
+    }
+
     pub async fn pause(&self) -> Result<()> {
         let pos = self.audio.lock().await.current_position_nanosec();
         self.persist_position(pos);
-        let settings =
-            crate::commands::settings::get_fade_settings_from_db(&self._db).unwrap_or_default();
-        if settings.fade_pause_enabled && settings.fade_pause_duration_ms > 0 {
-            self.audio
-                .lock()
-                .await
-                .pause_with_fade(settings.fade_pause_duration_ms)
-        } else {
-            self.audio.lock().await.pause()
+        match self.fade_duration_ms().await {
+            Some(ms) => self.audio.lock().await.pause_with_fade(ms),
+            None => self.audio.lock().await.pause(),
         }
     }
 
     pub async fn resume(&self) -> Result<()> {
-        let settings =
-            crate::commands::settings::get_fade_settings_from_db(&self._db).unwrap_or_default();
-        if settings.fade_pause_enabled && settings.fade_pause_duration_ms > 0 {
-            self.audio
-                .lock()
-                .await
-                .resume_with_fade(settings.fade_pause_duration_ms)
-        } else {
-            self.audio.lock().await.resume()
+        match self.fade_duration_ms().await {
+            Some(ms) => self.audio.lock().await.resume_with_fade(ms),
+            None => self.audio.lock().await.resume(),
         }
     }
 
@@ -1049,15 +1088,9 @@ impl Player {
         self.current_playlist_id = None;
         self.persist_current_song();
         self.persist_position(0);
-        let settings =
-            crate::commands::settings::get_fade_settings_from_db(&self._db).unwrap_or_default();
-        if settings.fade_pause_enabled && settings.fade_pause_duration_ms > 0 {
-            self.audio
-                .lock()
-                .await
-                .stop_with_fade(settings.fade_pause_duration_ms)
-        } else {
-            self.audio.lock().await.stop()
+        match self.fade_duration_ms().await {
+            Some(ms) => self.audio.lock().await.stop_with_fade(ms),
+            None => self.audio.lock().await.stop(),
         }
     }
 
@@ -1088,10 +1121,7 @@ impl Player {
         let audio = self.audio.lock().await;
         let _ = audio.set_volume(self.volume);
         if let Ok(conn) = self._db.pool.get() {
-            let _ = conn.execute(
-                "INSERT OR REPLACE INTO app_state (key, value) VALUES ('volume', ?1)",
-                rusqlite::params![self.volume.to_string()],
-            );
+            app_state_set(&conn, "volume", &self.volume.to_string());
         }
         Ok(())
     }
@@ -1110,20 +1140,15 @@ impl Player {
             self.queue.pop_front();
         }
 
-        if let Some(queued) = self.queue.pop_front() {
+        if let Some(queued) = self.queue.front() {
             let song = queued
                 .song
                 .clone()
                 .ok_or(anyhow!("queued item has no song"))?;
-            let start_ns = song.beginning_nanosec.max(0) as u64;
-            self.current_song = Some(song.clone());
-            self.current_item_uuid = Some(queued.uuid.clone());
-            self.scrobble_point_nanosec = song.length_nanosec.map(|ns| (ns as u64) / 2);
-            self.scrobbled = false;
-            self.apply_loudness_gain(&song).await;
-            self.preload_upcoming_waveforms();
-            let audio = self.audio.lock().await;
-            return audio.play(Box::new(song), start_ns);
+            let uuid = Some(queued.uuid.clone());
+            return self
+                .start_track(song, uuid, GaplessTargetKind::Queue, true)
+                .await;
         }
 
         let next_index = self.get_next_index();
@@ -1245,33 +1270,28 @@ impl Player {
     }
 
     /// Determine what will play after the current track ends naturally,
-    /// without mutating any state. Mirrors `on_track_finished`'s decision
-    /// tree — used both to preload the gapless next track and to commit the
-    /// transition when the engine reports it happened.
+    /// without mutating any state. The single source of truth for "what
+    /// plays next" (#1072) — `prepare_gapless_next` preloads this,
+    /// `on_gapless_transition` commits it silently, and `on_track_finished`
+    /// commits it with a real `Play` call.
     fn peek_next_natural(&self) -> Option<GaplessTarget> {
         if self.stop_after_current {
             return None;
         }
 
-        match self.repeat_mode {
-            RepeatMode::Track => {
-                self.current_index?; // only replay when a playlist track is loaded
-                let song = self.current_song.clone()?;
-                return Some(GaplessTarget {
-                    song,
-                    uuid: self.current_item_uuid.clone(),
-                    kind: GaplessTargetKind::Replay,
-                });
-            }
-            RepeatMode::Playlist => {
-                let idx = self.get_next_index().unwrap_or(0);
-                let candidate = self.peek_playable_index(idx)?;
-                return self.target_at_virtual_index(candidate);
-            }
-            _ => {}
+        if self.repeat_mode == RepeatMode::Track {
+            self.current_index?; // only replay when a playlist track is loaded
+            let song = self.current_song.clone()?;
+            return Some(GaplessTarget {
+                song,
+                uuid: self.current_item_uuid.clone(),
+                kind: GaplessTargetKind::Replay,
+            });
         }
 
-        // Queue first (peek without popping), then natural playlist order.
+        // Queue first (peek without popping) — every other repeat mode,
+        // including Playlist (#1073), lets a queued "play next" track take
+        // priority over the natural playlist advance, matching manual skip.
         if let Some(item) = self.queue.iter().find(|i| Self::is_item_playable(i)) {
             let song = item.song.clone()?;
             return Some(GaplessTarget {
@@ -1281,7 +1301,21 @@ impl Player {
             });
         }
 
-        let idx = self.get_next_index()?;
+        // RepeatMode::Album scopes the *natural* advance to the current
+        // album's own tracks (wrapping within it) — but this must not reach
+        // manual skip (get_next_index, also used by next_track): a track
+        // with no/blank album tag is its own group of one, so scoping
+        // manual Next the same way would make it appear to do nothing.
+        // RepeatMode::Playlist wraps to the first track when nothing else is
+        // playing yet (current_index is None); every other mode simply has
+        // nothing left to advance to at that point.
+        let idx = if self.repeat_mode == RepeatMode::Album {
+            self.next_album_index()?
+        } else if self.repeat_mode == RepeatMode::Playlist {
+            self.get_next_index().unwrap_or(0)
+        } else {
+            self.get_next_index()?
+        };
         let candidate = self.peek_playable_index(idx)?;
         self.target_at_virtual_index(candidate)
     }
@@ -1308,7 +1342,7 @@ impl Player {
         let start_ns = target.song.beginning_nanosec.max(0) as u64;
 
         let fade_settings =
-            crate::commands::settings::get_fade_settings_from_db(&self._db).unwrap_or_default();
+            crate::fade::get_fade_settings_from_db(&self._db).unwrap_or_default();
 
         let is_same_album = if let Some(current) = &self.current_song {
             current.is_same_album_or_cue_sibling(&target.song)
@@ -1349,43 +1383,8 @@ impl Player {
 
         match self.peek_next_natural() {
             Some(target) if target.song.id == started_song_id => {
-                let song = target.song;
-                self.scrobble_point_nanosec = song.length_nanosec.map(|ns| (ns as u64) / 2);
-                self.scrobbled = false;
-                // The engine reports this exactly when the previous track's
-                // last sample was consumed and `song` became audible — the
-                // correct moment to flip the global loudness-gain slot.
-                self.apply_loudness_gain(&song).await;
-
-                match target.kind {
-                    GaplessTargetKind::Replay => {
-                        // Same track again — nothing else to update.
-                    }
-                    GaplessTargetKind::Index(candidate) => {
-                        self.current_song = Some(song);
-                        self.current_item_uuid = target.uuid;
-                        self.current_index = Some(candidate);
-                        if candidate > 0 && !self.played_indices.contains(&candidate) {
-                            self.played_indices.push(candidate);
-                        }
-                    }
-                    GaplessTargetKind::Queue => {
-                        // Drop unplayable fronts, then the item that just
-                        // started (mirrors next_track's queue handling).
-                        while let Some(front) = self.queue.front() {
-                            if Self::is_item_playable(front) {
-                                break;
-                            }
-                            self.queue.pop_front();
-                        }
-                        self.queue.pop_front();
-                        self.current_song = Some(song);
-                        self.current_item_uuid = target.uuid;
-                    }
-                }
-                self.persist_current_song();
-                self.persist_position(0);
-                Ok(())
+                self.start_track(target.song, target.uuid, target.kind, false)
+                    .await
             }
             _ => {
                 // The preloaded track no longer matches what should play —
@@ -1398,28 +1397,71 @@ impl Player {
         }
     }
 
-    /// Called when the audio engine reports a track has finished.
+    /// Called when the audio engine reports a track has finished. Commits
+    /// `peek_next_natural`'s decision with a real `Play` call through the
+    /// same `start_track` sequence `on_gapless_transition` commits silently
+    /// and `prepare_gapless_next` preloads — so there is exactly one place
+    /// that decides what plays next and exactly one place that starts one.
     pub async fn on_track_finished(&mut self) -> Result<()> {
         if self.stop_after_current {
             self.stop_after_current = false;
             return self.stop().await;
         }
 
-        match self.repeat_mode {
-            RepeatMode::Track => {
-                if let Some(idx) = self.current_index {
-                    return self.play_at_index(idx).await;
-                }
-            }
-            RepeatMode::Playlist => {
-                let next = self.get_next_index();
-                let idx = next.unwrap_or(0); // wrap around
-                return self.play_at_index(idx).await;
-            }
-            _ => {}
+        if let Some(target) = self.peek_next_natural() {
+            return self
+                .start_track(target.song, target.uuid, target.kind, true)
+                .await;
         }
 
         self.next_track().await
+    }
+
+    /// The key `ShuffleMode::Albums`/`InsideAlbum` group tracks under, also
+    /// reused by `RepeatMode::Album` to find "the current album"'s tracks —
+    /// a single source of truth so both features agree on what counts as
+    /// the same album. Falls back to the item's own uuid when the song has
+    /// no (or blank) album tag, so an ungrouped track forms a group of one
+    /// rather than colliding with other untagged tracks.
+    fn album_key(item: &PlaylistItem) -> String {
+        if let Some(ref song) = item.song {
+            if let Some(ref album) = song.album {
+                if !album.trim().is_empty() {
+                    return album.to_lowercase();
+                }
+            }
+        }
+        item.uuid.clone()
+    }
+
+    /// The next virtual index within the current track's album, wrapping
+    /// back to the album's first (virtual-order) track after its last —
+    /// `RepeatMode::Album`'s "loop the current album indefinitely". A
+    /// single-track album (or an ungrouped track, its own group of one)
+    /// loops back to itself, mirroring `RepeatMode::Track`'s replay.
+    fn next_album_index(&self) -> Option<usize> {
+        let total = self.virtual_len();
+        if total == 0 {
+            return None;
+        }
+        let current_virtual = self.current_index?;
+        let current_real = self.resolve_item_index(current_virtual)?;
+        let key = Self::album_key(self.playlist_items.get(current_real)?);
+
+        let album_virtual_indices: Vec<usize> = (0..total)
+            .filter(|&v| {
+                self.resolve_item_index(v)
+                    .and_then(|r| self.playlist_items.get(r))
+                    .map(|item| Self::album_key(item) == key)
+                    .unwrap_or(false)
+            })
+            .collect();
+
+        let pos = album_virtual_indices
+            .iter()
+            .position(|&v| v == current_virtual)?;
+        let next_pos = (pos + 1) % album_virtual_indices.len();
+        Some(album_virtual_indices[next_pos])
     }
 
     /// Compute the next playback index based on mode.
@@ -1544,17 +1586,6 @@ impl Player {
             None
         };
 
-        let get_album_key = |item: &PlaylistItem| -> String {
-            if let Some(ref song) = item.song {
-                if let Some(ref album) = song.album {
-                    if !album.trim().is_empty() {
-                        return album.to_lowercase();
-                    }
-                }
-            }
-            item.uuid.clone()
-        };
-
         let get_artist_key = |item: &PlaylistItem| -> String {
             if let Some(ref song) = item.song {
                 if let Some(ref artist) = song.artist {
@@ -1588,7 +1619,7 @@ impl Player {
                     len,
                     current_real_idx,
                     &mut rng,
-                    get_album_key,
+                    Self::album_key,
                     false, // keep album order as-is
                     true,  // shuffle each album's own track order
                 ));
@@ -1598,7 +1629,7 @@ impl Player {
                     len,
                     current_real_idx,
                     &mut rng,
-                    get_album_key,
+                    Self::album_key,
                     true,  // shuffle which album comes next
                     false, // keep each album's own track order
                 ));
@@ -1626,18 +1657,8 @@ impl Player {
     pub fn set_shuffle_mode(&mut self, mode: ShuffleMode) {
         self.shuffle_mode = mode;
         self.rebuild_shuffle_order();
-        let mode_str = match mode {
-            ShuffleMode::Off => "off",
-            ShuffleMode::All => "all",
-            ShuffleMode::InsideAlbum => "inside_album",
-            ShuffleMode::Albums => "albums",
-            ShuffleMode::Artists => "artists",
-        };
         if let Ok(conn) = self._db.pool.get() {
-            let _ = conn.execute(
-                "INSERT OR REPLACE INTO app_state (key, value) VALUES ('shuffle_mode', ?1)",
-                rusqlite::params![mode_str],
-            );
+            app_state_set(&conn, "shuffle_mode", shuffle_mode_to_key(mode));
         }
     }
 
@@ -1656,18 +1677,8 @@ impl Player {
 
     pub fn set_repeat_mode(&mut self, mode: RepeatMode) {
         self.repeat_mode = mode;
-        let mode_str = match mode {
-            RepeatMode::Off => "off",
-            RepeatMode::Track => "track",
-            RepeatMode::Album => "album",
-            RepeatMode::Playlist => "playlist",
-            RepeatMode::Intro => "intro",
-        };
         if let Ok(conn) = self._db.pool.get() {
-            let _ = conn.execute(
-                "INSERT OR REPLACE INTO app_state (key, value) VALUES ('repeat_mode', ?1)",
-                rusqlite::params![mode_str],
-            );
+            app_state_set(&conn, "repeat_mode", repeat_mode_to_key(mode));
         }
     }
 
@@ -1718,7 +1729,8 @@ impl Player {
             playlist_item_uuid: self.current_item_uuid.clone(),
             position_nanosec: audio
                 .current_position_nanosec()
-                .saturating_sub(self.current_song_beginning_nanosec()) as i64,
+                .saturating_sub(self.current_song_beginning_nanosec())
+                as i64,
             volume: audio.current_volume(),
             shuffle_mode: self.shuffle_mode,
             repeat_mode: self.repeat_mode,
@@ -2388,6 +2400,524 @@ mod tests {
             1,
             "advancing past the last track with RepeatMode::Playlist must wrap to the first"
         );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// Regression coverage for #1070: `RepeatMode::Album` used to fall
+    /// through the `_ => {}`/`_ => None` catch-all in every repeat-mode
+    /// match, behaving identically to `Off` despite being reachable and
+    /// advertised in the UI ("Loop the current album indefinitely"). Songs
+    /// 1/3 are "Album A" and 2/4 are "Album B", interleaved in playlist
+    /// order — this proves *natural* advance (on_track_finished) stays
+    /// scoped to the current album's own tracks (not just "the next track"
+    /// or "the whole playlist"), and wraps back to the album's first track
+    /// rather than stopping or spilling into the other album. Manual skip
+    /// is intentionally NOT scoped this way — see the follow-up regression
+    /// test below (a real bug this exact confusion caused).
+    #[tokio::test]
+    async fn test_repeat_album_stays_within_album_and_wraps() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for id in 1..=4i64 {
+                let album = if id % 2 == 1 { "Album A" } else { "Album B" };
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (id, path, title, artist, album, length_nanosec) VALUES ({id}, '/fake/path{id}.mp3', 'Track {id}', 'Artist', '{album}', 180000000000)"
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+        }
+
+        let audio = Arc::new(Mutex::new(AudioEngine::new()));
+        let mut player = Player::new(db_arc.clone(), audio.clone());
+
+        let items = (1..=4i64)
+            .map(|id| {
+                let conn = db_arc.pool.get().unwrap();
+                let sql = format!(
+                    "SELECT {} FROM songs WHERE id = ?1",
+                    crate::collection::SONG_SELECT_COLS
+                );
+                let song = conn
+                    .query_row(&sql, rusqlite::params![id], crate::collection::row_to_song)
+                    .unwrap();
+                PlaylistItem::new_song(0, 0, song)
+            })
+            .collect::<Vec<_>>();
+
+        player.set_repeat_mode(RepeatMode::Album);
+        player
+            .play_playlist(items.clone(), 0, 0, None)
+            .await
+            .unwrap();
+        assert_eq!(player.current_song.as_ref().unwrap().id, 1);
+
+        // Natural track-end must stay within Album A, skipping over song 2
+        // (Album B) to reach song 3.
+        player.on_track_finished().await.unwrap();
+        assert_eq!(
+            player.current_song.as_ref().unwrap().id,
+            3,
+            "RepeatMode::Album must advance to the next track within the same album, \
+             skipping over tracks that belong to a different album"
+        );
+
+        // Past Album A's last track, must wrap back to its first rather
+        // than stopping or continuing into Album B.
+        player.on_track_finished().await.unwrap();
+        assert_eq!(
+            player.current_song.as_ref().unwrap().id,
+            1,
+            "RepeatMode::Album must wrap back to the album's first track, not stop or \
+             spill into the next album"
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// Regression coverage for a real bug caught in manual testing: an
+    /// earlier version of the #1070 fix scoped `get_next_index` itself to
+    /// the current album, which meant manual skip (`next_track`) inherited
+    /// that scoping too. For a track with no/blank album tag (its own
+    /// group of one via `album_key`'s uuid fallback) — or a genuine
+    /// single-track album — that made pressing Next appear to do nothing:
+    /// it kept "advancing" to the same track. Manual skip must always
+    /// advance linearly through the whole playlist regardless of repeat
+    /// mode, exactly like `RepeatMode::Track` already does (repeat only
+    /// governs natural track-end, never user-initiated navigation).
+    #[tokio::test]
+    async fn test_repeat_album_does_not_confine_manual_skip() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for id in 1..=3i64 {
+                // No album tag at all — each track is its own group of one
+                // under `album_key`'s uuid fallback, the exact case that
+                // triggered the bug.
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (id, path, title, artist, length_nanosec) VALUES ({id}, '/fake/path{id}.mp3', 'Track {id}', 'Artist', 180000000000)"
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+        }
+
+        let audio = Arc::new(Mutex::new(AudioEngine::new()));
+        let mut player = Player::new(db_arc.clone(), audio.clone());
+
+        let items = (1..=3i64)
+            .map(|id| {
+                let conn = db_arc.pool.get().unwrap();
+                let sql = format!(
+                    "SELECT {} FROM songs WHERE id = ?1",
+                    crate::collection::SONG_SELECT_COLS
+                );
+                let song = conn
+                    .query_row(&sql, rusqlite::params![id], crate::collection::row_to_song)
+                    .unwrap();
+                PlaylistItem::new_song(0, 0, song)
+            })
+            .collect::<Vec<_>>();
+
+        player.set_repeat_mode(RepeatMode::Album);
+        player.play_playlist(items, 0, 0, None).await.unwrap();
+        assert_eq!(player.current_song.as_ref().unwrap().id, 1);
+
+        player.next_track().await.unwrap();
+        assert_eq!(
+            player.current_song.as_ref().unwrap().id,
+            2,
+            "manual skip must always advance to the next track, even when the current \
+             track's \"album\" is just itself under RepeatMode::Album"
+        );
+
+        player.next_track().await.unwrap();
+        assert_eq!(player.current_song.as_ref().unwrap().id, 3);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// Regression coverage for #1073: `next_track`'s ad-hoc queue branch
+    /// used to update `current_song`/`current_item_uuid` in memory but skip
+    /// `persist_current_song`/`persist_position` entirely — so quitting the
+    /// app right after skipping into a queued "play next" track would
+    /// restore the *previous* song on restart instead of the one that was
+    /// actually audible when the app closed. Now routed through the shared
+    /// `start_track` helper every "start a track" path uses, so it can no
+    /// longer skip a step.
+    #[tokio::test]
+    async fn test_skipping_into_queued_track_persists_for_restart() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for id in 1..=4i64 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (id, path, title, artist, album, length_nanosec) VALUES ({id}, '/fake/path{id}.mp3', 'Track {id}', 'Artist', 'Album', 180000000000)"
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+        }
+
+        let audio = Arc::new(Mutex::new(AudioEngine::new()));
+        let mut player = Player::new(db_arc.clone(), audio.clone());
+
+        let sql = format!(
+            "SELECT {} FROM songs WHERE id = ?1",
+            crate::collection::SONG_SELECT_COLS
+        );
+
+        let items = (1..=3i64)
+            .map(|id| {
+                let conn = db_arc.pool.get().unwrap();
+                let song = conn
+                    .query_row(&sql, rusqlite::params![id], crate::collection::row_to_song)
+                    .unwrap();
+                PlaylistItem::new_song(0, 0, song)
+            })
+            .collect::<Vec<_>>();
+
+        player.play_playlist(items, 0, 0, None).await.unwrap();
+        assert_eq!(player.current_song.as_ref().unwrap().id, 1);
+
+        // Queue song 4 to play next.
+        let queued_song = {
+            let conn = db_arc.pool.get().unwrap();
+            conn.query_row(&sql, rusqlite::params![4i64], crate::collection::row_to_song)
+                .unwrap()
+        };
+        let expected_start_ns = queued_song.beginning_nanosec.max(0) as u64;
+        let queued_item = PlaylistItem::new_song(0, 0, queued_song);
+        let queued_uuid = queued_item.uuid.clone();
+        player.queue.push_back(queued_item);
+
+        player.next_track().await.unwrap();
+        assert_eq!(
+            player.current_song.as_ref().unwrap().id,
+            4,
+            "manual skip must drain the play-next queue before continuing the playlist"
+        );
+
+        // The concrete regression: restart persistence must reflect the
+        // queued track that's actually playing now, not the previous one.
+        let conn = db_arc.pool.get().unwrap();
+        let persisted_song_id: String = conn
+            .query_row(
+                "SELECT value FROM app_state WHERE key = 'last_song_id'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(persisted_song_id, "4");
+
+        let persisted_uuid: String = conn
+            .query_row(
+                "SELECT value FROM app_state WHERE key = 'last_item_uuid'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(persisted_uuid, queued_uuid);
+
+        let persisted_position: String = conn
+            .query_row(
+                "SELECT value FROM app_state WHERE key = 'last_position_nanosec'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(persisted_position, expected_start_ns.to_string());
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// Coverage for the #1073 design decision: under `RepeatMode::Playlist`,
+    /// a track finishing naturally must drain the ad-hoc "play next" queue
+    /// first, the same as manual skip — previously `on_track_finished`'s
+    /// `Playlist` arm called `play_at_index` directly and never looked at
+    /// `self.queue` at all, so a queued track would be silently skipped
+    /// while repeat-playlist was on.
+    #[tokio::test]
+    async fn test_repeat_playlist_drains_queue_before_wrapping() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for id in 1..=4i64 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (id, path, title, artist, album, length_nanosec) VALUES ({id}, '/fake/path{id}.mp3', 'Track {id}', 'Artist', 'Album', 180000000000)"
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+        }
+
+        let audio = Arc::new(Mutex::new(AudioEngine::new()));
+        let mut player = Player::new(db_arc.clone(), audio.clone());
+
+        let sql = format!(
+            "SELECT {} FROM songs WHERE id = ?1",
+            crate::collection::SONG_SELECT_COLS
+        );
+
+        let items = (1..=3i64)
+            .map(|id| {
+                let conn = db_arc.pool.get().unwrap();
+                let song = conn
+                    .query_row(&sql, rusqlite::params![id], crate::collection::row_to_song)
+                    .unwrap();
+                PlaylistItem::new_song(0, 0, song)
+            })
+            .collect::<Vec<_>>();
+
+        player.set_repeat_mode(RepeatMode::Playlist);
+        // Start on the last track, so "finishing naturally" would otherwise
+        // wrap straight back to track 1.
+        player.play_playlist(items, 2, 0, None).await.unwrap();
+        assert_eq!(player.current_song.as_ref().unwrap().id, 3);
+
+        let queued_song = {
+            let conn = db_arc.pool.get().unwrap();
+            conn.query_row(&sql, rusqlite::params![4i64], crate::collection::row_to_song)
+                .unwrap()
+        };
+        player
+            .queue
+            .push_back(PlaylistItem::new_song(0, 0, queued_song));
+
+        player.on_track_finished().await.unwrap();
+        assert_eq!(
+            player.current_song.as_ref().unwrap().id,
+            4,
+            "RepeatMode::Playlist must drain a queued \"play next\" track before wrapping \
+             back to the start of the playlist"
+        );
+
+        // The queue is now empty, so the *next* natural finish wraps as usual.
+        player.on_track_finished().await.unwrap();
+        assert_eq!(
+            player.current_song.as_ref().unwrap().id,
+            1,
+            "once the queue is drained, RepeatMode::Playlist still wraps to the first track"
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// Coverage for #1077: none of the file's tests previously touched
+    /// gapless handover at all. Exercises the happy path —
+    /// `prepare_gapless_next` preloading, then `on_gapless_transition`
+    /// committing it — confirming index/scrobble/persistence bookkeeping
+    /// lands correctly without a real `Play` call (the audio never stops
+    /// for a gapless commit).
+    #[tokio::test]
+    async fn test_gapless_transition_commits_index_and_scrobble_bookkeeping() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for id in 1..=3i64 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (id, path, title, artist, album, length_nanosec) VALUES ({id}, '/fake/path{id}.mp3', 'Track {id}', 'Artist', 'Album', 180000000000)"
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+        }
+
+        let audio = Arc::new(Mutex::new(AudioEngine::new()));
+        let mut player = Player::new(db_arc.clone(), audio.clone());
+
+        let sql = format!(
+            "SELECT {} FROM songs WHERE id = ?1",
+            crate::collection::SONG_SELECT_COLS
+        );
+        let items = (1..=3i64)
+            .map(|id| {
+                let conn = db_arc.pool.get().unwrap();
+                let song = conn
+                    .query_row(&sql, rusqlite::params![id], crate::collection::row_to_song)
+                    .unwrap();
+                PlaylistItem::new_song(0, 0, song)
+            })
+            .collect::<Vec<_>>();
+
+        player.set_repeat_mode(RepeatMode::Off);
+        player.play_playlist(items, 0, 0, None).await.unwrap();
+        assert_eq!(player.current_song.as_ref().unwrap().id, 1);
+
+        player.prepare_gapless_next().await.unwrap();
+
+        // Song 2 is what peek_next_natural should have preloaded.
+        player.on_gapless_transition(2).await.unwrap();
+
+        assert_eq!(player.current_song.as_ref().unwrap().id, 2);
+        assert_eq!(player.current_index, Some(1));
+        assert!(
+            player.played_indices.contains(&1),
+            "on_gapless_transition must record the new index in played_indices, matching \
+             play_at_index's bookkeeping"
+        );
+        assert!(
+            !player.scrobbled,
+            "a freshly-started track must not already be scrobbled"
+        );
+        assert_eq!(
+            player.scrobble_point_nanosec,
+            Some(90_000_000_000),
+            "scrobble point must be recomputed for the new song (50% of its 180s length)"
+        );
+
+        let conn = db_arc.pool.get().unwrap();
+        let persisted_song_id: String = conn
+            .query_row(
+                "SELECT value FROM app_state WHERE key = 'last_song_id'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(persisted_song_id, "2");
+        let persisted_position: String = conn
+            .query_row(
+                "SELECT value FROM app_state WHERE key = 'last_position_nanosec'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            persisted_position, "0",
+            "a gapless commit persists position 0 — the new track just started"
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// Coverage for #1077: `on_gapless_transition`'s doc comment promises a
+    /// self-healing fallback to `on_track_finished` when the preloaded
+    /// track no longer matches what should play (e.g. mode/queue changed
+    /// after the preload was armed) — previously untested.
+    #[tokio::test]
+    async fn test_gapless_transition_mismatch_falls_back_to_on_track_finished() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for id in 1..=3i64 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (id, path, title, artist, album, length_nanosec) VALUES ({id}, '/fake/path{id}.mp3', 'Track {id}', 'Artist', 'Album', 180000000000)"
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+        }
+
+        let audio = Arc::new(Mutex::new(AudioEngine::new()));
+        let mut player = Player::new(db_arc.clone(), audio.clone());
+
+        let sql = format!(
+            "SELECT {} FROM songs WHERE id = ?1",
+            crate::collection::SONG_SELECT_COLS
+        );
+        let items = (1..=3i64)
+            .map(|id| {
+                let conn = db_arc.pool.get().unwrap();
+                let song = conn
+                    .query_row(&sql, rusqlite::params![id], crate::collection::row_to_song)
+                    .unwrap();
+                PlaylistItem::new_song(0, 0, song)
+            })
+            .collect::<Vec<_>>();
+
+        player.set_repeat_mode(RepeatMode::Off);
+        player.play_playlist(items, 0, 0, None).await.unwrap();
+        assert_eq!(player.current_song.as_ref().unwrap().id, 1);
+
+        // A song id that doesn't match what peek_next_natural would return
+        // (song 2) — the preload no longer matches playback context.
+        player.on_gapless_transition(999).await.unwrap();
+
+        assert_eq!(
+            player.current_song.as_ref().unwrap().id,
+            2,
+            "a song-id mismatch must self-heal via on_track_finished's normal advance, not \
+             leave playback stuck or desynced"
+        );
+        assert_eq!(player.current_index, Some(1));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// Coverage for #1077: scrobble-point computation and the `scrobbled`
+    /// flag were previously untested. `on_position_update` must record the
+    /// listen exactly once when the position first crosses the 50%-length
+    /// scrobble point, and do nothing before or after that first crossing.
+    #[tokio::test]
+    async fn test_scrobble_point_reached_records_once() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            conn.execute(
+                "INSERT INTO songs (id, path, title, artist, album, length_nanosec) VALUES (1, '/fake/path1.mp3', 'Track 1', 'Artist', 'Album', 180000000000)",
+                [],
+            )
+            .unwrap();
+        }
+
+        let audio = Arc::new(Mutex::new(AudioEngine::new()));
+        let mut player = Player::new(db_arc.clone(), audio.clone());
+
+        let sql = format!(
+            "SELECT {} FROM songs WHERE id = ?1",
+            crate::collection::SONG_SELECT_COLS
+        );
+        let song = {
+            let conn = db_arc.pool.get().unwrap();
+            conn.query_row(&sql, rusqlite::params![1i64], crate::collection::row_to_song)
+                .unwrap()
+        };
+        player
+            .play_playlist(vec![PlaylistItem::new_song(0, 0, song)], 0, 0, None)
+            .await
+            .unwrap();
+
+        assert_eq!(player.scrobble_point_nanosec, Some(90_000_000_000));
+        assert!(!player.scrobbled);
+
+        // Below the scrobble point: no-op, not yet scrobbled.
+        assert!(player.on_position_update(50_000_000_000).is_none());
+        assert!(!player.scrobbled);
+
+        // At the scrobble point: records once.
+        assert!(player.on_position_update(90_000_000_000).is_some());
+        assert!(player.scrobbled);
+
+        // Already scrobbled: must not double-record even well past the point.
+        assert!(player.on_position_update(120_000_000_000).is_none());
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
