@@ -328,6 +328,8 @@ export interface TopAlbumItem {
   /** Distinct weeks this album has appeared in the chart, including the current one. */
   weeks_on_chart: number;
   movement: "new" | "rising" | "falling" | "steady";
+  /** Unix timestamp (UTC midnight) of this chart week's first day. */
+  period_start: number;
 }
 
 /** Personal Stats time window (#130). */
@@ -353,6 +355,12 @@ export interface StatsTopItem {
   art_manual?: string | null;
   year?: number | null;
   rating?: number;
+  /** Rank movement against the prior UTC calendar week, set only when this row
+   * came from the weekly "Top Albums" chart (`get_top_albums`, #662). */
+  movement?: "new" | "rising" | "falling" | "steady";
+  previous_rank?: number | null;
+  peak_rank?: number;
+  weeks_on_chart?: number;
 }
 
 /** Personal Stats summary for one range (#130). */

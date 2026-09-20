@@ -12,7 +12,13 @@
   import ArtistRowCard from "./ArtistRowCard.svelte";
   import { getArtistAlbums, getArtistSongs } from "../utils/artist";
   import { i18n } from "../stores/i18n.svelte";
-  import { CaretRightIcon as ChevronRight } from "phosphor-svelte";
+  import {
+    CaretRightIcon as ChevronRight,
+    TrendUpIcon,
+    TrendDownIcon,
+    AsteriskIcon,
+    MinusIcon,
+  } from "phosphor-svelte";
 
   interface Props {
     title?: string;
@@ -77,13 +83,48 @@
     if (!item.song_id) return;
     item.rating = await invoke<number>("set_song_rating", { songId: item.song_id, rating });
   }
+
+  /** Tooltip for the weekly chart movement icon (#662): trend and weeks on chart
+   * (peak rank is shown directly under the rank number, so it's left out here). */
+  function movementTooltip(item: StatsTopItem): string {
+    const movementLabels: Record<NonNullable<StatsTopItem["movement"]>, string> = {
+      new: i18n.t("home.chartNew", {}, "New"),
+      rising: i18n.t("home.chartRising", {}, "Rising"),
+      falling: i18n.t("home.chartFalling", {}, "Falling"),
+      steady: i18n.t("home.chartSteady", {}, "Steady"),
+    };
+    const weeks = item.weeks_on_chart ?? 1;
+    const weeksLabel = weeks === 1
+      ? i18n.t("home.chartWeek", {}, "1 week")
+      : i18n.t("home.chartWeeksCount", { weeks }, `${weeks} weeks`);
+    return `${movementLabels[item.movement ?? "steady"]} · ${weeksLabel}`;
+  }
 </script>
 
-{#snippet rankSnippet(rank: number)}
+{#snippet rankSnippet(item: StatsTopItem, rank: number)}
   <div class="w-8 shrink-0 flex flex-col items-center">
     <span class="text-center text-sm font-bold text-brand-text-secondary tabular-nums">
       {String(rank).padStart(2, "0")}
     </span>
+    {#if item.movement}
+      <span class="text-center text-[10px] font-normal text-brand-text-secondary/60 tabular-nums">
+        {item.movement === "new" ? "—" : i18n.t("home.chartPeak", { peak: item.peak_rank ?? rank }, `Peak #${item.peak_rank ?? rank}`)}
+      </span>
+    {/if}
+  </div>
+{/snippet}
+
+{#snippet movementSnippet(item: StatsTopItem)}
+  <div class="w-5 shrink-0 flex items-center justify-center" title={movementTooltip(item)}>
+    {#if item.movement === "rising"}
+      <TrendUpIcon class="w-4 h-4 text-green-400" weight="bold" />
+    {:else if item.movement === "falling"}
+      <TrendDownIcon class="w-4 h-4 text-red-400" weight="bold" />
+    {:else if item.movement === "new"}
+      <AsteriskIcon class="w-4 h-4 text-brand-accent-text" weight="bold" />
+    {:else}
+      <MinusIcon class="w-4 h-4 text-brand-text-secondary" />
+    {/if}
   </div>
 {/snippet}
 
@@ -119,7 +160,10 @@
   <div class="flex-1 flex flex-col gap-2">
     {#each items as item, i (item.key)}
       <div class="flex items-center gap-3">
-        {@render rankSnippet(i + 1)}
+        {#if item.movement}
+          {@render movementSnippet(item)}
+        {/if}
+        {@render rankSnippet(item, i + 1)}
 
         <div class="min-w-0 flex-1">
           {#if kind === "album"}

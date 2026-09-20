@@ -4,7 +4,7 @@
   import { listen } from "@tauri-apps/api/event";
   import { playerStore } from "../stores/player.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
-  import type { HomeItem, StatsTopItem, StatsRange, ScanProgress } from "../types";
+  import type { HomeItem, StatsTopItem, TopAlbumItem, ScanProgress } from "../types";
   import HomeRowList from "./HomeRowList.svelte";
   import TopTenList from "./TopTenList.svelte";
   import PinnedRow from "./PinnedRow.svelte";
@@ -12,10 +12,10 @@
   import { i18n } from "../stores/i18n.svelte";
   import { rememberScroll } from "../utils/scrollMemory";
   import { getDaypartBucket } from "../utils/daypart";
-
-  const TOP_ALBUMS_RANGE: StatsRange = "7d";
+  import { formatWeekRange } from "../utils/date";
 
   let topAlbums = $state<StatsTopItem[]>([]);
+  let topAlbumsPeriodStart = $state<number | null>(null);
   let recentlyAdded = $state<HomeItem[]>([]);
   let featuredAlbums = $state<HomeItem[]>([]);
   let isLoading = $state(true);
@@ -29,6 +29,13 @@
   let daypartBucket = $state(getDaypartBucket());
   let daypartPollTimer: ReturnType<typeof setInterval> | undefined;
 
+  const topAlbumsTitle = $derived.by((): string => {
+    const base = i18n.t('home.topAlbums');
+    return topAlbumsPeriodStart === null
+      ? base
+      : `${base} (${formatWeekRange(topAlbumsPeriodStart, i18n.currentLocale)})`;
+  });
+
   const timeOfDayGreeting = $derived.by((): string => {
     switch (daypartBucket) {
       case "morning": return i18n.t("home.greetingMorning");
@@ -38,15 +45,42 @@
     }
   });
 
+  /** Maps the weekly chart's `TopAlbumItem` (rank + movement, #662) onto the
+   * generic `StatsTopItem` shape `TopTenList` renders, carrying the movement
+   * fields through as extras so the rank column can show a trend icon. */
+  function toStatsTopItem(item: TopAlbumItem): StatsTopItem {
+    const { album } = item;
+    return {
+      key: album.album ?? "",
+      label: album.album ?? "",
+      secondary: album.artist,
+      play_count: 0,
+      minutes: 0,
+      excluded: false,
+      album: null,
+      sample_song_id: album.sample_song_id,
+      art_embedded: album.art_embedded,
+      art_automatic: album.art_automatic,
+      art_manual: album.art_manual,
+      year: album.year,
+      rating: album.rating,
+      movement: item.movement as StatsTopItem["movement"],
+      previous_rank: item.previous_rank,
+      peak_rank: item.peak_rank,
+      weeks_on_chart: item.weeks_on_chart,
+    };
+  }
+
   async function loadCuratedData() {
     isLoading = true;
     try {
       const [top, added, featured] = await Promise.all([
-        invoke<StatsTopItem[]>("get_top_albums_summary", { range: TOP_ALBUMS_RANGE, limit: 10 }),
+        invoke<TopAlbumItem[]>("get_top_albums", { limit: 10 }),
         invoke<HomeItem[]>("get_recently_added", { limit: 10 }),
         invoke<HomeItem[]>("get_featured_albums", { limit: 5 }),
       ]);
-      topAlbums = top;
+      topAlbums = top.map(toStatsTopItem);
+      topAlbumsPeriodStart = top[0]?.period_start ?? null;
       recentlyAdded = added;
       featuredAlbums = featured;
     } catch (err) {
@@ -101,7 +135,7 @@
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {#if topAlbums.length > 0}
             <TopTenList
-              title={i18n.t('home.topAlbums')}
+              title={topAlbumsTitle}
               items={topAlbums}
               kind="album"
               secondaryFallback={i18n.t('collection.variousArtists')}
