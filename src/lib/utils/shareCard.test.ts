@@ -91,6 +91,16 @@ describe("buildShareCardSvg", () => {
     expect(svg).toContain("data:image/png;base64,SOLO");
     expect(svg).not.toContain("rotate(5deg)");
   });
+
+  it("fans the cover stack away from the text column on landscape ratios", () => {
+    const { svg } = buildShareCardSvg({
+      ...baseOptions,
+      aspectRatio: "16:9",
+      coverStackDataUris: ["data:image/png;base64,AAA", "data:image/png;base64,BBB"],
+    });
+    expect(svg).toContain("rotate(-5deg)");
+    expect(svg).not.toContain("rotate(5deg)");
+  });
 });
 
 describe("buildStatsShareCardSvg", () => {

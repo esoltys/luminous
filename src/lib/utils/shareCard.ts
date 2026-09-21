@@ -89,20 +89,31 @@ function trackListLayout(dims: { width: number; height: number }, trackCount: nu
 /**
  * Renders either a single cover image or, when `stackUris` has 2+ entries, a
  * fanned stack of up to 4 — same offset/rotation/scale/opacity progression as
- * CoverStack.svelte's "right" direction (`translate(i*7, i*-5) rotate(i*5deg)
- * scale(1-i*0.05)`), expressed as a fraction of `size` so it holds up at any
- * card resolution. Painted back-to-front in DOM order so the front cover
- * (index 0) needs no explicit z-index.
+ * CoverStack.svelte's directional transforms (`translate(i*7, i*-5)
+ * rotate(i*5deg) scale(1-i*0.05)`), expressed as a fraction of `size` so it
+ * holds up at any card resolution. Painted back-to-front in DOM order so the
+ * front cover (index 0) needs no explicit z-index.
+ *
+ * `fanLeft` mirrors the horizontal offset/rotation so the stack fans away
+ * from, rather than into, the text column sitting beside it in landscape
+ * layouts — the cover sits on the left with text to its right, so fanning
+ * further right ran the back tiles under the title/metadata text.
  */
-function buildCoverHtml(coverDataUri: string | null, stackUris: (string | null)[] | null | undefined, size: number): string {
+function buildCoverHtml(
+  coverDataUri: string | null,
+  stackUris: (string | null)[] | null | undefined,
+  size: number,
+  fanLeft = false
+): string {
   const stack = (stackUris ?? []).filter((u): u is string => !!u).slice(0, 4);
   if (stack.length >= 2) {
     const radius = Math.round(size * 0.06);
+    const dxSign = fanLeft ? -1 : 1;
     const tiles = stack
       .map((uri, i) => {
-        const dx = Math.round(i * size * 0.073);
+        const dx = Math.round(i * size * 0.073 * dxSign);
         const dy = Math.round(i * size * -0.052);
-        const rot = i * 5;
+        const rot = i * 5 * dxSign;
         const scale = 1 - i * 0.05;
         const opacity = 1 - i * 0.09;
         return `<img src="${uri}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:${radius}px;box-shadow:0 20px 50px rgba(0,0,0,0.4);opacity:${opacity};transform:translate(${dx}px,${dy}px) rotate(${rot}deg) scale(${scale});" />`;
@@ -201,7 +212,7 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
   const contentHtml = `
     <div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;width:100%;height:100%;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:${cardPad}px;box-sizing:border-box;font-family:'Inter','Segoe UI',system-ui,sans-serif;">
       <div style="display:flex;flex-direction:${groupDirection};align-items:center;gap:${Math.round(width * 0.035 * contentScale)}px;max-width:100%;">
-        ${buildCoverHtml(options.coverDataUri, options.coverStackDataUris, coverSize)}
+        ${buildCoverHtml(options.coverDataUri, options.coverStackDataUris, coverSize, !isPortrait)}
         <div style="min-width:0;${isPortrait ? "" : "flex:1;"}display:flex;flex-direction:column;gap:2px;align-items:${isPortrait ? "center" : "flex-start"};text-align:${textAlign};${textBlockMaxWidth ? `max-width:${textBlockMaxWidth}px;` : ""}">
           <div style="font-size:${Math.round(width * 0.046 * contentScale)}px;font-weight:800;color:${textPrimary};line-height:1.3;padding-bottom:0.08em;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${escapeHtml(options.title)}</div>
           <div style="font-size:${Math.round(width * 0.026 * contentScale)}px;font-weight:600;color:${textSecondary};margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">${escapeHtml(options.subtitle)}</div>
