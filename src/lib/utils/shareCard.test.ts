@@ -214,4 +214,21 @@ describe("buildStatsShareCardSvg", () => {
     const b = buildStatsShareCardSvg({ ...baseStatsOptions, aspectRatio: "1:1" });
     expect(a.svg).toBe(b.svg);
   });
+
+  it("renders a section's cover stack when given one, and omits it otherwise", () => {
+    const { svg } = buildStatsShareCardSvg({
+      ...baseStatsOptions,
+      aspectRatio: "1:1",
+      sections: [
+        {
+          title: "Top Artists",
+          items: [{ label: "Artist A" }],
+          coverStackDataUris: ["data:image/png;base64,AAA", "data:image/png;base64,BBB"],
+        },
+        { title: "Top Genres", items: [{ label: "Rock" }] },
+      ],
+    });
+    expect(svg).toContain("data:image/png;base64,AAA");
+    expect(svg).toContain("data:image/png;base64,BBB");
+  });
 });

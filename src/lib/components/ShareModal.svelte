@@ -43,7 +43,13 @@
     // separate from the full 4-category "stats" summary — reuses the
     // entity-card engine's numbered track list rather than the stats grid,
     // since a single ranked list is exactly what that already renders.
-    | { kind: "stats-section"; sectionTitle: string; rangeLabel: string; items: StatsTopItem[] };
+    | {
+        kind: "stats-section";
+        sectionTitle: string;
+        sectionKind: "artist" | "album" | "song" | "genre";
+        rangeLabel: string;
+        items: StatsTopItem[];
+      };
 
   let { entity, onClose }: { entity: ShareEntity; onClose: () => void } = $props();
 
@@ -287,6 +293,44 @@
     return null;
   }
 
+  /** Same portrait-then-album-cover fallback as the entity "artist" card, for
+   * a single artist name — used to build a stack of *different* artists'
+   * images on stats cards' Top Artists section. */
+  async function resolveArtistImageUrl(name: string): Promise<string | null> {
+    const artwork = await collectionStore.getExtendedArtworkForArtist(name);
+    const portrait = getCoverArtUrl(artwork?.artist_portrait_uri) ?? null;
+    if (portrait) return portrait;
+    const stack = getArtistCoverStack(getArtistAlbums(collectionStore.albums, name), [], 1);
+    return stack[0] ? resolveCoverUrl(stack[0]) : null;
+  }
+
+  /** Resolves up to 4 cover URLs for a stats Top N section — top_albums/
+   * top_songs rows already carry their own art fields (see stats_summary.rs),
+   * top_artists rows don't (an "artist" has no single canonical image column)
+   * so those go through resolveArtistImageUrl by name instead; genres have
+   * no natural image at all. */
+  async function resolveTopItemsCoverUrls(
+    items: StatsTopItem[],
+    kind: "artist" | "album" | "song" | "genre"
+  ): Promise<string[]> {
+    if (kind === "genre") return [];
+    const top = items.slice(0, 4);
+    const urls =
+      kind === "artist"
+        ? await Promise.all(top.map((it) => resolveArtistImageUrl(it.label)))
+        : await Promise.all(
+            top.map((it) =>
+              resolveCoverUrl({
+                songId: it.sample_song_id ?? it.song_id ?? undefined,
+                artManual: it.art_manual,
+                artAutomatic: it.art_automatic,
+                artEmbedded: it.art_embedded,
+              })
+            )
+          );
+    return urls.filter((u): u is string => !!u);
+  }
+
   let coverUrl = $state<string | null>(null);
   let coverStackUrls = $state<string[]>([]);
 
@@ -328,6 +372,12 @@
       } else if (entity.kind === "playlist") {
         const stackItems = songsToCoverStack(entity.songs, 4);
         const urls = (await Promise.all(stackItems.map(resolveCoverUrl))).filter((u): u is string => !!u);
+        if (!cancelled) {
+          coverUrl = urls[0] ?? null;
+          coverStackUrls = urls;
+        }
+      } else if (entity.kind === "stats-section") {
+        const urls = await resolveTopItemsCoverUrls(entity.items, entity.sectionKind);
         if (!cancelled) {
           coverUrl = urls[0] ?? null;
           coverStackUrls = urls;
@@ -385,15 +435,52 @@
       : i18n.t("stats.totalMinutes", { count: n }, `${n} minutes listened`);
   });
 
+  // Cover stacks for the summary card's Top Artists/Albums/Songs cells
+  // (Top Genres has no natural image) — resolved separately from the
+  // entity-card coverUrl/coverStackUrls pipeline above since this card
+  // needs one stack *per section* rather than a single cover for the card.
+  let statsArtistsCoverStack = $state<string[]>([]);
+  let statsAlbumsCoverStack = $state<string[]>([]);
+  let statsSongsCoverStack = $state<string[]>([]);
+
+  $effect(() => {
+    if (entity.kind !== "stats") {
+      statsArtistsCoverStack = [];
+      statsAlbumsCoverStack = [];
+      statsSongsCoverStack = [];
+      return;
+    }
+    const s = entity.summary;
+    let cancelled = false;
+    Promise.all([
+      resolveTopItemsCoverUrls(s.top_artists, "artist"),
+      resolveTopItemsCoverUrls(s.top_albums, "album"),
+      resolveTopItemsCoverUrls(s.top_songs, "song"),
+    ]).then(async ([artistUrls, albumUrls, songUrls]) => {
+      const [artistDataUris, albumDataUris, songDataUris] = await Promise.all([
+        Promise.all(artistUrls.map(toDataUri)),
+        Promise.all(albumUrls.map(toDataUri)),
+        Promise.all(songUrls.map(toDataUri)),
+      ]);
+      if (cancelled) return;
+      statsArtistsCoverStack = artistDataUris.filter((u): u is string => !!u);
+      statsAlbumsCoverStack = albumDataUris.filter((u): u is string => !!u);
+      statsSongsCoverStack = songDataUris.filter((u): u is string => !!u);
+    });
+    return () => {
+      cancelled = true;
+    };
+  });
+
   let statsSections = $derived.by((): StatsShareCardSection[] => {
     if (entity.kind !== "stats") return [];
     const s = entity.summary;
     const toItems = (items: StatsTopItem[]) =>
       items.slice(0, 5).map((it) => ({ label: it.label, secondary: it.secondary }));
     return [
-      { title: i18n.t("stats.topArtists", {}, "Top Artists"), items: toItems(s.top_artists) },
-      { title: i18n.t("stats.topAlbums", {}, "Top Albums"), items: toItems(s.top_albums) },
-      { title: i18n.t("stats.topSongs", {}, "Top Songs"), items: toItems(s.top_songs) },
+      { title: i18n.t("stats.topArtists", {}, "Top Artists"), items: toItems(s.top_artists), coverStackDataUris: statsArtistsCoverStack },
+      { title: i18n.t("stats.topAlbums", {}, "Top Albums"), items: toItems(s.top_albums), coverStackDataUris: statsAlbumsCoverStack },
+      { title: i18n.t("stats.topSongs", {}, "Top Songs"), items: toItems(s.top_songs), coverStackDataUris: statsSongsCoverStack },
       { title: i18n.t("stats.topGenres", {}, "Top Genres"), items: toItems(s.top_genres) },
     ];
   });

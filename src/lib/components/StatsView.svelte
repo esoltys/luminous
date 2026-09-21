@@ -25,7 +25,7 @@
   let summary = $state<StatsSummary | null>(null);
   let loading = $state(true);
   let showShareModal = $state(false);
-  let shareSection = $state<{ title: string; items: StatsTopItem[] } | null>(null);
+  let shareSection = $state<{ title: string; kind: "artist" | "album" | "song" | "genre"; items: StatsTopItem[] } | null>(null);
 
   const RANGES: { value: StatsRange; label: () => string }[] = [
     { value: "7d", label: () => i18n.t("stats.range7d", {}, "Past 7 Days") },
@@ -185,7 +185,7 @@
                 title={section.title()}
                 items={itemsFor(section.key)}
                 kind={section.kind}
-                onShareClick={() => { shareSection = { title: section.title(), items: itemsFor(section.key) }; }}
+                onShareClick={() => { shareSection = { title: section.title(), kind: section.kind, items: itemsFor(section.key) }; }}
               />
             </div>
           {/each}
@@ -204,7 +204,7 @@
 
 {#if shareSection}
   <ShareModal
-    entity={{ kind: "stats-section", sectionTitle: shareSection.title, rangeLabel, items: shareSection.items }}
+    entity={{ kind: "stats-section", sectionTitle: shareSection.title, sectionKind: shareSection.kind, rangeLabel, items: shareSection.items }}
     onClose={() => { shareSection = null; }}
   />
 {/if}

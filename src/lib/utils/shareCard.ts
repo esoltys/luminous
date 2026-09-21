@@ -278,6 +278,11 @@ export interface StatsShareCardSection {
   title: string;
   /** Pre-capped by the caller (e.g. top 5) — this builder renders whatever it's given. */
   items: StatsShareCardItem[];
+  /** Up to 4 cover data URIs (album art, or per-artist images for the Top
+   * Artists section) shown as a fanned stack on the right of this section's
+   * list — omitted or empty renders the section as text-only (e.g. Top
+   * Genres, which has no natural image). */
+  coverStackDataUris?: string[];
 }
 
 export interface StatsShareCardClockBucket {
@@ -352,10 +357,20 @@ export function buildStatsShareCardSvg(options: StatsShareCardOptions): { svg: s
             `</div>`
         )
         .join("");
-      return (
-        `<div style="background:${cardBg};border-radius:${Math.round(scaleBasis * 0.016)}px;padding:${Math.round(scaleBasis * 0.024)}px;min-width:0;">` +
+      const textBlock =
+        `<div style="min-width:0;flex:1;">` +
           `<div style="font-size:${sectionTitleSize}px;font-weight:800;color:${textPrimary};margin-bottom:${Math.round(scaleBasis * 0.006)}px;">${escapeHtml(section.title)}</div>` +
           rows +
+        `</div>`;
+      const hasCover = !!(section.coverStackDataUris && section.coverStackDataUris.length > 0);
+      // Fanned toward the text (fanLeft) rather than further right, so it
+      // stays inside the section's own padding instead of extending toward
+      // the card's outer edge.
+      const coverHtml = hasCover ? buildCoverHtml(null, section.coverStackDataUris, Math.round(scaleBasis * 0.15), true) : "";
+      return (
+        `<div style="background:${cardBg};border-radius:${Math.round(scaleBasis * 0.016)}px;padding:${Math.round(scaleBasis * 0.024)}px;min-width:0;display:flex;align-items:center;gap:${Math.round(scaleBasis * 0.02)}px;">` +
+          textBlock +
+          coverHtml +
         `</div>`
       );
     })
