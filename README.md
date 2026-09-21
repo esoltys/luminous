@@ -27,8 +27,10 @@ Luminous is a fast, local-first player for your own audio library — no streami
 
 [<img src="https://get.microsoft.com/images/en-us%20dark.svg" width="200"/>](https://apps.microsoft.com/detail/9PNQ2NFSQ7XW?launch=true&mode=full)
 
-- **Windows**: get it from the **[Microsoft Store](https://apps.microsoft.com/detail/9PNQ2NFSQ7XW)** (recommended — installs and updates automatically), or grab `Luminous_{version}_x64-setup.exe` (or the `.msix`) from the **[Releases page](https://github.com/esoltys/luminous/releases/latest)** for a manual/sideloaded install.
-- **Linux**: download the `.deb` or `.rpm` for your distro from the **[Releases page](https://github.com/esoltys/luminous/releases/latest)** and install it as usual.
+| Platform    | Download |
+| ----------- | -------- |
+| **Windows** | [Microsoft Store](https://apps.microsoft.com/detail/9PNQ2NFSQ7XW) (recommended — installs and updates automatically) &#124; [.exe / .msix](https://github.com/esoltys/luminous/releases/latest) (manual/sideloaded install) |
+| **Linux**   | [.deb / .rpm](https://github.com/esoltys/luminous/releases/latest) for your distro |
 
 ---
 
