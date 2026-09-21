@@ -308,6 +308,8 @@ class NavigationStore {
   }
 
   viewPlaylist(id: number) {
+    collectionStore.searchQuery = "";
+    collectionStore.searchResults = [];
     this.activeTab = "playlists";
     this.playlistsSubTab = "custom";
     this.selectedAutoPlaylist = null;
@@ -315,6 +317,8 @@ class NavigationStore {
   }
 
   viewAutoPlaylist(ref: AutoPlaylistRef) {
+    collectionStore.searchQuery = "";
+    collectionStore.searchResults = [];
     this.activeTab = "playlists";
     this.playlistsSubTab = "auto";
     this.selectedPlaylistId = null;

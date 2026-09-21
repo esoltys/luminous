@@ -31,7 +31,7 @@ describe("CollectionStore - artist/album navigation and history", () => {
     });
   });
 
-  it("handles navigation helpers viewArtist and viewAlbum and clears search terms", () => {
+  it("handles navigation helpers viewArtist, viewAlbum, viewPlaylist, and viewAutoPlaylist and clears search terms", () => {
     collectionStore.searchQuery = "some search";
     collectionStore.searchResults = [{ id: 1 } as Song];
 
@@ -45,6 +45,16 @@ describe("CollectionStore - artist/album navigation and history", () => {
     collectionStore.searchQuery = "another search";
     navigationStore.viewAlbum("Dark Side");
     expect(navigationStore.selectedAlbumName).toBe("Dark Side");
+    expect(collectionStore.searchQuery).toBe("");
+
+    collectionStore.searchQuery = "playlist search";
+    navigationStore.viewPlaylist(42);
+    expect(navigationStore.selectedPlaylistId).toBe(42);
+    expect(collectionStore.searchQuery).toBe("");
+
+    collectionStore.searchQuery = "autoplaylist search";
+    navigationStore.viewAutoPlaylist({ kind: "favourites" });
+    expect(navigationStore.selectedAutoPlaylist).toEqual({ kind: "favourites" });
     expect(collectionStore.searchQuery).toBe("");
   });
 
