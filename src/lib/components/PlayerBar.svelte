@@ -274,7 +274,10 @@
   }
 </script>
 
-<footer transition:fly={{ y: 40, duration: 300, easing: cubicOut }} class="relative h-20 max-w-[1200px] mx-auto bg-brand-playerbar border border-brand-border rounded-[2rem] flex items-center justify-between gap-3 px-5 min-[768px]:px-8 text-brand-text-secondary select-none {themeStore.isGlassTheme || isLinux ? 'glass-surface' : ''} {isLinux ? 'opaque-linux' : ''}">
+<footer
+  transition:fly={{ y: 40, duration: windowLayoutStore.isPlaybarOnlyMode ? 0 : 300, easing: cubicOut }}
+  class="relative bg-brand-playerbar flex items-center justify-between gap-3 px-5 min-[768px]:px-8 text-brand-text-secondary select-none {themeStore.isGlassTheme || isLinux ? 'glass-surface' : ''} {isLinux ? 'opaque-linux' : ''} {windowLayoutStore.isPlaybarOnlyMode ? 'playbar-only-mode w-full h-full rounded-none border-none shadow-none' : 'h-20 max-w-[1200px] mx-auto border border-brand-border rounded-[2rem]'}"
+>
   <div data-walkthrough-target="player-bar-cover" class="flex items-center gap-3 min-w-0 flex-1 min-[768px]:w-1/3 min-[768px]:flex-none min-[768px]:min-w-[200px] max-w-sm">
     <button
       onclick={handleCoverClick}
@@ -600,6 +603,32 @@
     box-shadow:
       inset 1.5px 1.5px 1px 0 rgba(255, 255, 255, 0.45),
       inset -1px -1px 1px 0 rgba(255, 255, 255, 0.18);
+  }
+
+  /* Playbar-only mode: when the app is collapsed to only the playerbar (<240px tall),
+     all surrounding chrome (borders, rounded pill corners, drop shadows) is stripped
+     so the bar spans edge-to-edge flush with the window boundaries. */
+  :global(footer.playbar-only-mode) {
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  :global(footer.glass-surface.playbar-only-mode) {
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  :global(footer.glass-surface.playbar-only-mode.opaque-linux) {
+    box-shadow: none !important;
+  }
+
+  :global(footer.glass-surface.playbar-only-mode::after) {
+    border-radius: 0 !important;
+    box-shadow:
+      inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.45),
+      inset 0 -1px 1px 0 rgba(255, 255, 255, 0.18) !important;
   }
 
   .volume-slider {

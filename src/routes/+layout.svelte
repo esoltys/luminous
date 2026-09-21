@@ -444,12 +444,10 @@
     <!-- Playbar-only mode: the window is too short to show anything else,
          including the immersive cover view. Renders PlayerBar unconditionally
          (it already has a graceful "not playing" state) so the user never
-         sees a blank window when it's squashed short. The bar keeps its
-         normal fixed height and is simply centered in whatever room is left
-         — the window's own minimum height is low enough that a user can
-         shrink it down until it snugly fits the bar, rather than the bar
-         stretching to fill a taller window. -->
-    <div class="absolute inset-4 z-40 flex items-center justify-center">
+         sees a blank window when it's squashed short. When in this mode,
+         the chrome around the playbar (margins, borders, rounded pill corners,
+         and floating drop shadow) is removed so it fills the window edge-to-edge. -->
+    <div class="w-full h-full flex flex-col">
       <PlayerBar />
     </div>
   {:else}

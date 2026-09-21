@@ -38,7 +38,7 @@ export const RIGHT_PANEL_AUTO_HIDE_WIDTH_PX = 768;
 export const SMALL_BREAKPOINT_WIDTH_PX = 640;
 
 /** Window height below which the app collapses to showing only the PlayerBar (routes/+layout.svelte, collection.svelte.ts). */
-export const PLAYBAR_ONLY_HEIGHT_BREAKPOINT_PX = 360;
+export const PLAYBAR_ONLY_HEIGHT_BREAKPOINT_PX = 240;
 
 /** Window height below which detail-view hero headers (Playlist/Album/Artist) hide, so their song table gets the space instead (collection.svelte.ts). */
 export const DETAIL_HEADER_COLLAPSE_HEIGHT_PX = 600;
