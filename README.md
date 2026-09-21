@@ -17,7 +17,7 @@
 
 </p>
 
-Luminous is a fast, local-first player for your own audio library — no streaming, no subscriptions, no cloud. Just your files, indexed, searchable, and beautifully played. Built with **Rust**, **Tauri v2**, **TypeScript**, and **Svelte 5 (Runes)**.
+Luminous is a fast, local-first player for your own audio library. Built for anyone who wants the convenience of a modern streaming app without giving up ownership of their music. Turn a folder of files into a library worth browsing.
 
 ⭐ **[Issues](https://github.com/esoltys/luminous/issues)** - file a bug report or a feature request
 
