@@ -54,6 +54,14 @@
   } = $props();
 
   let showShareModal = $state(false);
+  // The Share item deliberately keeps this component mounted (no onClose())
+  // so ShareModal, rendered as its sibling below, survives past the click
+  // that opens it. But ContextMenu's own outside-click listener would still
+  // treat every click *inside* the portalled ShareModal as "outside this
+  // menu" and tear the whole component down — so hide the menu (unmounting
+  // it and its listener) the instant Share is clicked, rather than leaving
+  // it mounted underneath the modal.
+  let menuVisible = $state(true);
 
   async function handleDefaultAddToQueue() {
     try {
@@ -92,6 +100,7 @@
   }
 </script>
 
+{#if menuVisible}
 <ContextMenu {x} {y} {onClose} estimatedHeight={220}>
   <div class="px-3 py-1 text-[11px] font-bold text-brand-text-primary border-b border-brand-border/40 mb-1 truncate">
     {albumName || i18n.t("collection.unknownAlbum")}
@@ -165,7 +174,7 @@
     <ContextMenuItem
       icon={Share}
       label={i18n.t("shareModal.menuItem")}
-      onclick={() => { showShareModal = true; }}
+      onclick={() => { menuVisible = false; showShareModal = true; }}
     />
     <ContextMenuDivider />
     <ContextMenuItem
@@ -184,7 +193,8 @@
     />
   {/if}
 </ContextMenu>
+{/if}
 
 {#if showShareModal}
-  <ShareModal {albumName} onClose={() => { showShareModal = false; }} />
+  <ShareModal entity={{ kind: "album", albumName }} onClose={() => { showShareModal = false; onClose(); }} />
 {/if}

@@ -18,6 +18,7 @@
     TrendDownIcon,
     AsteriskIcon,
     MinusIcon,
+    ShareNetworkIcon as Share,
   } from "phosphor-svelte";
 
   interface Props {
@@ -31,9 +32,13 @@
     /** When provided, the title becomes a clickable button that navigates to
      * the full expanded view. */
     onHeaderClick?: () => void;
+    /** When provided, shows a Share Card button next to the title (used by
+     * StatsView to share a single Top N category on its own — not shown
+     * elsewhere TopTenList appears, e.g. Home). */
+    onShareClick?: () => void;
   }
 
-  let { title, items, kind, emptyText, secondaryFallback, showDuration = true, onHeaderClick }: Props = $props();
+  let { title, items, kind, emptyText, secondaryFallback, showDuration = true, onHeaderClick, onShareClick }: Props = $props();
 
   let contextMenuState = $state<{ x: number; y: number; song: Song } | null>(null);
 
@@ -144,17 +149,31 @@
 {/snippet}
 
 <div class="h-full flex flex-col gap-4">
-  {#if title && onHeaderClick}
-    <button
-      type="button"
-      onclick={onHeaderClick}
-      class="group flex items-center gap-1 text-xl font-semibold text-brand-text-primary hover:text-brand-accent-text transition-colors"
-    >
-      {title}
-      <ChevronRight class="w-5 h-5 opacity-0 group-hover:opacity-100 transition-opacity" />
-    </button>
-  {:else if title}
-    <h2 class="text-xl font-semibold text-brand-text-primary">{title}</h2>
+  {#if title}
+    <div class="flex items-center justify-between gap-2">
+      {#if onHeaderClick}
+        <button
+          type="button"
+          onclick={onHeaderClick}
+          class="group flex items-center gap-1 text-xl font-semibold text-brand-text-primary hover:text-brand-accent-text transition-colors"
+        >
+          {title}
+          <ChevronRight class="w-5 h-5 opacity-0 group-hover:opacity-100 transition-opacity" />
+        </button>
+      {:else}
+        <h2 class="text-xl font-semibold text-brand-text-primary">{title}</h2>
+      {/if}
+      {#if onShareClick}
+        <button
+          type="button"
+          onclick={onShareClick}
+          title={i18n.t("shareModal.menuItem")}
+          class="flex items-center justify-center w-8 h-8 rounded-full text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-main transition-colors cursor-pointer shrink-0"
+        >
+          <Share class="w-4 h-4" />
+        </button>
+      {/if}
+    </div>
   {/if}
 
   <div class="flex-1 flex flex-col gap-2">

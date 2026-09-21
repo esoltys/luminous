@@ -1,8 +1,10 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
+  import { ShareNetworkIcon as Share } from "phosphor-svelte";
   import LoadingSpinner from "./LoadingSpinner.svelte";
   import ListeningHeatmap from "./ListeningHeatmap.svelte";
   import TimeOfDayGraphic from "./TimeOfDayGraphic.svelte";
+  import ShareModal from "./ShareModal.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { rememberScroll } from "../utils/scrollMemory";
   import { playerStore } from "../stores/player.svelte";
@@ -22,6 +24,8 @@
   let range = $state<StatsRange>(loadSavedRange());
   let summary = $state<StatsSummary | null>(null);
   let loading = $state(true);
+  let showShareModal = $state(false);
+  let shareSection = $state<{ title: string; kind: "artist" | "album" | "song" | "genre"; items: StatsTopItem[] } | null>(null);
 
   const RANGES: { value: StatsRange; label: () => string }[] = [
     { value: "7d", label: () => i18n.t("stats.range7d", {}, "Past 7 Days") },
@@ -35,6 +39,8 @@
     { key: "evening", label: () => i18n.t("stats.clockEvening", {}, "Evening") },
     { key: "latenight", label: () => i18n.t("stats.clockLateNight", {}, "Late Night") }
   ];
+
+  let rangeLabel = $derived(RANGES.find((r) => r.value === range)?.label() ?? range);
 
   let clockCounts = $derived(
     summary
@@ -113,11 +119,20 @@
           {/each}
         </div>
         {#if summary}
-          <span class="text-sm font-medium text-brand-text-secondary shrink-0">
-            {summary.total_minutes === 1
-              ? i18n.t("stats.totalMinutesOne", {}, "1 minute listened")
-              : i18n.t("stats.totalMinutes", { count: summary.total_minutes }, `${summary.total_minutes} minutes listened`)}
-          </span>
+          <div class="flex items-center gap-2 shrink-0">
+            <span class="text-sm font-medium text-brand-text-secondary">
+              {summary.total_minutes === 1
+                ? i18n.t("stats.totalMinutesOne", {}, "1 minute listened")
+                : i18n.t("stats.totalMinutes", { count: summary.total_minutes }, `${summary.total_minutes} minutes listened`)}
+            </span>
+            <button
+              onclick={() => { showShareModal = true; }}
+              title={i18n.t("shareModal.menuItem")}
+              class="flex items-center justify-center w-8 h-8 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors cursor-pointer"
+            >
+              <Share class="w-4 h-4" />
+            </button>
+          </div>
         {/if}
       </div>
 
@@ -170,6 +185,7 @@
                 title={section.title()}
                 items={itemsFor(section.key)}
                 kind={section.kind}
+                onShareClick={() => { shareSection = { title: section.title(), kind: section.kind, items: itemsFor(section.key) }; }}
               />
             </div>
           {/each}
@@ -178,3 +194,17 @@
     {/if}
   </div>
 </div>
+
+{#if showShareModal && summary}
+  <ShareModal
+    entity={{ kind: "stats", summary, range, rangeLabel }}
+    onClose={() => { showShareModal = false; }}
+  />
+{/if}
+
+{#if shareSection}
+  <ShareModal
+    entity={{ kind: "stats-section", sectionTitle: shareSection.title, sectionKind: shareSection.kind, rangeLabel, items: shareSection.items }}
+    onClose={() => { shareSection = null; }}
+  />
+{/if}
