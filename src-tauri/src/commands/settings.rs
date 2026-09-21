@@ -13,20 +13,17 @@ pub async fn set_app_setting(
     key: String,
     value: String,
 ) -> Result<(), String> {
-    let result = state
-        .db
-        .pool
-        .get()
-        .map_err(|e| e.to_string())
-        .and_then(|conn| {
-            conn.execute(
-                "INSERT OR REPLACE INTO app_state (key, value) VALUES (?1, ?2)",
-                rusqlite::params![key, value],
-            )
-            .map_err(|e| e.to_string())
-        });
+    let key_for_log = key.clone();
+    let result = crate::db::run_blocking(&state.db, move |conn| {
+        conn.execute(
+            "INSERT OR REPLACE INTO app_state (key, value) VALUES (?1, ?2)",
+            rusqlite::params![key, value],
+        )?;
+        Ok(())
+    })
+    .await;
     if let Err(e) = result {
-        log::error!("Failed to persist app setting '{key}': {e}");
+        log::error!("Failed to persist app setting '{key_for_log}': {e}");
     }
     Ok(())
 }
@@ -147,24 +144,27 @@ pub async fn set_ui_preferences(
     state: State<'_, AppState>,
     mut prefs: UiPreferences,
 ) -> Result<(), String> {
-    let Ok(conn) = state.db.pool.get() else {
-        log::error!("Failed to persist UI preferences: no DB connection");
-        return Ok(());
-    };
-    let genre_sort_asc = prefs.genre_sort_asc;
-    for (key, slot, _) in prefs.fields() {
-        if let Err(e) = conn.execute(
-            "INSERT OR REPLACE INTO app_state (key, value) VALUES (?1, ?2)",
-            rusqlite::params![key, slot.as_str()],
-        ) {
-            log::error!("Failed to persist UI preference '{key}': {e}");
+    let result = crate::db::run_blocking(&state.db, move |conn| {
+        let genre_sort_asc = prefs.genre_sort_asc;
+        for (key, slot, _) in prefs.fields() {
+            if let Err(e) = conn.execute(
+                "INSERT OR REPLACE INTO app_state (key, value) VALUES (?1, ?2)",
+                rusqlite::params![key, slot.as_str()],
+            ) {
+                log::error!("Failed to persist UI preference '{key}': {e}");
+            }
         }
-    }
-    if let Err(e) = conn.execute(
-        "INSERT OR REPLACE INTO app_state (key, value) VALUES ('genre_sort_asc', ?1)",
-        rusqlite::params![genre_sort_asc.to_string()],
-    ) {
-        log::error!("Failed to persist UI preference 'genre_sort_asc': {e}");
+        if let Err(e) = conn.execute(
+            "INSERT OR REPLACE INTO app_state (key, value) VALUES ('genre_sort_asc', ?1)",
+            rusqlite::params![genre_sort_asc.to_string()],
+        ) {
+            log::error!("Failed to persist UI preference 'genre_sort_asc': {e}");
+        }
+        Ok(())
+    })
+    .await;
+    if let Err(e) = result {
+        log::error!("Failed to persist UI preferences: no DB connection ({e})");
     }
     Ok(())
 }
@@ -173,21 +173,20 @@ pub async fn set_ui_preferences(
 pub async fn get_all_app_settings(
     state: State<'_, AppState>,
 ) -> Result<HashMap<String, String>, String> {
-    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
-    let mut stmt = conn
-        .prepare("SELECT key, value FROM app_state")
-        .map_err(|e| e.to_string())?;
-    let rows = stmt
-        .query_map([], |row| {
+    crate::db::run_blocking(&state.db, |conn| {
+        let mut stmt = conn.prepare("SELECT key, value FROM app_state")?;
+        let rows = stmt.query_map([], |row| {
             Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-        })
-        .map_err(|e| e.to_string())?;
+        })?;
 
-    let mut settings = HashMap::new();
-    for (k, v) in rows.flatten() {
-        settings.insert(k, v);
-    }
-    Ok(settings)
+        let mut settings = HashMap::new();
+        for (k, v) in rows.flatten() {
+            settings.insert(k, v);
+        }
+        Ok(settings)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 /// Reads the in-memory flag `tray.rs` already keeps in sync with the
@@ -210,14 +209,15 @@ pub async fn set_minimize_to_tray_enabled(
     state
         .minimize_to_tray
         .store(enabled, std::sync::atomic::Ordering::Relaxed);
-    let Ok(conn) = state.db.pool.get() else {
-        log::error!("Failed to persist minimize_to_tray setting: no DB connection");
-        return Ok(());
-    };
-    if let Err(e) = conn.execute(
-        "INSERT OR REPLACE INTO app_state (key, value) VALUES ('minimize_to_tray', ?1)",
-        rusqlite::params![enabled.to_string()],
-    ) {
+    if let Err(e) = crate::db::run_blocking(&state.db, move |conn| {
+        conn.execute(
+            "INSERT OR REPLACE INTO app_state (key, value) VALUES ('minimize_to_tray', ?1)",
+            rusqlite::params![enabled.to_string()],
+        )?;
+        Ok(())
+    })
+    .await
+    {
         log::error!("Failed to persist minimize_to_tray setting: {e}");
     }
     Ok(())
@@ -277,7 +277,10 @@ pub fn get_db_schema_status(state: State<'_, crate::AppState>) -> DbSchemaStatus
 pub async fn get_fade_settings(
     state: State<'_, AppState>,
 ) -> Result<crate::models::FadeSettings, String> {
-    crate::fade::get_fade_settings_from_db(&state.db)
+    let db = state.db.clone();
+    tokio::task::spawn_blocking(move || crate::fade::get_fade_settings_from_db(&db))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 /// Fire-and-forget for the same reason as [`set_app_setting`] — always `Ok`.
@@ -286,43 +289,43 @@ pub async fn set_fade_settings(
     state: State<'_, AppState>,
     settings: crate::models::FadeSettings,
 ) -> Result<(), String> {
-    let conn = match state.db.pool.get() {
-        Ok(conn) => conn,
-        Err(e) => {
-            log::error!("Failed to persist fade settings: {e}");
-            return Ok(());
-        }
-    };
-    let pairs = [
-        (
-            "fade_pause_enabled",
-            settings.fade_pause_enabled.to_string(),
-        ),
-        (
-            "fade_pause_duration_ms",
-            settings.fade_pause_duration_ms.to_string(),
-        ),
-        (
-            "crossfade_auto_enabled",
-            settings.crossfade_auto_enabled.to_string(),
-        ),
-        (
-            "crossfade_auto_duration_secs",
-            settings.crossfade_auto_duration_secs.to_string(),
-        ),
-        (
-            "crossfade_suppress_same_album",
-            settings.crossfade_suppress_same_album.to_string(),
-        ),
-    ];
+    let result = crate::db::run_blocking(&state.db, move |conn| {
+        let pairs = [
+            (
+                "fade_pause_enabled",
+                settings.fade_pause_enabled.to_string(),
+            ),
+            (
+                "fade_pause_duration_ms",
+                settings.fade_pause_duration_ms.to_string(),
+            ),
+            (
+                "crossfade_auto_enabled",
+                settings.crossfade_auto_enabled.to_string(),
+            ),
+            (
+                "crossfade_auto_duration_secs",
+                settings.crossfade_auto_duration_secs.to_string(),
+            ),
+            (
+                "crossfade_suppress_same_album",
+                settings.crossfade_suppress_same_album.to_string(),
+            ),
+        ];
 
-    for (k, v) in pairs {
-        if let Err(e) = conn.execute(
-            "INSERT OR REPLACE INTO app_state (key, value) VALUES (?1, ?2)",
-            rusqlite::params![k, v],
-        ) {
-            log::error!("Failed to persist fade setting '{k}': {e}");
+        for (k, v) in pairs {
+            if let Err(e) = conn.execute(
+                "INSERT OR REPLACE INTO app_state (key, value) VALUES (?1, ?2)",
+                rusqlite::params![k, v],
+            ) {
+                log::error!("Failed to persist fade setting '{k}': {e}");
+            }
         }
+        Ok(())
+    })
+    .await;
+    if let Err(e) = result {
+        log::error!("Failed to persist fade settings: {e}");
     }
     Ok(())
 }

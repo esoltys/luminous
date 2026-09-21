@@ -18,8 +18,9 @@ pub async fn pin_item(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
-    pins::pin(&conn, &item_type, &ref_key).map_err(|e| e.to_string())?;
+    crate::db::run_blocking(&state.db, move |conn| pins::pin(conn, &item_type, &ref_key))
+        .await
+        .map_err(|e| e.to_string())?;
     let _ = app.emit("pinned-items-changed", ());
     Ok(())
 }
@@ -31,8 +32,9 @@ pub async fn unpin_item(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
-    pins::unpin(&conn, &item_type, &ref_key).map_err(|e| e.to_string())?;
+    crate::db::run_blocking(&state.db, move |conn| pins::unpin(conn, &item_type, &ref_key))
+        .await
+        .map_err(|e| e.to_string())?;
     let _ = app.emit("pinned-items-changed", ());
     Ok(())
 }
@@ -43,18 +45,18 @@ pub async fn reorder_pinned_items(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
-    pins::reorder(&conn, &order).map_err(|e| e.to_string())?;
+    crate::db::run_blocking(&state.db, move |conn| pins::reorder(conn, &order))
+        .await
+        .map_err(|e| e.to_string())?;
     let _ = app.emit("pinned-items-changed", ());
     Ok(())
 }
 
 #[tauri::command]
 pub async fn get_pinned_items(state: State<'_, AppState>) -> Result<Vec<PinnedItem>, String> {
-    let refs = {
-        let conn = state.db.pool.get().map_err(|e| e.to_string())?;
-        pins::pinned_refs(&conn).map_err(|e| e.to_string())?
-    };
+    let refs = crate::db::run_blocking(&state.db, |conn| pins::pinned_refs(conn))
+        .await
+        .map_err(|e| e.to_string())?;
     if refs.is_empty() {
         return Ok(Vec::new());
     }
@@ -68,10 +70,12 @@ pub async fn get_pinned_items(state: State<'_, AppState>) -> Result<Vec<PinnedIt
     for (item_type, ref_key) in refs {
         match item_type.as_str() {
             "song" => {
-                let conn = state.db.pool.get().map_err(|e| e.to_string())?;
-                if let Some(song) =
-                    pins::resolve_song(&conn, &ref_key).map_err(|e| e.to_string())?
-                {
+                let song = crate::db::run_blocking(&state.db, move |conn| {
+                    pins::resolve_song(conn, &ref_key)
+                })
+                .await
+                .map_err(|e| e.to_string())?;
+                if let Some(song) = song {
                     items.push(PinnedItem::Song {
                         song: Box::new(song),
                     });
@@ -113,12 +117,11 @@ pub async fn get_pinned_items(state: State<'_, AppState>) -> Result<Vec<PinnedIt
                 let playlists = match &playlists_cache {
                     Some(p) => p,
                     None => {
-                        let p = state
-                            .playlists
-                            .lock()
-                            .await
-                            .get_playlists()
-                            .map_err(|e| e.to_string())?;
+                        let p = crate::playlist::with_playlists(&state.playlists, |pm| {
+                            pm.get_playlists()
+                        })
+                        .await
+                        .map_err(|e| e.to_string())?;
                         playlists_cache = Some(p);
                         playlists_cache.as_ref().unwrap()
                     }
@@ -133,12 +136,11 @@ pub async fn get_pinned_items(state: State<'_, AppState>) -> Result<Vec<PinnedIt
                 let playlists = match &playlists_cache {
                     Some(p) => p,
                     None => {
-                        let p = state
-                            .playlists
-                            .lock()
-                            .await
-                            .get_playlists()
-                            .map_err(|e| e.to_string())?;
+                        let p = crate::playlist::with_playlists(&state.playlists, |pm| {
+                            pm.get_playlists()
+                        })
+                        .await
+                        .map_err(|e| e.to_string())?;
                         playlists_cache = Some(p);
                         playlists_cache.as_ref().unwrap()
                     }

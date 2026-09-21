@@ -56,10 +56,9 @@ pub async fn get_song_context(
 ) -> Result<SongContextEnrichment, String> {
     let force_refresh = force_refresh.unwrap_or(false);
 
-    let (release_group_id, artist_id) = {
-        let conn = state.db.pool.get().map_err(|e| e.to_string())?;
-        if !context_enrichment_enabled(&conn) {
-            return Ok(SongContextEnrichment::default());
+    let context_result = crate::db::run_blocking(&state.db, move |conn| {
+        if !context_enrichment_enabled(conn) {
+            return Ok(None);
         }
         let (rg, artist, album_artist): (Option<String>, Option<String>, Option<String>) = conn
             .query_row(
@@ -79,7 +78,14 @@ pub async fn get_song_context(
                     .to_string()
             })
             .filter(|a| !a.is_empty());
-        (rg, resolved_artist)
+        Ok(Some((rg, resolved_artist)))
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let (release_group_id, artist_id) = match context_result {
+        Some(v) => v,
+        None => return Ok(SongContextEnrichment::default()),
     };
 
     if release_group_id.is_none() && artist_id.is_none() {
@@ -92,7 +98,7 @@ pub async fn get_song_context(
     let db = state.db.clone();
 
     if let Some(ref rg_id) = release_group_id {
-        let cached = read_release_group_cache(&db, rg_id)?;
+        let cached = read_release_group_cache(&db, rg_id).await?;
         let fresh = cached
             .as_ref()
             .map(|c| is_cache_fresh(c.fetched_at, now))
@@ -125,7 +131,8 @@ pub async fn get_song_context(
                             &mb_ok,
                             &cb_ok,
                             now,
-                        );
+                        )
+                        .await;
                     }
                     (mb, cb)
                 })
@@ -168,7 +175,7 @@ pub async fn get_song_context(
     }
 
     if let Some(ref artist_id) = artist_id {
-        let cached = read_artist_cache(&db, artist_id)?;
+        let cached = read_artist_cache(&db, artist_id).await?;
         let fresh = cached
             .as_ref()
             .map(|c| is_cache_fresh(c.3, now))
@@ -197,7 +204,8 @@ pub async fn get_song_context(
                                 &artist_id_clone,
                                 bio,
                                 now,
-                            );
+                            )
+                            .await;
                         }
                         Err(err) => {
                             log::warn!(
@@ -246,32 +254,36 @@ struct ReleaseGroupCacheRow {
     fetched_at: i64,
 }
 
-fn read_release_group_cache(
-    db: &Database,
+async fn read_release_group_cache(
+    db: &std::sync::Arc<Database>,
     release_group_id: &str,
 ) -> Result<Option<ReleaseGroupCacheRow>, String> {
-    let conn = db.pool.get().map_err(|e| e.to_string())?;
-    conn.query_row(
-        "SELECT mb_rating, mb_rating_votes, mb_tags, critiquebrainz_rating, critiquebrainz_review_count, critiquebrainz_review_links, fetched_at
-         FROM context_enrichment WHERE release_group_id = ?1",
-        params![release_group_id],
-        |row| {
-            Ok(ReleaseGroupCacheRow {
-                mb_rating: row.get(0)?,
-                mb_rating_votes: row.get(1)?,
-                mb_tags: row.get(2)?,
-                critiquebrainz_rating: row.get(3)?,
-                critiquebrainz_review_count: row.get(4)?,
-                critiquebrainz_review_links: row.get(5)?,
-                fetched_at: row.get(6)?,
-            })
-        },
-    )
-    .map(Some)
-    .or_else(|e| match e {
-        rusqlite::Error::QueryReturnedNoRows => Ok(None),
-        e => Err(e.to_string()),
+    let release_group_id = release_group_id.to_string();
+    crate::db::run_blocking(db, move |conn| {
+        conn.query_row(
+            "SELECT mb_rating, mb_rating_votes, mb_tags, critiquebrainz_rating, critiquebrainz_review_count, critiquebrainz_review_links, fetched_at
+             FROM context_enrichment WHERE release_group_id = ?1",
+            params![release_group_id],
+            |row| {
+                Ok(ReleaseGroupCacheRow {
+                    mb_rating: row.get(0)?,
+                    mb_rating_votes: row.get(1)?,
+                    mb_tags: row.get(2)?,
+                    critiquebrainz_rating: row.get(3)?,
+                    critiquebrainz_review_count: row.get(4)?,
+                    critiquebrainz_review_links: row.get(5)?,
+                    fetched_at: row.get(6)?,
+                })
+            },
+        )
+        .map(Some)
+        .or_else(|e| match e {
+            rusqlite::Error::QueryReturnedNoRows => Ok(None),
+            e => Err(e.into()),
+        })
     })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 fn apply_release_group_cache(result: &mut SongContextEnrichment, cached: ReleaseGroupCacheRow) {
@@ -290,97 +302,112 @@ fn apply_release_group_cache(result: &mut SongContextEnrichment, cached: Release
     result.fetched_at = Some(cached.fetched_at);
 }
 
-fn write_release_group_cache(
-    db: &Database,
+async fn write_release_group_cache(
+    db: &std::sync::Arc<Database>,
     release_group_id: &str,
     mb: &Option<crate::context::MusicBrainzReleaseGroupData>,
     cb: &Option<crate::context::CritiqueBrainzData>,
     fetched_at: i64,
 ) -> Result<(), String> {
-    let conn = db.pool.get().map_err(|e| e.to_string())?;
-    let mb_tags_json = serde_json::to_string(&mb.as_ref().map(|m| m.tags.clone()).unwrap_or_default())
+    let release_group_id = release_group_id.to_string();
+    let mb = mb.clone();
+    let cb = cb.clone();
+    crate::db::run_blocking(db, move |conn| {
+        let mb_tags_json =
+            serde_json::to_string(&mb.as_ref().map(|m| m.tags.clone()).unwrap_or_default())
+                .unwrap_or_else(|_| "[]".to_string());
+        let cb_links_json = serde_json::to_string(
+            &cb.as_ref().map(|c| c.review_links.clone()).unwrap_or_default(),
+        )
         .unwrap_or_else(|_| "[]".to_string());
-    let cb_links_json =
-        serde_json::to_string(&cb.as_ref().map(|c| c.review_links.clone()).unwrap_or_default())
-            .unwrap_or_else(|_| "[]".to_string());
-    conn.execute(
-        "INSERT INTO context_enrichment
-            (release_group_id, mb_rating, mb_rating_votes, mb_tags, critiquebrainz_rating, critiquebrainz_review_count, critiquebrainz_review_links, fetched_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
-         ON CONFLICT(release_group_id) DO UPDATE SET
-            mb_rating = excluded.mb_rating,
-            mb_rating_votes = excluded.mb_rating_votes,
-            mb_tags = excluded.mb_tags,
-            critiquebrainz_rating = excluded.critiquebrainz_rating,
-            critiquebrainz_review_count = excluded.critiquebrainz_review_count,
-            critiquebrainz_review_links = excluded.critiquebrainz_review_links,
-            fetched_at = excluded.fetched_at",
-        params![
-            release_group_id,
-            mb.as_ref().and_then(|m| m.rating),
-            mb.as_ref().and_then(|m| m.rating_votes),
-            mb_tags_json,
-            cb.as_ref().and_then(|c| c.average_rating),
-            cb.as_ref().map(|c| c.review_count),
-            cb_links_json,
-            fetched_at,
-        ],
-    )
-    .map_err(|e| e.to_string())?;
-    Ok(())
+        conn.execute(
+            "INSERT INTO context_enrichment
+                (release_group_id, mb_rating, mb_rating_votes, mb_tags, critiquebrainz_rating, critiquebrainz_review_count, critiquebrainz_review_links, fetched_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+             ON CONFLICT(release_group_id) DO UPDATE SET
+                mb_rating = excluded.mb_rating,
+                mb_rating_votes = excluded.mb_rating_votes,
+                mb_tags = excluded.mb_tags,
+                critiquebrainz_rating = excluded.critiquebrainz_rating,
+                critiquebrainz_review_count = excluded.critiquebrainz_review_count,
+                critiquebrainz_review_links = excluded.critiquebrainz_review_links,
+                fetched_at = excluded.fetched_at",
+            params![
+                release_group_id,
+                mb.as_ref().and_then(|m| m.rating),
+                mb.as_ref().and_then(|m| m.rating_votes),
+                mb_tags_json,
+                cb.as_ref().and_then(|c| c.average_rating),
+                cb.as_ref().map(|c| c.review_count),
+                cb_links_json,
+                fetched_at,
+            ],
+        )?;
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 type ArtistCacheRow = (Option<String>, Option<String>, Option<String>, i64);
 
-fn read_artist_cache(
-    db: &Database,
+async fn read_artist_cache(
+    db: &std::sync::Arc<Database>,
     artist_id: &str,
 ) -> Result<Option<ArtistCacheRow>, String> {
-    let conn = db.pool.get().map_err(|e| e.to_string())?;
-    conn.query_row(
-        "SELECT wikipedia_extract, wikipedia_page_url, wikipedia_thumbnail_url, fetched_at
-         FROM artist_context_enrichment WHERE artist_id = ?1",
-        params![artist_id],
-        |row| {
-            Ok((
-                row.get(0)?,
-                row.get(1)?,
-                row.get(2)?,
-                row.get(3)?,
-            ))
-        },
-    )
-    .map(Some)
-    .or_else(|e| match e {
-        rusqlite::Error::QueryReturnedNoRows => Ok(None),
-        e => Err(e.to_string()),
+    let artist_id = artist_id.to_string();
+    crate::db::run_blocking(db, move |conn| {
+        conn.query_row(
+            "SELECT wikipedia_extract, wikipedia_page_url, wikipedia_thumbnail_url, fetched_at
+             FROM artist_context_enrichment WHERE artist_id = ?1",
+            params![artist_id],
+            |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                ))
+            },
+        )
+        .map(Some)
+        .or_else(|e| match e {
+            rusqlite::Error::QueryReturnedNoRows => Ok(None),
+            e => Err(e.into()),
+        })
     })
+    .await
+    .map_err(|e| e.to_string())
 }
 
-fn write_artist_cache(
-    db: &Database,
+async fn write_artist_cache(
+    db: &std::sync::Arc<Database>,
     artist_id: &str,
     bio: &Option<crate::context::WikipediaSummary>,
     fetched_at: i64,
 ) -> Result<(), String> {
-    let conn = db.pool.get().map_err(|e| e.to_string())?;
-    conn.execute(
-        "INSERT INTO artist_context_enrichment
-            (artist_id, wikidata_id, wikipedia_extract, wikipedia_page_url, wikipedia_thumbnail_url, fetched_at)
-         VALUES (?1, NULL, ?2, ?3, ?4, ?5)
-         ON CONFLICT(artist_id) DO UPDATE SET
-            wikipedia_extract = excluded.wikipedia_extract,
-            wikipedia_page_url = excluded.wikipedia_page_url,
-            wikipedia_thumbnail_url = excluded.wikipedia_thumbnail_url,
-            fetched_at = excluded.fetched_at",
-        params![
-            artist_id,
-            bio.as_ref().map(|b| b.extract.clone()),
-            bio.as_ref().and_then(|b| b.page_url.clone()),
-            bio.as_ref().and_then(|b| b.thumbnail_url.clone()),
-            fetched_at,
-        ],
-    )
-    .map_err(|e| e.to_string())?;
-    Ok(())
+    let artist_id = artist_id.to_string();
+    let bio = bio.clone();
+    crate::db::run_blocking(db, move |conn| {
+        conn.execute(
+            "INSERT INTO artist_context_enrichment
+                (artist_id, wikidata_id, wikipedia_extract, wikipedia_page_url, wikipedia_thumbnail_url, fetched_at)
+             VALUES (?1, NULL, ?2, ?3, ?4, ?5)
+             ON CONFLICT(artist_id) DO UPDATE SET
+                wikipedia_extract = excluded.wikipedia_extract,
+                wikipedia_page_url = excluded.wikipedia_page_url,
+                wikipedia_thumbnail_url = excluded.wikipedia_thumbnail_url,
+                fetched_at = excluded.fetched_at",
+            params![
+                artist_id,
+                bio.as_ref().map(|b| b.extract.clone()),
+                bio.as_ref().and_then(|b| b.page_url.clone()),
+                bio.as_ref().and_then(|b| b.thumbnail_url.clone()),
+                fetched_at,
+            ],
+        )?;
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())
 }

@@ -228,7 +228,17 @@ async fn rewrite_genre_and_persist(
     song_ids: &[i64],
     rewrite_genre: impl Fn(&str) -> String + Send + 'static,
 ) -> Result<u32, String> {
-    let metas = load_full_metadata(&conn, song_ids);
+    let song_ids = song_ids.to_vec();
+    // Runs the initial metadata read on a blocking thread rather than the
+    // tokio worker calling this — same rationale as the tag-write step below,
+    // which already offloads (#1102). Hands `conn` back out so the closing
+    // transaction further down can reuse it without a second pool checkout.
+    let (metas, conn) = tokio::task::spawn_blocking(move || {
+        let metas = load_full_metadata(&conn, &song_ids);
+        (metas, conn)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
 
     // See tageditor's save_song_tags — close the timing race the coarse
     // watcher-pause guard can't (#514) by tracking every path about to be
@@ -297,15 +307,19 @@ async fn rewrite_genre_and_persist(
         .await
         .map_err(|e| e.to_string())?;
 
-    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
-    for (song_id, new_genre) in &writes {
-        tx.execute(
-            "UPDATE songs SET genre = ?1 WHERE id = ?2",
-            rusqlite::params![new_genre, song_id],
-        )
-        .map_err(|e| e.to_string())?;
-    }
-    tx.commit().map_err(|e| e.to_string())?;
+    tokio::task::spawn_blocking(move || -> Result<(), String> {
+        let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+        for (song_id, new_genre) in &writes {
+            tx.execute(
+                "UPDATE songs SET genre = ?1 WHERE id = ?2",
+                rusqlite::params![new_genre, song_id],
+            )
+            .map_err(|e| e.to_string())?;
+        }
+        tx.commit().map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())??;
 
     Ok(updated_count)
 }
@@ -327,7 +341,11 @@ pub async fn merge_tags(
     let _watcher_pause_guard = WatcherPauseGuard::new(Arc::clone(&state.watcher_paused));
 
     let manager = TagManager::new(state.db.clone());
-    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
+    let db = state.db.clone();
+    let conn = tokio::task::spawn_blocking(move || db.pool.get())
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())?;
     let affected = manager
         .songs_containing_any(std::slice::from_ref(&from))
         .map_err(|e| e.to_string())?;
@@ -367,7 +385,11 @@ pub async fn delete_tags(
     let _watcher_pause_guard = WatcherPauseGuard::new(Arc::clone(&state.watcher_paused));
 
     let manager = TagManager::new(state.db.clone());
-    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
+    let db = state.db.clone();
+    let conn = tokio::task::spawn_blocking(move || db.pool.get())
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())?;
     let affected = manager
         .songs_containing_any(&names)
         .map_err(|e| e.to_string())?;

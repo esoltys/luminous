@@ -5,6 +5,7 @@ use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::params;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 pub type DbPool = Pool<SqliteConnectionManager>;
 
@@ -401,6 +402,28 @@ impl Database {
         // Every migration up to CURRENT_SCHEMA_VERSION ran above.
         Ok(CURRENT_SCHEMA_VERSION)
     }
+}
+
+/// Runs a synchronous rusqlite operation on a blocking thread rather than the
+/// calling `async fn`'s tokio worker — command handlers that don't hold an
+/// `AppState` mutex still ran DB work inline on the worker, which contributes
+/// to the same scheduler-stall pattern #1097 fixed for the locked cases
+/// (#1102). Mirrors `Player::load_loudness_settings`, the existing instance
+/// of this shape; callers not already inside a `PlaylistManager`/`Player`/
+/// `AudioEngine` method should use this instead of hand-rolling
+/// `tokio::task::spawn_blocking` + `pool.get()`.
+pub async fn run_blocking<F, R>(db: &Arc<Database>, f: F) -> Result<R>
+where
+    F: FnOnce(&rusqlite::Connection) -> Result<R> + Send + 'static,
+    R: Send + 'static,
+{
+    let db = db.clone();
+    tokio::task::spawn_blocking(move || {
+        let conn = db.pool.get().context("failed to get db connection")?;
+        f(&conn)
+    })
+    .await
+    .context("db task panicked")?
 }
 
 // ---------------------------------------------------------------------------

@@ -105,8 +105,7 @@ pub async fn get_extended_artwork_for_song(
     state: State<'_, AppState>,
     song_id: i64,
 ) -> Result<ExtendedArtworkResponse, String> {
-    let (path, album) = {
-        let conn = state.db.pool.get().map_err(|e| e.to_string())?;
+    let (path, album) = crate::db::run_blocking(&state.db, move |conn| {
         conn.query_row(
             "SELECT path, album FROM songs WHERE id = ?1",
             params![song_id],
@@ -117,8 +116,10 @@ pub async fn get_extended_artwork_for_song(
                 ))
             },
         )
-        .map_err(|e| e.to_string())?
-    };
+        .map_err(anyhow::Error::from)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
 
     let Some(path) = path else {
         return Ok(ExtendedArtworkResponse::default());
@@ -147,20 +148,21 @@ pub async fn get_extended_artwork_for_artist(
     state: State<'_, AppState>,
     artist: String,
 ) -> Result<ExtendedArtworkResponse, String> {
-    let path = {
-        let conn = state.db.pool.get().map_err(|e| e.to_string())?;
-        conn.query_row(
-            "SELECT path FROM songs
-             WHERE (album_artist = ?1 COLLATE NOCASE OR artist = ?1 COLLATE NOCASE)
-               AND path IS NOT NULL
-             LIMIT 1",
-            params![artist],
-            |row| row.get::<_, Option<String>>(0),
-        )
-        .optional()
-        .map_err(|e| e.to_string())?
-        .flatten()
-    };
+    let path = crate::db::run_blocking(&state.db, move |conn| {
+        Ok(conn
+            .query_row(
+                "SELECT path FROM songs
+                 WHERE (album_artist = ?1 COLLATE NOCASE OR artist = ?1 COLLATE NOCASE)
+                   AND path IS NOT NULL
+                 LIMIT 1",
+                params![artist],
+                |row| row.get::<_, Option<String>>(0),
+            )
+            .optional()?
+            .flatten())
+    })
+    .await
+    .map_err(|e| e.to_string())?;
 
     let Some(path) = path else {
         return Ok(ExtendedArtworkResponse::default());

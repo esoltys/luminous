@@ -84,13 +84,12 @@ pub async fn rescan_songs(
 ) -> Result<(), String> {
     let scanner = CollectionScanner::new(state.db.clone());
 
-    let paths: Vec<std::path::PathBuf> = {
-        let conn = state.db.pool.get().map_err(|e| e.to_string())?;
+    let paths: Vec<std::path::PathBuf> = crate::db::run_blocking(&state.db, move |conn| {
         let sql = format!(
             "SELECT {} FROM songs WHERE id = ?1",
             crate::collection::SONG_SELECT_COLS
         );
-        song_ids
+        Ok(song_ids
             .iter()
             .filter_map(|id| {
                 conn.query_row(&sql, [id], crate::collection::row_to_song)
@@ -101,8 +100,10 @@ pub async fn rescan_songs(
             })
             .filter_map(|song| song.path)
             .map(std::path::PathBuf::from)
-            .collect()
-    };
+            .collect())
+    })
+    .await
+    .map_err(|e| e.to_string())?;
 
     scanner
         .rescan_paths(&app, paths)
@@ -133,24 +134,27 @@ pub async fn get_library_stats(state: State<'_, AppState>) -> Result<LibraryStat
 /// remember to fire all three separately.
 #[tauri::command]
 pub async fn finish_scan(last_scan_time: String, state: State<'_, AppState>) -> Result<(), String> {
-    if let Ok(conn) = state.db.pool.get() {
-        if let Err(e) = conn.execute(
+    let db = state.db.clone();
+    if let Err(e) = crate::db::run_blocking(&db, move |conn| {
+        conn.execute(
             "INSERT OR REPLACE INTO app_state (key, value) VALUES ('last_scan_time', ?1)",
             [&last_scan_time],
-        ) {
-            log::error!("Failed to persist last_scan_time: {e}");
-        }
+        )?;
+        Ok(())
+    })
+    .await
+    {
+        log::error!("Failed to persist last_scan_time: {e}");
     }
 
-    if let Err(e) = state.player.lock().await.resync_queue_with_db() {
+    if let Err(e) =
+        crate::player::with_player(&state.player, |p| p.resync_queue_with_db()).await
+    {
         log::error!("Failed to resync playback queue after scan: {e}");
     }
 
-    state
-        .playlists
-        .lock()
+    crate::playlist::with_playlists(&state.playlists, |pm| pm.sync_all_auto_playlists())
         .await
-        .sync_all_auto_playlists()
         .map_err(|e| e.to_string())
 }
 
@@ -665,13 +669,21 @@ pub async fn set_songs_not_included(
     if song_ids.is_empty() {
         return Ok(());
     }
-    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
-    let placeholders = song_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
-    let sql = format!("UPDATE songs SET not_included = ?1 WHERE id IN ({placeholders})");
-    let mut params: Vec<&dyn rusqlite::ToSql> = vec![&not_included];
-    params.extend(song_ids.iter().map(|id| id as &dyn rusqlite::ToSql));
-    conn.execute(&sql, params.as_slice())
-        .map_err(|e| e.to_string())?;
+    let song_ids_for_write = song_ids.clone();
+    crate::db::run_blocking(&state.db, move |conn| {
+        let placeholders = song_ids_for_write
+            .iter()
+            .map(|_| "?")
+            .collect::<Vec<_>>()
+            .join(",");
+        let sql = format!("UPDATE songs SET not_included = ?1 WHERE id IN ({placeholders})");
+        let mut params: Vec<&dyn rusqlite::ToSql> = vec![&not_included];
+        params.extend(song_ids_for_write.iter().map(|id| id as &dyn rusqlite::ToSql));
+        conn.execute(&sql, params.as_slice())?;
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?;
 
     for song_id in &song_ids {
         let _ = app.emit(
