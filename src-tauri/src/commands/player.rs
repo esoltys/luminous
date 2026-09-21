@@ -244,15 +244,17 @@ async fn append_song_ids_to_queue(
 #[tauri::command]
 pub async fn play_song(song_id: i64, state: State<'_, AppState>) -> Result<(), String> {
     use rusqlite::params;
-    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     // Reject unknown ids up front so the Queue isn't cleared for nothing.
-    let sql = format!(
-        "SELECT {} FROM songs WHERE id = ?1",
-        crate::collection::SONG_SELECT_COLS
-    );
-    let _song = conn
-        .query_row(&sql, params![song_id], crate::collection::row_to_song)
-        .map_err(|e| e.to_string())?;
+    crate::db::run_blocking(&state.db, move |conn| {
+        let sql = format!(
+            "SELECT {} FROM songs WHERE id = ?1",
+            crate::collection::SONG_SELECT_COLS
+        );
+        conn.query_row(&sql, params![song_id], crate::collection::row_to_song)
+            .map_err(anyhow::Error::from)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
 
     replace_queue_and_play(&state, &[song_id], 0, Some(PlayContext::Song)).await
 }
@@ -484,10 +486,13 @@ pub async fn open_and_play(
         });
     }
 
-    let songs = {
-        let conn = state.db.pool.get().map_err(|e| e.to_string())?;
-        resolve_songs_from_paths(&conn, &state.cover_manager, resolved_paths)?
-    };
+    let cover_manager = state.cover_manager.clone();
+    let songs = crate::db::run_blocking(&state.db, move |conn| {
+        resolve_songs_from_paths(conn, &cover_manager, resolved_paths)
+            .map_err(anyhow::Error::msg)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
 
     if songs.is_empty() {
         // Nothing decodable — leave the current Queue untouched.
@@ -525,10 +530,13 @@ pub async fn add_paths_to_queue(
         });
     }
 
-    let songs = {
-        let conn = state.db.pool.get().map_err(|e| e.to_string())?;
-        resolve_songs_from_paths(&conn, &state.cover_manager, resolved_paths)?
-    };
+    let cover_manager = state.cover_manager.clone();
+    let songs = crate::db::run_blocking(&state.db, move |conn| {
+        resolve_songs_from_paths(conn, &cover_manager, resolved_paths)
+            .map_err(anyhow::Error::msg)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
 
     if songs.is_empty() {
         return Ok(AddPathsOutcome {
