@@ -38,7 +38,12 @@
     | { kind: "album"; albumName: string }
     | { kind: "playlist"; title: string; songs: Song[] }
     | { kind: "artist"; artistName: string }
-    | { kind: "stats"; summary: StatsSummary; range: StatsRange; rangeLabel: string };
+    | { kind: "stats"; summary: StatsSummary; range: StatsRange; rangeLabel: string }
+    // A single Top N category shared on its own (e.g. just "Top Songs"),
+    // separate from the full 4-category "stats" summary — reuses the
+    // entity-card engine's numbered track list rather than the stats grid,
+    // since a single ranked list is exactly what that already renders.
+    | { kind: "stats-section"; sectionTitle: string; rangeLabel: string; items: StatsTopItem[] };
 
   let { entity, onClose }: { entity: ShareEntity; onClose: () => void } = $props();
 
@@ -106,8 +111,10 @@
   });
 
   // Only the album/playlist entity cards have a track list to toggle —
-  // artist and stats cards never show one.
+  // artist and stats cards never show one, and a stats-section card's list
+  // *is* the whole card, so it's always shown with no toggle to hide it.
   let showTrackListToggle = $derived(entity.kind === "album" || entity.kind === "playlist");
+  let effectiveIncludeTrackList = $derived(entity.kind === "stats-section" ? true : showTrackListToggle && includeTrackList);
   // The artist/playlist cards' metadata line (album/track counts, duration)
   // is "library data" that can be toggled off for users who just want a
   // clean name-and-image card — independent of the playlist card's own
@@ -190,11 +197,13 @@
   });
 
   let trackCards = $derived<ShareCardTrack[]>(
-    entity.kind === "playlist"
-      // A playlist spans multiple artists, unlike an album, so each row
-      // needs its own artist to be legible on its own.
-      ? sortedTracks.map((s, i) => ({ number: i + 1, title: s.title || "", secondary: s.artist || s.album_artist || "" }))
-      : sortedTracks.map((s) => ({ number: s.track ?? null, title: s.title || "" }))
+    entity.kind === "stats-section"
+      ? entity.items.slice(0, 10).map((it, i) => ({ number: i + 1, title: it.label, secondary: it.secondary }))
+      : entity.kind === "playlist"
+        // A playlist spans multiple artists, unlike an album, so each row
+        // needs its own artist to be legible on its own.
+        ? sortedTracks.map((s, i) => ({ number: i + 1, title: s.title || "", secondary: s.artist || s.album_artist || "" }))
+        : sortedTracks.map((s) => ({ number: s.track ?? null, title: s.title || "" }))
   );
 
   let totalDurationLabel = $derived.by(() => {
@@ -215,6 +224,8 @@
         return entity.artistName || i18n.t("collection.unknownArtist");
       case "stats":
         return entity.rangeLabel;
+      case "stats-section":
+        return entity.sectionTitle;
     }
   });
 
@@ -227,6 +238,7 @@
 
   let cardMetadataLine = $derived.by(() => {
     if (entity.kind === "stats") return "";
+    if (entity.kind === "stats-section") return entity.rangeLabel;
     if ((entity.kind === "artist" || entity.kind === "playlist") && !includeLibraryInfo) return "";
     const parts: string[] = [];
     if (entity.kind === "album" && albumItem?.year) parts.push(String(albumItem.year));
@@ -254,6 +266,8 @@
         return entity.artistName;
       case "stats":
         return `stats-${entity.range}`;
+      case "stats-section":
+        return `stats-section-${entity.sectionTitle}`;
     }
   });
 
@@ -427,7 +441,7 @@
         subtitle: cardSubtitle,
         metadataLine: cardMetadataLine,
         tracks: trackCards,
-        includeTrackList: showTrackListToggle && includeTrackList,
+        includeTrackList: effectiveIncludeTrackList,
       },
       scale
     );
@@ -439,6 +453,7 @@
     void theme;
     void includeTrackList;
     void includeLibraryInfo;
+    void effectiveIncludeTrackList;
     void coverDataUri;
     void coverStackDataUris;
     void backgroundColors;
@@ -483,6 +498,8 @@
         return entity.artistName || "artist";
       case "stats":
         return `stats-${entity.range}`;
+      case "stats-section":
+        return entity.sectionTitle || "stats";
     }
   });
 

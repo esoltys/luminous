@@ -25,6 +25,7 @@
   let summary = $state<StatsSummary | null>(null);
   let loading = $state(true);
   let showShareModal = $state(false);
+  let shareSection = $state<{ title: string; items: StatsTopItem[] } | null>(null);
 
   const RANGES: { value: StatsRange; label: () => string }[] = [
     { value: "7d", label: () => i18n.t("stats.range7d", {}, "Past 7 Days") },
@@ -38,6 +39,8 @@
     { key: "evening", label: () => i18n.t("stats.clockEvening", {}, "Evening") },
     { key: "latenight", label: () => i18n.t("stats.clockLateNight", {}, "Late Night") }
   ];
+
+  let rangeLabel = $derived(RANGES.find((r) => r.value === range)?.label() ?? range);
 
   let clockCounts = $derived(
     summary
@@ -182,6 +185,7 @@
                 title={section.title()}
                 items={itemsFor(section.key)}
                 kind={section.kind}
+                onShareClick={() => { shareSection = { title: section.title(), items: itemsFor(section.key) }; }}
               />
             </div>
           {/each}
@@ -193,12 +197,14 @@
 
 {#if showShareModal && summary}
   <ShareModal
-    entity={{
-      kind: "stats",
-      summary,
-      range,
-      rangeLabel: RANGES.find((r) => r.value === range)?.label() ?? range,
-    }}
+    entity={{ kind: "stats", summary, range, rangeLabel }}
     onClose={() => { showShareModal = false; }}
+  />
+{/if}
+
+{#if shareSection}
+  <ShareModal
+    entity={{ kind: "stats-section", sectionTitle: shareSection.title, rangeLabel, items: shareSection.items }}
+    onClose={() => { shareSection = null; }}
   />
 {/if}
