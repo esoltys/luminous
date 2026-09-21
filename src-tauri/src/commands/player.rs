@@ -14,12 +14,13 @@ pub(crate) async fn replace_queue_and_play_state(
     start_index: usize,
     context: Option<PlayContext>,
 ) -> Result<(), String> {
-    let (queue_id, items) = {
-        let mut playlists = state.playlists.lock().await;
-        playlists
-            .replace_queue(song_ids)
-            .map_err(|e| e.to_string())?
-    };
+    // `with_playlists` runs the synchronous rusqlite work via
+    // `block_in_place` (#1097) — see its doc comment in playlist.rs.
+    let (queue_id, items) = crate::playlist::with_playlists(&state.playlists, |pm| {
+        pm.replace_queue(song_ids)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
     let mut player = state.player.lock().await;
     player
         .play_playlist(items, start_index, queue_id, context)

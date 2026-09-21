@@ -1,8 +1,21 @@
 use crate::{
     models::{Playlist, PlaylistItem, QueuePopulationMode},
+    playlist::PlaylistManager,
     AppState,
 };
 use tauri::State;
+
+/// Thin `String`-error adapter over [`crate::playlist::with_playlists`] for
+/// this module's `#[tauri::command]` handlers, which all return
+/// `Result<_, String>` per this project's IPC command convention.
+async fn with_playlists<F, R>(state: &State<'_, AppState>, f: F) -> Result<R, String>
+where
+    F: FnOnce(&mut PlaylistManager) -> anyhow::Result<R>,
+{
+    crate::playlist::with_playlists(&state.playlists, f)
+        .await
+        .map_err(|e| e.to_string())
+}
 
 #[derive(serde::Serialize)]
 pub struct PlaylistNameCheck {
@@ -31,22 +44,12 @@ pub fn validate_playlist_name(name: String) -> PlaylistNameCheck {
 
 #[tauri::command]
 pub async fn create_playlist(name: String, state: State<'_, AppState>) -> Result<Playlist, String> {
-    state
-        .playlists
-        .lock()
-        .await
-        .create_playlist(&name)
-        .map_err(|e| e.to_string())
+    with_playlists(&state, |pm| pm.create_playlist(&name)).await
 }
 
 #[tauri::command]
 pub async fn delete_playlist(id: i64, state: State<'_, AppState>) -> Result<(), String> {
-    state
-        .playlists
-        .lock()
-        .await
-        .delete_playlist(id)
-        .map_err(|e| e.to_string())
+    with_playlists(&state, |pm| pm.delete_playlist(id)).await
 }
 
 #[tauri::command]
@@ -55,22 +58,12 @@ pub async fn rename_playlist(
     name: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    state
-        .playlists
-        .lock()
-        .await
-        .rename_playlist(id, &name)
-        .map_err(|e| e.to_string())
+    with_playlists(&state, |pm| pm.rename_playlist(id, &name)).await
 }
 
 #[tauri::command]
 pub async fn get_playlists(state: State<'_, AppState>) -> Result<Vec<Playlist>, String> {
-    state
-        .playlists
-        .lock()
-        .await
-        .get_playlists()
-        .map_err(|e| e.to_string())
+    with_playlists(&state, |pm| pm.get_playlists()).await
 }
 
 /// Runs the genre, decade, and BPM auto-playlist syncs together — the
@@ -78,12 +71,7 @@ pub async fn get_playlists(state: State<'_, AppState>) -> Result<Vec<Playlist>, 
 /// at every call site.
 #[tauri::command]
 pub async fn sync_all_auto_playlists(state: State<'_, AppState>) -> Result<(), String> {
-    state
-        .playlists
-        .lock()
-        .await
-        .sync_all_auto_playlists()
-        .map_err(|e| e.to_string())
+    with_playlists(&state, |pm| pm.sync_all_auto_playlists()).await
 }
 
 #[tauri::command]
@@ -132,12 +120,7 @@ pub async fn get_playlists_by_artist(
     artist: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<Playlist>, String> {
-    state
-        .playlists
-        .lock()
-        .await
-        .get_playlists_by_artist(&artist)
-        .map_err(|e| e.to_string())
+    with_playlists(&state, |pm| pm.get_playlists_by_artist(&artist)).await
 }
 
 #[tauri::command]
@@ -154,12 +137,7 @@ pub async fn get_playlist_tracks(
     }
     drop(player);
 
-    state
-        .playlists
-        .lock()
-        .await
-        .get_playlist_tracks(playlist_id)
-        .map_err(|e| e.to_string())
+    with_playlists(&state, |pm| pm.get_playlist_tracks(playlist_id)).await
 }
 
 #[tauri::command]
@@ -168,12 +146,7 @@ pub async fn add_to_playlist(
     song_ids: Vec<i64>,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    state
-        .playlists
-        .lock()
-        .await
-        .add_songs_to_playlist(playlist_id, &song_ids)
-        .map_err(|e| e.to_string())
+    with_playlists(&state, |pm| pm.add_songs_to_playlist(playlist_id, &song_ids)).await
 }
 
 /// Cascades a set of removed playlist-item uuids into the live playback
@@ -206,12 +179,7 @@ pub async fn remove_from_playlist(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    state
-        .playlists
-        .lock()
-        .await
-        .remove_from_playlist(playlist_id, &uuids)
-        .map_err(|e| e.to_string())?;
+    with_playlists(&state, |pm| pm.remove_from_playlist(playlist_id, &uuids)).await?;
 
     sync_player_after_removal(&state, &app, &uuids).await;
     Ok(())
@@ -227,12 +195,7 @@ pub async fn deduplicate_playlist(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
 ) -> Result<Vec<String>, String> {
-    let removed_uuids = state
-        .playlists
-        .lock()
-        .await
-        .deduplicate_playlist(playlist_id)
-        .map_err(|e| e.to_string())?;
+    let removed_uuids = with_playlists(&state, |pm| pm.deduplicate_playlist(playlist_id)).await?;
 
     sync_player_after_removal(&state, &app, &removed_uuids).await;
     Ok(removed_uuids)
@@ -252,12 +215,10 @@ pub async fn reorder_playlist_item_by_uuid(
 ) -> Result<(), String> {
     use tauri::Emitter;
 
-    state
-        .playlists
-        .lock()
-        .await
-        .reorder_playlist_item_by_uuid(playlist_id, &source_uuid, &target_uuid)
-        .map_err(|e| e.to_string())?;
+    with_playlists(&state, |pm| {
+        pm.reorder_playlist_item_by_uuid(playlist_id, &source_uuid, &target_uuid)
+    })
+    .await?;
 
     let mut player = state.player.lock().await;
     player.reorder_playlist_item_by_uuid(&source_uuid, &target_uuid);
@@ -282,16 +243,11 @@ pub async fn reorder_playlist_item(
 ) -> Result<(), String> {
     use tauri::Emitter;
 
-    let is_queue = {
-        let mut playlists = state.playlists.lock().await;
-        playlists
-            .reorder_playlist_item(playlist_id, from, to)
-            .map_err(|e| e.to_string())?;
-        playlists
-            .queue()
-            .map(|q| q.id == playlist_id)
-            .unwrap_or(false)
-    };
+    let is_queue = with_playlists(&state, |pm| {
+        pm.reorder_playlist_item(playlist_id, from, to)?;
+        Ok(pm.queue().map(|q| q.id == playlist_id).unwrap_or(false))
+    })
+    .await?;
 
     if is_queue {
         let mut player = state.player.lock().await;
@@ -310,12 +266,10 @@ pub async fn reorder_playlist_items(
     to_index: i32,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    state
-        .playlists
-        .lock()
-        .await
-        .reorder_playlist_items_batch(playlist_id, &from_indices, to_index)
-        .map_err(|e| e.to_string())
+    with_playlists(&state, |pm| {
+        pm.reorder_playlist_items_batch(playlist_id, &from_indices, to_index)
+    })
+    .await
 }
 
 /// Clears a playlist's rows and, only when `playlist_id` is the Queue, also
@@ -330,16 +284,11 @@ pub async fn clear_playlist(
 ) -> Result<(), String> {
     use tauri::Emitter;
 
-    let is_queue = {
-        let mut playlists = state.playlists.lock().await;
-        playlists
-            .clear_playlist(playlist_id)
-            .map_err(|e| e.to_string())?;
-        playlists
-            .queue()
-            .map(|q| q.id == playlist_id)
-            .unwrap_or(false)
-    };
+    let is_queue = with_playlists(&state, |pm| {
+        pm.clear_playlist(playlist_id)?;
+        Ok(pm.queue().map(|q| q.id == playlist_id).unwrap_or(false))
+    })
+    .await?;
 
     if is_queue {
         let mut player = state.player.lock().await;
@@ -356,23 +305,13 @@ pub async fn clear_playlist(
 /// `PlaylistManager::undo`).
 #[tauri::command]
 pub async fn undo_playlist(state: State<'_, AppState>) -> Result<bool, String> {
-    state
-        .playlists
-        .lock()
-        .await
-        .undo()
-        .map_err(|e| e.to_string())
+    with_playlists(&state, |pm| pm.undo()).await
 }
 
 /// See [`undo_playlist`] — same `false`-means-empty-stack contract.
 #[tauri::command]
 pub async fn redo_playlist(state: State<'_, AppState>) -> Result<bool, String> {
-    state
-        .playlists
-        .lock()
-        .await
-        .redo()
-        .map_err(|e| e.to_string())
+    with_playlists(&state, |pm| pm.redo()).await
 }
 
 #[tauri::command]
@@ -380,12 +319,7 @@ pub async fn import_playlist(
     file_path: String,
     state: State<'_, AppState>,
 ) -> Result<Playlist, String> {
-    state
-        .playlists
-        .lock()
-        .await
-        .import_playlist(&file_path)
-        .map_err(|e| e.to_string())
+    with_playlists(&state, |pm| pm.import_playlist(&file_path)).await
 }
 
 #[tauri::command]
@@ -395,12 +329,10 @@ pub async fn export_playlist(
     relative: bool,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    state
-        .playlists
-        .lock()
-        .await
-        .export_playlist(playlist_id, &export_path, relative)
-        .map_err(|e| e.to_string())
+    with_playlists(&state, |pm| {
+        pm.export_playlist(playlist_id, &export_path, relative)
+    })
+    .await
 }
 
 #[tauri::command]
@@ -409,12 +341,7 @@ pub async fn set_playlist_dynamic_spec(
     spec: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    state
-        .playlists
-        .lock()
-        .await
-        .set_playlist_dynamic_spec(playlist_id, &spec)
-        .map_err(|e| e.to_string())
+    with_playlists(&state, |pm| pm.set_playlist_dynamic_spec(playlist_id, &spec)).await
 }
 
 /// Set a dynamic playlist's population-mode bias and its rule spec together,
@@ -429,12 +356,10 @@ pub async fn set_playlist_dynamic_config(
     spec: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    state
-        .playlists
-        .lock()
-        .await
-        .set_playlist_dynamic_config(playlist_id, mode, &spec)
-        .map_err(|e| e.to_string())
+    with_playlists(&state, |pm| {
+        pm.set_playlist_dynamic_config(playlist_id, mode, &spec)
+    })
+    .await
 }
 
 /// Persist the `population_mode` bias (All/Favourites/Familiar/Discover/Deep
@@ -447,11 +372,11 @@ pub async fn set_playlist_population_mode(
     mode: QueuePopulationMode,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let mut pm = state.playlists.lock().await;
-    pm.set_playlist_population_mode(playlist_id, mode)
-        .map_err(|e| e.to_string())?;
-    pm.refresh_auto_playlist(playlist_id)
-        .map_err(|e| e.to_string())
+    with_playlists(&state, |pm| {
+        pm.set_playlist_population_mode(playlist_id, mode)?;
+        pm.refresh_auto_playlist(playlist_id)
+    })
+    .await
 }
 
 /// Force-regenerates one auto-playlist's tracks from the library (e.g. when
@@ -461,12 +386,7 @@ pub async fn refresh_auto_playlist(
     playlist_id: i64,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    state
-        .playlists
-        .lock()
-        .await
-        .refresh_auto_playlist(playlist_id)
-        .map_err(|e| e.to_string())
+    with_playlists(&state, |pm| pm.refresh_auto_playlist(playlist_id)).await
 }
 
 /// Force-regenerates every dynamic/auto playlist's tracks from the library
@@ -474,10 +394,5 @@ pub async fn refresh_auto_playlist(
 /// of the frontend's old per-playlist fan-out.
 #[tauri::command]
 pub async fn refresh_all_auto_playlists(state: State<'_, AppState>) -> Result<(), String> {
-    state
-        .playlists
-        .lock()
-        .await
-        .refresh_all_dynamic_playlists()
-        .map_err(|e| e.to_string())
+    with_playlists(&state, |pm| pm.refresh_all_dynamic_playlists()).await
 }

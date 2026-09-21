@@ -92,6 +92,24 @@ pub struct PlaylistManager {
     redo_stack: Vec<PlaylistOp>,
 }
 
+/// Runs a synchronous `PlaylistManager` operation while `playlists`'s async
+/// mutex is held, via `block_in_place` rather than directly — every
+/// `PlaylistManager` method does rusqlite work, and running that straight on
+/// the tokio worker would both stall the runtime and block every other
+/// task waiting on the same mutex for the duration (#1097). The one place
+/// that wrap lives; callers (IPC command handlers, the dynamic-playlist
+/// reconcile listener) just state their intent.
+pub async fn with_playlists<F, R>(
+    playlists: &tokio::sync::Mutex<PlaylistManager>,
+    f: F,
+) -> Result<R>
+where
+    F: FnOnce(&mut PlaylistManager) -> Result<R>,
+{
+    let mut pm = playlists.lock().await;
+    tokio::task::block_in_place(move || f(&mut pm))
+}
+
 impl PlaylistManager {
     pub fn new(db: Arc<Database>) -> Result<Self> {
         Ok(Self {
