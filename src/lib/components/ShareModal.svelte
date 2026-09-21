@@ -590,21 +590,23 @@
 
         {#if showTrackListToggle}
           <div class="flex items-center gap-2">
-            <span class="text-xs font-semibold text-brand-text-secondary">{i18n.t("shareModal.trackListToggle")}</span>
+            <span class="text-xs font-medium text-brand-text-secondary text-right whitespace-nowrap">{i18n.t("shareModal.trackListToggle")}</span>
             <Toggle
               checked={includeTrackList}
               onchange={(v) => (includeTrackList = v)}
               label={i18n.t("shareModal.trackListToggle")}
+              showOnOffLabel={false}
             />
           </div>
         {/if}
         {#if showLibraryToggle}
           <div class="flex items-center gap-2">
-            <span class="text-xs font-semibold text-brand-text-secondary">{i18n.t("shareModal.libraryToggle")}</span>
+            <span class="text-xs font-medium text-brand-text-secondary text-right whitespace-nowrap">{i18n.t("shareModal.libraryToggle")}</span>
             <Toggle
               checked={includeLibraryInfo}
               onchange={(v) => (includeLibraryInfo = v)}
               label={i18n.t("shareModal.libraryToggle")}
+              showOnOffLabel={false}
             />
           </div>
         {/if}
