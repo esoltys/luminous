@@ -36,9 +36,11 @@
     PushPinSlashIcon as PinOff,
     DotsThreeIcon as MoreHorizontal,
     ChartBarIcon as BarChart2,
-    CaretDownIcon as CaretDown
+    CaretDownIcon as CaretDown,
+    ShareNetworkIcon as Share
   } from "phosphor-svelte";
   const ExternalLink = OpenInPicard;
+  import ShareModal from "./ShareModal.svelte";
   import type { Song, Playlist, AlbumItem, PlayContext, ArtistProfile, ExtendedArtworkResponse, SongContextEnrichment } from "../types";
   import { getCoverArtUrl } from "../types";
   import { resolveSocialUrl, formatDisplayLabel, deriveFanartTvUrl } from "../utils/artistSocials";
@@ -69,6 +71,7 @@
   let playableSongs = $derived(songs.filter((s) => !s.not_included));
   let editingSongId = $state<number | null>(null);
   let isEditorOpen = $state(false);
+  let showShareModal = $state(false);
   let isBioExpanded = $state(false);
   let selectedKeys = $state<Set<string>>(new Set());
 
@@ -545,6 +548,12 @@
               {/if}
             {/snippet}
           </IconActionButton>
+          <IconActionButton
+            onclick={() => { showShareModal = true; }}
+            title={i18n.t("shareModal.menuItem")}
+          >
+            {#snippet icon()}<Share class="w-4 h-4" />{/snippet}
+          </IconActionButton>
           <button
             onclick={toggleOverflowMenu}
             title={i18n.t("playlists.moreActionsTooltip", {}, "More actions")}
@@ -885,6 +894,10 @@
       onclick={() => { handleToggleStatsExcluded(); overflowMenuPos = null; }}
     />
   </ContextMenu>
+{/if}
+
+{#if showShareModal}
+  <ShareModal entity={{ kind: "artist", artistName }} onClose={() => { showShareModal = false; }} />
 {/if}
 
 {#if editingSongId !== null}

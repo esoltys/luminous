@@ -23,6 +23,7 @@
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
+  import ShareModal from "./ShareModal.svelte";
   import {
     ClockIcon as Clock,
     PlusIcon as Plus,
@@ -45,7 +46,8 @@
     PushPinSlashIcon as PinOff,
     WarningIcon as AlertTriangle,
     ArrowSquareOutIcon as OpenInPicard,
-    SunHorizonIcon as SunHorizon
+    SunHorizonIcon as SunHorizon,
+    ShareNetworkIcon as Share
   } from "phosphor-svelte";
   import { shuffleArray } from "../utils/shuffle";
   import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
@@ -121,6 +123,7 @@
   let contextMenuState = $state<{ x: number; y: number; song: Song } | null>(null);
 
   let showSaveModal = $state(false);
+  let showShareModal = $state(false);
   let savePlaylistName = $state("");
 
   let selectedKeys = $state<Set<string>>(new Set());
@@ -651,6 +654,14 @@
               {/if}
             {/snippet}
           </IconActionButton>
+          <IconActionButton
+            onclick={() => { showShareModal = true; }}
+            title={i18n.t("shareModal.menuItem")}
+            class="shrink-0"
+            disabled={songs.length === 0}
+          >
+            {#snippet icon()}<Share class="w-4 h-4" />{/snippet}
+          </IconActionButton>
         </div>
 
         <div class="flex flex-wrap items-center gap-2.5 mt-2.5 select-none relative z-40">
@@ -900,7 +911,6 @@
       onclick={() => { handleSaveAsCustomPlaylist(); overflowMenuPos = null; }}
       disabled={loading || songs.length === 0}
     />
-
     {#if (kind === "genre" || kind === "decade" || kind === "bpm" || kind === "missing_metadata" || kind === "missing_musicbrainz" || kind === "daypart") && playlistId !== undefined}
       <ContextMenuItem
         icon={RefreshCw}
@@ -934,6 +944,10 @@
       />
     {/if}
   </ContextMenu>
+{/if}
+
+{#if showShareModal}
+  <ShareModal entity={{ kind: "playlist", title: displayName, songs }} onClose={() => { showShareModal = false; }} />
 {/if}
 
 {#if showSaveModal}

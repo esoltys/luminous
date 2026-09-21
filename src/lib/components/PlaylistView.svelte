@@ -31,11 +31,13 @@
     SparkleIcon as Sparkles,
     FolderPlusIcon as FolderPlus,
     PushPinIcon as Pin,
-    PushPinSlashIcon as PinOff
+    PushPinSlashIcon as PinOff,
+    ShareNetworkIcon as Share
   } from "phosphor-svelte";
   import { resolveArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import type { PlaylistItem, Song } from "../types";
+  import { getPlaylistDisplayName } from "../utils/playlist";
   import { parseSearchRules, isSmartPlaylistSpec } from "../utils/filterParser";
   import { rememberScroll } from "../utils/scrollMemory";
   import { openInPicard } from "../utils/picard";
@@ -48,6 +50,7 @@
   import CoverArt from "./CoverArt.svelte";
   import CoverStack from "./CoverStack.svelte";
   import PlaylistContextMenu from "./PlaylistContextMenu.svelte";
+  import ShareModal from "./ShareModal.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import Modal from "./Modal.svelte";
   import Button from "./Button.svelte";
@@ -206,6 +209,11 @@
 
   let isQueue = $derived(
     activePlaylist !== undefined && activePlaylist.is_queue
+  );
+
+  let showShareModal = $state(false);
+  let shareSongs = $derived(
+    playlistsStore.activePlaylistTracks.filter((t) => !!t.song).map((t) => t.song!)
   );
 
   let isSpecialPlaylist = $derived(
@@ -781,6 +789,15 @@
                 {/snippet}
               </IconActionButton>
             {/if}
+            {#if !isQueue}
+              <IconActionButton
+                onclick={() => { showShareModal = true; }}
+                title={i18n.t("shareModal.menuItem")}
+                class="shrink-0"
+              >
+                {#snippet icon()}<Share class="w-4 h-4" />{/snippet}
+              </IconActionButton>
+            {/if}
           </div>
 
           {#if !windowLayoutStore.isDetailHeaderCollapsed}
@@ -1013,6 +1030,13 @@
       />
     {/if}
   </ContextMenu>
+{/if}
+
+{#if showShareModal && activePlaylist}
+  <ShareModal
+    entity={{ kind: "playlist", title: getPlaylistDisplayName(activePlaylist), songs: shareSongs }}
+    onClose={() => { showShareModal = false; }}
+  />
 {/if}
 
 {#if editingSongId !== null}

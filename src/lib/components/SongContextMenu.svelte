@@ -13,7 +13,8 @@
     ArrowSquareOutIcon as OpenInPicard,
     EyeSlashIcon as EyeSlash,
     EyeIcon as Eye,
-    ChartBarIcon as BarChart2
+    ChartBarIcon as BarChart2,
+    ShareNetworkIcon as Share
   } from "phosphor-svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { i18n } from "../stores/i18n.svelte";
@@ -26,6 +27,7 @@
   import ContextMenu from "./ContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
+  import ShareModal from "./ShareModal.svelte";
 
   let {
     x,
@@ -77,6 +79,13 @@
     toastStore.show(message);
   }
 
+  let showShareModal = $state(false);
+  // See AlbumContextMenu.svelte for why the menu must be hidden (not left
+  // mounted) the instant Share is clicked: ContextMenu's outside-click
+  // listener would otherwise treat any click inside the portalled
+  // ShareModal as "outside this menu" and tear the whole thing down.
+  let menuVisible = $state(true);
+
   async function handleToggleStatsExcluded() {
     const excluded = !statsExclusionsStore.isExcluded("song", String(song.id));
     await statsExclusionsStore.setExcluded("song", String(song.id), excluded);
@@ -88,6 +97,7 @@
   }
 </script>
 
+{#if menuVisible}
 <ContextMenu {x} {y} {onClose} estimatedHeight={280}>
   <div class="px-3 py-1 text-[11px] font-bold text-brand-text-primary border-b border-brand-border/40 mb-1 truncate">
     {#if selectedCount > 1}
@@ -164,6 +174,14 @@
       />
     {/if}
 
+    {#if song.artist}
+      <ContextMenuItem
+        icon={Share}
+        label={i18n.t("shareModal.menuItem")}
+        onclick={() => { menuVisible = false; showShareModal = true; }}
+      />
+    {/if}
+
     <ContextMenuItem
       icon={pinnedStore.isPinned("song", String(song.id)) ? PinOff : Pin}
       label={pinnedStore.isPinned("song", String(song.id))
@@ -201,3 +219,8 @@
     />
   {/if}
 </ContextMenu>
+{/if}
+
+{#if showShareModal && song.artist}
+  <ShareModal entity={{ kind: "artist", artistName: song.artist }} onClose={() => { showShareModal = false; onClose(); }} />
+{/if}
