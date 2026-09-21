@@ -36,6 +36,11 @@ export type ShareCardTheme = "light" | "dark";
 export interface ShareCardTrack {
   number?: number | null;
   title: string;
+  /** Shown as "Title — Secondary" (e.g. the track's artist on a playlist
+   * card, where tracks span multiple artists) — matches the "Label —
+   * Secondary" convention already used by the stats card's own rows. Album
+   * cards omit it since every track already shares the card's one artist. */
+  secondary?: string | null;
 }
 
 export interface ShareCardOptions {
@@ -200,7 +205,9 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
           (track.number != null
             ? `<span style="min-width:1.8em;text-align:right;opacity:0.7;">${track.number}</span>`
             : "") +
-          `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(track.title)}</span>` +
+          `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(track.title)}${
+            track.secondary ? ` <span style="opacity:0.65;">— ${escapeHtml(track.secondary)}</span>` : ""
+          }</span>` +
         `</div>`
     );
     const overflowRow =

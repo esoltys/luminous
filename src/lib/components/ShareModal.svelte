@@ -191,7 +191,9 @@
 
   let trackCards = $derived<ShareCardTrack[]>(
     entity.kind === "playlist"
-      ? sortedTracks.map((s, i) => ({ number: i + 1, title: s.title || "" }))
+      // A playlist spans multiple artists, unlike an album, so each row
+      // needs its own artist to be legible on its own.
+      ? sortedTracks.map((s, i) => ({ number: i + 1, title: s.title || "", secondary: s.artist || s.album_artist || "" }))
       : sortedTracks.map((s) => ({ number: s.track ?? null, title: s.title || "" }))
   );
 

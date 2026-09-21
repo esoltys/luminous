@@ -42,6 +42,16 @@ describe("buildShareCardSvg", () => {
     expect(svg).not.toContain("Opening Track");
   });
 
+  it("shows a track's secondary text (e.g. artist) alongside its title, for playlist cards spanning multiple artists", () => {
+    const { svg } = buildShareCardSvg({
+      ...baseOptions,
+      aspectRatio: "1:1",
+      tracks: [{ number: 1, title: "Opening Track", secondary: "Some Artist" }],
+    });
+    expect(svg).toContain("Opening Track");
+    expect(svg).toContain("Some Artist");
+  });
+
   it("caps visible tracks and shows a +N more overflow row", () => {
     const tracks = Array.from({ length: 20 }, (_, i) => ({ number: i + 1, title: `Track ${i + 1}` }));
     const { svg } = buildShareCardSvg({ ...baseOptions, aspectRatio: "16:9", tracks });
