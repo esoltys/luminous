@@ -340,8 +340,8 @@ describe("PlaylistView.svelte", () => {
     expect(metadataRow).not.toBeNull();
     expect(metadataRow?.firstElementChild).toBe(songsText);
 
-    // Cover stack container should be positioned at top-right (not bottom-right / self-stretch)
-    const coverStackContainer = document.querySelector(".w-48.h-36");
+    // Cover mosaic container should be positioned at top-right (not bottom-right / self-stretch)
+    const coverStackContainer = document.querySelector(".shrink-0.shadow-xl");
     expect(coverStackContainer).not.toBeNull();
     expect(coverStackContainer).toHaveClass("items-start");
     expect(coverStackContainer).not.toHaveClass("self-stretch");

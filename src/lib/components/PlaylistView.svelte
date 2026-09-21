@@ -49,6 +49,7 @@
   import { tagsStore } from "../stores/tags.svelte";
   import CoverArt from "./CoverArt.svelte";
   import CoverStack from "./CoverStack.svelte";
+  import CoverMosaic from "./CoverMosaic.svelte";
   import PlaylistContextMenu from "./PlaylistContextMenu.svelte";
   import ShareModal from "./ShareModal.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
@@ -75,13 +76,6 @@
     filesize: "75px", rating: "96px", playcount: "70px", skipcount: "70px",
     lastplayed: "90px", added: "90px", duration: "80px", path: "2fr", library: "130px", actions: "80px",
   };
-  import {
-    COVER_STACK_OFFSET_X_PX,
-    COVER_STACK_OFFSET_Y_PX,
-    COVER_STACK_ROTATION_DEG,
-    COVER_STACK_SCALE_STEP,
-    COVER_STACK_OPACITY_STEP,
-  } from "../constants";
 
   let editingSongId = $state<number | null>(null);
 
@@ -874,23 +868,8 @@
             <Sparkles class="w-16 h-16 text-[#F59E0B]" />
           </div>
         {:else if topAlbums.length > 0}
-          <div class="relative w-48 h-36 hidden sm:flex items-start justify-end shrink-0">
-            <div class="relative w-32 h-32 mt-5 mr-2">
-              {#each topAlbums.slice(0, 6) as album, i (i)}
-                <div
-                  class="absolute inset-0 overflow-hidden border border-brand-border/60 shadow-xl transition-all duration-300"
-                  style="z-index: {10 - i}; transform: translate({i * COVER_STACK_OFFSET_X_PX}px, {i * COVER_STACK_OFFSET_Y_PX}px) rotate({i * COVER_STACK_ROTATION_DEG}deg) scale({1 - i * COVER_STACK_SCALE_STEP}); opacity: {1 - i * COVER_STACK_OPACITY_STEP};"
-                >
-                  <CoverArt
-                    songId={album.songId}
-                    artEmbedded={album.artEmbedded}
-                    artAutomatic={album.artAutomatic}
-                    artManual={album.artManual}
-                    sizeClass="w-full h-full"
-                  />
-                </div>
-              {/each}
-            </div>
+          <div class="hidden sm:flex items-start shrink-0 shadow-xl">
+            <CoverMosaic covers={topAlbums} sizeClass="h-36" />
           </div>
         {/if}
         {/if}
