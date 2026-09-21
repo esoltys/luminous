@@ -31,6 +31,11 @@
     /** Collapses cards down to compact header-only rows (mirrors the
      * Albums/Artists cards-vs-rows toggle). */
     compact?: boolean;
+    /** Songs with no genre value at all — rendered as a trailing card in the
+     * same grid, matching the genre cards' size/styling, rather than as a
+     * separate full-width element below the grid. */
+    noGenreCount?: number;
+    onOpenNoGenre?: () => void;
   }
 
   let {
@@ -42,6 +47,8 @@
     sortField = "name",
     sortAsc = true,
     compact = false,
+    noGenreCount = 0,
+    onOpenNoGenre,
   }: Props = $props();
 
   // Portaled to document.body (see the imported `portal` action) rather than
@@ -390,6 +397,26 @@
       </div>
     </div>
   {/each}
+  {#if noGenreCount > 0}
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+      onclick={onOpenNoGenre}
+      class="rounded-lg bg-brand-sidebar border-2 border-brand-border/60 hover:border-brand-accent/60 overflow-hidden transition-colors cursor-pointer"
+    >
+      <div class="flex items-center gap-2 px-3 py-2.5">
+        <span class="flex-1 min-w-0 flex items-center justify-between gap-2">
+          <span class="text-sm font-semibold text-brand-text-primary truncate">
+            {i18n.t("songTags.noGenre", {}, "No Genre")}
+          </span>
+          <span class="text-xs text-brand-text-secondary tabular-nums shrink-0">
+            {i18n.t("songTags.songCount", { count: noGenreCount }, `${noGenreCount} songs`)}
+          </span>
+        </span>
+      </div>
+      <div class="px-3 pb-3 min-h-9 {compact ? 'hidden' : ''}"></div>
+    </div>
+  {/if}
 </div>
 
 {#if ghostInfo && pointerPos}

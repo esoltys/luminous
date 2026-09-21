@@ -274,18 +274,9 @@
         sortField={prefs.genreSortField}
         sortAsc={prefs.genreSortAsc}
         compact={prefs.genreCardsViewMode === "rows"}
+        noGenreCount={tagsStore.noGenreCount}
+        onOpenNoGenre={openNoGenre}
       />
-      {#if tagsStore.noGenreCount > 0}
-        <button
-          onclick={openNoGenre}
-          class="mt-1.5 w-full flex items-center justify-between px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 hover:border-brand-accent/60 transition-colors text-left text-brand-text-secondary"
-        >
-          <span class="text-sm font-semibold">{i18n.t("songTags.noGenre", {}, "No Genre")}</span>
-          <span class="text-xs tabular-nums">
-            {i18n.t("songTags.songCount", { count: tagsStore.noGenreCount }, `${tagsStore.noGenreCount} songs`)}
-          </span>
-        </button>
-      {/if}
     {/if}
 </div>
 
