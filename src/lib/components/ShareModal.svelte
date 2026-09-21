@@ -292,14 +292,22 @@
           coverStackUrls = [];
         }
       } else if (entity.kind === "artist") {
-        let url = artistPortraitUrl;
-        if (!url) {
-          const stack = getArtistCoverStack(artistAlbums, artistSongs, 1);
-          if (stack[0]) url = await resolveCoverUrl(stack[0]);
-        }
-        if (!cancelled) {
-          coverUrl = url;
-          coverStackUrls = [];
+        // Matches ArtistDetailView's own hero header: a portrait photo wins
+        // as a single image when one exists, otherwise fall back to a
+        // fanned stack of the artist's own album covers (getArtistCoverStack)
+        // rather than a single cover.
+        if (artistPortraitUrl) {
+          if (!cancelled) {
+            coverUrl = artistPortraitUrl;
+            coverStackUrls = [];
+          }
+        } else {
+          const stackItems = getArtistCoverStack(artistAlbums, artistSongs, 4);
+          const urls = (await Promise.all(stackItems.map(resolveCoverUrl))).filter((u): u is string => !!u);
+          if (!cancelled) {
+            coverUrl = urls[0] ?? null;
+            coverStackUrls = urls;
+          }
         }
       } else if (entity.kind === "playlist") {
         const stackItems = songsToCoverStack(entity.songs, 4);
