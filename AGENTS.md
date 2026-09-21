@@ -26,7 +26,7 @@ into Picard's territory; it's a different, complementary axis Picard was never m
 
 - NEVER commit or push directly to `main`. All changes ship via PR, even release version bumps and docs-only edits.
 - Merging is allowed once — and only once — every check on the PR has actually finished, not just the required ones GitHub's branch-protection summary cares about. Do not treat the green "Able to merge this pull request" banner or the API's `mergeable: MERGEABLE` field as that signal on their own — both go green as soon as required checks pass while non-required checks (e.g. Backend Tests, CodeQL) can still be `in_progress`. Confirm via `gh pr checks <pr> --watch` (blocks until every check concludes) or `gh pr checks <pr>` showing zero `pending`/`in_progress` rows, then run `gh pr merge <pr>`. Tell the user once it's merged.
-- PR base branch is `main` — see Branching Model below for when that changes (a future milestone integration branch, e.g. `3.0`).
+- PR base branch is always `main`, regardless of milestone.
 - Before creating a branch, confirm the base: `git fetch origin && git switch -c <branch> origin/<base>`.
 
 ## Destructive Operations
@@ -200,33 +200,11 @@ verify with the user, not a reason to skip telling them.
 
 ## Branching Model
 
-- **`main`** is the rolling release line, now on the 2.x series. `next` (the former 2.0
-  feature-integration branch) was merged into `main` and retired — 1.8.0 was the last 1.x
-  release. All feature and fix work, including what would previously have targeted `next`,
-  now targets `main` directly and ships as rolling 2.x releases per `docs/RELEASE_CHECKLIST.md`.
-- There is currently no long-lived integration branch. When the next major body of
-  work (breaking changes, a redesign, anything that needs to bake before release) warrants
-  isolating from the rolling release line again, cut a fresh branch named for the milestone
-  it's aiming at (e.g. `3.0`) rather than reusing the generic name `next` — the explicit
-  version number is easier to reason about when checking a PR's base or an issue's milestone.
-  Until that happens, don't create or target any integration branch other than `main`.
-- If/when such a branch exists again, the same mechanics that applied to `next` apply to it:
-  keep it current by periodically merging `main` into it; watch out for a prior sync that
-  landed as a squash commit (single parent, not a real merge — check with
-  `git show --no-patch --format='%P' <sync-commit>`), since a plain `git merge origin/main`
-  after one will walk the full pre-squash history and throw spurious conflicts in every file
-  the branch has touched since, even where `main` hasn't changed that file at all since the
-  last sync — before resolving any conflict by hand, diff the file between the last real sync
-  point and current `main` (`git diff <last-sync-commit> origin/main -- <file>`), and if it's
-  empty the conflict is a git artifact safe to resolve by keeping the integration branch's side
-  (`git checkout --ours -- <file>`); only do real content-level resolution where `main` actually
-  changed the file. Also double check `package.json` / `Cargo.toml` / `Cargo.lock` /
-  `tauri.conf.json` version fields after any merge like this in **either** direction — a clean
-  (non-conflicting) auto-merge can silently drag one branch's version onto the other, since git
-  applies the one-sided line change without knowing it's semantically wrong. This is exactly
-  how `main` ended up on `2.0.0` prematurely: a PR whose branch was cut from `next` got merged
-  into `main` instead of `next`, and every PR after it inherited that base — check a PR's actual
-  `baseRefName` (`gh pr view <n> --json baseRefName`) before merging, not just the branch name.
+- **`main`** is the rolling release line. All feature and fix work targets `main` directly and
+  ships as rolling releases per `docs/RELEASE_CHECKLIST.md` — regardless of milestone. A
+  milestone (e.g. `3.0`) tracks scope only, never a branch.
+- There is no long-lived integration branch, and none is planned. Don't create or target any
+  branch other than `main`, even for a milestone that sounds like it warrants isolation.
 
 ## Issue & PR Formatting
 
@@ -275,10 +253,8 @@ punt either to the user.
      a Priority using the scheme in [docs/ISSUE_PRIORITY.md](docs/ISSUE_PRIORITY.md) (which also
      has the `gh project item-add` / `item-edit` commands and field/option IDs). Do this for every
      bug or feature issue you create — don't leave the fields unset or punt them to the user.
-  9. Branch from and target the PR at `main`, unless a future milestone integration branch
-     exists and the issue's Milestone (`gh issue view <id> --json milestone`) says otherwise
-     (see Branching Model above) — don't assume the assigned branch name implies a different
-     base.
+  9. Branch from and target the PR at `main`. An issue's Milestone tracks scope only, not a
+     branch.
 - **Releases & Tagging**: When tagging a new release, only create and push a single semantic version tag matching the repository's convention (e.g., `vX.Y.Z` where X.Y.Z matches the project version in `package.json`/`Cargo.toml`) to avoid triggering duplicate build workflows in GitHub Actions.
 
 ## Git Hooks
