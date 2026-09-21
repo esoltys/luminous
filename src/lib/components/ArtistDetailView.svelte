@@ -36,7 +36,8 @@
     PushPinSlashIcon as PinOff,
     DotsThreeIcon as MoreHorizontal,
     ChartBarIcon as BarChart2,
-    CaretDownIcon as CaretDown
+    ArrowDownLeftIcon as ArrowDownLeft,
+    ArrowUpRightIcon as ArrowUpRight
   } from "phosphor-svelte";
   const ExternalLink = OpenInPicard;
   import type { Song, Playlist, AlbumItem, PlayContext, ArtistProfile, ExtendedArtworkResponse, SongContextEnrichment } from "../types";
@@ -577,27 +578,41 @@
 
   <div class="px-6 pt-6 flex flex-col gap-8">
     {#if !windowLayoutStore.isDetailHeaderCollapsed}
-      {#if hasChips}
-        <GenreChips
-          curatedTags={artistOnlyTags}
-          onCuratedTagClick={handleTagClick}
-          curatedTagTitle={(tag) => `Filter artists tagged "${tag}"`}
-          variant="full"
-        />
+      {#if hasChips || (hasProfileContent && !windowLayoutStore.isOverviewExpanded)}
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          {#if hasChips}
+            <GenreChips
+              curatedTags={artistOnlyTags}
+              onCuratedTagClick={handleTagClick}
+              curatedTagTitle={(tag) => `Filter artists tagged "${tag}"`}
+              variant="full"
+            />
+          {/if}
+          {#if hasProfileContent && !windowLayoutStore.isOverviewExpanded}
+            <button
+              type="button"
+              onclick={() => windowLayoutStore.setOverviewExpanded(true)}
+              class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-brand-border bg-brand-sidebar text-brand-text-secondary text-xs font-medium hover:text-brand-text-primary hover:border-brand-accent/40 transition-colors cursor-pointer shrink-0 ml-auto"
+            >
+              <ArrowDownLeft class="w-3.5 h-3.5" />
+              <span>{i18n.t('artistDetail.artistInfo', {}, 'Artist Info')}</span>
+            </button>
+          {/if}
+        </div>
       {/if}
     {/if}
 
     <!-- Artist Profile Card (About & Links) -->
-    {#if hasProfileContent && !windowLayoutStore.isDetailHeaderCollapsed}
+    {#if hasProfileContent && !windowLayoutStore.isDetailHeaderCollapsed && windowLayoutStore.isOverviewExpanded}
       {@const profile = artistProfile}
       <details
-        open={windowLayoutStore.isOverviewExpanded}
+        open
         ontoggle={(e) => windowLayoutStore.setOverviewExpanded(e.currentTarget.open)}
         class="group/overview border border-brand-border rounded-xl bg-brand-sidebar/40 backdrop-blur-md overflow-hidden shadow-xs transition-all @container"
       >
         <summary class="flex items-center justify-between px-4 py-2.5 sm:px-5 sm:py-3 text-xs font-semibold text-brand-text-secondary cursor-pointer select-none hover:text-brand-text-primary transition-colors">
-          <span>{i18n.t('artistDetail.overview', {}, 'Overview')}</span>
-          <CaretDown class="w-3.5 h-3.5 text-brand-text-secondary/70 group-open/overview:rotate-180 transition-transform" />
+          <span>{i18n.t('artistDetail.artistInfo', {}, 'Artist Info')}</span>
+          <ArrowUpRight class="w-3.5 h-3.5 text-brand-text-secondary/70" />
         </summary>
         <div class="p-4 sm:p-5 md:p-6 border-t border-brand-border/60 flex flex-col @2xl:flex-row gap-5 md:gap-6 justify-between">
           <!-- About Column (Left) -->
@@ -698,6 +713,7 @@
         </div>
       </details>
     {/if}
+
     {#if sets.length > 0}
       <HorizontalScrollRow title={i18n.t('artistDetail.setsFilter', { count: sets.length })}>
         {#each sets as album (album.album)}
