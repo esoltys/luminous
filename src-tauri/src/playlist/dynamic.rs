@@ -36,14 +36,17 @@ pub async fn reconcile_and_sync(app: tauri::AppHandle) {
     use tauri::{Emitter, Manager};
 
     let state = app.state::<crate::AppState>();
-    let deltas = {
-        let mut playlists = state.playlists.lock().await;
-        match playlists.reconcile_dynamic_playlists() {
-            Ok(deltas) => deltas,
-            Err(e) => {
-                log::error!("Dynamic playlist reconcile failed: {e}");
-                return;
-            }
+    // `with_playlists` runs the synchronous rusqlite reconcile pass via
+    // `block_in_place` (#1097) — see its doc comment in playlist.rs.
+    let deltas = match crate::playlist::with_playlists(&state.playlists, |pm| {
+        pm.reconcile_dynamic_playlists()
+    })
+    .await
+    {
+        Ok(deltas) => deltas,
+        Err(e) => {
+            log::error!("Dynamic playlist reconcile failed: {e}");
+            return;
         }
     };
     if deltas.is_empty() {

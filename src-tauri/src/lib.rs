@@ -415,7 +415,7 @@ fn spawn_position_tick_loop(
                 }
                 tick_counter = tick_counter.wrapping_add(1);
                 if tick_counter.is_multiple_of(4) {
-                    p.persist_position(pos);
+                    p.persist_position(pos).await;
                     let playback_snapshot = p.get_state().await;
                     crate::media_session::mirror_state(&app_handle, &playback_snapshot).await;
                 }

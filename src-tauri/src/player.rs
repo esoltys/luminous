@@ -697,8 +697,8 @@ impl Player {
 
         self.apply_loudness_gain(&song).await;
         self.preload_upcoming_waveforms();
-        self.persist_current_song();
-        self.persist_position(if real_play { start_ns } else { 0 });
+        self.persist_current_song().await;
+        self.persist_position(if real_play { start_ns } else { 0 }).await;
 
         if real_play {
             let audio = self.audio.lock().await;
@@ -796,22 +796,37 @@ impl Player {
     /// stale value behind. Called on every track change; separate from
     /// `persist_position`, which `lib.rs` also calls periodically on its own
     /// while a track just keeps playing.
-    pub fn persist_current_song(&self) {
-        if let Ok(conn) = self._db.pool.get() {
-            match &self.current_song {
-                Some(song) => app_state_set(&conn, "last_song_id", &song.id.to_string()),
-                None => app_state_clear(&conn, "last_song_id"),
-            }
+    ///
+    /// Runs the rusqlite write on a blocking thread (#1097) — every caller
+    /// already holds `AppState.player`'s async mutex, so doing this
+    /// synchronously on the tokio worker would stall every other IPC command
+    /// waiting on that lock for as long as the r2d2 pool takes.
+    pub async fn persist_current_song(&self) {
+        let db = self._db.clone();
+        let song_id = self.current_song.as_ref().map(|s| s.id);
+        let playlist_id = self.current_playlist_id;
+        let item_uuid = self.current_item_uuid.clone();
+        let result = tokio::task::spawn_blocking(move || {
+            if let Ok(conn) = db.pool.get() {
+                match song_id {
+                    Some(id) => app_state_set(&conn, "last_song_id", &id.to_string()),
+                    None => app_state_clear(&conn, "last_song_id"),
+                }
 
-            match self.current_playlist_id {
-                Some(pid) => app_state_set(&conn, "last_playlist_id", &pid.to_string()),
-                None => app_state_clear(&conn, "last_playlist_id"),
-            }
+                match playlist_id {
+                    Some(pid) => app_state_set(&conn, "last_playlist_id", &pid.to_string()),
+                    None => app_state_clear(&conn, "last_playlist_id"),
+                }
 
-            match &self.current_item_uuid {
-                Some(uuid) => app_state_set(&conn, "last_item_uuid", uuid),
-                None => app_state_clear(&conn, "last_item_uuid"),
+                match &item_uuid {
+                    Some(uuid) => app_state_set(&conn, "last_item_uuid", uuid),
+                    None => app_state_clear(&conn, "last_item_uuid"),
+                }
             }
+        })
+        .await;
+        if let Err(e) = result {
+            log::warn!("persist_current_song task panicked: {e}");
         }
     }
 
@@ -819,13 +834,23 @@ impl Player {
     /// restore. Called on every seek/pause/track-change and, while a track
     /// keeps playing, periodically by `lib.rs`'s position-tick loop —
     /// intentionally cheap (one `INSERT OR REPLACE`) since it runs often.
-    pub fn persist_position(&self, position_nanosec: u64) {
-        if let Ok(conn) = self._db.pool.get() {
-            app_state_set(
-                &conn,
-                "last_position_nanosec",
-                &position_nanosec.to_string(),
-            );
+    ///
+    /// Runs on a blocking thread for the same reason as
+    /// `persist_current_song` above (#1097).
+    pub async fn persist_position(&self, position_nanosec: u64) {
+        let db = self._db.clone();
+        let result = tokio::task::spawn_blocking(move || {
+            if let Ok(conn) = db.pool.get() {
+                app_state_set(
+                    &conn,
+                    "last_position_nanosec",
+                    &position_nanosec.to_string(),
+                );
+            }
+        })
+        .await;
+        if let Err(e) = result {
+            log::warn!("persist_position task panicked: {e}");
         }
     }
 
@@ -943,16 +968,25 @@ impl Player {
     /// milliseconds, `None` when they should apply instantly — the one
     /// decision `pause`, `resume`, and `stop` each otherwise re-derived from
     /// the same DB settings independently.
+    ///
+    /// Runs the rusqlite read on a blocking thread (#1097) — every caller is
+    /// itself called while `AppState.player`'s async mutex is held, so a
+    /// synchronous read here would stall every other IPC command waiting on
+    /// that lock for as long as the r2d2 pool takes.
     async fn fade_duration_ms(&self) -> Option<u32> {
-        let settings =
-            crate::fade::get_fade_settings_from_db(&self._db).unwrap_or_default();
+        let db = self._db.clone();
+        let settings = tokio::task::spawn_blocking(move || {
+            crate::fade::get_fade_settings_from_db(&db).unwrap_or_default()
+        })
+        .await
+        .unwrap_or_default();
         (settings.fade_pause_enabled && settings.fade_pause_duration_ms > 0)
             .then_some(settings.fade_pause_duration_ms)
     }
 
     pub async fn pause(&self) -> Result<()> {
         let pos = self.audio.lock().await.current_position_nanosec();
-        self.persist_position(pos);
+        self.persist_position(pos).await;
         match self.fade_duration_ms().await {
             Some(ms) => self.audio.lock().await.pause_with_fade(ms),
             None => self.audio.lock().await.pause(),
@@ -1086,8 +1120,8 @@ impl Player {
         self.current_song = None;
         self.current_item_uuid = None;
         self.current_playlist_id = None;
-        self.persist_current_song();
-        self.persist_position(0);
+        self.persist_current_song().await;
+        self.persist_position(0).await;
         match self.fade_duration_ms().await {
             Some(ms) => self.audio.lock().await.stop_with_fade(ms),
             None => self.audio.lock().await.stop(),
@@ -1101,7 +1135,7 @@ impl Player {
     /// plain, non-CUE song, so this is a no-op for the common case).
     pub async fn seek_to(&self, position_nanosec: u64) -> Result<()> {
         let absolute_ns = position_nanosec + self.current_song_beginning_nanosec();
-        self.persist_position(absolute_ns);
+        self.persist_position(absolute_ns).await;
         self.audio.lock().await.seek_to(absolute_ns)
     }
 
@@ -1900,8 +1934,8 @@ mod tests {
         assert_eq!(state.position_nanosec, 45_000_000_000);
 
         player.current_song = None;
-        player.persist_current_song();
-        player.persist_position(0);
+        player.persist_current_song().await;
+        player.persist_position(0).await;
 
         let conn = db_arc.pool.get().unwrap();
         let song_id_exists: Result<String, _> = conn.query_row(
