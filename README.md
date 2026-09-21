@@ -17,7 +17,7 @@
 
 </p>
 
-Luminous is a fast, local-first player for your own audio library. Built for anyone who wants the convenience of a modern streaming app without giving up ownership of their music. Turn a folder of files into a library worth browsing.
+Luminous is a fast, local-first player for your own audio library. Built for anyone who wants the convenience of a modern streaming app without giving up ownership of their music. Turn a folder of files into a library you'll enjoy browsing and listening to.
 
 ⭐ **[Issues](https://github.com/esoltys/luminous/issues)** - file a bug report or a feature request
 
