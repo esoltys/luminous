@@ -15,7 +15,7 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --tsgo --fail-on-warnings && bun run knip",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --tsgo --watch",
     "knip": "knip",
-    "tauri": "NO_STRIP=true tauri",
+    "tauri": "NO_STRIP=true LUMINOUS_REMOTE_DEVTOOLS=1 tauri",
     "icon": "tauri icon app-icon.png && bun run scripts/generate-msix-assets.ts",
     "generate:msix-assets": "bun run scripts/generate-msix-assets.ts",
     "test": "vitest",
