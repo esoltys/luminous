@@ -11,6 +11,7 @@
   } from "phosphor-svelte";
   import Modal from "./Modal.svelte";
   import Button from "./Button.svelte";
+  import Toggle from "./Toggle.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { collectionStore } from "../stores/collection.svelte";
@@ -580,16 +581,24 @@
         </div>
 
         {#if showTrackListToggle}
-          <label class="flex items-center gap-2 text-xs font-semibold text-brand-text-secondary cursor-pointer select-none">
-            <input type="checkbox" bind:checked={includeTrackList} class="accent-brand-accent" />
-            {i18n.t("shareModal.trackListToggle")}
-          </label>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold text-brand-text-secondary">{i18n.t("shareModal.trackListToggle")}</span>
+            <Toggle
+              checked={includeTrackList}
+              onchange={(v) => (includeTrackList = v)}
+              label={i18n.t("shareModal.trackListToggle")}
+            />
+          </div>
         {/if}
         {#if showLibraryToggle}
-          <label class="flex items-center gap-2 text-xs font-semibold text-brand-text-secondary cursor-pointer select-none">
-            <input type="checkbox" bind:checked={includeLibraryInfo} class="accent-brand-accent" />
-            {i18n.t("shareModal.libraryToggle")}
-          </label>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold text-brand-text-secondary">{i18n.t("shareModal.libraryToggle")}</span>
+            <Toggle
+              checked={includeLibraryInfo}
+              onchange={(v) => (includeLibraryInfo = v)}
+              label={i18n.t("shareModal.libraryToggle")}
+            />
+          </div>
         {/if}
       </div>
     </div>
