@@ -54,7 +54,7 @@ pub async fn reorder_pinned_items(
 
 #[tauri::command]
 pub async fn get_pinned_items(state: State<'_, AppState>) -> Result<Vec<PinnedItem>, String> {
-    let refs = crate::db::run_blocking(&state.db, |conn| pins::pinned_refs(conn))
+    let refs = crate::db::run_blocking(&state.db, pins::pinned_refs)
         .await
         .map_err(|e| e.to_string())?;
     if refs.is_empty() {
@@ -86,7 +86,7 @@ pub async fn get_pinned_items(state: State<'_, AppState>) -> Result<Vec<PinnedIt
                     None => {
                         let a = crate::collection::with_collection_scanner(
                             state.db.clone(),
-                            |scanner| pins::all_albums(scanner),
+                            pins::all_albums,
                         )
                         .await
                         .map_err(|e| e.to_string())?;
@@ -106,7 +106,7 @@ pub async fn get_pinned_items(state: State<'_, AppState>) -> Result<Vec<PinnedIt
                     None => {
                         let a = crate::collection::with_collection_scanner(
                             state.db.clone(),
-                            |scanner| pins::all_artists(scanner),
+                            pins::all_artists,
                         )
                         .await
                         .map_err(|e| e.to_string())?;

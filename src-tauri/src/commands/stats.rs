@@ -35,7 +35,7 @@ pub async fn get_listening_activity(
 pub async fn get_stats_exclusions(
     state: State<'_, AppState>,
 ) -> Result<Vec<(String, String)>, String> {
-    crate::db::run_blocking(&state.db, |conn| crate::stats::get_stats_exclusions(conn))
+    crate::db::run_blocking(&state.db, crate::stats::get_stats_exclusions)
         .await
         .map_err(|e| e.to_string())
 }
