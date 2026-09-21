@@ -117,9 +117,9 @@ const MINIPLAYER_MODE: WindowModeSpec = WindowModeSpec {
 const FULL_PLAYER_MODE: WindowModeSpec = WindowModeSpec {
     decorations: true,
     always_on_top: false,
-    min_size: (320.0, 120.0),
+    min_size: (320.0, 64.0),
     default_size: (FULL_PLAYER_WIDTH, FULL_PLAYER_HEIGHT),
-    min_clamp: (320.0, 120.0),
+    min_clamp: (320.0, 64.0),
     fallback_position: || Position::Center,
 };
 
