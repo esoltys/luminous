@@ -1,55 +1,36 @@
 <script lang="ts">
   import { DotsSixVerticalIcon as GripVertical } from "phosphor-svelte";
-  import { tagsStore } from "../stores/tags.svelte";
+  import { tagsStore, type TagGroup, type TagGroupChild } from "../stores/tags.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
-  import { genreColorHsl, genreColorHslBright, genreColorHslDark, getGenreColorChoices } from "../utils/genrePalette";
+  import { genreColorHsl, getGenreColorChoices } from "../utils/genrePalette";
   import { portal } from "../utils/portal";
-  import { themeStore } from "../stores/theme.svelte";
-  import { isLightColor } from "../utils/colorUtils";
-  import GenreContextMenu from "./GenreContextMenu.svelte";
+  import ArtistTagContextMenu from "./ArtistTagContextMenu.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import ColorPicker from "./ColorPicker.svelte";
 
   const genreColorChoices = getGenreColorChoices();
 
-  /** Subgenre chip text/border must read clearly against the chip's own pale
-   * fill, which tracks the active theme: bright text only works on a dark
-   * theme's near-black fill, so a light theme needs the dark/saturated
-   * variant instead. */
-  let isLightTheme = $derived(isLightColor(themeStore.resolvedColors["bg-main"]));
-  let genreColorHslFg = $derived(isLightTheme ? genreColorHslDark : genreColorHslBright);
-
   interface Props {
-    onOpenMainTag: (tag: string) => void;
-    onOpenGenreEdge: (root: string, child: string) => void;
+    hierarchy?: TagGroup[];
+    onOpenTag: (tag: string) => void;
     sortField?: "name" | "count";
     sortAsc?: boolean;
     /** Collapses cards down to compact header-only rows (mirrors the
      * Albums/Artists cards-vs-rows toggle). */
     compact?: boolean;
-    /** Songs with no genre value at all — rendered as a trailing card in the
-     * same grid, matching the genre cards' size/styling, rather than as a
-     * separate full-width element below the grid. */
-    noGenreCount?: number;
-    onOpenNoGenre?: () => void;
   }
 
   let {
-    onOpenMainTag,
-    onOpenGenreEdge,
+    hierarchy,
+    onOpenTag,
     sortField = "name",
     sortAsc = true,
     compact = false,
-    noGenreCount = 0,
-    onOpenNoGenre,
   }: Props = $props();
 
-  // Portaled to document.body (see the imported `portal` action) rather than
-  // positioned absolute inside the card — the card has overflow-hidden (so
-  // its header's flush corners match the rounded border), which otherwise
-  // clips the popover to a sliver instead of just placing it above other
-  // content.
+  let effectiveHierarchy = $derived(hierarchy ?? tagsStore.artistHierarchy);
+
   let colorPopoverFor = $state<string | null>(null);
   let colorPopoverPos = $state<{ x: number; y: number } | null>(null);
   let colorPopoverEl = $state<HTMLDivElement | null>(null);
@@ -67,8 +48,6 @@
   function handleWindowMouseDown(e: MouseEvent) {
     if (!colorPopoverFor) return;
     const target = e.target as HTMLElement;
-    // The swatch button that opened it toggles the popover itself in its
-    // own click handler — closing here first would just make it reopen.
     if (target.closest("[data-color-swatch-for]")) return;
     if (colorPopoverEl && !colorPopoverEl.contains(target)) {
       colorPopoverFor = null;
@@ -95,17 +74,14 @@
     node.select();
   }
 
-  /** Renaming a tag is just a merge where the destination name doesn't have
-   * to already exist — mergeTags rewrites every song's embedded/DB genre
-   * text from `from` to `into` regardless. */
   async function commitRename() {
     const from = renamingTag;
     const into = renameValue.trim();
     renamingTag = null;
     if (!from || !into || into === from) return;
-    const count = await tagsStore.mergeTags(from, into);
+    const count = await tagsStore.mergeArtistTags(from, into);
     toastStore.show(
-      i18n.t("songTags.renameToast", { count, name: into }, `Renamed to "${into}" (${count} songs updated)`),
+      i18n.t("songTags.artistRenameToast", { count, name: into }, `Renamed to "${into}" (${count} artists updated)`),
       "success"
     );
   }
@@ -114,70 +90,44 @@
     const name = deleteConfirmName;
     deleteConfirmName = null;
     if (!name) return;
-    const count = await tagsStore.deleteTags([name]);
+    const count = await tagsStore.deleteArtistTags([name]);
     toastStore.show(
-      i18n.t("songTags.deleteToast", { count }, `Deleted (${count} songs updated)`),
+      i18n.t("songTags.artistDeleteToast", { count }, `Deleted (${count} artists updated)`),
       "success"
     );
   }
 
-  /** Sorts both the cards themselves and each card's own children — display
-   * only, doesn't touch the persisted drag-reorder sort_order. */
   let sortedHierarchy = $derived.by(() => {
     const dir = sortAsc ? 1 : -1;
     const cmp = (a: { name: string; song_count: number }, b: { name: string; song_count: number }) =>
       sortField === "name" ? a.name.localeCompare(b.name) * dir : (a.song_count - b.song_count) * dir;
-    return tagsStore.hierarchy
+    return effectiveHierarchy
       .map((g) => ({ ...g, children: [...g.children].sort(cmp) }))
       .sort(cmp);
   });
 
-  // Drag reparent/promote/reorder cannot use native HTML5 drag-and-drop —
-  // Tauri intercepts OS-level drag-drop at the webview layer so `dragstart`
-  // never fires in-page (see ChipInput.svelte). Mirrors its pointer-event
-  // pattern instead.
   let draggedChip = $state<{ name: string; fromGroup: string } | null>(null);
-  /** Whole-card drag (via the header's grip handle) — demotes a top-level
-   * card into a sub-genre chip under whatever card it's dropped on. Shares
-   * the same dropTarget tracking as chip drags since hit-testing doesn't
-   * care which kind of drag is in progress. */
   let draggedCard = $state<string | null>(null);
   let dropTarget = $state<{ kind: "card" | "header" | "chip"; group: string; chip?: string } | null>(null);
-  /** Cursor position while a drag is active, for the floating ghost label —
-   * cleared alongside draggedChip/draggedCard on pointerup. */
   let pointerPos = $state<{ x: number; y: number } | null>(null);
-  /** Distinguishes a click from a drag on the same pointerdown/up pair — a
-   * chip's whole surface (not just its edge padding) needs to be grabbable,
-   * so click-to-open can no longer be a separate <button> the drag simply
-   * avoids; instead, movement past this threshold before pointerup is what
-   * makes it a drag rather than a click. */
   const CLICK_VS_DRAG_THRESHOLD_PX = 4;
   let dragStartPos: { x: number; y: number } | null = null;
   let dragMoved = false;
 
-  /** What the floating ghost shows: the dragged item's own label, colored
-   * like its current card (falls back to the target card's own hue for a
-   * promoted-from-nowhere case, though that shouldn't normally happen). */
   let ghostInfo = $derived.by(() => {
     if (draggedChip) {
-      const group = tagsStore.hierarchy.find((g) => g.name === draggedChip!.fromGroup);
+      const group = effectiveHierarchy.find((g) => g.name === draggedChip!.fromGroup);
       return { label: draggedChip.name, colorIndex: group?.color_index ?? 0 };
     }
     if (draggedCard) {
-      const group = tagsStore.hierarchy.find((g) => g.name === draggedCard);
+      const group = effectiveHierarchy.find((g) => g.name === draggedCard);
       return { label: draggedCard, colorIndex: group?.color_index ?? 0 };
     }
     return null;
   });
 
   function handleChipPointerDown(e: PointerEvent, name: string, fromGroup: string) {
-    // Right-click (and middle-click) must fall through untouched — calling
-    // preventDefault on any pointerdown suppresses the compatibility mouse
-    // events it's derived from, which was silently swallowing the
-    // right-button's contextmenu trigger too.
     if (e.button !== 0) return;
-    // The rename input and the a11y checkbox handle their own clicks —
-    // don't hijack them into a drag.
     if ((e.target as HTMLElement).tagName === "INPUT") return;
     e.preventDefault();
     draggedChip = { name, fromGroup };
@@ -204,29 +154,25 @@
       if (Math.hypot(dx, dy) > CLICK_VS_DRAG_THRESHOLD_PX) dragMoved = true;
     }
     const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
-    const chipEl = el?.closest<HTMLElement>("[data-chip-key]");
-    const headerEl = el?.closest<HTMLElement>("[data-card-header]");
-    const cardEl = el?.closest<HTMLElement>("[data-card-name]");
+    const chipEl = el?.closest<HTMLElement>("[data-artist-chip-key]");
+    const headerEl = el?.closest<HTMLElement>("[data-artist-card-header]");
+    const cardEl = el?.closest<HTMLElement>("[data-artist-card-name]");
     if (chipEl) {
-      dropTarget = { kind: "chip", group: chipEl.dataset.chipGroup!, chip: chipEl.dataset.chipKey! };
+      dropTarget = { kind: "chip", group: chipEl.dataset.artistChipGroup!, chip: chipEl.dataset.artistChipKey! };
     } else if (headerEl) {
-      dropTarget = { kind: "header", group: headerEl.dataset.cardHeader! };
+      dropTarget = { kind: "header", group: headerEl.dataset.artistCardHeader! };
     } else if (cardEl) {
-      dropTarget = { kind: "card", group: cardEl.dataset.cardName! };
+      dropTarget = { kind: "card", group: cardEl.dataset.artistCardName! };
     } else {
       dropTarget = null;
     }
   }
 
-  /** Clicking anywhere on a card other than a sub-genre chip (or one of the
-   * header's own controls) opens the card's drill-down — matches the
-   * inner name/count button's action, just extended to the whole card so
-   * users don't have to aim for that one small area. */
   function handleCardClick(e: MouseEvent, name: string) {
     const target = e.target as HTMLElement;
-    if (target.closest("[data-chip-key], [data-color-swatch-for]")) return;
+    if (target.closest("[data-artist-chip-key], [data-color-swatch-for]")) return;
     if (target.tagName === "INPUT") return;
-    onOpenMainTag(name);
+    onOpenTag(name);
   }
 
   async function handlePointerUp() {
@@ -243,31 +189,28 @@
 
     if (card) {
       if (target && target.group !== card) {
-        await tagsStore.demoteGroupToChild(card, target.group);
+        await tagsStore.demoteArtistGroupToChild(card, target.group);
       }
       return;
     }
 
     if (!chip) return;
-    // Barely moved — treat the whole gesture as a plain click on the chip
-    // rather than a drag, so the entire pill (not just its edge) opens the
-    // drill-down view.
     if (!moved) {
-      onOpenGenreEdge(chip.fromGroup, chip.name);
+      onOpenTag(chip.name);
       return;
     }
 
     if (!target) return;
     if (target.kind === "header" && target.group === chip.fromGroup) {
-      await tagsStore.promoteTag(chip.name);
+      await tagsStore.promoteArtistTag(chip.name);
     } else if (target.kind === "card" && target.group !== chip.fromGroup) {
-      await tagsStore.reparentTag(chip.name, target.group);
+      await tagsStore.reparentArtistTag(chip.name, target.group);
     } else if (target.kind === "chip" && target.group === chip.fromGroup && target.chip !== chip.name) {
-      const group = tagsStore.hierarchy.find((g) => g.name === chip.fromGroup);
-      const newIndex = group?.children.findIndex((c) => c.name === target.chip) ?? 0;
-      await tagsStore.reorderTagInGroup(chip.name, newIndex);
+      const group = effectiveHierarchy.find((g) => g.name === chip.fromGroup);
+      const newIndex = group?.children.findIndex((c: TagGroupChild) => c.name === target.chip) ?? 0;
+      await tagsStore.reorderArtistTagInGroup(chip.name, newIndex);
     } else if (target.kind === "chip" && target.group !== chip.fromGroup) {
-      await tagsStore.reparentTag(chip.name, target.group);
+      await tagsStore.reparentArtistTag(chip.name, target.group);
     }
   }
 </script>
@@ -280,22 +223,22 @@
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-      data-card-name={group.name}
+      data-artist-card-name={group.name}
       onclick={(e) => handleCardClick(e, group.name)}
       class="rounded-lg bg-brand-sidebar border-2 overflow-hidden transition-[opacity,box-shadow,border-color,transform] cursor-pointer {draggedCard === group.name ? 'opacity-40' : ''} {cardHighlighted ? 'border-brand-accent ring-4 ring-brand-accent/50 scale-[1.02] bg-brand-accent/5' : ''}"
       style={cardHighlighted ? '' : `border-color: ${genreColorHsl(group.color_index)}`}
     >
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div
-        data-card-header={group.name}
+        data-artist-card-header={group.name}
         oncontextmenu={(e) => openContextMenu(e, group.name, true)}
         class="flex items-center gap-2 px-3 py-2.5 transition-colors {dropTarget?.kind === 'header' && dropTarget.group === group.name ? 'bg-brand-accent/25' : ''}"
       >
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <span
           onpointerdown={(e) => handleCardPointerDown(e, group.name)}
-          class="shrink-0 touch-none genre-drag-handle {draggedCard === group.name ? 'is-dragging' : ''} text-brand-text-secondary/50 hover:text-brand-text-secondary"
-          title={i18n.t("songTags.dragCardTooltip", {}, "Drag to make this a sub-genre of another card")}
+          class="shrink-0 touch-none artist-drag-handle {draggedCard === group.name ? 'is-dragging' : ''} text-brand-text-secondary/50 hover:text-brand-text-secondary"
+          title={i18n.t("songTags.dragArtistCardTooltip", {}, "Drag to make this a sub-tag of another card")}
         >
           <GripVertical class="w-3.5 h-3.5" />
         </span>
@@ -324,12 +267,12 @@
         {:else}
           <button
             type="button"
-            onclick={() => onOpenMainTag(group.name)}
+            onclick={() => onOpenTag(group.name)}
             class="flex-1 min-w-0 flex items-center justify-between gap-2 text-left"
           >
             <span class="text-sm font-semibold text-brand-text-primary truncate">{group.name}</span>
             <span class="text-xs text-brand-text-secondary tabular-nums shrink-0">
-              {i18n.t("songTags.songCount", { count: group.song_count }, `${group.song_count} songs`)}
+              {i18n.t("songTags.artistCount", { count: group.song_count }, group.song_count === 1 ? "1 artist" : `${group.song_count} artists`)}
             </span>
           </button>
         {/if}
@@ -338,18 +281,18 @@
       <div class="px-3 pb-3 flex flex-wrap gap-1.5 min-h-9 {compact ? 'hidden' : ''}">
         {#if group.children.length === 0}
           <p class="text-xs text-brand-text-secondary/70 italic py-1">
-            {i18n.t("songTags.noSubgenresYet", {}, "No sub-genres yet — drag a tag here")}
+            {i18n.t("songTags.noArtistSubtagsYet", {}, "No sub-tags yet — drag a tag here")}
           </p>
         {/if}
         {#each group.children as child (child.name)}
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <!-- svelte-ignore a11y_no_static_element_interactions -->
           <span
-            data-chip-key={child.name}
-            data-chip-group={group.name}
+            data-artist-chip-key={child.name}
+            data-artist-chip-group={group.name}
             onpointerdown={(e) => handleChipPointerDown(e, child.name, group.name)}
             oncontextmenu={(e) => openContextMenu(e, child.name, false)}
-            class="inline-flex items-center gap-1 pl-2 pr-1.5 py-0.5 rounded-full border-2 bg-[color-mix(in_srgb,var(--color-brand-accent)_15%,var(--color-brand-sidebar))] text-brand-text-primary text-xs font-medium select-none touch-none transition-[opacity,box-shadow,transform] genre-drag-handle {draggedChip?.name === child.name ? 'is-dragging opacity-40' : ''} {dropTarget?.kind === 'chip' && dropTarget.chip === child.name ? 'ring-4 ring-brand-accent scale-110' : ''}"
+            class="inline-flex items-center gap-1 pl-2 pr-1.5 py-0.5 rounded-full border-2 bg-[color-mix(in_srgb,var(--color-brand-accent)_15%,var(--color-brand-sidebar))] text-brand-text-primary text-xs font-medium select-none touch-none transition-[opacity,box-shadow,transform] artist-drag-handle {draggedChip?.name === child.name ? 'is-dragging opacity-40' : ''} {dropTarget?.kind === 'chip' && dropTarget.chip === child.name ? 'ring-4 ring-brand-accent scale-110' : ''}"
             style={`border-color: ${genreColorHsl(group.color_index)};`}
           >
             {#if renamingTag === child.name}
@@ -365,10 +308,6 @@
                 class="w-24 bg-brand-main border border-brand-accent rounded px-1 text-brand-text-primary"
               />
             {:else}
-              <!-- Click-to-open is handled by handlePointerUp (a chip
-                   pointerdown/up with no meaningful movement) so the whole
-                   pill is grabbable for dragging, not just a <button>'s
-                   edge padding around the label. -->
               <span class="inline-flex items-baseline gap-1">
                 <span>{child.name}</span>
                 <span class="text-[0.85em] opacity-70">{child.song_count}</span>
@@ -379,26 +318,6 @@
       </div>
     </div>
   {/each}
-  {#if noGenreCount > 0}
-    <!-- svelte-ignore a11y_click_events_have_key_events -->
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div
-      onclick={onOpenNoGenre}
-      class="rounded-lg bg-brand-sidebar border-2 border-brand-border/60 hover:border-brand-accent/60 overflow-hidden transition-colors cursor-pointer"
-    >
-      <div class="flex items-center gap-2 px-3 py-2.5">
-        <span class="flex-1 min-w-0 flex items-center justify-between gap-2">
-          <span class="text-sm font-semibold text-brand-text-primary truncate">
-            {i18n.t("songTags.noGenre", {}, "No Genre")}
-          </span>
-          <span class="text-xs text-brand-text-secondary tabular-nums shrink-0">
-            {i18n.t("songTags.songCount", { count: noGenreCount }, `${noGenreCount} songs`)}
-          </span>
-        </span>
-      </div>
-      <div class="px-3 pb-3 min-h-9 {compact ? 'hidden' : ''}"></div>
-    </div>
-  {/if}
 </div>
 
 {#if ghostInfo && pointerPos}
@@ -411,7 +330,7 @@
 {/if}
 
 {#if colorPopoverFor && colorPopoverPos}
-  {@const group = sortedHierarchy.find((g) => g.name === colorPopoverFor)}
+  {@const group = effectiveHierarchy.find((g) => g.name === colorPopoverFor)}
   <div
     use:portal
     bind:this={colorPopoverEl}
@@ -421,7 +340,7 @@
     <ColorPicker
       choices={genreColorChoices}
       value={group ? String(group.color_index) : null}
-      onChange={(v) => { tagsStore.setGroupColor(colorPopoverFor!, Number(v)); colorPopoverFor = null; }}
+      onChange={(v) => { tagsStore.setArtistGroupColor(colorPopoverFor!, Number(v)); colorPopoverFor = null; }}
       size="sm"
       columns={5}
     />
@@ -429,13 +348,13 @@
 {/if}
 
 {#if contextMenuTarget}
-  <GenreContextMenu
+  <ArtistTagContextMenu
     x={contextMenuTarget.x}
     y={contextMenuTarget.y}
     name={contextMenuTarget.name}
     isRoot={contextMenuTarget.isRoot}
     onRename={() => startRename(contextMenuTarget!.name)}
-    onPromote={contextMenuTarget.isRoot ? undefined : () => tagsStore.promoteTag(contextMenuTarget!.name)}
+    onPromote={contextMenuTarget.isRoot ? undefined : () => tagsStore.promoteArtistTag(contextMenuTarget!.name)}
     onDelete={() => { deleteConfirmName = contextMenuTarget!.name; }}
     onClose={() => { contextMenuTarget = null; }}
   />
@@ -445,9 +364,9 @@
   <ConfirmDialog
     title={i18n.t("songTags.deleteBtn", {}, "Delete")}
     message={i18n.t(
-      "songTags.deleteConfirmMessage",
+      "songTags.artistDeleteConfirmMessage",
       { count: 1 },
-      `Remove "${deleteConfirmName}" from every song that carries it? This can't be undone.`
+      `Remove "${deleteConfirmName}" from every artist that carries it? This can't be undone.`
     )}
     confirmLabel={i18n.t("songTags.deleteBtn", {}, "Delete")}
     cancelLabel={i18n.t("songTags.cancelBtn", {}, "Cancel")}
@@ -457,20 +376,12 @@
 {/if}
 
 <style>
-  /* app.css resets cursor to default everywhere for this desktop app, and
-     `cursor` doesn't reliably inherit into a phosphor-svelte icon's rendered
-     <svg> from its wrapping element (confirmed via devtools: the <svg>'s
-     own computed cursor stayed "default" even though its parent <span>
-     correctly computed "grab") — so these drag handles set cursor
-     explicitly on every descendant rather than relying on inheritance.
-     :not(input) excludes the inline chip-rename <input>, which keeps its
-     own text-caret cursor from app.css. */
-  .genre-drag-handle,
-  .genre-drag-handle :global(*:not(input)) {
+  .artist-drag-handle,
+  .artist-drag-handle :global(*:not(input)) {
     cursor: grab !important;
   }
-  .genre-drag-handle.is-dragging,
-  .genre-drag-handle.is-dragging :global(*:not(input)) {
+  .artist-drag-handle.is-dragging,
+  .artist-drag-handle.is-dragging :global(*:not(input)) {
     cursor: grabbing !important;
   }
 </style>

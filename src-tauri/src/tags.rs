@@ -82,6 +82,9 @@ impl TagManager {
             if let Err(e) = conn.execute_batch(crate::db::TAG_HIERARCHY_TABLES_SQL) {
                 log::error!("Failed to ensure tag_groups/tag_assignments tables exist: {e}");
             }
+            if let Err(e) = conn.execute_batch(crate::db::ARTIST_TAG_HIERARCHY_TABLES_SQL) {
+                log::error!("Failed to ensure artist_tag_groups/artist_tag_assignments tables exist: {e}");
+            }
         }
         Self { db }
     }
@@ -947,6 +950,455 @@ impl TagManager {
         }
         Ok(())
     }
+
+    // -----------------------------------------------------------------
+    // Persisted Artist Tags curation hierarchy (#1105)
+    // -----------------------------------------------------------------
+
+    /// The persisted artist tag hierarchy: one [`TagGroup`] per `artist_tag_groups`
+    /// row, each with its assigned children. A child's `song_count` is the number
+    /// of distinct artists carrying that tag. A card's `song_count` is a rollup:
+    /// the number of distinct artists carrying the card's tag or any of its children.
+    pub fn get_artist_tag_hierarchy(&self) -> Result<Vec<TagGroup>> {
+        self.reconcile_artist_hierarchy()?;
+        let conn = self.db.pool.get()?;
+
+        let mut artist_tags: HashMap<String, HashSet<String>> = HashMap::new();
+        let mut tag_artists: HashMap<String, HashSet<String>> = HashMap::new();
+        let mut tag_display_names: HashMap<String, String> = HashMap::new();
+
+        let sql = format!(
+            "SELECT artist_profiles.artist_key, json_each.value AS tag
+             FROM artist_profiles, json_each(artist_profiles.tags)
+             JOIN songs ON COALESCE(NULLIF(songs.album_artist, ''), songs.artist)
+                 = artist_profiles.artist_key COLLATE NOCASE
+             WHERE songs.source IN ({lib})
+               AND songs.unavailable = 0
+               AND songs.not_included = 0
+             GROUP BY artist_profiles.artist_key, tag COLLATE NOCASE",
+            lib = *LIBRARY_SOURCES_SQL
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let rows = stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?;
+        for row in rows.flatten() {
+            let artist_key = row.0;
+            let tag = row.1;
+            let tag_lower = tag.to_lowercase();
+            tag_display_names.entry(tag_lower.clone()).or_insert(tag);
+            artist_tags.entry(artist_key.clone()).or_default().insert(tag_lower.clone());
+            tag_artists.entry(tag_lower).or_default().insert(artist_key);
+        }
+
+        let mut group_stmt = conn.prepare(
+            "SELECT id, name, color_index FROM artist_tag_groups ORDER BY sort_order, name COLLATE NOCASE",
+        )?;
+        let groups_raw: Vec<(i64, String, i32)> = group_stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        let mut child_stmt = conn.prepare(
+            "SELECT group_id, tag_name FROM artist_tag_assignments ORDER BY sort_order, tag_name COLLATE NOCASE",
+        )?;
+        let children_raw: Vec<(i64, String)> = child_stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        let groups = groups_raw
+            .into_iter()
+            .map(|(id, name, color_index)| {
+                let children: Vec<TagGroupChild> = children_raw
+                    .iter()
+                    .filter(|(group_id, _)| *group_id == id)
+                    .map(|(_, child_name)| {
+                        let count = tag_artists
+                            .get(&child_name.to_lowercase())
+                            .map(|s| s.len() as i64)
+                            .unwrap_or(0);
+                        TagGroupChild {
+                            name: child_name.clone(),
+                            song_count: count,
+                        }
+                    })
+                    .collect();
+
+                let mut rollup_keys: HashSet<String> =
+                    children.iter().map(|c| c.name.to_lowercase()).collect();
+                rollup_keys.insert(name.to_lowercase());
+
+                let mut matching_artists: HashSet<&str> = HashSet::new();
+                for (artist_key, tags) in &artist_tags {
+                    if !tags.is_disjoint(&rollup_keys) {
+                        matching_artists.insert(artist_key.as_str());
+                    }
+                }
+
+                TagGroup {
+                    name,
+                    song_count: matching_artists.len() as i64,
+                    color_index,
+                    children,
+                }
+            })
+            .collect();
+
+        Ok(groups)
+    }
+
+    /// Reconciles `artist_tag_groups`/`artist_tag_assignments` against artist
+    /// tags currently in use in the library (#1105). Auto-creates a group for
+    /// any tag name with none yet, preserves groups that have child assignments
+    /// even if not tagged directly on an artist (e.g. user-created "Award-Winning"),
+    /// and evicts orphaned rows.
+    pub fn reconcile_artist_hierarchy(&self) -> Result<bool> {
+        let conn = self.db.pool.get()?;
+        let mut stmt = conn.prepare(&format!(
+            "SELECT DISTINCT json_each.value AS tag
+             FROM artist_profiles, json_each(artist_profiles.tags)
+             JOIN songs ON COALESCE(NULLIF(songs.album_artist, ''), songs.artist)
+                 = artist_profiles.artist_key COLLATE NOCASE
+             WHERE songs.source IN ({lib})
+               AND songs.unavailable = 0
+               AND songs.not_included = 0",
+            lib = *LIBRARY_SOURCES_SQL
+        ))?;
+        let active_tags: Vec<String> = stmt
+            .query_map([], |r| r.get(0))?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        let active_tag_map: HashMap<String, String> = active_tags
+            .into_iter()
+            .map(|t| (t.to_lowercase(), t))
+            .collect();
+
+        let mut changed = false;
+
+        let mut existing_groups: HashMap<String, (i64, i64)> = HashMap::new();
+        {
+            let mut stmt = conn.prepare("SELECT id, name, is_custom FROM artist_tag_groups")?;
+            for row in stmt
+                .query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?, r.get::<_, i64>(2)?)))?
+                .filter_map(|r| r.ok())
+            {
+                existing_groups.insert(row.1.to_lowercase(), (row.0, row.2));
+            }
+        }
+
+        let mut existing_assignments: HashMap<String, i64> = HashMap::new();
+        {
+            let mut stmt = conn.prepare("SELECT tag_name, group_id FROM artist_tag_assignments")?;
+            for row in stmt
+                .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?)))?
+                .filter_map(|r| r.ok())
+            {
+                existing_assignments.insert(row.0.to_lowercase(), row.1);
+            }
+        }
+
+        // Strip any assignment whose name collides with an existing group
+        {
+            let mut stmt = conn.prepare(
+                "SELECT DISTINCT artist_tag_assignments.tag_name
+                 FROM artist_tag_assignments
+                 JOIN artist_tag_groups ON artist_tag_groups.name = artist_tag_assignments.tag_name COLLATE NOCASE",
+            )?;
+            let colliding: Vec<String> = stmt
+                .query_map([], |r| r.get::<_, String>(0))?
+                .filter_map(|r| r.ok())
+                .collect();
+            for name in colliding {
+                conn.execute(
+                    "DELETE FROM artist_tag_assignments WHERE tag_name = ?1 COLLATE NOCASE",
+                    params![name],
+                )?;
+                existing_assignments.remove(&name.to_lowercase());
+                changed = true;
+            }
+        }
+
+        // Evict child assignments for tags no longer used by any artist
+        for key in existing_assignments.keys().cloned().collect::<Vec<_>>() {
+            if !active_tag_map.contains_key(&key) {
+                conn.execute(
+                    "DELETE FROM artist_tag_assignments WHERE tag_name = ?1 COLLATE NOCASE",
+                    params![key],
+                )?;
+                existing_assignments.remove(&key);
+                changed = true;
+            }
+        }
+
+        // For groups: only evict if the group has NO children AND is not in active tags AND is not custom
+        for (key, (group_id, is_custom)) in existing_groups.clone() {
+            let has_children: bool = conn.query_row(
+                "SELECT EXISTS(SELECT 1 FROM artist_tag_assignments WHERE group_id = ?1)",
+                params![group_id],
+                |r| r.get(0),
+            )?;
+            if is_custom == 0 && !has_children && !active_tag_map.contains_key(&key) {
+                conn.execute(
+                    "DELETE FROM artist_tag_groups WHERE id = ?1",
+                    params![group_id],
+                )?;
+                existing_groups.remove(&key);
+                changed = true;
+            }
+        }
+
+        // Auto-create top-level groups for active tags that have neither a group nor an assignment
+        let mut next_group_sort: i32 = conn.query_row(
+            "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM artist_tag_groups",
+            [],
+            |r| r.get(0),
+        )?;
+        let mut group_count: i32 =
+            conn.query_row("SELECT COUNT(*) FROM artist_tag_groups", [], |r| r.get(0))?;
+
+        for (tag_lower, display_name) in &active_tag_map {
+            if !existing_groups.contains_key(tag_lower) && !existing_assignments.contains_key(tag_lower) {
+                conn.execute(
+                    "INSERT OR IGNORE INTO artist_tag_groups (name, color_index, sort_order) VALUES (?1, ?2, ?3)",
+                    params![display_name, group_count % PALETTE_SIZE, next_group_sort],
+                )?;
+                next_group_sort += 1;
+                group_count += 1;
+                changed = true;
+            }
+        }
+
+        Ok(changed)
+    }
+
+    pub fn set_artist_group_color(&self, name: &str, color_index: i32) -> Result<()> {
+        let conn = self.db.pool.get()?;
+        conn.execute(
+            "UPDATE artist_tag_groups SET color_index = ?1 WHERE name = ?2 COLLATE NOCASE",
+            params![color_index % PALETTE_SIZE, name],
+        )?;
+        Ok(())
+    }
+
+    pub fn reparent_artist_tag(&self, tag_name: &str, new_group_name: &str) -> Result<()> {
+        if tag_name.eq_ignore_ascii_case(new_group_name) {
+            return Ok(());
+        }
+        let conn = self.db.pool.get()?;
+        conn.execute(
+            "DELETE FROM artist_tag_groups WHERE name = ?1 COLLATE NOCASE",
+            params![tag_name],
+        )?;
+        let group_id: i64 = conn.query_row(
+            "SELECT id FROM artist_tag_groups WHERE name = ?1 COLLATE NOCASE",
+            params![new_group_name],
+            |r| r.get(0),
+        )?;
+        let next_sort: i32 = conn.query_row(
+            "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM artist_tag_assignments WHERE group_id = ?1",
+            params![group_id],
+            |r| r.get(0),
+        )?;
+        conn.execute(
+            "INSERT INTO artist_tag_assignments (tag_name, group_id, sort_order) VALUES (?1, ?2, ?3)
+             ON CONFLICT(tag_name) DO UPDATE SET group_id = excluded.group_id, sort_order = excluded.sort_order",
+            params![tag_name, group_id, next_sort],
+        )?;
+        Ok(())
+    }
+
+    pub fn promote_artist_tag(&self, tag_name: &str) -> Result<()> {
+        let conn = self.db.pool.get()?;
+        conn.execute(
+            "DELETE FROM artist_tag_assignments WHERE tag_name = ?1 COLLATE NOCASE",
+            params![tag_name],
+        )?;
+        let next_sort: i32 = conn.query_row(
+            "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM artist_tag_groups",
+            [],
+            |r| r.get(0),
+        )?;
+        let group_count: i32 =
+            conn.query_row("SELECT COUNT(*) FROM artist_tag_groups", [], |r| r.get(0))?;
+        conn.execute(
+            "INSERT INTO artist_tag_groups (name, color_index, sort_order) VALUES (?1, ?2, ?3)
+             ON CONFLICT(name) DO NOTHING",
+            params![tag_name, group_count % PALETTE_SIZE, next_sort],
+        )?;
+        Ok(())
+    }
+
+    pub fn demote_artist_group_to_child(&self, tag_name: &str, new_group_name: &str) -> Result<()> {
+        if tag_name.eq_ignore_ascii_case(new_group_name) {
+            return Ok(());
+        }
+        let conn = self.db.pool.get()?;
+        conn.execute(
+            "DELETE FROM artist_tag_groups WHERE name = ?1 COLLATE NOCASE",
+            params![tag_name],
+        )?;
+        let group_id: i64 = conn.query_row(
+            "SELECT id FROM artist_tag_groups WHERE name = ?1 COLLATE NOCASE",
+            params![new_group_name],
+            |r| r.get(0),
+        )?;
+        let next_sort: i32 = conn.query_row(
+            "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM artist_tag_assignments WHERE group_id = ?1",
+            params![group_id],
+            |r| r.get(0),
+        )?;
+        conn.execute(
+            "INSERT INTO artist_tag_assignments (tag_name, group_id, sort_order) VALUES (?1, ?2, ?3)
+             ON CONFLICT(tag_name) DO UPDATE SET group_id = excluded.group_id, sort_order = excluded.sort_order",
+            params![tag_name, group_id, next_sort],
+        )?;
+        Ok(())
+    }
+
+    pub fn reorder_artist_tag_in_group(&self, tag_name: &str, new_index: i32) -> Result<()> {
+        let conn = self.db.pool.get()?;
+        let group_id: i64 = conn.query_row(
+            "SELECT group_id FROM artist_tag_assignments WHERE tag_name = ?1 COLLATE NOCASE",
+            params![tag_name],
+            |r| r.get(0),
+        )?;
+        let mut stmt = conn.prepare(
+            "SELECT tag_name FROM artist_tag_assignments WHERE group_id = ?1 ORDER BY sort_order, tag_name COLLATE NOCASE",
+        )?;
+        let mut siblings: Vec<String> = stmt
+            .query_map(params![group_id], |r| r.get(0))?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        if let Some(pos) = siblings.iter().position(|s| s.eq_ignore_ascii_case(tag_name)) {
+            let item = siblings.remove(pos);
+            let target = (new_index.max(0) as usize).min(siblings.len());
+            siblings.insert(target, item);
+            for (i, name) in siblings.iter().enumerate() {
+                conn.execute(
+                    "UPDATE artist_tag_assignments SET sort_order = ?1 WHERE tag_name = ?2 COLLATE NOCASE",
+                    params![i as i32, name],
+                )?;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn create_artist_tag_group(&self, name: &str) -> Result<()> {
+        let name = name.trim();
+        if name.is_empty() {
+            return Ok(());
+        }
+        let conn = self.db.pool.get()?;
+        conn.execute(
+            "DELETE FROM artist_tag_assignments WHERE tag_name = ?1 COLLATE NOCASE",
+            params![name],
+        )?;
+        let next_sort: i32 = conn.query_row(
+            "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM artist_tag_groups",
+            [],
+            |r| r.get(0),
+        )?;
+        let group_count: i32 =
+            conn.query_row("SELECT COUNT(*) FROM artist_tag_groups", [], |r| r.get(0))?;
+        conn.execute(
+            "INSERT INTO artist_tag_groups (name, color_index, sort_order, is_custom) VALUES (?1, ?2, ?3, 1)
+             ON CONFLICT(name) DO UPDATE SET is_custom = 1",
+            params![name, group_count % PALETTE_SIZE, next_sort],
+        )?;
+        Ok(())
+    }
+
+    pub fn merge_artist_tags(&self, from: &str, into: &str) -> Result<usize> {
+        let conn = self.db.pool.get()?;
+        let mut stmt = conn.prepare(
+            "SELECT artist_key, tags FROM artist_profiles WHERE tags LIKE ?1",
+        )?;
+        let rows: Vec<(String, String)> = stmt
+            .query_map(params![format!("%\"{}\"%", from)], |r| Ok((r.get(0)?, r.get(1)?)))?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        let mut updated_count = 0;
+        for (artist_key, tags_json) in rows {
+            if let Ok(mut tags) = serde_json::from_str::<Vec<String>>(&tags_json) {
+                let mut modified = false;
+                let has_into = tags.iter().any(|t| t.eq_ignore_ascii_case(into));
+                tags.retain(|t| {
+                    if t.eq_ignore_ascii_case(from) {
+                        modified = true;
+                        false
+                    } else {
+                        true
+                    }
+                });
+                if modified {
+                    if !has_into {
+                        tags.push(into.to_string());
+                    }
+                    if let Ok(new_json) = serde_json::to_string(&tags) {
+                        conn.execute(
+                            "UPDATE artist_profiles SET tags = ?1 WHERE artist_key = ?2",
+                            params![new_json, artist_key],
+                        )?;
+                        updated_count += 1;
+                    }
+                }
+            }
+        }
+
+        conn.execute(
+            "DELETE FROM artist_tag_assignments WHERE tag_name = ?1 COLLATE NOCASE",
+            params![from],
+        )?;
+        conn.execute(
+            "DELETE FROM artist_tag_groups WHERE name = ?1 COLLATE NOCASE",
+            params![from],
+        )?;
+
+        Ok(updated_count)
+    }
+
+    pub fn delete_artist_tags(&self, names: &[String]) -> Result<usize> {
+        let conn = self.db.pool.get()?;
+        let mut stmt = conn.prepare("SELECT artist_key, tags FROM artist_profiles")?;
+        let rows: Vec<(String, String)> = stmt
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        let target_set: HashSet<String> = names.iter().map(|n| n.to_lowercase()).collect();
+        let mut updated_count = 0;
+
+        for (artist_key, tags_json) in rows {
+            if let Ok(mut tags) = serde_json::from_str::<Vec<String>>(&tags_json) {
+                let original_len = tags.len();
+                tags.retain(|t| !target_set.contains(&t.to_lowercase()));
+                if tags.len() != original_len {
+                    if let Ok(new_json) = serde_json::to_string(&tags) {
+                        conn.execute(
+                            "UPDATE artist_profiles SET tags = ?1 WHERE artist_key = ?2",
+                            params![new_json, artist_key],
+                        )?;
+                        updated_count += 1;
+                    }
+                }
+            }
+        }
+
+        for name in names {
+            conn.execute(
+                "DELETE FROM artist_tag_assignments WHERE tag_name = ?1 COLLATE NOCASE",
+                params![name],
+            )?;
+            conn.execute(
+                "DELETE FROM artist_tag_groups WHERE name = ?1 COLLATE NOCASE",
+                params![name],
+            )?;
+        }
+
+        Ok(updated_count)
+    }
 }
 
 /// Reconciles the persisted Genres hierarchy against the library and, if
@@ -964,6 +1416,21 @@ pub async fn reconcile_hierarchy_and_notify(app: tauri::AppHandle) {
         }
         Ok(false) => {}
         Err(e) => log::error!("Tag hierarchy reconcile failed: {e}"),
+    }
+}
+
+/// Reconciles the persisted Artist Tags hierarchy against the library and, if
+/// anything changed, emits `artist-tags-changed` so the frontend can refresh (#1105).
+pub async fn reconcile_artist_hierarchy_and_notify(app: tauri::AppHandle) {
+    use tauri::{Emitter, Manager};
+    let state = app.state::<crate::AppState>();
+    let manager = TagManager::new(state.db.clone());
+    match manager.reconcile_artist_hierarchy() {
+        Ok(true) => {
+            let _ = app.emit("artist-tags-changed", ());
+        }
+        Ok(false) => {}
+        Err(e) => log::error!("Artist tag hierarchy reconcile failed: {e}"),
     }
 }
 
@@ -1710,6 +2177,146 @@ mod tests {
                 .any(|c| c.name.eq_ignore_ascii_case("Electronic")),
             "Electronic must not be nested as its own sub-genre"
         );
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_artist_tag_hierarchy_grouping_and_rollup() {
+        use crate::collection::CollectionScanner;
+        use crate::models::{ArtistProfile, QueuePopulationMode};
+
+        let (db, dir) = test_db();
+        let conn = db.pool.get().unwrap();
+        let manager = TagManager::new(db.clone());
+        let scanner = CollectionScanner::new(db.clone());
+
+        let insert_artist_song = |path: &str, artist: &str| {
+            insert_song(&db, path, "Rock");
+            conn.execute(
+                "UPDATE songs SET artist = ?1 WHERE path = ?2",
+                params![artist, path],
+            )
+            .unwrap();
+        };
+
+        insert_artist_song("/rush1.mp3", "Rush");
+        insert_artist_song("/celine1.mp3", "Celine Dion");
+        insert_artist_song("/adele1.mp3", "Adele");
+
+        scanner
+            .set_artist_profile(&ArtistProfile {
+                artist_key: "Rush".to_string(),
+                tags: vec!["Canadian".to_string(), "Juno Award".to_string()],
+                ..Default::default()
+            })
+            .unwrap();
+
+        scanner
+            .set_artist_profile(&ArtistProfile {
+                artist_key: "Celine Dion".to_string(),
+                tags: vec![
+                    "Canadian".to_string(),
+                    "Juno Award".to_string(),
+                    "Grammy Award".to_string(),
+                ],
+                ..Default::default()
+            })
+            .unwrap();
+
+        scanner
+            .set_artist_profile(&ArtistProfile {
+                artist_key: "Adele".to_string(),
+                tags: vec![
+                    "English".to_string(),
+                    "Brit Award".to_string(),
+                    "Grammy Award".to_string(),
+                ],
+                ..Default::default()
+            })
+            .unwrap();
+
+        // 1. Initial hierarchy builds individual cards for each distinct tag
+        let hierarchy = manager.get_artist_tag_hierarchy().unwrap();
+        assert!(hierarchy.iter().any(|g| g.name == "Juno Award"));
+        assert!(hierarchy.iter().any(|g| g.name == "Grammy Award"));
+        assert!(hierarchy.iter().any(|g| g.name == "Brit Award"));
+        assert!(hierarchy.iter().any(|g| g.name == "Canadian"));
+
+        // 2. Create parent group "Award-Winning" and reparent the award tags into it
+        manager.create_artist_tag_group("Award-Winning").unwrap();
+        manager.set_artist_group_color("Award-Winning", 4).unwrap();
+        manager
+            .reparent_artist_tag("Juno Award", "Award-Winning")
+            .unwrap();
+        manager
+            .reparent_artist_tag("Grammy Award", "Award-Winning")
+            .unwrap();
+        manager
+            .reparent_artist_tag("Brit Award", "Award-Winning")
+            .unwrap();
+
+        let hierarchy_after = manager.get_artist_tag_hierarchy().unwrap();
+        let award_group = hierarchy_after
+            .iter()
+            .find(|g| g.name == "Award-Winning")
+            .unwrap();
+
+        assert_eq!(award_group.color_index, 4);
+        assert_eq!(award_group.children.len(), 3);
+
+        // Unique artists carrying Juno, Grammy, or Brit: Rush, Celine Dion, Adele (3 artists)
+        assert_eq!(award_group.song_count, 3);
+
+        let juno_child = award_group
+            .children
+            .iter()
+            .find(|c| c.name == "Juno Award")
+            .unwrap();
+        assert_eq!(juno_child.song_count, 2); // Rush + Celine Dion
+
+        let grammy_child = award_group
+            .children
+            .iter()
+            .find(|c| c.name == "Grammy Award")
+            .unwrap();
+        assert_eq!(grammy_child.song_count, 2); // Celine Dion + Adele
+
+        let brit_child = award_group
+            .children
+            .iter()
+            .find(|c| c.name == "Brit Award")
+            .unwrap();
+        assert_eq!(brit_child.song_count, 1); // Adele
+
+        // 3. get_songs_by_artist_tag on parent group "Award-Winning" returns songs by all 3 artists
+        let songs = scanner
+            .get_songs_by_artist_tag("Award-Winning", 50, QueuePopulationMode::All)
+            .unwrap();
+        assert_eq!(songs.len(), 3);
+
+        // 4. Promote "Brit Award" back to top-level
+        manager.promote_artist_tag("Brit Award").unwrap();
+        let hierarchy_promoted = manager.get_artist_tag_hierarchy().unwrap();
+        assert!(hierarchy_promoted.iter().any(|g| g.name == "Brit Award"));
+        let award_group2 = hierarchy_promoted
+            .iter()
+            .find(|g| g.name == "Award-Winning")
+            .unwrap();
+        assert_eq!(award_group2.children.len(), 2);
+        assert_eq!(award_group2.song_count, 3); // Rush, Celine Dion, and Adele (via Grammy Award)
+
+        // 5. Demote "Canadian" card into "Award-Winning"
+        manager
+            .demote_artist_group_to_child("Canadian", "Award-Winning")
+            .unwrap();
+        let hierarchy_demoted = manager.get_artist_tag_hierarchy().unwrap();
+        assert!(!hierarchy_demoted.iter().any(|g| g.name == "Canadian"));
+        let award_group3 = hierarchy_demoted
+            .iter()
+            .find(|g| g.name == "Award-Winning")
+            .unwrap();
+        assert!(award_group3.children.iter().any(|c| c.name == "Canadian"));
 
         let _ = std::fs::remove_dir_all(dir);
     }

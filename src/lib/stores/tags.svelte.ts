@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { GenreGroup, QueuePopulationMode, Song, Tag, TagGroup } from "../types";
+import type { GenreGroup, QueuePopulationMode, Song, Tag, TagGroup, TagGroupChild } from "../types";
+export type { TagGroup, TagGroupChild };
 
 /**
  * Genre/tag browsing (#224) plus the persisted Genres curation hierarchy
@@ -24,12 +25,13 @@ class TagsStore {
   hierarchy = $state<TagGroup[]>([]);
   private hierarchyLoadStarted = false;
 
-  /** Artist tags (curated, DB-only, `artist_profiles.tags` — #962/#956
-   * follow-up), browsable alongside genre in the Genres page but never part
-   * of `hierarchy`: an artist tag has no embedded file to write to, so it
-   * can't be merged/renamed/reparented/colored the way a genre tag can. */
+  /** Artist tags (curated, DB-only, `artist_profiles.tags` — #962/#956/#1105).
+   * Now supporting a single-layer hierarchy with group cards and child chips. */
   artistTags = $state<Tag[]>([]);
   private artistTagsLoadStarted = false;
+
+  artistHierarchy = $state<TagGroup[]>([]);
+  private artistHierarchyLoadStarted = false;
 
   async loadArtistTags() {
     const result = await invoke<Tag[]>("get_artist_tags_overview");
@@ -40,6 +42,66 @@ class TagsStore {
     if (this.artistTagsLoadStarted) return;
     this.artistTagsLoadStarted = true;
     this.loadArtistTags().catch((e) => console.error("Failed to load artist tags:", e));
+  }
+
+  async listenForArtistHierarchyChanges(): Promise<() => void> {
+    return listen("artist-tags-changed", () => {
+      this.loadArtistHierarchy();
+      this.loadArtistTags();
+    });
+  }
+
+  async loadArtistHierarchy() {
+    const result = await invoke<TagGroup[]>("get_artist_tag_hierarchy");
+    this.artistHierarchy = Array.isArray(result) ? result : [];
+  }
+
+  ensureArtistHierarchyLoaded() {
+    if (this.artistHierarchyLoadStarted) return;
+    this.artistHierarchyLoadStarted = true;
+    this.loadArtistHierarchy().catch((e) => console.error("Failed to load artist tag hierarchy:", e));
+  }
+
+  async setArtistGroupColor(name: string, colorIndex: number) {
+    await invoke("set_artist_group_color", { name, colorIndex });
+    await this.loadArtistHierarchy();
+  }
+
+  async reparentArtistTag(tagName: string, newGroupName: string) {
+    await invoke("reparent_artist_tag", { tagName, newGroupName });
+    await Promise.all([this.loadArtistHierarchy(), this.loadArtistTags()]);
+  }
+
+  async promoteArtistTag(tagName: string) {
+    await invoke("promote_artist_tag", { tagName });
+    await Promise.all([this.loadArtistHierarchy(), this.loadArtistTags()]);
+  }
+
+  async demoteArtistGroupToChild(tagName: string, newGroupName: string) {
+    await invoke("demote_artist_group_to_child", { tagName, newGroupName });
+    await Promise.all([this.loadArtistHierarchy(), this.loadArtistTags()]);
+  }
+
+  async reorderArtistTagInGroup(tagName: string, newIndex: number) {
+    await invoke("reorder_artist_tag_in_group", { tagName, newIndex });
+    await this.loadArtistHierarchy();
+  }
+
+  async createArtistTagGroup(name: string) {
+    await invoke("create_artist_tag_group", { name });
+    await Promise.all([this.loadArtistHierarchy(), this.loadArtistTags()]);
+  }
+
+  async mergeArtistTags(from: string, into: string): Promise<number> {
+    const count = await invoke<number>("merge_artist_tags", { from, into });
+    await Promise.all([this.loadArtistHierarchy(), this.loadArtistTags()]);
+    return count;
+  }
+
+  async deleteArtistTags(names: string[]): Promise<number> {
+    const count = await invoke<number>("delete_artist_tags", { names });
+    await Promise.all([this.loadArtistHierarchy(), this.loadArtistTags()]);
+    return count;
   }
 
   /** Call from the Genres tab's onMount (and unlisten on unmount, same as

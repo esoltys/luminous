@@ -518,8 +518,9 @@ impl CollectionScanner {
         Ok(songs)
     }
 
-    /// Songs by artists having a given custom profile tag (e.g. "canadian"),
-    /// selected per `mode`'s bias (see #120), for per-artist-tag auto-playlists.
+    /// Songs by artists having a given custom profile tag (e.g. "canadian")
+    /// or, if `tag` is a curated hierarchy group card (e.g. "Award-Winning"),
+    /// matching that tag or any of its child tags (#1105).
     pub fn get_songs_by_artist_tag(
         &self,
         tag: &str,
@@ -528,24 +529,54 @@ impl CollectionScanner {
     ) -> Result<Vec<Song>> {
         let conn = self.db.pool.get()?;
         let (extra_where, order_by) = mode_query_fragments(mode);
+
+        let group_id: Option<i64> = conn
+            .query_row(
+                "SELECT id FROM artist_tag_groups WHERE name = ?1 COLLATE NOCASE",
+                params![tag],
+                |r| r.get(0),
+            )
+            .optional()?;
+
+        let tags: Vec<String> = if let Some(gid) = group_id {
+            let mut stmt = conn.prepare(
+                "SELECT tag_name FROM artist_tag_assignments WHERE group_id = ?1",
+            )?;
+            let mut list: Vec<String> = stmt
+                .query_map(params![gid], |r| r.get(0))?
+                .filter_map(|r| r.ok())
+                .collect();
+            list.push(tag.to_string());
+            list
+        } else {
+            vec![tag.to_string()]
+        };
+
+        let placeholders = tags.iter().map(|_| "?").collect::<Vec<_>>().join(",");
         let sql = format!(
             "SELECT {} FROM songs
              WHERE COALESCE(NULLIF(album_artist, ''), artist) IN (
                  SELECT artist_key FROM artist_profiles, json_each(artist_profiles.tags)
-                 WHERE json_each.value = ?1 COLLATE NOCASE
+                 WHERE json_each.value IN ({placeholders}) COLLATE NOCASE
              )
                AND source IN ({lib})
                AND unavailable = 0
                AND not_included = 0
                {extra_where}
              ORDER BY {order_by}
-             LIMIT ?2",
+             LIMIT ?{}",
             SONG_SELECT_COLS,
+            tags.len() + 1,
             lib = *LIBRARY_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
+        let mut params: Vec<&dyn rusqlite::ToSql> = Vec::new();
+        for t in &tags {
+            params.push(t);
+        }
+        params.push(&limit);
         let songs = stmt
-            .query_map(params![tag, limit], row_to_song)?
+            .query_map(params.as_slice(), row_to_song)?
             .filter_map(|r| r.ok())
             .collect();
         Ok(songs)
@@ -661,17 +692,13 @@ impl CollectionScanner {
         Ok(tags)
     }
 
-    /// Every artist tag in the library with how many songs (by artists
-    /// carrying that tag) it currently matches — the browsable-only
-    /// counterpart to the embedded-genre `TagManager::get_tag_hierarchy` for
-    /// the Genres page (#962/#956 follow-up): artist tags are curated,
-    /// DB-only metadata with no file to write to, so unlike genre they never
-    /// get their own mergeable/renameable/colorable hierarchy entry here —
-    /// just a name and a count to browse by.
+    /// Every artist tag in the library with how many artists carrying that
+    /// tag it currently matches (#1105) — the counterpart to the embedded-genre
+    /// `TagManager::get_tag_hierarchy` for the Genres page.
     pub fn get_artist_tag_counts(&self) -> Result<Vec<Tag>> {
         let conn = self.db.pool.get()?;
         let sql = format!(
-            "SELECT json_each.value AS tag, COUNT(DISTINCT songs.id) AS song_count
+            "SELECT json_each.value AS tag, COUNT(DISTINCT artist_profiles.artist_key) AS song_count
              FROM artist_profiles, json_each(artist_profiles.tags)
              JOIN songs ON COALESCE(NULLIF(songs.album_artist, ''), songs.artist)
                  = artist_profiles.artist_key COLLATE NOCASE
@@ -3341,9 +3368,11 @@ mod tests {
         };
 
         // Two Danheim tracks (one crediting album_artist, one plain artist)
-        // and one Gunship track, tagged with a different (unrelated) genre.
+        // Two Danheim tracks (one crediting album_artist, one plain artist),
+        // one Wardruna track (sharing "Nordic Folk"), and one Gunship track.
         insert_song("path/danheim1.mp3", "Danheim", Some("Danheim"));
         insert_song("path/danheim2.mp3", "Danheim", None);
+        insert_song("path/wardruna.mp3", "Wardruna", None);
         insert_song("path/gunship.mp3", "Gunship", None);
 
         set_artist_profile_conn(
@@ -3351,6 +3380,15 @@ mod tests {
             &ArtistProfile {
                 artist_key: "Danheim".to_string(),
                 tags: vec!["Nordic Folk".to_string(), "Viking Music".to_string()],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        set_artist_profile_conn(
+            &conn,
+            &ArtistProfile {
+                artist_key: "Wardruna".to_string(),
+                tags: vec!["Nordic Folk".to_string()],
                 ..Default::default()
             },
         )
@@ -3369,8 +3407,10 @@ mod tests {
         let by_name: std::collections::HashMap<&str, i64> =
             counts.iter().map(|t| (t.name.as_str(), t.song_count)).collect();
 
+        // Nordic Folk is on 2 distinct artists (Danheim, Wardruna), even though Danheim has 2 songs.
         assert_eq!(by_name.get("Nordic Folk"), Some(&2));
-        assert_eq!(by_name.get("Viking Music"), Some(&2));
+        // Viking Music is on 1 artist (Danheim), despite 2 songs.
+        assert_eq!(by_name.get("Viking Music"), Some(&1));
         assert_eq!(by_name.get("Synthwave"), Some(&1));
 
         let _ = std::fs::remove_dir_all(temp_dir);
