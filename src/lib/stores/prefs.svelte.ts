@@ -3,7 +3,6 @@ import { invoke } from "@tauri-apps/api/core";
 export type RatingStyle = "heart" | "stars";
 type SeekBarMode = "waveform" | "bands";
 export type CollectionViewMode = "cards" | "rows";
-export type GenreViewMode = "genre" | "tags";
 export type GenreSortField = "name" | "count";
 export type WeekStart = "sunday" | "monday";
 
@@ -16,7 +15,7 @@ interface UiPreferences {
   artists_view_mode: CollectionViewMode;
   playlists_auto_view_mode: CollectionViewMode;
   playlists_custom_view_mode: CollectionViewMode;
-  genre_view_mode: GenreViewMode;
+  genre_view_mode: string;
   genre_cards_view_mode: CollectionViewMode;
   genre_sort_field: GenreSortField;
   genre_sort_asc: boolean;
@@ -30,7 +29,6 @@ class PrefsStore {
   artistsViewMode = $state<CollectionViewMode>("cards");
   playlistsAutoViewMode = $state<CollectionViewMode>("cards");
   playlistsCustomViewMode = $state<CollectionViewMode>("cards");
-  genreViewMode = $state<GenreViewMode>("genre");
   /** Collapses primary-genre cards down to compact header rows on the
    * Genres tab (mirrors the Albums/Artists cards-vs-rows toggle). */
   genreCardsViewMode = $state<CollectionViewMode>("cards");
@@ -52,7 +50,6 @@ class PrefsStore {
     this.artistsViewMode = prefs.artists_view_mode;
     this.playlistsAutoViewMode = prefs.playlists_auto_view_mode;
     this.playlistsCustomViewMode = prefs.playlists_custom_view_mode;
-    this.genreViewMode = prefs.genre_view_mode;
     this.genreCardsViewMode = prefs.genre_cards_view_mode;
     this.genreSortField = prefs.genre_sort_field;
     this.genreSortAsc = prefs.genre_sort_asc;
@@ -74,7 +71,7 @@ class PrefsStore {
       artists_view_mode: this.artistsViewMode,
       playlists_auto_view_mode: this.playlistsAutoViewMode,
       playlists_custom_view_mode: this.playlistsCustomViewMode,
-      genre_view_mode: this.genreViewMode,
+      genre_view_mode: "genre",
       genre_cards_view_mode: this.genreCardsViewMode,
       genre_sort_field: this.genreSortField,
       genre_sort_asc: this.genreSortAsc,
@@ -112,12 +109,6 @@ class PrefsStore {
     this.playlistsCustomViewMode = mode;
     this.save();
   }
-
-  setGenreViewMode(mode: GenreViewMode) {
-    this.genreViewMode = mode;
-    this.save();
-  }
-
   setGenreCardsViewMode(mode: CollectionViewMode) {
     this.genreCardsViewMode = mode;
     this.save();
