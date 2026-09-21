@@ -8,20 +8,20 @@
   <a href="https://esoltys.dev/luminous/"><strong>Luminous Homepage ↗</strong></a>
 </p>
 
+<p align="center">
+
 [![Rust](https://img.shields.io/badge/Rust-ea4335?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org)
 [![Tauri](https://img.shields.io/badge/Tauri-24c8db?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178c6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![Svelte](https://img.shields.io/badge/Svelte-ff3e00?style=flat-square&logo=svelte&logoColor=white)](https://svelte.dev)
 
+</p>
+
 Luminous is a fast, local-first player for your own audio library — no streaming, no subscriptions, no cloud. Just your files, indexed, searchable, and beautifully played. Built with **Rust**, **Tauri v2**, **TypeScript**, and **Svelte 5 (Runes)**.
-
- 🏠 **[Luminous Homepage](https://esoltys.dev/luminous/)** — downloads, screenshots, and feature overview
-
-💬 **[Luminous Discussions](https://github.com/esoltys/luminous/discussions)** - announcements, general discussion, Q&A, Show and Tell
 
 ⭐ **[Issues](https://github.com/esoltys/luminous/issues)** - file a bug report or a feature request
 
----
+💬 **[Luminous Discussions](https://github.com/esoltys/luminous/discussions)** - announcements, general discussion, Q&A, Show and Tell
 
 ## Quick Install
 
@@ -31,8 +31,6 @@ Luminous is a fast, local-first player for your own audio library — no streami
 | ----------- | -------- |
 | **Windows** | [Microsoft Store](https://apps.microsoft.com/detail/9PNQ2NFSQ7XW) (recommended — installs and updates automatically) &#124; [.exe / .msix](https://github.com/esoltys/luminous/releases/latest) (manual/sideloaded install) |
 | **Linux**   | [.deb / .rpm](https://github.com/esoltys/luminous/releases/latest) for your distro |
-
----
 
 ## Architecture
 
