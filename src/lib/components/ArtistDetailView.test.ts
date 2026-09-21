@@ -52,7 +52,7 @@ describe("ArtistDetailView", () => {
 
     expect(screen.getByText("Shania Twain")).toBeTruthy();
     expect(screen.getByRole("button", { name: /^Play$/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Shuffle Play/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^Shuffle$/i })).toBeTruthy();
     expect(screen.getByTitle("More actions")).toBeTruthy();
   });
 
@@ -410,7 +410,7 @@ describe("ArtistDetailView", () => {
 
         // Action buttons remain visible
         expect(screen.getByRole("button", { name: /^Play$/i })).toBeTruthy();
-        expect(screen.getByRole("button", { name: /Shuffle Play/i })).toBeTruthy();
+        expect(screen.getByRole("button", { name: /^Shuffle$/i })).toBeTruthy();
         expect(screen.getByTitle("More actions")).toBeTruthy();
 
         // Artist name, tags, and bio profile section are hidden

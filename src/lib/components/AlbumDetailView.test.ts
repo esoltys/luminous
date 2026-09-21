@@ -101,7 +101,7 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     expect(navigationStore.activeTab).toBe("collection");
   });
 
-  it("retains view on Shuffle Play while updating playback and queue", async () => {
+  it("retains view on Shuffle while updating playback and queue", async () => {
     const viewPlaylistSpy = vi.spyOn(navigationStore, "viewPlaylist");
     const playSongsSpy = vi.spyOn(playerStore, "playSongs");
     const setShuffleSpy = vi.spyOn(playerStore, "setShuffleMode");
@@ -113,8 +113,8 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     // Wait for songs to load
     await new Promise((resolve) => setTimeout(resolve, 50));
 
-    // Find the "Shuffle Play" button exactly
-    const shuffleButton = getByText("Shuffle Play").closest("button")!;
+    // Find the "Shuffle" button exactly
+    const shuffleButton = getByText("Shuffle").closest("button")!;
     await fireEvent.click(shuffleButton);
     await new Promise((resolve) => setTimeout(resolve, 50));
 

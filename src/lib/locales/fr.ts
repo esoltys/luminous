@@ -23,7 +23,7 @@ export const fr = {
   topNav: {
     goBack: "Retour",
     goForward: "Avancer",
-    searchPlaceholder: "Rechercher des chansons, albums, artistes... (Ctrl+L)",
+    searchPlaceholder: "Rechercher et filtrer... (Ctrl+L)",
     openFilesTooltip: "Ouvrir des fichiers audio ou listes de lecture (*.m3u)",
     openFilesTitle: "Ouvrir des fichiers audio ou des listes de lecture",
     searching: "Recherche...",
@@ -1007,7 +1007,7 @@ export const fr = {
     unknownGenre: "Genre inconnu",
     statsLine: "{genre} · {songs} • {duration} au total",
     playAll: "Lire",
-    shuffleAndPlay: "Lecture aléatoire",
+    shuffleAndPlay: "Aléatoire",
     editArtist: "Modifier",
     editArtistDetails: "Modifier les détails de l'artiste",
     editArtistTooltip: "Modifier les détails de l'artiste, site web, tags et liens",

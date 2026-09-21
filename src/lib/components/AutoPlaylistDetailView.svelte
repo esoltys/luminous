@@ -13,6 +13,8 @@
   import TagEditor from "./TagEditor.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
   import EmptyState from "./EmptyState.svelte";
+  import SearchEmptyState from "./SearchEmptyState.svelte";
+  import { matchesSongSearch } from "../utils/songSearch";
   import { tagsStore } from "../stores/tags.svelte";
   import PopulationModeTabs from "./PopulationModeTabs.svelte";
   import SongSelectionToolbar from "./SongSelectionToolbar.svelte";
@@ -34,7 +36,6 @@
     HeartIcon as Heart,
     CalendarIcon as Calendar,
     HourglassIcon as Hourglass,
-    MagnifyingGlassIcon as Search,
     ArrowCounterClockwiseIcon as RotateCcw,
     ArrowClockwiseIcon as RotateCw,
     DotsThreeIcon as MoreHorizontal,
@@ -552,7 +553,6 @@
     }
   }
 
-  let filterQuery = $state("");
   let overflowMenuPos = $state<{ x: number; y: number } | null>(null);
 
   function toggleOverflowMenu(event: MouseEvent) {
@@ -576,20 +576,12 @@
     }
   }
 
-  let filteredSongs = $derived.by(() => {
-    if (!filterQuery.trim()) return songs;
-    const q = filterQuery.toLowerCase().trim();
-    return songs.filter((s) => {
-      const titleMatch = s.title?.toLowerCase().includes(q);
-      const artistMatch = s.artist?.toLowerCase().includes(q) || s.album_artist?.toLowerCase().includes(q);
-      const albumMatch = s.album?.toLowerCase().includes(q);
-      const genreMatch = s.genre?.toLowerCase().includes(q);
-      return titleMatch || artistMatch || albumMatch || genreMatch;
-    });
-  });
-
   let sortedSongs = $derived.by(() => {
-    const list = filteredSongs;
+    let list = songs;
+    const q = collectionStore.searchQuery.trim();
+    if (q) {
+      list = list.filter((s) => matchesSongSearch(s, q));
+    }
     if (sortField === "default") {
       return sortAsc ? list : [...list].reverse();
     }
@@ -612,7 +604,19 @@
 </script>
 
 {#snippet autoPlaylistEmptyState()}
-  <EmptyState icon={Music} title={emptyStateMessage} />
+  {#if collectionStore.searchQuery.trim()}
+    <div class="py-12">
+      <SearchEmptyState
+        icon={Music}
+        title={i18n.t('collection.noSongsTitle')}
+        matchQueryText={i18n.t('collection.noTracksMatchQuery')}
+        query={collectionStore.searchQuery}
+        onReset={() => { collectionStore.searchQuery = ""; collectionStore.search(""); }}
+      />
+    </div>
+  {:else}
+    <EmptyState icon={Music} title={emptyStateMessage} />
+  {/if}
 {/snippet}
 
 <div
@@ -666,46 +670,13 @@
           >
             {#snippet icon()}<Share class="w-4 h-4" />{/snippet}
           </IconActionButton>
-        </div>
-
-        <div class="flex flex-wrap items-center gap-2.5 mt-2.5 select-none relative z-40">
-          <div class="relative w-full max-w-xs">
-            <Search class="w-3.5 h-3.5 absolute left-3.5 top-1/2 -translate-y-1/2 text-brand-text-secondary/60 pointer-events-none" />
-            <Input
-              type="text"
-              bind:value={filterQuery}
-              placeholder={i18n.t("playlists.filterPlaceholder")}
-              size="md"
-              pill
-              class="w-full"
-              style="padding-left: 2.25rem; padding-right: 2rem;"
-            />
-            {#if filterQuery}
-              <button
-                onclick={() => { filterQuery = ""; }}
-                class="absolute right-3 top-1/2 -translate-y-1/2 text-brand-text-secondary/60 hover:text-brand-text-primary p-0.5"
-                title={i18n.t("playlists.clearFilter")}
-              >
-                <X class="w-3.5 h-3.5" />
-              </button>
-            {/if}
-          </div>
-
-          <div class="flex items-center gap-2 shrink-0">
-            <IconActionButton onclick={() => playlistsStore.undo()} title={i18n.t("playlists.undoTooltip")}>
-              {#snippet icon()}<RotateCcw class="w-4 h-4" />{/snippet}
-            </IconActionButton>
-            <IconActionButton onclick={() => playlistsStore.redo()} title={i18n.t("playlists.redoTooltip")}>
-              {#snippet icon()}<RotateCw class="w-4 h-4" />{/snippet}
-            </IconActionButton>
-            <button
-              onclick={toggleOverflowMenu}
-              title={i18n.t("playlists.moreActionsTooltip")}
-              class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors shadow-xs"
-            >
-              <MoreHorizontal class="w-4 h-4" />
-            </button>
-          </div>
+          <button
+            onclick={toggleOverflowMenu}
+            title={i18n.t("playlists.moreActionsTooltip")}
+            class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors shadow-xs shrink-0 cursor-pointer"
+          >
+            <MoreHorizontal class="w-4 h-4" />
+          </button>
         </div>
 
         {#if (kind === "genre" || kind === "decade" || kind === "bpm" || kind === "artist_tag" || kind === "daypart") && playlistId !== undefined}
@@ -919,8 +890,20 @@
   <ContextMenu
     x={overflowMenuPos.x}
     y={overflowMenuPos.y}
+    estimatedHeight={280}
     onClose={() => { overflowMenuPos = null; }}
   >
+    <ContextMenuItem
+      icon={RotateCcw}
+      label={i18n.t("playlists.undoBtn")}
+      onclick={() => { playlistsStore.undo(); overflowMenuPos = null; }}
+    />
+    <ContextMenuItem
+      icon={RotateCw}
+      label={i18n.t("playlists.redoBtn")}
+      onclick={() => { playlistsStore.redo(); overflowMenuPos = null; }}
+    />
+    <ContextMenuDivider />
     <ContextMenuItem
       icon={Plus}
       label={playlistsStore.activeCustomPlaylist

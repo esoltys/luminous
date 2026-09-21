@@ -23,7 +23,7 @@ export const en = {
   topNav: {
     goBack: "Go back",
     goForward: "Go forward",
-    searchPlaceholder: "Search songs, albums, artists... (Ctrl+L)",
+    searchPlaceholder: "Search and filter... (Ctrl+L)",
     openFilesTooltip: "Open Audio Files or Playlists (*.m3u)",
     openFilesTitle: "Open Audio Files or Playlists",
     searching: "Searching...",
@@ -973,7 +973,7 @@ export const en = {
     unknownGenre: "Unknown genre",
     statsLine: "{genre} · {songs} • {duration} total",
     playAll: "Play",
-    shuffleAndPlay: "Shuffle Play",
+    shuffleAndPlay: "Shuffle",
     editArtist: "Edit",
     editArtistDetails: "Edit Artist Details",
     editArtistTooltip: "Edit artist details, website, tags, and links",

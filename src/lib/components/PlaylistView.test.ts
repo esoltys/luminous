@@ -120,6 +120,7 @@ describe("PlaylistView.svelte", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    collectionStore.searchQuery = "";
     playlistsStore.playlists = [mockPlaylist];
     playlistsStore.activePlaylistId = 1;
     playlistsStore.activePlaylistTracks = [...mockTracks];
@@ -209,11 +210,32 @@ describe("PlaylistView.svelte", () => {
     }
   });
 
-  it("filters tracks by title or artist using the filter search input", async () => {
-    const { getByPlaceholderText, getByText, queryByText } = render(PlaylistView);
-    const input = getByPlaceholderText("Filter songs...");
+  it("triggers undo and redo from the overflow menu", async () => {
+    const undoSpy = vi.spyOn(playlistsStore, "undo").mockResolvedValue();
+    const redoSpy = vi.spyOn(playlistsStore, "redo").mockResolvedValue();
+    const { getByText, getByTitle } = render(PlaylistView);
 
-    await fireEvent.input(input, { target: { value: "Track One" } });
+    const overflowBtn = getByTitle("More actions");
+    await fireEvent.click(overflowBtn);
+
+    expect(getByText("Undo")).toBeInTheDocument();
+    expect(getByText("Redo")).toBeInTheDocument();
+
+    const undoBtn = getByText("Undo").closest("button")!;
+    await fireEvent.click(undoBtn);
+    expect(undoSpy).toHaveBeenCalled();
+
+    // Reopen overflow menu for redo
+    await fireEvent.click(overflowBtn);
+    const redoBtn = getByText("Redo").closest("button")!;
+    await fireEvent.click(redoBtn);
+    expect(redoSpy).toHaveBeenCalled();
+  });
+
+  it("filters tracks using collectionStore.searchQuery and displays empty state when nothing matches", async () => {
+    collectionStore.searchQuery = "Track One";
+    const { getByText, queryByText } = render(PlaylistView);
+
     expect(getByText("Track One")).toBeInTheDocument();
     expect(queryByText("Track Two")).not.toBeInTheDocument();
     expect(queryByText("Track Three")).not.toBeInTheDocument();

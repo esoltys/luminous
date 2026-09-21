@@ -23,7 +23,6 @@
     CopyIcon as CopyPlus,
     MusicNotesIcon as Music,
     ShuffleIcon as Shuffle,
-    MagnifyingGlassIcon as Search,
     BroadcastIcon as Radio,
     StackIcon as Layers,
     DotsThreeIcon as MoreHorizontal,
@@ -60,6 +59,8 @@
   import ContextMenu from "./ContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
+  import SearchEmptyState from "./SearchEmptyState.svelte";
+  import { matchesSongSearch } from "../utils/songSearch";
   import { portal } from "../utils/portal";
   import { formatSampleRate, formatBitDepth, formatChannels, formatFileSize, formatDuration } from "../utils/formatters";
   import { formatDateAdded } from "../utils/date";
@@ -81,8 +82,6 @@
 
   let isEditingTitle = $state(false);
   let editTitleValue = $state("");
-
-  let filterQuery = $state("");
 
   let selectedUuids = $state<Set<string>>(new Set());
 
@@ -249,46 +248,11 @@
     }
   }
 
-  // Build the searchable text for a song from whichever columns are currently
-  // visible, so the filter reflects what's actually shown in the table rather
-  // than a fixed title/artist/album set.
-  function searchableColumnValues(song: Song | undefined): string[] {
-    if (!song) return [];
-    const vc = collectionStore.visibleColumns;
-    const values: (string | number | undefined | null)[] = [];
-    if (vc.title) values.push(song.title);
-    if (vc.artist) values.push(song.artist);
-    if (vc.album) values.push(song.album);
-    if (vc.composer) values.push(song.composer);
-    if (vc.album_artist) values.push(song.album_artist);
-    if (vc.format) values.push(song.filetype);
-    if (vc.year) values.push(song.year);
-    if (vc.genre) values.push(song.genre);
-    if (vc.grouping) values.push(song.grouping);
-    if (vc.bpm) values.push(song.bpm);
-    if (vc.initial_key) values.push(song.initial_key);
-    if (vc.bitrate) values.push(song.bitrate);
-    if (vc.samplerate) values.push(formatSampleRate(song.samplerate));
-    if (vc.bitdepth) values.push(formatBitDepth(song.bitdepth));
-    if (vc.channels) values.push(formatChannels(song.channels));
-    if (vc.filesize) values.push(formatFileSize(song.filesize));
-    if (vc.rating) values.push(song.rating);
-    if (vc.playcount) values.push(song.playcount);
-    if (vc.skipcount) values.push(song.skipcount);
-    if (vc.lastplayed) values.push(formatDateAdded(song.lastplayed));
-    if (vc.added) values.push(formatDateAdded(song.added));
-    if (vc.duration) values.push(formatDuration(song.length_nanosec));
-    if (vc.path) values.push(song.path);
-    return values
-      .filter((v) => v !== undefined && v !== null && v !== "")
-      .map((v) => String(v).toLowerCase());
-  }
-
-  let filteredTracks = $derived.by(() => {
-    const q = filterQuery.trim().toLowerCase();
+  let sortedTracks = $derived.by(() => {
     let result = playlistsStore.activePlaylistTracks;
+    const q = collectionStore.searchQuery.trim();
     if (q) {
-      result = result.filter((item) => searchableColumnValues(item.song).some((v) => v.includes(q)));
+      result = result.filter((item) => matchesSongSearch(item.song, q));
     }
 
     if (sortField === "position") {
@@ -403,7 +367,7 @@
     };
   }
 
-  let tableRows = $derived(filteredTracks.map(itemToRow));
+  let tableRows = $derived(sortedTracks.map(itemToRow));
   // Range (shift-click) selection and drag-target resolution both operate on
   // the underlying (unfiltered) playlist order — preserving the existing
   // behavior from before this table was consolidated.
@@ -628,16 +592,26 @@
 </script>
 
 {#snippet playlistEmptyState()}
-  <div class="py-12 text-center text-brand-text-primary/45 select-none">
-    <ListMusic class="w-12 h-12 mx-auto mb-2 text-brand-text-primary/30" />
-    {#if filterQuery}
-      {i18n.t("playlists.noFilterResults", { query: filterQuery })}
-    {:else if isQueue}
-      {i18n.t("playlists.emptyQueueText")}
-    {:else}
-      {i18n.t("playlists.emptyPlaylistTitle")}
-    {/if}
-  </div>
+  {#if collectionStore.searchQuery.trim()}
+    <div class="py-12">
+      <SearchEmptyState
+        icon={Music}
+        title={i18n.t('collection.noSongsTitle')}
+        matchQueryText={i18n.t('collection.noTracksMatchQuery')}
+        query={collectionStore.searchQuery}
+        onReset={() => { collectionStore.searchQuery = ""; collectionStore.search(""); }}
+      />
+    </div>
+  {:else}
+    <div class="py-12 text-center text-brand-text-primary/45 select-none">
+      <ListMusic class="w-12 h-12 mx-auto mb-2 text-brand-text-primary/30" />
+      {#if isQueue}
+        {i18n.t("playlists.emptyQueueText")}
+      {:else}
+        {i18n.t("playlists.emptyPlaylistTitle")}
+      {/if}
+    </div>
+  {/if}
 {/snippet}
 
 <svelte:window onkeydown={handleDeleteKey} />
@@ -792,50 +766,15 @@
                 {#snippet icon()}<Share class="w-4 h-4" />{/snippet}
               </IconActionButton>
             {/if}
+            <button
+              bind:this={overflowButtonEl}
+              onclick={toggleOverflowMenu}
+              title={i18n.t("playlists.moreActionsTooltip")}
+              class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors shadow-xs shrink-0 cursor-pointer"
+            >
+              <MoreHorizontal class="w-4 h-4" />
+            </button>
           </div>
-
-          {#if !windowLayoutStore.isDetailHeaderCollapsed}
-          <div class="flex flex-wrap items-center gap-2.5 mt-2.5 select-none">
-            <div class="relative w-full max-w-xs">
-              <Search class="w-3.5 h-3.5 absolute left-3.5 top-1/2 -translate-y-1/2 text-brand-text-secondary/60 pointer-events-none" />
-              <Input
-                type="text"
-                bind:value={filterQuery}
-                placeholder={i18n.t("playlists.filterPlaceholder")}
-                size="md"
-                pill
-                class="w-full"
-                style="padding-left: 2.25rem; padding-right: 2rem;"
-              />
-              {#if filterQuery}
-                <button
-                  onclick={() => { filterQuery = ""; }}
-                  class="absolute right-3 top-1/2 -translate-y-1/2 text-brand-text-secondary/60 hover:text-brand-text-primary p-0.5"
-                  title={i18n.t("playlists.clearFilter")}
-                >
-                  <X class="w-3.5 h-3.5" />
-                </button>
-              {/if}
-            </div>
-
-            <div class="flex items-center gap-2 shrink-0">
-              <IconActionButton onclick={() => playlistsStore.undo()} title={i18n.t("playlists.undoTooltip")}>
-                {#snippet icon()}<RotateCcw class="w-4 h-4" />{/snippet}
-              </IconActionButton>
-              <IconActionButton onclick={() => playlistsStore.redo()} title={i18n.t("playlists.redoTooltip")}>
-                {#snippet icon()}<RotateCw class="w-4 h-4" />{/snippet}
-              </IconActionButton>
-              <button
-                bind:this={overflowButtonEl}
-                onclick={toggleOverflowMenu}
-                title={i18n.t("playlists.moreActionsTooltip")}
-                class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors shadow-xs"
-              >
-                <MoreHorizontal class="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-          {/if}
         </div>
 
         {#if !windowLayoutStore.isDetailHeaderCollapsed}
@@ -962,9 +901,20 @@
   <ContextMenu
     x={overflowMenuPos.x}
     y={overflowMenuPos.y}
-    estimatedHeight={280}
+    estimatedHeight={320}
     onClose={() => { showOverflowMenu = false; }}
   >
+    <ContextMenuItem
+      icon={RotateCcw}
+      label={i18n.t("playlists.undoBtn")}
+      onclick={() => { playlistsStore.undo(); showOverflowMenu = false; }}
+    />
+    <ContextMenuItem
+      icon={RotateCw}
+      label={i18n.t("playlists.redoBtn")}
+      onclick={() => { playlistsStore.redo(); showOverflowMenu = false; }}
+    />
+    <ContextMenuDivider />
     <ContextMenuItem
       icon={FolderInput}
       label={i18n.t("playlists.importPlaylistBtn")}
