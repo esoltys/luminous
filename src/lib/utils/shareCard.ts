@@ -150,15 +150,26 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
   // relative to how much taller the frame is than a baseline 3:4 (1.33:1).
   const elongation = height / width;
   const contentScale = isPortrait ? Math.min(1.5, Math.max(1, elongation / 1.33)) : 1;
-  // Without a track list the text block is just three short lines, so the
-  // cover can claim a lot more of the frame than when it has to share space
-  // with a multi-column list — size each variant for what it's actually
-  // sitting next to rather than one flat ratio for both.
+  // Without a track list the text block is just as many short lines as the
+  // card actually has (title, plus an optional subtitle and metadata line —
+  // album cards show all three, artist/playlist cards with their toggles off
+  // may show only the title), so the cover can claim a lot more of the frame
+  // when there's a full text block to sit next to than when there's almost
+  // none — size each variant for what it's actually sitting next to rather
+  // than one flat ratio for every card.
   const willShowTrackList = !!(options.includeTrackList && options.tracks && options.tracks.length > 0);
+  const textLineCount = 1 + (options.subtitle ? 1 : 0) + (options.metadataLine ? 1 : 0);
+  // The elongation boost exists to fill extra vertical room with more text —
+  // when there's barely any text to begin with, cap how much of that boost
+  // the cover itself absorbs so it doesn't balloon to fill the empty space
+  // (e.g. a 9:16 artist card with everything shown as just a name).
+  const coverContentScale = textLineCount >= 3 ? contentScale : Math.min(contentScale, 1.15);
+  const noTrackListPortraitFraction = textLineCount >= 3 ? 0.72 : textLineCount === 2 ? 0.62 : 0.5;
+  const noTrackListLandscapeFraction = textLineCount >= 3 ? 0.6 : textLineCount === 2 ? 0.54 : 0.46;
   const coverSize = Math.round(
     isPortrait
-      ? width * (willShowTrackList ? 0.56 : 0.72) * contentScale
-      : Math.min(width, height) * (willShowTrackList ? 0.46 : 0.6)
+      ? width * (willShowTrackList ? 0.56 : noTrackListPortraitFraction) * coverContentScale
+      : Math.min(width, height) * (willShowTrackList ? 0.46 : noTrackListLandscapeFraction)
   );
 
   const background = generateEllipseGradientSvg({

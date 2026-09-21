@@ -101,6 +101,32 @@ describe("buildShareCardSvg", () => {
     expect(svg).toContain("rotate(-5deg)");
     expect(svg).not.toContain("rotate(5deg)");
   });
+
+  function coverPixelWidth(svg: string): number {
+    const match = svg.match(/width:(\d+)px;height:\d+px;object-fit:cover/);
+    if (!match) throw new Error("cover image not found in svg");
+    return Number(match[1]);
+  }
+
+  const withCover = { ...baseOptions, coverDataUri: "data:image/png;base64,COVER" };
+
+  it("shrinks the cover on portrait cards with no subtitle/metadata (e.g. a minimal artist card)", () => {
+    const full = buildShareCardSvg({ ...withCover, aspectRatio: "9:16", includeTrackList: false });
+    const titleOnly = buildShareCardSvg({
+      ...withCover,
+      aspectRatio: "9:16",
+      subtitle: "",
+      metadataLine: "",
+      includeTrackList: false,
+    });
+    expect(coverPixelWidth(titleOnly.svg)).toBeLessThan(coverPixelWidth(full.svg));
+  });
+
+  it("keeps the existing album (title+subtitle+metadata) cover size unchanged on portrait cards", () => {
+    const { svg } = buildShareCardSvg({ ...withCover, aspectRatio: "9:16", includeTrackList: false });
+    // 1080 * 0.72 * min(1.5, 1920/1080/1.33) = 1080 * 0.72 * 1.3363... rounds to 1039
+    expect(coverPixelWidth(svg)).toBe(1039);
+  });
 });
 
 describe("buildStatsShareCardSvg", () => {
