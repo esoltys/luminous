@@ -101,59 +101,61 @@
   }
 </script>
 
-<div class="flex-1 px-6 pt-4 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
-    <div class="h-10 flex items-center justify-between mb-3">
-      {#if totalArtistTagCount > 0}
-        <Button onclick={() => { showNewGroupDialog = true; }} variant="primary" title={i18n.t('songTags.newArtistGroup', {}, 'New Group')}>
-          <Plus class="w-4 h-4" />
-          <span>{i18n.t('songTags.newArtistGroup', {}, 'New Group')}</span>
-        </Button>
-      {:else}
-        <div></div>
-      {/if}
-      <div class="flex items-center gap-2">
-        <!-- Cards / rows toggle -->
-        <div class="relative inline-flex items-center gap-0.5 bg-brand-sidebar border border-brand-border rounded-full p-1">
-          <!-- Sliding background indicator -->
-          <span
-            class="absolute top-1 bottom-1 left-1 w-7 h-7 rounded-full bg-brand-accent shadow-sm pointer-events-none transition-transform duration-200 ease-out {prefs.genreCardsViewMode === 'rows' ? 'translate-x-[30px]' : 'translate-x-0'}"
-            aria-hidden="true"
-          ></span>
-          <button
-            onclick={() => prefs.setGenreCardsViewMode("cards")}
-            class="relative z-10 flex items-center justify-center w-7 h-7 rounded-full transition-colors duration-200 {prefs.genreCardsViewMode === 'cards' ? 'text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-            title={i18n.t("collection.viewCards", {}, "Card view")}
-            aria-label={i18n.t("collection.viewCards", {}, "Card view")}
-            aria-pressed={prefs.genreCardsViewMode === "cards"}
-          >
-            <LayoutGrid class="w-4 h-4" />
-          </button>
-          <button
-            onclick={() => prefs.setGenreCardsViewMode("rows")}
-            class="relative z-10 flex items-center justify-center w-7 h-7 rounded-full transition-colors duration-200 {prefs.genreCardsViewMode === 'rows' ? 'text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-            title={i18n.t("collection.viewRows", {}, "Row view")}
-            aria-label={i18n.t("collection.viewRows", {}, "Row view")}
-            aria-pressed={prefs.genreCardsViewMode === "rows"}
-          >
-            <Rows3 class="w-4 h-4" />
-          </button>
-        </div>
-        <!-- Sort dropdown -->
-        <div class="relative">
-          <Select
-            value={`${prefs.genreSortField}-${prefs.genreSortAsc}`}
-            onchange={(e) => {
-              const [field, asc] = e.currentTarget.value.split("-");
-              prefs.setGenreSortField(field as GenreSortField);
-              prefs.setGenreSortAsc(asc === "true");
-            }}
-            class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
-          >
-            <option value="name-true">▲ {i18n.t('songTags.sortName', {}, 'Name')}</option>
-            <option value="name-false">▼ {i18n.t('songTags.sortName', {}, 'Name')}</option>
-            <option value="count-true">▲ {i18n.t('songTags.sortSongCount', {}, 'Song Count')}</option>
-            <option value="count-false">▼ {i18n.t('songTags.sortSongCount', {}, 'Song Count')}</option>
-          </Select>
+<div class="flex-1 px-6 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
+    <div class="sticky top-0 z-20 bg-brand-main pt-3">
+      <div class="h-10 flex items-center justify-between mb-2">
+        {#if totalArtistTagCount > 0}
+          <Button onclick={() => { showNewGroupDialog = true; }} variant="primary" title={i18n.t('songTags.newArtistGroup', {}, 'New Group')}>
+            <Plus class="w-4 h-4" />
+            <span>{i18n.t('songTags.newArtistGroup', {}, 'New Group')}</span>
+          </Button>
+        {:else}
+          <div></div>
+        {/if}
+        <div class="flex items-center gap-2">
+          <!-- Cards / rows toggle -->
+          <div class="relative inline-flex items-center gap-0.5 bg-brand-sidebar border border-brand-border rounded-full p-1">
+            <!-- Sliding background indicator -->
+            <span
+              class="absolute top-1 bottom-1 left-1 w-7 h-7 rounded-full bg-brand-accent shadow-sm pointer-events-none transition-transform duration-200 ease-out {prefs.genreCardsViewMode === 'rows' ? 'translate-x-[30px]' : 'translate-x-0'}"
+              aria-hidden="true"
+            ></span>
+            <button
+              onclick={() => prefs.setGenreCardsViewMode("cards")}
+              class="relative z-10 flex items-center justify-center w-7 h-7 rounded-full transition-colors duration-200 {prefs.genreCardsViewMode === 'cards' ? 'text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+              title={i18n.t("collection.viewCards", {}, "Card view")}
+              aria-label={i18n.t("collection.viewCards", {}, "Card view")}
+              aria-pressed={prefs.genreCardsViewMode === "cards"}
+            >
+              <LayoutGrid class="w-4 h-4" />
+            </button>
+            <button
+              onclick={() => prefs.setGenreCardsViewMode("rows")}
+              class="relative z-10 flex items-center justify-center w-7 h-7 rounded-full transition-colors duration-200 {prefs.genreCardsViewMode === 'rows' ? 'text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+              title={i18n.t("collection.viewRows", {}, "Row view")}
+              aria-label={i18n.t("collection.viewRows", {}, "Row view")}
+              aria-pressed={prefs.genreCardsViewMode === "rows"}
+            >
+              <Rows3 class="w-4 h-4" />
+            </button>
+          </div>
+          <!-- Sort dropdown -->
+          <div class="relative">
+            <Select
+              value={`${prefs.genreSortField}-${prefs.genreSortAsc}`}
+              onchange={(e) => {
+                const [field, asc] = e.currentTarget.value.split("-");
+                prefs.setGenreSortField(field as GenreSortField);
+                prefs.setGenreSortAsc(asc === "true");
+              }}
+              class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+            >
+              <option value="name-true">▲ {i18n.t('songTags.sortName', {}, 'Name')}</option>
+              <option value="name-false">▼ {i18n.t('songTags.sortName', {}, 'Name')}</option>
+              <option value="count-true">▲ {i18n.t('songTags.sortSongCount', {}, 'Song Count')}</option>
+              <option value="count-false">▼ {i18n.t('songTags.sortSongCount', {}, 'Song Count')}</option>
+            </Select>
+          </div>
         </div>
       </div>
     </div>
@@ -161,7 +163,7 @@
     {#if totalArtistTagCount > 0}
       <div class="mb-6">
         <h2 class="text-xl font-semibold text-brand-text-primary mb-2.5">
-          {i18n.t("songTags.artistTagsHeading", { count: totalArtistTagCount }, `Artist Tags ${totalArtistTagCount}`)}
+          {i18n.t("songTags.artistTagsHeading", {}, "Artist Tags")}
         </h2>
         <ArtistTagCards
           hierarchy={artistOnlyHierarchy}
@@ -187,7 +189,7 @@
       </div>
     {:else}
       <h2 class="text-xl font-semibold text-brand-text-primary mb-3">
-        {i18n.t("songTags.songTagsHeading", { count: tagsStore.hierarchy.length }, `Song Tags ${tagsStore.hierarchy.length}`)}
+        {i18n.t("songTags.songTagsHeading", {}, "Song Tags")}
       </h2>
       <GenreCards
         onOpenMainTag={openMainTag}
