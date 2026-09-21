@@ -23,6 +23,8 @@ Luminous is a fast, local-first player for your own audio library. Built for any
 
 💬 **[Luminous Discussions](https://github.com/esoltys/luminous/discussions)** - announcements, general discussion, Q&A, Show and Tell
 
+Luminous doesn't accept PRs as this is a hobby project that I enjoy working on in my spare time.
+
 ## Quick Install
 
 [<img src="https://get.microsoft.com/images/en-us%20dark.svg" width="200"/>](https://apps.microsoft.com/detail/9PNQ2NFSQ7XW?launch=true&mode=full)
