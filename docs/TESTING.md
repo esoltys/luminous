@@ -75,7 +75,7 @@ see `src-tauri/src/paths.rs`).
 
 An agent (or a developer without desktop access to the running window) can inspect the live
 webview's Console/DOM/Network state without driving the app through WebDriver. This is automatically
-enabled in dev builds via `package.json`'s `tauri` script (`LUMINOUS_REMOTE_DEVTOOLS=1`), and is a no-op
+enabled in dev builds via `package.json`'s `tauri` script (`LUMINOUS_REMOTE_DEVTOOLS=true`), and is a no-op
 in release builds regardless (`remote_devtools_enabled()` in `src-tauri/src/lib.rs`).
 
 Launch the dev server normally:
@@ -84,7 +84,7 @@ Launch the dev server normally:
 bun run tauri dev
 ```
 
-(Or explicitly pass `LUMINOUS_REMOTE_DEVTOOLS=1` / `$env:LUMINOUS_REMOTE_DEVTOOLS = "1"` if running `tauri dev` directly without `bun run tauri`.)
+(Or explicitly pass `LUMINOUS_REMOTE_DEVTOOLS=true` / `$env:LUMINOUS_REMOTE_DEVTOOLS = "true"` if running `tauri dev` directly without `bun run tauri`.)
 
 Then, from a browser (e.g. Claude's Browser pane — `mcp__Claude_Browser__navigate`), open
 `http://127.0.0.1:9222`:

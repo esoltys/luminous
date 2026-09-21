@@ -230,7 +230,7 @@ const REMOTE_DEVTOOLS_PORT: u16 = 9222;
 /// should be wired up for this run. Gated on both a debug build *and* an
 /// explicit env var so it can never ship enabled in a release build or
 /// surprise a user who didn't ask for an unauthenticated loopback inspector
-/// server — set `LUMINOUS_REMOTE_DEVTOOLS=1` before `bun run tauri dev` to
+/// server — set `LUMINOUS_REMOTE_DEVTOOLS=true` before `bun run tauri dev` to
 /// turn it on.
 pub(crate) fn remote_devtools_enabled() -> bool {
     cfg!(debug_assertions) && std::env::var_os("LUMINOUS_REMOTE_DEVTOOLS").is_some()
