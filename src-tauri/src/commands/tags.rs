@@ -165,6 +165,109 @@ pub async fn reorder_tag_in_group(
     .map_err(|e| e.to_string())
 }
 
+// ---------------------------------------------------------------------------
+// Persisted Artist Tags curation hierarchy (#1105)
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+pub async fn get_artist_tag_hierarchy(
+    state: State<'_, AppState>,
+) -> Result<Vec<TagGroup>, String> {
+    let manager = TagManager::new(state.db.clone());
+    manager.get_artist_tag_hierarchy().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn set_artist_group_color(
+    state: State<'_, AppState>,
+    name: String,
+    color_index: i32,
+) -> Result<(), String> {
+    let manager = TagManager::new(state.db.clone());
+    manager
+        .set_artist_group_color(&name, color_index)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn reparent_artist_tag(
+    state: State<'_, AppState>,
+    tag_name: String,
+    new_group_name: String,
+) -> Result<(), String> {
+    let manager = TagManager::new(state.db.clone());
+    manager
+        .reparent_artist_tag(&tag_name, &new_group_name)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn promote_artist_tag(
+    state: State<'_, AppState>,
+    tag_name: String,
+) -> Result<(), String> {
+    let manager = TagManager::new(state.db.clone());
+    manager.promote_artist_tag(&tag_name).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn demote_artist_group_to_child(
+    state: State<'_, AppState>,
+    tag_name: String,
+    new_group_name: String,
+) -> Result<(), String> {
+    let manager = TagManager::new(state.db.clone());
+    manager
+        .demote_artist_group_to_child(&tag_name, &new_group_name)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn reorder_artist_tag_in_group(
+    state: State<'_, AppState>,
+    tag_name: String,
+    new_index: i32,
+) -> Result<(), String> {
+    let manager = TagManager::new(state.db.clone());
+    manager
+        .reorder_artist_tag_in_group(&tag_name, new_index)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn create_artist_tag_group(
+    state: State<'_, AppState>,
+    name: String,
+) -> Result<(), String> {
+    let manager = TagManager::new(state.db.clone());
+    manager
+        .create_artist_tag_group(&name)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn merge_artist_tags(
+    state: State<'_, AppState>,
+    from: String,
+    into: String,
+) -> Result<usize, String> {
+    let manager = TagManager::new(state.db.clone());
+    manager
+        .merge_artist_tags(&from, &into)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn delete_artist_tags(
+    state: State<'_, AppState>,
+    names: Vec<String>,
+) -> Result<usize, String> {
+    let manager = TagManager::new(state.db.clone());
+    manager
+        .delete_artist_tags(&names)
+        .map_err(|e| e.to_string())
+}
+
 /// Every field [`crate::tageditor::write_tags`] needs, read fresh per song so
 /// a bulk genre-only rewrite (merge/delete) can preserve everything else
 /// exactly as it already is on disk and in the DB.

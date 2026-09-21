@@ -4,7 +4,8 @@
     CheckSquareIcon as CheckSquare,
     SquaresFourIcon as LayoutGrid,
     RowsIcon as Rows3,
-    MicrophoneStageIcon as Mic
+    MicrophoneStageIcon as Mic,
+    PlusIcon as Plus
   } from "phosphor-svelte";
   import { genreColorHsl } from "../utils/genrePalette";
   import { onMount } from "svelte";
@@ -18,18 +19,46 @@
   import EmptyState from "./EmptyState.svelte";
   import Select from "./Select.svelte";
   import GenreCards from "./GenreCards.svelte";
+  import ArtistTagCards from "./ArtistTagCards.svelte";
   import MergeSurvivorDialog from "./MergeSurvivorDialog.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
+  import CreateArtistTagGroupDialog from "./CreateArtistTagGroupDialog.svelte";
 
   let selectMode = $state(false);
   let selected = $state<Set<string>>(new Set());
 
   let mergeDialogNames = $state<string[] | null>(null);
   let deleteConfirmNames = $state<string[] | null>(null);
+  let createGroupDialogTags = $state<string[] | null>(null);
+  let showNewGroupDialog = $state(false);
+
+  let genreNames = $derived(new Set(tagsStore.allTags.map((t) => t.name.toLowerCase())));
 
   let artistOnlyTags = $derived.by(() => {
-    const genreNames = new Set(tagsStore.allTags.map((t) => t.name.toLowerCase()));
     return tagsStore.artistTags.filter((t) => !genreNames.has(t.name.toLowerCase()));
+  });
+
+  let artistOnlyHierarchy = $derived.by(() => {
+    return tagsStore.artistHierarchy
+      .filter((g) => !genreNames.has(g.name.toLowerCase()))
+      .map((g) => ({
+        ...g,
+        children: g.children.filter((c) => !genreNames.has(c.name.toLowerCase())),
+      }));
+  });
+
+  let totalArtistTagCount = $derived.by(() => {
+    const names = new Set<string>();
+    for (const g of artistOnlyHierarchy) {
+      names.add(g.name.toLowerCase());
+      for (const c of g.children) {
+        names.add(c.name.toLowerCase());
+      }
+    }
+    for (const t of artistOnlyTags) {
+      names.add(t.name.toLowerCase());
+    }
+    return names.size;
   });
 
   let genreViewElements = $state<Record<string, HTMLButtonElement>>({});
@@ -79,6 +108,27 @@
     selected = next;
   }
 
+  function openGroupSelected() {
+    if (selected.size === 0) return;
+    createGroupDialogTags = Array.from(selected);
+  }
+
+  async function handleCreateGroup(groupName: string, tagsToReparent: string[]) {
+    createGroupDialogTags = null;
+    showNewGroupDialog = false;
+    await tagsStore.createArtistTagGroup(groupName);
+    for (const tag of tagsToReparent) {
+      await tagsStore.reparentArtistTag(tag, groupName);
+    }
+    selected = new Set();
+    if (tagsToReparent.length > 0) {
+      toastStore.show(
+        i18n.t("songTags.groupToast", { count: tagsToReparent.length, name: groupName }, `Grouped ${tagsToReparent.length} tags under "${groupName}"`),
+        "success"
+      );
+    }
+  }
+
   function openMergeSelected() {
     if (selected.size < 2) return;
     mergeDialogNames = Array.from(selected);
@@ -93,26 +143,70 @@
     const names = mergeDialogNames ?? [];
     mergeDialogNames = null;
     const others = names.filter((n) => n !== survivor);
-    let total = 0;
+    let songTotal = 0;
+    let artistTotal = 0;
+
+    const isArtistTag = (name: string) =>
+      tagsStore.artistTags.some((t) => t.name.toLowerCase() === name.toLowerCase()) ||
+      tagsStore.artistHierarchy.some((g) => g.name.toLowerCase() === name.toLowerCase() || g.children.some((c) => c.name.toLowerCase() === name.toLowerCase()));
+    const isSongTag = (name: string) =>
+      tagsStore.allTags.some((t) => t.name.toLowerCase() === name.toLowerCase());
+
     for (const other of others) {
-      total += await tagsStore.mergeTags(other, survivor);
+      if (isSongTag(other) || isSongTag(survivor)) {
+        songTotal += await tagsStore.mergeTags(other, survivor);
+      }
+      if (isArtistTag(other) || isArtistTag(survivor)) {
+        artistTotal += await tagsStore.mergeArtistTags(other, survivor);
+      }
     }
     selected = new Set();
-    toastStore.show(
-      i18n.t("songTags.mergeToast", { count: total, name: survivor }, `Merged into "${survivor}" (${total} songs updated)`),
-      "success"
-    );
+    if (artistTotal > 0 && songTotal === 0) {
+      toastStore.show(
+        i18n.t("songTags.artistMergeToast", { count: artistTotal, name: survivor }, `Merged into "${survivor}" (${artistTotal} artists updated)`),
+        "success"
+      );
+    } else {
+      toastStore.show(
+        i18n.t("songTags.mergeToast", { count: songTotal, name: survivor }, `Merged into "${survivor}" (${songTotal} songs updated)`),
+        "success"
+      );
+    }
   }
 
   async function confirmDelete() {
     const names = deleteConfirmNames ?? [];
     deleteConfirmNames = null;
-    const total = await tagsStore.deleteTags(names);
+
+    const isArtistTag = (name: string) =>
+      tagsStore.artistTags.some((t) => t.name.toLowerCase() === name.toLowerCase()) ||
+      tagsStore.artistHierarchy.some((g) => g.name.toLowerCase() === name.toLowerCase() || g.children.some((c) => c.name.toLowerCase() === name.toLowerCase()));
+    const isSongTag = (name: string) =>
+      tagsStore.allTags.some((t) => t.name.toLowerCase() === name.toLowerCase());
+
+    const songNames = names.filter(isSongTag);
+    const artistNames = names.filter(isArtistTag);
+
+    let songTotal = 0;
+    let artistTotal = 0;
+    if (songNames.length > 0) {
+      songTotal = await tagsStore.deleteTags(songNames);
+    }
+    if (artistNames.length > 0) {
+      artistTotal = await tagsStore.deleteArtistTags(artistNames);
+    }
     selected = new Set();
-    toastStore.show(
-      i18n.t("songTags.deleteToast", { count: total }, `Deleted (${total} songs updated)`),
-      "success"
-    );
+    if (artistTotal > 0 && songTotal === 0) {
+      toastStore.show(
+        i18n.t("songTags.artistDeleteToast", { count: artistTotal }, `Deleted (${artistTotal} artists updated)`),
+        "success"
+      );
+    } else {
+      toastStore.show(
+        i18n.t("songTags.deleteToast", { count: songTotal }, `Deleted (${songTotal} songs updated)`),
+        "success"
+      );
+    }
   }
 
   // This view mounts/unmounts with the tab (not a persistent singleton like
@@ -121,11 +215,15 @@
   // visit to this tab, compounding on itself.
   onMount(() => {
     let unlistenHierarchy: (() => void) | undefined;
+    let unlistenArtistHierarchy: (() => void) | undefined;
     tagsStore.listenForHierarchyChanges().then((fn) => { unlistenHierarchy = fn; });
+    tagsStore.listenForArtistHierarchyChanges().then((fn) => { unlistenArtistHierarchy = fn; });
     tagsStore.loadHierarchy().catch((e) => console.error("Failed to load tag hierarchy:", e));
     tagsStore.loadArtistTags().catch((e) => console.error("Failed to load artist tags:", e));
+    tagsStore.loadArtistHierarchy().catch((e) => console.error("Failed to load artist tag hierarchy:", e));
     return () => {
       unlistenHierarchy?.();
+      unlistenArtistHierarchy?.();
     };
   });
 
@@ -283,6 +381,13 @@
         </span>
         <div class="flex items-center gap-2">
           <button
+            onclick={openGroupSelected}
+            disabled={selected.size === 0}
+            class="text-xs font-semibold text-brand-accent-text hover:text-brand-accent-text-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {i18n.t("songTags.groupSelected", {}, "Group Selected")}
+          </button>
+          <button
             onclick={openMergeSelected}
             disabled={selected.size < 2}
             class="text-xs font-semibold text-brand-accent-text hover:text-brand-accent-text-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
@@ -300,25 +405,60 @@
       </div>
     {/if}
 
-    {#if artistOnlyTags.length > 0}
-      <div class="mb-4">
-        <div class="text-xs text-brand-text-secondary font-medium mb-2">
-          {i18n.t("songTags.artistTagsSectionTitle", { count: artistOnlyTags.length }, `Artist Only Tags (${artistOnlyTags.length})`)}
-        </div>
-        <div class="flex flex-wrap gap-1.5">
-          {#each artistOnlyTags as tag (tag.name)}
+    {#if totalArtistTagCount > 0}
+      <div class="mb-6">
+        <div class="flex items-center justify-between mb-2.5">
+          <div class="text-xs text-brand-text-secondary font-medium">
+            {i18n.t("songTags.artistTagsSectionTitle", { count: totalArtistTagCount }, `Artist Only Tags (${totalArtistTagCount})`)}
+          </div>
+          {#if prefs.genreViewMode === "genre"}
             <button
               type="button"
-              onclick={() => openArtistTag(tag.name)}
-              class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border-2 border-brand-border bg-brand-sidebar text-brand-text-primary text-xs font-medium select-none transition-colors hover:border-brand-accent/60 cursor-pointer"
-              title={i18n.t("songTags.goToArtistTagTooltip", { tag: tag.name }, `Browse ${tag.name}`)}
+              onclick={() => { showNewGroupDialog = true; }}
+              class="inline-flex items-center gap-1 text-xs font-semibold text-brand-accent-text hover:text-brand-accent-text-hover transition-colors"
             >
-              <Mic class="w-3 h-3 shrink-0 opacity-70" />
-              <span>{tag.name}</span>
-              <span class="opacity-70 text-[0.85em]">{tag.song_count}</span>
+              <Plus class="w-3.5 h-3.5" />
+              {i18n.t("songTags.newArtistGroup", {}, "New Group")}
             </button>
-          {/each}
+          {/if}
         </div>
+        {#if prefs.genreViewMode === "genre"}
+          <ArtistTagCards
+            hierarchy={artistOnlyHierarchy}
+            {selectMode}
+            {selected}
+            onToggleSelect={toggleSelect}
+            onOpenTag={openArtistTag}
+            sortField={prefs.genreSortField}
+            sortAsc={prefs.genreSortAsc}
+            compact={prefs.genreCardsViewMode === "rows"}
+          />
+        {:else}
+          <div class="flex flex-wrap gap-1.5">
+            {#each artistOnlyTags as tag (tag.name)}
+              <!-- svelte-ignore a11y_click_events_have_key_events -->
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
+              <span
+                onclick={() => { if (selectMode) toggleSelect(tag.name); }}
+                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border-2 border-brand-border bg-brand-sidebar text-brand-text-primary text-xs font-medium select-none transition-colors hover:border-brand-accent/60 {selectMode ? 'cursor-pointer' : ''} {selected.has(tag.name) ? 'ring-2 ring-brand-accent' : ''}"
+              >
+                {#if selectMode}
+                  <input type="checkbox" checked={selected.has(tag.name)} onchange={() => toggleSelect(tag.name)} class="self-center w-3 h-3 pointer-events-none" />
+                {/if}
+                <button
+                  type="button"
+                  onclick={() => !selectMode && openArtistTag(tag.name)}
+                  class="inline-flex items-center gap-1.5 cursor-pointer leading-none"
+                  title={i18n.t("songTags.goToArtistTagTooltip", { tag: tag.name }, `Browse ${tag.name}`)}
+                >
+                  <Mic class="w-3 h-3 shrink-0 opacity-70" />
+                  <span>{tag.name}</span>
+                </button>
+                <span class="opacity-70 text-[0.85em] font-bold leading-none">{tag.song_count}</span>
+              </span>
+            {/each}
+          </div>
+        {/if}
       </div>
     {/if}
 
@@ -418,3 +558,19 @@
     onCancel={() => { deleteConfirmNames = null; }}
   />
 {/if}
+
+{#if showNewGroupDialog}
+  <CreateArtistTagGroupDialog
+    onConfirm={(name) => handleCreateGroup(name, [])}
+    onCancel={() => { showNewGroupDialog = false; }}
+  />
+{/if}
+
+{#if createGroupDialogTags}
+  <CreateArtistTagGroupDialog
+    initialTags={createGroupDialogTags}
+    onConfirm={(name) => handleCreateGroup(name, createGroupDialogTags!)}
+    onCancel={() => { createGroupDialogTags = null; }}
+  />
+{/if}
+

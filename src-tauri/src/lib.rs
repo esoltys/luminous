@@ -1149,6 +1149,9 @@ pub fn run() {
                     tauri::async_runtime::spawn(tags::reconcile_hierarchy_and_notify(
                         handle.clone(),
                     ));
+                    tauri::async_runtime::spawn(tags::reconcile_artist_hierarchy_and_notify(
+                        handle.clone(),
+                    ));
                 });
             }
 
@@ -1305,6 +1308,16 @@ pub fn run() {
             commands::tags::reorder_tag_in_group,
             commands::tags::merge_tags,
             commands::tags::delete_tags,
+            // Persisted Artist Tags curation hierarchy (#1105)
+            commands::tags::get_artist_tag_hierarchy,
+            commands::tags::set_artist_group_color,
+            commands::tags::reparent_artist_tag,
+            commands::tags::promote_artist_tag,
+            commands::tags::demote_artist_group_to_child,
+            commands::tags::reorder_artist_tag_in_group,
+            commands::tags::create_artist_tag_group,
+            commands::tags::merge_artist_tags,
+            commands::tags::delete_artist_tags,
             // Theme commands (#165)
             commands::theme::import_theme,
             commands::theme::export_theme,

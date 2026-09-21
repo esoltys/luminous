@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 37;
+pub const CURRENT_SCHEMA_VERSION: i32 = 38;
 
 struct Migration {
     version: i32,
@@ -282,6 +282,14 @@ const MIGRATIONS: &[Migration] = &[
                 conn.execute_batch(MIGRATION_37)?;
             }
             Ok(())
+        },
+    },
+    Migration {
+        version: 38,
+        description: "artist_tag_groups/artist_tag_assignments for single-layer artist tag hierarchy (#1105)",
+        apply: |conn| {
+            conn.execute_batch(ARTIST_TAG_HIERARCHY_TABLES_SQL)?;
+            seed_artist_tag_hierarchy(conn)
         },
     },
 ];
@@ -1335,6 +1343,46 @@ fn seed_tag_hierarchy(conn: &rusqlite::Connection) -> Result<()> {
     Ok(())
 }
 
+// ---------------------------------------------------------------------------
+// Migration 38: artist_tag_groups/artist_tag_assignments — a persisted,
+// curatable Artist Tags hierarchy (#1105).
+// ---------------------------------------------------------------------------
+pub const ARTIST_TAG_HIERARCHY_TABLES_SQL: &str = "
+CREATE TABLE IF NOT EXISTS artist_tag_groups (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    color_index INTEGER NOT NULL DEFAULT 0,
+    sort_order  INTEGER NOT NULL DEFAULT 0,
+    is_custom   INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS artist_tag_assignments (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    tag_name    TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    group_id    INTEGER NOT NULL REFERENCES artist_tag_groups(id) ON DELETE CASCADE,
+    sort_order  INTEGER NOT NULL DEFAULT 0
+);
+";
+
+fn seed_artist_tag_hierarchy(conn: &rusqlite::Connection) -> Result<()> {
+    let mut stmt = conn.prepare(
+        "SELECT DISTINCT json_each.value
+         FROM artist_profiles, json_each(artist_profiles.tags)
+         ORDER BY json_each.value COLLATE NOCASE",
+    )?;
+    let tags: Vec<String> = stmt
+        .query_map([], |row| row.get(0))?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    for (i, tag) in tags.iter().enumerate() {
+        conn.execute(
+            "INSERT OR IGNORE INTO artist_tag_groups (name, color_index, sort_order) VALUES (?1, ?2, ?3)",
+            params![tag, (i % 10) as i32, i as i32],
+        )?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1835,6 +1883,32 @@ mod tests {
             )
             .unwrap();
         assert_eq!(count, 0);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_migration_38_artist_tag_hierarchy() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_migration38_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Database::new(temp_dir.clone()).unwrap();
+        assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
+
+        let conn = db.pool.get().unwrap();
+        // Verify tables exist
+        let tables_exist: bool = conn
+            .query_row(
+                "SELECT COUNT(*) = 2 FROM sqlite_master WHERE type = 'table' AND name IN ('artist_tag_groups', 'artist_tag_assignments')",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert!(tables_exist);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
