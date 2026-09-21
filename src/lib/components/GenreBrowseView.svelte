@@ -293,9 +293,7 @@
 
 <div class="flex-1 px-6 pt-4 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
     <div class="h-9 flex items-center justify-between mb-3">
-      <div class="text-xs text-brand-text-secondary font-medium">
-        {i18n.t("songTags.genresTabDescription", { count: tagsStore.hierarchy.length }, `Showing ${tagsStore.hierarchy.length} genres`)}
-      </div>
+
       <div class="flex items-center gap-2">
         <button
           onclick={toggleSelectMode}
@@ -408,9 +406,9 @@
     {#if totalArtistTagCount > 0}
       <div class="mb-6">
         <div class="flex items-center justify-between mb-2.5">
-          <div class="text-xs text-brand-text-secondary font-medium">
-            {i18n.t("songTags.artistTagsSectionTitle", { count: totalArtistTagCount }, `Artist Only Tags (${totalArtistTagCount})`)}
-          </div>
+          <h2 class="text-xl font-semibold text-brand-text-primary">
+            {i18n.t("songTags.artistTagsHeading", { count: totalArtistTagCount }, `Artist Tags ${totalArtistTagCount}`)}
+          </h2>
           {#if prefs.genreViewMode === "genre"}
             <button
               type="button"
@@ -475,6 +473,9 @@
         />
       </div>
     {:else if prefs.genreViewMode === "genre"}
+      <h2 class="text-xl font-semibold text-brand-text-primary mb-3">
+        {i18n.t("songTags.songTagsHeading", { count: tagsStore.hierarchy.length }, `Song Tags ${tagsStore.hierarchy.length}`)}
+      </h2>
       <GenreCards
         {selectMode}
         {selected}
@@ -497,6 +498,9 @@
         </button>
       {/if}
     {:else}
+      <h2 class="text-xl font-semibold text-brand-text-primary mb-3">
+        {i18n.t("songTags.songTagsHeading", { count: tagsStore.allTags.length }, `Song Tags ${tagsStore.allTags.length}`)}
+      </h2>
       <div class="flex flex-wrap items-center gap-2">
         {#each tagsStore.allTags as tag (tag.name)}
           {@const group = tagsStore.hierarchy.find((g) => g.name === tag.name || g.children.some((c) => c.name === tag.name))}
