@@ -184,6 +184,19 @@ pub struct Player {
     consecutive_playback_errors: u32,
 }
 
+/// Runs a synchronous `Player` operation while `player`'s async mutex is
+/// held, via `block_in_place` rather than directly — several `Player`
+/// methods do rusqlite work, and running that straight on the tokio worker
+/// would both stall the runtime and block every other task waiting on the
+/// same mutex for the duration (#1097, #1102). Mirrors `playlist::with_playlists`.
+pub async fn with_player<F, R>(player: &Mutex<Player>, f: F) -> R
+where
+    F: FnOnce(&mut Player) -> R,
+{
+    let mut p = player.lock().await;
+    tokio::task::block_in_place(move || f(&mut p))
+}
+
 impl Player {
     /// Construct the player and restore state persisted by
     /// `persist_current_song`/`persist_position` from a prior run: volume,

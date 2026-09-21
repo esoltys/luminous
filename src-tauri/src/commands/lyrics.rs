@@ -27,37 +27,39 @@ pub async fn save_lyrics(
     song_id: i64,
     lyrics: String,
 ) -> Result<(), String> {
-    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
+    crate::db::run_blocking(&state.db, move |conn| {
+        let (path_str, title, track): (Option<String>, Option<String>, Option<i32>) = conn
+            .query_row(
+                "SELECT path, title, track FROM songs WHERE id = ?1",
+                rusqlite::params![song_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .unwrap_or((None, None, None));
 
-    let (path_str, title, track): (Option<String>, Option<String>, Option<i32>) = conn
-        .query_row(
-            "SELECT path, title, track FROM songs WHERE id = ?1",
-            rusqlite::params![song_id],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-        )
-        .unwrap_or((None, None, None));
-
-    if let Some(ref path_str) = path_str {
-        let audio_path = std::path::Path::new(path_str);
-        if let Some(lrc_path) = crate::lyrics::find_sidecar_lrc(audio_path, title.as_deref(), track)
-        {
-            let clean_lyrics = if let Some(rest) = lyrics.strip_prefix("[synced:false]\n") {
-                rest
-            } else if let Some(rest) = lyrics.strip_prefix("[synced:false]") {
-                rest
-            } else {
-                &lyrics
-            };
-            let _ = std::fs::write(&lrc_path, clean_lyrics);
+        if let Some(ref path_str) = path_str {
+            let audio_path = std::path::Path::new(path_str);
+            if let Some(lrc_path) =
+                crate::lyrics::find_sidecar_lrc(audio_path, title.as_deref(), track)
+            {
+                let clean_lyrics = if let Some(rest) = lyrics.strip_prefix("[synced:false]\n") {
+                    rest
+                } else if let Some(rest) = lyrics.strip_prefix("[synced:false]") {
+                    rest
+                } else {
+                    &lyrics
+                };
+                let _ = std::fs::write(&lrc_path, clean_lyrics);
+            }
         }
-    }
 
-    conn.execute(
-        "UPDATE songs SET lyrics = ?1 WHERE id = ?2",
-        rusqlite::params![lyrics, song_id],
-    )
-    .map_err(|e| e.to_string())?;
-    Ok(())
+        conn.execute(
+            "UPDATE songs SET lyrics = ?1 WHERE id = ?2",
+            rusqlite::params![lyrics, song_id],
+        )?;
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -66,11 +68,14 @@ pub async fn set_instrumental(
     song_id: i64,
     is_instrumental: bool,
 ) -> Result<(), String> {
-    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
-    conn.execute(
-        "UPDATE songs SET is_instrumental = ?1 WHERE id = ?2",
-        rusqlite::params![is_instrumental, song_id],
-    )
+    crate::db::run_blocking(&state.db, move |conn| {
+        conn.execute(
+            "UPDATE songs SET is_instrumental = ?1 WHERE id = ?2",
+            rusqlite::params![is_instrumental, song_id],
+        )?;
+        Ok(())
+    })
+    .await
     .map_err(|e| e.to_string())?;
 
     let mut player = state.player.lock().await;

@@ -81,10 +81,13 @@ pub async fn get_songs_by_decade(
     limit: Option<i64>,
     mode: Option<QueuePopulationMode>,
 ) -> Result<Vec<crate::models::Song>, String> {
-    let scanner = crate::collection::CollectionScanner::new(state.db.clone());
-    scanner
-        .get_songs_by_decade(&decade, limit.unwrap_or(50), mode.unwrap_or_default())
-        .map_err(|e| e.to_string())
+    let limit = limit.unwrap_or(50);
+    let mode = mode.unwrap_or_default();
+    crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        scanner.get_songs_by_decade(&decade, limit, mode)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -96,10 +99,13 @@ pub async fn get_songs_by_bpm(
 ) -> Result<Vec<crate::models::Song>, String> {
     let (min, max) = crate::collection::parse_bpm_range_spec(&spec)
         .ok_or_else(|| format!("Invalid BPM range spec: {spec}"))?;
-    let scanner = crate::collection::CollectionScanner::new(state.db.clone());
-    scanner
-        .get_songs_by_bpm_range(min, max, limit.unwrap_or(50), mode.unwrap_or_default())
-        .map_err(|e| e.to_string())
+    let limit = limit.unwrap_or(50);
+    let mode = mode.unwrap_or_default();
+    crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        scanner.get_songs_by_bpm_range(min, max, limit, mode)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -109,10 +115,13 @@ pub async fn get_songs_by_artist_tag(
     limit: Option<i64>,
     mode: Option<QueuePopulationMode>,
 ) -> Result<Vec<crate::models::Song>, String> {
-    let scanner = crate::collection::CollectionScanner::new(state.db.clone());
-    scanner
-        .get_songs_by_artist_tag(&tag, limit.unwrap_or(50), mode.unwrap_or_default())
-        .map_err(|e| e.to_string())
+    let limit = limit.unwrap_or(50);
+    let mode = mode.unwrap_or_default();
+    crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        scanner.get_songs_by_artist_tag(&tag, limit, mode)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]

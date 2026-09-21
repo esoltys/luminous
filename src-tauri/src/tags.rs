@@ -48,6 +48,27 @@ pub struct TagManager {
     db: Arc<Database>,
 }
 
+/// Runs a synchronous `TagManager` operation on a blocking thread rather
+/// than the tokio worker calling this — every `TagManager` method does
+/// rusqlite work directly (#1097, #1102). Unlike `player::with_player` /
+/// `playlist::with_playlists` / `audio::with_audio`, this offloads via
+/// `spawn_blocking` rather than `block_in_place`: `TagManager` isn't held
+/// behind a shared `AppState` mutex — callers construct a fresh one per
+/// command — so there's no guard to hold across the blocking call, just a
+/// cheap-to-construct value to move into the blocking closure.
+pub async fn with_tag_manager<F, R>(db: Arc<Database>, f: F) -> Result<R>
+where
+    F: FnOnce(&TagManager) -> Result<R> + Send + 'static,
+    R: Send + 'static,
+{
+    tokio::task::spawn_blocking(move || {
+        let manager = TagManager::new(db);
+        f(&manager)
+    })
+    .await
+    .map_err(|e| anyhow::anyhow!("tag manager task panicked: {e}"))?
+}
+
 impl TagManager {
     /// Self-heals `tag_groups`/`tag_assignments` on every construction rather
     /// than trusting migration 18's `schema_version` bookkeeping alone to

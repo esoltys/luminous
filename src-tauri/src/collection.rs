@@ -55,6 +55,25 @@ pub struct CollectionScanner {
     db: Arc<Database>,
 }
 
+/// Runs a synchronous `CollectionScanner` operation (any of its non-`async`
+/// methods, including the `query` submodule's) on a blocking thread rather
+/// than the tokio worker calling this (#1097, #1102). Mirrors
+/// `tags::with_tag_manager`: `CollectionScanner` isn't held behind a shared
+/// `AppState` mutex — callers construct a fresh one per command — so this
+/// offloads via `spawn_blocking` rather than `block_in_place`.
+pub async fn with_collection_scanner<F, R>(db: Arc<Database>, f: F) -> Result<R>
+where
+    F: FnOnce(&CollectionScanner) -> Result<R> + Send + 'static,
+    R: Send + 'static,
+{
+    tokio::task::spawn_blocking(move || {
+        let scanner = CollectionScanner::new(db);
+        f(&scanner)
+    })
+    .await
+    .map_err(|e| anyhow::anyhow!("collection scanner task panicked: {e}"))?
+}
+
 impl CollectionScanner {
     pub fn new(db: Arc<Database>) -> Self {
         Self { db }

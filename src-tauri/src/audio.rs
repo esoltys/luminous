@@ -212,6 +212,22 @@ pub struct AudioEngine {
     pub fade_gain: Arc<AtomicU32>,
 }
 
+/// Runs a synchronous `AudioEngine` operation while `audio`'s async mutex is
+/// held, via `block_in_place` rather than directly — some `AudioEngine`
+/// callers (e.g. equalizer preset persistence) do rusqlite work, and running
+/// that straight on the tokio worker would both stall the runtime and block
+/// every other task waiting on the same mutex for the duration (#1097, #1102).
+/// Mirrors `playlist::with_playlists`. Note: this locks `AppState.audio`
+/// (`tokio::sync::Mutex<AudioEngine>`), distinct from the `parking_lot::Mutex`
+/// fields inside `AudioEngine` used on the allocation-free audio callback path.
+pub async fn with_audio<F, R>(audio: &tokio::sync::Mutex<AudioEngine>, f: F) -> R
+where
+    F: FnOnce(&mut AudioEngine) -> R,
+{
+    let mut a = audio.lock().await;
+    tokio::task::block_in_place(move || f(&mut a))
+}
+
 impl AudioEngine {
     pub fn new() -> Self {
         let (cmd_tx, cmd_rx) = mpsc::sync_channel::<AudioCommand>(64);

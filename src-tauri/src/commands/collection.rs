@@ -16,8 +16,11 @@ pub async fn add_directory(
     path: String,
     state: State<'_, AppState>,
 ) -> Result<MusicDirectory, String> {
-    let scanner = CollectionScanner::new(state.db.clone());
-    let res = scanner.add_directory(&path).map_err(|e| e.to_string())?;
+    let res = crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        scanner.add_directory(&path)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
     crate::collection::start_watcher(app, &state);
     Ok(res)
 }
@@ -28,16 +31,22 @@ pub async fn remove_directory(
     path: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let scanner = CollectionScanner::new(state.db.clone());
-    scanner.remove_directory(&path).map_err(|e| e.to_string())?;
+    crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        scanner.remove_directory(&path)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
     crate::collection::start_watcher(app, &state);
     Ok(())
 }
 
 #[tauri::command]
 pub async fn get_directories(state: State<'_, AppState>) -> Result<Vec<MusicDirectory>, String> {
-    let scanner = CollectionScanner::new(state.db.clone());
-    scanner.get_directories().map_err(|e| e.to_string())
+    crate::collection::with_collection_scanner(state.db.clone(), |scanner| {
+        scanner.get_directories()
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -48,10 +57,11 @@ pub async fn update_directory_metadata(
     color: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let scanner = CollectionScanner::new(state.db.clone());
-    scanner
-        .update_directory_metadata(id, nickname, icon, color)
-        .map_err(|e| e.to_string())
+    crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        scanner.update_directory_metadata(id, nickname, icon, color)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -82,15 +92,12 @@ pub async fn rescan_songs(
     song_ids: Vec<i64>,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let scanner = CollectionScanner::new(state.db.clone());
-
-    let paths: Vec<std::path::PathBuf> = {
-        let conn = state.db.pool.get().map_err(|e| e.to_string())?;
+    let paths: Vec<std::path::PathBuf> = crate::db::run_blocking(&state.db, move |conn| {
         let sql = format!(
             "SELECT {} FROM songs WHERE id = ?1",
             crate::collection::SONG_SELECT_COLS
         );
-        song_ids
+        Ok(song_ids
             .iter()
             .filter_map(|id| {
                 conn.query_row(&sql, [id], crate::collection::row_to_song)
@@ -101,9 +108,12 @@ pub async fn rescan_songs(
             })
             .filter_map(|song| song.path)
             .map(std::path::PathBuf::from)
-            .collect()
-    };
+            .collect())
+    })
+    .await
+    .map_err(|e| e.to_string())?;
 
+    let scanner = CollectionScanner::new(state.db.clone());
     scanner
         .rescan_paths(&app, paths)
         .await
@@ -115,14 +125,20 @@ pub async fn rescan_songs(
 
 #[tauri::command]
 pub async fn prune_missing_songs(state: State<'_, AppState>) -> Result<PruneResult, String> {
-    let scanner = CollectionScanner::new(state.db.clone());
-    scanner.prune_missing_songs().map_err(|e| e.to_string())
+    crate::collection::with_collection_scanner(state.db.clone(), |scanner| {
+        scanner.prune_missing_songs()
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn get_library_stats(state: State<'_, AppState>) -> Result<LibraryStats, String> {
-    let scanner = CollectionScanner::new(state.db.clone());
-    scanner.get_library_stats().map_err(|e| e.to_string())
+    crate::collection::with_collection_scanner(state.db.clone(), |scanner| {
+        scanner.get_library_stats()
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 /// Runs the backend-consistency steps a completed scan requires: persist
@@ -133,24 +149,27 @@ pub async fn get_library_stats(state: State<'_, AppState>) -> Result<LibraryStat
 /// remember to fire all three separately.
 #[tauri::command]
 pub async fn finish_scan(last_scan_time: String, state: State<'_, AppState>) -> Result<(), String> {
-    if let Ok(conn) = state.db.pool.get() {
-        if let Err(e) = conn.execute(
+    let db = state.db.clone();
+    if let Err(e) = crate::db::run_blocking(&db, move |conn| {
+        conn.execute(
             "INSERT OR REPLACE INTO app_state (key, value) VALUES ('last_scan_time', ?1)",
             [&last_scan_time],
-        ) {
-            log::error!("Failed to persist last_scan_time: {e}");
-        }
+        )?;
+        Ok(())
+    })
+    .await
+    {
+        log::error!("Failed to persist last_scan_time: {e}");
     }
 
-    if let Err(e) = state.player.lock().await.resync_queue_with_db() {
+    if let Err(e) =
+        crate::player::with_player(&state.player, |p| p.resync_queue_with_db()).await
+    {
         log::error!("Failed to resync playback queue after scan: {e}");
     }
 
-    state
-        .playlists
-        .lock()
+    crate::playlist::with_playlists(&state.playlists, |pm| pm.sync_all_auto_playlists())
         .await
-        .sync_all_auto_playlists()
         .map_err(|e| e.to_string())
 }
 
@@ -160,10 +179,12 @@ pub async fn search_songs(
     limit: Option<i64>,
     state: State<'_, AppState>,
 ) -> Result<Vec<Song>, String> {
-    let scanner = CollectionScanner::new(state.db.clone());
-    scanner
-        .search_songs(&query, limit.unwrap_or(500))
-        .map_err(|e| e.to_string())
+    let limit = limit.unwrap_or(500);
+    crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        scanner.search_songs(&query, limit)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[derive(serde::Serialize)]
@@ -179,12 +200,15 @@ pub struct LibrarySnapshot {
 /// all three round trips themselves.
 #[tauri::command]
 pub async fn get_library_snapshot(state: State<'_, AppState>) -> Result<LibrarySnapshot, String> {
-    let scanner = CollectionScanner::new(state.db.clone());
-    Ok(LibrarySnapshot {
-        songs: scanner.get_songs(-1, 0).map_err(|e| e.to_string())?,
-        albums: scanner.get_albums().map_err(|e| e.to_string())?,
-        artists: scanner.get_artists().map_err(|e| e.to_string())?,
+    crate::collection::with_collection_scanner(state.db.clone(), |scanner| {
+        Ok(LibrarySnapshot {
+            songs: scanner.get_songs(-1, 0)?,
+            albums: scanner.get_albums()?,
+            artists: scanner.get_artists()?,
+        })
     })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -192,10 +216,11 @@ pub async fn get_songs_by_album(
     album: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<Song>, String> {
-    let scanner = CollectionScanner::new(state.db.clone());
-    scanner
-        .get_songs_by_album(&album)
-        .map_err(|e| e.to_string())
+    crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        scanner.get_songs_by_album(&album)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -203,10 +228,11 @@ pub async fn get_songs_by_artist(
     artist: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<Song>, String> {
-    let scanner = CollectionScanner::new(state.db.clone());
-    scanner
-        .get_songs_by_artist(&artist)
-        .map_err(|e| e.to_string())
+    crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        scanner.get_songs_by_artist(&artist)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -214,16 +240,20 @@ pub async fn get_compilations_by_artist(
     artist: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<serde_json::Value>, String> {
-    let scanner = CollectionScanner::new(state.db.clone());
-    scanner
-        .get_compilations_by_artist(&artist)
-        .map_err(|e| e.to_string())
+    crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        scanner.get_compilations_by_artist(&artist)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn get_favourite_songs(state: State<'_, AppState>) -> Result<Vec<Song>, String> {
-    let scanner = CollectionScanner::new(state.db.clone());
-    scanner.get_favourite_songs().map_err(|e| e.to_string())
+    crate::collection::with_collection_scanner(state.db.clone(), |scanner| {
+        scanner.get_favourite_songs()
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -231,10 +261,12 @@ pub async fn get_recently_added_songs(
     limit: Option<i64>,
     state: State<'_, AppState>,
 ) -> Result<Vec<Song>, String> {
-    let scanner = CollectionScanner::new(state.db.clone());
-    scanner
-        .get_recently_added_songs(limit.unwrap_or(50))
-        .map_err(|e| e.to_string())
+    let limit = limit.unwrap_or(50);
+    crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        scanner.get_recently_added_songs(limit)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -242,10 +274,12 @@ pub async fn get_most_played_songs(
     limit: Option<i64>,
     state: State<'_, AppState>,
 ) -> Result<Vec<Song>, String> {
-    let scanner = CollectionScanner::new(state.db.clone());
-    scanner
-        .get_most_played_songs(limit.unwrap_or(50))
-        .map_err(|e| e.to_string())
+    let limit = limit.unwrap_or(50);
+    crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        scanner.get_most_played_songs(limit)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -253,10 +287,12 @@ pub async fn get_top_artists(
     limit: Option<i64>,
     state: State<'_, AppState>,
 ) -> Result<Vec<serde_json::Value>, String> {
-    let scanner = CollectionScanner::new(state.db.clone());
-    scanner
-        .get_top_artists(limit.unwrap_or(10))
-        .map_err(|e| e.to_string())
+    let limit = limit.unwrap_or(10);
+    crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        scanner.get_top_artists(limit)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -264,10 +300,12 @@ pub async fn get_recently_played(
     limit: Option<i64>,
     state: State<'_, AppState>,
 ) -> Result<Vec<HomeItem>, String> {
-    let scanner = CollectionScanner::new(state.db.clone());
-    scanner
-        .get_recently_played(limit.unwrap_or(10))
-        .map_err(|e| e.to_string())
+    let limit = limit.unwrap_or(10);
+    crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        scanner.get_recently_played(limit)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -275,16 +313,21 @@ pub async fn get_recently_played_songs(
     limit: Option<i64>,
     state: State<'_, AppState>,
 ) -> Result<Vec<Song>, String> {
-    let scanner = CollectionScanner::new(state.db.clone());
-    scanner
-        .get_recently_played_songs(limit.unwrap_or(100))
-        .map_err(|e| e.to_string())
+    let limit = limit.unwrap_or(100);
+    crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        scanner.get_recently_played_songs(limit)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn clear_play_history(state: State<'_, AppState>) -> Result<(), String> {
-    let scanner = CollectionScanner::new(state.db.clone());
-    scanner.clear_play_history().map_err(|e| e.to_string())
+    crate::collection::with_collection_scanner(state.db.clone(), |scanner| {
+        scanner.clear_play_history()
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -292,10 +335,12 @@ pub async fn get_recently_added(
     limit: Option<i64>,
     state: State<'_, AppState>,
 ) -> Result<Vec<HomeItem>, String> {
-    let scanner = CollectionScanner::new(state.db.clone());
-    scanner
-        .get_recently_added(limit.unwrap_or(10))
-        .map_err(|e| e.to_string())
+    let limit = limit.unwrap_or(10);
+    crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        scanner.get_recently_added(limit)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -303,10 +348,12 @@ pub async fn get_featured_albums(
     limit: Option<i64>,
     state: State<'_, AppState>,
 ) -> Result<Vec<HomeItem>, String> {
-    let scanner = CollectionScanner::new(state.db.clone());
-    scanner
-        .get_featured_albums(limit.unwrap_or(10))
-        .map_err(|e| e.to_string())
+    let limit = limit.unwrap_or(10);
+    crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        scanner.get_featured_albums(limit)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -314,10 +361,12 @@ pub async fn get_top_albums(
     limit: Option<i64>,
     state: State<'_, AppState>,
 ) -> Result<Vec<TopAlbumItem>, String> {
-    let scanner = CollectionScanner::new(state.db.clone());
-    scanner
-        .get_top_albums(limit.unwrap_or(10))
-        .map_err(|e| e.to_string())
+    let limit = limit.unwrap_or(10);
+    crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        scanner.get_top_albums(limit)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 /// Extracts just the prose portion of a sidecar file's content: everything
@@ -495,39 +544,40 @@ pub async fn get_artist_profile(
     artist: String,
     state: State<'_, AppState>,
 ) -> Result<ArtistProfile, String> {
-    let scanner = CollectionScanner::new(state.db.clone());
-    let mut profile = scanner
-        .get_artist_profile(&artist)
-        .map_err(|e| e.to_string())?;
+    crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        let mut profile = scanner.get_artist_profile(&artist)?;
 
-    // Self-heal a bio value polluted by an earlier bug where the whole
-    // sidecar file — including its generated "## Tags"/"## Links" sections —
-    // was adopted as the bio text instead of just its prose.
-    let cleaned_bio = profile.bio.as_deref().and_then(extract_bio_prose);
-    if cleaned_bio != profile.bio {
-        profile.bio = cleaned_bio;
-        if let Ok(saved) = scanner.set_artist_profile(&profile) {
-            profile = saved;
-        }
-    }
-
-    if profile.bio.is_none() {
-        let song_path = scanner
-            .get_representative_song_path_for_artist(&artist)
-            .unwrap_or(None);
-        if let Some(bio) = read_bio_sidecar(
-            song_path,
-            biomanager::artist_dir,
-            biomanager::ARTIST_BIO_FILENAME,
-        ) {
-            profile.bio = Some(bio);
+        // Self-heal a bio value polluted by an earlier bug where the whole
+        // sidecar file — including its generated "## Tags"/"## Links" sections —
+        // was adopted as the bio text instead of just its prose.
+        let cleaned_bio = profile.bio.as_deref().and_then(extract_bio_prose);
+        if cleaned_bio != profile.bio {
+            profile.bio = cleaned_bio;
             if let Ok(saved) = scanner.set_artist_profile(&profile) {
                 profile = saved;
             }
         }
-    }
 
-    Ok(profile)
+        if profile.bio.is_none() {
+            let song_path = scanner
+                .get_representative_song_path_for_artist(&artist)
+                .unwrap_or(None);
+            if let Some(bio) = read_bio_sidecar(
+                song_path,
+                biomanager::artist_dir,
+                biomanager::ARTIST_BIO_FILENAME,
+            ) {
+                profile.bio = Some(bio);
+                if let Ok(saved) = scanner.set_artist_profile(&profile) {
+                    profile = saved;
+                }
+            }
+        }
+
+        Ok(profile)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -535,32 +585,36 @@ pub async fn set_artist_profile(
     profile: ArtistProfile,
     state: State<'_, AppState>,
 ) -> Result<ArtistProfile, String> {
-    let scanner = CollectionScanner::new(state.db.clone());
-    let saved = scanner
-        .set_artist_profile(&profile)
-        .map_err(|e| e.to_string())?;
+    crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        let saved = scanner.set_artist_profile(&profile)?;
 
-    let song_path = scanner
-        .get_representative_song_path_for_artist(&saved.artist_key)
-        .unwrap_or(None);
-    let content = build_artist_md_content(&saved);
-    write_bio_sidecar(
-        song_path,
-        biomanager::artist_dir,
-        biomanager::ARTIST_BIO_FILENAME,
-        content.as_deref(),
-        &saved.artist_key,
-    );
+        let song_path = scanner
+            .get_representative_song_path_for_artist(&saved.artist_key)
+            .unwrap_or(None);
+        let content = build_artist_md_content(&saved);
+        write_bio_sidecar(
+            song_path,
+            biomanager::artist_dir,
+            biomanager::ARTIST_BIO_FILENAME,
+            content.as_deref(),
+            &saved.artist_key,
+        );
 
-    Ok(saved)
+        Ok(saved)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn get_all_artist_profiles(
     state: State<'_, AppState>,
 ) -> Result<Vec<ArtistProfile>, String> {
-    let scanner = CollectionScanner::new(state.db.clone());
-    scanner.get_all_artist_profiles().map_err(|e| e.to_string())
+    crate::collection::with_collection_scanner(state.db.clone(), |scanner| {
+        scanner.get_all_artist_profiles()
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 /// Retrieve an album's bio profile, adopting one from an `album.md` sidecar
@@ -571,38 +625,39 @@ pub async fn get_album_profile(
     album: String,
     state: State<'_, AppState>,
 ) -> Result<AlbumProfile, String> {
-    let scanner = CollectionScanner::new(state.db.clone());
-    let mut profile = scanner
-        .get_album_profile(&album)
-        .map_err(|e| e.to_string())?;
+    crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        let mut profile = scanner.get_album_profile(&album)?;
 
-    // Self-heal a description value polluted by an earlier bug — see the
-    // matching comment in `get_artist_profile`.
-    let cleaned_description = profile.description.as_deref().and_then(extract_bio_prose);
-    if cleaned_description != profile.description {
-        profile.description = cleaned_description;
-        if let Ok(saved) = scanner.set_album_profile(&profile) {
-            profile = saved;
-        }
-    }
-
-    if profile.description.is_none() {
-        let song_path = scanner
-            .get_representative_song_path_for_album(&album)
-            .unwrap_or(None);
-        if let Some(description) = read_bio_sidecar(
-            song_path,
-            biomanager::album_dir,
-            biomanager::ALBUM_BIO_FILENAME,
-        ) {
-            profile.description = Some(description);
+        // Self-heal a description value polluted by an earlier bug — see the
+        // matching comment in `get_artist_profile`.
+        let cleaned_description = profile.description.as_deref().and_then(extract_bio_prose);
+        if cleaned_description != profile.description {
+            profile.description = cleaned_description;
             if let Ok(saved) = scanner.set_album_profile(&profile) {
                 profile = saved;
             }
         }
-    }
 
-    Ok(profile)
+        if profile.description.is_none() {
+            let song_path = scanner
+                .get_representative_song_path_for_album(&album)
+                .unwrap_or(None);
+            if let Some(description) = read_bio_sidecar(
+                song_path,
+                biomanager::album_dir,
+                biomanager::ALBUM_BIO_FILENAME,
+            ) {
+                profile.description = Some(description);
+                if let Ok(saved) = scanner.set_album_profile(&profile) {
+                    profile = saved;
+                }
+            }
+        }
+
+        Ok(profile)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -610,32 +665,36 @@ pub async fn set_album_profile(
     profile: AlbumProfile,
     state: State<'_, AppState>,
 ) -> Result<AlbumProfile, String> {
-    let scanner = CollectionScanner::new(state.db.clone());
-    let saved = scanner
-        .set_album_profile(&profile)
-        .map_err(|e| e.to_string())?;
+    crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        let saved = scanner.set_album_profile(&profile)?;
 
-    let song_path = scanner
-        .get_representative_song_path_for_album(&saved.album_key)
-        .unwrap_or(None);
-    let content = build_album_md_content(&saved);
-    write_bio_sidecar(
-        song_path,
-        biomanager::album_dir,
-        biomanager::ALBUM_BIO_FILENAME,
-        content.as_deref(),
-        &saved.album_key,
-    );
+        let song_path = scanner
+            .get_representative_song_path_for_album(&saved.album_key)
+            .unwrap_or(None);
+        let content = build_album_md_content(&saved);
+        write_bio_sidecar(
+            song_path,
+            biomanager::album_dir,
+            biomanager::ALBUM_BIO_FILENAME,
+            content.as_deref(),
+            &saved.album_key,
+        );
 
-    Ok(saved)
+        Ok(saved)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn get_all_album_profiles(
     state: State<'_, AppState>,
 ) -> Result<Vec<AlbumProfile>, String> {
-    let scanner = CollectionScanner::new(state.db.clone());
-    scanner.get_all_album_profiles().map_err(|e| e.to_string())
+    crate::collection::with_collection_scanner(state.db.clone(), |scanner| {
+        scanner.get_all_album_profiles()
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 /// Every artist tag in the library with its song count, for the Genres
@@ -644,8 +703,11 @@ pub async fn get_all_album_profiles(
 /// hierarchy entry like genre does).
 #[tauri::command]
 pub async fn get_artist_tags_overview(state: State<'_, AppState>) -> Result<Vec<Tag>, String> {
-    let scanner = CollectionScanner::new(state.db.clone());
-    scanner.get_artist_tag_counts().map_err(|e| e.to_string())
+    crate::collection::with_collection_scanner(state.db.clone(), |scanner| {
+        scanner.get_artist_tag_counts()
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 /// Marks (or unmarks) one or more songs "Not included" (#104): excluded from
@@ -665,13 +727,21 @@ pub async fn set_songs_not_included(
     if song_ids.is_empty() {
         return Ok(());
     }
-    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
-    let placeholders = song_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
-    let sql = format!("UPDATE songs SET not_included = ?1 WHERE id IN ({placeholders})");
-    let mut params: Vec<&dyn rusqlite::ToSql> = vec![&not_included];
-    params.extend(song_ids.iter().map(|id| id as &dyn rusqlite::ToSql));
-    conn.execute(&sql, params.as_slice())
-        .map_err(|e| e.to_string())?;
+    let song_ids_for_write = song_ids.clone();
+    crate::db::run_blocking(&state.db, move |conn| {
+        let placeholders = song_ids_for_write
+            .iter()
+            .map(|_| "?")
+            .collect::<Vec<_>>()
+            .join(",");
+        let sql = format!("UPDATE songs SET not_included = ?1 WHERE id IN ({placeholders})");
+        let mut params: Vec<&dyn rusqlite::ToSql> = vec![&not_included];
+        params.extend(song_ids_for_write.iter().map(|id| id as &dyn rusqlite::ToSql));
+        conn.execute(&sql, params.as_slice())?;
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?;
 
     for song_id in &song_ids {
         let _ = app.emit(
@@ -688,13 +758,12 @@ pub async fn get_songs_missing_musicbrainz_id(
     limit: Option<i64>,
     state: State<'_, AppState>,
 ) -> Result<Vec<Song>, String> {
-    let scanner = CollectionScanner::new(state.db.clone());
-    scanner
-        .get_songs_missing_musicbrainz_id(
-            limit.unwrap_or(-1),
-            crate::models::QueuePopulationMode::All,
-        )
-        .map_err(|e| e.to_string())
+    let limit = limit.unwrap_or(-1);
+    crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        scanner.get_songs_missing_musicbrainz_id(limit, crate::models::QueuePopulationMode::All)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -702,10 +771,12 @@ pub async fn get_songs_missing_metadata(
     limit: Option<i64>,
     state: State<'_, AppState>,
 ) -> Result<Vec<Song>, String> {
-    let scanner = CollectionScanner::new(state.db.clone());
-    scanner
-        .get_songs_missing_core_tags(limit.unwrap_or(-1), crate::models::QueuePopulationMode::All)
-        .map_err(|e| e.to_string())
+    let limit = limit.unwrap_or(-1);
+    crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        scanner.get_songs_missing_core_tags(limit, crate::models::QueuePopulationMode::All)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[cfg(test)]
