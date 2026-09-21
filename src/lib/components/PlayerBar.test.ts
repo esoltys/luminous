@@ -526,4 +526,36 @@ describe("PlayerBar.svelte", () => {
     expect(queryByTitleNarrow(/shuffle/i)).toBeNull();
     expect(queryByTitleNarrow(/repeat/i)).toBeNull();
   });
+
+  it("removes chrome and applies edge-to-edge styling in playbar-only mode (< 160px tall)", () => {
+    playerStore.currentSong = mockSong;
+    windowLayoutStore.viewportHeight = 140;
+    expect(windowLayoutStore.isPlaybarOnlyMode).toBe(true);
+
+    const { container, unmount } = render(PlayerBar);
+    const footer = container.querySelector("footer");
+    expect(footer).not.toBeNull();
+    expect(footer).toHaveClass("playbar-only-mode");
+    expect(footer).toHaveClass("w-full");
+    expect(footer).toHaveClass("h-full");
+    expect(footer).toHaveClass("rounded-none");
+    expect(footer).toHaveClass("border-none");
+    expect(footer).not.toHaveClass("rounded-[2rem]");
+    expect(footer).not.toHaveClass("border-brand-border");
+    unmount();
+
+    // Above 160px: returns to floating dock with rounded pill corners and border
+    windowLayoutStore.viewportHeight = 500;
+    expect(windowLayoutStore.isPlaybarOnlyMode).toBe(false);
+
+    const { container: containerNormal } = render(PlayerBar);
+    const footerNormal = containerNormal.querySelector("footer");
+    expect(footerNormal).not.toBeNull();
+    expect(footerNormal).not.toHaveClass("playbar-only-mode");
+    expect(footerNormal).not.toHaveClass("rounded-none");
+    expect(footerNormal).toHaveClass("rounded-[2rem]");
+    expect(footerNormal).toHaveClass("border-brand-border");
+    expect(footerNormal).toHaveClass("h-20");
+    expect(footerNormal).toHaveClass("max-w-[1200px]");
+  });
 });
