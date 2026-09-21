@@ -127,6 +127,14 @@ describe("buildShareCardSvg", () => {
     // 1080 * 0.72 * min(1.5, 1920/1080/1.33) = 1080 * 0.72 * 1.3363... rounds to 1039
     expect(coverPixelWidth(svg)).toBe(1039);
   });
+
+  it("shrinks the cover as a long track list needs more of the frame for itself", () => {
+    const shortList = Array.from({ length: 10 }, (_, i) => ({ number: i + 1, title: `Track ${i + 1}` }));
+    const longList = Array.from({ length: 50 }, (_, i) => ({ number: i + 1, title: `Track ${i + 1}` }));
+    const short = buildShareCardSvg({ ...withCover, aspectRatio: "1:1", tracks: shortList, includeTrackList: true });
+    const long = buildShareCardSvg({ ...withCover, aspectRatio: "1:1", tracks: longList, includeTrackList: true });
+    expect(coverPixelWidth(long.svg)).toBeLessThan(coverPixelWidth(short.svg));
+  });
 });
 
 describe("buildStatsShareCardSvg", () => {
