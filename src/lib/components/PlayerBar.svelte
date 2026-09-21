@@ -605,7 +605,7 @@
       inset -1px -1px 1px 0 rgba(255, 255, 255, 0.18);
   }
 
-  /* Playbar-only mode: when the app is collapsed to only the playerbar (<240px tall),
+  /* Playbar-only mode: when the app is collapsed to only the playerbar (<160px tall),
      all surrounding chrome (borders, rounded pill corners, drop shadows) is stripped
      so the bar spans edge-to-edge flush with the window boundaries. */
   :global(footer.playbar-only-mode) {

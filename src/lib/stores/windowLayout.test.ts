@@ -104,10 +104,10 @@ describe("CollectionStore - sidebar/right-panel layout and responsive breakpoint
     expect(windowLayoutStore.isRightPanelAutoHidden).toBe(false);
     expect(windowLayoutStore.effectiveImmersiveMode).toBe(false);
 
-    // Height is independent of width: < 240px collapses to playbar-only mode.
-    windowLayoutStore.viewportHeight = 200;
+    // Height is independent of width: < 160px collapses to playbar-only mode.
+    windowLayoutStore.viewportHeight = 140;
     expect(windowLayoutStore.isPlaybarOnlyMode).toBe(true);
-    windowLayoutStore.viewportHeight = 240;
+    windowLayoutStore.viewportHeight = 160;
     expect(windowLayoutStore.isPlaybarOnlyMode).toBe(false);
     windowLayoutStore.viewportHeight = 800;
     expect(windowLayoutStore.isPlaybarOnlyMode).toBe(false);

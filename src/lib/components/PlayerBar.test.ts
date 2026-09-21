@@ -527,9 +527,9 @@ describe("PlayerBar.svelte", () => {
     expect(queryByTitleNarrow(/repeat/i)).toBeNull();
   });
 
-  it("removes chrome and applies edge-to-edge styling in playbar-only mode (< 240px tall)", () => {
+  it("removes chrome and applies edge-to-edge styling in playbar-only mode (< 160px tall)", () => {
     playerStore.currentSong = mockSong;
-    windowLayoutStore.viewportHeight = 200;
+    windowLayoutStore.viewportHeight = 140;
     expect(windowLayoutStore.isPlaybarOnlyMode).toBe(true);
 
     const { container, unmount } = render(PlayerBar);
@@ -544,7 +544,7 @@ describe("PlayerBar.svelte", () => {
     expect(footer).not.toHaveClass("border-brand-border");
     unmount();
 
-    // Above 240px: returns to floating dock with rounded pill corners and border
+    // Above 160px: returns to floating dock with rounded pill corners and border
     windowLayoutStore.viewportHeight = 500;
     expect(windowLayoutStore.isPlaybarOnlyMode).toBe(false);
 
