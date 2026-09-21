@@ -27,10 +27,7 @@ describe("ArtistTagCards", () => {
     render(ArtistTagCards, {
       props: {
         hierarchy: sampleHierarchy,
-        onOpenTag: vi.fn(),
-        selectMode: false,
-        selected: new Set<string>(),
-        onToggleSelect: vi.fn()
+        onOpenTag: vi.fn()
       }
     });
 
@@ -47,10 +44,7 @@ describe("ArtistTagCards", () => {
     render(ArtistTagCards, {
       props: {
         hierarchy: sampleHierarchy,
-        onOpenTag: vi.fn(),
-        selectMode: false,
-        selected: new Set<string>(),
-        onToggleSelect: vi.fn()
+        onOpenTag: vi.fn()
       }
     });
 
@@ -62,32 +56,12 @@ describe("ArtistTagCards", () => {
     render(ArtistTagCards, {
       props: {
         hierarchy: sampleHierarchy,
-        onOpenTag,
-        selectMode: false,
-        selected: new Set<string>(),
-        onToggleSelect: vi.fn()
+        onOpenTag
       }
     });
 
     const cardBtn = screen.getByText("Award-Winning");
     await fireEvent.click(cardBtn);
     expect(onOpenTag).toHaveBeenCalledWith("Award-Winning");
-  });
-
-  it("renders checkboxes in select mode and calls onToggleSelect", async () => {
-    const onToggleSelect = vi.fn();
-    render(ArtistTagCards, {
-      props: {
-        hierarchy: sampleHierarchy,
-        onOpenTag: vi.fn(),
-        selectMode: true,
-        selected: new Set(["Juno Award"]),
-        onToggleSelect
-      }
-    });
-
-    const junoChip = screen.getByText("Juno Award").closest("span")!;
-    await fireEvent.click(junoChip);
-    expect(onToggleSelect).toHaveBeenCalledWith("Juno Award");
   });
 });

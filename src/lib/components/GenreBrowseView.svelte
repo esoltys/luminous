@@ -14,14 +14,11 @@
   import { navigationStore } from "../stores/navigation.svelte";
   import EmptyState from "./EmptyState.svelte";
   import Select from "./Select.svelte";
+  import Button from "./Button.svelte";
   import GenreCards from "./GenreCards.svelte";
   import ArtistTagCards from "./ArtistTagCards.svelte";
-  import MergeSurvivorDialog from "./MergeSurvivorDialog.svelte";
-  import ConfirmDialog from "./ConfirmDialog.svelte";
   import CreateArtistTagGroupDialog from "./CreateArtistTagGroupDialog.svelte";
 
-  let mergeDialogNames = $state<string[] | null>(null);
-  let deleteConfirmNames = $state<string[] | null>(null);
   let showNewGroupDialog = $state(false);
 
   let genreNames = $derived(new Set(tagsStore.allTags.map((t) => t.name.toLowerCase())));
@@ -55,74 +52,6 @@
     if (tagsToReparent.length > 0) {
       toastStore.show(
         i18n.t("songTags.groupToast", { count: tagsToReparent.length, name: groupName }, `Grouped ${tagsToReparent.length} tags under "${groupName}"`),
-        "success"
-      );
-    }
-  }
-
-  async function confirmMerge(survivor: string) {
-    const names = mergeDialogNames ?? [];
-    mergeDialogNames = null;
-    const others = names.filter((n) => n !== survivor);
-    let songTotal = 0;
-    let artistTotal = 0;
-
-    const isArtistTag = (name: string) =>
-      tagsStore.artistTags.some((t) => t.name.toLowerCase() === name.toLowerCase()) ||
-      tagsStore.artistHierarchy.some((g) => g.name.toLowerCase() === name.toLowerCase() || g.children.some((c) => c.name.toLowerCase() === name.toLowerCase()));
-    const isSongTag = (name: string) =>
-      tagsStore.allTags.some((t) => t.name.toLowerCase() === name.toLowerCase());
-
-    for (const other of others) {
-      if (isSongTag(other) || isSongTag(survivor)) {
-        songTotal += await tagsStore.mergeTags(other, survivor);
-      }
-      if (isArtistTag(other) || isArtistTag(survivor)) {
-        artistTotal += await tagsStore.mergeArtistTags(other, survivor);
-      }
-    }
-    if (artistTotal > 0 && songTotal === 0) {
-      toastStore.show(
-        i18n.t("songTags.artistMergeToast", { count: artistTotal, name: survivor }, `Merged into "${survivor}" (${artistTotal} artists updated)`),
-        "success"
-      );
-    } else {
-      toastStore.show(
-        i18n.t("songTags.mergeToast", { count: songTotal, name: survivor }, `Merged into "${survivor}" (${songTotal} songs updated)`),
-        "success"
-      );
-    }
-  }
-
-  async function confirmDelete() {
-    const names = deleteConfirmNames ?? [];
-    deleteConfirmNames = null;
-
-    const isArtistTag = (name: string) =>
-      tagsStore.artistTags.some((t) => t.name.toLowerCase() === name.toLowerCase()) ||
-      tagsStore.artistHierarchy.some((g) => g.name.toLowerCase() === name.toLowerCase() || g.children.some((c) => c.name.toLowerCase() === name.toLowerCase()));
-    const isSongTag = (name: string) =>
-      tagsStore.allTags.some((t) => t.name.toLowerCase() === name.toLowerCase());
-
-    const songNames = names.filter(isSongTag);
-    const artistNames = names.filter(isArtistTag);
-
-    let songTotal = 0;
-    let artistTotal = 0;
-    if (songNames.length > 0) {
-      songTotal = await tagsStore.deleteTags(songNames);
-    }
-    if (artistNames.length > 0) {
-      artistTotal = await tagsStore.deleteArtistTags(artistNames);
-    }
-    if (artistTotal > 0 && songTotal === 0) {
-      toastStore.show(
-        i18n.t("songTags.artistDeleteToast", { count: artistTotal }, `Deleted (${artistTotal} artists updated)`),
-        "success"
-      );
-    } else {
-      toastStore.show(
-        i18n.t("songTags.deleteToast", { count: songTotal }, `Deleted (${songTotal} songs updated)`),
         "success"
       );
     }
@@ -173,7 +102,15 @@
 </script>
 
 <div class="flex-1 px-6 pt-4 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
-    <div class="h-9 flex items-center justify-end mb-3">
+    <div class="h-10 flex items-center justify-between mb-3">
+      {#if totalArtistTagCount > 0}
+        <Button onclick={() => { showNewGroupDialog = true; }} variant="primary" title={i18n.t('songTags.newArtistGroup', {}, 'New Group')}>
+          <Plus class="w-4 h-4" />
+          <span>{i18n.t('songTags.newArtistGroup', {}, 'New Group')}</span>
+        </Button>
+      {:else}
+        <div></div>
+      {/if}
       <div class="flex items-center gap-2">
         <!-- Cards / rows toggle -->
         <div class="relative inline-flex items-center gap-0.5 bg-brand-sidebar border border-brand-border rounded-full p-1">
@@ -223,24 +160,11 @@
 
     {#if totalArtistTagCount > 0}
       <div class="mb-6">
-        <div class="flex items-center justify-between mb-2.5">
-          <h2 class="text-xl font-semibold text-brand-text-primary">
-            {i18n.t("songTags.artistTagsHeading", { count: totalArtistTagCount }, `Artist Tags ${totalArtistTagCount}`)}
-          </h2>
-          <button
-            type="button"
-            onclick={() => { showNewGroupDialog = true; }}
-            class="inline-flex items-center gap-1 text-xs font-semibold text-brand-accent-text hover:text-brand-accent-text-hover transition-colors"
-          >
-            <Plus class="w-3.5 h-3.5" />
-            {i18n.t("songTags.newArtistGroup", {}, "New Group")}
-          </button>
-        </div>
+        <h2 class="text-xl font-semibold text-brand-text-primary mb-2.5">
+          {i18n.t("songTags.artistTagsHeading", { count: totalArtistTagCount }, `Artist Tags ${totalArtistTagCount}`)}
+        </h2>
         <ArtistTagCards
           hierarchy={artistOnlyHierarchy}
-          selectMode={false}
-          selected={new Set()}
-          onToggleSelect={() => {}}
           onOpenTag={openArtistTag}
           sortField={prefs.genreSortField}
           sortAsc={prefs.genreSortAsc}
@@ -266,9 +190,6 @@
         {i18n.t("songTags.songTagsHeading", { count: tagsStore.hierarchy.length }, `Song Tags ${tagsStore.hierarchy.length}`)}
       </h2>
       <GenreCards
-        selectMode={false}
-        selected={new Set()}
-        onToggleSelect={() => {}}
         onOpenMainTag={openMainTag}
         onOpenGenreEdge={openGenreEdge}
         sortField={prefs.genreSortField}
@@ -279,29 +200,6 @@
       />
     {/if}
 </div>
-
-{#if mergeDialogNames}
-  <MergeSurvivorDialog
-    names={mergeDialogNames}
-    onConfirm={confirmMerge}
-    onCancel={() => { mergeDialogNames = null; }}
-  />
-{/if}
-
-{#if deleteConfirmNames}
-  <ConfirmDialog
-    title={i18n.t("songTags.deleteSelected", {}, "Delete Selected")}
-    message={i18n.t(
-      "songTags.deleteConfirmMessage",
-      { count: deleteConfirmNames.length },
-      `Remove ${deleteConfirmNames.length} tag(s) from every song that carries them? This can't be undone.`
-    )}
-    confirmLabel={i18n.t("songTags.deleteBtn", {}, "Delete")}
-    cancelLabel={i18n.t("songTags.cancelBtn", {}, "Cancel")}
-    onConfirm={confirmDelete}
-    onCancel={() => { deleteConfirmNames = null; }}
-  />
-{/if}
 
 {#if showNewGroupDialog}
   <CreateArtistTagGroupDialog

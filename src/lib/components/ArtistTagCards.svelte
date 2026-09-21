@@ -14,9 +14,6 @@
   interface Props {
     hierarchy?: TagGroup[];
     onOpenTag: (tag: string) => void;
-    selectMode: boolean;
-    selected: Set<string>;
-    onToggleSelect: (name: string) => void;
     sortField?: "name" | "count";
     sortAsc?: boolean;
     /** Collapses cards down to compact header-only rows (mirrors the
@@ -27,9 +24,6 @@
   let {
     hierarchy,
     onOpenTag,
-    selectMode,
-    selected,
-    onToggleSelect,
     sortField = "name",
     sortAsc = true,
     compact = false,
@@ -133,7 +127,6 @@
   });
 
   function handleChipPointerDown(e: PointerEvent, name: string, fromGroup: string) {
-    if (selectMode) return;
     if (e.button !== 0) return;
     if ((e.target as HTMLElement).tagName === "INPUT") return;
     e.preventDefault();
@@ -144,7 +137,6 @@
   }
 
   function handleCardPointerDown(e: PointerEvent, name: string) {
-    if (selectMode) return;
     if (e.button !== 0) return;
     e.preventDefault();
     draggedCard = name;
@@ -177,7 +169,6 @@
   }
 
   function handleCardClick(e: MouseEvent, name: string) {
-    if (selectMode) return;
     const target = e.target as HTMLElement;
     if (target.closest("[data-artist-chip-key], [data-color-swatch-for]")) return;
     if (target.tagName === "INPUT") return;
@@ -234,7 +225,7 @@
     <div
       data-artist-card-name={group.name}
       onclick={(e) => handleCardClick(e, group.name)}
-      class="rounded-lg bg-brand-sidebar border-2 overflow-hidden transition-[opacity,box-shadow,border-color,transform] {selectMode ? '' : 'cursor-pointer'} {draggedCard === group.name ? 'opacity-40' : ''} {cardHighlighted ? 'border-brand-accent ring-4 ring-brand-accent/50 scale-[1.02] bg-brand-accent/5' : ''}"
+      class="rounded-lg bg-brand-sidebar border-2 overflow-hidden transition-[opacity,box-shadow,border-color,transform] cursor-pointer {draggedCard === group.name ? 'opacity-40' : ''} {cardHighlighted ? 'border-brand-accent ring-4 ring-brand-accent/50 scale-[1.02] bg-brand-accent/5' : ''}"
       style={cardHighlighted ? '' : `border-color: ${genreColorHsl(group.color_index)}`}
     >
       <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -246,7 +237,7 @@
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <span
           onpointerdown={(e) => handleCardPointerDown(e, group.name)}
-          class="shrink-0 touch-none {selectMode ? '' : 'artist-drag-handle'} {draggedCard === group.name ? 'is-dragging' : ''} text-brand-text-secondary/50 hover:text-brand-text-secondary"
+          class="shrink-0 touch-none artist-drag-handle {draggedCard === group.name ? 'is-dragging' : ''} text-brand-text-secondary/50 hover:text-brand-text-secondary"
           title={i18n.t("songTags.dragArtistCardTooltip", {}, "Drag to make this a sub-tag of another card")}
         >
           <GripVertical class="w-3.5 h-3.5" />
@@ -262,14 +253,6 @@
             aria-label={i18n.t("songTags.changeColorTooltip", {}, "Change color")}
           ></button>
         </div>
-        {#if selectMode}
-          <input
-            type="checkbox"
-            checked={selected.has(group.name)}
-            onchange={() => onToggleSelect(group.name)}
-            class="w-3.5 h-3.5 shrink-0 rounded text-brand-accent"
-          />
-        {/if}
         {#if renamingTag === group.name}
           <input
             use:focusAndSelect
@@ -308,19 +291,10 @@
             data-artist-chip-key={child.name}
             data-artist-chip-group={group.name}
             onpointerdown={(e) => handleChipPointerDown(e, child.name, group.name)}
-            onclick={() => { if (selectMode) onToggleSelect(child.name); }}
             oncontextmenu={(e) => openContextMenu(e, child.name, false)}
-            class="inline-flex items-center gap-1 pl-2 pr-1.5 py-0.5 rounded-full border-2 bg-[color-mix(in_srgb,var(--color-brand-accent)_15%,var(--color-brand-sidebar))] text-brand-text-primary text-xs font-medium select-none touch-none transition-[opacity,box-shadow,transform] {selectMode ? 'cursor-pointer' : 'artist-drag-handle'} {!selectMode && draggedChip?.name === child.name ? 'is-dragging' : ''} {draggedChip?.name === child.name ? 'opacity-40' : ''} {dropTarget?.kind === 'chip' && dropTarget.chip === child.name ? 'ring-4 ring-brand-accent scale-110' : selected.has(child.name) ? 'ring-2 ring-brand-accent' : ''}"
+            class="inline-flex items-center gap-1 pl-2 pr-1.5 py-0.5 rounded-full border-2 bg-[color-mix(in_srgb,var(--color-brand-accent)_15%,var(--color-brand-sidebar))] text-brand-text-primary text-xs font-medium select-none touch-none transition-[opacity,box-shadow,transform] artist-drag-handle {draggedChip?.name === child.name ? 'is-dragging opacity-40' : ''} {dropTarget?.kind === 'chip' && dropTarget.chip === child.name ? 'ring-4 ring-brand-accent scale-110' : ''}"
             style={`border-color: ${genreColorHsl(group.color_index)};`}
           >
-            {#if selectMode}
-              <input
-                type="checkbox"
-                checked={selected.has(child.name)}
-                onchange={() => onToggleSelect(child.name)}
-                class="w-3 h-3 pointer-events-none"
-              />
-            {/if}
             {#if renamingTag === child.name}
               <input
                 use:focusAndSelect
