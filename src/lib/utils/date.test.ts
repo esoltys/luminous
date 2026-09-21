@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
-import { formatDateAdded } from "./date";
+import { formatDateAdded, formatWeekRange } from "./date";
 import { i18n } from "../stores/i18n.svelte";
 
 describe("formatDateAdded", () => {
@@ -62,3 +62,28 @@ describe("formatDateAdded", () => {
     expect(formatDateAdded(tenDaysAgoSec)).toBe(expected);
   });
 });
+
+describe("formatWeekRange", () => {
+  it("formats dates in the same month compactly as 'MMM D-D'", () => {
+    const periodStart = Math.floor(Date.UTC(2026, 8, 21) / 1000);
+    expect(formatWeekRange(periodStart, "en")).toBe("Sep 21-27");
+  });
+
+  it("formats dates crossing monthly boundaries as 'MMM D-MMM D'", () => {
+    const periodStart = Math.floor(Date.UTC(2026, 8, 27) / 1000);
+    expect(formatWeekRange(periodStart, "en")).toBe("Sep 27-Oct 3");
+  });
+
+  it("formats dates crossing yearly boundaries as 'MMM D-MMM D'", () => {
+    const periodStart = Math.floor(Date.UTC(2026, 11, 28) / 1000);
+    expect(formatWeekRange(periodStart, "en")).toBe("Dec 28-Jan 3");
+  });
+
+  it("formats compactly with other locales such as French", () => {
+    const sameMonth = Math.floor(Date.UTC(2026, 8, 21) / 1000);
+    const crossMonth = Math.floor(Date.UTC(2026, 8, 27) / 1000);
+    expect(formatWeekRange(sameMonth, "fr")).toBe("sept. 21-27");
+    expect(formatWeekRange(crossMonth, "fr")).toBe("sept. 27-oct. 3");
+  });
+});
+

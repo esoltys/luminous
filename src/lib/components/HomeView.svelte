@@ -33,7 +33,7 @@
     const base = i18n.t('home.topAlbums');
     return topAlbumsPeriodStart === null
       ? base
-      : `${base} (${formatWeekRange(topAlbumsPeriodStart, i18n.currentLocale)})`;
+      : `${base} ${formatWeekRange(topAlbumsPeriodStart, i18n.currentLocale)}`;
   });
 
   const timeOfDayGreeting = $derived.by((): string => {

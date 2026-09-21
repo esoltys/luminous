@@ -65,12 +65,21 @@ export function formatRelativeDate(timestampSec: number | undefined | null): str
 }
 
 /** Formats a UTC calendar week (as computed by the backend's `week_start_utc`,
- * #662) as a short date range, e.g. "Sep 14 – Sep 20". Renders in UTC rather
- * than the viewer's local time zone, since the week boundary itself is
- * UTC-anchored regardless of where the app is running. */
+ * #662) as a compact date range, e.g. "Sep 21-27" or "Sep 27-Oct 3" when
+ * crossing a monthly boundary. Renders in UTC rather than the viewer's local
+ * time zone, since the week boundary itself is UTC-anchored regardless of where
+ * the app is running. */
 export function formatWeekRange(periodStartSec: number, locale: string): string {
   const start = new Date(periodStartSec * 1000);
   const end = new Date((periodStartSec + 6 * 86_400) * 1000);
-  const fmt = new Intl.DateTimeFormat(locale, { month: "short", day: "numeric", timeZone: "UTC" });
-  return `${fmt.format(start)} – ${fmt.format(end)}`;
+  const fmtMonth = new Intl.DateTimeFormat(locale, { month: "short", timeZone: "UTC" });
+  const startMonth = fmtMonth.format(start);
+  const startDay = start.getUTCDate();
+  const endDay = end.getUTCDate();
+
+  if (start.getUTCMonth() === end.getUTCMonth()) {
+    return `${startMonth} ${startDay}-${endDay}`;
+  }
+  const endMonth = fmtMonth.format(end);
+  return `${startMonth} ${startDay}-${endMonth} ${endDay}`;
 }

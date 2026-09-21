@@ -124,38 +124,38 @@ describe("HomeView.svelte", () => {
     });
   });
 
-  it("hides the Explore Your Library row in favor of Top Albums This Week once play history exists", async () => {
+  it("hides the Explore Your Library row in favor of Top Albums once play history exists", async () => {
     mockTopAlbums = [makeTopAlbum({}, { album: "Chart Topper", artist: "Tom Petty" })];
     mockFeaturedAlbums = [{ type: "album", album: makeAlbum({ album: "Discover Me" }) }];
 
     render(HomeView);
 
     await waitFor(() => {
-      expect(screen.getByText(/^Top Albums This Week/)).toBeInTheDocument();
+      expect(screen.getByText(/^Top Albums/)).toBeInTheDocument();
       expect(screen.getByText("Chart Topper")).toBeInTheDocument();
     });
     expect(screen.queryByText("Explore Your Library")).not.toBeInTheDocument();
   });
 
-  it("navigates to the Stats view when the Top Albums This Week heading is clicked", async () => {
+  it("navigates to the Stats view when the Top Albums heading is clicked", async () => {
     mockTopAlbums = [makeTopAlbum({}, { album: "Chart Topper", artist: "Tom Petty" })];
     render(HomeView);
 
     await waitFor(() => {
-      expect(screen.getByText(/^Top Albums This Week/)).toBeInTheDocument();
+      expect(screen.getByText(/^Top Albums/)).toBeInTheDocument();
     });
 
-    screen.getByText(/^Top Albums This Week/).click();
+    screen.getByText(/^Top Albums/).click();
 
     expect(navigationStore.activeTab).toBe("stats");
   });
 
-  it("shows the chart week's date range next to the Top Albums This Week heading", async () => {
+  it("shows the chart week's compact date range in the Top Albums heading", async () => {
     mockTopAlbums = [makeTopAlbum({ period_start: 1_700_000_000 }, { album: "Chart Topper", artist: "Tom Petty" })];
     render(HomeView);
 
     await waitFor(() => {
-      expect(screen.getByText("Top Albums This Week (Nov 14 – Nov 20)")).toBeInTheDocument();
+      expect(screen.getByText("Top Albums Nov 14-20")).toBeInTheDocument();
     });
   });
 
