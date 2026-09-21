@@ -1,11 +1,17 @@
-![Luminous Music Player](./docs/luminous-wordmark.png)
+<p align="center">
+  <img width="150" height="150" src="app-icon.png" alt="Luminous">
+</p>
+
+<h1 align="center">Luminous</h1>
+<p align="center">A high-performance home for the music you already own.</p>
+<p align="center">
+  <a href="https://esoltys.dev/luminous/"><strong>Luminous Homepage ↗</strong></a>
+</p>
 
 [![Rust](https://img.shields.io/badge/Rust-ea4335?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org)
 [![Tauri](https://img.shields.io/badge/Tauri-24c8db?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178c6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![Svelte](https://img.shields.io/badge/Svelte-ff3e00?style=flat-square&logo=svelte&logoColor=white)](https://svelte.dev)
-
-# A high-performance home for the music you already own.
 
 Luminous is a fast, local-first player for your own audio library — no streaming, no subscriptions, no cloud. Just your files, indexed, searchable, and beautifully played. Built with **Rust**, **Tauri v2**, **TypeScript**, and **Svelte 5 (Runes)**.
 
