@@ -308,16 +308,27 @@ export function buildStatsShareCardSvg(options: StatsShareCardOptions): { svg: s
   const cardBg = isDark ? "rgba(0,0,0,0.28)" : "rgba(255,255,255,0.4)";
   const scrimFrom = isDark ? "rgba(0,0,0,0)" : "rgba(255,255,255,0)";
   const scrimTo = isDark ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.55)";
-  const pad = Math.round(width * 0.055);
+  // Unlike the entity card (which only ever stacks a cover next to a short
+  // text block), this card's content — title, a 2x2 grid of up to 5 rows
+  // each, and a chart — is tall enough that sizing every metric off `width`
+  // alone overflowed badly on landscape ratios, where `height` is the
+  // actually-constrained dimension: the whole block ran well past the frame
+  // and got clipped top and bottom by the centered layout. Basing every
+  // font/padding/gap off whichever dimension is smaller keeps the content
+  // within the frame on any aspect ratio, while the grid's own max-width
+  // still scales off `width` so it uses the extra horizontal room a
+  // landscape frame has instead of going unnecessarily narrow.
+  const scaleBasis = Math.min(width, height);
+  const pad = Math.round(scaleBasis * 0.055);
 
   const background = generateEllipseGradientSvg({ width, height, colors: options.backgroundColors, seed: options.seed });
   const backgroundInner = background.replace(/^<svg[^>]*>/, "").replace(/<\/svg>$/, "");
 
-  const titleSize = Math.round(width * 0.038);
-  const subtitleSize = Math.round(width * 0.02);
-  const sectionTitleSize = Math.round(width * 0.02);
-  const rowSize = Math.round(width * 0.0165);
-  const clockLabelSize = Math.round(width * 0.014);
+  const titleSize = Math.round(scaleBasis * 0.038);
+  const subtitleSize = Math.round(scaleBasis * 0.02);
+  const sectionTitleSize = Math.round(scaleBasis * 0.02);
+  const rowSize = Math.round(scaleBasis * 0.0165);
+  const clockLabelSize = Math.round(scaleBasis * 0.014);
 
   const sectionsHtml = options.sections
     .map((section) => {
@@ -333,7 +344,7 @@ export function buildStatsShareCardSvg(options: StatsShareCardOptions): { svg: s
         )
         .join("");
       return (
-        `<div style="background:${cardBg};border-radius:${Math.round(width * 0.014)}px;padding:${Math.round(width * 0.018)}px;min-width:0;">` +
+        `<div style="background:${cardBg};border-radius:${Math.round(scaleBasis * 0.014)}px;padding:${Math.round(scaleBasis * 0.018)}px;min-width:0;">` +
           `<div style="font-size:${sectionTitleSize}px;font-weight:800;color:${textPrimary};margin-bottom:4px;">${escapeHtml(section.title)}</div>` +
           rows +
         `</div>`
@@ -342,16 +353,16 @@ export function buildStatsShareCardSvg(options: StatsShareCardOptions): { svg: s
     .join("");
 
   const maxClockCount = Math.max(1, ...options.clockBuckets.map((b) => b.count));
-  const clockBarMaxHeight = Math.round(height * 0.09);
+  const clockBarMaxHeight = Math.round(scaleBasis * 0.09);
   const clockHtml = `
-    <div style="display:flex;align-items:flex-end;justify-content:center;gap:${Math.round(width * 0.035)}px;margin-top:${Math.round(width * 0.02)}px;">
+    <div style="display:flex;align-items:flex-end;justify-content:center;gap:${Math.round(scaleBasis * 0.035)}px;margin-top:${Math.round(scaleBasis * 0.02)}px;">
       ${options.clockBuckets
         .map((bucket) => {
           const barHeight = Math.max(4, Math.round((bucket.count / maxClockCount) * clockBarMaxHeight));
           return (
             `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;">` +
-              `<div style="width:${Math.round(width * 0.028)}px;height:${clockBarMaxHeight}px;display:flex;align-items:flex-end;">` +
-                `<div style="width:100%;height:${barHeight}px;border-radius:${Math.round(width * 0.006)}px;background:${textPrimary};opacity:0.75;"></div>` +
+              `<div style="width:${Math.round(scaleBasis * 0.028)}px;height:${clockBarMaxHeight}px;display:flex;align-items:flex-end;">` +
+                `<div style="width:100%;height:${barHeight}px;border-radius:${Math.round(scaleBasis * 0.006)}px;background:${textPrimary};opacity:0.75;"></div>` +
               `</div>` +
               `<span style="font-size:${clockLabelSize}px;color:${textTertiary};">${escapeHtml(bucket.label)}</span>` +
             `</div>`
@@ -364,14 +375,14 @@ export function buildStatsShareCardSvg(options: StatsShareCardOptions): { svg: s
   const contentHtml = `
     <div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;width:100%;height:100%;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:${pad}px;box-sizing:border-box;font-family:'Inter','Segoe UI',system-ui,sans-serif;">
       <div style="font-size:${titleSize}px;font-weight:800;color:${textPrimary};text-align:center;">${escapeHtml(options.rangeLabel)}</div>
-      <div style="font-size:${subtitleSize}px;font-weight:600;color:${textSecondary};margin-top:4px;margin-bottom:${Math.round(width * 0.03)}px;text-align:center;">${escapeHtml(options.totalMinutesLabel)}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:${Math.round(width * 0.018)}px;width:100%;max-width:${Math.round(width * 0.86)}px;">
+      <div style="font-size:${subtitleSize}px;font-weight:600;color:${textSecondary};margin-top:4px;margin-bottom:${Math.round(scaleBasis * 0.03)}px;text-align:center;">${escapeHtml(options.totalMinutesLabel)}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:${Math.round(scaleBasis * 0.018)}px;width:100%;max-width:${Math.round(width * 0.86)}px;">
         ${sectionsHtml}
       </div>
       ${clockHtml}
-      <div style="position:absolute;left:${pad}px;bottom:${pad}px;display:flex;align-items:center;gap:${Math.round(width * 0.008)}px;opacity:0.85;">
-        ${LUMINOUS_MARK_SVG(Math.round(width * 0.024))}
-        <span style="font-family:'Expose','Inter','Segoe UI',system-ui,sans-serif;font-size:${Math.round(width * 0.015)}px;font-weight:700;letter-spacing:0.04em;color:${textSecondary};">LUMINOUS</span>
+      <div style="position:absolute;left:${pad}px;bottom:${pad}px;display:flex;align-items:center;gap:${Math.round(scaleBasis * 0.008)}px;opacity:0.85;">
+        ${LUMINOUS_MARK_SVG(Math.round(scaleBasis * 0.024))}
+        <span style="font-family:'Expose','Inter','Segoe UI',system-ui,sans-serif;font-size:${Math.round(scaleBasis * 0.015)}px;font-weight:700;letter-spacing:0.04em;color:${textSecondary};">LUMINOUS</span>
       </div>
     </div>
   `;

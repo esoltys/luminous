@@ -167,6 +167,20 @@ describe("buildStatsShareCardSvg", () => {
     }
   });
 
+  it("sizes text off whichever dimension is smaller, so a landscape frame's constrained height doesn't overflow", () => {
+    const landscape = buildStatsShareCardSvg({ ...baseStatsOptions, aspectRatio: "16:9" });
+    const square = buildStatsShareCardSvg({ ...baseStatsOptions, aspectRatio: "1:1" });
+    const titleFontSize = (svg: string): number => {
+      const match = svg.match(/font-size:(\d+)px;font-weight:800;color:[^;]+;text-align:center/);
+      if (!match) throw new Error("title not found in svg");
+      return Number(match[1]);
+    };
+    // 1920x1080 and 1080x1080 share the same smaller dimension (1080), so
+    // sizing off that (not the 16:9 frame's much wider 1920) should produce
+    // an identical title size on both.
+    expect(titleFontSize(landscape.svg)).toBe(titleFontSize(square.svg));
+  });
+
   it("includes each section's title and items", () => {
     const { svg } = buildStatsShareCardSvg({ ...baseStatsOptions, aspectRatio: "1:1" });
     expect(svg).toContain("Top Artists");
