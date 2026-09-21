@@ -1110,6 +1110,7 @@ export const fr = {
     themeLight: "Clair",
     themeDark: "Sombre",
     trackListToggle: "Afficher la liste des pistes",
+    libraryToggle: "Afficher la bibliothèque",
     copyButton: "Copier l'image",
     saveButton: "Enregistrer l'image",
     copySuccess: "Carte de partage copiée dans le presse-papiers",

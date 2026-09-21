@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildShareCardSvg, SHARE_ASPECT_RATIOS } from "./shareCard";
+import { buildShareCardSvg, buildStatsShareCardSvg, SHARE_ASPECT_RATIOS } from "./shareCard";
 
 const baseOptions = {
   theme: "dark" as const,
@@ -66,6 +66,84 @@ describe("buildShareCardSvg", () => {
   it("is deterministic for a given seed", () => {
     const a = buildShareCardSvg({ ...baseOptions, aspectRatio: "1:1" });
     const b = buildShareCardSvg({ ...baseOptions, aspectRatio: "1:1" });
+    expect(a.svg).toBe(b.svg);
+  });
+
+  it("renders a fanned cover stack when 2+ stack covers are given", () => {
+    const { svg } = buildShareCardSvg({
+      ...baseOptions,
+      aspectRatio: "1:1",
+      coverStackDataUris: ["data:image/png;base64,AAA", "data:image/png;base64,BBB", "data:image/png;base64,CCC"],
+    });
+    expect(svg).toContain("data:image/png;base64,AAA");
+    expect(svg).toContain("data:image/png;base64,BBB");
+    expect(svg).toContain("data:image/png;base64,CCC");
+    expect(svg).toContain("rotate(5deg)");
+  });
+
+  it("falls back to a single cover when the stack has fewer than 2 entries", () => {
+    const { svg } = buildShareCardSvg({
+      ...baseOptions,
+      aspectRatio: "1:1",
+      coverDataUri: "data:image/png;base64,SOLO",
+      coverStackDataUris: ["data:image/png;base64,SOLO"],
+    });
+    expect(svg).toContain("data:image/png;base64,SOLO");
+    expect(svg).not.toContain("rotate(5deg)");
+  });
+});
+
+describe("buildStatsShareCardSvg", () => {
+  const baseStatsOptions = {
+    theme: "dark" as const,
+    seed: "stats-7d",
+    rangeLabel: "Past 7 Days",
+    totalMinutesLabel: "123 minutes listened",
+    sections: [
+      { title: "Top Artists", items: [{ label: "Artist A", secondary: null }] },
+      { title: "Top Albums", items: [{ label: "Album A", secondary: "Artist A" }] },
+      { title: "Top Songs", items: [{ label: "Song A", secondary: "Artist A" }] },
+      { title: "Top Genres", items: [{ label: "Rock" }] },
+    ],
+    clockBuckets: [
+      { label: "Morning", count: 3 },
+      { label: "Afternoon", count: 8 },
+      { label: "Evening", count: 5 },
+      { label: "Late Night", count: 1 },
+    ],
+  };
+
+  it("renders each aspect ratio at its declared pixel dimensions", () => {
+    for (const ratio of SHARE_ASPECT_RATIOS) {
+      const { svg, width, height } = buildStatsShareCardSvg({ ...baseStatsOptions, aspectRatio: ratio.id });
+      expect(width).toBe(ratio.width);
+      expect(height).toBe(ratio.height);
+      expect(svg).toContain(`width="${ratio.width}"`);
+      expect(svg).toContain(`height="${ratio.height}"`);
+    }
+  });
+
+  it("includes each section's title and items", () => {
+    const { svg } = buildStatsShareCardSvg({ ...baseStatsOptions, aspectRatio: "1:1" });
+    expect(svg).toContain("Top Artists");
+    expect(svg).toContain("Artist A");
+    expect(svg).toContain("Song A");
+    expect(svg).toContain("Rock");
+  });
+
+  it("escapes section item text", () => {
+    const { svg } = buildStatsShareCardSvg({
+      ...baseStatsOptions,
+      aspectRatio: "1:1",
+      sections: [{ title: "Top Artists", items: [{ label: '<script>alert("x")</script>' }] }],
+    });
+    expect(svg).not.toContain("<script>alert");
+    expect(svg).toContain("&lt;script&gt;");
+  });
+
+  it("is deterministic for a given seed", () => {
+    const a = buildStatsShareCardSvg({ ...baseStatsOptions, aspectRatio: "1:1" });
+    const b = buildStatsShareCardSvg({ ...baseStatsOptions, aspectRatio: "1:1" });
     expect(a.svg).toBe(b.svg);
   });
 });

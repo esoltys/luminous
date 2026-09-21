@@ -781,7 +781,7 @@
 {/if}
 
 {#if showShareModal}
-  <ShareModal {albumName} onClose={() => { showShareModal = false; }} />
+  <ShareModal entity={{ kind: "album", albumName }} onClose={() => { showShareModal = false; }} />
 {/if}
 
 {#if isEditorOpen && songs.length > 0}

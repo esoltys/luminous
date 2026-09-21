@@ -44,6 +44,12 @@ export interface ShareCardOptions {
   seed: string;
   backgroundColors?: string[];
   coverDataUri: string | null;
+  /** Up to 4 cover data URIs, front-to-back, rendered as a fanned stack
+   * (mirroring CoverStack.svelte's "right" direction transform) instead of
+   * the single `coverDataUri` image — used for playlist cards, where a
+   * single cover would misrepresent a multi-artist/multi-album mix.
+   * Ignored when it has fewer than 2 entries; falls back to `coverDataUri`. */
+  coverStackDataUris?: (string | null)[] | null;
   title: string;
   subtitle: string;
   metadataLine: string;
@@ -78,6 +84,36 @@ function trackListLayout(dims: { width: number; height: number }, trackCount: nu
   const maxColumns = isPortrait || isSquareish ? 2 : 3;
   const columns = Math.min(maxColumns, Math.max(1, Math.ceil(trackCount / rowsPerColumn)));
   return { columns, maxVisible: columns * rowsPerColumn };
+}
+
+/**
+ * Renders either a single cover image or, when `stackUris` has 2+ entries, a
+ * fanned stack of up to 4 — same offset/rotation/scale/opacity progression as
+ * CoverStack.svelte's "right" direction (`translate(i*7, i*-5) rotate(i*5deg)
+ * scale(1-i*0.05)`), expressed as a fraction of `size` so it holds up at any
+ * card resolution. Painted back-to-front in DOM order so the front cover
+ * (index 0) needs no explicit z-index.
+ */
+function buildCoverHtml(coverDataUri: string | null, stackUris: (string | null)[] | null | undefined, size: number): string {
+  const stack = (stackUris ?? []).filter((u): u is string => !!u).slice(0, 4);
+  if (stack.length >= 2) {
+    const radius = Math.round(size * 0.06);
+    const tiles = stack
+      .map((uri, i) => {
+        const dx = Math.round(i * size * 0.073);
+        const dy = Math.round(i * size * -0.052);
+        const rot = i * 5;
+        const scale = 1 - i * 0.05;
+        const opacity = 1 - i * 0.09;
+        return `<img src="${uri}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:${radius}px;box-shadow:0 20px 50px rgba(0,0,0,0.4);opacity:${opacity};transform:translate(${dx}px,${dy}px) rotate(${rot}deg) scale(${scale});" />`;
+      })
+      .reverse();
+    return `<div style="position:relative;width:${size}px;height:${size}px;flex-shrink:0;">${tiles.join("")}</div>`;
+  }
+  const single = coverDataUri ?? stack[0] ?? null;
+  return single
+    ? `<img src="${single}" style="width:${size}px;height:${size}px;object-fit:cover;border-radius:${Math.round(size * 0.06)}px;box-shadow:0 20px 50px rgba(0,0,0,0.4);flex-shrink:0;" />`
+    : "";
 }
 
 export function buildShareCardSvg(options: ShareCardOptions): { svg: string; width: number; height: number } {
@@ -165,11 +201,7 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
   const contentHtml = `
     <div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;width:100%;height:100%;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:${cardPad}px;box-sizing:border-box;font-family:'Inter','Segoe UI',system-ui,sans-serif;">
       <div style="display:flex;flex-direction:${groupDirection};align-items:center;gap:${Math.round(width * 0.035 * contentScale)}px;max-width:100%;">
-        ${
-          options.coverDataUri
-            ? `<img src="${options.coverDataUri}" style="width:${coverSize}px;height:${coverSize}px;object-fit:cover;border-radius:${Math.round(coverSize * 0.06)}px;box-shadow:0 20px 50px rgba(0,0,0,0.4);flex-shrink:0;" />`
-            : ""
-        }
+        ${buildCoverHtml(options.coverDataUri, options.coverStackDataUris, coverSize)}
         <div style="min-width:0;${isPortrait ? "" : "flex:1;"}display:flex;flex-direction:column;gap:2px;align-items:${isPortrait ? "center" : "flex-start"};text-align:${textAlign};${textBlockMaxWidth ? `max-width:${textBlockMaxWidth}px;` : ""}">
           <div style="font-size:${Math.round(width * 0.046 * contentScale)}px;font-weight:800;color:${textPrimary};line-height:1.3;padding-bottom:0.08em;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${escapeHtml(options.title)}</div>
           <div style="font-size:${Math.round(width * 0.026 * contentScale)}px;font-weight:600;color:${textSecondary};margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">${escapeHtml(options.subtitle)}</div>
@@ -178,6 +210,138 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
         </div>
       </div>
       <div style="position:absolute;left:${cardPad}px;bottom:${cardPad}px;display:flex;align-items:center;gap:${Math.round(width * 0.008)}px;opacity:0.85;">
+        ${LUMINOUS_MARK_SVG(Math.round(width * 0.024))}
+        <span style="font-family:'Expose','Inter','Segoe UI',system-ui,sans-serif;font-size:${Math.round(width * 0.015)}px;font-weight:700;letter-spacing:0.04em;color:${textSecondary};">LUMINOUS</span>
+      </div>
+    </div>
+  `;
+
+  const fontFace = options.exposeFontDataUri
+    ? `<style>@font-face{font-family:'Expose';src:url(${options.exposeFontDataUri}) format('woff2');font-weight:700;font-style:normal;}</style>`
+    : "";
+
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">` +
+      `<g>${backgroundInner}</g>` +
+      `<defs>${fontFace}<linearGradient id="scrim" x1="0" y1="0" x2="0" y2="1">` +
+        `<stop offset="0%" stop-color="${scrimFrom}"/>` +
+        `<stop offset="100%" stop-color="${scrimTo}"/>` +
+      `</linearGradient></defs>` +
+      `<rect x="0" y="0" width="${width}" height="${height}" fill="url(#scrim)"/>` +
+      `<foreignObject x="0" y="0" width="${width}" height="${height}">${contentHtml}</foreignObject>` +
+    `</svg>`;
+
+  return { svg, width, height };
+}
+
+interface StatsShareCardItem {
+  label: string;
+  secondary?: string | null;
+}
+
+export interface StatsShareCardSection {
+  title: string;
+  /** Pre-capped by the caller (e.g. top 5) — this builder renders whatever it's given. */
+  items: StatsShareCardItem[];
+}
+
+export interface StatsShareCardClockBucket {
+  label: string;
+  count: number;
+}
+
+export interface StatsShareCardOptions {
+  aspectRatio: ShareAspectRatio;
+  theme: ShareCardTheme;
+  seed: string;
+  backgroundColors?: string[];
+  rangeLabel: string;
+  totalMinutesLabel: string;
+  /** Top Artists/Albums/Songs/Genres, in that order, laid out as a 2x2 grid. */
+  sections: StatsShareCardSection[];
+  /** Morning/Afternoon/Evening/Late Night, in that order. */
+  clockBuckets: StatsShareCardClockBucket[];
+  exposeFontDataUri?: string | null;
+}
+
+/**
+ * A distinct "Wrapped"-style summary card — not a single-entity card, so it
+ * doesn't reuse buildShareCardSvg's cover/title/tracklist layout. Shares the
+ * same background gradient, scrim, and LUMINOUS footer mark for visual
+ * consistency with the entity cards.
+ */
+export function buildStatsShareCardSvg(options: StatsShareCardOptions): { svg: string; width: number; height: number } {
+  const dims = SHARE_ASPECT_RATIOS.find((r) => r.id === options.aspectRatio) ?? SHARE_ASPECT_RATIOS[0];
+  const { width, height } = dims;
+  const isDark = options.theme === "dark";
+  const textPrimary = isDark ? "#f5f6f8" : "#0b0c0f";
+  const textSecondary = isDark ? "rgba(245,246,248,0.78)" : "rgba(11,12,15,0.72)";
+  const textTertiary = isDark ? "rgba(245,246,248,0.55)" : "rgba(11,12,15,0.5)";
+  const cardBg = isDark ? "rgba(0,0,0,0.28)" : "rgba(255,255,255,0.4)";
+  const scrimFrom = isDark ? "rgba(0,0,0,0)" : "rgba(255,255,255,0)";
+  const scrimTo = isDark ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.55)";
+  const pad = Math.round(width * 0.055);
+
+  const background = generateEllipseGradientSvg({ width, height, colors: options.backgroundColors, seed: options.seed });
+  const backgroundInner = background.replace(/^<svg[^>]*>/, "").replace(/<\/svg>$/, "");
+
+  const titleSize = Math.round(width * 0.038);
+  const subtitleSize = Math.round(width * 0.02);
+  const sectionTitleSize = Math.round(width * 0.02);
+  const rowSize = Math.round(width * 0.0165);
+  const clockLabelSize = Math.round(width * 0.014);
+
+  const sectionsHtml = options.sections
+    .map((section) => {
+      const rows = section.items
+        .map(
+          (item, i) =>
+            `<div style="display:flex;gap:8px;align-items:baseline;padding:3px 0;font-size:${rowSize}px;color:${textSecondary};">` +
+              `<span style="min-width:1.6em;opacity:0.6;">${i + 1}</span>` +
+              `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">${escapeHtml(item.label)}${
+                item.secondary ? ` <span style="opacity:0.65;">— ${escapeHtml(item.secondary)}</span>` : ""
+              }</span>` +
+            `</div>`
+        )
+        .join("");
+      return (
+        `<div style="background:${cardBg};border-radius:${Math.round(width * 0.014)}px;padding:${Math.round(width * 0.018)}px;min-width:0;">` +
+          `<div style="font-size:${sectionTitleSize}px;font-weight:800;color:${textPrimary};margin-bottom:4px;">${escapeHtml(section.title)}</div>` +
+          rows +
+        `</div>`
+      );
+    })
+    .join("");
+
+  const maxClockCount = Math.max(1, ...options.clockBuckets.map((b) => b.count));
+  const clockBarMaxHeight = Math.round(height * 0.09);
+  const clockHtml = `
+    <div style="display:flex;align-items:flex-end;justify-content:center;gap:${Math.round(width * 0.035)}px;margin-top:${Math.round(width * 0.02)}px;">
+      ${options.clockBuckets
+        .map((bucket) => {
+          const barHeight = Math.max(4, Math.round((bucket.count / maxClockCount) * clockBarMaxHeight));
+          return (
+            `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;">` +
+              `<div style="width:${Math.round(width * 0.028)}px;height:${clockBarMaxHeight}px;display:flex;align-items:flex-end;">` +
+                `<div style="width:100%;height:${barHeight}px;border-radius:${Math.round(width * 0.006)}px;background:${textPrimary};opacity:0.75;"></div>` +
+              `</div>` +
+              `<span style="font-size:${clockLabelSize}px;color:${textTertiary};">${escapeHtml(bucket.label)}</span>` +
+            `</div>`
+          );
+        })
+        .join("")}
+    </div>
+  `;
+
+  const contentHtml = `
+    <div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;width:100%;height:100%;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:${pad}px;box-sizing:border-box;font-family:'Inter','Segoe UI',system-ui,sans-serif;">
+      <div style="font-size:${titleSize}px;font-weight:800;color:${textPrimary};text-align:center;">${escapeHtml(options.rangeLabel)}</div>
+      <div style="font-size:${subtitleSize}px;font-weight:600;color:${textSecondary};margin-top:4px;margin-bottom:${Math.round(width * 0.03)}px;text-align:center;">${escapeHtml(options.totalMinutesLabel)}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:${Math.round(width * 0.018)}px;width:100%;max-width:${Math.round(width * 0.86)}px;">
+        ${sectionsHtml}
+      </div>
+      ${clockHtml}
+      <div style="position:absolute;left:${pad}px;bottom:${pad}px;display:flex;align-items:center;gap:${Math.round(width * 0.008)}px;opacity:0.85;">
         ${LUMINOUS_MARK_SVG(Math.round(width * 0.024))}
         <span style="font-family:'Expose','Inter','Segoe UI',system-ui,sans-serif;font-size:${Math.round(width * 0.015)}px;font-weight:700;letter-spacing:0.04em;color:${textSecondary};">LUMINOUS</span>
       </div>
@@ -238,9 +402,8 @@ function getExposeFontDataUri(): Promise<string | null> {
   return cachedExposeFontDataUri;
 }
 
-export async function rasterizeShareCard(options: ShareCardOptions, scale = 2): Promise<Blob | null> {
-  const exposeFontDataUri = options.exposeFontDataUri ?? (await getExposeFontDataUri());
-  const { svg, width, height } = buildShareCardSvg({ ...options, exposeFontDataUri });
+/** Loads a built card SVG into an <img> and rasterizes it to a PNG blob at `scale`x the card's declared pixel size. Shared by rasterizeShareCard() and rasterizeStatsShareCard(). */
+async function rasterizeSvg(svg: string, width: number, height: number, scale: number): Promise<Blob | null> {
   const svgDataUri = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
   const img = await loadImage(svgDataUri);
   if (!img) return null;
@@ -255,6 +418,18 @@ export async function rasterizeShareCard(options: ShareCardOptions, scale = 2): 
   return new Promise((resolve) => {
     canvas.toBlob((blob) => resolve(blob), "image/png");
   });
+}
+
+export async function rasterizeShareCard(options: ShareCardOptions, scale = 2): Promise<Blob | null> {
+  const exposeFontDataUri = options.exposeFontDataUri ?? (await getExposeFontDataUri());
+  const { svg, width, height } = buildShareCardSvg({ ...options, exposeFontDataUri });
+  return rasterizeSvg(svg, width, height, scale);
+}
+
+export async function rasterizeStatsShareCard(options: StatsShareCardOptions, scale = 2): Promise<Blob | null> {
+  const exposeFontDataUri = options.exposeFontDataUri ?? (await getExposeFontDataUri());
+  const { svg, width, height } = buildStatsShareCardSvg({ ...options, exposeFontDataUri });
+  return rasterizeSvg(svg, width, height, scale);
 }
 
 export function blobToBase64(blob: Blob): Promise<string> {
