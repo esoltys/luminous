@@ -1,30 +1,38 @@
-![Luminous Music Player](./docs/luminous-wordmark.png)
+<p align="center">
+  <img width="150" height="150" src="app-icon.png" alt="Luminous">
+</p>
+
+<h1 align="center">Luminous</h1>
+<p align="center">A high-performance home for the music you already own.</p>
+<p align="center">
+  <a href="https://esoltys.dev/luminous/"><strong>Luminous Homepage ↗</strong></a>
+</p>
+
+<p align="center">
 
 [![Rust](https://img.shields.io/badge/Rust-ea4335?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org)
 [![Tauri](https://img.shields.io/badge/Tauri-24c8db?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178c6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![Svelte](https://img.shields.io/badge/Svelte-ff3e00?style=flat-square&logo=svelte&logoColor=white)](https://svelte.dev)
 
-# A high-performance home for the music you already own.
+</p>
 
-Luminous is a fast, local-first player for your own audio library — no streaming, no subscriptions, no cloud. Just your files, indexed, searchable, and beautifully played. Built with **Rust**, **Tauri v2**, **TypeScript**, and **Svelte 5 (Runes)**.
-
- 🏠 **[Luminous Homepage](https://esoltys.dev/luminous/)** — downloads, screenshots, and feature overview
-
-💬 **[Luminous Discussions](https://github.com/esoltys/luminous/discussions)** - announcements, general discussion, Q&A, Show and Tell
+Luminous is a fast, local-first player for your own audio library. Built for anyone who wants the convenience of a modern streaming app without giving up ownership of their music. Turn a folder of files into a library you'll enjoy browsing and listening to.
 
 ⭐ **[Issues](https://github.com/esoltys/luminous/issues)** - file a bug report or a feature request
 
----
+💬 **[Luminous Discussions](https://github.com/esoltys/luminous/discussions)** - announcements, general discussion, Q&A, Show and Tell
+
+Luminous doesn't accept PRs as this is a hobby project that I enjoy working on in my spare time.
 
 ## Quick Install
 
 [<img src="https://get.microsoft.com/images/en-us%20dark.svg" width="200"/>](https://apps.microsoft.com/detail/9PNQ2NFSQ7XW?launch=true&mode=full)
 
-- **Windows**: get it from the **[Microsoft Store](https://apps.microsoft.com/detail/9PNQ2NFSQ7XW)** (recommended — installs and updates automatically), or grab `Luminous_{version}_x64-setup.exe` (or the `.msix`) from the **[Releases page](https://github.com/esoltys/luminous/releases/latest)** for a manual/sideloaded install.
-- **Linux**: download the `.deb` or `.rpm` for your distro from the **[Releases page](https://github.com/esoltys/luminous/releases/latest)** and install it as usual.
-
----
+| Platform    | Download |
+| ----------- | -------- |
+| **Windows** | [Microsoft Store](https://apps.microsoft.com/detail/9PNQ2NFSQ7XW) (recommended — installs and updates automatically) &#124; [.exe / .msix](https://github.com/esoltys/luminous/releases/latest) (manual/sideloaded install) |
+| **Linux**   | [.deb / .rpm](https://github.com/esoltys/luminous/releases/latest) for your distro |
 
 ## Architecture
 
