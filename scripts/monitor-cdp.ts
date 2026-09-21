@@ -7,7 +7,7 @@
  * visibility, and can test window minimization / restoration responsiveness.
  *
  * Requires Luminous to be running in dev mode (`bun run tauri dev`).
- * (Dev builds automatically export remote devtools on port 9222 via LUMINOUS_REMOTE_DEVTOOLS=1).
+ * (Dev builds automatically export remote devtools on port 9222 via LUMINOUS_REMOTE_DEVTOOLS=true).
  *
  * Usage:
  *   bun run scripts/monitor-cdp.ts                          # Single latency & state check
