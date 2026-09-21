@@ -8,7 +8,7 @@
 //! is left in place and self-heals if the item reappears. The DB/query logic
 //! itself lives in `crate::pins`; this file is just the Tauri wiring.
 
-use crate::{collection::CollectionScanner, models::PinnedItem, pins, AppState};
+use crate::{models::PinnedItem, pins, AppState};
 use tauri::{AppHandle, Emitter, State};
 
 #[tauri::command]
@@ -61,7 +61,6 @@ pub async fn get_pinned_items(state: State<'_, AppState>) -> Result<Vec<PinnedIt
         return Ok(Vec::new());
     }
 
-    let scanner = CollectionScanner::new(state.db.clone());
     let mut albums_cache: Option<Vec<serde_json::Value>> = None;
     let mut artists_cache: Option<Vec<serde_json::Value>> = None;
     let mut playlists_cache: Option<Vec<crate::models::Playlist>> = None;
@@ -85,7 +84,13 @@ pub async fn get_pinned_items(state: State<'_, AppState>) -> Result<Vec<PinnedIt
                 let albums = match &albums_cache {
                     Some(a) => a,
                     None => {
-                        albums_cache = Some(pins::all_albums(&scanner).map_err(|e| e.to_string())?);
+                        let a = crate::collection::with_collection_scanner(
+                            state.db.clone(),
+                            |scanner| pins::all_albums(scanner),
+                        )
+                        .await
+                        .map_err(|e| e.to_string())?;
+                        albums_cache = Some(a);
                         albums_cache.as_ref().unwrap()
                     }
                 };
@@ -99,8 +104,13 @@ pub async fn get_pinned_items(state: State<'_, AppState>) -> Result<Vec<PinnedIt
                 let artists = match &artists_cache {
                     Some(a) => a,
                     None => {
-                        artists_cache =
-                            Some(pins::all_artists(&scanner).map_err(|e| e.to_string())?);
+                        let a = crate::collection::with_collection_scanner(
+                            state.db.clone(),
+                            |scanner| pins::all_artists(scanner),
+                        )
+                        .await
+                        .map_err(|e| e.to_string())?;
+                        artists_cache = Some(a);
                         artists_cache.as_ref().unwrap()
                     }
                 };
@@ -145,9 +155,20 @@ pub async fn get_pinned_items(state: State<'_, AppState>) -> Result<Vec<PinnedIt
                         playlists_cache.as_ref().unwrap()
                     }
                 };
-                if let Some(auto_playlist) =
-                    pins::resolve_auto_playlist(&scanner, playlists, &ref_key)
-                        .map_err(|e| e.to_string())?
+                let playlists_for_scanner = playlists.clone();
+                let ref_key_for_scanner = ref_key.clone();
+                if let Some(auto_playlist) = crate::collection::with_collection_scanner(
+                    state.db.clone(),
+                    move |scanner| {
+                        pins::resolve_auto_playlist(
+                            scanner,
+                            &playlists_for_scanner,
+                            &ref_key_for_scanner,
+                        )
+                    },
+                )
+                .await
+                .map_err(|e| e.to_string())?
                 {
                     items.push(PinnedItem::AutoPlaylist { auto_playlist });
                 }

@@ -21,8 +21,10 @@ pub struct TagsOverview {
 /// "No Genre" group.
 #[tauri::command]
 pub async fn get_tags_overview(state: State<'_, AppState>) -> Result<TagsOverview, String> {
-    let manager = TagManager::new(state.db.clone());
-    let (tags, graph, no_genre_count) = manager.get_tags_overview().map_err(|e| e.to_string())?;
+    let (tags, graph, no_genre_count) =
+        crate::tags::with_tag_manager(state.db.clone(), |manager| manager.get_tags_overview())
+            .await
+            .map_err(|e| e.to_string())?;
     Ok(TagsOverview {
         tags,
         graph,
@@ -36,10 +38,13 @@ pub async fn get_songs_without_genre(
     mode: Option<QueuePopulationMode>,
     state: State<'_, AppState>,
 ) -> Result<Vec<Song>, String> {
-    let manager = TagManager::new(state.db.clone());
-    manager
-        .get_songs_without_genre(limit.unwrap_or(50), mode.unwrap_or_default())
-        .map_err(|e| e.to_string())
+    let limit = limit.unwrap_or(50);
+    let mode = mode.unwrap_or_default();
+    crate::tags::with_tag_manager(state.db.clone(), move |manager| {
+        manager.get_songs_without_genre(limit, mode)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -49,10 +54,13 @@ pub async fn get_songs_by_tag(
     mode: Option<QueuePopulationMode>,
     state: State<'_, AppState>,
 ) -> Result<Vec<Song>, String> {
-    let manager = TagManager::new(state.db.clone());
-    manager
-        .get_songs_by_tag(&tag_name, limit.unwrap_or(50), mode.unwrap_or_default())
-        .map_err(|e| e.to_string())
+    let limit = limit.unwrap_or(50);
+    let mode = mode.unwrap_or_default();
+    crate::tags::with_tag_manager(state.db.clone(), move |manager| {
+        manager.get_songs_by_tag(&tag_name, limit, mode)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 /// Curated-hierarchy song lookup (#548) — the direct-query fallback used
@@ -66,10 +74,13 @@ pub async fn get_songs_by_curated_tag(
     mode: Option<QueuePopulationMode>,
     state: State<'_, AppState>,
 ) -> Result<Vec<Song>, String> {
-    let manager = TagManager::new(state.db.clone());
-    manager
-        .get_songs_by_curated_tag(&tag_name, limit.unwrap_or(50), mode.unwrap_or_default())
-        .map_err(|e| e.to_string())
+    let limit = limit.unwrap_or(50);
+    let mode = mode.unwrap_or_default();
+    crate::tags::with_tag_manager(state.db.clone(), move |manager| {
+        manager.get_songs_by_curated_tag(&tag_name, limit, mode)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 // ---------------------------------------------------------------------------
@@ -78,16 +89,19 @@ pub async fn get_songs_by_curated_tag(
 
 #[tauri::command]
 pub async fn get_tag_hierarchy(state: State<'_, AppState>) -> Result<Vec<TagGroup>, String> {
-    let manager = TagManager::new(state.db.clone());
-    // Self-heals on every read rather than relying solely on the
-    // `library-changed` listener having already caught up — cheap (a no-op
-    // pass over already-in-sync data) and guarantees the Genres tab never
-    // shows a stale-empty hierarchy just because reconciliation hasn't run
-    // yet this session.
-    if let Err(e) = manager.reconcile_hierarchy() {
-        log::error!("Tag hierarchy reconcile-on-read failed: {e}");
-    }
-    manager.get_tag_hierarchy().map_err(|e| e.to_string())
+    crate::tags::with_tag_manager(state.db.clone(), |manager| {
+        // Self-heals on every read rather than relying solely on the
+        // `library-changed` listener having already caught up — cheap (a no-op
+        // pass over already-in-sync data) and guarantees the Genres tab never
+        // shows a stale-empty hierarchy just because reconciliation hasn't run
+        // yet this session.
+        if let Err(e) = manager.reconcile_hierarchy() {
+            log::error!("Tag hierarchy reconcile-on-read failed: {e}");
+        }
+        manager.get_tag_hierarchy()
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -96,10 +110,11 @@ pub async fn set_tag_group_color(
     name: String,
     color_index: i32,
 ) -> Result<(), String> {
-    let manager = TagManager::new(state.db.clone());
-    manager
-        .set_group_color(&name, color_index)
-        .map_err(|e| e.to_string())
+    crate::tags::with_tag_manager(state.db.clone(), move |manager| {
+        manager.set_group_color(&name, color_index)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -108,16 +123,20 @@ pub async fn reparent_tag(
     tag_name: String,
     new_group_name: String,
 ) -> Result<(), String> {
-    let manager = TagManager::new(state.db.clone());
-    manager
-        .reparent_tag(&tag_name, &new_group_name)
-        .map_err(|e| e.to_string())
+    crate::tags::with_tag_manager(state.db.clone(), move |manager| {
+        manager.reparent_tag(&tag_name, &new_group_name)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn promote_tag(state: State<'_, AppState>, tag_name: String) -> Result<(), String> {
-    let manager = TagManager::new(state.db.clone());
-    manager.promote_tag(&tag_name).map_err(|e| e.to_string())
+    crate::tags::with_tag_manager(state.db.clone(), move |manager| {
+        manager.promote_tag(&tag_name)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -126,10 +145,11 @@ pub async fn demote_group_to_child(
     tag_name: String,
     new_group_name: String,
 ) -> Result<(), String> {
-    let manager = TagManager::new(state.db.clone());
-    manager
-        .demote_group_to_child(&tag_name, &new_group_name)
-        .map_err(|e| e.to_string())
+    crate::tags::with_tag_manager(state.db.clone(), move |manager| {
+        manager.demote_group_to_child(&tag_name, &new_group_name)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -138,10 +158,11 @@ pub async fn reorder_tag_in_group(
     tag_name: String,
     new_index: i32,
 ) -> Result<(), String> {
-    let manager = TagManager::new(state.db.clone());
-    manager
-        .reorder_tag_in_group(&tag_name, new_index)
-        .map_err(|e| e.to_string())
+    crate::tags::with_tag_manager(state.db.clone(), move |manager| {
+        manager.reorder_tag_in_group(&tag_name, new_index)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 /// Every field [`crate::tageditor::write_tags`] needs, read fresh per song so
@@ -340,15 +361,17 @@ pub async fn merge_tags(
 
     let _watcher_pause_guard = WatcherPauseGuard::new(Arc::clone(&state.watcher_paused));
 
-    let manager = TagManager::new(state.db.clone());
     let db = state.db.clone();
     let conn = tokio::task::spawn_blocking(move || db.pool.get())
         .await
         .map_err(|e| e.to_string())?
         .map_err(|e| e.to_string())?;
-    let affected = manager
-        .songs_containing_any(std::slice::from_ref(&from))
-        .map_err(|e| e.to_string())?;
+    let from_for_lookup = from.clone();
+    let affected = crate::tags::with_tag_manager(state.db.clone(), move |manager| {
+        manager.songs_containing_any(std::slice::from_ref(&from_for_lookup))
+    })
+    .await
+    .map_err(|e| e.to_string())?;
     let song_ids: Vec<i64> = affected.iter().map(|(id, _, _)| *id).collect();
 
     let from_c = from.clone();
@@ -359,9 +382,13 @@ pub async fn merge_tags(
         })
         .await?;
 
-    manager
-        .apply_merge_hierarchy(&from, &into)
-        .map_err(|e| e.to_string())?;
+    let from_c2 = from.clone();
+    let into_c2 = into.clone();
+    crate::tags::with_tag_manager(state.db.clone(), move |manager| {
+        manager.apply_merge_hierarchy(&from_c2, &into_c2)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
 
     let _ = app.emit("library-changed", ());
 
@@ -384,15 +411,17 @@ pub async fn delete_tags(
 
     let _watcher_pause_guard = WatcherPauseGuard::new(Arc::clone(&state.watcher_paused));
 
-    let manager = TagManager::new(state.db.clone());
     let db = state.db.clone();
     let conn = tokio::task::spawn_blocking(move || db.pool.get())
         .await
         .map_err(|e| e.to_string())?
         .map_err(|e| e.to_string())?;
-    let affected = manager
-        .songs_containing_any(&names)
-        .map_err(|e| e.to_string())?;
+    let names_for_lookup = names.clone();
+    let affected = crate::tags::with_tag_manager(state.db.clone(), move |manager| {
+        manager.songs_containing_any(&names_for_lookup)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
     let song_ids: Vec<i64> = affected.iter().map(|(id, _, _)| *id).collect();
 
     let names_c = names.clone();
@@ -402,9 +431,12 @@ pub async fn delete_tags(
         })
         .await?;
 
-    manager
-        .apply_delete_hierarchy(&names)
-        .map_err(|e| e.to_string())?;
+    let names_c2 = names.clone();
+    crate::tags::with_tag_manager(state.db.clone(), move |manager| {
+        manager.apply_delete_hierarchy(&names_c2)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
 
     let _ = app.emit("library-changed", ());
 
