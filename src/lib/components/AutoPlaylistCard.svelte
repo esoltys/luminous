@@ -139,13 +139,9 @@
       });
   });
 
-  // Favourites/Recently Added/History use a fixed icon cover instead of a CoverStack —
-  // they're rebuilt from the whole library on every load, so a coverstack of
-  // whichever songs happen to be in them right now reads as arbitrary rather
-  // than representative (unlike a genre, decade, BPM, or user playlist).
-  let topCovers = $derived(
-    kind === "genre" || kind === "decade" || kind === "bpm" || kind === "artist_tag" || kind === "daypart" ? songsToCoverStack(songs) : []
-  );
+  // Missing Metadata keeps its fixed icon cover — it's a to-do list rather
+  // than a set of songs whose covers say anything about the playlist.
+  let topCovers = $derived(kind === "missing_metadata" ? [] : songsToCoverStack(songs));
 
   let updatedLabel = $derived.by(() => {
     if (
@@ -158,7 +154,7 @@
 </script>
 
 {#snippet cover()}
-  {#if (kind === "genre" || kind === "decade" || kind === "bpm" || kind === "artist_tag" || kind === "daypart") && topCovers.length > 0}
+  {#if topCovers.length > 0}
     {@const t = getPlaylistCardTheme(kind)}
     <PlaylistCoverFrame gradientClass={t.gradientClass}>
       <CoverStack covers={topCovers} hoverEffect={true} sizeClass="w-[82%] h-[82%]" />

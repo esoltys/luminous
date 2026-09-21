@@ -10,7 +10,7 @@
   import { shuffleArray } from "../utils/shuffle";
   import { formatDuration } from "../utils/formatters";
   import CoverArt from "./CoverArt.svelte";
-  import CoverStack from "./CoverStack.svelte";
+  import CoverMosaic from "./CoverMosaic.svelte";
   import GenreChips from "./GenreChips.svelte";
   import AlbumCard from "./AlbumCard.svelte";
   import PlaylistCard from "./PlaylistCard.svelte";
@@ -556,20 +556,8 @@
       </div>
 
       {#if !windowLayoutStore.isDetailHeaderCollapsed && (artistPortraitUrl || headerCovers.length > 0)}
-        <div class="relative w-48 h-36 hidden sm:block shrink-0 flex items-center justify-end">
-          {#if artistPortraitUrl}
-            <div class="flex items-center justify-end w-full h-full my-auto select-none">
-              <div class="w-28 h-28 overflow-hidden relative bg-brand-sidebar border border-brand-border">
-                <img
-                  src={artistPortraitUrl}
-                  alt={artistName}
-                  class="w-full h-full object-cover"
-                />
-              </div>
-            </div>
-          {:else}
-            <CoverStack covers={headerCovers} direction="left" sizeClass="w-28 h-28" />
-          {/if}
+        <div class="hidden sm:flex items-start shrink-0 shadow-xl">
+          <CoverMosaic covers={headerCovers} heroImageUrl={artistPortraitUrl} heroImageAlt={artistName} sizeClass="h-36" />
         </div>
       {/if}
     </div>
