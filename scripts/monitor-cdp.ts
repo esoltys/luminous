@@ -6,9 +6,8 @@
  * Measures renderer event loop latency, evaluates expressions, tracks document
  * visibility, and can test window minimization / restoration responsiveness.
  *
- * Requires Luminous to be launched with LUMINOUS_REMOTE_DEVTOOLS=1:
- *   $env:LUMINOUS_REMOTE_DEVTOOLS = "1"; bun run tauri dev   (PowerShell)
- *   LUMINOUS_REMOTE_DEVTOOLS=1 bun run tauri dev            (Bash)
+ * Requires Luminous to be running in dev mode (`bun run tauri dev`).
+ * (Dev builds automatically export remote devtools on port 9222 via LUMINOUS_REMOTE_DEVTOOLS=1).
  *
  * Usage:
  *   bun run scripts/monitor-cdp.ts                          # Single latency & state check
@@ -49,9 +48,8 @@ class CdpClient {
     } catch (e) {
       throw new Error(
         `Failed to connect to CDP endpoint at ${endpoint}.\n` +
-          `Is Luminous running with LUMINOUS_REMOTE_DEVTOOLS=1?\n` +
-          `  PowerShell: $env:LUMINOUS_REMOTE_DEVTOOLS = "1"; bun run tauri dev\n` +
-          `  Bash:       LUMINOUS_REMOTE_DEVTOOLS=1 bun run tauri dev`
+          `Is Luminous running in dev mode?\n` +
+          `  bun run tauri dev`
       );
     }
 
