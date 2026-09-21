@@ -35,7 +35,8 @@
     ArrowSquareOutIcon as OpenInPicard,
     ArrowSquareOutIcon as ExternalLink,
     ShareNetworkIcon as Share,
-    CaretDownIcon as CaretDown
+    ArrowDownLeftIcon as ArrowDownLeft,
+    ArrowUpRightIcon as ArrowUpRight
   } from "phosphor-svelte";
   import ShareModal from "./ShareModal.svelte";
   import AlbumProfileEditor from "./AlbumProfileEditor.svelte";
@@ -571,29 +572,41 @@
 
   <div class="relative z-10 px-6 py-6 flex flex-col gap-6" class:pb-28={!!playerStore.currentSong}>
     {#if !windowLayoutStore.isDetailHeaderCollapsed}
-      {#if hasChips}
-        <GenreChips
-          genre={rawGenre}
-          variant="full"
-          limit={4}
-        />
-      {:else}
-        <div class="text-xs text-brand-text-secondary italic">
-          <span>{genreLabel}</span>
-        </div>
-      {/if}
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        {#if hasChips}
+          <GenreChips
+            genre={rawGenre}
+            variant="full"
+            limit={4}
+          />
+        {:else}
+          <div class="text-xs text-brand-text-secondary italic">
+            <span>{genreLabel}</span>
+          </div>
+        {/if}
+        {#if hasProfileContent && !windowLayoutStore.isOverviewExpanded}
+          <button
+            type="button"
+            onclick={() => windowLayoutStore.setOverviewExpanded(true)}
+            class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-brand-border bg-brand-sidebar text-brand-text-secondary text-xs font-medium hover:text-brand-text-primary hover:border-brand-accent/40 transition-colors cursor-pointer shrink-0 ml-auto"
+          >
+            <ArrowDownLeft class="w-3.5 h-3.5" />
+            <span>{i18n.t('albumDetail.albumInfo', {}, 'Album Info')}</span>
+          </button>
+        {/if}
+      </div>
     {/if}
 
     <!-- Album Profile Card (Liner Notes & Release Links) -->
-    {#if hasProfileContent && !windowLayoutStore.isDetailHeaderCollapsed}
+    {#if hasProfileContent && !windowLayoutStore.isDetailHeaderCollapsed && windowLayoutStore.isOverviewExpanded}
       <details
-        open={windowLayoutStore.isOverviewExpanded}
+        open
         ontoggle={(e) => windowLayoutStore.setOverviewExpanded(e.currentTarget.open)}
         class="group border border-brand-border rounded-xl bg-brand-sidebar/95 backdrop-blur-xl overflow-hidden shadow-md transition-all @container"
       >
         <summary class="flex items-center justify-between px-4 py-2.5 sm:px-5 sm:py-3 text-xs font-semibold text-brand-text-secondary cursor-pointer select-none hover:text-brand-text-primary transition-colors">
-          <span>{i18n.t('albumDetail.overview', {}, 'Overview')}</span>
-          <CaretDown class="w-3.5 h-3.5 text-brand-text-secondary/70 group-open:rotate-180 transition-transform" />
+          <span>{i18n.t('albumDetail.albumInfo', {}, 'Album Info')}</span>
+          <ArrowUpRight class="w-3.5 h-3.5 text-brand-text-secondary/70" />
         </summary>
         <div class="p-4 sm:p-5 md:p-6 border-t border-brand-border/60 flex flex-col @2xl:flex-row gap-5 md:gap-6 justify-between">
           <!-- Liner Notes / Description (Left) -->

@@ -318,7 +318,7 @@ describe("ArtistDetailView", () => {
   describe("biography accordion", () => {
     const longBio = "Shania Twain is a Canadian singer and songwriter. She has sold over 100 million records, making her the best-selling female artist in country music history and one of the best-selling music artists of all time. Her success garnered her several titles including the Queen of Country Pop.";
 
-    it("renders bio and links in an Overview accordion without inline show more buttons", async () => {
+    it("renders bio and links in an Artist Info accordion without inline show more buttons", async () => {
       const invokeMock = vi.mocked(invoke);
       invokeMock.mockImplementation((cmd: string, args?: any) => {
         if (cmd === "get_songs_by_artist") return Promise.resolve([]);
@@ -348,13 +348,13 @@ describe("ArtistDetailView", () => {
       render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
       await new Promise((resolve) => setTimeout(resolve, 50));
 
-      expect(screen.getByText("Overview")).toBeTruthy();
+      expect(screen.getByText("Artist Info")).toBeTruthy();
       expect(screen.getByText(longBio)).toBeTruthy();
       expect(screen.queryByRole("button", { name: "Show more" })).toBeNull();
       expect(screen.queryByRole("button", { name: "Show less" })).toBeNull();
     });
 
-    it("collapses and expands the Overview accordion", async () => {
+    it("collapses to a corner button and expands the Artist Info accordion", async () => {
       const invokeMock = vi.mocked(invoke);
       invokeMock.mockImplementation((cmd: string, args?: any) => {
         if (cmd === "get_songs_by_artist") return Promise.resolve([]);
@@ -384,14 +384,17 @@ describe("ArtistDetailView", () => {
       render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
       await new Promise((resolve) => setTimeout(resolve, 50));
 
-      const overviewHeader = screen.getByText("Overview");
+      const overviewHeader = screen.getByText("Artist Info");
       const detailsEl = overviewHeader.closest("details");
       expect(detailsEl).toBeTruthy();
       expect(detailsEl?.hasAttribute("open")).toBe(true);
 
-      // Closing the accordion updates the global layout store
+      // Closing the accordion updates the global layout store and swaps
+      // the inline accordion for a floating corner-tuck button
       windowLayoutStore.setOverviewExpanded(false);
+      await new Promise((resolve) => setTimeout(resolve, 0));
       expect(windowLayoutStore.isOverviewExpanded).toBe(false);
+      expect(screen.queryByRole("button", { name: /Artist Info/ })).toBeTruthy();
     });
   });
 
