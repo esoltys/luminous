@@ -331,18 +331,20 @@ export function buildStatsShareCardSvg(options: StatsShareCardOptions): { svg: s
   const background = generateEllipseGradientSvg({ width, height, colors: options.backgroundColors, seed: options.seed });
   const backgroundInner = background.replace(/^<svg[^>]*>/, "").replace(/<\/svg>$/, "");
 
-  const titleSize = Math.round(scaleBasis * 0.038);
-  const subtitleSize = Math.round(scaleBasis * 0.02);
-  const sectionTitleSize = Math.round(scaleBasis * 0.02);
-  const rowSize = Math.round(scaleBasis * 0.0165);
-  const clockLabelSize = Math.round(scaleBasis * 0.014);
+  const titleSize = Math.round(scaleBasis * 0.05);
+  const subtitleSize = Math.round(scaleBasis * 0.026);
+  const sectionTitleSize = Math.round(scaleBasis * 0.026);
+  const rowSize = Math.round(scaleBasis * 0.021);
+  const clockLabelSize = Math.round(scaleBasis * 0.018);
 
   const sectionsHtml = options.sections
     .map((section) => {
+      const rowPad = Math.round(scaleBasis * 0.005);
+      const rowGap = Math.round(scaleBasis * 0.009);
       const rows = section.items
         .map(
           (item, i) =>
-            `<div style="display:flex;gap:8px;align-items:baseline;padding:3px 0;font-size:${rowSize}px;color:${textSecondary};">` +
+            `<div style="display:flex;gap:${rowGap}px;align-items:baseline;padding:${rowPad}px 0;font-size:${rowSize}px;color:${textSecondary};">` +
               `<span style="min-width:1.6em;opacity:0.6;">${i + 1}</span>` +
               `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">${escapeHtml(item.label)}${
                 item.secondary ? ` <span style="opacity:0.65;">— ${escapeHtml(item.secondary)}</span>` : ""
@@ -351,8 +353,8 @@ export function buildStatsShareCardSvg(options: StatsShareCardOptions): { svg: s
         )
         .join("");
       return (
-        `<div style="background:${cardBg};border-radius:${Math.round(scaleBasis * 0.014)}px;padding:${Math.round(scaleBasis * 0.018)}px;min-width:0;">` +
-          `<div style="font-size:${sectionTitleSize}px;font-weight:800;color:${textPrimary};margin-bottom:4px;">${escapeHtml(section.title)}</div>` +
+        `<div style="background:${cardBg};border-radius:${Math.round(scaleBasis * 0.016)}px;padding:${Math.round(scaleBasis * 0.024)}px;min-width:0;">` +
+          `<div style="font-size:${sectionTitleSize}px;font-weight:800;color:${textPrimary};margin-bottom:${Math.round(scaleBasis * 0.006)}px;">${escapeHtml(section.title)}</div>` +
           rows +
         `</div>`
       );
@@ -360,16 +362,16 @@ export function buildStatsShareCardSvg(options: StatsShareCardOptions): { svg: s
     .join("");
 
   const maxClockCount = Math.max(1, ...options.clockBuckets.map((b) => b.count));
-  const clockBarMaxHeight = Math.round(scaleBasis * 0.09);
+  const clockBarMaxHeight = Math.round(scaleBasis * 0.1);
   const clockHtml = `
-    <div style="display:flex;align-items:flex-end;justify-content:center;gap:${Math.round(scaleBasis * 0.035)}px;margin-top:${Math.round(scaleBasis * 0.02)}px;">
+    <div style="display:flex;align-items:flex-end;justify-content:center;gap:${Math.round(scaleBasis * 0.04)}px;margin-top:${Math.round(scaleBasis * 0.028)}px;">
       ${options.clockBuckets
         .map((bucket) => {
           const barHeight = Math.max(4, Math.round((bucket.count / maxClockCount) * clockBarMaxHeight));
           return (
-            `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;">` +
-              `<div style="width:${Math.round(scaleBasis * 0.028)}px;height:${clockBarMaxHeight}px;display:flex;align-items:flex-end;">` +
-                `<div style="width:100%;height:${barHeight}px;border-radius:${Math.round(scaleBasis * 0.006)}px;background:${textPrimary};opacity:0.75;"></div>` +
+            `<div style="display:flex;flex-direction:column;align-items:center;gap:${Math.round(scaleBasis * 0.006)}px;">` +
+              `<div style="width:${Math.round(scaleBasis * 0.034)}px;height:${clockBarMaxHeight}px;display:flex;align-items:flex-end;">` +
+                `<div style="width:100%;height:${barHeight}px;border-radius:${Math.round(scaleBasis * 0.007)}px;background:${textPrimary};opacity:0.75;"></div>` +
               `</div>` +
               `<span style="font-size:${clockLabelSize}px;color:${textTertiary};">${escapeHtml(bucket.label)}</span>` +
             `</div>`
@@ -382,14 +384,14 @@ export function buildStatsShareCardSvg(options: StatsShareCardOptions): { svg: s
   const contentHtml = `
     <div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;width:100%;height:100%;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:${pad}px;box-sizing:border-box;font-family:'Inter','Segoe UI',system-ui,sans-serif;">
       <div style="font-size:${titleSize}px;font-weight:800;color:${textPrimary};text-align:center;">${escapeHtml(options.rangeLabel)}</div>
-      <div style="font-size:${subtitleSize}px;font-weight:600;color:${textSecondary};margin-top:4px;margin-bottom:${Math.round(scaleBasis * 0.03)}px;text-align:center;">${escapeHtml(options.totalMinutesLabel)}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:${Math.round(scaleBasis * 0.018)}px;width:100%;max-width:${Math.round(width * 0.86)}px;">
+      <div style="font-size:${subtitleSize}px;font-weight:600;color:${textSecondary};margin-top:${Math.round(scaleBasis * 0.006)}px;margin-bottom:${Math.round(scaleBasis * 0.038)}px;text-align:center;">${escapeHtml(options.totalMinutesLabel)}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:${Math.round(scaleBasis * 0.022)}px;width:100%;max-width:${Math.round(width * 0.86)}px;">
         ${sectionsHtml}
       </div>
       ${clockHtml}
       <div style="position:absolute;left:${pad}px;bottom:${pad}px;display:flex;align-items:center;gap:${Math.round(scaleBasis * 0.008)}px;opacity:0.85;">
-        ${LUMINOUS_MARK_SVG(Math.round(scaleBasis * 0.024))}
-        <span style="font-family:'Expose','Inter','Segoe UI',system-ui,sans-serif;font-size:${Math.round(scaleBasis * 0.015)}px;font-weight:700;letter-spacing:0.04em;color:${textSecondary};">LUMINOUS</span>
+        ${LUMINOUS_MARK_SVG(Math.round(scaleBasis * 0.026))}
+        <span style="font-family:'Expose','Inter','Segoe UI',system-ui,sans-serif;font-size:${Math.round(scaleBasis * 0.016)}px;font-weight:700;letter-spacing:0.04em;color:${textSecondary};">LUMINOUS</span>
       </div>
     </div>
   `;
