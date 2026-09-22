@@ -554,11 +554,49 @@ pub async fn clear_album_cover_art(
     Ok(cleared.len() as u32)
 }
 
+fn is_disc_folder_name(name: &str) -> bool {
+    let s = name.trim().to_ascii_lowercase();
+    if let Some(rest) = s
+        .strip_prefix("disc")
+        .or_else(|| s.strip_prefix("disk"))
+        .or_else(|| s.strip_prefix("cd"))
+    {
+        let trimmed_rest = rest.trim();
+        if trimmed_rest.is_empty() {
+            return false;
+        }
+        if trimmed_rest.chars().all(|c| c.is_ascii_digit()) {
+            return true;
+        }
+        let id = rest.trim_matches(|c: char| c.is_whitespace() || c == '-' || c == '_');
+        if (rest.starts_with(' ') || rest.starts_with('-') || rest.starts_with('_'))
+            && id.len() == 1
+            && id.chars().next().unwrap().is_ascii_alphabetic()
+        {
+            return true;
+        }
+    }
+    false
+}
+
+fn resolve_album_dir(dir: &std::path::Path) -> std::path::PathBuf {
+    if let Some(file_name) = dir.file_name().and_then(|n| n.to_str()) {
+        if is_disc_folder_name(file_name) {
+            if let Some(parent) = dir.parent() {
+                return parent.to_path_buf();
+            }
+        }
+    }
+    dir.to_path_buf()
+}
+
 /// Opens the containing folder of the first of `song_ids` that has a local
 /// file (in the OS file manager), for the Song/Album Details "Open Folder"
 /// action. Songs sharing an album normally share one folder, so the first
 /// hit is enough -- this mirrors `open_in_picard`'s song-id-to-parent-dir
 /// resolution rather than trusting a raw path from the frontend.
+/// If multiple songs are selected (album context), disc subfolders (e.g.
+/// `Disc 1`, `CD 1`) are resolved up to the common album directory.
 #[tauri::command]
 pub async fn open_song_folder(
     app: tauri::AppHandle,
@@ -575,7 +613,13 @@ pub async fn open_song_folder(
         path.as_deref()
             .map(std::path::Path::new)
             .and_then(|p| p.parent())
-            .map(|p| p.to_path_buf())
+            .map(|p| {
+                if song_ids.len() > 1 {
+                    resolve_album_dir(p)
+                } else {
+                    p.to_path_buf()
+                }
+            })
     });
     drop(conn);
 
@@ -586,4 +630,39 @@ pub async fn open_song_folder(
     app.opener()
         .open_path(dir.to_string_lossy().to_string(), None::<&str>)
         .map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn test_is_disc_folder_name() {
+        assert!(is_disc_folder_name("Disc 1"));
+        assert!(is_disc_folder_name("disc 02"));
+        assert!(is_disc_folder_name("CD1"));
+        assert!(is_disc_folder_name("CD 2"));
+        assert!(is_disc_folder_name("Disk 1"));
+        assert!(is_disc_folder_name("CD A"));
+        assert!(is_disc_folder_name("disc - b"));
+
+        assert!(!is_disc_folder_name(""));
+        assert!(!is_disc_folder_name("Albatross"));
+        assert!(!is_disc_folder_name("2012 - Albatross"));
+        assert!(!is_disc_folder_name("Discography"));
+        assert!(!is_disc_folder_name("CDs"));
+    }
+
+    #[test]
+    fn test_resolve_album_dir() {
+        let disc_dir = Path::new("/Music/Pink Floyd/The Wall/Disc 1");
+        assert_eq!(
+            resolve_album_dir(disc_dir),
+            Path::new("/Music/Pink Floyd/The Wall")
+        );
+
+        let album_dir = Path::new("/Music/Big Wreck/2012 - Albatross");
+        assert_eq!(resolve_album_dir(album_dir), album_dir);
+    }
 }
