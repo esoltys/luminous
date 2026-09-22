@@ -139,6 +139,48 @@ impl From<i64> for FileType {
     }
 }
 
+impl FileType {
+    pub fn is_lossless(&self) -> bool {
+        matches!(
+            self,
+            FileType::Flac
+                | FileType::OggFlac
+                | FileType::Alac
+                | FileType::Aiff
+                | FileType::Wav
+                | FileType::WavPack
+                | FileType::TrueAudio
+                | FileType::Ape
+                | FileType::Dsf
+                | FileType::Dsdiff
+        )
+    }
+
+    pub fn display_name(&self) -> &'static str {
+        match self {
+            FileType::Mp3 => "MP3",
+            FileType::Flac => "FLAC",
+            FileType::OggFlac => "Ogg FLAC",
+            FileType::OggVorbis => "Vorbis",
+            FileType::OggOpus => "Opus",
+            FileType::OggSpeex => "Speex",
+            FileType::Aac => "AAC",
+            FileType::Alac => "ALAC",
+            FileType::Aiff => "AIFF",
+            FileType::Wav => "WAV",
+            FileType::WavPack => "WavPack",
+            FileType::Mpc => "Musepack",
+            FileType::TrueAudio => "TrueAudio",
+            FileType::Ape => "Monkey's Audio",
+            FileType::Dsf => "DSF (DSD)",
+            FileType::Dsdiff => "DSDIFF (DSD)",
+            FileType::Asf => "WMA/ASF",
+            FileType::Stream => "Stream",
+            FileType::Unknown => "Unknown",
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Multi-value field helpers (genre, artist, album artist, composer)
 // ---------------------------------------------------------------------------
@@ -677,6 +719,71 @@ pub enum LoudnessGainSource {
     /// Neither analysis, a tag, nor a DR log is available — the fixed
     /// fallback gain.
     Fallback,
+}
+
+// ---------------------------------------------------------------------------
+// Audio Pipeline & Quality Tier (#1041)
+// ---------------------------------------------------------------------------
+
+/// Quality tier classification for playback quality indicator badge.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum QualityTier {
+    /// Lossy codec below 256 kbps.
+    #[default]
+    Lq,
+    /// Lossy codec at 256 kbps or higher.
+    Sq,
+    /// Lossless codec (standard resolution: <= 48 kHz and <= 16-bit).
+    Hq,
+    /// Lossless codec with high resolution (sample rate > 48 kHz or bit depth > 16-bit).
+    HiRes,
+}
+
+impl QualityTier {
+    pub fn badge_label(&self) -> &'static str {
+        match self {
+            Self::Lq => "LQ",
+            Self::Sq => "SQ",
+            Self::Hq => "HQ",
+            Self::HiRes => "Hi-Res",
+        }
+    }
+}
+
+/// Comprehensive snapshot of the audio pipeline from source file to output device.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AudioPipelineInfo {
+    pub quality_tier: QualityTier,
+
+    // Stage 1: Input
+    pub input_source: SongSource,
+    pub input_format: String,
+    pub input_codec: String,
+    pub input_bitrate_kbps: Option<i32>,
+    pub input_sample_rate: Option<u32>,
+    pub input_bit_depth: Option<i32>,
+    pub input_channels: Option<u16>,
+    pub input_path: Option<String>,
+
+    // Stage 2: Processing
+    pub decoder_name: String,
+    pub headroom: String,
+    pub resample_rate: Option<u32>,
+    pub loudness_source: LoudnessGainSource,
+    pub loudness_gain_db: Option<f32>,
+    pub eq_enabled: bool,
+    pub eq_mode: Option<String>,
+    pub eq_preamp_db: Option<f32>,
+    pub eq_active_bands_count: usize,
+
+    // Stage 3: Output
+    pub limiter: String,
+    pub output_sample_rate: u32,
+    pub output_channels: u16,
+    pub output_format: String,
+    pub output_device_name: String,
+    pub output_backend: String,
 }
 
 // ---------------------------------------------------------------------------

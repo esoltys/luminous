@@ -16,11 +16,10 @@ pub(crate) async fn replace_queue_and_play_state(
 ) -> Result<(), String> {
     // `with_playlists` runs the synchronous rusqlite work via
     // `block_in_place` (#1097) — see its doc comment in playlist.rs.
-    let (queue_id, items) = crate::playlist::with_playlists(&state.playlists, |pm| {
-        pm.replace_queue(song_ids)
-    })
-    .await
-    .map_err(|e| e.to_string())?;
+    let (queue_id, items) =
+        crate::playlist::with_playlists(&state.playlists, |pm| pm.replace_queue(song_ids))
+            .await
+            .map_err(|e| e.to_string())?;
     let mut player = state.player.lock().await;
     player
         .play_playlist(items, start_index, queue_id, context)
@@ -488,8 +487,7 @@ pub async fn open_and_play(
 
     let cover_manager = state.cover_manager.clone();
     let songs = crate::db::run_blocking(&state.db, move |conn| {
-        resolve_songs_from_paths(conn, &cover_manager, resolved_paths)
-            .map_err(anyhow::Error::msg)
+        resolve_songs_from_paths(conn, &cover_manager, resolved_paths).map_err(anyhow::Error::msg)
     })
     .await
     .map_err(|e| e.to_string())?;
@@ -532,8 +530,7 @@ pub async fn add_paths_to_queue(
 
     let cover_manager = state.cover_manager.clone();
     let songs = crate::db::run_blocking(&state.db, move |conn| {
-        resolve_songs_from_paths(conn, &cover_manager, resolved_paths)
-            .map_err(anyhow::Error::msg)
+        resolve_songs_from_paths(conn, &cover_manager, resolved_paths).map_err(anyhow::Error::msg)
     })
     .await
     .map_err(|e| e.to_string())?;
@@ -598,6 +595,16 @@ pub async fn add_songs_to_queue(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     append_song_ids_to_queue(&state, &song_ids, &app).await
+}
+
+/// Snapshots the active audio pipeline configuration for the current track (#1041).
+#[tauri::command]
+pub async fn get_audio_pipeline_info(
+    state: State<'_, AppState>,
+) -> Result<Option<crate::models::AudioPipelineInfo>, String> {
+    let player = state.player.lock().await;
+    let audio = state.audio.lock().await;
+    Ok(player.get_pipeline_info(&audio))
 }
 
 #[cfg(test)]

@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent } from "@testing-library/svelte";
 import RightPanel from "./RightPanel.svelte";
 import { playerStore } from "../stores/player.svelte";
-import type { Song } from "../types";
+import type { Song, AudioPipelineInfo } from "../types";
 
 import { invoke } from "@tauri-apps/api/core";
 
@@ -54,49 +54,63 @@ describe("RightPanel.svelte", () => {
     expect(getByText(/nothing playing/i)).toBeInTheDocument();
   });
 
-  it("renders format when song is set", () => {
+  const mockAudioPipeline: AudioPipelineInfo = {
+    quality_tier: "hq",
+    input_source: "local_file",
+    input_format: "FLAC",
+    input_codec: "flac",
+    input_bitrate_kbps: 320,
+    input_sample_rate: 44100,
+    input_bit_depth: 16,
+    input_channels: 2,
+    decoder_name: "Symphonia FLAC decoder",
+    headroom: "Direct passthrough (no DSP)",
+    loudness_source: "disabled",
+    eq_enabled: false,
+    eq_active_bands_count: 0,
+    limiter: "None",
+    output_sample_rate: 44100,
+    output_channels: 2,
+    output_format: "32-bit float",
+    output_device_name: "Default Output Device",
+    output_backend: "WASAPI",
+  };
+
+  it("renders audio pipeline stages on Technical tab when audioPipeline is set", () => {
     playerStore.currentSong = mockSong;
+    playerStore.audioPipeline = mockAudioPipeline;
     const { getByText } = render(RightPanel);
 
+    expect(getByText("Input")).toBeInTheDocument();
+    expect(getByText("Processing")).toBeInTheDocument();
+    expect(getByText("Output")).toBeInTheDocument();
     expect(getByText("FLAC")).toBeInTheDocument();
-  });
-
-  it("renders a plain bitrate for CBR files", () => {
-    playerStore.currentSong = { ...mockSong, bitrate: 320, is_vbr: false };
-    const { getByText } = render(RightPanel);
-
     expect(getByText("320 kbps")).toBeInTheDocument();
+    expect(getByText("Bit-perfect")).toBeInTheDocument();
   });
 
-  it("labels the bitrate as an average for VBR files", () => {
-    playerStore.currentSong = { ...mockSong, bitrate: 245, is_vbr: true };
+  it("renders bitrate in pipeline", () => {
+    playerStore.currentSong = mockSong;
+    playerStore.audioPipeline = { ...mockAudioPipeline, input_bitrate_kbps: 245 };
     const { getByText } = render(RightPanel);
 
-    expect(getByText("245 kbps (avg)")).toBeInTheDocument();
+    expect(getByText("245 kbps")).toBeInTheDocument();
   });
 
-  it("renders Mono channel info when channels is 1", () => {
-    playerStore.currentSong = { ...mockSong, channels: 1 };
+  it("renders Mono channel info in pipeline when channels is 1", () => {
+    playerStore.currentSong = mockSong;
+    playerStore.audioPipeline = { ...mockAudioPipeline, input_channels: 1 };
     const { getByText } = render(RightPanel);
 
-    expect(getByText("Channels")).toBeInTheDocument();
-    expect(getByText("Mono")).toBeInTheDocument();
+    expect(getByText("Mono (1 ch)")).toBeInTheDocument();
   });
 
-  it("renders Stereo channel info when channels is 2", () => {
-    playerStore.currentSong = { ...mockSong, channels: 2 };
-    const { getByText } = render(RightPanel);
+  it("renders Stereo channel info in pipeline when channels is 2", () => {
+    playerStore.currentSong = mockSong;
+    playerStore.audioPipeline = { ...mockAudioPipeline, input_channels: 2 };
+    const { getAllByText } = render(RightPanel);
 
-    expect(getByText("Channels")).toBeInTheDocument();
-    expect(getByText("Stereo")).toBeInTheDocument();
-  });
-
-  it("renders 5.1 Surround channel info when channels is 6", () => {
-    playerStore.currentSong = { ...mockSong, channels: 6 };
-    const { getByText } = render(RightPanel);
-
-    expect(getByText("Channels")).toBeInTheDocument();
-    expect(getByText("5.1 Surround")).toBeInTheDocument();
+    expect(getAllByText("Stereo (2 ch)").length).toBeGreaterThan(0);
   });
 
   it("hides the MusicBrainz section on the Technical tab when no MusicBrainz IDs are present", () => {

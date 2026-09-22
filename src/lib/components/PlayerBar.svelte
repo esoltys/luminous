@@ -21,6 +21,7 @@
   import { tagsStore } from "../stores/tags.svelte";
   import { openInPicard } from "../utils/picard";
   import { isLinux } from "../platform";
+  import QualityBadge from "./QualityBadge.svelte";
 
   // Responsive control trimming (issue #413, refined against real usage,
   // padding/seekbar fixed under #543): three named tiers as this floating
@@ -433,9 +434,8 @@
       <div
         class="flex items-center gap-2.5 w-full text-[10px] text-brand-text-secondary/60"
       >
-        <!-- Invisible spacer matching the mode-toggle button's footprint, so the
-             waveform + timers stay centered instead of skewing left toward it. -->
-        <div class="w-4 h-4 flex-shrink-0" aria-hidden="true"></div>
+        <!-- Quality indicator badge (opens pipeline popover on click) -->
+        <QualityBadge />
         <span>{formatDuration(playerStore.positionNanosec)}</span>
         <div class="flex-1 flex flex-col gap-1">
           <WaveformSeekBar />
