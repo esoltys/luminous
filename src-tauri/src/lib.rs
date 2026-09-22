@@ -14,6 +14,7 @@ pub mod audio;
 pub mod band_waveform;
 pub mod biomanager;
 pub mod bridge;
+pub mod codecs;
 pub mod collection;
 pub mod commands;
 pub mod context;

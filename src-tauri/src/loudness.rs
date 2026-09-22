@@ -179,7 +179,7 @@ fn decode_channels(path: &Path) -> Result<(Vec<Vec<f32>>, u32)> {
         .ok_or_else(|| anyhow!("no audio codec parameters for R128 analysis"))?;
     let sample_rate = audio_params.sample_rate.unwrap_or(44100);
 
-    let mut decoder = symphonia::default::get_codecs()
+    let mut decoder = crate::codecs::CODEC_REGISTRY
         .make_audio_decoder(audio_params, &AudioDecoderOptions::default())
         .context("failed to create decoder for R128 analysis")?;
 
