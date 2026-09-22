@@ -147,28 +147,30 @@
     </div>
 
     <form onsubmit={handleSubmit} class="p-6 flex-1 overflow-y-auto flex flex-col gap-4">
-      <div class="space-y-1.5">
-        <label for="webdav-name" class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
-          {i18n.t("settings.webdavName")}
-        </label>
-        <Input
-          id="webdav-name"
-          bind:value={name}
-          placeholder={i18n.t("settings.webdavNamePlaceholder")}
-          required
-        />
-      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div class="space-y-1.5">
+          <label for="webdav-name" class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
+            {i18n.t("settings.webdavName")}
+          </label>
+          <Input
+            id="webdav-name"
+            bind:value={name}
+            placeholder={i18n.t("settings.webdavNamePlaceholder")}
+            required
+          />
+        </div>
 
-      <div class="space-y-1.5">
-        <label for="webdav-url" class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
-          {i18n.t("settings.webdavUrl")}
-        </label>
-        <Input
-          id="webdav-url"
-          bind:value={url}
-          placeholder={i18n.t("settings.webdavUrlPlaceholder")}
-          required
-        />
+        <div class="space-y-1.5">
+          <label for="webdav-url" class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
+            {i18n.t("settings.webdavUrl")}
+          </label>
+          <Input
+            id="webdav-url"
+            bind:value={url}
+            placeholder={i18n.t("settings.webdavUrlPlaceholder")}
+            required
+          />
+        </div>
       </div>
 
       <div class="grid grid-cols-2 gap-3">
