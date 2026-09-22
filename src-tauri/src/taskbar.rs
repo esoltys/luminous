@@ -44,8 +44,9 @@ use windows::Win32::UI::Shell::{
     THBN_CLICKED, THB_FLAGS, THB_ICON, THB_TOOLTIP, THUMBBUTTON,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateIconIndirect, GetClientRect, GetSystemMetrics, RegisterWindowMessageW, HICON, ICONINFO,
-    SIZE_RESTORED, SM_CXSMICON, WM_COMMAND, WM_SIZE,
+    ChangeWindowMessageFilterEx, CreateIconIndirect, GetClientRect, GetSystemMetrics,
+    IsWindowVisible, RegisterWindowMessageW, HICON, ICONINFO, MSGFLT_ALLOW, SIZE_RESTORED,
+    SM_CXSMICON, WM_COMMAND, WM_SIZE,
 };
 
 /// Not currently exported by the `windows` crate's `Win32_Graphics_Dwm`
@@ -96,10 +97,10 @@ struct TaskbarContext {
     app: AppHandle,
     hwnd: HWND,
     /// `None` until a taskbar button actually exists for our window (see
-    /// `try_register_thumbbar`) — `ThumbBarAddButtons` is a no-op if called
-    /// before that, which is exactly what a window created hidden
-    /// (`"visible": false`, shown later from the frontend) hits if it's
-    /// called eagerly at `.setup()` time.
+    /// `try_register_thumbbar`) — `ThumbBarAddButtons` returns `E_NOTIMPL`
+    /// (0x80004001) if called before that, which is why windows created
+    /// hidden (`"visible": false`, shown later from the frontend) defer
+    /// registration until `TaskbarButtonCreated` arrives.
     taskbar: parking_lot::Mutex<Option<ITaskbarList3>>,
     icons: ButtonIcons,
     /// The most recently applied (playing, has_song) pair, so a taskbar
@@ -162,6 +163,14 @@ fn try_init(app: &tauri::App) -> windows::core::Result<()> {
     // for it — see `try_register_thumbbar`.
     let taskbar_button_created_msg = unsafe { RegisterWindowMessageW(w!("TaskbarButtonCreated")) };
 
+    // Allow the shell's `TaskbarButtonCreated` message through UIPI if
+    // running with elevated privileges (as administrator).
+    if taskbar_button_created_msg != 0 {
+        let _ = unsafe {
+            ChangeWindowMessageFilterEx(hwnd, taskbar_button_created_msg, MSGFLT_ALLOW, None)
+        };
+    }
+
     let ctx = Box::new(TaskbarContext {
         app: app.handle().clone(),
         hwnd,
@@ -177,11 +186,14 @@ fn try_init(app: &tauri::App) -> windows::core::Result<()> {
 
     unsafe { SetWindowSubclass(hwnd, Some(subclass_proc), SUBCLASS_ID, ctx_ptr) }.ok()?;
 
-    // Covers the (unlikely, given the window starts hidden) case where a
-    // taskbar button already exists by the time we get here; the normal
-    // path is via `TaskbarButtonCreated` in `subclass_proc`.
-    let ctx = unsafe { &*(ctx_ptr as *const TaskbarContext) };
-    register_thumbbar(ctx);
+    // If the window is already visible at init time, attempt thumbbar
+    // registration immediately. When starting hidden ("visible": false),
+    // the taskbar button does not exist yet; registration will occur once
+    // `TaskbarButtonCreated` is received in `subclass_proc`.
+    if unsafe { IsWindowVisible(hwnd) }.as_bool() {
+        let ctx = unsafe { &*(ctx_ptr as *const TaskbarContext) };
+        register_thumbbar(ctx);
+    }
 
     listen_playback_state(app, ctx_ptr);
     seed_playback_state(app.handle().clone(), ctx_ptr);
@@ -196,7 +208,15 @@ fn try_init(app: &tauri::App) -> windows::core::Result<()> {
 /// again if Explorer restarts and rebroadcasts that message.
 fn register_thumbbar(ctx: &TaskbarContext) {
     if let Err(e) = try_register_thumbbar(ctx) {
-        log::warn!("Failed to register taskbar thumbbar buttons: {e:?}");
+        // `E_NOTIMPL` (0x80004001) occurs when ThumbBarAddButtons is called
+        // before Explorer has established the window's taskbar button.
+        // It is an expected intermediate state when waiting for
+        // `TaskbarButtonCreated`, so log at debug rather than warn.
+        if e.code() == windows::core::HRESULT(0x80004001u32 as i32) {
+            log::debug!("Taskbar button not yet created by shell; awaiting TaskbarButtonCreated");
+        } else {
+            log::warn!("Failed to register taskbar thumbbar buttons: {e:?}");
+        }
     }
 }
 
