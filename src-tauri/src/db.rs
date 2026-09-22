@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 39;
+pub const CURRENT_SCHEMA_VERSION: i32 = 40;
 
 struct Migration {
     version: i32,
@@ -303,6 +303,21 @@ const MIGRATIONS: &[Migration] = &[
                 .exists([])?;
             if !has_musicbrainz_artist_id {
                 conn.execute_batch(MIGRATION_39)?;
+            }
+            Ok(())
+        },
+    },
+    Migration {
+        version: 40,
+        description: "fetched_image_filename/fetched_image_source columns on artist_profiles for Fetch Artist Image (#1127)",
+        apply: |conn| {
+            let has_fetched_image_filename: bool = conn
+                .prepare(
+                    "SELECT 1 FROM pragma_table_info('artist_profiles') WHERE name = 'fetched_image_filename'",
+                )?
+                .exists([])?;
+            if !has_fetched_image_filename {
+                conn.execute_batch(MIGRATION_40)?;
             }
             Ok(())
         },
@@ -1388,6 +1403,17 @@ const MIGRATION_39: &str = "
 ALTER TABLE artist_profiles ADD COLUMN musicbrainz_artist_id TEXT;
 ";
 
+// ---------------------------------------------------------------------------
+// Migration 40: artist_profiles.fetched_image_filename/fetched_image_source —
+// an artist portrait fetched via "Fetch Artist Image" (#1127) from fanart.tv
+// or, lacking an API key/match, Wikidata's P18 property. Cached under
+// `CoverManager`'s covers_dir, same convention as `songs.art_automatic`.
+// ---------------------------------------------------------------------------
+const MIGRATION_40: &str = "
+ALTER TABLE artist_profiles ADD COLUMN fetched_image_filename TEXT;
+ALTER TABLE artist_profiles ADD COLUMN fetched_image_source TEXT;
+";
+
 fn seed_artist_tag_hierarchy(conn: &rusqlite::Connection) -> Result<()> {
     let mut stmt = conn.prepare(
         "SELECT DISTINCT json_each.value
@@ -1965,6 +1991,38 @@ mod tests {
             )
             .unwrap();
         assert_eq!(mbid.as_deref(), Some("042c0697-3948-4720-bf43-690240aeac43"));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_migration_40_adds_artist_profiles_fetched_image_columns() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_migration40_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Database::new(temp_dir.clone()).unwrap();
+        assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
+
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO artist_profiles (artist_key, fetched_image_filename, fetched_image_source) VALUES (?1, ?2, ?3)",
+            params!["Shania Twain", "artist-abc123.jpg", "fanart"],
+        )
+        .unwrap();
+
+        let (filename, source): (Option<String>, Option<String>) = conn
+            .query_row(
+                "SELECT fetched_image_filename, fetched_image_source FROM artist_profiles WHERE artist_key = 'Shania Twain'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(filename.as_deref(), Some("artist-abc123.jpg"));
+        assert_eq!(source.as_deref(), Some("fanart"));
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

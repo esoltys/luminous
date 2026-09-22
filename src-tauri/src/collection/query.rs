@@ -1539,7 +1539,7 @@ fn attach_album_ratings(conn: &rusqlite::Connection, items: &mut [HomeItem]) -> 
 /// Retrieve customizable profile for an artist from SQLite (#473).
 pub fn get_artist_profile_conn(conn: &rusqlite::Connection, artist: &str) -> Result<ArtistProfile> {
     let mut stmt = conn.prepare(
-        "SELECT artist_key, website, tags, social_links, bio, musicbrainz_artist_id FROM artist_profiles WHERE artist_key = ?1 COLLATE NOCASE",
+        "SELECT artist_key, website, tags, social_links, bio, musicbrainz_artist_id, fetched_image_filename, fetched_image_source FROM artist_profiles WHERE artist_key = ?1 COLLATE NOCASE",
     )?;
     let result = stmt.query_row(params![artist], |row| {
         let artist_key: String = row.get(0)?;
@@ -1548,6 +1548,8 @@ pub fn get_artist_profile_conn(conn: &rusqlite::Connection, artist: &str) -> Res
         let social_links_json: String = row.get(3)?;
         let bio: Option<String> = row.get(4)?;
         let musicbrainz_artist_id: Option<String> = row.get(5)?;
+        let fetched_image_filename: Option<String> = row.get(6)?;
+        let fetched_image_source: Option<String> = row.get(7)?;
 
         let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
         let social_links: Vec<ArtistSocialLink> =
@@ -1560,6 +1562,8 @@ pub fn get_artist_profile_conn(conn: &rusqlite::Connection, artist: &str) -> Res
             social_links,
             bio,
             musicbrainz_artist_id,
+            fetched_image_filename,
+            fetched_image_source,
         })
     });
 
@@ -1572,6 +1576,8 @@ pub fn get_artist_profile_conn(conn: &rusqlite::Connection, artist: &str) -> Res
             social_links: Vec::new(),
             bio: None,
             musicbrainz_artist_id: None,
+            fetched_image_filename: None,
+            fetched_image_source: None,
         }),
         Err(e) => Err(e.into()),
     }
@@ -1627,21 +1633,25 @@ pub fn set_artist_profile_conn(
     let social_links_json = serde_json::to_string(&profile.social_links)?;
 
     conn.execute(
-        "INSERT INTO artist_profiles (artist_key, website, tags, social_links, bio, musicbrainz_artist_id)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+        "INSERT INTO artist_profiles (artist_key, website, tags, social_links, bio, musicbrainz_artist_id, fetched_image_filename, fetched_image_source)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
          ON CONFLICT(artist_key) DO UPDATE SET
             website = excluded.website,
             tags = excluded.tags,
             social_links = excluded.social_links,
             bio = excluded.bio,
-            musicbrainz_artist_id = excluded.musicbrainz_artist_id",
+            musicbrainz_artist_id = excluded.musicbrainz_artist_id,
+            fetched_image_filename = excluded.fetched_image_filename,
+            fetched_image_source = excluded.fetched_image_source",
         params![
             profile.artist_key,
             profile.website,
             tags_json,
             social_links_json,
             profile.bio,
-            profile.musicbrainz_artist_id
+            profile.musicbrainz_artist_id,
+            profile.fetched_image_filename,
+            profile.fetched_image_source
         ],
     )?;
 
@@ -1655,7 +1665,7 @@ pub fn set_artist_profile_conn(
 /// Retrieve all saved artist profiles in SQLite (#473).
 pub fn get_all_artist_profiles_conn(conn: &rusqlite::Connection) -> Result<Vec<ArtistProfile>> {
     let mut stmt = conn.prepare(
-        "SELECT artist_key, website, tags, social_links, bio, musicbrainz_artist_id FROM artist_profiles ORDER BY artist_key COLLATE NOCASE",
+        "SELECT artist_key, website, tags, social_links, bio, musicbrainz_artist_id, fetched_image_filename, fetched_image_source FROM artist_profiles ORDER BY artist_key COLLATE NOCASE",
     )?;
     let profiles = stmt
         .query_map([], |row| {
@@ -1665,6 +1675,8 @@ pub fn get_all_artist_profiles_conn(conn: &rusqlite::Connection) -> Result<Vec<A
             let social_links_json: String = row.get(3)?;
             let bio: Option<String> = row.get(4)?;
             let musicbrainz_artist_id: Option<String> = row.get(5)?;
+            let fetched_image_filename: Option<String> = row.get(6)?;
+            let fetched_image_source: Option<String> = row.get(7)?;
 
             let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
             let social_links: Vec<ArtistSocialLink> =
@@ -1677,6 +1689,8 @@ pub fn get_all_artist_profiles_conn(conn: &rusqlite::Connection) -> Result<Vec<A
                 social_links,
                 bio,
                 musicbrainz_artist_id,
+                fetched_image_filename,
+                fetched_image_source,
             })
         })?
         .filter_map(|r| r.ok())
@@ -3228,6 +3242,8 @@ mod tests {
             ],
             bio: Some("Canadian singer-songwriter".to_string()),
             musicbrainz_artist_id: Some("042c0697-3948-4720-bf43-690240aeac43".to_string()),
+            fetched_image_filename: None,
+            fetched_image_source: None,
         };
 
         set_artist_profile_conn(&conn, &profile).unwrap();
@@ -3351,6 +3367,8 @@ mod tests {
                 social_links: vec![],
                 bio: None,
                 musicbrainz_artist_id: None,
+                fetched_image_filename: None,
+                fetched_image_source: None,
             },
         )
         .unwrap();
@@ -3363,6 +3381,8 @@ mod tests {
                 social_links: vec![],
                 bio: None,
                 musicbrainz_artist_id: None,
+                fetched_image_filename: None,
+                fetched_image_source: None,
             },
         )
         .unwrap();
@@ -3379,6 +3399,8 @@ mod tests {
                 social_links: vec![],
                 bio: None,
                 musicbrainz_artist_id: None,
+                fetched_image_filename: None,
+                fetched_image_source: None,
             },
         )
         .unwrap();

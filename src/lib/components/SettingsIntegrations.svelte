@@ -22,10 +22,13 @@
     ArrowUpRightIcon as ArrowUpRight,
     HeartIcon as Heart,
     BookOpenIcon as Globe,
-    DiscordLogoIcon as DiscordLogo
+    DiscordLogoIcon as DiscordLogo,
+    ImageIcon as ImageIntegration
   } from "phosphor-svelte";
 
   let showListenBrainzToken = $state(false);
+  let showFanartKey = $state(false);
+  let hasFanartEnvKey = $state(false);
   let picardCustomPath = $state("");
   let isRecheckingPicard = $state(false);
   let contextEnrichmentEnabled = $state(true);
@@ -69,6 +72,11 @@
       contextEnrichmentEnabled = settings?.context_enrichment_enabled !== "false";
     } catch (e) {
       console.error("Failed to load Picard custom path on mount:", e);
+    }
+    try {
+      hasFanartEnvKey = await invoke("has_fanart_env_key");
+    } catch (e) {
+      console.error("Failed to check fanart.tv env key on mount:", e);
     }
   });
 </script>
@@ -473,6 +481,71 @@
         <FolderOpen class="w-4 h-4" />
         {i18n.t('picard.browseBtn')}
       </Button>
+    </div>
+  </div>
+</div>
+
+<!-- fanart.tv Integration Card -->
+<div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
+  <div class="pb-3 flex justify-between items-center">
+    <div class="flex items-center gap-3">
+      <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
+        <ImageIntegration class="w-5 h-5" />
+      </div>
+      <div class="space-y-1 min-w-0">
+        <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('settings.fanartIntegration')}</h3>
+        <p class="text-xs text-brand-text-secondary leading-relaxed">
+          {i18n.t('settings.fanartDesc1')}<button onclick={() => openExternalUrl("https://fanart.tv")} class="text-brand-accent hover:underline">fanart.tv</button>{i18n.t('settings.fanartDesc2')}
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="space-y-2 pt-2 border-t border-brand-border/60">
+    <div class="flex items-center justify-between">
+      <label for="fanart-key-input" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
+        {i18n.t('settings.fanartApiKeyLabel')}
+      </label>
+      <button
+        type="button"
+        onclick={() => openExternalUrl("https://fanart.tv/get-an-api-key/")}
+        class="text-xs text-brand-accent hover:underline inline-flex items-center gap-1"
+      >
+        {i18n.t('settings.fanartGetKeyLink')}
+        <ArrowUpRight class="w-3 h-3" />
+      </button>
+    </div>
+
+    {#if hasFanartEnvKey}
+      <div class="text-xs font-medium text-brand-accent-text flex items-center gap-2">
+        <Check class="w-3.5 h-3.5" />
+        <span>{i18n.t('settings.fanartEnvKeyFound', { env: 'FANART_API_KEY' })}</span>
+      </div>
+    {/if}
+
+    <div class="flex items-center gap-3 max-w-md">
+      <div class="relative flex-1">
+        <Input
+          id="fanart-key-input"
+          type={showFanartKey ? "text" : "password"}
+          bind:value={prefs.fanartApiKey}
+          onchange={() => prefs.setFanartApiKey(prefs.fanartApiKey)}
+          placeholder={i18n.t('settings.fanartPlaceholder')}
+          class="w-full pr-10"
+        />
+        <button
+          type="button"
+          onclick={() => showFanartKey = !showFanartKey}
+          class="absolute right-3 top-1/2 -translate-y-1/2 text-brand-text-secondary hover:text-brand-text-primary transition-colors"
+          title={showFanartKey ? "Hide key" : "Show key"}
+        >
+          {#if showFanartKey}
+            <EyeOff class="w-4 h-4" />
+          {:else}
+            <Eye class="w-4 h-4" />
+          {/if}
+        </button>
+      </div>
     </div>
   </div>
 </div>

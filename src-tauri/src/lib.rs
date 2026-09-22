@@ -10,6 +10,7 @@
 //   playlist  — Playlist CRUD + undo/redo
 
 pub mod analyzer;
+pub mod artist_image;
 pub mod audio;
 pub mod band_waveform;
 pub mod biomanager;
@@ -1219,6 +1220,8 @@ pub fn run() {
             commands::collection::get_all_album_profiles,
             commands::collection::retrieve_album_details,
             commands::collection::retrieve_artist_details,
+            commands::collection::fetch_artist_image,
+            commands::collection::has_fanart_env_key,
             commands::collection::get_artist_tags_overview,
             commands::collection::set_songs_not_included,
             commands::collection::get_songs_missing_musicbrainz_id,

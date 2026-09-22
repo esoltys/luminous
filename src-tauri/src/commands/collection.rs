@@ -1029,6 +1029,30 @@ pub struct ArtistDetailsRetrievalResult {
     pub added_count: usize,
 }
 
+/// Resolves an artist's MusicBrainz ID the same way for every "look this
+/// artist up on MusicBrainz-linked sources" action (`retrieve_artist_details`,
+/// `fetch_artist_image`): prefers the profile's own `musicbrainz_artist_id`
+/// if already captured, otherwise falls back to whichever of the artist's
+/// songs has one tagged. Returns the resolved MBID alongside the current
+/// profile so callers that also need to update the profile don't have to
+/// re-fetch it.
+async fn resolve_artist_mbid_and_profile(
+    state: &State<'_, AppState>,
+    artist: &str,
+) -> Result<(Option<String>, ArtistProfile), String> {
+    let artist_for_lookup = artist.to_string();
+    crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        let profile = scanner.get_artist_profile(&artist_for_lookup)?;
+        let mbid = match &profile.musicbrainz_artist_id {
+            Some(id) => Some(id.clone()),
+            None => scanner.get_representative_artist_mbid_for_artist(&artist_for_lookup)?,
+        };
+        Ok((mbid, profile))
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
 /// The artist detail overflow menu's "Retrieve Artist Details" action
 /// (#1123) — the artist-level equivalent of `retrieve_album_details`: looks
 /// up the artist's MusicBrainz MBID (the profile's own `musicbrainz_artist_id`
@@ -1047,18 +1071,7 @@ pub async fn retrieve_artist_details(
     // See `set_artist_profile`'s matching guard — same reasoning, for the
     // `artist.md` sidecar write this command triggers (#1123).
     let _watcher_pause_guard = WatcherPauseGuard::new(Arc::clone(&state.watcher_paused));
-    let artist_for_lookup = artist.clone();
-    let (artist_mbid, current_profile) =
-        crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
-            let profile = scanner.get_artist_profile(&artist_for_lookup)?;
-            let mbid = match &profile.musicbrainz_artist_id {
-                Some(id) => Some(id.clone()),
-                None => scanner.get_representative_artist_mbid_for_artist(&artist_for_lookup)?,
-            };
-            Ok((mbid, profile))
-        })
-        .await
-        .map_err(|e| e.to_string())?;
+    let (artist_mbid, current_profile) = resolve_artist_mbid_and_profile(&state, &artist).await?;
 
     let Some(artist_mbid) = artist_mbid else {
         return Err(
@@ -1154,6 +1167,128 @@ pub async fn retrieve_artist_details(
     Ok(ArtistDetailsRetrievalResult {
         profile,
         added_count,
+    })
+}
+
+#[tauri::command]
+pub async fn has_fanart_env_key() -> Result<bool, String> {
+    Ok(std::env::var("FANART_API_KEY").is_ok())
+}
+
+#[derive(Serialize, Clone, Debug, Default)]
+pub struct ArtistImageFetchResult {
+    /// `luminous-art://` URI for the fetched (and now cached) image, or
+    /// `None` when neither fanart.tv nor the Wikidata fallback had one —
+    /// not an error, just nothing found.
+    pub uri: Option<String>,
+    /// `"fanart"` or `"wikidata"`, matching `ArtistProfile.fetched_image_source`.
+    pub source: Option<String>,
+}
+
+/// Reads the settings-stored fanart.tv API key (`fanart_api_key` in the
+/// generic `app_state` KV table), falling back to the `FANART_API_KEY`
+/// environment variable when unset — same precedence AcoustID's API key
+/// used before it was removed (#847).
+async fn resolve_fanart_api_key(state: &State<'_, AppState>) -> Option<String> {
+    let stored: Option<String> = crate::db::run_blocking(&state.db, |conn| {
+        Ok(conn
+            .query_row(
+                "SELECT value FROM app_state WHERE key = 'fanart_api_key'",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .ok())
+    })
+    .await
+    .ok()
+    .flatten();
+
+    stored
+        .filter(|k| !k.trim().is_empty())
+        .or_else(|| std::env::var("FANART_API_KEY").ok())
+}
+
+/// The artist detail overflow menu's "Fetch Artist Image" action (#1127):
+/// resolves the artist's MusicBrainz MBID (same lookup
+/// `retrieve_artist_details` uses), then tries fanart.tv's artist-images API
+/// first (if a key is configured — settings or `FANART_API_KEY` env var),
+/// falling back to Wikidata's `P18` (image) property when no key is
+/// available or fanart.tv has no thumbnail for this artist. The winning
+/// image is downloaded and cached under `CoverManager`'s `covers_dir` (same
+/// directory the `luminous-art://` protocol handler already serves), and the
+/// cache filename + source are persisted onto the artist's profile so it
+/// doesn't need to be re-fetched on every visit.
+#[tauri::command]
+pub async fn fetch_artist_image(
+    artist: String,
+    state: State<'_, AppState>,
+) -> Result<ArtistImageFetchResult, String> {
+    let (artist_mbid, current_profile) = resolve_artist_mbid_and_profile(&state, &artist).await?;
+
+    let Some(artist_mbid) = artist_mbid else {
+        return Err(
+            "No MusicBrainz artist ID found for this artist — tag their songs with Picard first, or run Retrieve Album Details on one of their albums."
+                .to_string(),
+        );
+    };
+
+    let client = crate::artist_image::new_http_client().map_err(|e| e.to_string())?;
+    let fanart_key = resolve_fanart_api_key(&state).await;
+
+    let mut image_url = None;
+    let mut source = None;
+    if let Some(key) = fanart_key {
+        image_url = crate::artist_image::fetch_fanart_artist_image_url(&client, &artist_mbid, &key)
+            .await
+            .map_err(|e| e.to_string())?;
+        if image_url.is_some() {
+            source = Some(crate::artist_image::ArtistImageSource::Fanart);
+        }
+    }
+    if image_url.is_none() {
+        image_url = crate::artist_image::fetch_wikidata_artist_image_url(
+            &ContextManager::new(),
+            &artist_mbid,
+        )
+        .await
+        .map_err(|e| e.to_string())?;
+        if image_url.is_some() {
+            source = Some(crate::artist_image::ArtistImageSource::Wikidata);
+        }
+    }
+
+    let Some(image_url) = image_url else {
+        return Ok(ArtistImageFetchResult::default());
+    };
+    let source = source.expect("source is set whenever image_url is Some");
+
+    let filename_stem = state.cover_manager.get_artist_image_hash(&artist_mbid);
+    let filename = crate::artist_image::download_and_cache_artist_image(
+        &client,
+        &image_url,
+        state.cover_manager.covers_dir(),
+        &filename_stem,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let mut updated_profile = current_profile;
+    updated_profile.artist_key = artist;
+    if updated_profile.musicbrainz_artist_id.is_none() {
+        updated_profile.musicbrainz_artist_id = Some(artist_mbid);
+    }
+    updated_profile.fetched_image_filename = Some(filename.clone());
+    updated_profile.fetched_image_source = Some(source.as_str().to_string());
+
+    crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        save_artist_profile_with_sidecar(scanner, &updated_profile)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(ArtistImageFetchResult {
+        uri: Some(format!("luminous-art://{filename}")),
+        source: Some(source.as_str().to_string()),
     })
 }
 
@@ -1651,6 +1786,8 @@ mod tests {
                 },
             ],
             musicbrainz_artist_id: None,
+            fetched_image_filename: None,
+            fetched_image_source: None,
         };
 
         let content = build_artist_md_content(&profile).unwrap();

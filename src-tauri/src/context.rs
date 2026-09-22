@@ -255,10 +255,31 @@ struct WikidataSitelink {
     title: String,
 }
 
+/// A Wikidata claim's `mainsnak.datavalue.value` — left as an untyped
+/// `serde_json::Value` since its shape depends on the property (a plain
+/// string for `P18`/image filename, an object for e.g. a quantity or
+/// coordinate property this app doesn't otherwise consume).
+#[derive(Deserialize, Debug, Default)]
+struct WikidataDataValue {
+    value: Option<serde_json::Value>,
+}
+
+#[derive(Deserialize, Debug, Default)]
+struct WikidataMainsnak {
+    datavalue: Option<WikidataDataValue>,
+}
+
+#[derive(Deserialize, Debug, Default)]
+struct WikidataClaim {
+    mainsnak: Option<WikidataMainsnak>,
+}
+
 #[derive(Deserialize, Debug, Default)]
 struct WikidataEntity {
     #[serde(default)]
     sitelinks: HashMap<String, WikidataSitelink>,
+    #[serde(default)]
+    claims: HashMap<String, Vec<WikidataClaim>>,
 }
 
 #[derive(Deserialize, Debug, Default)]
@@ -530,6 +551,36 @@ impl ContextManager {
             .get(wikidata_id)
             .and_then(|e| e.sitelinks.get("enwiki"))
             .map(|s| s.title.clone()))
+    }
+
+    /// Resolves a Wikidata QID's `P18` (image) claim to the raw Wikimedia
+    /// Commons filename (e.g. `"Nirvana 1992 crop.jpg"`), for the Wikidata
+    /// fallback artist image lookup (#1127) used when no fanart.tv API key is
+    /// configured. Returns `None` — not an error — when the entity simply has
+    /// no `P18` claim, the common case for most artists.
+    pub async fn fetch_wikidata_image_filename(&self, wikidata_id: &str) -> Result<Option<String>> {
+        let url = format!(
+            "https://www.wikidata.org/wiki/Special:EntityData/{}.json",
+            percent_encoding::utf8_percent_encode(wikidata_id, percent_encoding::NON_ALPHANUMERIC)
+        );
+        let response = self.client.get(&url).send().await?;
+        if !response.status().is_success() {
+            return Err(anyhow!(
+                "Wikidata entity lookup failed: HTTP {}",
+                response.status()
+            ));
+        }
+        let parsed: WikidataEntityData = response.json().await?;
+        Ok(parsed
+            .entities
+            .get(wikidata_id)
+            .and_then(|e| e.claims.get("P18"))
+            .and_then(|claims| claims.first())
+            .and_then(|c| c.mainsnak.as_ref())
+            .and_then(|m| m.datavalue.as_ref())
+            .and_then(|d| d.value.as_ref())
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()))
     }
 
     /// Full chain: artist MusicBrainz ID -> Wikidata QID -> Wikipedia title
@@ -808,6 +859,65 @@ mod tests {
             .and_then(|e| e.sitelinks.get("enwiki"))
             .map(|s| s.title.clone());
         assert_eq!(title, Some("Nirvana (band)".to_string()));
+    }
+
+    #[test]
+    fn test_wikidata_entity_data_resolves_p18_image_filename() {
+        // Captured shape of a real P18 (image) claim.
+        let json = r#"{
+            "entities": {
+                "Q11649": {
+                    "claims": {
+                        "P18": [
+                            {
+                                "mainsnak": {
+                                    "datavalue": {
+                                        "value": "Nirvana 1992 crop.jpg",
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        }"#;
+        let parsed: WikidataEntityData = serde_json::from_str(json).unwrap();
+        let filename = parsed
+            .entities
+            .get("Q11649")
+            .and_then(|e| e.claims.get("P18"))
+            .and_then(|claims| claims.first())
+            .and_then(|c| c.mainsnak.as_ref())
+            .and_then(|m| m.datavalue.as_ref())
+            .and_then(|d| d.value.as_ref())
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        assert_eq!(filename, Some("Nirvana 1992 crop.jpg".to_string()));
+    }
+
+    #[test]
+    fn test_wikidata_entity_data_no_p18_claim_yields_none() {
+        let json = r#"{
+            "entities": {
+                "Q11649": {
+                    "claims": {
+                        "P569": [{"mainsnak": {"datavalue": {"value": "1967-02-20", "type": "string"}}}]
+                    }
+                }
+            }
+        }"#;
+        let parsed: WikidataEntityData = serde_json::from_str(json).unwrap();
+        let filename = parsed
+            .entities
+            .get("Q11649")
+            .and_then(|e| e.claims.get("P18"))
+            .and_then(|claims| claims.first())
+            .and_then(|c| c.mainsnak.as_ref())
+            .and_then(|m| m.datavalue.as_ref())
+            .and_then(|d| d.value.as_ref())
+            .and_then(|v| v.as_str());
+        assert_eq!(filename, None);
     }
 
     #[test]

@@ -15,6 +15,7 @@ import type {
   ArtistItem,
   ArtistProfile,
   ArtistDetailsRetrievalResult,
+  ArtistImageFetchResult,
   ExtendedArtworkResponse,
   RecentSearchItem,
   QueuePopulationMode,
@@ -738,6 +739,33 @@ class CollectionStore {
         ...this.artistProfiles,
         [result.profile.artist_key.toLowerCase()]: result.profile,
       };
+    }
+    return result;
+  }
+
+  /** Artist detail overflow menu's "Fetch Artist Image" (#1127): fetches a
+   * portrait from fanart.tv (if an API key is configured) or, lacking a key
+   * or a match, Wikidata's image property, caches it, and persists the
+   * result onto the artist's profile. Updates the cached profile locally
+   * from the returned filename rather than re-fetching the whole profile,
+   * same convention as `retrieveArtistDetails`. */
+  async fetchArtistImage(artistName: string): Promise<ArtistImageFetchResult> {
+    const result = await invoke<ArtistImageFetchResult>("fetch_artist_image", {
+      artist: artistName,
+    });
+    if (result?.uri) {
+      const key = artistName.toLowerCase();
+      const existing = this.artistProfiles[key];
+      if (existing) {
+        this.artistProfiles = {
+          ...this.artistProfiles,
+          [key]: {
+            ...existing,
+            fetched_image_filename: result.uri.replace("luminous-art://", ""),
+            fetched_image_source: result.source,
+          },
+        };
+      }
     }
     return result;
   }
