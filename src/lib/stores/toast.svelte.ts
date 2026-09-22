@@ -1,10 +1,21 @@
 import { TOAST_DURATION_MS } from "../constants";
 
-type ToastVariant = "info" | "error" | "success" | "milestone" | "warning";
+type ToastVariant = "info" | "error" | "success" | "milestone" | "warning" | "task";
 
 interface ToastAction {
   label: string;
   onClick: () => void;
+}
+
+interface ToastTaskData {
+  taskId: string;
+  taskName: string;
+  status: "running" | "done" | "failed";
+  current?: number;
+  total?: number;
+  progress?: number;
+  completedText?: string;
+  error?: string;
 }
 
 interface ToastMessage {
@@ -13,12 +24,151 @@ interface ToastMessage {
   variant: ToastVariant;
   url?: string;
   action?: ToastAction;
+  task?: ToastTaskData;
 }
 
 class ToastStore {
   messages = $state<ToastMessage[]>([]);
   private nextId = 0;
   private timers = new Map<number, ReturnType<typeof setTimeout>>();
+
+  /**
+   * Start or update a long-lived task notification in the toast stack.
+   * Stays visible until completion.
+   */
+  startTask(options: {
+    taskId: string;
+    text: string;
+    taskName?: string;
+    total?: number;
+    current?: number;
+    progress?: number;
+  }): number {
+    const existing = this.messages.find((m) => m.task?.taskId === options.taskId);
+    const progress = typeof options.progress === "number"
+      ? options.progress
+      : (typeof options.current === "number" && typeof options.total === "number" && options.total > 0)
+        ? options.current / options.total
+        : undefined;
+
+    const taskName = options.taskName || existing?.task?.taskName || options.text.replace(/\s*\([^)]*\)\s*$/, "").trim() || options.text;
+
+    if (existing) {
+      existing.text = options.text;
+      existing.variant = "task";
+      existing.task = {
+        taskId: options.taskId,
+        taskName,
+        status: "running",
+        current: options.current,
+        total: options.total,
+        progress,
+      };
+      return existing.id;
+    }
+
+    const id = this.nextId++;
+    this.messages.push({
+      id,
+      text: options.text,
+      variant: "task",
+      task: {
+        taskId: options.taskId,
+        taskName,
+        status: "running",
+        current: options.current,
+        total: options.total,
+        progress,
+      },
+    });
+    return id;
+  }
+
+  /** Update an in-flight task notification's progress or text. */
+  updateTask(
+    taskId: string,
+    updates: {
+      text?: string;
+      current?: number;
+      total?: number;
+      progress?: number;
+    }
+  ) {
+    const msg = this.messages.find((m) => m.task?.taskId === taskId);
+    if (!msg || !msg.task) return;
+    if (updates.text) msg.text = updates.text;
+    const current = updates.current !== undefined ? updates.current : msg.task.current;
+    const total = updates.total !== undefined ? updates.total : msg.task.total;
+    let progress = updates.progress;
+    if (progress === undefined && typeof current === "number" && typeof total === "number" && total > 0) {
+      progress = current / total;
+    }
+    msg.task = {
+      ...msg.task,
+      current,
+      total,
+      progress: progress !== undefined ? Math.max(0, Math.min(1, progress)) : msg.task.progress,
+    };
+    this.messages = [...this.messages];
+  }
+
+  /**
+   * Complete a task notification, transitioning it into the success/done state.
+   */
+  completeTask(
+    taskId: string,
+    completedText?: string,
+    durationMs?: number
+  ) {
+    const msg = this.messages.find((m) => m.task?.taskId === taskId);
+    if (!msg || !msg.task) {
+      if (completedText && completedText !== "Done") {
+        this.show(completedText, "success", durationMs);
+      }
+      return;
+    }
+    msg.task = {
+      ...msg.task,
+      status: "done",
+      progress: 1,
+      completedText: completedText && completedText !== "Done" ? completedText : msg.task.completedText,
+    };
+    msg.variant = "task";
+    this.messages = [...this.messages];
+    if (durationMs && durationMs > 0) {
+      this.scheduleDismiss(msg.id, durationMs);
+    }
+  }
+
+  /**
+   * Mark a task notification as failed, displaying error state.
+   */
+  failTask(taskId: string, error: string) {
+    const msg = this.messages.find((m) => m.task?.taskId === taskId);
+    if (!msg || !msg.task) {
+      this.show(error, "error");
+      return;
+    }
+    msg.task = {
+      ...msg.task,
+      status: "failed",
+      error,
+    };
+    msg.text = error;
+    this.messages = [...this.messages];
+  }
+
+  isTaskActive(taskId: string): boolean {
+    const msg = this.messages.find((m) => m.task?.taskId === taskId);
+    return msg?.task?.status === "running";
+  }
+
+  dismissTask(taskId: string) {
+    const msg = this.messages.find((m) => m.task?.taskId === taskId);
+    if (msg) {
+      this.dismiss(msg.id);
+    }
+  }
 
   show(
     text: string,

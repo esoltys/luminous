@@ -25,6 +25,7 @@
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { toastStore } from "../stores/toast.svelte";
+  import { tasksStore } from "../stores/tasks.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { portal } from "../utils/portal";
   import SocialIcon from "./SocialIcon.svelte";
@@ -214,6 +215,17 @@
         description: description.trim() || null,
       };
 
+      const taskId = "album-tag-save";
+      const targetAlbumName = album || albumName || i18n.t("collection.unknownAlbum");
+      if (songIds.length > 0) {
+        tasksStore.startTask({
+          id: taskId,
+          label: i18n.t("tasks.savingAlbumTags", { album: targetAlbumName }, `Saving tags for ${targetAlbumName}...`),
+          total: songIds.length,
+          contextName: targetAlbumName,
+        });
+      }
+
       const savePromises: Promise<unknown>[] = [collectionStore.saveAlbumProfile(profile)];
       if (songIds.length > 0) {
         savePromises.push(
@@ -235,15 +247,23 @@
       const [saved] = await Promise.all(savePromises);
 
       if (songIds.length > 0) {
+        tasksStore.completeTask(
+          taskId,
+          i18n.t("tasks.albumTagsSaved", { album: targetAlbumName }, `Saved tags for ${targetAlbumName}`)
+        );
         await collectionStore.refreshStats();
+      } else {
+        toastStore.show(i18n.t("albumProfileEditor.savedSuccess", {}, "Album details updated"), "success");
       }
       await collectionStore.refreshLibrary();
 
-      toastStore.show(i18n.t("albumProfileEditor.savedSuccess", {}, "Album details updated"), "success");
       onSaved?.(saved as AlbumProfile);
       onClose();
     } catch (e) {
       console.error("Failed to save album details:", e);
+      if (songIds.length > 0) {
+        tasksStore.failTask("album-tag-save", String(e));
+      }
       toastStore.show(i18n.t("albumProfileEditor.savedError", {}, "Failed to save album details"), "error");
     } finally {
       isSaving = false;

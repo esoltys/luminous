@@ -1408,5 +1408,18 @@ export const fr = {
         description: "Ajoutez des dossiers à analyser depuis les Paramètres, et Luminous maintient votre bibliothèque à jour automatiquement."
       }
     }
+  },
+  tasks: {
+    title: "Tâches en arrière-plan",
+    clear: "Effacer",
+    clearCompleted: "Effacer les tâches terminées",
+    inProgress: "En cours…",
+    allDone: "Tâches terminées",
+    syncingWebdav: "Synchronisation de {name}…",
+    syncingWebdavCount: "Synchronisation de {name} ({count} éléments)…",
+    savingAlbumTags: "Enregistrement des balises pour {album}…",
+    savingTagsCount: "Enregistrement des balises ({current}/{total})…",
+    albumTagsSaved: "Balises enregistrées pour {album}",
+    libraryScanDone: "Analyse de la bibliothèque terminée"
   }
 };

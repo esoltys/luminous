@@ -2,6 +2,7 @@
   import { collectionStore } from "../stores/collection.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { loudnessStore } from "../stores/loudness.svelte";
+  import { tasksStore } from "../stores/tasks.svelte";
   import { onMount } from "svelte";
   import Toggle from "./Toggle.svelte";
   import Button from "./Button.svelte";
@@ -66,10 +67,20 @@
     }
   }
 
+  function isServerSyncing(serverId: number): boolean {
+    return syncingServerId === serverId || tasksStore.isTaskActive(`webdav-sync-${serverId}`);
+  }
+
   async function handleSyncWebdavServer(server: WebDavServer) {
-    if (syncingServerId !== null) return;
+    if (isServerSyncing(server.id)) return;
     syncingServerId = server.id;
     syncFeedback = null;
+    const taskId = `webdav-sync-${server.id}`;
+    tasksStore.startTask({
+      id: taskId,
+      label: i18n.t("tasks.syncingWebdav", { name: server.name }, `Syncing ${server.name}...`),
+      contextName: server.name,
+    });
     try {
       const stats = await invoke<{ added: number; updated: number; removed: number; errors: number }>(
         "sync_webdav_server",
@@ -80,10 +91,13 @@
         updated: stats.updated,
         errors: stats.errors,
       });
+      tasksStore.completeTask(taskId, `${server.name}: ${syncFeedback}`);
       await loadWebdavServers();
     } catch (e: any) {
       console.error("Failed to sync WebDAV server:", e);
-      syncFeedback = String(e?.message || e);
+      const errMsg = String(e?.message || e);
+      syncFeedback = errMsg;
+      tasksStore.failTask(taskId, errMsg);
     } finally {
       syncingServerId = null;
     }
@@ -101,7 +115,7 @@
   }
 
   function getWebdavStatusText(server: WebDavServer): string {
-    if (server.syncStatus === "syncing") return i18n.t("settings.webdavStatusSyncing");
+    if (isServerSyncing(server.id) || server.syncStatus === "syncing") return i18n.t("settings.webdavStatusSyncing");
     if (server.lastSyncedAt) {
       return i18n.t("settings.webdavStatusSynced", { time: new Date(server.lastSyncedAt * 1000).toLocaleString() });
     }
@@ -283,7 +297,7 @@
                 </span>
               {:else}
                 <span class="flex items-center gap-1">
-                  {#if server.syncStatus === "syncing"}
+                  {#if isServerSyncing(server.id) || server.syncStatus === "syncing"}
                     <LoaderCircle class="w-3 h-3 animate-spin text-brand-accent-text" />
                   {/if}
                   {getWebdavStatusText(server)}
@@ -296,11 +310,11 @@
         <div class="flex items-center gap-1.5 shrink-0 ml-3">
           <button
             onclick={() => handleSyncWebdavServer(server)}
-            disabled={syncingServerId === server.id}
+            disabled={isServerSyncing(server.id)}
             class="p-2 rounded-lg bg-brand-main hover:bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary border border-brand-border hover:border-brand-accent/40 transition-colors disabled:opacity-50"
             title={i18n.t('settings.webdavSyncBtn')}
           >
-            {#if syncingServerId === server.id}
+            {#if isServerSyncing(server.id)}
               <LoaderCircle class="w-4 h-4 animate-spin text-brand-accent-text" />
             {:else}
               <RefreshCw class="w-4 h-4 text-brand-accent-text" />

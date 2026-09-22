@@ -17,12 +17,15 @@ import type {
   RecentSearchItem,
   QueuePopulationMode,
   WebDavServer,
+  WebDavSyncProgressPayload,
+  TagBatchProgressPayload,
 } from "../types";
 import { applySongStats, type SongStatsPayload, applyAlbumStats, type AlbumStatsPayload } from "../utils/stats";
 import { navigationStore } from "./navigation.svelte";
 import { playlistsStore } from "./playlists.svelte";
 import { tagsStore } from "./tags.svelte";
 import { toastStore } from "./toast.svelte";
+import { tasksStore } from "./tasks.svelte";
 import { MAX_RECENT_SEARCHES } from "../constants";
 
 export interface VisibleColumns {
@@ -107,10 +110,6 @@ class CollectionStore {
   isScanning = $state<boolean>(false);
   scanProgress = $state<ScanProgress | null>(null);
 
-  /** Tracks the single toast representing the currently in-flight file-watcher
-   *  batch (#233), so its progress collapses into one notification instead of
-   *  a toast per file. */
-  private activeBatchToast: { batchId: number; toastId: number } | null = null;
 
   /** Celebration moment states (issue #182) — consumed by Toast and layout. */
   isFirstLaunch = $state<boolean>(false);
@@ -330,7 +329,33 @@ class CollectionStore {
       await listen<ScanProgress>("scan-progress", (event) => {
         this.scanProgress = event.payload;
         this.isScanning = event.payload.phase !== "done";
+
+        const scanTaskId = "library-scan";
+        if (event.payload.phase !== "done") {
+          const phaseName = event.payload.phase === "discovering"
+            ? i18n.t("settings.phaseDiscovering", {}, "Discovering files...")
+            : event.payload.phase === "reading_tags"
+              ? i18n.t("settings.phaseReadingTags", {}, "Reading metadata...")
+              : i18n.t("settings.phaseUpdating", {}, "Updating library...");
+          const taskName = i18n.t("settings.rescanTitle", {}, "Library Scanning & Maintenance");
+          const label = `${taskName} (${phaseName})`;
+          if (!tasksStore.isTaskActive(scanTaskId)) {
+            tasksStore.startTask({
+              id: scanTaskId,
+              taskName,
+              label,
+              total: Number(event.payload.total) || undefined,
+            });
+          }
+          tasksStore.updateTask(scanTaskId, {
+            label,
+            current: Number(event.payload.scanned),
+            total: Number(event.payload.total) || undefined,
+          });
+        }
+
         if (event.payload.phase === "done") {
+          tasksStore.completeTask(scanTaskId);
           const nowStr = new Date().toLocaleString();
           this.lastScanTime = nowStr;
           this.refreshDirectories();
@@ -401,37 +426,90 @@ class CollectionStore {
         });
       });
 
-      // Collapse a whole debounced file-watcher batch (#233) into one toast
-      // that updates in place, instead of one toast per file it touches.
+      // Track file-watcher batches (#233, #1087) in tasksStore so they stay visible
+      // in the persistent task tracker rather than cluttering toast banners.
       await listen<BatchProgress>("batch-processing-started", (event) => {
         const { batch_id, total_count } = event.payload;
-        const toastId = toastStore.startBatch(
-          i18n.t("settings.batchProcessingToast", { current: 0, total: total_count })
-        );
-        this.activeBatchToast = { batchId: batch_id, toastId };
+        const taskId = `watcher-batch-${batch_id}`;
+        tasksStore.startTask({
+          id: taskId,
+          label: i18n.t("settings.batchProcessingToast", { current: 0, total: total_count }),
+          total: total_count,
+        });
       });
 
       await listen<BatchProgress>("batch-processing-progress", (event) => {
         const { batch_id, current_count, total_count } = event.payload;
-        if (this.activeBatchToast?.batchId !== batch_id) return;
-        toastStore.updateBatch(
-          this.activeBatchToast.toastId,
-          i18n.t("settings.batchProcessingToast", { current: current_count, total: total_count })
-        );
+        const taskId = `watcher-batch-${batch_id}`;
+        tasksStore.updateTask(taskId, {
+          label: i18n.t("settings.batchProcessingToast", { current: current_count, total: total_count }),
+          current: current_count,
+          total: total_count,
+        });
       });
 
       await listen<BatchProgress>("batch-processing-completed", (event) => {
         const { batch_id, total_count } = event.payload;
-        if (this.activeBatchToast?.batchId !== batch_id) return;
+        const taskId = `watcher-batch-${batch_id}`;
         const text = total_count === 1
           ? i18n.t("settings.batchProcessingDoneToastOne")
           : i18n.t("settings.batchProcessingDoneToastMany", { count: total_count });
-        toastStore.finishBatch(
-          this.activeBatchToast.toastId,
-          text,
-          "success"
-        );
-        this.activeBatchToast = null;
+        tasksStore.completeTask(taskId, text);
+      });
+
+      // Track WebDAV synchronization (#682, #1083, #1087)
+      await listen<WebDavSyncProgressPayload>("webdav-sync-progress", (event) => {
+        const { server_id, server_name, current_count, added, updated, errors, done } = event.payload;
+        const taskId = `webdav-sync-${server_id}`;
+        if (done) {
+          const summary = i18n.t("settings.webdavSyncComplete", {
+            added,
+            updated,
+            errors,
+          }, `Sync complete: ${added} added, ${updated} updated, ${errors} errors`);
+          tasksStore.completeTask(taskId, `${server_name}: ${summary}`);
+          this.refreshWebDavServers();
+        } else {
+          const label = current_count > 0
+            ? i18n.t("tasks.syncingWebdavCount", { name: server_name, count: current_count }, `Syncing ${server_name} (${current_count} items)...`)
+            : i18n.t("tasks.syncingWebdav", { name: server_name }, `Syncing ${server_name}...`);
+
+          if (!tasksStore.isTaskActive(taskId)) {
+            tasksStore.startTask({
+              id: taskId,
+              label,
+              contextName: server_name,
+            });
+          } else {
+            tasksStore.updateTask(taskId, {
+              label,
+              current: current_count,
+            });
+          }
+        }
+      });
+
+      // Track batch tag edits (#1087)
+      await listen<TagBatchProgressPayload>("tag-batch-progress", (event) => {
+        const { current, total, title, done } = event.payload;
+        const taskId = "album-tag-save";
+        if (done) {
+          tasksStore.completeTask(taskId, i18n.t("tasks.albumTagsSaved", { album: title }, `Saved tags for ${title}`));
+        } else {
+          const label = i18n.t("tasks.savingTagsCount", { current, total }, `Saving tags (${current}/${total})...`);
+          if (!tasksStore.isTaskActive(taskId)) {
+            tasksStore.startTask({
+              id: taskId,
+              label,
+              total,
+            });
+          }
+          tasksStore.updateTask(taskId, {
+            label,
+            current,
+            total,
+          });
+        }
       });
 
       // Keep cached song rows in sync with rating/playcount changes made

@@ -256,8 +256,25 @@ export interface WebDavServer {
 export interface WebDavSyncStats {
   added: number;
   updated: number;
-  removed: number;
   errors: number;
+}
+
+export interface WebDavSyncProgressPayload {
+  server_id: number;
+  server_name: string;
+  current_path: string;
+  current_count: number;
+  added: number;
+  updated: number;
+  errors: number;
+  done: boolean;
+}
+
+export interface TagBatchProgressPayload {
+  current: number;
+  total: number;
+  title: string;
+  done: boolean;
 }
 
 export type ScanPhase = "discovering" | "reading_tags" | "updating" | "done";
