@@ -1,3 +1,4 @@
+use crate::models;
 use crate::picard;
 use crate::AppState;
 use tauri::State;
@@ -36,17 +37,28 @@ pub async fn open_in_picard(state: State<'_, AppState>, song_ids: Vec<i64>) -> R
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     let mut dirs = Vec::new();
     let mut seen = std::collections::HashSet::new();
+    let mut webdav_skipped = 0;
     for id in song_ids {
-        let path: Option<String> = conn
-            .query_row("SELECT path FROM songs WHERE id = ?1", [id], |row| {
-                row.get(0)
+        let row: Option<(String, i32)> = conn
+            .query_row("SELECT path, source FROM songs WHERE id = ?1", [id], |row| {
+                Ok((row.get(0)?, row.get(1)?))
             })
             .ok();
-        if let Some(dir) = path
-            .as_deref()
-            .map(std::path::Path::new)
-            .and_then(|p| p.parent())
-        {
+        let Some((path, source)) = row else {
+            continue;
+        };
+        // A WebDAV song's `path` is an `http(s)://` URL (see webdav.rs's
+        // `playback_url`), not a local filesystem path — Picard can only
+        // open real files, and `Path::new(url).parent()` would silently
+        // "succeed" with a bogus directory that just looks like one (its
+        // `/`-separated segments) since `Path` doesn't understand URL
+        // schemes. Skip these rather than handing Picard something it can't
+        // actually open (#1082 follow-up).
+        if source == models::SongSource::WebDav as i32 {
+            webdav_skipped += 1;
+            continue;
+        }
+        if let Some(dir) = std::path::Path::new(&path).parent() {
             if seen.insert(dir.to_path_buf()) {
                 dirs.push(dir.to_path_buf());
             }
@@ -55,6 +67,9 @@ pub async fn open_in_picard(state: State<'_, AppState>, song_ids: Vec<i64>) -> R
     drop(conn);
 
     if dirs.is_empty() {
+        if webdav_skipped > 0 {
+            return Err("The selected songs are on a WebDAV server — MusicBrainz Picard can only open local files.".to_string());
+        }
         return Err("No local files found for the selected songs".to_string());
     }
 

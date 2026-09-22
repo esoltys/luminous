@@ -848,6 +848,10 @@ pub struct WebDavServer {
     pub color: Option<String>,
     pub auto_sync_enabled: bool,
     pub sync_interval_minutes: i64,
+    /// Unix timestamp (seconds) of this server's next scheduled auto-sync —
+    /// runtime-only (from `webdav_scheduler::AutoSyncScheduler`), not a DB
+    /// column, so it's `None` unless the command handler populates it.
+    pub next_auto_sync_at: Option<i64>,
 }
 
 /// Statistics returned after syncing a WebDAV server.

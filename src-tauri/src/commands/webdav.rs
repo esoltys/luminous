@@ -1,5 +1,6 @@
 //! Tauri IPC commands for remote WebDAV server management and synchronization (#682).
 
+use crate::covermanager::CoverManager;
 use crate::db::Database;
 use crate::models::{WebDavServer, WebDavSyncStats};
 use crate::webdav::{detect_filetype_from_url, WebDavClient};
@@ -53,12 +54,14 @@ pub async fn list_webdav_servers(state: State<'_, AppState>) -> Result<Vec<WebDa
                 color: row.get(11)?,
                 auto_sync_enabled: row.get(12)?,
                 sync_interval_minutes: row.get(13)?,
+                next_auto_sync_at: None,
             })
         })
         .map_err(|e| e.to_string())?;
 
     let mut servers = Vec::new();
-    for s in rows.flatten() {
+    for mut s in rows.flatten() {
+        s.next_auto_sync_at = state.webdav_auto_sync.next_run_at(s.id);
         servers.push(s);
     }
     Ok(servers)
@@ -102,6 +105,7 @@ fn row_to_webdav_server(row: &rusqlite::Row) -> rusqlite::Result<WebDavServer> {
         color: row.get(11)?,
         auto_sync_enabled: row.get(12)?,
         sync_interval_minutes: row.get(13)?,
+        next_auto_sync_at: None,
     })
 }
 
@@ -132,7 +136,7 @@ pub async fn save_webdav_server(
     let auto_sync_enabled_val = auto_sync_enabled.unwrap_or(false);
     let sync_interval_minutes_val = sync_interval_minutes.unwrap_or(60).max(1);
 
-    let saved = if let Some(server_id) = id {
+    let mut saved = if let Some(server_id) = id {
         if let Some(pass) = password {
             conn.execute(
                 "UPDATE webdav_servers
@@ -200,12 +204,14 @@ pub async fn save_webdav_server(
         state.webdav_auto_sync.reschedule(
             app,
             Arc::clone(&state.db),
+            Arc::clone(&state.cover_manager),
             saved.id,
             saved.sync_interval_minutes,
         );
     } else {
         state.webdav_auto_sync.cancel(saved.id);
     }
+    saved.next_auto_sync_at = state.webdav_auto_sync.next_run_at(saved.id);
 
     Ok(saved)
 }
@@ -267,17 +273,18 @@ pub async fn sync_webdav_server(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<WebDavSyncStats, String> {
-    sync_webdav_server_inner(id, app, state.db.clone()).await
+    sync_webdav_server_inner(id, app, state.db.clone(), state.cover_manager.clone()).await
 }
 
 /// Core sync routine shared by the [`sync_webdav_server`] command (manual
 /// "Sync Now" clicks) and `webdav_scheduler::AutoSyncScheduler` (periodic
 /// auto-sync, #1082) — the scheduler runs as a background task with only an
-/// `AppHandle` and `Arc<Database>`, not a `State<AppState>`.
+/// `AppHandle` and `Arc<Database>`/`Arc<CoverManager>`, not a `State<AppState>`.
 pub async fn sync_webdav_server_inner(
     id: i64,
     app: AppHandle,
     db: Arc<Database>,
+    cover_manager: Arc<CoverManager>,
 ) -> Result<WebDavSyncStats, String> {
     let app_clone = app.clone();
 
@@ -339,6 +346,33 @@ pub async fn sync_webdav_server_inner(
                     continue;
                 }
             };
+
+            // Standalone folder-art image (`album.png`, `cover.jpg`, etc.)
+            // for this directory, if any — the WebDAV counterpart to
+            // `CoverManager::scan_folder_art`'s local-filesystem `read_dir`
+            // scan, resolved from this directory's own PROPFIND listing
+            // instead since there's no filesystem to scan (#1082 follow-up).
+            // Downloaded lazily (only if some song in the directory actually
+            // needs it) and at most once per directory, since every song
+            // here shares the same folder image.
+            let folder_art_item = items
+                .iter()
+                .find(|it| {
+                    !it.is_directory
+                        && std::path::Path::new(&it.href)
+                            .file_stem()
+                            .zip(std::path::Path::new(&it.href).extension())
+                            .map(|(stem, ext)| {
+                                CoverManager::is_folder_art_filename(
+                                    &stem.to_string_lossy(),
+                                    &ext.to_string_lossy(),
+                                )
+                            })
+                            .unwrap_or(false)
+                })
+                .cloned();
+            let mut folder_art_bytes: Option<Vec<u8>> = None;
+            let mut folder_art_fetch_attempted = false;
 
             for item in items {
                 // Avoid infinite loops matching the directory itself
@@ -429,6 +463,48 @@ pub async fn sync_webdav_server_inner(
                             song.path = Some(playback_url.clone());
                             song.url = Some(playback_url.clone());
                             song.stream_url = Some(playback_url.clone());
+
+                            // No embedded-picture extraction over WebDAV yet, so
+                            // `art_automatic` is always still unset here — fall
+                            // back to this directory's folder-art image, same as
+                            // a local scan's `scan_folder_art` fallback (#1082
+                            // follow-up).
+                            if song.art_automatic.is_none() {
+                                if let Some(art_item) = &folder_art_item {
+                                    if !folder_art_fetch_attempted {
+                                        folder_art_fetch_attempted = true;
+                                        let art_url = client.build_url(&art_item.href);
+                                        match client.fetch_full(&art_url) {
+                                            Ok(bytes) => folder_art_bytes = Some(bytes),
+                                            Err(e) => log::warn!(
+                                                "Failed to download WebDAV folder art {}: {e}",
+                                                art_item.href
+                                            ),
+                                        }
+                                    }
+                                    if let Some(bytes) = &folder_art_bytes {
+                                        let artist = song
+                                            .album_artist
+                                            .clone()
+                                            .filter(|a| !a.trim().is_empty())
+                                            .or_else(|| song.artist.clone())
+                                            .unwrap_or_default();
+                                        let album = song
+                                            .album
+                                            .clone()
+                                            .filter(|a| !a.trim().is_empty())
+                                            .or_else(|| song.title.clone())
+                                            .unwrap_or_default();
+                                        match cover_manager.cache_art_bytes(&artist, &album, bytes) {
+                                            Ok(filename) => song.art_automatic = Some(filename),
+                                            Err(e) => log::warn!(
+                                                "Failed to cache WebDAV folder art for {}: {e}",
+                                                item.href
+                                            ),
+                                        }
+                                    }
+                                }
+                            }
 
                             if let Err(e) = crate::collection::upsert_song(&conn, &song) {
                                 log::warn!("Failed to upsert WebDAV song {}: {e}", item.href);

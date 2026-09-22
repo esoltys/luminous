@@ -284,6 +284,7 @@ export interface WebDavServer {
   color?: string | null;
   autoSyncEnabled: boolean;
   syncIntervalMinutes: number;
+  nextAutoSyncAt?: number | null;
 }
 
 export interface WebDavSyncStats {

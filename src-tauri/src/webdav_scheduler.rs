@@ -8,6 +8,7 @@
 //! be replaced or cancelled (on save/delete) without touching any other
 //! server's timer or restarting the app.
 
+use crate::covermanager::CoverManager;
 use crate::db::Database;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -17,6 +18,17 @@ use tauri::AppHandle;
 #[derive(Default)]
 pub struct AutoSyncScheduler {
     tasks: parking_lot::Mutex<HashMap<i64, JoinHandle<()>>>,
+    /// Unix timestamp (seconds) each scheduled server's next tick is due —
+    /// purely in-memory, recomputed on every (re)schedule and after every
+    /// tick, so the frontend can show "next sync in N minutes" (#1082).
+    next_run: parking_lot::Mutex<HashMap<i64, i64>>,
+}
+
+fn now_unix() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
 }
 
 impl AutoSyncScheduler {
@@ -29,16 +41,28 @@ impl AutoSyncScheduler {
     /// fires after the interval elapses (not immediately), since scheduling
     /// happens both at startup and on every settings save, and a server that
     /// was just synced shouldn't be re-synced right away.
+    ///
+    /// Takes `self: &Arc<Self>` (rather than `&self`) so the spawned task can
+    /// hold its own `Arc` clone of the scheduler to update `next_run` on each
+    /// tick — every caller already reaches this through `AppState`'s
+    /// `Arc<AutoSyncScheduler>`, so this is transparent at call sites.
     pub fn reschedule(
-        &self,
+        self: &Arc<Self>,
         app: AppHandle,
         db: Arc<Database>,
+        cover_manager: Arc<CoverManager>,
         server_id: i64,
         interval_minutes: i64,
     ) {
         self.cancel(server_id);
 
-        let period = std::time::Duration::from_secs(interval_minutes.max(1) as u64 * 60);
+        let interval_secs = interval_minutes.max(1) as u64 * 60;
+        let period = std::time::Duration::from_secs(interval_secs);
+        self.next_run
+            .lock()
+            .insert(server_id, now_unix() + interval_secs as i64);
+
+        let scheduler = Arc::clone(self);
         let handle = tauri::async_runtime::spawn(async move {
             let mut interval =
                 tokio::time::interval_at(tokio::time::Instant::now() + period, period);
@@ -46,6 +70,10 @@ impl AutoSyncScheduler {
 
             loop {
                 interval.tick().await;
+                scheduler
+                    .next_run
+                    .lock()
+                    .insert(server_id, now_unix() + interval_secs as i64);
 
                 if Self::is_syncing(&db, server_id) {
                     log::debug!(
@@ -58,6 +86,7 @@ impl AutoSyncScheduler {
                     server_id,
                     app.clone(),
                     Arc::clone(&db),
+                    Arc::clone(&cover_manager),
                 )
                 .await
                 {
@@ -74,6 +103,13 @@ impl AutoSyncScheduler {
         if let Some(handle) = self.tasks.lock().remove(&server_id) {
             handle.abort();
         }
+        self.next_run.lock().remove(&server_id);
+    }
+
+    /// Unix timestamp (seconds) of `server_id`'s next scheduled auto-sync, or
+    /// `None` if it has no timer running.
+    pub fn next_run_at(&self, server_id: i64) -> Option<i64> {
+        self.next_run.lock().get(&server_id).copied()
     }
 
     fn is_syncing(db: &Arc<Database>, server_id: i64) -> bool {
@@ -96,7 +132,12 @@ impl AutoSyncScheduler {
     /// enabled. Called once at app startup, mirroring how the folder watcher
     /// is started from the servers/directories on disk rather than assuming
     /// no reschedule ever happened.
-    pub fn start_all_from_db(&self, app: AppHandle, db: Arc<Database>) {
+    pub fn start_all_from_db(
+        self: &Arc<Self>,
+        app: AppHandle,
+        db: Arc<Database>,
+        cover_manager: Arc<CoverManager>,
+    ) {
         let conn = match db.pool.get() {
             Ok(c) => c,
             Err(e) => {
@@ -126,7 +167,13 @@ impl AutoSyncScheduler {
         drop(conn);
 
         for (server_id, interval_minutes) in servers {
-            self.reschedule(app.clone(), Arc::clone(&db), server_id, interval_minutes);
+            self.reschedule(
+                app.clone(),
+                Arc::clone(&db),
+                Arc::clone(&cover_manager),
+                server_id,
+                interval_minutes,
+            );
         }
     }
 }

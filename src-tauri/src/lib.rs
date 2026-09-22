@@ -1110,9 +1110,11 @@ pub fn run() {
             let managed_state = app.state::<AppState>();
 
             // Start each enabled WebDAV server's periodic auto-sync timer (#1082).
-            managed_state
-                .webdav_auto_sync
-                .start_all_from_db(app.handle().clone(), Arc::clone(&managed_state.db));
+            managed_state.webdav_auto_sync.start_all_from_db(
+                app.handle().clone(),
+                Arc::clone(&managed_state.db),
+                Arc::clone(&managed_state.cover_manager),
+            );
 
             // Spawn position tick loop (Tokio). Spawned after app.manage()
             // above since it calls media_session::mirror_state(), which

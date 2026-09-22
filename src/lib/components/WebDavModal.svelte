@@ -36,7 +36,6 @@
   let enabled = $state(untrack(() => server?.enabled ?? true));
   let autoSyncEnabled = $state(untrack(() => server?.autoSyncEnabled ?? false));
   let syncIntervalMinutes = $state(untrack(() => server?.syncIntervalMinutes ?? 60));
-  let nickname = $state(untrack(() => server?.nickname ?? ""));
   let selectedIcon = $state(untrack(() => server?.icon ?? "cloud"));
   let selectedColor = $state<string | null>(untrack(() => server?.color ?? null));
 
@@ -47,7 +46,7 @@
 
   let previewSource = $derived({
     path: combineWebdavPath(url, remotePath),
-    nickname: nickname.trim() || null,
+    nickname: name.trim() || null,
     icon: selectedIcon,
     color: selectedColor,
   });
@@ -98,7 +97,7 @@
           enabled,
           autoSyncEnabled,
           syncIntervalMinutes: Math.max(1, Math.round(syncIntervalMinutes) || 60),
-          nickname: nickname.trim() || null,
+          nickname: name.trim() || null,
           icon: selectedIcon,
           color: selectedColor,
         },
@@ -245,18 +244,6 @@
         </div>
       </div>
 
-      <!-- Nickname -->
-      <div class="space-y-1.5">
-        <label for="webdav-nickname" class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
-          {i18n.t("settings.folderNickname")}
-        </label>
-        <Input
-          id="webdav-nickname"
-          bind:value={nickname}
-          placeholder={i18n.t("settings.folderNicknamePlaceholder")}
-        />
-      </div>
-
       <!-- Icon Selection -->
       <div>
         <span class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider mb-2">
@@ -273,10 +260,10 @@
                 {isSelected
                   ? 'bg-brand-accent/20 border-brand-accent text-brand-accent-text ring-1 ring-brand-accent'
                   : 'bg-brand-main/40 border-brand-border/60 text-brand-text-secondary hover:text-brand-text-primary hover:border-brand-border'}"
-              title={choice.label}
+              title={i18n.t(choice.label)}
             >
               <Icon class="w-5 h-5" />
-              <span class="text-[10px] font-medium truncate max-w-full">{choice.label}</span>
+              <span class="text-[10px] font-medium truncate max-w-full">{i18n.t(choice.label)}</span>
             </button>
           {/each}
         </div>
@@ -291,13 +278,13 @@
       </div>
 
       {#if testSuccess === true}
-        <div class="flex items-start gap-2 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-400">
+        <div class="flex items-start gap-2 p-3 bg-brand-accent/10 border border-brand-accent/30 rounded-xl text-xs text-brand-accent-text">
           <CheckCircle class="w-4 h-4 shrink-0 translate-y-[calc((1lh-1rem)/2)]" />
           <span>{i18n.t("settings.webdavTestSuccess")}</span>
         </div>
       {:else if testSuccess === false}
-        <div class="flex items-start gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-400">
-          <WarningCircle class="w-4 h-4 shrink-0 translate-y-[calc((1lh-1rem)/2)]" />
+        <div class="flex items-start gap-2 p-3 bg-brand-main/60 border border-brand-border rounded-xl text-xs text-brand-text-primary">
+          <WarningCircle class="w-4 h-4 shrink-0 translate-y-[calc((1lh-1rem)/2)] text-brand-text-secondary" />
           <span>{i18n.t("settings.webdavTestFailed", { error: testError || "" })}</span>
         </div>
       {/if}

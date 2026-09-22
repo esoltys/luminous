@@ -137,10 +137,10 @@
                 {isSelected
                   ? 'bg-brand-accent/20 border-brand-accent text-brand-accent-text ring-1 ring-brand-accent'
                   : 'bg-brand-main/40 border-brand-border/60 text-brand-text-secondary hover:text-brand-text-primary hover:border-brand-border'}"
-              title={choice.label}
+              title={i18n.t(choice.label)}
             >
               <Icon class="w-5 h-5" />
-              <span class="text-[10px] font-medium truncate max-w-full">{choice.label}</span>
+              <span class="text-[10px] font-medium truncate max-w-full">{i18n.t(choice.label)}</span>
             </button>
           {/each}
         </div>
