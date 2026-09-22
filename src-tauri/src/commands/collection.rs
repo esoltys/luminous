@@ -1,12 +1,14 @@
 use crate::{
     biomanager,
     collection::CollectionScanner,
+    context::ContextManager,
     models::{
-        AlbumProfile, ArtistProfile, HomeItem, LibraryStats, MusicDirectory, PruneResult, Song,
-        Tag, TopAlbumItem,
+        AlbumLink, AlbumProfile, ArtistProfile, HomeItem, LibraryStats, MusicDirectory,
+        PruneResult, Song, Tag, TopAlbumItem,
     },
     AppState,
 };
+use serde::Serialize;
 use std::path::Path;
 use tauri::{AppHandle, Emitter, State};
 
@@ -660,27 +662,38 @@ pub async fn get_album_profile(
     .map_err(|e| e.to_string())
 }
 
+/// Saves an album profile and mirrors it to the `album.md` sidecar, shared
+/// by `set_album_profile` (a user's manual edit) and `retrieve_album_details`
+/// (a MusicBrainz-sourced link merge) so both go through the same
+/// persistence path.
+fn save_album_profile_with_sidecar(
+    scanner: &CollectionScanner,
+    profile: &AlbumProfile,
+) -> anyhow::Result<AlbumProfile> {
+    let saved = scanner.set_album_profile(profile)?;
+
+    let song_path = scanner
+        .get_representative_song_path_for_album(&saved.album_key)
+        .unwrap_or(None);
+    let content = build_album_md_content(&saved);
+    write_bio_sidecar(
+        song_path,
+        biomanager::album_dir,
+        biomanager::ALBUM_BIO_FILENAME,
+        content.as_deref(),
+        &saved.album_key,
+    );
+
+    Ok(saved)
+}
+
 #[tauri::command]
 pub async fn set_album_profile(
     profile: AlbumProfile,
     state: State<'_, AppState>,
 ) -> Result<AlbumProfile, String> {
     crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
-        let saved = scanner.set_album_profile(&profile)?;
-
-        let song_path = scanner
-            .get_representative_song_path_for_album(&saved.album_key)
-            .unwrap_or(None);
-        let content = build_album_md_content(&saved);
-        write_bio_sidecar(
-            song_path,
-            biomanager::album_dir,
-            biomanager::ALBUM_BIO_FILENAME,
-            content.as_deref(),
-            &saved.album_key,
-        );
-
-        Ok(saved)
+        save_album_profile_with_sidecar(scanner, &profile)
     })
     .await
     .map_err(|e| e.to_string())
@@ -695,6 +708,110 @@ pub async fn get_all_album_profiles(
     })
     .await
     .map_err(|e| e.to_string())
+}
+
+/// Maps a MusicBrainz release-group `url-rels` relation type to the album
+/// link platform id we render it under. Only the relation types the album
+/// details overflow menu's "Retrieve Album Details" action is scoped to
+/// (Discogs, AllMusic, Wikidata, lyrics sites, other databases) are
+/// recognized — MusicBrainz returns many more relation types (streaming,
+/// purchase links, etc.) that are out of scope here and are simply dropped.
+fn platform_for_release_group_rel_type(rel_type: &str) -> Option<&'static str> {
+    match rel_type {
+        "discogs" => Some("discogs"),
+        "allmusic" => Some("allmusic"),
+        "wikidata" => Some("wikidata"),
+        "lyrics" => Some("lyrics"),
+        "other databases" => Some("other_databases"),
+        _ => None,
+    }
+}
+
+/// Appends `fetched` links onto `existing`, skipping any that are already
+/// present (same platform and URL) so re-running "Retrieve Album Details"
+/// is idempotent rather than piling up duplicates. Multiple links of the
+/// same platform (e.g. several lyrics sites) are intentionally allowed to
+/// coexist.
+fn merge_album_links(mut existing: Vec<AlbumLink>, fetched: Vec<AlbumLink>) -> (Vec<AlbumLink>, usize) {
+    let mut added = 0;
+    for link in fetched {
+        let already_present = existing
+            .iter()
+            .any(|l| l.platform == link.platform && l.handle_or_url == link.handle_or_url);
+        if !already_present {
+            existing.push(link);
+            added += 1;
+        }
+    }
+    (existing, added)
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct AlbumDetailsRetrievalResult {
+    pub profile: AlbumProfile,
+    pub added_count: usize,
+}
+
+/// The album detail overflow menu's "Retrieve Album Details" action: looks
+/// up the album's representative MusicBrainz release-group MBID, fetches
+/// its `url-rels` relations, and merges the ones we recognize (Discogs,
+/// AllMusic, Wikidata, lyrics, other databases) into the album's curated
+/// link list — the same `album_profiles.links` the manual editor and the
+/// derived ListenBrainz link already render (#950).
+#[tauri::command]
+pub async fn retrieve_album_details(
+    album: String,
+    state: State<'_, AppState>,
+) -> Result<AlbumDetailsRetrievalResult, String> {
+    let album_for_lookup = album.clone();
+    let (release_group_id, current_profile) =
+        crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+            let release_group_id =
+                scanner.get_representative_release_group_id_for_album(&album_for_lookup)?;
+            let profile = scanner.get_album_profile(&album_for_lookup)?;
+            Ok((release_group_id, profile))
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let Some(release_group_id) = release_group_id else {
+        return Err(
+            "No MusicBrainz release group ID found for this album — tag it with Picard first."
+                .to_string(),
+        );
+    };
+
+    let relations = ContextManager::new()
+        .fetch_musicbrainz_release_group_relations(&release_group_id)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let fetched_links: Vec<AlbumLink> = relations
+        .into_iter()
+        .filter_map(|(rel_type, url)| {
+            platform_for_release_group_rel_type(&rel_type).map(|platform| AlbumLink {
+                platform: platform.to_string(),
+                handle_or_url: url,
+            })
+        })
+        .collect();
+
+    let mut updated_profile = current_profile;
+    updated_profile.album_key = album;
+    let existing_links = std::mem::take(&mut updated_profile.links);
+    let (merged_links, added_count) = merge_album_links(existing_links, fetched_links);
+    updated_profile.links = merged_links;
+
+    let profile = crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        save_album_profile_with_sidecar(scanner, &updated_profile)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(AlbumDetailsRetrievalResult {
+        profile,
+        added_count,
+    })
 }
 
 /// Every artist tag in the library with its song count, for the Genres
@@ -783,6 +900,50 @@ pub async fn get_songs_missing_metadata(
 mod tests {
     use super::*;
     use crate::models::{AlbumLink, ArtistSocialLink};
+
+    #[test]
+    fn test_platform_for_release_group_rel_type_maps_recognized_types() {
+        assert_eq!(platform_for_release_group_rel_type("discogs"), Some("discogs"));
+        assert_eq!(platform_for_release_group_rel_type("allmusic"), Some("allmusic"));
+        assert_eq!(platform_for_release_group_rel_type("wikidata"), Some("wikidata"));
+        assert_eq!(platform_for_release_group_rel_type("lyrics"), Some("lyrics"));
+        assert_eq!(
+            platform_for_release_group_rel_type("other databases"),
+            Some("other_databases")
+        );
+        assert_eq!(platform_for_release_group_rel_type("streaming"), None);
+        assert_eq!(platform_for_release_group_rel_type("free streaming"), None);
+    }
+
+    #[test]
+    fn test_merge_album_links_appends_new_and_skips_exact_duplicates() {
+        let existing = vec![AlbumLink {
+            platform: "discogs".to_string(),
+            handle_or_url: "https://discogs.com/master/1".to_string(),
+        }];
+        let fetched = vec![
+            // Exact duplicate of an existing link — should not be re-added.
+            AlbumLink {
+                platform: "discogs".to_string(),
+                handle_or_url: "https://discogs.com/master/1".to_string(),
+            },
+            // New platform.
+            AlbumLink {
+                platform: "wikidata".to_string(),
+                handle_or_url: "https://www.wikidata.org/wiki/Q1".to_string(),
+            },
+            // Second link of a platform that can have several (lyrics sites).
+            AlbumLink {
+                platform: "lyrics".to_string(),
+                handle_or_url: "https://genius.com/albums/x".to_string(),
+            },
+        ];
+        let (merged, added) = merge_album_links(existing, fetched);
+        assert_eq!(added, 2);
+        assert_eq!(merged.len(), 3);
+        assert_eq!(merged[1].platform, "wikidata");
+        assert_eq!(merged[2].platform, "lyrics");
+    }
 
     #[test]
     fn test_extract_bio_prose_none_for_tags_only_content() {

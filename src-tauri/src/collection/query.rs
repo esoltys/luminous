@@ -1020,6 +1020,31 @@ impl CollectionScanner {
         Ok(path)
     }
 
+    /// A MusicBrainz release-group MBID for this album, read off whichever
+    /// of its songs has one tagged — same "representative song" convention
+    /// as `get_representative_song_path_for_album`. Used by the album
+    /// details overflow menu's "Retrieve Album Details" action to know
+    /// which release group to query MusicBrainz for.
+    pub fn get_representative_release_group_id_for_album(
+        &self,
+        album: &str,
+    ) -> Result<Option<String>> {
+        let conn = self.db.pool.get()?;
+        let id = conn
+            .query_row(
+                "SELECT musicbrainz_release_group_id FROM songs
+                 WHERE album = ?1 COLLATE NOCASE
+                   AND musicbrainz_release_group_id IS NOT NULL
+                   AND musicbrainz_release_group_id != ''
+                 LIMIT 1",
+                params![album],
+                |row| row.get::<_, Option<String>>(0),
+            )
+            .optional()?
+            .flatten();
+        Ok(id)
+    }
+
     pub fn get_library_stats(&self) -> Result<LibraryStats> {
         let conn = self.db.pool.get()?;
         let sql = format!(

@@ -15,6 +15,7 @@
     siMusicbrainz,
     siDiscogs,
     siWikipedia,
+    siWikidata,
     type SimpleIcon,
   } from "simple-icons";
 
@@ -47,6 +48,7 @@
     musicbrainz: siMusicbrainz,
     discogs: siDiscogs,
     wikipedia: siWikipedia,
+    wikidata: siWikidata,
   };
 
   const brandIcon = $derived(BRAND_ICONS[normalized]);

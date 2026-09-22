@@ -213,6 +213,12 @@ struct MbArtistResponse {
 }
 
 #[derive(Deserialize, Debug, Default)]
+struct MbReleaseGroupRelationsResponse {
+    #[serde(default)]
+    relations: Vec<MbRelation>,
+}
+
+#[derive(Deserialize, Debug, Default)]
 struct WikidataSitelink {
     title: String,
 }
@@ -392,6 +398,41 @@ impl ContextManager {
             .and_then(|u| u.resource)
             .and_then(|resource| extract_wikidata_qid(&resource));
         Ok(qid)
+    }
+
+    /// Looks up a release-group's `url-rels` relations (Discogs, AllMusic,
+    /// Wikidata, lyrics sites, other databases, ...) for the album details
+    /// overflow menu's "Retrieve Album Details" action. Returns every
+    /// `(rel_type, url)` pair MusicBrainz has on file; callers filter down
+    /// to the relation types they care about — unlike the artist Wikidata
+    /// lookup, this isn't narrowed to one relation here, since multiple
+    /// relation types (and multiple relations of the same type, e.g.
+    /// several lyrics sites) are all potentially useful.
+    pub async fn fetch_musicbrainz_release_group_relations(
+        &self,
+        release_group_id: &str,
+    ) -> Result<Vec<(String, String)>> {
+        throttle_musicbrainz().await;
+        let url = format!(
+            "https://musicbrainz.org/ws/2/release-group/{}?inc=url-rels&fmt=json",
+            percent_encoding::utf8_percent_encode(
+                release_group_id,
+                percent_encoding::NON_ALPHANUMERIC
+            )
+        );
+        let response = self.client.get(&url).send().await?;
+        if !response.status().is_success() {
+            return Err(anyhow!(
+                "MusicBrainz release-group relations lookup failed: HTTP {}",
+                response.status()
+            ));
+        }
+        let parsed: MbReleaseGroupRelationsResponse = response.json().await?;
+        Ok(parsed
+            .relations
+            .into_iter()
+            .filter_map(|r| Some((r.rel_type?, r.url?.resource?)))
+            .collect())
     }
 
     /// Resolves a Wikidata QID to its English Wikipedia article title via
@@ -606,6 +647,35 @@ mod tests {
             .and_then(|u| u.resource)
             .and_then(|resource| extract_wikidata_qid(&resource));
         assert_eq!(qid, Some("Q11649".to_string()));
+    }
+
+    #[test]
+    fn test_musicbrainz_release_group_relations_deserializes_captured_fixture() {
+        let json = r#"{
+            "relations": [
+                {"type": "discogs", "target-type": "url", "url": {"resource": "https://www.discogs.com/master/12345"}},
+                {"type": "allmusic", "target-type": "url", "url": {"resource": "https://www.allmusic.com/album/mw0000123456"}},
+                {"type": "wikidata", "target-type": "url", "url": {"resource": "https://www.wikidata.org/wiki/Q11649"}},
+                {"type": "lyrics", "target-type": "url", "url": {"resource": "https://genius.com/albums/Nirvana/Nevermind"}},
+                {"type": "streaming", "target-type": "url", "url": {"resource": "https://open.spotify.com/album/xyz"}}
+            ]
+        }"#;
+        let parsed: MbReleaseGroupRelationsResponse = serde_json::from_str(json).unwrap();
+        let relations: Vec<(String, String)> = parsed
+            .relations
+            .into_iter()
+            .filter_map(|r| Some((r.rel_type?, r.url?.resource?)))
+            .collect();
+        assert_eq!(
+            relations,
+            vec![
+                ("discogs".to_string(), "https://www.discogs.com/master/12345".to_string()),
+                ("allmusic".to_string(), "https://www.allmusic.com/album/mw0000123456".to_string()),
+                ("wikidata".to_string(), "https://www.wikidata.org/wiki/Q11649".to_string()),
+                ("lyrics".to_string(), "https://genius.com/albums/Nirvana/Nevermind".to_string()),
+                ("streaming".to_string(), "https://open.spotify.com/album/xyz".to_string()),
+            ]
+        );
     }
 
     #[test]

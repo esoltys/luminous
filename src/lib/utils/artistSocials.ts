@@ -117,7 +117,9 @@ export const SOCIAL_PLATFORMS: SocialPlatformInfo[] = [
 ];
 
 export function getPlatformInfo(platformId: string): SocialPlatformInfo {
-  const found = SOCIAL_PLATFORMS.find((p) => p.id === platformId);
+  const found =
+    SOCIAL_PLATFORMS.find((p) => p.id === platformId) ??
+    ALBUM_LINK_PLATFORMS.find((p) => p.id === platformId);
   if (found) return found;
   return {
     id: platformId,
@@ -199,7 +201,13 @@ export function formatDisplayLabel(platformId: string, input: string): string {
 
   const info = getPlatformInfo(platformId);
 
-  if (platformId === "website") {
+  // "website", "lyrics" and "other_databases" cover many different sites
+  // rather than one fixed destination — unlike a single-site platform (e.g.
+  // "discogs"), a generic label would render several near-identical link
+  // buttons when there's more than one (MusicBrainz's release-group
+  // relations can have multiple "lyrics"/"other databases" entries), so
+  // show the source hostname instead so they're distinguishable.
+  if (platformId === "website" || platformId === "lyrics" || platformId === "other_databases") {
     // Show clean hostname or short path without http/https
     try {
       const url = resolveSocialUrl(platformId, trimmed);
@@ -313,6 +321,30 @@ export const ALBUM_LINK_PLATFORMS: SocialPlatformInfo[] = [
     label: "SoundCloud",
     placeholder: "https://soundcloud.com/artist/sets/...",
     example: "https://soundcloud.com/artist/sets/album-name",
+  },
+  {
+    id: "allmusic",
+    label: "AllMusic",
+    placeholder: "https://www.allmusic.com/album/...",
+    example: "https://www.allmusic.com/album/mw0000123456",
+  },
+  {
+    id: "wikidata",
+    label: "Wikidata",
+    placeholder: "https://www.wikidata.org/wiki/...",
+    example: "https://www.wikidata.org/wiki/Q11649",
+  },
+  {
+    id: "lyrics",
+    label: "Lyrics",
+    placeholder: "https://... (e.g. Genius, Musixmatch)",
+    example: "https://genius.com/albums/Artist/Album-name",
+  },
+  {
+    id: "other_databases",
+    label: "Other Databases",
+    placeholder: "https://... (e.g. Rate Your Music, VGMdb)",
+    example: "https://rateyourmusic.com/release/album/...",
   },
   {
     id: "custom",

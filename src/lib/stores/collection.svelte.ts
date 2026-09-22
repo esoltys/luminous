@@ -11,6 +11,7 @@ import type {
   BatchProgress,
   AlbumItem,
   AlbumProfile,
+  AlbumDetailsRetrievalResult,
   ArtistItem,
   ArtistProfile,
   ExtendedArtworkResponse,
@@ -754,6 +755,22 @@ class CollectionStore {
       };
     }
     return saved;
+  }
+
+  /** Album detail overflow menu's "Retrieve Album Details": fetches
+   * MusicBrainz release-group relations (Discogs, AllMusic, Wikidata, lyrics,
+   * other databases) and merges them into the album's curated link list. */
+  async retrieveAlbumDetails(albumName: string): Promise<AlbumDetailsRetrievalResult> {
+    const result = await invoke<AlbumDetailsRetrievalResult>("retrieve_album_details", {
+      album: albumName,
+    });
+    if (result?.profile?.album_key) {
+      this.albumProfiles = {
+        ...this.albumProfiles,
+        [result.profile.album_key.toLowerCase()]: result.profile,
+      };
+    }
+    return result;
   }
 
   /** Cached extended-artwork lookup for a song's album (#98/#760) — returns
