@@ -11,6 +11,7 @@
   import Input from "./Input.svelte";
   import LibraryBadge from "./LibraryBadge.svelte";
   import ColorPicker from "./ColorPicker.svelte";
+  import Toggle from "./Toggle.svelte";
   import {
     CloudIcon,
     XIcon as X,
@@ -33,6 +34,8 @@
   let password = $state("");
   let remotePath = $state(untrack(() => server?.remotePath ?? "/"));
   let enabled = $state(untrack(() => server?.enabled ?? true));
+  let autoSyncEnabled = $state(untrack(() => server?.autoSyncEnabled ?? false));
+  let syncIntervalMinutes = $state(untrack(() => server?.syncIntervalMinutes ?? 60));
   let nickname = $state(untrack(() => server?.nickname ?? ""));
   let selectedIcon = $state(untrack(() => server?.icon ?? "cloud"));
   let selectedColor = $state<string | null>(untrack(() => server?.color ?? null));
@@ -93,6 +96,8 @@
           password: password ? password : null,
           remotePath: remotePath.trim() || "/",
           enabled,
+          autoSyncEnabled,
+          syncIntervalMinutes: Math.max(1, Math.round(syncIntervalMinutes) || 60),
           nickname: nickname.trim() || null,
           icon: selectedIcon,
           color: selectedColor,
@@ -201,6 +206,33 @@
           bind:value={remotePath}
           placeholder="/Music"
         />
+      </div>
+
+      <!-- Auto-Sync -->
+      <div class="bg-brand-main/40 border border-brand-border/50 rounded-xl p-4 space-y-3">
+        <div class="flex items-center justify-between gap-4">
+          <div class="flex flex-col gap-0.5 min-w-0">
+            <span class="text-sm font-medium text-brand-text-primary">{i18n.t("settings.webdavAutoSyncLabel")}</span>
+            <p class="text-xs text-brand-text-secondary text-pretty">{i18n.t("settings.webdavAutoSyncHint")}</p>
+          </div>
+          <Toggle
+            checked={autoSyncEnabled}
+            onchange={(v) => { autoSyncEnabled = v; }}
+            label={i18n.t("settings.webdavAutoSyncLabel")}
+          />
+        </div>
+        {#if autoSyncEnabled}
+          <div class="space-y-1.5">
+            <label for="webdav-sync-interval" class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
+              {i18n.t("settings.webdavSyncIntervalLabel")}
+            </label>
+            <Input
+              id="webdav-sync-interval"
+              type="number"
+              bind:value={syncIntervalMinutes}
+            />
+          </div>
+        {/if}
       </div>
 
       <!-- Live Preview -->
