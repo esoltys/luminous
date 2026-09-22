@@ -68,7 +68,7 @@
         </span>
       </div>
 
-      <div class="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs bg-brand-bg/40 p-2.5 rounded-lg border border-brand-border/30">
+      <div class="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs bg-brand-bg p-2.5 rounded-lg border border-brand-border/30">
         <div class="flex flex-col">
           <span class="text-[10px] uppercase font-semibold text-brand-text-secondary">{i18n.t('audioPipeline.codec', {}, 'Codec')}</span>
           <span class="text-brand-text-primary font-semibold uppercase">{pipeline.input_format}</span>
@@ -122,7 +122,7 @@
         {/if}
       </div>
 
-      <div class="grid grid-cols-1 gap-2 text-xs bg-brand-bg/40 p-2.5 rounded-lg border border-brand-border/30">
+      <div class="grid grid-cols-1 gap-2 text-xs bg-brand-bg p-2.5 rounded-lg border border-brand-border/30">
         <!-- Equalizer -->
         <div class="flex items-center justify-between gap-2">
           <span class="text-brand-text-secondary font-medium">{i18n.t('audioPipeline.equalizer', {}, 'Equalizer & DSP')}</span>
@@ -175,7 +175,7 @@
         {/if}
       </div>
 
-      <div class="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs bg-brand-bg/40 p-2.5 rounded-lg border border-brand-border/30">
+      <div class="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs bg-brand-bg p-2.5 rounded-lg border border-brand-border/30">
         <div class="col-span-2 flex flex-col">
           <span class="text-[10px] uppercase font-semibold text-brand-text-secondary">{i18n.t('audioPipeline.outputDevice', {}, 'Device')}</span>
           <span class="text-brand-text-primary font-semibold truncate" title={pipeline.output_device_name}>
