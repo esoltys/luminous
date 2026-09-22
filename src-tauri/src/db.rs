@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 38;
+pub const CURRENT_SCHEMA_VERSION: i32 = 39;
 
 struct Migration {
     version: i32,
@@ -290,6 +290,21 @@ const MIGRATIONS: &[Migration] = &[
         apply: |conn| {
             conn.execute_batch(ARTIST_TAG_HIERARCHY_TABLES_SQL)?;
             seed_artist_tag_hierarchy(conn)
+        },
+    },
+    Migration {
+        version: 39,
+        description: "musicbrainz_artist_id column on artist_profiles for Retrieve Artist Details (#1123)",
+        apply: |conn| {
+            let has_musicbrainz_artist_id: bool = conn
+                .prepare(
+                    "SELECT 1 FROM pragma_table_info('artist_profiles') WHERE name = 'musicbrainz_artist_id'",
+                )?
+                .exists([])?;
+            if !has_musicbrainz_artist_id {
+                conn.execute_batch(MIGRATION_39)?;
+            }
+            Ok(())
         },
     },
 ];
@@ -1363,6 +1378,16 @@ CREATE TABLE IF NOT EXISTS artist_tag_assignments (
 );
 ";
 
+// ---------------------------------------------------------------------------
+// Migration 39: artist_profiles.musicbrainz_artist_id — the artist's
+// MusicBrainz ID, distinct from any per-song tagged MBID, captured from a
+// release-group's `artist-credit` during "Retrieve Album Details" or from a
+// song's tagged MBID as a fallback. Drives "Retrieve Artist Details" (#1123).
+// ---------------------------------------------------------------------------
+const MIGRATION_39: &str = "
+ALTER TABLE artist_profiles ADD COLUMN musicbrainz_artist_id TEXT;
+";
+
 fn seed_artist_tag_hierarchy(conn: &rusqlite::Connection) -> Result<()> {
     let mut stmt = conn.prepare(
         "SELECT DISTINCT json_each.value
@@ -1909,6 +1934,37 @@ mod tests {
             )
             .unwrap();
         assert!(tables_exist);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_migration_39_adds_artist_profiles_musicbrainz_artist_id_column() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_migration39_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Database::new(temp_dir.clone()).unwrap();
+        assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
+
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO artist_profiles (artist_key, musicbrainz_artist_id) VALUES (?1, ?2)",
+            params!["Shania Twain", "042c0697-3948-4720-bf43-690240aeac43"],
+        )
+        .unwrap();
+
+        let mbid: Option<String> = conn
+            .query_row(
+                "SELECT musicbrainz_artist_id FROM artist_profiles WHERE artist_key = 'Shania Twain'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(mbid.as_deref(), Some("042c0697-3948-4720-bf43-690240aeac43"));
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

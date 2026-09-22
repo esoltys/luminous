@@ -14,6 +14,7 @@ import type {
   AlbumDetailsRetrievalResult,
   ArtistItem,
   ArtistProfile,
+  ArtistDetailsRetrievalResult,
   ExtendedArtworkResponse,
   RecentSearchItem,
   QueuePopulationMode,
@@ -722,6 +723,23 @@ class CollectionStore {
       };
     }
     return saved;
+  }
+
+  /** Artist detail overflow menu's "Retrieve Artist Details" (#1123): fetches
+   * MusicBrainz artist relations (Discogs, AllMusic, Wikidata, IMDb, official
+   * homepage, social links) and merges them into the artist's curated social
+   * link list. */
+  async retrieveArtistDetails(artistName: string): Promise<ArtistDetailsRetrievalResult> {
+    const result = await invoke<ArtistDetailsRetrievalResult>("retrieve_artist_details", {
+      artist: artistName,
+    });
+    if (result?.profile?.artist_key) {
+      this.artistProfiles = {
+        ...this.artistProfiles,
+        [result.profile.artist_key.toLowerCase()]: result.profile,
+      };
+    }
+    return result;
   }
 
   async loadAlbumProfiles() {

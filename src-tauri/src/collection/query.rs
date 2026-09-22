@@ -1045,6 +1045,59 @@ impl CollectionScanner {
         Ok(id)
     }
 
+    /// This album's effective artist (album artist, falling back to the
+    /// track artist), used by `retrieve_album_details` to know which
+    /// `ArtistProfile` row to backfill `musicbrainz_artist_id` onto from the
+    /// release-group's `artist-credit` (#1123).
+    pub fn get_representative_artist_for_album(&self, album: &str) -> Result<Option<String>> {
+        let conn = self.db.pool.get()?;
+        let artist = conn
+            .query_row(
+                "SELECT COALESCE(NULLIF(album_artist, ''), artist) FROM songs
+                 WHERE album = ?1 COLLATE NOCASE
+                 LIMIT 1",
+                params![album],
+                |row| row.get::<_, Option<String>>(0),
+            )
+            .optional()?
+            .flatten();
+        Ok(artist)
+    }
+
+    /// A MusicBrainz artist MBID for this artist, read off whichever of
+    /// their songs has one tagged (`musicbrainz_artist_id`, falling back to
+    /// `musicbrainz_album_artist_id`) — used by "Retrieve Artist Details"
+    /// (#1123) when the artist's profile hasn't already captured one via
+    /// `retrieve_album_details`'s `artist-credit` backfill. A tagged value
+    /// can list several MBIDs separated by `;`/`/` for multi-artist tracks
+    /// (same convention `get_song_context` resolves), so only the first is
+    /// used.
+    pub fn get_representative_artist_mbid_for_artist(
+        &self,
+        artist: &str,
+    ) -> Result<Option<String>> {
+        let conn = self.db.pool.get()?;
+        let raw: Option<String> = conn
+            .query_row(
+                "SELECT COALESCE(NULLIF(musicbrainz_artist_id, ''), NULLIF(musicbrainz_album_artist_id, ''))
+                 FROM songs
+                 WHERE (album_artist = ?1 COLLATE NOCASE OR artist = ?1 COLLATE NOCASE)
+                   AND COALESCE(NULLIF(musicbrainz_artist_id, ''), NULLIF(musicbrainz_album_artist_id, '')) IS NOT NULL
+                 LIMIT 1",
+                params![artist],
+                |row| row.get::<_, Option<String>>(0),
+            )
+            .optional()?
+            .flatten();
+        Ok(raw.and_then(|v| {
+            v.split(&[';', '/'][..])
+                .next()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(str::to_string)
+        }))
+    }
+
     pub fn get_library_stats(&self) -> Result<LibraryStats> {
         let conn = self.db.pool.get()?;
         let sql = format!(
@@ -1486,7 +1539,7 @@ fn attach_album_ratings(conn: &rusqlite::Connection, items: &mut [HomeItem]) -> 
 /// Retrieve customizable profile for an artist from SQLite (#473).
 pub fn get_artist_profile_conn(conn: &rusqlite::Connection, artist: &str) -> Result<ArtistProfile> {
     let mut stmt = conn.prepare(
-        "SELECT artist_key, website, tags, social_links, bio FROM artist_profiles WHERE artist_key = ?1 COLLATE NOCASE",
+        "SELECT artist_key, website, tags, social_links, bio, musicbrainz_artist_id FROM artist_profiles WHERE artist_key = ?1 COLLATE NOCASE",
     )?;
     let result = stmt.query_row(params![artist], |row| {
         let artist_key: String = row.get(0)?;
@@ -1494,6 +1547,7 @@ pub fn get_artist_profile_conn(conn: &rusqlite::Connection, artist: &str) -> Res
         let tags_json: String = row.get(2)?;
         let social_links_json: String = row.get(3)?;
         let bio: Option<String> = row.get(4)?;
+        let musicbrainz_artist_id: Option<String> = row.get(5)?;
 
         let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
         let social_links: Vec<ArtistSocialLink> =
@@ -1505,6 +1559,7 @@ pub fn get_artist_profile_conn(conn: &rusqlite::Connection, artist: &str) -> Res
             tags,
             social_links,
             bio,
+            musicbrainz_artist_id,
         })
     });
 
@@ -1516,6 +1571,7 @@ pub fn get_artist_profile_conn(conn: &rusqlite::Connection, artist: &str) -> Res
             tags: Vec::new(),
             social_links: Vec::new(),
             bio: None,
+            musicbrainz_artist_id: None,
         }),
         Err(e) => Err(e.into()),
     }
@@ -1571,19 +1627,21 @@ pub fn set_artist_profile_conn(
     let social_links_json = serde_json::to_string(&profile.social_links)?;
 
     conn.execute(
-        "INSERT INTO artist_profiles (artist_key, website, tags, social_links, bio)
-         VALUES (?1, ?2, ?3, ?4, ?5)
+        "INSERT INTO artist_profiles (artist_key, website, tags, social_links, bio, musicbrainz_artist_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)
          ON CONFLICT(artist_key) DO UPDATE SET
             website = excluded.website,
             tags = excluded.tags,
             social_links = excluded.social_links,
-            bio = excluded.bio",
+            bio = excluded.bio,
+            musicbrainz_artist_id = excluded.musicbrainz_artist_id",
         params![
             profile.artist_key,
             profile.website,
             tags_json,
             social_links_json,
-            profile.bio
+            profile.bio,
+            profile.musicbrainz_artist_id
         ],
     )?;
 
@@ -1597,7 +1655,7 @@ pub fn set_artist_profile_conn(
 /// Retrieve all saved artist profiles in SQLite (#473).
 pub fn get_all_artist_profiles_conn(conn: &rusqlite::Connection) -> Result<Vec<ArtistProfile>> {
     let mut stmt = conn.prepare(
-        "SELECT artist_key, website, tags, social_links, bio FROM artist_profiles ORDER BY artist_key COLLATE NOCASE",
+        "SELECT artist_key, website, tags, social_links, bio, musicbrainz_artist_id FROM artist_profiles ORDER BY artist_key COLLATE NOCASE",
     )?;
     let profiles = stmt
         .query_map([], |row| {
@@ -1606,6 +1664,7 @@ pub fn get_all_artist_profiles_conn(conn: &rusqlite::Connection) -> Result<Vec<A
             let tags_json: String = row.get(2)?;
             let social_links_json: String = row.get(3)?;
             let bio: Option<String> = row.get(4)?;
+            let musicbrainz_artist_id: Option<String> = row.get(5)?;
 
             let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
             let social_links: Vec<ArtistSocialLink> =
@@ -1617,6 +1676,7 @@ pub fn get_all_artist_profiles_conn(conn: &rusqlite::Connection) -> Result<Vec<A
                 tags,
                 social_links,
                 bio,
+                musicbrainz_artist_id,
             })
         })?
         .filter_map(|r| r.ok())
@@ -3145,6 +3205,7 @@ mod tests {
         assert!(initial.tags.is_empty());
         assert!(initial.social_links.is_empty());
         assert_eq!(initial.bio, None);
+        assert_eq!(initial.musicbrainz_artist_id, None);
 
         // Save profile
         let profile = ArtistProfile {
@@ -3166,6 +3227,7 @@ mod tests {
                 },
             ],
             bio: Some("Canadian singer-songwriter".to_string()),
+            musicbrainz_artist_id: Some("042c0697-3948-4720-bf43-690240aeac43".to_string()),
         };
 
         set_artist_profile_conn(&conn, &profile).unwrap();
@@ -3182,11 +3244,88 @@ mod tests {
         assert_eq!(loaded.social_links[0].platform, "instagram");
         assert_eq!(loaded.social_links[0].handle_or_url, "@shaniatwain");
         assert_eq!(loaded.bio, Some("Canadian singer-songwriter".to_string()));
+        assert_eq!(
+            loaded.musicbrainz_artist_id,
+            Some("042c0697-3948-4720-bf43-690240aeac43".to_string())
+        );
 
         // Get all profiles
         let all = get_all_artist_profiles_conn(&conn).unwrap();
         assert_eq!(all.len(), 1);
         assert_eq!(all[0].artist_key, "Shania Twain");
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_get_representative_artist_for_album_prefers_album_artist() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_representative_artist_for_album_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let scanner = CollectionScanner::new(db.clone());
+        let conn = db.pool.get().unwrap();
+
+        conn.execute(
+            "INSERT INTO songs (title, album, artist, album_artist, source, unavailable)
+             VALUES ('Track', 'Come On Over', 'Shania Twain (feat. Someone)', 'Shania Twain', 1, 0)",
+            [],
+        )
+        .unwrap();
+
+        assert_eq!(
+            scanner
+                .get_representative_artist_for_album("Come On Over")
+                .unwrap(),
+            Some("Shania Twain".to_string())
+        );
+        assert_eq!(
+            scanner
+                .get_representative_artist_for_album("No Such Album")
+                .unwrap(),
+            None
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_get_representative_artist_mbid_for_artist_falls_back_to_tagged_song() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_representative_artist_mbid_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let scanner = CollectionScanner::new(db.clone());
+        let conn = db.pool.get().unwrap();
+
+        // Multiple tagged MBIDs, separated by ';' — only the first is used.
+        conn.execute(
+            "INSERT INTO songs (title, artist, musicbrainz_artist_id, source, unavailable)
+             VALUES ('Duet', 'Shania Twain; Someone Else', '042c0697-3948-4720-bf43-690240aeac43; other-id', 1, 0)",
+            [],
+        )
+        .unwrap();
+
+        assert_eq!(
+            scanner
+                .get_representative_artist_mbid_for_artist("Shania Twain; Someone Else")
+                .unwrap(),
+            Some("042c0697-3948-4720-bf43-690240aeac43".to_string())
+        );
+        assert_eq!(
+            scanner
+                .get_representative_artist_mbid_for_artist("No Such Artist")
+                .unwrap(),
+            None
+        );
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
@@ -3211,6 +3350,7 @@ mod tests {
                 tags: vec!["canadian".to_string()],
                 social_links: vec![],
                 bio: None,
+                musicbrainz_artist_id: None,
             },
         )
         .unwrap();
@@ -3222,6 +3362,7 @@ mod tests {
                 tags: vec!["canadian".to_string(), "rock".to_string()],
                 social_links: vec![],
                 bio: None,
+                musicbrainz_artist_id: None,
             },
         )
         .unwrap();
@@ -3237,6 +3378,7 @@ mod tests {
                 tags: vec!["Canadian".to_string()],
                 social_links: vec![],
                 bio: None,
+                musicbrainz_artist_id: None,
             },
         )
         .unwrap();

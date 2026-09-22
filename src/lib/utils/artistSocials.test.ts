@@ -1,5 +1,16 @@
 import { describe, it, expect } from "vitest";
-import { resolveSocialUrl, formatDisplayLabel, getPlatformInfo, SOCIAL_PLATFORMS, deriveFanartTvUrl } from "./artistSocials";
+import {
+  resolveSocialUrl,
+  formatDisplayLabel,
+  getPlatformInfo,
+  SOCIAL_PLATFORMS,
+  deriveFanartTvUrl,
+  resolveArtistMbid,
+  deriveMusicbrainzArtistUrl,
+  deriveListenbrainzArtistUrl,
+  deriveFanartTvUrlFromMbid,
+  normalizeWebsitePlatform,
+} from "./artistSocials";
 
 describe("artistSocials", () => {
   it("provides info for all known platforms", () => {
@@ -41,6 +52,83 @@ describe("artistSocials", () => {
     expect(formatDisplayLabel("website", "https://shaniatwain.com/tour")).toBe("shaniatwain.com/tour");
     expect(formatDisplayLabel("instagram", "@shaniatwain")).toBe("Instagram");
     expect(formatDisplayLabel("youtube", "@ShaniaTwain")).toBe("YouTube");
+  });
+
+  it("labels a web.archive.org website link as 'Internet Archive' instead of its unreadable path (#1123)", () => {
+    expect(
+      formatDisplayLabel(
+        "website",
+        "https://web.archive.org/web/19970131155102/http://www.vmg.co.uk/massive/index.html"
+      )
+    ).toBe("Internet Archive");
+  });
+
+  describe("normalizeWebsitePlatform (#1123)", () => {
+    it("swaps 'website' for 'internet_archive' when the URL is a web.archive.org snapshot", () => {
+      expect(
+        normalizeWebsitePlatform(
+          "website",
+          "https://web.archive.org/web/19970131155102/http://www.vmg.co.uk/massive/index.html"
+        )
+      ).toBe("internet_archive");
+    });
+
+    it("does the same for 'lyrics' and 'other_databases'", () => {
+      expect(normalizeWebsitePlatform("lyrics", "https://web.archive.org/web/2020/https://genius.com/x")).toBe(
+        "internet_archive"
+      );
+      expect(
+        normalizeWebsitePlatform("other_databases", "https://web.archive.org/web/2020/https://rateyourmusic.com/x")
+      ).toBe("internet_archive");
+    });
+
+    it("leaves a normal website URL's platform unchanged", () => {
+      expect(normalizeWebsitePlatform("website", "https://massiveattack.com")).toBe("website");
+    });
+
+    it("leaves other platform ids unchanged even against a web.archive.org URL", () => {
+      expect(normalizeWebsitePlatform("discogs", "https://web.archive.org/web/2020/https://discogs.com/x")).toBe(
+        "discogs"
+      );
+    });
+  });
+
+  describe("resolveArtistMbid / derived MusicBrainz links (#1123)", () => {
+    const mbid = "7249b899-8db8-43e7-9e6e-22f1e736024e";
+
+    it("prefers ArtistProfile.musicbrainz_artist_id over a stored social link", () => {
+      expect(
+        resolveArtistMbid(mbid, [
+          { platform: "musicbrainz", handle_or_url: "https://musicbrainz.org/artist/other-id-not-a-real-mbid" },
+        ])
+      ).toBe(mbid);
+    });
+
+    it("falls back to a stored 'musicbrainz' social link when the profile field is unset", () => {
+      expect(
+        resolveArtistMbid(null, [
+          { platform: "musicbrainz", handle_or_url: `https://musicbrainz.org/artist/${mbid}` },
+        ])
+      ).toBe(mbid);
+    });
+
+    it("returns null when neither source has a recognizable MBID", () => {
+      expect(resolveArtistMbid(null, null)).toBeNull();
+      expect(resolveArtistMbid(undefined, [])).toBeNull();
+      expect(resolveArtistMbid("not-a-valid-mbid", [{ platform: "discogs", handle_or_url: "https://discogs.com/artist/1" }])).toBeNull();
+    });
+
+    it("derives MusicBrainz/ListenBrainz/Fanart.tv URLs from the resolved MBID", () => {
+      expect(deriveMusicbrainzArtistUrl(mbid)).toBe(`https://musicbrainz.org/artist/${mbid}`);
+      expect(deriveListenbrainzArtistUrl(mbid)).toBe(`https://listenbrainz.org/artist/${mbid}/`);
+      expect(deriveFanartTvUrlFromMbid(mbid)).toBe(`https://fanart.tv/artist/${mbid}`);
+    });
+
+    it("returns null from all three derivers when there is no MBID", () => {
+      expect(deriveMusicbrainzArtistUrl(null)).toBeNull();
+      expect(deriveListenbrainzArtistUrl(null)).toBeNull();
+      expect(deriveFanartTvUrlFromMbid(null)).toBeNull();
+    });
   });
 
   describe("deriveFanartTvUrl (#98/#761)", () => {

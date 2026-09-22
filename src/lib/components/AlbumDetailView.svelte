@@ -54,6 +54,7 @@
   import {
     resolveSocialUrl,
     formatDisplayLabel,
+    normalizeWebsitePlatform,
     deriveListenbrainzAlbumUrl,
   } from "../utils/artistSocials";
 
@@ -109,12 +110,16 @@
     retrievingDetails = true;
     try {
       const result = await collectionStore.retrieveAlbumDetails(albumName);
-      if (result.added_count > 0) {
+      if (result.added_count === 1) {
+        toastStore.show(
+          i18n.t("albumDetail.retrieveDetailsSuccessOne", {}, "Added 1 link from MusicBrainz")
+        );
+      } else if (result.added_count > 1) {
         toastStore.show(
           i18n.t(
-            "albumDetail.retrieveDetailsSuccess",
+            "albumDetail.retrieveDetailsSuccessMany",
             { count: result.added_count },
-            `Added ${result.added_count} link(s) from MusicBrainz`
+            `Added ${result.added_count} links from MusicBrainz`
           )
         );
       } else {
@@ -260,6 +265,9 @@
     platform: string;
     url: string;
     label: string;
+    /** The release's own official page, rendered more prominently than a
+     * plain cross-reference or curated link (#1123). */
+    isOfficial: boolean;
   }
 
   // Unifies the website, curated (#950), and derived ListenBrainz links into
@@ -269,19 +277,23 @@
     const items: ReleaseLinkItem[] = [];
     if (hasWebsite) {
       const website = albumProfile?.website ?? "";
+      const url = resolveSocialUrl("website", website);
       items.push({
         key: "website",
-        platform: "website",
-        url: resolveSocialUrl("website", website),
+        platform: normalizeWebsitePlatform("website", url),
+        url,
         label: formatDisplayLabel("website", website),
+        isOfficial: true,
       });
     }
     for (const link of albumProfile?.links ?? []) {
+      const url = resolveSocialUrl(link.platform, link.handle_or_url);
       items.push({
         key: `${link.platform}:${link.handle_or_url}`,
-        platform: link.platform,
-        url: resolveSocialUrl(link.platform, link.handle_or_url),
+        platform: normalizeWebsitePlatform(link.platform, url),
+        url,
         label: formatDisplayLabel(link.platform, link.handle_or_url),
+        isOfficial: false,
       });
     }
     if (listenbrainzUrl) {
@@ -290,10 +302,23 @@
         platform: "listenbrainz",
         url: listenbrainzUrl,
         label: "ListenBrainz",
+        isOfficial: false,
       });
     }
-    return items.sort((a, b) => a.label.localeCompare(b.label));
+    // Official homepage(s) lead as a group, ahead of the alphabetical sort —
+    // it's the artist/label's own page, not just one more retrieved link.
+    return items.sort((a, b) => {
+      if (a.isOfficial !== b.isOfficial) return a.isOfficial ? -1 : 1;
+      if (a.key === "website") return -1;
+      if (b.key === "website") return 1;
+      return a.label.localeCompare(b.label);
+    });
   });
+
+  // Past a certain count the narrow single-column links panel (used
+  // alongside liner notes) gets tall enough to feel unbalanced — switch to
+  // two columns so it stays compact.
+  let hasManyReleaseLinks = $derived(releaseLinkItems.length > 10);
 
   async function handleOpenUrl(url: string) {
     if (!url) return;
@@ -703,18 +728,19 @@
           {#if hasWebsite || hasLinks || listenbrainzUrl}
             <div
               class={hasDescription
-                ? "@2xl:w-60 @3xl:w-72 shrink-0 border-t border-brand-border/40 pt-4 @2xl:border-t-0 @2xl:border-l @2xl:border-brand-border/60 @2xl:pt-0 @2xl:pl-6 flex flex-col gap-3"
+                ? `${hasManyReleaseLinks ? "@2xl:w-[22rem] @3xl:w-[28rem]" : "@2xl:w-60 @3xl:w-72"} shrink-0 border-t border-brand-border/40 pt-4 @2xl:border-t-0 @2xl:border-l @2xl:border-brand-border/60 @2xl:pt-0 @2xl:pl-6 flex flex-col gap-3`
                 : "w-full flex flex-col gap-3"}
             >
-              <div class="grid grid-cols-1 @sm:grid-cols-2 {hasDescription ? '@2xl:flex @2xl:flex-col' : '@md:grid-cols-3 @xl:grid-cols-4'} gap-2.5">
+              <div class="grid grid-cols-1 @sm:grid-cols-2 {hasDescription ? (hasManyReleaseLinks ? '@2xl:grid @2xl:grid-cols-2' : '@2xl:flex @2xl:flex-col') : '@md:grid-cols-3 @xl:grid-cols-4'} gap-2.5">
                 <!-- Website, curated (#950) and derived ListenBrainz links, unified and sorted alphabetically (#1122) -->
                 {#each releaseLinkItems as item (item.key)}
                   <button
                     type="button"
                     onclick={() => handleOpenUrl(item.url)}
+                    title={item.url}
                     class="flex items-center gap-2.5 sm:gap-3 group text-left transition-colors cursor-pointer min-w-0"
                   >
-                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-brand-main/60 border border-brand-border flex items-center justify-center text-brand-text-secondary group-hover:text-brand-accent group-hover:border-brand-accent/40 transition-colors shrink-0 shadow-2xs">
+                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-brand-main/60 {item.isOfficial ? 'border-[3px]' : 'border'} border-brand-border flex items-center justify-center text-brand-text-secondary group-hover:text-brand-accent group-hover:border-brand-accent/40 transition-colors shrink-0 shadow-2xs">
                       <SocialIcon platform={item.platform} size={14} />
                     </div>
                     <div class="flex items-center gap-1 min-w-0 flex-1">

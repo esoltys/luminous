@@ -462,6 +462,12 @@ export interface ArtistProfile {
   tags: string[];
   social_links: ArtistSocialLink[];
   bio?: string | null;
+  /** The artist's MusicBrainz ID, distinct from whatever MBID happens to be
+   * embedded in an individual song's own tags — captured from a
+   * release-group's `artist-credit` during "Retrieve Album Details", or from
+   * a tagged song as a fallback, and used to drive "Retrieve Artist
+   * Details" (#1123). */
+  musicbrainz_artist_id?: string | null;
   /** Same on-demand artist visuals as {@link ArtistItem} — see there for why
    * these aren't populated by `get_artist_profile()`/`get_all_artist_profiles()`. */
   portrait_uri?: string | null;
@@ -484,6 +490,11 @@ export interface AlbumProfile {
 
 export interface AlbumDetailsRetrievalResult {
   profile: AlbumProfile;
+  added_count: number;
+}
+
+export interface ArtistDetailsRetrievalResult {
+  profile: ArtistProfile;
   added_count: number;
 }
 

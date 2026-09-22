@@ -1,15 +1,16 @@
 use crate::{
     biomanager,
-    collection::CollectionScanner,
+    collection::{CollectionScanner, WatcherPauseGuard},
     context::ContextManager,
     models::{
-        AlbumLink, AlbumProfile, ArtistProfile, HomeItem, LibraryStats, MusicDirectory,
-        PruneResult, Song, Tag, TopAlbumItem,
+        AlbumLink, AlbumProfile, ArtistProfile, ArtistSocialLink, HomeItem, LibraryStats,
+        MusicDirectory, PruneResult, Song, Tag, TopAlbumItem,
     },
     AppState,
 };
 use serde::Serialize;
 use std::path::Path;
+use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State};
 
 #[tauri::command]
@@ -582,27 +583,44 @@ pub async fn get_artist_profile(
     .map_err(|e| e.to_string())
 }
 
+/// Saves an artist profile and mirrors it to the `artist.md` sidecar, shared
+/// by `set_artist_profile` (a user's manual edit) and `retrieve_artist_details`
+/// (a MusicBrainz-sourced link merge) so both go through the same
+/// persistence path — same convention as `save_album_profile_with_sidecar`.
+fn save_artist_profile_with_sidecar(
+    scanner: &CollectionScanner,
+    profile: &ArtistProfile,
+) -> anyhow::Result<ArtistProfile> {
+    let saved = scanner.set_artist_profile(profile)?;
+
+    let song_path = scanner
+        .get_representative_song_path_for_artist(&saved.artist_key)
+        .unwrap_or(None);
+    let content = build_artist_md_content(&saved);
+    write_bio_sidecar(
+        song_path,
+        biomanager::artist_dir,
+        biomanager::ARTIST_BIO_FILENAME,
+        content.as_deref(),
+        &saved.artist_key,
+    );
+
+    Ok(saved)
+}
+
 #[tauri::command]
 pub async fn set_artist_profile(
     profile: ArtistProfile,
     state: State<'_, AppState>,
 ) -> Result<ArtistProfile, String> {
+    // The artist.md sidecar write below is app-driven, not an external
+    // change — without this, the realtime watcher can pick up the write
+    // (or the directory-level change notification it triggers on some
+    // platforms) and kick off a redundant full rescan on top of the
+    // in-memory update this command's return value already applies (#1123).
+    let _watcher_pause_guard = WatcherPauseGuard::new(Arc::clone(&state.watcher_paused));
     crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
-        let saved = scanner.set_artist_profile(&profile)?;
-
-        let song_path = scanner
-            .get_representative_song_path_for_artist(&saved.artist_key)
-            .unwrap_or(None);
-        let content = build_artist_md_content(&saved);
-        write_bio_sidecar(
-            song_path,
-            biomanager::artist_dir,
-            biomanager::ARTIST_BIO_FILENAME,
-            content.as_deref(),
-            &saved.artist_key,
-        );
-
-        Ok(saved)
+        save_artist_profile_with_sidecar(scanner, &profile)
     })
     .await
     .map_err(|e| e.to_string())
@@ -692,6 +710,9 @@ pub async fn set_album_profile(
     profile: AlbumProfile,
     state: State<'_, AppState>,
 ) -> Result<AlbumProfile, String> {
+    // See `set_artist_profile`'s matching guard — same reasoning, for
+    // `album.md` (#1123).
+    let _watcher_pause_guard = WatcherPauseGuard::new(Arc::clone(&state.watcher_paused));
     crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
         save_album_profile_with_sidecar(scanner, &profile)
     })
@@ -727,17 +748,65 @@ fn platform_for_release_group_rel_type(rel_type: &str) -> Option<&'static str> {
     }
 }
 
+/// Normalizes a URL for duplicate detection: lowercased, scheme stripped,
+/// `www.` stripped, trailing slash stripped. MusicBrainz relations for
+/// "the same" link often differ in exactly these superficial ways between
+/// sources (e.g. `https://www.shaniatwain.com` vs `https://shaniatwain.com`,
+/// or an Instagram URL with vs. without a trailing slash) — comparing raw
+/// strings let those through as separate "distinct" links (#1123). The
+/// original string is still what's stored; this is only used as the
+/// dedup key.
+fn normalize_url_for_dedup(url: &str) -> String {
+    let mut s = url.trim().to_lowercase();
+    for prefix in ["https://", "http://"] {
+        if let Some(rest) = s.strip_prefix(prefix) {
+            s = rest.to_string();
+            break;
+        }
+    }
+    if let Some(rest) = s.strip_prefix("www.") {
+        s = rest.to_string();
+    }
+    while s.ends_with('/') {
+        s.pop();
+    }
+    s
+}
+
+/// Drops any later link that's a same-platform, equivalent-URL (see
+/// `normalize_url_for_dedup`) repeat of an earlier one, keeping the first
+/// occurrence. `merge_album_links`/`merge_artist_social_links` only guard
+/// against a *newly fetched* link duplicating something already saved —
+/// they don't touch the pre-existing list itself, so a link list saved by
+/// an earlier version of "Retrieve Album/Artist Details" (before this
+/// equivalence check existed) could already hold two URL-form variants of
+/// the same link side by side. Callers run this over `existing` before
+/// merging so re-running the retrieval action heals that stale duplication
+/// instead of only preventing new instances of it (#1123).
+fn dedupe_links_by_platform_and_url<T>(links: Vec<T>, key: impl Fn(&T) -> (&str, &str)) -> Vec<T> {
+    let mut seen = std::collections::HashSet::new();
+    links
+        .into_iter()
+        .filter(|link| {
+            let (platform, url) = key(link);
+            seen.insert((platform.to_string(), normalize_url_for_dedup(url)))
+        })
+        .collect()
+}
+
 /// Appends `fetched` links onto `existing`, skipping any that are already
-/// present (same platform and URL) so re-running "Retrieve Album Details"
-/// is idempotent rather than piling up duplicates. Multiple links of the
+/// present (same platform and an equivalent URL, see
+/// `normalize_url_for_dedup`) so re-running "Retrieve Album Details" is
+/// idempotent rather than piling up duplicates. Multiple links of the
 /// same platform (e.g. several lyrics sites) are intentionally allowed to
 /// coexist.
 fn merge_album_links(mut existing: Vec<AlbumLink>, fetched: Vec<AlbumLink>) -> (Vec<AlbumLink>, usize) {
     let mut added = 0;
     for link in fetched {
-        let already_present = existing
-            .iter()
-            .any(|l| l.platform == link.platform && l.handle_or_url == link.handle_or_url);
+        let already_present = existing.iter().any(|l| {
+            l.platform == link.platform
+                && normalize_url_for_dedup(&l.handle_or_url) == normalize_url_for_dedup(&link.handle_or_url)
+        });
         if !already_present {
             existing.push(link);
             added += 1;
@@ -763,6 +832,9 @@ pub async fn retrieve_album_details(
     album: String,
     state: State<'_, AppState>,
 ) -> Result<AlbumDetailsRetrievalResult, String> {
+    // See `set_artist_profile`'s matching guard — same reasoning, for the
+    // `album.md`/`artist.md` sidecar writes this command can trigger (#1123).
+    let _watcher_pause_guard = WatcherPauseGuard::new(Arc::clone(&state.watcher_paused));
     let album_for_lookup = album.clone();
     let (release_group_id, current_profile) =
         crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
@@ -787,6 +859,7 @@ pub async fn retrieve_album_details(
         .map_err(|e| e.to_string())?;
 
     let fetched_links: Vec<AlbumLink> = relations
+        .relations
         .into_iter()
         .filter_map(|(rel_type, url)| {
             platform_for_release_group_rel_type(&rel_type).map(|platform| AlbumLink {
@@ -797,8 +870,11 @@ pub async fn retrieve_album_details(
         .collect();
 
     let mut updated_profile = current_profile;
-    updated_profile.album_key = album;
-    let existing_links = std::mem::take(&mut updated_profile.links);
+    updated_profile.album_key = album.clone();
+    let existing_links = dedupe_links_by_platform_and_url(
+        std::mem::take(&mut updated_profile.links),
+        |l| (l.platform.as_str(), l.handle_or_url.as_str()),
+    );
     let (merged_links, added_count) = merge_album_links(existing_links, fetched_links);
     updated_profile.links = merged_links;
 
@@ -808,7 +884,274 @@ pub async fn retrieve_album_details(
     .await
     .map_err(|e| e.to_string())?;
 
+    // Backfill the album's artist's MusicBrainz ID from the release-group's
+    // `artist-credit` (#1123) — the same MBID "Retrieve Artist Details"
+    // needs, captured here so it works without depending on a song having a
+    // usable tagged MBID. Best-effort: this is a bonus of the album lookup,
+    // not the reason it was run, so a failure here doesn't fail the command.
+    if let Some(artist_credit_id) = relations.artist_credit_ids.into_iter().next() {
+        let _ = crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+            let Some(artist_key) = scanner.get_representative_artist_for_album(&album)? else {
+                return Ok(());
+            };
+            let mut artist_profile = scanner.get_artist_profile(&artist_key)?;
+            if artist_profile.musicbrainz_artist_id.is_none() {
+                artist_profile.musicbrainz_artist_id = Some(artist_credit_id);
+                save_artist_profile_with_sidecar(scanner, &artist_profile)?;
+            }
+            Ok(())
+        })
+        .await;
+    }
+
     Ok(AlbumDetailsRetrievalResult {
+        profile,
+        added_count,
+    })
+}
+
+/// Maps a MusicBrainz artist `url-rels` relation type to the artist social
+/// link platform id we render it under (#1123). Only the relation types the
+/// artist detail overflow menu's "Retrieve Artist Details" action is scoped
+/// to (Discogs, AllMusic, Wikidata, IMDb, official homepage, and the common
+/// social platforms already in `SOCIAL_PLATFORMS`) are recognized —
+/// MusicBrainz returns many more relation types (streaming, purchase links,
+/// etc.) that are out of scope here and are simply dropped. MusicBrainz
+/// groups most social platforms under one generic "social network" relation
+/// type, so those are further disambiguated by the link's own domain.
+/// "official homepage" isn't mapped here — it's handled separately, routed
+/// into `ArtistProfile.website` rather than the social link list, so it
+/// keeps rendering as the artist's primary site instead of one more icon
+/// among the social links (#1123).
+fn platform_for_artist_rel_type(rel_type: &str, url: &str) -> Option<&'static str> {
+    match rel_type {
+        "discogs" => Some("discogs"),
+        "allmusic" => Some("allmusic"),
+        "wikidata" => Some("wikidata"),
+        "imdb" => Some("imdb"),
+        "bandcamp" => Some("bandcamp"),
+        "soundcloud" => Some("soundcloud"),
+        "youtube" => Some("youtube"),
+        "social network" => platform_for_social_network_url(url),
+        _ => None,
+    }
+}
+
+/// Disambiguates MusicBrainz's generic "social network" relation type by the
+/// link's own domain, so Instagram/Facebook/Bluesky/Threads/TikTok links
+/// render with their own icon and label instead of a single generic one.
+/// x.com/twitter.com is deliberately excluded (returns `None`, dropped by
+/// the caller) rather than mapped to a platform.
+fn platform_for_social_network_url(url: &str) -> Option<&'static str> {
+    let host = url
+        .split("://")
+        .nth(1)?
+        .split('/')
+        .next()?
+        .trim_start_matches("www.")
+        .to_lowercase();
+    match host.as_str() {
+        "instagram.com" => Some("instagram"),
+        "facebook.com" => Some("facebook"),
+        "bsky.app" => Some("bluesky"),
+        "threads.net" => Some("threads"),
+        "tiktok.com" => Some("tiktok"),
+        _ => None,
+    }
+}
+
+/// Collects every "official homepage" relation's URL, deduped by exact URL
+/// match (MB occasionally repeats the same relation) — used by
+/// `retrieve_artist_details` before deciding which one becomes the primary
+/// `ArtistProfile.website` and which (if any more) become additional
+/// "website" social links, since MusicBrainz can list more than one (#1123).
+fn dedupe_official_homepages(relations: &[(String, String)]) -> Vec<String> {
+    let mut seen = std::collections::HashSet::new();
+    relations
+        .iter()
+        .filter(|(rel_type, _)| rel_type == "official homepage")
+        .map(|(_, url)| url.clone())
+        .filter(|url| seen.insert(normalize_url_for_dedup(url)))
+        .collect()
+}
+
+/// Resolves a set of candidate homepage URLs down to the ones actually
+/// worth keeping (#1123): a web.archive.org snapshot is only ever a
+/// fallback reference for a site that's gone offline, so once *any* live
+/// homepage is known, every archive.org URL is dropped entirely rather than
+/// displayed alongside it — a defunct site's archived copy adds nothing once
+/// the current one is known, and keeping several would show `Internet
+/// Archive` multiple times over for what's practically the same reference.
+/// When every known homepage is an archive.org snapshot (no live site at
+/// all), only the first (sorted for determinism) is kept, for the same
+/// "don't show `Internet Archive` twice" reason. The output is sorted with
+/// any live homepage first, then alphabetically, so which URL lands in the
+/// primary `ArtistProfile.website` slot is stable across runs.
+fn resolve_homepage_urls(mut urls: Vec<String>) -> Vec<String> {
+    urls.sort();
+    let mut seen = std::collections::HashSet::new();
+    urls.retain(|url| seen.insert(normalize_url_for_dedup(url)));
+    let has_live_homepage = urls.iter().any(|u| !u.contains("web.archive.org"));
+    if has_live_homepage {
+        urls.retain(|u| !u.contains("web.archive.org"));
+    } else {
+        urls.truncate(1);
+    }
+    urls
+}
+
+/// Appends `fetched` links onto `existing`, skipping any that are already
+/// present (same platform and an equivalent URL, see
+/// `normalize_url_for_dedup`) so re-running "Retrieve Artist Details" is
+/// idempotent rather than piling up duplicates — same convention as
+/// `merge_album_links`.
+fn merge_artist_social_links(
+    mut existing: Vec<ArtistSocialLink>,
+    fetched: Vec<ArtistSocialLink>,
+) -> (Vec<ArtistSocialLink>, usize) {
+    let mut added = 0;
+    for link in fetched {
+        let already_present = existing.iter().any(|l| {
+            l.platform == link.platform
+                && normalize_url_for_dedup(&l.handle_or_url) == normalize_url_for_dedup(&link.handle_or_url)
+        });
+        if !already_present {
+            existing.push(link);
+            added += 1;
+        }
+    }
+    (existing, added)
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct ArtistDetailsRetrievalResult {
+    pub profile: ArtistProfile,
+    pub added_count: usize,
+}
+
+/// The artist detail overflow menu's "Retrieve Artist Details" action
+/// (#1123) — the artist-level equivalent of `retrieve_album_details`: looks
+/// up the artist's MusicBrainz MBID (the profile's own `musicbrainz_artist_id`
+/// if already captured, otherwise falling back to whichever of the artist's
+/// songs has one tagged), fetches its `url-rels` relations, backfills the
+/// artist's primary website from the first "official homepage" if it's
+/// unset (MusicBrainz can list more than one; any further ones become
+/// additional "website" links rather than being discarded), and merges the
+/// rest of the recognized types (Discogs, AllMusic, Wikidata, IMDb, social
+/// platforms) into the artist's curated social link list.
+#[tauri::command]
+pub async fn retrieve_artist_details(
+    artist: String,
+    state: State<'_, AppState>,
+) -> Result<ArtistDetailsRetrievalResult, String> {
+    // See `set_artist_profile`'s matching guard — same reasoning, for the
+    // `artist.md` sidecar write this command triggers (#1123).
+    let _watcher_pause_guard = WatcherPauseGuard::new(Arc::clone(&state.watcher_paused));
+    let artist_for_lookup = artist.clone();
+    let (artist_mbid, current_profile) =
+        crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+            let profile = scanner.get_artist_profile(&artist_for_lookup)?;
+            let mbid = match &profile.musicbrainz_artist_id {
+                Some(id) => Some(id.clone()),
+                None => scanner.get_representative_artist_mbid_for_artist(&artist_for_lookup)?,
+            };
+            Ok((mbid, profile))
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let Some(artist_mbid) = artist_mbid else {
+        return Err(
+            "No MusicBrainz artist ID found for this artist — tag their songs with Picard first, or run Retrieve Album Details on one of their albums."
+                .to_string(),
+        );
+    };
+
+    let relations = ContextManager::new()
+        .fetch_musicbrainz_artist_relations(&artist_mbid)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // MusicBrainz can list more than one "official homepage" (e.g. the
+    // artist's own site plus a label's page for them) — dedupe by URL, since
+    // MB occasionally repeats the same relation exactly.
+    let official_homepages = dedupe_official_homepages(&relations);
+
+    let fetched_links: Vec<ArtistSocialLink> = relations
+        .into_iter()
+        .filter_map(|(rel_type, url)| {
+            platform_for_artist_rel_type(&rel_type, &url).map(|platform| ArtistSocialLink {
+                platform: platform.to_string(),
+                handle_or_url: url,
+            })
+        })
+        .collect();
+
+    let mut updated_profile = current_profile;
+    updated_profile.artist_key = artist;
+    if updated_profile.musicbrainz_artist_id.is_none() {
+        updated_profile.musicbrainz_artist_id = Some(artist_mbid);
+    }
+
+    // Re-derive the full set of homepage URLs — the current primary website,
+    // any secondary ones already saved as "website" social links, plus
+    // whatever's freshly fetched — deduped and with a live homepage
+    // preferred over a web.archive.org snapshot (only ever a fallback
+    // reference for a site that's gone offline). Recomputing primary vs.
+    // secondary from the *whole* known set on every run, rather than only
+    // reconciling against what was freshly fetched, means re-running this
+    // action heals stale ordering/duplication left by an earlier run
+    // instead of layering more on top of it (#1123).
+    let mut known_homepage_urls: Vec<String> = updated_profile.website.iter().cloned().collect();
+    known_homepage_urls.extend(
+        updated_profile
+            .social_links
+            .iter()
+            .filter(|l| l.platform == "website")
+            .map(|l| l.handle_or_url.clone()),
+    );
+    let new_homepages_count = official_homepages
+        .iter()
+        .filter(|url| !known_homepage_urls.contains(url))
+        .count();
+
+    let mut all_homepages = known_homepage_urls;
+    for url in official_homepages {
+        if !all_homepages.contains(&url) {
+            all_homepages.push(url);
+        }
+    }
+    let mut all_homepages = resolve_homepage_urls(all_homepages);
+
+    updated_profile.social_links.retain(|l| l.platform != "website");
+    updated_profile.website = None;
+    let mut fetched_links = fetched_links;
+    if !all_homepages.is_empty() {
+        updated_profile.website = Some(all_homepages.remove(0));
+    }
+    for url in all_homepages {
+        fetched_links.push(ArtistSocialLink {
+            platform: "website".to_string(),
+            handle_or_url: url,
+        });
+    }
+
+    let mut added_count = new_homepages_count;
+    let existing_links = dedupe_links_by_platform_and_url(
+        std::mem::take(&mut updated_profile.social_links),
+        |l| (l.platform.as_str(), l.handle_or_url.as_str()),
+    );
+    let (merged_links, links_added) = merge_artist_social_links(existing_links, fetched_links);
+    updated_profile.social_links = merged_links;
+    added_count += links_added;
+
+    let profile = crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        save_artist_profile_with_sidecar(scanner, &updated_profile)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(ArtistDetailsRetrievalResult {
         profile,
         added_count,
     })
@@ -946,6 +1289,298 @@ mod tests {
     }
 
     #[test]
+    fn test_normalize_url_for_dedup_treats_scheme_www_and_trailing_slash_as_equivalent() {
+        let variants = [
+            "https://www.shaniatwain.com",
+            "https://shaniatwain.com",
+            "http://www.shaniatwain.com/",
+            "HTTPS://WWW.SHANIATWAIN.COM",
+        ];
+        let normalized: Vec<String> = variants.iter().map(|u| normalize_url_for_dedup(u)).collect();
+        assert!(normalized.windows(2).all(|w| w[0] == w[1]));
+        assert_eq!(normalized[0], "shaniatwain.com");
+    }
+
+    #[test]
+    fn test_normalize_url_for_dedup_treats_different_paths_as_distinct() {
+        assert_ne!(
+            normalize_url_for_dedup("https://instagram.com/shaniatwain"),
+            normalize_url_for_dedup("https://instagram.com/shania.twain")
+        );
+    }
+
+    #[test]
+    fn test_dedupe_links_by_platform_and_url_heals_a_stale_www_and_trailing_slash_duplicate() {
+        // Reproduces a reported case: a Shania Twain profile saved by an
+        // earlier run of "Retrieve Artist Details" already had two
+        // URL-form variants of the same Instagram link sitting side by
+        // side — re-running the action must heal that, not just prevent
+        // new instances of it (#1123).
+        let links = vec![
+            ArtistSocialLink {
+                platform: "instagram".to_string(),
+                handle_or_url: "https://instagram.com/shaniatwain".to_string(),
+            },
+            ArtistSocialLink {
+                platform: "instagram".to_string(),
+                handle_or_url: "https://instagram.com/shaniatwain/".to_string(),
+            },
+            ArtistSocialLink {
+                platform: "discogs".to_string(),
+                handle_or_url: "https://discogs.com/artist/1".to_string(),
+            },
+        ];
+        let deduped = dedupe_links_by_platform_and_url(links, |l| {
+            (l.platform.as_str(), l.handle_or_url.as_str())
+        });
+        assert_eq!(deduped.len(), 2);
+        assert_eq!(deduped[0].handle_or_url, "https://instagram.com/shaniatwain");
+        assert_eq!(deduped[1].platform, "discogs");
+    }
+
+    #[test]
+    fn test_merge_album_links_skips_a_www_and_trailing_slash_variant_of_an_existing_url() {
+        // Reproduces a reported case: MusicBrainz relations for "the same"
+        // link can differ in exactly these superficial ways between
+        // sources, and a raw-string comparison let both through as
+        // "distinct" links (#1123).
+        let existing = vec![AlbumLink {
+            platform: "website".to_string(),
+            handle_or_url: "https://www.shaniatwain.com".to_string(),
+        }];
+        let fetched = vec![AlbumLink {
+            platform: "website".to_string(),
+            handle_or_url: "https://shaniatwain.com/".to_string(),
+        }];
+        let (merged, added) = merge_album_links(existing, fetched);
+        assert_eq!(added, 0);
+        assert_eq!(merged.len(), 1);
+    }
+
+    #[test]
+    fn test_platform_for_artist_rel_type_maps_recognized_types() {
+        // "official homepage" is deliberately not mapped here — it's routed
+        // into `ArtistProfile.website` by `retrieve_artist_details` instead.
+        assert_eq!(
+            platform_for_artist_rel_type("official homepage", "https://artist.com"),
+            None
+        );
+        assert_eq!(
+            platform_for_artist_rel_type("discogs", "https://discogs.com/artist/1"),
+            Some("discogs")
+        );
+        assert_eq!(
+            platform_for_artist_rel_type("allmusic", "https://allmusic.com/artist/1"),
+            Some("allmusic")
+        );
+        assert_eq!(
+            platform_for_artist_rel_type("wikidata", "https://www.wikidata.org/wiki/Q1"),
+            Some("wikidata")
+        );
+        assert_eq!(
+            platform_for_artist_rel_type("imdb", "https://www.imdb.com/name/nm1"),
+            Some("imdb")
+        );
+        assert_eq!(
+            platform_for_artist_rel_type("bandcamp", "https://artist.bandcamp.com"),
+            Some("bandcamp")
+        );
+        assert_eq!(
+            platform_for_artist_rel_type("soundcloud", "https://soundcloud.com/artist"),
+            Some("soundcloud")
+        );
+        assert_eq!(
+            platform_for_artist_rel_type("youtube", "https://youtube.com/@artist"),
+            Some("youtube")
+        );
+        assert_eq!(platform_for_artist_rel_type("streaming", "https://spotify.com/x"), None);
+        assert_eq!(
+            platform_for_artist_rel_type("purchase for download", "https://itunes.apple.com/x"),
+            None
+        );
+    }
+
+    #[test]
+    fn test_platform_for_artist_rel_type_disambiguates_social_network_by_domain() {
+        assert_eq!(
+            platform_for_artist_rel_type("social network", "https://www.instagram.com/artist"),
+            Some("instagram")
+        );
+        // x.com/twitter.com is deliberately filtered out (#1123).
+        assert_eq!(
+            platform_for_artist_rel_type("social network", "https://x.com/artist"),
+            None
+        );
+        assert_eq!(
+            platform_for_artist_rel_type("social network", "https://twitter.com/artist"),
+            None
+        );
+        assert_eq!(
+            platform_for_artist_rel_type("social network", "https://www.facebook.com/artist"),
+            Some("facebook")
+        );
+        assert_eq!(
+            platform_for_artist_rel_type("social network", "https://bsky.app/profile/artist"),
+            Some("bluesky")
+        );
+        assert_eq!(
+            platform_for_artist_rel_type("social network", "https://www.threads.net/@artist"),
+            Some("threads")
+        );
+        assert_eq!(
+            platform_for_artist_rel_type("social network", "https://www.tiktok.com/@artist"),
+            Some("tiktok")
+        );
+        assert_eq!(
+            platform_for_artist_rel_type("social network", "https://myspace.com/artist"),
+            None
+        );
+    }
+
+    #[test]
+    fn test_merge_artist_social_links_appends_new_and_skips_exact_duplicates() {
+        let existing = vec![ArtistSocialLink {
+            platform: "discogs".to_string(),
+            handle_or_url: "https://discogs.com/artist/1".to_string(),
+        }];
+        let fetched = vec![
+            // Exact duplicate of an existing link — should not be re-added.
+            ArtistSocialLink {
+                platform: "discogs".to_string(),
+                handle_or_url: "https://discogs.com/artist/1".to_string(),
+            },
+            // New platform.
+            ArtistSocialLink {
+                platform: "wikidata".to_string(),
+                handle_or_url: "https://www.wikidata.org/wiki/Q1".to_string(),
+            },
+        ];
+        let (merged, added) = merge_artist_social_links(existing, fetched);
+        assert_eq!(added, 1);
+        assert_eq!(merged.len(), 2);
+        assert_eq!(merged[1].platform, "wikidata");
+    }
+
+    #[test]
+    fn test_merge_artist_social_links_skips_a_www_and_trailing_slash_variant_of_an_existing_url() {
+        // Reproduces a reported case: Shania Twain's website and Instagram
+        // links each showed up twice, because MusicBrainz relations for
+        // "the same" link differed only in www./scheme/trailing-slash and a
+        // raw-string comparison let both through (#1123).
+        let existing = vec![
+            ArtistSocialLink {
+                platform: "website".to_string(),
+                handle_or_url: "https://www.shaniatwain.com".to_string(),
+            },
+            ArtistSocialLink {
+                platform: "instagram".to_string(),
+                handle_or_url: "https://instagram.com/shaniatwain/".to_string(),
+            },
+        ];
+        let fetched = vec![
+            ArtistSocialLink {
+                platform: "website".to_string(),
+                handle_or_url: "https://shaniatwain.com".to_string(),
+            },
+            ArtistSocialLink {
+                platform: "instagram".to_string(),
+                handle_or_url: "https://www.instagram.com/shaniatwain".to_string(),
+            },
+        ];
+        let (merged, added) = merge_artist_social_links(existing, fetched);
+        assert_eq!(added, 0);
+        assert_eq!(merged.len(), 2);
+    }
+
+    #[test]
+    fn test_dedupe_official_homepages_keeps_distinct_urls_and_drops_exact_repeats() {
+        let relations = vec![
+            ("official homepage".to_string(), "https://massiveattack.com".to_string()),
+            // Exact repeat of the same relation — MB occasionally does this.
+            ("official homepage".to_string(), "https://massiveattack.com".to_string()),
+            // A second, distinct official homepage (e.g. a label's page).
+            ("official homepage".to_string(), "https://virginmusic.com/massive-attack".to_string()),
+            // Not an official homepage — must be ignored entirely.
+            ("discogs".to_string(), "https://discogs.com/artist/1".to_string()),
+        ];
+        let homepages = dedupe_official_homepages(&relations);
+        assert_eq!(
+            homepages,
+            vec![
+                "https://massiveattack.com".to_string(),
+                "https://virginmusic.com/massive-attack".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_dedupe_official_homepages_empty_when_none_present() {
+        let relations = vec![("discogs".to_string(), "https://discogs.com/artist/1".to_string())];
+        assert!(dedupe_official_homepages(&relations).is_empty());
+    }
+
+    #[test]
+    fn test_resolve_homepage_urls_drops_archive_snapshots_once_a_live_site_is_known() {
+        // Reproduces the reported case: Massive Attack has a live official
+        // site plus two distinct web.archive.org snapshot URLs — once the
+        // live site is known, both archive snapshots should be dropped
+        // entirely rather than shown as two redundant "Internet Archive"
+        // entries alongside the real one.
+        let urls = vec![
+            "https://web.archive.org/web/19970131155102/http://www.vmg.co.uk/massive/index.html".to_string(),
+            "https://massiveattack.co.uk".to_string(),
+            "https://web.archive.org/web/20200101000000/http://www.vmg.co.uk/massive/index.html".to_string(),
+        ];
+        assert_eq!(
+            resolve_homepage_urls(urls),
+            vec!["https://massiveattack.co.uk".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_resolve_homepage_urls_keeps_only_one_archive_snapshot_when_no_live_site_exists() {
+        let urls = vec![
+            "https://web.archive.org/web/20200101000000/http://example.com".to_string(),
+            "https://web.archive.org/web/19970101000000/http://example.com".to_string(),
+        ];
+        let resolved = resolve_homepage_urls(urls);
+        assert_eq!(resolved.len(), 1);
+        assert!(resolved[0].contains("web.archive.org"));
+    }
+
+    #[test]
+    fn test_resolve_homepage_urls_keeps_multiple_distinct_live_homepages() {
+        // MusicBrainz can legitimately list more than one live official
+        // homepage (e.g. the artist's own site plus a label's page).
+        let urls = vec![
+            "https://massiveattack.co.uk".to_string(),
+            "https://virginmusic.com/massive-attack".to_string(),
+        ];
+        let resolved = resolve_homepage_urls(urls);
+        assert_eq!(
+            resolved,
+            vec![
+                "https://massiveattack.co.uk".to_string(),
+                "https://virginmusic.com/massive-attack".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_resolve_homepage_urls_dedupes_exact_repeats() {
+        let urls = vec![
+            "https://massiveattack.co.uk".to_string(),
+            "https://massiveattack.co.uk".to_string(),
+        ];
+        assert_eq!(resolve_homepage_urls(urls), vec!["https://massiveattack.co.uk".to_string()]);
+    }
+
+    #[test]
+    fn test_resolve_homepage_urls_empty_input_stays_empty() {
+        assert!(resolve_homepage_urls(Vec::new()).is_empty());
+    }
+
+    #[test]
     fn test_extract_bio_prose_none_for_tags_only_content() {
         // Regression: saving tags with no bio wrote "## Tags\n- canadian" to
         // the sidecar file; reading it back must not treat that as the bio.
@@ -1015,6 +1650,7 @@ mod tests {
                     handle_or_url: "https://youtube.com/@ShaniaTwain".to_string(),
                 },
             ],
+            musicbrainz_artist_id: None,
         };
 
         let content = build_artist_md_content(&profile).unwrap();
