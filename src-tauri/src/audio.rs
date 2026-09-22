@@ -22,6 +22,7 @@
 //! or blocks. When every stage is neutral (EQ off, gains at 1.0) samples pass
 //! through bit-perfect.
 
+use crate::codecs::CODEC_REGISTRY;
 use crate::models::{
     AudioPipelineInfo, FileType, LoudnessGainSource, PlayState, QualityTier, Song,
 };
@@ -908,7 +909,7 @@ impl ActiveTrack {
             .as_ref()
             .and_then(|c| c.audio())
             .ok_or_else(|| "No audio codec parameters".to_string())?;
-        let mut decoder = symphonia::default::get_codecs()
+        let mut decoder = CODEC_REGISTRY
             .make_audio_decoder(audio_params, &AudioDecoderOptions::default())
             .map_err(|e| format!("Decoder init failed: {e}"))?;
 
@@ -1414,10 +1415,16 @@ fn decode_thread(
             target_channels as usize,
         ) {
             Ok(t) => {
-                *shared.active_decoder_name.write() = Some(format!(
-                    "Symphonia {} decoder",
-                    t.song.filetype.display_name()
-                ));
+                // Every format decodes natively inside Symphonia except Opus (#1121),
+                // which has no first-party Symphonia decoder and goes through the
+                // libopus adapter instead — label it distinctly so the Audio Pipeline
+                // panel doesn't misattribute the decode to Symphonia itself.
+                *shared.active_decoder_name.write() =
+                    Some(if t.song.filetype == FileType::OggOpus {
+                        "libopus (via Symphonia)".to_string()
+                    } else {
+                        format!("Symphonia {} decoder", t.song.filetype.display_name())
+                    });
                 t
             }
             Err(message) => {

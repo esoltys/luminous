@@ -66,6 +66,10 @@ r2d2_sqlite = "0.35"
 # `all` enables every codec and format symphonia supports.
 # Note: AIFF is not yet a supported format in symphonia 0.5.x.
 symphonia = { version = "0.6", features = ["all"] }
+# Symphonia has no native Opus decoder (#1121); this adapter bridges to libopus,
+# which is compiled from vendored C source and statically linked (`bundled`,
+# the default feature) so no runtime DLL or system libopus install is needed.
+symphonia-adapter-libopus = "0.3"
 
 # --- Audio output ---
 cpal = "0.18"
