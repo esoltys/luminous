@@ -282,6 +282,9 @@ export interface WebDavServer {
   nickname?: string | null;
   icon?: string | null;
   color?: string | null;
+  autoSyncEnabled: boolean;
+  syncIntervalMinutes: number;
+  nextAutoSyncAt?: number | null;
 }
 
 export interface WebDavSyncStats {

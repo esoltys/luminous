@@ -11,6 +11,7 @@
   import Input from "./Input.svelte";
   import LibraryBadge from "./LibraryBadge.svelte";
   import ColorPicker from "./ColorPicker.svelte";
+  import Toggle from "./Toggle.svelte";
   import {
     CloudIcon,
     XIcon as X,
@@ -33,7 +34,8 @@
   let password = $state("");
   let remotePath = $state(untrack(() => server?.remotePath ?? "/"));
   let enabled = $state(untrack(() => server?.enabled ?? true));
-  let nickname = $state(untrack(() => server?.nickname ?? ""));
+  let autoSyncEnabled = $state(untrack(() => server?.autoSyncEnabled ?? false));
+  let syncIntervalMinutes = $state(untrack(() => server?.syncIntervalMinutes ?? 60));
   let selectedIcon = $state(untrack(() => server?.icon ?? "cloud"));
   let selectedColor = $state<string | null>(untrack(() => server?.color ?? null));
 
@@ -44,7 +46,7 @@
 
   let previewSource = $derived({
     path: combineWebdavPath(url, remotePath),
-    nickname: nickname.trim() || null,
+    nickname: name.trim() || null,
     icon: selectedIcon,
     color: selectedColor,
   });
@@ -93,7 +95,9 @@
           password: password ? password : null,
           remotePath: remotePath.trim() || "/",
           enabled,
-          nickname: nickname.trim() || null,
+          autoSyncEnabled,
+          syncIntervalMinutes: Math.max(1, Math.round(syncIntervalMinutes) || 60),
+          nickname: name.trim() || null,
           icon: selectedIcon,
           color: selectedColor,
         },
@@ -143,28 +147,30 @@
     </div>
 
     <form onsubmit={handleSubmit} class="p-6 flex-1 overflow-y-auto flex flex-col gap-4">
-      <div class="space-y-1.5">
-        <label for="webdav-name" class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
-          {i18n.t("settings.webdavName")}
-        </label>
-        <Input
-          id="webdav-name"
-          bind:value={name}
-          placeholder={i18n.t("settings.webdavNamePlaceholder")}
-          required
-        />
-      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div class="space-y-1.5">
+          <label for="webdav-name" class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
+            {i18n.t("settings.webdavName")}
+          </label>
+          <Input
+            id="webdav-name"
+            bind:value={name}
+            placeholder={i18n.t("settings.webdavNamePlaceholder")}
+            required
+          />
+        </div>
 
-      <div class="space-y-1.5">
-        <label for="webdav-url" class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
-          {i18n.t("settings.webdavUrl")}
-        </label>
-        <Input
-          id="webdav-url"
-          bind:value={url}
-          placeholder={i18n.t("settings.webdavUrlPlaceholder")}
-          required
-        />
+        <div class="space-y-1.5">
+          <label for="webdav-url" class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
+            {i18n.t("settings.webdavUrl")}
+          </label>
+          <Input
+            id="webdav-url"
+            bind:value={url}
+            placeholder={i18n.t("settings.webdavUrlPlaceholder")}
+            required
+          />
+        </div>
       </div>
 
       <div class="grid grid-cols-2 gap-3">
@@ -203,6 +209,33 @@
         />
       </div>
 
+      <!-- Auto-Sync -->
+      <div class="bg-brand-main/40 border border-brand-border/50 rounded-xl p-4 space-y-3">
+        <div class="flex items-center justify-between gap-4">
+          <div class="flex flex-col gap-0.5 min-w-0">
+            <span class="text-sm font-medium text-brand-text-primary">{i18n.t("settings.webdavAutoSyncLabel")}</span>
+            <p class="text-xs text-brand-text-secondary text-pretty">{i18n.t("settings.webdavAutoSyncHint")}</p>
+          </div>
+          <Toggle
+            checked={autoSyncEnabled}
+            onchange={(v) => { autoSyncEnabled = v; }}
+            label={i18n.t("settings.webdavAutoSyncLabel")}
+          />
+        </div>
+        {#if autoSyncEnabled}
+          <div class="space-y-1.5">
+            <label for="webdav-sync-interval" class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
+              {i18n.t("settings.webdavSyncIntervalLabel")}
+            </label>
+            <Input
+              id="webdav-sync-interval"
+              type="number"
+              bind:value={syncIntervalMinutes}
+            />
+          </div>
+        {/if}
+      </div>
+
       <!-- Live Preview -->
       <div class="bg-brand-main/40 border border-brand-border/50 rounded-xl p-4 flex items-center justify-between gap-4">
         <span class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
@@ -211,18 +244,6 @@
         <div>
           <LibraryBadge directory={previewSource} size="md" />
         </div>
-      </div>
-
-      <!-- Nickname -->
-      <div class="space-y-1.5">
-        <label for="webdav-nickname" class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
-          {i18n.t("settings.folderNickname")}
-        </label>
-        <Input
-          id="webdav-nickname"
-          bind:value={nickname}
-          placeholder={i18n.t("settings.folderNicknamePlaceholder")}
-        />
       </div>
 
       <!-- Icon Selection -->
@@ -241,10 +262,10 @@
                 {isSelected
                   ? 'bg-brand-accent/20 border-brand-accent text-brand-accent-text ring-1 ring-brand-accent'
                   : 'bg-brand-main/40 border-brand-border/60 text-brand-text-secondary hover:text-brand-text-primary hover:border-brand-border'}"
-              title={choice.label}
+              title={i18n.t(choice.label)}
             >
               <Icon class="w-5 h-5" />
-              <span class="text-[10px] font-medium truncate max-w-full">{choice.label}</span>
+              <span class="text-[10px] font-medium truncate max-w-full">{i18n.t(choice.label)}</span>
             </button>
           {/each}
         </div>
@@ -259,13 +280,13 @@
       </div>
 
       {#if testSuccess === true}
-        <div class="flex items-start gap-2 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-400">
+        <div class="flex items-start gap-2 p-3 bg-brand-accent/10 border border-brand-accent/30 rounded-xl text-xs text-brand-accent-text">
           <CheckCircle class="w-4 h-4 shrink-0 translate-y-[calc((1lh-1rem)/2)]" />
           <span>{i18n.t("settings.webdavTestSuccess")}</span>
         </div>
       {:else if testSuccess === false}
-        <div class="flex items-start gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-400">
-          <WarningCircle class="w-4 h-4 shrink-0 translate-y-[calc((1lh-1rem)/2)]" />
+        <div class="flex items-start gap-2 p-3 bg-brand-main/60 border border-brand-border rounded-xl text-xs text-brand-text-primary">
+          <WarningCircle class="w-4 h-4 shrink-0 translate-y-[calc((1lh-1rem)/2)] text-brand-text-secondary" />
           <span>{i18n.t("settings.webdavTestFailed", { error: testError || "" })}</span>
         </div>
       {/if}

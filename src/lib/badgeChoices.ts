@@ -18,18 +18,19 @@ export interface IconChoice {
   icon: Component<any>;
 }
 
-/** Shared icon set for library/source badges (watched folders, WebDAV servers). */
+/** Shared icon set for library/source badges (watched folders, WebDAV servers).
+ * `label` is an i18n key (resolve with `i18n.t(choice.label)`), not display text. */
 export const BADGE_ICON_CHOICES: IconChoice[] = [
-  { id: "folder", label: "Folder", icon: FolderIcon },
-  { id: "hard-drive", label: "Drive", icon: HardDriveIcon },
-  { id: "cloud", label: "Cloud / NAS", icon: CloudIcon },
-  { id: "desktop", label: "Computer", icon: DesktopIcon },
-  { id: "usb", label: "USB", icon: UsbIcon },
-  { id: "house", label: "Home", icon: HouseIcon },
-  { id: "disc", label: "Disc", icon: DiscIcon },
-  { id: "music", label: "Music", icon: MusicNotesIcon },
-  { id: "archive", label: "Archive", icon: ArchiveIcon },
-  { id: "broadcast", label: "Shared", icon: BroadcastIcon },
+  { id: "folder", label: "settings.badgeIconFolder", icon: FolderIcon },
+  { id: "hard-drive", label: "settings.badgeIconDrive", icon: HardDriveIcon },
+  { id: "cloud", label: "settings.badgeIconCloud", icon: CloudIcon },
+  { id: "desktop", label: "settings.badgeIconComputer", icon: DesktopIcon },
+  { id: "usb", label: "settings.badgeIconUsb", icon: UsbIcon },
+  { id: "house", label: "settings.badgeIconHome", icon: HouseIcon },
+  { id: "disc", label: "settings.badgeIconDisc", icon: DiscIcon },
+  { id: "music", label: "settings.badgeIconMusic", icon: MusicNotesIcon },
+  { id: "archive", label: "settings.badgeIconArchive", icon: ArchiveIcon },
+  { id: "broadcast", label: "settings.badgeIconShared", icon: BroadcastIcon },
 ];
 
 export interface ColorChoice {
@@ -42,16 +43,17 @@ export interface ColorChoice {
   swatchColor?: string;
 }
 
-/** Shared badge colour palette (watched folders, WebDAV servers, and other future badges). */
+/** Shared badge colour palette (watched folders, WebDAV servers, and other future badges).
+ * `label` is an i18n key (resolve with `i18n.t(choice.label)`), not display text. */
 export const BADGE_COLOR_CHOICES: ColorChoice[] = [
-  { value: null, label: "Default" },
-  { value: "#3b82f6", label: "Blue" },
-  { value: "#8b5cf6", label: "Purple" },
-  { value: "#ec4899", label: "Pink" },
-  { value: "#ef4444", label: "Red" },
-  { value: "#f97316", label: "Orange" },
-  { value: "#eab308", label: "Yellow" },
-  { value: "#10b981", label: "Emerald" },
-  { value: "#06b6d4", label: "Cyan" },
-  { value: "#6366f1", label: "Indigo" },
+  { value: null, label: "settings.badgeColorDefault" },
+  { value: "#3b82f6", label: "settings.badgeColorBlue" },
+  { value: "#8b5cf6", label: "settings.badgeColorPurple" },
+  { value: "#ec4899", label: "settings.badgeColorPink" },
+  { value: "#ef4444", label: "settings.badgeColorRed" },
+  { value: "#f97316", label: "settings.badgeColorOrange" },
+  { value: "#eab308", label: "settings.badgeColorYellow" },
+  { value: "#10b981", label: "settings.badgeColorEmerald" },
+  { value: "#06b6d4", label: "settings.badgeColorCyan" },
+  { value: "#6366f1", label: "settings.badgeColorIndigo" },
 ];

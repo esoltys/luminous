@@ -1,6 +1,7 @@
 <script lang="ts">
   import { CheckIcon as Check } from "phosphor-svelte";
   import type { ColorChoice } from "../badgeChoices";
+  import { i18n } from "../stores/i18n.svelte";
 
   interface Props {
     choices: ColorChoice[];
@@ -39,8 +40,8 @@
           : (size === 'sm' ? 'border-transparent hover:border-brand-border' : 'hover:scale-105')}
         {choice.value === null ? 'bg-brand-sidebar border-brand-border' : (size === 'sm' ? '' : 'border-white/20')}"
       style={swatchColor ? `background-color: ${swatchColor};` : ''}
-      title={choice.label}
-      aria-label={choice.label}
+      title={i18n.t(choice.label)}
+      aria-label={i18n.t(choice.label)}
     >
       {#if isSelected && size !== 'sm'}
         <Check class="w-3.5 h-3.5 {choice.value === null ? 'text-brand-accent-text' : 'text-white'} drop-shadow-sm" />

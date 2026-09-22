@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 39;
+pub const CURRENT_SCHEMA_VERSION: i32 = 40;
 
 struct Migration {
     version: i32,
@@ -303,6 +303,21 @@ const MIGRATIONS: &[Migration] = &[
                 .exists([])?;
             if !has_musicbrainz_artist_id {
                 conn.execute_batch(MIGRATION_39)?;
+            }
+            Ok(())
+        },
+    },
+    Migration {
+        version: 40,
+        description: "auto_sync_enabled and sync_interval_minutes columns on webdav_servers for periodic auto-sync (#1082)",
+        apply: |conn| {
+            let has_auto_sync_enabled: bool = conn
+                .prepare(
+                    "SELECT 1 FROM pragma_table_info('webdav_servers') WHERE name = 'auto_sync_enabled'",
+                )?
+                .exists([])?;
+            if !has_auto_sync_enabled {
+                conn.execute_batch(MIGRATION_40)?;
             }
             Ok(())
         },
@@ -1388,6 +1403,17 @@ const MIGRATION_39: &str = "
 ALTER TABLE artist_profiles ADD COLUMN musicbrainz_artist_id TEXT;
 ";
 
+// ---------------------------------------------------------------------------
+// Migration 40: auto_sync_enabled and sync_interval_minutes on webdav_servers
+// (#1082). WebDAV has no filesystem-watch equivalent to notice remote
+// changes, so each server that opts in gets its own periodic-poll schedule
+// instead — see `webdav_scheduler::AutoSyncScheduler`.
+// ---------------------------------------------------------------------------
+const MIGRATION_40: &str = "
+ALTER TABLE webdav_servers ADD COLUMN auto_sync_enabled INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE webdav_servers ADD COLUMN sync_interval_minutes INTEGER NOT NULL DEFAULT 60;
+";
+
 fn seed_artist_tag_hierarchy(conn: &rusqlite::Connection) -> Result<()> {
     let mut stmt = conn.prepare(
         "SELECT DISTINCT json_each.value
@@ -1864,6 +1890,60 @@ mod tests {
         assert_eq!(server_name, "My NAS");
         assert_eq!(remote_path, "/Music/track.flac");
         assert_eq!(size, 10_485_760);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_migration_40_webdav_auto_sync_columns() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_migration40_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Database::new(temp_dir.clone()).unwrap();
+        assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
+
+        let conn = db.pool.get().unwrap();
+
+        // New rows default to auto-sync disabled with a 60-minute interval.
+        conn.execute(
+            "INSERT INTO webdav_servers (name, url, remote_path) VALUES (?1, ?2, ?3)",
+            params![
+                "My NAS",
+                "http://nas.local:8080/remote.php/webdav",
+                "/Music"
+            ],
+        )
+        .unwrap();
+        let server_id = conn.last_insert_rowid();
+
+        let (auto_sync_enabled, sync_interval_minutes): (bool, i64) = conn
+            .query_row(
+                "SELECT auto_sync_enabled, sync_interval_minutes FROM webdav_servers WHERE id = ?1",
+                params![server_id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert!(!auto_sync_enabled);
+        assert_eq!(sync_interval_minutes, 60);
+
+        conn.execute(
+            "UPDATE webdav_servers SET auto_sync_enabled = 1, sync_interval_minutes = 15 WHERE id = ?1",
+            params![server_id],
+        )
+        .unwrap();
+        let (auto_sync_enabled, sync_interval_minutes): (bool, i64) = conn
+            .query_row(
+                "SELECT auto_sync_enabled, sync_interval_minutes FROM webdav_servers WHERE id = ?1",
+                params![server_id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert!(auto_sync_enabled);
+        assert_eq!(sync_interval_minutes, 15);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

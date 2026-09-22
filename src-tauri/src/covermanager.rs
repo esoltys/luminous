@@ -512,7 +512,41 @@ impl CoverManager {
     /// manager is in scope.
     pub fn scan_folder_art_static(audio_path: &Path) -> Option<PathBuf> {
         let parent_dir = audio_path.parent()?;
-        let common_names = [
+
+        if let Ok(entries) = std::fs::read_dir(parent_dir) {
+            for entry in entries.filter_map(|e| e.ok()) {
+                let path = entry.path();
+                if path.is_file() {
+                    let stem = path.file_stem().and_then(|s| s.to_str());
+                    let ext = path.extension().and_then(|e| e.to_str());
+                    if let (Some(stem), Some(ext)) = (stem, ext) {
+                        if Self::is_folder_art_filename(stem, ext) {
+                            let canonical = path.canonicalize().unwrap_or(path);
+                            let s = canonical.to_string_lossy();
+                            #[cfg(windows)]
+                            let cleaned_s = match s.strip_prefix(r"\\?\") {
+                                Some(stripped) => stripped.to_string(),
+                                None => s.to_string(),
+                            };
+                            #[cfg(not(windows))]
+                            let cleaned_s = s.to_string();
+                            return Some(PathBuf::from(cleaned_s));
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    /// Whether a file's stem/extension match the standalone-folder-art
+    /// naming convention (`cover.jpg`, `folder.png`, etc.) — shared by
+    /// `scan_folder_art_static` (local filesystem scan) and the WebDAV sync
+    /// loop (`commands::webdav::sync_webdav_server_inner`, #1082), which has
+    /// no filesystem to `read_dir` but gets the same filenames from a
+    /// directory's PROPFIND listing.
+    pub fn is_folder_art_filename(stem: &str, extension: &str) -> bool {
+        const COMMON_NAMES: [&str; 8] = [
             "cover",
             "folder",
             "album",
@@ -522,35 +556,28 @@ impl CoverManager {
             "album-art",
             "folder-art",
         ];
-        let common_extensions = ["jpg", "jpeg", "png", "webp", "gif", "bmp"];
+        const COMMON_EXTENSIONS: [&str; 6] = ["jpg", "jpeg", "png", "webp", "gif", "bmp"];
 
-        if let Ok(entries) = std::fs::read_dir(parent_dir) {
-            for entry in entries.filter_map(|e| e.ok()) {
-                let path = entry.path();
-                if path.is_file() {
-                    if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
-                        let stem_lower = stem.to_lowercase();
-                        if common_names.contains(&stem_lower.as_str()) {
-                            if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                                if common_extensions.contains(&ext.to_lowercase().as_str()) {
-                                    let canonical = path.canonicalize().unwrap_or(path);
-                                    let s = canonical.to_string_lossy();
-                                    #[cfg(windows)]
-                                    let cleaned_s = match s.strip_prefix(r"\\?\") {
-                                        Some(stripped) => stripped.to_string(),
-                                        None => s.to_string(),
-                                    };
-                                    #[cfg(not(windows))]
-                                    let cleaned_s = s.to_string();
-                                    return Some(PathBuf::from(cleaned_s));
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        None
+        COMMON_NAMES.contains(&stem.to_lowercase().as_str())
+            && COMMON_EXTENSIONS.contains(&extension.to_lowercase().as_str())
+    }
+
+    /// Cleans/detects `data`'s image format and caches it under `covers_dir`
+    /// keyed by `get_album_hash(album_artist, album)`, exactly like
+    /// `extract_embedded_art`'s tail — but for bytes that didn't come from
+    /// an embedded tag picture (e.g. a WebDAV folder-art image downloaded
+    /// over HTTP, #1082). Returns the cache filename to store in
+    /// `songs.art_automatic`.
+    pub fn cache_art_bytes(&self, album_artist: &str, album: &str, data: &[u8]) -> Result<String> {
+        let (cleaned_data, _mime, ext) = detect_image_format_and_clean(data);
+        let hash_name = self.get_album_hash(album_artist, album);
+        let filename = format!("{}.{}", hash_name, ext);
+        let dest_path = self.covers_dir.join(&filename);
+
+        std::fs::write(&dest_path, cleaned_data)
+            .context("failed to write cover art file to cache")?;
+
+        Ok(filename)
     }
 
     /// Look up the song's artist/album on the iTunes Search API and cache
@@ -902,6 +929,47 @@ mod tests {
         let found = CoverManager::scan_folder_art_static(&audio_path);
         assert!(found.is_some());
         assert_eq!(found.unwrap().extension().unwrap(), "webp");
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_is_folder_art_filename_matches_common_names_case_insensitively() {
+        assert!(CoverManager::is_folder_art_filename("cover", "jpg"));
+        assert!(CoverManager::is_folder_art_filename("Album", "PNG"));
+        assert!(CoverManager::is_folder_art_filename("folder-art", "webp"));
+        assert!(!CoverManager::is_folder_art_filename("cover", "txt"));
+        assert!(!CoverManager::is_folder_art_filename("thumbnail", "jpg"));
+    }
+
+    /// A WebDAV directory's PROPFIND listing has no filesystem to `read_dir`
+    /// (#1082 follow-up), so the sync loop downloads a matched folder-art
+    /// image's bytes directly and caches them the same way an embedded tag
+    /// picture would be.
+    #[test]
+    fn test_cache_art_bytes_writes_to_covers_dir_keyed_by_album_hash() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_cover_webdav_art_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let manager = CoverManager::new(db, temp_dir.clone());
+
+        let raw_png = b"\x89PNG\r\n\x1a\n\x00\x00\x00\x0dIHDR";
+        let filename = manager
+            .cache_art_bytes("My NAS Artist", "My NAS Album", raw_png)
+            .unwrap();
+
+        assert!(filename.starts_with("album-"));
+        assert!(filename.ends_with(".png"));
+        assert_eq!(
+            filename,
+            format!("{}.png", manager.get_album_hash("My NAS Artist", "My NAS Album"))
+        );
+        assert!(manager.covers_dir.join(&filename).exists());
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }
