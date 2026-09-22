@@ -503,6 +503,12 @@ export interface AlbumProfile {
 export interface AlbumDetailsRetrievalResult {
   profile: AlbumProfile;
   added_count: number;
+  /** The album's representative artist's profile, freshly re-read after
+   * this command's `musicbrainz_artist_id` backfill — lets callers refresh
+   * their cached artist profile instead of it going stale until the whole
+   * library's profile cache reloads. `null` if no representative artist
+   * could be resolved for the album. */
+  artist_profile: ArtistProfile | null;
 }
 
 export interface ArtistDetailsRetrievalResult {

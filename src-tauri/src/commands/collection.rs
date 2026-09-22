@@ -819,6 +819,15 @@ fn merge_album_links(mut existing: Vec<AlbumLink>, fetched: Vec<AlbumLink>) -> (
 pub struct AlbumDetailsRetrievalResult {
     pub profile: AlbumProfile,
     pub added_count: usize,
+    /// The album's representative artist's profile, freshly read after this
+    /// command's `musicbrainz_artist_id` backfill (#1123) — `None` only when
+    /// no representative artist could be resolved for the album. Always
+    /// populated (not just when the backfill actually changed something) so
+    /// the frontend can refresh its cached artist profile unconditionally
+    /// and never show a stale `musicbrainz_artist_id` on the artist page
+    /// after running this action, regardless of whether this particular run
+    /// was the one that set it.
+    pub artist_profile: Option<ArtistProfile>,
 }
 
 /// The album detail overflow menu's "Retrieve Album Details" action: looks
@@ -885,28 +894,42 @@ pub async fn retrieve_album_details(
     .map_err(|e| e.to_string())?;
 
     // Backfill the album's artist's MusicBrainz ID from the release-group's
-    // `artist-credit` (#1123) — the same MBID "Retrieve Artist Details"
-    // needs, captured here so it works without depending on a song having a
-    // usable tagged MBID. Best-effort: this is a bonus of the album lookup,
-    // not the reason it was run, so a failure here doesn't fail the command.
-    if let Some(artist_credit_id) = relations.artist_credit_ids.into_iter().next() {
-        let _ = crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
-            let Some(artist_key) = scanner.get_representative_artist_for_album(&album)? else {
-                return Ok(());
+    // `artist-credit` (#1123) — the same MBID "Retrieve Artist Details"/
+    // "Fetch Artist Image" need, captured here so they work without
+    // depending on a song having a usable tagged MBID. Always re-reads (and
+    // returns) the artist's profile, backfilled or not, so the frontend can
+    // refresh its cached copy — without this, the artist page can keep
+    // showing a stale (missing) `musicbrainz_artist_id` until the whole
+    // library's profile cache happens to reload. Best-effort: this is a
+    // bonus of the album lookup, not the reason it was run, so a failure
+    // here doesn't fail the command.
+    let artist_credit_id = relations.artist_credit_ids.into_iter().next();
+    let album_for_artist_lookup = album.clone();
+    let artist_profile = crate::collection::with_collection_scanner(
+        state.db.clone(),
+        move |scanner| {
+            let Some(artist_key) =
+                scanner.get_representative_artist_for_album(&album_for_artist_lookup)?
+            else {
+                return Ok(None);
             };
             let mut artist_profile = scanner.get_artist_profile(&artist_key)?;
-            if artist_profile.musicbrainz_artist_id.is_none() {
-                artist_profile.musicbrainz_artist_id = Some(artist_credit_id);
-                save_artist_profile_with_sidecar(scanner, &artist_profile)?;
+            if let Some(artist_credit_id) = artist_credit_id {
+                if artist_profile.musicbrainz_artist_id.is_none() {
+                    artist_profile.musicbrainz_artist_id = Some(artist_credit_id);
+                    artist_profile = save_artist_profile_with_sidecar(scanner, &artist_profile)?;
+                }
             }
-            Ok(())
-        })
-        .await;
-    }
+            Ok(Some(artist_profile))
+        },
+    )
+    .await
+    .unwrap_or(None);
 
     Ok(AlbumDetailsRetrievalResult {
         profile,
         added_count,
+        artist_profile,
     })
 }
 

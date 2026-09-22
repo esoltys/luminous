@@ -816,6 +816,17 @@ class CollectionStore {
         [result.profile.album_key.toLowerCase()]: result.profile,
       };
     }
+    // The backend backfills the album's artist's musicbrainz_artist_id as a
+    // side effect of this action (#1123) — refresh the cached artist
+    // profile too, or the artist page keeps showing it as missing (and
+    // "Retrieve Artist Details"/"Fetch Artist Image" stay disabled) until
+    // the whole library's profile cache happens to reload.
+    if (result?.artist_profile?.artist_key) {
+      this.artistProfiles = {
+        ...this.artistProfiles,
+        [result.artist_profile.artist_key.toLowerCase()]: result.artist_profile,
+      };
+    }
     return result;
   }
 

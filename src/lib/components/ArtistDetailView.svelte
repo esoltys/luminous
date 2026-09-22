@@ -334,7 +334,7 @@
       toastStore.show(i18n.t("artistDetail.refreshSuccess", {}, "Artist artwork and bio refreshed"));
     } catch (err) {
       console.error("Failed to refresh artist:", err);
-      toastStore.show(i18n.t("artistDetail.refreshError", {}, "Failed to refresh artist"));
+      toastStore.show(i18n.t("artistDetail.refreshError", {}, "Failed to refresh artist"), "error");
     } finally {
       refreshing = false;
     }
@@ -370,9 +370,11 @@
       }
     } catch (err) {
       console.error("Failed to retrieve artist details:", err);
-      toastStore.show(
-        i18n.t("artistDetail.retrieveDetailsError", {}, "Failed to retrieve artist details")
-      );
+      // Surfaces the backend's actual error text (e.g. a MusicBrainz API
+      // failure reason) rather than a generic message — same convention as
+      // `openInPicard` — so a real failure is actionable instead of just
+      // "something went wrong".
+      toastStore.show(String(err), "error");
     } finally {
       retrievingDetails = false;
     }
@@ -398,7 +400,7 @@
       }
     } catch (err) {
       console.error("Failed to fetch artist image:", err);
-      toastStore.show(i18n.t("artistDetail.fetchImageError", {}, "Failed to fetch artist image"));
+      toastStore.show(String(err), "error");
     } finally {
       fetchingImage = false;
     }

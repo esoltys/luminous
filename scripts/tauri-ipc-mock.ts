@@ -1155,7 +1155,7 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
       const album = args.album as string;
       const profile = albumProfiles.find((p) => p.album_key.toLowerCase() === album?.toLowerCase())
         ?? { album_key: album, artist_key: null, description: null, website: null, links: [] };
-      return { profile, added_count: 0 };
+      return { profile, added_count: 0, artist_profile: null };
     },
 
     get_song_details: (args) => {
