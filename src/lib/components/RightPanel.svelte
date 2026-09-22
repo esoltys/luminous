@@ -13,6 +13,7 @@
   import { lyricsStatus } from "../utils/lyrics";
   import { openExternalUrl } from "../utils/openExternalUrl";
   import GenreChips from "./GenreChips.svelte";
+  import AudioPipelineStages from "./AudioPipelineStages.svelte";
   import type { SongContextEnrichment } from "../types";
 
   interface Props {
@@ -85,24 +86,6 @@
       contextData.critiquebrainz_rating != null ||
       (contextData.critiquebrainz_review_links?.length ?? 0) > 0
     );
-  });
-
-  // Loudness normalization (#77) — expanded detail for the right panel
-  // (the player bar only has room for a compact "R128"/"RG" badge).
-  function loudnessSourceLabel(): string {
-    switch (playerStore.loudnessSource) {
-      case "analyzed": return i18n.t('playerBar.loudnessSourceAnalyzed', {}, 'R128 analysis');
-      case "replay_gain": return i18n.t('playerBar.loudnessSourceReplayGain', {}, 'ReplayGain tag');
-      case "dynamic_range_log": return i18n.t('playerBar.loudnessSourceDynamicRangeLog', {}, 'DR Log');
-      case "fallback": return i18n.t('playerBar.loudnessSourceFallback', {}, 'Fallback gain');
-      default: return "";
-    }
-  }
-
-  let loudnessGainText = $derived.by(() => {
-    const gain = playerStore.loudnessGainDb;
-    if (gain === undefined) return "";
-    return `${gain > 0 ? "+" : ""}${gain.toFixed(1)} dB`;
   });
 
   // Per-track DR/Peak/RMS parsed from a foobar2000 foo_dr.txt log (#57) —
@@ -215,15 +198,6 @@
     }
     return "https://listenbrainz.org";
   });
-
-  function formatChannels(channels?: number): string {
-    if (!channels) return "";
-    if (channels === 1) return i18n.t('playerBar.channelsMono', {}, 'Mono');
-    if (channels === 2) return i18n.t('playerBar.channelsStereo', {}, 'Stereo');
-    if (channels === 6) return i18n.t('playerBar.channels51', {}, '5.1 Surround');
-    if (channels === 8) return i18n.t('playerBar.channels71', {}, '7.1 Surround');
-    return i18n.t('playerBar.channelsCount', { count: channels }, `${channels} channels`);
-  }
 </script>
 
 <aside
@@ -395,37 +369,8 @@
           {/if}
         {/if}
       {:else}
-        <div class="space-y-2">
-          {#if currentSong.filetype}
-            <div class="flex items-start justify-between gap-3 text-xs">
-              <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.formatLabel', {}, 'Format')}</span>
-              <span class="text-brand-text-primary uppercase text-right break-words min-w-0">{currentSong.filetype}</span>
-            </div>
-          {/if}
-          {#if currentSong.bitrate}
-            <div class="flex items-start justify-between gap-3 text-xs">
-              <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.bitrateLabel', {}, 'Bitrate')}</span>
-              <span class="text-brand-text-primary text-right break-words min-w-0">{currentSong.bitrate} kbps{currentSong.is_vbr ? ` (${i18n.t('playerBar.bitrateVbrSuffix', {}, 'avg')})` : ''}</span>
-            </div>
-          {/if}
-          {#if currentSong.samplerate}
-            <div class="flex items-start justify-between gap-3 text-xs">
-              <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.sampleRateLabel', {}, 'Sample Rate')}</span>
-              <span class="text-brand-text-primary text-right break-words min-w-0">{(currentSong.samplerate / 1000).toFixed(1)} kHz</span>
-            </div>
-          {/if}
-          {#if currentSong.channels}
-            <div class="flex items-start justify-between gap-3 text-xs">
-              <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.channelsLabel', {}, 'Channels')}</span>
-              <span class="text-brand-text-primary text-right break-words min-w-0">{formatChannels(currentSong.channels)}</span>
-            </div>
-          {/if}
-          {#if playerStore.loudnessSource !== "disabled"}
-            <div class="flex items-start justify-between gap-3 text-xs">
-              <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.loudnessLabel', {}, 'Loudness')}</span>
-              <span class="text-brand-text-primary text-right break-words min-w-0">{loudnessSourceLabel()}{loudnessGainText ? ` · ${loudnessGainText}` : ""}</span>
-            </div>
-          {/if}
+        <div class="space-y-3">
+          <AudioPipelineStages pipeline={playerStore.audioPipeline} class="pb-3 border-b border-brand-border/40" />
           {#if currentSong.dynamic_range != null}
             <div class="flex items-start justify-between gap-3 text-xs">
               <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.dynamicRangeLabel', {}, 'Dynamic Range')}</span>

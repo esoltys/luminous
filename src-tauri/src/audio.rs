@@ -22,10 +22,42 @@
 //! or blocks. When every stage is neutral (EQ off, gains at 1.0) samples pass
 //! through bit-perfect.
 
-use crate::models::{PlayState, Song};
+use crate::models::{
+    AudioPipelineInfo, FileType, LoudnessGainSource, PlayState, QualityTier, Song,
+};
 use anyhow::{anyhow, Result};
 use cpal::traits::StreamTrait;
 use parking_lot::Mutex;
+
+/// Pure function mapping codec + bitrate + sample rate + bit depth to a `QualityTier` (#1041).
+/// - LQ — lossy codec below 256 kbps
+/// - SQ — lossy codec at 256 kbps or higher
+/// - HQ — lossless codec (standard resolution: <= 48 kHz and <= 16-bit)
+/// - Hi-Res — lossless codec with sample rate above 48 kHz or bit depth above 16-bit
+pub fn classify_quality_tier(
+    filetype: FileType,
+    bitrate_kbps: Option<i32>,
+    sample_rate: Option<u32>,
+    bit_depth: Option<i32>,
+) -> QualityTier {
+    if filetype.is_lossless() {
+        let is_hires =
+            sample_rate.map_or(false, |r| r > 48_000) || bit_depth.map_or(false, |d| d > 16);
+        if is_hires {
+            QualityTier::HiRes
+        } else {
+            QualityTier::Hq
+        }
+    } else {
+        let kbps = bitrate_kbps.unwrap_or(0);
+        if kbps >= 256 {
+            QualityTier::Sq
+        } else {
+            QualityTier::Lq
+        }
+    }
+}
+
 use ringbuf::{
     traits::{Consumer, Observer, Producer, Split},
     HeapRb,
@@ -167,6 +199,8 @@ pub enum AudioEvent {
         finished_song_id: i64,
         song_id: i64,
     },
+    /// The audio pipeline has changed (e.g. output device reconnected or changed format).
+    PipelineChanged,
     Error {
         message: String,
     },
@@ -177,12 +211,15 @@ pub enum AudioEvent {
 // a single value instead of 6-10 individual Arcs through every layer.
 // ---------------------------------------------------------------------------
 
-struct AudioShared {
+pub(crate) struct AudioShared {
     position: Arc<AtomicU64>,
     volume: Arc<AtomicU32>,
     play_state: Arc<Mutex<PlayState>>,
     visualizer_buf: Arc<crate::analyzer::AudioVisualizerBuffer>,
     output_sample_rate: Arc<AtomicU32>,
+    output_channels: Arc<std::sync::atomic::AtomicU16>,
+    output_device_name: Arc<parking_lot::RwLock<Option<String>>>,
+    active_decoder_name: Arc<parking_lot::RwLock<Option<String>>>,
     equalizer: Arc<Mutex<crate::equalizer::Equalizer>>,
     loudness_gain: Arc<AtomicU32>,
     fade_gain: Arc<AtomicU32>,
@@ -210,6 +247,7 @@ pub struct AudioEngine {
     loudness_gain: Arc<AtomicU32>,
     /// Fade-envelope multiplier slot (#79). 1.0 = neutral.
     pub fade_gain: Arc<AtomicU32>,
+    pub(crate) shared: Arc<AudioShared>,
 }
 
 /// Runs a synchronous `AudioEngine` operation while `audio`'s async mutex is
@@ -238,6 +276,9 @@ impl AudioEngine {
         let visualizer_buf = Arc::new(crate::analyzer::AudioVisualizerBuffer::new(4096));
         let spectrum_enabled = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let output_sample_rate = Arc::new(AtomicU32::new(44100));
+        let output_channels = Arc::new(std::sync::atomic::AtomicU16::new(2));
+        let output_device_name = Arc::new(parking_lot::RwLock::new(get_default_device_name()));
+        let active_decoder_name = Arc::new(parking_lot::RwLock::new(None));
         let equalizer = Arc::new(Mutex::new(crate::equalizer::Equalizer::new()));
         let loudness_gain = Arc::new(AtomicU32::new(1.0f32.to_bits()));
         let fade_gain = Arc::new(AtomicU32::new(1.0f32.to_bits()));
@@ -248,6 +289,9 @@ impl AudioEngine {
             play_state: Arc::clone(&play_state),
             visualizer_buf: Arc::clone(&visualizer_buf),
             output_sample_rate: Arc::clone(&output_sample_rate),
+            output_channels: Arc::clone(&output_channels),
+            output_device_name: Arc::clone(&output_device_name),
+            active_decoder_name: Arc::clone(&active_decoder_name),
             equalizer: Arc::clone(&equalizer),
             loudness_gain: Arc::clone(&loudness_gain),
             fade_gain: Arc::clone(&fade_gain),
@@ -274,6 +318,7 @@ impl AudioEngine {
             equalizer,
             loudness_gain,
             fade_gain,
+            shared,
         }
     }
 
@@ -408,6 +453,135 @@ impl AudioEngine {
     pub fn spectrum_snapshot(&self, fft_size: usize) -> Vec<f32> {
         let sample_rate = self.output_sample_rate.load(Ordering::Relaxed);
         crate::analyzer::calculate_spectrum(&self.visualizer_buf, fft_size, sample_rate)
+    }
+
+    /// Snapshots the current audio pipeline configuration for the active track (#1041).
+    pub fn get_pipeline_info(
+        &self,
+        current_song: Option<&Song>,
+        loudness_source: LoudnessGainSource,
+        loudness_gain_db: Option<f32>,
+    ) -> Option<AudioPipelineInfo> {
+        let song = current_song?;
+
+        let bitrate = song.bitrate;
+        let sample_rate = song.samplerate.map(|r| r as u32);
+        let bit_depth = song.bitdepth;
+        let quality_tier = classify_quality_tier(song.filetype, bitrate, sample_rate, bit_depth);
+
+        let input_source = song.source;
+        let input_format = song.filetype.display_name().to_string();
+        let input_codec = match song.filetype {
+            FileType::Mp3 => "mp3",
+            FileType::Flac | FileType::OggFlac => "flac",
+            FileType::OggVorbis => "vorbis",
+            FileType::OggOpus => "opus",
+            FileType::OggSpeex => "speex",
+            FileType::Aac => "aac",
+            FileType::Alac => "alac",
+            FileType::Aiff => "pcm_s16be",
+            FileType::Wav => "pcm_s16le",
+            FileType::WavPack => "wavpack",
+            FileType::Mpc => "musepack",
+            FileType::TrueAudio => "trueaudio",
+            FileType::Ape => "monkeys_audio",
+            FileType::Dsf | FileType::Dsdiff => "dsd",
+            FileType::Asf => "wma",
+            FileType::Stream => "stream",
+            FileType::Unknown => "unknown",
+        }
+        .to_string();
+
+        let decoder_name = self
+            .shared
+            .active_decoder_name
+            .read()
+            .clone()
+            .unwrap_or_else(|| format!("Symphonia {} decoder", song.filetype.display_name()));
+        let headroom = "32-bit float PCM".to_string();
+
+        let out_rate = self.shared.output_sample_rate.load(Ordering::Relaxed);
+        let resample_rate = if let Some(in_rate) = sample_rate {
+            if in_rate != out_rate && out_rate > 0 {
+                Some(out_rate)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let (eq_enabled, eq_mode, eq_preamp_db, eq_active_bands_count) = {
+            let eq = self.equalizer.lock();
+            let mode_str = match eq.mode {
+                crate::equalizer::EqMode::Graphic10 => "10-band Graphic",
+                crate::equalizer::EqMode::Parametric20 => "20-band Parametric",
+            };
+            let active_bands = match eq.mode {
+                crate::equalizer::EqMode::Graphic10 => {
+                    eq.gains.iter().filter(|&&g| g.abs() > 0.01).count()
+                }
+                crate::equalizer::EqMode::Parametric20 => eq
+                    .parametric
+                    .iter()
+                    .filter(|f| f.gain_db.abs() > 0.01)
+                    .count(),
+            };
+            (
+                eq.enabled,
+                Some(mode_str.to_string()),
+                Some(eq.preamp),
+                active_bands,
+            )
+        };
+
+        let limiter = "-1.0 dBTP True Peak limiter".to_string();
+        let output_sample_rate = if out_rate > 0 { out_rate } else { 44100 };
+        let output_channels = {
+            let ch = self.shared.output_channels.load(Ordering::Relaxed);
+            if ch > 0 {
+                ch
+            } else {
+                2
+            }
+        };
+        let output_format = "32-bit float PCM".to_string();
+        let output_device_name = self
+            .shared
+            .output_device_name
+            .read()
+            .clone()
+            .unwrap_or_else(|| {
+                get_default_device_name().unwrap_or_else(|| "Default Audio Device".to_string())
+            });
+        let output_backend = "CPAL".to_string();
+
+        Some(AudioPipelineInfo {
+            quality_tier,
+            input_source,
+            input_format,
+            input_codec,
+            input_bitrate_kbps: bitrate,
+            input_sample_rate: sample_rate,
+            input_bit_depth: bit_depth,
+            input_channels: song.channels.map(|c| c as u16),
+            input_path: song.path.clone().or_else(|| song.url.clone()),
+            decoder_name,
+            headroom,
+            resample_rate,
+            loudness_source,
+            loudness_gain_db,
+            eq_enabled,
+            eq_mode,
+            eq_preamp_db,
+            eq_active_bands_count,
+            limiter,
+            output_sample_rate,
+            output_channels,
+            output_format,
+            output_device_name,
+            output_backend,
+        })
     }
 
     /// A cheaply-cloneable handle to the event receiver. Callers lock it
@@ -658,7 +832,8 @@ pub(crate) fn open_media_source(path: &str) -> Result<Box<dyn MediaSource>, Stri
         let reader = HttpRangeReader::new(path)?;
         Ok(Box::new(reader))
     } else {
-        let file = std::fs::File::open(path).map_err(|e| format!("Cannot open file '{path}': {e}"))?;
+        let file =
+            std::fs::File::open(path).map_err(|e| format!("Cannot open file '{path}': {e}"))?;
         Ok(Box::new(file))
     }
 }
@@ -703,7 +878,12 @@ impl ActiveTrack {
         let mut hint = Hint::new();
         if let Some(ext) = Path::new(&path).extension().and_then(|e| e.to_str()) {
             hint.with_extension(ext);
-        } else if let Some(ext) = song.path.as_deref().and_then(|p| Path::new(p).extension()).and_then(|e| e.to_str()) {
+        } else if let Some(ext) = song
+            .path
+            .as_deref()
+            .and_then(|p| Path::new(p).extension())
+            .and_then(|e| e.to_str())
+        {
             hint.with_extension(ext);
         }
 
@@ -1099,6 +1279,8 @@ fn decode_thread(
                                     shared
                                         .output_sample_rate
                                         .store(o.sample_rate, Ordering::Relaxed);
+                                    shared.output_channels.store(o.channels, Ordering::Relaxed);
+                                    *shared.output_device_name.write() = o.device_name.clone();
                                     output = Some(o);
                                 }
                                 Err(message) => {
@@ -1211,6 +1393,8 @@ fn decode_thread(
                     shared
                         .output_sample_rate
                         .store(o.sample_rate, Ordering::Relaxed);
+                    shared.output_channels.store(o.channels, Ordering::Relaxed);
+                    *shared.output_device_name.write() = o.device_name.clone();
                     output = Some(o);
                 }
                 Err(message) => {
@@ -1229,7 +1413,13 @@ fn decode_thread(
             target_sample_rate,
             target_channels as usize,
         ) {
-            Ok(t) => t,
+            Ok(t) => {
+                *shared.active_decoder_name.write() = Some(format!(
+                    "Symphonia {} decoder",
+                    t.song.filetype.display_name()
+                ));
+                t
+            }
             Err(message) => {
                 let _ = event_tx.send(AudioEvent::Error { message });
                 continue;
@@ -1353,6 +1543,10 @@ fn check_and_rebuild_output(
                     shared
                         .output_sample_rate
                         .store(new_out.sample_rate, Ordering::Relaxed);
+                    shared
+                        .output_channels
+                        .store(new_out.channels, Ordering::Relaxed);
+                    *shared.output_device_name.write() = new_out.device_name.clone();
                     session.target_sample_rate = new_out.sample_rate;
                     session.target_channels = new_out.channels;
 
@@ -1402,6 +1596,7 @@ fn check_and_rebuild_output(
                         });
                     }
                     *output = Some(new_out);
+                    let _ = event_tx.send(AudioEvent::PipelineChanged);
                 }
                 Err(message) => {
                     let _ = event_tx.send(AudioEvent::Error { message });
@@ -1975,17 +2170,26 @@ mod tests {
         Mock::given(method("GET"))
             .and(path("/track.mp3"))
             .respond_with(|req: &wiremock::Request| {
-                if let Some(range) = req.headers.get(wiremock::http::HeaderName::from_static("range")) {
+                if let Some(range) = req
+                    .headers
+                    .get(wiremock::http::HeaderName::from_static("range"))
+                {
                     let range_str = range.to_str().unwrap();
                     if let Some(bytes_part) = range_str.strip_prefix("bytes=") {
                         let parts: Vec<&str> = bytes_part.split('-').collect();
                         let start: usize = parts[0].parse().unwrap_or(0);
-                        let end: usize = parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(test_data.len() - 1);
+                        let end: usize = parts
+                            .get(1)
+                            .and_then(|s| s.parse().ok())
+                            .unwrap_or(test_data.len() - 1);
                         let end = end.min(test_data.len() - 1);
                         if start <= end && start < test_data.len() {
                             let slice = &test_data[start..=end];
                             return ResponseTemplate::new(206)
-                                .insert_header("content-range", format!("bytes {start}-{end}/{}", test_data.len()))
+                                .insert_header(
+                                    "content-range",
+                                    format!("bytes {start}-{end}/{}", test_data.len()),
+                                )
                                 .insert_header("content-length", slice.len().to_string())
                                 .set_body_bytes(slice.to_vec());
                         }
@@ -2026,5 +2230,76 @@ mod tests {
         })
         .await
         .unwrap();
+    }
+
+    #[test]
+    fn test_classify_quality_tier() {
+        // Lossless: Standard (<= 48kHz, <= 16-bit) -> HQ
+        assert_eq!(
+            classify_quality_tier(FileType::Flac, Some(900), Some(44100), Some(16)),
+            QualityTier::Hq
+        );
+        assert_eq!(
+            classify_quality_tier(FileType::Wav, None, Some(48000), Some(16)),
+            QualityTier::Hq
+        );
+        assert_eq!(
+            classify_quality_tier(FileType::Alac, Some(850), Some(44100), None),
+            QualityTier::Hq
+        );
+
+        // Lossless: High-Res (> 48kHz or > 16-bit) -> HiRes
+        assert_eq!(
+            classify_quality_tier(FileType::Flac, Some(1500), Some(96000), Some(24)),
+            QualityTier::HiRes
+        );
+        assert_eq!(
+            classify_quality_tier(FileType::Flac, Some(1100), Some(44100), Some(24)),
+            QualityTier::HiRes
+        );
+        assert_eq!(
+            classify_quality_tier(FileType::Aiff, None, Some(88200), Some(16)),
+            QualityTier::HiRes
+        );
+        assert_eq!(
+            classify_quality_tier(FileType::Dsf, None, Some(2822400), Some(1)),
+            QualityTier::HiRes
+        );
+
+        // Lossy: >= 256 kbps -> SQ
+        assert_eq!(
+            classify_quality_tier(FileType::Mp3, Some(320), Some(44100), None),
+            QualityTier::Sq
+        );
+        assert_eq!(
+            classify_quality_tier(FileType::Mp3, Some(256), Some(44100), None),
+            QualityTier::Sq
+        );
+        assert_eq!(
+            classify_quality_tier(FileType::Aac, Some(256), Some(48000), None),
+            QualityTier::Sq
+        );
+        assert_eq!(
+            classify_quality_tier(FileType::OggOpus, Some(320), Some(48000), None),
+            QualityTier::Sq
+        );
+
+        // Lossy: < 256 kbps -> LQ
+        assert_eq!(
+            classify_quality_tier(FileType::Mp3, Some(192), Some(44100), None),
+            QualityTier::Lq
+        );
+        assert_eq!(
+            classify_quality_tier(FileType::Mp3, Some(128), Some(44100), None),
+            QualityTier::Lq
+        );
+        assert_eq!(
+            classify_quality_tier(FileType::Aac, Some(96), Some(44100), None),
+            QualityTier::Lq
+        );
+        assert_eq!(
+            classify_quality_tier(FileType::Unknown, None, None, None),
+            QualityTier::Lq
+        );
     }
 }

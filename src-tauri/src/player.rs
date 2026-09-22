@@ -157,8 +157,8 @@ pub struct Player {
 
     // Loudness normalization (#77) — where the currently applied gain came
     // from, for the player-bar indicator.
-    current_loudness_source: LoudnessGainSource,
-    current_loudness_gain_db: Option<f32>,
+    pub current_loudness_source: LoudnessGainSource,
+    pub current_loudness_gain_db: Option<f32>,
 
     // Shuffle state
     /// The playlist items in their current order.
@@ -711,7 +711,8 @@ impl Player {
         self.apply_loudness_gain(&song).await;
         self.preload_upcoming_waveforms();
         self.persist_current_song().await;
-        self.persist_position(if real_play { start_ns } else { 0 }).await;
+        self.persist_position(if real_play { start_ns } else { 0 })
+            .await;
 
         if real_play {
             let audio = self.audio.lock().await;
@@ -1388,8 +1389,7 @@ impl Player {
         };
         let start_ns = target.song.beginning_nanosec.max(0) as u64;
 
-        let fade_settings =
-            crate::fade::get_fade_settings_from_db(&self._db).unwrap_or_default();
+        let fade_settings = crate::fade::get_fade_settings_from_db(&self._db).unwrap_or_default();
 
         let is_same_album = if let Some(current) = &self.current_song {
             current.is_same_album_or_cue_sibling(&target.song)
@@ -1786,6 +1786,18 @@ impl Player {
             loudness_gain_db: self.current_loudness_gain_db,
             remaining_playlist_items: self.remaining_playlist_items(),
         }
+    }
+
+    /// Snapshots the current audio pipeline configuration for the active track (#1041).
+    pub fn get_pipeline_info(
+        &self,
+        audio: &AudioEngine,
+    ) -> Option<crate::models::AudioPipelineInfo> {
+        audio.get_pipeline_info(
+            self.current_song.as_ref(),
+            self.current_loudness_source,
+            self.current_loudness_gain_db,
+        )
     }
 
     /// Update position and check scrobble point. When the scrobble point is
@@ -2644,8 +2656,12 @@ mod tests {
         // Queue song 4 to play next.
         let queued_song = {
             let conn = db_arc.pool.get().unwrap();
-            conn.query_row(&sql, rusqlite::params![4i64], crate::collection::row_to_song)
-                .unwrap()
+            conn.query_row(
+                &sql,
+                rusqlite::params![4i64],
+                crate::collection::row_to_song,
+            )
+            .unwrap()
         };
         let expected_start_ns = queued_song.beginning_nanosec.max(0) as u64;
         let queued_item = PlaylistItem::new_song(0, 0, queued_song);
@@ -2742,8 +2758,12 @@ mod tests {
 
         let queued_song = {
             let conn = db_arc.pool.get().unwrap();
-            conn.query_row(&sql, rusqlite::params![4i64], crate::collection::row_to_song)
-                .unwrap()
+            conn.query_row(
+                &sql,
+                rusqlite::params![4i64],
+                crate::collection::row_to_song,
+            )
+            .unwrap()
         };
         player
             .queue
@@ -2944,8 +2964,12 @@ mod tests {
         );
         let song = {
             let conn = db_arc.pool.get().unwrap();
-            conn.query_row(&sql, rusqlite::params![1i64], crate::collection::row_to_song)
-                .unwrap()
+            conn.query_row(
+                &sql,
+                rusqlite::params![1i64],
+                crate::collection::row_to_song,
+            )
+            .unwrap()
         };
         player
             .play_playlist(vec![PlaylistItem::new_song(0, 0, song)], 0, 0, None)

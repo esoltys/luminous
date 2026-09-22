@@ -206,6 +206,37 @@ export type ShuffleMode = "off" | "all" | "inside_album" | "albums" | "artists";
 export type RepeatMode = "off" | "track" | "album" | "playlist" | "intro";
 export type PlayState = "stopped" | "playing" | "paused";
 export type LoudnessGainSource = "disabled" | "analyzed" | "replay_gain" | "dynamic_range_log" | "fallback";
+export type QualityTier = "lq" | "sq" | "hq" | "hi-res";
+
+export interface AudioPipelineInfo {
+  quality_tier: QualityTier;
+  // Stage 1: Input
+  input_source: SongSource;
+  input_format: string;
+  input_codec: string;
+  input_bitrate_kbps?: number;
+  input_sample_rate?: number;
+  input_bit_depth?: number;
+  input_channels?: number;
+  input_path?: string;
+  // Stage 2: Processing
+  decoder_name: string;
+  headroom: string;
+  resample_rate?: number;
+  loudness_source: LoudnessGainSource;
+  loudness_gain_db?: number;
+  eq_enabled: boolean;
+  eq_mode?: string;
+  eq_preamp_db?: number;
+  eq_active_bands_count: number;
+  // Stage 3: Output
+  limiter: string;
+  output_sample_rate: number;
+  output_channels: number;
+  output_format: string;
+  output_device_name: string;
+  output_backend: string;
+}
 
 export interface PlaybackState {
   state: PlayState;

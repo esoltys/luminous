@@ -483,6 +483,7 @@ fn spawn_audio_event_loop(
                 log::trace!("Received audio event: {:?}", event);
                 let app = app_handle.clone();
                 let player = player.clone();
+                let audio = audio.clone();
                 tauri::async_runtime::block_on(async move {
                     let mut p = player.lock().await;
                     match event {
@@ -503,10 +504,15 @@ fn spawn_audio_event_loop(
                                 }
                             }
                             sync_window_title(&app, p.current_song.as_ref(), true);
+                            let pipeline = {
+                                let a = audio.lock().await;
+                                p.get_pipeline_info(&a)
+                            };
                             let _ = app.emit(
                                 "track-changed",
                                 serde_json::json!({
-                                    "song": p.current_song.clone()
+                                    "song": p.current_song.clone(),
+                                    "pipeline": pipeline,
                                 }),
                             );
                             crate::media_session::mirror_state(&app, &state).await;
@@ -574,14 +580,26 @@ fn spawn_audio_event_loop(
                                 }
                             }
                             sync_window_title(&app, p.current_song.as_ref(), true);
+                            let pipeline = {
+                                let a = audio.lock().await;
+                                p.get_pipeline_info(&a)
+                            };
                             let _ = app.emit(
                                 "track-changed",
                                 serde_json::json!({
-                                    "song": p.current_song.clone()
+                                    "song": p.current_song.clone(),
+                                    "pipeline": pipeline,
                                 }),
                             );
                             crate::media_session::mirror_state(&app, &state).await;
                             let _ = app.emit("playback-state", state);
+                        }
+                        crate::audio::AudioEvent::PipelineChanged => {
+                            let pipeline = {
+                                let a = audio.lock().await;
+                                p.get_pipeline_info(&a)
+                            };
+                            let _ = app.emit("audio-pipeline-changed", pipeline);
                         }
                         crate::audio::AudioEvent::Error { message } => {
                             log::error!("Audio engine error: {}", message);
@@ -1223,6 +1241,7 @@ pub fn run() {
             commands::player::refresh_playback_queue,
             commands::player::set_shuffle_mode,
             commands::player::set_repeat_mode,
+            commands::player::get_audio_pipeline_info,
             // Pinned Home shelf commands (#222)
             commands::pins::pin_item,
             commands::pins::unpin_item,

@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { PlaybackState, Playlist, PlaylistItem, Song, ShuffleMode, RepeatMode, PlayState, LoudnessGainSource, PlayContext } from "../types";
+import type { PlaybackState, Playlist, PlaylistItem, Song, ShuffleMode, RepeatMode, PlayState, LoudnessGainSource, PlayContext, AudioPipelineInfo } from "../types";
 import { applySongStats, type SongStatsPayload } from "../utils/stats";
 import { themeStore } from "./theme.svelte";
 import { toastStore } from "./toast.svelte";
@@ -20,6 +20,7 @@ export class PlayerStore {
   stopAfterCurrent = $state<boolean>(false);
   loudnessSource = $state<LoudnessGainSource>("disabled");
   loudnessGainDb = $state<number | undefined>(undefined);
+  audioPipeline = $state<AudioPipelineInfo | null>(null);
   /** Tracks remaining after the current one; populated from PlaybackState.
    * Only read for the queue-completion celebration (#182). */
   remainingPlaylistItems = $state<number>(0);
@@ -104,9 +105,14 @@ export class PlayerStore {
         }
       });
 
-      await listen<{ song: Song | null }>("track-changed", async (event) => {
+      await listen<{ song: Song | null; pipeline?: AudioPipelineInfo | null }>("track-changed", async (event) => {
         this.currentSong = event.payload.song || undefined;
+        this.audioPipeline = event.payload.pipeline ?? null;
         themeStore.updateArtworkColors(this.currentSong);
+      });
+
+      await listen<AudioPipelineInfo | null>("audio-pipeline-changed", (event) => {
+        this.audioPipeline = event.payload;
       });
 
       // A song couldn't be opened/decoded (e.g. its file just vanished —
@@ -143,6 +149,11 @@ export class PlayerStore {
       const startupFile = await invoke<string | null>("get_startup_file");
       if (startupFile) {
         await this.openAndPlay([startupFile]);
+      }
+
+      const initialPipeline = await invoke<AudioPipelineInfo | null>("get_audio_pipeline_info").catch(() => null);
+      if (initialPipeline) {
+        this.audioPipeline = initialPipeline;
       }
     } catch (err) {
       console.error("Failed to initialize PlayerStore:", err);
@@ -182,6 +193,12 @@ export class PlayerStore {
     this.loudnessSource = state.loudness_source;
     this.loudnessGainDb = state.loudness_gain_db;
     this.remainingPlaylistItems = state.remaining_playlist_items ?? 0;
+    if (!state.current_song) {
+      this.audioPipeline = null;
+    } else if (this.audioPipeline) {
+      this.audioPipeline.loudness_source = state.loudness_source;
+      this.audioPipeline.loudness_gain_db = state.loudness_gain_db;
+    }
   }
 
   /** Force a refresh of the playback state from the backend (e.g., after tags are edited) */
