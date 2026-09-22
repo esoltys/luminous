@@ -1216,6 +1216,7 @@ pub fn run() {
             commands::collection::get_album_profile,
             commands::collection::set_album_profile,
             commands::collection::get_all_album_profiles,
+            commands::collection::retrieve_album_details,
             commands::collection::get_artist_tags_overview,
             commands::collection::set_songs_not_included,
             commands::collection::get_songs_missing_musicbrainz_id,

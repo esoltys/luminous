@@ -1061,6 +1061,12 @@ export const en = {
     refreshTooltip: "Rescan metadata and artwork for this album",
     refreshSuccess: "Album metadata and artwork refreshed",
     refreshError: "Failed to refresh album metadata",
+    retrieveAlbumDetails: "Retrieve Album Details",
+    retrieveAlbumDetailsTooltip: "Fetch Discogs, AllMusic, Wikidata and lyrics links from MusicBrainz",
+    retrieveAlbumDetailsNoMbidTooltip: "No MusicBrainz release group ID found for this album",
+    retrieveDetailsSuccess: "Added {count} link(s) from MusicBrainz",
+    retrieveDetailsNoResults: "No additional details found on MusicBrainz",
+    retrieveDetailsError: "Failed to retrieve album details",
   },
   immersive: {
     emptyStateText: "Select a song from your collection to start playing."

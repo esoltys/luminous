@@ -482,6 +482,11 @@ export interface AlbumProfile {
   links: AlbumLink[];
 }
 
+export interface AlbumDetailsRetrievalResult {
+  profile: AlbumProfile;
+  added_count: number;
+}
+
 /**
  * Category within the Standardized Artwork Hierarchy (#98) — mirrors
  * `ArtworkCategory::as_str()` in `covermanager.rs` exactly. Don't rename a

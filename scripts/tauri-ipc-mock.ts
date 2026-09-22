@@ -1148,6 +1148,16 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
       return profile;
     },
 
+    // The real command hits MusicBrainz's release-group url-rels and merges
+    // any Discogs/AllMusic/Wikidata/lyrics links into the profile — mocked
+    // here as a no-op (no new links found) rather than fabricating results.
+    retrieve_album_details: (args) => {
+      const album = args.album as string;
+      const profile = albumProfiles.find((p) => p.album_key.toLowerCase() === album?.toLowerCase())
+        ?? { album_key: album, artist_key: null, description: null, website: null, links: [] };
+      return { profile, added_count: 0 };
+    },
+
     get_song_details: (args) => {
       const songId = args.songId as number;
       const song = library.songs.find((s) => s.id === songId) ?? featuredSong;

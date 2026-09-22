@@ -29,6 +29,7 @@
     PlusIcon as Plus,
     PencilSimpleIcon as Edit3,
     ArrowsClockwiseIcon as RefreshCw,
+    DownloadSimpleIcon as RetrieveDetails,
     PushPinIcon as Pin,
     PushPinSlashIcon as PinOff,
     DotsThreeIcon as MoreHorizontal,
@@ -61,6 +62,7 @@
   let songs = $state<Song[]>([]);
   let loading = $state(true);
   let refreshing = $state(false);
+  let retrievingDetails = $state(false);
   let editingSongId = $state<number | null>(null);
   let contextMenuState = $state<{ x: number; y: number; song: Song } | null>(null);
   let showShareModal = $state(false);
@@ -95,6 +97,42 @@
       toastStore.show(i18n.t("albumDetail.refreshError", {}, "Failed to refresh album metadata"));
     } finally {
       refreshing = false;
+    }
+  }
+
+  let hasReleaseGroupMbid = $derived(
+    songs.some((s) => (s.musicbrainz_release_group_id ?? "").trim().length > 0)
+  );
+
+  async function handleRetrieveAlbumDetails() {
+    if (retrievingDetails || !hasReleaseGroupMbid) return;
+    retrievingDetails = true;
+    try {
+      const result = await collectionStore.retrieveAlbumDetails(albumName);
+      if (result.added_count > 0) {
+        toastStore.show(
+          i18n.t(
+            "albumDetail.retrieveDetailsSuccess",
+            { count: result.added_count },
+            `Added ${result.added_count} link(s) from MusicBrainz`
+          )
+        );
+      } else {
+        toastStore.show(
+          i18n.t(
+            "albumDetail.retrieveDetailsNoResults",
+            {},
+            "No additional details found on MusicBrainz"
+          )
+        );
+      }
+    } catch (err) {
+      console.error("Failed to retrieve album details:", err);
+      toastStore.show(
+        i18n.t("albumDetail.retrieveDetailsError", {}, "Failed to retrieve album details")
+      );
+    } finally {
+      retrievingDetails = false;
     }
   }
 
@@ -216,6 +254,46 @@
   let hasProfileContent = $derived(
     hasDescription || hasWebsite || hasLinks || !!listenbrainzUrl
   );
+
+  interface ReleaseLinkItem {
+    key: string;
+    platform: string;
+    url: string;
+    label: string;
+  }
+
+  // Unifies the website, curated (#950), and derived ListenBrainz links into
+  // one alphabetically-sorted list so the "Release Links" panel doesn't read
+  // as source-ordered clutter once an album has a dozen retrieved links (#1122).
+  let releaseLinkItems = $derived.by((): ReleaseLinkItem[] => {
+    const items: ReleaseLinkItem[] = [];
+    if (hasWebsite) {
+      const website = albumProfile?.website ?? "";
+      items.push({
+        key: "website",
+        platform: "website",
+        url: resolveSocialUrl("website", website),
+        label: formatDisplayLabel("website", website),
+      });
+    }
+    for (const link of albumProfile?.links ?? []) {
+      items.push({
+        key: `${link.platform}:${link.handle_or_url}`,
+        platform: link.platform,
+        url: resolveSocialUrl(link.platform, link.handle_or_url),
+        label: formatDisplayLabel(link.platform, link.handle_or_url),
+      });
+    }
+    if (listenbrainzUrl) {
+      items.push({
+        key: "listenbrainz",
+        platform: "listenbrainz",
+        url: listenbrainzUrl,
+        label: "ListenBrainz",
+      });
+    }
+    return items.sort((a, b) => a.label.localeCompare(b.label));
+  });
 
   async function handleOpenUrl(url: string) {
     if (!url) return;
@@ -629,64 +707,24 @@
                 : "w-full flex flex-col gap-3"}
             >
               <div class="grid grid-cols-1 @sm:grid-cols-2 {hasDescription ? '@2xl:flex @2xl:flex-col' : '@md:grid-cols-3 @xl:grid-cols-4'} gap-2.5">
-                <!-- Official Website / Store Link -->
-                {#if hasWebsite}
-                  {@const siteUrl = resolveSocialUrl("website", albumProfile?.website ?? "")}
+                <!-- Website, curated (#950) and derived ListenBrainz links, unified and sorted alphabetically (#1122) -->
+                {#each releaseLinkItems as item (item.key)}
                   <button
                     type="button"
-                    onclick={() => handleOpenUrl(siteUrl)}
+                    onclick={() => handleOpenUrl(item.url)}
                     class="flex items-center gap-2.5 sm:gap-3 group text-left transition-colors cursor-pointer min-w-0"
                   >
                     <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-brand-main/60 border border-brand-border flex items-center justify-center text-brand-text-secondary group-hover:text-brand-accent group-hover:border-brand-accent/40 transition-colors shrink-0 shadow-2xs">
-                      <SocialIcon platform="website" size={14} />
+                      <SocialIcon platform={item.platform} size={14} />
                     </div>
                     <div class="flex items-center gap-1 min-w-0 flex-1">
                       <span class="text-xs font-medium text-brand-text-primary truncate transition-colors">
-                        {formatDisplayLabel("website", albumProfile?.website ?? "")}
-                      </span>
-                      <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-                    </div>
-                  </button>
-                {/if}
-
-                <!-- Curated Release Links -->
-                {#each albumProfile?.links ?? [] as link (link.platform + link.handle_or_url)}
-                  {@const fullUrl = resolveSocialUrl(link.platform, link.handle_or_url)}
-                  <button
-                    type="button"
-                    onclick={() => handleOpenUrl(fullUrl)}
-                    class="flex items-center gap-2.5 sm:gap-3 group text-left transition-colors cursor-pointer min-w-0"
-                  >
-                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-brand-main/60 border border-brand-border flex items-center justify-center text-brand-text-secondary group-hover:text-brand-accent group-hover:border-brand-accent/40 transition-colors shrink-0 shadow-2xs">
-                      <SocialIcon platform={link.platform} size={14} />
-                    </div>
-                    <div class="flex items-center gap-1 min-w-0 flex-1">
-                      <span class="text-xs font-medium text-brand-text-primary truncate transition-colors">
-                        {formatDisplayLabel(link.platform, link.handle_or_url)}
+                        {item.label}
                       </span>
                       <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                     </div>
                   </button>
                 {/each}
-
-                <!-- Derived ListenBrainz Album Link (#950) -->
-                {#if listenbrainzUrl}
-                  <button
-                    type="button"
-                    onclick={() => handleOpenUrl(listenbrainzUrl)}
-                    class="flex items-center gap-2.5 sm:gap-3 group text-left transition-colors cursor-pointer min-w-0"
-                  >
-                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-brand-main/60 border border-brand-border flex items-center justify-center text-brand-text-secondary group-hover:text-brand-accent group-hover:border-brand-accent/40 transition-colors shrink-0 shadow-2xs">
-                      <SocialIcon platform="listenbrainz" size={14} />
-                    </div>
-                    <div class="flex items-center gap-1 min-w-0 flex-1">
-                      <span class="text-xs font-medium text-brand-text-primary truncate transition-colors">
-                        ListenBrainz
-                      </span>
-                      <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-                    </div>
-                  </button>
-                {/if}
               </div>
             </div>
           {/if}
@@ -773,6 +811,13 @@
       title={i18n.t('albumDetail.refreshTooltip')}
       onclick={() => { handleRefreshAlbum(); overflowMenuPos = null; }}
       disabled={loading || collectionStore.isScanning || refreshing}
+    />
+    <ContextMenuItem
+      icon={RetrieveDetails}
+      label={i18n.t("albumDetail.retrieveAlbumDetails", {}, "Retrieve Album Details")}
+      title={hasReleaseGroupMbid ? i18n.t("albumDetail.retrieveAlbumDetailsTooltip", {}, "Fetch Discogs, AllMusic, Wikidata and lyrics links from MusicBrainz") : i18n.t("albumDetail.retrieveAlbumDetailsNoMbidTooltip", {}, "No MusicBrainz release group ID found for this album")}
+      onclick={() => { handleRetrieveAlbumDetails(); overflowMenuPos = null; }}
+      disabled={loading || retrievingDetails || !hasReleaseGroupMbid}
     />
     <ContextMenuItem
       icon={OpenInPicard}

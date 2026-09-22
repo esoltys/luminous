@@ -1102,7 +1102,13 @@ export const fr = {
     refresh: "Actualiser",
     refreshTooltip: "Actualiser les métadonnées et la pochette de cet album",
     refreshSuccess: "Métadonnées et pochette de l'album actualisées",
-    refreshError: "Échec de l'actualisation de l'album"
+    refreshError: "Échec de l'actualisation de l'album",
+    retrieveAlbumDetails: "Récupérer les détails de l'album",
+    retrieveAlbumDetailsTooltip: "Récupérer les liens Discogs, AllMusic, Wikidata et paroles depuis MusicBrainz",
+    retrieveAlbumDetailsNoMbidTooltip: "Aucun identifiant de groupe de parution MusicBrainz trouvé pour cet album",
+    retrieveDetailsSuccess: "{count} lien(s) ajouté(s) depuis MusicBrainz",
+    retrieveDetailsNoResults: "Aucun détail supplémentaire trouvé sur MusicBrainz",
+    retrieveDetailsError: "Échec de la récupération des détails de l'album"
   },
   immersive: {
     emptyStateText: "Sélectionnez une chanson de votre collection pour commencer la lecture."
