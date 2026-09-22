@@ -30,6 +30,7 @@
   import { portal } from "../utils/portal";
   import SocialIcon from "./SocialIcon.svelte";
   import { ALBUM_LINK_PLATFORMS, getPlatformInfo } from "../utils/artistSocials";
+  import { getAlbumFolderPath } from "../utils/pathUtils";
   import type { AlbumProfile, AlbumLink } from "../types";
 
   let {
@@ -110,6 +111,12 @@
   // an album's tracks all share one source.
   let samplePath = $derived.by(() => collectionStore.songs.find((s) => s.id === songIds[0])?.path ?? "");
   let isRemoteSource = $derived(!!samplePath && /^https?:\/\//i.test(samplePath));
+  let albumFolderPath = $derived.by(() => {
+    const paths = songIds
+      .map((id) => collectionStore.songs.find((s) => s.id === id)?.path)
+      .filter((p): p is string => Boolean(p));
+    return getAlbumFolderPath(paths);
+  });
 
   // Sync state when opened or the underlying album changes
   $effect(() => {
@@ -327,7 +334,7 @@
           <div class="flex items-center gap-3">
             <div class="flex-1 flex flex-col gap-1 min-w-0">
               <span class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">{i18n.t('albumTagEditor.locationField')}</span>
-              <span class="text-xs text-brand-text-secondary break-all select-text">{samplePath}</span>
+              <span class="text-xs text-brand-text-secondary break-all select-text">{albumFolderPath}</span>
             </div>
             {#if !isRemoteSource}
               <Button
