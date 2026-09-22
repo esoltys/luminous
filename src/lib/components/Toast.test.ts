@@ -1,6 +1,7 @@
 import "@testing-library/jest-dom";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/svelte";
+import { tick } from "svelte";
 import Toast from "./Toast.svelte";
 import { toastStore } from "../stores/toast.svelte";
 import { i18n } from "../stores/i18n.svelte";
@@ -112,5 +113,38 @@ describe("Toast.svelte", () => {
 
     expect(onClick).toHaveBeenCalledTimes(1);
     expect(toastStore.messages.find((m) => m.id === id)).toBeDefined();
+  });
+
+  it("renders a task progress notification, updates in place, and completes with line-through on task name", async () => {
+    toastStore.startTask({
+      taskId: "album-save",
+      taskName: "Saving tags for Nevermind",
+      text: "Saving tags for Nevermind (5/15)...",
+      total: 15,
+      current: 5,
+    });
+
+    render(Toast);
+
+    expect(screen.getByText("Saving tags for Nevermind (5/15)...")).toBeInTheDocument();
+    expect(screen.getByText("5 / 15")).toBeInTheDocument();
+
+    // Update in place
+    toastStore.updateTask("album-save", {
+      text: "Saving tags for Nevermind (10/15)...",
+      current: 10,
+    });
+    await tick();
+    expect(screen.getByText("Saving tags for Nevermind (10/15)...")).toBeInTheDocument();
+    expect(screen.getByText("10 / 15")).toBeInTheDocument();
+
+    // Complete task (e.g. even if caller passes "Done")
+    toastStore.completeTask("album-save", "Done");
+    await tick();
+    const completedLabel = screen.getByText("Saving tags for Nevermind");
+    expect(completedLabel).toBeInTheDocument();
+    expect(completedLabel.className).toContain("line-through");
+    expect(screen.queryByText("Done")).not.toBeInTheDocument();
+    expect(screen.queryByText("10 / 15")).not.toBeInTheDocument();
   });
 });

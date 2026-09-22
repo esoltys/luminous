@@ -4,8 +4,22 @@ use crate::models::{WebDavServer, WebDavSyncStats};
 use crate::webdav::{detect_filetype_from_url, WebDavClient};
 use crate::AppState;
 use rusqlite::params;
+use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use tauri::{AppHandle, Emitter, State};
+
+/// Progress update emitted during WebDAV library synchronization (#1087).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WebDavSyncProgressPayload {
+    pub server_id: i64,
+    pub server_name: String,
+    pub current_path: String,
+    pub current_count: usize,
+    pub added: usize,
+    pub updated: usize,
+    pub errors: usize,
+    pub done: bool,
+}
 
 /// List all configured WebDAV servers.
 #[tauri::command]
@@ -241,11 +255,11 @@ pub async fn sync_webdav_server(
         let conn = db.pool.get().map_err(|e| e.to_string())?;
 
         // Retrieve server credentials & config
-        let (url, username, password, remote_path): (String, Option<String>, Option<String>, String) = conn
+        let (server_name, url, username, password, remote_path): (String, String, Option<String>, Option<String>, String) = conn
             .query_row(
-                "SELECT url, username, password, remote_path FROM webdav_servers WHERE id = ?1",
+                "SELECT name, url, username, password, remote_path FROM webdav_servers WHERE id = ?1",
                 params![id],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
             )
             .map_err(|e| e.to_string())?;
 
@@ -255,12 +269,36 @@ pub async fn sync_webdav_server(
             params![id],
         );
 
-        let client = WebDavClient::new(url.clone(), username, password).map_err(|e| e.to_string())?;
+        let _ = app_clone.emit(
+            "webdav-sync-progress",
+            WebDavSyncProgressPayload {
+                server_id: id,
+                server_name: server_name.clone(),
+                current_path: remote_path.clone(),
+                current_count: 0,
+                added: 0,
+                updated: 0,
+                errors: 0,
+                done: false,
+            },
+        );
+
+        let client = match WebDavClient::new(url.clone(), username, password) {
+            Ok(c) => c,
+            Err(e) => {
+                let _ = conn.execute(
+                    "UPDATE webdav_servers SET sync_status = 'idle' WHERE id = ?1",
+                    params![id],
+                );
+                return Err(e.to_string());
+            }
+        };
 
         let mut queue = VecDeque::new();
         queue.push_back(remote_path);
 
         let mut stats = WebDavSyncStats::default();
+        let mut current_count = 0usize;
 
         while let Some(current_path) = queue.pop_front() {
             let items = match client.list_directory(&current_path) {
@@ -338,6 +376,20 @@ pub async fn sync_webdav_server(
                                 stats.updated += 1;
                             }
                         }
+                        current_count += 1;
+                        let _ = app_clone.emit(
+                            "webdav-sync-progress",
+                            WebDavSyncProgressPayload {
+                                server_id: id,
+                                server_name: server_name.clone(),
+                                current_path: item.href.clone(),
+                                current_count,
+                                added: stats.added,
+                                updated: stats.updated,
+                                errors: stats.errors,
+                                done: false,
+                            },
+                        );
                         continue;
                     }
 
@@ -385,6 +437,21 @@ pub async fn sync_webdav_server(
                             stats.errors += 1;
                         }
                     }
+
+                    current_count += 1;
+                    let _ = app_clone.emit(
+                        "webdav-sync-progress",
+                        WebDavSyncProgressPayload {
+                            server_id: id,
+                            server_name: server_name.clone(),
+                            current_path: item.href.clone(),
+                            current_count,
+                            added: stats.added,
+                            updated: stats.updated,
+                            errors: stats.errors,
+                            done: false,
+                        },
+                    );
                 }
             }
         }
@@ -398,6 +465,20 @@ pub async fn sync_webdav_server(
         let _ = conn.execute(
             "UPDATE webdav_servers SET sync_status = 'idle', last_synced_at = ?1 WHERE id = ?2",
             params![now_ts, id],
+        );
+
+        let _ = app_clone.emit(
+            "webdav-sync-progress",
+            WebDavSyncProgressPayload {
+                server_id: id,
+                server_name: server_name.clone(),
+                current_path: String::new(),
+                current_count,
+                added: stats.added,
+                updated: stats.updated,
+                errors: stats.errors,
+                done: true,
+            },
         );
 
         let _ = app_clone.emit("library-changed", ());

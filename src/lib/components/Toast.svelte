@@ -79,7 +79,53 @@
               ? 'bg-[#1f1a12] border-brand-gold/50 text-brand-gold'
               : 'bg-brand-sidebar border-brand-border text-brand-text-primary'}"
     >
-      {#if toast.variant === "error" || toast.variant === "warning"}
+      {#if toast.task}
+        <div class="relative w-4 h-4 shrink-0 flex items-center justify-center translate-y-[calc((1lh-1rem)/2)]">
+          {#if toast.task.status === "running"}
+            {#if typeof toast.task.progress === "number"}
+              <svg class="w-4 h-4 -rotate-90 origin-center shrink-0" viewBox="0 0 20 20">
+                <circle
+                  cx="10"
+                  cy="10"
+                  r="7.5"
+                  class="stroke-brand-border/40 fill-none"
+                  stroke-width="2.5"
+                />
+                <circle
+                  cx="10"
+                  cy="10"
+                  r="7.5"
+                  class="stroke-brand-accent-text fill-none transition-all duration-300 ease-out"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-dasharray="47.12"
+                  stroke-dashoffset={47.12 * (1 - Math.min(1, Math.max(0, toast.task.progress)))}
+                />
+              </svg>
+            {:else}
+              <svg class="w-4 h-4 animate-spin text-brand-accent-text shrink-0" viewBox="0 0 20 20" fill="none">
+                <circle
+                  cx="10"
+                  cy="10"
+                  r="7.5"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-dasharray="24 24"
+                  stroke-linecap="round"
+                  class="opacity-75"
+                />
+              </svg>
+            {/if}
+          {:else if toast.task.status === "done"}
+            <span class="relative inline-flex w-4 h-4 shrink-0 items-center justify-center">
+              <span class="absolute inset-0 rounded-full anim-glow-ring"></span>
+              <CheckCircle2 class="w-4 h-4 text-brand-accent-text anim-check-pop" />
+            </span>
+          {:else if toast.task.status === "failed"}
+            <AlertTriangle class="w-4 h-4 shrink-0 text-brand-text-secondary" />
+          {/if}
+        </div>
+      {:else if toast.variant === "error" || toast.variant === "warning"}
         <AlertTriangle class="w-4 h-4 shrink-0 translate-y-[calc((1lh-1rem)/2)]" />
       {:else if toast.variant === "success"}
         <span class="relative inline-flex w-4 h-4 shrink-0 items-center justify-center translate-y-[calc((1lh-1rem)/2)]">
@@ -94,7 +140,32 @@
       {:else}
         <Info class="w-4 h-4 shrink-0 text-brand-accent-text translate-y-[calc((1lh-1rem)/2)]" />
       {/if}
-      {#if toast.url}
+      {#if toast.task}
+        <div class="flex-1 min-w-0 flex flex-col justify-center">
+          <div class="flex items-center justify-between gap-3">
+            <span
+              class="text-pretty transition-all duration-200"
+              class:line-through={toast.task.status === "done"}
+              class:text-brand-text-secondary={toast.task.status === "done"}
+            >
+              {toast.task.status === "done" ? (toast.task.taskName || toast.text) : toast.text}
+            </span>
+            {#if toast.task.status === "running" && toast.task.current !== undefined && toast.task.total !== undefined}
+              <span class="text-xs font-mono text-brand-text-secondary shrink-0 select-none">
+                {toast.task.current} / {toast.task.total}
+              </span>
+            {/if}
+          </div>
+          {#if toast.task.status === "running" && typeof toast.task.progress === "number"}
+            <div class="w-full bg-brand-main rounded-full h-1 overflow-hidden border border-brand-border/40 mt-1.5">
+              <div
+                class="bg-brand-accent h-1 rounded-full transition-all duration-300 ease-out"
+                style="width: {Math.min(100, Math.max(0, toast.task.progress * 100))}%"
+              ></div>
+            </div>
+          {/if}
+        </div>
+      {:else if toast.url}
         <button
           type="button"
           onclick={() => openExternalUrl(toast.url!)}
@@ -130,7 +201,7 @@
               : i18n.t('toast.copyError', {}, 'Copy error to clipboard')}
           >
             {#if copiedToastId === toast.id}
-              <Check class="w-3.5 h-3.5 text-emerald-400" />
+              <Check class="w-3.5 h-3.5 text-brand-accent-text" />
             {:else}
               <Clipboard class="w-3.5 h-3.5" />
             {/if}

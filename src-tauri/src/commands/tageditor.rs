@@ -1,9 +1,19 @@
 use crate::collection::WatcherPauseGuard;
 use crate::models;
 use crate::AppState;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tauri::State;
+use tauri::{AppHandle, Emitter, State};
 use tauri_plugin_opener::OpenerExt;
+
+/// Progress update emitted during batch tag writing (#1087).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TagBatchProgressPayload {
+    pub current: usize,
+    pub total: usize,
+    pub title: String,
+    pub done: bool,
+}
 
 #[derive(serde::Serialize)]
 pub struct SongDetails {
@@ -262,6 +272,7 @@ pub async fn save_song_tags(
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
 pub async fn save_album_tags(
+    app: AppHandle,
     state: State<'_, AppState>,
     song_ids: Vec<i64>,
     album: String,
@@ -350,9 +361,21 @@ pub async fn save_album_tags(
         models::join_multi_value(&models::parse_multi_value(&genre.unwrap_or_default()));
     let genre_c = genre_str.clone();
 
+    let total_songs = songs_data.len();
+    let app_clone = app.clone();
     let updated_count = tauri::async_runtime::spawn_blocking(move || {
         let mut count = 0u32;
-        for item in songs_data {
+        for (idx, item) in songs_data.into_iter().enumerate() {
+            let _ = app_clone.emit(
+                "tag-batch-progress",
+                TagBatchProgressPayload {
+                    current: idx + 1,
+                    total: total_songs,
+                    title: item.title.clone(),
+                    done: false,
+                },
+            );
+
             // WebDAV songs (source 11) have no local file to write lofty tags to,
             // and there's no write-back to the remote server implemented — the
             // change is saved to Luminous's own DB only (the tag editor surfaces
@@ -428,6 +451,16 @@ pub async fn save_album_tags(
         .map_err(|e| e.to_string())?;
     }
     tx.commit().map_err(|e| e.to_string())?;
+
+    let _ = app.emit(
+        "tag-batch-progress",
+        TagBatchProgressPayload {
+            current: total_songs,
+            total: total_songs,
+            title: album.clone(),
+            done: true,
+        },
+    );
 
     Ok(updated_count)
 }

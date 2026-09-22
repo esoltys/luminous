@@ -15,6 +15,7 @@
   import { tagsStore } from "../stores/tags.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
+  import { tasksStore } from "../stores/tasks.svelte";
   import FormField from "./FormField.svelte";
   import Modal from "./Modal.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
@@ -141,6 +142,14 @@
 
   async function handleSave() {
     isSaving = true;
+    const albumName = album || i18n.t("collection.unknownAlbum");
+    const taskId = "album-tag-save";
+    tasksStore.startTask({
+      id: taskId,
+      label: i18n.t("tasks.savingAlbumTags", { album: albumName }, `Saving tags for ${albumName}...`),
+      total: songIds.length,
+      contextName: albumName,
+    });
     try {
       await invoke("save_album_tags", {
         songIds,
@@ -155,6 +164,10 @@
         compilation,
       });
 
+      tasksStore.completeTask(
+        taskId,
+        i18n.t("tasks.albumTagsSaved", { album: albumName }, `Saved tags for ${albumName}`)
+      );
       await collectionStore.refreshStats();
       await collectionStore.refreshLibrary();
 
@@ -162,7 +175,9 @@
       onClose();
     } catch (e: any) {
       console.error("Failed to save album tags:", e);
-      toastStore.show(i18n.t("albumTagEditor.saveFailedPrefix") + e.toString(), "error");
+      const errMsg = e.toString();
+      tasksStore.failTask(taskId, errMsg);
+      toastStore.show(i18n.t("albumTagEditor.saveFailedPrefix") + errMsg, "error");
     } finally {
       isSaving = false;
     }

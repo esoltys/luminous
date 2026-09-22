@@ -1409,5 +1409,18 @@ export const en = {
         description: "Add folders to scan from Settings, and Luminous keeps your library up to date automatically."
       }
     }
+  },
+  tasks: {
+    title: "Background Tasks",
+    clear: "Clear",
+    clearCompleted: "Clear completed tasks",
+    inProgress: "In progress…",
+    allDone: "Tasks done",
+    syncingWebdav: "Syncing {name}…",
+    syncingWebdavCount: "Syncing {name} ({count} items)…",
+    savingAlbumTags: "Saving tags for {album}…",
+    savingTagsCount: "Saving tags ({current}/{total})…",
+    albumTagsSaved: "Saved tags for {album}",
+    libraryScanDone: "Library scan complete"
   }
 };
