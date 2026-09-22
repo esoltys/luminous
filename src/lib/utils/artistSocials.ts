@@ -109,6 +109,24 @@ export const SOCIAL_PLATFORMS: SocialPlatformInfo[] = [
     example: "https://en.wikipedia.org/wiki/Shania_Twain",
   },
   {
+    id: "allmusic",
+    label: "AllMusic",
+    placeholder: "https://www.allmusic.com/artist/...",
+    example: "https://www.allmusic.com/artist/shania-twain-mn0000869402",
+  },
+  {
+    id: "wikidata",
+    label: "Wikidata",
+    placeholder: "https://www.wikidata.org/wiki/...",
+    example: "https://www.wikidata.org/wiki/Q11649",
+  },
+  {
+    id: "imdb",
+    label: "IMDb",
+    placeholder: "https://www.imdb.com/name/...",
+    example: "https://www.imdb.com/name/nm0876013",
+  },
+  {
     id: "custom",
     label: "Custom Link",
     placeholder: "https://...",
@@ -207,18 +225,44 @@ export function formatDisplayLabel(platformId: string, input: string): string {
   // buttons when there's more than one (MusicBrainz's release-group
   // relations can have multiple "lyrics"/"other databases" entries), so
   // show the source hostname instead so they're distinguishable.
-  if (platformId === "website" || platformId === "lyrics" || platformId === "other_databases") {
+  if (platformId === "website" || platformId === "lyrics" || platformId === "other_databases" || platformId === "internet_archive") {
     // Show clean hostname or short path without http/https
     try {
       const url = resolveSocialUrl(platformId, trimmed);
       const parsed = new URL(url);
-      return parsed.hostname.replace(/^www\./, "") + (parsed.pathname !== "/" ? parsed.pathname : "");
+      const hostname = parsed.hostname.replace(/^www\./, "");
+      // web.archive.org's own path is a timestamp plus the entire archived
+      // URL (e.g. "/web/19970131155102/http://www.vmg.co.uk/..."), which is
+      // unreadable as a label — name it plainly instead (#1123).
+      if (hostname === "web.archive.org") return "Internet Archive";
+      return hostname + (parsed.pathname !== "/" ? parsed.pathname : "");
     } catch {
       return trimmed.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "");
     }
   }
 
   return info.label;
+}
+
+/**
+ * Swaps a website-like platform id ("website", "lyrics", "other_databases")
+ * for "internet_archive" when the resolved URL is actually a
+ * web.archive.org snapshot, so it renders with the Internet Archive icon
+ * instead of a generic globe (#1123) — MusicBrainz's "official homepage"
+ * relation sometimes points at an archived snapshot of a site that's since
+ * gone offline. Any other platform id (or URL) is returned unchanged.
+ */
+export function normalizeWebsitePlatform(platformId: string, url: string): string {
+  if (platformId !== "website" && platformId !== "lyrics" && platformId !== "other_databases") {
+    return platformId;
+  }
+  try {
+    const hostname = new URL(url).hostname.replace(/^www\./, "");
+    if (hostname === "web.archive.org") return "internet_archive";
+  } catch {
+    // Not a parseable absolute URL — fall through unchanged.
+  }
+  return platformId;
 }
 
 const MBID_PATTERN = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i;
@@ -240,6 +284,43 @@ export function deriveFanartTvUrl(socialLinks: ArtistSocialLink[] | undefined | 
   const match = mbLink.handle_or_url.match(MBID_PATTERN);
   if (!match) return null;
   return `https://fanart.tv/artist/${match[1].toLowerCase()}`;
+}
+
+/**
+ * Resolves the artist's MusicBrainz MBID for the derived MusicBrainz/
+ * ListenBrainz/Fanart.tv links: prefers `ArtistProfile.musicbrainz_artist_id`
+ * (#1123, captured from "Retrieve Album/Artist Details" or a tagged song),
+ * falling back to a manually-stored "musicbrainz" social link's MBID — the
+ * only source available before #1123 added the dedicated field. Returns
+ * `null` when neither is present or recognizable.
+ */
+export function resolveArtistMbid(
+  musicbrainzArtistId: string | null | undefined,
+  socialLinks: ArtistSocialLink[] | undefined | null
+): string | null {
+  const directMatch = musicbrainzArtistId?.trim().match(MBID_PATTERN);
+  if (directMatch) return directMatch[1].toLowerCase();
+
+  const mbLink = socialLinks?.find((l) => l.platform === "musicbrainz");
+  const linkMatch = mbLink?.handle_or_url?.match(MBID_PATTERN);
+  return linkMatch ? linkMatch[1].toLowerCase() : null;
+}
+
+/** Derives a MusicBrainz artist page URL from a resolved MBID (#1123). */
+export function deriveMusicbrainzArtistUrl(mbid: string | null | undefined): string | null {
+  return mbid ? `https://musicbrainz.org/artist/${mbid}` : null;
+}
+
+/** Derives a ListenBrainz artist page URL from a resolved MBID (#1123). */
+export function deriveListenbrainzArtistUrl(mbid: string | null | undefined): string | null {
+  return mbid ? `https://listenbrainz.org/artist/${mbid}/` : null;
+}
+
+/** Derives a fanart.tv artist page URL from a resolved MBID (#1123) — same
+ * destination as {@link deriveFanartTvUrl}, computed from the resolved MBID
+ * directly instead of re-deriving it from `socialLinks`. */
+export function deriveFanartTvUrlFromMbid(mbid: string | null | undefined): string | null {
+  return mbid ? `https://fanart.tv/artist/${mbid}` : null;
 }
 
 /**

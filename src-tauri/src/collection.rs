@@ -47,6 +47,9 @@ fn scan_thread_count() -> usize {
 mod query;
 mod reconcile;
 mod watcher;
+#[cfg(test)]
+pub(crate) use query::set_artist_profile_conn;
+pub(crate) use query::get_artist_profile_conn;
 pub(crate) use reconcile::resolve_case_insensitive_path;
 pub use watcher::{start_watcher, SelfWriteTracker, WatcherPauseGuard};
 

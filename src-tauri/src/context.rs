@@ -204,6 +204,14 @@ struct MbRelation {
     rel_type: Option<String>,
     #[serde(default)]
     url: Option<MbUrlRef>,
+    /// True when MusicBrainz editors have marked this relationship as no
+    /// longer current (e.g. a label's official site died and was replaced by
+    /// an archive.org snapshot, or an artist changed labels/socials).
+    /// Relations we surface as live links (official homepage, social links,
+    /// etc.) are filtered to `!ended` so a defunct/archival URL doesn't get
+    /// presented as the current one.
+    #[serde(default)]
+    ended: bool,
 }
 
 #[derive(Deserialize, Debug, Default)]
@@ -213,9 +221,33 @@ struct MbArtistResponse {
 }
 
 #[derive(Deserialize, Debug, Default)]
+struct MbArtistCreditArtist {
+    id: Option<String>,
+}
+
+#[derive(Deserialize, Debug, Default)]
+struct MbArtistCreditItem {
+    artist: Option<MbArtistCreditArtist>,
+}
+
+#[derive(Deserialize, Debug, Default)]
 struct MbReleaseGroupRelationsResponse {
     #[serde(default)]
     relations: Vec<MbRelation>,
+    #[serde(default, rename = "artist-credit")]
+    artist_credit: Vec<MbArtistCreditItem>,
+}
+
+/// Result of [`ContextManager::fetch_musicbrainz_release_group_relations`]:
+/// the release-group's `url-rels` relations, plus the MusicBrainz artist
+/// ID(s) from its `artist-credit` — authoritative for the album's artist(s),
+/// distinct from (and potentially more reliable than) whatever
+/// `musicbrainz_artist_id` happens to be embedded in each song's own tags
+/// (#1123).
+#[derive(Debug, Default, Clone)]
+pub struct MusicBrainzReleaseGroupRelations {
+    pub relations: Vec<(String, String)>,
+    pub artist_credit_ids: Vec<String>,
 }
 
 #[derive(Deserialize, Debug, Default)]
@@ -401,20 +433,23 @@ impl ContextManager {
     }
 
     /// Looks up a release-group's `url-rels` relations (Discogs, AllMusic,
-    /// Wikidata, lyrics sites, other databases, ...) for the album details
-    /// overflow menu's "Retrieve Album Details" action. Returns every
-    /// `(rel_type, url)` pair MusicBrainz has on file; callers filter down
-    /// to the relation types they care about — unlike the artist Wikidata
-    /// lookup, this isn't narrowed to one relation here, since multiple
-    /// relation types (and multiple relations of the same type, e.g.
-    /// several lyrics sites) are all potentially useful.
+    /// Wikidata, lyrics sites, other databases, ...) plus its `artist-credit`
+    /// MBID(s), for the album details overflow menu's "Retrieve Album
+    /// Details" action. Returns every `(rel_type, url)` pair MusicBrainz has
+    /// on file; callers filter down to the relation types they care about —
+    /// unlike the artist Wikidata lookup, this isn't narrowed to one
+    /// relation here, since multiple relation types (and multiple relations
+    /// of the same type, e.g. several lyrics sites) are all potentially
+    /// useful. The artist-credit MBID(s) let `retrieve_album_details`
+    /// backfill `ArtistProfile.musicbrainz_artist_id` (#1123) without
+    /// depending on a song having a usable tagged MBID.
     pub async fn fetch_musicbrainz_release_group_relations(
         &self,
         release_group_id: &str,
-    ) -> Result<Vec<(String, String)>> {
+    ) -> Result<MusicBrainzReleaseGroupRelations> {
         throttle_musicbrainz().await;
         let url = format!(
-            "https://musicbrainz.org/ws/2/release-group/{}?inc=url-rels&fmt=json",
+            "https://musicbrainz.org/ws/2/release-group/{}?inc=url-rels+artist-credits&fmt=json",
             percent_encoding::utf8_percent_encode(
                 release_group_id,
                 percent_encoding::NON_ALPHANUMERIC
@@ -428,9 +463,48 @@ impl ContextManager {
             ));
         }
         let parsed: MbReleaseGroupRelationsResponse = response.json().await?;
+        Ok(MusicBrainzReleaseGroupRelations {
+            relations: parsed
+                .relations
+                .into_iter()
+                .filter(|r| !r.ended)
+                .filter_map(|r| Some((r.rel_type?, r.url?.resource?)))
+                .collect(),
+            artist_credit_ids: parsed
+                .artist_credit
+                .into_iter()
+                .filter_map(|c| c.artist?.id)
+                .collect(),
+        })
+    }
+
+    /// Looks up an artist's `url-rels` relations (Discogs, AllMusic,
+    /// Wikidata, IMDb, social links, ...) for the artist detail overflow
+    /// menu's "Retrieve Artist Details" action (#1123) — the artist-level
+    /// equivalent of `fetch_musicbrainz_release_group_relations`. Returns
+    /// every `(rel_type, url)` pair MusicBrainz has on file; callers filter
+    /// down to the relation types they care about.
+    pub async fn fetch_musicbrainz_artist_relations(
+        &self,
+        artist_id: &str,
+    ) -> Result<Vec<(String, String)>> {
+        throttle_musicbrainz().await;
+        let url = format!(
+            "https://musicbrainz.org/ws/2/artist/{}?inc=url-rels&fmt=json",
+            percent_encoding::utf8_percent_encode(artist_id, percent_encoding::NON_ALPHANUMERIC)
+        );
+        let response = self.client.get(&url).send().await?;
+        if !response.status().is_success() {
+            return Err(anyhow!(
+                "MusicBrainz artist relations lookup failed: HTTP {}",
+                response.status()
+            ));
+        }
+        let parsed: MbArtistResponse = response.json().await?;
         Ok(parsed
             .relations
             .into_iter()
+            .filter(|r| !r.ended)
             .filter_map(|r| Some((r.rel_type?, r.url?.resource?)))
             .collect())
     }
@@ -675,6 +749,43 @@ mod tests {
                 ("lyrics".to_string(), "https://genius.com/albums/Nirvana/Nevermind".to_string()),
                 ("streaming".to_string(), "https://open.spotify.com/album/xyz".to_string()),
             ]
+        );
+    }
+
+    #[test]
+    fn test_mb_relation_ended_flag_deserializes_and_defaults_to_false() {
+        // Reproduces a real case (#1123): an artist's "official homepage"
+        // relation pointed at a dead site archived on web.archive.org and
+        // was marked `"ended": true` by MusicBrainz editors — that relation
+        // must not be surfaced as the artist's current website.
+        let json = r#"{
+            "relations": [
+                {
+                    "type": "official homepage",
+                    "target-type": "url",
+                    "ended": true,
+                    "url": {"resource": "https://web.archive.org/web/19970131155102/http://www.vmg.co.uk/massive/index.html"}
+                },
+                {
+                    "type": "discogs",
+                    "target-type": "url",
+                    "url": {"resource": "https://www.discogs.com/artist/1"}
+                }
+            ]
+        }"#;
+        let parsed: MbArtistResponse = serde_json::from_str(json).unwrap();
+        assert!(parsed.relations[0].ended);
+        assert!(!parsed.relations[1].ended);
+
+        let live: Vec<(String, String)> = parsed
+            .relations
+            .into_iter()
+            .filter(|r| !r.ended)
+            .filter_map(|r| Some((r.rel_type?, r.url?.resource?)))
+            .collect();
+        assert_eq!(
+            live,
+            vec![("discogs".to_string(), "https://www.discogs.com/artist/1".to_string())]
         );
     }
 

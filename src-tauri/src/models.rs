@@ -1150,6 +1150,14 @@ pub struct ArtistProfile {
     pub tags: Vec<String>,
     pub social_links: Vec<ArtistSocialLink>,
     pub bio: Option<String>,
+    /// The artist's MusicBrainz ID, distinct from whatever
+    /// `songs.musicbrainz_artist_id`/`musicbrainz_album_artist_id` happens to
+    /// be embedded in an individual song's own tags — captured from a
+    /// release-group's `artist-credit` during "Retrieve Album Details"
+    /// (#1122), or from a song's tagged MBID as a fallback, and used to
+    /// drive "Retrieve Artist Details" (#1123) without depending on a song
+    /// having a usable tagged MBID.
+    pub musicbrainz_artist_id: Option<String>,
 }
 
 /// An external platform or web link associated with an album release (#950).

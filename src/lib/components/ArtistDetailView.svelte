@@ -32,6 +32,7 @@
     PencilSimpleIcon as Edit3,
     ArrowSquareOutIcon as OpenInPicard,
     ArrowsClockwiseIcon as RefreshCw,
+    DownloadSimpleIcon as RetrieveDetails,
     PushPinIcon as Pin,
     PushPinSlashIcon as PinOff,
     DotsThreeIcon as MoreHorizontal,
@@ -44,7 +45,15 @@
   import ShareModal from "./ShareModal.svelte";
   import type { Song, Playlist, AlbumItem, PlayContext, ArtistProfile, ExtendedArtworkResponse, SongContextEnrichment } from "../types";
   import { getCoverArtUrl } from "../types";
-  import { resolveSocialUrl, formatDisplayLabel, deriveFanartTvUrl } from "../utils/artistSocials";
+  import {
+    resolveSocialUrl,
+    formatDisplayLabel,
+    normalizeWebsitePlatform,
+    resolveArtistMbid,
+    deriveMusicbrainzArtistUrl,
+    deriveListenbrainzArtistUrl,
+    deriveFanartTvUrlFromMbid,
+  } from "../utils/artistSocials";
   import { getArtistAlbums, classifyRelease } from "../utils/artist";
   import { songsToCoverStack } from "../utils/covers";
   import { parseMultiValue, joinMultiValue } from "../utils/multiValue";
@@ -63,6 +72,7 @@
   let compilations = $state<AlbumItem[]>([]);
   let loading = $state(true);
   let refreshing = $state(false);
+  let retrievingDetails = $state(false);
 
   let albumContextMenuState = $state<{ x: number; y: number; album: AlbumItem } | null>(null);
   let singleContextMenuState = $state<{ x: number; y: number; song: Song } | null>(null);
@@ -97,6 +107,14 @@
   let hasTags = $derived((artistProfile?.tags?.length ?? 0) > 0);
   let hasSocials = $derived((artistProfile?.social_links?.length ?? 0) > 0);
 
+  // "Retrieve Artist Details" needs a MusicBrainz artist MBID: either
+  // already captured on the profile (via "Retrieve Album Details" or a
+  // previous run of this action), or resolvable from a tagged song.
+  let hasMusicbrainzArtistId = $derived(
+    !!artistProfile?.musicbrainz_artist_id ||
+      songs.some((s) => (s.musicbrainz_artist_id ?? s.musicbrainz_album_artist_id ?? "").trim().length > 0)
+  );
+
   // Fetched MusicBrainz/Wikipedia context (#23), keyed off a track by
   // this artist with a MusicBrainz ID (or first song) — neither ArtistProfile
   // nor a dedicated artist entity carry a MusicBrainz ID of their own,
@@ -128,7 +146,18 @@
   let effectiveBio = $derived(artistProfile?.bio || contextData?.wikipedia_extract);
   let bioIsFromWikipedia = $derived(!artistProfile?.bio && !!contextData?.wikipedia_extract);
   let hasBio = $derived(!!effectiveBio);
-  let hasProfileContent = $derived(hasWebsite || hasBio || hasSocials);
+
+  // Derived, read-only MusicBrainz/ListenBrainz/Fanart.tv links (#98/#761,
+  // #1123) from the artist's resolved MBID — not a fetch, just computed
+  // URLs, same as any other link in this section.
+  let artistMbid = $derived(
+    resolveArtistMbid(artistProfile?.musicbrainz_artist_id, artistProfile?.social_links)
+  );
+  let musicbrainzArtistUrl = $derived(deriveMusicbrainzArtistUrl(artistMbid));
+  let listenbrainzArtistUrl = $derived(deriveListenbrainzArtistUrl(artistMbid));
+  let fanartTvUrl = $derived(deriveFanartTvUrlFromMbid(artistMbid));
+
+  let hasProfileContent = $derived(hasWebsite || hasBio || hasSocials || !!artistMbid);
 
   // Locally-discovered artist visuals (#98/#761) — portrait/logo/fanart,
   // fetched on demand per artist since scanning every artist's folder
@@ -148,10 +177,75 @@
   let bandLogoUrl = $derived(getCoverArtUrl(artistArtwork?.band_logo_uri));
   let fanartBannerUrl = $derived(getCoverArtUrl(artistArtwork?.fanart_uri));
 
-  // Derived, read-only fanart.tv link (#98/#761) from the user-entered
-  // MusicBrainz social link's MBID — not a fetch, just a computed URL, same
-  // as any other link in this section.
-  let fanartTvUrl = $derived(deriveFanartTvUrl(artistProfile?.social_links));
+  interface ArtistLinkItem {
+    key: string;
+    platform: string;
+    url: string;
+    label: string;
+    /** The artist's own official site(s) — MusicBrainz's "official
+     * homepage" relation(s) — rendered more prominently than a plain
+     * cross-reference or social link (#1123). */
+    isOfficial: boolean;
+  }
+
+  // Unifies the website, curated social links, and derived MusicBrainz/
+  // ListenBrainz/Fanart.tv links into one alphabetically-sorted list — same
+  // convention as AlbumDetailView's `releaseLinkItems` (#1122) — so the
+  // derived links aren't stuck at a fixed spot at the end regardless of
+  // what else is present. The official website always leads, ahead of the
+  // alphabetical sort, since it's the artist's own page rather than one
+  // more retrieved link.
+  let artistLinkItems = $derived.by((): ArtistLinkItem[] => {
+    const items: ArtistLinkItem[] = [];
+    if (hasWebsite) {
+      const website = artistProfile?.website ?? "";
+      const url = resolveSocialUrl("website", website);
+      items.push({
+        key: "website",
+        platform: normalizeWebsitePlatform("website", url),
+        url,
+        label: formatDisplayLabel("website", website),
+        isOfficial: true,
+      });
+    }
+    for (const link of artistProfile?.social_links ?? []) {
+      const url = resolveSocialUrl(link.platform, link.handle_or_url);
+      items.push({
+        key: `${link.platform}:${link.handle_or_url}`,
+        platform: normalizeWebsitePlatform(link.platform, url),
+        url,
+        label: formatDisplayLabel(link.platform, link.handle_or_url),
+        // A secondary "official homepage" (multiple listed on MB) is still
+        // stored under platform "website" before normalization — it's
+        // official too, just not the primary one.
+        isOfficial: link.platform === "website",
+      });
+    }
+    if (musicbrainzArtistUrl) {
+      items.push({ key: "musicbrainz-derived", platform: "musicbrainz", url: musicbrainzArtistUrl, label: "MusicBrainz", isOfficial: false });
+    }
+    if (listenbrainzArtistUrl) {
+      items.push({ key: "listenbrainz-derived", platform: "listenbrainz", url: listenbrainzArtistUrl, label: "ListenBrainz", isOfficial: false });
+    }
+    if (fanartTvUrl) {
+      items.push({ key: "fanart-tv", platform: "fanart_tv", url: fanartTvUrl, label: "Fanart.tv", isOfficial: false });
+    }
+    // Official homepage(s) lead as a group, ahead of the alphabetical sort —
+    // they're the artist's own page(s) rather than retrieved cross-references,
+    // and grouping them keeps a second/third homepage next to the first
+    // instead of scattered wherever its label happens to sort (#1123).
+    return items.sort((a, b) => {
+      if (a.isOfficial !== b.isOfficial) return a.isOfficial ? -1 : 1;
+      if (a.key === "website") return -1;
+      if (b.key === "website") return 1;
+      return a.label.localeCompare(b.label);
+    });
+  });
+
+  // Past a certain count the narrow single-column links panel (used
+  // alongside a bio) gets tall enough to feel unbalanced — switch to two
+  // columns so it stays compact.
+  let hasManyArtistLinks = $derived(artistLinkItems.length > 10);
 
   function handleTagClick(tag: string) {
     collectionStore.searchQuery = `artist-tag:${tag}`;
@@ -231,6 +325,44 @@
       toastStore.show(i18n.t("artistDetail.refreshError", {}, "Failed to refresh artist"));
     } finally {
       refreshing = false;
+    }
+  }
+
+  // The artist detail overflow menu's "Retrieve Artist Details" (#1123) —
+  // the artist-level equivalent of AlbumDetailView's handleRetrieveAlbumDetails.
+  async function handleRetrieveArtistDetails() {
+    if (retrievingDetails || !hasMusicbrainzArtistId) return;
+    retrievingDetails = true;
+    try {
+      const result = await collectionStore.retrieveArtistDetails(artistName);
+      if (result.added_count === 1) {
+        toastStore.show(
+          i18n.t("artistDetail.retrieveDetailsSuccessOne", {}, "Added 1 link from MusicBrainz")
+        );
+      } else if (result.added_count > 1) {
+        toastStore.show(
+          i18n.t(
+            "artistDetail.retrieveDetailsSuccessMany",
+            { count: result.added_count },
+            `Added ${result.added_count} links from MusicBrainz`
+          )
+        );
+      } else {
+        toastStore.show(
+          i18n.t(
+            "artistDetail.retrieveDetailsNoResults",
+            {},
+            "No additional details found on MusicBrainz"
+          )
+        );
+      }
+    } catch (err) {
+      console.error("Failed to retrieve artist details:", err);
+      toastStore.show(
+        i18n.t("artistDetail.retrieveDetailsError", {}, "Failed to retrieve artist details")
+      );
+    } finally {
+      retrievingDetails = false;
     }
   }
 
@@ -601,7 +733,6 @@
 
     <!-- Artist Profile Card (About & Links) -->
     {#if hasProfileContent && !windowLayoutStore.isDetailHeaderCollapsed && windowLayoutStore.isOverviewExpanded}
-      {@const profile = artistProfile}
       <details
         open
         ontoggle={(e) => windowLayoutStore.setOverviewExpanded(e.currentTarget.open)}
@@ -637,73 +768,34 @@
           {/if}
 
           <!-- Links Column (Right or Below) -->
-          {#if hasWebsite || hasSocials}
+          {#if hasWebsite || hasSocials || artistMbid}
             <div
               class={hasBio
-                ? "@2xl:w-60 @3xl:w-72 shrink-0 border-t border-brand-border/40 pt-4 @2xl:border-t-0 @2xl:border-l @2xl:border-brand-border/60 @2xl:pt-0 @2xl:pl-6 flex flex-col gap-3"
+                ? `${hasManyArtistLinks ? "@2xl:w-[22rem] @3xl:w-[28rem]" : "@2xl:w-60 @3xl:w-72"} shrink-0 border-t border-brand-border/40 pt-4 @2xl:border-t-0 @2xl:border-l @2xl:border-brand-border/60 @2xl:pt-0 @2xl:pl-6 flex flex-col gap-3`
                 : "w-full flex flex-col gap-3"}
             >
-              <div class="grid grid-cols-1 @sm:grid-cols-2 {hasBio ? '@2xl:flex @2xl:flex-col' : '@md:grid-cols-3 @xl:grid-cols-4'} gap-2.5">
-                <!-- Primary Website Link -->
-                {#if hasWebsite}
-                  {@const siteUrl = resolveSocialUrl("website", profile?.website ?? "")}
+              <div class="grid grid-cols-1 @sm:grid-cols-2 {hasBio ? (hasManyArtistLinks ? '@2xl:grid @2xl:grid-cols-2' : '@2xl:flex @2xl:flex-col') : '@md:grid-cols-3 @xl:grid-cols-4'} gap-2.5">
+                <!-- Website, curated social links, and derived MusicBrainz/
+                     ListenBrainz/Fanart.tv links, unified and sorted
+                     alphabetically with the website first (#1122, #1123) -->
+                {#each artistLinkItems as item (item.key)}
                   <button
                     type="button"
-                    onclick={() => handleOpenUrl(siteUrl)}
+                    onclick={() => handleOpenUrl(item.url)}
+                    title={item.url}
                     class="flex items-center gap-2.5 sm:gap-3 group text-left transition-colors cursor-pointer min-w-0"
                   >
-                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-brand-main/60 border border-brand-border flex items-center justify-center text-brand-text-secondary group-hover:text-brand-accent group-hover:border-brand-accent/40 transition-colors shrink-0 shadow-2xs">
-                      <SocialIcon platform="website" size={14} />
+                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-brand-main/60 {item.isOfficial ? 'border-[3px]' : 'border'} border-brand-border flex items-center justify-center text-brand-text-secondary group-hover:text-brand-accent group-hover:border-brand-accent/40 transition-colors shrink-0 shadow-2xs">
+                      <SocialIcon platform={item.platform} size={14} />
                     </div>
                     <div class="flex items-center gap-1 min-w-0 flex-1">
                       <span class="text-xs font-medium text-brand-text-primary truncate transition-colors">
-                        {formatDisplayLabel("website", profile?.website ?? "")}
-                      </span>
-                      <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-                    </div>
-                  </button>
-                {/if}
-
-                <!-- Social Links -->
-                {#each profile?.social_links ?? [] as link, idx (idx)}
-                  {@const resolvedUrl = resolveSocialUrl(link.platform, link.handle_or_url)}
-                  <button
-                    type="button"
-                    onclick={() => handleOpenUrl(resolvedUrl)}
-                    class="flex items-center gap-2.5 sm:gap-3 group text-left transition-colors cursor-pointer min-w-0"
-                  >
-                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-brand-main/60 border border-brand-border flex items-center justify-center text-brand-text-secondary group-hover:text-brand-accent group-hover:border-brand-accent/40 transition-colors shrink-0 shadow-2xs">
-                      <SocialIcon platform={link.platform} size={14} />
-                    </div>
-                    <div class="flex items-center gap-1 min-w-0 flex-1">
-                      <span class="text-xs font-medium text-brand-text-primary truncate transition-colors">
-                        {formatDisplayLabel(link.platform, link.handle_or_url)}
+                        {item.label}
                       </span>
                       <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                     </div>
                   </button>
                 {/each}
-
-                <!-- Derived Fanart.tv link (#98/#761) — computed from the
-                     MusicBrainz link's MBID above, not a stored/user-editable
-                     social link, so it isn't part of the {#each} above. -->
-                {#if fanartTvUrl}
-                  <button
-                    type="button"
-                    onclick={() => handleOpenUrl(fanartTvUrl)}
-                    class="flex items-center gap-2.5 sm:gap-3 group text-left transition-colors cursor-pointer min-w-0"
-                  >
-                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-brand-main/60 border border-brand-border flex items-center justify-center text-brand-text-secondary group-hover:text-brand-accent group-hover:border-brand-accent/40 transition-colors shrink-0 shadow-2xs">
-                      <SocialIcon platform="fanart_tv" size={14} />
-                    </div>
-                    <div class="flex items-center gap-1 min-w-0 flex-1">
-                      <span class="text-xs font-medium text-brand-text-primary truncate transition-colors">
-                        Fanart.tv
-                      </span>
-                      <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-                    </div>
-                  </button>
-                {/if}
               </div>
             </div>
           {/if}
@@ -889,6 +981,13 @@
       onclick={() => { handleOpenAllInPicard(); overflowMenuPos = null; }}
       disabled={loading || songs.length === 0 || !picardStore.available}
       title={picardStore.available ? undefined : i18n.t("picard.notFoundTooltip")}
+    />
+    <ContextMenuItem
+      icon={RetrieveDetails}
+      label={i18n.t("artistDetail.retrieveArtistDetails", {}, "Retrieve Artist Details")}
+      title={hasMusicbrainzArtistId ? i18n.t("artistDetail.retrieveArtistDetailsTooltip", {}, "Fetch Discogs, AllMusic, Wikidata, IMDb and social links from MusicBrainz") : i18n.t("artistDetail.retrieveArtistDetailsNoMbidTooltip", {}, "No MusicBrainz artist ID found for this artist")}
+      onclick={() => { handleRetrieveArtistDetails(); overflowMenuPos = null; }}
+      disabled={loading || retrievingDetails || !hasMusicbrainzArtistId}
     />
     <ContextMenuItem
       icon={BarChart2}

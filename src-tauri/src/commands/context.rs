@@ -4,6 +4,7 @@
 //! (see `db.rs` migration 28) with a 30-day TTL. Each source degrades
 //! independently on failure — see `context::ContextManager`'s doc comment.
 
+use crate::collection::get_artist_profile_conn;
 use crate::context::{
     is_cache_fresh, ContextManager, ARTIST_FLIGHT, RELEASE_GROUP_FLIGHT,
 };
@@ -48,6 +49,49 @@ fn context_enrichment_enabled(conn: &rusqlite::Connection) -> bool {
     stored.map(|v| v != "false").unwrap_or(true)
 }
 
+/// Resolves the MusicBrainz artist ID `get_song_context` uses to drive the
+/// Wikipedia bio lookup: prefers a song's own tagged `musicbrainz_artist_id`
+/// (falling back to `musicbrainz_album_artist_id`, first entry if
+/// multi-valued), and only when the song has neither falls back to the
+/// artist's own persisted `ArtistProfile.musicbrainz_artist_id` (#1123,
+/// captured by "Retrieve Album/Artist Details" or a *different* song's tag)
+/// — so the Wikipedia bio isn't limited to songs that happen to carry a
+/// usable tagged MBID themselves, which is the common case for a library
+/// tagged before Picard-level MBID tagging was consistently used.
+fn resolve_song_context_artist_mbid(
+    conn: &rusqlite::Connection,
+    tagged_artist_mbid: Option<&str>,
+    tagged_album_artist_mbid: Option<&str>,
+    artist_name: Option<&str>,
+    album_artist_name: Option<&str>,
+) -> Option<String> {
+    let first_value = |raw: &str| {
+        raw.split(&[';', '/'][..])
+            .next()
+            .unwrap_or(raw)
+            .trim()
+            .to_string()
+    };
+
+    let resolved_from_tags = tagged_artist_mbid
+        .filter(|a| !a.trim().is_empty())
+        .or_else(|| tagged_album_artist_mbid.filter(|a| !a.trim().is_empty()))
+        .map(first_value)
+        .filter(|a| !a.is_empty());
+    if resolved_from_tags.is_some() {
+        return resolved_from_tags;
+    }
+
+    let effective_artist_name = album_artist_name
+        .filter(|a| !a.trim().is_empty())
+        .or_else(|| artist_name.filter(|a| !a.trim().is_empty()))
+        .map(first_value)
+        .filter(|a| !a.is_empty())?;
+    get_artist_profile_conn(conn, &effective_artist_name)
+        .ok()
+        .and_then(|profile| profile.musicbrainz_artist_id)
+}
+
 #[tauri::command]
 pub async fn get_song_context(
     state: State<'_, AppState>,
@@ -60,24 +104,26 @@ pub async fn get_song_context(
         if !context_enrichment_enabled(conn) {
             return Ok(None);
         }
-        let (rg, artist, album_artist): (Option<String>, Option<String>, Option<String>) = conn
+        let (rg, tagged_artist_mbid, tagged_album_artist_mbid, artist_name, album_artist_name): (
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+        ) = conn
             .query_row(
-                "SELECT musicbrainz_release_group_id, musicbrainz_artist_id, musicbrainz_album_artist_id FROM songs WHERE id = ?1",
+                "SELECT musicbrainz_release_group_id, musicbrainz_artist_id, musicbrainz_album_artist_id, artist, album_artist FROM songs WHERE id = ?1",
                 params![song_id],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
             )
-            .unwrap_or((None, None, None));
-        let resolved_artist = artist
-            .filter(|a| !a.trim().is_empty())
-            .or_else(|| album_artist.filter(|a| !a.trim().is_empty()))
-            .map(|a| {
-                a.split(&[';', '/'][..])
-                    .next()
-                    .unwrap_or(&a)
-                    .trim()
-                    .to_string()
-            })
-            .filter(|a| !a.is_empty());
+            .unwrap_or((None, None, None, None, None));
+        let resolved_artist = resolve_song_context_artist_mbid(
+            conn,
+            tagged_artist_mbid.as_deref(),
+            tagged_album_artist_mbid.as_deref(),
+            artist_name.as_deref(),
+            album_artist_name.as_deref(),
+        );
         Ok(Some((rg, resolved_artist)))
     })
     .await
@@ -410,4 +456,86 @@ async fn write_artist_cache(
     })
     .await
     .map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::Database;
+    use crate::models::ArtistProfile;
+
+    fn temp_db(name: &str) -> Database {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_{}_{}",
+            name,
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        Database::new(temp_dir).unwrap()
+    }
+
+    #[test]
+    fn test_resolve_song_context_artist_mbid_prefers_tagged_mbid() {
+        let db = temp_db("context_resolve_tagged");
+        let conn = db.pool.get().unwrap();
+        assert_eq!(
+            resolve_song_context_artist_mbid(
+                &conn,
+                Some("tagged-mbid"),
+                None,
+                Some("Some Artist"),
+                None
+            ),
+            Some("tagged-mbid".to_string())
+        );
+    }
+
+    #[test]
+    fn test_resolve_song_context_artist_mbid_falls_back_to_artist_profile() {
+        // Reproduces a reported gap (#1123): a song with no tagged MBID
+        // still couldn't get a Wikipedia bio, even after "Retrieve Artist
+        // Details" had persisted the artist's MBID onto their profile.
+        let db = temp_db("context_resolve_profile_fallback");
+        let conn = db.pool.get().unwrap();
+        crate::collection::set_artist_profile_conn(
+            &conn,
+            &ArtistProfile {
+                artist_key: "Shania Twain".to_string(),
+                musicbrainz_artist_id: Some("profile-mbid".to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(
+            resolve_song_context_artist_mbid(&conn, None, None, Some("Shania Twain"), None),
+            Some("profile-mbid".to_string())
+        );
+        // Album artist takes precedence over track artist, same convention
+        // as elsewhere (effective_artist resolution).
+        assert_eq!(
+            resolve_song_context_artist_mbid(
+                &conn,
+                None,
+                None,
+                Some("Feature Artist"),
+                Some("Shania Twain")
+            ),
+            Some("profile-mbid".to_string())
+        );
+    }
+
+    #[test]
+    fn test_resolve_song_context_artist_mbid_none_when_nothing_resolves() {
+        let db = temp_db("context_resolve_none");
+        let conn = db.pool.get().unwrap();
+        assert_eq!(resolve_song_context_artist_mbid(&conn, None, None, None, None), None);
+        // An artist with no saved profile at all yields None, not an error.
+        assert_eq!(
+            resolve_song_context_artist_mbid(&conn, None, None, Some("Nobody Known"), None),
+            None
+        );
+    }
 }
