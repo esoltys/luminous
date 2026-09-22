@@ -14,6 +14,18 @@ use rusqlite::params;
 use serde::Serialize;
 use tauri::State;
 
+/// `(release_group_id, tagged_artist_mbid, tagged_album_artist_mbid, artist,
+/// album_artist)` — the handful of `songs` columns `get_song_context` needs
+/// to resolve what to fetch. Named to keep clippy's `type_complexity` lint
+/// happy on the `query_row` call site.
+type SongIdentifiersRow = (
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+);
+
 #[derive(Serialize, Default, Clone, Debug)]
 pub struct SongContextEnrichment {
     pub mb_rating: Option<f32>,
@@ -104,19 +116,14 @@ pub async fn get_song_context(
         if !context_enrichment_enabled(conn) {
             return Ok(None);
         }
-        let (rg, tagged_artist_mbid, tagged_album_artist_mbid, artist_name, album_artist_name): (
-            Option<String>,
-            Option<String>,
-            Option<String>,
-            Option<String>,
-            Option<String>,
-        ) = conn
+        let row: SongIdentifiersRow = conn
             .query_row(
                 "SELECT musicbrainz_release_group_id, musicbrainz_artist_id, musicbrainz_album_artist_id, artist, album_artist FROM songs WHERE id = ?1",
                 params![song_id],
                 |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
             )
             .unwrap_or((None, None, None, None, None));
+        let (rg, tagged_artist_mbid, tagged_album_artist_mbid, artist_name, album_artist_name) = row;
         let resolved_artist = resolve_song_context_artist_mbid(
             conn,
             tagged_artist_mbid.as_deref(),
