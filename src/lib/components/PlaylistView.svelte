@@ -883,6 +883,8 @@
 
 {#if contextMenuState}
   {@const singleItem = contextMenuState.item}
+  {@const selectedTracks = playlistsStore.activePlaylistTracks.filter((t) => selectedUuids.has(t.uuid) && t.song)}
+  {@const picardTargets = selectedTracks.length > 0 ? selectedTracks.map((t) => t.song!) : singleItem.song ? [singleItem.song] : []}
   <PlaylistContextMenu
     x={contextMenuState.x}
     y={contextMenuState.y}
@@ -893,6 +895,7 @@
     onGoToAlbum={singleItem.song?.album ? () => navigationStore.viewAlbum(singleItem.song?.album || "") : undefined}
     onEditTags={singleItem.song?.id && !isItemUnavailable(singleItem) ? () => openTagEditor(singleItem.song!.id) : undefined}
     onOpenInPicard={singleItem.song?.id ? () => openSelectedInPicard(singleItem.song!.id) : undefined}
+    allSelectedWebDav={picardTargets.length > 0 && picardTargets.every((s) => s.source === "web_dav")}
     onClose={() => { contextMenuState = null; }}
   />
 {/if}

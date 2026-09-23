@@ -1262,6 +1262,7 @@ export const fr = {
     openAllInPicard: "Tout ouvrir dans Picard",
     openSelectedInPicard: "Ouvrir {count} dans Picard",
     notFoundTooltip: "MusicBrainz Picard introuvable. Installez-le depuis picard.musicbrainz.org, ou définissez un chemin personnalisé dans les paramètres.",
+    webdavNotSupportedTooltip: "Ouvrir dans Picard n'est pas disponible pour les morceaux WebDAV",
     integrationTitle: "MusicBrainz Picard",
     integrationDesc: "est un programme open source qui identifie les fichiers musicaux grâce à leur empreinte audio numérique unique, complétant automatiquement les détails de piste manquants, les pochettes et des noms de fichiers soignés à l'aide d'une vaste encyclopédie communautaire.",
     foundAt: "Trouvé à {path}",

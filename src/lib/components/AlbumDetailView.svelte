@@ -786,12 +786,14 @@
 
 {#if contextMenuState}
   {@const song = contextMenuState.song}
+  {@const selectedSongs = selectedKeys.size > 1 ? songs.filter((s) => selectedKeys.has(String(s.id))) : undefined}
   <SongContextMenu
     x={contextMenuState.x}
     y={contextMenuState.y}
     {song}
     selectedCount={selectedKeys.size}
     selectedSongIds={Array.from(selectedKeys, Number)}
+    {selectedSongs}
     onPlay={() => {
       if (selectedKeys.size > 1) {
         handlePlaySelected();
@@ -844,8 +846,12 @@
       icon={OpenInPicard}
       label={i18n.t("picard.openInPicard")}
       onclick={() => { handleOpenAlbumInPicard(); overflowMenuPos = null; }}
-      disabled={loading || songs.length === 0 || !picardStore.available}
-      title={picardStore.available ? undefined : i18n.t("picard.notFoundTooltip")}
+      disabled={loading || songs.length === 0 || !picardStore.available || songs.every((s) => s.source === "web_dav")}
+      title={!picardStore.available
+        ? i18n.t("picard.notFoundTooltip")
+        : songs.length > 0 && songs.every((s) => s.source === "web_dav")
+          ? i18n.t("picard.webdavNotSupportedTooltip")
+          : undefined}
     />
   </ContextMenu>
 {/if}

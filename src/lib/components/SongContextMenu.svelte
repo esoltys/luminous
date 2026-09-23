@@ -35,6 +35,7 @@
     song,
     selectedCount = 1,
     selectedSongIds,
+    selectedSongs,
     onPlay,
     onAddToQueue,
     onAddToPlaylist,
@@ -50,6 +51,7 @@
     song: Song;
     selectedCount?: number;
     selectedSongIds?: number[];
+    selectedSongs?: Song[];
     onPlay: () => void;
     onAddToQueue?: () => void;
     onAddToPlaylist?: () => void;
@@ -78,6 +80,9 @@
       : i18n.t("playlists.unmarkedNotIncluded", { name });
     toastStore.show(message);
   }
+
+  const picardSelection = $derived(selectedSongs && selectedSongs.length > 0 ? selectedSongs : [song]);
+  const allSelectedWebDav = $derived(picardSelection.every((s) => s.source === "web_dav"));
 
   let showShareModal = $state(false);
   // See AlbumContextMenu.svelte for why the menu must be hidden (not left
@@ -214,8 +219,12 @@
       icon={OpenInPicard}
       label={i18n.t("picard.openInPicard")}
       onclick={() => { onOpenInPicard?.(); onClose(); }}
-      disabled={!picardStore.available}
-      title={picardStore.available ? undefined : i18n.t("picard.notFoundTooltip")}
+      disabled={!picardStore.available || allSelectedWebDav}
+      title={!picardStore.available
+        ? i18n.t("picard.notFoundTooltip")
+        : allSelectedWebDav
+          ? i18n.t("picard.webdavNotSupportedTooltip")
+          : undefined}
     />
   {/if}
 </ContextMenu>
