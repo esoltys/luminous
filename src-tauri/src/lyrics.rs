@@ -234,9 +234,9 @@ fn extract_track_and_title_from_stem(stem: &str) -> (Option<i32>, Option<String>
     let mut parts = effective_stem.splitn(2, ['-', '_', ' ']);
     if let Some(first) = parts.next() {
         if let Ok(num) = first.trim().parse::<i32>() {
-            let title = parts.next().map(|t| {
-                t.trim_start_matches(['-', '_', ' ']).trim().to_string()
-            });
+            let title = parts
+                .next()
+                .map(|t| t.trim_start_matches(['-', '_', ' ']).trim().to_string());
             return (Some(num), title);
         }
     }

@@ -83,7 +83,9 @@ impl TagManager {
                 log::error!("Failed to ensure tag_groups/tag_assignments tables exist: {e}");
             }
             if let Err(e) = conn.execute_batch(crate::db::ARTIST_TAG_HIERARCHY_TABLES_SQL) {
-                log::error!("Failed to ensure artist_tag_groups/artist_tag_assignments tables exist: {e}");
+                log::error!(
+                    "Failed to ensure artist_tag_groups/artist_tag_assignments tables exist: {e}"
+                );
             }
         }
         Self { db }
@@ -985,7 +987,10 @@ impl TagManager {
             let tag = row.1;
             let tag_lower = tag.to_lowercase();
             tag_display_names.entry(tag_lower.clone()).or_insert(tag);
-            artist_tags.entry(artist_key.clone()).or_default().insert(tag_lower.clone());
+            artist_tags
+                .entry(artist_key.clone())
+                .or_default()
+                .insert(tag_lower.clone());
             tag_artists.entry(tag_lower).or_default().insert(artist_key);
         }
 
@@ -1079,7 +1084,13 @@ impl TagManager {
         {
             let mut stmt = conn.prepare("SELECT id, name, is_custom FROM artist_tag_groups")?;
             for row in stmt
-                .query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?, r.get::<_, i64>(2)?)))?
+                .query_map([], |r| {
+                    Ok((
+                        r.get::<_, i64>(0)?,
+                        r.get::<_, String>(1)?,
+                        r.get::<_, i64>(2)?,
+                    ))
+                })?
                 .filter_map(|r| r.ok())
             {
                 existing_groups.insert(row.1.to_lowercase(), (row.0, row.2));
@@ -1157,7 +1168,9 @@ impl TagManager {
             conn.query_row("SELECT COUNT(*) FROM artist_tag_groups", [], |r| r.get(0))?;
 
         for (tag_lower, display_name) in &active_tag_map {
-            if !existing_groups.contains_key(tag_lower) && !existing_assignments.contains_key(tag_lower) {
+            if !existing_groups.contains_key(tag_lower)
+                && !existing_assignments.contains_key(tag_lower)
+            {
                 conn.execute(
                     "INSERT OR IGNORE INTO artist_tag_groups (name, color_index, sort_order) VALUES (?1, ?2, ?3)",
                     params![display_name, group_count % PALETTE_SIZE, next_group_sort],
@@ -1270,7 +1283,10 @@ impl TagManager {
             .filter_map(|r| r.ok())
             .collect();
 
-        if let Some(pos) = siblings.iter().position(|s| s.eq_ignore_ascii_case(tag_name)) {
+        if let Some(pos) = siblings
+            .iter()
+            .position(|s| s.eq_ignore_ascii_case(tag_name))
+        {
             let item = siblings.remove(pos);
             let target = (new_index.max(0) as usize).min(siblings.len());
             siblings.insert(target, item);
@@ -1311,11 +1327,12 @@ impl TagManager {
 
     pub fn merge_artist_tags(&self, from: &str, into: &str) -> Result<usize> {
         let conn = self.db.pool.get()?;
-        let mut stmt = conn.prepare(
-            "SELECT artist_key, tags FROM artist_profiles WHERE tags LIKE ?1",
-        )?;
+        let mut stmt =
+            conn.prepare("SELECT artist_key, tags FROM artist_profiles WHERE tags LIKE ?1")?;
         let rows: Vec<(String, String)> = stmt
-            .query_map(params![format!("%\"{}\"%", from)], |r| Ok((r.get(0)?, r.get(1)?)))?
+            .query_map(params![format!("%\"{}\"%", from)], |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })?
             .filter_map(|r| r.ok())
             .collect();
 

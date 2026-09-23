@@ -53,9 +53,7 @@ pub async fn get_scrobble_cache_status(
 }
 
 #[tauri::command]
-pub async fn flush_scrobble_cache(
-    state: State<'_, AppState>,
-) -> Result<u32, String> {
+pub async fn flush_scrobble_cache(state: State<'_, AppState>) -> Result<u32, String> {
     state.scrobbler.flush_cache_now().await
 }
 

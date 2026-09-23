@@ -42,8 +42,7 @@ pub fn classify_quality_tier(
     bit_depth: Option<i32>,
 ) -> QualityTier {
     if filetype.is_lossless() {
-        let is_hires =
-            sample_rate.is_some_and(|r| r > 48_000) || bit_depth.is_some_and(|d| d > 16);
+        let is_hires = sample_rate.is_some_and(|r| r > 48_000) || bit_depth.is_some_and(|d| d > 16);
         if is_hires {
             QualityTier::HiRes
         } else {

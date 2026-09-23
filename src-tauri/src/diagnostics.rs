@@ -52,7 +52,11 @@ fn append_log_entry(path: &Path, kind: &str, body: &str) {
         }
     }
     let entry = format!("[{}] {kind}: {body}\n", chrono::Local::now().to_rfc3339());
-    match std::fs::OpenOptions::new().create(true).append(true).open(path) {
+    match std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+    {
         Ok(mut f) => {
             let _ = f.write_all(entry.as_bytes());
         }
@@ -65,7 +69,10 @@ fn append_log_entry(path: &Path, kind: &str, body: &str) {
 pub fn build_diagnostics_bundle(app_data_dir: &Path, app_version: &str) -> String {
     let mut out = String::new();
     out.push_str("Luminous diagnostics export\n");
-    out.push_str(&format!("Generated: {}\n", chrono::Local::now().to_rfc3339()));
+    out.push_str(&format!(
+        "Generated: {}\n",
+        chrono::Local::now().to_rfc3339()
+    ));
     out.push_str(&format!("App version: {app_version}\n"));
     out.push_str(&format!(
         "OS: {} ({})\n",

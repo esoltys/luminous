@@ -165,7 +165,9 @@ impl ScrobblerManager {
             .unwrap_or_default();
 
         let initial_settings = Self::load_settings_from_db(&db);
-        let paused = Arc::new(std::sync::atomic::AtomicBool::new(initial_settings.scrobble_paused));
+        let paused = Arc::new(std::sync::atomic::AtomicBool::new(
+            initial_settings.scrobble_paused,
+        ));
         let discord = Arc::new(Mutex::new(crate::discord::DiscordManager::new()));
 
         Self {
@@ -193,12 +195,23 @@ impl ScrobblerManager {
                 if let Some(rows) = rows {
                     for (k, v) in rows.flatten() {
                         match k.as_str() {
-                            "listenbrainz_enabled" => settings.listenbrainz_enabled = v == "true" || v == "1",
+                            "listenbrainz_enabled" => {
+                                settings.listenbrainz_enabled = v == "true" || v == "1"
+                            }
                             "listenbrainz_token" => settings.listenbrainz_token = v,
-                            "listenbrainz_username" => settings.listenbrainz_username = if v.is_empty() { None } else { Some(v) },
-                            "scrobbler_now_playing" => settings.scrobble_now_playing = v != "false" && v != "0",
-                            "scrobbler_ratings" => settings.scrobble_ratings = v != "false" && v != "0",
-                            "scrobbler_paused" => settings.scrobble_paused = v == "true" || v == "1",
+                            "listenbrainz_username" => {
+                                settings.listenbrainz_username =
+                                    if v.is_empty() { None } else { Some(v) }
+                            }
+                            "scrobbler_now_playing" => {
+                                settings.scrobble_now_playing = v != "false" && v != "0"
+                            }
+                            "scrobbler_ratings" => {
+                                settings.scrobble_ratings = v != "false" && v != "0"
+                            }
+                            "scrobbler_paused" => {
+                                settings.scrobble_paused = v == "true" || v == "1"
+                            }
                             "scrobbler_min_duration_secs" => {
                                 if let Ok(n) = v.parse::<u32>() {
                                     settings.min_duration_secs = n;
@@ -210,8 +223,12 @@ impl ScrobblerManager {
                                     settings.discord_client_id = v;
                                 }
                             }
-                            "discord_show_album" => settings.discord_show_album = v != "false" && v != "0",
-                            "discord_show_time" => settings.discord_show_time = v != "false" && v != "0",
+                            "discord_show_album" => {
+                                settings.discord_show_album = v != "false" && v != "0"
+                            }
+                            "discord_show_time" => {
+                                settings.discord_show_time = v != "false" && v != "0"
+                            }
                             _ => {}
                         }
                     }
@@ -225,17 +242,44 @@ impl ScrobblerManager {
     pub async fn save_settings(&self, new_settings: ScrobblerSettings) -> Result<()> {
         if let Ok(conn) = self.db.pool.get() {
             let pairs: &[(&str, String)] = &[
-                ("listenbrainz_enabled", new_settings.listenbrainz_enabled.to_string()),
-                ("listenbrainz_token", new_settings.listenbrainz_token.clone()),
-                ("listenbrainz_username", new_settings.listenbrainz_username.clone().unwrap_or_default()),
-                ("scrobbler_now_playing", new_settings.scrobble_now_playing.to_string()),
-                ("scrobbler_ratings", new_settings.scrobble_ratings.to_string()),
+                (
+                    "listenbrainz_enabled",
+                    new_settings.listenbrainz_enabled.to_string(),
+                ),
+                (
+                    "listenbrainz_token",
+                    new_settings.listenbrainz_token.clone(),
+                ),
+                (
+                    "listenbrainz_username",
+                    new_settings
+                        .listenbrainz_username
+                        .clone()
+                        .unwrap_or_default(),
+                ),
+                (
+                    "scrobbler_now_playing",
+                    new_settings.scrobble_now_playing.to_string(),
+                ),
+                (
+                    "scrobbler_ratings",
+                    new_settings.scrobble_ratings.to_string(),
+                ),
                 ("scrobbler_paused", new_settings.scrobble_paused.to_string()),
-                ("scrobbler_min_duration_secs", new_settings.min_duration_secs.to_string()),
+                (
+                    "scrobbler_min_duration_secs",
+                    new_settings.min_duration_secs.to_string(),
+                ),
                 ("discord_enabled", new_settings.discord_enabled.to_string()),
                 ("discord_client_id", new_settings.discord_client_id.clone()),
-                ("discord_show_album", new_settings.discord_show_album.to_string()),
-                ("discord_show_time", new_settings.discord_show_time.to_string()),
+                (
+                    "discord_show_album",
+                    new_settings.discord_show_album.to_string(),
+                ),
+                (
+                    "discord_show_time",
+                    new_settings.discord_show_time.to_string(),
+                ),
             ];
             for (k, v) in pairs {
                 let _ = conn.execute(
@@ -244,7 +288,10 @@ impl ScrobblerManager {
                 );
             }
         }
-        self.paused.store(new_settings.scrobble_paused, std::sync::atomic::Ordering::Relaxed);
+        self.paused.store(
+            new_settings.scrobble_paused,
+            std::sync::atomic::Ordering::Relaxed,
+        );
         let mut s = self.settings.lock().await;
         *s = new_settings.clone();
 
@@ -464,7 +511,8 @@ impl ScrobblerManager {
         is_playing: bool,
         position_nanosec: i64,
     ) {
-        self.update_discord(song, is_playing, position_nanosec).await;
+        self.update_discord(song, is_playing, position_nanosec)
+            .await;
     }
 
     /// Called when playback has completely stopped.
@@ -476,7 +524,10 @@ impl ScrobblerManager {
     pub async fn get_discord_status(&self) -> crate::discord::DiscordStatus {
         let mut d = self.discord.lock().await;
         let settings = self.get_settings().await;
-        if settings.discord_enabled && !settings.scrobble_paused && d.status() != crate::discord::DiscordStatus::Connected {
+        if settings.discord_enabled
+            && !settings.scrobble_paused
+            && d.status() != crate::discord::DiscordStatus::Connected
+        {
             let _ = d.connect(&settings.discord_client_id).await;
         }
         d.status()
@@ -494,7 +545,13 @@ impl ScrobblerManager {
         }
 
         // Exclude radio streams
-        if matches!(song.source, SongSource::Stream | SongSource::SomaFm | SongSource::RadioParadise | SongSource::RadioBrowser) {
+        if matches!(
+            song.source,
+            SongSource::Stream
+                | SongSource::SomaFm
+                | SongSource::RadioParadise
+                | SongSource::RadioBrowser
+        ) {
             return;
         }
 
@@ -504,10 +561,8 @@ impl ScrobblerManager {
         let duration_ms = song.length_nanosec.map(|ns| ns / 1_000_000);
         let tracknumber = song.track;
 
-        let artist_mbids_vec: Option<Vec<&str>> = song
-            .musicbrainz_artist_id
-            .as_deref()
-            .map(|id| vec![id]);
+        let artist_mbids_vec: Option<Vec<&str>> =
+            song.musicbrainz_artist_id.as_deref().map(|id| vec![id]);
 
         let payload = ListenBrainzSubmitRequest {
             listen_type: "playing_now",
@@ -556,7 +611,10 @@ impl ScrobblerManager {
                     log::debug!("ListenBrainz now-playing submitted successfully");
                 }
                 Ok(resp) => {
-                    log::warn!("ListenBrainz now-playing returned status: {}", resp.status());
+                    log::warn!(
+                        "ListenBrainz now-playing returned status: {}",
+                        resp.status()
+                    );
                 }
                 Err(e) => {
                     log::warn!("Failed to submit now-playing to ListenBrainz: {e}");
@@ -573,7 +631,13 @@ impl ScrobblerManager {
         }
 
         // Radio / live stream tracks are not scrobbled
-        if matches!(song.source, SongSource::Stream | SongSource::SomaFm | SongSource::RadioParadise | SongSource::RadioBrowser) {
+        if matches!(
+            song.source,
+            SongSource::Stream
+                | SongSource::SomaFm
+                | SongSource::RadioParadise
+                | SongSource::RadioBrowser
+        ) {
             return;
         }
 
@@ -581,12 +645,19 @@ impl ScrobblerManager {
         if let Some(ns) = song.length_nanosec {
             let secs = (ns as u64) / 1_000_000_000;
             if secs < (settings.min_duration_secs as u64) {
-                log::debug!("Song duration ({}s) is below scrobble minimum ({}s); skipping scrobble", secs, settings.min_duration_secs);
+                log::debug!(
+                    "Song duration ({}s) is below scrobble minimum ({}s); skipping scrobble",
+                    secs,
+                    settings.min_duration_secs
+                );
                 return;
             }
         }
 
-        let artist = song.artist.clone().unwrap_or_else(|| "Unknown Artist".into());
+        let artist = song
+            .artist
+            .clone()
+            .unwrap_or_else(|| "Unknown Artist".into());
         let track = song.title.clone().unwrap_or_else(|| "Unknown Track".into());
         let album = song.album.clone();
         let duration_ms = song.length_nanosec.map(|ns| ns / 1_000_000);
@@ -631,7 +702,12 @@ impl ScrobblerManager {
             return;
         }
 
-        log::info!("Scrobble enqueued for '{} - {}' at timestamp {}", artist, track, listened_at);
+        log::info!(
+            "Scrobble enqueued for '{} - {}' at timestamp {}",
+            artist,
+            track,
+            listened_at
+        );
 
         // Trigger asynchronous cache drain
         self.trigger_flush();
@@ -640,7 +716,8 @@ impl ScrobblerManager {
     /// Submit love/feedback when song rating changes.
     pub async fn on_song_rating(&self, song: &Song, rating: f32) {
         let settings = self.get_settings().await;
-        if !settings.listenbrainz_enabled || settings.scrobble_paused || !settings.scrobble_ratings {
+        if !settings.listenbrainz_enabled || settings.scrobble_paused || !settings.scrobble_ratings
+        {
             return;
         }
 
@@ -662,7 +739,9 @@ impl ScrobblerManager {
                 score,
             };
             let res = client
-                .post(format!("{LISTENBRAINZ_API_BASE}/feedback/recording-feedback"))
+                .post(format!(
+                    "{LISTENBRAINZ_API_BASE}/feedback/recording-feedback"
+                ))
                 .header("Authorization", format!("Token {token}"))
                 .json(&payload)
                 .send()
@@ -731,7 +810,9 @@ impl ScrobblerManager {
 
             let res = self
                 .client
-                .post(format!("{LISTENBRAINZ_API_BASE}/feedback/recording-feedback"))
+                .post(format!(
+                    "{LISTENBRAINZ_API_BASE}/feedback/recording-feedback"
+                ))
                 .header("Authorization", format!("Token {token}"))
                 .json(&payload)
                 .send()
@@ -808,7 +889,9 @@ impl ScrobblerManager {
             {
                 return;
             }
-            if let Err(e) = Self::flush_cache_internal(&db, &client, &settings.listenbrainz_token).await {
+            if let Err(e) =
+                Self::flush_cache_internal(&db, &client, &settings.listenbrainz_token).await
+            {
                 log::warn!("Scrobble cache flush finished with error: {e}");
             }
         });
@@ -823,7 +906,11 @@ impl ScrobblerManager {
         Self::flush_cache_internal(&self.db, &self.client, &settings.listenbrainz_token).await
     }
 
-    async fn flush_cache_internal(db: &Database, client: &Client, token: &str) -> Result<u32, String> {
+    async fn flush_cache_internal(
+        db: &Database,
+        client: &Client,
+        token: &str,
+    ) -> Result<u32, String> {
         let entries: Vec<ScrobbleCacheEntry> = {
             let conn = db.pool.get().map_err(|e| e.to_string())?;
 
@@ -872,7 +959,11 @@ impl ScrobblerManager {
             return Ok(0);
         }
 
-        let listen_type = if entries.len() == 1 { "single" } else { "import" };
+        let listen_type = if entries.len() == 1 {
+            "single"
+        } else {
+            "import"
+        };
 
         let payload_items: Vec<ListenBrainzPayload<'_>> = entries
             .iter()
@@ -929,7 +1020,10 @@ impl ScrobblerManager {
             }
             Ok(r) => {
                 let status = r.status().as_u16();
-                let err_text = r.text().await.unwrap_or_else(|_| format!("HTTP error {status}"));
+                let err_text = r
+                    .text()
+                    .await
+                    .unwrap_or_else(|_| format!("HTTP error {status}"));
                 log::warn!("ListenBrainz returned {status} on submit: {err_text}");
 
                 for e in &entries {
@@ -995,7 +1089,8 @@ mod tests {
 
     #[test]
     fn test_validate_token_json_parsing() {
-        let json_success = r#"{"valid": true, "user_name": "soltys", "message": "Token is valid."}"#;
+        let json_success =
+            r#"{"valid": true, "user_name": "soltys", "message": "Token is valid."}"#;
         let parsed: ValidateTokenResponse = serde_json::from_str(json_success).unwrap();
         assert!(parsed.valid);
         assert_eq!(parsed.user_name.as_deref(), Some("soltys"));
@@ -1010,7 +1105,10 @@ mod tests {
     fn test_discord_settings_defaults_and_serialization() {
         let settings = ScrobblerSettings::default();
         assert!(!settings.discord_enabled);
-        assert_eq!(settings.discord_client_id, crate::discord::DEFAULT_DISCORD_CLIENT_ID);
+        assert_eq!(
+            settings.discord_client_id,
+            crate::discord::DEFAULT_DISCORD_CLIENT_ID
+        );
         assert!(settings.discord_show_album);
         assert!(settings.discord_show_time);
 
@@ -1018,7 +1116,10 @@ mod tests {
         assert!(json.contains("\"discord_enabled\":false"));
         assert!(json.contains("\"discord_show_album\":true"));
         assert!(json.contains("\"discord_show_time\":true"));
-        assert!(json.contains(&format!("\"discord_client_id\":\"{}\"", crate::discord::DEFAULT_DISCORD_CLIENT_ID)));
+        assert!(json.contains(&format!(
+            "\"discord_client_id\":\"{}\"",
+            crate::discord::DEFAULT_DISCORD_CLIENT_ID
+        )));
 
         let deserialized: ScrobblerSettings = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.discord_enabled, settings.discord_enabled);

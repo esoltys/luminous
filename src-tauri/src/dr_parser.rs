@@ -197,15 +197,19 @@ pub fn match_tracks<'a>(
         if normalized_entry.is_empty() {
             continue;
         }
-        if let Some(song) = candidates.iter().filter(|c| !used_songs.contains(&c.id)).find(|c| {
-            let title_norm = c.title.as_deref().map(normalize).unwrap_or_default();
-            let stem_norm = normalize(&c.filename_stem);
-            (!title_norm.is_empty()
-                && (title_norm == normalized_entry
-                    || title_norm.contains(&normalized_entry)
-                    || normalized_entry.contains(&title_norm)))
-                || stem_norm.contains(&normalized_entry)
-        }) {
+        if let Some(song) = candidates
+            .iter()
+            .filter(|c| !used_songs.contains(&c.id))
+            .find(|c| {
+                let title_norm = c.title.as_deref().map(normalize).unwrap_or_default();
+                let stem_norm = normalize(&c.filename_stem);
+                (!title_norm.is_empty()
+                    && (title_norm == normalized_entry
+                        || title_norm.contains(&normalized_entry)
+                        || normalized_entry.contains(&title_norm)))
+                    || stem_norm.contains(&normalized_entry)
+            })
+        {
             matches.push((song.id, entry));
             used_songs.insert(song.id);
         }
@@ -329,8 +333,12 @@ Number of tracks:  12\n";
         ];
         let matched = match_tracks(&log.tracks, &candidates);
         assert_eq!(matched.len(), 2);
-        assert!(matched.iter().any(|(id, e)| *id == 1 && e.track_number == Some(1)));
-        assert!(matched.iter().any(|(id, e)| *id == 2 && e.track_number == Some(2)));
+        assert!(matched
+            .iter()
+            .any(|(id, e)| *id == 1 && e.track_number == Some(1)));
+        assert!(matched
+            .iter()
+            .any(|(id, e)| *id == 2 && e.track_number == Some(2)));
     }
 
     #[test]

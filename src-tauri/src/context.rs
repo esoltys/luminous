@@ -424,7 +424,10 @@ fn extract_wikidata_qid(resource_url: &str) -> Option<String> {
 fn merge_tags(genres: Vec<MbTagOrGenre>, tags: Vec<MbTagOrGenre>, cap: usize) -> Vec<String> {
     let mut merged: Vec<MbTagOrGenre> = genres;
     for tag in tags {
-        if !merged.iter().any(|g| g.name.eq_ignore_ascii_case(&tag.name)) {
+        if !merged
+            .iter()
+            .any(|g| g.name.eq_ignore_ascii_case(&tag.name))
+        {
             merged.push(tag);
         }
     }
@@ -672,7 +675,10 @@ impl ContextManager {
     /// Resolves a Wikidata QID to its English Wikipedia article title via
     /// `sitelinks.enwiki.title`. Returns `None` when the entity has no
     /// English Wikipedia article.
-    async fn resolve_wikidata_to_wikipedia_title(&self, wikidata_id: &str) -> Result<Option<String>> {
+    async fn resolve_wikidata_to_wikipedia_title(
+        &self,
+        wikidata_id: &str,
+    ) -> Result<Option<String>> {
         let url = format!(
             "https://www.wikidata.org/wiki/Special:EntityData/{}.json",
             percent_encoding::utf8_percent_encode(wikidata_id, percent_encoding::NON_ALPHANUMERIC)
@@ -760,7 +766,10 @@ impl ContextManager {
         }
         Ok(WikipediaSummary {
             extract,
-            page_url: parsed.content_urls.and_then(|c| c.desktop).and_then(|d| d.page),
+            page_url: parsed
+                .content_urls
+                .and_then(|c| c.desktop)
+                .and_then(|d| d.page),
             thumbnail_url: parsed.thumbnail.and_then(|t| t.source),
         })
     }
@@ -821,23 +830,47 @@ mod tests {
     #[test]
     fn test_merge_tags_dedupes_prefers_genres_and_sorts_by_count() {
         let genres = vec![
-            MbTagOrGenre { name: "progressive rock".to_string(), count: 42 },
-            MbTagOrGenre { name: "art rock".to_string(), count: 17 },
+            MbTagOrGenre {
+                name: "progressive rock".to_string(),
+                count: 42,
+            },
+            MbTagOrGenre {
+                name: "art rock".to_string(),
+                count: 17,
+            },
         ];
         let tags = vec![
-            MbTagOrGenre { name: "Progressive Rock".to_string(), count: 99 }, // dup, case-insensitive
-            MbTagOrGenre { name: "concept album".to_string(), count: 5 },
+            MbTagOrGenre {
+                name: "Progressive Rock".to_string(),
+                count: 99,
+            }, // dup, case-insensitive
+            MbTagOrGenre {
+                name: "concept album".to_string(),
+                count: 5,
+            },
         ];
         let merged = merge_tags(genres, tags, 12);
-        assert_eq!(merged, vec!["progressive rock", "art rock", "concept album"]);
+        assert_eq!(
+            merged,
+            vec!["progressive rock", "art rock", "concept album"]
+        );
     }
 
     #[test]
     fn test_merge_tags_respects_cap() {
         let genres = vec![
-            MbTagOrGenre { name: "a".to_string(), count: 3 },
-            MbTagOrGenre { name: "b".to_string(), count: 2 },
-            MbTagOrGenre { name: "c".to_string(), count: 1 },
+            MbTagOrGenre {
+                name: "a".to_string(),
+                count: 3,
+            },
+            MbTagOrGenre {
+                name: "b".to_string(),
+                count: 2,
+            },
+            MbTagOrGenre {
+                name: "c".to_string(),
+                count: 1,
+            },
         ];
         let merged = merge_tags(genres, vec![], 2);
         assert_eq!(merged, vec!["a", "b"]);
@@ -933,11 +966,26 @@ mod tests {
         assert_eq!(
             relations,
             vec![
-                ("discogs".to_string(), "https://www.discogs.com/master/12345".to_string()),
-                ("allmusic".to_string(), "https://www.allmusic.com/album/mw0000123456".to_string()),
-                ("wikidata".to_string(), "https://www.wikidata.org/wiki/Q11649".to_string()),
-                ("lyrics".to_string(), "https://genius.com/albums/Nirvana/Nevermind".to_string()),
-                ("streaming".to_string(), "https://open.spotify.com/album/xyz".to_string()),
+                (
+                    "discogs".to_string(),
+                    "https://www.discogs.com/master/12345".to_string()
+                ),
+                (
+                    "allmusic".to_string(),
+                    "https://www.allmusic.com/album/mw0000123456".to_string()
+                ),
+                (
+                    "wikidata".to_string(),
+                    "https://www.wikidata.org/wiki/Q11649".to_string()
+                ),
+                (
+                    "lyrics".to_string(),
+                    "https://genius.com/albums/Nirvana/Nevermind".to_string()
+                ),
+                (
+                    "streaming".to_string(),
+                    "https://open.spotify.com/album/xyz".to_string()
+                ),
             ]
         );
     }
@@ -975,7 +1023,10 @@ mod tests {
             .collect();
         assert_eq!(
             live,
-            vec![("discogs".to_string(), "https://www.discogs.com/artist/1".to_string())]
+            vec![(
+                "discogs".to_string(),
+                "https://www.discogs.com/artist/1".to_string()
+            )]
         );
     }
 

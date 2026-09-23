@@ -267,7 +267,8 @@ fn scan_dir_for_category_with_fallback(
         let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
             continue;
         };
-        let category = categorize(stem.to_lowercase().as_str()).unwrap_or(ArtworkCategory::Subfolder);
+        let category =
+            categorize(stem.to_lowercase().as_str()).unwrap_or(ArtworkCategory::Subfolder);
         out.push(ArtworkEntry { category, path });
     }
 }
@@ -990,7 +991,10 @@ mod tests {
         assert!(filename.ends_with(".png"));
         assert_eq!(
             filename,
-            format!("{}.png", manager.get_album_hash("My NAS Artist", "My NAS Album"))
+            format!(
+                "{}.png",
+                manager.get_album_hash("My NAS Artist", "My NAS Album")
+            )
         );
         assert!(manager.covers_dir.join(&filename).exists());
 

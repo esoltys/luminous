@@ -123,7 +123,9 @@ pub fn top_songs_with_limit(
                 art_automatic: row.get(7)?,
                 art_manual: row.get(8)?,
                 year: row.get(9)?,
-                rating: row.get::<_, Option<f32>>(10)?.unwrap_or(crate::stats::RATING_UNRATED),
+                rating: row
+                    .get::<_, Option<f32>>(10)?
+                    .unwrap_or(crate::stats::RATING_UNRATED),
             })
         })?
         .filter_map(|r| r.ok())
@@ -224,7 +226,8 @@ pub fn top_albums_with_limit(
         .collect();
 
     for item in &mut rows {
-        item.rating = crate::stats::get_album_rating(conn, &item.key).unwrap_or(crate::stats::RATING_UNRATED);
+        item.rating =
+            crate::stats::get_album_rating(conn, &item.key).unwrap_or(crate::stats::RATING_UNRATED);
     }
 
     Ok(rows)
@@ -784,7 +787,14 @@ mod tests {
         let now = 1_700_000_000;
         let range_start = range_start_unix(StatsRange::SevenDays, now);
 
-        let song_id = insert_song(&conn, "/art.flac", "Art Song", "Art Artist", "Art Album", "Rock");
+        let song_id = insert_song(
+            &conn,
+            "/art.flac",
+            "Art Song",
+            "Art Artist",
+            "Art Album",
+            "Rock",
+        );
         conn.execute(
             "UPDATE songs SET art_embedded = 1, art_manual = 'cover.jpg', year = 2024, rating = 4.5 WHERE id = ?1",
             params![song_id],

@@ -170,11 +170,11 @@ pub async fn reorder_tag_in_group(
 // ---------------------------------------------------------------------------
 
 #[tauri::command]
-pub async fn get_artist_tag_hierarchy(
-    state: State<'_, AppState>,
-) -> Result<Vec<TagGroup>, String> {
+pub async fn get_artist_tag_hierarchy(state: State<'_, AppState>) -> Result<Vec<TagGroup>, String> {
     let manager = TagManager::new(state.db.clone());
-    manager.get_artist_tag_hierarchy().map_err(|e| e.to_string())
+    manager
+        .get_artist_tag_hierarchy()
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -207,7 +207,9 @@ pub async fn promote_artist_tag(
     tag_name: String,
 ) -> Result<(), String> {
     let manager = TagManager::new(state.db.clone());
-    manager.promote_artist_tag(&tag_name).map_err(|e| e.to_string())
+    manager
+        .promote_artist_tag(&tag_name)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]

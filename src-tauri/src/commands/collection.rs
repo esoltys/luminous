@@ -165,9 +165,7 @@ pub async fn finish_scan(last_scan_time: String, state: State<'_, AppState>) -> 
         log::error!("Failed to persist last_scan_time: {e}");
     }
 
-    if let Err(e) =
-        crate::player::with_player(&state.player, |p| p.resync_queue_with_db()).await
-    {
+    if let Err(e) = crate::player::with_player(&state.player, |p| p.resync_queue_with_db()).await {
         log::error!("Failed to resync playback queue after scan: {e}");
     }
 
@@ -800,12 +798,16 @@ fn dedupe_links_by_platform_and_url<T>(links: Vec<T>, key: impl Fn(&T) -> (&str,
 /// idempotent rather than piling up duplicates. Multiple links of the
 /// same platform (e.g. several lyrics sites) are intentionally allowed to
 /// coexist.
-fn merge_album_links(mut existing: Vec<AlbumLink>, fetched: Vec<AlbumLink>) -> (Vec<AlbumLink>, usize) {
+fn merge_album_links(
+    mut existing: Vec<AlbumLink>,
+    fetched: Vec<AlbumLink>,
+) -> (Vec<AlbumLink>, usize) {
     let mut added = 0;
     for link in fetched {
         let already_present = existing.iter().any(|l| {
             l.platform == link.platform
-                && normalize_url_for_dedup(&l.handle_or_url) == normalize_url_for_dedup(&link.handle_or_url)
+                && normalize_url_for_dedup(&l.handle_or_url)
+                    == normalize_url_for_dedup(&link.handle_or_url)
         });
         if !already_present {
             existing.push(link);
@@ -890,10 +892,10 @@ pub async fn retrieve_album_details(
     let mut updated_profile = current_profile;
     updated_profile.album_key = album.clone();
     updated_profile.details_fetched = true;
-    let existing_links = dedupe_links_by_platform_and_url(
-        std::mem::take(&mut updated_profile.links),
-        |l| (l.platform.as_str(), l.handle_or_url.as_str()),
-    );
+    let existing_links =
+        dedupe_links_by_platform_and_url(std::mem::take(&mut updated_profile.links), |l| {
+            (l.platform.as_str(), l.handle_or_url.as_str())
+        });
     let (merged_links, added_count) = merge_album_links(existing_links, fetched_links);
     updated_profile.links = merged_links;
 
@@ -1044,7 +1046,8 @@ fn merge_artist_social_links(
     for link in fetched {
         let already_present = existing.iter().any(|l| {
             l.platform == link.platform
-                && normalize_url_for_dedup(&l.handle_or_url) == normalize_url_for_dedup(&link.handle_or_url)
+                && normalize_url_for_dedup(&l.handle_or_url)
+                    == normalize_url_for_dedup(&link.handle_or_url)
         });
         if !already_present {
             existing.push(link);
@@ -1177,7 +1180,9 @@ pub async fn retrieve_artist_details(
     }
     let mut all_homepages = resolve_homepage_urls(all_homepages);
 
-    updated_profile.social_links.retain(|l| l.platform != "website");
+    updated_profile
+        .social_links
+        .retain(|l| l.platform != "website");
     updated_profile.website = None;
     let mut fetched_links = fetched_links;
     if !all_homepages.is_empty() {
@@ -1191,10 +1196,10 @@ pub async fn retrieve_artist_details(
     }
 
     let mut added_count = new_homepages_count;
-    let existing_links = dedupe_links_by_platform_and_url(
-        std::mem::take(&mut updated_profile.social_links),
-        |l| (l.platform.as_str(), l.handle_or_url.as_str()),
-    );
+    let existing_links =
+        dedupe_links_by_platform_and_url(std::mem::take(&mut updated_profile.social_links), |l| {
+            (l.platform.as_str(), l.handle_or_url.as_str())
+        });
     let (merged_links, links_added) = merge_artist_social_links(existing_links, fetched_links);
     updated_profile.social_links = merged_links;
     added_count += links_added;
@@ -1403,7 +1408,11 @@ pub async fn set_songs_not_included(
             .join(",");
         let sql = format!("UPDATE songs SET not_included = ?1 WHERE id IN ({placeholders})");
         let mut params: Vec<&dyn rusqlite::ToSql> = vec![&not_included];
-        params.extend(song_ids_for_write.iter().map(|id| id as &dyn rusqlite::ToSql));
+        params.extend(
+            song_ids_for_write
+                .iter()
+                .map(|id| id as &dyn rusqlite::ToSql),
+        );
         conn.execute(&sql, params.as_slice())?;
         Ok(())
     })
@@ -1453,10 +1462,22 @@ mod tests {
 
     #[test]
     fn test_platform_for_release_group_rel_type_maps_recognized_types() {
-        assert_eq!(platform_for_release_group_rel_type("discogs"), Some("discogs"));
-        assert_eq!(platform_for_release_group_rel_type("allmusic"), Some("allmusic"));
-        assert_eq!(platform_for_release_group_rel_type("wikidata"), Some("wikidata"));
-        assert_eq!(platform_for_release_group_rel_type("lyrics"), Some("lyrics"));
+        assert_eq!(
+            platform_for_release_group_rel_type("discogs"),
+            Some("discogs")
+        );
+        assert_eq!(
+            platform_for_release_group_rel_type("allmusic"),
+            Some("allmusic")
+        );
+        assert_eq!(
+            platform_for_release_group_rel_type("wikidata"),
+            Some("wikidata")
+        );
+        assert_eq!(
+            platform_for_release_group_rel_type("lyrics"),
+            Some("lyrics")
+        );
         assert_eq!(
             platform_for_release_group_rel_type("other databases"),
             Some("other_databases")
@@ -1503,7 +1524,10 @@ mod tests {
             "http://www.shaniatwain.com/",
             "HTTPS://WWW.SHANIATWAIN.COM",
         ];
-        let normalized: Vec<String> = variants.iter().map(|u| normalize_url_for_dedup(u)).collect();
+        let normalized: Vec<String> = variants
+            .iter()
+            .map(|u| normalize_url_for_dedup(u))
+            .collect();
         assert!(normalized.windows(2).all(|w| w[0] == w[1]));
         assert_eq!(normalized[0], "shaniatwain.com");
     }
@@ -1541,7 +1565,10 @@ mod tests {
             (l.platform.as_str(), l.handle_or_url.as_str())
         });
         assert_eq!(deduped.len(), 2);
-        assert_eq!(deduped[0].handle_or_url, "https://instagram.com/shaniatwain");
+        assert_eq!(
+            deduped[0].handle_or_url,
+            "https://instagram.com/shaniatwain"
+        );
         assert_eq!(deduped[1].platform, "discogs");
     }
 
@@ -1600,7 +1627,10 @@ mod tests {
             platform_for_artist_rel_type("youtube", "https://youtube.com/@artist"),
             Some("youtube")
         );
-        assert_eq!(platform_for_artist_rel_type("streaming", "https://spotify.com/x"), None);
+        assert_eq!(
+            platform_for_artist_rel_type("streaming", "https://spotify.com/x"),
+            None
+        );
         assert_eq!(
             platform_for_artist_rel_type("purchase for download", "https://itunes.apple.com/x"),
             None
@@ -1702,13 +1732,25 @@ mod tests {
     #[test]
     fn test_dedupe_official_homepages_keeps_distinct_urls_and_drops_exact_repeats() {
         let relations = vec![
-            ("official homepage".to_string(), "https://massiveattack.com".to_string()),
+            (
+                "official homepage".to_string(),
+                "https://massiveattack.com".to_string(),
+            ),
             // Exact repeat of the same relation — MB occasionally does this.
-            ("official homepage".to_string(), "https://massiveattack.com".to_string()),
+            (
+                "official homepage".to_string(),
+                "https://massiveattack.com".to_string(),
+            ),
             // A second, distinct official homepage (e.g. a label's page).
-            ("official homepage".to_string(), "https://virginmusic.com/massive-attack".to_string()),
+            (
+                "official homepage".to_string(),
+                "https://virginmusic.com/massive-attack".to_string(),
+            ),
             // Not an official homepage — must be ignored entirely.
-            ("discogs".to_string(), "https://discogs.com/artist/1".to_string()),
+            (
+                "discogs".to_string(),
+                "https://discogs.com/artist/1".to_string(),
+            ),
         ];
         let homepages = dedupe_official_homepages(&relations);
         assert_eq!(
@@ -1722,7 +1764,10 @@ mod tests {
 
     #[test]
     fn test_dedupe_official_homepages_empty_when_none_present() {
-        let relations = vec![("discogs".to_string(), "https://discogs.com/artist/1".to_string())];
+        let relations = vec![(
+            "discogs".to_string(),
+            "https://discogs.com/artist/1".to_string(),
+        )];
         assert!(dedupe_official_homepages(&relations).is_empty());
     }
 
@@ -1734,9 +1779,11 @@ mod tests {
         // entirely rather than shown as two redundant "Internet Archive"
         // entries alongside the real one.
         let urls = vec![
-            "https://web.archive.org/web/19970131155102/http://www.vmg.co.uk/massive/index.html".to_string(),
+            "https://web.archive.org/web/19970131155102/http://www.vmg.co.uk/massive/index.html"
+                .to_string(),
             "https://massiveattack.co.uk".to_string(),
-            "https://web.archive.org/web/20200101000000/http://www.vmg.co.uk/massive/index.html".to_string(),
+            "https://web.archive.org/web/20200101000000/http://www.vmg.co.uk/massive/index.html"
+                .to_string(),
         ];
         assert_eq!(
             resolve_homepage_urls(urls),
@@ -1779,7 +1826,10 @@ mod tests {
             "https://massiveattack.co.uk".to_string(),
             "https://massiveattack.co.uk".to_string(),
         ];
-        assert_eq!(resolve_homepage_urls(urls), vec!["https://massiveattack.co.uk".to_string()]);
+        assert_eq!(
+            resolve_homepage_urls(urls),
+            vec!["https://massiveattack.co.uk".to_string()]
+        );
     }
 
     #[test]
@@ -1797,7 +1847,9 @@ mod tests {
     #[test]
     fn test_extract_bio_prose_strips_trailing_generated_sections() {
         assert_eq!(
-            extract_bio_prose("A real bio.\n\n## Tags\n- canadian\n\n## Links\n- [Website](https://example.com)"),
+            extract_bio_prose(
+                "A real bio.\n\n## Tags\n- canadian\n\n## Links\n- [Website](https://example.com)"
+            ),
             Some("A real bio.".to_string())
         );
     }

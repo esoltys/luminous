@@ -34,12 +34,10 @@ fn save_eq_settings(db: &crate::db::Database, eq: &Equalizer) {
 
 #[tauri::command]
 pub async fn get_equalizer_state(state: State<'_, AppState>) -> Result<EqualizerConfig, String> {
-    Ok(
-        crate::audio::with_audio(&state.audio, |engine| {
-            engine.with_equalizer(|eq| EqualizerConfig::snapshot(eq))
-        })
-        .await,
-    )
+    Ok(crate::audio::with_audio(&state.audio, |engine| {
+        engine.with_equalizer(|eq| EqualizerConfig::snapshot(eq))
+    })
+    .await)
 }
 
 /// The one EQ mutation entry point: the frontend edits a config and applies

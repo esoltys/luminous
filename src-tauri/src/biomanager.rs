@@ -71,10 +71,7 @@ mod tests {
             album_dir(song),
             Some(PathBuf::from("/music/Artist Name/Album Name"))
         );
-        assert_eq!(
-            artist_dir(song),
-            Some(PathBuf::from("/music/Artist Name"))
-        );
+        assert_eq!(artist_dir(song), Some(PathBuf::from("/music/Artist Name")));
     }
 
     #[test]

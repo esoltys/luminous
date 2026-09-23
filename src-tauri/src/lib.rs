@@ -148,6 +148,29 @@ const LINUX_WEBKITGTK_RENDERING_ENV_VARS: &[(&str, &str)] = &[
     ("WEBKIT_DISABLE_DMABUF_RENDERER", "1"),
 ];
 
+/// Which of `LINUX_WEBKITGTK_RENDERING_ENV_VARS` to set for this launch.
+/// Only the AppImage (the runtime sets `APPIMAGE`) bundles its own, older
+/// WebKitGTK — every other build (Flatpak, distro packages, `tauri dev`)
+/// runs against a current WebKitGTK that renders fine with GPU compositing.
+/// Forcing compositing off there made WebKitGTK paint every frame on the
+/// CPU: at a 3x display scale a full-window repaint took 300–600ms, so theme
+/// changes, hovers and typing all lagged. A var the user already set is
+/// never overridden, so either behavior can still be forced by hand.
+#[cfg(target_os = "linux")]
+fn linux_webkitgtk_env_vars_to_set(
+    is_appimage: bool,
+    is_already_set: impl Fn(&str) -> bool,
+) -> Vec<(&'static str, &'static str)> {
+    if !is_appimage {
+        return Vec::new();
+    }
+    LINUX_WEBKITGTK_RENDERING_ENV_VARS
+        .iter()
+        .copied()
+        .filter(|(key, _)| !is_already_set(key))
+        .collect()
+}
+
 /// Appends WebView2's occlusion-calculation-disabling flag to an existing
 /// `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` value, without duplicating it if
 /// already present. Factored out of `run()`'s `cfg(target_os = "windows")`
@@ -780,9 +803,14 @@ pub fn run() {
     // can be substantially older than the host's system WebKitGTK. Older
     // WebKitGTK builds' accelerated compositing path is known to render a
     // blank window against newer Mesa/Wayland stacks; disabling compositing
-    // mode avoids that without touching DMA-BUF handling (#370, #383).
+    // mode avoids that (#370, #383). AppImage-only — see
+    // `linux_webkitgtk_env_vars_to_set()`.
     #[cfg(target_os = "linux")]
-    for (key, value) in LINUX_WEBKITGTK_RENDERING_ENV_VARS {
+    for (key, value) in
+        linux_webkitgtk_env_vars_to_set(std::env::var_os("APPIMAGE").is_some(), |key| {
+            std::env::var_os(key).is_some()
+        })
+    {
         std::env::set_var(key, value);
     }
 
@@ -1441,6 +1469,24 @@ mod startup_rendering_workaround_tests {
         for (_, value) in LINUX_WEBKITGTK_RENDERING_ENV_VARS {
             assert_eq!(*value, "1");
         }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_linux_webkitgtk_env_vars_only_for_appimage() {
+        assert_eq!(
+            linux_webkitgtk_env_vars_to_set(true, |_| false),
+            LINUX_WEBKITGTK_RENDERING_ENV_VARS.to_vec()
+        );
+        assert!(linux_webkitgtk_env_vars_to_set(false, |_| false).is_empty());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_linux_webkitgtk_env_vars_never_override_user_values() {
+        let to_set =
+            linux_webkitgtk_env_vars_to_set(true, |key| key == "WEBKIT_DISABLE_COMPOSITING_MODE");
+        assert_eq!(to_set, vec![("WEBKIT_DISABLE_DMABUF_RENDERER", "1")]);
     }
 
     #[test]

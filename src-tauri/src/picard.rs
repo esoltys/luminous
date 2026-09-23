@@ -215,7 +215,10 @@ fn check_flatpak_filesystem_access(exe: &Path, paths: &[PathBuf]) -> Result<()> 
         return Ok(()); // `flatpak info` unavailable, or grants full host access.
     };
 
-    if let Some(blocked) = paths.iter().find(|p| !roots.iter().any(|r| p.starts_with(r))) {
+    if let Some(blocked) = paths
+        .iter()
+        .find(|p| !roots.iter().any(|r| p.starts_with(r)))
+    {
         return Err(anyhow!(
             "MusicBrainz Picard is installed as a Flatpak, and its sandbox doesn't have access to {}. Grant access with:\n  flatpak override --user --filesystem=\"{}\" {app_id}\nor allow it to see your whole filesystem with:\n  flatpak override --user --filesystem=host {app_id}",
             blocked.display(),

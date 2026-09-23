@@ -54,9 +54,9 @@ pub fn should_notify_update(format: &str, stored: Option<&str>, current: &str) -
 /// with package identity (not an MSIX/APPX install).
 #[cfg(target_os = "windows")]
 fn current_application_user_model_id() -> Option<String> {
+    use windows::core::PWSTR;
     use windows::Win32::Foundation::{ERROR_INSUFFICIENT_BUFFER, ERROR_SUCCESS};
     use windows::Win32::Storage::Packaging::Appx::GetCurrentApplicationUserModelId;
-    use windows::core::PWSTR;
 
     unsafe {
         let mut len: u32 = 0;
@@ -66,8 +66,7 @@ fn current_application_user_model_id() -> Option<String> {
         }
 
         let mut buf: Vec<u16> = vec![0; len as usize];
-        let result =
-            GetCurrentApplicationUserModelId(&mut len, Some(PWSTR(buf.as_mut_ptr())));
+        let result = GetCurrentApplicationUserModelId(&mut len, Some(PWSTR(buf.as_mut_ptr())));
         if result != ERROR_SUCCESS {
             return None;
         }
@@ -124,7 +123,11 @@ mod tests {
 
     #[test]
     fn test_does_not_notify_for_non_msix_formats() {
-        assert!(!should_notify_update("windows_setup", Some("1.0.0"), "1.1.0"));
+        assert!(!should_notify_update(
+            "windows_setup",
+            Some("1.0.0"),
+            "1.1.0"
+        ));
         assert!(!should_notify_update("deb", Some("1.0.0"), "1.1.0"));
     }
 }
