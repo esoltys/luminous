@@ -112,6 +112,7 @@ rand = "0.10"
 percent-encoding = "2"
 # --- Data-parallel tag reading during library scan ---
 rayon = "1"
+md-5 = "0.10"
 
 [features]
 # Enables `tokio-console` task/scheduler introspection — see

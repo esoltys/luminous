@@ -86,7 +86,7 @@ pub async fn scan_directories(
 /// a specific set of tracks, so a view like the album detail page can offer
 /// a fast "resync from disk" action instead of only reloading whatever the
 /// DB already has (which a plain library snapshot reload can't distinguish
-/// from a genuine on-disk change — see #956). WebDAV songs (no local file)
+/// from a genuine on-disk change — see #956). Remote songs (no local file)
 /// and CUE-derived songs (tags live in the .cue sheet, not embedded — #78)
 /// are skipped, same as the tag editor's other bulk-write paths.
 #[tauri::command]
@@ -106,9 +106,7 @@ pub async fn rescan_songs(
                 conn.query_row(&sql, [id], crate::collection::row_to_song)
                     .ok()
             })
-            .filter(|song| {
-                song.source != crate::models::SongSource::WebDav && song.cue_path.is_none()
-            })
+            .filter(|song| !song.source.is_remote() && song.cue_path.is_none())
             .filter_map(|song| song.path)
             .map(std::path::PathBuf::from)
             .collect())

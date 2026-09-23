@@ -174,6 +174,32 @@ pub(crate) fn is_webdav_song_orphaned(
     true
 }
 
+/// Ids of every configured OpenSubsonic server (enabled or not).
+pub(crate) fn load_subsonic_server_ids(conn: &rusqlite::Connection) -> HashSet<i64> {
+    let mut ids = HashSet::new();
+    if let Ok(mut stmt) = conn.prepare("SELECT id FROM subsonic_servers") {
+        if let Ok(rows) = stmt.query_map([], |row| row.get::<_, i64>(0)) {
+            ids.extend(rows.flatten());
+        }
+    }
+    ids
+}
+
+/// Checks whether an OpenSubsonic song is orphaned because its server was
+/// removed. Its `subsonic://{server_id}/…` path names the server directly, so
+/// unlike WebDAV there's no URL matching involved. A song whose server still
+/// exists is never orphaned, even while the server is offline or disabled —
+/// its availability is owned by the server sync.
+pub(crate) fn is_subsonic_song_orphaned(
+    song_path: Option<&str>,
+    server_ids: &HashSet<i64>,
+) -> bool {
+    match song_path.and_then(crate::subsonic::parse_track_uri) {
+        Some((server_id, _)) => !server_ids.contains(&server_id),
+        None => true,
+    }
+}
+
 impl CollectionScanner {
     pub fn new(db: Arc<Database>) -> Self {
         Self { db }
@@ -311,6 +337,7 @@ impl CollectionScanner {
         }
 
         let (active_webdav_song_ids, active_webdav_servers) = load_active_webdav_servers(conn);
+        let subsonic_server_ids = load_subsonic_server_ids(conn);
 
         let query = if only_available {
             "SELECT id, path, source FROM songs WHERE path IS NOT NULL AND unavailable = 0"
@@ -339,6 +366,14 @@ impl CollectionScanner {
                     &active_webdav_song_ids,
                     &active_webdav_servers,
                 ) {
+                    missing.push(id);
+                }
+                continue;
+            }
+            // OpenSubsonic songs: same rule, keyed on the server id in their
+            // `subsonic://` path rather than a URL prefix.
+            if source.is_subsonic() {
+                if is_subsonic_song_orphaned(Some(&path), &subsonic_server_ids) {
                     missing.push(id);
                 }
                 continue;
@@ -595,6 +630,7 @@ impl CollectionScanner {
         let conn = self.db.pool.get()?;
 
         let (active_webdav_song_ids, active_webdav_servers) = load_active_webdav_servers(&conn);
+        let subsonic_server_ids = load_subsonic_server_ids(&conn);
 
         let mut to_delete = self.find_missing_song_ids(&conn, false)?;
 
@@ -619,6 +655,13 @@ impl CollectionScanner {
                 {
                     to_delete.push(id);
                 }
+            } else if source.is_subsonic() {
+                // Same rule as WebDAV: only prune once the server itself is gone.
+                if is_subsonic_song_orphaned(path.as_deref(), &subsonic_server_ids)
+                    && !to_delete.contains(&id)
+                {
+                    to_delete.push(id);
+                }
             } else if !to_delete.contains(&id) {
                 to_delete.push(id);
             }
@@ -637,6 +680,9 @@ impl CollectionScanner {
                 }
                 tx.execute_batch("DELETE FROM playlist_items WHERE song_id IS NULL;")?;
                 tx.execute_batch("DELETE FROM webdav_cache WHERE song_id IS NULL OR server_id NOT IN (SELECT id FROM webdav_servers);")?;
+                // Forget cache rows for pruned Subsonic songs, so the next sync
+                // re-imports the track as new if it's still on the server.
+                tx.execute_batch("DELETE FROM subsonic_cache WHERE song_id IS NULL;")?;
             }
             tx.commit()?;
             log::info!(
@@ -3522,6 +3568,98 @@ Official DR value: DR13\n",
             .query_row("SELECT COUNT(*) FROM songs", [], |r| r.get(0))
             .unwrap();
         assert_eq!(count, 1, "song must be preserved");
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_is_subsonic_song_orphaned() {
+        let ids: HashSet<i64> = [1, 3].into_iter().collect();
+        assert!(!is_subsonic_song_orphaned(Some("subsonic://1/abc"), &ids));
+        assert!(!is_subsonic_song_orphaned(Some("subsonic://3/tr-9"), &ids));
+        assert!(is_subsonic_song_orphaned(Some("subsonic://2/abc"), &ids));
+        assert!(is_subsonic_song_orphaned(Some("https://host/x.mp3"), &ids));
+        assert!(is_subsonic_song_orphaned(None, &ids));
+        assert!(is_subsonic_song_orphaned(
+            Some("subsonic://1/abc"),
+            &HashSet::new()
+        ));
+    }
+
+    /// Subsonic songs follow the WebDAV rule: prune only when their server was
+    /// removed — never for a song that is merely unavailable, and never via a
+    /// `Path::exists()` check on their `subsonic://` path.
+    #[test]
+    fn test_prune_missing_songs_subsonic_only_removes_orphans() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_subsonic_prune_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        conn.execute(
+            "INSERT INTO subsonic_servers (id, name, url, username, enabled) VALUES (1, 'Home', 'https://music.example.com', 'alice', 0)",
+            [],
+        )
+        .unwrap();
+
+        let song = |path: &str, title: &str| Song {
+            path: Some(path.to_string()),
+            title: Some(title.to_string()),
+            source: SongSource::Subsonic,
+            ..Default::default()
+        };
+        upsert_song(&conn, &song("subsonic://1/live", "Available")).unwrap();
+        upsert_song(&conn, &song("subsonic://1/gone", "Unavailable")).unwrap();
+        upsert_song(&conn, &song("subsonic://2/orphan", "Orphaned")).unwrap();
+        conn.execute(
+            "UPDATE songs SET unavailable = 1 WHERE path = 'subsonic://1/gone'",
+            [],
+        )
+        .unwrap();
+        let orphan_id: i64 = conn
+            .query_row(
+                "SELECT id FROM songs WHERE path = 'subsonic://2/orphan'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        conn.execute(
+            "INSERT INTO subsonic_servers (id, name, url, username) VALUES (2, 'Old', 'https://old.example.com', 'bob')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO subsonic_cache (server_id, remote_id, song_id) VALUES (2, 'orphan', ?1)",
+            params![orphan_id],
+        )
+        .unwrap();
+        // Removing server 2 cascades its cache row away and orphans its song.
+        conn.execute("DELETE FROM subsonic_servers WHERE id = 2", [])
+            .unwrap();
+
+        let scanner = CollectionScanner::new(db.clone());
+        assert_eq!(
+            scanner.mark_missing_unavailable().unwrap(),
+            1,
+            "only the orphan is flagged; the available song on server 1 is left alone"
+        );
+        let pruned = scanner.prune_missing_songs().unwrap();
+        assert_eq!(pruned.deleted_songs, 1, "only the orphan is pruned");
+
+        let mut remaining: Vec<String> = conn
+            .prepare("SELECT path FROM songs ORDER BY path")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .flatten()
+            .collect();
+        remaining.sort();
+        assert_eq!(remaining, vec!["subsonic://1/gone", "subsonic://1/live"]);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

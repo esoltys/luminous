@@ -36,6 +36,7 @@ impl SongSource {
     pub const LOCAL_FILE_ID: i32 = Self::LocalFile as i32;
     pub const COLLECTION_ID: i32 = Self::Collection as i32;
     pub const WEBDAV_ID: i32 = Self::WebDav as i32;
+    pub const SUBSONIC_ID: i32 = Self::Subsonic as i32;
 
     /// True if this source represents a local file on disk (LocalFile or Collection).
     pub fn is_local(&self) -> bool {
@@ -45,6 +46,19 @@ impl SongSource {
     /// True if this source represents a remote WebDAV item.
     pub fn is_webdav(&self) -> bool {
         matches!(self, Self::WebDav)
+    }
+
+    /// True if this source represents a remote OpenSubsonic server track (#916).
+    pub fn is_subsonic(&self) -> bool {
+        matches!(self, Self::Subsonic)
+    }
+
+    /// True for synced remote-server library sources (WebDAV, OpenSubsonic).
+    /// Their `path` is a URL/URI, not a filesystem path: there's no local file
+    /// to `Path::exists()`, write tags to, clear embedded art from, or hand to
+    /// Picard, and their availability is owned by the server sync instead.
+    pub fn is_remote(&self) -> bool {
+        matches!(self, Self::WebDav | Self::Subsonic)
     }
 }
 
@@ -74,22 +88,23 @@ impl From<i64> for SongSource {
 }
 
 /// SQL `IN (...)` fragment listing the source IDs that make up the browsable
-/// library (local files, managed collection folders, and WebDAV mounts).
-/// Derived from `SongSource` discriminants so it can't silently drift from
-/// the enum. Interpolate into query strings, e.g. `format!("source IN ({})",
-/// *LIBRARY_SOURCES_SQL)`.
+/// library (local files, managed collection folders, WebDAV mounts, and
+/// OpenSubsonic servers). Derived from `SongSource` discriminants so it can't
+/// silently drift from the enum. Interpolate into query strings, e.g.
+/// `format!("source IN ({})", *LIBRARY_SOURCES_SQL)`.
 pub(crate) static LIBRARY_SOURCES_SQL: LazyLock<String> = LazyLock::new(|| {
     format!(
-        "{}, {}, {}",
+        "{}, {}, {}, {}",
         SongSource::LocalFile as i32,
         SongSource::Collection as i32,
         SongSource::WebDav as i32,
+        SongSource::Subsonic as i32,
     )
 });
 
 /// SQL `IN (...)` fragment listing the source IDs backed by a local
 /// filesystem path (local files and managed collection folders). Excludes
-/// WebDAV — remote files can't be moved/renamed by filesystem operations
+/// remote sources — remote files can't be moved/renamed by filesystem operations
 /// like the Organize feature. Derived from `SongSource` discriminants so it
 /// can't silently drift from the enum.
 pub(crate) static LOCAL_SOURCES_SQL: LazyLock<String> = LazyLock::new(|| {
@@ -870,6 +885,41 @@ pub struct WebDavServer {
     pub next_auto_sync_at: Option<i64>,
 }
 
+/// A configured OpenSubsonic-compatible server — Navidrome, Nextcloud Music,
+/// Gonic, Airsonic, LMS, etc. (#916).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SubsonicServer {
+    pub id: i64,
+    pub name: String,
+    pub url: String,
+    pub username: String,
+    /// Needed on every request to derive the salted auth token, so it has to
+    /// be stored (same as `WebDavServer::password`) — but never sent to the
+    /// frontend.
+    #[serde(skip_serializing)]
+    pub password: Option<String>,
+    pub enabled: bool,
+    pub sync_status: String,
+    pub last_synced_at: Option<i64>,
+    pub created_at: i64,
+    pub nickname: Option<String>,
+    pub icon: Option<String>,
+    pub color: Option<String>,
+    pub auto_sync_enabled: bool,
+    pub sync_interval_minutes: i64,
+    /// Whether to report now-playing/scrobbles back to this server.
+    pub report_plays: bool,
+    /// Server software as reported by `ping` (`type`/`serverVersion` are
+    /// OpenSubsonic additions, so `None` for a legacy Subsonic server).
+    pub server_type: Option<String>,
+    pub server_version: Option<String>,
+    /// Names of the OpenSubsonic extensions last discovered on this server.
+    pub extensions: Vec<String>,
+    /// Runtime-only, like `WebDavServer::next_auto_sync_at`.
+    pub next_auto_sync_at: Option<i64>,
+}
+
 /// Statistics returned after syncing a WebDAV server.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -1305,6 +1355,31 @@ mod tests {
             serde_json::to_string(&SongSource::SomaFm).unwrap(),
             "\"soma_fm\""
         );
+        assert_eq!(
+            serde_json::to_string(&SongSource::Subsonic).unwrap(),
+            "\"subsonic\""
+        );
+    }
+
+    #[test]
+    fn test_is_remote_covers_webdav_and_subsonic_only() {
+        assert!(SongSource::WebDav.is_remote());
+        assert!(SongSource::Subsonic.is_remote());
+        for local in [SongSource::LocalFile, SongSource::Collection] {
+            assert!(!local.is_remote());
+        }
+        // Radio/stream sources aren't synced library sources.
+        assert!(!SongSource::Stream.is_remote());
+        assert!(!SongSource::RadioBrowser.is_remote());
+    }
+
+    #[test]
+    fn test_library_sources_include_subsonic_but_local_sources_do_not() {
+        let lib: Vec<&str> = LIBRARY_SOURCES_SQL.split(", ").collect();
+        let local: Vec<&str> = LOCAL_SOURCES_SQL.split(", ").collect();
+        let subsonic = SongSource::SUBSONIC_ID.to_string();
+        assert!(lib.contains(&subsonic.as_str()));
+        assert!(!local.contains(&subsonic.as_str()));
     }
 
     #[test]

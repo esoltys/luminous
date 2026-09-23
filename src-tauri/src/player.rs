@@ -1092,13 +1092,13 @@ impl Player {
 
         let mut flagged_unavailable = false;
         if let Some(song) = &self.current_song {
-            // WebDAV songs (source 11) have HTTP URLs as their path — `Path::exists()`
+            // Remote songs (WebDAV, OpenSubsonic) have URL/URI paths — `Path::exists()`
             // always returns false for them, so a transient network/auth failure would
             // otherwise get misread as "confirmed missing" and hide the song from every
             // library view (which all filter on `unavailable = 0`). They're managed by
-            // the WebDAV sync instead, mirroring the same exemption in
+            // their server sync instead, mirroring the same exemption in
             // `find_missing_song_ids` (see collection.rs).
-            let missing_on_disk = song.source != crate::models::SongSource::WebDav
+            let missing_on_disk = !song.source.is_remote()
                 && song
                     .path
                     .as_deref()

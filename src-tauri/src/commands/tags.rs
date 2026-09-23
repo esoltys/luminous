@@ -377,17 +377,17 @@ async fn rewrite_genre_and_persist(
             let mut writes = Vec::with_capacity(metas.len());
             for item in &metas {
                 let new_genre = rewrite_genre(&item.genre);
-                // WebDAV songs (source 11) have no local file to write lofty tags to,
-                // and there's no write-back to the remote server implemented — the
-                // change is saved to Luminous's own DB only (the tag editor surfaces
+                // Remote songs (WebDAV, OpenSubsonic) have no local file to write lofty
+                // tags to, and there's no write-back to the remote server implemented —
+                // the change is saved to Luminous's own DB only (the tag editor surfaces
                 // this to the user). Attempting the write here would always fail and
                 // just spam the log with a warning that tells nobody anything new.
-                // Same DB-only treatment as WebDAV: a CUE sheet track's tags
+                // Same DB-only treatment for a CUE sheet track: its tags
                 // live in the .cue file, not the shared media file's own
                 // embedded tags, and there's no CUE-sheet write-back yet.
                 // Writing here would silently overwrite every other track cut
                 // from the same file with just this one's values (#78).
-                if item.source == crate::models::SongSource::WebDav || item.cue_path.is_some() {
+                if item.source.is_remote() || item.cue_path.is_some() {
                     count += 1;
                     writes.push((item.id, new_genre));
                     continue;

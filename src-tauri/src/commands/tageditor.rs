@@ -144,12 +144,12 @@ pub async fn save_song_tags(
             "This track's tags come from its CUE sheet and can't be edited yet.".to_string(),
         );
     }
-    // WebDAV songs (source 11) have no local file to write lofty tags to —
-    // there's no write-back to the remote server implemented, so the edit is
-    // saved to Luminous's own DB only (the tag editor surfaces this to the
-    // user). Attempting the on-disk write here would always fail and abort
+    // Remote songs (WebDAV, OpenSubsonic) have no local file to write lofty
+    // tags to — there's no write-back to the remote server implemented, so the
+    // edit is saved to Luminous's own DB only (the tag editor surfaces this to
+    // the user). Attempting the on-disk write here would always fail and abort
     // the whole save before the DB update below ever ran.
-    let is_webdav = source == models::SongSource::WebDav as i32;
+    let is_remote = models::SongSource::from(source as i64).is_remote();
 
     let path = std::path::PathBuf::from(path_str);
     // Close the timing race the coarse guard above can't (#514): the OS's own
@@ -186,7 +186,7 @@ pub async fn save_song_tags(
     let grouping_c = grouping.clone();
     let initial_key_c = initial_key.clone();
 
-    if !is_webdav {
+    if !is_remote {
         tauri::async_runtime::spawn_blocking(move || {
             crate::tageditor::write_tags(
                 &path_clone,
@@ -376,11 +376,11 @@ pub async fn save_album_tags(
                 },
             );
 
-            // WebDAV songs (source 11) have no local file to write lofty tags to,
-            // and there's no write-back to the remote server implemented — the
-            // change is saved to Luminous's own DB only (the tag editor surfaces
+            // Remote songs (WebDAV, OpenSubsonic) have no local file to write lofty
+            // tags to, and there's no write-back to the remote server implemented —
+            // the change is saved to Luminous's own DB only (the tag editor surfaces
             // this to the user), same as save_song_tags/rewrite_genre_and_persist.
-            if item.source == models::SongSource::WebDav as i32 {
+            if models::SongSource::from(item.source as i64).is_remote() {
                 count += 1;
                 continue;
             }
@@ -485,13 +485,13 @@ pub async fn clear_song_cover_art(state: State<'_, AppState>, song_id: i64) -> R
         .map_err(|_| "Song not found in library".to_string())?;
 
     let path = std::path::PathBuf::from(path_str);
-    // WebDAV songs (source 11) have no local file to clear an embedded
-    // picture from, and there's no write-back to the remote server
+    // Remote songs (WebDAV, OpenSubsonic) have no local file to clear an
+    // embedded picture from, and there's no write-back to the remote server
     // implemented — same as tag edits (see save_song_tags), this is
     // DB-only. The tag editor hides the Clear Artwork button for these
     // songs; this guard is what keeps it from erroring if it's ever
     // reached some other way.
-    if source != models::SongSource::WebDav as i32 {
+    if !models::SongSource::from(source as i64).is_remote() {
         // See save_song_tags — close the timing race the coarse guard above can't (#514).
         state
             .self_writes
@@ -536,7 +536,7 @@ pub async fn clear_album_cover_art(
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
 
     let mut local_paths = Vec::with_capacity(song_ids.len());
-    let mut webdav_paths = Vec::new();
+    let mut remote_paths = Vec::new();
     for &song_id in &song_ids {
         if let Ok((path_str, source)) = conn.query_row(
             "SELECT path, source FROM songs WHERE id = ?1",
@@ -544,10 +544,10 @@ pub async fn clear_album_cover_art(
             |row| Ok((row.get::<_, String>(0)?, row.get::<_, i32>(1)?)),
         ) {
             let path = std::path::PathBuf::from(path_str);
-            // WebDAV songs (source 11) have no local file to clear an embedded
-            // picture from — DB-only, same as clear_song_cover_art above.
-            if source == models::SongSource::WebDav as i32 {
-                webdav_paths.push((song_id, path));
+            // Remote songs (WebDAV, OpenSubsonic) have no local file to clear an
+            // embedded picture from — DB-only, same as clear_song_cover_art above.
+            if models::SongSource::from(source as i64).is_remote() {
+                remote_paths.push((song_id, path));
             } else {
                 local_paths.push((song_id, path));
             }
@@ -568,7 +568,7 @@ pub async fn clear_album_cover_art(
         })
         .await
         .map_err(|e| e.to_string())?;
-    cleared.extend(webdav_paths);
+    cleared.extend(remote_paths);
 
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
     for (song_id, path) in &cleared {
