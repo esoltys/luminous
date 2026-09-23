@@ -16,17 +16,17 @@
     heroImageUrl?: string | null;
     heroImageAlt?: string;
     /**
-     * Sets the mosaic's height (e.g. "h-24"); width is derived from it via an
-     * explicit `aspect-ratio` computed from the tile count, not set here.
-     * The big tile (hero image or covers[0]) is always a full square (edge =
-     * the mosaic's height, H); every additional cover (up to 4) is always a
-     * quarter tile (H/2 x H/2), never stretched to share the full square
-     * with fewer siblings — so 4 total tiles is [full][3x quarter], not four
-     * equal tiles.
+     * Sets the mosaic's height (e.g. "h-24"); width is derived from it (see
+     * `measuredWidth` below) from a ratio computed from the tile count, not
+     * set here. The big tile (hero image or covers[0]) is always a full
+     * square (edge = the mosaic's height, H); every additional cover (up to
+     * 4) is always a quarter tile (H/2 x H/2), never stretched to share the
+     * full square with fewer siblings — so 4 total tiles is [full][3x
+     * quarter], not four equal tiles.
      *
-     * The ratio must be resolved with a definite height (from `sizeClass`)
-     * and no width class so `aspect-ratio` can derive a definite pixel width
-     * up front — grid cells then fill that fixed box with plain fr tracks.
+     * No width class should be set here — `measuredWidth` needs a definite
+     * height (from `sizeClass`) to measure and derive a definite pixel width
+     * from; grid cells then fill that fixed box with plain fr tracks.
      * Deriving square tiles bottom-up instead (`h-full`/`aspect-square` on
      * each leaf, nested inside width:auto flex containers) hits a circular
      * sizing dependency in Tailwind's webview renderer where the browser
@@ -66,6 +66,31 @@
   let ratio = $derived(quarterCovers.length === 0 ? 1 : (2 + quarterCols) / 2);
 
   let tileClass = $derived(`w-full h-full ${hoverEffect ? "group-hover:scale-105 transition-transform duration-300" : ""}`);
+
+  /** Width is derived from the rendered height via JS (ResizeObserver), not CSS
+   * `aspect-ratio` (see the sizeClass doc comment above for why the bottom-up
+   * nested-aspect-ratio approach was already rejected once). WebKitGTK's
+   * handling of `aspect-ratio`-driven cross-axis sizing on an auto-width flex
+   * item has proven inconsistent across engine versions -- it renders fine on
+   * one WebKitGTK build and balloons to ~full container width (overlapping
+   * sibling content) on another, e.g. the newer WebKitGTK bundled by the
+   * Flatpak's GNOME runtime vs. the host system's — so don't reintroduce a
+   * CSS-only width derivation here even if it looks fine on whatever engine
+   * you're testing against. */
+  let rootEl = $state<HTMLDivElement | undefined>();
+  let measuredHeight = $state(0);
+
+  $effect(() => {
+    if (!rootEl) return;
+    const el = rootEl;
+    const update = () => { measuredHeight = el.getBoundingClientRect().height; };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  });
+
+  let measuredWidth = $derived(measuredHeight > 0 ? measuredHeight * ratio : 0);
 </script>
 
 {#snippet bigTile()}
@@ -92,7 +117,11 @@
   `<img>` via CoverArt's own `overflow-hidden`, so nothing needs a second
   clip here — any stray device-pixel just bleeds harmlessly outside the box.
 -->
-<div class="{sizeClass} shrink-0 select-none" style="aspect-ratio: {ratio};">
+<div
+  bind:this={rootEl}
+  class="{sizeClass} shrink-0 select-none"
+  style={measuredWidth > 0 ? `width: ${measuredWidth}px;` : `aspect-ratio: ${ratio};`}
+>
   {#if !hasBigTile}
     {#if fallbackName}
       <div class="w-full h-full bg-gradient-to-br {getArtistGradient(fallbackName)} rounded-full flex items-center justify-center text-white border border-brand-border/40 font-bold text-2xl shadow-md">
