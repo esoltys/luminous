@@ -609,10 +609,8 @@ impl CollectionScanner {
                     path.as_deref(),
                     &active_webdav_song_ids,
                     &active_webdav_servers,
-                ) {
-                    if !to_delete.contains(&id) {
-                        to_delete.push(id);
-                    }
+                ) && !to_delete.contains(&id) {
+                    to_delete.push(id);
                 }
             } else if !to_delete.contains(&id) {
                 to_delete.push(id);

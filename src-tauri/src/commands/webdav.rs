@@ -252,10 +252,10 @@ pub async fn delete_webdav_server(
                 .query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)))
                 .map_err(|e| e.to_string())?;
             for (song_id, path) in rows.flatten() {
-                if crate::collection::song_matches_webdav_server(&path, url) {
-                    if !song_ids.contains(&song_id) {
-                        song_ids.push(song_id);
-                    }
+                if crate::collection::song_matches_webdav_server(&path, url)
+                    && !song_ids.contains(&song_id)
+                {
+                    song_ids.push(song_id);
                 }
             }
         }
