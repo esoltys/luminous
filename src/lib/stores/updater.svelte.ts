@@ -52,16 +52,19 @@ class UpdaterStore {
     return this.updateAutoInstall ? "auto" : "notify";
   }
 
-  // deb/rpm and MSIX installs are all updated by something other than us —
-  // apt/dnf or the Microsoft Store — and GitHub releases aren't even the
-  // same artifact stream. The check/notify/auto-install UI is meaningless
-  // there, so callers use this to swap in "managed by X" messaging instead
-  // of a control panel with nothing it can do.
-  get externallyManagedFormat(): "deb" | "rpm" | "msix" | null {
+  // deb/rpm, Flatpak, and MSIX installs are all updated by something other
+  // than us — apt/dnf, `flatpak update`, or the Microsoft Store — and GitHub
+  // releases aren't even the same artifact stream for any of them (Flatpak's
+  // update source is the shared OSTree repo, not a GitHub release asset).
+  // The check/notify/auto-install UI is meaningless there, so callers use
+  // this to swap in "managed by X" messaging instead of a control panel
+  // with nothing it can do.
+  get externallyManagedFormat(): "deb" | "rpm" | "msix" | "flatpak" | null {
     switch (this.installFormat.format) {
       case "deb":
       case "rpm":
       case "msix":
+      case "flatpak":
         return this.installFormat.format;
       default:
         return null;
