@@ -62,15 +62,23 @@
   });
 </script>
 
+<!-- Anchored inside the 80px (h-20) TopNavigation header, just left of the w-16
+     logo (lg and up, where the logo shows), and allowed to overlap the search
+     box on narrower windows. The first grid row is exactly the header's
+     height with the first toast self-centered in it, so the newest toast lines
+     up vertically with the header controls whatever its own height; any
+     further toasts stack below in auto rows. The px-6 matches the header's
+     own px-6 (and lg:right-22 = the w-16 logo + the header's gap-6), so the
+     toast's right edge lines up with the search box's when they overlap. -->
 <div
   use:portal
-  class="fixed top-24 right-4 z-[100] flex flex-col items-end gap-2 pointer-events-none px-4"
+  class="fixed top-0 right-0 lg:right-22 z-[100] grid grid-rows-[5rem] justify-items-end gap-2 pointer-events-none px-6 [&>:first-child]:self-center"
 >
   {#each toastStore.messages as toast (toast.id)}
     <div
       in:fly={{ x: 24, duration: 200 }}
       out:fade={{ duration: 150 }}
-      class="pointer-events-auto flex items-start gap-2.5 px-4 py-2.5 rounded-xl border shadow-2xl backdrop-blur-md text-sm font-semibold max-w-md
+      class="pointer-events-auto flex items-start gap-2.5 px-4 py-2.5 rounded-lg border shadow-2xl backdrop-blur-md text-sm font-semibold max-w-md
         {toast.variant === 'error'
           ? 'bg-[#1f1013] border-red-500/50 text-red-400 anim-warn-shake'
           : toast.variant === 'warning'
