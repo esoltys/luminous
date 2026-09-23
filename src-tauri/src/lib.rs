@@ -374,6 +374,8 @@ fn spawn_scheduler_latency_monitor() {
 fn spawn_visualizer_loop(app_handle: tauri::AppHandle, audio: Arc<Mutex<AudioEngine>>) {
     tauri::async_runtime::spawn(async move {
         let mut interval = tokio::time::interval(std::time::Duration::from_millis(33)); // ~30 FPS
+        let mut is_minimized_or_hidden = false;
+        let mut ticks_until_visibility_check: u32 = 0;
         loop {
             interval.tick().await;
 
@@ -381,10 +383,27 @@ fn spawn_visualizer_loop(app_handle: tauri::AppHandle, audio: Arc<Mutex<AudioEng
             // When minimized, Chromium disables compositor frame commits. Continuous Canvas2D drawing
             // would pile up uncommitted PaintOpBuffers in Skia, leading to severe memory ballooning
             // and an unresponsive renderer thread upon restore (#1052).
-            let is_minimized_or_hidden = app_handle
-                .get_webview_window("main")
-                .map(|w| w.is_minimized().unwrap_or(false) || !w.is_visible().unwrap_or(true))
+            //
+            // `is_minimized()`/`is_visible()` block until the main (UI) thread answers, so they run
+            // on the blocking pool — never on a Tokio worker, where waiting on a busy main thread
+            // stalled other tasks queued behind this one (including MPRIS's D-Bus connect, which the
+            // main thread was itself waiting on at startup) — and only every ~0.5s rather than on
+            // every frame, which was ~60 main-thread round trips a second.
+            if ticks_until_visibility_check == 0 {
+                ticks_until_visibility_check = 15;
+                let handle = app_handle.clone();
+                is_minimized_or_hidden = tokio::task::spawn_blocking(move || {
+                    handle
+                        .get_webview_window("main")
+                        .map(|w| {
+                            w.is_minimized().unwrap_or(false) || !w.is_visible().unwrap_or(true)
+                        })
+                        .unwrap_or(false)
+                })
+                .await
                 .unwrap_or(false);
+            }
+            ticks_until_visibility_check -= 1;
             if is_minimized_or_hidden {
                 continue;
             }
@@ -1109,11 +1128,6 @@ pub fn run() {
             let media_hwnd: Option<*mut std::ffi::c_void> = None;
 
             let media_session = media_session::spawn(app.handle().clone(), media_hwnd);
-            if media_session.is_none() {
-                log::info!(
-                    "OS media session integration (SMTC/MPRIS2) unavailable; continuing without it."
-                );
-            }
 
             let watcher_paused = Arc::new(std::sync::atomic::AtomicU32::new(0));
             let self_writes = Arc::new(collection::SelfWriteTracker::new());
