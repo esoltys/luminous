@@ -174,21 +174,42 @@ jobs:
     permissions:
       contents: write
     runs-on: ubuntu-24.04
+    env:
+      # The `secrets` context isn't available in step-level `if:`, but a
+      # job-level env var populated from it is, via `env.*` below.
+      FLATPAK_REPO_GPG_KEY: ${{ secrets.FLATPAK_REPO_GPG_KEY }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-
-      # TODO(#1086): pin to a commit SHA (matching this file's other `uses:`
-      # pins) once verified against the real tag - not done here, no network
-      # access in this session to confirm the current release SHA.
-      - name: Build Flatpak bundle
-        uses: flatpak/flatpak-github-actions/flatpak-builder@v6.3
         with:
-          bundle: LuminousMusicPlayer.flatpak
-          manifest-path: flatpak/org.luminous.music.yml
-          cache-key: flatpak-builder-${{ github.sha }}
-          repository-name: flathub
-          repository-url: https://flathub.org/repo/flathub.flatpakrepo
+          # flatpak/shared-modules (libappindicator) is a git submodule.
+          submodules: true
+
+      # flatpak/flatpak-github-actions/flatpak-builder expects flatpak-builder
+      # to already be on PATH (normally via its container image); a bare
+      # ubuntu runner doesn't have it. `ostree` is for the publish step.
+      - name: Install Flatpak tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder ostree xvfb
+          # The action installs the runtime/SDK with `flatpak --system install
+          # flathub ...`, which needs the remote to exist system-wide.
+          sudo flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+
+      # Same commands verified locally against this manifest. Not using
+      # flatpak/flatpak-github-actions: it runs `flatpak --system install` as
+      # the unprivileged runner user (polkit denies it) and assumes its own
+      # container image.
+      - name: Build Flatpak bundle
+        run: |
+          set -euo pipefail
+          sudo flatpak install -y --noninteractive flathub \
+            org.gnome.Platform//50 org.gnome.Sdk//50 \
+            org.freedesktop.Sdk.Extension.rust-stable//25.08 \
+            org.freedesktop.Sdk.Extension.node20//25.08
+          flatpak-builder --disable-rofiles-fuse --repo=repo --force-clean \
+            --default-branch=master flatpak_app flatpak/org.luminous.music.yml
+          flatpak build-bundle repo LuminousMusicPlayer.flatpak org.luminous.music master
 
       - name: Upload Flatpak bundle to Release Assets
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
@@ -208,7 +229,7 @@ jobs:
       # secrets) documented in docs/FLATPAK.md - until FLATPAK_REPO_GPG_KEY is
       # set, this step skips instead of failing the release.
       - name: Publish to shared Flatpak repo
-        if: ${{ secrets.FLATPAK_REPO_GPG_KEY != '' }}
+        if: ${{ env.FLATPAK_REPO_GPG_KEY != '' }}
         env:
           FLATPAK_REPO_GPG_KEY: ${{ secrets.FLATPAK_REPO_GPG_KEY }}
           FLATPAK_REPO_GPG_KEY_ID: ${{ secrets.FLATPAK_REPO_GPG_KEY_ID }}
@@ -219,12 +240,19 @@ jobs:
           echo "$FLATPAK_REPO_GPG_KEY" | base64 -d | gpg --batch --import
 
           git clone --depth 1 "https://x-access-token:${ESOLTYS_IO_DEPLOY_TOKEN}@github.com/esoltys/esoltys.github.io.git" pages-repo
-          mkdir -p pages-repo/flatpak/repo
+          DST=pages-repo/flatpak/repo
+          mkdir -p "$DST"
+          # First publish only: create the shared OSTree repo. Later runs (and
+          # other projects' refs already in it) are left untouched.
+          if [ ! -f "$DST/config" ]; then
+            ostree init --mode=archive-z2 --repo="$DST"
+          fi
 
-          flatpak build-export --gpg-sign="$FLATPAK_REPO_GPG_KEY_ID" \
-            pages-repo/flatpak/repo .flatpak-builder/build/luminous org.luminous.music || \
-          flatpak-builder --repo=pages-repo/flatpak/repo --gpg-sign="$FLATPAK_REPO_GPG_KEY_ID" \
-            --force-clean flatpak-build-dir flatpak/org.luminous.music.yml
+          # Re-sign the unsigned `repo/` the builder step produced into the
+          # shared repo, then regenerate its index/appstream/deltas.
+          flatpak build-commit-from --src-repo=repo --gpg-sign="$FLATPAK_REPO_GPG_KEY_ID" "$DST" \
+            app/org.luminous.music/x86_64/master \
+            runtime/org.luminous.music.Debug/x86_64/master
 
           flatpak build-update-repo --generate-static-deltas \
             --gpg-sign="$FLATPAK_REPO_GPG_KEY_ID" pages-repo/flatpak/repo
