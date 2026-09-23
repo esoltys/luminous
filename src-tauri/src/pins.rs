@@ -84,6 +84,53 @@ pub fn reorder(conn: &Connection, order: &[(String, String)]) -> Result<()> {
     Ok(())
 }
 
+pub const PINNED_DEFAULTS_APPLIED_KEY: &str = "pinned_defaults_applied";
+
+pub const DEFAULT_PINNED_ITEMS: [(&str, &str); 2] = [
+    ("auto_playlist", "daypart"),
+    ("auto_playlist", "favourites"),
+];
+
+/// Initializes default pins for new installs (#1149):
+/// If defaults have not yet been applied and the user has nothing pinned to Home,
+/// pins the Moment Mix ("daypart") and Favourite Songs ("favourites") once only.
+/// If the user already had pinned items or if this has already run, leaves existing
+/// pins intact and records that defaults were applied so unpinning everything
+/// does not re-add defaults on next launch.
+pub fn init_default_pins(conn: &Connection) -> Result<()> {
+    let already_applied: bool = conn
+        .query_row(
+            "SELECT 1 FROM app_state WHERE key = ?1",
+            params![PINNED_DEFAULTS_APPLIED_KEY],
+            |_| Ok(()),
+        )
+        .is_ok();
+    if already_applied {
+        return Ok(());
+    }
+
+    let existing_count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM pinned_items", [], |r| r.get(0))
+        .unwrap_or(0);
+
+    if existing_count == 0 {
+        let now = chrono::Utc::now().timestamp();
+        for (idx, (item_type, ref_key)) in DEFAULT_PINNED_ITEMS.iter().enumerate() {
+            conn.execute(
+                "INSERT OR IGNORE INTO pinned_items (item_type, ref_key, position, pinned_at) VALUES (?1, ?2, ?3, ?4)",
+                params![item_type, ref_key, idx as i64, now],
+            )?;
+        }
+    }
+
+    conn.execute(
+        "INSERT OR REPLACE INTO app_state (key, value) VALUES (?1, 'true')",
+        params![PINNED_DEFAULTS_APPLIED_KEY],
+    )?;
+
+    Ok(())
+}
+
 /// Resolves a pinned song reference against live data — `None` (not an
 /// error) when the id doesn't parse or the song no longer exists/is
 /// unavailable, so a stale pin is silently dropped by the caller.
@@ -682,6 +729,86 @@ mod tests {
                 .unwrap()
                 .is_none()
         );
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn init_default_pins_seeds_moment_mix_and_favourites_when_empty() {
+        let (db, dir) = test_db();
+        let conn = db.pool.get().unwrap();
+
+        assert_eq!(pinned_refs(&conn).unwrap().len(), 0);
+
+        init_default_pins(&conn).unwrap();
+
+        let refs = pinned_refs(&conn).unwrap();
+        assert_eq!(
+            refs,
+            vec![
+                ("auto_playlist".to_string(), "daypart".to_string()),
+                ("auto_playlist".to_string(), "favourites".to_string()),
+            ]
+        );
+
+        let flag: String = conn
+            .query_row(
+                "SELECT value FROM app_state WHERE key = ?1",
+                params![PINNED_DEFAULTS_APPLIED_KEY],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(flag, "true");
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn init_default_pins_is_once_only_and_does_not_repin_after_unpin() {
+        let (db, dir) = test_db();
+        let conn = db.pool.get().unwrap();
+
+        init_default_pins(&conn).unwrap();
+        assert_eq!(pinned_refs(&conn).unwrap().len(), 2);
+
+        unpin(&conn, "auto_playlist", "daypart").unwrap();
+        unpin(&conn, "auto_playlist", "favourites").unwrap();
+        assert_eq!(pinned_refs(&conn).unwrap().len(), 0);
+
+        // Calling again must not re-pin defaults
+        init_default_pins(&conn).unwrap();
+        assert_eq!(pinned_refs(&conn).unwrap().len(), 0);
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn init_default_pins_leaves_existing_pins_intact() {
+        let (db, dir) = test_db();
+        let conn = db.pool.get().unwrap();
+
+        pin(&conn, "album", "Dark Side of the Moon").unwrap();
+        assert_eq!(
+            pinned_refs(&conn).unwrap(),
+            vec![("album".to_string(), "Dark Side of the Moon".to_string())]
+        );
+
+        init_default_pins(&conn).unwrap();
+
+        // Must still only have the pre-existing pin
+        assert_eq!(
+            pinned_refs(&conn).unwrap(),
+            vec![("album".to_string(), "Dark Side of the Moon".to_string())]
+        );
+
+        let flag: String = conn
+            .query_row(
+                "SELECT value FROM app_state WHERE key = ?1",
+                params![PINNED_DEFAULTS_APPLIED_KEY],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(flag, "true");
 
         let _ = std::fs::remove_dir_all(dir);
     }
