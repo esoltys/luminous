@@ -62,14 +62,15 @@
   });
 </script>
 
-<!-- From 2xl up, anchored inside the 80px (h-20) TopNavigation header just left
-     of the w-16 logo, so a single toast sits in the header's empty space
-     instead of covering page content. Narrower than that, the flex-1
-     max-w-2xl search box leaves too little room for a max-w-md toast, so drop
-     back to just under the header. -->
+<!-- Anchored inside the 80px (h-20) TopNavigation header, just left of the w-16
+     logo (lg and up, where the logo shows), and allowed to overlap the search
+     box on narrower windows. The first grid row is exactly the header's
+     height with the first toast self-centered in it, so the newest toast lines
+     up vertically with the header controls whatever its own height; any
+     further toasts stack below in auto rows. -->
 <div
   use:portal
-  class="fixed top-24 right-4 2xl:top-3 2xl:right-24 z-[100] flex flex-col items-end gap-2 pointer-events-none px-4"
+  class="fixed top-0 right-4 lg:right-24 z-[100] grid grid-rows-[5rem] justify-items-end gap-2 pointer-events-none px-4 [&>:first-child]:self-center"
 >
   {#each toastStore.messages as toast (toast.id)}
     <div
