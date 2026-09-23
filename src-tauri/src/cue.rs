@@ -211,7 +211,10 @@ FILE "Flying In A Blue Dream.flac" WAVE
         );
 
         // INDEX 00 (pre-gap) must be ignored in favor of INDEX 01.
-        assert_eq!(sheet.tracks[1].start_nanosec, parse_cue_time("04:00:50").unwrap());
+        assert_eq!(
+            sheet.tracks[1].start_nanosec,
+            parse_cue_time("04:00:50").unwrap()
+        );
 
         assert_eq!(
             sheet.tracks[2].start_nanosec,

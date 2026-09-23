@@ -148,6 +148,52 @@ const LINUX_WEBKITGTK_RENDERING_ENV_VARS: &[(&str, &str)] = &[
     ("WEBKIT_DISABLE_DMABUF_RENDERER", "1"),
 ];
 
+/// Which of `LINUX_WEBKITGTK_RENDERING_ENV_VARS` to set for this launch.
+/// Only the AppImage (the runtime sets `APPIMAGE`) bundles its own, older
+/// WebKitGTK — every other build (Flatpak, distro packages, `tauri dev`)
+/// runs against a current WebKitGTK that renders fine with GPU compositing.
+/// Forcing compositing off there made WebKitGTK paint every frame on the
+/// CPU: at a 3x display scale a full-window repaint took 300–600ms, so theme
+/// changes, hovers and typing all lagged. A var the user already set is
+/// never overridden, so either behavior can still be forced by hand.
+#[cfg(target_os = "linux")]
+fn linux_webkitgtk_env_vars_to_set(
+    is_appimage: bool,
+    is_already_set: impl Fn(&str) -> bool,
+) -> Vec<(&'static str, &'static str)> {
+    if !is_appimage {
+        return Vec::new();
+    }
+    LINUX_WEBKITGTK_RENDERING_ENV_VARS
+        .iter()
+        .copied()
+        .filter(|(key, _)| !is_already_set(key))
+        .collect()
+}
+
+/// Whether any of `LINUX_WEBKITGTK_RENDERING_ENV_VARS` is in effect for this
+/// process — set by `run()` for the AppImage, or by the user by hand
+/// (WebKitGTK treats any value other than "0" as set). Takes the env lookup
+/// as a parameter so it's testable without mutating the process env.
+#[cfg(target_os = "linux")]
+fn webkitgtk_gpu_rendering_disabled_by(get: impl Fn(&str) -> Option<std::ffi::OsString>) -> bool {
+    LINUX_WEBKITGTK_RENDERING_ENV_VARS
+        .iter()
+        .any(|(key, _)| get(key).is_some_and(|value| value != "0"))
+}
+
+/// See `webkitgtk_gpu_rendering_disabled_by()`. Always false off Linux.
+pub(crate) fn webkitgtk_gpu_rendering_disabled() -> bool {
+    #[cfg(target_os = "linux")]
+    {
+        webkitgtk_gpu_rendering_disabled_by(|key| std::env::var_os(key))
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        false
+    }
+}
+
 /// Appends WebView2's occlusion-calculation-disabling flag to an existing
 /// `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` value, without duplicating it if
 /// already present. Factored out of `run()`'s `cfg(target_os = "windows")`
@@ -351,6 +397,8 @@ fn spawn_scheduler_latency_monitor() {
 fn spawn_visualizer_loop(app_handle: tauri::AppHandle, audio: Arc<Mutex<AudioEngine>>) {
     tauri::async_runtime::spawn(async move {
         let mut interval = tokio::time::interval(std::time::Duration::from_millis(33)); // ~30 FPS
+        let mut is_minimized_or_hidden = false;
+        let mut ticks_until_visibility_check: u32 = 0;
         loop {
             interval.tick().await;
 
@@ -358,10 +406,27 @@ fn spawn_visualizer_loop(app_handle: tauri::AppHandle, audio: Arc<Mutex<AudioEng
             // When minimized, Chromium disables compositor frame commits. Continuous Canvas2D drawing
             // would pile up uncommitted PaintOpBuffers in Skia, leading to severe memory ballooning
             // and an unresponsive renderer thread upon restore (#1052).
-            let is_minimized_or_hidden = app_handle
-                .get_webview_window("main")
-                .map(|w| w.is_minimized().unwrap_or(false) || !w.is_visible().unwrap_or(true))
+            //
+            // `is_minimized()`/`is_visible()` block until the main (UI) thread answers, so they run
+            // on the blocking pool — never on a Tokio worker, where waiting on a busy main thread
+            // stalled other tasks queued behind this one (including MPRIS's D-Bus connect, which the
+            // main thread was itself waiting on at startup) — and only every ~0.5s rather than on
+            // every frame, which was ~60 main-thread round trips a second.
+            if ticks_until_visibility_check == 0 {
+                ticks_until_visibility_check = 15;
+                let handle = app_handle.clone();
+                is_minimized_or_hidden = tokio::task::spawn_blocking(move || {
+                    handle
+                        .get_webview_window("main")
+                        .map(|w| {
+                            w.is_minimized().unwrap_or(false) || !w.is_visible().unwrap_or(true)
+                        })
+                        .unwrap_or(false)
+                })
+                .await
                 .unwrap_or(false);
+            }
+            ticks_until_visibility_check -= 1;
             if is_minimized_or_hidden {
                 continue;
             }
@@ -780,9 +845,14 @@ pub fn run() {
     // can be substantially older than the host's system WebKitGTK. Older
     // WebKitGTK builds' accelerated compositing path is known to render a
     // blank window against newer Mesa/Wayland stacks; disabling compositing
-    // mode avoids that without touching DMA-BUF handling (#370, #383).
+    // mode avoids that (#370, #383). AppImage-only — see
+    // `linux_webkitgtk_env_vars_to_set()`.
     #[cfg(target_os = "linux")]
-    for (key, value) in LINUX_WEBKITGTK_RENDERING_ENV_VARS {
+    for (key, value) in
+        linux_webkitgtk_env_vars_to_set(std::env::var_os("APPIMAGE").is_some(), |key| {
+            std::env::var_os(key).is_some()
+        })
+    {
         std::env::set_var(key, value);
     }
 
@@ -1081,11 +1151,6 @@ pub fn run() {
             let media_hwnd: Option<*mut std::ffi::c_void> = None;
 
             let media_session = media_session::spawn(app.handle().clone(), media_hwnd);
-            if media_session.is_none() {
-                log::info!(
-                    "OS media session integration (SMTC/MPRIS2) unavailable; continuing without it."
-                );
-            }
 
             let watcher_paused = Arc::new(std::sync::atomic::AtomicU32::new(0));
             let self_writes = Arc::new(collection::SelfWriteTracker::new());
@@ -1413,6 +1478,7 @@ pub fn run() {
             commands::window::exit_miniplayer_mode,
             commands::window::move_window_to_preset,
             commands::window::get_window_geometry,
+            commands::window::webview_gpu_compositing,
             commands::window::start_window_drag,
             commands::window::start_window_resize,
         ])
@@ -1441,6 +1507,37 @@ mod startup_rendering_workaround_tests {
         for (_, value) in LINUX_WEBKITGTK_RENDERING_ENV_VARS {
             assert_eq!(*value, "1");
         }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_webkitgtk_gpu_rendering_disabled_by_env() {
+        use std::ffi::OsString;
+        assert!(!webkitgtk_gpu_rendering_disabled_by(|_| None));
+        assert!(webkitgtk_gpu_rendering_disabled_by(|key| {
+            (key == "WEBKIT_DISABLE_DMABUF_RENDERER").then(|| OsString::from("1"))
+        }));
+        assert!(!webkitgtk_gpu_rendering_disabled_by(|_| Some(
+            OsString::from("0")
+        )));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_linux_webkitgtk_env_vars_only_for_appimage() {
+        assert_eq!(
+            linux_webkitgtk_env_vars_to_set(true, |_| false),
+            LINUX_WEBKITGTK_RENDERING_ENV_VARS.to_vec()
+        );
+        assert!(linux_webkitgtk_env_vars_to_set(false, |_| false).is_empty());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_linux_webkitgtk_env_vars_never_override_user_values() {
+        let to_set =
+            linux_webkitgtk_env_vars_to_set(true, |key| key == "WEBKIT_DISABLE_COMPOSITING_MODE");
+        assert_eq!(to_set, vec![("WEBKIT_DISABLE_DMABUF_RENDERER", "1")]);
     }
 
     #[test]

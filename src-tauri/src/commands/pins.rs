@@ -32,9 +32,11 @@ pub async fn unpin_item(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    crate::db::run_blocking(&state.db, move |conn| pins::unpin(conn, &item_type, &ref_key))
-        .await
-        .map_err(|e| e.to_string())?;
+    crate::db::run_blocking(&state.db, move |conn| {
+        pins::unpin(conn, &item_type, &ref_key)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
     let _ = app.emit("pinned-items-changed", ());
     Ok(())
 }
@@ -160,18 +162,16 @@ pub async fn get_pinned_items(state: State<'_, AppState>) -> Result<Vec<PinnedIt
                 };
                 let playlists_for_scanner = playlists.clone();
                 let ref_key_for_scanner = ref_key.clone();
-                if let Some(auto_playlist) = crate::collection::with_collection_scanner(
-                    state.db.clone(),
-                    move |scanner| {
+                if let Some(auto_playlist) =
+                    crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
                         pins::resolve_auto_playlist(
                             scanner,
                             &playlists_for_scanner,
                             &ref_key_for_scanner,
                         )
-                    },
-                )
-                .await
-                .map_err(|e| e.to_string())?
+                    })
+                    .await
+                    .map_err(|e| e.to_string())?
                 {
                     items.push(PinnedItem::AutoPlaylist { auto_playlist });
                 }

@@ -5,9 +5,7 @@
 //! independently on failure — see `context::ContextManager`'s doc comment.
 
 use crate::collection::get_artist_profile_conn;
-use crate::context::{
-    is_cache_fresh, ContextManager, ARTIST_FLIGHT, RELEASE_GROUP_FLIGHT,
-};
+use crate::context::{is_cache_fresh, ContextManager, ARTIST_FLIGHT, RELEASE_GROUP_FLIGHT};
 use crate::db::Database;
 use crate::AppState;
 use rusqlite::params;
@@ -195,14 +193,9 @@ pub async fn get_song_context(
                     let cb_ok = cb.as_ref().ok().cloned();
 
                     if mb.is_ok() || cb.is_ok() {
-                        let _ = write_release_group_cache(
-                            &db_clone,
-                            &rg_id_clone,
-                            &mb_ok,
-                            &cb_ok,
-                            now,
-                        )
-                        .await;
+                        let _ =
+                            write_release_group_cache(&db_clone, &rg_id_clone, &mb_ok, &cb_ok, now)
+                                .await;
                     }
                     (mb, cb)
                 })
@@ -663,7 +656,10 @@ mod tests {
     fn test_resolve_song_context_artist_mbid_none_when_nothing_resolves() {
         let db = temp_db("context_resolve_none");
         let conn = db.pool.get().unwrap();
-        assert_eq!(resolve_song_context_artist_mbid(&conn, None, None, None, None), None);
+        assert_eq!(
+            resolve_song_context_artist_mbid(&conn, None, None, None, None),
+            None
+        );
         // An artist with no saved profile at all yields None, not an error.
         assert_eq!(
             resolve_song_context_artist_mbid(&conn, None, None, Some("Nobody Known"), None),
@@ -720,7 +716,10 @@ mod tests {
 
         let mut enrichment = SongContextEnrichment::default();
         apply_artist_cache(&mut enrichment, &cached);
-        assert_eq!(enrichment.artist_sort_name.as_deref(), Some("Twain, Shania"));
+        assert_eq!(
+            enrichment.artist_sort_name.as_deref(),
+            Some("Twain, Shania")
+        );
         assert_eq!(enrichment.artist_gender.as_deref(), Some("Female"));
         assert_eq!(enrichment.artist_begin_date.as_deref(), Some("1965-08-28"));
     }
@@ -739,7 +738,10 @@ mod tests {
             .await
             .unwrap();
 
-        let cached = read_artist_cache(&db, "artist-legacy").await.unwrap().unwrap();
+        let cached = read_artist_cache(&db, "artist-legacy")
+            .await
+            .unwrap()
+            .unwrap();
         assert!(cached.sort_name.is_none());
         assert_eq!(cached.wikipedia_extract.as_deref(), Some("Bio only"));
     }

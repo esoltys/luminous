@@ -539,9 +539,8 @@ impl CollectionScanner {
             .optional()?;
 
         let tags: Vec<String> = if let Some(gid) = group_id {
-            let mut stmt = conn.prepare(
-                "SELECT tag_name FROM artist_tag_assignments WHERE group_id = ?1",
-            )?;
+            let mut stmt =
+                conn.prepare("SELECT tag_name FROM artist_tag_assignments WHERE group_id = ?1")?;
             let mut list: Vec<String> = stmt
                 .query_map(params![gid], |r| r.get(0))?
                 .filter_map(|r| r.ok())
@@ -3623,8 +3622,10 @@ mod tests {
         .unwrap();
 
         let counts = scanner.get_artist_tag_counts().unwrap();
-        let by_name: std::collections::HashMap<&str, i64> =
-            counts.iter().map(|t| (t.name.as_str(), t.song_count)).collect();
+        let by_name: std::collections::HashMap<&str, i64> = counts
+            .iter()
+            .map(|t| (t.name.as_str(), t.song_count))
+            .collect();
 
         // Nordic Folk is on 2 distinct artists (Danheim, Wardruna), even though Danheim has 2 songs.
         assert_eq!(by_name.get("Nordic Folk"), Some(&2));

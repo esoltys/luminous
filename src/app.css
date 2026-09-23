@@ -95,6 +95,11 @@
   inherits: true;
   initial-value: rgba(25, 27, 35, 0.5);
 }
+@property --glass-solid-sidebar {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #12141c;
+}
 
 @property --color-text-primary {
   syntax: '<color>';
@@ -125,13 +130,14 @@
 @layer base {
   :root {
     --theme-morph-duration: 1.2s;
+    /* Fallback morph, used only where View Transitions aren't available
+       (see .theme-vt below). --color-artwork-* are deliberately not in this
+       list: they're rewritten on every track change even when Dynamic
+       Artwork isn't the active theme, and each morph of an inherited
+       custom property on :root restyles the whole document every frame.
+       When Dynamic Artwork is active, --bg-main etc. reference them and
+       morph on their own. */
     transition:
-      --color-artwork-primary var(--theme-morph-duration) ease,
-      --color-artwork-sidebar var(--theme-morph-duration) ease,
-      --color-artwork-playerbar var(--theme-morph-duration) ease,
-      --color-artwork-accent var(--theme-morph-duration) ease,
-      --color-artwork-accent-hover var(--theme-morph-duration) ease,
-      --color-artwork-border var(--theme-morph-duration) ease,
       --bg-main var(--theme-morph-duration) ease,
       --bg-sidebar var(--theme-morph-duration) ease,
       --bg-playerbar var(--theme-morph-duration) ease,
@@ -144,7 +150,8 @@
       --color-accent-text var(--theme-morph-duration) ease,
       --color-accent-text-hover var(--theme-morph-duration) ease,
       --glass-bg-sidebar var(--theme-morph-duration) ease,
-      --glass-bg-playerbar var(--theme-morph-duration) ease;
+      --glass-bg-playerbar var(--theme-morph-duration) ease,
+      --glass-solid-sidebar var(--theme-morph-duration) ease;
 
     /* Default theme colors (Luminous, dark variant) — overwritten by
        ThemeStore.applyActiveTheme() on load; this is only the first-paint
@@ -230,6 +237,31 @@
   ::-webkit-scrollbar-thumb:hover {
     background: var(--color-accent);
   }
+}
+
+/*
+ * Theme changes crossfade as a View Transition wherever the webview
+ * supports one (ThemeStore.commitThemeChange() adds .theme-vt): one
+ * snapshot of the old frame fades into the live new one on the compositor.
+ * The @property morph above would instead restyle and repaint the entire
+ * document, every glass panel's backdrop-filter included, on every frame.
+ * Not used while WebKitGTK's GPU rendering is disabled (the AppImage), where
+ * View Transitions crash it (ThemeStore.gpuCompositing).
+ * `pointer-events: none` lets input reach the live page during the fade in
+ * Chromium.
+ */
+:root.theme-vt {
+  transition: none;
+}
+
+::view-transition {
+  pointer-events: none;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--theme-morph-duration);
+  animation-timing-function: ease;
 }
 
 /* Glassmorphism utility classes */

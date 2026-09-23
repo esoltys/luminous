@@ -644,7 +644,7 @@
     {#if song}
       <button
         onclick={(e) => { e.stopPropagation(); if (!rowDisabled(row)) onRowDoubleClick(row); }}
-        class="absolute flex items-center justify-center opacity-0 group-hover:opacity-100 text-brand-text-primary hover:text-brand-accent-text-hover transition-all duration-150 disabled:opacity-0 disabled:cursor-not-allowed"
+        class="absolute flex items-center justify-center opacity-0 group-hover:opacity-100 text-brand-text-primary hover:text-brand-accent-text-hover transition-[opacity,color] duration-150 disabled:opacity-0 disabled:cursor-not-allowed"
         disabled={rowDisabled(row)}
         title={row.disabledTooltip ?? i18n.t("collection.playSong")}
       >

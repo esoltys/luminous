@@ -103,7 +103,9 @@ pub fn init(app: &tauri::App) -> tauri::Result<()> {
 
     let pause_scrobbling_handle = pause_scrobbling.clone();
     app.listen("scrobbler-settings-changed", move |event| {
-        if let Ok(settings) = serde_json::from_str::<crate::scrobbler::ScrobblerSettings>(event.payload()) {
+        if let Ok(settings) =
+            serde_json::from_str::<crate::scrobbler::ScrobblerSettings>(event.payload())
+        {
             let _ = pause_scrobbling_handle.set_checked(settings.scrobble_paused);
         }
     });

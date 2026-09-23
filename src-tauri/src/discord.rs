@@ -245,7 +245,10 @@ impl DiscordManager {
             trimmed_id
         };
 
-        if self.stream.is_some() && self.active_client_id == target_id && self.status == DiscordStatus::Connected {
+        if self.stream.is_some()
+            && self.active_client_id == target_id
+            && self.status == DiscordStatus::Connected
+        {
             return Ok(());
         }
 

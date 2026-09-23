@@ -40,9 +40,11 @@ pub async fn open_in_picard(state: State<'_, AppState>, song_ids: Vec<i64>) -> R
     let mut webdav_skipped = 0;
     for id in song_ids {
         let row: Option<(String, i32)> = conn
-            .query_row("SELECT path, source FROM songs WHERE id = ?1", [id], |row| {
-                Ok((row.get(0)?, row.get(1)?))
-            })
+            .query_row(
+                "SELECT path, source FROM songs WHERE id = ?1",
+                [id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
             .ok();
         let Some((path, source)) = row else {
             continue;

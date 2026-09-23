@@ -47,9 +47,9 @@ fn scan_thread_count() -> usize {
 mod query;
 mod reconcile;
 mod watcher;
+pub(crate) use query::get_artist_profile_conn;
 #[cfg(test)]
 pub(crate) use query::set_artist_profile_conn;
-pub(crate) use query::get_artist_profile_conn;
 pub(crate) use reconcile::resolve_case_insensitive_path;
 pub use watcher::{start_watcher, SelfWriteTracker, WatcherPauseGuard};
 
@@ -130,7 +130,9 @@ pub(crate) fn song_matches_webdav_server(song_url_str: &str, server_url_str: &st
     if song_url.scheme() != server_url.scheme() {
         return false;
     }
-    if song_url.host_str().map(|h| h.to_lowercase()) != server_url.host_str().map(|h| h.to_lowercase()) {
+    if song_url.host_str().map(|h| h.to_lowercase())
+        != server_url.host_str().map(|h| h.to_lowercase())
+    {
         return false;
     }
     if song_url.port_or_known_default() != server_url.port_or_known_default() {
@@ -162,7 +164,10 @@ pub(crate) fn is_webdav_song_orphaned(
         return false;
     }
     if let Some(path) = song_path {
-        if active_servers.iter().any(|s| song_matches_webdav_server(path, &s.url)) {
+        if active_servers
+            .iter()
+            .any(|s| song_matches_webdav_server(path, &s.url))
+        {
             return false;
         }
     }
@@ -593,7 +598,8 @@ impl CollectionScanner {
 
         let mut to_delete = self.find_missing_song_ids(&conn, false)?;
 
-        let mut stmt_unavail = conn.prepare("SELECT id, source, path FROM songs WHERE unavailable = 1")?;
+        let mut stmt_unavail =
+            conn.prepare("SELECT id, source, path FROM songs WHERE unavailable = 1")?;
         let unavail_rows = stmt_unavail.query_map([], |row| {
             let id: i64 = row.get(0)?;
             let source = SongSource::from(row.get::<_, i64>(1)?);
@@ -609,7 +615,8 @@ impl CollectionScanner {
                     path.as_deref(),
                     &active_webdav_song_ids,
                     &active_webdav_servers,
-                ) && !to_delete.contains(&id) {
+                ) && !to_delete.contains(&id)
+                {
                     to_delete.push(id);
                 }
             } else if !to_delete.contains(&id) {
@@ -618,9 +625,7 @@ impl CollectionScanner {
         }
 
         // Safety invariant: never delete a WebDAV song that belongs to an active server
-        to_delete.retain(|&id| {
-            !active_webdav_song_ids.contains(&id)
-        });
+        to_delete.retain(|&id| !active_webdav_song_ids.contains(&id));
 
         let deleted_count = to_delete.len();
         if !to_delete.is_empty() {
@@ -3387,7 +3392,10 @@ Official DR value: DR13\n",
 
         let scanner = CollectionScanner::new(db.clone());
         let pruned = scanner.prune_missing_songs().unwrap();
-        assert_eq!(pruned.deleted_songs, 1, "orphaned WebDAV song should be cleaned up");
+        assert_eq!(
+            pruned.deleted_songs, 1,
+            "orphaned WebDAV song should be cleaned up"
+        );
 
         let count: i64 = conn
             .query_row("SELECT COUNT(*) FROM songs", [], |r| r.get(0))
@@ -3424,7 +3432,13 @@ Official DR value: DR13\n",
             ..Default::default()
         };
         upsert_song(&conn, &webdav_song).unwrap();
-        let song_id: i64 = conn.query_row("SELECT id FROM songs WHERE path = ?1", params![webdav_song.path], |r| r.get(0)).unwrap();
+        let song_id: i64 = conn
+            .query_row(
+                "SELECT id FROM songs WHERE path = ?1",
+                params![webdav_song.path],
+                |r| r.get(0),
+            )
+            .unwrap();
 
         conn.execute(
             "INSERT INTO webdav_cache (server_id, remote_path, size, song_id) VALUES (1, '/song1.mp3', 1000, ?1)",
@@ -3434,7 +3448,10 @@ Official DR value: DR13\n",
 
         let scanner = CollectionScanner::new(db.clone());
         let pruned = scanner.prune_missing_songs().unwrap();
-        assert_eq!(pruned.deleted_songs, 0, "active WebDAV song must not be pruned");
+        assert_eq!(
+            pruned.deleted_songs, 0,
+            "active WebDAV song must not be pruned"
+        );
 
         let count: i64 = conn
             .query_row("SELECT COUNT(*) FROM songs", [], |r| r.get(0))
@@ -3473,7 +3490,13 @@ Official DR value: DR13\n",
             ..Default::default()
         };
         upsert_song(&conn, &webdav_song).unwrap();
-        let song_id: i64 = conn.query_row("SELECT id FROM songs WHERE path = ?1", params![webdav_song.path], |r| r.get(0)).unwrap();
+        let song_id: i64 = conn
+            .query_row(
+                "SELECT id FROM songs WHERE path = ?1",
+                params![webdav_song.path],
+                |r| r.get(0),
+            )
+            .unwrap();
 
         conn.execute(
             "INSERT INTO webdav_cache (server_id, remote_path, size, song_id) VALUES (1, '/track.mp3', 2000, ?1)",

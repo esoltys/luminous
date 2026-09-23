@@ -20,7 +20,8 @@ mod windows;
 use crate::models::{PlayState, PlaybackState};
 use crate::AppState;
 use std::path::PathBuf;
-use std::sync::mpsc;
+use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::{mpsc, Arc};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
 
@@ -121,9 +122,20 @@ impl PlatformMediaSession for NoopMediaSession {
 #[derive(Clone)]
 pub struct MediaSessionHandle {
     tx: mpsc::Sender<Command>,
+    status: Arc<AtomicU8>,
 }
 
+/// `MediaSessionHandle::status` values. Updates sent while `PENDING` queue
+/// in the channel and are applied once the backend is up.
+const STATUS_PENDING: u8 = 0;
+const STATUS_READY: u8 = 1;
+const STATUS_UNAVAILABLE: u8 = 2;
+
 impl MediaSessionHandle {
+    fn is_unavailable(&self) -> bool {
+        self.status.load(Ordering::Acquire) == STATUS_UNAVAILABLE
+    }
+
     fn send_update(&self, playback: &PlaybackState, cover_path: Option<PathBuf>) {
         let song = playback.current_song.as_ref();
         let cover_url = cover_path
@@ -155,7 +167,11 @@ impl MediaSessionHandle {
 /// the new state.
 pub async fn mirror_state(app: &AppHandle, playback: &PlaybackState) {
     let state = app.state::<AppState>();
-    let Some(handle) = state.media_session.as_ref() else {
+    let Some(handle) = state
+        .media_session
+        .as_ref()
+        .filter(|handle| !handle.is_unavailable())
+    else {
         return;
     };
     let cover_path = playback.current_song.as_ref().and_then(|song| {
@@ -168,9 +184,11 @@ pub async fn mirror_state(app: &AppHandle, playback: &PlaybackState) {
     handle.send_update(playback, cover_path);
 }
 
-/// Start the dedicated media-session OS thread. Returns `None` (logging a
-/// warning) if the platform integration can't be initialized — callers
-/// should treat this as a best-effort feature, not a hard requirement.
+/// Start the dedicated media-session OS thread and return immediately.
+/// Returns `None` only if the thread itself can't be spawned; a platform
+/// integration that turns out to be unavailable is logged from the thread
+/// and makes `mirror_state` a no-op — callers should treat this as a
+/// best-effort feature, not a hard requirement.
 pub fn spawn(
     app_handle: AppHandle,
     hwnd: Option<*mut std::ffi::c_void>,
@@ -182,7 +200,8 @@ pub fn spawn(
     let hwnd = SendableHwnd(hwnd);
 
     let (tx, rx) = mpsc::channel::<Command>();
-    let (ready_tx, ready_rx) = mpsc::channel::<bool>();
+    let status = Arc::new(AtomicU8::new(STATUS_PENDING));
+    let thread_status = status.clone();
 
     let spawn_result = std::thread::Builder::new()
         .name("luminous-media-session".to_string())
@@ -197,10 +216,17 @@ pub fn spawn(
                 Platform::init(app_handle.clone(), hwnd.0)
             }));
 
+            let unavailable = || {
+                thread_status.store(STATUS_UNAVAILABLE, Ordering::Release);
+                log::info!(
+                    "OS media session integration (SMTC/MPRIS2) unavailable; continuing without it."
+                );
+            };
+
             let mut platform = match init_result {
                 Ok(Some(p)) => p,
                 Ok(None) => {
-                    let _ = ready_tx.send(false);
+                    unavailable();
                     return;
                 }
                 Err(panic_payload) => {
@@ -214,12 +240,12 @@ pub fn spawn(
                     log::warn!(
                         "OS media session initialization panicked ({panic_msg}); continuing without OS media integration"
                     );
-                    let _ = ready_tx.send(false);
+                    unavailable();
                     return;
                 }
             };
 
-            let _ = ready_tx.send(true);
+            thread_status.store(STATUS_READY, Ordering::Release);
 
             for cmd in rx {
                 match cmd {
@@ -251,12 +277,12 @@ pub fn spawn(
         return None;
     }
 
-    // A stuck/absent backend should fail fast inside its own init(); this
-    // timeout just guarantees app startup can't hang on it.
-    match ready_rx.recv_timeout(Duration::from_secs(5)) {
-        Ok(true) => Some(MediaSessionHandle { tx }),
-        _ => None,
-    }
+    // Deliberately doesn't wait for the backend: this runs on the main
+    // (GTK/Win32) thread during setup, and init() can depend on async tasks
+    // that are themselves waiting on the main thread — MPRIS's zbus connect
+    // sat out a 5s ready-timeout here on every Linux launch, freezing the
+    // window. Updates queue until init() finishes, then apply in order.
+    Some(MediaSessionHandle { tx, status })
 }
 
 /// Route an inbound OS media control event onto the same `state.player`

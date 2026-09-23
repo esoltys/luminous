@@ -40,14 +40,9 @@ describe("ReactiveLogoBrand.svelte", () => {
     expect(burstCore).not.toBeNull();
     expect(burstCore?.getAttribute("fill")).toBe("#FFFFFF");
 
-    // Ambient glow halo and burst halo should have opacity 0 at rest
-    const glowCircle = container.querySelector('circle[fill="var(--color-accent)"]');
-    expect(glowCircle?.getAttribute("opacity")).toBe("0");
-    expect(glowCircle?.getAttribute("filter")).toBeNull();
-
-    const burstHalo = container.querySelector('circle[cx="150.6"][cy="59.6"][r="0"]');
-    expect(burstHalo?.getAttribute("opacity")).toBe("0");
-    expect(burstHalo?.getAttribute("filter")).toBeNull();
+    // No glow, burst halo or blur filters at rest
+    expect(container.querySelector('[data-layer]')).toBeNull();
+    expect(container.querySelector("filter")).toBeNull();
   });
 
   it("renders the crisp authentic brand logo in resting state when playback is paused", () => {
@@ -69,27 +64,41 @@ describe("ReactiveLogoBrand.svelte", () => {
     playerStore.state = "playing";
     const { container } = render(ReactiveLogoBrand, { props: { size: "lg" } });
 
-    // Inner rim re-targets to theme accent with ringBlur filter
-    const innerRim = container.querySelector('circle[r="77"]');
-    expect(innerRim?.getAttribute("stroke")).toBe("var(--color-accent)");
-    expect(innerRim?.getAttribute("filter")).toBe("url(#ringBlur)");
+    // Inner rim re-targets to the theme accent, as a blurred thin/thick pair
+    const rims = container.querySelectorAll('circle[data-layer="rim"]');
+    expect([...rims].map((c) => c.getAttribute("stroke-width"))).toEqual(["12", "24"]);
+    for (const rim of rims) {
+      expect(rim.getAttribute("stroke")).toBe("var(--color-accent)");
+      expect(rim.getAttribute("filter")).toMatch(/^url\(#rimBlur-/);
+    }
 
-    // Eclipse ring re-targets to theme accent-hover with ringBlur filter
-    const eclipseRing = container.querySelector('circle[r="92"]');
-    expect(eclipseRing?.getAttribute("stroke")).toBe("var(--color-accent-hover)");
-    expect(eclipseRing?.getAttribute("filter")).toBe("url(#ringBlur)");
+    // Eclipse ring re-targets to the theme accent-hover, same treatment
+    const rings = container.querySelectorAll('circle[data-layer="ring"]');
+    expect([...rings].map((c) => c.getAttribute("stroke-width"))).toEqual(["5", "21"]);
+    for (const ring of rings) {
+      expect(ring.getAttribute("stroke")).toBe("var(--color-accent-hover)");
+      expect(ring.getAttribute("filter")).toMatch(/^url\(#ringBlur-/);
+    }
 
-    // Ambient glow halo becomes active
-    const glowCircle = container.querySelector('circle[fill="var(--color-accent)"]');
-    expect(glowCircle?.getAttribute("filter")).toBe("url(#glowBlurOuter)");
-    const glowOpacity = parseFloat(glowCircle?.getAttribute("opacity") || "0");
-    expect(glowOpacity).toBeGreaterThan(0);
+    // Ambient glow and burst halo are active, blurred, visible layers
+    const glow = container.querySelector('circle[data-layer="glow"]');
+    expect(glow?.getAttribute("filter")).toMatch(/^url\(#glowBlurOuter-/);
+    expect(parseFloat((glow?.parentElement as unknown as SVGElement).style.opacity)).toBeGreaterThan(0);
 
-    // Burst halo becomes active
-    const burstHalo = container.querySelector('circle[cx="150.6"][cy="59.6"][filter="url(#burstBlur)"]');
-    expect(burstHalo).not.toBeNull();
-    const burstOpacity = parseFloat(burstHalo?.getAttribute("opacity") || "0");
-    expect(burstOpacity).toBeGreaterThan(0);
+    const burst = container.querySelector('circle[data-layer="burst"]');
+    expect(burst?.getAttribute("filter")).toMatch(/^url\(#burstBlur-/);
+    expect(parseFloat((burst?.parentElement as unknown as SVGElement).style.opacity)).toBeGreaterThan(0);
+  });
+
+  it("drives the playing layers only through transform and opacity, never SVG geometry", () => {
+    playerStore.state = "playing";
+    const { container } = render(ReactiveLogoBrand, { props: { size: "lg" } });
+
+    // Blurred content is fixed-size; the audio reaches it only via layer style
+    expect(container.querySelector('circle[data-layer="glow"]')?.getAttribute("r")).toBe("112");
+    expect(container.querySelector('circle[data-layer="burst"]')?.getAttribute("r")).toBe("31");
+    const glowLayer = container.querySelector('circle[data-layer="glow"]')?.parentElement as unknown as SVGElement;
+    expect(glowLayer.style.transform).toMatch(/^scale\(/);
   });
 
   it("returns to resting crisp brand mark when clicking the button to disable pulsing", async () => {
@@ -98,14 +107,13 @@ describe("ReactiveLogoBrand.svelte", () => {
 
     const button = getByRole("button");
     // Initially playing: active visualizer
-    let innerRim = container.querySelector('circle[r="77"]');
-    expect(innerRim?.getAttribute("stroke")).toBe("var(--color-accent)");
+    expect(container.querySelector('circle[data-layer="rim"]')?.getAttribute("stroke")).toBe("var(--color-accent)");
 
     // Toggle pulsing off
     await fireEvent.click(button);
 
     // Should return to resting crisp brand mark
-    innerRim = container.querySelector('circle[r="77"]');
+    const innerRim = container.querySelector('circle[r="77"]');
     expect(innerRim?.getAttribute("stroke")).toBe("#626FE8");
     expect(innerRim?.getAttribute("stroke-width")).toBe("14");
     expect(innerRim?.getAttribute("filter")).toBeNull();
@@ -114,7 +122,6 @@ describe("ReactiveLogoBrand.svelte", () => {
     expect(eclipseRing?.getAttribute("stroke")).toBe("#FFB648");
     expect(eclipseRing?.getAttribute("filter")).toBeNull();
 
-    const glowCircle = container.querySelector('circle[fill="var(--color-accent)"]');
-    expect(glowCircle?.getAttribute("opacity")).toBe("0");
+    expect(container.querySelector('[data-layer]')).toBeNull();
   });
 });

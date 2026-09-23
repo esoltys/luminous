@@ -127,6 +127,75 @@ export function hexToRgbaString(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+/** Glass panel tint alpha: dark themes 0.5, light themes 0.6. */
+function glassAlpha(isDark: boolean): number {
+  return isDark ? 0.5 : 0.6;
+}
+
+/**
+ * Opaque equivalent of a .glass-surface panel whose only backdrop is the
+ * flat bg-main canvas (sidebar, top nav, right panel — none of them ever
+ * overlap other content): `blur(20px)` of a flat color is that same color,
+ * so the panel's visible result is exactly the translucent tint composited
+ * over `saturate(180%)` of bg-main. Painting that as a solid color keeps
+ * the look while dropping backdrop-filter from those panels, which was
+ * re-rasterized whenever anything nearby repainted (main-view hover
+ * effects, the reactive logo, the playbar spectrum) and showed up as
+ * banding/pulsing in the sidebar.
+ */
+export function flatGlassColor(tintHex: string, alpha: number, backdropHex: string, saturation = 1.8): string {
+  const { r, g, b } = hexToRgb(backdropHex);
+  const s = saturation;
+  // Filter Effects `saturate()` matrix, applied in sRGB like the browser's
+  // CSS filter shorthand.
+  const sr = (0.213 + 0.787 * s) * r + (0.715 - 0.715 * s) * g + (0.072 - 0.072 * s) * b;
+  const sg = (0.213 - 0.213 * s) * r + (0.715 + 0.285 * s) * g + (0.072 - 0.072 * s) * b;
+  const sb = (0.213 - 0.213 * s) * r + (0.715 - 0.715 * s) * g + (0.072 + 0.928 * s) * b;
+  const tint = hexToRgb(tintHex);
+  const over = (t: number, back: number) =>
+    Math.round(Math.min(255, Math.max(0, t * alpha + Math.min(255, Math.max(0, back)) * (1 - alpha))));
+  return rgbToHex(over(tint.r, sr), over(tint.g, sg), over(tint.b, sb));
+}
+
+/** Whether this webview implements View Transitions at all. */
+function hasViewTransitions(): boolean {
+  return typeof document !== "undefined" && typeof document.startViewTransition === "function";
+}
+
+const VIEW_TRANSITION_INPUT_EVENTS = ["pointermove", "pointerdown", "wheel"] as const;
+
+/**
+ * Ends a View Transition at the first pointer input that's hit-tested to
+ * <html> rather than the live page. `pointer-events: none` on
+ * ::view-transition (app.css) is meant to pass input through, but WebKit
+ * ignores it and captures all input for the length of the transition, and
+ * that hasn't been confirmed in WebView2 either — a 1.2s crossfade would otherwise
+ * swallow hovers, clicks and wheel-scrolls on every track change under
+ * Dynamic Artwork. Hit-testing is restored synchronously once skipped, so
+ * the pointer movement that precedes a click lets that click land.
+ */
+function yieldViewTransitionToInput(transition: ViewTransition | undefined) {
+  if (!transition) return;
+  const root = document.documentElement;
+  const onInput = (event: Event) => {
+    if (event.target === root) transition.skipTransition();
+  };
+  for (const type of VIEW_TRANSITION_INPUT_EVENTS) {
+    window.addEventListener(type, onInput, { capture: true, passive: true });
+  }
+  void transition.finished
+    .catch(() => {})
+    .finally(() => {
+      for (const type of VIEW_TRANSITION_INPUT_EVENTS) {
+        window.removeEventListener(type, onInput, { capture: true });
+      }
+    });
+}
+
+function prefersReducedMotion(): boolean {
+  return typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+}
+
 const RUBY_RED_COLORS: ThemeColors = {
   "bg-main": "#17110e",
   "bg-sidebar": "#6e0b1b",
@@ -523,6 +592,7 @@ export class ThemeStore {
           this.colorSchemeMode = settings.color_scheme_mode;
         }
       }
+      await this.queryGpuCompositing();
       this.applyActiveTheme();
     } catch (e) {
       console.error("Failed to init ThemeStore:", e);
@@ -704,32 +774,46 @@ export class ThemeStore {
   applyArtworkColors(colors: ExtractedColors, skipApplyActiveTheme = false) {
     this.artworkColors = colors;
     if (typeof document === "undefined") return;
-    const root = document.documentElement;
-    root.style.setProperty("--color-artwork-primary", colors.primary);
-    root.style.setProperty("--color-artwork-sidebar", colors.sidebar);
-    root.style.setProperty("--color-artwork-playerbar", colors.playerbar);
-    root.style.setProperty("--color-artwork-accent", colors.accent);
-    root.style.setProperty("--color-artwork-accent-hover", colors.accentHover);
-    root.style.setProperty("--color-artwork-border", colors.border);
-
-    if (!skipApplyActiveTheme && this.activeThemeId === "dynamic-artwork") {
-      this.applyActiveTheme(true);
-    }
+    this.writeArtworkVars(colors, skipApplyActiveTheme);
   }
 
   resetArtworkColors(skipApplyActiveTheme = false) {
     this.artworkColors = null;
     if (typeof document === "undefined") return;
-    const root = document.documentElement;
-    root.style.setProperty("--color-artwork-primary", "#2e3440");
-    root.style.setProperty("--color-artwork-sidebar", "#242933");
-    root.style.setProperty("--color-artwork-playerbar", "#2b303c");
-    root.style.setProperty("--color-artwork-accent", "#88c0d0");
-    root.style.setProperty("--color-artwork-accent-hover", "#8fbcbb");
-    root.style.setProperty("--color-artwork-border", "#3b4252");
+    this.writeArtworkVars({
+      primary: "#2e3440",
+      sidebar: "#242933",
+      playerbar: "#2b303c",
+      accent: "#88c0d0",
+      accentHover: "#8fbcbb",
+      border: "#3b4252"
+    }, skipApplyActiveTheme);
+  }
+
+  /**
+   * Writes the --color-artwork-* vars. While Dynamic Artwork is active they
+   * feed --bg-main etc. directly, so they're written inside the same theme
+   * commit as the rest of the theme (see commitThemeChange()) — written
+   * before it, they'd already show in the crossfade's "old" snapshot.
+   */
+  private writeArtworkVars(colors: Omit<ExtractedColors, "isLight">, skipApplyActiveTheme: boolean) {
+    const write = () => {
+      const root = document.documentElement;
+      root.style.setProperty("--color-artwork-primary", colors.primary);
+      root.style.setProperty("--color-artwork-sidebar", colors.sidebar);
+      root.style.setProperty("--color-artwork-playerbar", colors.playerbar);
+      root.style.setProperty("--color-artwork-accent", colors.accent);
+      root.style.setProperty("--color-artwork-accent-hover", colors.accentHover);
+      root.style.setProperty("--color-artwork-border", colors.border);
+    };
 
     if (!skipApplyActiveTheme && this.activeThemeId === "dynamic-artwork") {
-      this.applyActiveTheme(true);
+      this.commitThemeChange(() => {
+        write();
+        this.applyActiveTheme(true);
+      });
+    } else {
+      write();
     }
   }
 
@@ -769,25 +853,116 @@ export class ThemeStore {
       }
     `;
 
+    this.applyGlassVars(resolvedBgMain, resolvedBgSidebar, resolvedBgPlayerbar, resolvedAccent);
+  }
+
+  /**
+   * Glass rendering vars — computed for every theme (not just System) so
+   * all four chrome panels get the blur/tint/shine treatment regardless
+   * of which theme is active. isDark comes from this theme's own bg-main
+   * luminance rather than systemColorScheme, since only System tracks the
+   * OS scheme — every other theme has fixed colors. Rendering-only,
+   * separate from the opaque theme colors — alpha never reaches a color
+   * picker, see hexToRgbaString(). All arguments must be literal hex.
+   */
+  private applyGlassVars(bgMain: string, bgSidebar: string, bgPlayerbar: string, accent: string) {
     const root = document.documentElement;
     root.classList.toggle("theme-glass", true);
 
-    const isDark = !isLightColor(resolvedBgMain);
-    root.style.setProperty("--glass-bg-sidebar", hexToRgbaString(resolvedBgSidebar, isDark ? 0.5 : 0.6));
-    root.style.setProperty("--glass-bg-playerbar", hexToRgbaString(resolvedBgPlayerbar, isDark ? 0.5 : 0.6));
+    const isDark = !isLightColor(bgMain);
+    const alpha = glassAlpha(isDark);
+    root.style.setProperty("--glass-bg-sidebar", hexToRgbaString(bgSidebar, alpha));
+    root.style.setProperty("--glass-bg-playerbar", hexToRgbaString(bgPlayerbar, alpha));
+    root.style.setProperty("--glass-solid-sidebar", flatGlassColor(bgSidebar, alpha, bgMain));
     root.style.setProperty("--glass-border-color", isDark ? "rgba(255, 255, 255, 0.10)" : "rgba(15, 15, 20, 0.08)");
 
     const elevation = isDark ? "0 8px 32px rgba(0, 0, 0, 0.45)" : "0 8px 32px rgba(15, 15, 20, 0.10)";
     const highlight = isDark ? "inset 0 1px 0 rgba(255, 255, 255, 0.14)" : "inset 0 1px 0 rgba(255, 255, 255, 0.9)";
     root.style.setProperty("--glass-shadow", `${elevation}, ${highlight}`);
 
-    const glowNear = `0 0 24px 2px ${hexToRgbaString(resolvedAccent, isDark ? 0.45 : 0.28)}`;
-    const glowFar = `0 0 90px 10px ${hexToRgbaString(resolvedAccent, isDark ? 0.28 : 0.16)}`;
+    // PlayDock-only accent glow — kept out of --glass-shadow above since
+    // the other three panels don't get it. Two-layer glow (tight bright
+    // core + wide soft halo) reads as an actual glow rather than a flat
+    // blurred outline. `accent` must be a literal hex: for Dynamic Artwork
+    // the theme's color-accent is a CSS var() reference string, and
+    // hexToRgbaString() fed that would silently fall back to black,
+    // rendering as an invisible glow.
+    const glowNear = `0 0 24px 2px ${hexToRgbaString(accent, isDark ? 0.45 : 0.28)}`;
+    const glowFar = `0 0 90px 10px ${hexToRgbaString(accent, isDark ? 0.28 : 0.16)}`;
     root.style.setProperty("--glass-glow", `${glowNear}, ${glowFar}`);
+  }
+
+  /** Set while a theme change is being written, so nested applies join it. */
+  private committingTheme = false;
+  private hasAppliedTheme = false;
+
+  /**
+   * Whether the webview renders with GPU compositing (see
+   * webview_gpu_compositing in commands/window.rs) — false only for the
+   * AppImage, whose WebKitGTK runs with GPU rendering disabled. `null` until
+   * init() hears back. Chrome styling treats only an explicit `false` as
+   * "no GPU" (opaque panels instead of backdrop-filter, a fade instead of
+   * the 3D flip), so Linux and Windows otherwise look the same. View
+   * Transitions need an explicit `true`: WebKitGTK exposes
+   * startViewTransition() either way but segfaults on the first one without
+   * GPU rendering, so an unanswered or failed query must fall back to the
+   * @property morph, never to a crash.
+   */
+  gpuCompositing = $state<boolean | null>(null);
+
+  private async queryGpuCompositing() {
+    try {
+      this.gpuCompositing = (await invoke<boolean>("webview_gpu_compositing")) === true;
+    } catch (e) {
+      console.error("Failed to query webview GPU compositing:", e);
+    }
+  }
+
+  private supportsViewTransitions(): boolean {
+    return this.gpuCompositing === true && hasViewTransitions();
+  }
+
+  /**
+   * Writes a theme change to the DOM — as a View Transition crossfade when
+   * the webview supports one. A crossfade snapshots the old frame once and
+   * fades it into the live new one on the compositor; the fallback
+   * @property morph in app.css instead restyles and repaints the entire
+   * document (every glass panel included) on every frame of the
+   * transition, which staggers on laptop GPUs. The first application at
+   * startup and nested applies (applyArtworkColors → applyActiveTheme) are
+   * written directly. A newer change arriving mid-crossfade skips the
+   * running one, but its DOM writes still run — nothing is lost.
+   */
+  private commitThemeChange(write: () => void) {
+    const run = () => {
+      this.committingTheme = true;
+      try {
+        write();
+      } finally {
+        this.committingTheme = false;
+      }
+    };
+
+    const animate = this.hasAppliedTheme && !this.committingTheme && this.supportsViewTransitions() && !prefersReducedMotion();
+    this.hasAppliedTheme = true;
+    if (this.supportsViewTransitions()) {
+      // Turns off the @property morph (see app.css) — the crossfade
+      // replaces it, and under reduced motion changes apply instantly.
+      document.documentElement.classList.add("theme-vt");
+    }
+    if (animate) {
+      yieldViewTransitionToInput(document.startViewTransition(run));
+    } else {
+      run();
+    }
   }
 
   applyActiveTheme(skipApplyArtworkColors = false) {
     if (typeof document === "undefined") return;
+    this.commitThemeChange(() => this.writeActiveTheme(skipApplyArtworkColors));
+  }
+
+  private writeActiveTheme(skipApplyArtworkColors: boolean) {
     const theme = this.currentTheme;
 
     // updateArtworkColors() only re-extracts/applies colors on a song
@@ -875,36 +1050,8 @@ export class ThemeStore {
       }
     `;
 
-    const root = document.documentElement;
-    root.classList.toggle("theme-glass", true);
-
-    // Glass rendering vars — computed for every theme (not just System) so
-    // all four chrome panels get the blur/tint/shine treatment regardless
-    // of which theme is active. isDark comes from this theme's own
-    // bg-main luminance rather than systemColorScheme, since only System
-    // tracks the OS scheme — every other theme has fixed colors.
-    // Rendering-only, separate from the opaque `colors` above — alpha
-    // never reaches a color picker, see hexToRgbaString().
-    const isDark = !isLightColor(resolvedBgMain);
-    root.style.setProperty("--glass-bg-sidebar", hexToRgbaString(resolvedBgSidebar, isDark ? 0.5 : 0.6));
-    root.style.setProperty("--glass-bg-playerbar", hexToRgbaString(resolvedBgPlayerbar, isDark ? 0.5 : 0.6));
-    root.style.setProperty("--glass-border-color", isDark ? "rgba(255, 255, 255, 0.10)" : "rgba(15, 15, 20, 0.08)");
-
-    const elevation = isDark ? "0 8px 32px rgba(0, 0, 0, 0.45)" : "0 8px 32px rgba(15, 15, 20, 0.10)";
-    const highlight = isDark ? "inset 0 1px 0 rgba(255, 255, 255, 0.14)" : "inset 0 1px 0 rgba(255, 255, 255, 0.9)";
-    root.style.setProperty("--glass-shadow", `${elevation}, ${highlight}`);
-
-    // PlayDock-only accent glow — kept out of --glass-shadow above since
-    // the other three panels don't get it. Two-layer glow (tight bright
-    // core + wide soft halo) reads as an actual glow rather than a flat
-    // blurred outline. Reuses resolvedAccent (computed above), not
-    // colors["color-accent"] directly: for Dynamic Artwork that's a CSS
-    // var() reference string, and hexToRgbaString() needs a literal hex —
-    // fed the reference string, hexToRgb()'s regex fails and silently
-    // falls back to black, rendering as an invisible glow.
-    const glowNear = `0 0 24px 2px ${hexToRgbaString(resolvedAccent, isDark ? 0.45 : 0.28)}`;
-    const glowFar = `0 0 90px 10px ${hexToRgbaString(resolvedAccent, isDark ? 0.28 : 0.16)}`;
-    root.style.setProperty("--glass-glow", `${glowNear}, ${glowFar}`);
+    // resolvedAccent (not colors["color-accent"]) — see applyGlassVars().
+    this.applyGlassVars(resolvedBgMain, resolvedBgSidebar, resolvedBgPlayerbar, resolvedAccent);
   }
 }
 

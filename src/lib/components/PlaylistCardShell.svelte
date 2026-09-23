@@ -40,7 +40,7 @@
 
   <button
     onclick={(e) => { e.stopPropagation(); onClick(); }}
-    class="font-semibold text-sm text-brand-text-primary group-hover:text-brand-accent-text group-hover:underline transition-all duration-150 text-left truncate w-full"
+    class="font-semibold text-sm text-brand-text-primary group-hover:text-brand-accent-text group-hover:underline transition-colors duration-150 text-left truncate w-full"
     {title}
   >
     {title}

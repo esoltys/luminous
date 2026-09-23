@@ -231,14 +231,22 @@ pub async fn delete_webdav_server(
     {
         let mut song_ids: Vec<i64> = {
             let mut stmt = tx
-                .prepare("SELECT song_id FROM webdav_cache WHERE server_id = ?1 AND song_id IS NOT NULL")
+                .prepare(
+                    "SELECT song_id FROM webdav_cache WHERE server_id = ?1 AND song_id IS NOT NULL",
+                )
                 .map_err(|e| e.to_string())?;
-            let rows = stmt.query_map(params![id], |r| r.get(0)).map_err(|e| e.to_string())?;
+            let rows = stmt
+                .query_map(params![id], |r| r.get(0))
+                .map_err(|e| e.to_string())?;
             rows.flatten().collect()
         };
 
         let server_url: Option<String> = tx
-            .query_row("SELECT url FROM webdav_servers WHERE id = ?1", params![id], |r| r.get(0))
+            .query_row(
+                "SELECT url FROM webdav_servers WHERE id = ?1",
+                params![id],
+                |r| r.get(0),
+            )
             .ok();
 
         if let Some(ref url) = server_url {

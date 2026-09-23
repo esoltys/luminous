@@ -30,7 +30,7 @@
     />
   </div>
   <div class="p-3.5 flex flex-col flex-1">
-    <p class="font-semibold text-sm text-brand-text-primary group-hover:text-brand-accent-text group-hover:underline transition-all duration-150 truncate w-full">
+    <p class="font-semibold text-sm text-brand-text-primary group-hover:text-brand-accent-text group-hover:underline transition-colors duration-150 truncate w-full">
       {song.title || i18n.t('collection.unknownSong')}
     </p>
     <p class="text-xs text-brand-text-secondary truncate mt-0.5 font-medium">

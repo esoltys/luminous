@@ -1670,18 +1670,21 @@ mod tests {
                 [],
             )
             .unwrap();
-            let webdav_song_id: i64 = conn.query_row(
-                "SELECT id FROM songs WHERE path = 'shared.flac'",
-                [],
-                |r| r.get(0),
-            ).unwrap();
+            let webdav_song_id: i64 = conn
+                .query_row("SELECT id FROM songs WHERE path = 'shared.flac'", [], |r| {
+                    r.get(0)
+                })
+                .unwrap();
 
             // The pre-migration-33 schema must still enforce UNIQUE(path).
             let dup = conn.execute(
                 "INSERT INTO songs (path, title, beginning_nanosec) VALUES ('shared.flac', 'Track 2', 5)",
                 [],
             );
-            assert!(dup.is_err(), "old schema should still reject a bare duplicate path");
+            assert!(
+                dup.is_err(),
+                "old schema should still reject a bare duplicate path"
+            );
 
             // A row with a foreign key into songs(id), to confirm the rebuild
             // doesn't orphan or corrupt it.
@@ -2128,7 +2131,10 @@ mod tests {
                 |r| r.get(0),
             )
             .unwrap();
-        assert_eq!(mbid.as_deref(), Some("042c0697-3948-4720-bf43-690240aeac43"));
+        assert_eq!(
+            mbid.as_deref(),
+            Some("042c0697-3948-4720-bf43-690240aeac43")
+        );
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

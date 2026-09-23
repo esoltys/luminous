@@ -117,9 +117,10 @@ pub fn compute_gain(
             None => match (dr_rms_db, dr_peak_db) {
                 // Aim for the target loudness from RMS, but never boost
                 // past the point where Peak would clip (0 dBFS headroom).
-                (Some(rms), Some(peak)) if rms.is_finite() && peak.is_finite() => {
-                    (f64::min(target - rms, -peak), LoudnessGainSource::DynamicRangeLog)
-                }
+                (Some(rms), Some(peak)) if rms.is_finite() && peak.is_finite() => (
+                    f64::min(target - rms, -peak),
+                    LoudnessGainSource::DynamicRangeLog,
+                ),
                 _ => (
                     settings.fallback_gain_db as f64,
                     LoudnessGainSource::Fallback,
@@ -418,7 +419,14 @@ mod tests {
     #[test]
     fn analysis_failure_sentinel_is_ignored() {
         let s = settings(-18.0, LoudnessMode::Track, -6.0);
-        let result = compute_gain(Some(ANALYSIS_FAILED_SENTINEL), Some(-2.0), None, None, None, &s);
+        let result = compute_gain(
+            Some(ANALYSIS_FAILED_SENTINEL),
+            Some(-2.0),
+            None,
+            None,
+            None,
+            &s,
+        );
         let expected = 10f32.powf(-2.0 / 20.0);
         assert!(
             (result.linear - expected).abs() < 1e-3,

@@ -78,7 +78,7 @@
   <div class="p-3.5 flex flex-col flex-1">
     <LinkButton
       onclick={(e) => { e.stopPropagation(); navigationStore.viewAlbum(album.album || ""); }}
-      class="font-semibold text-sm text-brand-text-primary group-hover:text-brand-accent-text group-hover:underline transition-all duration-150 truncate w-full"
+      class="font-semibold text-sm text-brand-text-primary group-hover:text-brand-accent-text group-hover:underline transition-colors duration-150 truncate w-full"
       title={i18n.t('collection.filterByAlbum', { album: album.album || i18n.t('collection.unknownAlbum') })}
     >
       {album.album || i18n.t('collection.unknownAlbum')}

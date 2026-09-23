@@ -20,7 +20,6 @@
   import TagEditor from "./TagEditor.svelte";
   import { tagsStore } from "../stores/tags.svelte";
   import { openInPicard } from "../utils/picard";
-  import { isLinux } from "../platform";
   import QualityBadge from "./QualityBadge.svelte";
 
   // Responsive control trimming (issue #413, refined against real usage,
@@ -277,7 +276,7 @@
 
 <footer
   transition:fly={{ y: 40, duration: windowLayoutStore.isPlaybarOnlyMode ? 0 : 300, easing: cubicOut }}
-  class="relative bg-brand-playerbar flex items-center justify-between gap-3 px-5 min-[768px]:px-8 text-brand-text-secondary select-none {themeStore.isGlassTheme || isLinux ? 'glass-surface' : ''} {isLinux ? 'opaque-linux' : ''} {windowLayoutStore.isPlaybarOnlyMode ? 'playbar-only-mode w-full h-full rounded-none border-none shadow-none' : 'h-20 max-w-[1200px] mx-auto border border-brand-border rounded-[2rem]'}"
+  class="relative bg-brand-playerbar flex items-center justify-between gap-3 px-5 min-[768px]:px-8 text-brand-text-secondary select-none {themeStore.isGlassTheme ? 'glass-surface' : ''} {themeStore.gpuCompositing === false ? 'no-backdrop' : ''} {windowLayoutStore.isPlaybarOnlyMode ? 'playbar-only-mode w-full h-full rounded-none border-none shadow-none' : 'h-20 max-w-[1200px] mx-auto border border-brand-border rounded-[2rem]'}"
 >
   <div data-walkthrough-target="player-bar-cover" class="flex items-center gap-3 min-w-0 flex-1 min-[768px]:w-1/3 min-[768px]:flex-none min-[768px]:min-w-[200px] max-w-sm">
     <button
@@ -582,7 +581,10 @@
     box-shadow: var(--glass-shadow, none), var(--glass-glow, none);
   }
 
-  :global(footer.glass-surface.opaque-linux) {
+  /* No GPU compositing (the AppImage's WebKitGTK — see
+     ThemeStore.gpuCompositing): backdrop-filter doesn't render there, so the
+     dock goes opaque with a stronger glow instead of see-through. */
+  :global(footer.glass-surface.no-backdrop) {
     background-color: var(--bg-playerbar, #191b23) !important;
     -webkit-backdrop-filter: none !important;
     backdrop-filter: none !important;
@@ -620,7 +622,7 @@
     box-shadow: none !important;
   }
 
-  :global(footer.glass-surface.playbar-only-mode.opaque-linux) {
+  :global(footer.glass-surface.playbar-only-mode.no-backdrop) {
     box-shadow: none !important;
   }
 

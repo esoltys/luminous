@@ -24,6 +24,7 @@
   import IconActionButton from "./IconActionButton.svelte";
   import LinkButton from "./LinkButton.svelte";
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
+  import BlurredCover from "./BlurredCover.svelte";
   import ContextMenu from "./ContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import {
@@ -564,12 +565,7 @@
 >
   {#if backdropUrl}
     <div class="absolute inset-0 z-0 overflow-hidden pointer-events-none" aria-hidden="true">
-      <img
-        src={backdropUrl}
-        alt=""
-        class="w-full h-full object-cover blur-2xl"
-        style="will-change: filter; transform: translateZ(0) scale(1.5);"
-      />
+      <BlurredCover src={backdropUrl} class="w-full h-full" style="transform: scale(1.5);" />
       <div class="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-brand-main"></div>
     </div>
   {/if}

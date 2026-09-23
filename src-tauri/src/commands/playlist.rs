@@ -155,7 +155,10 @@ pub async fn add_to_playlist(
     song_ids: Vec<i64>,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    with_playlists(&state, |pm| pm.add_songs_to_playlist(playlist_id, &song_ids)).await
+    with_playlists(&state, |pm| {
+        pm.add_songs_to_playlist(playlist_id, &song_ids)
+    })
+    .await
 }
 
 /// Cascades a set of removed playlist-item uuids into the live playback
@@ -350,7 +353,10 @@ pub async fn set_playlist_dynamic_spec(
     spec: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    with_playlists(&state, |pm| pm.set_playlist_dynamic_spec(playlist_id, &spec)).await
+    with_playlists(&state, |pm| {
+        pm.set_playlist_dynamic_spec(playlist_id, &spec)
+    })
+    .await
 }
 
 /// Set a dynamic playlist's population-mode bias and its rule spec together,

@@ -185,7 +185,9 @@ impl WebDavClient {
             return Err(anyhow!("Range request failed with HTTP {}", resp.status()));
         }
 
-        let bytes = resp.bytes().context("failed to read range response bytes")?;
+        let bytes = resp
+            .bytes()
+            .context("failed to read range response bytes")?;
         Ok(bytes.to_vec())
     }
 
@@ -198,7 +200,9 @@ impl WebDavClient {
 
         let tail_bytes = if content_length > head_size {
             let tail_probe_size = 128 * 1024;
-            let tail_start = content_length.saturating_sub(tail_probe_size).max(head_size);
+            let tail_start = content_length
+                .saturating_sub(tail_probe_size)
+                .max(head_size);
             self.fetch_range(url, tail_start, content_length.saturating_sub(1))
                 .unwrap_or_default()
         } else {
@@ -241,7 +245,10 @@ impl WebDavClient {
                 candidate_tags.push(primary);
             }
             for t in tagged_file.tags() {
-                if !candidate_tags.iter().any(|existing| std::ptr::eq(*existing, t)) {
+                if !candidate_tags
+                    .iter()
+                    .any(|existing| std::ptr::eq(*existing, t))
+                {
                     candidate_tags.push(t);
                 }
             }
@@ -406,9 +413,7 @@ pub fn parse_propfind_response(xml: &str) -> Result<Vec<WebDavItem>> {
                             // Re-encode it (and bare spaces) so the href is a valid URL path.
                             current_href = text_buf.replace('&', "%26").replace(' ', "%20");
                         }
-                        "getcontentlength" => {
-                            current_length = text_buf.trim().parse::<u64>().ok()
-                        }
+                        "getcontentlength" => current_length = text_buf.trim().parse::<u64>().ok(),
                         "getlastmodified" => current_mtime = Some(text_buf.trim().to_string()),
                         "getetag" => current_etag = Some(text_buf.trim().to_string()),
                         _ => {}

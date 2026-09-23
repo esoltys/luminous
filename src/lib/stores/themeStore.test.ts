@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   LUMINOUS_DARK_COLORS,
   LUMINOUS_LIGHT_COLORS,
@@ -6,6 +6,7 @@ import {
   ThemeStore,
   blendToward,
   hexToRgbaString,
+  flatGlassColor,
   extractColorsFromImage,
   type Theme
 } from "./theme.svelte";
@@ -372,6 +373,139 @@ describe("Custom Theme Builder & ThemeStore", () => {
     });
 
     expect(spy).toHaveBeenCalled();
+  });
+});
+
+describe("flatGlassColor (solid stand-in for glass over the flat canvas)", () => {
+  it("composites the tint at its alpha over the backdrop", () => {
+    // A gray backdrop is unchanged by saturate(), so this is a plain 50/50 mix.
+    expect(flatGlassColor("#ffffff", 0.5, "#000000")).toBe("#808080");
+    expect(flatGlassColor("#204060", 0.5, "#808080")).toBe("#506070");
+  });
+
+  it("saturates a colored backdrop before compositing, like backdrop-filter: saturate(180%)", () => {
+    const flat = hexToRgb(flatGlassColor("#000000", 0, "#6040a0"));
+    const plain = hexToRgb("#6040a0");
+    expect(flat.b - flat.g).toBeGreaterThan(plain.b - plain.g);
+  });
+
+  it("matches the default dark theme's first-paint value in app.css", () => {
+    expect(flatGlassColor(LUMINOUS_DARK_COLORS["bg-sidebar"], 0.5, LUMINOUS_DARK_COLORS["bg-main"])).toBe("#12141c");
+  });
+});
+
+describe("Theme change View Transitions", () => {
+  let startViewTransition: ReturnType<typeof vi.fn>;
+  const fakeTransition = () => ({ finished: new Promise<void>(() => {}), skipTransition: vi.fn() });
+
+  beforeEach(() => {
+    startViewTransition = vi.fn((update: () => void) => {
+      update();
+      return fakeTransition();
+    });
+    Object.defineProperty(document, "startViewTransition", { value: startViewTransition, configurable: true });
+    document.documentElement.classList.remove("theme-vt");
+    document.documentElement.style.removeProperty("--color-artwork-primary");
+  });
+
+  afterEach(() => {
+    delete (document as { startViewTransition?: unknown }).startViewTransition;
+  });
+
+  it("applies the first theme directly, then crossfades later changes", () => {
+    const store = new ThemeStore();
+    store.gpuCompositing = true;
+    store.applyActiveTheme();
+    expect(startViewTransition).not.toHaveBeenCalled();
+    expect(document.documentElement.classList.contains("theme-vt")).toBe(true);
+
+    store.activeThemeId = "nordic-blue";
+    store.applyActiveTheme();
+    expect(startViewTransition).toHaveBeenCalledTimes(1);
+    expect(document.documentElement.style.getPropertyValue("--glass-solid-sidebar")).toMatch(/^#[0-9a-f]{6}$/);
+  });
+
+  it("writes Dynamic Artwork colors and the theme inside one transition", () => {
+    const store = new ThemeStore();
+    store.gpuCompositing = true;
+    store.applyActiveTheme();
+    store.activeThemeId = "dynamic-artwork";
+    startViewTransition.mockImplementation(() => fakeTransition());
+
+    store.applyArtworkColors({
+      primary: "#112233",
+      sidebar: "#223344",
+      playerbar: "#334455",
+      accent: "#445566",
+      accentHover: "#556677",
+      border: "#667788"
+    });
+
+    // Nothing written yet: the update runs inside the transition, after the
+    // old frame is snapshotted.
+    expect(startViewTransition).toHaveBeenCalledTimes(1);
+    expect(document.documentElement.style.getPropertyValue("--color-artwork-primary")).not.toBe("#112233");
+
+    const update = startViewTransition.mock.calls[0][0] as () => void;
+    update();
+    expect(document.documentElement.style.getPropertyValue("--color-artwork-primary")).toBe("#112233");
+    expect(startViewTransition).toHaveBeenCalledTimes(1);
+  });
+
+  it("never uses a View Transition without confirmed GPU compositing (WebKitGTK crashes without it)", () => {
+    const store = new ThemeStore();
+    store.gpuCompositing = false;
+    store.applyActiveTheme();
+    store.activeThemeId = "nordic-blue";
+    store.applyActiveTheme();
+    expect(startViewTransition).not.toHaveBeenCalled();
+    expect(document.documentElement.classList.contains("theme-vt")).toBe(false);
+  });
+
+  it("never uses a View Transition before the backend has answered", () => {
+    const store = new ThemeStore();
+    expect(store.gpuCompositing).toBeNull();
+    store.applyActiveTheme();
+    store.activeThemeId = "nordic-blue";
+    store.applyActiveTheme();
+    expect(startViewTransition).not.toHaveBeenCalled();
+  });
+
+  it("init() takes GPU compositing support from the backend", async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "webview_gpu_compositing") return true;
+      return {};
+    });
+    const store = new ThemeStore();
+    await store.init();
+    expect(store.gpuCompositing).toBe(true);
+  });
+
+  it("ends the crossfade at the first pointer input hit-tested to <html>, then stops listening", async () => {
+    const store = new ThemeStore();
+    store.gpuCompositing = true;
+    store.applyActiveTheme();
+    let finish!: () => void;
+    const transition = { finished: new Promise<void>((resolve) => (finish = resolve)), skipTransition: vi.fn() };
+    startViewTransition.mockImplementation((update: () => void) => {
+      update();
+      return transition;
+    });
+
+    store.activeThemeId = "nordic-blue";
+    store.applyActiveTheme();
+
+    document.body.dispatchEvent(new Event("pointermove", { bubbles: true }));
+    expect(transition.skipTransition).not.toHaveBeenCalled();
+
+    document.documentElement.dispatchEvent(new Event("pointermove", { bubbles: true }));
+    expect(transition.skipTransition).toHaveBeenCalledTimes(1);
+
+    finish();
+    await transition.finished;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    document.documentElement.dispatchEvent(new Event("wheel", { bubbles: true }));
+    expect(transition.skipTransition).toHaveBeenCalledTimes(1);
   });
 });
 

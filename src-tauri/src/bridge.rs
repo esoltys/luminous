@@ -238,7 +238,11 @@ async fn handle_connection(mut stream: TcpStream, app: AppHandle) {
                 }
                 if buffer.len() > 16384 {
                     let _ = stream
-                        .write_all(&http_response(413, "Payload Too Large", "{\"error\":\"Header too large\"}"))
+                        .write_all(&http_response(
+                            413,
+                            "Payload Too Large",
+                            "{\"error\":\"Header too large\"}",
+                        ))
                         .await;
                     return;
                 }
@@ -252,7 +256,11 @@ async fn handle_connection(mut stream: TcpStream, app: AppHandle) {
         Ok(s) => s,
         Err(_) => {
             let _ = stream
-                .write_all(&http_response(400, "Bad Request", "{\"error\":\"Invalid UTF-8 in headers\"}"))
+                .write_all(&http_response(
+                    400,
+                    "Bad Request",
+                    "{\"error\":\"Invalid UTF-8 in headers\"}",
+                ))
                 .await;
             return;
         }
@@ -267,7 +275,11 @@ async fn handle_connection(mut stream: TcpStream, app: AppHandle) {
     let parts: Vec<&str> = request_line.split_whitespace().collect();
     if parts.len() < 2 {
         let _ = stream
-            .write_all(&http_response(400, "Bad Request", "{\"error\":\"Malformed request line\"}"))
+            .write_all(&http_response(
+                400,
+                "Bad Request",
+                "{\"error\":\"Malformed request line\"}",
+            ))
             .await;
         return;
     }
@@ -293,7 +305,11 @@ async fn handle_connection(mut stream: TcpStream, app: AppHandle) {
 
     if content_length > 10 * 1024 * 1024 {
         let _ = stream
-            .write_all(&http_response(413, "Payload Too Large", "{\"error\":\"Body too large\"}"))
+            .write_all(&http_response(
+                413,
+                "Payload Too Large",
+                "{\"error\":\"Body too large\"}",
+            ))
             .await;
         return;
     }
@@ -313,7 +329,11 @@ async fn handle_connection(mut stream: TcpStream, app: AppHandle) {
         Some(s) => s,
         None => {
             let _ = stream
-                .write_all(&http_response(503, "Service Unavailable", "{\"error\":\"App state not yet initialized\"}"))
+                .write_all(&http_response(
+                    503,
+                    "Service Unavailable",
+                    "{\"error\":\"App state not yet initialized\"}",
+                ))
                 .await;
             return;
         }
@@ -341,35 +361,41 @@ async fn handle_connection(mut stream: TcpStream, app: AppHandle) {
 
         ("POST", "/playback/control") | ("POST", "/api/playback/control") => {
             match serde_json::from_slice::<ControlPayload>(&body_bytes) {
-                Err(e) => {
-                    http_response(400, "Bad Request", &format!("{{\"error\":\"Invalid JSON payload: {}\"}}", e))
-                }
-                Ok(payload) => {
-                    match execute_control_action(&payload, &app_state, &app).await {
-                        Err(err) => {
-                            http_response(400, "Bad Request", &format!("{{\"error\":\"{}\"}}", err))
-                        }
-                        Ok(player_state) => {
-                            let bridge_state = format_bridge_state(player_state, None);
-                            let resp_json = serde_json::json!({
-                                "success": true,
-                                "state": bridge_state,
-                            });
-                            http_response(200, "OK", &resp_json.to_string())
-                        }
+                Err(e) => http_response(
+                    400,
+                    "Bad Request",
+                    &format!("{{\"error\":\"Invalid JSON payload: {}\"}}", e),
+                ),
+                Ok(payload) => match execute_control_action(&payload, &app_state, &app).await {
+                    Err(err) => {
+                        http_response(400, "Bad Request", &format!("{{\"error\":\"{}\"}}", err))
                     }
-                }
+                    Ok(player_state) => {
+                        let bridge_state = format_bridge_state(player_state, None);
+                        let resp_json = serde_json::json!({
+                            "success": true,
+                            "state": bridge_state,
+                        });
+                        http_response(200, "OK", &resp_json.to_string())
+                    }
+                },
             }
         }
 
         ("POST", "/playback/play") | ("POST", "/api/playback/play") => {
             match serde_json::from_slice::<PlayPayload>(&body_bytes) {
-                Err(e) => {
-                    http_response(400, "Bad Request", &format!("{{\"error\":\"Invalid JSON payload: {}\"}}", e))
-                }
+                Err(e) => http_response(
+                    400,
+                    "Bad Request",
+                    &format!("{{\"error\":\"Invalid JSON payload: {}\"}}", e),
+                ),
                 Ok(payload) => {
                     if payload.track_ids.is_empty() {
-                        http_response(400, "Bad Request", "{\"error\":\"track_ids cannot be empty\"}")
+                        http_response(
+                            400,
+                            "Bad Request",
+                            "{\"error\":\"track_ids cannot be empty\"}",
+                        )
                     } else {
                         let res = crate::commands::player::replace_queue_and_play_state(
                             &app_state,
@@ -380,13 +406,17 @@ async fn handle_connection(mut stream: TcpStream, app: AppHandle) {
                         .await;
 
                         match res {
-                            Err(e) => {
-                                http_response(400, "Bad Request", &format!("{{\"error\":\"{}\"}}", e))
-                            }
+                            Err(e) => http_response(
+                                400,
+                                "Bad Request",
+                                &format!("{{\"error\":\"{}\"}}", e),
+                            ),
                             Ok(()) => {
                                 let player_state = app_state.player.lock().await.get_state().await;
-                                let bridge_state =
-                                    format_bridge_state(player_state, Some(payload.track_ids.len()));
+                                let bridge_state = format_bridge_state(
+                                    player_state,
+                                    Some(payload.track_ids.len()),
+                                );
                                 let resp_json = serde_json::json!({
                                     "success": true,
                                     "message": format!("Queued {} tracks and started playback", payload.track_ids.len()),
@@ -402,9 +432,11 @@ async fn handle_connection(mut stream: TcpStream, app: AppHandle) {
 
         ("POST", "/events/notify") | ("POST", "/api/events/notify") => {
             match serde_json::from_slice::<EventPayload>(&body_bytes) {
-                Err(e) => {
-                    http_response(400, "Bad Request", &format!("{{\"error\":\"Invalid JSON payload: {}\"}}", e))
-                }
+                Err(e) => http_response(
+                    400,
+                    "Bad Request",
+                    &format!("{{\"error\":\"Invalid JSON payload: {}\"}}", e),
+                ),
                 Ok(payload) => {
                     if payload.event == "playlists-changed" {
                         let mut changed_ids: Vec<i64> = Vec::new();
@@ -415,7 +447,9 @@ async fn handle_connection(mut stream: TcpStream, app: AppHandle) {
                                         changed_ids.push(id);
                                     }
                                 }
-                            } else if let Some(id) = data.get("playlist_id").and_then(|v| v.as_i64()) {
+                            } else if let Some(id) =
+                                data.get("playlist_id").and_then(|v| v.as_i64())
+                            {
                                 changed_ids.push(id);
                             }
                         }
@@ -447,7 +481,10 @@ pub fn spawn_bridge_server(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
         let listener = match TcpListener::bind(&bind_addr).await {
             Ok(l) => {
-                log::info!("Luminous desktop bridge server listening on http://{}", bind_addr);
+                log::info!(
+                    "Luminous desktop bridge server listening on http://{}",
+                    bind_addr
+                );
                 l
             }
             Err(e) => {
@@ -496,7 +533,9 @@ pub fn spawn_bridge_server(app: AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{FileType, PlayState, PlaybackState, RepeatMode, ShuffleMode, Song, SongSource};
+    use crate::models::{
+        FileType, PlayState, PlaybackState, RepeatMode, ShuffleMode, Song, SongSource,
+    };
 
     #[test]
     fn test_http_response_formatting() {
@@ -571,12 +610,14 @@ mod tests {
         assert!(payload.volume.is_none());
 
         let json_vol = r#"{"action":"set_volume","volume":75}"#;
-        let payload_vol: ControlPayload = serde_json::from_str(json_vol).expect("valid volume payload");
+        let payload_vol: ControlPayload =
+            serde_json::from_str(json_vol).expect("valid volume payload");
         assert_eq!(payload_vol.action, "set_volume");
         assert_eq!(payload_vol.volume, Some(75.0));
 
         let json_shuf = r#"{"action":"set_shuffle","shuffle":true}"#;
-        let payload_shuf: ControlPayload = serde_json::from_str(json_shuf).expect("valid shuffle payload");
+        let payload_shuf: ControlPayload =
+            serde_json::from_str(json_shuf).expect("valid shuffle payload");
         assert_eq!(payload_shuf.action, "set_shuffle");
         assert_eq!(payload_shuf.shuffle, Some(serde_json::Value::Bool(true)));
     }

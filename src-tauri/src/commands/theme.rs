@@ -85,8 +85,8 @@ pub async fn import_theme(file_path: String) -> Result<Theme, String> {
     let content = fs::read_to_string(path)
         .map_err(|e| format!("Failed to read theme file '{file_path}': {e}"))?;
 
-    let mut theme: Theme = serde_json::from_str(&content)
-        .map_err(|e| format!("Invalid theme file format: {e}"))?;
+    let mut theme: Theme =
+        serde_json::from_str(&content).map_err(|e| format!("Invalid theme file format: {e}"))?;
 
     theme.colors.validate()?;
 
@@ -220,7 +220,9 @@ mod tests {
 
         let res = import_theme(file_str).await;
         assert!(res.is_err());
-        assert!(res.unwrap_err().contains("Theme color 'bg-main' cannot be empty"));
+        assert!(res
+            .unwrap_err()
+            .contains("Theme color 'bg-main' cannot be empty"));
 
         let _ = fs::remove_file(file_path);
     }
