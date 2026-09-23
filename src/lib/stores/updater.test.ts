@@ -246,8 +246,8 @@ describe("UpdaterStore", () => {
   });
 
   describe("externallyManagedFormat / isExternallyManaged", () => {
-    it("is set for deb, rpm, and msix installs, and null otherwise", () => {
-      for (const format of ["deb", "rpm", "msix"] as const) {
+    it("is set for deb, rpm, msix, and flatpak installs, and null otherwise", () => {
+      for (const format of ["deb", "rpm", "msix", "flatpak"] as const) {
         updaterStore.installFormat = { format, human_name: format, supports_self_update: false };
         expect(updaterStore.externallyManagedFormat).toBe(format);
         expect(updaterStore.isExternallyManaged).toBe(true);
@@ -278,7 +278,7 @@ describe("UpdaterStore", () => {
     });
 
     it("checkForUpdates() is a no-op for externally-managed formats even if called directly", async () => {
-      for (const format of ["deb", "rpm", "msix"] as const) {
+      for (const format of ["deb", "rpm", "msix", "flatpak"] as const) {
         updaterStore.installFormat = { format, human_name: format, supports_self_update: false };
         updaterStore.checkStatus = "idle";
         vi.mocked(check).mockResolvedValueOnce(fakeUpdate());

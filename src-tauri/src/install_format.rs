@@ -39,6 +39,18 @@ pub fn get_install_format() -> InstallFormatInfo {
 pub fn detect_install_format() -> InstallFormatInfo {
     #[cfg(target_os = "linux")]
     {
+        if env::var("FLATPAK_ID").is_ok() {
+            // Flatpak sets this for every sandboxed process. `/app` is a
+            // read-only bind mount of the app's own OSTree checkout — the
+            // in-app updater can't write there even if it wanted to; updates
+            // come from `flatpak update` against the shared repo instead.
+            return InstallFormatInfo {
+                format: "flatpak".to_string(),
+                human_name: "Flatpak".to_string(),
+                supports_self_update: false,
+            };
+        }
+
         if env::var("APPIMAGE").is_ok() {
             // AppImages are monolithic binary bundles the user downloaded and
             // must manually replace; there's no external package manager to
@@ -173,6 +185,23 @@ mod tests {
         env::remove_var("APPIMAGE");
 
         assert_eq!(info.format, "appimage");
+        assert!(!info.supports_self_update);
+    }
+
+    // Regression test: without this check, a Flatpak install (binary at
+    // /app/bin/, not /usr/) fell through to `linux_generic`, whose
+    // `supports_self_update: false` still doesn't stop the frontend from
+    // actively checking GitHub for updates and offering a .deb/.rpm download
+    // — meaningless and confusing from inside the sandbox. `FLATPAK_ID` is
+    // set by the Flatpak runtime for every sandboxed process.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_flatpak_does_not_support_self_update() {
+        env::set_var("FLATPAK_ID", "org.luminous.music");
+        let info = detect_install_format();
+        env::remove_var("FLATPAK_ID");
+
+        assert_eq!(info.format, "flatpak");
         assert!(!info.supports_self_update);
     }
 

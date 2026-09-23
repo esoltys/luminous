@@ -11,7 +11,9 @@
       subscriptions, no cloud. Just your files, indexed, searchable, and beautifully played.
     </p>
   </description>
-  <developer_name>Eric James Soltys</developer_name>
+  <developer id="dev.esoltys">
+    <name>Eric James Soltys</name>
+  </developer>
   <launchable type="desktop-id">org.luminous.music.desktop</launchable>
   <screenshots>
     <screenshot type="default">
@@ -62,9 +64,12 @@
   </categories>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="2.0.0" date="2026-09-18" />
+    <release version="1.8.0" date="2026-09-07" />
+    <release version="1.7.0" date="2026-09-03" />
     <release version="1.6.0" date="2026-09-01" />
     <release version="1.5.0" date="2026-08-29" />
-    <release version="1.0.1" date="2026-08-20" />
+    <release version="1.0.1" date="2026-08-19" />
     <release version="1.0.0" date="2026-08-19" />
   </releases>
 </component>

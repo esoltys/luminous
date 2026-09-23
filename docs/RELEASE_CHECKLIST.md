@@ -64,8 +64,9 @@ manual.
   Pushing the tag (not `main` itself) is what triggers
   [`release.yml`](../.github/workflows/release.yml), which builds signed Linux + Windows
   bundles and drafts a GitHub release.
-- [ ] Watch the GitHub Actions run to completion for **both** platforms
-      (`gh run watch`, or the Beeper notification from `release.ts` if configured).
+- [ ] Watch the GitHub Actions run to completion for **all** platforms, including the
+      `flatpak-build` job (`gh run watch`, or the Beeper notification from `release.ts`
+      if configured).
 
 ## Post-build
 
@@ -96,6 +97,9 @@ manual.
   was committed, not certified/live.
 - [ ] Download and install the new build on at least one real machine per platform
       (Windows + Linux) — don't just trust the CI build succeeded.
+- [ ] Confirm the `.flatpak` bundle is attached to the release, and that
+      `flatpak update org.luminous.music` (with the `esoltys` remote already added — see
+      [docs/FLATPAK.md](FLATPAK.md)) picks up the new version from the shared repo.
 - [ ] Verify the in-app updater picks up the new release from an older installed version
       (the app checks for updates on launch — confirm the prompt/flow actually works end
       to end, not just that the build has `createUpdaterArtifacts` set).
