@@ -2,7 +2,7 @@
 
 use crate::covermanager::CoverManager;
 use crate::db::Database;
-use crate::models::{WebDavServer, WebDavSyncStats};
+use crate::models::{SongSource, WebDavServer, WebDavSyncStats};
 use crate::webdav::{detect_filetype_from_url, WebDavClient};
 use crate::AppState;
 use rusqlite::params;
@@ -217,12 +217,67 @@ pub async fn save_webdav_server(
 }
 
 /// Delete a WebDAV server profile and its associated cache.
+/// Marks associated songs unavailable (soft-deleted), mirroring `remove_directory`
+/// for watched folders. The explicit "Clean Up" button permanently removes them.
 #[tauri::command]
-pub async fn delete_webdav_server(id: i64, state: State<'_, AppState>) -> Result<(), String> {
+pub async fn delete_webdav_server(
+    id: i64,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
-    conn.execute("DELETE FROM webdav_servers WHERE id = ?1", params![id])
-        .map_err(|e| e.to_string())?;
+
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    {
+        let mut song_ids: Vec<i64> = {
+            let mut stmt = tx
+                .prepare("SELECT song_id FROM webdav_cache WHERE server_id = ?1 AND song_id IS NOT NULL")
+                .map_err(|e| e.to_string())?;
+            let rows = stmt.query_map(params![id], |r| r.get(0)).map_err(|e| e.to_string())?;
+            rows.flatten().collect()
+        };
+
+        let server_url: Option<String> = tx
+            .query_row("SELECT url FROM webdav_servers WHERE id = ?1", params![id], |r| r.get(0))
+            .ok();
+
+        if let Some(ref url) = server_url {
+            let mut stmt = tx
+                .prepare(&format!(
+                    "SELECT id, path FROM songs WHERE source = {} AND unavailable = 0 AND path IS NOT NULL",
+                    SongSource::WEBDAV_ID
+                ))
+                .map_err(|e| e.to_string())?;
+            let rows = stmt
+                .query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)))
+                .map_err(|e| e.to_string())?;
+            for (song_id, path) in rows.flatten() {
+                if crate::collection::song_matches_webdav_server(&path, url) {
+                    if !song_ids.contains(&song_id) {
+                        song_ids.push(song_id);
+                    }
+                }
+            }
+        }
+
+        if !song_ids.is_empty() {
+            let mut upd = tx
+                .prepare("UPDATE songs SET unavailable = 1 WHERE id = ?1")
+                .map_err(|e| e.to_string())?;
+            for song_id in song_ids {
+                let _ = upd.execute(params![song_id]);
+            }
+        }
+
+        tx.execute("DELETE FROM webdav_cache WHERE server_id = ?1", params![id])
+            .map_err(|e| e.to_string())?;
+        tx.execute("DELETE FROM webdav_servers WHERE id = ?1", params![id])
+            .map_err(|e| e.to_string())?;
+    }
+    tx.commit().map_err(|e| e.to_string())?;
+
     state.webdav_auto_sync.cancel(id);
+    let _ = app.emit("library-changed", ());
     Ok(())
 }
 

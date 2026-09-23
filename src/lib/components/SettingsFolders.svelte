@@ -60,6 +60,8 @@
       try {
         await invoke("delete_webdav_server", { id: server.id });
         await loadWebdavServers();
+        await collectionStore.refreshLibrary();
+        await collectionStore.refreshStats();
       } catch (e) {
         console.error("Failed to delete WebDAV server:", e);
       }

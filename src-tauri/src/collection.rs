@@ -20,7 +20,7 @@ use lofty::{
 use rayon::prelude::*;
 use rusqlite::params;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
     sync::Arc,
     time::UNIX_EPOCH,
@@ -75,6 +75,98 @@ where
     })
     .await
     .map_err(|e| anyhow::anyhow!("collection scanner task panicked: {e}"))?
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ConfiguredWebDavServer {
+    #[allow(dead_code)]
+    pub id: i64,
+    pub url: String,
+}
+
+pub(crate) fn load_active_webdav_servers(
+    conn: &rusqlite::Connection,
+) -> (HashSet<i64>, Vec<ConfiguredWebDavServer>) {
+    let mut song_ids = HashSet::new();
+    if let Ok(mut stmt) = conn.prepare(
+        "SELECT DISTINCT song_id FROM webdav_cache \
+         WHERE song_id IS NOT NULL \
+           AND server_id IN (SELECT id FROM webdav_servers)",
+    ) {
+        if let Ok(rows) = stmt.query_map([], |row| row.get::<_, i64>(0)) {
+            for id in rows.flatten() {
+                song_ids.insert(id);
+            }
+        }
+    }
+
+    let mut servers = Vec::new();
+    if let Ok(mut stmt) = conn.prepare("SELECT id, url FROM webdav_servers") {
+        if let Ok(rows) = stmt.query_map([], |row| {
+            Ok(ConfiguredWebDavServer {
+                id: row.get(0)?,
+                url: row.get(1)?,
+            })
+        }) {
+            for server in rows.flatten() {
+                servers.push(server);
+            }
+        }
+    }
+
+    (song_ids, servers)
+}
+
+/// Matches a song's HTTP(S) URL against a WebDAV server's base URL.
+/// Compares scheme, host, port, and URL path prefix, ignoring credentials.
+pub(crate) fn song_matches_webdav_server(song_url_str: &str, server_url_str: &str) -> bool {
+    let Ok(song_url) = reqwest::Url::parse(song_url_str) else {
+        return false;
+    };
+    let Ok(server_url) = reqwest::Url::parse(server_url_str) else {
+        return false;
+    };
+
+    if song_url.scheme() != server_url.scheme() {
+        return false;
+    }
+    if song_url.host_str().map(|h| h.to_lowercase()) != server_url.host_str().map(|h| h.to_lowercase()) {
+        return false;
+    }
+    if song_url.port_or_known_default() != server_url.port_or_known_default() {
+        return false;
+    }
+
+    let server_path = server_url.path().trim_end_matches('/');
+    if server_path.is_empty() {
+        true
+    } else {
+        let song_path = song_url.path();
+        song_path == server_path || song_path.starts_with(&format!("{server_path}/"))
+    }
+}
+
+/// Checks whether a WebDAV song is orphaned because its WebDAV server was actually removed.
+/// Returns false if the song belongs to any currently configured WebDAV server
+/// (even if the server is offline/unavailable or disabled/detached).
+pub(crate) fn is_webdav_song_orphaned(
+    song_id: i64,
+    song_path: Option<&str>,
+    active_song_ids: &HashSet<i64>,
+    active_servers: &[ConfiguredWebDavServer],
+) -> bool {
+    if active_servers.is_empty() {
+        return true;
+    }
+    if active_song_ids.contains(&song_id) {
+        return false;
+    }
+    if let Some(path) = song_path {
+        if active_servers.iter().any(|s| song_matches_webdav_server(path, &s.url)) {
+            return false;
+        }
+    }
+    true
 }
 
 impl CollectionScanner {
@@ -213,6 +305,8 @@ impl CollectionScanner {
             );
         }
 
+        let (active_webdav_song_ids, active_webdav_servers) = load_active_webdav_servers(conn);
+
         let query = if only_available {
             "SELECT id, path, source FROM songs WHERE path IS NOT NULL AND unavailable = 0"
         } else {
@@ -222,23 +316,33 @@ impl CollectionScanner {
         let rows = stmt.query_map([], |row| {
             let id: i64 = row.get(0)?;
             let path: String = row.get(1)?;
-            let source: i32 = row.get(2)?;
+            let source = SongSource::from(row.get::<_, i64>(2)?);
             Ok((id, path, source))
         })?;
 
         let mut missing = Vec::new();
         for (id, path, source) in rows.flatten() {
-            // WebDAV songs (source 11) have HTTP URLs as their path — Path::exists()
-            // always returns false for them, so skip the filesystem check entirely.
-            // They're managed by the WebDAV sync and never pruned by this path.
-            if source == 11 {
+            // WebDAV songs:
+            // If the WebDAV server still exists (even if offline/unavailable or disabled/detached),
+            // Path::exists() check must not run on their HTTP URLs and they must not be pruned.
+            // But if the WebDAV server was actually removed (no matching server in webdav_servers),
+            // the song is orphaned and should be cleaned up.
+            if source.is_webdav() {
+                if is_webdav_song_orphaned(
+                    id,
+                    Some(&path),
+                    &active_webdav_song_ids,
+                    &active_webdav_servers,
+                ) {
+                    missing.push(id);
+                }
                 continue;
             }
 
             let p = Path::new(&path);
 
             // If the file is local (source 1 or 2) and not in any watched directory, it is orphaned.
-            if source == 1 || source == 2 {
+            if source.is_local() {
                 let is_watched = all_roots.iter().any(|root| p.starts_with(root));
                 if !is_watched {
                     missing.push(id);
@@ -485,15 +589,40 @@ impl CollectionScanner {
 
         let conn = self.db.pool.get()?;
 
+        let (active_webdav_song_ids, active_webdav_servers) = load_active_webdav_servers(&conn);
+
         let mut to_delete = self.find_missing_song_ids(&conn, false)?;
 
-        let mut stmt_unavail = conn.prepare("SELECT id FROM songs WHERE unavailable = 1")?;
-        let unavail_rows = stmt_unavail.query_map([], |row| row.get::<_, i64>(0))?;
-        for id in unavail_rows.flatten() {
-            if !to_delete.contains(&id) {
+        let mut stmt_unavail = conn.prepare("SELECT id, source, path FROM songs WHERE unavailable = 1")?;
+        let unavail_rows = stmt_unavail.query_map([], |row| {
+            let id: i64 = row.get(0)?;
+            let source = SongSource::from(row.get::<_, i64>(1)?);
+            let path: Option<String> = row.get(2)?;
+            Ok((id, source, path))
+        })?;
+        for (id, source, path) in unavail_rows.flatten() {
+            if source.is_webdav() {
+                // If it belongs to an existing WebDAV server (even if unavailable or detached),
+                // do NOT delete it!
+                if is_webdav_song_orphaned(
+                    id,
+                    path.as_deref(),
+                    &active_webdav_song_ids,
+                    &active_webdav_servers,
+                ) {
+                    if !to_delete.contains(&id) {
+                        to_delete.push(id);
+                    }
+                }
+            } else if !to_delete.contains(&id) {
                 to_delete.push(id);
             }
         }
+
+        // Safety invariant: never delete a WebDAV song that belongs to an active server
+        to_delete.retain(|&id| {
+            !active_webdav_song_ids.contains(&id)
+        });
 
         let deleted_count = to_delete.len();
         if !to_delete.is_empty() {
@@ -504,6 +633,7 @@ impl CollectionScanner {
                     del_stmt.execute(params![id])?;
                 }
                 tx.execute_batch("DELETE FROM playlist_items WHERE song_id IS NULL;")?;
+                tx.execute_batch("DELETE FROM webdav_cache WHERE song_id IS NULL OR server_id NOT IN (SELECT id FROM webdav_servers);")?;
             }
             tx.commit()?;
             log::info!(
@@ -3203,5 +3333,175 @@ Official DR value: DR13\n",
         assert_eq!(rows[1].3, 0, "last track should play to EOF (no cutoff)");
 
         let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_song_matches_webdav_server() {
+        assert!(song_matches_webdav_server(
+            "https://user:pass@example.com:5005/webdav/Music/song.mp3",
+            "https://example.com:5005/webdav"
+        ));
+        assert!(song_matches_webdav_server(
+            "http://nas.local/Music/song.flac",
+            "http://nas.local/"
+        ));
+        assert!(song_matches_webdav_server(
+            "https://example.com/remote.php/webdav/track.opus",
+            "https://example.com/remote.php/webdav"
+        ));
+        // Different host
+        assert!(!song_matches_webdav_server(
+            "https://other.com/webdav/song.mp3",
+            "https://example.com/webdav"
+        ));
+        // Different port
+        assert!(!song_matches_webdav_server(
+            "https://example.com:5006/webdav/song.mp3",
+            "https://example.com:5005/webdav"
+        ));
+        // Different path prefix
+        assert!(!song_matches_webdav_server(
+            "https://example.com/webdav2/song.mp3",
+            "https://example.com/webdav"
+        ));
+    }
+
+    #[test]
+    fn test_prune_missing_songs_removes_songs_from_removed_webdav_server() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_webdav_prune_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        // WebDAV song whose server has been removed (no rows in webdav_servers)
+        let orphaned_webdav_song = Song {
+            path: Some("https://nas.example.com:5005/webdav/song1.mp3".to_string()),
+            title: Some("Orphaned Remote Track".to_string()),
+            source: SongSource::WebDav,
+            ..Default::default()
+        };
+        upsert_song(&conn, &orphaned_webdav_song).unwrap();
+
+        let scanner = CollectionScanner::new(db.clone());
+        let pruned = scanner.prune_missing_songs().unwrap();
+        assert_eq!(pruned.deleted_songs, 1, "orphaned WebDAV song should be cleaned up");
+
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM songs", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 0, "no songs should remain");
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_prune_missing_songs_preserves_songs_from_existing_webdav_server() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_webdav_preserve_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        // Add a WebDAV server
+        conn.execute(
+            "INSERT INTO webdav_servers (id, name, url, remote_path, enabled) VALUES (1, 'My NAS', 'https://nas.example.com:5005/webdav', '/', 1)",
+            [],
+        )
+        .unwrap();
+
+        // WebDAV song matching the server
+        let webdav_song = Song {
+            path: Some("https://user:pass@nas.example.com:5005/webdav/song1.mp3".to_string()),
+            title: Some("Remote Track".to_string()),
+            source: SongSource::WebDav,
+            ..Default::default()
+        };
+        upsert_song(&conn, &webdav_song).unwrap();
+        let song_id: i64 = conn.query_row("SELECT id FROM songs WHERE path = ?1", params![webdav_song.path], |r| r.get(0)).unwrap();
+
+        conn.execute(
+            "INSERT INTO webdav_cache (server_id, remote_path, size, song_id) VALUES (1, '/song1.mp3', 1000, ?1)",
+            params![song_id],
+        )
+        .unwrap();
+
+        let scanner = CollectionScanner::new(db.clone());
+        let pruned = scanner.prune_missing_songs().unwrap();
+        assert_eq!(pruned.deleted_songs, 0, "active WebDAV song must not be pruned");
+
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM songs", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 1, "active WebDAV song should survive");
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_prune_missing_songs_preserves_unavailable_song_from_existing_webdav_server() {
+        // Verifies the user requirement: "Not unavailable or detached, but the WebDAV was actually removed."
+        // A song from an existing server that is unavailable or detached (e.g. disabled or marked unavailable)
+        // must NOT be pruned.
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_webdav_unavailable_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        // Existing WebDAV server that is disabled/detached
+        conn.execute(
+            "INSERT INTO webdav_servers (id, name, url, remote_path, enabled) VALUES (1, 'Detached NAS', 'https://detached.example.com/webdav', '/', 0)",
+            [],
+        )
+        .unwrap();
+
+        let webdav_song = Song {
+            path: Some("https://detached.example.com/webdav/track.mp3".to_string()),
+            title: Some("Detached Track".to_string()),
+            source: SongSource::WebDav,
+            ..Default::default()
+        };
+        upsert_song(&conn, &webdav_song).unwrap();
+        let song_id: i64 = conn.query_row("SELECT id FROM songs WHERE path = ?1", params![webdav_song.path], |r| r.get(0)).unwrap();
+
+        conn.execute(
+            "INSERT INTO webdav_cache (server_id, remote_path, size, song_id) VALUES (1, '/track.mp3', 2000, ?1)",
+            params![song_id],
+        )
+        .unwrap();
+
+        // Simulate song being marked unavailable (e.g. transient offline or detached state)
+        conn.execute(
+            "UPDATE songs SET unavailable = 1 WHERE id = ?1",
+            params![song_id],
+        )
+        .unwrap();
+
+        let scanner = CollectionScanner::new(db.clone());
+        let pruned = scanner.prune_missing_songs().unwrap();
+        assert_eq!(
+            pruned.deleted_songs, 0,
+            "unavailable/detached song from existing server must not be pruned"
+        );
+
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM songs", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 1, "song must be preserved");
+
+        let _ = std::fs::remove_dir_all(temp_dir);
     }
 }
