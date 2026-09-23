@@ -401,17 +401,23 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                 // "new" row).
                 //
                 // The window slides: it resets on every new event instead of
-                // expiring 400ms after the *first* one. A real folder copy or
-                // extraction can spread its filesystem events over several
-                // seconds (disk I/O, antivirus scanning, etc), and a fixed
-                // deadline would chop that single logical operation into many
-                // separate batches — each emitting its own "batch-processing-*"
-                // events and its own "songs added" toast instead of one (#233).
+                // expiring a fixed delay after the *first* one. A real folder
+                // copy or extraction can spread its filesystem events over
+                // several seconds (disk I/O, antivirus scanning, etc), and a
+                // fixed deadline would chop that single logical operation into
+                // many separate batches — each emitting its own
+                // "batch-processing-*" events and its own "songs added" toast
+                // instead of one (#233). 400ms wasn't enough slack for an
+                // external tagger like Picard saving a whole album: each
+                // track's write/rename lands as its own notify event, and the
+                // per-track gap (disk flush, embedded-cover-art write) regularly
+                // exceeded 400ms, splitting one album edit into several
+                // "Processing songs" toasts instead of one.
                 // `max_batch_duration` bounds the worst case so a folder that's
                 // never quiet (e.g. continuously written to) still flushes
                 // periodically instead of buffering forever.
                 let mut batch = vec![msg];
-                let debounce = std::time::Duration::from_millis(400);
+                let debounce = std::time::Duration::from_millis(2000);
                 let max_batch_duration = std::time::Duration::from_secs(20);
                 let batch_started_at = std::time::Instant::now();
                 loop {
