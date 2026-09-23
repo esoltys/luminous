@@ -677,7 +677,12 @@
     width: 100%;
     height: 100%;
     transform: rotateY(0deg);
-    transform-style: preserve-3d;
+    /* Flat, not preserve-3d: only .flip-card needs a 3D context for the
+       faces to rotate in. preserve-3d here pulled every positioned
+       descendant into that shared 3D scene, where WebKitGTK depth-sorts
+       coplanar layers ambiguously — sidebar items (e.g. Settings), toolbars
+       and cover art randomly vanished behind their own backgrounds. */
+    transform-style: flat;
     visibility: visible;
   }
 
