@@ -62,9 +62,14 @@
   });
 </script>
 
+<!-- From 2xl up, anchored inside the 80px (h-20) TopNavigation header just left
+     of the w-16 logo, so a single toast sits in the header's empty space
+     instead of covering page content. Narrower than that, the flex-1
+     max-w-2xl search box leaves too little room for a max-w-md toast, so drop
+     back to just under the header. -->
 <div
   use:portal
-  class="fixed top-24 right-4 z-[100] flex flex-col items-end gap-2 pointer-events-none px-4"
+  class="fixed top-24 right-4 2xl:top-3 2xl:right-24 z-[100] flex flex-col items-end gap-2 pointer-events-none px-4"
 >
   {#each toastStore.messages as toast (toast.id)}
     <div
