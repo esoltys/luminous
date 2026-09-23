@@ -420,8 +420,8 @@
           <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('discord.integrationTitle')}</h3>
           {#if scrobblerStore.discordEnabled}
             {#if scrobblerStore.discordStatus === 'connected'}
-              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-brand-accent/15 text-brand-text-primary border border-brand-accent/25">
+                <span class="w-1.5 h-1.5 rounded-full bg-brand-accent"></span>
                 {i18n.t('discord.statusConnected')}
               </span>
             {:else if scrobblerStore.discordStatus === 'not_running'}
@@ -430,7 +430,7 @@
                 {i18n.t('discord.statusNotRunning')}
               </span>
             {:else}
-              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-brand-border/40 text-brand-text-secondary">
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-brand-border/40 text-brand-text-secondary border border-brand-border">
                 {i18n.t('discord.statusDisconnected')}
               </span>
             {/if}
