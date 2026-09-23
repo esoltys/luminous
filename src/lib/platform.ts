@@ -6,5 +6,4 @@
 const userAgent = typeof navigator !== "undefined" ? navigator.userAgent : "";
 const platform = typeof navigator !== "undefined" ? navigator.platform : "";
 
-export const isLinux = /linux/i.test(userAgent) || /linux/i.test(platform);
 export const isWindows = userAgent.includes("Windows") || platform.includes("Win");

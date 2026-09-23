@@ -9,7 +9,6 @@
   import CoverArt from "./CoverArt.svelte";
   import WaveformSeekBar from "./WaveformSeekBar.svelte";
   import SongRating from "./SongRating.svelte";
-  import { isLinux } from "../platform";
   import {
     PlayIcon as Play,
     PauseIcon as Pause,
@@ -135,8 +134,7 @@
   }
 
   // backdrop-filter fallback for webviews without GPU compositing — see
-  // ThemeStore.gpuCompositing. Resize handles below stay Linux-gated: that's
-  // window-manager behavior, not styling.
+  // ThemeStore.gpuCompositing.
   let noBackdrop = $derived(themeStore.gpuCompositing === false);
 
   function handleStartDrag(e: PointerEvent) {
@@ -144,7 +142,6 @@
   }
 
   function handleStartResize(direction: string, e: PointerEvent) {
-    if (isLinux) return;
     e.stopPropagation();
     invoke("start_window_resize", { direction }).catch(() => {});
   }
@@ -219,25 +216,23 @@
   tabindex="0"
   class="group relative w-full h-full flex flex-col justify-between overflow-hidden bg-brand-main select-none p-3 shadow-2xl {themeStore.isGlassTheme ? 'glass-surface' : ''} {noBackdrop ? 'no-backdrop' : ''}"
 >
-  <!-- Edge and Corner Resize Handles for Frameless Window (non-Linux platforms) -->
-  {#if !isLinux}
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="absolute top-0 left-0 right-0 h-2 cursor-n-resize z-50" onpointerdown={(e) => handleStartResize("north", e)}></div>
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="absolute bottom-0 left-0 right-0 h-2 cursor-s-resize z-50" onpointerdown={(e) => handleStartResize("south", e)}></div>
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="absolute top-0 bottom-0 left-0 w-2 cursor-w-resize z-50" onpointerdown={(e) => handleStartResize("west", e)}></div>
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="absolute top-0 bottom-0 right-0 w-2 cursor-e-resize z-50" onpointerdown={(e) => handleStartResize("east", e)}></div>
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="absolute top-0 left-0 w-4 h-4 cursor-nw-resize z-50" onpointerdown={(e) => handleStartResize("north-west", e)}></div>
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="absolute top-0 right-0 w-4 h-4 cursor-ne-resize z-50" onpointerdown={(e) => handleStartResize("north-east", e)}></div>
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="absolute bottom-0 left-0 w-4 h-4 cursor-sw-resize z-50" onpointerdown={(e) => handleStartResize("south-west", e)}></div>
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize z-50" onpointerdown={(e) => handleStartResize("south-east", e)}></div>
-  {/if}
+  <!-- Edge and Corner Resize Handles for Frameless Window -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="absolute top-0 left-0 right-0 h-2 cursor-n-resize z-50" onpointerdown={(e) => handleStartResize("north", e)}></div>
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="absolute bottom-0 left-0 right-0 h-2 cursor-s-resize z-50" onpointerdown={(e) => handleStartResize("south", e)}></div>
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="absolute top-0 bottom-0 left-0 w-2 cursor-w-resize z-50" onpointerdown={(e) => handleStartResize("west", e)}></div>
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="absolute top-0 bottom-0 right-0 w-2 cursor-e-resize z-50" onpointerdown={(e) => handleStartResize("east", e)}></div>
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="absolute top-0 left-0 w-4 h-4 cursor-nw-resize z-50" onpointerdown={(e) => handleStartResize("north-west", e)}></div>
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="absolute top-0 right-0 w-4 h-4 cursor-ne-resize z-50" onpointerdown={(e) => handleStartResize("north-east", e)}></div>
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="absolute bottom-0 left-0 w-4 h-4 cursor-sw-resize z-50" onpointerdown={(e) => handleStartResize("south-west", e)}></div>
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize z-50" onpointerdown={(e) => handleStartResize("south-east", e)}></div>
   {#if playerStore.currentSong}
     <div
       class="absolute inset-0 z-0 opacity-25 blur-2xl pointer-events-none"
