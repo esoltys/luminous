@@ -1,11 +1,14 @@
 //! Tauri IPC commands for remote WebDAV server management and synchronization (#682).
 
+use crate::covermanager::CoverManager;
+use crate::db::Database;
 use crate::models::{WebDavServer, WebDavSyncStats};
 use crate::webdav::{detect_filetype_from_url, WebDavClient};
 use crate::AppState;
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
+use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State};
 
 /// Progress update emitted during WebDAV library synchronization (#1087).
@@ -27,7 +30,7 @@ pub async fn list_webdav_servers(state: State<'_, AppState>) -> Result<Vec<WebDa
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     let mut stmt = conn
         .prepare(
-            "SELECT id, name, url, username, remote_path, enabled, sync_status, last_synced_at, created_at, nickname, icon, color
+            "SELECT id, name, url, username, remote_path, enabled, sync_status, last_synced_at, created_at, nickname, icon, color, auto_sync_enabled, sync_interval_minutes
              FROM webdav_servers
              ORDER BY created_at ASC",
         )
@@ -49,12 +52,16 @@ pub async fn list_webdav_servers(state: State<'_, AppState>) -> Result<Vec<WebDa
                 nickname: row.get(9)?,
                 icon: row.get(10)?,
                 color: row.get(11)?,
+                auto_sync_enabled: row.get(12)?,
+                sync_interval_minutes: row.get(13)?,
+                next_auto_sync_at: None,
             })
         })
         .map_err(|e| e.to_string())?;
 
     let mut servers = Vec::new();
-    for s in rows.flatten() {
+    for mut s in rows.flatten() {
+        s.next_auto_sync_at = state.webdav_auto_sync.next_run_at(s.id);
         servers.push(s);
     }
     Ok(servers)
@@ -75,12 +82,38 @@ pub struct SaveWebDavServerInput {
     pub nickname: Option<String>,
     pub icon: Option<String>,
     pub color: Option<String>,
+    pub auto_sync_enabled: Option<bool>,
+    pub sync_interval_minutes: Option<i64>,
+}
+
+const WEBDAV_SERVER_COLUMNS: &str = "id, name, url, username, remote_path, enabled, sync_status, last_synced_at, created_at, nickname, icon, color, auto_sync_enabled, sync_interval_minutes";
+
+fn row_to_webdav_server(row: &rusqlite::Row) -> rusqlite::Result<WebDavServer> {
+    Ok(WebDavServer {
+        id: row.get(0)?,
+        name: row.get(1)?,
+        url: row.get(2)?,
+        username: row.get(3)?,
+        password: None,
+        remote_path: row.get(4)?,
+        enabled: row.get(5)?,
+        sync_status: row.get(6)?,
+        last_synced_at: row.get(7)?,
+        created_at: row.get(8)?,
+        nickname: row.get(9)?,
+        icon: row.get(10)?,
+        color: row.get(11)?,
+        auto_sync_enabled: row.get(12)?,
+        sync_interval_minutes: row.get(13)?,
+        next_auto_sync_at: None,
+    })
 }
 
 /// Save (create or update) a WebDAV server profile.
 #[tauri::command]
 pub async fn save_webdav_server(
     input: SaveWebDavServerInput,
+    app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<WebDavServer, String> {
     let SaveWebDavServerInput {
@@ -94,27 +127,34 @@ pub async fn save_webdav_server(
         nickname,
         icon,
         color,
+        auto_sync_enabled,
+        sync_interval_minutes,
     } = input;
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     let remote_path_val = remote_path.unwrap_or_else(|| "/".to_string());
     let enabled_val = enabled.unwrap_or(true);
+    let auto_sync_enabled_val = auto_sync_enabled.unwrap_or(false);
+    let sync_interval_minutes_val = sync_interval_minutes.unwrap_or(60).max(1);
 
-    if let Some(server_id) = id {
+    let mut saved = if let Some(server_id) = id {
         if let Some(pass) = password {
             conn.execute(
                 "UPDATE webdav_servers
                  SET name = ?1, url = ?2, username = ?3, password = ?4, remote_path = ?5, enabled = ?6,
-                     nickname = ?7, icon = ?8, color = ?9
-                 WHERE id = ?10",
-                params![name, url, username, pass, remote_path_val, enabled_val, nickname, icon, color, server_id],
+                     nickname = ?7, icon = ?8, color = ?9, auto_sync_enabled = ?10, sync_interval_minutes = ?11
+                 WHERE id = ?12",
+                params![
+                    name, url, username, pass, remote_path_val, enabled_val, nickname, icon, color,
+                    auto_sync_enabled_val, sync_interval_minutes_val, server_id
+                ],
             )
             .map_err(|e| e.to_string())?;
         } else {
             conn.execute(
                 "UPDATE webdav_servers
                  SET name = ?1, url = ?2, username = ?3, remote_path = ?4, enabled = ?5,
-                     nickname = ?6, icon = ?7, color = ?8
-                 WHERE id = ?9",
+                     nickname = ?6, icon = ?7, color = ?8, auto_sync_enabled = ?9, sync_interval_minutes = ?10
+                 WHERE id = ?11",
                 params![
                     name,
                     url,
@@ -124,72 +164,56 @@ pub async fn save_webdav_server(
                     nickname,
                     icon,
                     color,
+                    auto_sync_enabled_val,
+                    sync_interval_minutes_val,
                     server_id
                 ],
             )
             .map_err(|e| e.to_string())?;
         }
 
-        let s: WebDavServer = conn
-            .query_row(
-                "SELECT id, name, url, username, remote_path, enabled, sync_status, last_synced_at, created_at, nickname, icon, color
-                 FROM webdav_servers WHERE id = ?1",
-                params![server_id],
-                |row| {
-                    Ok(WebDavServer {
-                        id: row.get(0)?,
-                        name: row.get(1)?,
-                        url: row.get(2)?,
-                        username: row.get(3)?,
-                        password: None,
-                        remote_path: row.get(4)?,
-                        enabled: row.get(5)?,
-                        sync_status: row.get(6)?,
-                        last_synced_at: row.get(7)?,
-                        created_at: row.get(8)?,
-                        nickname: row.get(9)?,
-                        icon: row.get(10)?,
-                        color: row.get(11)?,
-                    })
-                },
-            )
-            .map_err(|e| e.to_string())?;
-        Ok(s)
+        conn.query_row(
+            &format!("SELECT {WEBDAV_SERVER_COLUMNS} FROM webdav_servers WHERE id = ?1"),
+            params![server_id],
+            row_to_webdav_server,
+        )
+        .map_err(|e| e.to_string())?
     } else {
         conn.execute(
-            "INSERT INTO webdav_servers (name, url, username, password, remote_path, enabled, nickname, icon, color)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-            params![name, url, username, password, remote_path_val, enabled_val, nickname, icon, color],
+            "INSERT INTO webdav_servers (name, url, username, password, remote_path, enabled, nickname, icon, color, auto_sync_enabled, sync_interval_minutes)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+            params![
+                name, url, username, password, remote_path_val, enabled_val, nickname, icon, color,
+                auto_sync_enabled_val, sync_interval_minutes_val
+            ],
         )
         .map_err(|e| e.to_string())?;
 
         let new_id = conn.last_insert_rowid();
-        let s: WebDavServer = conn
-            .query_row(
-                "SELECT id, name, url, username, remote_path, enabled, sync_status, last_synced_at, created_at, nickname, icon, color
-                 FROM webdav_servers WHERE id = ?1",
-                params![new_id],
-                |row| {
-                    Ok(WebDavServer {
-                        id: row.get(0)?,
-                        name: row.get(1)?,
-                        url: row.get(2)?,
-                        username: row.get(3)?,
-                        password: None,
-                        remote_path: row.get(4)?,
-                        enabled: row.get(5)?,
-                        sync_status: row.get(6)?,
-                        last_synced_at: row.get(7)?,
-                        created_at: row.get(8)?,
-                        nickname: row.get(9)?,
-                        icon: row.get(10)?,
-                        color: row.get(11)?,
-                    })
-                },
-            )
-            .map_err(|e| e.to_string())?;
-        Ok(s)
+        conn.query_row(
+            &format!("SELECT {WEBDAV_SERVER_COLUMNS} FROM webdav_servers WHERE id = ?1"),
+            params![new_id],
+            row_to_webdav_server,
+        )
+        .map_err(|e| e.to_string())?
+    };
+
+    // Reschedule (or cancel) this server's auto-sync timer to reflect the
+    // settings just saved — takes effect immediately, no app restart needed.
+    if saved.enabled && saved.auto_sync_enabled {
+        state.webdav_auto_sync.reschedule(
+            app,
+            Arc::clone(&state.db),
+            Arc::clone(&state.cover_manager),
+            saved.id,
+            saved.sync_interval_minutes,
+        );
+    } else {
+        state.webdav_auto_sync.cancel(saved.id);
     }
+    saved.next_auto_sync_at = state.webdav_auto_sync.next_run_at(saved.id);
+
+    Ok(saved)
 }
 
 /// Delete a WebDAV server profile and its associated cache.
@@ -198,6 +222,7 @@ pub async fn delete_webdav_server(id: i64, state: State<'_, AppState>) -> Result
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM webdav_servers WHERE id = ?1", params![id])
         .map_err(|e| e.to_string())?;
+    state.webdav_auto_sync.cancel(id);
     Ok(())
 }
 
@@ -248,7 +273,19 @@ pub async fn sync_webdav_server(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<WebDavSyncStats, String> {
-    let db = state.db.clone();
+    sync_webdav_server_inner(id, app, state.db.clone(), state.cover_manager.clone()).await
+}
+
+/// Core sync routine shared by the [`sync_webdav_server`] command (manual
+/// "Sync Now" clicks) and `webdav_scheduler::AutoSyncScheduler` (periodic
+/// auto-sync, #1082) — the scheduler runs as a background task with only an
+/// `AppHandle` and `Arc<Database>`/`Arc<CoverManager>`, not a `State<AppState>`.
+pub async fn sync_webdav_server_inner(
+    id: i64,
+    app: AppHandle,
+    db: Arc<Database>,
+    cover_manager: Arc<CoverManager>,
+) -> Result<WebDavSyncStats, String> {
     let app_clone = app.clone();
 
     tokio::task::spawn_blocking(move || {
@@ -309,6 +346,33 @@ pub async fn sync_webdav_server(
                     continue;
                 }
             };
+
+            // Standalone folder-art image (`album.png`, `cover.jpg`, etc.)
+            // for this directory, if any — the WebDAV counterpart to
+            // `CoverManager::scan_folder_art`'s local-filesystem `read_dir`
+            // scan, resolved from this directory's own PROPFIND listing
+            // instead since there's no filesystem to scan (#1082 follow-up).
+            // Downloaded lazily (only if some song in the directory actually
+            // needs it) and at most once per directory, since every song
+            // here shares the same folder image.
+            let folder_art_item = items
+                .iter()
+                .find(|it| {
+                    !it.is_directory
+                        && std::path::Path::new(&it.href)
+                            .file_stem()
+                            .zip(std::path::Path::new(&it.href).extension())
+                            .map(|(stem, ext)| {
+                                CoverManager::is_folder_art_filename(
+                                    &stem.to_string_lossy(),
+                                    &ext.to_string_lossy(),
+                                )
+                            })
+                            .unwrap_or(false)
+                })
+                .cloned();
+            let mut folder_art_bytes: Option<Vec<u8>> = None;
+            let mut folder_art_fetch_attempted = false;
 
             for item in items {
                 // Avoid infinite loops matching the directory itself
@@ -399,6 +463,48 @@ pub async fn sync_webdav_server(
                             song.path = Some(playback_url.clone());
                             song.url = Some(playback_url.clone());
                             song.stream_url = Some(playback_url.clone());
+
+                            // No embedded-picture extraction over WebDAV yet, so
+                            // `art_automatic` is always still unset here — fall
+                            // back to this directory's folder-art image, same as
+                            // a local scan's `scan_folder_art` fallback (#1082
+                            // follow-up).
+                            if song.art_automatic.is_none() {
+                                if let Some(art_item) = &folder_art_item {
+                                    if !folder_art_fetch_attempted {
+                                        folder_art_fetch_attempted = true;
+                                        let art_url = client.build_url(&art_item.href);
+                                        match client.fetch_full(&art_url) {
+                                            Ok(bytes) => folder_art_bytes = Some(bytes),
+                                            Err(e) => log::warn!(
+                                                "Failed to download WebDAV folder art {}: {e}",
+                                                art_item.href
+                                            ),
+                                        }
+                                    }
+                                    if let Some(bytes) = &folder_art_bytes {
+                                        let artist = song
+                                            .album_artist
+                                            .clone()
+                                            .filter(|a| !a.trim().is_empty())
+                                            .or_else(|| song.artist.clone())
+                                            .unwrap_or_default();
+                                        let album = song
+                                            .album
+                                            .clone()
+                                            .filter(|a| !a.trim().is_empty())
+                                            .or_else(|| song.title.clone())
+                                            .unwrap_or_default();
+                                        match cover_manager.cache_art_bytes(&artist, &album, bytes) {
+                                            Ok(filename) => song.art_automatic = Some(filename),
+                                            Err(e) => log::warn!(
+                                                "Failed to cache WebDAV folder art for {}: {e}",
+                                                item.href
+                                            ),
+                                        }
+                                    }
+                                }
+                            }
 
                             if let Err(e) = crate::collection::upsert_song(&conn, &song) {
                                 log::warn!("Failed to upsert WebDAV song {}: {e}", item.href);

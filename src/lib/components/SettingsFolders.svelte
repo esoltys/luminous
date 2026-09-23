@@ -27,7 +27,6 @@
   } from "phosphor-svelte";
 
   let editingDirectory = $state<MusicDirectory | null>(null);
-  let webdavServers = $state<WebDavServer[]>([]);
   let isWebdavModalOpen = $state(false);
   let editingWebdavServer = $state<WebDavServer | null>(null);
   let syncingServerId = $state<number | null>(null);
@@ -41,7 +40,7 @@
 
   async function loadWebdavServers() {
     try {
-      webdavServers = await invoke<WebDavServer[]>("list_webdav_servers");
+      await collectionStore.refreshWebDavServers();
       checkWebdavConnections();
     } catch (e) {
       console.error("Failed to load WebDAV servers:", e);
@@ -49,7 +48,7 @@
   }
 
   function checkWebdavConnections() {
-    for (const server of webdavServers) {
+    for (const server of collectionStore.webdavServers) {
       invoke<boolean>("check_webdav_connection", { id: server.id })
         .then((ok) => { webdavConnected[server.id] = ok; })
         .catch(() => { webdavConnected[server.id] = false; });
@@ -120,6 +119,14 @@
       return i18n.t("settings.webdavStatusSynced", { time: new Date(server.lastSyncedAt * 1000).toLocaleString() });
     }
     return i18n.t("settings.webdavStatusNeverSynced");
+  }
+
+  function getWebdavNextSyncText(server: WebDavServer): string | null {
+    if (!server.autoSyncEnabled || !server.enabled) return null;
+    if (isServerSyncing(server.id) || server.syncStatus === "syncing") return null;
+    if (!server.nextAutoSyncAt) return null;
+    const minutes = Math.max(1, Math.round((server.nextAutoSyncAt * 1000 - Date.now()) / 60000));
+    return i18n.t("settings.webdavNextSyncIn", { minutes });
   }
 
   function getPhaseDisplayName(phase: string | undefined): string {
@@ -270,7 +277,7 @@
   {/if}
 
   <div class="space-y-2">
-    {#each webdavServers as server (server.id)}
+    {#each collectionStore.webdavServers as server (server.id)}
       <div class="flex items-center justify-between bg-brand-main/50 border border-brand-border/60 rounded-xl p-4 hover:border-brand-border transition-colors">
         <div class="flex items-center gap-3.5 min-w-0 flex-1">
           <div class="min-w-0 space-y-1">
@@ -304,6 +311,9 @@
                 </span>
               {/if}
             </p>
+            {#if getWebdavNextSyncText(server)}
+              <p class="text-xs text-brand-text-secondary/70">{getWebdavNextSyncText(server)}</p>
+            {/if}
           </div>
         </div>
 
@@ -341,7 +351,7 @@
       </div>
     {/each}
 
-    {#if webdavServers.length === 0}
+    {#if collectionStore.webdavServers.length === 0}
       <div class="border border-dashed border-brand-border rounded-xl py-8 text-center text-brand-text-secondary">
         <Cloud class="w-10 h-10 mx-auto mb-2 text-brand-text-secondary/50" />
         <h4 class="font-semibold text-brand-text-primary mb-1 text-xs">{i18n.t('settings.webdavNoServersTitle')}</h4>

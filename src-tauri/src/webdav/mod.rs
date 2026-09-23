@@ -149,6 +149,25 @@ impl WebDavClient {
         parse_propfind_response(&xml_text)
     }
 
+    /// Fetch a resource's full body — used for small non-audio files (e.g. a
+    /// folder-art image found during sync, #1082) where there's no benefit
+    /// to `fetch_range`'s partial-probe behavior.
+    pub fn fetch_full(&self, url: &str) -> Result<Vec<u8>> {
+        let resp = self
+            .client
+            .get(url)
+            .headers(self.auth_headers())
+            .send()
+            .context("failed to fetch resource")?;
+
+        if !resp.status().is_success() {
+            return Err(anyhow!("GET failed with HTTP {}", resp.status()));
+        }
+
+        let bytes = resp.bytes().context("failed to read response bytes")?;
+        Ok(bytes.to_vec())
+    }
+
     /// Fetch partial bytes via HTTP Range request.
     pub fn fetch_range(&self, url: &str, start: u64, end: u64) -> Result<Vec<u8>> {
         let mut headers = self.auth_headers();

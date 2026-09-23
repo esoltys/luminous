@@ -51,6 +51,7 @@ pub mod taskbar;
 pub mod tray;
 pub mod waveform;
 pub mod webdav;
+pub mod webdav_scheduler;
 
 use std::sync::Arc;
 use tauri::{Emitter, Manager};
@@ -93,6 +94,8 @@ pub struct AppState {
     /// the same name by `commands::settings::set_minimize_to_tray_enabled`.
     pub minimize_to_tray: Arc<std::sync::atomic::AtomicBool>,
     pub scrobbler: Arc<scrobbler::ScrobblerManager>,
+    /// Per-server periodic auto-sync timers for WebDAV servers (#1082).
+    pub webdav_auto_sync: Arc<webdav_scheduler::AutoSyncScheduler>,
 }
 
 /// Suppresses stock webview browser chrome — reload/find/print keybindings and
@@ -1096,6 +1099,7 @@ pub fn run() {
                 media_session,
                 minimize_to_tray,
                 scrobbler,
+                webdav_auto_sync: Arc::new(webdav_scheduler::AutoSyncScheduler::new()),
             };
 
             crate::collection::start_watcher(app.handle().clone(), &state);
@@ -1105,6 +1109,13 @@ pub fn run() {
 
             app.manage(state);
             let managed_state = app.state::<AppState>();
+
+            // Start each enabled WebDAV server's periodic auto-sync timer (#1082).
+            managed_state.webdav_auto_sync.start_all_from_db(
+                app.handle().clone(),
+                Arc::clone(&managed_state.db),
+                Arc::clone(&managed_state.cover_manager),
+            );
 
             // Spawn position tick loop (Tokio). Spawned after app.manage()
             // above since it calls media_session::mirror_state(), which

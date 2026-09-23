@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 40;
+pub const CURRENT_SCHEMA_VERSION: i32 = 41;
 
 struct Migration {
     version: i32,
@@ -309,6 +309,21 @@ const MIGRATIONS: &[Migration] = &[
     },
     Migration {
         version: 40,
+        description: "auto_sync_enabled and sync_interval_minutes columns on webdav_servers for periodic auto-sync (#1082)",
+        apply: |conn| {
+            let has_auto_sync_enabled: bool = conn
+                .prepare(
+                    "SELECT 1 FROM pragma_table_info('webdav_servers') WHERE name = 'auto_sync_enabled'",
+                )?
+                .exists([])?;
+            if !has_auto_sync_enabled {
+                conn.execute_batch(MIGRATION_40)?;
+            }
+            Ok(())
+        },
+    },
+    Migration {
+        version: 41,
         description: "fetched_image_filename/fetched_image_source columns on artist_profiles for Retrieve Artist Image (#1127)",
         apply: |conn| {
             let has_fetched_image_filename: bool = conn
@@ -317,7 +332,7 @@ const MIGRATIONS: &[Migration] = &[
                 )?
                 .exists([])?;
             if !has_fetched_image_filename {
-                conn.execute_batch(MIGRATION_40)?;
+                conn.execute_batch(MIGRATION_41)?;
             }
             Ok(())
         },
@@ -1404,12 +1419,23 @@ ALTER TABLE artist_profiles ADD COLUMN musicbrainz_artist_id TEXT;
 ";
 
 // ---------------------------------------------------------------------------
-// Migration 40: artist_profiles.fetched_image_filename/fetched_image_source —
+// Migration 40: auto_sync_enabled and sync_interval_minutes on webdav_servers
+// (#1082). WebDAV has no filesystem-watch equivalent to notice remote
+// changes, so each server that opts in gets its own periodic-poll schedule
+// instead — see `webdav_scheduler::AutoSyncScheduler`.
+// ---------------------------------------------------------------------------
+const MIGRATION_40: &str = "
+ALTER TABLE webdav_servers ADD COLUMN auto_sync_enabled INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE webdav_servers ADD COLUMN sync_interval_minutes INTEGER NOT NULL DEFAULT 60;
+";
+
+// ---------------------------------------------------------------------------
+// Migration 41: artist_profiles.fetched_image_filename/fetched_image_source —
 // an artist portrait fetched via "Retrieve Artist Image" (#1127) from fanart.tv
 // or, lacking an API key/match, Wikidata's P18 property. Cached under
 // `CoverManager`'s covers_dir, same convention as `songs.art_automatic`.
 // ---------------------------------------------------------------------------
-const MIGRATION_40: &str = "
+const MIGRATION_41: &str = "
 ALTER TABLE artist_profiles ADD COLUMN fetched_image_filename TEXT;
 ALTER TABLE artist_profiles ADD COLUMN fetched_image_source TEXT;
 ";
@@ -1895,6 +1921,60 @@ mod tests {
     }
 
     #[test]
+    fn test_migration_40_webdav_auto_sync_columns() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_migration40_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Database::new(temp_dir.clone()).unwrap();
+        assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
+
+        let conn = db.pool.get().unwrap();
+
+        // New rows default to auto-sync disabled with a 60-minute interval.
+        conn.execute(
+            "INSERT INTO webdav_servers (name, url, remote_path) VALUES (?1, ?2, ?3)",
+            params![
+                "My NAS",
+                "http://nas.local:8080/remote.php/webdav",
+                "/Music"
+            ],
+        )
+        .unwrap();
+        let server_id = conn.last_insert_rowid();
+
+        let (auto_sync_enabled, sync_interval_minutes): (bool, i64) = conn
+            .query_row(
+                "SELECT auto_sync_enabled, sync_interval_minutes FROM webdav_servers WHERE id = ?1",
+                params![server_id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert!(!auto_sync_enabled);
+        assert_eq!(sync_interval_minutes, 60);
+
+        conn.execute(
+            "UPDATE webdav_servers SET auto_sync_enabled = 1, sync_interval_minutes = 15 WHERE id = ?1",
+            params![server_id],
+        )
+        .unwrap();
+        let (auto_sync_enabled, sync_interval_minutes): (bool, i64) = conn
+            .query_row(
+                "SELECT auto_sync_enabled, sync_interval_minutes FROM webdav_servers WHERE id = ?1",
+                params![server_id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert!(auto_sync_enabled);
+        assert_eq!(sync_interval_minutes, 15);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
     fn test_migration_35_target_lufs_and_crossfade_cleanup() {
         let temp_dir = std::env::temp_dir().join(format!(
             "luminous_migration35_test_{}",
@@ -1996,7 +2076,7 @@ mod tests {
     }
 
     #[test]
-    fn test_migration_40_adds_artist_profiles_fetched_image_columns() {
+    fn test_migration_41_adds_artist_profiles_fetched_image_columns() {
         let temp_dir = std::env::temp_dir().join(format!(
             "luminous_migration40_test_{}",
             std::time::SystemTime::now()
