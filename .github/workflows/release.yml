@@ -181,6 +181,17 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # flatpak/shared-modules (libappindicator) is a git submodule.
+          submodules: true
+
+      # flatpak/flatpak-github-actions/flatpak-builder expects flatpak-builder
+      # to already be on PATH (normally via its container image); a bare
+      # ubuntu runner doesn't have it. `ostree` is for the publish step.
+      - name: Install Flatpak tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder ostree xvfb
 
       # TODO(#1086): pin to a commit SHA (matching this file's other `uses:`
       # pins) once verified against the real tag - not done here, no network
@@ -223,12 +234,19 @@ jobs:
           echo "$FLATPAK_REPO_GPG_KEY" | base64 -d | gpg --batch --import
 
           git clone --depth 1 "https://x-access-token:${ESOLTYS_IO_DEPLOY_TOKEN}@github.com/esoltys/esoltys.github.io.git" pages-repo
-          mkdir -p pages-repo/flatpak/repo
+          DST=pages-repo/flatpak/repo
+          mkdir -p "$DST"
+          # First publish only: create the shared OSTree repo. Later runs (and
+          # other projects' refs already in it) are left untouched.
+          if [ ! -f "$DST/config" ]; then
+            ostree init --mode=archive-z2 --repo="$DST"
+          fi
 
-          flatpak build-export --gpg-sign="$FLATPAK_REPO_GPG_KEY_ID" \
-            pages-repo/flatpak/repo .flatpak-builder/build/luminous org.luminous.music || \
-          flatpak-builder --repo=pages-repo/flatpak/repo --gpg-sign="$FLATPAK_REPO_GPG_KEY_ID" \
-            --force-clean flatpak-build-dir flatpak/org.luminous.music.yml
+          # Re-sign the unsigned `repo/` the builder step produced into the
+          # shared repo, then regenerate its index/appstream/deltas.
+          flatpak build-commit-from --src-repo=repo --gpg-sign="$FLATPAK_REPO_GPG_KEY_ID" "$DST" \
+            app/org.luminous.music/x86_64/master \
+            runtime/org.luminous.music.Debug/x86_64/master
 
           flatpak build-update-repo --generate-static-deltas \
             --gpg-sign="$FLATPAK_REPO_GPG_KEY_ID" pages-repo/flatpak/repo
