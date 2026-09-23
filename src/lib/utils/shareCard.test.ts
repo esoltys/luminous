@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildShareCardSvg, buildStatsShareCardSvg, SHARE_ASPECT_RATIOS } from "./shareCard";
+import { buildShareCardSvg, buildStatsShareCardSvg, buildMosaicCoverHtml, SHARE_ASPECT_RATIOS } from "./shareCard";
 
 const baseOptions = {
   theme: "dark" as const,
@@ -102,14 +102,53 @@ describe("buildShareCardSvg", () => {
     expect(svg).not.toContain("rotate(5deg)");
   });
 
-  it("fans the cover stack away from the text column on landscape ratios", () => {
+  it("renders a mosaic cover layout on horizontal aspect ratios (16:9 and 4:3)", () => {
+    for (const ratio of ["16:9", "4:3"] as const) {
+      const { svg } = buildShareCardSvg({
+        ...baseOptions,
+        aspectRatio: ratio,
+        coverStackDataUris: ["data:image/png;base64,AAA", "data:image/png;base64,BBB"],
+      });
+      expect(svg).not.toContain("rotate(-5deg)");
+      expect(svg).not.toContain("rotate(5deg)");
+      expect(svg).toContain("data:image/png;base64,AAA");
+      expect(svg).toContain("data:image/png;base64,BBB");
+      expect(svg).toContain("grid-template-columns:2fr 1fr");
+    }
+  });
+
+  it("keeps the fanned stack on portrait aspect ratios (9:16, 3:4)", () => {
+    for (const ratio of ["9:16", "3:4"] as const) {
+      const { svg } = buildShareCardSvg({
+        ...baseOptions,
+        aspectRatio: ratio,
+        coverStackDataUris: ["data:image/png;base64,AAA", "data:image/png;base64,BBB"],
+      });
+      expect(svg).toContain("rotate(5deg)");
+    }
+  });
+
+  it("caps mosaic width on horizontal frames so adjacent text has sufficient space and is not pushed offscreen", () => {
     const { svg } = buildShareCardSvg({
       ...baseOptions,
-      aspectRatio: "16:9",
-      coverStackDataUris: ["data:image/png;base64,AAA", "data:image/png;base64,BBB"],
+      aspectRatio: "4:3",
+      includeTrackList: false,
+      coverStackDataUris: [
+        "data:image/png;base64,1",
+        "data:image/png;base64,2",
+        "data:image/png;base64,3",
+        "data:image/png;base64,4",
+      ],
     });
-    expect(svg).toContain("rotate(-5deg)");
-    expect(svg).not.toContain("rotate(5deg)");
+    const match = svg.match(/width:(\d+)px;height:(\d+)px;border-radius/);
+    expect(match).not.toBeNull();
+    const mosaicWidth = Number(match![1]);
+    const cardWidth = 1440;
+    const cardPad = Math.round(1440 * 0.06);
+    const contentGap = Math.round(1440 * 0.035);
+    const availWidth = cardWidth - 2 * cardPad - contentGap;
+    expect(mosaicWidth).toBeLessThanOrEqual(availWidth * 0.55);
+    expect(availWidth - mosaicWidth).toBeGreaterThan(500);
   });
 
   function coverPixelWidth(svg: string): number {
@@ -230,5 +269,129 @@ describe("buildStatsShareCardSvg", () => {
     });
     expect(svg).toContain("data:image/png;base64,AAA");
     expect(svg).toContain("data:image/png;base64,BBB");
+    expect(svg).toContain("rotate(-5deg)");
+  });
+
+  it("renders a mosaic cover for sections on horizontal aspect ratios (16:9 and 4:3)", () => {
+    for (const ratio of ["16:9", "4:3"] as const) {
+      const { svg } = buildStatsShareCardSvg({
+        ...baseStatsOptions,
+        aspectRatio: ratio,
+        sections: [
+          {
+            title: "Top Artists",
+            items: [{ label: "Artist A" }],
+            coverStackDataUris: ["data:image/png;base64,AAA", "data:image/png;base64,BBB"],
+          },
+        ],
+      });
+      expect(svg).not.toContain("rotate(-5deg)");
+      expect(svg).not.toContain("rotate(5deg)");
+      expect(svg).toContain("data:image/png;base64,AAA");
+      expect(svg).toContain("data:image/png;base64,BBB");
+      expect(svg).toContain("grid-template-columns:2fr 1fr");
+    }
+  });
+
+  it("renders a fanned cover stack for sections on portrait/square aspect ratios (1:1, 9:16, 3:4)", () => {
+    for (const ratio of ["1:1", "9:16", "3:4"] as const) {
+      const { svg } = buildStatsShareCardSvg({
+        ...baseStatsOptions,
+        aspectRatio: ratio,
+        sections: [
+          {
+            title: "Top Artists",
+            items: [{ label: "Artist A" }],
+            coverStackDataUris: ["data:image/png;base64,AAA", "data:image/png;base64,BBB"],
+          },
+        ],
+      });
+      expect(svg).toContain("rotate(-5deg)");
+    }
+  });
+});
+
+describe("buildMosaicCoverHtml", () => {
+  it("returns empty string when no covers are provided", () => {
+    expect(buildMosaicCoverHtml(null, [], 100)).toBe("");
+  });
+
+  it("falls back to a single image for 1 cover", () => {
+    const html = buildMosaicCoverHtml("data:image/png;base64,ONE", null, 100);
+    expect(html).toContain('src="data:image/png;base64,ONE"');
+    expect(html).toContain("width:100px;height:100px");
+    expect(html).not.toContain("grid-template-columns");
+  });
+
+  it("renders 1 full tile + 1 quarter tile for 2 covers (ratio 1.5)", () => {
+    const html = buildMosaicCoverHtml(null, ["data:image/png;base64,1", "data:image/png;base64,2"], 100);
+    expect(html).toContain("grid-template-columns:2fr 1fr");
+    expect(html).toContain("width:150px;height:100px");
+    expect(html).toContain('src="data:image/png;base64,1"');
+    expect(html).toContain('src="data:image/png;base64,2"');
+  });
+
+  it("renders 1 full tile + 2 stacked quarter tiles for 3 covers (ratio 1.5)", () => {
+    const html = buildMosaicCoverHtml(
+      null,
+      ["data:image/png;base64,1", "data:image/png;base64,2", "data:image/png;base64,3"],
+      100
+    );
+    expect(html).toContain("grid-template-columns:2fr 1fr");
+    expect(html).toContain("width:150px;height:100px");
+    expect(html).toContain('src="data:image/png;base64,1"');
+    expect(html).toContain('src="data:image/png;base64,2"');
+    expect(html).toContain('src="data:image/png;base64,3"');
+  });
+
+  it("renders 1 full tile + 3 quarter tiles for 4 covers (ratio 2.0)", () => {
+    const html = buildMosaicCoverHtml(
+      null,
+      [
+        "data:image/png;base64,1",
+        "data:image/png;base64,2",
+        "data:image/png;base64,3",
+        "data:image/png;base64,4",
+      ],
+      100
+    );
+    expect(html).toContain("grid-template-columns:2fr 2fr");
+    expect(html).toContain("grid-template-columns:1fr 1fr");
+    expect(html).toContain("width:200px;height:100px");
+  });
+
+  it("renders 1 full tile + 4 quarter tiles for 5 covers (ratio 2.0)", () => {
+    const html = buildMosaicCoverHtml(
+      null,
+      [
+        "data:image/png;base64,1",
+        "data:image/png;base64,2",
+        "data:image/png;base64,3",
+        "data:image/png;base64,4",
+        "data:image/png;base64,5",
+      ],
+      100
+    );
+    expect(html).toContain("grid-template-columns:2fr 2fr");
+    expect(html).toContain("grid-template-columns:1fr 1fr");
+    expect(html).toContain("width:200px;height:100px");
+    expect(html).toContain('src="data:image/png;base64,5"');
+  });
+
+  it("caps the mosaic at 5 covers when more are supplied", () => {
+    const html = buildMosaicCoverHtml(
+      null,
+      [
+        "data:image/png;base64,1",
+        "data:image/png;base64,2",
+        "data:image/png;base64,3",
+        "data:image/png;base64,4",
+        "data:image/png;base64,5",
+        "data:image/png;base64,6",
+      ],
+      100
+    );
+    expect(html).toContain('src="data:image/png;base64,5"');
+    expect(html).not.toContain('src="data:image/png;base64,6"');
   });
 });

@@ -132,6 +132,59 @@ function buildCoverHtml(
     : "";
 }
 
+/**
+ * Renders a mosaic layout for horizontal share cards (mirroring
+ * CoverMosaic.svelte): one full-square "big" tile (covers[0]) and up to 4
+ * quarter tiles (H/2 × H/2) laid out in a grid.
+ *
+ * Sizing rules mirror CoverMosaic.svelte:
+ * - Height H = `size`.
+ * - 0 quarter covers (1 cover total): single square tile (H × H), ratio 1.
+ * - 1–2 quarter covers (2–3 covers total): 1 quarter column, ratio 1.5,
+ *   width = round(H * 1.5).
+ * - 3–4 quarter covers (4–5 covers total): 2 quarter columns, ratio 2.0,
+ *   width = round(H * 2).
+ * - Capped at 5 covers total (1 big + 4 quarters).
+ */
+export function buildMosaicCoverHtml(
+  coverDataUri: string | null,
+  stackUris: (string | null)[] | null | undefined,
+  size: number,
+  fallbackSingleSize = size
+): string {
+  const stack = (stackUris ?? []).filter((u): u is string => !!u).slice(0, 5);
+  if (stack.length < 2) {
+    const single = coverDataUri ?? stack[0] ?? null;
+    return single
+      ? `<img src="${single}" style="width:${fallbackSingleSize}px;height:${fallbackSingleSize}px;object-fit:cover;border-radius:${Math.round(fallbackSingleSize * 0.06)}px;box-shadow:0 20px 50px rgba(0,0,0,0.4);flex-shrink:0;" />`
+      : "";
+  }
+
+  const bigCover = stack[0];
+  const quarterCovers = stack.slice(1);
+  const quarterCols = quarterCovers.length <= 2 ? 1 : 2;
+  const ratio = (2 + quarterCols) / 2;
+  const width = Math.round(size * ratio);
+  const radius = Math.round(size * 0.06);
+  const gap = 2;
+
+  const quarterImages = quarterCovers
+    .map(
+      (uri) =>
+        `<img src="${uri}" style="width:100%;height:100%;object-fit:cover;display:block;" />`
+    )
+    .join("");
+
+  return (
+    `<div style="display:grid;grid-template-columns:2fr ${quarterCols}fr;gap:${gap}px;width:${width}px;height:${size}px;border-radius:${radius}px;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,0.4);flex-shrink:0;background:rgba(0,0,0,0.2);">` +
+      `<img src="${bigCover}" style="width:100%;height:100%;object-fit:cover;display:block;" />` +
+      `<div style="display:grid;grid-template-rows:1fr 1fr;grid-template-columns:${quarterCols === 2 ? "1fr 1fr" : "1fr"};gap:${gap}px;height:100%;">` +
+        quarterImages +
+      `</div>` +
+    `</div>`
+  );
+}
+
 export function buildShareCardSvg(options: ShareCardOptions): { svg: string; width: number; height: number } {
   const dims = SHARE_ASPECT_RATIOS.find((r) => r.id === options.aspectRatio) ?? SHARE_ASPECT_RATIOS[0];
   const { width, height } = dims;
@@ -232,11 +285,28 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
   const textAlign = isPortrait ? "center" : "left";
   const groupDirection = isPortrait ? "column" : "row";
   const textBlockMaxWidth = isPortrait ? Math.round(width * 0.82) : undefined;
+  const contentGap = Math.round(width * 0.035 * contentScale);
+
+  // In landscape frames, a multi-cover mosaic is wider than a single square
+  // cover (aspect ratio 1.5–2.0 vs 1.0). Cap the mosaic's width to a safe
+  // fraction of the available horizontal space so the adjacent text column
+  // (and track list) isn't squeezed or pushed offscreen.
+  const availWidth = width - 2 * cardPad - contentGap;
+  const stackCount = (options.coverStackDataUris ?? []).filter(Boolean).length;
+  const quarterCols = Math.min(Math.max(0, stackCount - 1), 4) <= 2 ? 1 : 2;
+  const mosaicRatio = (2 + quarterCols) / 2;
+  const maxMosaicWidthFraction = willShowTrackList
+    ? (width / height > 1.5 ? 0.45 : 0.42)
+    : 0.54;
+  const maxMosaicWidth = Math.round(availWidth * maxMosaicWidthFraction);
+  const mosaicHeight = Math.min(coverSize, Math.round(maxMosaicWidth / mosaicRatio));
 
   const contentHtml = `
     <div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;width:100%;height:100%;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:${cardPad}px;box-sizing:border-box;font-family:'Inter','Segoe UI',system-ui,sans-serif;">
-      <div style="display:flex;flex-direction:${groupDirection};align-items:center;gap:${Math.round(width * 0.035 * contentScale)}px;max-width:100%;">
-        ${buildCoverHtml(options.coverDataUri, options.coverStackDataUris, coverSize, !isPortrait)}
+      <div style="display:flex;flex-direction:${groupDirection};align-items:center;gap:${contentGap}px;max-width:100%;">
+        ${!isPortrait
+          ? buildMosaicCoverHtml(options.coverDataUri, options.coverStackDataUris, mosaicHeight, coverSize)
+          : buildCoverHtml(options.coverDataUri, options.coverStackDataUris, coverSize, false)}
         <div style="min-width:0;${isPortrait ? "" : "flex:1;"}display:flex;flex-direction:column;gap:2px;align-items:${isPortrait ? "center" : "flex-start"};text-align:${textAlign};${textBlockMaxWidth ? `max-width:${textBlockMaxWidth}px;` : ""}">
           <div style="font-size:${Math.round(width * 0.046 * contentScale)}px;font-weight:800;color:${textPrimary};line-height:1.3;padding-bottom:0.08em;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${escapeHtml(options.title)}</div>
           <div style="font-size:${Math.round(width * 0.026 * contentScale)}px;font-weight:600;color:${textSecondary};margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">${escapeHtml(options.subtitle)}</div>
@@ -313,6 +383,7 @@ export interface StatsShareCardOptions {
 export function buildStatsShareCardSvg(options: StatsShareCardOptions): { svg: string; width: number; height: number } {
   const dims = SHARE_ASPECT_RATIOS.find((r) => r.id === options.aspectRatio) ?? SHARE_ASPECT_RATIOS[0];
   const { width, height } = dims;
+  const isHorizontal = width > height;
   const isDark = options.theme === "dark";
   const textPrimary = isDark ? "#f5f6f8" : "#0b0c0f";
   const textSecondary = isDark ? "rgba(245,246,248,0.78)" : "rgba(11,12,15,0.72)";
@@ -363,10 +434,17 @@ export function buildStatsShareCardSvg(options: StatsShareCardOptions): { svg: s
           rows +
         `</div>`;
       const hasCover = !!(section.coverStackDataUris && section.coverStackDataUris.length > 0);
-      // Fanned toward the text (fanLeft) rather than further right, so it
-      // stays inside the section's own padding instead of extending toward
-      // the card's outer edge.
-      const coverHtml = hasCover ? buildCoverHtml(null, section.coverStackDataUris, Math.round(scaleBasis * 0.15), true) : "";
+      // On horizontal aspect ratios (16:9, 4:3), multi-cover sections render
+      // as a CoverMosaic grid. On portrait/square ratios (1:1, 9:16, 3:4),
+      // they keep the fanned stack, fanned toward the text (fanLeft) so it
+      // stays inside the section's own padding.
+      const statsCoverSize = Math.round(scaleBasis * 0.15);
+      const statsMosaicHeight = Math.round(scaleBasis * 0.10);
+      const coverHtml = hasCover
+        ? isHorizontal
+          ? buildMosaicCoverHtml(null, section.coverStackDataUris, statsMosaicHeight, statsCoverSize)
+          : buildCoverHtml(null, section.coverStackDataUris, statsCoverSize, true)
+        : "";
       return (
         `<div style="background:${cardBg};border-radius:${Math.round(scaleBasis * 0.016)}px;padding:${Math.round(scaleBasis * 0.024)}px;min-width:0;display:flex;align-items:center;gap:${Math.round(scaleBasis * 0.02)}px;">` +
           textBlock +

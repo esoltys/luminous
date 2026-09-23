@@ -360,19 +360,17 @@
           coverStackUrls = [];
         }
       } else if (entity.kind === "artist") {
-        // Matches ArtistDetailView's own hero header: a portrait photo wins
-        // as a single image when one exists, otherwise fall back to a
-        // fanned stack of the artist's own album covers (getArtistCoverStack)
-        // rather than a single cover.
-        if (artistPortraitUrl) {
-          if (!cancelled) {
+        // Matches ArtistDetailView's own hero header: when an artist portrait
+        // exists, it serves as the big tile and the artist's album covers fill
+        // the mosaic quarter tiles (or the fanned stack behind it). When no
+        // portrait exists, the album covers themselves form the stack/mosaic.
+        const stackItems = getArtistCoverStack(artistAlbums, artistSongs, 4);
+        const urls = (await Promise.all(stackItems.map(resolveCoverUrl))).filter((u): u is string => !!u);
+        if (!cancelled) {
+          if (artistPortraitUrl) {
             coverUrl = artistPortraitUrl;
-            coverStackUrls = [];
-          }
-        } else {
-          const stackItems = getArtistCoverStack(artistAlbums, artistSongs, 4);
-          const urls = (await Promise.all(stackItems.map(resolveCoverUrl))).filter((u): u is string => !!u);
-          if (!cancelled) {
+            coverStackUrls = urls.length > 0 ? [artistPortraitUrl, ...urls] : [];
+          } else {
             coverUrl = urls[0] ?? null;
             coverStackUrls = urls;
           }
