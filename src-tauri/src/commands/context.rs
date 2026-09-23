@@ -246,9 +246,12 @@ pub async fn get_song_context(
 
     if let Some(ref artist_id) = artist_id {
         let cached = read_artist_cache(&db, artist_id).await?;
+        // If sort_name is missing, the row was cached before migration 42
+        // introduced structured MusicBrainz artist details (#1128, #1146);
+        // treat it as stale so details are fetched.
         let fresh = cached
             .as_ref()
-            .map(|c| is_cache_fresh(c.fetched_at, now))
+            .map(|c| is_cache_fresh(c.fetched_at, now) && c.sort_name.is_some())
             .unwrap_or(false);
 
         if fresh && !force_refresh {
@@ -720,5 +723,24 @@ mod tests {
         assert_eq!(enrichment.artist_sort_name.as_deref(), Some("Twain, Shania"));
         assert_eq!(enrichment.artist_gender.as_deref(), Some("Female"));
         assert_eq!(enrichment.artist_begin_date.as_deref(), Some("1965-08-28"));
+    }
+
+    #[tokio::test]
+    async fn test_artist_cache_without_sort_name_is_stale() {
+        let db = Arc::new(temp_db("artist_cache_no_sort_name"));
+        let bio = crate::context::WikipediaSummary {
+            extract: "Bio only".to_string(),
+            page_url: None,
+            thumbnail_url: None,
+        };
+
+        // Write row with bio but no MB details (legacy pre-migration 42 shape)
+        write_artist_cache(&db, "artist-legacy", &Some(bio), &None, 1000)
+            .await
+            .unwrap();
+
+        let cached = read_artist_cache(&db, "artist-legacy").await.unwrap().unwrap();
+        assert!(cached.sort_name.is_none());
+        assert_eq!(cached.wikipedia_extract.as_deref(), Some("Bio only"));
     }
 }
