@@ -28,6 +28,26 @@ The db lives at `%APPDATA%\org.luminous.music\luminous.db` on Windows,
 `~/.local/share/org.luminous.music/luminous.db` on Linux (respects `LUMINOUS_DATA_DIR` if set —
 see `src-tauri/src/paths.rs`).
 
+## Testing clean / new app installs (`LUMINOUS_DATA_DIR`)
+
+To test fresh install onboarding, default pins, and first-run experiences without modifying or deleting your real user library, point the app at an isolated directory via the `LUMINOUS_DATA_DIR` environment variable:
+
+- **PowerShell (Windows)**:
+  ```powershell
+  $env:LUMINOUS_DATA_DIR = "$env:TEMP\luminous-test"
+  bun run tauri dev
+  ```
+
+- **Bash (Linux / macOS)**:
+  ```bash
+  LUMINOUS_DATA_DIR=/tmp/luminous-test bun run tauri dev
+  ```
+
+This causes Luminous to initialize a brand new `luminous.db`, `covers/`, and `logs/` directory in that location while leaving your primary database completely untouched. To reset between test runs, simply remove that temporary folder or point to a new path.
+
+> [!NOTE]
+> On Windows, WebView2 persists `localStorage` (such as last-viewed tabs or navigation state) across sessions in its User Data Directory (`%LOCALAPPDATA%\com.luminous.app\EBWebView`). When testing a genuinely pristine first launch, you can clear `localStorage` via the DevTools console (`Ctrl+Shift+I` -> `localStorage.clear(); location.reload()`) in addition to setting `LUMINOUS_DATA_DIR`.
+
 ## Windows UI automation
 
 - **Windows e2e smoke test (`bun run test:e2e:windows`, `e2e/run-smoke.ts`)**: drives the real
