@@ -264,6 +264,78 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     expect(extIcon?.classList.contains("group-hover/link:opacity-100")).toBe(true);
     expect(extIcon?.classList.contains("group-hover:opacity-100")).toBe(false);
   });
+
+  it("auto-fetches album details on visit when details_fetched is false and context enrichment is enabled (#1143)", async () => {
+    const invokeMock = vi.mocked(invoke);
+    collectionStore.albumProfiles = {
+      "abbey road": {
+        album_key: "abbey road",
+        details_fetched: false,
+        links: [],
+      },
+    };
+
+    const songsWithMbid = [
+      {
+        id: 1,
+        title: "Come Together",
+        artist: "The Beatles",
+        album: "Abbey Road",
+        musicbrainz_release_group_id: "rg-123",
+      },
+    ];
+
+    invokeMock.mockImplementation((cmd: string) => {
+      if (cmd === "get_songs_by_album") return Promise.resolve(songsWithMbid);
+      if (cmd === "is_context_enrichment_enabled") return Promise.resolve(true);
+      if (cmd === "retrieve_album_details") {
+        return Promise.resolve({
+          added_count: 1,
+          profile: { album_key: "Abbey Road", details_fetched: true, links: [] },
+        });
+      }
+      return Promise.resolve();
+    });
+
+    render(AlbumDetailView, { props: { albumName: mockAlbumName } });
+
+    await vi.waitFor(() => {
+      expect(invokeMock).toHaveBeenCalledWith("retrieve_album_details", { album: "Abbey Road" });
+    });
+  });
+
+  it("does not auto-fetch album details when details_fetched is already true (#1143)", async () => {
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockClear();
+    collectionStore.albumProfiles = {
+      "abbey road": {
+        album_key: "abbey road",
+        details_fetched: true,
+        links: [],
+      },
+    };
+
+    const songsWithMbid = [
+      {
+        id: 1,
+        title: "Come Together",
+        artist: "The Beatles",
+        album: "Abbey Road",
+        musicbrainz_release_group_id: "rg-123",
+      },
+    ];
+
+    invokeMock.mockImplementation((cmd: string) => {
+      if (cmd === "get_songs_by_album") return Promise.resolve(songsWithMbid);
+      if (cmd === "is_context_enrichment_enabled") return Promise.resolve(true);
+      return Promise.resolve();
+    });
+
+    render(AlbumDetailView, { props: { albumName: mockAlbumName } });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(invokeMock).not.toHaveBeenCalledWith("retrieve_album_details", expect.anything());
+  });
 });
 
 

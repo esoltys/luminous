@@ -1320,6 +1320,7 @@ pub fn run() {
             commands::lyrics::set_instrumental,
             // Details pane context enrichment (#23)
             commands::context::get_song_context,
+            commands::context::is_context_enrichment_enabled,
             // Tag Editor commands
             commands::tageditor::get_song_details,
             commands::tageditor::save_song_tags,

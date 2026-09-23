@@ -844,6 +844,15 @@ pub async fn retrieve_album_details(
     // See `set_artist_profile`'s matching guard — same reasoning, for the
     // `album.md`/`artist.md` sidecar writes this command can trigger (#1123).
     let _watcher_pause_guard = WatcherPauseGuard::new(Arc::clone(&state.watcher_paused));
+    let enrichment_enabled = crate::db::run_blocking(&state.db, |conn| {
+        Ok(crate::commands::context::context_enrichment_enabled(conn))
+    })
+    .await
+    .unwrap_or(true);
+    if !enrichment_enabled {
+        return Err("Online context enrichment is disabled".to_string());
+    }
+
     let album_for_lookup = album.clone();
     let (release_group_id, current_profile) =
         crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
@@ -880,6 +889,7 @@ pub async fn retrieve_album_details(
 
     let mut updated_profile = current_profile;
     updated_profile.album_key = album.clone();
+    updated_profile.details_fetched = true;
     let existing_links = dedupe_links_by_platform_and_url(
         std::mem::take(&mut updated_profile.links),
         |l| (l.platform.as_str(), l.handle_or_url.as_str()),
@@ -1092,6 +1102,15 @@ pub async fn retrieve_artist_details(
     // See `set_artist_profile`'s matching guard — same reasoning, for the
     // `artist.md` sidecar write this command triggers (#1123).
     let _watcher_pause_guard = WatcherPauseGuard::new(Arc::clone(&state.watcher_paused));
+    let enrichment_enabled = crate::db::run_blocking(&state.db, |conn| {
+        Ok(crate::commands::context::context_enrichment_enabled(conn))
+    })
+    .await
+    .unwrap_or(true);
+    if !enrichment_enabled {
+        return Err("Online context enrichment is disabled".to_string());
+    }
+
     let (artist_mbid, current_profile) = resolve_artist_mbid_and_profile(&state, &artist).await?;
 
     let Some(artist_mbid) = artist_mbid else {
@@ -1123,6 +1142,7 @@ pub async fn retrieve_artist_details(
 
     let mut updated_profile = current_profile;
     updated_profile.artist_key = artist;
+    updated_profile.details_fetched = true;
     if updated_profile.musicbrainz_artist_id.is_none() {
         updated_profile.musicbrainz_artist_id = Some(artist_mbid);
     }
@@ -1255,6 +1275,15 @@ pub async fn retrieve_artist_image(
     artist: String,
     state: State<'_, AppState>,
 ) -> Result<ArtistImageRetrievalResult, String> {
+    let enrichment_enabled = crate::db::run_blocking(&state.db, |conn| {
+        Ok(crate::commands::context::context_enrichment_enabled(conn))
+    })
+    .await
+    .unwrap_or(true);
+    if !enrichment_enabled {
+        return Err("Online context enrichment is disabled".to_string());
+    }
+
     let (artist_mbid, current_profile) = resolve_artist_mbid_and_profile(&state, &artist).await?;
 
     let Some(artist_mbid) = artist_mbid else {
@@ -1290,6 +1319,16 @@ pub async fn retrieve_artist_image(
     }
 
     let Some(image_url) = image_url else {
+        let mut updated_profile = current_profile;
+        updated_profile.artist_key = artist;
+        if updated_profile.musicbrainz_artist_id.is_none() {
+            updated_profile.musicbrainz_artist_id = Some(artist_mbid);
+        }
+        updated_profile.image_fetched = true;
+        let _ = crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+            save_artist_profile_with_sidecar(scanner, &updated_profile)
+        })
+        .await;
         return Ok(ArtistImageRetrievalResult::default());
     };
     let source = source.expect("source is set whenever image_url is Some");
@@ -1311,6 +1350,7 @@ pub async fn retrieve_artist_image(
     }
     updated_profile.fetched_image_filename = Some(filename.clone());
     updated_profile.fetched_image_source = Some(source.as_str().to_string());
+    updated_profile.image_fetched = true;
 
     crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
         save_artist_profile_with_sidecar(scanner, &updated_profile)
@@ -1820,6 +1860,8 @@ mod tests {
             musicbrainz_artist_id: None,
             fetched_image_filename: None,
             fetched_image_source: None,
+            details_fetched: false,
+            image_fetched: false,
         };
 
         let content = build_artist_md_content(&profile).unwrap();
@@ -1845,6 +1887,7 @@ mod tests {
                 platform: "discogs".to_string(),
                 handle_or_url: "https://www.discogs.com/master/132556".to_string(),
             }],
+            details_fetched: false,
         };
 
         let content = build_album_md_content(&profile).unwrap();

@@ -18,6 +18,7 @@
   import SongContextMenu from "./SongContextMenu.svelte";
   import GenreChips from "./GenreChips.svelte";
   import { tagsStore } from "../stores/tags.svelte";
+  import { tasksStore } from "../stores/tasks.svelte";
   import SongSelectionToolbar from "./SongSelectionToolbar.svelte";
   import PlayShuffleButtons from "./PlayShuffleButtons.svelte";
   import IconActionButton from "./IconActionButton.svelte";
@@ -108,34 +109,24 @@
   async function handleRetrieveAlbumDetails() {
     if (retrievingDetails || !hasReleaseGroupMbid) return;
     retrievingDetails = true;
+    const taskId = `album-enrichment-${albumName.toLowerCase()}`;
+    tasksStore.startTask({
+      id: taskId,
+      label: i18n.t("albumDetail.retrievingDetails", {}, "Retrieving album details..."),
+      taskName: i18n.t("albumDetail.retrievingAlbumTask", {}, "Retrieving album information"),
+      total: 1,
+    });
     try {
       const result = await collectionStore.retrieveAlbumDetails(albumName);
-      if (result.added_count === 1) {
-        toastStore.show(
-          i18n.t("albumDetail.retrieveDetailsSuccessOne", {}, "Added 1 link from MusicBrainz")
-        );
-      } else if (result.added_count > 1) {
-        toastStore.show(
-          i18n.t(
-            "albumDetail.retrieveDetailsSuccessMany",
-            { count: result.added_count },
-            `Added ${result.added_count} links from MusicBrainz`
-          )
-        );
-      } else {
-        toastStore.show(
-          i18n.t(
-            "albumDetail.retrieveDetailsNoResults",
-            {},
-            "No additional details found on MusicBrainz"
-          )
-        );
-      }
+      const label = result.added_count === 1
+        ? i18n.t("albumDetail.retrieveDetailsSuccessOne", {}, "Added 1 link from MusicBrainz")
+        : result.added_count > 1
+          ? i18n.t("albumDetail.retrieveDetailsSuccessMany", { count: result.added_count }, `Added ${result.added_count} links from MusicBrainz`)
+          : i18n.t("albumDetail.retrieveDetailsNoResults", {}, "No additional details found on MusicBrainz");
+      tasksStore.completeTask(taskId, label);
     } catch (err) {
       console.error("Failed to retrieve album details:", err);
-      toastStore.show(
-        i18n.t("albumDetail.retrieveDetailsError", {}, "Failed to retrieve album details")
-      );
+      tasksStore.failTask(taskId, String(err));
     } finally {
       retrievingDetails = false;
     }
@@ -259,6 +250,27 @@
   let hasProfileContent = $derived(
     hasDescription || hasWebsite || hasLinks || !!listenbrainzUrl
   );
+
+  let lastAutoFetchedAlbum = $state<string | null>(null);
+  $effect(() => {
+    const currentAlbum = albumName;
+    if (!currentAlbum || songs.length === 0) return;
+    if (lastAutoFetchedAlbum === currentAlbum) return;
+
+    const profile = albumProfile;
+    if (profile?.details_fetched) {
+      lastAutoFetchedAlbum = currentAlbum;
+      return;
+    }
+    if (!hasReleaseGroupMbid) return;
+
+    lastAutoFetchedAlbum = currentAlbum;
+    collectionStore.isContextEnrichmentEnabled().then((enabled) => {
+      if (enabled && !retrievingDetails && !tasksStore.isTaskActive(`album-enrichment-${currentAlbum.toLowerCase()}`)) {
+        handleRetrieveAlbumDetails();
+      }
+    });
+  });
 
   interface ReleaseLinkItem {
     key: string;
