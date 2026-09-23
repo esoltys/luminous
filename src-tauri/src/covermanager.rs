@@ -437,6 +437,29 @@ impl CoverManager {
         format!("album-{:016x}", hash)
     }
 
+    /// Same FNV-1a hashing as `get_album_hash`, keyed on an artist's
+    /// MusicBrainz ID rather than artist/album name, for a fetched artist
+    /// image's cache filename stem (#1127). `artist-`-prefixed so it can
+    /// never collide with an `album-*` cache filename in the same
+    /// `covers_dir`.
+    pub fn get_artist_image_hash(&self, artist_mbid: &str) -> String {
+        let mut hash = 0xcbf29ce484222325u64;
+        for &byte in artist_mbid.to_lowercase().as_bytes() {
+            hash ^= byte as u64;
+            hash = hash.wrapping_mul(0x100000001b3u64);
+        }
+        format!("artist-{:016x}", hash)
+    }
+
+    /// The on-disk directory cached cover art (and, since #1127, fetched
+    /// artist images) is stored under — exposed so other modules can cache
+    /// into the same directory the `luminous-art://` protocol handler
+    /// resolves non-`local/` filenames against, without duplicating that
+    /// directory-resolution logic.
+    pub fn covers_dir(&self) -> &Path {
+        &self.covers_dir
+    }
+
     /// Save the file's best embedded tag picture (if any) to the covers
     /// cache and return its cache filename. Returns `Ok(None)` — not an
     /// error — when the file has no tag or the tag has no picture; callers

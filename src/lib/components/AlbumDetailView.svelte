@@ -315,11 +315,6 @@
     });
   });
 
-  // Past a certain count the narrow single-column links panel (used
-  // alongside liner notes) gets tall enough to feel unbalanced — switch to
-  // two columns so it stays compact.
-  let hasManyReleaseLinks = $derived(releaseLinkItems.length > 10);
-
   async function handleOpenUrl(url: string) {
     if (!url) return;
     try {
@@ -728,10 +723,10 @@
           {#if hasWebsite || hasLinks || listenbrainzUrl}
             <div
               class={hasDescription
-                ? `${hasManyReleaseLinks ? "@2xl:w-[22rem] @3xl:w-[28rem]" : "@2xl:w-60 @3xl:w-72"} shrink-0 border-t border-brand-border/40 pt-4 @2xl:border-t-0 @2xl:border-l @2xl:border-brand-border/60 @2xl:pt-0 @2xl:pl-6 flex flex-col gap-3`
+                ? "@2xl:w-[22rem] @3xl:w-[28rem] shrink-0 border-t border-brand-border/40 pt-4 @2xl:border-t-0 @2xl:border-l @2xl:border-brand-border/60 @2xl:pt-0 @2xl:pl-6 flex flex-col gap-3"
                 : "w-full flex flex-col gap-3"}
             >
-              <div class="grid grid-cols-1 @sm:grid-cols-2 {hasDescription ? (hasManyReleaseLinks ? '@2xl:grid @2xl:grid-cols-2' : '@2xl:flex @2xl:flex-col') : '@md:grid-cols-3 @xl:grid-cols-4'} gap-2.5">
+              <div class="grid grid-cols-1 @sm:grid-cols-2 {hasDescription ? '@2xl:grid @2xl:grid-cols-2' : '@md:grid-cols-3 @xl:grid-cols-4'} gap-2.5">
                 <!-- Website, curated (#950) and derived ListenBrainz links, unified and sorted alphabetically (#1122) -->
                 {#each releaseLinkItems as item (item.key)}
                   <button

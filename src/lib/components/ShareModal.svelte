@@ -18,7 +18,7 @@
   import { extractColorsFromImage } from "../stores/theme.svelte";
   import { getCoverArtUrl, resolveArtUrl, type Song, type StatsSummary, type StatsRange, type StatsTopItem } from "../types";
   import { getArtistAlbums, classifyRelease } from "../utils/artist";
-  import { songsToCoverStack, getArtistCoverStack, type CoverStackItem } from "../utils/covers";
+  import { songsToCoverStack, getArtistCoverStack, resolveArtistPortraitUrl, type CoverStackItem } from "../utils/covers";
   import { bucketListeningClock } from "../utils/listeningClock";
   import type { DaypartBucket } from "../utils/daypart";
   import {
@@ -166,7 +166,12 @@
       })
       .catch((err) => console.error("Failed to load songs for share card:", err));
     collectionStore.getExtendedArtworkForArtist(name).then((res) => {
-      if (!cancelled) artistPortraitUrl = getCoverArtUrl(res?.artist_portrait_uri) ?? null;
+      if (!cancelled) {
+        artistPortraitUrl = resolveArtistPortraitUrl(
+          res?.artist_portrait_uri,
+          collectionStore.getArtistProfile(name)?.fetched_image_filename
+        );
+      }
     });
     return () => {
       cancelled = true;
@@ -298,7 +303,10 @@
    * images on stats cards' Top Artists section. */
   async function resolveArtistImageUrl(name: string): Promise<string | null> {
     const artwork = await collectionStore.getExtendedArtworkForArtist(name);
-    const portrait = getCoverArtUrl(artwork?.artist_portrait_uri) ?? null;
+    const portrait = resolveArtistPortraitUrl(
+      artwork?.artist_portrait_uri,
+      collectionStore.getArtistProfile(name)?.fetched_image_filename
+    );
     if (portrait) return portrait;
     const stack = getArtistCoverStack(getArtistAlbums(collectionStore.albums, name), [], 1);
     return stack[0] ? resolveCoverUrl(stack[0]) : null;

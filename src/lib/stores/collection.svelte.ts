@@ -15,6 +15,7 @@ import type {
   ArtistItem,
   ArtistProfile,
   ArtistDetailsRetrievalResult,
+  ArtistImageRetrievalResult,
   ExtendedArtworkResponse,
   RecentSearchItem,
   QueuePopulationMode,
@@ -742,6 +743,33 @@ class CollectionStore {
     return result;
   }
 
+  /** Artist detail overflow menu's "Retrieve Artist Image" (#1127): fetches a
+   * portrait from fanart.tv (if an API key is configured) or, lacking a key
+   * or a match, Wikidata's image property, caches it, and persists the
+   * result onto the artist's profile. Updates the cached profile locally
+   * from the returned filename rather than re-fetching the whole profile,
+   * same convention as `retrieveArtistDetails`. */
+  async retrieveArtistImage(artistName: string): Promise<ArtistImageRetrievalResult> {
+    const result = await invoke<ArtistImageRetrievalResult>("retrieve_artist_image", {
+      artist: artistName,
+    });
+    if (result?.uri) {
+      const key = artistName.toLowerCase();
+      const existing = this.artistProfiles[key];
+      if (existing) {
+        this.artistProfiles = {
+          ...this.artistProfiles,
+          [key]: {
+            ...existing,
+            fetched_image_filename: result.uri.replace("luminous-art://", ""),
+            fetched_image_source: result.source,
+          },
+        };
+      }
+    }
+    return result;
+  }
+
   async loadAlbumProfiles() {
     try {
       const profiles = await invoke<AlbumProfile[]>("get_all_album_profiles");
@@ -786,6 +814,17 @@ class CollectionStore {
       this.albumProfiles = {
         ...this.albumProfiles,
         [result.profile.album_key.toLowerCase()]: result.profile,
+      };
+    }
+    // The backend backfills the album's artist's musicbrainz_artist_id as a
+    // side effect of this action (#1123) — refresh the cached artist
+    // profile too, or the artist page keeps showing it as missing (and
+    // "Retrieve Artist Details"/"Retrieve Artist Image" stay disabled) until
+    // the whole library's profile cache happens to reload.
+    if (result?.artist_profile?.artist_key) {
+      this.artistProfiles = {
+        ...this.artistProfiles,
+        [result.artist_profile.artist_key.toLowerCase()]: result.artist_profile,
       };
     }
     return result;

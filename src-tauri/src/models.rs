@@ -1164,6 +1164,18 @@ pub struct ArtistProfile {
     /// drive "Retrieve Artist Details" (#1123) without depending on a song
     /// having a usable tagged MBID.
     pub musicbrainz_artist_id: Option<String>,
+    /// Cache filename (under `CoverManager`'s `covers_dir`, same convention as
+    /// `songs.art_automatic`) of an artist portrait fetched via "Fetch Artist
+    /// Image" (#1127) — from fanart.tv or, lacking an API key/match, Wikidata's
+    /// P18 property. Distinct from `get_extended_artwork_for_artist`'s
+    /// locally-discovered `artist_portrait_uri`: that's scanned from files
+    /// already sitting next to the artist's music, this is fetched on demand.
+    pub fetched_image_filename: Option<String>,
+    /// Which source `fetched_image_filename` came from (`"fanart"` or
+    /// `"wikidata"`) — surfaced in the UI so a Wikidata fallback image (often
+    /// lower quality/relevance than a curated fanart.tv pick) can be labeled
+    /// as such.
+    pub fetched_image_source: Option<String>,
 }
 
 /// An external platform or web link associated with an album release (#950).

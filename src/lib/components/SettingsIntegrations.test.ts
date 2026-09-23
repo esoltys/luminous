@@ -38,6 +38,9 @@ vi.mock("@tauri-apps/api/core", () => ({
     if (cmd === "get_picard_path") {
       return Promise.resolve(null);
     }
+    if (cmd === "has_fanart_env_key") {
+      return Promise.resolve(false);
+    }
     return Promise.resolve(null);
   }),
 }));
@@ -51,13 +54,44 @@ describe("SettingsIntegrations.svelte", () => {
     vi.clearAllMocks();
   });
 
-  it("renders all integration cards: Online Data Sources, ListenBrainz, Discord, and Picard", async () => {
+  it("renders all integration cards: Online Data Sources, ListenBrainz, Discord, Picard, and fanart.tv", async () => {
     const { findByText, findByRole } = render(SettingsIntegrations);
 
     expect(await findByText("Online Data Sources")).toBeInTheDocument();
     expect(await findByText("ListenBrainz Scrobbler")).toBeInTheDocument();
     expect(await findByRole("heading", { name: "Discord Rich Presence" })).toBeInTheDocument();
     expect(await findByRole("heading", { name: "MusicBrainz Picard" })).toBeInTheDocument();
+    expect(await findByRole("heading", { name: "fanart.tv Integration" })).toBeInTheDocument();
+  });
+
+  it("shows the fanart.tv env key badge only when has_fanart_env_key is true", async () => {
+    const core = await import("@tauri-apps/api/core");
+    vi.mocked(core.invoke).mockImplementation((cmd: string) => {
+      if (cmd === "has_fanart_env_key") return Promise.resolve(true);
+      if (cmd === "get_scrobbler_settings") {
+        return Promise.resolve({
+          listenbrainz_enabled: false,
+          listenbrainz_token: "",
+          listenbrainz_username: null,
+          scrobble_now_playing: true,
+          scrobble_ratings: true,
+          scrobble_paused: false,
+          min_duration_secs: 30,
+          discord_enabled: false,
+          discord_client_id: "1548913001715990610",
+          discord_show_album: true,
+          discord_show_time: true,
+        });
+      }
+      if (cmd === "get_scrobble_cache_status") {
+        return Promise.resolve({ pending_count: 0, last_error: null, last_attempt: null });
+      }
+      if (cmd === "get_all_app_settings") return Promise.resolve({});
+      return Promise.resolve(null);
+    });
+
+    const { findByText } = render(SettingsIntegrations);
+    expect(await findByText(/found in the FANART_API_KEY environment variable/)).toBeInTheDocument();
   });
 
   it("toggles Discord Rich Presence and shows sub-options when enabled", async () => {
