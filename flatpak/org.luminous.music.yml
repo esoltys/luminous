@@ -24,11 +24,20 @@ finish-args:
   - --filesystem=xdg-music
   - --talk-name=org.freedesktop.portal.FileChooser
   - --talk-name=org.freedesktop.portal.Notification
+  # MPRIS2 media-key/session integration (src-tauri/src/media_session/linux.rs)
+  # registers its own well-known name on the session bus.
+  - --socket=session-bus
+  - --own-name=org.mpris.MediaPlayer2.luminous
 
 build-options:
-  append-path: /usr/lib/sdk/rust-stable/bin:/usr/lib/sdk/node20/bin
+  append-path: /usr/lib/sdk/rust-stable/bin:/usr/lib/sdk/node20/bin:/var/tmp/bun/bin
 
 modules:
+  # System tray icon (tray-icon crate) dlopens libayatana-appindicator3 or
+  # libappindicator3 at runtime, neither of which the GNOME runtime ships.
+  # This builds the latter (same soname the crate falls back to) from
+  # upstream Flathub's shared-modules definitions.
+  - shared-modules/libappindicator/libappindicator-gtk3-12.10.json
   - name: luminous
     buildsystem: simple
     # This repo is self-hosted (not submitted to Flathub, which is the party that
@@ -40,15 +49,27 @@ modules:
       build-args:
         - --share=network
     build-commands:
+      # The node20 SDK extension provides Node.js/npm, not Bun — install it
+      # directly since this repo uses bun.lock (see the network-access note above).
+      - curl -fsSL https://bun.sh/install | BUN_INSTALL=/var/tmp/bun bash
       - bun install --frozen-lockfile
-      - bun run tauri build --bundles none
-      - install -Dm755 src-tauri/target/release/LuminousMusicPlayer
+      - bun run tauri build --no-bundle
+      # This repo is a Cargo workspace (src-tauri is a member), so cargo/tauri
+      # write build output to the workspace-root target/, not src-tauri/target/
+      # (see docs/TROUBLESHOOTING.md).
+      - install -Dm755 target/release/LuminousMusicPlayer
         /app/bin/LuminousMusicPlayer
       - install -Dm644 flatpak/org.luminous.music.desktop
         /app/share/applications/org.luminous.music.desktop
       - install -Dm644 src-tauri/metainfo/org.luminous.music.metainfo.xml
         /app/share/metainfo/org.luminous.music.metainfo.xml
+      - mkdir -p /app/share/icons
       - cp -r src-tauri/icons/hicolor /app/share/icons/hicolor
+      # AppStream requires the app icon be named after the component id;
+      # icons/hicolor names it after mainBinaryName instead (shared with the
+      # deb/rpm packaging, which doesn't care) — add an id-named copy alongside.
+      - for f in /app/share/icons/hicolor/*/apps/LuminousMusicPlayer.png; do
+        cp "$f" "$(dirname "$f")/org.luminous.music.png"; done
     sources:
       - type: dir
         path: ..

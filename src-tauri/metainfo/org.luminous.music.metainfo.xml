@@ -11,7 +11,9 @@
       subscriptions, no cloud. Just your files, indexed, searchable, and beautifully played.
     </p>
   </description>
-  <developer_name>Eric James Soltys</developer_name>
+  <developer id="dev.esoltys">
+    <name>Eric James Soltys</name>
+  </developer>
   <launchable type="desktop-id">org.luminous.music.desktop</launchable>
   <screenshots>
     <screenshot type="default">
