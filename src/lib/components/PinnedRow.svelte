@@ -45,6 +45,10 @@
         return i18n.t("playlists.autoMostPlayed");
       case "history":
         return i18n.t("playlists.autoHistory");
+      case "daypart": {
+        const pl = playlistsStore.playlists.find((p) => p.id === ap.playlistId);
+        return pl ? getPlaylistDisplayName(pl) : i18n.t("playlists.daypartAutoPlaylist");
+      }
       default: {
         const pl = playlistsStore.playlists.find((p) => p.id === ap.playlistId);
         return pl ? getPlaylistDisplayName(pl) : (ap.genre ?? ap.decade ?? ap.bpm ?? ap.artistTag ?? ap.kind);

@@ -243,6 +243,36 @@ class NavigationStore {
     this.recordHistory();
   }
 
+  /**
+   * Reconciles restored or current navigation state against loaded collection
+   * and playlist data, dropping stale targets (e.g. an album, artist, or playlist
+   * restored from localStorage that does not exist in the current collection).
+   */
+  reconcile() {
+    if (collectionStore.statsLoaded && !collectionStore.isScanning) {
+      if (this._selectedAlbumName !== null) {
+        const albumExists = collectionStore.albums.some((a) => a.album === this._selectedAlbumName);
+        if (!albumExists) {
+          this.selectedAlbumName = null;
+        }
+      }
+      if (this._selectedArtistName !== null) {
+        const artistExists = collectionStore.artists.some(
+          (a) => a.name?.toLowerCase() === this._selectedArtistName?.toLowerCase()
+        );
+        if (!artistExists) {
+          this.selectedArtistName = null;
+        }
+      }
+    }
+    if (playlistsStore.playlists.length > 0 && this._selectedPlaylistId !== null) {
+      const playlistExists = playlistsStore.playlists.some((p) => p.id === this._selectedPlaylistId);
+      if (!playlistExists) {
+        this.selectedPlaylistId = null;
+      }
+    }
+  }
+
   /** Opens a genre/tag's auto-playlist detail view (#548) — every Genres-tab
    * card/chip click and every "browse this genre" entry point elsewhere in
    * the app (e.g. a GenreChips chip on a song row) route through here.

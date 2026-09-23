@@ -248,8 +248,9 @@ fn parse_auto_playlist_ref(ref_key: &str) -> (&str, Option<&str>) {
 /// selector value rather than `Playlist.id` — the row can be dropped and
 /// recreated by a sync, but the selector (a genre name, decade, etc.) is what
 /// the user actually pinned. Returns `None` (not an error) when the kind is
-/// unknown or the auto-playlist currently has no songs — mirrors
-/// `resolve_song`'s silent-drop-on-stale-pin behavior.
+/// unknown or an empty optional category (most_played/history/genre/decade/etc.)
+/// has no songs. Default pins (favourites and daypart) always resolve so new
+/// installs and empty collections show their pinned defaults.
 pub fn resolve_auto_playlist(
     scanner: &CollectionScanner,
     playlists: &[Playlist],
@@ -271,7 +272,7 @@ pub fn resolve_auto_playlist(
     let item = match kind {
         "favourites" => {
             let count = scanner.get_favourite_songs()?.len() as i32;
-            (count > 0).then(|| virtual_item(kind, count))
+            Some(virtual_item(kind, count))
         }
         "recently_added" => {
             let count = scanner.get_recently_added_songs(50)?.len() as i32;
@@ -336,7 +337,6 @@ pub fn resolve_auto_playlist(
                 .iter()
                 .find(|p| {
                     p.dynamic_enabled
-                        && p.track_count > 0
                         && p.dynamic_spec
                             .as_deref()
                             .is_some_and(|s| s.starts_with("daypart:"))
@@ -351,6 +351,7 @@ pub fn resolve_auto_playlist(
                     updated: Some(p.updated),
                     track_count: p.track_count,
                 })
+                .or_else(|| Some(virtual_item(kind, 0)))
         }
         "genre" | "decade" | "bpm" | "artist_tag" => {
             let selector = selector.unwrap_or("").to_string();
@@ -644,20 +645,48 @@ mod tests {
     }
 
     #[test]
-    fn resolve_auto_playlist_virtual_kind_drops_when_empty() {
+    fn resolve_auto_playlist_virtual_kind_drops_when_empty_except_defaults() {
         let (db, dir) = test_db();
         let scanner = CollectionScanner::new(std::sync::Arc::new(db));
 
-        // No songs at all in the library — favourites/most_played/history all resolve to None.
-        assert!(resolve_auto_playlist(&scanner, &[], "favourites")
+        // No songs at all in the library:
+        // favourites and daypart (pinned defaults) resolve with track_count 0 so new installs show them.
+        let fav = resolve_auto_playlist(&scanner, &[], "favourites")
             .unwrap()
-            .is_none());
+            .expect("favourites resolves even when empty");
+        assert_eq!(fav.kind, "favourites");
+        assert_eq!(fav.track_count, 0);
+
+        let daypart = resolve_auto_playlist(&scanner, &[], "daypart")
+            .unwrap()
+            .expect("daypart resolves even without backing playlist");
+        assert_eq!(daypart.kind, "daypart");
+        assert_eq!(daypart.track_count, 0);
+        assert_eq!(daypart.playlist_id, None);
+
+        // Optional virtual kinds drop when empty.
         assert!(resolve_auto_playlist(&scanner, &[], "most_played")
             .unwrap()
             .is_none());
         assert!(resolve_auto_playlist(&scanner, &[], "history")
             .unwrap()
             .is_none());
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn resolve_auto_playlist_daypart_uses_backing_playlist_if_present() {
+        let (db, dir) = test_db();
+        let scanner = CollectionScanner::new(std::sync::Arc::new(db));
+        let playlists = vec![test_playlist(42, "daypart:afternoon:2026-09-23", 5)];
+
+        let daypart = resolve_auto_playlist(&scanner, &playlists, "daypart")
+            .unwrap()
+            .expect("daypart should resolve against backing row");
+        assert_eq!(daypart.kind, "daypart");
+        assert_eq!(daypart.playlist_id, Some(42));
+        assert_eq!(daypart.track_count, 5);
 
         let _ = std::fs::remove_dir_all(dir);
     }

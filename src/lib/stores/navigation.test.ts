@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { Song } from "../types";
+import type { Song, AlbumItem, ArtistItem, Playlist } from "../types";
 
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: vi.fn(() => ({
@@ -12,6 +12,7 @@ vi.mock("@tauri-apps/api/window", () => ({
 
 import { collectionStore } from "./collection.svelte";
 import { navigationStore } from "./navigation.svelte";
+import { playlistsStore } from "./playlists.svelte";
 
 describe("CollectionStore - artist/album navigation and history", () => {
   beforeEach(() => {
@@ -118,5 +119,31 @@ describe("CollectionStore - artist/album navigation and history", () => {
 
     navigationStore.goBack();
     expect(navigationStore.selectedArtistName).toBe("Artist A");
+  });
+
+  it("reconciles and clears stale album, artist, or playlist selections not present in data", () => {
+    collectionStore.statsLoaded = true;
+    collectionStore.isScanning = false;
+    collectionStore.albums = [{ album: "Existing Album" } as AlbumItem];
+    collectionStore.artists = [{ name: "Existing Artist" } as ArtistItem];
+    playlistsStore.playlists = [{ id: 10, name: "Existing Playlist" } as Playlist];
+
+    // Targets that exist are preserved
+    navigationStore.selectedAlbumName = "Existing Album";
+    navigationStore.selectedArtistName = "Existing Artist";
+    navigationStore.selectedPlaylistId = 10;
+    navigationStore.reconcile();
+    expect(navigationStore.selectedAlbumName).toBe("Existing Album");
+    expect(navigationStore.selectedArtistName).toBe("Existing Artist");
+    expect(navigationStore.selectedPlaylistId).toBe(10);
+
+    // Stale targets that do not exist are cleared (self-healed)
+    navigationStore.selectedAlbumName = "Nonexistent Album";
+    navigationStore.selectedArtistName = "Nonexistent Artist";
+    navigationStore.selectedPlaylistId = 999;
+    navigationStore.reconcile();
+    expect(navigationStore.selectedAlbumName).toBeNull();
+    expect(navigationStore.selectedArtistName).toBeNull();
+    expect(navigationStore.selectedPlaylistId).toBeNull();
   });
 });
