@@ -2185,43 +2185,45 @@ mod tests {
         )
         .unwrap();
 
-        let (sort_name, artist_type, gender, begin_date, end_date, ended, begin_area, area): (
-            Option<String>,
-            Option<String>,
-            Option<String>,
-            Option<String>,
-            Option<String>,
-            Option<i64>,
-            Option<String>,
-            Option<String>,
-        ) = conn
+        struct Row {
+            sort_name: Option<String>,
+            artist_type: Option<String>,
+            gender: Option<String>,
+            begin_date: Option<String>,
+            end_date: Option<String>,
+            ended: Option<i64>,
+            begin_area: Option<String>,
+            area: Option<String>,
+        }
+
+        let row: Row = conn
             .query_row(
                 "SELECT sort_name, artist_type, gender, begin_date, end_date, ended, begin_area_name, area_name
                  FROM artist_context_enrichment WHERE artist_id = 'artist-bowie'",
                 [],
                 |r| {
-                    Ok((
-                        r.get(0)?,
-                        r.get(1)?,
-                        r.get(2)?,
-                        r.get(3)?,
-                        r.get(4)?,
-                        r.get(5)?,
-                        r.get(6)?,
-                        r.get(7)?,
-                    ))
+                    Ok(Row {
+                        sort_name: r.get(0)?,
+                        artist_type: r.get(1)?,
+                        gender: r.get(2)?,
+                        begin_date: r.get(3)?,
+                        end_date: r.get(4)?,
+                        ended: r.get(5)?,
+                        begin_area: r.get(6)?,
+                        area: r.get(7)?,
+                    })
                 },
             )
             .unwrap();
 
-        assert_eq!(sort_name.as_deref(), Some("Bowie, David"));
-        assert_eq!(artist_type.as_deref(), Some("Person"));
-        assert_eq!(gender.as_deref(), Some("male"));
-        assert_eq!(begin_date.as_deref(), Some("1947-01-08"));
-        assert_eq!(end_date.as_deref(), Some("2016-01-10"));
-        assert_eq!(ended, Some(1));
-        assert_eq!(begin_area.as_deref(), Some("Brixton"));
-        assert_eq!(area.as_deref(), Some("United Kingdom"));
+        assert_eq!(row.sort_name.as_deref(), Some("Bowie, David"));
+        assert_eq!(row.artist_type.as_deref(), Some("Person"));
+        assert_eq!(row.gender.as_deref(), Some("male"));
+        assert_eq!(row.begin_date.as_deref(), Some("1947-01-08"));
+        assert_eq!(row.end_date.as_deref(), Some("2016-01-10"));
+        assert_eq!(row.ended, Some(1));
+        assert_eq!(row.begin_area.as_deref(), Some("Brixton"));
+        assert_eq!(row.area.as_deref(), Some("United Kingdom"));
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
