@@ -12,7 +12,6 @@
   import { playerStore } from '../lib/stores/player.svelte';
   import CoverArt from '../lib/components/CoverArt.svelte';
   import Miniplayer from '../lib/components/Miniplayer.svelte';
-  import QualityBadge from '../lib/components/QualityBadge.svelte';
   import KeyboardShortcutsModal from '../lib/components/KeyboardShortcutsModal.svelte';
   import Toast from '../lib/components/Toast.svelte';
   import WalkthroughOverlay from '../lib/components/WalkthroughOverlay.svelte';
@@ -571,12 +570,9 @@
               <!-- Song Details Info: hidden below md, where it would stack
                    under the cover art instead of sitting beside it. -->
               <div class="hidden md:flex flex-col text-center md:text-left w-full max-w-md">
-                <div class="flex items-center gap-2">
-                  <span class="px-3 py-1 text-xs font-semibold uppercase tracking-wider bg-brand-accent/15 text-brand-accent-text border border-brand-border rounded-full select-none">
-                    {i18n.t('playerBar.nowPlaying')}
-                  </span>
-                  <QualityBadge />
-                </div>
+                <span class="self-start px-3 py-1 text-xs font-semibold uppercase tracking-wider bg-brand-accent/15 text-brand-accent-text border border-brand-border rounded-full select-none">
+                  {i18n.t('playerBar.nowPlaying')}
+                </span>
                 <h1 class="mt-3 text-4xl md:text-6xl font-black text-brand-text-primary leading-[0.95] tracking-tight select-text text-balance">
                   {playerStore.currentSong.title || i18n.t('collection.unknownSong')}
                 </h1>
