@@ -438,6 +438,7 @@ export const fr = {
     fanartEnvKeyFound: "Une clé API a été trouvée dans la variable d'environnement {env}.",
     fanartPlaceholder: "Collez votre clé API personnelle fanart.tv",
     fanartGetKeyLink: "Obtenir votre clé API",
+    fanartValidateBtn: "Valider et enregistrer",
     pruneCompleteMsg: "{count} chanson(s) manquante(s) nettoyée(s)",
     pruneCompleteMsgWithFolders: "{count} chanson(s) manquante(s) nettoyée(s), {folders} dossier(s) vide(s) supprimé(s)",
     pruneCompleteMsgWithDuplicates: "{count} chanson(s) manquante(s) nettoyée(s), {duplicates} doublon(s) fusionné(s)",

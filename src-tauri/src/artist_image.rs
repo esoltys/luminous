@@ -90,6 +90,36 @@ pub async fn fetch_fanart_artist_image_url(
     Ok(best_fanart_image(parsed.artistthumb))
 }
 
+/// MBID of an artist near-certain to have fanart.tv images, used purely to
+/// exercise an API key against a real endpoint — its images are discarded.
+const KEY_VALIDATION_PROBE_ARTIST_MBID: &str = "5b11f4ce-a62d-471e-81fc-a69a8278c7da"; // Nirvana
+
+/// Classifies a fanart.tv response status for key validation purposes: any
+/// success — even a miss (`404`) on the probe artist — proves the key was
+/// accepted, while a `401`/`403` gets a plain "invalid key" message rather
+/// than a raw HTTP status. Pure so it's unit-testable without a live request.
+fn classify_validation_status(status: reqwest::StatusCode) -> Result<()> {
+    match status {
+        s if s.is_success() || s == reqwest::StatusCode::NOT_FOUND => Ok(()),
+        reqwest::StatusCode::UNAUTHORIZED | reqwest::StatusCode::FORBIDDEN => {
+            Err(anyhow!("Invalid fanart.tv API key"))
+        }
+        s => Err(anyhow!("fanart.tv validation failed: HTTP {s}")),
+    }
+}
+
+/// Validates a fanart.tv API key for the Settings UI's "Validate & Save"
+/// button — same gate the ListenBrainz token field uses.
+pub async fn validate_fanart_api_key(client: &Client, api_key: &str) -> Result<()> {
+    let url = format!(
+        "https://webservice.fanart.tv/v3/music/{}?api_key={}",
+        KEY_VALIDATION_PROBE_ARTIST_MBID,
+        percent_encoding::utf8_percent_encode(api_key, percent_encoding::NON_ALPHANUMERIC)
+    );
+    let response = client.get(&url).send().await?;
+    classify_validation_status(response.status())
+}
+
 /// Wikidata `P18` fallback — reuses the same MBID -> Wikidata QID chain
 /// `ContextManager::fetch_wikipedia_bio_for_artist` uses to resolve an
 /// artist's bio, but stopping at the QID's image claim instead of its
@@ -207,5 +237,39 @@ mod tests {
     fn test_artist_image_source_as_str() {
         assert_eq!(ArtistImageSource::Fanart.as_str(), "fanart");
         assert_eq!(ArtistImageSource::Wikidata.as_str(), "wikidata");
+    }
+
+    #[test]
+    fn test_classify_validation_status_accepts_success_and_not_found() {
+        assert!(classify_validation_status(reqwest::StatusCode::OK).is_ok());
+        // A miss on the probe artist still proves the key itself was accepted.
+        assert!(classify_validation_status(reqwest::StatusCode::NOT_FOUND).is_ok());
+    }
+
+    #[test]
+    fn test_classify_validation_status_rejects_unauthorized_and_forbidden() {
+        let unauthorized = classify_validation_status(reqwest::StatusCode::UNAUTHORIZED);
+        assert!(unauthorized.is_err());
+        assert_eq!(
+            unauthorized.unwrap_err().to_string(),
+            "Invalid fanart.tv API key"
+        );
+
+        let forbidden = classify_validation_status(reqwest::StatusCode::FORBIDDEN);
+        assert!(forbidden.is_err());
+        assert_eq!(
+            forbidden.unwrap_err().to_string(),
+            "Invalid fanart.tv API key"
+        );
+    }
+
+    #[test]
+    fn test_classify_validation_status_surfaces_other_errors_as_http_status() {
+        let result = classify_validation_status(reqwest::StatusCode::INTERNAL_SERVER_ERROR);
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "fanart.tv validation failed: HTTP 500 Internal Server Error"
+        );
     }
 }

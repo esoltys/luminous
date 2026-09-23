@@ -22,16 +22,33 @@
     ArrowUpRightIcon as ArrowUpRight,
     HeartIcon as Heart,
     BookOpenIcon as Globe,
-    DiscordLogoIcon as DiscordLogo,
-    ImageIcon as ImageIntegration
+    DiscordLogoIcon as DiscordLogo
   } from "phosphor-svelte";
 
   let showListenBrainzToken = $state(false);
   let showFanartKey = $state(false);
   let hasFanartEnvKey = $state(false);
+  let fanartKeyInput = $state("");
+  let isValidatingFanartKey = $state(false);
+  let fanartValidationError = $state<string | null>(null);
   let picardCustomPath = $state("");
   let isRecheckingPicard = $state(false);
   let contextEnrichmentEnabled = $state(true);
+
+  async function handleValidateFanartKey() {
+    const key = fanartKeyInput.trim();
+    if (!key || isValidatingFanartKey) return;
+    isValidatingFanartKey = true;
+    fanartValidationError = null;
+    try {
+      await invoke("validate_fanart_api_key", { apiKey: key });
+      prefs.setFanartApiKey(key);
+    } catch (err) {
+      fanartValidationError = typeof err === "string" ? err : "Failed to validate API key";
+    } finally {
+      isValidatingFanartKey = false;
+    }
+  }
 
   async function handleContextEnrichmentToggle(v: boolean) {
     contextEnrichmentEnabled = v;
@@ -78,6 +95,7 @@
     } catch (e) {
       console.error("Failed to check fanart.tv env key on mount:", e);
     }
+    fanartKeyInput = prefs.fanartApiKey;
   });
 </script>
 
@@ -320,6 +338,76 @@
   {/if}
 </div>
 
+<!-- MusicBrainz Picard Card -->
+<div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
+  <div class="pb-3 flex justify-between items-center">
+    <div class="flex items-center gap-3">
+      <img src="/picard-icon.png" alt="Picard" class="w-9 h-9 shrink-0 object-contain" />
+      <div class="space-y-1 min-w-0">
+        <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('picard.integrationTitle')}</h3>
+        <p class="text-xs text-brand-text-secondary leading-relaxed">
+          <button onclick={() => openExternalUrl("https://picard.musicbrainz.org")} class="text-brand-accent hover:underline">MusicBrainz Picard</button>
+          {i18n.t('picard.integrationDesc')}
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="flex items-center justify-between gap-4 py-1">
+    <div class="flex flex-col gap-0.5 min-w-0">
+      <span class="text-sm font-medium text-brand-text-primary">{i18n.t('picard.missingPlaylistLabel')}</span>
+      <p class="text-xs text-brand-text-secondary">{i18n.t('picard.missingPlaylistHint')}</p>
+    </div>
+    <Toggle
+      checked={picardStore.missingPlaylistEnabled}
+      onchange={(v) => picardStore.setMissingPlaylistEnabled(v)}
+      label={i18n.t('picard.missingPlaylistLabel')}
+    />
+  </div>
+
+  <div class="flex flex-col gap-1.5">
+    <label for="picard-custom-path-input" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
+      {i18n.t('picard.customPathLabel')}
+    </label>
+    <div class="flex items-center gap-2">
+      <div class="max-w-md flex-1">
+        <Input
+          id="picard-custom-path-input"
+          type="text"
+          bind:value={picardCustomPath}
+          onchange={handlePicardCustomPathChange}
+          placeholder={i18n.t(isWindows ? 'picard.customPathPlaceholder' : 'picard.customPathPlaceholderLinux')}
+          class="w-full"
+        />
+      </div>
+      <Button onclick={handleBrowsePicardPath} variant="secondary" size="sm">
+        <FolderOpen class="w-4 h-4" />
+        {i18n.t('picard.browseBtn')}
+      </Button>
+    </div>
+
+    <div class="flex items-center gap-2 text-xs font-medium pt-1">
+      {#if picardStore.available}
+        <Check class="w-3.5 h-3.5 text-brand-accent-text shrink-0" />
+        <span class="text-brand-accent-text truncate" title={picardStore.path ?? undefined}>
+          {i18n.t('picard.foundAt', { path: picardStore.path ?? '' })}
+        </span>
+      {:else}
+        <AlertTriangle class="w-3.5 h-3.5 text-amber-500 shrink-0" />
+        <span class="text-brand-text-secondary">{i18n.t('picard.notFound')}</span>
+      {/if}
+      <button
+        onclick={handleRecheckPicard}
+        disabled={isRecheckingPicard}
+        class="ml-1 text-brand-text-secondary hover:text-brand-accent-text transition-colors disabled:opacity-50"
+        title={i18n.t('picard.recheckTooltip')}
+      >
+        <RefreshCw class="w-3.5 h-3.5 {isRecheckingPicard ? 'animate-spin' : ''}" />
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- Discord Rich Presence Card -->
 <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
   <div class="pb-3 flex justify-between items-center border-b border-brand-border/60">
@@ -415,83 +503,11 @@
   {/if}
 </div>
 
-<!-- MusicBrainz Picard Card -->
-<div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
-  <div class="pb-3 flex justify-between items-center">
-    <div class="flex items-center gap-3">
-      <img src="/picard-icon.png" alt="Picard" class="w-9 h-9 shrink-0 object-contain" />
-      <div class="space-y-1 min-w-0">
-        <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('picard.integrationTitle')}</h3>
-        <p class="text-xs text-brand-text-secondary leading-relaxed">
-          <button onclick={() => openExternalUrl("https://picard.musicbrainz.org")} class="text-brand-accent hover:underline">MusicBrainz Picard</button>
-          {i18n.t('picard.integrationDesc')}
-        </p>
-      </div>
-    </div>
-  </div>
-
-  <div class="flex items-center justify-between gap-4 py-1">
-    <div class="flex flex-col gap-0.5 min-w-0">
-      <span class="text-sm font-medium text-brand-text-primary">{i18n.t('picard.missingPlaylistLabel')}</span>
-      <p class="text-xs text-brand-text-secondary">{i18n.t('picard.missingPlaylistHint')}</p>
-    </div>
-    <Toggle
-      checked={picardStore.missingPlaylistEnabled}
-      onchange={(v) => picardStore.setMissingPlaylistEnabled(v)}
-      label={i18n.t('picard.missingPlaylistLabel')}
-    />
-  </div>
-
-  <div class="flex items-center gap-2 text-xs font-medium">
-    {#if picardStore.available}
-      <Check class="w-3.5 h-3.5 text-brand-accent-text shrink-0" />
-      <span class="text-brand-accent-text truncate" title={picardStore.path ?? undefined}>
-        {i18n.t('picard.foundAt', { path: picardStore.path ?? '' })}
-      </span>
-    {:else}
-      <AlertTriangle class="w-3.5 h-3.5 text-amber-500 shrink-0" />
-      <span class="text-brand-text-secondary">{i18n.t('picard.notFound')}</span>
-    {/if}
-    <button
-      onclick={handleRecheckPicard}
-      disabled={isRecheckingPicard}
-      class="ml-1 text-brand-text-secondary hover:text-brand-accent-text transition-colors disabled:opacity-50"
-      title={i18n.t('picard.recheckTooltip')}
-    >
-      <RefreshCw class="w-3.5 h-3.5 {isRecheckingPicard ? 'animate-spin' : ''}" />
-    </button>
-  </div>
-
-  <div class="flex flex-col gap-1.5">
-    <label for="picard-custom-path-input" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
-      {i18n.t('picard.customPathLabel')}
-    </label>
-    <div class="flex items-center gap-2">
-      <div class="max-w-md flex-1">
-        <Input
-          id="picard-custom-path-input"
-          type="text"
-          bind:value={picardCustomPath}
-          onchange={handlePicardCustomPathChange}
-          placeholder={i18n.t(isWindows ? 'picard.customPathPlaceholder' : 'picard.customPathPlaceholderLinux')}
-          class="w-full"
-        />
-      </div>
-      <Button onclick={handleBrowsePicardPath} variant="secondary" size="sm">
-        <FolderOpen class="w-4 h-4" />
-        {i18n.t('picard.browseBtn')}
-      </Button>
-    </div>
-  </div>
-</div>
-
 <!-- fanart.tv Integration Card -->
 <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
   <div class="pb-3 flex justify-between items-center">
     <div class="flex items-center gap-3">
-      <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
-        <ImageIntegration class="w-5 h-5" />
-      </div>
+      <img src="/fanart-icon.svg" alt="fanart.tv" class="w-9 h-9 shrink-0 object-contain" />
       <div class="space-y-1 min-w-0">
         <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('settings.fanartIntegration')}</h3>
         <p class="text-xs text-brand-text-secondary leading-relaxed">
@@ -523,13 +539,13 @@
       </div>
     {/if}
 
-    <div class="flex items-center gap-3 max-w-md">
-      <div class="relative flex-1">
+    <div class="flex items-center gap-2">
+      <div class="relative flex-1 max-w-md">
         <Input
           id="fanart-key-input"
           type={showFanartKey ? "text" : "password"}
-          bind:value={prefs.fanartApiKey}
-          onchange={() => prefs.setFanartApiKey(prefs.fanartApiKey)}
+          bind:value={fanartKeyInput}
+          oninput={() => { fanartValidationError = null; }}
           placeholder={i18n.t('settings.fanartPlaceholder')}
           class="w-full pr-10"
         />
@@ -546,6 +562,27 @@
           {/if}
         </button>
       </div>
+
+      <Button
+        onclick={handleValidateFanartKey}
+        disabled={isValidatingFanartKey || !fanartKeyInput?.trim()}
+        variant="secondary"
+        size="sm"
+      >
+        {#if isValidatingFanartKey}
+          <LoaderCircle class="w-4 h-4 animate-spin" />
+        {:else}
+          <Check class="w-4 h-4" />
+        {/if}
+        {i18n.t('settings.fanartValidateBtn')}
+      </Button>
     </div>
+
+    {#if fanartValidationError}
+      <div class="flex items-start gap-2 text-xs text-amber-500 pt-1">
+        <AlertTriangle class="w-3.5 h-3.5 shrink-0 translate-y-[calc((1lh-0.875rem)/2)]" />
+        <span>{fanartValidationError}</span>
+      </div>
+    {/if}
   </div>
 </div>

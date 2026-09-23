@@ -439,6 +439,7 @@ export const en = {
     fanartEnvKeyFound: "An API key was found in the {env} environment variable.",
     fanartPlaceholder: "Paste your fanart.tv Personal API Key",
     fanartGetKeyLink: "Get your API key",
+    fanartValidateBtn: "Validate & Save",
     pruneCompleteMsg: "Cleaned up {count} missing song(s)",
     pruneCompleteMsgWithFolders: "Cleaned up {count} missing song(s) and removed {folders} empty folder(s)",
     pruneCompleteMsgWithDuplicates: "Cleaned up {count} missing song(s) and merged {duplicates} duplicate(s)",

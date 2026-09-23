@@ -1233,6 +1233,7 @@ pub fn run() {
             commands::collection::retrieve_artist_details,
             commands::collection::retrieve_artist_image,
             commands::collection::has_fanart_env_key,
+            commands::collection::validate_fanart_api_key,
             commands::collection::get_artist_tags_overview,
             commands::collection::set_songs_not_included,
             commands::collection::get_songs_missing_musicbrainz_id,

@@ -1196,6 +1196,17 @@ pub async fn has_fanart_env_key() -> Result<bool, String> {
     Ok(std::env::var("FANART_API_KEY").is_ok())
 }
 
+/// Settings > Integrations' fanart.tv "Validate & Save" button — mirrors the
+/// ListenBrainz token field's validate-before-persist flow. The key is only
+/// saved into `UiPreferences` by the frontend after this succeeds.
+#[tauri::command]
+pub async fn validate_fanart_api_key(api_key: String) -> Result<(), String> {
+    let client = crate::artist_image::new_http_client().map_err(|e| e.to_string())?;
+    crate::artist_image::validate_fanart_api_key(&client, &api_key)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 #[derive(Serialize, Clone, Debug, Default)]
 pub struct ArtistImageRetrievalResult {
     /// `luminous-art://` URI for the fetched (and now cached) image, or
