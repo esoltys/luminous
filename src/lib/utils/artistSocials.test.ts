@@ -49,9 +49,27 @@ describe("artistSocials", () => {
 
   it("formats display labels cleanly", () => {
     expect(formatDisplayLabel("website", "https://www.shaniatwain.com")).toBe("shaniatwain.com");
-    expect(formatDisplayLabel("website", "https://shaniatwain.com/tour")).toBe("shaniatwain.com/tour");
+    expect(formatDisplayLabel("website", "https://shaniatwain.com/tour")).toBe("shaniatwain.com");
     expect(formatDisplayLabel("instagram", "@shaniatwain")).toBe("Instagram");
     expect(formatDisplayLabel("youtube", "@ShaniaTwain")).toBe("YouTube");
+    expect(formatDisplayLabel("discogs", "https://discogs.com/release/12345")).toBe("Discogs");
+    expect(formatDisplayLabel("allmusic", "https://allmusic.com/album/mw0001")).toBe("AllMusic");
+    expect(formatDisplayLabel("wikidata", "https://wikidata.org/wiki/Q11649")).toBe("Wikidata");
+  });
+
+  it("shows only the domain for URLs from unrecognized or generic platforms (#1133)", () => {
+    expect(
+      formatDisplayLabel("other_databases", "https://rateyourmusic.com/release/album/dorothy/28-days-in-the-valley/")
+    ).toBe("rateyourmusic.com");
+    expect(
+      formatDisplayLabel("lyrics", "https://genius.com/albums/Dorothy/28-days-in-the-valley")
+    ).toBe("genius.com");
+    expect(
+      formatDisplayLabel("custom", "https://pitchfork.com/reviews/albums/dorothy-28-days-in-the-valley/")
+    ).toBe("pitchfork.com");
+    expect(
+      formatDisplayLabel("unrecognized_site", "https://subdomain.example.org/path/to/page?query=1#hash")
+    ).toBe("subdomain.example.org");
   });
 
   it("labels a web.archive.org website link as 'Internet Archive' instead of its unreadable path (#1123)", () => {
@@ -73,12 +91,15 @@ describe("artistSocials", () => {
       ).toBe("internet_archive");
     });
 
-    it("does the same for 'lyrics' and 'other_databases'", () => {
+    it("does the same for 'lyrics', 'other_databases', and 'custom'", () => {
       expect(normalizeWebsitePlatform("lyrics", "https://web.archive.org/web/2020/https://genius.com/x")).toBe(
         "internet_archive"
       );
       expect(
         normalizeWebsitePlatform("other_databases", "https://web.archive.org/web/2020/https://rateyourmusic.com/x")
+      ).toBe("internet_archive");
+      expect(
+        normalizeWebsitePlatform("custom", "https://web.archive.org/web/2020/https://pitchfork.com/x")
       ).toBe("internet_archive");
     });
 

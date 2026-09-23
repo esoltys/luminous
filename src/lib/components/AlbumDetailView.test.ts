@@ -216,5 +216,54 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     await fireEvent.click(picardItem);
     expect(invoke).toHaveBeenCalledWith("open_in_picard", { songIds: [1, 2] });
   });
+
+  it("scopes Album Info card to group/overview, buttons to group/link, and shows domain-only for unrecognized sites (#1133)", async () => {
+    collectionStore.albumProfiles = {
+      "abbey road": {
+        album_key: "abbey road",
+        artist_key: "the beatles",
+        description: "Classic album",
+        website: "https://thebeatles.com",
+        links: [
+          {
+            platform: "other_databases",
+            handle_or_url: "https://rateyourmusic.com/release/album/the-beatles/abbey-road/",
+          },
+          {
+            platform: "allmusic",
+            handle_or_url: "https://www.allmusic.com/album/mw0000192938",
+          },
+        ],
+      },
+    };
+
+    const { getByText, container } = render(AlbumDetailView, {
+      props: { albumName: mockAlbumName },
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // Album Info card should exist and use group/overview rather than un-namespaced group
+    const details = container.querySelector("details");
+    expect(details).not.toBeNull();
+    expect(details?.classList.contains("group/overview")).toBe(true);
+    expect(details?.classList.contains("group")).toBe(false);
+
+    // Unrecognized / other_databases link must show only domain name
+    expect(getByText("rateyourmusic.com")).toBeInTheDocument();
+    // Branded platform link shows its label
+    expect(getByText("AllMusic")).toBeInTheDocument();
+
+    // Release link buttons should use group/link scoping
+    const rymButton = getByText("rateyourmusic.com").closest("button")!;
+    expect(rymButton.classList.contains("group/link")).toBe(true);
+    expect(rymButton.classList.contains("group")).toBe(false);
+
+    // External link icon should have group-hover/link:opacity-100
+    const extIcon = rymButton.querySelector("svg.opacity-0");
+    expect(extIcon?.classList.contains("group-hover/link:opacity-100")).toBe(true);
+    expect(extIcon?.classList.contains("group-hover:opacity-100")).toBe(false);
+  });
 });
+
 

@@ -705,7 +705,7 @@
       <details
         open
         ontoggle={(e) => windowLayoutStore.setOverviewExpanded(e.currentTarget.open)}
-        class="group border border-brand-border rounded-xl bg-brand-sidebar/95 backdrop-blur-xl overflow-hidden shadow-md transition-all @container"
+        class="group/overview border border-brand-border rounded-xl bg-brand-sidebar/95 backdrop-blur-xl overflow-hidden shadow-md transition-all @container"
       >
         <summary class="flex items-center justify-between px-4 py-2.5 sm:px-5 sm:py-3 text-xs font-semibold text-brand-text-secondary cursor-pointer select-none hover:text-brand-text-primary transition-colors">
           <span>{i18n.t('albumDetail.albumInfo', {}, 'Album Info')}</span>
@@ -738,16 +738,16 @@
                     type="button"
                     onclick={() => handleOpenUrl(item.url)}
                     title={item.url}
-                    class="flex items-center gap-2.5 sm:gap-3 group text-left transition-colors cursor-pointer min-w-0"
+                    class="flex items-center gap-2.5 sm:gap-3 group/link text-left transition-colors cursor-pointer min-w-0"
                   >
-                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-brand-main/60 {item.isOfficial ? 'border-[3px]' : 'border'} border-brand-border flex items-center justify-center text-brand-text-secondary group-hover:text-brand-accent group-hover:border-brand-accent/40 transition-colors shrink-0 shadow-2xs">
+                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-brand-main/60 {item.isOfficial ? 'border-[3px]' : 'border'} border-brand-border flex items-center justify-center text-brand-text-secondary group-hover/link:text-brand-accent group-hover/link:border-brand-accent/40 transition-colors shrink-0 shadow-2xs">
                       <SocialIcon platform={item.platform} size={14} />
                     </div>
                     <div class="flex items-center gap-1 min-w-0 flex-1">
                       <span class="text-xs font-medium text-brand-text-primary truncate transition-colors">
                         {item.label}
                       </span>
-                      <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                      <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover/link:opacity-100 transition-opacity shrink-0" />
                     </div>
                   </button>
                 {/each}

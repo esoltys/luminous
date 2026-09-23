@@ -210,8 +210,34 @@ export function resolveSocialUrl(platformId: string, input: string): string {
   }
 }
 
+const KNOWN_FIXED_PLATFORMS = new Set([
+  "bandcamp",
+  "soundcloud",
+  "spotify",
+  "apple_music",
+  "apple",
+  "youtube",
+  "instagram",
+  "x",
+  "twitter",
+  "facebook",
+  "bluesky",
+  "threads",
+  "tiktok",
+  "musicbrainz",
+  "discogs",
+  "wikipedia",
+  "allmusic",
+  "wikidata",
+  "imdb",
+  "listenbrainz",
+]);
+
 /**
  * Formats a clean human-readable label to display for a link in the UI.
+ * URLs from unrecognized sites or generic platforms ("website", "lyrics",
+ * "other_databases", "custom") display only their domain rather than the
+ * full URL path (#1133).
  */
 export function formatDisplayLabel(platformId: string, input: string): string {
   const trimmed = (input || "").trim();
@@ -219,25 +245,29 @@ export function formatDisplayLabel(platformId: string, input: string): string {
 
   const info = getPlatformInfo(platformId);
 
-  // "website", "lyrics" and "other_databases" cover many different sites
-  // rather than one fixed destination — unlike a single-site platform (e.g.
-  // "discogs"), a generic label would render several near-identical link
-  // buttons when there's more than one (MusicBrainz's release-group
-  // relations can have multiple "lyrics"/"other databases" entries), so
-  // show the source hostname instead so they're distinguishable.
-  if (platformId === "website" || platformId === "lyrics" || platformId === "other_databases" || platformId === "internet_archive") {
-    // Show clean hostname or short path without http/https
+  if (platformId === "internet_archive") {
+    return "Internet Archive";
+  }
+
+  // "website", "lyrics", "other_databases", "custom", and any unrecognized
+  // platforms cover many different sites rather than one fixed destination —
+  // show only the domain so buttons remain compact and distinguishable.
+  if (!KNOWN_FIXED_PLATFORMS.has(platformId)) {
     try {
       const url = resolveSocialUrl(platformId, trimmed);
       const parsed = new URL(url);
-      const hostname = parsed.hostname.replace(/^www\./, "");
+      const hostname = parsed.hostname.replace(/^www\./i, "");
       // web.archive.org's own path is a timestamp plus the entire archived
-      // URL (e.g. "/web/19970131155102/http://www.vmg.co.uk/..."), which is
-      // unreadable as a label — name it plainly instead (#1123).
+      // URL, which is unreadable as a label — name it plainly (#1123).
       if (hostname === "web.archive.org") return "Internet Archive";
-      return hostname + (parsed.pathname !== "/" ? parsed.pathname : "");
+      if (hostname) return hostname;
     } catch {
-      return trimmed.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "");
+      const fallback = trimmed
+        .replace(/^https?:\/\//i, "")
+        .replace(/^www\./i, "")
+        .split(/[/?#]/)[0]
+        .trim();
+      if (fallback) return fallback;
     }
   }
 
@@ -245,7 +275,7 @@ export function formatDisplayLabel(platformId: string, input: string): string {
 }
 
 /**
- * Swaps a website-like platform id ("website", "lyrics", "other_databases")
+ * Swaps a website-like platform id ("website", "lyrics", "other_databases", "custom")
  * for "internet_archive" when the resolved URL is actually a
  * web.archive.org snapshot, so it renders with the Internet Archive icon
  * instead of a generic globe (#1123) — MusicBrainz's "official homepage"
@@ -253,11 +283,16 @@ export function formatDisplayLabel(platformId: string, input: string): string {
  * gone offline. Any other platform id (or URL) is returned unchanged.
  */
 export function normalizeWebsitePlatform(platformId: string, url: string): string {
-  if (platformId !== "website" && platformId !== "lyrics" && platformId !== "other_databases") {
+  if (
+    platformId !== "website" &&
+    platformId !== "lyrics" &&
+    platformId !== "other_databases" &&
+    platformId !== "custom"
+  ) {
     return platformId;
   }
   try {
-    const hostname = new URL(url).hostname.replace(/^www\./, "");
+    const hostname = new URL(url).hostname.replace(/^www\./i, "");
     if (hostname === "web.archive.org") return "internet_archive";
   } catch {
     // Not a parseable absolute URL — fall through unchanged.
