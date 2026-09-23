@@ -32,6 +32,22 @@ pub enum SongSource {
     WebDav = 11,
 }
 
+impl SongSource {
+    pub const LOCAL_FILE_ID: i32 = Self::LocalFile as i32;
+    pub const COLLECTION_ID: i32 = Self::Collection as i32;
+    pub const WEBDAV_ID: i32 = Self::WebDav as i32;
+
+    /// True if this source represents a local file on disk (LocalFile or Collection).
+    pub fn is_local(&self) -> bool {
+        matches!(self, Self::LocalFile | Self::Collection)
+    }
+
+    /// True if this source represents a remote WebDAV item.
+    pub fn is_webdav(&self) -> bool {
+        matches!(self, Self::WebDav)
+    }
+}
+
 impl fmt::Display for SongSource {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self)
