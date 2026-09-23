@@ -33,29 +33,29 @@ Requires `flatpak` and `flatpak-builder`, plus the GNOME runtime/SDK and the Rus
 
 ```bash
 flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-flatpak install flathub org.gnome.Platform//47 org.gnome.Sdk//47 \
+flatpak install flathub org.gnome.Platform//50 org.gnome.Sdk//50 \
   org.freedesktop.Sdk.Extension.rust-stable org.freedesktop.Sdk.Extension.node20
 ```
 
-Generate the offline dependency sources (regenerate whenever `Cargo.lock` or `bun.lock` change —
-see `flatpak/generate-sources.sh`), then build:
-
 ```bash
-./flatpak/generate-sources.sh
 flatpak-builder --repo=/tmp/luminous-repo --force-clean /tmp/luminous-build flatpak/org.luminous.music.yml
 flatpak build-bundle /tmp/luminous-repo LuminousMusicPlayer.flatpak org.luminous.music
 flatpak install --bundle LuminousMusicPlayer.flatpak
 ```
 
-### JS offline sources caveat
+### Why the build module has network access
 
-`flatpak/generate-sources.sh` uses `flatpak-node-generator` from upstream
-[`flatpak-builder-tools`](https://github.com/flatpak/flatpak-builder-tools) to turn `bun.lock` into
-an offline source list. Bun lockfile support in that generator is newer than its npm/yarn/pnpm
-support — if it fails or produces an incomplete `node-sources.json`, fall back to vendoring
-`node_modules/` directly: run `bun install` with network access, `tar` the resulting `node_modules/`,
-and add it to `flatpak/org.luminous.music.yml` as a `type: archive`/`type: dir` source instead of
-`node-sources.json`, installed into the build tree before `bun run tauri build`.
+Flathub is the party that enforces network-isolated builds (for reproducibility/supply-chain
+review during submission). This repo is self-hosted, not submitted to Flathub, so
+`flatpak/org.luminous.music.yml`'s `luminous` module is granted `--share=network` directly and
+just runs `bun install`/`bun run tauri build` normally — no `cargo-sources.json`/`node-sources.json`
+generation step. This was a deliberate simplification: `flatpak-node-generator` (the standard tool
+for turning a JS lockfile into offline Flatpak sources) only supports npm/yarn/pnpm lockfiles, not
+Bun's `bun.lock`, so the offline route would have needed vendoring `node_modules/` as a pre-fetched
+archive source instead — more moving parts for no benefit outside a Flathub submission. If Luminous
+ever does go through Flathub, this module will need to be reworked back to offline sources (Cargo's
+via `flatpak-cargo-generator`, which works fine against `Cargo.lock`; JS via a vendored
+`node_modules/` archive, since the generator still won't support Bun).
 
 ## Sandbox notes
 
