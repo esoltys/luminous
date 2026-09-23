@@ -1066,6 +1066,11 @@ export const fr = {
     retrieveImageSuccessFanart: "Image de l'artiste récupérée depuis fanart.tv",
     retrieveImageSuccessWikidata: "Image de l'artiste récupérée depuis Wikidata",
     retrieveImageNoResults: "Aucune image d'artiste trouvée",
+    retrievingDetails: "Récupération des détails de l'artiste...",
+    retrievingBio: "Récupération du résumé de l'artiste...",
+    retrievingImage: "Récupération de l'image de l'artiste...",
+    retrievingArtistTask: "Récupération des informations de l'artiste",
+    enrichmentComplete: "Informations de l'artiste récupérées",
     pinHome: "Épingler à l'accueil",
     unpinHome: "Détacher de l'accueil",
     artistInfo: "Infos artiste",
@@ -1168,7 +1173,10 @@ export const fr = {
     retrieveDetailsSuccessOne: "1 lien ajouté depuis MusicBrainz",
     retrieveDetailsSuccessMany: "{count} liens ajoutés depuis MusicBrainz",
     retrieveDetailsNoResults: "Aucun détail supplémentaire trouvé sur MusicBrainz",
-    retrieveDetailsError: "Échec de la récupération des détails de l'album"
+    retrieveDetailsError: "Échec de la récupération des détails de l'album",
+    retrievingDetails: "Récupération des détails de l'album...",
+    retrievingAlbumTask: "Récupération des informations de l'album",
+    enrichmentComplete: "Détails de l'album récupérés"
   },
   immersive: {
     emptyStateText: "Sélectionnez une chanson de votre collection pour commencer la lecture."

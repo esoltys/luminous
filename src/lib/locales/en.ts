@@ -1024,6 +1024,11 @@ export const en = {
     retrieveImageSuccessFanart: "Artist image retrieved from fanart.tv",
     retrieveImageSuccessWikidata: "Artist image retrieved from Wikidata",
     retrieveImageNoResults: "No artist image found",
+    retrievingDetails: "Retrieving artist details...",
+    retrievingBio: "Retrieving artist summary...",
+    retrievingImage: "Retrieving artist image...",
+    retrievingArtistTask: "Retrieving artist information",
+    enrichmentComplete: "Artist information retrieved",
     pinHome: "Pin to Home",
     unpinHome: "Unpin from Home",
     artistInfo: "Artist Info",
@@ -1127,6 +1132,9 @@ export const en = {
     retrieveDetailsSuccessMany: "Added {count} links from MusicBrainz",
     retrieveDetailsNoResults: "No additional details found on MusicBrainz",
     retrieveDetailsError: "Failed to retrieve album details",
+    retrievingDetails: "Retrieving album details...",
+    retrievingAlbumTask: "Retrieving album information",
+    enrichmentComplete: "Album details retrieved",
   },
   immersive: {
     emptyStateText: "Select a song from your collection to start playing."

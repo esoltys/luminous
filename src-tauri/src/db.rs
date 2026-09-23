@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 42;
+pub const CURRENT_SCHEMA_VERSION: i32 = 43;
 
 struct Migration {
     version: i32,
@@ -348,6 +348,21 @@ const MIGRATIONS: &[Migration] = &[
                 .exists([])?;
             if !has_sort_name {
                 conn.execute_batch(MIGRATION_42)?;
+            }
+            Ok(())
+        },
+    },
+    Migration {
+        version: 43,
+        description: "details_fetched and image_fetched on artist_profiles, details_fetched on album_profiles (#1143)",
+        apply: |conn| {
+            let has_details_fetched: bool = conn
+                .prepare(
+                    "SELECT 1 FROM pragma_table_info('artist_profiles') WHERE name = 'details_fetched'",
+                )?
+                .exists([])?;
+            if !has_details_fetched {
+                conn.execute_batch(MIGRATION_43)?;
             }
             Ok(())
         },
@@ -1473,6 +1488,16 @@ ALTER TABLE artist_context_enrichment ADD COLUMN area_name TEXT;
 ALTER TABLE artist_context_enrichment ADD COLUMN area_mbid TEXT;
 ";
 
+// ---------------------------------------------------------------------------
+// Migration 43: details_fetched and image_fetched on artist_profiles,
+// details_fetched on album_profiles (#1143).
+// ---------------------------------------------------------------------------
+const MIGRATION_43: &str = "
+ALTER TABLE artist_profiles ADD COLUMN details_fetched INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE artist_profiles ADD COLUMN image_fetched INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE album_profiles ADD COLUMN details_fetched INTEGER NOT NULL DEFAULT 0;
+";
+
 fn seed_artist_tag_hierarchy(conn: &rusqlite::Connection) -> Result<()> {
     let mut stmt = conn.prepare(
         "SELECT DISTINCT json_each.value
@@ -2224,6 +2249,53 @@ mod tests {
         assert_eq!(row.ended, Some(1));
         assert_eq!(row.begin_area.as_deref(), Some("Brixton"));
         assert_eq!(row.area.as_deref(), Some("United Kingdom"));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_migration_43_adds_auto_fetch_flags() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_migration43_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Database::new(temp_dir.clone()).unwrap();
+        assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
+
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO artist_profiles (artist_key, details_fetched, image_fetched) VALUES (?1, 1, 1)",
+            params!["Radiohead"],
+        )
+        .unwrap();
+
+        let (details_fetched, image_fetched): (bool, bool) = conn
+            .query_row(
+                "SELECT details_fetched, image_fetched FROM artist_profiles WHERE artist_key = 'Radiohead'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert!(details_fetched);
+        assert!(image_fetched);
+
+        conn.execute(
+            "INSERT INTO album_profiles (album_key, details_fetched) VALUES (?1, 1)",
+            params!["OK Computer"],
+        )
+        .unwrap();
+
+        let album_details_fetched: bool = conn
+            .query_row(
+                "SELECT details_fetched FROM album_profiles WHERE album_key = 'OK Computer'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert!(album_details_fetched);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

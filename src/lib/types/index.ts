@@ -493,6 +493,10 @@ export interface ArtistProfile {
   fetched_image_filename?: string | null;
   /** `"fanart"` or `"wikidata"` — which source `fetched_image_filename` came from. */
   fetched_image_source?: string | null;
+  /** Whether artist details/links have already been automatically fetched (#1143). */
+  details_fetched?: boolean;
+  /** Whether artist image has already been automatically fetched or attempted (#1143). */
+  image_fetched?: boolean;
 }
 
 export interface ArtistImageRetrievalResult {
@@ -511,6 +515,8 @@ export interface AlbumProfile {
   description?: string | null;
   website?: string | null;
   links: AlbumLink[];
+  /** Whether album details/links have already been automatically fetched (#1143). */
+  details_fetched?: boolean;
 }
 
 export interface AlbumDetailsRetrievalResult {

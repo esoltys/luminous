@@ -17,6 +17,7 @@
   import AlbumContextMenu from "./AlbumContextMenu.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
   import { tagsStore } from "../stores/tags.svelte";
+  import { tasksStore } from "../stores/tasks.svelte";
   import TagEditor from "./TagEditor.svelte";
   import IconActionButton from "./IconActionButton.svelte";
   import HorizontalScrollRow from "./HorizontalScrollRow.svelte";
@@ -336,41 +337,113 @@
     }
   }
 
+  let retrievingAll = $state(false);
+
+  // Multi-step artist enrichment (#1143): fetches MusicBrainz links,
+  // Wikipedia summary, and artist image sequentially, showing progress
+  // in a single unified task notification instead of multiple stacked toasts.
+  async function handleRetrieveArtistAll() {
+    if (retrievingAll || !hasMusicbrainzArtistId) return;
+    retrievingAll = true;
+    const taskId = `artist-enrichment-${artistName.toLowerCase()}`;
+    const taskName = i18n.t("artistDetail.retrievingArtistTask", {}, "Retrieving artist information");
+    tasksStore.startTask({
+      id: taskId,
+      label: i18n.t("artistDetail.retrievingDetails", {}, "Retrieving artist details..."),
+      taskName,
+      total: 3,
+    });
+
+    try {
+      // Step 1: MusicBrainz relations & links
+      await collectionStore.retrieveArtistDetails(artistName).catch((e) => {
+        console.warn("Failed to retrieve artist details:", e);
+      });
+
+      // Step 2: Wikipedia summary & context
+      tasksStore.updateTask(taskId, {
+        current: 1,
+        label: i18n.t("artistDetail.retrievingBio", {}, "Retrieving artist summary..."),
+      });
+      const songWithMb = songs.find((s) => s.musicbrainz_artist_id || s.musicbrainz_album_artist_id);
+      const contextSongId = songWithMb?.id ?? songs[0]?.id;
+      if (contextSongId) {
+        try {
+          const context = await invoke<SongContextEnrichment>("get_song_context", {
+            songId: contextSongId,
+            forceRefresh: true,
+          });
+          if (context) contextData = context;
+        } catch (e) {
+          console.warn("Failed to retrieve artist context:", e);
+        }
+      }
+
+      // Step 3: Artist portrait image
+      tasksStore.updateTask(taskId, {
+        current: 2,
+        label: i18n.t("artistDetail.retrievingImage", {}, "Retrieving artist image..."),
+      });
+      await collectionStore.retrieveArtistImage(artistName).catch((e) => {
+        console.warn("Failed to retrieve artist image:", e);
+      });
+
+      tasksStore.completeTask(
+        taskId,
+        i18n.t("artistDetail.enrichmentComplete", {}, "Artist information retrieved")
+      );
+    } catch (err) {
+      console.error("Failed to retrieve artist data:", err);
+      tasksStore.failTask(taskId, String(err));
+    } finally {
+      retrievingAll = false;
+    }
+  }
+
+  let lastAutoFetchedArtist = $state<string | null>(null);
+  $effect(() => {
+    const currentArtist = artistName;
+    if (!currentArtist || songs.length === 0) return;
+    if (lastAutoFetchedArtist === currentArtist) return;
+
+    const profile = artistProfile;
+    if (profile?.details_fetched && profile?.image_fetched) {
+      lastAutoFetchedArtist = currentArtist;
+      return;
+    }
+    if (!hasMusicbrainzArtistId) return;
+
+    lastAutoFetchedArtist = currentArtist;
+    collectionStore.isContextEnrichmentEnabled().then((enabled) => {
+      if (enabled && !retrievingAll && !tasksStore.isTaskActive(`artist-enrichment-${currentArtist.toLowerCase()}`)) {
+        handleRetrieveArtistAll();
+      }
+    });
+  });
+
   // The artist detail overflow menu's "Retrieve Artist Details" (#1123) —
   // the artist-level equivalent of AlbumDetailView's handleRetrieveAlbumDetails.
   async function handleRetrieveArtistDetails() {
     if (retrievingDetails || !hasMusicbrainzArtistId) return;
     retrievingDetails = true;
+    const taskId = `artist-details-${artistName.toLowerCase()}`;
+    tasksStore.startTask({
+      id: taskId,
+      label: i18n.t("artistDetail.retrievingDetails", {}, "Retrieving artist details..."),
+      taskName: i18n.t("artistDetail.retrieveArtistDetails", {}, "Retrieve Artist Details"),
+      total: 1,
+    });
     try {
       const result = await collectionStore.retrieveArtistDetails(artistName);
-      if (result.added_count === 1) {
-        toastStore.show(
-          i18n.t("artistDetail.retrieveDetailsSuccessOne", {}, "Added 1 link from MusicBrainz")
-        );
-      } else if (result.added_count > 1) {
-        toastStore.show(
-          i18n.t(
-            "artistDetail.retrieveDetailsSuccessMany",
-            { count: result.added_count },
-            `Added ${result.added_count} links from MusicBrainz`
-          )
-        );
-      } else {
-        toastStore.show(
-          i18n.t(
-            "artistDetail.retrieveDetailsNoResults",
-            {},
-            "No additional details found on MusicBrainz"
-          )
-        );
-      }
+      const label = result.added_count === 1
+        ? i18n.t("artistDetail.retrieveDetailsSuccessOne", {}, "Added 1 link from MusicBrainz")
+        : result.added_count > 1
+          ? i18n.t("artistDetail.retrieveDetailsSuccessMany", { count: result.added_count }, `Added ${result.added_count} links from MusicBrainz`)
+          : i18n.t("artistDetail.retrieveDetailsNoResults", {}, "No additional details found on MusicBrainz");
+      tasksStore.completeTask(taskId, label);
     } catch (err) {
       console.error("Failed to retrieve artist details:", err);
-      // Surfaces the backend's actual error text (e.g. a MusicBrainz API
-      // failure reason) rather than a generic message — same convention as
-      // `openInPicard` — so a real failure is actionable instead of just
-      // "something went wrong".
-      toastStore.show(String(err), "error");
+      tasksStore.failTask(taskId, String(err));
     } finally {
       retrievingDetails = false;
     }
@@ -378,25 +451,28 @@
 
   // Artist detail overflow menu's "Retrieve Artist Image" (#1127) — fetches a
   // portrait from fanart.tv (if a key is configured) or, lacking one, the
-  // Wikidata fallback, only ever filling the gap when no *local* portrait
-  // exists (see `artistPortraitUrl`'s fallback ordering).
+  // Wikidata fallback.
   async function handleRetrieveArtistImage() {
     if (retrievingImage || !hasMusicbrainzArtistId) return;
     retrievingImage = true;
+    const taskId = `artist-image-${artistName.toLowerCase()}`;
+    tasksStore.startTask({
+      id: taskId,
+      label: i18n.t("artistDetail.retrievingImage", {}, "Retrieving artist image..."),
+      taskName: i18n.t("artistDetail.retrieveArtistImage", {}, "Retrieve Artist Image"),
+      total: 1,
+    });
     try {
       const result = await collectionStore.retrieveArtistImage(artistName);
-      if (result.uri) {
-        toastStore.show(
-          result.source === "fanart"
+      const label = result.uri
+        ? (result.source === "fanart"
             ? i18n.t("artistDetail.retrieveImageSuccessFanart", {}, "Artist image retrieved from fanart.tv")
-            : i18n.t("artistDetail.retrieveImageSuccessWikidata", {}, "Artist image retrieved from Wikidata")
-        );
-      } else {
-        toastStore.show(i18n.t("artistDetail.retrieveImageNoResults", {}, "No artist image found"));
-      }
+            : i18n.t("artistDetail.retrieveImageSuccessWikidata", {}, "Artist image retrieved from Wikidata"))
+        : i18n.t("artistDetail.retrieveImageNoResults", {}, "No artist image found");
+      tasksStore.completeTask(taskId, label);
     } catch (err) {
       console.error("Failed to retrieve artist image:", err);
-      toastStore.show(String(err), "error");
+      tasksStore.failTask(taskId, String(err));
     } finally {
       retrievingImage = false;
     }

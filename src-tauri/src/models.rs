@@ -1176,6 +1176,12 @@ pub struct ArtistProfile {
     /// lower quality/relevance than a curated fanart.tv pick) can be labeled
     /// as such.
     pub fetched_image_source: Option<String>,
+    /// Whether artist details/links have already been automatically fetched (#1143).
+    #[serde(default)]
+    pub details_fetched: bool,
+    /// Whether artist image has already been automatically fetched or attempted (#1143).
+    #[serde(default)]
+    pub image_fetched: bool,
 }
 
 /// An external platform or web link associated with an album release (#950).
@@ -1203,6 +1209,9 @@ pub struct AlbumProfile {
     pub description: Option<String>,
     pub website: Option<String>,
     pub links: Vec<AlbumLink>,
+    /// Whether album details/links have already been automatically fetched (#1143).
+    #[serde(default)]
+    pub details_fetched: bool,
 }
 
 /// A Luminous-native song tag (#224), independent of the embedded

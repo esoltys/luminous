@@ -60,7 +60,7 @@ fn now_unix() -> i64 {
 /// Reads `context_enrichment_enabled` from the generic `app_state` KV table
 /// (same mechanism as `set_app_setting`/other toggles). Defaults to enabled
 /// — absent means "never explicitly turned off".
-fn context_enrichment_enabled(conn: &rusqlite::Connection) -> bool {
+pub fn context_enrichment_enabled(conn: &rusqlite::Connection) -> bool {
     let stored: Option<String> = conn
         .query_row(
             "SELECT value FROM app_state WHERE key = 'context_enrichment_enabled'",
@@ -69,6 +69,13 @@ fn context_enrichment_enabled(conn: &rusqlite::Connection) -> bool {
         )
         .ok();
     stored.map(|v| v != "false").unwrap_or(true)
+}
+
+#[tauri::command]
+pub async fn is_context_enrichment_enabled(state: State<'_, AppState>) -> Result<bool, String> {
+    crate::db::run_blocking(&state.db, |conn| Ok(context_enrichment_enabled(conn)))
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Resolves the MusicBrainz artist ID `get_song_context` uses to drive the

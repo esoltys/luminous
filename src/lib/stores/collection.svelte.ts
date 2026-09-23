@@ -753,21 +753,28 @@ class CollectionStore {
     const result = await invoke<ArtistImageRetrievalResult>("retrieve_artist_image", {
       artist: artistName,
     });
-    if (result?.uri) {
-      const key = artistName.toLowerCase();
-      const existing = this.artistProfiles[key];
-      if (existing) {
-        this.artistProfiles = {
-          ...this.artistProfiles,
-          [key]: {
-            ...existing,
-            fetched_image_filename: result.uri.replace("luminous-art://", ""),
-            fetched_image_source: result.source,
-          },
-        };
-      }
+    const key = artistName.toLowerCase();
+    const existing = this.artistProfiles[key];
+    if (existing) {
+      this.artistProfiles = {
+        ...this.artistProfiles,
+        [key]: {
+          ...existing,
+          fetched_image_filename: result?.uri ? result.uri.replace("luminous-art://", "") : existing.fetched_image_filename,
+          fetched_image_source: result?.source ?? existing.fetched_image_source,
+          image_fetched: true,
+        },
+      };
     }
     return result;
+  }
+
+  async isContextEnrichmentEnabled(): Promise<boolean> {
+    try {
+      return await invoke<boolean>("is_context_enrichment_enabled");
+    } catch {
+      return true;
+    }
   }
 
   async loadAlbumProfiles() {
