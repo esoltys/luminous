@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Luminous Music Player
+GenericName=Music Player
+Comment=A high-performance home for the music you already own
+Exec=LuminousMusicPlayer %U
+Icon=org.luminous.music
+Terminal=false
+Categories=AudioVideo;Audio;Player;
+MimeType=audio/mpeg;audio/flac;audio/ogg;audio/mp4;audio/aac;audio/vnd.wave;audio/x-aiff;audio/x-wavpack;audio/x-musepack;audio/x-ape;audio/x-tta;audio/x-dsf;audio/x-dff;application/vnd.ms-asf;audio/x-ms-wma;audio/x-m4b;audio/x-mpegurl;application/vnd.apple.mpegurl;audio/x-scpls;application/xspf+xml;
+StartupWMClass=org.luminous.music

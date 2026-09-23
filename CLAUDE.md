@@ -20,7 +20,11 @@ A release is only complete when **all three** of the following hold. Never repor
 1. The release GitHub Actions workflow is green.
 2. The pushed tag matches the version in `package.json`/`Cargo.toml`.
 3. The GitHub release has the expected artifacts attached (including a `.msix`/`.msixbundle` for
-   Store submission).
+   Store submission and a `.flatpak` bundle).
+4. The `.flatpak` bundle is attached to the release AND the shared OSTree repo at
+   `esoltys.dev/flatpak/` has been updated with the new ref (see
+   [docs/FLATPAK.md](docs/FLATPAK.md)) — unless the shared-repo secrets aren't bootstrapped yet,
+   in which case the publish step skips by design and this item doesn't block the release.
 
 ## CI Monitoring
 - Use `gh run watch <run-id> --exit-status` to monitor a run instead of polling with repeated `gh run list`/API calls. Only fall back to scheduled re-checks for waits expected to exceed 15 minutes.
