@@ -3,6 +3,7 @@
 For manual/dev-time testing guidance (re-testing onboarding flows, the Windows e2e smoke test, `inspect-app.ts`), see [docs/TESTING.md](TESTING.md).
 
 - **Tauri dev won't start**: ensure the git hook is installed (`bun run install:git-hooks`), check the Rust toolchain (`cargo --version`), or clear the Tauri cache (`rm -rf src-tauri/target`).
+- **`Failed to unregister class Chrome_WidgetWin_0. Error = 1411` in dev server console**: this is a benign diagnostic log from Chromium's window cleanup code (`ui\gfx\win\window_impl.cc`) via the embedded Microsoft Edge WebView2 runtime. It appears during window teardown, app shutdown, or dev server restarts when Chromium calls `UnregisterClass` on a window class already unregistered or released by the OS (Win32 error `1411` = `ERROR_CLASS_DOES_NOT_EXIST`). It is harmless, causes no memory leaks or instability, and can be safely ignored.
 - **Frontend type errors after a dependency update**: run `bun run check`. Svelte 5 Runes don't need destructuring (`$`-prefixed variables are already reactive).
 - **Audio playback crackling/stuttering**: verify no allocations happen in the `audio.rs` playback loop; profile with `cargo flamegraph` if CPU-bound.
 - **Tests fail in CI but pass locally**: Vitest in CI uses jsdom (not a browser) — confirm jsdom-compatible selectors; for Rust, check for platform-specific code (especially file paths).
