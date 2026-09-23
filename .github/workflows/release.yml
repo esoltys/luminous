@@ -196,17 +196,20 @@ jobs:
           # flathub ...`, which needs the remote to exist system-wide.
           sudo flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 
-      # TODO(#1086): pin to a commit SHA (matching this file's other `uses:`
-      # pins) once verified against the real tag - not done here, no network
-      # access in this session to confirm the current release SHA.
+      # Same commands verified locally against this manifest. Not using
+      # flatpak/flatpak-github-actions: it runs `flatpak --system install` as
+      # the unprivileged runner user (polkit denies it) and assumes its own
+      # container image.
       - name: Build Flatpak bundle
-        uses: flatpak/flatpak-github-actions/flatpak-builder@v6.3
-        with:
-          bundle: LuminousMusicPlayer.flatpak
-          manifest-path: flatpak/org.luminous.music.yml
-          cache-key: flatpak-builder-${{ github.sha }}
-          repository-name: flathub
-          repository-url: https://flathub.org/repo/flathub.flatpakrepo
+        run: |
+          set -euo pipefail
+          sudo flatpak install -y --noninteractive flathub \
+            org.gnome.Platform//50 org.gnome.Sdk//50 \
+            org.freedesktop.Sdk.Extension.rust-stable//25.08 \
+            org.freedesktop.Sdk.Extension.node20//25.08
+          flatpak-builder --disable-rofiles-fuse --repo=repo --force-clean \
+            --default-branch=master flatpak_app flatpak/org.luminous.music.yml
+          flatpak build-bundle repo LuminousMusicPlayer.flatpak org.luminous.music master
 
       - name: Upload Flatpak bundle to Release Assets
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
