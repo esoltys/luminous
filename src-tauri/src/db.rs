@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 41;
+pub const CURRENT_SCHEMA_VERSION: i32 = 42;
 
 struct Migration {
     version: i32,
@@ -2136,6 +2136,92 @@ mod tests {
             .unwrap();
         assert_eq!(filename.as_deref(), Some("artist-abc123.jpg"));
         assert_eq!(source.as_deref(), Some("fanart"));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_migration_42_adds_artist_context_enrichment_columns() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_migration42_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Database::new(temp_dir.clone()).unwrap();
+        assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
+
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO artist_context_enrichment (
+                artist_id,
+                sort_name,
+                artist_type,
+                gender,
+                begin_date,
+                end_date,
+                ended,
+                begin_area_name,
+                begin_area_mbid,
+                area_name,
+                area_mbid,
+                fetched_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+            params![
+                "artist-bowie",
+                "Bowie, David",
+                "Person",
+                "male",
+                "1947-01-08",
+                "2016-01-10",
+                1,
+                "Brixton",
+                "d9e80e14-d07f-4ca6-b8db-60cb1c07cb81",
+                "United Kingdom",
+                "8a754a16-0027-4a29-b6d7-2b40ea0481ed",
+                1000
+            ],
+        )
+        .unwrap();
+
+        let (sort_name, artist_type, gender, begin_date, end_date, ended, begin_area, area): (
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<i64>,
+            Option<String>,
+            Option<String>,
+        ) = conn
+            .query_row(
+                "SELECT sort_name, artist_type, gender, begin_date, end_date, ended, begin_area_name, area_name
+                 FROM artist_context_enrichment WHERE artist_id = 'artist-bowie'",
+                [],
+                |r| {
+                    Ok((
+                        r.get(0)?,
+                        r.get(1)?,
+                        r.get(2)?,
+                        r.get(3)?,
+                        r.get(4)?,
+                        r.get(5)?,
+                        r.get(6)?,
+                        r.get(7)?,
+                    ))
+                },
+            )
+            .unwrap();
+
+        assert_eq!(sort_name.as_deref(), Some("Bowie, David"));
+        assert_eq!(artist_type.as_deref(), Some("Person"));
+        assert_eq!(gender.as_deref(), Some("male"));
+        assert_eq!(begin_date.as_deref(), Some("1947-01-08"));
+        assert_eq!(end_date.as_deref(), Some("2016-01-10"));
+        assert_eq!(ended, Some(1));
+        assert_eq!(begin_area.as_deref(), Some("Brixton"));
+        assert_eq!(area.as_deref(), Some("United Kingdom"));
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
