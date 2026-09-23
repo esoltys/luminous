@@ -1,7 +1,7 @@
 id: org.luminous.music
 runtime: org.gnome.Platform
-runtime-version: '47'
-sdk: org.freedesktop.Sdk
+runtime-version: '50'
+sdk: org.gnome.Sdk
 sdk-extensions:
   - org.freedesktop.Sdk.Extension.rust-stable
   - org.freedesktop.Sdk.Extension.node20
