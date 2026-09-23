@@ -430,7 +430,7 @@
                 {i18n.t('discord.statusNotRunning')}
               </span>
             {:else}
-              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-brand-surface text-brand-text-secondary">
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-brand-border/40 text-brand-text-secondary">
                 {i18n.t('discord.statusDisconnected')}
               </span>
             {/if}
@@ -495,7 +495,7 @@
           <span class="text-xs font-medium text-brand-text-primary">{i18n.t('discord.applicationIdLabel')}</span>
           <p class="text-xs text-brand-text-secondary">{i18n.t('discord.applicationIdHint')}</p>
         </div>
-        <span class="text-xs bg-brand-surface px-2.5 py-1 rounded-md border border-brand-border text-brand-text-secondary select-all">
+        <span class="text-xs bg-brand-main px-2.5 py-1 rounded-md border border-brand-border text-brand-text-secondary select-all">
           {DEFAULT_DISCORD_CLIENT_ID}
         </span>
       </div>
