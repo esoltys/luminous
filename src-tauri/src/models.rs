@@ -1261,6 +1261,27 @@ pub struct TagGroup {
 mod tests {
     use super::*;
 
+    /// Guards the wire format the frontend's `SongSource` TS union depends
+    /// on (`src/lib/types/index.ts`) — `#[serde(rename_all = "snake_case")]`
+    /// turns `WebDav` into `"web_dav"`, not `"webdav"` (#1131 follow-up: a
+    /// frontend/backend literal mismatch here silently broke every
+    /// `source === "webdav"` check).
+    #[test]
+    fn test_song_source_serializes_to_snake_case() {
+        assert_eq!(
+            serde_json::to_string(&SongSource::WebDav).unwrap(),
+            "\"web_dav\""
+        );
+        assert_eq!(
+            serde_json::to_string(&SongSource::LocalFile).unwrap(),
+            "\"local_file\""
+        );
+        assert_eq!(
+            serde_json::to_string(&SongSource::SomaFm).unwrap(),
+            "\"soma_fm\""
+        );
+    }
+
     #[test]
     fn test_parse_multi_value_splits_trims_and_dedupes() {
         assert_eq!(

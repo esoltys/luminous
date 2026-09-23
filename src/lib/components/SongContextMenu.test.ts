@@ -26,7 +26,7 @@ describe("SongContextMenu.svelte", () => {
   };
 
   const localSong: Song = { ...baseSong, id: 1, source: "local_file" };
-  const webdavSong: Song = { ...baseSong, id: 2, source: "webdav" };
+  const webdavSong: Song = { ...baseSong, id: 2, source: "web_dav" };
 
   beforeEach(() => {
     picardStore.path = "/usr/bin/picard";

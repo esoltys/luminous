@@ -1008,10 +1008,10 @@
       icon={OpenInPicard}
       label={i18n.t("picard.openAllInPicard")}
       onclick={() => { handleOpenAllInPicard(); overflowMenuPos = null; }}
-      disabled={loading || songs.length === 0 || !picardStore.available || songs.every((s) => s.source === "webdav")}
+      disabled={loading || songs.length === 0 || !picardStore.available || songs.every((s) => s.source === "web_dav")}
       title={!picardStore.available
         ? i18n.t("picard.notFoundTooltip")
-        : songs.length > 0 && songs.every((s) => s.source === "webdav")
+        : songs.length > 0 && songs.every((s) => s.source === "web_dav")
           ? i18n.t("picard.webdavNotSupportedTooltip")
           : undefined}
     />

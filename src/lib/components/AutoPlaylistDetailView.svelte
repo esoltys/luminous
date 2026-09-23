@@ -938,10 +938,10 @@
           ? i18n.t("picard.openSelectedInPicard", { count: selectedKeys.size })
           : i18n.t("picard.openAllInPicard")}
         onclick={() => { handleOpenAllInPicard(); overflowMenuPos = null; }}
-        disabled={loading || songs.length === 0 || !picardStore.available || picardTargets.every((s) => s.source === "webdav")}
+        disabled={loading || songs.length === 0 || !picardStore.available || picardTargets.every((s) => s.source === "web_dav")}
         title={!picardStore.available
           ? i18n.t("picard.notFoundTooltip")
-          : picardTargets.length > 0 && picardTargets.every((s) => s.source === "webdav")
+          : picardTargets.length > 0 && picardTargets.every((s) => s.source === "web_dav")
             ? i18n.t("picard.webdavNotSupportedTooltip")
             : undefined}
       />

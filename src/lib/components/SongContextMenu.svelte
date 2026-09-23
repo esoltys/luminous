@@ -82,7 +82,7 @@
   }
 
   const picardSelection = $derived(selectedSongs && selectedSongs.length > 0 ? selectedSongs : [song]);
-  const allSelectedWebDav = $derived(picardSelection.every((s) => s.source === "webdav"));
+  const allSelectedWebDav = $derived(picardSelection.every((s) => s.source === "web_dav"));
 
   let showShareModal = $state(false);
   // See AlbumContextMenu.svelte for why the menu must be hidden (not left

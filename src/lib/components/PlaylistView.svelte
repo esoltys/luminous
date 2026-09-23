@@ -895,7 +895,7 @@
     onGoToAlbum={singleItem.song?.album ? () => navigationStore.viewAlbum(singleItem.song?.album || "") : undefined}
     onEditTags={singleItem.song?.id && !isItemUnavailable(singleItem) ? () => openTagEditor(singleItem.song!.id) : undefined}
     onOpenInPicard={singleItem.song?.id ? () => openSelectedInPicard(singleItem.song!.id) : undefined}
-    allSelectedWebDav={picardTargets.length > 0 && picardTargets.every((s) => s.source === "webdav")}
+    allSelectedWebDav={picardTargets.length > 0 && picardTargets.every((s) => s.source === "web_dav")}
     onClose={() => { contextMenuState = null; }}
   />
 {/if}
