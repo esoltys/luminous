@@ -43,6 +43,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { open, save } from "@tauri-apps/plugin-dialog";
   import TagEditor from "./TagEditor.svelte";
+  import BlurredCover from "./BlurredCover.svelte";
   import GenreChips from "./GenreChips.svelte";
   import { parseMultiValue, joinMultiValue } from "../utils/multiValue";
   import { tagsStore } from "../stores/tags.svelte";
@@ -620,13 +621,9 @@
   {#if currentCoverUrl && isQueue}
     <div class="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden">
       {#key currentCoverUrl}
-        <img
-          src={currentCoverUrl}
-          alt=""
-          class="absolute inset-0 w-full h-full object-cover blur-2xl"
-          style="will-change: filter; transform: translateZ(0) scale(1.5);"
-          in:fade={{ duration: 400 }}
-        />
+        <div class="absolute inset-0" in:fade={{ duration: 400 }}>
+          <BlurredCover src={currentCoverUrl} class="w-full h-full" style="transform: scale(1.5);" />
+        </div>
       {/key}
       <div class="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-brand-main"></div>
     </div>
