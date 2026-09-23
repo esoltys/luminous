@@ -16,6 +16,7 @@ import {
   type ColorCount
 } from "../utils/colorUtils";
 import { LIGHTNESS_STEP } from "../constants";
+import { isLinux } from "../platform";
 
 const MAX_READABILITY_ADJUST_STEPS = 30;
 
@@ -157,21 +158,28 @@ export function flatGlassColor(tintHex: string, alpha: number, backdropHex: stri
   return rgbToHex(over(tint.r, sr), over(tint.g, sg), over(tint.b, sb));
 }
 
-/** Whether theme changes can crossfade as a View Transition. */
+/**
+ * Whether theme changes can crossfade as a View Transition. Never on Linux:
+ * WebKitGTK exposes startViewTransition(), but with the DMA-BUF renderer
+ * disabled — which the app always does there (LINUX_WEBKITGTK_RENDERING_ENV_VARS
+ * in lib.rs) — the first transition segfaults the whole app (reproduced on
+ * WebKitGTK 2.52.6). Linux keeps the @property morph instead.
+ */
 function supportsViewTransitions(): boolean {
-  return typeof document !== "undefined" && typeof document.startViewTransition === "function";
+  return !isLinux && typeof document !== "undefined" && typeof document.startViewTransition === "function";
 }
 
 const VIEW_TRANSITION_INPUT_EVENTS = ["pointermove", "pointerdown", "wheel"] as const;
 
 /**
- * WebKitGTK hit-tests every pointer event to <html> for the whole length
- * of a View Transition — `pointer-events: none` on ::view-transition
- * (app.css) only helps in Chromium — so a 1.2s crossfade would swallow
- * hovers, clicks and wheel-scrolls, on every track change under Dynamic
- * Artwork. Ends the crossfade at the first such input instead: hit-testing
- * is restored synchronously once it's skipped, so the pointer movement
- * that precedes a click lets that click land on its real target.
+ * Ends a View Transition at the first pointer input that's hit-tested to
+ * <html> rather than the live page. `pointer-events: none` on
+ * ::view-transition (app.css) is meant to pass input through, but WebKit
+ * ignores it and captures all input for the length of the transition, and
+ * that hasn't been confirmed in WebView2 either — a 1.2s crossfade would otherwise
+ * swallow hovers, clicks and wheel-scrolls on every track change under
+ * Dynamic Artwork. Hit-testing is restored synchronously once skipped, so
+ * the pointer movement that precedes a click lets that click land.
  */
 function yieldViewTransitionToInput(transition: ViewTransition | undefined) {
   if (!transition) return;

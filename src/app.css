@@ -245,9 +245,9 @@
  * snapshot of the old frame fades into the live new one on the compositor.
  * The @property morph above would instead restyle and repaint the entire
  * document, every glass panel's backdrop-filter included, on every frame.
- * `pointer-events: none` lets input reach the live page during the fade in
- * Chromium; WebKitGTK ignores it, so ThemeStore ends the fade at the first
- * pointer input there instead (yieldViewTransitionToInput()).
+ * Not used on Linux, where View Transitions crash WebKitGTK under the
+ * app's rendering flags (see supportsViewTransitions()). `pointer-events:
+ * none` lets input reach the live page during the fade in Chromium.
  */
 :root.theme-vt {
   transition: none;
