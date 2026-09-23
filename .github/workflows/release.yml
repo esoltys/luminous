@@ -194,7 +194,10 @@ jobs:
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           tag_name: ${{ needs.create-release.outputs.tag }}
-          draft: true
+          # softprops sets draft state explicitly, so a flatpak_only re-run
+          # against an already-published release must pass false here or it
+          # would flip the live release back to draft.
+          draft: ${{ !inputs.flatpak_only }}
           files: LuminousMusicPlayer.flatpak
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
