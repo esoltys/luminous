@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 41;
+pub const CURRENT_SCHEMA_VERSION: i32 = 42;
 
 struct Migration {
     version: i32,
@@ -333,6 +333,21 @@ const MIGRATIONS: &[Migration] = &[
                 .exists([])?;
             if !has_fetched_image_filename {
                 conn.execute_batch(MIGRATION_41)?;
+            }
+            Ok(())
+        },
+    },
+    Migration {
+        version: 42,
+        description: "sort_name, artist_type, gender, begin_date, end_date, ended, begin_area_name/mbid, area_name/mbid columns on artist_context_enrichment (#1128)",
+        apply: |conn| {
+            let has_sort_name: bool = conn
+                .prepare(
+                    "SELECT 1 FROM pragma_table_info('artist_context_enrichment') WHERE name = 'sort_name'",
+                )?
+                .exists([])?;
+            if !has_sort_name {
+                conn.execute_batch(MIGRATION_42)?;
             }
             Ok(())
         },
@@ -1440,6 +1455,24 @@ ALTER TABLE artist_profiles ADD COLUMN fetched_image_filename TEXT;
 ALTER TABLE artist_profiles ADD COLUMN fetched_image_source TEXT;
 ";
 
+// ---------------------------------------------------------------------------
+// Migration 42: artist_context_enrichment structured artist fields —
+// sort name, gender, life span (begin, end, ended), birth/formation place
+// (begin_area), and containing country/area from MusicBrainz (#1128).
+// ---------------------------------------------------------------------------
+const MIGRATION_42: &str = "
+ALTER TABLE artist_context_enrichment ADD COLUMN sort_name TEXT;
+ALTER TABLE artist_context_enrichment ADD COLUMN artist_type TEXT;
+ALTER TABLE artist_context_enrichment ADD COLUMN gender TEXT;
+ALTER TABLE artist_context_enrichment ADD COLUMN begin_date TEXT;
+ALTER TABLE artist_context_enrichment ADD COLUMN end_date TEXT;
+ALTER TABLE artist_context_enrichment ADD COLUMN ended INTEGER;
+ALTER TABLE artist_context_enrichment ADD COLUMN begin_area_name TEXT;
+ALTER TABLE artist_context_enrichment ADD COLUMN begin_area_mbid TEXT;
+ALTER TABLE artist_context_enrichment ADD COLUMN area_name TEXT;
+ALTER TABLE artist_context_enrichment ADD COLUMN area_mbid TEXT;
+";
+
 fn seed_artist_tag_hierarchy(conn: &rusqlite::Connection) -> Result<()> {
     let mut stmt = conn.prepare(
         "SELECT DISTINCT json_each.value
@@ -2103,6 +2136,94 @@ mod tests {
             .unwrap();
         assert_eq!(filename.as_deref(), Some("artist-abc123.jpg"));
         assert_eq!(source.as_deref(), Some("fanart"));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_migration_42_adds_artist_context_enrichment_columns() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_migration42_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Database::new(temp_dir.clone()).unwrap();
+        assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
+
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO artist_context_enrichment (
+                artist_id,
+                sort_name,
+                artist_type,
+                gender,
+                begin_date,
+                end_date,
+                ended,
+                begin_area_name,
+                begin_area_mbid,
+                area_name,
+                area_mbid,
+                fetched_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+            params![
+                "artist-bowie",
+                "Bowie, David",
+                "Person",
+                "male",
+                "1947-01-08",
+                "2016-01-10",
+                1,
+                "Brixton",
+                "d9e80e14-d07f-4ca6-b8db-60cb1c07cb81",
+                "United Kingdom",
+                "8a754a16-0027-4a29-b6d7-2b40ea0481ed",
+                1000
+            ],
+        )
+        .unwrap();
+
+        struct Row {
+            sort_name: Option<String>,
+            artist_type: Option<String>,
+            gender: Option<String>,
+            begin_date: Option<String>,
+            end_date: Option<String>,
+            ended: Option<i64>,
+            begin_area: Option<String>,
+            area: Option<String>,
+        }
+
+        let row: Row = conn
+            .query_row(
+                "SELECT sort_name, artist_type, gender, begin_date, end_date, ended, begin_area_name, area_name
+                 FROM artist_context_enrichment WHERE artist_id = 'artist-bowie'",
+                [],
+                |r| {
+                    Ok(Row {
+                        sort_name: r.get(0)?,
+                        artist_type: r.get(1)?,
+                        gender: r.get(2)?,
+                        begin_date: r.get(3)?,
+                        end_date: r.get(4)?,
+                        ended: r.get(5)?,
+                        begin_area: r.get(6)?,
+                        area: r.get(7)?,
+                    })
+                },
+            )
+            .unwrap();
+
+        assert_eq!(row.sort_name.as_deref(), Some("Bowie, David"));
+        assert_eq!(row.artist_type.as_deref(), Some("Person"));
+        assert_eq!(row.gender.as_deref(), Some("male"));
+        assert_eq!(row.begin_date.as_deref(), Some("1947-01-08"));
+        assert_eq!(row.end_date.as_deref(), Some("2016-01-10"));
+        assert_eq!(row.ended, Some(1));
+        assert_eq!(row.begin_area.as_deref(), Some("Brixton"));
+        assert_eq!(row.area.as_deref(), Some("United Kingdom"));
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

@@ -37,6 +37,16 @@ pub struct SongContextEnrichment {
     pub wikipedia_extract: Option<String>,
     pub wikipedia_page_url: Option<String>,
     pub wikipedia_thumbnail_url: Option<String>,
+    pub artist_sort_name: Option<String>,
+    pub artist_type: Option<String>,
+    pub artist_gender: Option<String>,
+    pub artist_begin_date: Option<String>,
+    pub artist_end_date: Option<String>,
+    pub artist_ended: Option<bool>,
+    pub artist_begin_area_name: Option<String>,
+    pub artist_begin_area_mbid: Option<String>,
+    pub artist_area_name: Option<String>,
+    pub artist_area_mbid: Option<String>,
     pub fetched_at: Option<i64>,
 }
 
@@ -231,46 +241,80 @@ pub async fn get_song_context(
         let cached = read_artist_cache(&db, artist_id).await?;
         let fresh = cached
             .as_ref()
-            .map(|c| is_cache_fresh(c.3, now))
+            .map(|c| is_cache_fresh(c.fetched_at, now))
             .unwrap_or(false);
 
         if fresh && !force_refresh {
-            if let Some((extract, page_url, thumbnail_url, _)) = cached {
-                result.wikipedia_extract = extract;
-                result.wikipedia_page_url = page_url;
-                result.wikipedia_thumbnail_url = thumbnail_url;
+            if let Some(ref row) = cached {
+                apply_artist_cache(&mut result, row);
             }
         } else {
             let db_clone = db.clone();
             let artist_id_clone = artist_id.clone();
-            let bio_res = ARTIST_FLIGHT
+            let cm = context_manager.clone();
+            let (details_res, bio_res) = ARTIST_FLIGHT
                 .work(artist_id, move || async move {
-                    let res = context_manager
-                        .fetch_wikipedia_bio_for_artist(&artist_id_clone)
-                        .await
-                        .map_err(|e| e.to_string());
+                    // Fetch MusicBrainz details + wikidata_id in one request (#1128)
+                    let mb_res = cm
+                        .fetch_musicbrainz_artist_details_and_wikidata_id(&artist_id_clone)
+                        .await;
 
-                    match &res {
-                        Ok(bio) => {
-                            let _ = write_artist_cache(
-                                &db_clone,
-                                &artist_id_clone,
-                                bio,
-                                now,
-                            )
-                            .await;
-                        }
-                        Err(err) => {
-                            log::warn!(
-                                "Failed to fetch Wikipedia bio for artist {}: {}",
-                                artist_id_clone,
-                                err
-                            );
-                        }
+                    let (details, wikidata_id) = match mb_res {
+                        Ok((d, qid)) => (Ok(d), qid),
+                        Err(e) => (Err(e.to_string()), None),
+                    };
+
+                    let bio = if let Some(ref qid) = wikidata_id {
+                        cm.fetch_wikipedia_bio_from_wikidata_id(qid)
+                            .await
+                            .map_err(|e| e.to_string())
+                    } else {
+                        cm.fetch_wikipedia_bio_for_artist(&artist_id_clone)
+                            .await
+                            .map_err(|e| e.to_string())
+                    };
+
+                    let bio_ok = bio.as_ref().ok().cloned().flatten();
+                    let details_ok = details.as_ref().ok().cloned();
+
+                    if bio.is_ok() || details.is_ok() {
+                        let _ = write_artist_cache(
+                            &db_clone,
+                            &artist_id_clone,
+                            &bio_ok,
+                            &details_ok,
+                            now,
+                        )
+                        .await;
                     }
-                    res
+                    (details, bio)
                 })
                 .await;
+
+            if let Ok(ref details) = details_res {
+                result.artist_sort_name = details.sort_name.clone();
+                result.artist_type = details.artist_type.clone();
+                result.artist_gender = details.gender.clone();
+                result.artist_begin_date = details.begin_date.clone();
+                result.artist_end_date = details.end_date.clone();
+                result.artist_ended = details.ended;
+                result.artist_begin_area_name = details.begin_area_name.clone();
+                result.artist_begin_area_mbid = details.begin_area_mbid.clone();
+                result.artist_area_name = details.area_name.clone();
+                result.artist_area_mbid = details.area_mbid.clone();
+                result.fetched_at = Some(now);
+            } else if let Some(ref c) = cached {
+                result.artist_sort_name = c.sort_name.clone();
+                result.artist_type = c.artist_type.clone();
+                result.artist_gender = c.gender.clone();
+                result.artist_begin_date = c.begin_date.clone();
+                result.artist_end_date = c.end_date.clone();
+                result.artist_ended = c.ended;
+                result.artist_begin_area_name = c.begin_area_name.clone();
+                result.artist_begin_area_mbid = c.begin_area_mbid.clone();
+                result.artist_area_name = c.area_name.clone();
+                result.artist_area_mbid = c.area_mbid.clone();
+            }
 
             match bio_res {
                 Ok(Some(bio)) => {
@@ -283,11 +327,11 @@ pub async fn get_song_context(
                     result.fetched_at = Some(now);
                 }
                 Err(_) => {
-                    if let Some((extract, page_url, thumbnail_url, fetched_at)) = cached {
-                        result.wikipedia_extract = extract;
-                        result.wikipedia_page_url = page_url;
-                        result.wikipedia_thumbnail_url = thumbnail_url;
-                        result.fetched_at = Some(fetched_at);
+                    if let Some(ref c) = cached {
+                        result.wikipedia_extract = c.wikipedia_extract.clone();
+                        result.wikipedia_page_url = c.wikipedia_page_url.clone();
+                        result.wikipedia_thumbnail_url = c.wikipedia_thumbnail_url.clone();
+                        result.fetched_at = Some(c.fetched_at);
                     }
                 }
             }
@@ -402,7 +446,40 @@ async fn write_release_group_cache(
     .map_err(|e| e.to_string())
 }
 
-type ArtistCacheRow = (Option<String>, Option<String>, Option<String>, i64);
+#[derive(Default, Debug, Clone)]
+struct ArtistCacheRow {
+    wikipedia_extract: Option<String>,
+    wikipedia_page_url: Option<String>,
+    wikipedia_thumbnail_url: Option<String>,
+    sort_name: Option<String>,
+    artist_type: Option<String>,
+    gender: Option<String>,
+    begin_date: Option<String>,
+    end_date: Option<String>,
+    ended: Option<bool>,
+    begin_area_name: Option<String>,
+    begin_area_mbid: Option<String>,
+    area_name: Option<String>,
+    area_mbid: Option<String>,
+    fetched_at: i64,
+}
+
+fn apply_artist_cache(result: &mut SongContextEnrichment, cached: &ArtistCacheRow) {
+    result.wikipedia_extract = cached.wikipedia_extract.clone();
+    result.wikipedia_page_url = cached.wikipedia_page_url.clone();
+    result.wikipedia_thumbnail_url = cached.wikipedia_thumbnail_url.clone();
+    result.artist_sort_name = cached.sort_name.clone();
+    result.artist_type = cached.artist_type.clone();
+    result.artist_gender = cached.gender.clone();
+    result.artist_begin_date = cached.begin_date.clone();
+    result.artist_end_date = cached.end_date.clone();
+    result.artist_ended = cached.ended;
+    result.artist_begin_area_name = cached.begin_area_name.clone();
+    result.artist_begin_area_mbid = cached.begin_area_mbid.clone();
+    result.artist_area_name = cached.area_name.clone();
+    result.artist_area_mbid = cached.area_mbid.clone();
+    result.fetched_at = Some(cached.fetched_at);
+}
 
 async fn read_artist_cache(
     db: &std::sync::Arc<Database>,
@@ -411,16 +488,29 @@ async fn read_artist_cache(
     let artist_id = artist_id.to_string();
     crate::db::run_blocking(db, move |conn| {
         conn.query_row(
-            "SELECT wikipedia_extract, wikipedia_page_url, wikipedia_thumbnail_url, fetched_at
+            "SELECT wikipedia_extract, wikipedia_page_url, wikipedia_thumbnail_url,
+                    sort_name, artist_type, gender, begin_date, end_date, ended,
+                    begin_area_name, begin_area_mbid, area_name, area_mbid, fetched_at
              FROM artist_context_enrichment WHERE artist_id = ?1",
             params![artist_id],
             |row| {
-                Ok((
-                    row.get(0)?,
-                    row.get(1)?,
-                    row.get(2)?,
-                    row.get(3)?,
-                ))
+                let ended_int: Option<i64> = row.get(8)?;
+                Ok(ArtistCacheRow {
+                    wikipedia_extract: row.get(0)?,
+                    wikipedia_page_url: row.get(1)?,
+                    wikipedia_thumbnail_url: row.get(2)?,
+                    sort_name: row.get(3)?,
+                    artist_type: row.get(4)?,
+                    gender: row.get(5)?,
+                    begin_date: row.get(6)?,
+                    end_date: row.get(7)?,
+                    ended: ended_int.map(|v| v != 0),
+                    begin_area_name: row.get(9)?,
+                    begin_area_mbid: row.get(10)?,
+                    area_name: row.get(11)?,
+                    area_mbid: row.get(12)?,
+                    fetched_at: row.get(13)?,
+                })
             },
         )
         .map(Some)
@@ -437,25 +527,49 @@ async fn write_artist_cache(
     db: &std::sync::Arc<Database>,
     artist_id: &str,
     bio: &Option<crate::context::WikipediaSummary>,
+    details: &Option<crate::context::MusicBrainzArtistDetails>,
     fetched_at: i64,
 ) -> Result<(), String> {
     let artist_id = artist_id.to_string();
     let bio = bio.clone();
+    let details = details.clone();
     crate::db::run_blocking(db, move |conn| {
         conn.execute(
             "INSERT INTO artist_context_enrichment
-                (artist_id, wikidata_id, wikipedia_extract, wikipedia_page_url, wikipedia_thumbnail_url, fetched_at)
-             VALUES (?1, NULL, ?2, ?3, ?4, ?5)
+                (artist_id, wikidata_id, wikipedia_extract, wikipedia_page_url, wikipedia_thumbnail_url,
+                 sort_name, artist_type, gender, begin_date, end_date, ended,
+                 begin_area_name, begin_area_mbid, area_name, area_mbid, fetched_at)
+             VALUES (?1, NULL, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
              ON CONFLICT(artist_id) DO UPDATE SET
-                wikipedia_extract = excluded.wikipedia_extract,
-                wikipedia_page_url = excluded.wikipedia_page_url,
-                wikipedia_thumbnail_url = excluded.wikipedia_thumbnail_url,
+                wikipedia_extract = CASE WHEN excluded.wikipedia_extract IS NOT NULL THEN excluded.wikipedia_extract ELSE artist_context_enrichment.wikipedia_extract END,
+                wikipedia_page_url = CASE WHEN excluded.wikipedia_page_url IS NOT NULL THEN excluded.wikipedia_page_url ELSE artist_context_enrichment.wikipedia_page_url END,
+                wikipedia_thumbnail_url = CASE WHEN excluded.wikipedia_thumbnail_url IS NOT NULL THEN excluded.wikipedia_thumbnail_url ELSE artist_context_enrichment.wikipedia_thumbnail_url END,
+                sort_name = CASE WHEN excluded.sort_name IS NOT NULL THEN excluded.sort_name ELSE artist_context_enrichment.sort_name END,
+                artist_type = CASE WHEN excluded.artist_type IS NOT NULL THEN excluded.artist_type ELSE artist_context_enrichment.artist_type END,
+                gender = CASE WHEN excluded.gender IS NOT NULL THEN excluded.gender ELSE artist_context_enrichment.gender END,
+                begin_date = CASE WHEN excluded.begin_date IS NOT NULL THEN excluded.begin_date ELSE artist_context_enrichment.begin_date END,
+                end_date = CASE WHEN excluded.end_date IS NOT NULL THEN excluded.end_date ELSE artist_context_enrichment.end_date END,
+                ended = CASE WHEN excluded.ended IS NOT NULL THEN excluded.ended ELSE artist_context_enrichment.ended END,
+                begin_area_name = CASE WHEN excluded.begin_area_name IS NOT NULL THEN excluded.begin_area_name ELSE artist_context_enrichment.begin_area_name END,
+                begin_area_mbid = CASE WHEN excluded.begin_area_mbid IS NOT NULL THEN excluded.begin_area_mbid ELSE artist_context_enrichment.begin_area_mbid END,
+                area_name = CASE WHEN excluded.area_name IS NOT NULL THEN excluded.area_name ELSE artist_context_enrichment.area_name END,
+                area_mbid = CASE WHEN excluded.area_mbid IS NOT NULL THEN excluded.area_mbid ELSE artist_context_enrichment.area_mbid END,
                 fetched_at = excluded.fetched_at",
             params![
                 artist_id,
                 bio.as_ref().map(|b| b.extract.clone()),
                 bio.as_ref().and_then(|b| b.page_url.clone()),
                 bio.as_ref().and_then(|b| b.thumbnail_url.clone()),
+                details.as_ref().and_then(|d| d.sort_name.clone()),
+                details.as_ref().and_then(|d| d.artist_type.clone()),
+                details.as_ref().and_then(|d| d.gender.clone()),
+                details.as_ref().and_then(|d| d.begin_date.clone()),
+                details.as_ref().and_then(|d| d.end_date.clone()),
+                details.as_ref().and_then(|d| d.ended.map(|b| if b { 1 } else { 0 })),
+                details.as_ref().and_then(|d| d.begin_area_name.clone()),
+                details.as_ref().and_then(|d| d.begin_area_mbid.clone()),
+                details.as_ref().and_then(|d| d.area_name.clone()),
+                details.as_ref().and_then(|d| d.area_mbid.clone()),
                 fetched_at,
             ],
         )?;
@@ -470,6 +584,7 @@ mod tests {
     use super::*;
     use crate::db::Database;
     use crate::models::ArtistProfile;
+    use std::sync::Arc;
 
     fn temp_db(name: &str) -> Database {
         let temp_dir = std::env::temp_dir().join(format!(
@@ -544,5 +659,59 @@ mod tests {
             resolve_song_context_artist_mbid(&conn, None, None, Some("Nobody Known"), None),
             None
         );
+    }
+
+    #[tokio::test]
+    async fn test_write_and_read_artist_cache_with_mb_details() {
+        let db = Arc::new(temp_db("artist_cache_mb_details"));
+        let details = crate::context::MusicBrainzArtistDetails {
+            sort_name: Some("Twain, Shania".to_string()),
+            artist_type: Some("Person".to_string()),
+            gender: Some("Female".to_string()),
+            begin_date: Some("1965-08-28".to_string()),
+            end_date: None,
+            ended: Some(false),
+            begin_area_name: Some("Windsor".to_string()),
+            begin_area_mbid: Some("e4f1e288-92a0-4f36-8f0e-23397e261a99".to_string()),
+            area_name: Some("Canada".to_string()),
+            area_mbid: Some("71bbafaa-e825-3e15-8ca9-017dcad1748b".to_string()),
+        };
+        let bio = crate::context::WikipediaSummary {
+            extract: "Shania Twain is a Canadian singer-songwriter.".to_string(),
+            page_url: Some("https://en.wikipedia.org/wiki/Shania_Twain".to_string()),
+            thumbnail_url: None,
+        };
+
+        write_artist_cache(&db, "artist-123", &Some(bio), &Some(details), 1000)
+            .await
+            .unwrap();
+
+        let cached = read_artist_cache(&db, "artist-123").await.unwrap().unwrap();
+        assert_eq!(cached.sort_name.as_deref(), Some("Twain, Shania"));
+        assert_eq!(cached.artist_type.as_deref(), Some("Person"));
+        assert_eq!(cached.gender.as_deref(), Some("Female"));
+        assert_eq!(cached.begin_date.as_deref(), Some("1965-08-28"));
+        assert_eq!(cached.ended, Some(false));
+        assert_eq!(cached.begin_area_name.as_deref(), Some("Windsor"));
+        assert_eq!(
+            cached.begin_area_mbid.as_deref(),
+            Some("e4f1e288-92a0-4f36-8f0e-23397e261a99")
+        );
+        assert_eq!(cached.area_name.as_deref(), Some("Canada"));
+        assert_eq!(
+            cached.area_mbid.as_deref(),
+            Some("71bbafaa-e825-3e15-8ca9-017dcad1748b")
+        );
+        assert_eq!(
+            cached.wikipedia_extract.as_deref(),
+            Some("Shania Twain is a Canadian singer-songwriter.")
+        );
+        assert_eq!(cached.fetched_at, 1000);
+
+        let mut enrichment = SongContextEnrichment::default();
+        apply_artist_cache(&mut enrichment, &cached);
+        assert_eq!(enrichment.artist_sort_name.as_deref(), Some("Twain, Shania"));
+        assert_eq!(enrichment.artist_gender.as_deref(), Some("Female"));
+        assert_eq!(enrichment.artist_begin_date.as_deref(), Some("1965-08-28"));
     }
 }
