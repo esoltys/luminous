@@ -1263,6 +1263,7 @@ export const en = {
     openAllInPicard: "Open All in Picard",
     openSelectedInPicard: "Open {count} in Picard",
     notFoundTooltip: "MusicBrainz Picard not found. Install it from picard.musicbrainz.org, or set a custom path in Settings.",
+    webdavNotSupportedTooltip: "Open in Picard isn't available for WebDAV songs",
     integrationTitle: "MusicBrainz Picard",
     integrationDesc: "is an open-source program that identifies music files by their unique digital audio fingerprint, automatically filling in missing track details, artwork, and tidy filenames using a massive community encyclopedia.",
     foundAt: "Found at {path}",

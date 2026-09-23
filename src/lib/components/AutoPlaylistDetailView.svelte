@@ -849,12 +849,14 @@
 
 {#if contextMenuState}
   {@const song = contextMenuState.song}
+  {@const selectedSongs = selectedKeys.size > 1 ? songs.filter((s) => selectedKeys.has(String(s.id))) : undefined}
   <SongContextMenu
     x={contextMenuState.x}
     y={contextMenuState.y}
     {song}
     selectedCount={selectedKeys.size}
     selectedSongIds={Array.from(selectedKeys, Number)}
+    {selectedSongs}
     onPlay={() => {
       if (selectedKeys.size > 1) {
         handlePlaySelected();
@@ -928,6 +930,7 @@
     {/if}
 
     {#if kind === "missing_metadata" || kind === "missing_musicbrainz"}
+      {@const picardTargets = selectedKeys.size > 0 ? songs.filter((s) => selectedKeys.has(String(s.id))) : songs}
       <ContextMenuDivider />
       <ContextMenuItem
         icon={OpenInPicard}
@@ -935,8 +938,12 @@
           ? i18n.t("picard.openSelectedInPicard", { count: selectedKeys.size })
           : i18n.t("picard.openAllInPicard")}
         onclick={() => { handleOpenAllInPicard(); overflowMenuPos = null; }}
-        disabled={loading || songs.length === 0 || !picardStore.available}
-        title={picardStore.available ? undefined : i18n.t("picard.notFoundTooltip")}
+        disabled={loading || songs.length === 0 || !picardStore.available || picardTargets.every((s) => s.source === "webdav")}
+        title={!picardStore.available
+          ? i18n.t("picard.notFoundTooltip")
+          : picardTargets.length > 0 && picardTargets.every((s) => s.source === "webdav")
+            ? i18n.t("picard.webdavNotSupportedTooltip")
+            : undefined}
       />
     {/if}
 

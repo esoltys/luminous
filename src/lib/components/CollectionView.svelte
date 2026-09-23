@@ -634,12 +634,14 @@
 
 {#if contextMenuState}
   {@const song = contextMenuState.song}
+  {@const selectedSongs = selectedKeys.size > 1 ? filteredSongs.filter((s) => selectedKeys.has(String(s.id))) : undefined}
   <SongContextMenu
     x={contextMenuState.x}
     y={contextMenuState.y}
     {song}
     selectedCount={selectedKeys.size}
     selectedSongIds={Array.from(selectedKeys, Number)}
+    {selectedSongs}
     onPlay={() => {
       if (selectedKeys.size > 1) {
         handlePlaySelected();

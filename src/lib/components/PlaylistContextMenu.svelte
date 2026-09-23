@@ -23,6 +23,7 @@
     onGoToAlbum,
     onEditTags,
     onOpenInPicard,
+    allSelectedWebDav = false,
     onClose,
   }: {
     x: number;
@@ -34,6 +35,7 @@
     onGoToAlbum?: () => void;
     onEditTags?: () => void;
     onOpenInPicard?: () => void;
+    allSelectedWebDav?: boolean;
     onClose: () => void;
   } = $props();
 </script>
@@ -85,8 +87,12 @@
       icon={OpenInPicard}
       label={i18n.t("picard.openInPicard")}
       onclick={() => { onOpenInPicard?.(); onClose(); }}
-      disabled={!picardStore.available}
-      title={picardStore.available ? undefined : i18n.t("picard.notFoundTooltip")}
+      disabled={!picardStore.available || allSelectedWebDav}
+      title={!picardStore.available
+        ? i18n.t("picard.notFoundTooltip")
+        : allSelectedWebDav
+          ? i18n.t("picard.webdavNotSupportedTooltip")
+          : undefined}
     />
   {/if}
 
