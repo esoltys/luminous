@@ -131,6 +131,16 @@
   // (e.g. a genre's tags got edited away, or no songs are rated 5 stars).
   let autoDefs = $derived.by((): AutoDef[] => {
     const defs: AutoDef[] = [];
+    if (daypartMixPlaylist && daypartMixPlaylist.track_count > 0) {
+      defs.push({
+        id: `auto:daypart:${daypartMixPlaylist.id}`,
+        kind: "daypart",
+        label: getPlaylistDisplayName(daypartMixPlaylist),
+        playlistId: daypartMixPlaylist.id,
+        updated: daypartMixPlaylist.updated,
+        trackCount: daypartMixPlaylist.track_count,
+      });
+    }
     if (playlistsStore.favouritesCount > 0) {
       defs.push({
         id: "auto:favourites",
@@ -179,16 +189,6 @@
         playlistId: missingMusicBrainzAutoPlaylist.id,
         updated: missingMusicBrainzAutoPlaylist.updated,
         trackCount: missingMusicBrainzAutoPlaylist.track_count,
-      });
-    }
-    if (daypartMixPlaylist && daypartMixPlaylist.track_count > 0) {
-      defs.push({
-        id: `auto:daypart:${daypartMixPlaylist.id}`,
-        kind: "daypart",
-        label: getPlaylistDisplayName(daypartMixPlaylist),
-        playlistId: daypartMixPlaylist.id,
-        updated: daypartMixPlaylist.updated,
-        trackCount: daypartMixPlaylist.track_count,
       });
     }
     for (const p of decadeAutoPlaylists) {
@@ -257,7 +257,7 @@
     typeof window !== "undefined" ? localStorage.getItem("sort_auto_playlist_asc") !== "false" : true
   );
 
-  // Favourites/Recently Added are always pinned first, ahead of the sort
+  // Moment Mix and Favourites/Recently Added are always pinned first, ahead of the sort
   // order applied to decade, genre & artist tag auto-playlists. BPM auto-playlists always
   // sort last, in their fixed intensity order (Down-Tempo → Extreme, set by
   // BPM_BUCKET_ORDER above) — never interleaved into the name/track_count/

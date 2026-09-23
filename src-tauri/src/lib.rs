@@ -1027,6 +1027,11 @@ pub fn run() {
             if let Err(e) = manager.sync_all_auto_playlists() {
                 log::error!("Failed to sync auto-playlists at startup: {e}");
             }
+            if let Ok(conn) = db.pool.get() {
+                if let Err(e) = pins::init_default_pins(&conn) {
+                    log::error!("Failed to initialize default pinned items: {e}");
+                }
+            }
             let playlists = Arc::new(Mutex::new(manager));
 
             let cover_manager = Arc::new(CoverManager::new(

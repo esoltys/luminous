@@ -269,6 +269,7 @@
       }
       return invoke<Song[]>("get_songs_missing_metadata");
     }
+    if (k === "daypart") return [];
     if (k === "favourites") return invoke<Song[]>("get_favourite_songs");
     if (k === "recently_added") return invoke<Song[]>("get_recently_added_songs", { limit: 50 });
     if (k === "most_played") return invoke<Song[]>("get_most_played_songs", { limit: 50 });

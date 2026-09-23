@@ -116,4 +116,30 @@ describe("PlaylistsCollectionView.svelte - Decades Auto Playlists", () => {
       expect(invoke).toHaveBeenCalledWith("refresh_all_auto_playlists");
     });
   });
+
+  it("places Moment Mix (daypart) at the front before Favourite Songs in auto grid", async () => {
+    playlistsStore.favouritesCount = 10;
+    playlistsStore.playlists = [
+      {
+        id: 99,
+        name: "Morning Mix",
+        dynamic_enabled: true,
+        is_queue: false,
+        dynamic_spec: "daypart:morning:2026-09-23:",
+        track_count: 20,
+        created: 1700000000,
+        updated: 1700000000,
+      },
+    ];
+
+    const { getByText } = render(PlaylistsCollectionView);
+    const morningMixEl = getByText("Morning Mix");
+    const favSongsEl = getByText("Favourite Songs");
+
+    expect(morningMixEl).toBeInTheDocument();
+    expect(favSongsEl).toBeInTheDocument();
+    expect(
+      morningMixEl.compareDocumentPosition(favSongsEl) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
 });

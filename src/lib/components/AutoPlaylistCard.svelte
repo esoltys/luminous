@@ -67,6 +67,7 @@
       const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
       if (pl) return getPlaylistDisplayName(pl);
     }
+    if (kind === "daypart") return label || i18n.t("playlists.daypartAutoPlaylist");
     return kind === "artist_tag" ? toTitleCase(label) : label;
   });
 
@@ -100,6 +101,8 @@
         ? invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: pid }).then((items) =>
             items.filter((item) => !!item.song).map((item) => item.song as Song)
           )
+        : k === "daypart"
+          ? Promise.resolve([])
         : k === "missing_musicbrainz"
           ? (pid !== undefined
               ? invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: pid }).then((items) =>

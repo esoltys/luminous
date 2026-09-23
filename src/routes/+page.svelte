@@ -5,6 +5,7 @@
   import { collectionStore } from "../lib/stores/collection.svelte";
   import { navigationStore, type ActiveTab, type ActiveSubTab } from "../lib/stores/navigation.svelte";
   import { playerStore } from "../lib/stores/player.svelte";
+  import { playlistsStore } from "../lib/stores/playlists.svelte";
 
   let isInitialized = $state(false);
 
@@ -106,6 +107,17 @@
         console.error("Failed to save active_sub_tab:", err);
       });
     }
+  });
+
+  $effect(() => {
+    // Reconcile navigation state when collection or playlists data changes
+    // to drop stale targets restored from previous sessions.
+    const _statsLoaded = collectionStore.statsLoaded;
+    const _isScanning = collectionStore.isScanning;
+    const _albums = collectionStore.albums;
+    const _artists = collectionStore.artists;
+    const _playlists = playlistsStore.playlists;
+    navigationStore.reconcile();
   });
   import SmartPlaylistBuilderModal from "../lib/components/SmartPlaylistBuilderModal.svelte";
 </script>

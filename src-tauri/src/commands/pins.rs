@@ -54,9 +54,12 @@ pub async fn reorder_pinned_items(
 
 #[tauri::command]
 pub async fn get_pinned_items(state: State<'_, AppState>) -> Result<Vec<PinnedItem>, String> {
-    let refs = crate::db::run_blocking(&state.db, pins::pinned_refs)
-        .await
-        .map_err(|e| e.to_string())?;
+    let refs = crate::db::run_blocking(&state.db, |conn| {
+        pins::init_default_pins(conn)?;
+        pins::pinned_refs(conn)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
     if refs.is_empty() {
         return Ok(Vec::new());
     }
