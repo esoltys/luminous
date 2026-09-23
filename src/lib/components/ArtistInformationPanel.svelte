@@ -84,6 +84,12 @@
       <span class="text-brand-text-primary text-right break-words min-w-0">{formattedBeginDate}</span>
     </div>
   {/if}
+  {#if formattedEndDate}
+    <div class="flex items-start justify-between gap-3">
+      <span class="text-brand-text-secondary/60 shrink-0">{endLabel}</span>
+      <span class="text-brand-text-primary text-right break-words min-w-0">{formattedEndDate}</span>
+    </div>
+  {/if}
   {#if city}
     <div class="flex items-start justify-between gap-3">
       <span class="text-brand-text-secondary/60 shrink-0">{cityLabel}</span>
@@ -94,12 +100,6 @@
     <div class="flex items-start justify-between gap-3">
       <span class="text-brand-text-secondary/60 shrink-0">{countryLabel}</span>
       <span class="text-brand-text-primary text-right break-words min-w-0">{country}</span>
-    </div>
-  {/if}
-  {#if formattedEndDate}
-    <div class="flex items-start justify-between gap-3">
-      <span class="text-brand-text-secondary/60 shrink-0">{endLabel}</span>
-      <span class="text-brand-text-primary text-right break-words min-w-0">{formattedEndDate}</span>
     </div>
   {/if}
 {/snippet}

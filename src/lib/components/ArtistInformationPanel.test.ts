@@ -56,6 +56,12 @@ describe("ArtistInformationPanel", () => {
     expect(screen.getByText("Died")).toBeTruthy();
     expect(container.textContent).toContain("January 10, 2016");
 
+    // Check row order: Gender, Born, Died, City/Region, Country
+    const labels = Array.from(
+      container.querySelectorAll(".flex.items-start.justify-between > span:first-child")
+    ).map((el) => el.textContent?.trim());
+    expect(labels).toEqual(["Gender", "Born", "Died", "City/Region", "Country"]);
+
     // CRITICAL: Type should NOT be rendered in the UI
     expect(screen.queryByText("Type")).toBeNull();
     expect(screen.queryByText("Person")).toBeNull();
@@ -79,13 +85,19 @@ describe("ArtistInformationPanel", () => {
     expect(screen.queryByText("Sort Name")).toBeNull();
     expect(screen.queryByText("Beatles, The")).toBeNull();
 
-    // Group should say Formed / City/Region / Country / Disbanded
+    // Group should say Formed / Disbanded / City/Region / Country
     expect(screen.getByText("Formed")).toBeTruthy();
+    expect(screen.getByText("Disbanded")).toBeTruthy();
     expect(screen.getByText("City/Region")).toBeTruthy();
     expect(screen.getByText("Liverpool")).toBeTruthy();
     expect(screen.getByText("Country")).toBeTruthy();
     expect(screen.getByText("United Kingdom")).toBeTruthy();
-    expect(screen.getByText("Disbanded")).toBeTruthy();
+
+    // Check row order: Formed, Disbanded, City/Region, Country
+    const labels = Array.from(
+      container.querySelectorAll(".flex.items-start.justify-between > span:first-child")
+    ).map((el) => el.textContent?.trim());
+    expect(labels).toEqual(["Formed", "Disbanded", "City/Region", "Country"]);
 
     // No gender
     expect(screen.queryByText("Gender")).toBeNull();
