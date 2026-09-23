@@ -245,9 +245,10 @@
  * snapshot of the old frame fades into the live new one on the compositor.
  * The @property morph above would instead restyle and repaint the entire
  * document, every glass panel's backdrop-filter included, on every frame.
- * Not used on Linux, where View Transitions crash WebKitGTK under the
- * app's rendering flags (see supportsViewTransitions()). `pointer-events:
- * none` lets input reach the live page during the fade in Chromium.
+ * Not used while WebKitGTK's GPU rendering is disabled (the AppImage), where
+ * View Transitions crash it (ThemeStore.gpuCompositing).
+ * `pointer-events: none` lets input reach the live page during the fade in
+ * Chromium.
  */
 :root.theme-vt {
   transition: none;

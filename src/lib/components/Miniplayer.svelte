@@ -134,6 +134,11 @@
     }
   }
 
+  // backdrop-filter fallback for webviews without GPU compositing — see
+  // ThemeStore.gpuCompositing. Resize handles below stay Linux-gated: that's
+  // window-manager behavior, not styling.
+  let noBackdrop = $derived(themeStore.gpuCompositing === false);
+
   function handleStartDrag(e: PointerEvent) {
     invoke("start_window_drag").catch(() => {});
   }
@@ -212,7 +217,7 @@
   onpointerleave={hideHover}
   onmouseleave={hideHover}
   tabindex="0"
-  class="group relative w-full h-full flex flex-col justify-between overflow-hidden bg-brand-main select-none p-3 shadow-2xl {themeStore.isGlassTheme || isLinux ? 'glass-surface' : ''} {isLinux ? 'opaque-linux' : ''}"
+  class="group relative w-full h-full flex flex-col justify-between overflow-hidden bg-brand-main select-none p-3 shadow-2xl {themeStore.isGlassTheme ? 'glass-surface' : ''} {noBackdrop ? 'no-backdrop' : ''}"
 >
   <!-- Edge and Corner Resize Handles for Frameless Window (non-Linux platforms) -->
   {#if !isLinux}
@@ -278,7 +283,7 @@
     onpointerenter={showHover}
     onpointermove={showHover}
     onpointerleave={hideHover}
-    class="absolute inset-0 z-30 flex flex-col justify-between p-3 transition-opacity duration-200 {isHovered ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'} {isLinux ? 'bg-brand-main' : 'bg-brand-main/85 backdrop-blur-md'}"
+    class="absolute inset-0 z-30 flex flex-col justify-between p-3 transition-opacity duration-200 {isHovered ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'} {noBackdrop ? 'bg-brand-main' : 'bg-brand-main/85 backdrop-blur-md'}"
   >
     <div
       data-tauri-drag-region
@@ -425,10 +430,10 @@
     backdrop-filter: blur(20px) saturate(180%);
   }
 
-  /* backdrop-filter doesn't composite reliably in WebKitGTK, rendering the
-     panel see-through instead of frosted — same issue and same fix as
-     PlayerBar's footer.opaque-linux (PlayerBar.svelte). */
-  :global(.glass-surface.opaque-linux) {
+  /* backdrop-filter doesn't render without GPU compositing (the AppImage's
+     WebKitGTK), leaving the panel see-through instead of frosted — same
+     fallback as PlayerBar's footer.no-backdrop. */
+  :global(.glass-surface.no-backdrop) {
     background-color: var(--bg-main, #08090c) !important;
     -webkit-backdrop-filter: none !important;
     backdrop-filter: none !important;

@@ -13,11 +13,6 @@ import {
 import { checkWcagCompliance, hexToRgb, rgbToHsl, hslToRgb } from "../utils/colorUtils";
 import { invoke } from "@tauri-apps/api/core";
 
-// jsdom's user agent reports the host OS, so on a Linux machine the store
-// would take its Linux (no View Transition) path in every test.
-const platformMock = vi.hoisted(() => ({ isLinux: false, isWindows: false }));
-vi.mock("../platform", () => platformMock);
-
 describe("buildExtractedColors (archetype-based artwork color extraction, #61)", () => {
   const darkCoverWithNeonAccent = [
     { r: 5, g: 5, b: 5, count: 1000 },
@@ -419,6 +414,7 @@ describe("Theme change View Transitions", () => {
 
   it("applies the first theme directly, then crossfades later changes", () => {
     const store = new ThemeStore();
+    store.gpuCompositing = true;
     store.applyActiveTheme();
     expect(startViewTransition).not.toHaveBeenCalled();
     expect(document.documentElement.classList.contains("theme-vt")).toBe(true);
@@ -431,6 +427,7 @@ describe("Theme change View Transitions", () => {
 
   it("writes Dynamic Artwork colors and the theme inside one transition", () => {
     const store = new ThemeStore();
+    store.gpuCompositing = true;
     store.applyActiveTheme();
     store.activeThemeId = "dynamic-artwork";
     startViewTransition.mockImplementation(() => fakeTransition());
@@ -455,22 +452,38 @@ describe("Theme change View Transitions", () => {
     expect(startViewTransition).toHaveBeenCalledTimes(1);
   });
 
-  it("never uses a View Transition on Linux, where it crashes WebKitGTK", () => {
-    platformMock.isLinux = true;
-    try {
-      const store = new ThemeStore();
-      store.applyActiveTheme();
-      store.activeThemeId = "nordic-blue";
-      store.applyActiveTheme();
-      expect(startViewTransition).not.toHaveBeenCalled();
-      expect(document.documentElement.classList.contains("theme-vt")).toBe(false);
-    } finally {
-      platformMock.isLinux = false;
-    }
+  it("never uses a View Transition without confirmed GPU compositing (WebKitGTK crashes without it)", () => {
+    const store = new ThemeStore();
+    store.gpuCompositing = false;
+    store.applyActiveTheme();
+    store.activeThemeId = "nordic-blue";
+    store.applyActiveTheme();
+    expect(startViewTransition).not.toHaveBeenCalled();
+    expect(document.documentElement.classList.contains("theme-vt")).toBe(false);
+  });
+
+  it("never uses a View Transition before the backend has answered", () => {
+    const store = new ThemeStore();
+    expect(store.gpuCompositing).toBeNull();
+    store.applyActiveTheme();
+    store.activeThemeId = "nordic-blue";
+    store.applyActiveTheme();
+    expect(startViewTransition).not.toHaveBeenCalled();
+  });
+
+  it("init() takes GPU compositing support from the backend", async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "webview_gpu_compositing") return true;
+      return {};
+    });
+    const store = new ThemeStore();
+    await store.init();
+    expect(store.gpuCompositing).toBe(true);
   });
 
   it("ends the crossfade at the first pointer input hit-tested to <html>, then stops listening", async () => {
     const store = new ThemeStore();
+    store.gpuCompositing = true;
     store.applyActiveTheme();
     let finish!: () => void;
     const transition = { finished: new Promise<void>((resolve) => (finish = resolve)), skipTransition: vi.fn() };

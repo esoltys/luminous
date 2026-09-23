@@ -16,7 +16,6 @@ import {
   type ColorCount
 } from "../utils/colorUtils";
 import { LIGHTNESS_STEP } from "../constants";
-import { isLinux } from "../platform";
 
 const MAX_READABILITY_ADJUST_STEPS = 30;
 
@@ -158,15 +157,9 @@ export function flatGlassColor(tintHex: string, alpha: number, backdropHex: stri
   return rgbToHex(over(tint.r, sr), over(tint.g, sg), over(tint.b, sb));
 }
 
-/**
- * Whether theme changes can crossfade as a View Transition. Never on Linux:
- * WebKitGTK exposes startViewTransition(), but with the DMA-BUF renderer
- * disabled — which the app always does there (LINUX_WEBKITGTK_RENDERING_ENV_VARS
- * in lib.rs) — the first transition segfaults the whole app (reproduced on
- * WebKitGTK 2.52.6). Linux keeps the @property morph instead.
- */
-function supportsViewTransitions(): boolean {
-  return !isLinux && typeof document !== "undefined" && typeof document.startViewTransition === "function";
+/** Whether this webview implements View Transitions at all. */
+function hasViewTransitions(): boolean {
+  return typeof document !== "undefined" && typeof document.startViewTransition === "function";
 }
 
 const VIEW_TRANSITION_INPUT_EVENTS = ["pointermove", "pointerdown", "wheel"] as const;
@@ -599,6 +592,7 @@ export class ThemeStore {
           this.colorSchemeMode = settings.color_scheme_mode;
         }
       }
+      await this.queryGpuCompositing();
       this.applyActiveTheme();
     } catch (e) {
       console.error("Failed to init ThemeStore:", e);
@@ -903,6 +897,32 @@ export class ThemeStore {
   private hasAppliedTheme = false;
 
   /**
+   * Whether the webview renders with GPU compositing (see
+   * webview_gpu_compositing in commands/window.rs) — false only for the
+   * AppImage, whose WebKitGTK runs with GPU rendering disabled. `null` until
+   * init() hears back. Chrome styling treats only an explicit `false` as
+   * "no GPU" (opaque panels instead of backdrop-filter, a fade instead of
+   * the 3D flip), so Linux and Windows otherwise look the same. View
+   * Transitions need an explicit `true`: WebKitGTK exposes
+   * startViewTransition() either way but segfaults on the first one without
+   * GPU rendering, so an unanswered or failed query must fall back to the
+   * @property morph, never to a crash.
+   */
+  gpuCompositing = $state<boolean | null>(null);
+
+  private async queryGpuCompositing() {
+    try {
+      this.gpuCompositing = (await invoke<boolean>("webview_gpu_compositing")) === true;
+    } catch (e) {
+      console.error("Failed to query webview GPU compositing:", e);
+    }
+  }
+
+  private supportsViewTransitions(): boolean {
+    return this.gpuCompositing === true && hasViewTransitions();
+  }
+
+  /**
    * Writes a theme change to the DOM — as a View Transition crossfade when
    * the webview supports one. A crossfade snapshots the old frame once and
    * fades it into the live new one on the compositor; the fallback
@@ -923,9 +943,9 @@ export class ThemeStore {
       }
     };
 
-    const animate = this.hasAppliedTheme && !this.committingTheme && supportsViewTransitions() && !prefersReducedMotion();
+    const animate = this.hasAppliedTheme && !this.committingTheme && this.supportsViewTransitions() && !prefersReducedMotion();
     this.hasAppliedTheme = true;
-    if (supportsViewTransitions()) {
+    if (this.supportsViewTransitions()) {
       // Turns off the @property morph (see app.css) — the crossfade
       // replaces it, and under reduced motion changes apply instantly.
       document.documentElement.classList.add("theme-vt");

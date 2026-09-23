@@ -28,7 +28,6 @@
   import { toastStore } from '../lib/stores/toast.svelte';
   import { walkthroughStore } from '../lib/stores/walkthrough.svelte';
   import { welcomeStore } from '../lib/stores/welcome.svelte';
-  import { isLinux as platformIsLinux } from '../lib/platform';
   import { themeStore } from '../lib/stores/theme.svelte';
   import { generateEllipseGradientSvg } from '../lib/utils/ellipseGradient';
   import { formatWindowTitle } from '../lib/utils/formatters';
@@ -54,7 +53,6 @@
     welcomeStore.markSeen();
     walkthroughStore.start();
   }
-  let isLinux = $state(false);
   let isShortcutsModalOpen = $state(false);
   let isDragActive = $state(false);
   let isShiftHeld = $state(false);
@@ -121,7 +119,6 @@
   });
 
   onMount(() => {
-    isLinux = platformIsLinux;
     i18n.init();
     prefs.init();
     // The very first launch shows WelcomeScreen instead of auto-popping the
@@ -455,7 +452,7 @@
     <!-- 3D Flip Container fills the full window height; the PlayerBar floats
          on top of it (absolute, below) so scrolled content passes underneath
          the glass footer instead of stopping above it. -->
-    <div class="flex-1 relative overflow-hidden flip-perspective" class:no-3d={isLinux}>
+    <div class="flex-1 relative overflow-hidden flip-perspective" class:no-3d={themeStore.gpuCompositing === false}>
       <!-- Inner Card Wrapper -->
       <div class="w-full h-full relative flip-card" class:flipped={windowLayoutStore.effectiveImmersiveMode}>
 
@@ -703,7 +700,9 @@
     transition: visibility 0s linear 0.8s;
   }
 
-  /* Disable 3D flip on Linux/WebKit and use simple, clean opacity cross-fade.
+  /* Without GPU compositing (the AppImage's WebKitGTK — see
+     ThemeStore.gpuCompositing), 3D transforms mirror faces and misroute
+     pointer events, so the flip becomes a plain opacity cross-fade.
      `perspective` alone (with no rotation left to apply) still forces its
      subtree into a separate 3D compositing layer, which is enough to break
      WebKitGTK's backdrop-filter sampling for elements outside that subtree

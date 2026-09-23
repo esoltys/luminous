@@ -171,6 +171,29 @@ fn linux_webkitgtk_env_vars_to_set(
         .collect()
 }
 
+/// Whether any of `LINUX_WEBKITGTK_RENDERING_ENV_VARS` is in effect for this
+/// process — set by `run()` for the AppImage, or by the user by hand
+/// (WebKitGTK treats any value other than "0" as set). Takes the env lookup
+/// as a parameter so it's testable without mutating the process env.
+#[cfg(target_os = "linux")]
+fn webkitgtk_gpu_rendering_disabled_by(get: impl Fn(&str) -> Option<std::ffi::OsString>) -> bool {
+    LINUX_WEBKITGTK_RENDERING_ENV_VARS
+        .iter()
+        .any(|(key, _)| get(key).is_some_and(|value| value != "0"))
+}
+
+/// See `webkitgtk_gpu_rendering_disabled_by()`. Always false off Linux.
+pub(crate) fn webkitgtk_gpu_rendering_disabled() -> bool {
+    #[cfg(target_os = "linux")]
+    {
+        webkitgtk_gpu_rendering_disabled_by(|key| std::env::var_os(key))
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        false
+    }
+}
+
 /// Appends WebView2's occlusion-calculation-disabling flag to an existing
 /// `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` value, without duplicating it if
 /// already present. Factored out of `run()`'s `cfg(target_os = "windows")`
@@ -1455,6 +1478,7 @@ pub fn run() {
             commands::window::exit_miniplayer_mode,
             commands::window::move_window_to_preset,
             commands::window::get_window_geometry,
+            commands::window::webview_gpu_compositing,
             commands::window::start_window_drag,
             commands::window::start_window_resize,
         ])
@@ -1483,6 +1507,19 @@ mod startup_rendering_workaround_tests {
         for (_, value) in LINUX_WEBKITGTK_RENDERING_ENV_VARS {
             assert_eq!(*value, "1");
         }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_webkitgtk_gpu_rendering_disabled_by_env() {
+        use std::ffi::OsString;
+        assert!(!webkitgtk_gpu_rendering_disabled_by(|_| None));
+        assert!(webkitgtk_gpu_rendering_disabled_by(|key| {
+            (key == "WEBKIT_DISABLE_DMABUF_RENDERER").then(|| OsString::from("1"))
+        }));
+        assert!(!webkitgtk_gpu_rendering_disabled_by(|_| Some(
+            OsString::from("0")
+        )));
     }
 
     #[cfg(target_os = "linux")]
