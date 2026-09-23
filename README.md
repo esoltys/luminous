@@ -132,6 +132,8 @@ This produces `.deb`/`.rpm` on Linux — `appimage` was dropped from the default
 ```bash
 bun run tauri build -b appimage
 ```
+> [!CAUTION]
+> AppImage builds aren't recommended. Luminous always runs an AppImage with WebKitGTK's GPU compositing disabled, so everything is painted on the CPU: expect noticeably laggier scrolling, theme changes and typing (especially on HiDPI displays), plus an opaque player bar and a plain fade instead of the immersive flip. Prefer the `.deb`/`.rpm` or Flatpak.
 > On rolling-release distros (Arch/CachyOS), the AppImage step bundles `strip` binaries too old to handle the RELR relocations in current system libraries. `bun run tauri build` sets `NO_STRIP=true` for this automatically, so no extra steps are needed here — it only skips stripping debug symbols from vendored libraries, slightly increasing AppImage size.
 
 ---
