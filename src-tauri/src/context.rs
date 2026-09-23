@@ -12,7 +12,7 @@
 use anyhow::{anyhow, Result};
 use parking_lot::Mutex;
 use reqwest::Client;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock};
 use std::time::{Duration, Instant};
@@ -94,7 +94,12 @@ impl<T: Clone + Send + 'static> FlightGroup<T> {
     }
 }
 
-pub static ARTIST_FLIGHT: LazyLock<FlightGroup<Result<Option<WikipediaSummary>, String>>> =
+type ArtistFlightResult = (
+    Result<MusicBrainzArtistDetails, String>,
+    Result<Option<WikipediaSummary>, String>,
+);
+
+pub static ARTIST_FLIGHT: LazyLock<FlightGroup<ArtistFlightResult>> =
     LazyLock::new(FlightGroup::new);
 
 type ReleaseGroupFlightResult = (
@@ -215,9 +220,76 @@ struct MbRelation {
 }
 
 #[derive(Deserialize, Debug, Default)]
+struct MbLifeSpan {
+    begin: Option<String>,
+    end: Option<String>,
+    ended: Option<bool>,
+}
+
+#[derive(Deserialize, Debug, Default)]
+struct MbArea {
+    id: Option<String>,
+    name: Option<String>,
+}
+
+#[derive(Deserialize, Debug, Default)]
 struct MbArtistResponse {
+    #[serde(rename = "sort-name")]
+    sort_name: Option<String>,
+    #[serde(rename = "type")]
+    artist_type: Option<String>,
+    gender: Option<String>,
+    #[serde(rename = "life-span")]
+    life_span: Option<MbLifeSpan>,
+    #[serde(rename = "begin-area")]
+    begin_area: Option<MbArea>,
+    area: Option<MbArea>,
     #[serde(default)]
     relations: Vec<MbRelation>,
+}
+
+/// Structured biographical details fetched from MusicBrainz's artist lookup (#1128).
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
+pub struct MusicBrainzArtistDetails {
+    pub sort_name: Option<String>,
+    pub artist_type: Option<String>,
+    pub gender: Option<String>,
+    pub begin_date: Option<String>,
+    pub end_date: Option<String>,
+    pub ended: Option<bool>,
+    pub begin_area_name: Option<String>,
+    pub begin_area_mbid: Option<String>,
+    pub area_name: Option<String>,
+    pub area_mbid: Option<String>,
+}
+
+impl From<MbArtistResponse> for MusicBrainzArtistDetails {
+    fn from(res: MbArtistResponse) -> Self {
+        let (begin_date, end_date, ended) = match res.life_span {
+            Some(ls) => (ls.begin, ls.end, ls.ended),
+            None => (None, None, None),
+        };
+        let (begin_area_mbid, begin_area_name) = match res.begin_area {
+            Some(a) => (a.id, a.name),
+            None => (None, None),
+        };
+        let (area_mbid, area_name) = match res.area {
+            Some(a) => (a.id, a.name),
+            None => (None, None),
+        };
+        Self {
+            sort_name: res.sort_name,
+            artist_type: res.artist_type,
+            gender: res.gender,
+            begin_date,
+            end_date,
+            ended,
+            begin_area_name,
+            begin_area_mbid,
+            area_name,
+            area_mbid,
+        }
+    }
 }
 
 #[derive(Deserialize, Debug, Default)]
@@ -528,6 +600,73 @@ impl ContextManager {
             .filter(|r| !r.ended)
             .filter_map(|r| Some((r.rel_type?, r.url?.resource?)))
             .collect())
+    }
+
+    /// Looks up an artist's biographical details (sort name, gender,
+    /// birth/formation date, birth/formation place, and country) from
+    /// MusicBrainz (#1128).
+    pub async fn fetch_musicbrainz_artist_details(
+        &self,
+        artist_id: &str,
+    ) -> Result<MusicBrainzArtistDetails> {
+        throttle_musicbrainz().await;
+        let url = format!(
+            "https://musicbrainz.org/ws/2/artist/{}?fmt=json",
+            percent_encoding::utf8_percent_encode(artist_id, percent_encoding::NON_ALPHANUMERIC)
+        );
+        let response = self.client.get(&url).send().await?;
+        if !response.status().is_success() {
+            return Err(anyhow!(
+                "MusicBrainz artist details lookup failed: HTTP {}",
+                response.status()
+            ));
+        }
+        let parsed: MbArtistResponse = response.json().await?;
+        Ok(parsed.into())
+    }
+
+    /// Looks up both the artist's biographical details AND their Wikidata QID
+    /// in a single MusicBrainz API call with `?inc=url-rels&fmt=json` (#1128),
+    /// avoiding duplicate rate-limited calls to MusicBrainz.
+    pub async fn fetch_musicbrainz_artist_details_and_wikidata_id(
+        &self,
+        artist_id: &str,
+    ) -> Result<(MusicBrainzArtistDetails, Option<String>)> {
+        throttle_musicbrainz().await;
+        let url = format!(
+            "https://musicbrainz.org/ws/2/artist/{}?inc=url-rels&fmt=json",
+            percent_encoding::utf8_percent_encode(artist_id, percent_encoding::NON_ALPHANUMERIC)
+        );
+        let response = self.client.get(&url).send().await?;
+        if !response.status().is_success() {
+            return Err(anyhow!(
+                "MusicBrainz artist details lookup failed: HTTP {}",
+                response.status()
+            ));
+        }
+        let parsed: MbArtistResponse = response.json().await?;
+        let qid = parsed
+            .relations
+            .iter()
+            .find(|r| r.rel_type.as_deref() == Some("wikidata"))
+            .and_then(|r| r.url.as_ref())
+            .and_then(|u| u.resource.as_ref())
+            .and_then(|resource| extract_wikidata_qid(resource));
+        Ok((parsed.into(), qid))
+    }
+
+    /// Resolves a Wikidata QID to a Wikipedia summary (#1128).
+    pub async fn fetch_wikipedia_bio_from_wikidata_id(
+        &self,
+        wikidata_id: &str,
+    ) -> Result<Option<WikipediaSummary>> {
+        let Some(title) = self
+            .resolve_wikidata_to_wikipedia_title(wikidata_id)
+            .await?
+        else {
+            return Ok(None);
+        };
+        self.fetch_wikipedia_summary(&title).await.map(Some)
     }
 
     /// Resolves a Wikidata QID to its English Wikipedia article title via
@@ -1008,5 +1147,81 @@ mod tests {
         assert_eq!(r2.unwrap(), "result_val");
         // Only one worker should have actually executed the inner work future
         assert_eq!(counter.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn test_musicbrainz_artist_details_person_deserialization() {
+        let json = r#"{
+            "id": "faabb55d-3c9e-4c23-8779-732ac2ee2c0d",
+            "name": "Shania Twain",
+            "sort-name": "Twain, Shania",
+            "type": "Person",
+            "gender": "Female",
+            "life-span": {
+                "begin": "1965-08-28",
+                "end": null,
+                "ended": false
+            },
+            "begin-area": {
+                "id": "e4f1e288-92a0-4f36-8f0e-23397e261a99",
+                "name": "Windsor"
+            },
+            "area": {
+                "id": "71bbafaa-e825-3e15-8ca9-017dcad1748b",
+                "name": "Canada"
+            }
+        }"#;
+        let parsed: MbArtistResponse = serde_json::from_str(json).unwrap();
+        let details: MusicBrainzArtistDetails = parsed.into();
+        assert_eq!(details.sort_name.as_deref(), Some("Twain, Shania"));
+        assert_eq!(details.artist_type.as_deref(), Some("Person"));
+        assert_eq!(details.gender.as_deref(), Some("Female"));
+        assert_eq!(details.begin_date.as_deref(), Some("1965-08-28"));
+        assert_eq!(details.end_date, None);
+        assert_eq!(details.ended, Some(false));
+        assert_eq!(details.begin_area_name.as_deref(), Some("Windsor"));
+        assert_eq!(
+            details.begin_area_mbid.as_deref(),
+            Some("e4f1e288-92a0-4f36-8f0e-23397e261a99")
+        );
+        assert_eq!(details.area_name.as_deref(), Some("Canada"));
+        assert_eq!(
+            details.area_mbid.as_deref(),
+            Some("71bbafaa-e825-3e15-8ca9-017dcad1748b")
+        );
+    }
+
+    #[test]
+    fn test_musicbrainz_artist_details_group_deserialization() {
+        let json = r#"{
+            "id": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+            "name": "Nirvana",
+            "sort-name": "Nirvana",
+            "type": "Group",
+            "gender": null,
+            "life-span": {
+                "begin": "1987",
+                "end": "1994-04-05",
+                "ended": true
+            },
+            "begin-area": {
+                "id": "a640b45c-c173-49b1-8030-973603e895b5",
+                "name": "Aberdeen"
+            },
+            "area": {
+                "id": "489ce91b-6658-3307-9877-795b68554c98",
+                "name": "United States"
+            }
+        }"#;
+        let parsed: MbArtistResponse = serde_json::from_str(json).unwrap();
+        let details: MusicBrainzArtistDetails = parsed.into();
+        assert_eq!(details.sort_name.as_deref(), Some("Nirvana"));
+        assert_eq!(details.artist_type.as_deref(), Some("Group"));
+        assert_eq!(details.gender, None);
+        assert_eq!(details.begin_date.as_deref(), Some("1987"));
+        assert_eq!(details.end_date.as_deref(), Some("1994-04-05"));
+        assert_eq!(details.ended, Some(true));
+        assert_eq!(details.begin_area_name.as_deref(), Some("Aberdeen"));
+        assert_eq!(details.area_name.as_deref(), Some("United States"));
     }
 }

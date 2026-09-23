@@ -14,6 +14,7 @@
   import { openExternalUrl } from "../utils/openExternalUrl";
   import GenreChips from "./GenreChips.svelte";
   import AudioPipelineStages from "./AudioPipelineStages.svelte";
+  import ArtistInformationPanel from "./ArtistInformationPanel.svelte";
   import type { SongContextEnrichment } from "../types";
 
   interface Props {
@@ -78,13 +79,22 @@
     loadContext(currentSong?.id);
   });
 
+  let hasArtistInfo = $derived(
+    !!contextData?.artist_gender ||
+      !!contextData?.artist_begin_date ||
+      !!contextData?.artist_end_date ||
+      !!contextData?.artist_begin_area_name ||
+      !!contextData?.artist_area_name
+  );
+
   let hasContextData = $derived.by(() => {
     if (listenbrainzRows.length > 0) return true;
     if (!contextData) return false;
     return !!(
       contextData.wikipedia_extract ||
       contextData.critiquebrainz_rating != null ||
-      (contextData.critiquebrainz_review_links?.length ?? 0) > 0
+      (contextData.critiquebrainz_review_links?.length ?? 0) > 0 ||
+      hasArtistInfo
     );
   });
 
@@ -273,6 +283,22 @@
             </button>
           </div>
         {:else}
+          {#if hasArtistInfo}
+            <ArtistInformationPanel
+              sortName={contextData?.artist_sort_name}
+              gender={contextData?.artist_gender}
+              beginDate={contextData?.artist_begin_date}
+              endDate={contextData?.artist_end_date}
+              ended={contextData?.artist_ended}
+              artistType={contextData?.artist_type}
+              beginAreaName={contextData?.artist_begin_area_name}
+              beginAreaMbid={contextData?.artist_begin_area_mbid}
+              areaName={contextData?.artist_area_name}
+              areaMbid={contextData?.artist_area_mbid}
+              variant="card"
+            />
+          {/if}
+
           {#if contextData?.wikipedia_extract}
             <details
               open

@@ -167,6 +167,16 @@ export interface SongContextEnrichment {
   wikipedia_extract?: string;
   wikipedia_page_url?: string;
   wikipedia_thumbnail_url?: string;
+  artist_sort_name?: string;
+  artist_type?: string;
+  artist_gender?: string;
+  artist_begin_date?: string;
+  artist_end_date?: string;
+  artist_ended?: boolean;
+  artist_begin_area_name?: string;
+  artist_begin_area_mbid?: string;
+  artist_area_name?: string;
+  artist_area_mbid?: string;
   fetched_at?: number;
 }
 

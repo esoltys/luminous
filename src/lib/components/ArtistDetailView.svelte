@@ -24,6 +24,7 @@
   import ArtistProfileEditor from "./ArtistProfileEditor.svelte";
   import MarkdownBio from "./MarkdownBio.svelte";
   import SocialIcon from "./SocialIcon.svelte";
+  import ArtistInformationPanel from "./ArtistInformationPanel.svelte";
   import SongSelectionToolbar from "./SongSelectionToolbar.svelte";
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
   import ContextMenu from "./ContextMenu.svelte";
@@ -159,7 +160,15 @@
   let listenbrainzArtistUrl = $derived(deriveListenbrainzArtistUrl(artistMbid));
   let fanartTvUrl = $derived(deriveFanartTvUrlFromMbid(artistMbid));
 
-  let hasProfileContent = $derived(hasWebsite || hasBio || hasSocials || !!artistMbid);
+  let hasArtistInfo = $derived(
+    !!contextData?.artist_gender ||
+      !!contextData?.artist_begin_date ||
+      !!contextData?.artist_end_date ||
+      !!contextData?.artist_begin_area_name ||
+      !!contextData?.artist_area_name
+  );
+
+  let hasProfileContent = $derived(hasWebsite || hasBio || hasSocials || !!artistMbid || hasArtistInfo);
 
   // Locally-discovered artist visuals (#98/#761) — portrait/logo/fanart,
   // fetched on demand per artist since scanning every artist's folder
@@ -794,36 +803,55 @@
             </div>
           {/if}
 
-          <!-- Links Column (Right or Below) -->
-          {#if hasWebsite || hasSocials || artistMbid}
+          <!-- Links & Facts Column (Right or Below) -->
+          {#if hasWebsite || hasSocials || artistMbid || hasArtistInfo}
             <div
               class={hasBio
-                ? "@2xl:w-[22rem] @3xl:w-[28rem] shrink-0 border-t border-brand-border/40 pt-4 @2xl:border-t-0 @2xl:border-l @2xl:border-brand-border/60 @2xl:pt-0 @2xl:pl-6 flex flex-col gap-3"
-                : "w-full flex flex-col gap-3"}
+                ? "@2xl:w-[22rem] @3xl:w-[28rem] shrink-0 border-t border-brand-border/40 pt-4 @2xl:border-t-0 @2xl:border-l @2xl:border-brand-border/60 @2xl:pt-0 @2xl:pl-6 flex flex-col gap-4"
+                : "w-full flex flex-col gap-4"}
             >
-              <div class="grid grid-cols-1 @sm:grid-cols-2 {hasBio ? '@2xl:grid @2xl:grid-cols-2' : '@md:grid-cols-3 @xl:grid-cols-4'} gap-2.5">
-                <!-- Website, curated social links, and derived MusicBrainz/
-                     ListenBrainz/Fanart.tv links, unified and sorted
-                     alphabetically with the website first (#1122, #1123) -->
-                {#each artistLinkItems as item (item.key)}
-                  <button
-                    type="button"
-                    onclick={() => handleOpenUrl(item.url)}
-                    title={item.url}
-                    class="flex items-center gap-2.5 sm:gap-3 group/link text-left transition-colors cursor-pointer min-w-0"
-                  >
-                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-brand-main/60 {item.isOfficial ? 'border-[3px]' : 'border'} border-brand-border flex items-center justify-center text-brand-text-secondary group-hover/link:text-brand-accent group-hover/link:border-brand-accent/40 transition-colors shrink-0 shadow-2xs">
-                      <SocialIcon platform={item.platform} size={14} />
-                    </div>
-                    <div class="flex items-center gap-1 min-w-0 flex-1">
-                      <span class="text-xs font-medium text-brand-text-primary truncate transition-colors">
-                        {item.label}
-                      </span>
-                      <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover/link:opacity-100 transition-opacity shrink-0" />
-                    </div>
-                  </button>
-                {/each}
-              </div>
+              {#if hasArtistInfo}
+                <ArtistInformationPanel
+                  sortName={contextData?.artist_sort_name}
+                  gender={contextData?.artist_gender}
+                  beginDate={contextData?.artist_begin_date}
+                  endDate={contextData?.artist_end_date}
+                  ended={contextData?.artist_ended}
+                  artistType={contextData?.artist_type}
+                  beginAreaName={contextData?.artist_begin_area_name}
+                  beginAreaMbid={contextData?.artist_begin_area_mbid}
+                  areaName={contextData?.artist_area_name}
+                  areaMbid={contextData?.artist_area_mbid}
+                  onOpenUrl={handleOpenUrl}
+                  variant="plain"
+                />
+              {/if}
+
+              {#if hasWebsite || hasSocials || artistMbid}
+                <div class="grid grid-cols-1 @sm:grid-cols-2 {hasBio ? '@2xl:grid @2xl:grid-cols-2' : '@md:grid-cols-3 @xl:grid-cols-4'} gap-2.5">
+                  <!-- Website, curated social links, and derived MusicBrainz/
+                       ListenBrainz/Fanart.tv links, unified and sorted
+                       alphabetically with the website first (#1122, #1123) -->
+                  {#each artistLinkItems as item (item.key)}
+                    <button
+                      type="button"
+                      onclick={() => handleOpenUrl(item.url)}
+                      title={item.url}
+                      class="flex items-center gap-2.5 sm:gap-3 group/link text-left transition-colors cursor-pointer min-w-0"
+                    >
+                      <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-brand-main/60 {item.isOfficial ? 'border-[3px]' : 'border'} border-brand-border flex items-center justify-center text-brand-text-secondary group-hover/link:text-brand-accent group-hover/link:border-brand-accent/40 transition-colors shrink-0 shadow-2xs">
+                        <SocialIcon platform={item.platform} size={14} />
+                      </div>
+                      <div class="flex items-center gap-1 min-w-0 flex-1">
+                        <span class="text-xs font-medium text-brand-text-primary truncate transition-colors">
+                          {item.label}
+                        </span>
+                        <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover/link:opacity-100 transition-opacity shrink-0" />
+                      </div>
+                    </button>
+                  {/each}
+                </div>
+              {/if}
             </div>
           {/if}
         </div>

@@ -337,6 +337,21 @@ const MIGRATIONS: &[Migration] = &[
             Ok(())
         },
     },
+    Migration {
+        version: 42,
+        description: "sort_name, artist_type, gender, begin_date, end_date, ended, begin_area_name/mbid, area_name/mbid columns on artist_context_enrichment (#1128)",
+        apply: |conn| {
+            let has_sort_name: bool = conn
+                .prepare(
+                    "SELECT 1 FROM pragma_table_info('artist_context_enrichment') WHERE name = 'sort_name'",
+                )?
+                .exists([])?;
+            if !has_sort_name {
+                conn.execute_batch(MIGRATION_42)?;
+            }
+            Ok(())
+        },
+    },
 ];
 
 #[derive(Debug)]
@@ -1438,6 +1453,24 @@ ALTER TABLE webdav_servers ADD COLUMN sync_interval_minutes INTEGER NOT NULL DEF
 const MIGRATION_41: &str = "
 ALTER TABLE artist_profiles ADD COLUMN fetched_image_filename TEXT;
 ALTER TABLE artist_profiles ADD COLUMN fetched_image_source TEXT;
+";
+
+// ---------------------------------------------------------------------------
+// Migration 42: artist_context_enrichment structured artist fields —
+// sort name, gender, life span (begin, end, ended), birth/formation place
+// (begin_area), and containing country/area from MusicBrainz (#1128).
+// ---------------------------------------------------------------------------
+const MIGRATION_42: &str = "
+ALTER TABLE artist_context_enrichment ADD COLUMN sort_name TEXT;
+ALTER TABLE artist_context_enrichment ADD COLUMN artist_type TEXT;
+ALTER TABLE artist_context_enrichment ADD COLUMN gender TEXT;
+ALTER TABLE artist_context_enrichment ADD COLUMN begin_date TEXT;
+ALTER TABLE artist_context_enrichment ADD COLUMN end_date TEXT;
+ALTER TABLE artist_context_enrichment ADD COLUMN ended INTEGER;
+ALTER TABLE artist_context_enrichment ADD COLUMN begin_area_name TEXT;
+ALTER TABLE artist_context_enrichment ADD COLUMN begin_area_mbid TEXT;
+ALTER TABLE artist_context_enrichment ADD COLUMN area_name TEXT;
+ALTER TABLE artist_context_enrichment ADD COLUMN area_mbid TEXT;
 ";
 
 fn seed_artist_tag_hierarchy(conn: &rusqlite::Connection) -> Result<()> {
