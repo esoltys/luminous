@@ -161,7 +161,7 @@
       <div class="relative {sizeClass} flex items-center justify-center shrink-0">
         {#each activeCovers as cover, i (i)}
           <div
-            class="cover-item absolute {direction === 'left' ? 'bottom-0 right-0 w-28 h-28' : 'inset-0'} overflow-hidden border border-brand-border/60 shadow-xl transition-all duration-300 {hoverEffect ? 'group-hover:scale-105' : ''}"
+            class="cover-item absolute {direction === 'left' ? 'bottom-0 right-0 w-28 h-28' : 'inset-0'} overflow-hidden border border-brand-border/60 shadow-xl transition-[transform,opacity] duration-300 {hoverEffect ? 'group-hover:scale-105' : ''}"
             style="z-index: {10 - i}; transform: {getTransform(i, activeCovers.length)}; opacity: {getOpacity(i, activeCovers.length)};"
           >
             <CoverArt

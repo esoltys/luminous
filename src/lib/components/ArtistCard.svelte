@@ -81,7 +81,7 @@
   </div>
 
   <span
-    class="font-semibold text-sm text-brand-text-primary group-hover:text-brand-accent-text group-hover:underline transition-all duration-150 text-left truncate w-full"
+    class="font-semibold text-sm text-brand-text-primary group-hover:text-brand-accent-text group-hover:underline transition-colors duration-150 text-left truncate w-full"
     title={i18n.t('collection.filterByArtist', { artist: artist.name || i18n.t('collection.unknownArtist') })}
   >
     {artist.name || i18n.t('collection.unknownArtist')}

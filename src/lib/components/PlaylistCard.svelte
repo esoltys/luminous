@@ -123,7 +123,7 @@
     {#if !isActive}
       <button
         onclick={(e) => { e.stopPropagation(); playlistsStore.pinPlaylist(playlist.id); }}
-        class="mt-2.5 w-full py-1 px-2.5 text-xs font-semibold rounded-lg bg-brand-main/80 hover:bg-brand-accent hover:text-brand-accent-contrast border border-brand-border/60 text-brand-text-secondary hover:border-transparent transition-all duration-150 flex items-center justify-center gap-1.5 shadow-xs"
+        class="mt-2.5 w-full py-1 px-2.5 text-xs font-semibold rounded-lg bg-brand-main/80 hover:bg-brand-accent hover:text-brand-accent-contrast border border-brand-border/60 text-brand-text-secondary hover:border-transparent transition-colors duration-150 flex items-center justify-center gap-1.5 shadow-xs"
         title={i18n.t('playlists.makeActiveBtn')}
       >
         <Radio class="w-3.5 h-3.5 text-brand-accent-text group-hover:text-current" />
