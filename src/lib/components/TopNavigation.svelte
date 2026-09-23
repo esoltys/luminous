@@ -23,7 +23,8 @@
   import { themeStore } from "../stores/theme.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { picardStore } from "../stores/picard.svelte";
-  import { getCoverArtUrl, type RecentSearchItem } from "../types";
+  import type { RecentSearchItem } from "../types";
+  import { resolveArtistPortraitUrl } from "../utils/covers";
   import { getPlaylistDisplayName } from "../utils/playlist";
   import CoverArt from "./CoverArt.svelte";
   import FavouriteCornerFlag from "./FavouriteCornerFlag.svelte";
@@ -461,7 +462,7 @@
                           {#await collectionStore.getExtendedArtworkForArtist(artist.name)}
                             <User class="w-4 h-4 text-brand-text-secondary" />
                           {:then artwork}
-                            {@const portraitUrl = getCoverArtUrl(artwork.artist_portrait_uri)}
+                            {@const portraitUrl = resolveArtistPortraitUrl(artwork.artist_portrait_uri, collectionStore.getArtistProfile(artist.name)?.fetched_image_filename)}
                             {#if portraitUrl}
                               <img src={portraitUrl} alt={artist.name} class="w-full h-full object-cover" />
                             {:else}
@@ -681,7 +682,7 @@
                         <User class="w-4 h-4 text-brand-text-secondary" />
                       </div>
                     {:then artwork}
-                      {@const portraitUrl = getCoverArtUrl(artwork.artist_portrait_uri)}
+                      {@const portraitUrl = resolveArtistPortraitUrl(artwork.artist_portrait_uri, collectionStore.getArtistProfile(item.title)?.fetched_image_filename)}
                       {#if portraitUrl}
                         <div class="w-9 h-9 flex-shrink-0 overflow-hidden bg-brand-sidebar border border-brand-border">
                           <img src={portraitUrl} alt={item.title} class="w-full h-full object-cover" />

@@ -895,7 +895,7 @@ pub async fn retrieve_album_details(
 
     // Backfill the album's artist's MusicBrainz ID from the release-group's
     // `artist-credit` (#1123) — the same MBID "Retrieve Artist Details"/
-    // "Fetch Artist Image" need, captured here so they work without
+    // "Retrieve Artist Image" need, captured here so they work without
     // depending on a song having a usable tagged MBID. Always re-reads (and
     // returns) the artist's profile, backfilled or not, so the frontend can
     // refresh its cached copy — without this, the artist page can keep
@@ -905,9 +905,8 @@ pub async fn retrieve_album_details(
     // here doesn't fail the command.
     let artist_credit_id = relations.artist_credit_ids.into_iter().next();
     let album_for_artist_lookup = album.clone();
-    let artist_profile = crate::collection::with_collection_scanner(
-        state.db.clone(),
-        move |scanner| {
+    let artist_profile =
+        crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
             let Some(artist_key) =
                 scanner.get_representative_artist_for_album(&album_for_artist_lookup)?
             else {
@@ -921,10 +920,9 @@ pub async fn retrieve_album_details(
                 }
             }
             Ok(Some(artist_profile))
-        },
-    )
-    .await
-    .unwrap_or(None);
+        })
+        .await
+        .unwrap_or(None);
 
     Ok(AlbumDetailsRetrievalResult {
         profile,
@@ -1054,7 +1052,7 @@ pub struct ArtistDetailsRetrievalResult {
 
 /// Resolves an artist's MusicBrainz ID the same way for every "look this
 /// artist up on MusicBrainz-linked sources" action (`retrieve_artist_details`,
-/// `fetch_artist_image`): prefers the profile's own `musicbrainz_artist_id`
+/// `retrieve_artist_image`): prefers the profile's own `musicbrainz_artist_id`
 /// if already captured, otherwise falls back to whichever of the artist's
 /// songs has one tagged. Returns the resolved MBID alongside the current
 /// profile so callers that also need to update the profile don't have to
@@ -1199,7 +1197,7 @@ pub async fn has_fanart_env_key() -> Result<bool, String> {
 }
 
 #[derive(Serialize, Clone, Debug, Default)]
-pub struct ArtistImageFetchResult {
+pub struct ArtistImageRetrievalResult {
     /// `luminous-art://` URI for the fetched (and now cached) image, or
     /// `None` when neither fanart.tv nor the Wikidata fallback had one —
     /// not an error, just nothing found.
@@ -1231,7 +1229,7 @@ async fn resolve_fanart_api_key(state: &State<'_, AppState>) -> Option<String> {
         .or_else(|| std::env::var("FANART_API_KEY").ok())
 }
 
-/// The artist detail overflow menu's "Fetch Artist Image" action (#1127):
+/// The artist detail overflow menu's "Retrieve Artist Image" action (#1127):
 /// resolves the artist's MusicBrainz MBID (same lookup
 /// `retrieve_artist_details` uses), then tries fanart.tv's artist-images API
 /// first (if a key is configured — settings or `FANART_API_KEY` env var),
@@ -1242,10 +1240,10 @@ async fn resolve_fanart_api_key(state: &State<'_, AppState>) -> Option<String> {
 /// cache filename + source are persisted onto the artist's profile so it
 /// doesn't need to be re-fetched on every visit.
 #[tauri::command]
-pub async fn fetch_artist_image(
+pub async fn retrieve_artist_image(
     artist: String,
     state: State<'_, AppState>,
-) -> Result<ArtistImageFetchResult, String> {
+) -> Result<ArtistImageRetrievalResult, String> {
     let (artist_mbid, current_profile) = resolve_artist_mbid_and_profile(&state, &artist).await?;
 
     let Some(artist_mbid) = artist_mbid else {
@@ -1281,7 +1279,7 @@ pub async fn fetch_artist_image(
     }
 
     let Some(image_url) = image_url else {
-        return Ok(ArtistImageFetchResult::default());
+        return Ok(ArtistImageRetrievalResult::default());
     };
     let source = source.expect("source is set whenever image_url is Some");
 
@@ -1309,7 +1307,7 @@ pub async fn fetch_artist_image(
     .await
     .map_err(|e| e.to_string())?;
 
-    Ok(ArtistImageFetchResult {
+    Ok(ArtistImageRetrievalResult {
         uri: Some(format!("luminous-art://{filename}")),
         source: Some(source.as_str().to_string()),
     })

@@ -40,7 +40,7 @@
     ArrowDownLeftIcon as ArrowDownLeft,
     ArrowUpRightIcon as ArrowUpRight,
     ShareNetworkIcon as Share,
-    ImageIcon as FetchImage
+    ImageIcon as RetrieveImage
   } from "phosphor-svelte";
   const ExternalLink = OpenInPicard;
   import ShareModal from "./ShareModal.svelte";
@@ -56,7 +56,7 @@
     deriveFanartTvUrlFromMbid,
   } from "../utils/artistSocials";
   import { getArtistAlbums, classifyRelease } from "../utils/artist";
-  import { songsToCoverStack } from "../utils/covers";
+  import { songsToCoverStack, resolveArtistPortraitUrl } from "../utils/covers";
   import { parseMultiValue, joinMultiValue } from "../utils/multiValue";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
   import { i18n } from "../stores/i18n.svelte";
@@ -74,7 +74,7 @@
   let loading = $state(true);
   let refreshing = $state(false);
   let retrievingDetails = $state(false);
-  let fetchingImage = $state(false);
+  let retrievingImage = $state(false);
 
   let albumContextMenuState = $state<{ x: number; y: number; album: AlbumItem } | null>(null);
   let singleContextMenuState = $state<{ x: number; y: number; song: Song } | null>(null);
@@ -175,16 +175,8 @@
       cancelled = true;
     };
   });
-  // A network-fetched portrait (#1127, "Fetch Artist Image") only ever fills
-  // in for a *locally* discovered one — it never overrides art already
-  // sitting next to the artist's own music.
-  let fetchedArtistImageUrl = $derived(
-    artistProfile?.fetched_image_filename
-      ? getCoverArtUrl(`luminous-art://${artistProfile.fetched_image_filename}`)
-      : null
-  );
   let artistPortraitUrl = $derived(
-    getCoverArtUrl(artistArtwork?.artist_portrait_uri) || fetchedArtistImageUrl
+    resolveArtistPortraitUrl(artistArtwork?.artist_portrait_uri, artistProfile?.fetched_image_filename)
   );
   let bandLogoUrl = $derived(getCoverArtUrl(artistArtwork?.band_logo_uri));
   let fanartBannerUrl = $derived(getCoverArtUrl(artistArtwork?.fanart_uri));
@@ -253,11 +245,6 @@
       return a.label.localeCompare(b.label);
     });
   });
-
-  // Past a certain count the narrow single-column links panel (used
-  // alongside a bio) gets tall enough to feel unbalanced — switch to two
-  // columns so it stays compact.
-  let hasManyArtistLinks = $derived(artistLinkItems.length > 10);
 
   function handleTagClick(tag: string) {
     collectionStore.searchQuery = `artist-tag:${tag}`;
@@ -380,29 +367,29 @@
     }
   }
 
-  // Artist detail overflow menu's "Fetch Artist Image" (#1127) — fetches a
+  // Artist detail overflow menu's "Retrieve Artist Image" (#1127) — fetches a
   // portrait from fanart.tv (if a key is configured) or, lacking one, the
   // Wikidata fallback, only ever filling the gap when no *local* portrait
   // exists (see `artistPortraitUrl`'s fallback ordering).
-  async function handleFetchArtistImage() {
-    if (fetchingImage || !hasMusicbrainzArtistId) return;
-    fetchingImage = true;
+  async function handleRetrieveArtistImage() {
+    if (retrievingImage || !hasMusicbrainzArtistId) return;
+    retrievingImage = true;
     try {
-      const result = await collectionStore.fetchArtistImage(artistName);
+      const result = await collectionStore.retrieveArtistImage(artistName);
       if (result.uri) {
         toastStore.show(
           result.source === "fanart"
-            ? i18n.t("artistDetail.fetchImageSuccessFanart", {}, "Artist image fetched from fanart.tv")
-            : i18n.t("artistDetail.fetchImageSuccessWikidata", {}, "Artist image fetched from Wikidata")
+            ? i18n.t("artistDetail.retrieveImageSuccessFanart", {}, "Artist image retrieved from fanart.tv")
+            : i18n.t("artistDetail.retrieveImageSuccessWikidata", {}, "Artist image retrieved from Wikidata")
         );
       } else {
-        toastStore.show(i18n.t("artistDetail.fetchImageNoResults", {}, "No artist image found"));
+        toastStore.show(i18n.t("artistDetail.retrieveImageNoResults", {}, "No artist image found"));
       }
     } catch (err) {
-      console.error("Failed to fetch artist image:", err);
+      console.error("Failed to retrieve artist image:", err);
       toastStore.show(String(err), "error");
     } finally {
-      fetchingImage = false;
+      retrievingImage = false;
     }
   }
 
@@ -811,10 +798,10 @@
           {#if hasWebsite || hasSocials || artistMbid}
             <div
               class={hasBio
-                ? `${hasManyArtistLinks ? "@2xl:w-[22rem] @3xl:w-[28rem]" : "@2xl:w-60 @3xl:w-72"} shrink-0 border-t border-brand-border/40 pt-4 @2xl:border-t-0 @2xl:border-l @2xl:border-brand-border/60 @2xl:pt-0 @2xl:pl-6 flex flex-col gap-3`
+                ? "@2xl:w-[22rem] @3xl:w-[28rem] shrink-0 border-t border-brand-border/40 pt-4 @2xl:border-t-0 @2xl:border-l @2xl:border-brand-border/60 @2xl:pt-0 @2xl:pl-6 flex flex-col gap-3"
                 : "w-full flex flex-col gap-3"}
             >
-              <div class="grid grid-cols-1 @sm:grid-cols-2 {hasBio ? (hasManyArtistLinks ? '@2xl:grid @2xl:grid-cols-2' : '@2xl:flex @2xl:flex-col') : '@md:grid-cols-3 @xl:grid-cols-4'} gap-2.5">
+              <div class="grid grid-cols-1 @sm:grid-cols-2 {hasBio ? '@2xl:grid @2xl:grid-cols-2' : '@md:grid-cols-3 @xl:grid-cols-4'} gap-2.5">
                 <!-- Website, curated social links, and derived MusicBrainz/
                      ListenBrainz/Fanart.tv links, unified and sorted
                      alphabetically with the website first (#1122, #1123) -->
@@ -1030,11 +1017,11 @@
       disabled={loading || retrievingDetails || !hasMusicbrainzArtistId}
     />
     <ContextMenuItem
-      icon={FetchImage}
-      label={i18n.t("artistDetail.fetchArtistImage", {}, "Fetch Artist Image")}
-      title={hasMusicbrainzArtistId ? i18n.t("artistDetail.fetchArtistImageTooltip", {}, "Fetch an artist portrait from fanart.tv or Wikidata") : i18n.t("artistDetail.retrieveArtistDetailsNoMbidTooltip", {}, "No MusicBrainz artist ID found for this artist")}
-      onclick={() => { handleFetchArtistImage(); overflowMenuPos = null; }}
-      disabled={loading || fetchingImage || !hasMusicbrainzArtistId}
+      icon={RetrieveImage}
+      label={i18n.t("artistDetail.retrieveArtistImage", {}, "Retrieve Artist Image")}
+      title={hasMusicbrainzArtistId ? i18n.t("artistDetail.retrieveArtistImageTooltip", {}, "Retrieve an artist portrait from fanart.tv or Wikidata") : i18n.t("artistDetail.retrieveArtistDetailsNoMbidTooltip", {}, "No MusicBrainz artist ID found for this artist")}
+      onclick={() => { handleRetrieveArtistImage(); overflowMenuPos = null; }}
+      disabled={loading || retrievingImage || !hasMusicbrainzArtistId}
     />
     <ContextMenuItem
       icon={BarChart2}

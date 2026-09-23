@@ -474,7 +474,7 @@ export interface ArtistProfile {
   band_logo_uri?: string | null;
   fanart_uri?: string | null;
   /** Cache filename (build a URI with `luminous-art://${filename}`) of a
-   * portrait fetched via "Fetch Artist Image" (#1127) — distinct from
+   * portrait fetched via "Retrieve Artist Image" (#1127) — distinct from
    * `portrait_uri`, which is scanned from files already sitting next to the
    * artist's music. */
   fetched_image_filename?: string | null;
@@ -482,7 +482,7 @@ export interface ArtistProfile {
   fetched_image_source?: string | null;
 }
 
-export interface ArtistImageFetchResult {
+export interface ArtistImageRetrievalResult {
   uri: string | null;
   source: string | null;
 }

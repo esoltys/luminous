@@ -1,11 +1,10 @@
 <script lang="ts">
   import type { ArtistItem, AlbumItem, Song, ExtendedArtworkResponse } from "../types";
-  import { getCoverArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import CoverStack from "./CoverStack.svelte";
   import GenreChips from "./GenreChips.svelte";
-  import { getArtistCoverStack } from "../utils/covers";
+  import { getArtistCoverStack, resolveArtistPortraitUrl } from "../utils/covers";
 
   interface Props {
     artist: ArtistItem;
@@ -47,7 +46,10 @@
       cancelled = true;
     };
   });
-  let artistPortraitUrl = $derived(getCoverArtUrl(artistArtwork?.artist_portrait_uri));
+  let artistProfile = $derived(collectionStore.getArtistProfile(artist.name));
+  let artistPortraitUrl = $derived(
+    resolveArtistPortraitUrl(artistArtwork?.artist_portrait_uri, artistProfile?.fetched_image_filename)
+  );
 </script>
 
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->

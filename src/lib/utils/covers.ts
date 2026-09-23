@@ -1,3 +1,24 @@
+import { getCoverArtUrl } from "../types";
+
+/**
+ * Resolves the display URL for an artist's portrait: a locally-discovered
+ * one (artist.jpg/portrait next to the artist's music, from
+ * `get_extended_artwork_for_artist`) always wins; a network-fetched one
+ * (#1127, "Retrieve Artist Image") only ever fills in when no local
+ * portrait exists. Shared by every place an artist portrait is rendered
+ * (detail header, cards/rows, search results, share card) so they can't
+ * drift on which one to prefer.
+ */
+export function resolveArtistPortraitUrl(
+  localPortraitUri: string | null | undefined,
+  fetchedImageFilename: string | null | undefined
+): string | null {
+  return (
+    getCoverArtUrl(localPortraitUri) ??
+    (fetchedImageFilename ? getCoverArtUrl(`luminous-art://${fetchedImageFilename}`) : null)
+  );
+}
+
 export interface CoverSource {
   id: number;
   art_manual?: string | null;

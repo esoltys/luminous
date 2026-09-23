@@ -15,7 +15,7 @@ import type {
   ArtistItem,
   ArtistProfile,
   ArtistDetailsRetrievalResult,
-  ArtistImageFetchResult,
+  ArtistImageRetrievalResult,
   ExtendedArtworkResponse,
   RecentSearchItem,
   QueuePopulationMode,
@@ -743,14 +743,14 @@ class CollectionStore {
     return result;
   }
 
-  /** Artist detail overflow menu's "Fetch Artist Image" (#1127): fetches a
+  /** Artist detail overflow menu's "Retrieve Artist Image" (#1127): fetches a
    * portrait from fanart.tv (if an API key is configured) or, lacking a key
    * or a match, Wikidata's image property, caches it, and persists the
    * result onto the artist's profile. Updates the cached profile locally
    * from the returned filename rather than re-fetching the whole profile,
    * same convention as `retrieveArtistDetails`. */
-  async fetchArtistImage(artistName: string): Promise<ArtistImageFetchResult> {
-    const result = await invoke<ArtistImageFetchResult>("fetch_artist_image", {
+  async retrieveArtistImage(artistName: string): Promise<ArtistImageRetrievalResult> {
+    const result = await invoke<ArtistImageRetrievalResult>("retrieve_artist_image", {
       artist: artistName,
     });
     if (result?.uri) {
@@ -819,7 +819,7 @@ class CollectionStore {
     // The backend backfills the album's artist's musicbrainz_artist_id as a
     // side effect of this action (#1123) — refresh the cached artist
     // profile too, or the artist page keeps showing it as missing (and
-    // "Retrieve Artist Details"/"Fetch Artist Image" stay disabled) until
+    // "Retrieve Artist Details"/"Retrieve Artist Image" stay disabled) until
     // the whole library's profile cache happens to reload.
     if (result?.artist_profile?.artist_key) {
       this.artistProfiles = {

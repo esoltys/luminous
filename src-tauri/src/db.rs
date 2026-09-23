@@ -309,7 +309,7 @@ const MIGRATIONS: &[Migration] = &[
     },
     Migration {
         version: 40,
-        description: "fetched_image_filename/fetched_image_source columns on artist_profiles for Fetch Artist Image (#1127)",
+        description: "fetched_image_filename/fetched_image_source columns on artist_profiles for Retrieve Artist Image (#1127)",
         apply: |conn| {
             let has_fetched_image_filename: bool = conn
                 .prepare(
@@ -1405,7 +1405,7 @@ ALTER TABLE artist_profiles ADD COLUMN musicbrainz_artist_id TEXT;
 
 // ---------------------------------------------------------------------------
 // Migration 40: artist_profiles.fetched_image_filename/fetched_image_source —
-// an artist portrait fetched via "Fetch Artist Image" (#1127) from fanart.tv
+// an artist portrait fetched via "Retrieve Artist Image" (#1127) from fanart.tv
 // or, lacking an API key/match, Wikidata's P18 property. Cached under
 // `CoverManager`'s covers_dir, same convention as `songs.art_automatic`.
 // ---------------------------------------------------------------------------
