@@ -489,11 +489,14 @@
     background: transparent;
   }
 
+  /* Nothing ever renders behind this panel but the flat bg-main canvas,
+     so it paints the glass result as a solid color instead of running a
+     backdrop-filter (see flatGlassColor() in theme.svelte.ts). */
   aside.glass-surface {
     position: relative;
-    -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-    backdrop-filter: blur(20px) saturate(180%) !important;
-    background-color: var(--glass-bg-sidebar) !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    background-color: var(--glass-solid-sidebar) !important;
     border-color: var(--glass-border-color, var(--color-border)) !important;
     box-shadow: var(--glass-shadow, none);
   }

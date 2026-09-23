@@ -6,7 +6,13 @@
 
   let canvas = $state<HTMLCanvasElement | null>(null);
   let unlisten: (() => void) | null = null;
-  let spectrumData = $state<number[]>(Array(32).fill(0));
+  // Plain (non-reactive) on purpose: draw() reads it, and as $state the
+  // theme $effect below would also re-run on every spectrum event, drawing
+  // each frame twice.
+  let spectrumData: number[] = Array(32).fill(0);
+  let pendingFrame = 0;
+  let accentColor = "#8b5cf6";
+  let hoverColor = "#a78bfa";
 
   function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
     const shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
@@ -44,10 +50,6 @@
     const barGap = 2.5;
     const barWidth = (width - (numBars - 1) * barGap) / numBars;
 
-    const colors = themeStore.resolvedColors;
-    const accentColor = colors["color-accent"] || '#8b5cf6';
-    const hoverColor = colors["color-accent-hover"] || '#a78bfa';
-
     const rgb = hexToRgb(accentColor) || { r: 139, g: 92, b: 246 };
 
     const grad = ctx.createLinearGradient(0, height, 0, 0);
@@ -74,15 +76,26 @@
     }
   }
 
+  // Coalesces bursts of spectrum events into at most one draw per display
+  // frame, painted in step with the compositor rather than mid-frame.
+  function scheduleDraw() {
+    if (pendingFrame) return;
+    pendingFrame = requestAnimationFrame(() => {
+      pendingFrame = 0;
+      draw();
+    });
+  }
+
   $effect(() => {
-    const _theme = themeStore.activeThemeId;
-    const _art = themeStore.artworkColors;
-    draw();
+    const colors = themeStore.resolvedColors;
+    accentColor = colors["color-accent"] || '#8b5cf6';
+    hoverColor = colors["color-accent-hover"] || '#a78bfa';
+    scheduleDraw();
   });
 
   function handleVisibilityChange() {
     if (typeof document !== "undefined" && !document.hidden) {
-      draw();
+      scheduleDraw();
     }
   }
 
@@ -95,7 +108,7 @@
       unlisten = await listen<number[]>("spectrum-data", (event) => {
         spectrumData = event.payload;
         if (typeof document === "undefined" || !document.hidden) {
-          draw();
+          scheduleDraw();
         }
       });
     } catch (e) {
@@ -104,6 +117,7 @@
   });
 
   onDestroy(() => {
+    if (pendingFrame) cancelAnimationFrame(pendingFrame);
     releaseSpectrum();
     if (typeof document !== "undefined") {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
