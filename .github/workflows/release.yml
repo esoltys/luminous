@@ -192,6 +192,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y flatpak flatpak-builder ostree xvfb
+          # The action installs the runtime/SDK with `flatpak --system install
+          # flathub ...`, which needs the remote to exist system-wide.
+          sudo flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 
       # TODO(#1086): pin to a commit SHA (matching this file's other `uses:`
       # pins) once verified against the real tag - not done here, no network
