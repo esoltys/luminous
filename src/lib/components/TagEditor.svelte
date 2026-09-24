@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { isRemotePath } from "../utils/remoteSource";
   import { invoke } from "@tauri-apps/api/core";
   import { onMount } from "svelte";
   import {
@@ -51,12 +52,12 @@
   let initialKey = $state("");
   let path = $state("");
   let rating = $state(-1);
-  // WebDAV songs (#682) have no local file Luminous can write lofty tags to,
+  // Remote songs (WebDAV #682, OpenSubsonic #916) have no local file Luminous can write lofty tags to,
   // and there's no write-back to the remote server -- edits here only ever
   // reach Luminous's own DB. Derived from the path scheme rather than a
   // dedicated field since it's the same signal audio.rs/collection.rs
   // already key off of for "is this a remote source" checks.
-  let isRemoteSource = $derived(/^https?:\/\//i.test(path));
+  let isRemoteSource = $derived(isRemotePath(path));
   // CUE sheet tracks (#78) share one physical file's embedded tags across
   // every track cut from it, so there's nowhere to persist a per-track edit
   // back to disk yet -- the backend rejects the save outright, so keep the

@@ -638,11 +638,18 @@ pub async fn open_song_folder(
 ) -> Result<(), String> {
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     let dir = song_ids.iter().find_map(|id| {
-        let path: Option<String> = conn
-            .query_row("SELECT path FROM songs WHERE id = ?1", [id], |row| {
-                row.get(0)
-            })
+        let row: Option<(String, i32)> = conn
+            .query_row(
+                "SELECT path, source FROM songs WHERE id = ?1",
+                [id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
             .ok();
+        // A remote song's path is a URL / `subsonic://` URI, not a folder
+        // that exists on disk (#916).
+        let path = row
+            .filter(|(_, source)| !crate::models::SongSource::from(*source as i64).is_remote())
+            .map(|(path, _)| path);
         path.as_deref()
             .map(std::path::Path::new)
             .and_then(|p| p.parent())

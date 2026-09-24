@@ -24,7 +24,7 @@ describe("PlaylistContextMenu.svelte", () => {
     expect(item.closest("button")).not.toBeDisabled();
   });
 
-  it("disables Open in Picard when the selection is all WebDAV", async () => {
+  it("disables Open in Picard when the selection is all remote", async () => {
     render(PlaylistContextMenu, {
       x: 0,
       y: 0,
@@ -32,13 +32,13 @@ describe("PlaylistContextMenu.svelte", () => {
       onPlay: () => {},
       onRemove: () => {},
       onOpenInPicard: () => {},
-      allSelectedWebDav: true,
+      allSelectedRemote: true,
       onClose: () => {},
     });
 
     const item = await screen.findByText("Open in Picard");
     const button = item.closest("button");
     expect(button).toBeDisabled();
-    expect(button).toHaveAttribute("title", "Open in Picard isn't available for WebDAV songs");
+    expect(button).toHaveAttribute("title", "Open in Picard isn't available for songs on a remote server");
   });
 });

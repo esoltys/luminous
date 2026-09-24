@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { isRemoteSource } from "../utils/remoteSource";
   import {
     PlayIcon as Play,
     PlusIcon as Plus,
@@ -82,7 +83,7 @@
   }
 
   const picardSelection = $derived(selectedSongs && selectedSongs.length > 0 ? selectedSongs : [song]);
-  const allSelectedWebDav = $derived(picardSelection.every((s) => s.source === "web_dav"));
+  const allSelectedRemote = $derived(picardSelection.every(isRemoteSource));
 
   let showShareModal = $state(false);
   // See AlbumContextMenu.svelte for why the menu must be hidden (not left
@@ -219,11 +220,11 @@
       icon={OpenInPicard}
       label={i18n.t("picard.openInPicard")}
       onclick={() => { onOpenInPicard?.(); onClose(); }}
-      disabled={!picardStore.available || allSelectedWebDav}
+      disabled={!picardStore.available || allSelectedRemote}
       title={!picardStore.available
         ? i18n.t("picard.notFoundTooltip")
-        : allSelectedWebDav
-          ? i18n.t("picard.webdavNotSupportedTooltip")
+        : allSelectedRemote
+          ? i18n.t("picard.remoteNotSupportedTooltip")
           : undefined}
     />
   {/if}
