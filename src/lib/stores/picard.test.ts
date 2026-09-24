@@ -6,6 +6,7 @@ describe("PicardStore", () => {
   beforeEach(() => {
     (picardStore as any).initialized = false;
     picardStore.path = null;
+    picardStore.missingPlaylistEnabled = false;
     vi.mocked(invoke).mockReset();
   });
 
@@ -66,20 +67,30 @@ describe("PicardStore", () => {
     expect(picardStore.path).toBeNull();
   });
 
-  it("defaults missingPlaylistEnabled to true and updates via setMissingPlaylistEnabled", async () => {
-    expect(picardStore.missingPlaylistEnabled).toBe(true);
-    await picardStore.setMissingPlaylistEnabled(false);
+  it("defaults missingPlaylistEnabled to false and updates via setMissingPlaylistEnabled", async () => {
     expect(picardStore.missingPlaylistEnabled).toBe(false);
+    await picardStore.setMissingPlaylistEnabled(true);
+    expect(picardStore.missingPlaylistEnabled).toBe(true);
     expect(invoke).toHaveBeenCalledWith("set_app_setting", {
       key: "picard_missing_playlist_enabled",
-      value: "false",
+      value: "true",
     });
   });
 
   it("loads missingPlaylistEnabled from app settings on refresh", async () => {
     vi.mocked(invoke).mockImplementation(async (cmd: string) => {
       if (cmd === "get_picard_path") return null;
-      if (cmd === "get_all_app_settings") return { picard_missing_playlist_enabled: "false" };
+      if (cmd === "get_all_app_settings") return { picard_missing_playlist_enabled: "true" };
+      return null;
+    });
+    await picardStore.refresh();
+    expect(picardStore.missingPlaylistEnabled).toBe(true);
+  });
+
+  it("keeps missingPlaylistEnabled off when the setting was never saved", async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_picard_path") return null;
+      if (cmd === "get_all_app_settings") return {};
       return null;
     });
     await picardStore.refresh();

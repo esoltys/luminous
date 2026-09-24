@@ -149,10 +149,10 @@ describe("SettingsIntegrations.svelte", () => {
 
     const toggle = getByLabelText(/Missing MusicBrainz ID/i);
     expect(toggle).toBeInTheDocument();
-    expect(toggle).toBeChecked();
+    expect(toggle).not.toBeChecked();
 
     await fireEvent.click(toggle);
     await tick();
-    expect(toggle).not.toBeChecked();
+    expect(toggle).toBeChecked();
   });
 });
