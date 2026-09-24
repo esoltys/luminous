@@ -17,6 +17,7 @@
   import PlaylistCard from "./PlaylistCard.svelte";
   import AlbumContextMenu from "./AlbumContextMenu.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
+  import PlaylistCardContextMenu from "./PlaylistCardContextMenu.svelte";
   import { tagsStore } from "../stores/tags.svelte";
   import { tasksStore } from "../stores/tasks.svelte";
   import TagEditor from "./TagEditor.svelte";
@@ -80,6 +81,7 @@
   let retrievingImage = $state(false);
 
   let albumContextMenuState = $state<{ x: number; y: number; album: AlbumItem } | null>(null);
+  let playlistContextMenuState = $state<{ x: number; y: number; playlist: Playlist } | null>(null);
   let singleContextMenuState = $state<{ x: number; y: number; song: Song } | null>(null);
 
   // "Not included" tracks stay visible/individually playable but drop out of
@@ -277,6 +279,11 @@
   function handleAlbumContextMenu(event: MouseEvent, album: AlbumItem) {
     event.preventDefault();
     albumContextMenuState = { x: event.clientX, y: event.clientY, album };
+  }
+
+  function handlePlaylistContextMenu(event: MouseEvent, playlist: Playlist) {
+    event.preventDefault();
+    playlistContextMenuState = { x: event.clientX, y: event.clientY, playlist };
   }
 
   function handleRowContextMenu(event: MouseEvent, row: SongTableRow) {
@@ -1022,7 +1029,12 @@
     <div class="px-6 pt-10 {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
       <HorizontalScrollRow title={i18n.t('artistDetail.playlistsFeaturing', { artist: artistName })}>
         {#each playlists as playlist (playlist.id)}
-          <PlaylistCard {playlist} widthClass="w-48 shrink-0" onClick={() => openPlaylist(playlist)} />
+          <PlaylistCard
+            {playlist}
+            widthClass="w-48 shrink-0"
+            onClick={() => openPlaylist(playlist)}
+            oncontextmenu={(e) => handlePlaylistContextMenu(e, playlist)}
+          />
         {/each}
       </HorizontalScrollRow>
     </div>
@@ -1058,6 +1070,15 @@
     }}
     onGoToArtist={album.artist && album.artist !== artistName ? () => navigationStore.viewArtist(album.artist || "") : undefined}
     onClose={() => { albumContextMenuState = null; }}
+  />
+{/if}
+
+{#if playlistContextMenuState}
+  <PlaylistCardContextMenu
+    x={playlistContextMenuState.x}
+    y={playlistContextMenuState.y}
+    playlist={playlistContextMenuState.playlist}
+    onClose={() => { playlistContextMenuState = null; }}
   />
 {/if}
 

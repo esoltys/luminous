@@ -12,7 +12,11 @@
   import { isSmartPlaylistSpec } from "../utils/filterParser";
   import { getPlaylistDisplayName } from "../utils/playlist";
 
-  let { playlist, onClick }: { playlist: Playlist; onClick: () => void } = $props();
+  let {
+    playlist,
+    onClick,
+    oncontextmenu,
+  }: { playlist: Playlist; onClick: () => void; oncontextmenu?: (e: MouseEvent) => void } = $props();
 
   let cardTitle = $derived(getPlaylistDisplayName(playlist));
 
@@ -44,6 +48,7 @@
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <div
   onclick={onClick}
+  {oncontextmenu}
   class="group flex items-center gap-3 px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 select-none"
 >
   <div

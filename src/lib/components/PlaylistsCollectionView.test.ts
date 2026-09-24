@@ -5,6 +5,7 @@ import PlaylistsCollectionView from "./PlaylistsCollectionView.svelte";
 import { collectionStore } from "../stores/collection.svelte";
 import { navigationStore } from "../stores/navigation.svelte";
 import { playlistsStore } from "../stores/playlists.svelte";
+import { pinnedStore } from "../stores/pinned.svelte";
 import { invoke } from "@tauri-apps/api/core";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -141,5 +142,49 @@ describe("PlaylistsCollectionView.svelte - Decades Auto Playlists", () => {
     expect(
       morningMixEl.compareDocumentPosition(favSongsEl) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
+  });
+
+  it("opens a pin-able context menu when an auto-playlist card is right-clicked", async () => {
+    playlistsStore.favouritesCount = 10;
+    playlistsStore.playlists = [];
+    const toggleSpy = vi.spyOn(pinnedStore, "toggle").mockResolvedValue();
+
+    const { getByText } = render(PlaylistsCollectionView);
+    await fireEvent.contextMenu(getByText("Favourite Songs"));
+    await fireEvent.click(getByText("Pin to Home"));
+
+    expect(toggleSpy).toHaveBeenCalledWith("auto_playlist", "favourites");
+    toggleSpy.mockRestore();
+  });
+});
+
+describe("PlaylistsCollectionView.svelte - Custom Playlists", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    navigationStore.selectedPlaylistId = null;
+    navigationStore.selectedAutoPlaylist = null;
+    navigationStore.playlistsSubTab = "custom";
+  });
+
+  it("opens a pin-able context menu when a playlist card is right-clicked", async () => {
+    playlistsStore.playlists = [
+      {
+        id: 7,
+        name: "Road Trip",
+        dynamic_enabled: false,
+        is_queue: false,
+        track_count: 3,
+        created: 1700000000,
+        updated: 1700000000,
+      },
+    ];
+    const toggleSpy = vi.spyOn(pinnedStore, "toggle").mockResolvedValue();
+
+    const { getAllByText, getByText } = render(PlaylistsCollectionView);
+    await fireEvent.contextMenu(getAllByText("Road Trip")[0]);
+    await fireEvent.click(getByText("Pin to Home"));
+
+    expect(toggleSpy).toHaveBeenCalledWith("playlist", "7");
+    toggleSpy.mockRestore();
   });
 });
