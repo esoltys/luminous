@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 43;
+pub const CURRENT_SCHEMA_VERSION: i32 = 44;
 
 struct Migration {
     version: i32,
@@ -366,6 +366,10 @@ const MIGRATIONS: &[Migration] = &[
             }
             Ok(())
         },
+    },    Migration {
+        version: 44,
+        description: "subsonic_servers, subsonic_cache, and subsonic_album_cache tables for OpenSubsonic servers (#916, #1161)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_44)?),
     },
 ];
 
@@ -1498,6 +1502,64 @@ ALTER TABLE artist_profiles ADD COLUMN image_fetched INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE album_profiles ADD COLUMN details_fetched INTEGER NOT NULL DEFAULT 0;
 ";
 
+// ---------------------------------------------------------------------------
+// Migration 44: OpenSubsonic servers (#916, #1161). Songs synced from a
+// server live in `songs` with `source = 5` and a credential-free
+// `subsonic://{server_id}/{track_id}` path; `subsonic_cache` maps each remote
+// track to its song row and remembers the last rating/star seen on the
+// server, so a sync only adopts server-side changes made since then (and
+// never clobbers a local edit). `subsonic_album_cache` does the same for
+// album stars/ratings, keyed to `album_ratings.album_key`.
+// ---------------------------------------------------------------------------
+const MIGRATION_44: &str = "
+CREATE TABLE IF NOT EXISTS subsonic_servers (
+    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+    name                  TEXT NOT NULL,
+    url                   TEXT NOT NULL,
+    username              TEXT NOT NULL,
+    password              TEXT,
+    enabled               BOOLEAN NOT NULL DEFAULT 1,
+    sync_status           TEXT NOT NULL DEFAULT 'idle',
+    last_synced_at        INTEGER,
+    created_at            INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+    nickname              TEXT,
+    icon                  TEXT,
+    color                 TEXT,
+    auto_sync_enabled     INTEGER NOT NULL DEFAULT 0,
+    sync_interval_minutes INTEGER NOT NULL DEFAULT 60,
+    report_plays          INTEGER NOT NULL DEFAULT 1,
+    server_type           TEXT,
+    server_version        TEXT,
+    extensions_json       TEXT NOT NULL DEFAULT '[]'
+);
+
+CREATE TABLE IF NOT EXISTS subsonic_cache (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    server_id      INTEGER NOT NULL REFERENCES subsonic_servers(id) ON DELETE CASCADE,
+    remote_id      TEXT NOT NULL,
+    song_id        INTEGER REFERENCES songs(id) ON DELETE SET NULL,
+    album_id       TEXT,
+    cover_art_id   TEXT,
+    server_rating  INTEGER,
+    server_starred INTEGER NOT NULL DEFAULT 0,
+    cached_at      INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+    UNIQUE(server_id, remote_id)
+);
+CREATE INDEX IF NOT EXISTS idx_subsonic_cache_song ON subsonic_cache(song_id);
+
+CREATE TABLE IF NOT EXISTS subsonic_album_cache (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    server_id       INTEGER NOT NULL REFERENCES subsonic_servers(id) ON DELETE CASCADE,
+    remote_album_id TEXT NOT NULL,
+    album_key       TEXT NOT NULL,
+    server_rating   INTEGER,
+    server_starred  INTEGER NOT NULL DEFAULT 0,
+    cached_at       INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+    UNIQUE(server_id, remote_album_id)
+);
+CREATE INDEX IF NOT EXISTS idx_subsonic_album_cache_key ON subsonic_album_cache(album_key);
+";
+
 fn seed_artist_tag_hierarchy(conn: &rusqlite::Connection) -> Result<()> {
     let mut stmt = conn.prepare(
         "SELECT DISTINCT json_each.value
@@ -2031,6 +2093,106 @@ mod tests {
             .unwrap();
         assert!(auto_sync_enabled);
         assert_eq!(sync_interval_minutes, 15);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_migration_44_subsonic_tables() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_migration44_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Database::new(temp_dir.clone()).unwrap();
+        assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
+
+        let conn = db.pool.get().unwrap();
+
+        conn.execute(
+            "INSERT INTO subsonic_servers (name, url, username, password) VALUES (?1, ?2, ?3, ?4)",
+            params!["Home", "https://music.example.com", "alice", "pw"],
+        )
+        .unwrap();
+        let server_id = conn.last_insert_rowid();
+
+        let (enabled, auto_sync, interval, report_plays, sync_status, extensions): (
+            bool,
+            bool,
+            i64,
+            bool,
+            String,
+            String,
+        ) = conn
+            .query_row(
+                "SELECT enabled, auto_sync_enabled, sync_interval_minutes, report_plays, sync_status, extensions_json
+                 FROM subsonic_servers WHERE id = ?1",
+                params![server_id],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?)),
+            )
+            .unwrap();
+        assert!(enabled);
+        assert!(!auto_sync);
+        assert_eq!(interval, 60);
+        assert!(report_plays);
+        assert_eq!(sync_status, "idle");
+        assert_eq!(extensions, "[]");
+
+        conn.execute(
+            "INSERT INTO songs (title, path, source) VALUES ('Knowing', 'subsonic://1/abc', 5)",
+            [],
+        )
+        .unwrap();
+        let song_id = conn.last_insert_rowid();
+        conn.execute(
+            "INSERT INTO subsonic_cache (server_id, remote_id, song_id, server_rating, server_starred)
+             VALUES (?1, 'abc', ?2, 5, 1)",
+            params![server_id, song_id],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO subsonic_album_cache (server_id, remote_album_id, album_key, server_starred)
+             VALUES (?1, 'alb1', 'Bloom', 1)",
+            params![server_id],
+        )
+        .unwrap();
+
+        // One cache row per (server, remote id).
+        assert!(conn
+            .execute(
+                "INSERT INTO subsonic_cache (server_id, remote_id) VALUES (?1, 'abc')",
+                params![server_id],
+            )
+            .is_err());
+
+        // Deleting the song keeps the cache row but detaches it.
+        conn.execute("DELETE FROM songs WHERE id = ?1", params![song_id])
+            .unwrap();
+        let cached_song: Option<i64> = conn
+            .query_row(
+                "SELECT song_id FROM subsonic_cache WHERE remote_id = 'abc'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(cached_song, None);
+
+        // Deleting the server cascades to both caches.
+        conn.execute(
+            "DELETE FROM subsonic_servers WHERE id = ?1",
+            params![server_id],
+        )
+        .unwrap();
+        let remaining: i64 = conn
+            .query_row(
+                "SELECT (SELECT COUNT(*) FROM subsonic_cache) + (SELECT COUNT(*) FROM subsonic_album_cache)",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(remaining, 0);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

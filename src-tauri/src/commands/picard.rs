@@ -37,7 +37,7 @@ pub async fn open_in_picard(state: State<'_, AppState>, song_ids: Vec<i64>) -> R
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     let mut dirs = Vec::new();
     let mut seen = std::collections::HashSet::new();
-    let mut webdav_skipped = 0;
+    let mut remote_skipped = 0;
     for id in song_ids {
         let row: Option<(String, i32)> = conn
             .query_row(
@@ -49,15 +49,15 @@ pub async fn open_in_picard(state: State<'_, AppState>, song_ids: Vec<i64>) -> R
         let Some((path, source)) = row else {
             continue;
         };
-        // A WebDAV song's `path` is an `http(s)://` URL (see webdav.rs's
-        // `playback_url`), not a local filesystem path — Picard can only
-        // open real files, and `Path::new(url).parent()` would silently
-        // "succeed" with a bogus directory that just looks like one (its
-        // `/`-separated segments) since `Path` doesn't understand URL
+        // A remote song's `path` is a URL/URI (WebDAV's `http(s)://`
+        // playback URL, OpenSubsonic's `subsonic://`), not a local filesystem
+        // path — Picard can only open real files, and `Path::new(url).parent()`
+        // would silently "succeed" with a bogus directory that just looks like
+        // one (its `/`-separated segments) since `Path` doesn't understand URL
         // schemes. Skip these rather than handing Picard something it can't
         // actually open (#1082 follow-up).
-        if source == models::SongSource::WebDav as i32 {
-            webdav_skipped += 1;
+        if models::SongSource::from(source as i64).is_remote() {
+            remote_skipped += 1;
             continue;
         }
         if let Some(dir) = std::path::Path::new(&path).parent() {
@@ -69,8 +69,8 @@ pub async fn open_in_picard(state: State<'_, AppState>, song_ids: Vec<i64>) -> R
     drop(conn);
 
     if dirs.is_empty() {
-        if webdav_skipped > 0 {
-            return Err("The selected songs are on a WebDAV server — MusicBrainz Picard can only open local files.".to_string());
+        if remote_skipped > 0 {
+            return Err("The selected songs are on a remote server — MusicBrainz Picard can only open local files.".to_string());
         }
         return Err("No local files found for the selected songs".to_string());
     }

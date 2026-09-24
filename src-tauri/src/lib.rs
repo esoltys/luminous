@@ -44,6 +44,7 @@ pub mod restart_manager;
 pub mod scrobbler;
 pub mod stats;
 pub mod stats_summary;
+pub mod subsonic;
 pub mod tageditor;
 pub mod tags;
 #[cfg(target_os = "windows")]
@@ -1465,6 +1466,11 @@ pub fn run() {
             commands::organizer::preview_organize,
             commands::organizer::apply_organize,
             // WebDAV commands (#682)
+            commands::subsonic::list_subsonic_servers,
+            commands::subsonic::save_subsonic_server,
+            commands::subsonic::delete_subsonic_server,
+            commands::subsonic::test_subsonic_connection,
+            commands::subsonic::check_subsonic_connection,
             commands::webdav::list_webdav_servers,
             commands::webdav::save_webdav_server,
             commands::webdav::delete_webdav_server,

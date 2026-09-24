@@ -14,6 +14,7 @@ pub mod scrobbler;
 pub mod settings;
 pub mod share;
 pub mod stats;
+pub mod subsonic;
 pub mod tageditor;
 pub mod tags;
 pub mod theme;
