@@ -1414,7 +1414,7 @@ export const fr = {
     createTitle: "Créer une liste intelligente",
     selectFolderTitle: "Sélectionner un dossier",
     browseFolderTooltip: "Parcourir le dossier",
-    folderValuePlaceholder: "ex. Radio ou parcourir...",
+    folderValuePlaceholder: "ex. Radio Downloads ou parcourir...",
     subtitle: "Créez une liste de lecture dynamique à partir de règles de métadonnées personnalisées",
     nameLabel: "Nom de la liste",
     namePlaceholder: "Ma liste intelligente",

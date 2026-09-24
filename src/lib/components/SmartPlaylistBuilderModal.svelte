@@ -230,6 +230,10 @@
       .map((r) => {
         const val = r.value.trim();
         const opPrefix = r.op === "contains" ? "" : r.op;
+        if (/[\s"';]/.test(val) || opPrefix) {
+          const escapedVal = val.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+          return `${r.field}:${opPrefix}"${escapedVal}"`;
+        }
         return `${r.field}:${opPrefix}${val}`;
       })
       .join("; ");
@@ -381,7 +385,7 @@
                     type="text"
                     bind:value={rule.value}
                     oninput={() => { if (!userHasEditedName) playlistName = generateSuggestedName(rules); }}
-                    placeholder={i18n.t("smartPlaylistBuilder.folderValuePlaceholder", {}, "e.g. Radio or browse...")}
+                    placeholder={i18n.t("smartPlaylistBuilder.folderValuePlaceholder", {}, "e.g. Radio Downloads or browse...")}
                     size="sm"
                     surface="sidebar"
                     class="flex-1 min-w-0"

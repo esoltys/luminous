@@ -1415,7 +1415,7 @@ export const en = {
     createTitle: "Create Smart Playlist",
     selectFolderTitle: "Select Folder",
     browseFolderTooltip: "Browse folder",
-    folderValuePlaceholder: "e.g. Radio or browse...",
+    folderValuePlaceholder: "e.g. Radio Downloads or browse...",
     subtitle: "Build a dynamic playlist based on custom metadata rules",
     nameLabel: "Playlist Name",
     namePlaceholder: "My Smart Playlist",

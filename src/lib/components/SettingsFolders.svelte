@@ -203,9 +203,10 @@
 
   async function handleCreateFolderPlaylist(dir: MusicDirectory) {
     const name = dir.nickname || dir.path.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || dir.path;
+    const escapedPath = dir.path.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
     try {
       const playlist = await playlistsStore.createPlaylist(name);
-      await playlistsStore.updatePlaylistSpec(playlist.id, `folder:"${dir.path}"`);
+      await playlistsStore.updatePlaylistSpec(playlist.id, `folder:"${escapedPath}"`);
       navigationStore.activeTab = "playlists";
       navigationStore.selectedPlaylistId = playlist.id;
     } catch (err) {

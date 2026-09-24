@@ -135,9 +135,16 @@ fn tokenize(input: &str) -> Vec<String> {
     let mut current = String::new();
     let mut in_quotes = false;
     let mut quote_char = ' ';
+    let mut escaped = false;
 
     for ch in input.chars() {
-        if ch == '"' || ch == '\'' {
+        if ch == '\\' && !escaped {
+            escaped = true;
+            current.push(ch);
+            continue;
+        }
+
+        if (ch == '"' || ch == '\'') && !escaped {
             if in_quotes && ch == quote_char {
                 in_quotes = false;
             } else if !in_quotes {
@@ -153,6 +160,7 @@ fn tokenize(input: &str) -> Vec<String> {
         } else {
             current.push(ch);
         }
+        escaped = false;
     }
     if !current.trim().is_empty() {
         tokens.push(current.trim().to_string());
@@ -164,7 +172,16 @@ fn tokenize(input: &str) -> Vec<String> {
 fn parse_field_filter(token: &str) -> Option<FieldFilter> {
     let colon_idx = token.find(':')?;
     let (field_part, val_part) = token.split_at(colon_idx);
-    let val_str = val_part[1..].trim_matches('"').trim_matches('\'');
+    let mut val_raw = val_part[1..].trim();
+    if (val_raw.starts_with('"') && val_raw.ends_with('"'))
+        || (val_raw.starts_with('\'') && val_raw.ends_with('\''))
+    {
+        val_raw = &val_raw[1..val_raw.len() - 1];
+    }
+    let val_str = val_raw
+        .replace("\\\"", "\"")
+        .replace("\\'", "'")
+        .replace("\\\\", "\\");
 
     let field_clean = field_part.trim().to_lowercase();
     if field_clean.is_empty() || val_str.is_empty() {
@@ -203,7 +220,7 @@ fn parse_field_filter(token: &str) -> Option<FieldFilter> {
         _ => return None,
     };
 
-    let (op, raw_val) = parse_op_and_value(val_str, is_numeric);
+    let (op, raw_val) = parse_op_and_value(&val_str, is_numeric);
 
     let value = if sql_column == "path" {
         let normalized_val = raw_val.replace('\\', "/");
@@ -392,14 +409,14 @@ mod tests {
 
     #[test]
     fn test_parse_folder_filter() {
-        let q = parse_query("folder:\"Worship forever1\"");
+        let q = parse_query("folder:\"Radio Downloads\"");
         assert_eq!(q.field_filters.len(), 1);
         assert_eq!(q.field_filters[0].field, "folder");
         assert_eq!(q.field_filters[0].sql_column, "path");
         assert_eq!(q.field_filters[0].op, Op::Contains);
         assert_eq!(
             q.field_filters[0].value,
-            FilterValue::Text("%Worship forever1%".to_string())
+            FilterValue::Text("%Radio Downloads%".to_string())
         );
         assert_eq!(
             q.field_filters[0].to_sql_clause(1),
@@ -407,11 +424,19 @@ mod tests {
         );
 
         // Windows path slashes normalized in filter value
-        let q2 = parse_query("path:Music\\Worship");
+        let q2 = parse_query("path:\"Music\\Radio Downloads\"");
         assert_eq!(q2.field_filters.len(), 1);
         assert_eq!(
             q2.field_filters[0].value,
-            FilterValue::Text("%Music/Worship%".to_string())
+            FilterValue::Text("%Music/Radio Downloads%".to_string())
+        );
+
+        // Folder path with spaces and internal quotes (e.g. station name in path)
+        let q3 = parse_query("folder:\"/home/esoltys/Music/Shortwave/CKLZ-FM 104.7 \\\"The Lizard\\\" Kelowna, BC\"");
+        assert_eq!(q3.field_filters.len(), 1);
+        assert_eq!(
+            q3.field_filters[0].value,
+            FilterValue::Text("%/home/esoltys/Music/Shortwave/CKLZ-FM 104.7 \"The Lizard\" Kelowna, BC%".to_string())
         );
     }
 }

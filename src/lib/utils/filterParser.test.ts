@@ -33,7 +33,7 @@ describe("isSmartPlaylistSpec", () => {
     expect(isSmartPlaylistSpec("genre:rock")).toBe(true);
     expect(isSmartPlaylistSpec("artist_tag:canadian")).toBe(true);
     expect(isSmartPlaylistSpec("artist:Miles Davis; rating:>=4")).toBe(true);
-    expect(isSmartPlaylistSpec("folder:Worship forever1")).toBe(true);
+    expect(isSmartPlaylistSpec("folder:Radio Downloads")).toBe(true);
   });
 });
 
@@ -46,8 +46,8 @@ describe("parseSearchRules", () => {
   });
 
   it("normalizes folder, subfolder, directory, path filters to folder", () => {
-    expect(parseSearchRules("folder:\"Worship forever1\"")).toEqual([
-      { field: "folder", op: "contains", value: "Worship forever1" },
+    expect(parseSearchRules("folder:\"Radio Downloads\"")).toEqual([
+      { field: "folder", op: "contains", value: "Radio Downloads" },
     ]);
     expect(parseSearchRules("path:Downloads/Metal")).toEqual([
       { field: "folder", op: "contains", value: "Downloads/Metal" },
