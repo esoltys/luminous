@@ -3,6 +3,7 @@
 use crate::covermanager::CoverManager;
 use crate::db::Database;
 use crate::models::{SongSource, WebDavServer, WebDavSyncStats};
+use crate::remote_scheduler::RemoteKind;
 use crate::webdav::{detect_filetype_from_url, WebDavClient};
 use crate::AppState;
 use rusqlite::params;
@@ -61,7 +62,7 @@ pub async fn list_webdav_servers(state: State<'_, AppState>) -> Result<Vec<WebDa
 
     let mut servers = Vec::new();
     for mut s in rows.flatten() {
-        s.next_auto_sync_at = state.webdav_auto_sync.next_run_at(s.id);
+        s.next_auto_sync_at = state.remote_auto_sync.next_run_at(RemoteKind::WebDav, s.id);
         servers.push(s);
     }
     Ok(servers)
@@ -201,17 +202,20 @@ pub async fn save_webdav_server(
     // Reschedule (or cancel) this server's auto-sync timer to reflect the
     // settings just saved — takes effect immediately, no app restart needed.
     if saved.enabled && saved.auto_sync_enabled {
-        state.webdav_auto_sync.reschedule(
+        state.remote_auto_sync.reschedule(
             app,
             Arc::clone(&state.db),
             Arc::clone(&state.cover_manager),
+            RemoteKind::WebDav,
             saved.id,
             saved.sync_interval_minutes,
         );
     } else {
-        state.webdav_auto_sync.cancel(saved.id);
+        state.remote_auto_sync.cancel(RemoteKind::WebDav, saved.id);
     }
-    saved.next_auto_sync_at = state.webdav_auto_sync.next_run_at(saved.id);
+    saved.next_auto_sync_at = state
+        .remote_auto_sync
+        .next_run_at(RemoteKind::WebDav, saved.id);
 
     Ok(saved)
 }
@@ -284,7 +288,7 @@ pub async fn delete_webdav_server(
     }
     tx.commit().map_err(|e| e.to_string())?;
 
-    state.webdav_auto_sync.cancel(id);
+    state.remote_auto_sync.cancel(RemoteKind::WebDav, id);
     let _ = app.emit("library-changed", ());
     Ok(())
 }
@@ -340,7 +344,7 @@ pub async fn sync_webdav_server(
 }
 
 /// Core sync routine shared by the [`sync_webdav_server`] command (manual
-/// "Sync Now" clicks) and `webdav_scheduler::AutoSyncScheduler` (periodic
+/// "Sync Now" clicks) and `remote_scheduler::AutoSyncScheduler` (periodic
 /// auto-sync, #1082) — the scheduler runs as a background task with only an
 /// `AppHandle` and `Arc<Database>`/`Arc<CoverManager>`, not a `State<AppState>`.
 pub async fn sync_webdav_server_inner(

@@ -880,7 +880,7 @@ pub struct WebDavServer {
     pub auto_sync_enabled: bool,
     pub sync_interval_minutes: i64,
     /// Unix timestamp (seconds) of this server's next scheduled auto-sync —
-    /// runtime-only (from `webdav_scheduler::AutoSyncScheduler`), not a DB
+    /// runtime-only (from `remote_scheduler::AutoSyncScheduler`), not a DB
     /// column, so it's `None` unless the command handler populates it.
     pub next_auto_sync_at: Option<i64>,
 }
@@ -918,6 +918,20 @@ pub struct SubsonicServer {
     pub extensions: Vec<String>,
     /// Runtime-only, like `WebDavServer::next_auto_sync_at`.
     pub next_auto_sync_at: Option<i64>,
+}
+
+/// Statistics returned after syncing an OpenSubsonic server (#1162).
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SubsonicSyncStats {
+    /// Tracks imported for the first time.
+    pub added: usize,
+    /// Tracks whose metadata changed on the server, or that reappeared.
+    pub updated: usize,
+    /// Tracks no longer on the server, now marked unavailable.
+    pub removed: usize,
+    /// Albums whose artwork couldn't be downloaded (the sync still completes).
+    pub errors: usize,
 }
 
 /// Statistics returned after syncing a WebDAV server.
