@@ -91,6 +91,14 @@ function trackListLayout(dims: { width: number; height: number }, trackCount: nu
   return { columns, maxVisible: columns * rowsPerColumn };
 }
 
+// Cover shadow. filter:drop-shadow rather than box-shadow: WebKitGTK renders a
+// box-shadow blur inside an SVG-as-image foreignObject as a hard-edged, clipped
+// dark rectangle, while drop-shadow blurs correctly on every platform.
+// Cover <img>s also carry decoding="sync" — without it WebKitGTK paints the
+// SVG before the embedded data-URI images decode, so the first rasterization
+// comes out with the cover missing.
+const COVER_SHADOW = "filter:drop-shadow(0 20px 25px rgba(0,0,0,0.4))";
+
 /**
  * Renders either a single cover image or, when `stackUris` has 2+ entries, a
  * fanned stack of up to 4 — same offset/rotation/scale/opacity progression as
@@ -121,14 +129,14 @@ function buildCoverHtml(
         const rot = i * 5 * dxSign;
         const scale = 1 - i * 0.05;
         const opacity = 1 - i * 0.09;
-        return `<img src="${uri}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:${radius}px;box-shadow:0 20px 50px rgba(0,0,0,0.4);opacity:${opacity};transform:translate(${dx}px,${dy}px) rotate(${rot}deg) scale(${scale});" />`;
+        return `<img decoding="sync" src="${uri}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:${radius}px;${COVER_SHADOW};opacity:${opacity};transform:translate(${dx}px,${dy}px) rotate(${rot}deg) scale(${scale});" />`;
       })
       .reverse();
     return `<div style="position:relative;width:${size}px;height:${size}px;flex-shrink:0;">${tiles.join("")}</div>`;
   }
   const single = coverDataUri ?? stack[0] ?? null;
   return single
-    ? `<img src="${single}" style="width:${size}px;height:${size}px;object-fit:cover;border-radius:${Math.round(size * 0.06)}px;box-shadow:0 20px 50px rgba(0,0,0,0.4);flex-shrink:0;" />`
+    ? `<img decoding="sync" src="${single}" style="width:${size}px;height:${size}px;object-fit:cover;border-radius:${Math.round(size * 0.06)}px;${COVER_SHADOW};flex-shrink:0;" />`
     : "";
 }
 
@@ -156,7 +164,7 @@ export function buildMosaicCoverHtml(
   if (stack.length < 2) {
     const single = coverDataUri ?? stack[0] ?? null;
     return single
-      ? `<img src="${single}" style="width:${fallbackSingleSize}px;height:${fallbackSingleSize}px;object-fit:cover;border-radius:${Math.round(fallbackSingleSize * 0.06)}px;box-shadow:0 20px 50px rgba(0,0,0,0.4);flex-shrink:0;" />`
+      ? `<img decoding="sync" src="${single}" style="width:${fallbackSingleSize}px;height:${fallbackSingleSize}px;object-fit:cover;border-radius:${Math.round(fallbackSingleSize * 0.06)}px;${COVER_SHADOW};flex-shrink:0;" />`
       : "";
   }
 
@@ -171,16 +179,18 @@ export function buildMosaicCoverHtml(
   const quarterImages = quarterCovers
     .map(
       (uri) =>
-        `<img src="${uri}" style="width:100%;height:100%;object-fit:cover;display:block;" />`
+        `<img decoding="sync" src="${uri}" style="width:100%;height:100%;object-fit:cover;display:block;" />`
     )
     .join("");
 
   return (
-    `<div style="display:grid;grid-template-columns:2fr ${quarterCols}fr;gap:${gap}px;width:${width}px;height:${size}px;border-radius:${radius}px;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,0.4);flex-shrink:0;background:rgba(0,0,0,0.2);">` +
-      `<img src="${bigCover}" style="width:100%;height:100%;object-fit:cover;display:block;" />` +
+    `<div style="${COVER_SHADOW};flex-shrink:0;">` +
+    `<div style="display:grid;grid-template-columns:2fr ${quarterCols}fr;gap:${gap}px;width:${width}px;height:${size}px;border-radius:${radius}px;overflow:hidden;background:rgba(0,0,0,0.2);">` +
+      `<img decoding="sync" src="${bigCover}" style="width:100%;height:100%;object-fit:cover;display:block;" />` +
       `<div style="display:grid;grid-template-rows:1fr 1fr;grid-template-columns:${quarterCols === 2 ? "1fr 1fr" : "1fr"};gap:${gap}px;height:100%;">` +
         quarterImages +
       `</div>` +
+    `</div>` +
     `</div>`
   );
 }

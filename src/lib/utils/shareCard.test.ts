@@ -394,4 +394,17 @@ describe("buildMosaicCoverHtml", () => {
     expect(html).toContain('src="data:image/png;base64,5"');
     expect(html).not.toContain('src="data:image/png;base64,6"');
   });
+
+  it("uses drop-shadow and synchronously-decoded images so WebKitGTK renders covers correctly", () => {
+    const uris = ["data:image/png;base64,1", "data:image/png;base64,2", "data:image/png;base64,3"];
+    for (const html of [
+      buildMosaicCoverHtml("data:image/png;base64,ONE", null, 100),
+      buildMosaicCoverHtml(null, uris, 100),
+    ]) {
+      expect(html).not.toContain("box-shadow");
+      expect(html).toContain("drop-shadow(");
+      const imgs = html.match(/<img /g)?.length ?? 0;
+      expect(html.match(/<img decoding="sync" /g)?.length).toBe(imgs);
+    }
+  });
 });
