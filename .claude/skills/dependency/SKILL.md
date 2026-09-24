@@ -11,14 +11,15 @@ left out.
    `gh pr list --author app/dependabot --json number,title,headRefName,files --jq '.[] | "\(.number)\t\(.title)\t\([.files[].path]|join(","))"'`.
    If there are none, or none of the listed numbers are open Dependabot PRs, run step 6's
    known-blocker check before stopping. If that finds nothing to do, say so and stop.
-   Note which files each PR touches: a PR that only touches `package-lock.json` (e.g.
+   Note which files each PR touches: a PR that only touches `bun.lock` (e.g.
    `@tauri-apps/*` declared as `^2`) is a lockfile-only bump — keep the `package.json` range
    as-is for those.
 2. **Prep the branch**: `git fetch origin`, confirm the worktree is clean
    (`git status --porcelain`), and branch from (or `git reset --hard` this session's worktree
    branch onto) `origin/main`. See the `issue` skill for why this session's existing worktree is
    reused rather than creating a new one.
-3. **Apply the npm bumps with bun** (bun.lock is canonical — CI runs `bun install --frozen-lockfile`):
+3. **Apply the npm bumps with bun** (`bun.lock` is the only JS lockfile — Dependabot uses the `bun`
+   ecosystem and CI runs `bun install --frozen-lockfile`; don't recreate `package-lock.json`):
    - `bun add <pkg>@^<new>` for dependencies, `bun add -d <pkg>@^<new>` for devDependencies.
    - For lockfile-only bumps, restore the original range in `package.json` afterwards and run
      `bun install`; confirm the new version landed in `bun.lock`.
@@ -39,21 +40,16 @@ left out.
    Dependabot PR is closed, so Dependabot only offers the *next* vitest release. If jest-dom has
    a new release, add `bun add -d vitest@^5 @testing-library/jest-dom@latest` to this batch by
    hand and verify. If it passes, remove this blocker note from the skill in the same PR.
-7. **Sync `package-lock.json`** (tracked; Dependabot reads it):
-   `bunx npm@11 install --package-lock-only --ignore-scripts`, then
-   `bunx npm@11 update <lockfile-only pkgs> --package-lock-only --ignore-scripts` for bumps
-   whose range didn't change. Spot-check that the bumped versions appear in it
-   (`grep -A1 '"node_modules/<pkg>"' package-lock.json`).
-8. **Commit** one `chore(deps): consolidate dependabot bumps` commit. The body lists what was
+7. **Commit** one `chore(deps): consolidate dependabot bumps` commit. The body lists what was
    bumped (with the Dependabot PR numbers), any code changes a breaking bump required, and any
    excluded PR with the reason.
-9. **Open the PR** against `main` using `.github/PULL_REQUEST_TEMPLATE.md` (unwrapped
+8. **Open the PR** against `main` using `.github/PULL_REQUEST_TEMPLATE.md` (unwrapped
    paragraphs). Summary lists every bump and PR number; Implementation Notes cover code changes
    and exclusions; Test Plan reports the actual check/test counts.
-10. **Merge** only once `gh pr checks <pr> --watch` shows every check concluded and passed, then
-    `gh pr merge <pr>` (per AGENTS.md). Dependabot auto-closes the superseded PRs after the merge
-    lands on `main`. Confirm with the step 1 command. Close each excluded PR with a comment
-    explaining why it was held back (`gh pr close <pr> --comment "..."`). Dependabot then skips
-    that version and opens a new PR when the next one is released. Never reply
-    `@dependabot ignore this major/minor version`, because that also hides the later release
-    that fixes the blocker.
+9. **Merge** only once `gh pr checks <pr> --watch` shows every check concluded and passed, then
+   `gh pr merge <pr>` (per AGENTS.md). Dependabot auto-closes the superseded PRs after the merge
+   lands on `main`. Confirm with the step 1 command. Close each excluded PR with a comment
+   explaining why it was held back (`gh pr close <pr> --comment "..."`). Dependabot then skips
+   that version and opens a new PR when the next one is released. Never reply
+   `@dependabot ignore this major/minor version`, because that also hides the later release
+   that fixes the blocker.
