@@ -1,13 +1,17 @@
-//! Tauri IPC commands for OpenSubsonic server management (#916, #1161).
-//!
-//! Library sync, playback, and play/rating reporting build on these in
-//! follow-up changes (#1162, #1163, #1165); this module only covers server
-//! CRUD plus connection testing/capability discovery.
+//! Tauri IPC commands for OpenSubsonic servers (#916): server CRUD and
+//! connection testing (#1161), plus library sync and auto-sync scheduling
+//! (#1162). Playback and play/rating reporting follow in #1163 and #1165.
 
-use crate::models::{SongSource, SubsonicServer};
+use crate::covermanager::CoverManager;
+use crate::db::Database;
+use crate::models::{SongSource, SubsonicServer, SubsonicSyncStats};
+use crate::remote_scheduler::RemoteKind;
+use crate::subsonic::sync;
 use crate::subsonic::{ServerProbe, SubsonicClient, URI_SCHEME};
 use crate::AppState;
 use rusqlite::params;
+use serde::Serialize;
+use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State};
 
 const SUBSONIC_SERVER_COLUMNS: &str = "id, name, url, username, enabled, sync_status, last_synced_at, created_at, nickname, icon, color, auto_sync_enabled, sync_interval_minutes, report_plays, server_type, server_version, extensions_json";
@@ -66,7 +70,7 @@ fn load_credentials(
 pub async fn list_subsonic_servers(
     state: State<'_, AppState>,
 ) -> Result<Vec<SubsonicServer>, String> {
-    crate::db::run_blocking(&state.db, |conn| {
+    let mut servers: Vec<SubsonicServer> = crate::db::run_blocking(&state.db, |conn| {
         let mut stmt = conn.prepare(&format!(
             "SELECT {SUBSONIC_SERVER_COLUMNS} FROM subsonic_servers ORDER BY created_at ASC, id ASC"
         ))?;
@@ -74,7 +78,13 @@ pub async fn list_subsonic_servers(
         Ok(rows.flatten().collect())
     })
     .await
-    .map_err(|e| e.to_string())
+    .map_err(|e| e.to_string())?;
+    for s in &mut servers {
+        s.next_auto_sync_at = state
+            .remote_auto_sync
+            .next_run_at(RemoteKind::Subsonic, s.id);
+    }
+    Ok(servers)
 }
 
 /// Fields for [`save_subsonic_server`], bundled into one struct like
@@ -120,10 +130,12 @@ fn validate_input(input: &SaveSubsonicServerInput) -> Result<(String, String, St
 
 /// Save (create or update) an OpenSubsonic server profile. Doesn't contact
 /// the server — the settings UI tests the connection before saving, and
-/// [`check_subsonic_connection`] refreshes the stored server details.
+/// [`check_subsonic_connection`] refreshes the stored server details. The
+/// server's auto-sync timer is (re)scheduled or cancelled to match.
 #[tauri::command]
 pub async fn save_subsonic_server(
     input: SaveSubsonicServerInput,
+    app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<SubsonicServer, String> {
     let (name, url, username) = validate_input(&input)?;
@@ -193,7 +205,26 @@ pub async fn save_subsonic_server(
         conn.last_insert_rowid()
     };
 
-    load_server(&conn, saved_id)
+    let mut saved = load_server(&conn, saved_id)?;
+    drop(conn);
+    if saved.enabled && saved.auto_sync_enabled {
+        state.remote_auto_sync.reschedule(
+            app,
+            Arc::clone(&state.db),
+            Arc::clone(&state.cover_manager),
+            RemoteKind::Subsonic,
+            saved.id,
+            saved.sync_interval_minutes,
+        );
+    } else {
+        state
+            .remote_auto_sync
+            .cancel(RemoteKind::Subsonic, saved.id);
+    }
+    saved.next_auto_sync_at = state
+        .remote_auto_sync
+        .next_run_at(RemoteKind::Subsonic, saved.id);
+    Ok(saved)
 }
 
 /// Delete an OpenSubsonic server profile. Its songs are marked unavailable
@@ -219,6 +250,7 @@ pub async fn delete_subsonic_server(
     .await
     .map_err(|e| e.to_string())?;
 
+    state.remote_auto_sync.cancel(RemoteKind::Subsonic, id);
     let _ = app.emit("library-changed", ());
     Ok(())
 }
@@ -284,6 +316,124 @@ pub async fn check_subsonic_connection(
         )
         .map_err(|e| e.to_string())?;
         Ok(probe)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Progress update emitted as `subsonic-sync-progress` during a sync.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SubsonicSyncProgressPayload {
+    pub server_id: i64,
+    pub server_name: String,
+    /// `listing`, `artwork`, `saving`, or `done`.
+    pub phase: &'static str,
+    /// Songs listed so far (`listing`) or albums checked for artwork (`artwork`).
+    pub current_count: usize,
+    pub stats: SubsonicSyncStats,
+    pub done: bool,
+    /// Set on the final event when the sync failed.
+    pub error: Option<String>,
+}
+
+/// Synchronize an OpenSubsonic server into the library ("Sync Now").
+#[tauri::command]
+pub async fn sync_subsonic_server(
+    id: i64,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<SubsonicSyncStats, String> {
+    sync_subsonic_server_inner(id, app, state.db.clone(), state.cover_manager.clone()).await
+}
+
+/// Core sync routine shared by [`sync_subsonic_server`] and the auto-sync
+/// scheduler (`remote_scheduler`), which only has an `AppHandle` and the
+/// shared `Arc`s rather than a `State<AppState>`.
+pub async fn sync_subsonic_server_inner(
+    id: i64,
+    app: AppHandle,
+    db: Arc<Database>,
+    cover_manager: Arc<CoverManager>,
+) -> Result<SubsonicSyncStats, String> {
+    tokio::task::spawn_blocking(move || {
+        let emit = |name: &str, phase: &'static str, count: usize, stats: &SubsonicSyncStats, done: bool, error: Option<String>| {
+            let _ = app.emit(
+                "subsonic-sync-progress",
+                SubsonicSyncProgressPayload {
+                    server_id: id,
+                    server_name: name.to_string(),
+                    phase,
+                    current_count: count,
+                    stats: stats.clone(),
+                    done,
+                    error,
+                },
+            );
+        };
+
+        // Pooled connections are only held for DB work, never across the
+        // network requests below — the pool is small (see `Database::new`).
+        let (name, url, username, password, existing_art) = {
+            let conn = db.pool.get().map_err(|e| e.to_string())?;
+            let name: String = conn
+                .query_row(
+                    "SELECT name FROM subsonic_servers WHERE id = ?1",
+                    params![id],
+                    |r| r.get(0),
+                )
+                .map_err(|_| format!("OpenSubsonic server {id} not found"))?;
+            let (url, username, password) = load_credentials(&conn, id)?;
+            conn.execute(
+                "UPDATE subsonic_servers SET sync_status = 'syncing' WHERE id = ?1",
+                params![id],
+            )
+            .map_err(|e| e.to_string())?;
+            let existing_art = sync::existing_album_art(&conn, id).unwrap_or_default();
+            (name, url, username, password, existing_art)
+        };
+
+        let empty = SubsonicSyncStats::default();
+        emit(&name, "listing", 0, &empty, false, None);
+
+        let result = (|| -> anyhow::Result<SubsonicSyncStats> {
+            let client = SubsonicClient::new(&url, &username, &password)?;
+            let library = sync::fetch_library(&client, |n| {
+                emit(&name, "listing", n, &empty, false, None)
+            })?;
+            let (art, art_errors) =
+                sync::fetch_album_art(&existing_art, &client, &cover_manager, id, &library, |n| {
+                    emit(&name, "artwork", n, &empty, false, None)
+                });
+            emit(&name, "saving", library.songs.len(), &empty, false, None);
+            let conn = db.pool.get()?;
+            let mut stats = sync::apply_library(&conn, id, &library, &art)?;
+            stats.errors = art_errors;
+            Ok(stats)
+        })();
+
+        let conn = db.pool.get().map_err(|e| e.to_string())?;
+        match result {
+            Ok(stats) => {
+                let _ = conn.execute(
+                    "UPDATE subsonic_servers SET sync_status = 'idle', last_synced_at = strftime('%s', 'now') WHERE id = ?1",
+                    params![id],
+                );
+                emit(&name, "done", 0, &stats, true, None);
+                let _ = app.emit("library-changed", ());
+                Ok(stats)
+            }
+            Err(e) => {
+                let message = format!("{e:#}");
+                log::warn!("OpenSubsonic sync of server {id} failed: {message}");
+                let _ = conn.execute(
+                    "UPDATE subsonic_servers SET sync_status = 'idle' WHERE id = ?1",
+                    params![id],
+                );
+                emit(&name, "done", 0, &empty, true, Some(message.clone()));
+                Err(message)
+            }
+        }
     })
     .await
     .map_err(|e| e.to_string())?

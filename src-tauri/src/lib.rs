@@ -40,6 +40,7 @@ pub mod pins;
 pub mod player;
 pub mod playlist;
 pub mod playlist_parsers;
+pub mod remote_scheduler;
 pub mod restart_manager;
 pub mod scrobbler;
 pub mod stats;
@@ -52,7 +53,6 @@ pub mod taskbar;
 pub mod tray;
 pub mod waveform;
 pub mod webdav;
-pub mod webdav_scheduler;
 
 use std::sync::Arc;
 use tauri::{Emitter, Manager};
@@ -95,8 +95,8 @@ pub struct AppState {
     /// the same name by `commands::settings::set_minimize_to_tray_enabled`.
     pub minimize_to_tray: Arc<std::sync::atomic::AtomicBool>,
     pub scrobbler: Arc<scrobbler::ScrobblerManager>,
-    /// Per-server periodic auto-sync timers for WebDAV servers (#1082).
-    pub webdav_auto_sync: Arc<webdav_scheduler::AutoSyncScheduler>,
+    /// Per-server periodic auto-sync timers for remote servers (WebDAV #1082, OpenSubsonic #1162).
+    pub remote_auto_sync: Arc<remote_scheduler::AutoSyncScheduler>,
 }
 
 /// Suppresses stock webview browser chrome — reload/find/print keybindings and
@@ -1170,7 +1170,7 @@ pub fn run() {
                 media_session,
                 minimize_to_tray,
                 scrobbler,
-                webdav_auto_sync: Arc::new(webdav_scheduler::AutoSyncScheduler::new()),
+                remote_auto_sync: Arc::new(remote_scheduler::AutoSyncScheduler::new()),
             };
 
             crate::collection::start_watcher(app.handle().clone(), &state);
@@ -1181,8 +1181,8 @@ pub fn run() {
             app.manage(state);
             let managed_state = app.state::<AppState>();
 
-            // Start each enabled WebDAV server's periodic auto-sync timer (#1082).
-            managed_state.webdav_auto_sync.start_all_from_db(
+            // Start each enabled remote server's periodic auto-sync timer (WebDAV #1082, OpenSubsonic #1162).
+            managed_state.remote_auto_sync.start_all_from_db(
                 app.handle().clone(),
                 Arc::clone(&managed_state.db),
                 Arc::clone(&managed_state.cover_manager),
@@ -1471,6 +1471,7 @@ pub fn run() {
             commands::subsonic::delete_subsonic_server,
             commands::subsonic::test_subsonic_connection,
             commands::subsonic::check_subsonic_connection,
+            commands::subsonic::sync_subsonic_server,
             commands::webdav::list_webdav_servers,
             commands::webdav::save_webdav_server,
             commands::webdav::delete_webdav_server,

@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 44;
+pub const CURRENT_SCHEMA_VERSION: i32 = 45;
 
 struct Migration {
     version: i32,
@@ -370,6 +370,19 @@ const MIGRATIONS: &[Migration] = &[
         version: 44,
         description: "subsonic_servers, subsonic_cache, and subsonic_album_cache tables for OpenSubsonic servers (#916, #1161)",
         apply: |conn| Ok(conn.execute_batch(MIGRATION_44)?),
+    },
+    Migration {
+        version: 45,
+        description: "fingerprint column on subsonic_cache so a sync can skip unchanged tracks (#1162)",
+        apply: |conn| {
+            let has_fingerprint: bool = conn
+                .prepare("SELECT 1 FROM pragma_table_info('subsonic_cache') WHERE name = 'fingerprint'")?
+                .exists([])?;
+            if !has_fingerprint {
+                conn.execute_batch(MIGRATION_45)?;
+            }
+            Ok(())
+        },
     },
 ];
 
@@ -1456,7 +1469,7 @@ ALTER TABLE artist_profiles ADD COLUMN musicbrainz_artist_id TEXT;
 // Migration 40: auto_sync_enabled and sync_interval_minutes on webdav_servers
 // (#1082). WebDAV has no filesystem-watch equivalent to notice remote
 // changes, so each server that opts in gets its own periodic-poll schedule
-// instead — see `webdav_scheduler::AutoSyncScheduler`.
+// instead — see `remote_scheduler::AutoSyncScheduler`.
 // ---------------------------------------------------------------------------
 const MIGRATION_40: &str = "
 ALTER TABLE webdav_servers ADD COLUMN auto_sync_enabled INTEGER NOT NULL DEFAULT 0;
@@ -1558,6 +1571,14 @@ CREATE TABLE IF NOT EXISTS subsonic_album_cache (
     UNIQUE(server_id, remote_album_id)
 );
 CREATE INDEX IF NOT EXISTS idx_subsonic_album_cache_key ON subsonic_album_cache(album_key);
+";
+
+// ---------------------------------------------------------------------------
+// Migration 45: a hash of each synced track's mapped metadata, so a re-sync
+// only rewrites the `songs` rows whose server-side metadata changed (#1162).
+// ---------------------------------------------------------------------------
+const MIGRATION_45: &str = "
+ALTER TABLE subsonic_cache ADD COLUMN fingerprint TEXT;
 ";
 
 fn seed_artist_tag_hierarchy(conn: &rusqlite::Connection) -> Result<()> {

@@ -20,6 +20,8 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::time::Duration;
 
+pub mod sync;
+
 /// Subsonic REST API version we speak. 1.16.1 is the last version of the
 /// original spec and the baseline every OpenSubsonic server supports.
 pub const API_VERSION: &str = "1.16.1";
@@ -494,6 +496,77 @@ impl SubsonicClient {
             Err(e) if e.downcast_ref::<SubsonicApiError>().is_some() => Ok(Vec::new()),
             Err(e) => Err(e),
         }
+    }
+
+    /// One page of `search3` with an empty query — how Navidrome (and most
+    /// OpenSubsonic servers) enumerate the whole song library.
+    pub fn search3_songs_page(&self, offset: usize, count: usize) -> Result<Vec<Child>> {
+        let (offset, count) = (offset.to_string(), count.to_string());
+        let (_, map) = self.call(
+            "search3",
+            &[
+                ("query", ""),
+                ("songCount", &count),
+                ("songOffset", &offset),
+                ("albumCount", "0"),
+                ("artistCount", "0"),
+            ],
+        )?;
+        Ok(payload::<SearchResult3>(&map, "searchResult3")?.song)
+    }
+
+    /// One page of `getAlbumList2?type=alphabeticalByName`.
+    pub fn album_list2_page(&self, offset: usize, size: usize) -> Result<Vec<AlbumId3>> {
+        #[derive(Deserialize, Default)]
+        struct AlbumList2 {
+            #[serde(default)]
+            album: Vec<AlbumId3>,
+        }
+        let (offset, size) = (offset.to_string(), size.to_string());
+        let (_, map) = self.call(
+            "getAlbumList2",
+            &[
+                ("type", "alphabeticalByName"),
+                ("size", &size),
+                ("offset", &offset),
+            ],
+        )?;
+        Ok(payload::<AlbumList2>(&map, "albumList2")?.album)
+    }
+
+    /// `getAlbum`: the album with its songs.
+    pub fn get_album(&self, id: &str) -> Result<AlbumId3> {
+        let (_, map) = self.call("getAlbum", &[("id", id)])?;
+        payload(&map, "album")
+    }
+
+    /// `getCoverArt`: raw image bytes. A missing image comes back as an
+    /// HTTP-200 JSON/XML error envelope, not an image, so the content type
+    /// is checked before the body is trusted.
+    pub fn get_cover_art(&self, id: &str, size: u32) -> Result<Vec<u8>> {
+        let size = size.to_string();
+        let url = self.signed_url("getCoverArt", &[("id", id), ("size", &size)])?;
+        let resp = self
+            .client
+            .get(url)
+            .send()
+            .context("Couldn't reach the server")?;
+        let status = resp.status();
+        if !status.is_success() {
+            return Err(anyhow!("Cover art request returned HTTP {status}"));
+        }
+        let content_type = resp
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("")
+            .to_ascii_lowercase();
+        if content_type.contains("json") || content_type.contains("xml") {
+            let body = resp.text().unwrap_or_default();
+            parse_envelope(&body)?;
+            return Err(anyhow!("The server returned no image"));
+        }
+        Ok(resp.bytes().context("failed to read cover art")?.to_vec())
     }
 
     /// Connection test + capability discovery: `ping`, then (on an
