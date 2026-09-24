@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 46;
+pub const CURRENT_SCHEMA_VERSION: i32 = 47;
 
 struct Migration {
     version: i32,
@@ -388,6 +388,19 @@ const MIGRATIONS: &[Migration] = &[
         version: 46,
         description: "subsonic_scrobble_queue retry queue for plays reported to OpenSubsonic servers (#1165)",
         apply: |conn| Ok(conn.execute_batch(MIGRATION_46)?),
+    },
+    Migration {
+        version: 47,
+        description: "auth_mode column on subsonic_servers for legacy password and API key sign-in (#1167)",
+        apply: |conn| {
+            let has_auth_mode: bool = conn
+                .prepare("SELECT 1 FROM pragma_table_info('subsonic_servers') WHERE name = 'auth_mode'")?
+                .exists([])?;
+            if !has_auth_mode {
+                conn.execute_batch(MIGRATION_47)?;
+            }
+            Ok(())
+        },
     },
 ];
 
@@ -1600,6 +1613,15 @@ CREATE TABLE IF NOT EXISTS subsonic_scrobble_queue (
     attempts    INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_subsonic_scrobble_queue_server ON subsonic_scrobble_queue(server_id);
+";
+
+// ---------------------------------------------------------------------------
+// Migration 47: per-server sign-in method (#1167) — 'token' (salted token,
+// the default), 'password' (legacy p=enc:), or 'apiKey' (OpenSubsonic API
+// key, held in the password column).
+// ---------------------------------------------------------------------------
+const MIGRATION_47: &str = "
+ALTER TABLE subsonic_servers ADD COLUMN auth_mode TEXT NOT NULL DEFAULT 'token';
 ";
 
 fn seed_artist_tag_hierarchy(conn: &rusqlite::Connection) -> Result<()> {

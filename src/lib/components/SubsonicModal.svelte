@@ -1,6 +1,6 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import type { SubsonicServer, SubsonicServerProbe } from "../types";
+  import type { SubsonicAuthMode, SubsonicServer, SubsonicServerProbe } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { playerStore } from "../stores/player.svelte";
@@ -11,6 +11,7 @@
   import LibraryBadge from "./LibraryBadge.svelte";
   import ColorPicker from "./ColorPicker.svelte";
   import Toggle from "./Toggle.svelte";
+  import Select from "./Select.svelte";
   import {
     CloudIcon,
     XIcon as X,
@@ -30,8 +31,11 @@
   let name = $state(untrack(() => server?.name ?? ""));
   let url = $state(untrack(() => server?.url ?? ""));
   let username = $state(untrack(() => server?.username ?? ""));
-  // Never pre-filled: a blank password on edit keeps the stored one.
+  let authMode = $state<SubsonicAuthMode>(untrack(() => server?.authMode ?? "token"));
+  // Never pre-filled: a blank password/API key on edit keeps the stored one.
   let password = $state("");
+  // Whether the server at `url` offers API-key sign-in (asked without credentials).
+  let apiKeySupported = $state(false);
   let enabled = $state(untrack(() => server?.enabled ?? true));
   let autoSyncEnabled = $state(untrack(() => server?.autoSyncEnabled ?? false));
   let syncIntervalMinutes = $state(untrack(() => server?.syncIntervalMinutes ?? 60));
@@ -42,13 +46,57 @@
   let testing = $state(false);
   let testProbe = $state<SubsonicServerProbe | null>(null);
   let testError = $state<string | null>(null);
+  // Subsonic API error code of the last failed test (41 = token sign-in unsupported).
+  let testErrorCode = $state<number | null>(null);
   let saving = $state(false);
   let saveError = $state<string | null>(null);
 
-  // A new server can't be tested or saved without a password; an existing one
-  // falls back to its stored password.
-  let hasCredentials = $derived(!!url.trim() && !!username.trim() && (!!password || !!server));
+  let isApiKey = $derived(authMode === "apiKey");
+  // The stored secret only carries over between token and password sign-in;
+  // switching to or from an API key needs a new one.
+  let storedSecretFits = $derived(
+    !!server && (server.authMode === "apiKey") === isApiKey
+  );
+  // A new server can't be tested or saved without a secret; an existing one
+  // falls back to its stored one.
+  let hasCredentials = $derived(
+    !!url.trim() && (isApiKey || !!username.trim()) && (!!password || storedSecretFits)
+  );
   let canSave = $derived(!!name.trim() && hasCredentials);
+  let showApiKeyOption = $derived(apiKeySupported || isApiKey);
+  let showHttpWarning = $derived(
+    authMode === "password" && url.trim().toLowerCase().startsWith("http://")
+  );
+  let suggestPassword = $derived(authMode === "token" && testErrorCode === 41);
+
+  // Ask the server which sign-in methods it offers once the URL settles.
+  $effect(() => {
+    const target = url.trim();
+    if (!/^https?:\/\/\S+/i.test(target)) {
+      apiKeySupported = false;
+      return;
+    }
+    let stale = false;
+    const timer = setTimeout(async () => {
+      try {
+        const support = await invoke<{ apiKey: boolean }>("get_subsonic_auth_support", { url: target });
+        if (!stale) apiKeySupported = support.apiKey;
+      } catch {
+        if (!stale) apiKeySupported = false;
+      }
+    }, 400);
+    return () => {
+      stale = true;
+      clearTimeout(timer);
+    };
+  });
+
+  function setAuthMode(mode: SubsonicAuthMode) {
+    authMode = mode;
+    testProbe = null;
+    testError = null;
+    testErrorCode = null;
+  }
 
   let previewSource = $derived({
     path: url.trim(),
@@ -82,16 +130,19 @@
     testing = true;
     testProbe = null;
     testError = null;
+    testErrorCode = null;
 
     try {
       testProbe = await invoke<SubsonicServerProbe>("test_subsonic_connection", {
         url: url.trim(),
-        username: username.trim(),
+        username: isApiKey ? "" : username.trim(),
         password: password ? password : null,
+        authMode,
         id: server?.id ?? null,
       });
     } catch (err) {
       testError = errorText(err);
+      testErrorCode = typeof (err as any)?.code === "number" ? (err as any).code : null;
     } finally {
       testing = false;
     }
@@ -109,8 +160,9 @@
           id: server?.id ?? null,
           name: name.trim(),
           url: url.trim(),
-          username: username.trim(),
+          username: isApiKey ? "" : username.trim(),
           password: password ? password : null,
+          authMode,
           enabled,
           nickname: name.trim() || null,
           icon: selectedIcon,
@@ -192,31 +244,63 @@
         </div>
       </div>
 
-      <div class="grid grid-cols-2 gap-3">
-        <div class="space-y-1.5">
-          <label for="subsonic-username" class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
-            {i18n.t("settings.subsonicUsername")}
-          </label>
-          <Input
-            id="subsonic-username"
-            bind:value={username}
-            placeholder={i18n.t("settings.subsonicUsernamePlaceholder")}
-            required
-          />
+      <div class="space-y-1.5">
+        <label for="subsonic-auth-mode" class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
+          {i18n.t("settings.subsonicAuthMode")}
+        </label>
+        <Select
+          id="subsonic-auth-mode"
+          value={authMode}
+          onchange={(e) => setAuthMode(e.currentTarget.value as SubsonicAuthMode)}
+          class="bg-brand-main border border-brand-border rounded-xl px-3.5 py-2 text-sm font-medium text-brand-text-primary outline-none focus:border-brand-accent w-full pr-8"
+        >
+          <option value="token">{i18n.t("settings.subsonicAuthToken")}</option>
+          <option value="password">{i18n.t("settings.subsonicAuthPassword")}</option>
+          {#if showApiKeyOption}
+            <option value="apiKey">{i18n.t("settings.subsonicAuthApiKey")}</option>
+          {/if}
+        </Select>
+        <p class="text-xs text-brand-text-secondary text-pretty">{i18n.t("settings.subsonicAuthModeHint")}</p>
+      </div>
+
+      {#if showHttpWarning}
+        <div class="flex items-start gap-2 p-3 bg-brand-main/60 border border-brand-border rounded-xl text-xs text-brand-text-primary" data-testid="subsonic-http-warning">
+          <WarningCircle class="w-4 h-4 shrink-0 translate-y-[calc((1lh-1rem)/2)] text-brand-text-secondary" />
+          <span>{i18n.t("settings.subsonicAuthHttpWarning")}</span>
         </div>
+      {/if}
+
+      <div class="grid {isApiKey ? 'grid-cols-1' : 'grid-cols-2'} gap-3">
+        {#if !isApiKey}
+          <div class="space-y-1.5">
+            <label for="subsonic-username" class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
+              {i18n.t("settings.subsonicUsername")}
+            </label>
+            <Input
+              id="subsonic-username"
+              bind:value={username}
+              placeholder={i18n.t("settings.subsonicUsernamePlaceholder")}
+              required
+            />
+          </div>
+        {/if}
 
         <div class="space-y-1.5">
           <label for="subsonic-password" class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
-            {i18n.t("settings.subsonicPassword")}
+            {isApiKey ? i18n.t("settings.subsonicApiKey") : i18n.t("settings.subsonicPassword")}
           </label>
           <Input
             id="subsonic-password"
             type="password"
             bind:value={password}
-            placeholder={server
-              ? i18n.t("settings.subsonicPasswordKeepPlaceholder")
-              : i18n.t("settings.subsonicPasswordPlaceholder")}
-            required={!server}
+            placeholder={storedSecretFits
+              ? (isApiKey
+                ? i18n.t("settings.subsonicApiKeyKeepPlaceholder")
+                : i18n.t("settings.subsonicPasswordKeepPlaceholder"))
+              : (isApiKey
+                ? i18n.t("settings.subsonicApiKeyPlaceholder")
+                : i18n.t("settings.subsonicPasswordPlaceholder"))}
+            required={!storedSecretFits}
           />
         </div>
       </div>
@@ -312,7 +396,19 @@
       {:else if testError !== null}
         <div class="flex items-start gap-2 p-3 bg-brand-main/60 border border-brand-border rounded-xl text-xs text-brand-text-primary" data-testid="subsonic-test-failed">
           <WarningCircle class="w-4 h-4 shrink-0 translate-y-[calc((1lh-1rem)/2)] text-brand-text-secondary" />
-          <span>{i18n.t("settings.webdavTestFailed", { error: testError })}</span>
+          <div class="flex flex-col items-start gap-2">
+            <span>{i18n.t("settings.webdavTestFailed", { error: testError })}</span>
+            {#if suggestPassword}
+              <button
+                type="button"
+                data-testid="subsonic-use-password"
+                onclick={() => setAuthMode("password")}
+                class="px-3 py-1 rounded-lg border border-brand-border text-brand-text-primary hover:border-brand-accent transition-colors"
+              >
+                {i18n.t("settings.subsonicUsePasswordAuth")}
+              </button>
+            {/if}
+          </div>
         </div>
       {/if}
 

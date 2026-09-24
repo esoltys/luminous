@@ -12,7 +12,7 @@
 //! connection across a request; the `spawn_*` wrappers run them on a
 //! blocking thread.
 
-use super::{parse_track_uri, StarTarget, SubsonicApiError, SubsonicClient};
+use super::{parse_track_uri, Auth, AuthMode, StarTarget, SubsonicApiError, SubsonicClient};
 use crate::db::Database;
 use crate::models::Song;
 use anyhow::Result;
@@ -42,18 +42,23 @@ struct Server {
 /// The enabled server `server_id`, with a client for it. `None` when it
 /// was removed or disabled.
 fn load_server(conn: &Connection, server_id: i64) -> Result<Option<Server>> {
-    let row: Option<(String, String, Option<String>, bool)> = conn
+    let row: Option<(String, String, Option<String>, String, bool)> = conn
         .query_row(
-            "SELECT url, username, password, report_plays FROM subsonic_servers
+            "SELECT url, username, password, auth_mode, report_plays FROM subsonic_servers
              WHERE id = ?1 AND enabled = 1",
             params![server_id],
-            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
         )
         .optional()?;
-    let Some((url, username, password, report_plays)) = row else {
+    let Some((url, username, secret, mode, report_plays)) = row else {
         return Ok(None);
     };
-    let client = SubsonicClient::new(&url, &username, &password.unwrap_or_default())?;
+    let auth = Auth::new(
+        AuthMode::from_db(&mode),
+        &username,
+        &secret.unwrap_or_default(),
+    );
+    let client = SubsonicClient::new(&url, auth)?;
     Ok(Some(Server {
         id: server_id,
         report_plays,

@@ -314,6 +314,10 @@ export interface WebDavSyncProgressPayload {
   done: boolean;
 }
 
+/** How Luminous signs in to a Subsonic server (#1167): salted token
+ * (default), legacy hex-encoded password, or an OpenSubsonic API key. */
+export type SubsonicAuthMode = "token" | "password" | "apiKey";
+
 /** A configured OpenSubsonic/Subsonic media server (#916). The password is
  * never serialized to the frontend. */
 export interface SubsonicServer {
@@ -321,6 +325,7 @@ export interface SubsonicServer {
   name: string;
   url: string;
   username: string;
+  authMode: SubsonicAuthMode;
   enabled: boolean;
   syncStatus: string;
   lastSyncedAt?: number | null;
