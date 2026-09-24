@@ -66,7 +66,7 @@ use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 use std::sync::{
     atomic::{AtomicU32, AtomicU64, Ordering},
-    mpsc, Arc,
+    mpsc, Arc, OnceLock,
 };
 use symphonia::core::{
     codecs::audio::{AudioDecoder, AudioDecoderOptions},
@@ -647,6 +647,9 @@ fn extract_basic_auth(url: &str) -> (String, Option<String>) {
 /// Enables streaming audio from WebDAV and remote HTTP endpoints without full downloads.
 pub struct HttpRangeReader {
     url: String,
+    /// Names the source in error messages instead of `url`, which for
+    /// Subsonic carries a password-equivalent auth token.
+    label: String,
     auth_header: Option<String>,
     client: reqwest::blocking::Client,
     content_length: u64,
@@ -656,39 +659,73 @@ pub struct HttpRangeReader {
     chunk_size: usize,
 }
 
+/// True for replies that are an API error document rather than media —
+/// Subsonic servers answer a bad `stream.view` request with HTTP 200 and a
+/// JSON (or XML) body.
+fn is_error_content_type(headers: &reqwest::header::HeaderMap) -> bool {
+    headers
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .map(|ct| {
+            let ct = ct.to_ascii_lowercase();
+            ct.starts_with("application/json")
+                || ct.starts_with("application/xml")
+                || ct.starts_with("text/xml")
+        })
+        .unwrap_or(false)
+}
+
+/// Parses `Content-Range: bytes {first}-{last}/{total}` into `(first, total)`;
+/// `total` is `None` when the server sends `*`.
+fn parse_content_range(headers: &reqwest::header::HeaderMap) -> Option<(u64, Option<u64>)> {
+    let value = headers.get(reqwest::header::CONTENT_RANGE)?.to_str().ok()?;
+    let (range, total) = value.trim().strip_prefix("bytes ")?.split_once('/')?;
+    let first = range.split_once('-')?.0.trim().parse().ok()?;
+    Some((first, total.trim().parse().ok()))
+}
+
 impl HttpRangeReader {
     pub fn new(url: &str) -> Result<Self, String> {
         let (url, auth_header) = extract_basic_auth(url);
+        let label = url.clone();
+        Self::open(url, label, auth_header)
+    }
+
+    /// Like `new`, but error messages name the source as `label` rather than
+    /// quoting `url` — for signed URLs that must never reach logs or the UI.
+    pub fn new_with_label(url: &str, label: &str) -> Result<Self, String> {
+        Self::open(url.to_string(), label.to_string(), None)
+    }
+
+    fn open(url: String, label: String, auth_header: Option<String>) -> Result<Self, String> {
         let client = reqwest::blocking::Client::builder()
             .timeout(std::time::Duration::from_secs(30))
             .build()
             .map_err(|e| format!("Failed to build HTTP client: {e}"))?;
 
-        // Issue a HEAD request to discover Content-Length and verify reachability
+        // HEAD discovers Content-Length cheaply. Not every server answers HEAD
+        // (or answers it with a length), so a failure here isn't fatal: the
+        // first range GET below reports the real error, and its Content-Range
+        // supplies the length instead.
         let mut head_req = client.head(&url);
         if let Some(ref h) = auth_header {
             head_req = head_req.header(reqwest::header::AUTHORIZATION, h);
         }
-        let resp = head_req
+        let content_length = head_req
             .send()
-            .map_err(|e| format!("HEAD request failed for '{url}': {e}"))?;
-
-        if !resp.status().is_success() {
-            return Err(format!(
-                "HTTP error {} when accessing '{url}'",
-                resp.status()
-            ));
-        }
-
-        let content_length = resp
-            .headers()
-            .get(reqwest::header::CONTENT_LENGTH)
-            .and_then(|v| v.to_str().ok())
-            .and_then(|s| s.parse::<u64>().ok())
+            .ok()
+            .filter(|resp| resp.status().is_success() && !is_error_content_type(resp.headers()))
+            .and_then(|resp| {
+                resp.headers()
+                    .get(reqwest::header::CONTENT_LENGTH)
+                    .and_then(|v| v.to_str().ok())
+                    .and_then(|s| s.parse::<u64>().ok())
+            })
             .unwrap_or(0);
 
         let mut reader = Self {
-            url: url.to_string(),
+            url,
+            label,
             auth_header,
             client,
             content_length,
@@ -718,9 +755,14 @@ impl HttpRangeReader {
         if let Some(ref h) = self.auth_header {
             req = req.header(reqwest::header::AUTHORIZATION, h);
         }
-        let mut resp = req
-            .send()
-            .map_err(|e| format!("Range request failed for '{}': {e}", self.url))?;
+        // `without_url`: reqwest errors otherwise quote the (signed) URL.
+        let mut resp = req.send().map_err(|e| {
+            format!(
+                "Range request failed for '{}': {}",
+                self.label,
+                e.without_url()
+            )
+        })?;
 
         if resp.status() == reqwest::StatusCode::RANGE_NOT_SATISFIABLE {
             self.buffer_start = start;
@@ -728,22 +770,47 @@ impl HttpRangeReader {
             return Ok(());
         }
 
-        if !resp.status().is_success() && resp.status() != reqwest::StatusCode::PARTIAL_CONTENT {
+        if !resp.status().is_success() {
             return Err(format!(
-                "Range request returned unexpected status {}",
-                resp.status()
+                "HTTP error {} when accessing '{}'",
+                resp.status(),
+                self.label
             ));
         }
 
-        let mut data = Vec::new();
-        resp.copy_to(&mut data)
-            .map_err(|e| format!("Failed to read stream chunk: {e}"))?;
-
-        if self.content_length == 0 && resp.status() == reqwest::StatusCode::OK {
-            self.content_length = data.len() as u64;
+        if is_error_content_type(resp.headers()) {
+            let body = resp.text().unwrap_or_default();
+            let reason = crate::subsonic::describe_error_body(&body)
+                .unwrap_or_else(|| "the server sent an error page instead of audio".into());
+            return Err(format!("Can't play '{}': {reason}", self.label));
         }
 
-        self.buffer_start = start;
+        let partial = resp.status() == reqwest::StatusCode::PARTIAL_CONTENT;
+        let content_range = if partial {
+            parse_content_range(resp.headers())
+        } else {
+            None
+        };
+
+        let mut data = Vec::new();
+        resp.copy_to(&mut data)
+            .map_err(|e| format!("Failed to read stream chunk: {}", e.without_url()))?;
+
+        if partial {
+            if let Some((_, Some(total))) = content_range {
+                if self.content_length == 0 {
+                    self.content_length = total;
+                }
+            }
+            self.buffer_start = content_range.map_or(start, |(first, _)| first);
+        } else {
+            // A plain 200 ignored the Range header and sent the whole file
+            // from byte 0, whatever offset was asked for.
+            if self.content_length == 0 {
+                self.content_length = data.len() as u64;
+            }
+            self.buffer_start = 0;
+        }
         self.buffer = data;
         Ok(())
     }
@@ -764,6 +831,12 @@ impl Read for HttpRangeReader {
             }
             if self.buffer.is_empty() {
                 return Ok(0);
+            }
+            if self.position < self.buffer_start {
+                return Err(std::io::Error::other(format!(
+                    "Server returned the wrong byte range for '{}'",
+                    self.label
+                )));
             }
         }
 
@@ -823,12 +896,35 @@ impl MediaSource for HttpRangeReader {
     }
 }
 
+/// Turns a stored `subsonic://` path into a signed stream URL. Registered at
+/// startup (it needs the database, which this module doesn't own).
+type StreamUrlResolver = dyn Fn(&str) -> Result<String, String> + Send + Sync;
+
+static SUBSONIC_RESOLVER: OnceLock<Box<StreamUrlResolver>> = OnceLock::new();
+
+/// Installs the `subsonic://` resolver used by `open_media_source` (#1163).
+/// Only the first registration takes effect.
+pub fn register_subsonic_resolver(
+    resolver: impl Fn(&str) -> Result<String, String> + Send + Sync + 'static,
+) {
+    let _ = SUBSONIC_RESOLVER.set(Box::new(resolver));
+}
+
 /// Open a playable media source. Local files or remote HTTP/WebDAV endpoints (#682).
 /// Shared with the offline analyzers (`analyzer::decode_all_samples`,
 /// `loudness::decode_channels`) so waveform/band-waveform generation and R128
 /// loudness analysis also work against WebDAV songs, not just live playback.
 pub(crate) fn open_media_source(path: &str) -> Result<Box<dyn MediaSource>, String> {
-    if path.starts_with("http://") || path.starts_with("https://") {
+    if path.starts_with(crate::subsonic::URI_SCHEME) {
+        // Signed fresh on every open; the URL itself never leaves this
+        // function, and errors name the track by its `subsonic://` path.
+        let resolver = SUBSONIC_RESOLVER
+            .get()
+            .ok_or_else(|| format!("Can't play '{path}': Subsonic playback isn't available"))?;
+        let url = resolver(path).map_err(|e| format!("Can't play '{path}': {e}"))?;
+        let reader = HttpRangeReader::new_with_label(&url, path)?;
+        Ok(Box::new(reader))
+    } else if path.starts_with("http://") || path.starts_with("https://") {
         let reader = HttpRangeReader::new(path)?;
         Ok(Box::new(reader))
     } else {
@@ -2236,6 +2332,145 @@ mod tests {
         })
         .await
         .unwrap();
+    }
+
+    const RANGE_TEST_DATA: &[u8] = b"0123456789ABCDEFabcdefghijklmnopqrstuvwxyz";
+
+    /// Answers `Range` GETs with 206 + `Content-Range`, like a well-behaved server.
+    fn ranged_response(req: &wiremock::Request) -> wiremock::ResponseTemplate {
+        let data = RANGE_TEST_DATA;
+        let (start, end) = req
+            .headers
+            .get(wiremock::http::HeaderName::from_static("range"))
+            .and_then(|r| r.to_str().ok())
+            .and_then(|r| r.strip_prefix("bytes="))
+            .and_then(|r| r.split_once('-'))
+            .map(|(s, e)| {
+                let start: usize = s.parse().unwrap();
+                let end: usize = e.parse().unwrap_or(data.len() - 1);
+                (start, end.min(data.len() - 1))
+            })
+            .expect("test server expects a Range header");
+        wiremock::ResponseTemplate::new(206)
+            .insert_header(
+                "content-range",
+                format!("bytes {start}-{end}/{}", data.len()),
+            )
+            .set_body_bytes(data[start..=end].to_vec())
+    }
+
+    #[tokio::test]
+    async fn http_range_reader_takes_length_from_content_range_when_head_fails() {
+        use wiremock::matchers::method;
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(method("HEAD"))
+            .respond_with(ResponseTemplate::new(405))
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .respond_with(ranged_response)
+            .mount(&server)
+            .await;
+
+        let url = format!("{}/rest/stream.view?id=1", server.uri());
+        tokio::task::spawn_blocking(move || {
+            let mut reader = HttpRangeReader::new_with_label(&url, "subsonic://1/1").unwrap();
+            assert_eq!(reader.byte_len(), Some(RANGE_TEST_DATA.len() as u64));
+            reader.chunk_size = 8;
+            reader.seek(SeekFrom::End(-4)).unwrap();
+            let mut tail = Vec::new();
+            reader.read_to_end(&mut tail).unwrap();
+            assert_eq!(tail, b"wxyz");
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn http_range_reader_handles_a_server_that_ignores_range() {
+        use wiremock::matchers::method;
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(method("HEAD"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("content-length", RANGE_TEST_DATA.len().to_string()),
+            )
+            .mount(&server)
+            .await;
+        // Always the whole file with a plain 200, whatever range was asked for.
+        Mock::given(method("GET"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(RANGE_TEST_DATA.to_vec()))
+            .mount(&server)
+            .await;
+
+        let url = format!("{}/track.mp3", server.uri());
+        tokio::task::spawn_blocking(move || {
+            let mut reader = HttpRangeReader::new(&url).unwrap();
+            reader.chunk_size = 8;
+            // Force a refill at a non-zero offset: drop the buffered prefix.
+            reader.buffer.clear();
+            reader.seek(SeekFrom::Start(16)).unwrap();
+            let mut buf = [0u8; 5];
+            reader.read_exact(&mut buf).unwrap();
+            assert_eq!(&buf, b"abcde");
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn http_range_reader_rejects_a_subsonic_error_sent_as_200() {
+        use wiremock::matchers::any;
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(any())
+            .respond_with(ResponseTemplate::new(200).set_body_raw(
+                r#"{"subsonic-response":{"status":"failed","version":"1.16.1","error":{"code":70,"message":"data not found"}}}"#,
+                "application/json",
+            ))
+            .mount(&server)
+            .await;
+
+        let url = format!("{}/rest/stream.view?id=1&t=SECRETTOKEN", server.uri());
+        let err = tokio::task::spawn_blocking(move || {
+            HttpRangeReader::new_with_label(&url, "subsonic://1/1")
+                .err()
+                .expect("an error body must not be decoded as audio")
+        })
+        .await
+        .unwrap();
+        assert!(err.contains("Not found on the server"), "{err}");
+        assert!(err.contains("subsonic://1/1"), "{err}");
+        assert!(!err.contains("SECRETTOKEN"), "{err}");
+    }
+
+    #[test]
+    fn http_range_reader_errors_never_quote_a_signed_url() {
+        // Nothing listens on port 9 (discard) locally, so the request fails
+        // at connect time — reqwest's own message would include the URL.
+        let url = "http://127.0.0.1:9/rest/stream.view?t=SECRETTOKEN";
+        let err = HttpRangeReader::new_with_label(url, "subsonic://1/1")
+            .err()
+            .expect("connection should fail");
+        assert!(err.contains("subsonic://1/1"), "{err}");
+        assert!(!err.contains("SECRETTOKEN"), "{err}");
+    }
+
+    #[test]
+    fn open_media_source_names_the_track_when_subsonic_resolution_fails() {
+        // Registration is process-wide and first-wins; this is the only test
+        // that installs one.
+        register_subsonic_resolver(|_| Err("The Subsonic server has been removed".into()));
+        let err = open_media_source("subsonic://4/abc")
+            .err()
+            .expect("resolution failure must surface");
+        assert!(err.contains("subsonic://4/abc"), "{err}");
+        assert!(err.contains("has been removed"), "{err}");
     }
 
     #[test]

@@ -128,6 +128,54 @@ fn validate_input(input: &SaveSubsonicServerInput) -> Result<(String, String, St
     Ok((name, url, username))
 }
 
+/// Comparison key for a server URL: scheme and host are case-insensitive,
+/// and a pasted `/rest` suffix or trailing `/` points at the same server.
+fn server_url_key(url: &str) -> String {
+    let url = url.trim().trim_end_matches('/');
+    let url = url.strip_suffix("/rest").unwrap_or(url);
+    match reqwest::Url::parse(url) {
+        Ok(u) => u.as_str().trim_end_matches('/').to_string(),
+        Err(_) => url.to_ascii_lowercase(),
+    }
+}
+
+/// Rejects a save that would add the same account on the same server twice
+/// (other than the server being edited): each profile syncs its own copy of
+/// the library, so a duplicate shows every song twice.
+fn ensure_not_duplicate(
+    conn: &rusqlite::Connection,
+    url: &str,
+    username: &str,
+    editing_id: Option<i64>,
+) -> Result<(), String> {
+    let key = server_url_key(url);
+    let mut stmt = conn
+        .prepare("SELECT id, name, url, username FROM subsonic_servers")
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?;
+    for row in rows {
+        let (id, name, other_url, other_user) = row.map_err(|e| e.to_string())?;
+        if Some(id) != editing_id
+            && other_user.eq_ignore_ascii_case(username)
+            && server_url_key(&other_url) == key
+        {
+            return Err(format!(
+                "This account on this server is already added as \"{name}\""
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// Save (create or update) an OpenSubsonic server profile. Doesn't contact
 /// the server — the settings UI tests the connection before saving, and
 /// [`check_subsonic_connection`] refreshes the stored server details. The
@@ -159,6 +207,7 @@ pub async fn save_subsonic_server(
     let password = password.filter(|p| !p.is_empty());
 
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
+    ensure_not_duplicate(&conn, &url, &username, id)?;
     let saved_id = if let Some(server_id) = id {
         conn.execute(
             "UPDATE subsonic_servers
@@ -520,5 +569,30 @@ mod tests {
                 "secret".to_string()
             )
         );
+    }
+
+    #[test]
+    fn duplicate_server_is_rejected_but_editing_itself_is_not() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE subsonic_servers (id INTEGER PRIMARY KEY, name TEXT, url TEXT, username TEXT);
+             INSERT INTO subsonic_servers VALUES (1, 'Home', 'https://Music.example.com', 'alice');",
+        )
+        .unwrap();
+
+        for url in [
+            "https://music.example.com",
+            "https://music.example.com/",
+            "https://MUSIC.example.com/rest",
+        ] {
+            let err = ensure_not_duplicate(&conn, url, "Alice", None).unwrap_err();
+            assert!(err.contains("\"Home\""), "{url}: {err}");
+        }
+        // Editing server 1 itself is fine.
+        ensure_not_duplicate(&conn, "https://music.example.com", "alice", Some(1)).unwrap();
+        // A different account or server is fine.
+        ensure_not_duplicate(&conn, "https://music.example.com", "bob", None).unwrap();
+        ensure_not_duplicate(&conn, "https://other.example.com", "alice", None).unwrap();
+        ensure_not_duplicate(&conn, "https://music.example.com/navidrome", "alice", None).unwrap();
     }
 }

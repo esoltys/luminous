@@ -690,6 +690,11 @@ fn spawn_audio_event_loop(
                                             "songId": song.id,
                                             "title": song.title,
                                             "path": song.path,
+                                            // Why it failed, e.g. a Subsonic
+                                            // server's "Wrong username or
+                                            // password" (#1163). Never holds a
+                                            // signed URL.
+                                            "message": message,
                                         }),
                                     );
                                 }
@@ -1022,6 +1027,16 @@ pub fn run() {
                 Database::new(crate::paths::resolve_app_data_dir(app))
                     .expect("failed to initialize database"),
             );
+
+            // `subsonic://` library paths are signed into stream URLs at open
+            // time from the server's saved credentials (#1163).
+            {
+                let db = db.clone();
+                audio::register_subsonic_resolver(move |path| {
+                    let conn = db.pool.get().map_err(|e| e.to_string())?;
+                    subsonic::resolve_stream_url(&conn, path).map_err(|e| e.to_string())
+                });
+            }
 
             // Graceful Store (MSIX) update handling (#744): register for
             // Restart Manager-driven relaunch, and fire a one-time "app

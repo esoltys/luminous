@@ -91,6 +91,81 @@ pub fn auth_params(username: &str, password: &str) -> Vec<(&'static str, String)
     ]
 }
 
+/// Normalizes a user-entered server URL to its root. A trailing `/rest` or
+/// `/` is tolerated, since users often paste either.
+fn normalize_base_url(base_url: &str) -> Result<String> {
+    let trimmed = base_url.trim().trim_end_matches('/');
+    let trimmed = trimmed.strip_suffix("/rest").unwrap_or(trimmed);
+    reqwest::Url::parse(trimmed)
+        .context("Enter a full server URL, e.g. https://music.example.com")?;
+    Ok(trimmed.to_string())
+}
+
+/// Fully signed URL for `endpoint` (e.g. `"stream"`) with `params`. Each call
+/// gets a fresh salt.
+fn build_signed_url(
+    base_url: &str,
+    username: &str,
+    password: &str,
+    endpoint: &str,
+    params: &[(&str, &str)],
+) -> Result<reqwest::Url> {
+    let mut url = reqwest::Url::parse(&format!("{base_url}/rest/{endpoint}.view"))
+        .context("invalid Subsonic endpoint URL")?;
+    {
+        let mut q = url.query_pairs_mut();
+        for (k, v) in auth_params(username, password) {
+            q.append_pair(k, &v);
+        }
+        for (k, v) in params {
+            q.append_pair(k, v);
+        }
+    }
+    Ok(url)
+}
+
+/// Signed `stream.view` URL for `track_id`, requesting the original file
+/// (`format=raw`) so it stays seekable with HTTP Range requests. The result
+/// holds a password-equivalent token: use it for the request only, never
+/// store or log it.
+pub fn stream_url(
+    base_url: &str,
+    username: &str,
+    password: &str,
+    track_id: &str,
+) -> Result<String> {
+    let base = normalize_base_url(base_url)?;
+    let url = build_signed_url(
+        &base,
+        username,
+        password,
+        "stream",
+        &[("id", track_id), ("format", "raw")],
+    )?;
+    Ok(url.to_string())
+}
+
+/// Resolves a stored `subsonic://{server_id}/{track_id}` path to a freshly
+/// signed stream URL, using the server's saved credentials. Called by
+/// `audio::open_media_source` at open time (#1163).
+pub fn resolve_stream_url(conn: &rusqlite::Connection, path: &str) -> Result<String> {
+    let (server_id, track_id) =
+        parse_track_uri(path).ok_or_else(|| anyhow!("Invalid Subsonic track path '{path}'"))?;
+    let (url, username, password): (String, String, Option<String>) = conn
+        .query_row(
+            "SELECT url, username, password FROM subsonic_servers WHERE id = ?1",
+            rusqlite::params![server_id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .map_err(|e| match e {
+            rusqlite::Error::QueryReturnedNoRows => {
+                anyhow!("The Subsonic server for '{path}' has been removed")
+            }
+            e => anyhow!(e),
+        })?;
+    stream_url(&url, &username, &password.unwrap_or_default(), &track_id)
+}
+
 // ---------------------------------------------------------------------------
 // Response models
 // ---------------------------------------------------------------------------
@@ -394,6 +469,16 @@ fn parse_envelope(body: &str) -> Result<(ServerInfo, serde_json::Map<String, ser
     Ok((info, map))
 }
 
+/// User-facing message for a failed envelope in a body that was expected to
+/// be media. `stream.view` reports errors (bad auth, unknown id) as HTTP 200
+/// with a JSON body, so the playback reader checks non-audio replies here.
+pub fn describe_error_body(body: &str) -> Option<String> {
+    parse_envelope(body)
+        .err()?
+        .downcast_ref::<SubsonicApiError>()
+        .map(|e| e.to_string())
+}
+
 /// Deserializes `map[key]` into `T`, treating a missing key as `T::default()`
 /// (servers omit empty containers, e.g. `searchResult3` with no hits).
 fn payload<T: DeserializeOwned + Default>(
@@ -425,16 +510,13 @@ impl SubsonicClient {
     /// `base_url` is the server root (e.g. `https://music.example.com`); a
     /// trailing `/rest` or `/` is tolerated, since users often paste either.
     pub fn new(base_url: &str, username: &str, password: &str) -> Result<Self> {
-        let trimmed = base_url.trim().trim_end_matches('/');
-        let trimmed = trimmed.strip_suffix("/rest").unwrap_or(trimmed);
-        reqwest::Url::parse(trimmed)
-            .context("Enter a full server URL, e.g. https://music.example.com")?;
+        let base_url = normalize_base_url(base_url)?;
         let client = Client::builder()
             .timeout(Duration::from_secs(30))
             .build()
             .context("failed to create http client")?;
         Ok(Self {
-            base_url: trimmed.to_string(),
+            base_url,
             username: username.to_string(),
             password: password.to_string(),
             client,
@@ -444,18 +526,13 @@ impl SubsonicClient {
     /// Fully signed URL for `endpoint` (e.g. `"stream"`) with `params`.
     /// Each call gets a fresh salt.
     pub fn signed_url(&self, endpoint: &str, params: &[(&str, &str)]) -> Result<reqwest::Url> {
-        let mut url = reqwest::Url::parse(&format!("{}/rest/{endpoint}.view", self.base_url))
-            .context("invalid Subsonic endpoint URL")?;
-        {
-            let mut q = url.query_pairs_mut();
-            for (k, v) in auth_params(&self.username, &self.password) {
-                q.append_pair(k, &v);
-            }
-            for (k, v) in params {
-                q.append_pair(k, v);
-            }
-        }
-        Ok(url)
+        build_signed_url(
+            &self.base_url,
+            &self.username,
+            &self.password,
+            endpoint,
+            params,
+        )
     }
 
     /// Calls `endpoint` and returns the parsed, status-checked envelope.
@@ -627,6 +704,64 @@ mod tests {
         assert_eq!(get("v"), API_VERSION);
         assert_eq!(get("c"), CLIENT_NAME);
         assert_eq!(get("f"), "json");
+    }
+
+    #[test]
+    fn stream_url_is_signed_without_the_password() {
+        let a = stream_url(
+            "https://music.example.com/rest/",
+            "alice",
+            "hunter2",
+            "tr/1",
+        )
+        .unwrap();
+        let b = stream_url("https://music.example.com", "alice", "hunter2", "tr/1").unwrap();
+        assert!(a.starts_with("https://music.example.com/rest/stream.view?"));
+        assert!(!a.contains("hunter2") && !a.contains("p="));
+        let parsed = reqwest::Url::parse(&a).unwrap();
+        let q: std::collections::HashMap<_, _> = parsed.query_pairs().into_owned().collect();
+        assert_eq!(q["id"], "tr/1");
+        assert_eq!(q["format"], "raw");
+        assert_eq!(q["u"], "alice");
+        assert_eq!(q["t"], auth_token("hunter2", &q["s"]));
+        assert_ne!(a, b, "each URL gets a fresh salt");
+    }
+
+    fn servers_db() -> rusqlite::Connection {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE subsonic_servers (id INTEGER PRIMARY KEY, url TEXT, username TEXT, password TEXT);
+             INSERT INTO subsonic_servers VALUES (3, 'https://music.example.com', 'alice', 'hunter2');",
+        )
+        .unwrap();
+        conn
+    }
+
+    #[test]
+    fn resolve_stream_url_signs_with_the_saved_server() {
+        let conn = servers_db();
+        let url = resolve_stream_url(&conn, &track_uri(3, "a b")).unwrap();
+        assert!(url.starts_with("https://music.example.com/rest/stream.view?"));
+        assert!(url.contains("id=a+b") || url.contains("id=a%20b"));
+        assert!(url.contains("u=alice"));
+    }
+
+    #[test]
+    fn resolve_stream_url_reports_a_removed_server() {
+        let conn = servers_db();
+        let err = resolve_stream_url(&conn, "subsonic://9/abc").unwrap_err();
+        assert!(err.to_string().contains("has been removed"), "{err}");
+        assert!(resolve_stream_url(&conn, "/music/a.flac").is_err());
+    }
+
+    #[test]
+    fn describe_error_body_only_matches_failed_envelopes() {
+        assert_eq!(
+            describe_error_body(NAVIDROME_ERROR).as_deref(),
+            Some("Not found on the server")
+        );
+        assert_eq!(describe_error_body(NAVIDROME_EXTENSIONS), None);
+        assert_eq!(describe_error_body("<html>nope</html>"), None);
     }
 
     #[test]

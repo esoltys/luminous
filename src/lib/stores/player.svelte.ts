@@ -122,7 +122,12 @@ export class PlayerStore {
       // fail several consecutive tracks in a row before the backend's
       // circuit breaker stops it — one toast per failure would be a
       // notification avalanche.
-      await listen<{ songId: number; title: string | null; path: string | null }>(
+      await listen<{
+        songId: number;
+        title: string | null;
+        path: string | null;
+        message: string;
+      }>(
         "playback-error",
         (event) => {
           this._playbackErrorBatch.push(event.payload.title || i18n.t("collection.unknownSong"));
