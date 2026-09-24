@@ -9,9 +9,11 @@ left out.
 
 1. **Collect the PRs**:
    `gh pr list --author app/dependabot --json number,title,headRefName,files --jq '.[] | "\(.number)\t\(.title)\t\([.files[].path]|join(","))"'`.
-   If there are none, or none of the listed numbers are open Dependabot PRs, say so and stop. Note which files each PR touches: a PR that only touches
-   `package-lock.json` (e.g. `@tauri-apps/*` declared as `^2`) is a lockfile-only bump — keep the
-   `package.json` range as-is for those.
+   If there are none, or none of the listed numbers are open Dependabot PRs, run step 6's
+   known-blocker check before stopping. If that finds nothing to do, say so and stop.
+   Note which files each PR touches: a PR that only touches `package-lock.json` (e.g.
+   `@tauri-apps/*` declared as `^2`) is a lockfile-only bump — keep the `package.json` range
+   as-is for those.
 2. **Prep the branch**: `git fetch origin`, confirm the worktree is clean
    (`git status --porcelain`), and branch from (or `git reset --hard` this session's worktree
    branch onto) `origin/main`. See the `issue` skill for why this session's existing worktree is
@@ -32,9 +34,11 @@ left out.
    update, revert just that package (restore its range, `bun install` / `cargo update -p`), re-run
    the checks, and record why it was excluded. Known blocker: **vitest 5** breaks
    `@testing-library/jest-dom@7.0.1`'s type augmentation (`toBeInTheDocument` missing on
-   `Assertion`, ~470 `bun run check` errors). Re-test it each week (`bun pm view
-   @testing-library/jest-dom versions`) and only include it once jest-dom ships a compatible
-   release.
+   `Assertion`, ~470 `bun run check` errors). Check for a newer jest-dom every run
+   (`bun pm view @testing-library/jest-dom versions`), even when no vitest PR is open. The held-back
+   Dependabot PR is closed, so Dependabot only offers the *next* vitest release. If jest-dom has
+   a new release, add `bun add -d vitest@^5 @testing-library/jest-dom@latest` to this batch by
+   hand and verify. If it passes, remove this blocker note from the skill in the same PR.
 7. **Sync `package-lock.json`** (tracked; Dependabot reads it):
    `bunx npm@11 install --package-lock-only --ignore-scripts`, then
    `bunx npm@11 update <lockfile-only pkgs> --package-lock-only --ignore-scripts` for bumps
@@ -48,5 +52,8 @@ left out.
    and exclusions; Test Plan reports the actual check/test counts.
 10. **Merge** only once `gh pr checks <pr> --watch` shows every check concluded and passed, then
     `gh pr merge <pr>` (per AGENTS.md). Dependabot auto-closes the superseded PRs after the merge
-    lands on `main`. Confirm with the step 1 command. Leave excluded PRs open, and comment on
-    each one with why it was held back.
+    lands on `main`. Confirm with the step 1 command. Close each excluded PR with a comment
+    explaining why it was held back (`gh pr close <pr> --comment "..."`). Dependabot then skips
+    that version and opens a new PR when the next one is released. Never reply
+    `@dependabot ignore this major/minor version`, because that also hides the later release
+    that fixes the blocker.
