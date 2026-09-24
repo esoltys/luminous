@@ -3,11 +3,13 @@ name: dependency
 description: Consolidate the week's open Dependabot PRs (npm + cargo) into a single verified PR against main
 ---
 
-Consolidate all open Dependabot PRs into one PR. $ARGUMENTS may list PR numbers to exclude.
+Consolidate open Dependabot PRs into one PR. With no arguments, include every open Dependabot
+PR. If $ARGUMENTS lists PR numbers, include only those PRs. Tell the user which open PRs were
+left out.
 
 1. **Collect the PRs**:
    `gh pr list --author app/dependabot --json number,title,headRefName,files --jq '.[] | "\(.number)\t\(.title)\t\([.files[].path]|join(","))"'`.
-   If there are none, say so and stop. Note which files each PR touches: a PR that only touches
+   If there are none, or none of the listed numbers are open Dependabot PRs, say so and stop. Note which files each PR touches: a PR that only touches
    `package-lock.json` (e.g. `@tauri-apps/*` declared as `^2`) is a lockfile-only bump — keep the
    `package.json` range as-is for those.
 2. **Prep the branch**: `git fetch origin`, confirm the worktree is clean
