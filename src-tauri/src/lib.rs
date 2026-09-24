@@ -1485,6 +1485,7 @@ pub fn run() {
             commands::subsonic::save_subsonic_server,
             commands::subsonic::delete_subsonic_server,
             commands::subsonic::test_subsonic_connection,
+            commands::subsonic::get_subsonic_auth_support,
             commands::subsonic::check_subsonic_connection,
             commands::subsonic::sync_subsonic_server,
             commands::webdav::list_webdav_servers,

@@ -1,9 +1,10 @@
 //! OpenSubsonic / Subsonic REST API client (#916).
 //!
 //! Talks to any Subsonic-compatible server (Navidrome, Nextcloud Music, Gonic,
-//! Airsonic, LMS, ...) using the JSON flavour of the API (`f=json`) and
-//! salted-token authentication (`t = md5(password + salt)`), so the plain
-//! password never goes over the wire.
+//! Airsonic, LMS, ...) using the JSON flavour of the API (`f=json`). Sign-in
+//! defaults to salted-token authentication (`t = md5(password + salt)`), so the
+//! plain password never goes over the wire; legacy password and OpenSubsonic
+//! API-key sign-in are per-server opt-ins (see [`AuthMode`], #1167).
 //!
 //! Two quirks shape the parsing here, both observed against Navidrome 0.63:
 //! - API errors come back as **HTTP 200** with `"status": "failed"` in the
@@ -30,6 +31,9 @@ pub const API_VERSION: &str = "1.16.1";
 /// Client name sent as `c=`. Kept constant: Navidrome registers a "player"
 /// per client name, so varying it would clutter the user's player list.
 pub const CLIENT_NAME: &str = "Luminous";
+
+/// OpenSubsonic extension a server lists when it accepts `apiKey=` sign-in.
+pub const API_KEY_EXTENSION: &str = "apiKeyAuthentication";
 
 /// URI scheme stored in `songs.path` for Subsonic tracks. The stored path
 /// deliberately carries no credentials — a signed `stream.view` URL holds a
@@ -79,13 +83,100 @@ fn new_salt() -> String {
     uuid::Uuid::new_v4().simple().to_string()
 }
 
-/// The query parameters every request carries: `u`, `t`, `s`, `v`, `c`, `f`.
-pub fn auth_params(username: &str, password: &str) -> Vec<(&'static str, String)> {
-    let salt = new_salt();
-    vec![
-        ("u", username.to_string()),
-        ("t", auth_token(password, &salt)),
-        ("s", salt),
+/// How requests to a server are authenticated (#1167). Stored in
+/// `subsonic_servers.auth_mode` as the serde name.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum AuthMode {
+    /// Salted token, `t = md5(password + salt)`. Works with most servers.
+    #[default]
+    Token,
+    /// Legacy `p=enc:<hex(password)>`, for servers that can't verify a token
+    /// (Nextcloud Music, LDAP-backed Subsonic/Airsonic). The password is
+    /// effectively cleartext on the wire, so it's opt-in only.
+    Password,
+    /// OpenSubsonic `apiKeyAuthentication`: `apiKey=<key>`, no username.
+    ApiKey,
+}
+
+impl AuthMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AuthMode::Token => "token",
+            AuthMode::Password => "password",
+            AuthMode::ApiKey => "apiKey",
+        }
+    }
+
+    /// Parses a stored `auth_mode`; anything unknown falls back to `Token`.
+    pub fn from_db(value: &str) -> Self {
+        match value {
+            "password" => AuthMode::Password,
+            "apiKey" => AuthMode::ApiKey,
+            _ => AuthMode::Token,
+        }
+    }
+}
+
+/// A server's credentials. `secret` is the password, or the API key in
+/// `ApiKey` mode. `Debug` redacts the secret so it can't reach a log.
+#[derive(Clone, PartialEq, Eq)]
+pub struct Auth {
+    pub mode: AuthMode,
+    pub username: String,
+    pub secret: String,
+}
+
+impl std::fmt::Debug for Auth {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Auth")
+            .field("mode", &self.mode)
+            .field("username", &self.username)
+            .field("secret", &"<redacted>")
+            .finish()
+    }
+}
+
+impl Auth {
+    pub fn new(mode: AuthMode, username: &str, secret: &str) -> Self {
+        Self {
+            mode,
+            username: username.to_string(),
+            secret: secret.to_string(),
+        }
+    }
+
+    /// Token auth with `username` / `password`.
+    pub fn token(username: &str, password: &str) -> Self {
+        Self::new(AuthMode::Token, username, password)
+    }
+
+    /// The query parameters every request carries: the credentials for this
+    /// mode, then `v`, `c`, `f`. Token mode gets a fresh salt per call.
+    pub fn params(&self) -> Vec<(&'static str, String)> {
+        let mut params = match self.mode {
+            AuthMode::Token => {
+                let salt = new_salt();
+                vec![
+                    ("u", self.username.clone()),
+                    ("t", auth_token(&self.secret, &salt)),
+                    ("s", salt),
+                ]
+            }
+            AuthMode::Password => {
+                let hex: String = self.secret.bytes().map(|b| format!("{b:02x}")).collect();
+                vec![("u", self.username.clone()), ("p", format!("enc:{hex}"))]
+            }
+            AuthMode::ApiKey => vec![("apiKey", self.secret.clone())],
+        };
+        params.extend(client_params());
+        params
+    }
+}
+
+/// The non-credential parameters every request carries: `v`, `c`, `f`.
+fn client_params() -> [(&'static str, String); 3] {
+    [
         ("v", API_VERSION.to_string()),
         ("c", CLIENT_NAME.to_string()),
         ("f", "json".to_string()),
@@ -106,8 +197,7 @@ fn normalize_base_url(base_url: &str) -> Result<String> {
 /// gets a fresh salt.
 fn build_signed_url(
     base_url: &str,
-    username: &str,
-    password: &str,
+    auth: &Auth,
     endpoint: &str,
     params: &[(&str, &str)],
 ) -> Result<reqwest::Url> {
@@ -115,7 +205,7 @@ fn build_signed_url(
         .context("invalid Subsonic endpoint URL")?;
     {
         let mut q = url.query_pairs_mut();
-        for (k, v) in auth_params(username, password) {
+        for (k, v) in auth.params() {
             q.append_pair(k, &v);
         }
         for (k, v) in params {
@@ -129,21 +219,35 @@ fn build_signed_url(
 /// (`format=raw`) so it stays seekable with HTTP Range requests. The result
 /// holds a password-equivalent token: use it for the request only, never
 /// store or log it.
-pub fn stream_url(
-    base_url: &str,
-    username: &str,
-    password: &str,
-    track_id: &str,
-) -> Result<String> {
+pub fn stream_url(base_url: &str, auth: &Auth, track_id: &str) -> Result<String> {
     let base = normalize_base_url(base_url)?;
     let url = build_signed_url(
         &base,
-        username,
-        password,
+        auth,
         "stream",
         &[("id", track_id), ("format", "raw")],
     )?;
     Ok(url.to_string())
+}
+
+/// A saved server's `(url, credentials)`. `Ok(None)` when no server has that id.
+pub fn load_auth(conn: &rusqlite::Connection, server_id: i64) -> Result<Option<(String, Auth)>> {
+    use rusqlite::OptionalExtension;
+    let row: Option<(String, String, Option<String>, String)> = conn
+        .query_row(
+            "SELECT url, username, password, auth_mode FROM subsonic_servers WHERE id = ?1",
+            rusqlite::params![server_id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+        )
+        .optional()?;
+    Ok(row.map(|(url, username, secret, mode)| {
+        let auth = Auth::new(
+            AuthMode::from_db(&mode),
+            &username,
+            &secret.unwrap_or_default(),
+        );
+        (url, auth)
+    }))
 }
 
 /// Resolves a stored `subsonic://{server_id}/{track_id}` path to a freshly
@@ -152,19 +256,9 @@ pub fn stream_url(
 pub fn resolve_stream_url(conn: &rusqlite::Connection, path: &str) -> Result<String> {
     let (server_id, track_id) =
         parse_track_uri(path).ok_or_else(|| anyhow!("Invalid Subsonic track path '{path}'"))?;
-    let (url, username, password): (String, String, Option<String>) = conn
-        .query_row(
-            "SELECT url, username, password FROM subsonic_servers WHERE id = ?1",
-            rusqlite::params![server_id],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-        )
-        .map_err(|e| match e {
-            rusqlite::Error::QueryReturnedNoRows => {
-                anyhow!("The Subsonic server for '{path}' has been removed")
-            }
-            e => anyhow!(e),
-        })?;
-    stream_url(&url, &username, &password.unwrap_or_default(), &track_id)
+    let (url, auth) = load_auth(conn, server_id)?
+        .ok_or_else(|| anyhow!("The Subsonic server for '{path}' has been removed"))?;
+    stream_url(&url, &auth, &track_id)
 }
 
 // ---------------------------------------------------------------------------
@@ -423,9 +517,10 @@ pub fn describe_api_error(err: &ApiError) -> String {
         20 => "The server needs a newer Subsonic client version than Luminous supports".into(),
         30 => "The server's Subsonic API version is too old for Luminous".into(),
         40 => "Wrong username or password".into(),
-        41 => "The server doesn't support token authentication (common with LDAP logins)".into(),
+        41 => "The server can't check a token sign-in (common with LDAP logins) — try the Password sign-in method".into(),
         42 => "The server doesn't support this sign-in method".into(),
-        43 | 44 => "The server rejected the sign-in details".into(),
+        43 => "The server received more than one kind of sign-in details".into(),
+        44 => "The server rejected the API key".into(),
         50 => "This account isn't allowed to do that on the server".into(),
         60 => "The server's trial period has ended".into(),
         70 => "Not found on the server".into(),
@@ -509,15 +604,14 @@ pub enum StarTarget<'a> {
 #[derive(Clone)]
 pub struct SubsonicClient {
     base_url: String,
-    username: String,
-    password: String,
+    auth: Auth,
     client: Client,
 }
 
 impl SubsonicClient {
     /// `base_url` is the server root (e.g. `https://music.example.com`); a
     /// trailing `/rest` or `/` is tolerated, since users often paste either.
-    pub fn new(base_url: &str, username: &str, password: &str) -> Result<Self> {
+    pub fn new(base_url: &str, auth: Auth) -> Result<Self> {
         let base_url = normalize_base_url(base_url)?;
         let client = Client::builder()
             .timeout(Duration::from_secs(30))
@@ -525,8 +619,7 @@ impl SubsonicClient {
             .context("failed to create http client")?;
         Ok(Self {
             base_url,
-            username: username.to_string(),
-            password: password.to_string(),
+            auth,
             client,
         })
     }
@@ -534,13 +627,7 @@ impl SubsonicClient {
     /// Fully signed URL for `endpoint` (e.g. `"stream"`) with `params`.
     /// Each call gets a fresh salt.
     pub fn signed_url(&self, endpoint: &str, params: &[(&str, &str)]) -> Result<reqwest::Url> {
-        build_signed_url(
-            &self.base_url,
-            &self.username,
-            &self.password,
-            endpoint,
-            params,
-        )
+        build_signed_url(&self.base_url, &self.auth, endpoint, params)
     }
 
     /// Calls `endpoint` and returns the parsed, status-checked envelope.
@@ -549,7 +636,14 @@ impl SubsonicClient {
         endpoint: &str,
         params: &[(&str, &str)],
     ) -> Result<(ServerInfo, serde_json::Map<String, serde_json::Value>)> {
-        let url = self.signed_url(endpoint, params)?;
+        self.fetch_envelope(self.signed_url(endpoint, params)?)
+    }
+
+    /// GETs `url` and returns the parsed, status-checked envelope.
+    fn fetch_envelope(
+        &self,
+        url: reqwest::Url,
+    ) -> Result<(ServerInfo, serde_json::Map<String, serde_json::Value>)> {
         let resp = self
             .client
             .get(url)
@@ -685,9 +779,40 @@ impl SubsonicClient {
             .map(|_| ())
     }
 
+    /// `getOpenSubsonicExtensions` sent without credentials. The OpenSubsonic
+    /// spec makes this endpoint public so a client can tell which sign-in
+    /// methods a server supports before asking for any. A server that
+    /// refuses it (a legacy Subsonic server) yields an empty list.
+    pub fn public_extensions(&self) -> Result<Vec<OpenSubsonicExtension>> {
+        let mut url = reqwest::Url::parse(&format!(
+            "{}/rest/getOpenSubsonicExtensions.view",
+            self.base_url
+        ))
+        .context("invalid Subsonic endpoint URL")?;
+        url.query_pairs_mut().extend_pairs(client_params());
+        match self.fetch_envelope(url) {
+            Ok((_, map)) => payload(&map, "openSubsonicExtensions"),
+            Err(e) if e.downcast_ref::<SubsonicApiError>().is_some() => Ok(Vec::new()),
+            Err(e) => Err(e),
+        }
+    }
+
+    /// Whether the server offers API-key sign-in (`apiKeyAuthentication`).
+    pub fn supports_api_key(&self) -> Result<bool> {
+        Ok(self
+            .public_extensions()?
+            .iter()
+            .any(|e| e.name == API_KEY_EXTENSION))
+    }
+
     /// Connection test + capability discovery: `ping`, then (on an
-    /// OpenSubsonic server) the extension list.
+    /// OpenSubsonic server) the extension list. In API-key mode the server
+    /// is first checked for `apiKeyAuthentication`, so an unsupported server
+    /// gets a clear message rather than a generic auth error.
     pub fn probe(&self) -> Result<ServerProbe> {
+        if self.auth.mode == AuthMode::ApiKey && !self.supports_api_key()? {
+            return Err(anyhow!("This server doesn't support API key sign-in"));
+        }
         let info = self.ping()?;
         let extensions = if info.open_subsonic {
             self.get_open_subsonic_extensions().unwrap_or_else(|e| {
@@ -732,8 +857,8 @@ mod tests {
 
     #[test]
     fn auth_params_use_fresh_salt_and_never_include_password() {
-        let a = auth_params("alice", "hunter2");
-        let b = auth_params("alice", "hunter2");
+        let a = Auth::token("alice", "hunter2").params();
+        let b = Auth::token("alice", "hunter2").params();
         let salt = |p: &[(&str, String)]| p.iter().find(|(k, _)| *k == "s").unwrap().1.clone();
         assert_ne!(salt(&a), salt(&b));
         assert!(salt(&a).len() >= 6);
@@ -747,14 +872,9 @@ mod tests {
 
     #[test]
     fn stream_url_is_signed_without_the_password() {
-        let a = stream_url(
-            "https://music.example.com/rest/",
-            "alice",
-            "hunter2",
-            "tr/1",
-        )
-        .unwrap();
-        let b = stream_url("https://music.example.com", "alice", "hunter2", "tr/1").unwrap();
+        let auth = Auth::token("alice", "hunter2");
+        let a = stream_url("https://music.example.com/rest/", &auth, "tr/1").unwrap();
+        let b = stream_url("https://music.example.com", &auth, "tr/1").unwrap();
         assert!(a.starts_with("https://music.example.com/rest/stream.view?"));
         assert!(!a.contains("hunter2") && !a.contains("p="));
         let parsed = reqwest::Url::parse(&a).unwrap();
@@ -766,11 +886,61 @@ mod tests {
         assert_ne!(a, b, "each URL gets a fresh salt");
     }
 
+    fn query(url: &str) -> std::collections::HashMap<String, String> {
+        reqwest::Url::parse(url)
+            .unwrap()
+            .query_pairs()
+            .into_owned()
+            .collect()
+    }
+
+    #[test]
+    fn password_mode_sends_hex_encoded_password() {
+        let auth = Auth::new(AuthMode::Password, "alice", "sesame");
+        let q = query(&stream_url("https://music.example.com", &auth, "1").unwrap());
+        assert_eq!(q["u"], "alice");
+        assert_eq!(q["p"], "enc:736573616d65");
+        assert!(!q.contains_key("t") && !q.contains_key("s") && !q.contains_key("apiKey"));
+        assert_eq!(q["v"], API_VERSION);
+    }
+
+    #[test]
+    fn api_key_mode_sends_only_the_key() {
+        let auth = Auth::new(AuthMode::ApiKey, "", "k3y");
+        let q = query(&stream_url("https://music.example.com", &auth, "1").unwrap());
+        assert_eq!(q["apiKey"], "k3y");
+        for k in ["u", "t", "s", "p"] {
+            assert!(!q.contains_key(k), "{k} should not be sent");
+        }
+        assert_eq!(q["c"], CLIENT_NAME);
+        assert_eq!(q["f"], "json");
+    }
+
+    #[test]
+    fn auth_debug_never_shows_the_secret() {
+        let dbg = format!("{:?}", Auth::new(AuthMode::ApiKey, "", "k3y-secret"));
+        assert!(!dbg.contains("k3y-secret"), "{dbg}");
+    }
+
+    #[test]
+    fn auth_mode_round_trips_through_the_db_value() {
+        for mode in [AuthMode::Token, AuthMode::Password, AuthMode::ApiKey] {
+            assert_eq!(AuthMode::from_db(mode.as_str()), mode);
+            assert_eq!(
+                serde_json::to_string(&mode).unwrap(),
+                format!("\"{}\"", mode.as_str())
+            );
+        }
+        assert_eq!(AuthMode::from_db("bogus"), AuthMode::Token);
+    }
+
     fn servers_db() -> rusqlite::Connection {
         let conn = rusqlite::Connection::open_in_memory().unwrap();
         conn.execute_batch(
-            "CREATE TABLE subsonic_servers (id INTEGER PRIMARY KEY, url TEXT, username TEXT, password TEXT);
-             INSERT INTO subsonic_servers VALUES (3, 'https://music.example.com', 'alice', 'hunter2');",
+            "CREATE TABLE subsonic_servers (id INTEGER PRIMARY KEY, url TEXT, username TEXT, password TEXT,
+                auth_mode TEXT NOT NULL DEFAULT 'token');
+             INSERT INTO subsonic_servers (id, url, username, password) VALUES (3, 'https://music.example.com', 'alice', 'hunter2');
+             INSERT INTO subsonic_servers VALUES (4, 'https://keys.example.com', '', 'k3y', 'apiKey');",
         )
         .unwrap();
         conn
@@ -783,6 +953,14 @@ mod tests {
         assert!(url.starts_with("https://music.example.com/rest/stream.view?"));
         assert!(url.contains("id=a+b") || url.contains("id=a%20b"));
         assert!(url.contains("u=alice"));
+    }
+
+    #[test]
+    fn resolve_stream_url_uses_the_saved_auth_mode() {
+        let conn = servers_db();
+        let q = query(&resolve_stream_url(&conn, &track_uri(4, "x")).unwrap());
+        assert_eq!(q["apiKey"], "k3y");
+        assert!(!q.contains_key("u"));
     }
 
     #[test]
@@ -925,7 +1103,8 @@ mod tests {
             message: "x".into(),
         };
         assert_eq!(describe_api_error(&e(40)), "Wrong username or password");
-        assert!(describe_api_error(&e(41)).contains("token authentication"));
+        assert!(describe_api_error(&e(41)).contains("Password sign-in method"));
+        assert_eq!(describe_api_error(&e(44)), "The server rejected the API key");
         assert_eq!(describe_api_error(&e(999)), "Server error: x");
     }
 
@@ -946,22 +1125,22 @@ mod tests {
             "https://music.example.com/rest",
             "https://music.example.com/rest/",
         ] {
-            let c = SubsonicClient::new(input, "u", "p").unwrap();
+            let c = SubsonicClient::new(input, Auth::token("u", "p")).unwrap();
             let url = c.signed_url("ping", &[]).unwrap();
             assert_eq!(url.path(), "/rest/ping.view", "input: {input}");
         }
         // Sub-path installs keep their prefix.
-        let c = SubsonicClient::new("https://example.com/navidrome/", "u", "p").unwrap();
+        let c = SubsonicClient::new("https://example.com/navidrome/", Auth::token("u", "p")).unwrap();
         assert_eq!(
             c.signed_url("ping", &[]).unwrap().path(),
             "/navidrome/rest/ping.view"
         );
-        assert!(SubsonicClient::new("music.example.com", "u", "p").is_err());
+        assert!(SubsonicClient::new("music.example.com", Auth::token("u", "p")).is_err());
     }
 
     #[test]
     fn signed_url_carries_extra_params_and_no_password() {
-        let c = SubsonicClient::new("https://music.example.com", "alice", "hunter2").unwrap();
+        let c = SubsonicClient::new("https://music.example.com", Auth::token("alice", "hunter2")).unwrap();
         let url = c
             .signed_url("stream", &[("id", "abc"), ("format", "raw")])
             .unwrap();
@@ -1003,7 +1182,7 @@ mod tests {
 
             let uri = server.uri();
             let probe = tokio::task::spawn_blocking(move || {
-                SubsonicClient::new(&uri, "alice", "pw").unwrap().probe()
+                SubsonicClient::new(&uri, Auth::token("alice", "pw")).unwrap().probe()
             })
             .await
             .unwrap()
@@ -1034,7 +1213,7 @@ mod tests {
 
             let uri = server.uri();
             let probe = tokio::task::spawn_blocking(move || {
-                SubsonicClient::new(&uri, "alice", "pw").unwrap().probe()
+                SubsonicClient::new(&uri, Auth::token("alice", "pw")).unwrap().probe()
             })
             .await
             .unwrap()
@@ -1056,7 +1235,7 @@ mod tests {
 
             let uri = server.uri();
             let err = tokio::task::spawn_blocking(move || {
-                SubsonicClient::new(&uri, "alice", "wrong").unwrap().ping()
+                SubsonicClient::new(&uri, Auth::token("alice", "wrong")).unwrap().ping()
             })
             .await
             .unwrap()
@@ -1074,12 +1253,153 @@ mod tests {
 
             let uri = server.uri();
             let err = tokio::task::spawn_blocking(move || {
-                SubsonicClient::new(&uri, "alice", "pw").unwrap().ping()
+                SubsonicClient::new(&uri, Auth::token("alice", "pw")).unwrap().ping()
             })
             .await
             .unwrap()
             .unwrap_err();
             assert!(err.to_string().contains("HTTP 404"));
+        }
+
+        const PING_OK: &str =
+            r#"{"subsonic-response":{"status":"ok","version":"1.16.1","openSubsonic":true}}"#;
+        const API_KEY_EXTENSIONS: &str = r#"{"subsonic-response":{"status":"ok","version":"1.16.1","openSubsonic":true,"openSubsonicExtensions":[{"name":"apiKeyAuthentication","versions":[1]}]}}"#;
+
+        #[tokio::test]
+        async fn password_mode_sends_hex_password() {
+            let server = MockServer::start().await;
+            Mock::given(method("GET"))
+                .and(path("/rest/ping.view"))
+                .and(query_param("u", "alice"))
+                .and(query_param("p", "enc:736573616d65"))
+                .respond_with(json(PING_OK))
+                .expect(1)
+                .mount(&server)
+                .await;
+
+            let uri = server.uri();
+            tokio::task::spawn_blocking(move || {
+                SubsonicClient::new(&uri, Auth::new(AuthMode::Password, "alice", "sesame"))
+                    .unwrap()
+                    .ping()
+            })
+            .await
+            .unwrap()
+            .unwrap();
+        }
+
+        #[tokio::test]
+        async fn api_key_probe_checks_public_extensions_then_pings_with_key() {
+            let server = MockServer::start().await;
+            Mock::given(method("GET"))
+                .and(path("/rest/ping.view"))
+                .and(query_param("apiKey", "k3y"))
+                .respond_with(json(PING_OK))
+                .expect(1)
+                .mount(&server)
+                .await;
+            Mock::given(method("GET"))
+                .and(path("/rest/getOpenSubsonicExtensions.view"))
+                .respond_with(json(API_KEY_EXTENSIONS))
+                .mount(&server)
+                .await;
+
+            let uri = server.uri();
+            let probe = tokio::task::spawn_blocking(move || {
+                SubsonicClient::new(&uri, Auth::new(AuthMode::ApiKey, "", "k3y"))
+                    .unwrap()
+                    .probe()
+            })
+            .await
+            .unwrap()
+            .unwrap();
+            assert_eq!(probe.extension_names(), vec!["apiKeyAuthentication"]);
+
+            // The capability check goes out without any credentials.
+            let requests = server.received_requests().await.unwrap();
+            let public = requests
+                .iter()
+                .find(|r| r.url.path().ends_with("getOpenSubsonicExtensions.view"))
+                .unwrap();
+            let q: Vec<_> = public.url.query_pairs().map(|(k, _)| k.into_owned()).collect();
+            for k in ["u", "t", "s", "p", "apiKey"] {
+                assert!(!q.contains(&k.to_string()), "{k} sent to public endpoint");
+            }
+        }
+
+        #[tokio::test]
+        async fn api_key_probe_is_refused_without_the_extension() {
+            let server = MockServer::start().await;
+            Mock::given(method("GET"))
+                .and(path("/rest/getOpenSubsonicExtensions.view"))
+                .respond_with(json(super::NAVIDROME_EXTENSIONS))
+                .mount(&server)
+                .await;
+            Mock::given(method("GET"))
+                .and(path("/rest/ping.view"))
+                .respond_with(json(PING_OK))
+                .expect(0)
+                .mount(&server)
+                .await;
+
+            let uri = server.uri();
+            let err = tokio::task::spawn_blocking(move || {
+                SubsonicClient::new(&uri, Auth::new(AuthMode::ApiKey, "", "k3y"))
+                    .unwrap()
+                    .probe()
+            })
+            .await
+            .unwrap()
+            .unwrap_err();
+            assert_eq!(err.to_string(), "This server doesn't support API key sign-in");
+        }
+
+        #[tokio::test]
+        async fn supports_api_key_is_false_on_a_legacy_server() {
+            let server = MockServer::start().await;
+            Mock::given(method("GET"))
+                .and(path("/rest/getOpenSubsonicExtensions.view"))
+                .respond_with(json(
+                    r#"{"subsonic-response":{"status":"failed","version":"1.15.0","error":{"code":0,"message":"Unknown endpoint"}}}"#,
+                ))
+                .mount(&server)
+                .await;
+
+            let uri = server.uri();
+            let supported = tokio::task::spawn_blocking(move || {
+                SubsonicClient::new(&uri, Auth::token("", ""))
+                    .unwrap()
+                    .supports_api_key()
+            })
+            .await
+            .unwrap()
+            .unwrap();
+            assert!(!supported);
+        }
+
+        #[tokio::test]
+        async fn token_error_41_suggests_password_sign_in() {
+            let server = MockServer::start().await;
+            Mock::given(method("GET"))
+                .and(path("/rest/ping.view"))
+                .respond_with(json(
+                    r#"{"subsonic-response":{"status":"failed","version":"1.16.1","error":{"code":41,"message":"Token authentication not supported for LDAP users."}}}"#,
+                ))
+                .mount(&server)
+                .await;
+
+            let uri = server.uri();
+            let err = tokio::task::spawn_blocking(move || {
+                SubsonicClient::new(&uri, Auth::token("alice", "pw"))
+                    .unwrap()
+                    .probe()
+            })
+            .await
+            .unwrap()
+            .unwrap_err();
+            let api = err.downcast_ref::<SubsonicApiError>().unwrap();
+            assert_eq!(api.0.code, 41);
+            assert!(err.to_string().contains("Password sign-in method"));
         }
     }
 }

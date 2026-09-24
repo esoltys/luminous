@@ -558,6 +558,7 @@ fn apply_album_ratings(tx: &Connection, server_id: i64, albums: &[AlbumId3]) -> 
 mod tests {
     use super::*;
     use crate::db::Database;
+    use crate::subsonic::Auth;
     use serde_json::json;
     use std::sync::Arc;
     use wiremock::matchers::{method, path, query_param};
@@ -910,7 +911,7 @@ mod tests {
         let db2 = Arc::clone(&db);
         let dir2 = dir.clone();
         let stats = tokio::task::spawn_blocking(move || {
-            let client = SubsonicClient::new(&uri, "u", "p").unwrap();
+            let client = SubsonicClient::new(&uri, Auth::token("u", "p")).unwrap();
             let covers = CoverManager::new(Arc::clone(&db2), dir2);
             let lib = fetch_library(&client, |_| {}).unwrap();
             assert_eq!(lib.songs.len(), 2);
@@ -962,7 +963,7 @@ mod tests {
 
         let uri = server.uri();
         let lib = tokio::task::spawn_blocking(move || {
-            fetch_library(&SubsonicClient::new(&uri, "u", "p").unwrap(), |_| {})
+            fetch_library(&SubsonicClient::new(&uri, Auth::token("u", "p")).unwrap(), |_| {})
         })
         .await
         .unwrap()
@@ -987,7 +988,7 @@ mod tests {
 
         let uri = server.uri();
         let result = tokio::task::spawn_blocking(move || {
-            fetch_library(&SubsonicClient::new(&uri, "u", "p").unwrap(), |_| {})
+            fetch_library(&SubsonicClient::new(&uri, Auth::token("u", "p")).unwrap(), |_| {})
         })
         .await
         .unwrap();

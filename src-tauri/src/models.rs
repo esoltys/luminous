@@ -899,6 +899,9 @@ pub struct SubsonicServer {
     /// frontend.
     #[serde(skip_serializing)]
     pub password: Option<String>,
+    /// How requests are signed (#1167). In API-key mode `password` holds the
+    /// key and `username` is empty.
+    pub auth_mode: crate::subsonic::AuthMode,
     pub enabled: bool,
     pub sync_status: String,
     pub last_synced_at: Option<i64>,
