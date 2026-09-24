@@ -120,7 +120,7 @@ impl AuthMode {
 
 /// A server's credentials. `secret` is the password, or the API key in
 /// `ApiKey` mode. `Debug` redacts the secret so it can't reach a log.
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Default, PartialEq, Eq)]
 pub struct Auth {
     pub mode: AuthMode,
     pub username: String,
@@ -609,6 +609,12 @@ pub struct SubsonicClient {
 }
 
 impl SubsonicClient {
+    /// A client with no credentials, for the few endpoints a server answers
+    /// without sign-in (`getOpenSubsonicExtensions`).
+    pub fn anonymous(base_url: &str) -> Result<Self> {
+        Self::new(base_url, Auth::default())
+    }
+
     /// `base_url` is the server root (e.g. `https://music.example.com`); a
     /// trailing `/rest` or `/` is tolerated, since users often paste either.
     pub fn new(base_url: &str, auth: Auth) -> Result<Self> {
@@ -1367,7 +1373,7 @@ mod tests {
 
             let uri = server.uri();
             let supported = tokio::task::spawn_blocking(move || {
-                SubsonicClient::new(&uri, Auth::token("", ""))
+                SubsonicClient::anonymous(&uri)
                     .unwrap()
                     .supports_api_key()
             })

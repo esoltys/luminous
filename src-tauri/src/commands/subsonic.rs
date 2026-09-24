@@ -432,7 +432,7 @@ pub struct SubsonicAuthSupport {
 #[tauri::command]
 pub async fn get_subsonic_auth_support(url: String) -> Result<SubsonicAuthSupport, String> {
     tokio::task::spawn_blocking(move || {
-        let api_key = SubsonicClient::new(url.trim(), Auth::token("", ""))
+        let api_key = SubsonicClient::anonymous(url.trim())
             .and_then(|c| c.supports_api_key())
             .unwrap_or(false);
         Ok(SubsonicAuthSupport { api_key })
