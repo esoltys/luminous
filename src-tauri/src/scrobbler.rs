@@ -147,6 +147,17 @@ struct FeedbackRequest {
     score: i32,
 }
 
+/// ListenBrainz feedback score for a Luminous rating (0.5–5, negative =
+/// unrated): "love" (1) at the same 4-star threshold that stars a track on
+/// a Subsonic server, otherwise neutral (0).
+fn feedback_score(rating: f32) -> i32 {
+    if rating >= crate::subsonic::report::STAR_THRESHOLD {
+        1
+    } else {
+        0
+    }
+}
+
 /// Central manager orchestrating ListenBrainz API calls, offline cache, and Discord Rich Presence.
 pub struct ScrobblerManager {
     db: Arc<Database>,
@@ -732,7 +743,7 @@ impl ScrobblerManager {
             _ => return, // ListenBrainz recording feedback requires recording_mbid
         };
 
-        let score = if rating >= 0.8 { 1 } else { 0 };
+        let score = feedback_score(rating);
         let token = settings.listenbrainz_token.trim().to_string();
         if token.is_empty() {
             return;
@@ -1059,6 +1070,16 @@ impl ScrobblerManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn feedback_loves_only_four_stars_and_up() {
+        assert_eq!(feedback_score(-1.0), 0);
+        assert_eq!(feedback_score(0.5), 0);
+        assert_eq!(feedback_score(1.0), 0);
+        assert_eq!(feedback_score(3.5), 0);
+        assert_eq!(feedback_score(4.0), 1);
+        assert_eq!(feedback_score(5.0), 1);
+    }
 
     #[test]
     fn test_listenbrainz_payload_serialization() {

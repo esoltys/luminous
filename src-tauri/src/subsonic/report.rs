@@ -21,7 +21,7 @@ use std::sync::Arc;
 
 /// Luminous rating at or above which a song/album counts as a server-side
 /// favourite (star) — the inverse of `sync::server_rating`'s mapping.
-const STAR_THRESHOLD: f32 = 4.0;
+pub const STAR_THRESHOLD: f32 = 4.0;
 
 /// A queued play is dropped after this many failed attempts.
 const MAX_QUEUE_ATTEMPTS: i64 = 20;
