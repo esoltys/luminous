@@ -52,7 +52,7 @@
     "@types/node": "^26.4.1",
     "@typescript/native-preview": "^7.0.0-dev.20260707.2",
     "image-js": "^1.7.0",
-    "jsdom": "^30.0.1",
+    "jsdom": "^30.1.0",
     "knip": "^6.34.0",
     "music-metadata": "^11.15.0",
     "playwright": "^1.63.0",
