@@ -85,6 +85,12 @@ impl FieldFilter {
                 self.op.to_sql(),
                 param_idx
             )
+        } else if self.sql_column == "path" {
+            format!(
+                "REPLACE(path, '\\', '/') {} ?{}",
+                self.op.to_sql(),
+                param_idx
+            )
         } else {
             format!("{} {} ?{}", self.sql_column, self.op.to_sql(), param_idx)
         }
@@ -193,12 +199,20 @@ fn parse_field_filter(token: &str) -> Option<FieldFilter> {
             ("artist_tag", false)
         }
         "lyrics" | "lyric" => ("lyrics", false),
+        "folder" | "subfolder" | "directory" | "path" => ("path", false),
         _ => return None,
     };
 
     let (op, raw_val) = parse_op_and_value(val_str, is_numeric);
 
-    let value = if sql_column == "length_nanosec" {
+    let value = if sql_column == "path" {
+        let normalized_val = raw_val.replace('\\', "/");
+        if op == Op::Contains {
+            FilterValue::Text(format!("%{normalized_val}%"))
+        } else {
+            FilterValue::Text(normalized_val)
+        }
+    } else if sql_column == "length_nanosec" {
         FilterValue::Int(parse_duration_ns(raw_val)?)
     } else if is_numeric {
         if let Ok(i) = raw_val.parse::<i64>() {
@@ -374,5 +388,30 @@ mod tests {
 
         assert_eq!(q.field_filters[1].field, "tag");
         assert_eq!(q.field_filters[1].sql_column, "artist_tag");
+    }
+
+    #[test]
+    fn test_parse_folder_filter() {
+        let q = parse_query("folder:\"Worship forever1\"");
+        assert_eq!(q.field_filters.len(), 1);
+        assert_eq!(q.field_filters[0].field, "folder");
+        assert_eq!(q.field_filters[0].sql_column, "path");
+        assert_eq!(q.field_filters[0].op, Op::Contains);
+        assert_eq!(
+            q.field_filters[0].value,
+            FilterValue::Text("%Worship forever1%".to_string())
+        );
+        assert_eq!(
+            q.field_filters[0].to_sql_clause(1),
+            "REPLACE(path, '\\', '/') LIKE ?1"
+        );
+
+        // Windows path slashes normalized in filter value
+        let q2 = parse_query("path:Music\\Worship");
+        assert_eq!(q2.field_filters.len(), 1);
+        assert_eq!(
+            q2.field_filters[0].value,
+            FilterValue::Text("%Music/Worship%".to_string())
+        );
     }
 }

@@ -1,5 +1,7 @@
 <script lang="ts">
   import { collectionStore } from "../stores/collection.svelte";
+  import { playlistsStore } from "../stores/playlists.svelte";
+  import { navigationStore } from "../stores/navigation.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { loudnessStore } from "../stores/loudness.svelte";
   import { tasksStore } from "../stores/tasks.svelte";
@@ -25,6 +27,7 @@
     WarningIcon as AlertTriangle,
     CloudIcon as Cloud,
     CircleNotchIcon as LoaderCircle,
+    PlaylistIcon as ListMusic,
   } from "phosphor-svelte";
 
   let editingDirectory = $state<MusicDirectory | null>(null);
@@ -198,6 +201,18 @@
     }
   }
 
+  async function handleCreateFolderPlaylist(dir: MusicDirectory) {
+    const name = dir.nickname || dir.path.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || dir.path;
+    try {
+      const playlist = await playlistsStore.createPlaylist(name);
+      await playlistsStore.updatePlaylistSpec(playlist.id, `folder:"${dir.path}"`);
+      navigationStore.activeTab = "playlists";
+      navigationStore.selectedPlaylistId = playlist.id;
+    } catch (err) {
+      console.error("Failed to create smart playlist from folder:", err);
+    }
+  }
+
   function getWebdavStatusText(server: WebDavServer): string {
     if (isServerSyncing(server.id) || server.syncStatus === "syncing") return i18n.t("settings.webdavStatusSyncing");
     if (server.lastSyncedAt) {
@@ -289,6 +304,13 @@
             {:else}
               <RefreshCw class="w-4 h-4 text-brand-accent-text" />
             {/if}
+          </button>
+          <button
+            onclick={() => handleCreateFolderPlaylist(dir)}
+            class="p-2 rounded-lg bg-brand-main hover:bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary border border-brand-border hover:border-brand-accent/40 transition-colors"
+            title={i18n.t('settings.folderCreatePlaylist', {}, 'Create Smart Playlist from folder')}
+          >
+            <ListMusic class="w-4 h-4 text-brand-accent-text" />
           </button>
           <button
             onclick={() => { editingDirectory = dir; }}

@@ -74,6 +74,16 @@ export function parseSearchRules(query: string): Rule[] {
         op = "contains";
       } else if (
         [
+          "folder",
+          "subfolder",
+          "directory",
+          "path",
+        ].includes(field)
+      ) {
+        normalizedField = "folder";
+        op = "contains";
+      } else if (
+        [
           "artist",
           "album_artist",
           "album",
