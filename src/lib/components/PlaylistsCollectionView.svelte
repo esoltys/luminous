@@ -16,6 +16,8 @@
   import PlaylistView from "./PlaylistView.svelte";
   import AutoPlaylistDetailView from "./AutoPlaylistDetailView.svelte";
   import SmartPlaylistBuilderModal from "./SmartPlaylistBuilderModal.svelte";
+  import PlaylistCardContextMenu from "./PlaylistCardContextMenu.svelte";
+  import AutoPlaylistContextMenu from "./AutoPlaylistContextMenu.svelte";
   import EmptyState from "./EmptyState.svelte";
   import Select from "./Select.svelte";
   import Button from "./Button.svelte";
@@ -327,6 +329,24 @@
     }
   }
 
+  let contextMenuState = $state<
+    | { x: number; y: number; kind: "playlist"; playlist: Playlist }
+    | { x: number; y: number; kind: "auto"; def: AutoDef }
+    | null
+  >(null);
+
+  function handlePlaylistContextMenu(e: MouseEvent, playlist: Playlist) {
+    e.preventDefault();
+    e.stopPropagation();
+    contextMenuState = { x: e.clientX, y: e.clientY, kind: "playlist", playlist };
+  }
+
+  function handleAutoContextMenu(e: MouseEvent, def: AutoDef) {
+    e.preventDefault();
+    e.stopPropagation();
+    contextMenuState = { x: e.clientX, y: e.clientY, kind: "auto", def };
+  }
+
   function openAuto(def: AutoDef) {
     navigationStore.viewAutoPlaylist(
       def.kind === "genre"
@@ -508,6 +528,7 @@
                   updated={def.updated}
                   trackCount={def.trackCount}
                   onClick={() => openAuto(def)}
+                  oncontextmenu={(e) => handleAutoContextMenu(e, def)}
                 />
               {:else}
                 <AutoPlaylistCard
@@ -521,6 +542,7 @@
                   updated={def.updated}
                   trackCount={def.trackCount}
                   onClick={() => openAuto(def)}
+                  oncontextmenu={(e) => handleAutoContextMenu(e, def)}
                 />
               {/if}
             {/each}
@@ -540,9 +562,17 @@
             <div class="grid {activeViewMode === 'rows' ? 'grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2' : 'grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-5'}">
               {#each sortedPlaylists as pl (pl.id)}
                 {#if activeViewMode === "rows"}
-                  <PlaylistRowCard playlist={pl} onClick={() => openPlaylist(pl)} />
+                  <PlaylistRowCard
+                    playlist={pl}
+                    onClick={() => openPlaylist(pl)}
+                    oncontextmenu={(e) => handlePlaylistContextMenu(e, pl)}
+                  />
                 {:else}
-                  <PlaylistCard playlist={pl} onClick={() => openPlaylist(pl)} />
+                  <PlaylistCard
+                    playlist={pl}
+                    onClick={() => openPlaylist(pl)}
+                    oncontextmenu={(e) => handlePlaylistContextMenu(e, pl)}
+                  />
                 {/if}
               {/each}
             </div>
@@ -551,4 +581,21 @@
       </div>
     </div>
   </div>
+{/if}
+
+{#if contextMenuState?.kind === "playlist"}
+  <PlaylistCardContextMenu
+    x={contextMenuState.x}
+    y={contextMenuState.y}
+    playlist={contextMenuState.playlist}
+    onClose={() => { contextMenuState = null; }}
+  />
+{:else if contextMenuState?.kind === "auto"}
+  <AutoPlaylistContextMenu
+    x={contextMenuState.x}
+    y={contextMenuState.y}
+    autoPlaylist={contextMenuState.def}
+    label={contextMenuState.def.label}
+    onClose={() => { contextMenuState = null; }}
+  />
 {/if}

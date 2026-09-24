@@ -28,9 +28,10 @@
     updated?: number;
     trackCount: number;
     onClick: () => void;
+    oncontextmenu?: (e: MouseEvent) => void;
   }
 
-  let { label, kind, genre, artistTag, decade, bpm, playlistId, updated, trackCount, onClick }: Props = $props();
+  let { label, kind, genre, artistTag, decade, bpm, playlistId, updated, trackCount, onClick, oncontextmenu }: Props = $props();
 
   let displayLabel = $derived.by(() => {
     if (
@@ -72,6 +73,7 @@
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <div
   onclick={onClick}
+  {oncontextmenu}
   class="group flex items-center gap-3 px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 select-none"
 >
   <div
