@@ -6,7 +6,9 @@ import { invoke } from "@tauri-apps/api/core";
  * Settings integration card can show the resolved path. */
 class PicardStore {
   path = $state<string | null>(null);
-  missingPlaylistEnabled = $state(true);
+  // Off by default: most users don't know what MusicBrainz/Picard is, so
+  // the "Missing MusicBrainz ID" auto-playlist is opt-in via Settings.
+  missingPlaylistEnabled = $state(false);
   private initialized = false;
 
   get available(): boolean {
@@ -29,7 +31,7 @@ class PicardStore {
     try {
       const settings = await invoke<Record<string, string>>("get_all_app_settings");
       if (settings && settings.picard_missing_playlist_enabled !== undefined) {
-        this.missingPlaylistEnabled = settings.picard_missing_playlist_enabled !== "false";
+        this.missingPlaylistEnabled = settings.picard_missing_playlist_enabled === "true";
       }
     } catch {
       // In tests where get_all_app_settings is not mocked, keep default
