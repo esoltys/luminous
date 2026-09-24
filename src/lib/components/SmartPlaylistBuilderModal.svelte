@@ -5,11 +5,13 @@
   import { playlistsStore } from "../stores/playlists.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { i18n } from "../stores/i18n.svelte";
+  import { open } from "@tauri-apps/plugin-dialog";
   import {
     XIcon as X,
     PlusIcon as Plus,
     SparkleIcon as Sparkles,
-    SlidersHorizontalIcon as SlidersHorizontal
+    SlidersHorizontalIcon as SlidersHorizontal,
+    FolderIcon as Folder,
   } from "phosphor-svelte";
   import type { Rule } from "../utils/filterParser";
   import type { QueuePopulationMode } from "../types";
@@ -195,6 +197,24 @@
     rules = rules.filter((r) => r.id !== id);
   }
 
+  async function handlePickFolder(rule: RuleItem) {
+    try {
+      const selected = await open({
+        directory: true,
+        multiple: false,
+        title: i18n.t("smartPlaylistBuilder.selectFolderTitle", {}, "Select Folder"),
+      });
+      if (selected && typeof selected === "string") {
+        rule.value = selected;
+        if (!userHasEditedName) {
+          playlistName = generateSuggestedName(rules);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to open folder picker dialog:", err);
+    }
+  }
+
   async function handleSubmit(e: Event) {
     e.preventDefault();
     const name = playlistName.trim();
@@ -354,6 +374,26 @@
                     onchange={(checked) => { rule.value = checked ? "1" : "0"; }}
                     label={i18n.t("smartPlaylistBuilder.fieldCompilation", {}, "Compilation")}
                   />
+                </div>
+              {:else if rule.field === "folder" || rule.field === "path" || rule.field === "subfolder" || rule.field === "directory"}
+                <div class="flex-1 min-w-0 flex items-center gap-1.5">
+                  <Input
+                    type="text"
+                    bind:value={rule.value}
+                    oninput={() => { if (!userHasEditedName) playlistName = generateSuggestedName(rules); }}
+                    placeholder={i18n.t("smartPlaylistBuilder.folderValuePlaceholder", {}, "e.g. Radio or browse...")}
+                    size="sm"
+                    surface="sidebar"
+                    class="flex-1 min-w-0"
+                  />
+                  <button
+                    type="button"
+                    onclick={() => handlePickFolder(rule)}
+                    class="p-2 rounded-lg bg-brand-sidebar hover:bg-brand-main text-brand-text-secondary hover:text-brand-text-primary border border-brand-border hover:border-brand-accent/40 transition-colors shrink-0"
+                    title={i18n.t("smartPlaylistBuilder.browseFolderTooltip", {}, "Browse folder")}
+                  >
+                    <Folder class="w-3.5 h-3.5 text-brand-accent-text" />
+                  </button>
                 </div>
               {:else}
                 <Input
