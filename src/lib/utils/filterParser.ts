@@ -12,9 +12,16 @@ export function parseSearchRules(query: string): Rule[] {
   let current = "";
   let inQuotes = false;
   let quoteChar = "";
+  let escaped = false;
 
   for (const ch of query) {
-    if (ch === '"' || ch === "'") {
+    if (ch === "\\" && !escaped) {
+      escaped = true;
+      current += ch;
+      continue;
+    }
+
+    if ((ch === '"' || ch === "'") && !escaped) {
       if (inQuotes && ch === quoteChar) {
         inQuotes = false;
       } else if (!inQuotes) {
@@ -30,6 +37,7 @@ export function parseSearchRules(query: string): Rule[] {
     } else {
       current += ch;
     }
+    escaped = false;
   }
   if (current.trim()) {
     tokens.push(current.trim());
@@ -39,7 +47,14 @@ export function parseSearchRules(query: string): Rule[] {
     const colonIdx = token.indexOf(":");
     if (colonIdx > 0) {
       const field = token.slice(0, colonIdx).trim().toLowerCase();
-      let rawVal = token.slice(colonIdx + 1).replace(/^['"]|['"]$/g, "").trim();
+      let rawVal = token.slice(colonIdx + 1).trim();
+      if (
+        (rawVal.startsWith('"') && rawVal.endsWith('"')) ||
+        (rawVal.startsWith("'") && rawVal.endsWith("'"))
+      ) {
+        rawVal = rawVal.slice(1, -1);
+      }
+      rawVal = rawVal.replace(/\\"/g, '"').replace(/\\'/g, "'").replace(/\\\\/g, "\\");
       let op = "=";
 
       if (rawVal.startsWith(">=")) {
@@ -71,6 +86,16 @@ export function parseSearchRules(query: string): Rule[] {
         ].includes(field)
       ) {
         normalizedField = "artist_tag";
+        op = "contains";
+      } else if (
+        [
+          "folder",
+          "subfolder",
+          "directory",
+          "path",
+        ].includes(field)
+      ) {
+        normalizedField = "folder";
         op = "contains";
       } else if (
         [

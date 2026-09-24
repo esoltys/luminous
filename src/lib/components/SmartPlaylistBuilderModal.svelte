@@ -5,11 +5,13 @@
   import { playlistsStore } from "../stores/playlists.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { i18n } from "../stores/i18n.svelte";
+  import { open } from "@tauri-apps/plugin-dialog";
   import {
     XIcon as X,
     PlusIcon as Plus,
     SparkleIcon as Sparkles,
-    SlidersHorizontalIcon as SlidersHorizontal
+    SlidersHorizontalIcon as SlidersHorizontal,
+    FolderIcon as Folder,
   } from "phosphor-svelte";
   import type { Rule } from "../utils/filterParser";
   import type { QueuePopulationMode } from "../types";
@@ -61,7 +63,11 @@
       const val = r.value.trim().replace(/^["']|["']$/g, "");
       if (!val) return;
 
-      if (r.field === "genre" || r.field === "artist_tag" || r.field === "artist-tag") {
+      if (["folder", "subfolder", "directory", "path"].includes(r.field)) {
+        const cleanVal = val.replace(/[\\/]+$/, "");
+        const baseName = cleanVal.split(/[\\/]/).pop() || cleanVal;
+        parts.push(baseName);
+      } else if (r.field === "genre" || r.field === "artist_tag" || r.field === "artist-tag") {
         parts.push(val.charAt(0).toUpperCase() + val.slice(1));
       } else if (r.field === "artist") {
         parts.push(val);
@@ -86,6 +92,7 @@
       if (decadeToken && single === decadeToken) return `${decadeToken} ${mixWord}`;
       const firstNonYear = activeRules.find((r) => r.field !== "year");
       const firstField = firstNonYear?.field ?? activeRules[0].field;
+      if (["folder", "subfolder", "directory", "path"].includes(firstField)) return single;
       if (firstField === "genre" || firstField === "artist_tag" || firstField === "artist-tag") return `${single} ${mixWord}`;
       if (firstField === "artist") return `${single} ${i18n.t("smartPlaylistBuilder.selectionWord", {}, "Selection")}`;
       if (firstField === "rating") return `${single} ${i18n.t("smartPlaylistBuilder.songsWord", {}, "Songs")}`;
@@ -136,6 +143,7 @@
     { key: "album", label: i18n.t("smartPlaylistBuilder.fieldAlbum", {}, "Album"), type: "text" },
     { key: "title", label: i18n.t("smartPlaylistBuilder.fieldTitle", {}, "Title"), type: "text" },
     { key: "genre", label: i18n.t("smartPlaylistBuilder.fieldGenre", {}, "Genre"), type: "text" },
+    { key: "folder", label: i18n.t("smartPlaylistBuilder.fieldFolder", {}, "Folder / Path"), type: "text" },
     { key: "composer", label: i18n.t("smartPlaylistBuilder.fieldComposer", {}, "Composer"), type: "text" },
     { key: "key", label: i18n.t("smartPlaylistBuilder.fieldKey", {}, "Key"), type: "text" },
     { key: "bpm", label: i18n.t("smartPlaylistBuilder.fieldBpm", {}, "BPM"), type: "number" },
@@ -189,6 +197,24 @@
     rules = rules.filter((r) => r.id !== id);
   }
 
+  async function handlePickFolder(rule: RuleItem) {
+    try {
+      const selected = await open({
+        directory: true,
+        multiple: false,
+        title: i18n.t("smartPlaylistBuilder.selectFolderTitle", {}, "Select Folder"),
+      });
+      if (selected && typeof selected === "string") {
+        rule.value = selected;
+        if (!userHasEditedName) {
+          playlistName = generateSuggestedName(rules);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to open folder picker dialog:", err);
+    }
+  }
+
   async function handleSubmit(e: Event) {
     e.preventDefault();
     const name = playlistName.trim();
@@ -204,6 +230,10 @@
       .map((r) => {
         const val = r.value.trim();
         const opPrefix = r.op === "contains" ? "" : r.op;
+        if (/[\s"';]/.test(val) || opPrefix) {
+          const escapedVal = val.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+          return `${r.field}:${opPrefix}"${escapedVal}"`;
+        }
         return `${r.field}:${opPrefix}${val}`;
       })
       .join("; ");
@@ -348,6 +378,26 @@
                     onchange={(checked) => { rule.value = checked ? "1" : "0"; }}
                     label={i18n.t("smartPlaylistBuilder.fieldCompilation", {}, "Compilation")}
                   />
+                </div>
+              {:else if rule.field === "folder" || rule.field === "path" || rule.field === "subfolder" || rule.field === "directory"}
+                <div class="flex-1 min-w-0 flex items-center gap-1.5">
+                  <Input
+                    type="text"
+                    bind:value={rule.value}
+                    oninput={() => { if (!userHasEditedName) playlistName = generateSuggestedName(rules); }}
+                    placeholder={i18n.t("smartPlaylistBuilder.folderValuePlaceholder", {}, "e.g. Radio Downloads or browse...")}
+                    size="sm"
+                    surface="sidebar"
+                    class="flex-1 min-w-0"
+                  />
+                  <button
+                    type="button"
+                    onclick={() => handlePickFolder(rule)}
+                    class="p-2 rounded-lg bg-brand-sidebar hover:bg-brand-main text-brand-text-secondary hover:text-brand-text-primary border border-brand-border hover:border-brand-accent/40 transition-colors shrink-0"
+                    title={i18n.t("smartPlaylistBuilder.browseFolderTooltip", {}, "Browse folder")}
+                  >
+                    <Folder class="w-3.5 h-3.5 text-brand-accent-text" />
+                  </button>
                 </div>
               {:else}
                 <Input
