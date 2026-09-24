@@ -7,6 +7,7 @@ import { themeStore } from "./theme.svelte";
 import { toastStore } from "./toast.svelte";
 import { playlistsStore } from "./playlists.svelte";
 import { i18n } from "./i18n.svelte";
+import { isRemotePath } from "../utils/remoteSource";
 
 export class PlayerStore {
   state = $state<PlayState>("stopped");
@@ -35,7 +36,7 @@ export class PlayerStore {
   /** Titles pending a "couldn't play" toast — batched so a run of consecutive
    *  unavailable tracks (e.g. a whole disconnected drive) shows one summary
    *  toast instead of a notification per failed track. */
-  private _playbackErrorBatch: string[] = [];
+  private _playbackErrorBatch: { title: string; path: string | null; message: string }[] = [];
   private _playbackErrorTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
@@ -130,7 +131,11 @@ export class PlayerStore {
       }>(
         "playback-error",
         (event) => {
-          this._playbackErrorBatch.push(event.payload.title || i18n.t("collection.unknownSong"));
+          this._playbackErrorBatch.push({
+            title: event.payload.title || i18n.t("collection.unknownSong"),
+            path: event.payload.path,
+            message: event.payload.message,
+          });
           if (this._playbackErrorTimer) clearTimeout(this._playbackErrorTimer);
           this._playbackErrorTimer = setTimeout(() => this.flushPlaybackErrorToast(), 400);
         }
@@ -166,19 +171,31 @@ export class PlayerStore {
   }
 
   private flushPlaybackErrorToast() {
-    const titles = this._playbackErrorBatch;
+    const failures = this._playbackErrorBatch;
     this._playbackErrorBatch = [];
     this._playbackErrorTimer = null;
-    if (titles.length === 0) return;
+    if (failures.length === 0) return;
 
-    if (titles.length === 1) {
-      toastStore.show(
-        i18n.t("playerBar.trackSkippedToast", { title: titles[0] }, `Couldn't play "${titles[0]}" — file not found. Skipped.`),
-        "error"
-      );
+    if (failures.length === 1) {
+      const { title, path, message } = failures[0];
+      // A remote song (WebDAV/OpenSubsonic, #916) fails for reasons other than
+      // a missing file — bad credentials, server down — so surface the
+      // backend's reason instead of "file not found".
+      const reason = message?.trim().replace(/[.\s]+$/, "");
+      if (isRemotePath(path) && reason) {
+        toastStore.show(
+          i18n.t("playerBar.trackSkippedRemoteToast", { title, message: reason }, `Couldn't play "${title}" — ${reason}. Skipped.`),
+          "error"
+        );
+      } else {
+        toastStore.show(
+          i18n.t("playerBar.trackSkippedToast", { title }, `Couldn't play "${title}" — file not found. Skipped.`),
+          "error"
+        );
+      }
     } else {
       toastStore.show(
-        i18n.t("playerBar.tracksSkippedToast", { count: titles.length }, `Skipped ${titles.length} unavailable tracks.`),
+        i18n.t("playerBar.tracksSkippedToast", { count: failures.length }, `Skipped ${failures.length} unavailable tracks.`),
         "error"
       );
     }

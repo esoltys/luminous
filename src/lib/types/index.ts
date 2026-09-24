@@ -314,6 +314,55 @@ export interface WebDavSyncProgressPayload {
   done: boolean;
 }
 
+/** A configured OpenSubsonic/Subsonic media server (#916). The password is
+ * never serialized to the frontend. */
+export interface SubsonicServer {
+  id: number;
+  name: string;
+  url: string;
+  username: string;
+  enabled: boolean;
+  syncStatus: string;
+  lastSyncedAt?: number | null;
+  createdAt: number;
+  nickname?: string | null;
+  icon?: string | null;
+  color?: string | null;
+  autoSyncEnabled: boolean;
+  syncIntervalMinutes: number;
+  reportPlays: boolean;
+  serverType?: string | null;
+  serverVersion?: string | null;
+  extensions: string[];
+  nextAutoSyncAt?: number | null;
+}
+
+/** Result of `test_subsonic_connection` / `check_subsonic_connection`. */
+export interface SubsonicServerProbe {
+  version: string;
+  serverType?: string | null;
+  serverVersion?: string | null;
+  openSubsonic: boolean;
+  extensions: { name: string; versions: number[] }[];
+}
+
+export interface SubsonicSyncStats {
+  added: number;
+  updated: number;
+  removed: number;
+  errors: number;
+}
+
+export interface SubsonicSyncProgressPayload {
+  serverId: number;
+  serverName: string;
+  phase: "listing" | "artwork" | "saving" | "done";
+  currentCount: number;
+  stats: SubsonicSyncStats;
+  done: boolean;
+  error?: string | null;
+}
+
 export interface TagBatchProgressPayload {
   current: number;
   total: number;

@@ -3,6 +3,7 @@ import { PlayerStore } from "./player.svelte";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { playlistsStore } from "./playlists.svelte";
+import { toastStore } from "./toast.svelte";
 
 describe("PlayerStore", () => {
   let store: PlayerStore;
@@ -165,6 +166,44 @@ describe("PlayerStore", () => {
     expect(store.currentSong).toBeUndefined();
 
     if (originalListenImpl) vi.mocked(listen).mockImplementation(originalListenImpl);
+  });
+
+  it("shows the backend's reason when a remote track fails to play", async () => {
+    const originalListenImpl = vi.mocked(listen).getMockImplementation();
+    let errorCallback: ((event: { payload: unknown }) => void) | undefined;
+    vi.mocked(listen).mockImplementation(async (event: string, callback: any) => {
+      if (event === "playback-error") errorCallback = callback;
+      return () => {};
+    });
+    const showSpy = vi.spyOn(toastStore, "show");
+    vi.useFakeTimers();
+
+    try {
+      store = new PlayerStore();
+      await vi.advanceTimersByTimeAsync(50);
+
+      errorCallback?.({
+        payload: { songId: 9, title: "Remote Song", path: "subsonic://2/tr-9", message: "Wrong username or password." },
+      });
+      await vi.advanceTimersByTimeAsync(500);
+      expect(showSpy).toHaveBeenLastCalledWith(
+        'Couldn\'t play "Remote Song" — Wrong username or password. Skipped.',
+        "error"
+      );
+
+      errorCallback?.({
+        payload: { songId: 10, title: "Local Song", path: "/music/a.flac", message: "No such file" },
+      });
+      await vi.advanceTimersByTimeAsync(500);
+      expect(showSpy).toHaveBeenLastCalledWith(
+        'Couldn\'t play "Local Song" — file not found. Skipped.',
+        "error"
+      );
+    } finally {
+      vi.useRealTimers();
+      showSpy.mockRestore();
+      if (originalListenImpl) vi.mocked(listen).mockImplementation(originalListenImpl);
+    }
   });
 
   it("should clear the Queue playlist when queue playback naturally completes", async () => {
