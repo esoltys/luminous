@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 45;
+pub const CURRENT_SCHEMA_VERSION: i32 = 46;
 
 struct Migration {
     version: i32,
@@ -383,6 +383,11 @@ const MIGRATIONS: &[Migration] = &[
             }
             Ok(())
         },
+    },
+    Migration {
+        version: 46,
+        description: "subsonic_scrobble_queue retry queue for plays reported to OpenSubsonic servers (#1165)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_46)?),
     },
 ];
 
@@ -1579,6 +1584,22 @@ CREATE INDEX IF NOT EXISTS idx_subsonic_album_cache_key ON subsonic_album_cache(
 // ---------------------------------------------------------------------------
 const MIGRATION_45: &str = "
 ALTER TABLE subsonic_cache ADD COLUMN fingerprint TEXT;
+";
+
+// ---------------------------------------------------------------------------
+// Migration 46: plays that couldn't be reported to an OpenSubsonic server
+// (offline, timeout) wait here and are retried on the next report (#1165).
+// Kept apart from `scrobble_cache`, which drains to ListenBrainz only.
+// ---------------------------------------------------------------------------
+const MIGRATION_46: &str = "
+CREATE TABLE IF NOT EXISTS subsonic_scrobble_queue (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    server_id   INTEGER NOT NULL REFERENCES subsonic_servers(id) ON DELETE CASCADE,
+    remote_id   TEXT NOT NULL,
+    listened_at INTEGER NOT NULL,
+    attempts    INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_subsonic_scrobble_queue_server ON subsonic_scrobble_queue(server_id);
 ";
 
 fn seed_artist_tag_hierarchy(conn: &rusqlite::Connection) -> Result<()> {
