@@ -690,6 +690,11 @@ fn spawn_audio_event_loop(
                                             "songId": song.id,
                                             "title": song.title,
                                             "path": song.path,
+                                            // Why it failed, e.g. a Subsonic
+                                            // server's "Wrong username or
+                                            // password" (#1163). Never holds a
+                                            // signed URL.
+                                            "message": message,
                                         }),
                                     );
                                 }
