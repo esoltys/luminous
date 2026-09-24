@@ -536,6 +536,9 @@ impl ScrobblerManager {
     /// Submit a "Playing Now" listen to ListenBrainz when track playback starts.
     pub async fn on_now_playing(&self, song: &Song) {
         let settings = self.get_settings().await;
+        if !settings.scrobble_paused {
+            crate::subsonic::report::spawn_now_playing(self.db.clone(), song);
+        }
         if !settings.listenbrainz_enabled
             || settings.scrobble_paused
             || !settings.scrobble_now_playing
@@ -626,6 +629,9 @@ impl ScrobblerManager {
     /// Enqueue a scrobble when the 50% scrobble point is reached, then trigger a flush.
     pub async fn on_scrobble_point(&self, song: &Song, listened_at: i64) {
         let settings = self.get_settings().await;
+        if !settings.scrobble_paused {
+            crate::subsonic::report::spawn_play(self.db.clone(), song, listened_at);
+        }
         if !settings.listenbrainz_enabled || settings.scrobble_paused {
             return;
         }

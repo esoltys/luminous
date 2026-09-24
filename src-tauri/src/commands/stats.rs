@@ -107,6 +107,7 @@ pub async fn set_song_rating(
     };
 
     if let Some(song) = song_for_scrobbler {
+        crate::subsonic::report::spawn_song_rating(state.db.clone(), &song, normalized);
         state.scrobbler.on_song_rating(&song, normalized).await;
     }
 
@@ -128,6 +129,8 @@ pub async fn set_album_rating(
     })
     .await
     .map_err(|e| e.to_string())?;
+
+    crate::subsonic::report::spawn_album_rating(state.db.clone(), album.clone(), normalized);
 
     let _ = app.emit(
         "album-stats-changed",

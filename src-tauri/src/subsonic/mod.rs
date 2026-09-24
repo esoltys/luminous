@@ -20,6 +20,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::time::Duration;
 
+pub mod report;
 pub mod sync;
 
 /// Subsonic REST API version we speak. 1.16.1 is the last version of the
@@ -496,6 +497,13 @@ fn payload<T: DeserializeOwned + Default>(
 // Client
 // ---------------------------------------------------------------------------
 
+/// What a `star` / `unstar` call targets.
+#[derive(Debug, Clone, Copy)]
+pub enum StarTarget<'a> {
+    Song(&'a str),
+    Album(&'a str),
+}
+
 /// Blocking OpenSubsonic client — callers run it on a blocking thread
 /// (`tokio::task::spawn_blocking`), same as `WebDavClient`.
 #[derive(Clone)]
@@ -644,6 +652,37 @@ impl SubsonicClient {
             return Err(anyhow!("The server returned no image"));
         }
         Ok(resp.bytes().context("failed to read cover art")?.to_vec())
+    }
+
+    /// `scrobble`: `submission = false` reports "now playing"; `true`
+    /// records a play at `time` (Unix seconds).
+    pub fn scrobble(&self, id: &str, submission: bool, time: Option<i64>) -> Result<()> {
+        let time_ms = time.map(|t| (t * 1000).to_string());
+        let mut params = vec![
+            ("id", id),
+            ("submission", if submission { "true" } else { "false" }),
+        ];
+        if let Some(ms) = time_ms.as_deref() {
+            params.push(("time", ms));
+        }
+        self.call("scrobble", &params).map(|_| ())
+    }
+
+    /// `star` / `unstar` a song or an album (ID3 `albumId`).
+    pub fn set_starred(&self, target: StarTarget<'_>, starred: bool) -> Result<()> {
+        let endpoint = if starred { "star" } else { "unstar" };
+        let param = match target {
+            StarTarget::Song(id) => ("id", id),
+            StarTarget::Album(id) => ("albumId", id),
+        };
+        self.call(endpoint, &[param]).map(|_| ())
+    }
+
+    /// `setRating`: 1–5 stars, or 0 to clear. Works for song and album ids.
+    pub fn set_rating(&self, id: &str, rating: u8) -> Result<()> {
+        let rating = rating.min(5).to_string();
+        self.call("setRating", &[("id", id), ("rating", &rating)])
+            .map(|_| ())
     }
 
     /// Connection test + capability discovery: `ping`, then (on an
