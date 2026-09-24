@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { isRemoteSource } from "../utils/remoteSource";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { applySongStats, type SongStatsPayload } from "../utils/stats";
@@ -939,11 +940,11 @@
           ? i18n.t("picard.openSelectedInPicard", { count: selectedKeys.size })
           : i18n.t("picard.openAllInPicard")}
         onclick={() => { handleOpenAllInPicard(); overflowMenuPos = null; }}
-        disabled={loading || songs.length === 0 || !picardStore.available || picardTargets.every((s) => s.source === "web_dav")}
+        disabled={loading || songs.length === 0 || !picardStore.available || picardTargets.every(isRemoteSource)}
         title={!picardStore.available
           ? i18n.t("picard.notFoundTooltip")
-          : picardTargets.length > 0 && picardTargets.every((s) => s.source === "web_dav")
-            ? i18n.t("picard.webdavNotSupportedTooltip")
+          : picardTargets.length > 0 && picardTargets.every(isRemoteSource)
+            ? i18n.t("picard.remoteNotSupportedTooltip")
             : undefined}
       />
     {/if}

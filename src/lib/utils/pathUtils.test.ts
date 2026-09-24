@@ -58,6 +58,10 @@ describe("pathUtils", () => {
       ).toBe("https://example.com/remote.php/webdav/Music/Big%20Wreck/2012%20-%20Albatross");
     });
 
+    it("handles subsonic:// paths without falling back to a drive root", () => {
+      expect(getParentFolder("subsonic://3/tr-abc123")).toBe("subsonic://3/");
+    });
+
     it("handles empty or relative path without directory", () => {
       expect(getParentFolder("")).toBe("");
       expect(getParentFolder("song.mp3")).toBe("");

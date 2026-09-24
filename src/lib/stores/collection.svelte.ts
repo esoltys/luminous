@@ -21,8 +21,11 @@ import type {
   QueuePopulationMode,
   WebDavServer,
   WebDavSyncProgressPayload,
+  SubsonicServer,
+  SubsonicSyncProgressPayload,
   TagBatchProgressPayload,
 } from "../types";
+import { parseSubsonicPath } from "../utils/remoteSource";
 import { applySongStats, type SongStatsPayload, applyAlbumStats, type AlbumStatsPayload } from "../utils/stats";
 import { navigationStore } from "./navigation.svelte";
 import { playlistsStore } from "./playlists.svelte";
@@ -93,6 +96,7 @@ const EMPTY_EXTENDED_ARTWORK: ExtendedArtworkResponse = {
 class CollectionStore {
   directories = $state<MusicDirectory[]>([]);
   webdavServers = $state<WebDavServer[]>([]);
+  subsonicServers = $state<SubsonicServer[]>([]);
   stats = $state<LibraryStats>({
     total_songs: 0,
     total_artists: 0,
@@ -280,6 +284,7 @@ class CollectionStore {
 
       await this.refreshDirectories();
       await this.refreshWebDavServers();
+      await this.refreshSubsonicServers();
       await this.refreshDbSchemaStatus();
       await this.refreshStats();
       await this.refreshLibrary();
@@ -418,6 +423,7 @@ class CollectionStore {
         this.refreshLibrary();
         this.refreshDirectories();
         this.refreshWebDavServers();
+        this.refreshSubsonicServers();
         tagsStore.load().catch((err) => {
           console.error("Failed to refresh tags after library change:", err);
         });
@@ -492,6 +498,36 @@ class CollectionStore {
         }
       });
 
+      // Track OpenSubsonic synchronization (#916) — Sync Now and auto-sync
+      // both report here, so either shows up in the task tray.
+      await listen<SubsonicSyncProgressPayload>("subsonic-sync-progress", (event) => {
+        const { serverId, serverName, currentCount, stats, done, error } = event.payload;
+        const taskId = `subsonic-sync-${serverId}`;
+        if (done) {
+          // An auto-sync that fails before its first progress event still
+          // needs a task to fail.
+          if (!tasksStore.isTaskActive(taskId)) tasksStore.startTask({ id: taskId, label: serverName, contextName: serverName });
+          if (error) {
+            tasksStore.failTask(taskId, i18n.t("settings.subsonicSyncFailed", { name: serverName, error }));
+          } else {
+            tasksStore.completeTask(
+              taskId,
+              `${serverName}: ${i18n.t("settings.subsonicSyncComplete", { ...stats })}`
+            );
+          }
+          this.refreshSubsonicServers();
+          return;
+        }
+        const label = currentCount > 0
+          ? i18n.t("tasks.syncingWebdavCount", { name: serverName, count: currentCount })
+          : i18n.t("tasks.syncingWebdav", { name: serverName });
+        if (!tasksStore.isTaskActive(taskId)) {
+          tasksStore.startTask({ id: taskId, label, contextName: serverName });
+        } else {
+          tasksStore.updateTask(taskId, { label, current: currentCount });
+        }
+      });
+
       // Track batch tag edits (#1087)
       await listen<TagBatchProgressPayload>("tag-batch-progress", (event) => {
         const { current, total, title, done } = event.payload;
@@ -557,6 +593,14 @@ class CollectionStore {
     this.webdavServers = await invoke("list_webdav_servers");
   }
 
+  async refreshSubsonicServers() {
+    try {
+      this.subsonicServers = await invoke("list_subsonic_servers");
+    } catch (err) {
+      console.error("Failed to load Subsonic servers:", err);
+    }
+  }
+
   async updateDirectoryMetadata(
     id: number,
     metadata: { nickname?: string | null; icon?: string | null; color?: string | null }
@@ -594,7 +638,29 @@ class CollectionStore {
     }
     if (bestMatch) return bestMatch;
 
-    return this.getWebDavServerForPath(path);
+    return this.getWebDavServerForPath(path) ?? this.getSubsonicServerForPath(path);
+  }
+
+  /**
+   * Resolves the OpenSubsonic server a `subsonic://{serverId}/{trackId}` song
+   * path belongs to, as a `MusicDirectory`-shaped badge source (see
+   * {@link getWebDavServerForPath} for the negative-id convention; Subsonic
+   * ids are offset further so they can't collide with a WebDAV server's).
+   */
+  getSubsonicServerForPath(path: string | null | undefined): MusicDirectory | undefined {
+    const parsed = parseSubsonicPath(path);
+    if (!parsed) return undefined;
+    const server = this.subsonicServers.find((s) => s.id === parsed.serverId);
+    if (!server) return undefined;
+    return {
+      id: -1_000_000 - server.id,
+      path: server.url,
+      subdirs: true,
+      nickname: server.nickname || server.name,
+      icon: server.icon || "cloud",
+      color: server.color ?? null,
+      is_available: server.syncStatus !== "error",
+    };
   }
 
   /**

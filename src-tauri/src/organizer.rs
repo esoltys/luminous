@@ -501,8 +501,9 @@ pub fn compute_preview(
             let placeholders = vec!["?"; chunk.len()].join(",");
             let sql = format!(
                 "SELECT id, path, title, artist, album, album_artist, track, disc, year, genre
-                 FROM songs WHERE id IN ({}) AND path IS NOT NULL AND TRIM(path) != '' AND unavailable = 0",
-                placeholders
+                 FROM songs WHERE id IN ({}) AND path IS NOT NULL AND TRIM(path) != '' AND source IN ({lib}) AND unavailable = 0",
+                placeholders,
+                lib = *LOCAL_SOURCES_SQL
             );
             let mut stmt = conn.prepare(&sql)?;
             let params = rusqlite::params_from_iter(chunk.iter());
@@ -1782,6 +1783,63 @@ mod tests {
     /// a single target folder casing at *every* level of the template, so
     /// re-running preview after Apply doesn't show them as needing organization
     /// again.
+    #[test]
+    fn test_compute_preview_by_ids_skips_remote_songs() {
+        use crate::collection::upsert_song;
+        use crate::db::Database;
+        use crate::models::{FileType, SongSource};
+        use std::sync::Arc;
+
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_organizer_remote_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        for (path, source) in [
+            ("/music/local.mp3", SongSource::LocalFile),
+            ("subsonic://1/tr-1", SongSource::Subsonic),
+        ] {
+            let song = Song {
+                path: Some(path.to_string()),
+                title: Some("Track".to_string()),
+                artist: Some("Artist".to_string()),
+                source,
+                filetype: FileType::Mp3,
+                ..Default::default()
+            };
+            upsert_song(&conn, &song).unwrap();
+        }
+        let ids: Vec<i64> = conn
+            .prepare("SELECT id FROM songs ORDER BY id")
+            .unwrap()
+            .query_map([], |row| row.get(0))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        drop(conn);
+
+        let options = OrganizeOptions {
+            destination_dir: None,
+            replace_spaces_with_underscores: false,
+            ascii_only: false,
+            clean_empty_dirs: false,
+            move_extra_files: false,
+        };
+
+        // An explicit selection that includes a synced OpenSubsonic song
+        // must never try to move its `subsonic://` path on disk (#916).
+        let items = compute_preview(&db, &ids, "%artist/%title", &options).unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].from_path, "/music/local.mp3");
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
     #[test]
     fn test_compute_preview_and_apply_converge_on_majority_artist_and_album_casing() {
         use crate::collection::upsert_song;

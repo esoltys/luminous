@@ -24,8 +24,8 @@ export function isDiscFolder(folderName: string): boolean {
 export function getParentFolder(filePath: string): string {
   if (!filePath) return "";
 
-  // Remote URL handling (e.g. WebDAV streams)
-  if (/^https?:\/\//i.test(filePath)) {
+  // Remote URL handling (WebDAV streams, subsonic://{server}/{track} paths)
+  if (/^(?:https?|subsonic):\/\//i.test(filePath)) {
     try {
       const url = new URL(filePath);
       const cleanPath = url.pathname.replace(/\/+$/, "");

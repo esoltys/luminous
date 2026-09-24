@@ -9,7 +9,8 @@
   import LibraryBadge from "./LibraryBadge.svelte";
   import FolderEditModal from "./FolderEditModal.svelte";
   import WebDavModal from "./WebDavModal.svelte";
-  import type { MusicDirectory, WebDavServer } from "../types";
+  import SubsonicModal from "./SubsonicModal.svelte";
+  import type { MusicDirectory, SubsonicServer, SubsonicSyncStats, WebDavServer } from "../types";
   import { combineWebdavPath } from "../webdavDisplay";
   import { invoke } from "@tauri-apps/api/core";
   import {
@@ -104,9 +105,91 @@
     }
   }
 
+  // OpenSubsonic media servers (#916) — mirrors the WebDAV list above.
+  let isSubsonicModalOpen = $state(false);
+  let editingSubsonicServer = $state<SubsonicServer | null>(null);
+  let syncingSubsonicId = $state<number | null>(null);
+  let subsonicSyncFeedback = $state<string | null>(null);
+  let subsonicConnected = $state<Record<number, boolean | undefined>>({});
+
+  async function loadSubsonicServers() {
+    await collectionStore.refreshSubsonicServers();
+    checkSubsonicConnections();
+  }
+
+  function checkSubsonicConnections() {
+    for (const server of collectionStore.subsonicServers) {
+      invoke("check_subsonic_connection", { id: server.id })
+        .then(() => { subsonicConnected[server.id] = true; })
+        .catch(() => { subsonicConnected[server.id] = false; });
+    }
+  }
+
+  function isSubsonicSyncing(server: SubsonicServer): boolean {
+    return (
+      syncingSubsonicId === server.id ||
+      server.syncStatus === "syncing" ||
+      tasksStore.isTaskActive(`subsonic-sync-${server.id}`)
+    );
+  }
+
+  async function handleSyncSubsonicServer(server: SubsonicServer) {
+    if (isSubsonicSyncing(server)) return;
+    syncingSubsonicId = server.id;
+    subsonicSyncFeedback = null;
+    // Task progress/completion is driven by the `subsonic-sync-progress`
+    // listener in collectionStore, so auto-syncs get the same task row.
+    try {
+      const stats = await invoke<SubsonicSyncStats>("sync_subsonic_server", { id: server.id });
+      subsonicSyncFeedback = `${server.name}: ${i18n.t("settings.subsonicSyncComplete", { ...stats })}`;
+    } catch (e: any) {
+      console.error("Failed to sync media server:", e);
+      subsonicSyncFeedback = i18n.t("settings.subsonicSyncFailed", {
+        name: server.name,
+        error: String(e?.message || e),
+      });
+    } finally {
+      syncingSubsonicId = null;
+      await loadSubsonicServers();
+    }
+  }
+
+  async function handleRemoveSubsonicServer(server: SubsonicServer) {
+    if (!confirm(i18n.t("settings.confirmRemoveSubsonicServer", { name: server.name }))) return;
+    try {
+      await invoke("delete_subsonic_server", { id: server.id });
+      await loadSubsonicServers();
+      await collectionStore.refreshLibrary();
+      await collectionStore.refreshStats();
+    } catch (e) {
+      console.error("Failed to delete media server:", e);
+    }
+  }
+
+  function getSubsonicStatusText(server: SubsonicServer): string {
+    if (isSubsonicSyncing(server)) return i18n.t("settings.webdavStatusSyncing");
+    if (server.lastSyncedAt) {
+      return i18n.t("settings.webdavStatusSynced", { time: new Date(server.lastSyncedAt * 1000).toLocaleString() });
+    }
+    return i18n.t("settings.webdavStatusNeverSynced");
+  }
+
+  function getSubsonicNextSyncText(server: SubsonicServer): string | null {
+    if (!server.autoSyncEnabled || !server.enabled || isSubsonicSyncing(server)) return null;
+    if (!server.nextAutoSyncAt) return null;
+    const minutes = Math.max(1, Math.round((server.nextAutoSyncAt * 1000 - Date.now()) / 60000));
+    return i18n.t("settings.webdavNextSyncIn", { minutes });
+  }
+
+  function getSubsonicServerLabel(server: SubsonicServer): string {
+    const kind = [server.serverType, server.serverVersion].filter(Boolean).join(" ");
+    return kind ? `${server.url} · ${kind}` : server.url;
+  }
+
   onMount(() => {
     loudnessStore.init();
     loadWebdavServers();
+    loadSubsonicServers();
   });
 
   async function handleRemoveDirectory(path: string) {
@@ -370,6 +453,141 @@
     onSaved={() => {
       isWebdavModalOpen = false;
       loadWebdavServers();
+    }}
+  />
+{/if}
+
+<!-- OpenSubsonic media servers (#916) -->
+<div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
+  <div class="pb-3 flex justify-between items-center">
+    <div class="flex items-center gap-3">
+      <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
+        <Cloud class="w-5 h-5" />
+      </div>
+      <div class="space-y-1 min-w-0">
+        <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('settings.subsonicTitle')}</h3>
+        <p class="text-xs text-brand-text-secondary leading-relaxed text-pretty">{i18n.t('settings.subsonicSubtitle')}</p>
+      </div>
+    </div>
+    <Button
+      onclick={() => {
+        editingSubsonicServer = null;
+        isSubsonicModalOpen = true;
+      }}
+      variant="primary"
+      size="sm"
+    >
+      <Plus class="w-4 h-4" /> {i18n.t('settings.addSubsonicServer')}
+    </Button>
+  </div>
+
+  {#if subsonicSyncFeedback}
+    <div class="p-3 bg-brand-main/60 border border-brand-border rounded-xl text-xs text-brand-text-secondary flex items-center justify-between">
+      <span>{subsonicSyncFeedback}</span>
+      <button
+        onclick={() => { subsonicSyncFeedback = null; }}
+        class="text-brand-text-secondary hover:text-brand-text-primary font-bold ml-2"
+      >
+        ✕
+      </button>
+    </div>
+  {/if}
+
+  <div class="space-y-2">
+    {#each collectionStore.subsonicServers as server (server.id)}
+      <div class="flex items-center justify-between bg-brand-main/50 border border-brand-border/60 rounded-xl p-4 hover:border-brand-border transition-colors" data-testid="subsonic-server-row">
+        <div class="flex items-center gap-3.5 min-w-0 flex-1">
+          <div class="min-w-0 space-y-1">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <LibraryBadge
+                directory={{
+                  path: server.url,
+                  nickname: server.nickname || server.name,
+                  icon: server.icon,
+                  color: server.color,
+                  is_available: subsonicConnected[server.id] !== false,
+                }}
+                size="sm"
+              />
+              <p class="text-xs text-brand-text-secondary truncate" title={getSubsonicServerLabel(server)}>
+                {getSubsonicServerLabel(server)}
+              </p>
+            </div>
+            <p class="text-xs" class:text-brand-text-secondary={subsonicConnected[server.id] !== false} class:text-red-400={subsonicConnected[server.id] === false}>
+              {#if subsonicConnected[server.id] === false}
+                <span class="flex items-center gap-1">
+                  <AlertTriangle class="w-3 h-3" />
+                  {i18n.t('settings.webdavStatusDisconnected')}
+                </span>
+              {:else}
+                <span class="flex items-center gap-1">
+                  {#if isSubsonicSyncing(server)}
+                    <LoaderCircle class="w-3 h-3 animate-spin text-brand-accent-text" />
+                  {/if}
+                  {getSubsonicStatusText(server)}
+                </span>
+              {/if}
+            </p>
+            {#if getSubsonicNextSyncText(server)}
+              <p class="text-xs text-brand-text-secondary/70">{getSubsonicNextSyncText(server)}</p>
+            {/if}
+          </div>
+        </div>
+
+        <div class="flex items-center gap-1.5 shrink-0 ml-3">
+          <button
+            onclick={() => handleSyncSubsonicServer(server)}
+            disabled={isSubsonicSyncing(server)}
+            class="p-2 rounded-lg bg-brand-main hover:bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary border border-brand-border hover:border-brand-accent/40 transition-colors disabled:opacity-50"
+            title={i18n.t('settings.webdavSyncBtn')}
+            aria-label={i18n.t('settings.webdavSyncBtn')}
+          >
+            {#if isSubsonicSyncing(server)}
+              <LoaderCircle class="w-4 h-4 animate-spin text-brand-accent-text" />
+            {:else}
+              <RefreshCw class="w-4 h-4 text-brand-accent-text" />
+            {/if}
+          </button>
+          <button
+            onclick={() => {
+              editingSubsonicServer = server;
+              isSubsonicModalOpen = true;
+            }}
+            class="p-2 rounded-lg bg-brand-main hover:bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary border border-brand-border hover:border-brand-accent/40 transition-colors"
+            title={i18n.t('settings.subsonicItemEdit')}
+            aria-label={i18n.t('settings.subsonicItemEdit')}
+          >
+            <Edit3 class="w-4 h-4" />
+          </button>
+          <button
+            onclick={() => handleRemoveSubsonicServer(server)}
+            class="p-2 rounded-lg bg-brand-main hover:bg-red-950/20 text-brand-text-secondary hover:text-red-400 border border-brand-border hover:border-red-900/30 transition-colors"
+            title={i18n.t('settings.removeSubsonicServer')}
+            aria-label={i18n.t('settings.removeSubsonicServer')}
+          >
+            <Trash2 class="w-4 h-4 text-brand-accent-text" />
+          </button>
+        </div>
+      </div>
+    {/each}
+
+    {#if collectionStore.subsonicServers.length === 0}
+      <div class="border border-dashed border-brand-border rounded-xl py-8 text-center text-brand-text-secondary">
+        <Cloud class="w-10 h-10 mx-auto mb-2 text-brand-text-secondary/50" />
+        <h4 class="font-semibold text-brand-text-primary mb-1 text-xs">{i18n.t('settings.subsonicNoServersTitle')}</h4>
+        <p class="text-xs text-brand-text-secondary text-pretty">{i18n.t('settings.subsonicNoServersText')}</p>
+      </div>
+    {/if}
+  </div>
+</div>
+
+{#if isSubsonicModalOpen}
+  <SubsonicModal
+    server={editingSubsonicServer}
+    onClose={() => { isSubsonicModalOpen = false; }}
+    onSaved={() => {
+      isSubsonicModalOpen = false;
+      loadSubsonicServers();
     }}
   />
 {/if}

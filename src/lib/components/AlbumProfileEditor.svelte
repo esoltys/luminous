@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { isRemotePath } from "../utils/remoteSource";
   import { invoke } from "@tauri-apps/api/core";
   import {
     XIcon as X,
@@ -105,12 +106,12 @@
 
   let isSaving = $state(false);
 
-  // WebDAV songs (#682) have no local file Luminous can write lofty tags to,
+  // Remote songs (WebDAV #682, OpenSubsonic #916) have no local file Luminous can write lofty tags to,
   // and there's no write-back to the remote server -- edits here only ever
   // reach Luminous's own DB. A representative track's path is enough since
   // an album's tracks all share one source.
   let samplePath = $derived.by(() => collectionStore.songs.find((s) => s.id === songIds[0])?.path ?? "");
-  let isRemoteSource = $derived(!!samplePath && /^https?:\/\//i.test(samplePath));
+  let isRemoteSource = $derived(isRemotePath(samplePath));
   let albumFolderPath = $derived.by(() => {
     const paths = songIds
       .map((id) => collectionStore.songs.find((s) => s.id === id)?.path)

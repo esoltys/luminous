@@ -59,7 +59,21 @@ describe("SongContextMenu.svelte", () => {
     const item = await screen.findByText("Open in Picard");
     const button = item.closest("button");
     expect(button).toBeDisabled();
-    expect(button).toHaveAttribute("title", "Open in Picard isn't available for WebDAV songs");
+    expect(button).toHaveAttribute("title", "Open in Picard isn't available for songs on a remote server");
+  });
+
+  it("disables Open in Picard for a song synced from an OpenSubsonic server", async () => {
+    render(SongContextMenu, {
+      x: 0,
+      y: 0,
+      song: { ...baseSong, id: 3, source: "subsonic" },
+      onPlay: () => {},
+      onOpenInPicard: () => {},
+      onClose: () => {},
+    });
+
+    const item = await screen.findByText("Open in Picard");
+    expect(item.closest("button")).toBeDisabled();
   });
 
   it("disables Open in Picard when every selected song is WebDAV", async () => {

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { isRemoteSource as isRemoteSourceOf } from "../utils/remoteSource";
   import { invoke } from "@tauri-apps/api/core";
   import { onMount } from "svelte";
   import {
@@ -83,13 +84,13 @@
   // svelte-ignore state_referenced_locally
   let genresort = $state(initialGenreSort ?? "");
 
-  // WebDAV songs (#682) have no local file Luminous can write lofty tags to,
+  // Remote songs (WebDAV #682, OpenSubsonic #916) have no local file Luminous can write lofty tags to,
   // and there's no write-back to the remote server -- edits here only ever
   // reach Luminous's own DB. A representative track's path is enough since
   // an album's tracks all share one source.
   let isRemoteSource = $derived.by(() => {
     const sample = collectionStore.songs.find((s) => s.id === songIds[0]);
-    return !!sample?.path && /^https?:\/\//i.test(sample.path);
+    return isRemoteSourceOf(sample);
   });
 
   onMount(() => {

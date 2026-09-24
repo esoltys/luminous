@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { isRemoteSource } from "../utils/remoteSource";
   import { onMount } from "svelte";
   import { fade } from "svelte/transition";
   import { playlistsStore } from "../stores/playlists.svelte";
@@ -892,7 +893,7 @@
     onGoToAlbum={singleItem.song?.album ? () => navigationStore.viewAlbum(singleItem.song?.album || "") : undefined}
     onEditTags={singleItem.song?.id && !isItemUnavailable(singleItem) ? () => openTagEditor(singleItem.song!.id) : undefined}
     onOpenInPicard={singleItem.song?.id ? () => openSelectedInPicard(singleItem.song!.id) : undefined}
-    allSelectedWebDav={picardTargets.length > 0 && picardTargets.every((s) => s.source === "web_dav")}
+    allSelectedRemote={picardTargets.length > 0 && picardTargets.every(isRemoteSource)}
     onClose={() => { contextMenuState = null; }}
   />
 {/if}

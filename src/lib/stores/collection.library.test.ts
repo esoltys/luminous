@@ -41,6 +41,25 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
               createdAt: 0,
             },
           ];
+        case "list_subsonic_servers":
+          return [
+            {
+              id: 3,
+              name: "Home Navidrome",
+              url: "https://music.example.com",
+              username: "me",
+              enabled: true,
+              syncStatus: "idle",
+              createdAt: 0,
+              autoSyncEnabled: false,
+              syncIntervalMinutes: 60,
+              reportPlays: true,
+              nickname: "Navidrome",
+              icon: "server",
+              color: "#ff0000",
+              extensions: [],
+            },
+          ];
         case "get_library_stats":
           return {
             total_songs: 10,
@@ -104,6 +123,26 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
   it("returns undefined for a path matching neither a directory nor a WebDAV server", async () => {
     await collectionStore.refreshWebDavServers();
     expect(collectionStore.getDirectoryForPath("http://example.com/other/track.mp3")).toBeUndefined();
+  });
+
+  it("resolves an OpenSubsonic server as the Library badge for a subsonic:// path (#1164)", async () => {
+    await collectionStore.refreshSubsonicServers();
+
+    const badge = collectionStore.getDirectoryForPath("subsonic://3/tr-abc123");
+
+    expect(badge).toBeDefined();
+    expect(badge?.nickname).toBe("Navidrome");
+    expect(badge?.icon).toBe("server");
+    expect(badge?.color).toBe("#ff0000");
+    // Offset past WebDAV's negative ids so the two can't collide.
+    expect(badge?.id).toBe(-1_000_003);
+    expect(badge?.is_available).toBe(true);
+  });
+
+  it("returns undefined for a subsonic:// path whose server is gone or malformed", async () => {
+    await collectionStore.refreshSubsonicServers();
+    expect(collectionStore.getDirectoryForPath("subsonic://99/tr-abc123")).toBeUndefined();
+    expect(collectionStore.getDirectoryForPath("subsonic://abc/tr-abc123")).toBeUndefined();
   });
 
   it("invokes backend on addDirectory and removeDirectory", async () => {
