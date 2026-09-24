@@ -42,7 +42,7 @@
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
-    "@choochmeque/tauri-windows-bundle": "^0.1.29",
+    "@choochmeque/tauri-windows-bundle": "^0.2.0",
     "@sveltejs/adapter-static": "^3.0.6",
     "@sveltejs/kit": "^2.70.3",
     "@sveltejs/vite-plugin-svelte": "^7.3.0",
