@@ -25,6 +25,7 @@ into Picard's territory; it's a different, complementary axis Picard was never m
 ## Branching & PR Rules
 
 - NEVER commit or push directly to `main`. All changes ship via PR, even release version bumps and docs-only edits.
+- NEVER assign a milestone or release tag to a Pull Request. Milestones track issues only, and tagging a PR can inadvertently trigger release workflows. Never pass `--milestone` to `gh pr create` or `gh pr edit`.
 - Merging is allowed once — and only once — every check on the PR has actually finished, not just the required ones GitHub's branch-protection summary cares about. Do not treat the green "Able to merge this pull request" banner or the API's `mergeable: MERGEABLE` field as that signal on their own — both go green as soon as required checks pass while non-required checks (e.g. Backend Tests, CodeQL) can still be `in_progress`. Confirm via `gh pr checks <pr> --watch` (blocks until every check concludes) or `gh pr checks <pr>` showing zero `pending`/`in_progress` rows, then run `gh pr merge <pr>`. Tell the user once it's merged.
 - PR base branch is always `main`, regardless of milestone.
 - Before creating a branch, confirm the base: `git fetch origin && git switch -c <branch> origin/<base>`.
@@ -241,7 +242,9 @@ punt either to the user.
   5. Pick the milestone: never file a new issue against a Closed milestone. Unless the user
      specifies one, default to the open milestone with the highest version number (`gh api
      repos/esoltys/luminous/milestones -q '.[] | select(.state=="open") | .title'` — at the time
-     of writing that's `3.0`) rather than asking which milestone to use each time.
+     of writing that's `3.0`) rather than asking which milestone to use each time. **Never attach a
+     milestone to a Pull Request** — milestones track issues only, and tagging or assigning a
+     milestone to a PR can trigger release workflows.
   6. Create the issue using the GitHub CLI:
      - For bugs: `gh issue create --title "<Title>" --body-file "<PathToScratchFile>" --label "bug" --milestone "<Milestone>"`
      - For features: `gh issue create --title "<Title>" --body-file "<PathToScratchFile>" --milestone "<Milestone>"` (no label needed)
@@ -254,7 +257,7 @@ punt either to the user.
      has the `gh project item-add` / `item-edit` commands and field/option IDs). Do this for every
      bug or feature issue you create — don't leave the fields unset or punt them to the user.
   9. Branch from and target the PR at `main`. An issue's Milestone tracks scope only, not a
-     branch.
+     branch. Never pass `--milestone` to `gh pr create` or `gh pr edit`.
 - **Releases & Tagging**: When tagging a new release, only create and push a single semantic version tag matching the repository's convention (e.g., `vX.Y.Z` where X.Y.Z matches the project version in `package.json`/`Cargo.toml`) to avoid triggering duplicate build workflows in GitHub Actions.
 
 ## Git Hooks
