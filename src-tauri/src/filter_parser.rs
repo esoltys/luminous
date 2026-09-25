@@ -186,7 +186,7 @@ fn tokenize(input: &str) -> Vec<String> {
                 } else {
                     None
                 };
-                if count == 2 && next_char.map_or(true, |nc| nc.is_whitespace() || nc == ';') {
+                if count == 2 && next_char.is_none_or(|nc| nc.is_whitespace() || nc == ';') {
                     current.push(ch);
                     current.push(ch);
                     i += 2;
