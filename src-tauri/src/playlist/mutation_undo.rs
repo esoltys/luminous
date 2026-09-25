@@ -881,4 +881,59 @@ mod tests {
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
+
+    proptest::proptest! {
+        #![proptest_config(proptest::prelude::ProptestConfig::with_cases(32))]
+
+        /// Undoing any sequence of `PlaylistOp::Move`s steps back through
+        /// every intermediate order to the original, and redoing steps
+        /// forward through them again (`UndoRedo.lean`'s `undoN_execAll`,
+        /// `redo_undo`; #1226).
+        #[test]
+        fn prop_move_undo_redo_walks_every_state(
+            moves in proptest::collection::vec((0..6i32, 0..6i32), 1..12),
+        ) {
+            let (db, temp_dir) = setup_test_db();
+            let db_arc = std::sync::Arc::new(db);
+            {
+                let conn = db_arc.pool.get().unwrap();
+                for i in 1..=6 {
+                    conn.execute(
+                        "INSERT INTO songs (id, title) VALUES (?1, ?2)",
+                        params![i, format!("Song {i}")],
+                    )
+                    .unwrap();
+                }
+            }
+            let mut manager = PlaylistManager::new(db_arc.clone()).unwrap();
+            let pl = manager.create_playlist("Move Property").unwrap();
+            manager.add_songs_to_playlist(pl.id, &[1, 2, 3, 4, 5, 6]).unwrap();
+            let uuids = |m: &PlaylistManager| -> Vec<String> {
+                m.get_playlist_tracks(pl.id).unwrap().into_iter().map(|t| t.uuid).collect()
+            };
+
+            // A same-position move is a no-op that records nothing to undo.
+            let mut states = vec![uuids(&manager)];
+            for &(from, to) in &moves {
+                manager.reorder_playlist_item(pl.id, from, to).unwrap();
+                if from != to {
+                    states.push(uuids(&manager));
+                }
+            }
+
+            let result = (|| {
+                for expected in states.iter().rev().skip(1) {
+                    proptest::prop_assert!(manager.undo().unwrap());
+                    proptest::prop_assert_eq!(&uuids(&manager), expected);
+                }
+                for expected in states.iter().skip(1) {
+                    proptest::prop_assert!(manager.redo().unwrap());
+                    proptest::prop_assert_eq!(&uuids(&manager), expected);
+                }
+                Ok(())
+            })();
+            let _ = std::fs::remove_dir_all(temp_dir);
+            result?;
+        }
+    }
 }

@@ -7,6 +7,8 @@ cd verification/lean
 lake build --wfail   # fails if any proof does not check or uses `sorry`
 ```
 
+The models are hand-written, so CI can't tell on its own when the Rust code drifts from them. The property tests in `src-tauri/src/player/invariant_tests.rs` (player invariants) and `prop_move_undo_redo_walks_every_state` in `src-tauri/src/playlist/mutation_undo.rs` (move undo/redo) check the same invariants against the real code in `cargo test`. Update both sides together.
+
 The toolchain is pinned in `lean-toolchain`. Install it with [elan](https://github.com/leanprover/elan). CI runs the same command in the `Lean Proofs` job of `.github/workflows/ci.yml`.
 
 | File | Covers |
