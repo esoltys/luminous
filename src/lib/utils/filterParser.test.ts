@@ -1,5 +1,44 @@
 import { describe, it, expect } from "vitest";
-import { isSmartPlaylistSpec, parseSearchRules } from "./filterParser";
+import { isSmartPlaylistSpec, parseSearchRules, stripEnclosingQuotes } from "./filterParser";
+
+describe("stripEnclosingQuotes", () => {
+  it("strips double enclosing quotes from file picker paths", () => {
+    expect(
+      stripEnclosingQuotes('""/home/esoltys/Music/Shortwave/SomaFM PopTron""')
+    ).toBe("/home/esoltys/Music/Shortwave/SomaFM PopTron");
+  });
+
+  it("strips single enclosing quotes", () => {
+    expect(
+      stripEnclosingQuotes('"/home/esoltys/Music/Shortwave/SomaFM PopTron"')
+    ).toBe("/home/esoltys/Music/Shortwave/SomaFM PopTron");
+    expect(
+      stripEnclosingQuotes("'/home/esoltys/Music/Shortwave/SomaFM PopTron'")
+    ).toBe("/home/esoltys/Music/Shortwave/SomaFM PopTron");
+  });
+
+  it("preserves internal quotes in path names", () => {
+    expect(
+      stripEnclosingQuotes(
+        '""/home/esoltys/Music/Shortwave/CKLZ-FM 104.7 "The Lizard" Kelowna, BC""'
+      )
+    ).toBe('/home/esoltys/Music/Shortwave/CKLZ-FM 104.7 "The Lizard" Kelowna, BC');
+  });
+
+  it("preserves internal quotes on Windows paths", () => {
+    expect(
+      stripEnclosingQuotes(
+        '""C:\\Music\\Shortwave\\CKLZ-FM 104.7 "The Lizard" Kelowna, BC""'
+      )
+    ).toBe('C:\\Music\\Shortwave\\CKLZ-FM 104.7 "The Lizard" Kelowna, BC');
+  });
+
+  it("leaves unquoted paths untouched", () => {
+    expect(
+      stripEnclosingQuotes('/home/esoltys/Music/Shortwave/CKLZ-FM 104.7 "The Lizard" Kelowna, BC')
+    ).toBe('/home/esoltys/Music/Shortwave/CKLZ-FM 104.7 "The Lizard" Kelowna, BC');
+  });
+});
 
 describe("isSmartPlaylistSpec", () => {
   it("returns false for a curated genre auto-playlist spec (tag:)", () => {
@@ -34,6 +73,7 @@ describe("isSmartPlaylistSpec", () => {
     expect(isSmartPlaylistSpec("artist_tag:canadian")).toBe(true);
     expect(isSmartPlaylistSpec("artist:Miles Davis; rating:>=4")).toBe(true);
     expect(isSmartPlaylistSpec("folder:Radio Downloads")).toBe(true);
+    expect(isSmartPlaylistSpec("folder:=/home/music")).toBe(true);
   });
 });
 
@@ -51,6 +91,34 @@ describe("parseSearchRules", () => {
     ]);
     expect(parseSearchRules("path:Downloads/Metal")).toEqual([
       { field: "folder", op: "contains", value: "Downloads/Metal" },
+    ]);
+  });
+
+  it("parses folder with equals operator and strips outer quotes", () => {
+    expect(
+      parseSearchRules('folder:="/home/esoltys/Music/Shortwave/SomaFM PopTron"')
+    ).toEqual([
+      { field: "folder", op: "=", value: "/home/esoltys/Music/Shortwave/SomaFM PopTron" },
+    ]);
+  });
+
+  it("parses folder with double-quoted path and equals operator", () => {
+    expect(
+      parseSearchRules('folder:=""/home/esoltys/Music/Shortwave/SomaFM PopTron""')
+    ).toEqual([
+      { field: "folder", op: "=", value: "/home/esoltys/Music/Shortwave/SomaFM PopTron" },
+    ]);
+  });
+
+  it("parses folder with internal quotes and equals operator", () => {
+    expect(
+      parseSearchRules('folder:="/home/esoltys/Music/Shortwave/CKLZ-FM 104.7 \\"The Lizard\\" Kelowna, BC"')
+    ).toEqual([
+      {
+        field: "folder",
+        op: "=",
+        value: '/home/esoltys/Music/Shortwave/CKLZ-FM 104.7 "The Lizard" Kelowna, BC',
+      },
     ]);
   });
 });

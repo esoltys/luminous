@@ -86,11 +86,16 @@ impl FieldFilter {
                 param_idx
             )
         } else if self.sql_column == "path" {
-            format!(
-                "REPLACE(path, '\\', '/') {} ?{}",
-                self.op.to_sql(),
-                param_idx
-            )
+            match self.op {
+                Op::Eq => format!(
+                    "(REPLACE(path, '\\', '/') = ?{param_idx} OR REPLACE(path, '\\', '/') LIKE ?{param_idx} || '/%')"
+                ),
+                Op::Neq => format!(
+                    "NOT (REPLACE(path, '\\', '/') = ?{param_idx} OR REPLACE(path, '\\', '/') LIKE ?{param_idx} || '/%')"
+                ),
+                Op::Contains => format!("REPLACE(path, '\\', '/') LIKE ?{param_idx}"),
+                _ => format!("REPLACE(path, '\\', '/') {} ?{param_idx}", self.op.to_sql()),
+            }
         } else {
             format!("{} {} ?{}", self.sql_column, self.op.to_sql(), param_idx)
         }
@@ -135,24 +140,72 @@ fn tokenize(input: &str) -> Vec<String> {
     let mut current = String::new();
     let mut in_quotes = false;
     let mut quote_char = ' ';
+    let mut quote_count = 0;
     let mut escaped = false;
+    let chars: Vec<char> = input.chars().collect();
+    let mut i = 0;
 
-    for ch in input.chars() {
+    while i < chars.len() {
+        let ch = chars[i];
         if ch == '\\' && !escaped {
             escaped = true;
             current.push(ch);
+            i += 1;
             continue;
         }
 
         if (ch == '"' || ch == '\'') && !escaped {
             if in_quotes && ch == quote_char {
-                in_quotes = false;
+                let mut count = 0;
+                while i + count < chars.len() && chars[i + count] == quote_char {
+                    count += 1;
+                }
+                if count >= quote_count {
+                    for _ in 0..count {
+                        current.push(quote_char);
+                    }
+                    i += count;
+                    in_quotes = false;
+                    quote_char = ' ';
+                    quote_count = 0;
+                    escaped = false;
+                    continue;
+                } else {
+                    current.push(ch);
+                    i += 1;
+                    escaped = false;
+                    continue;
+                }
             } else if !in_quotes {
+                let mut count = 0;
+                while i + count < chars.len() && chars[i + count] == ch {
+                    count += 1;
+                }
+                let next_char = if i + count < chars.len() {
+                    Some(chars[i + count])
+                } else {
+                    None
+                };
+                if count == 2 && next_char.map_or(true, |nc| nc.is_whitespace() || nc == ';') {
+                    current.push(ch);
+                    current.push(ch);
+                    i += 2;
+                    escaped = false;
+                    continue;
+                }
                 in_quotes = true;
                 quote_char = ch;
+                quote_count = count;
+                for _ in 0..count {
+                    current.push(ch);
+                }
+                i += count;
+                escaped = false;
+                continue;
             }
-            current.push(ch);
-        } else if ch.is_whitespace() && !in_quotes {
+        }
+
+        if ch.is_whitespace() && !in_quotes {
             if !current.trim().is_empty() {
                 tokens.push(current.trim().to_string());
                 current.clear();
@@ -161,6 +214,7 @@ fn tokenize(input: &str) -> Vec<String> {
             current.push(ch);
         }
         escaped = false;
+        i += 1;
     }
     if !current.trim().is_empty() {
         tokens.push(current.trim().to_string());
@@ -169,22 +223,53 @@ fn tokenize(input: &str) -> Vec<String> {
     tokens
 }
 
-fn parse_field_filter(token: &str) -> Option<FieldFilter> {
-    let colon_idx = token.find(':')?;
-    let (field_part, val_part) = token.split_at(colon_idx);
-    let mut val_raw = val_part[1..].trim();
-    if (val_raw.starts_with('"') && val_raw.ends_with('"'))
-        || (val_raw.starts_with('\'') && val_raw.ends_with('\''))
-    {
-        val_raw = &val_raw[1..val_raw.len() - 1];
+fn strip_enclosing_quotes(mut s: &str) -> &str {
+    loop {
+        let trimmed = s.trim();
+        if (trimmed.starts_with('"') && trimmed.ends_with('"') && trimmed.len() >= 2)
+            || (trimmed.starts_with('\'') && trimmed.ends_with('\'') && trimmed.len() >= 2)
+        {
+            s = &trimmed[1..trimmed.len() - 1];
+        } else {
+            return trimmed;
+        }
     }
-    let val_str = val_raw
+}
+
+fn parse_op_and_raw_value(raw: &str, is_numeric: bool) -> (Op, String) {
+    let raw_trimmed = strip_enclosing_quotes(raw);
+    let (op, after_op) = if let Some(rest) = raw_trimmed.strip_prefix(">=") {
+        (Op::Gte, rest)
+    } else if let Some(rest) = raw_trimmed.strip_prefix("<=") {
+        (Op::Lte, rest)
+    } else if let Some(rest) = raw_trimmed.strip_prefix("!=") {
+        (Op::Neq, rest)
+    } else if let Some(rest) = raw_trimmed.strip_prefix('>') {
+        (Op::Gt, rest)
+    } else if let Some(rest) = raw_trimmed.strip_prefix('<') {
+        (Op::Lt, rest)
+    } else if let Some(rest) = raw_trimmed.strip_prefix('=') {
+        (Op::Eq, rest)
+    } else if is_numeric {
+        (Op::Eq, raw_trimmed)
+    } else {
+        (Op::Contains, raw_trimmed)
+    };
+
+    let inner = strip_enclosing_quotes(after_op);
+    let unescaped = inner
         .replace("\\\"", "\"")
         .replace("\\'", "'")
         .replace("\\\\", "\\");
+    let clean = strip_enclosing_quotes(&unescaped);
+    (op, clean.to_string())
+}
 
+fn parse_field_filter(token: &str) -> Option<FieldFilter> {
+    let colon_idx = token.find(':')?;
+    let (field_part, val_part) = token.split_at(colon_idx);
     let field_clean = field_part.trim().to_lowercase();
-    if field_clean.is_empty() || val_str.is_empty() {
+    if field_clean.is_empty() {
         return None;
     }
 
@@ -220,17 +305,24 @@ fn parse_field_filter(token: &str) -> Option<FieldFilter> {
         _ => return None,
     };
 
-    let (op, raw_val) = parse_op_and_value(&val_str, is_numeric);
+    let (op, raw_val) = parse_op_and_raw_value(val_part[1..].trim(), is_numeric);
+    if raw_val.is_empty() {
+        return None;
+    }
 
     let value = if sql_column == "path" {
-        let normalized_val = raw_val.replace('\\', "/");
+        let clean_path = strip_enclosing_quotes(&raw_val);
+        let mut normalized_val = clean_path.replace('\\', "/");
+        if normalized_val.len() > 1 && normalized_val.ends_with('/') {
+            normalized_val.pop();
+        }
         if op == Op::Contains {
             FilterValue::Text(format!("%{normalized_val}%"))
         } else {
             FilterValue::Text(normalized_val)
         }
     } else if sql_column == "length_nanosec" {
-        FilterValue::Int(parse_duration_ns(raw_val)?)
+        FilterValue::Int(parse_duration_ns(&raw_val)?)
     } else if is_numeric {
         if let Ok(i) = raw_val.parse::<i64>() {
             FilterValue::Int(i)
@@ -242,7 +334,7 @@ fn parse_field_filter(token: &str) -> Option<FieldFilter> {
     } else if op == Op::Contains {
         FilterValue::Text(format!("%{raw_val}%"))
     } else {
-        FilterValue::Text(raw_val.to_string())
+        FilterValue::Text(raw_val)
     };
 
     Some(FieldFilter {
@@ -252,26 +344,6 @@ fn parse_field_filter(token: &str) -> Option<FieldFilter> {
         op,
         value,
     })
-}
-
-fn parse_op_and_value(val_str: &str, is_numeric: bool) -> (Op, &str) {
-    if let Some(rest) = val_str.strip_prefix(">=") {
-        (Op::Gte, rest)
-    } else if let Some(rest) = val_str.strip_prefix("<=") {
-        (Op::Lte, rest)
-    } else if let Some(rest) = val_str.strip_prefix("!=") {
-        (Op::Neq, rest)
-    } else if let Some(rest) = val_str.strip_prefix('>') {
-        (Op::Gt, rest)
-    } else if let Some(rest) = val_str.strip_prefix('<') {
-        (Op::Lt, rest)
-    } else if let Some(rest) = val_str.strip_prefix('=') {
-        (Op::Eq, rest)
-    } else if is_numeric {
-        (Op::Eq, val_str)
-    } else {
-        (Op::Contains, val_str)
-    }
 }
 
 /// Parse a duration filter value as nanoseconds, matching `songs.length_nanosec`'s
@@ -437,6 +509,64 @@ mod tests {
         assert_eq!(
             q3.field_filters[0].value,
             FilterValue::Text("%/home/esoltys/Music/Shortwave/CKLZ-FM 104.7 \"The Lizard\" Kelowna, BC%".to_string())
+        );
+
+        // Exact folder match with equals operator
+        let q4 = parse_query("folder:=\"/home/esoltys/Music/Shortwave/SomaFM PopTron\"");
+        assert_eq!(q4.field_filters.len(), 1);
+        assert_eq!(q4.field_filters[0].op, Op::Eq);
+        assert_eq!(
+            q4.field_filters[0].value,
+            FilterValue::Text("/home/esoltys/Music/Shortwave/SomaFM PopTron".to_string())
+        );
+        assert_eq!(
+            q4.field_filters[0].to_sql_clause(1),
+            "(REPLACE(path, '\\', '/') = ?1 OR REPLACE(path, '\\', '/') LIKE ?1 || '/%')"
+        );
+
+        // Double-quoted path from file picker
+        let q5 = parse_query("folder:=\"\"/home/esoltys/Music/Shortwave/SomaFM PopTron\"\"");
+        assert_eq!(q5.field_filters.len(), 1);
+        assert_eq!(q5.field_filters[0].op, Op::Eq);
+        assert_eq!(
+            q5.field_filters[0].value,
+            FilterValue::Text("/home/esoltys/Music/Shortwave/SomaFM PopTron".to_string())
+        );
+
+        // Double-quoted path with contains
+        let q6 = parse_query("folder:\"\"/home/esoltys/Music/Shortwave/SomaFM PopTron\"\"");
+        assert_eq!(q6.field_filters.len(), 1);
+        assert_eq!(q6.field_filters[0].op, Op::Contains);
+        assert_eq!(
+            q6.field_filters[0].value,
+            FilterValue::Text("%/home/esoltys/Music/Shortwave/SomaFM PopTron%".to_string())
+        );
+
+        // Folder equals with internal quotes in path
+        let q7 = parse_query("folder:=\"/home/esoltys/Music/Shortwave/CKLZ-FM 104.7 \\\"The Lizard\\\" Kelowna, BC\"");
+        assert_eq!(q7.field_filters.len(), 1);
+        assert_eq!(q7.field_filters[0].op, Op::Eq);
+        assert_eq!(
+            q7.field_filters[0].value,
+            FilterValue::Text("/home/esoltys/Music/Shortwave/CKLZ-FM 104.7 \"The Lizard\" Kelowna, BC".to_string())
+        );
+
+        // Windows path with equals operator and internal quotes
+        let q8 = parse_query("path:=\"C:\\Music\\Shortwave\\CKLZ-FM 104.7 \\\"The Lizard\\\" Kelowna, BC\"");
+        assert_eq!(q8.field_filters.len(), 1);
+        assert_eq!(q8.field_filters[0].op, Op::Eq);
+        assert_eq!(
+            q8.field_filters[0].value,
+            FilterValue::Text("C:/Music/Shortwave/CKLZ-FM 104.7 \"The Lizard\" Kelowna, BC".to_string())
+        );
+
+        // Not equals folder filter
+        let q9 = parse_query("folder:!=\"/home/esoltys/Music/Shortwave/SomaFM PopTron\"");
+        assert_eq!(q9.field_filters.len(), 1);
+        assert_eq!(q9.field_filters[0].op, Op::Neq);
+        assert_eq!(
+            q9.field_filters[0].to_sql_clause(1),
+            "NOT (REPLACE(path, '\\', '/') = ?1 OR REPLACE(path, '\\', '/') LIKE ?1 || '/%')"
         );
     }
 }
