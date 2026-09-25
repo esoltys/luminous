@@ -300,7 +300,11 @@ export function appendCsvRow(csv: string, row: CsvRow) {
       throw new Error(`${csv} has header "${existing}", expected "${header}". Refusing to append a mismatched row.`);
     }
   }
-  appendFileSync(csv, `${CSV_COLUMNS.map((c) => row[c]).join(",")}\n`);
+  appendFileSync(csv, `${csvLine(row)}\n`);
+}
+
+export function csvLine(row: CsvRow): string {
+  return CSV_COLUMNS.map((c) => row[c]).join(",");
 }
 
 async function report(opts: ReturnType<typeof parseArgs>) {

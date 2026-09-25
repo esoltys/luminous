@@ -45,6 +45,7 @@ import {
   APP_SOURCE_PATHS,
   appCommit,
   appendCsvRow,
+  csvLine,
   formatSnapshot,
   osLabel,
   packageVersion,
@@ -123,7 +124,11 @@ function ps(script: string): string {
 }
 
 const saveWindowPlacement = () => ps(`${WIN32}[LumPerf.Win]::Save($h)`);
-const restoreWindowPlacement = (placement: string) => ps(`${WIN32}[LumPerf.Win]::Restore($h, '${placement}')`);
+function restoreWindowPlacement(placement: string) {
+  // Spliced into a PowerShell command, so accept only what Save() produces: ten integers.
+  if (!/^-?\d+(,-?\d+){9}$/.test(placement)) throw new Error(`Unexpected window placement "${placement}"`);
+  ps(`${WIN32}[LumPerf.Win]::Restore($h, '${placement}')`);
+}
 const pinWindow = (w: number, h: number) => ps(`${WIN32}[LumPerf.Win]::Pin($h, ${w}, ${h})`);
 
 function isRunning(): boolean {
@@ -171,10 +176,32 @@ async function launch(exe: string): Promise<CdpClient> {
   throw new Error(`Luminous didn't expose a ready page on CDP port ${CDP_PORT} within 60s.`);
 }
 
+/**
+ * Calls a fixed in-page function with `args` passed as CDP call arguments
+ * (Runtime.callFunctionOn), never spliced into source text, so values like
+ * the saved localStorage entries can't change what code runs in the page.
+ */
+async function callInPage<T>(cdp: CdpClient, fn: string, ...args: unknown[]): Promise<T> {
+  const global = await cdp.send("Runtime.evaluate", { expression: "globalThis" });
+  const res = await cdp.send("Runtime.callFunctionOn", {
+    objectId: global.result.objectId,
+    functionDeclaration: fn,
+    arguments: args.map((value) => ({ value })),
+    awaitPromise: true,
+    returnByValue: true,
+  });
+  if (res.exceptionDetails) {
+    throw new Error(res.exceptionDetails.exception?.description ?? res.exceptionDetails.text);
+  }
+  return res.result?.value as T;
+}
+
 async function invoke<T = unknown>(cdp: CdpClient, cmd: string, args: Record<string, unknown> = {}): Promise<T> {
-  const res = await cdp.eval(`window.__TAURI_INTERNALS__.invoke(${JSON.stringify(cmd)}, ${JSON.stringify(args)})`);
-  if (res.error) throw new Error(`invoke('${cmd}') failed: ${res.error}`);
-  return res.value as T;
+  try {
+    return await callInPage<T>(cdp, "function (cmd, args) { return this.__TAURI_INTERNALS__.invoke(cmd, args); }", cmd, args);
+  } catch (e) {
+    throw new Error(`invoke('${cmd}') failed: ${e instanceof Error ? e.message : e}`);
+  }
 }
 
 /** Runs `fn` with a short-lived CDP connection, so an attached debugger isn't inflating the renderer while sampling. */
@@ -190,17 +217,25 @@ async function withCdp<T>(fn: (cdp: CdpClient) => Promise<T>): Promise<T> {
 
 const NAV_PREFIX = "navigation_";
 
-async function readNavigationKeys(cdp: CdpClient): Promise<Record<string, string>> {
-  const res = await cdp.eval(
-    `JSON.stringify(Object.fromEntries(Object.keys(localStorage).filter(k => k.startsWith(${JSON.stringify(NAV_PREFIX)})).map(k => [k, localStorage.getItem(k)])))`,
+function readNavigationKeys(cdp: CdpClient): Promise<Record<string, string>> {
+  return callInPage(
+    cdp,
+    `function (prefix) {
+      return Object.fromEntries(Object.keys(localStorage).filter((k) => k.startsWith(prefix)).map((k) => [k, localStorage.getItem(k)]));
+    }`,
+    NAV_PREFIX,
   );
-  return JSON.parse(res.value ?? "{}");
 }
 
 async function writeNavigationKeys(cdp: CdpClient, keys: Record<string, string>) {
-  await cdp.eval(
-    `(() => { for (const k of Object.keys(localStorage)) if (k.startsWith(${JSON.stringify(NAV_PREFIX)})) localStorage.removeItem(k);
-      for (const [k, v] of Object.entries(${JSON.stringify(keys)})) localStorage.setItem(k, v); })()`,
+  await callInPage(
+    cdp,
+    `function (prefix, keys) {
+      for (const k of Object.keys(localStorage)) if (k.startsWith(prefix)) localStorage.removeItem(k);
+      for (const [k, v] of Object.entries(keys)) localStorage.setItem(k, v);
+    }`,
+    NAV_PREFIX,
+    keys,
   );
 }
 
@@ -365,7 +400,7 @@ async function main() {
   }
 
   for (const r of rows) {
-    if (opts.dryRun) console.log(Object.values(r).join(","));
+    if (opts.dryRun) console.log(csvLine(r));
     else appendCsvRow(opts.csv, r);
   }
   log(opts.dryRun ? "dry run — nothing written" : `appended ${rows.length} rows to ${opts.csv}`);
