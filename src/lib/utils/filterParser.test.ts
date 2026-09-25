@@ -121,4 +121,18 @@ describe("parseSearchRules", () => {
       },
     ]);
   });
+
+  it("recovers and strips accumulated triple quotes while preserving equals operator", () => {
+    expect(
+      parseSearchRules(
+        'folder:="\\"\\"\\"/home/esoltys/Music/Shortwave/CKLZ-FM 104.7 \\"The Lizard\\" Kelowna, BC\\"\\"\\""'
+      )
+    ).toEqual([
+      {
+        field: "folder",
+        op: "=",
+        value: '/home/esoltys/Music/Shortwave/CKLZ-FM 104.7 "The Lizard" Kelowna, BC',
+      },
+    ]);
+  });
 });

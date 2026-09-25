@@ -568,5 +568,14 @@ mod tests {
             q9.field_filters[0].to_sql_clause(1),
             "NOT (REPLACE(path, '\\', '/') = ?1 OR REPLACE(path, '\\', '/') LIKE ?1 || '/%')"
         );
+
+        // Accumulated triple-quoted path recovery
+        let q10 = parse_query("folder:=\"\\\"\\\"\\\"/home/esoltys/Music/Shortwave/CKLZ-FM 104.7 \\\"The Lizard\\\" Kelowna, BC\\\"\\\"\\\"\"");
+        assert_eq!(q10.field_filters.len(), 1);
+        assert_eq!(q10.field_filters[0].op, Op::Eq);
+        assert_eq!(
+            q10.field_filters[0].value,
+            FilterValue::Text("/home/esoltys/Music/Shortwave/CKLZ-FM 104.7 \"The Lizard\" Kelowna, BC".to_string())
+        );
     }
 }
