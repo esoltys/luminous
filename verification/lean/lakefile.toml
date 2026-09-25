@@ -1,0 +1,5 @@
+name = "luminous-spec"
+defaultTargets = ["Luminous"]
+
+[[lean_lib]]
+name = "Luminous"
