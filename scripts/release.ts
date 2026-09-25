@@ -144,8 +144,12 @@ async function main() {
     if (!isPushEnabled) {
       console.log(`\n=============================================================`);
       console.log(`Release is prepared locally!`);
-      console.log(`To push the release tag and trigger the GitHub Action build, run:`);
-      console.log(`  git push origin main && git push origin ${tagName}`);
+      console.log(`Next, open a PR from this branch into main (never push to main directly).`);
+      console.log(`Once it merges, re-tag main's merge commit and push only the tag:`);
+      console.log(`  git checkout main && git pull`);
+      console.log(`  git tag -d ${tagName}`);
+      console.log(`  git tag -a ${tagName} -m "Release ${tagName}"`);
+      console.log(`  git push origin ${tagName}`);
       console.log(`=============================================================`);
       return;
     }
