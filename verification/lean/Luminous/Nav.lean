@@ -103,7 +103,8 @@ theorem findPlayable_complete {total : Nat} {p : Nat → Bool} {start k : Nat}
 
 /-! ## `previous_track` (the non-history, playlist-order walk) -/
 
-/-- The linear walk at the end of `previous_track`: start one before
+/-- The linear walk at the end of `previous_track` as it was **before** the
+fix for #1223 (it now wraps wherever it crosses the start): start one before
 `current` (wrapping to the last track only under `RepeatMode::Playlist` when
 `current == 0`), then step backwards, `break`ing at index 0. -/
 def prevLinear (total : Nat) (playable : Nat → Bool) (cur : Nat) (rep : RepeatMode) :

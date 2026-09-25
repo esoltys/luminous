@@ -18,10 +18,10 @@ The toolchain is pinned in `lean-toolchain`. Install it with [elan](https://gith
 
 ## Findings
 
-Each finding is a `decide`-checked counterexample, and each was reproduced against the real `Player` in a scratch Rust test:
+Each finding is a `decide`-checked counterexample against a model of the code *before* its fix, and each was reproduced against the real `Player`. All three are now fixed, with regression tests in `src-tauri/src/player.rs`:
 
-1. **`setShuffle_off_desyncs`**: turning shuffle off leaves `current_index` as a position in the discarded shuffle order. Shuffle on, start at track 3 of 6, shuffle off, Next → plays track 2 instead of track 4.
-2. **`setShuffle_reshuffle_scrambles_history`**: re-shuffling (switching shuffle modes) never remaps `played_indices`, so Previous walks back through different songs. This happened in 18 of 20 randomized runs.
-3. **`prev_playlist_does_not_wrap`**: under `RepeatMode::Playlist`, Previous wraps past the start only when the first track is current. With `[unavailable, current, playable]` it does nothing.
+1. **`setShuffle_off_desyncs`**: turning shuffle off leaves `current_index` as a position in the discarded shuffle order. Shuffle on, start at track 3 of 6, shuffle off, Next → plays track 2 instead of track 4. Fixed in #1221 (`test_shuffle_off_keeps_next_relative_to_current_track`).
+2. **`setShuffle_reshuffle_scrambles_history`**: re-shuffling (switching shuffle modes) never remaps `played_indices`, so Previous walks back through different songs. This happened in 18 of 20 randomized runs. Fixed in #1222 (`test_reshuffle_keeps_previous_history`).
+3. **`prev_playlist_does_not_wrap`**: under `RepeatMode::Playlist`, Previous wraps past the start only when the first track is current. With `[unavailable, current, playable]` it does nothing. Fixed in #1223 (`test_previous_wraps_past_unavailable_tracks_with_repeat_playlist`).
 
-`rebuildFixed_ok` / `rebuildFixed_synced` prove a fix for 1 and 2: after building the new order, remap `current_index` and `played_indices` through the items they designate. This applies in the `Off` branch too, and holds for any permutation the shuffle produces.
+`rebuildFixed_ok` / `rebuildFixed_synced` prove the fix now in `rebuild_shuffle_order` for 1 and 2: after building the new order, remap `current_index` and `played_indices` through the items they designate. This applies in the `Off` branch too, and holds for any permutation the shuffle produces.
