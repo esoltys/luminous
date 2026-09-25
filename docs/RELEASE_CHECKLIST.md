@@ -37,6 +37,17 @@ manual.
       new ones; fix any pre-existing warnings you encounter rather than leaving them
 - [ ] Do the manual QA walkthrough in [docs/TESTING.md](TESTING.md) (real-hardware smoke
       test + dev-build exercise), plus anything specific to what changed this release.
+- [ ] Compare memory against the previous release on Windows (from a local machine, with
+      Luminous closed and a track over 2.5 minutes loaded in the player). Pass the
+      upcoming version, since the bump hasn't happened yet at this point:
+  ```bash
+  bun run tauri build --no-bundle
+  bun run perf:memory -- --app-version X.Y.Z
+  bun run perf:chart -- --baseline <previous> --candidate X.Y.Z
+  ```
+  Add the new rows, chart and delta table to [docs/PERFORMANCE.md](PERFORMANCE.md).
+  Look into any private-bytes change beyond ~3% (run-to-run noise) before cutting the
+  release.
 - [ ] Check the [Security Audit](../.github/workflows/audit.yml) and
       [CodeQL](../.github/workflows/codeql.yml) workflows are green on `main`.
 

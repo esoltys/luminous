@@ -14,55 +14,121 @@ before/after a change, instead of relying on "it feels heavier." See #706.
   "what's not shared with other processes" figure. Private bytes/Pss is the more meaningful number
   for comparing builds, since working set/RSS includes shared pages (e.g. WebView2 runtime code)
   that don't change with Luminous's own code.
-- **Build measured**: a release build (`bun run tauri build`), not the dev server — the dev
-  server's Vite/HMR overhead isn't representative of what ships to users.
-- **Tool**: `bun run measure-memory -- --label <scenario>` (`scripts/measure-memory.ts`) takes one
-  snapshot and prints it; add `--csv docs/performance-baseline.csv` to append a row, or `--watch
-  --interval <sec>` to poll continuously while driving the app through a scenario.
+- **Build measured**: a release build (`bun run tauri build --no-bundle`), not the dev server — the
+  dev server's Vite/HMR overhead isn't representative of what ships to users.
+- **Held constant between runs**: the window is on screen at a fixed size, the app launches fresh
+  into Collection → Songs with nothing selected, each scenario settles before sampling, and the
+  recorded figure is the median of 5 readings. Each of these moves the numbers on its own: a
+  minimized WebView2 reads ~100MB lower than a visible one, and the restored view alone shifted idle
+  private bytes by ~26MB between otherwise identical runs.
+
+## Running it
+
+**Windows**: one command runs all three scenarios the same way every time and appends one row per
+scenario to `docs/performance-history.csv`:
+
+```bash
+bun run tauri build --no-bundle
+bun run perf:memory -- --app-version 2.5.0
+```
+
+`scripts/perf-memory-scenarios.ts` launches the release exe with WebView2's DevTools port open and
+triggers each scenario through the same IPC calls the UI's buttons make (Force Full Scan, Play). It
+runs against your real library and settings, and restores the view, window placement, EQ state and
+playback position it changed before closing the app. Playback is audible for about a minute. It
+starts from 0:00 of whatever track is loaded and stops before the track's halfway mark, so it never
+records a play or scrobble. Pass `--app-version` when measuring before the version bump, since
+`package.json` still has the previous version then. It refuses to run if Luminous is already open or
+the exe is older than the last app-source commit.
+
+**Linux**: the scenario script needs WebView2's DevTools protocol, so drive the app by hand and
+take each reading with `measure-memory`, keeping the window on screen at a consistent size:
+
+```bash
+bun run measure-memory -- --label idle --samples 5 --app-version 2.5.0 --tracks 99 --csv docs/performance-history.csv
+```
+
+**Comparing versions**: `scripts/perf-chart.py` (needs `pip install matplotlib`) draws the chart
+below and prints the Markdown delta table from the CSV. For each version and scenario it uses the
+newest row, so a re-run supersedes an earlier one without deleting history:
+
+```bash
+bun run perf:chart -- --baseline 2.0.0 --candidate 2.5.0
+```
 
 ## Scenarios
 
 1. **Idle** — app freshly launched, library already scanned from a prior run, no playback.
-2. **After a full library scan** — freshly launched, then a full rescan triggered and run to
+2. **After a full library scan** — freshly launched, then a forced full rescan triggered and run to
    completion.
 3. **During playback** — a track playing, with the equalizer and spectrum analyzer enabled.
 
 ## Baseline results
 
-| Date | App version | OS | Library size | Scenario | Working set (MB) | Private bytes (MB) |
-| --- | --- | --- | --- | --- | --- | --- |
-| 2026-09-02 | 2.0.0 | Windows 11 | 2,375 tracks | Idle | 488.2 | 474.4 |
-| 2026-09-02 | 2.0.0 | Windows 11 | 2,375 tracks | After full scan | 553.7 | 436.5 |
-| 2026-09-02 | 2.0.0 | Windows 11 | 2,375 tracks | During playback (EQ + analyzer on) | 603.6 | 427.4 |
-| 2026-09-02 | 2.0.0 | Linux (CachyOS, WebKitGTK) | 99 tracks | Idle | 500.6 | 289.4 |
-| 2026-09-02 | 2.0.0 | Linux (CachyOS, WebKitGTK) | 99 tracks | After full scan | 486.5 | 275.8 |
-| 2026-09-02 | 2.0.0 | Linux (CachyOS, WebKitGTK) | 99 tracks | During playback (EQ + analyzer on) | 543.7 | 332.6 |
+Dates are UTC. Each figure is the newest row for that version/OS/scenario in
+`docs/performance-history.csv`, which also has every raw reading.
 
-Raw per-scenario snapshots are in `docs/performance-baseline.csv`. Process count was 7 in every
-Windows scenario (main process + 6 WebView2 subprocesses — renderer, GPU, network, etc. — a fixed
-cost of the WebView2 runtime, not something Luminous's own code controls). On Linux, process count
-varied between 3 and 6: the steady-state tree is the main process + WebKitNetworkProcess +
-WebKitWebProcess, with a transient sandboxed `glycin-svg` image-loader process (launched via
-`bwrap`) spinning up briefly during cover art rendering. This is expected — WebKitGTK's process
-model differs from WebView2's — not a bug or a leak signature.
+| Date | App version | OS | Library size | Window | Scenario | Working set (MB) | Private bytes (MB) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 2026-09-02 | 2.0.0 | Windows 11 | 2,375 tracks | not recorded | Idle | 494.9 | 481.3 |
+| 2026-09-02 | 2.0.0 | Windows 11 | 2,375 tracks | not recorded | After full scan | 553.7 | 436.5 |
+| 2026-09-02 | 2.0.0 | Windows 11 | 2,375 tracks | not recorded | During playback (EQ + analyzer on) | 603.6 | 427.4 |
+| 2026-09-02 | 2.0.0 | Linux (CachyOS, WebKitGTK) | 99 tracks | not recorded | Idle | 500.5 | 289.3 |
+| 2026-09-02 | 2.0.0 | Linux (CachyOS, WebKitGTK) | 99 tracks | not recorded | After full scan | 486.5 | 275.8 |
+| 2026-09-02 | 2.0.0 | Linux (CachyOS, WebKitGTK) | 99 tracks | not recorded | During playback (EQ + analyzer on) | 543.7 | 332.6 |
+| 2026-09-25 | 2.5.0 (`1d562877`) | Windows 11 | 2,480 tracks | 1400x900 | Idle | 534.4 | 460.2 |
+| 2026-09-25 | 2.5.0 (`1d562877`) | Windows 11 | 2,480 tracks | 1400x900 | After full scan | 547.6 | 479.3 |
+| 2026-09-25 | 2.5.0 (`1d562877`) | Windows 11 | 2,480 tracks | 1400x900 | During playback (EQ + analyzer on) | 576.0 | 443.7 |
+
+Process count was 7 in every Windows scenario (main process + 6 WebView2 subprocesses — renderer,
+GPU, network, etc. — a fixed cost of the WebView2 runtime, not something Luminous's own code
+controls). On Linux, process count varied between 3 and 6: the steady-state tree is the main
+process + WebKitNetworkProcess + WebKitWebProcess, with a transient sandboxed `glycin-svg`
+image-loader process (launched via `bwrap`) spinning up briefly during cover art rendering. This is
+expected — WebKitGTK's process model differs from WebView2's — not a bug or a leak signature.
 
 ## Assessment
 
-Windows: private bytes stayed flat-to-slightly-down across scenarios (474 → 436 → 427 MB) rather
-than climbing, and working set only grew modestly (488 → 554 → 604 MB) as more code paths
+### 2.0 (2026-09-02)
+
+Windows: private bytes stayed flat-to-slightly-down across scenarios (481 → 436 → 427 MB) rather
+than climbing, and working set only grew modestly (495 → 554 → 604 MB) as more code paths
 (scanner, EQ, analyzer) got paged in — neither pattern suggests a leak. ~430-480MB of private
 memory for a WebView2-based app is in line with what the WebView2 runtime itself typically costs
 before counting any of Luminous's own state (a bare WebView2 host process commonly runs
 150-300MB), so these numbers look reasonable for the app's scope.
 
 Linux: private bytes are noticeably lower than Windows across the board (289 → 276 → 333 MB vs.
-474 → 436 → 427 MB) — expected, since WebKitGTK's runtime footprint is smaller than WebView2's and
+481 → 436 → 427 MB) — expected, since WebKitGTK's runtime footprint is smaller than WebView2's and
 this machine's library is much smaller (99 vs. 2,375 tracks). The same flat/non-climbing pattern
 holds: no scenario shows unbounded growth. The playback+EQ+analyzer scenario was noticeably
 noisier than idle/after-scan on Linux (individual readings ranged roughly 486-640MB working set
 before settling), most likely GC/allocation churn from the spectrum analyzer's per-frame typed
 array usage in the WebView's JS heap; the reported figure is from two consecutive readings that
 had converged. Nothing on either platform warrants a code change.
+
+### 2.5 vs. 2.0 (Windows)
+
+![Memory: 2.5.0 vs. 2.0.0](performance-2.0.0-vs-2.5.0.png)
+
+| Scenario | Private bytes Δ | Working set Δ |
+| --- | --- | --- |
+| Idle | −21.1 MB (−4.4%) | +39.5 MB (+8.0%) |
+| After full scan | +43.2 MB (+9.9%) | −5.7 MB (−1.0%) |
+| During playback (EQ + analyzer on) | +16.3 MB (+3.8%) | −26.0 MB (−4.3%) |
+
+No regression shows up, but treat these deltas with caution. The 2.0 readings were single snapshots
+taken before the view and window size were held constant, and those two factors alone move the
+numbers by as much as the deltas above. An uncontrolled 2.5 run on the same day read 486.5 MB idle
+private bytes against 460.2 MB here, which is enough to flip the idle result from +1.1% to −4.4%.
+Private bytes still don't climb across scenarios, and the forced full scan of 2,480 tracks took
+3.0s. Linux wasn't re-measured for 2.5.
+
+The 2.5 rows are the first taken with every condition held constant, so they're the baseline to
+compare future releases against. Two back-to-back scripted runs differed by 2-13MB of private bytes
+per scenario, so a change under ~3% is within run-to-run noise. Measuring against a fixed test
+library instead of the real one would remove library drift and allow a controlled re-run of 2.0.0
+(#1197).
 
 ## Candidate areas if numbers look high in the future
 
@@ -77,6 +143,11 @@ had converged. Nothing on either platform warrants a code change.
 Tracks scheduler-level questions the memory baseline above can't answer — is an `AppState`
 mutex held across blocking I/O, is a task hogging a worker thread on a single poll, is a
 background loop's tick getting delayed. See #1002 for the audit this was built for.
+
+This is an A/B tool for checking a specific fix, not a release-to-release comparison. It runs
+against a dev build (`tokio-console` needs a feature flag and `tokio_unstable`, so it can't be
+compiled into a release build), and its wall times depend on the machine and library. It isn't
+re-run each release. The memory scenarios above are the release-to-release check.
 
 ### Setup
 
