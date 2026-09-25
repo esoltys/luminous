@@ -174,9 +174,10 @@ theorem currentReal_eq {s : State} (hw : WF s) : currentReal s = curItem s := by
       | some r =>
         simp [hw.perm.bound r (List.mem_of_getElem? hp)]
 
-/-- `rebuild_shuffle_order` **as written**. `rest` is whatever the shuffle
-produced for the tracks after the current one. Note the early `return` in the
-`Off` branch, and that no branch touches `played_indices`. -/
+/-- `rebuild_shuffle_order` as it was **before** the fix for #1221/#1222.
+`rest` is whatever the shuffle produced for the tracks after the current one.
+Note the early `return` in the `Off` branch, and that no branch touches
+`played_indices`. The current code implements `rebuildFixed` below. -/
 def rebuild (s : State) (rest : List Nat) : State :=
   if s.n = 0 then { s with order := [] }
   else if !s.shuffle then { s with order := List.range s.n }
@@ -184,7 +185,7 @@ def rebuild (s : State) (rest : List Nat) : State :=
     let cr := currentReal s
     { s with order := cr.toList ++ rest, cur := cr.map fun _ => 0 }
 
-/-- `set_shuffle_mode` as written. -/
+/-- `set_shuffle_mode` before the fix for #1221/#1222. -/
 def setShuffle (on : Bool) (s : State) (rest : List Nat) : State :=
   rebuild { s with shuffle := on } rest
 
@@ -234,7 +235,8 @@ theorem setShuffle_on_curItem {s : State} (hw : WF s) (rest : List Nat) :
     | none => simp [curItem]
     | some r => simp [curItem, resolve]
 
-/-- The fix: build the new order, then translate `current_index` and every
+/-- The fix, as now implemented by `rebuild_shuffle_order` /
+`build_play_order`: build the new order, then translate `current_index` and every
 `played_indices` entry through the item it designates into the *new* order —
 in the `Off` branch too. For shuffle-on this yields `current_index = Some(0)`,
 which the code already does. -/

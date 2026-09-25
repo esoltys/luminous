@@ -1231,16 +1231,20 @@ impl Player {
         // Walk backwards from current, skipping unavailable items. Mirrors
         // `get_next_index`'s boundary behavior: only wrap past the start
         // under `RepeatMode::Playlist` — otherwise Previous at the first
-        // track is a no-op instead of jumping to the last track.
+        // track is a no-op instead of jumping to the last track. The wrap
+        // applies wherever the walk crosses the start, not only when it
+        // begins there, so unavailable tracks before the current one can't
+        // strand Previous (#1223).
         if let Some(current) = self.current_index {
             let len = self.playlist_items.len();
             if len == 0 {
                 return Ok(());
             }
+            let wrap = self.repeat_mode == RepeatMode::Playlist;
             let mut candidate = if current > 0 {
                 current - 1
-            } else if self.repeat_mode == RepeatMode::Playlist {
-                len.saturating_sub(1)
+            } else if wrap {
+                len - 1
             } else {
                 return Ok(());
             };
@@ -1248,10 +1252,11 @@ impl Player {
                 if self.is_playable_at(candidate) {
                     return self.play_at_index(candidate).await;
                 }
-                if candidate == 0 {
-                    break;
-                }
-                candidate -= 1;
+                candidate = match candidate {
+                    0 if wrap => len - 1,
+                    0 => break,
+                    c => c - 1,
+                };
             }
         }
         Ok(())
@@ -1604,6 +1609,13 @@ impl Player {
         order
     }
 
+    /// Replaces `shuffle_order` for the current `shuffle_mode`, keeping the
+    /// virtual indices that point into it (`current_index`, `played_indices`)
+    /// on the same items: each is resolved to its real index through the
+    /// outgoing order, then re-found in the new one — including when shuffle
+    /// is turned *off*, where the new order is the identity (#1221, #1222).
+    /// Proven for every permutation in `verification/lean/Luminous/Player.lean`
+    /// (`rebuildFixed_ok`).
     fn rebuild_shuffle_order(&mut self) {
         let len = self.playlist_items.len();
         if len == 0 {
@@ -1611,27 +1623,43 @@ impl Player {
             return;
         }
 
-        if self.shuffle_mode == ShuffleMode::Off {
-            self.shuffle_order = (0..len).collect();
-            return;
-        }
-
-        let mut rng = rand::rng();
-
-        let current_real_idx = if let Some(pos) = self.current_index {
-            let idx = if self.shuffle_order.is_empty() {
+        // An empty outgoing order means callers seeded `current_index` with
+        // a real index (`play_playlist`, `Player::new`).
+        let old_order = std::mem::take(&mut self.shuffle_order);
+        let to_real = |pos: usize| -> Option<usize> {
+            let idx = if old_order.is_empty() {
                 pos
             } else {
-                self.shuffle_order.get(pos).copied().unwrap_or(pos)
+                old_order.get(pos).copied().unwrap_or(pos)
             };
-            if idx < len {
-                Some(idx)
-            } else {
-                None
-            }
-        } else {
-            None
+            (idx < len).then_some(idx)
         };
+        let current_real_idx = self.current_index.and_then(to_real);
+        let played_real: Vec<usize> = self
+            .played_indices
+            .iter()
+            .filter_map(|&v| to_real(v))
+            .collect();
+
+        let order = self.build_play_order(len, current_real_idx);
+
+        let mut virtual_of_real = vec![None; len];
+        for (virtual_idx, &real_idx) in order.iter().enumerate() {
+            virtual_of_real[real_idx] = Some(virtual_idx);
+        }
+        self.current_index = current_real_idx.and_then(|r| virtual_of_real[r]);
+        self.played_indices = played_real
+            .into_iter()
+            .filter_map(|r| virtual_of_real[r])
+            .collect();
+        self.shuffle_order = order;
+    }
+
+    /// A fresh play order (a permutation of `0..len`) for the current
+    /// `shuffle_mode`: the identity when shuffle is off, otherwise a shuffle
+    /// that starts with `current_real_idx` so the playing track stays put.
+    fn build_play_order(&self, len: usize, current_real_idx: Option<usize>) -> Vec<usize> {
+        let mut rng = rand::rng();
 
         let get_artist_key = |item: &PlaylistItem| -> String {
             if let Some(ref song) = item.song {
@@ -1651,10 +1679,7 @@ impl Player {
         };
 
         match self.shuffle_mode {
-            ShuffleMode::Off => {
-                self.shuffle_order = (0..len).collect();
-                return;
-            }
+            ShuffleMode::Off => return (0..len).collect(),
             ShuffleMode::All => {
                 let mut remaining_indices: Vec<usize> =
                     (0..len).filter(|&i| current_real_idx != Some(i)).collect();
@@ -1693,12 +1718,7 @@ impl Player {
             }
         }
 
-        self.shuffle_order = order;
-        if current_real_idx.is_some() && self.current_index.is_some() {
-            self.current_index = Some(0);
-        } else if current_real_idx.is_none() {
-            self.current_index = None;
-        }
+        order
     }
 
     pub fn set_shuffle_mode(&mut self, mode: ShuffleMode) {
@@ -3197,6 +3217,146 @@ mod tests {
         assert_eq!(result[0].uuid, items[0].uuid);
         assert_eq!(result[1].uuid, items[1].uuid);
         assert_eq!(result[2].uuid, items[2].uuid);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// A `Player` over songs `1..=count` (all on one album/artist), with the
+    /// given ids flagged `unavailable`, plus the matching playlist items.
+    fn player_with_songs(
+        count: i64,
+        unavailable: &[i64],
+    ) -> (Player, Vec<PlaylistItem>, std::path::PathBuf) {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = Arc::new(db);
+        let conn = db_arc.pool.get().unwrap();
+        for id in 1..=count {
+            conn.execute(
+                "INSERT INTO songs (id, path, title, artist, album, length_nanosec, unavailable) VALUES (?1, ?2, ?3, 'Artist', 'Album', 180000000000, ?4)",
+                rusqlite::params![
+                    id,
+                    format!("/fake/path{id}.mp3"),
+                    format!("Track {id}"),
+                    unavailable.contains(&id)
+                ],
+            )
+            .unwrap();
+        }
+        let sql = format!(
+            "SELECT {} FROM songs WHERE id = ?1",
+            crate::collection::SONG_SELECT_COLS
+        );
+        let items = (1..=count)
+            .map(|id| {
+                let song = conn
+                    .query_row(&sql, rusqlite::params![id], crate::collection::row_to_song)
+                    .unwrap();
+                PlaylistItem::new_song(0, 0, song)
+            })
+            .collect();
+        drop(conn);
+        let audio = Arc::new(Mutex::new(AudioEngine::new()));
+        (Player::new(db_arc, audio), items, temp_dir)
+    }
+
+    /// #1221: turning shuffle off must leave `current_index` on the playing
+    /// track, so Next continues from it in playlist order.
+    #[tokio::test]
+    async fn test_shuffle_off_keeps_next_relative_to_current_track() {
+        let (mut player, items, temp_dir) = player_with_songs(6, &[]);
+
+        for _ in 0..10 {
+            player.set_shuffle_mode(ShuffleMode::All);
+            player
+                .play_playlist(items.clone(), 2, 0, None)
+                .await
+                .unwrap();
+            assert_eq!(player.current_song.as_ref().unwrap().id, 3);
+            // Wander through the shuffle so current_index is not 0.
+            player.next_track().await.unwrap();
+            player.next_track().await.unwrap();
+            let playing = player.current_song.as_ref().unwrap().id;
+
+            player.set_shuffle_mode(ShuffleMode::Off);
+            player.next_track().await.unwrap();
+            let expected = if playing == 6 {
+                None
+            } else {
+                Some(playing + 1)
+            };
+            assert_eq!(
+                player.current_song.as_ref().map(|s| s.id),
+                expected,
+                "Next after turning shuffle off must play the track after {playing}"
+            );
+        }
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// #1222: re-shuffling (switching shuffle modes) must keep Previous
+    /// walking back through the songs that actually played.
+    #[tokio::test]
+    async fn test_reshuffle_keeps_previous_history() {
+        let (mut player, items, temp_dir) = player_with_songs(8, &[]);
+
+        for mode in [ShuffleMode::Artists, ShuffleMode::Albums, ShuffleMode::All] {
+            for _ in 0..10 {
+                player.set_shuffle_mode(ShuffleMode::All);
+                player
+                    .play_playlist(items.clone(), 0, 0, None)
+                    .await
+                    .unwrap();
+                let first = player.current_song.as_ref().unwrap().id;
+                player.next_track().await.unwrap();
+                let second = player.current_song.as_ref().unwrap().id;
+                player.next_track().await.unwrap();
+                let third = player.current_song.as_ref().unwrap().id;
+
+                player.set_shuffle_mode(mode);
+                assert_eq!(
+                    player.current_song.as_ref().unwrap().id,
+                    third,
+                    "re-shuffling must not change the playing track"
+                );
+                player.previous_track().await.unwrap();
+                assert_eq!(player.current_song.as_ref().unwrap().id, second);
+                player.previous_track().await.unwrap();
+                assert_eq!(player.current_song.as_ref().unwrap().id, first);
+            }
+        }
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// #1223: under RepeatMode::Playlist, Previous wraps past the start even
+    /// when the walk reaches it through unavailable tracks; without repeat
+    /// it still stays put.
+    #[tokio::test]
+    async fn test_previous_wraps_past_unavailable_tracks_with_repeat_playlist() {
+        let (mut player, items, temp_dir) = player_with_songs(3, &[1]);
+
+        player.set_repeat_mode(RepeatMode::Playlist);
+        player
+            .play_playlist(items.clone(), 1, 0, None)
+            .await
+            .unwrap();
+        assert_eq!(player.current_song.as_ref().unwrap().id, 2);
+        player.previous_track().await.unwrap();
+        assert_eq!(
+            player.current_song.as_ref().unwrap().id,
+            3,
+            "Previous must skip the unavailable first track and wrap to the last"
+        );
+
+        player.set_repeat_mode(RepeatMode::Off);
+        player.play_playlist(items, 1, 0, None).await.unwrap();
+        player.previous_track().await.unwrap();
+        assert_eq!(
+            player.current_song.as_ref().unwrap().id,
+            2,
+            "without repeat, Previous must not wrap past the start"
+        );
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
