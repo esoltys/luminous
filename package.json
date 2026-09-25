@@ -27,6 +27,8 @@
     "bump-version": "bun run scripts/bump-version.ts",
     "tauri:windows:build": "tauri-windows-bundle build",
     "measure-memory": "bun run scripts/measure-memory.ts",
+    "perf:memory": "bun run scripts/perf-memory-scenarios.ts",
+    "perf:chart": "python scripts/perf-chart.py",
     "monitor-cdp": "bun run scripts/monitor-cdp.ts"
   },
   "dependencies": {

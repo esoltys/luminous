@@ -31,7 +31,7 @@ interface EvalResult {
   error?: string;
 }
 
-class CdpClient {
+export class CdpClient {
   private ws: WebSocket | null = null;
   private nextId = 1;
   private pending = new Map<
@@ -304,7 +304,9 @@ async function main() {
   client.close();
 }
 
-main().catch((err) => {
-  console.error(err.message || err);
-  process.exit(1);
-});
+if (import.meta.main) {
+  main().catch((err) => {
+    console.error(err.message || err);
+    process.exit(1);
+  });
+}
