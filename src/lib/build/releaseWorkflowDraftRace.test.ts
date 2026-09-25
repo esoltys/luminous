@@ -57,3 +57,25 @@ describe("release.yml: platform matrix can't race to create the draft release", 
     expect(release).toMatch(/tagName:\s*\$\{\{\s*needs\.create-release\.outputs\.tag\s*\}\}/);
   });
 });
+
+// Both softprops/action-gh-release and tauri-action set the release's draft
+// state on every upload. A hardcoded value there published v2.5.0 early: its
+// flatpak_only re-run passed `draft: ${{ !inputs.flatpak_only }}` (false)
+// against a release that was still a draft. Every upload must instead keep
+// the state create-release found the release in.
+describe("release.yml: asset uploads preserve the release's existing draft state", () => {
+  it("create-release exposes the release's draft state as an output", () => {
+    const createRelease = extractJobBlock(workflow, "create-release");
+    expect(createRelease).toMatch(/draft:\s*\$\{\{\s*steps\.release\.outputs\.draft\s*\}\}/);
+    expect(createRelease).toMatch(/draft=\$\(gh release view "\$TAG" --json isDraft -q \.isDraft\)/);
+  });
+
+  it("every draft/releaseDraft setting passes through create-release's draft output", () => {
+    const settings = [...workflow.matchAll(/^\s*(draft|releaseDraft):\s*(.+)$/gm)]
+      .filter(([, , value]) => !value.includes("steps.release.outputs.draft"));
+    expect(settings.length, "expected the tauri-action, MSIX, and Flatpak uploads to set draft state").toBeGreaterThanOrEqual(3);
+    for (const [line, , value] of settings) {
+      expect(value.trim(), `hardcoded draft state: ${line.trim()}`).toBe("${{ needs.create-release.outputs.draft }}");
+    }
+  });
+});

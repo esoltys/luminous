@@ -24,6 +24,12 @@ jobs:
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
       release_id: ${{ steps.release.outputs.id }}
+      # The release's draft state as found (or created) here. Every asset
+      # upload below passes this through, since both softprops and
+      # tauri-action set draft state explicitly on each call: hardcoding it
+      # would re-draft a live release on a full re-run, or publish a draft
+      # early on a flatpak_only re-run (which happened to v2.5.0).
+      draft: ${{ steps.release.outputs.draft }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -57,6 +63,7 @@ jobs:
             ID=$(gh release view "$TAG" --json id -q .id)
           fi
           echo "id=${ID}" >> "$GITHUB_OUTPUT"
+          echo "draft=$(gh release view "$TAG" --json isDraft -q .isDraft)" >> "$GITHUB_OUTPUT"
 
   release:
     needs: create-release
@@ -123,7 +130,7 @@ jobs:
           with: |
             releaseId: ${{ needs.create-release.outputs.release_id }}
             tagName: ${{ needs.create-release.outputs.tag }}
-            releaseDraft: true
+            releaseDraft: ${{ needs.create-release.outputs.draft }}
             prerelease: false
 
       # cargo tracks installed-binary versions in .crates.toml/.crates2.json,
@@ -161,7 +168,7 @@ jobs:
           tag_name: ${{ needs.create-release.outputs.tag }}
           # softprops/action-gh-release publishes the release if `draft` is
           # omitted - it doesn't preserve the existing draft state.
-          draft: true
+          draft: ${{ needs.create-release.outputs.draft }}
           files: |
             target/msix/*.msix
             target/msix/*.msixbundle
@@ -215,10 +222,9 @@ jobs:
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           tag_name: ${{ needs.create-release.outputs.tag }}
-          # softprops sets draft state explicitly, so a flatpak_only re-run
-          # against an already-published release must pass false here or it
-          # would flip the live release back to draft.
-          draft: ${{ !inputs.flatpak_only }}
+          # softprops sets draft state explicitly; keep whatever state the
+          # release already has (see create-release's `draft` output).
+          draft: ${{ needs.create-release.outputs.draft }}
           files: LuminousMusicPlayer.flatpak
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
