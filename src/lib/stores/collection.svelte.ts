@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
+import { stripEnclosingQuotes } from "../utils/filterParser";
 import { i18n } from "./i18n.svelte";
 import type {
   Song,
@@ -1004,7 +1005,7 @@ class CollectionStore {
         title: i18n.t('settings.selectMusicDirectory'),
       });
       if (selected && typeof selected === "string") {
-        await this.addDirectory(selected);
+        await this.addDirectory(stripEnclosingQuotes(selected));
       }
     } catch (err) {
       console.error("Failed to open directory dialog:", err);

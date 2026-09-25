@@ -14,6 +14,7 @@
   import SubsonicModal from "./SubsonicModal.svelte";
   import type { MusicDirectory, SubsonicServer, SubsonicSyncStats, WebDavServer } from "../types";
   import { combineWebdavPath } from "../webdavDisplay";
+  import { stripEnclosingQuotes } from "../utils/filterParser";
   import { invoke } from "@tauri-apps/api/core";
   import {
     FolderIcon as Folder,
@@ -202,11 +203,12 @@
   }
 
   async function handleCreateFolderPlaylist(dir: MusicDirectory) {
-    const name = dir.nickname || dir.path.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || dir.path;
-    const escapedPath = dir.path.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    const cleanPath = stripEnclosingQuotes(dir.path);
+    const name = dir.nickname || cleanPath.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || cleanPath;
+    const escapedPath = cleanPath.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
     try {
       const playlist = await playlistsStore.createPlaylist(name);
-      await playlistsStore.updatePlaylistSpec(playlist.id, `folder:"${escapedPath}"`);
+      await playlistsStore.updatePlaylistSpec(playlist.id, `folder:="${escapedPath}"`);
       navigationStore.activeTab = "playlists";
       navigationStore.selectedPlaylistId = playlist.id;
     } catch (err) {

@@ -4,6 +4,17 @@ export interface Rule {
   value: string;
 }
 
+export function stripEnclosingQuotes(str: string): string {
+  let s = str.trim();
+  while (
+    (s.startsWith('"') && s.endsWith('"') && s.length >= 2) ||
+    (s.startsWith("'") && s.endsWith("'") && s.length >= 2)
+  ) {
+    s = s.slice(1, -1).trim();
+  }
+  return s;
+}
+
 export function parseSearchRules(query: string): Rule[] {
   const rules: Rule[] = [];
   if (!query.trim()) return rules;
@@ -12,24 +23,67 @@ export function parseSearchRules(query: string): Rule[] {
   let current = "";
   let inQuotes = false;
   let quoteChar = "";
+  let quoteCount = 0;
   let escaped = false;
+  let i = 0;
 
-  for (const ch of query) {
+  while (i < query.length) {
+    const ch = query[i];
+
     if (ch === "\\" && !escaped) {
       escaped = true;
       current += ch;
+      i++;
       continue;
     }
 
     if ((ch === '"' || ch === "'") && !escaped) {
       if (inQuotes && ch === quoteChar) {
-        inQuotes = false;
+        let count = 0;
+        while (i + count < query.length && query[i + count] === quoteChar) {
+          count++;
+        }
+        if (count >= quoteCount) {
+          for (let c = 0; c < count; c++) {
+            current += quoteChar;
+          }
+          i += count;
+          inQuotes = false;
+          quoteChar = "";
+          quoteCount = 0;
+          escaped = false;
+          continue;
+        } else {
+          current += ch;
+          i++;
+          escaped = false;
+          continue;
+        }
       } else if (!inQuotes) {
+        let count = 0;
+        while (i + count < query.length && query[i + count] === ch) {
+          count++;
+        }
+        const nextChar = i + count < query.length ? query[i + count] : "";
+        if (count === 2 && (!nextChar || /\s|;/.test(nextChar))) {
+          current += ch + ch;
+          i += 2;
+          escaped = false;
+          continue;
+        }
         inQuotes = true;
         quoteChar = ch;
+        quoteCount = count;
+        for (let c = 0; c < count; c++) {
+          current += ch;
+        }
+        i += count;
+        escaped = false;
+        continue;
       }
-      current += ch;
-    } else if (/\s/.test(ch) && !inQuotes) {
+    }
+
+    if (/\s/.test(ch) && !inQuotes) {
       if (current.trim()) {
         tokens.push(current.trim());
         current = "";
@@ -38,6 +92,7 @@ export function parseSearchRules(query: string): Rule[] {
       current += ch;
     }
     escaped = false;
+    i++;
   }
   if (current.trim()) {
     tokens.push(current.trim());
@@ -48,34 +103,40 @@ export function parseSearchRules(query: string): Rule[] {
     if (colonIdx > 0) {
       const field = token.slice(0, colonIdx).trim().toLowerCase();
       let rawVal = token.slice(colonIdx + 1).trim();
-      if (
-        (rawVal.startsWith('"') && rawVal.endsWith('"')) ||
-        (rawVal.startsWith("'") && rawVal.endsWith("'"))
-      ) {
-        rawVal = rawVal.slice(1, -1);
-      }
-      rawVal = rawVal.replace(/\\"/g, '"').replace(/\\'/g, "'").replace(/\\\\/g, "\\");
+      rawVal = stripEnclosingQuotes(rawVal);
       let op = "=";
+      let hasExplicitOp = false;
 
       if (rawVal.startsWith(">=")) {
         op = ">=";
         rawVal = rawVal.slice(2);
+        hasExplicitOp = true;
       } else if (rawVal.startsWith("<=")) {
         op = "<=";
         rawVal = rawVal.slice(2);
+        hasExplicitOp = true;
       } else if (rawVal.startsWith("!=")) {
         op = "!=";
         rawVal = rawVal.slice(2);
+        hasExplicitOp = true;
       } else if (rawVal.startsWith(">")) {
         op = ">";
         rawVal = rawVal.slice(1);
+        hasExplicitOp = true;
       } else if (rawVal.startsWith("<")) {
         op = "<";
         rawVal = rawVal.slice(1);
+        hasExplicitOp = true;
       } else if (rawVal.startsWith("=")) {
         op = "=";
         rawVal = rawVal.slice(1);
+        hasExplicitOp = true;
       }
+
+      rawVal = stripEnclosingQuotes(rawVal);
+      rawVal = rawVal.replace(/\\"/g, '"').replace(/\\'/g, "'").replace(/\\\\/g, "\\");
+      rawVal = stripEnclosingQuotes(rawVal);
+
       let normalizedField = field;
       if (
         [
@@ -86,7 +147,7 @@ export function parseSearchRules(query: string): Rule[] {
         ].includes(field)
       ) {
         normalizedField = "artist_tag";
-        op = "contains";
+        if (!hasExplicitOp) op = "contains";
       } else if (
         [
           "folder",
@@ -96,7 +157,7 @@ export function parseSearchRules(query: string): Rule[] {
         ].includes(field)
       ) {
         normalizedField = "folder";
-        op = "contains";
+        if (!hasExplicitOp) op = "contains";
       } else if (
         [
           "artist",
@@ -111,7 +172,7 @@ export function parseSearchRules(query: string): Rule[] {
           "tags",
         ].includes(field)
       ) {
-        op = "contains";
+        if (!hasExplicitOp) op = "contains";
       }
 
       if (normalizedField && rawVal) {

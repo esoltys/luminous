@@ -13,7 +13,7 @@
     SlidersHorizontalIcon as SlidersHorizontal,
     FolderIcon as Folder,
   } from "phosphor-svelte";
-  import type { Rule } from "../utils/filterParser";
+  import { stripEnclosingQuotes, type Rule } from "../utils/filterParser";
   import type { QueuePopulationMode } from "../types";
   import PopulationModeTabs from "./PopulationModeTabs.svelte";
   import Toggle from "./Toggle.svelte";
@@ -60,7 +60,7 @@
 
     activeRules.forEach((r, idx) => {
       if (consumedIndices.has(idx)) return;
-      const val = r.value.trim().replace(/^["']|["']$/g, "");
+      const val = stripEnclosingQuotes(r.value.trim());
       if (!val) return;
 
       if (["folder", "subfolder", "directory", "path"].includes(r.field)) {
@@ -205,7 +205,8 @@
         title: i18n.t("smartPlaylistBuilder.selectFolderTitle", {}, "Select Folder"),
       });
       if (selected && typeof selected === "string") {
-        rule.value = selected;
+        rule.value = stripEnclosingQuotes(selected);
+        rule.op = "=";
         if (!userHasEditedName) {
           playlistName = generateSuggestedName(rules);
         }
@@ -228,7 +229,10 @@
     //   numeric op     → "field:>=value" etc.
     const specString = validRules
       .map((r) => {
-        const val = r.value.trim();
+        let val = r.value.trim();
+        if (["folder", "subfolder", "directory", "path"].includes(r.field)) {
+          val = stripEnclosingQuotes(val);
+        }
         const opPrefix = r.op === "contains" ? "" : r.op;
         if (/[\s"';]/.test(val) || opPrefix) {
           const escapedVal = val.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
