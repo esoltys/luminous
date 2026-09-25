@@ -78,6 +78,37 @@ jobs:
         working-directory: src-tauri
         run: cargo clippy --all-targets -- -D warnings
 
+  # Machine-checked Lean models of the player/playlist state machines
+  # (verification/lean/, epic #1224). `--wfail` turns warnings into failures,
+  # so an unfinished proof (`sorry`, reported only as a warning) fails the job.
+  lean_proofs:
+    name: Lean Proofs
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: verification/lean
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Cache Lean toolchain and build
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: |
+            ~/.elan
+            verification/lean/.lake
+          key: lean-${{ hashFiles('verification/lean/lean-toolchain') }}-${{ hashFiles('verification/lean/**/*.lean', 'verification/lean/lakefile.toml') }}
+          restore-keys: lean-${{ hashFiles('verification/lean/lean-toolchain') }}-
+
+      # The toolchain itself comes from verification/lean/lean-toolchain.
+      - name: Install elan
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/v4.2.4/elan-init.sh | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      - name: Build and check proofs
+        run: lake build --wfail
+
   # Extra gate for Dependabot PRs specifically, on top of the frontend_test/
   # backend_test jobs every PR already gets. Every historical dependency-
   # upgrade regression we've hit (lofty 0.21->0.25 silently dropping album

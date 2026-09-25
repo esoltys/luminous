@@ -4,10 +4,10 @@ Machine-checked models of the index bookkeeping in `src-tauri/src/player.rs` and
 
 ```bash
 cd verification/lean
-lake build   # succeeds only if every proof checks
+lake build --wfail   # fails if any proof does not check or uses `sorry`
 ```
 
-The toolchain is pinned in `lean-toolchain`. Install it with [elan](https://github.com/leanprover/elan).
+The toolchain is pinned in `lean-toolchain`. Install it with [elan](https://github.com/leanprover/elan). CI runs the same command in the `Lean Proofs` job of `.github/workflows/ci.yml`.
 
 | File | Covers |
 | --- | --- |
