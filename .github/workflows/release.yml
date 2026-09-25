@@ -247,6 +247,11 @@ jobs:
           if [ ! -f "$DST/config" ]; then
             ostree init --mode=archive-z2 --repo="$DST"
           fi
+          # Git doesn't track empty directories, so a repo cloned back from
+          # pages-repo is missing the ones OSTree expects (refs/remotes is
+          # always empty here) and every ref listing fails with
+          # "opendir(refs/remotes): No such file or directory".
+          mkdir -p "$DST"/refs/{heads,remotes,mirrors} "$DST"/{tmp,extensions,state}
 
           # Re-sign the unsigned `repo/` the builder step produced into the
           # shared repo, then regenerate its index/appstream/deltas.
