@@ -1,0 +1,9 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 649f57e0e6c92578ea60bbc39215eeb62ea95419b495221a03da59fab3e3da8c # shrinks to unavailable = [false, false, false, false, false, false, false, false], ops = [Play { start: 1 }, Reorder { from: 8, to: 1 }]
+cc 92ecebdfeb9f9d7ba67b73eaacac29302f6d8657c235f6b52cd4903d02a0c820 # shrinks to unavailable = [false, false, false, false, false, false, false, false], ops = [Shuffle(All), QueueNext { song: 7 }, Next, Next, Next, Play { start: 7 }, Next, Next, Reorder { from: 4, to: 15 }, TrackFinished, Next, Previous, QueueNext { song: 7 }, Play { start: 4 }, Next, Next, Next, Shuffle(Off), Previous, Append { song: 4 }, Reorder { from: 3, to: 2 }, Append { song: 8 }, Previous, TrackFinished, QueueNext { song: 6 }, Play { start: 6 }, Append { song: 6 }]
+cc 0436ece87cfd00e639c4e9fa9629be82ce6d9d6ab8090aa2f1441a8ce3299bc4 # shrinks to unavailable = [false, false, false, false, false, false, false, false], ops = [Shuffle(All), Play { start: 1 }, Shuffle(Off)]

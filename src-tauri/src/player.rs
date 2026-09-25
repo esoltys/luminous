@@ -598,18 +598,32 @@ impl Player {
             .as_ref()
             .and_then(|u| self.playlist_items.iter().position(|i| &i.uuid == u));
 
+        // Where the item previously at real index `i` ends up (`remap` in
+        // verification/lean/Luminous/Move.lean).
+        let moved = |i: usize| {
+            if i == from {
+                to
+            } else if from < to && i > from && i <= to {
+                i - 1
+            } else if from > to && i >= to && i < from {
+                i + 1
+            } else {
+                i
+            }
+        };
+
         if self.shuffle_mode == ShuffleMode::Off {
             self.current_index = new_real_idx;
             self.shuffle_order = (0..self.playlist_items.len()).collect();
+            // Virtual == real here, so history entries move with their items.
+            for idx in &mut self.played_indices {
+                *idx = moved(*idx);
+            }
         } else {
+            // Positions in the play order stay put (so `played_indices` needs
+            // no change); only the real indices they hold move.
             for idx in &mut self.shuffle_order {
-                if *idx == from {
-                    *idx = to;
-                } else if from < to && *idx > from && *idx <= to {
-                    *idx -= 1;
-                } else if from > to && *idx >= to && *idx < from {
-                    *idx += 1;
-                }
+                *idx = moved(*idx);
             }
             self.current_index = new_real_idx
                 .and_then(|real_idx| self.shuffle_order.iter().position(|&i| i == real_idx));
@@ -1893,12 +1907,15 @@ impl Player {
 }
 
 #[cfg(test)]
+mod invariant_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::db::Database;
     use std::sync::Arc;
 
-    fn setup_test_db() -> (Database, std::path::PathBuf) {
+    pub(super) fn setup_test_db() -> (Database, std::path::PathBuf) {
         let temp_dir =
             std::env::temp_dir().join(format!("luminous_player_test_{}", uuid::Uuid::new_v4()));
         let db = Database::new(temp_dir.clone()).unwrap();
