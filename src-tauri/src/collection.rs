@@ -33,6 +33,12 @@ use walkdir::WalkDir;
 /// bounds how many decoded `Song`s are held in memory at once.
 const SCAN_WRITE_BATCH_SIZE: usize = 300;
 
+/// How many files a scan processes between `scan-progress` events — both
+/// for unchanged files skipped by the mtime check and for the parallel
+/// tag-read sub-chunks within a write batch. Keeps the progress counter
+/// moving steadily without flooding the frontend with events (#1243).
+const SCAN_PROGRESS_INTERVAL: usize = 50;
+
 /// Thread count for the scan's parallel tag-reading pool. Leaves headroom
 /// below the machine's full core count so a scan doesn't compete with the
 /// audio playback thread or background analysis for CPU.
@@ -905,6 +911,9 @@ impl CollectionScanner {
             }
 
             // Partition into unchanged (skip tag re-read) vs. needs-update.
+            // Unchanged files still count toward `scanned`, so report them
+            // as they're skipped — on a mostly-unchanged library this is
+            // nearly every file, and without it the counter sits at 0 (#1243).
             let mut needs_update: Vec<&PathBuf> = Vec::new();
             for path in &all_paths {
                 if !force {
@@ -912,6 +921,15 @@ impl CollectionScanner {
                     let mtime = get_mtime(path).unwrap_or(0);
                     if known_mtimes.get(&path_str) == Some(&mtime) {
                         scanned += 1;
+                        if scanned.is_multiple_of(SCAN_PROGRESS_INTERVAL as u64) {
+                            on_progress(ScanProgress {
+                                phase: ScanPhase::ReadingTags,
+                                scanned,
+                                total,
+                                current_path: Some(path_str),
+                                silent,
+                            });
+                        }
                         continue;
                     }
                 }
@@ -932,37 +950,44 @@ impl CollectionScanner {
                 .build()
                 .context("failed to build scan thread pool")?;
 
+            // Each write batch is read in smaller parallel sub-chunks with a
+            // progress event after each, so the counter advances steadily
+            // instead of jumping once per whole write batch (#1243).
             for chunk in needs_update.chunks(SCAN_WRITE_BATCH_SIZE) {
-                let prepared: Vec<(PathBuf, Result<Song>)> = scan_pool.install(|| {
-                    chunk
-                        .par_iter()
-                        .map(|path| ((*path).clone(), read_and_prepare_song(&cover_manager, path)))
-                        .collect()
-                });
-
                 let tx = conn.unchecked_transaction()?;
-                for (path, result) in prepared {
-                    match result {
-                        Ok(song) => {
-                            if let Err(e) = upsert_song(&tx, &song) {
-                                log::warn!("Failed to save tags for {}: {e}", path.display());
+                for read_chunk in chunk.chunks(SCAN_PROGRESS_INTERVAL) {
+                    let prepared: Vec<(PathBuf, Result<Song>)> = scan_pool.install(|| {
+                        read_chunk
+                            .par_iter()
+                            .map(|path| {
+                                ((*path).clone(), read_and_prepare_song(&cover_manager, path))
+                            })
+                            .collect()
+                    });
+
+                    let mut last_path = None;
+                    for (path, result) in prepared {
+                        match result {
+                            Ok(song) => {
+                                if let Err(e) = upsert_song(&tx, &song) {
+                                    log::warn!("Failed to save tags for {}: {e}", path.display());
+                                }
+                            }
+                            Err(e) => {
+                                log::warn!("Failed to read tags for {}: {e}", path.display())
                             }
                         }
-                        Err(e) => log::warn!("Failed to read tags for {}: {e}", path.display()),
+                        scanned += 1;
+                        last_path = Some(path);
                     }
 
-                    scanned += 1;
-
-                    // Emit progress every 50 files to avoid flooding
-                    if scanned.is_multiple_of(50) || scanned == total {
-                        on_progress(ScanProgress {
-                            phase: ScanPhase::ReadingTags,
-                            scanned,
-                            total,
-                            current_path: Some(path.to_string_lossy().to_string()),
-                            silent,
-                        });
-                    }
+                    on_progress(ScanProgress {
+                        phase: ScanPhase::ReadingTags,
+                        scanned,
+                        total,
+                        current_path: last_path.map(|p| p.to_string_lossy().to_string()),
+                        silent,
+                    });
                 }
                 tx.commit()?;
             }
@@ -992,7 +1017,7 @@ impl CollectionScanner {
                     }
 
                     scanned += 1;
-                    if scanned.is_multiple_of(50) || scanned == total {
+                    if scanned.is_multiple_of(SCAN_PROGRESS_INTERVAL as u64) || scanned == total {
                         on_progress(ScanProgress {
                             phase: ScanPhase::ReadingTags,
                             scanned,
@@ -1005,6 +1030,18 @@ impl CollectionScanner {
                 tx.commit()?;
             }
         }
+
+        // Tag reading is finished — switch to the Updating phase before the
+        // maintenance passes below (missing-file check, DR logs, artwork
+        // query), which can take a while on a large library and would
+        // otherwise run under a stale "Reading Tags" label (#1243).
+        on_progress(ScanProgress {
+            phase: ScanPhase::Updating,
+            scanned: total,
+            total,
+            current_path: None,
+            silent,
+        });
 
         // Mark songs from these directories that no longer exist as unavailable.
         // This is a soft-delete only: automatic scans never hard-delete, so a watched
@@ -1069,16 +1106,6 @@ impl CollectionScanner {
         }
 
         let total_updating_items = albums_to_resolve.len() as u64;
-
-        if total_updating_items == 0 {
-            on_progress(ScanProgress {
-                phase: ScanPhase::Updating,
-                scanned: total,
-                total,
-                current_path: None,
-                silent,
-            });
-        }
 
         let mut remote_fetch_count = 0;
         for (idx, (song_id, path_str, effective_artist, album, art_embedded)) in
@@ -2345,6 +2372,62 @@ mod tests {
             )
             .unwrap();
         assert_eq!(genre_after_rescan, "Synthwave; Electronic");
+    }
+
+    #[tokio::test]
+    async fn test_scan_reports_intermediate_reading_tags_progress() {
+        // Regression test for #1243: a scan emitted `ReadingTags` at 0/N and
+        // then nothing until the phase changed — unchanged files were
+        // counted silently and tag reads only reported per 300-file batch.
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let music_dir = temp_dir.path().join("music");
+        std::fs::create_dir_all(&music_dir).unwrap();
+        let file_count = 120u64;
+        for i in 0..file_count {
+            write_test_wav(&music_dir.join(format!("song{i:03}.wav")));
+        }
+
+        let db = Arc::new(Database::new(temp_dir.path().to_path_buf()).unwrap());
+        let scanner = CollectionScanner::new(Arc::clone(&db));
+        scanner.add_directory(&music_dir.to_string_lossy()).unwrap();
+
+        let reading_tags_counts = |events: &[ScanProgress]| -> Vec<u64> {
+            events
+                .iter()
+                .filter(|p| p.phase == ScanPhase::ReadingTags && p.scanned > 0)
+                .map(|p| p.scanned)
+                .collect()
+        };
+
+        // First scan: every file needs a tag read.
+        let mut first = Vec::new();
+        scanner
+            .scan_all_core(temp_dir.path().to_path_buf(), false, false, false, |p| {
+                first.push(p)
+            })
+            .await
+            .unwrap();
+        assert_eq!(reading_tags_counts(&first), vec![50, 100, 120]);
+
+        // Second scan: every file is unchanged and skipped by the mtime check.
+        let mut second = Vec::new();
+        scanner
+            .scan_all_core(temp_dir.path().to_path_buf(), false, false, false, |p| {
+                second.push(p)
+            })
+            .await
+            .unwrap();
+        assert_eq!(reading_tags_counts(&second), vec![50, 100]);
+
+        // Both scans leave Reading Tags before the maintenance passes and
+        // finish with Done, with phases never going backwards.
+        for events in [&first, &second] {
+            let phases: Vec<ScanPhase> = events.iter().map(|p| p.phase).collect();
+            let rank = |p: &ScanPhase| *p as u8;
+            assert!(phases.windows(2).all(|w| rank(&w[0]) <= rank(&w[1])));
+            assert!(phases.contains(&ScanPhase::Updating));
+            assert_eq!(phases.last(), Some(&ScanPhase::Done));
+        }
     }
 
     #[test]
