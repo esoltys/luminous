@@ -1,8 +1,14 @@
 <script lang="ts">
-  import { FolderSimpleIcon as FolderClosed, ArrowsClockwiseIcon as RefreshCw } from "phosphor-svelte";
+  import {
+    FileAudioIcon as FileAudio,
+    FolderOpenIcon as FolderOpen,
+    FolderSimplePlusIcon as FolderPlus,
+    ArrowsClockwiseIcon as RefreshCw,
+  } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
+  import { playerStore } from "../stores/player.svelte";
   import { walkthroughStore } from "../stores/walkthrough.svelte";
   import Button from "./Button.svelte";
 
@@ -16,17 +22,11 @@
 <!-- Shown wherever a view would otherwise render an empty grid/list because no
      watched folder has been added yet — distinct from the "your search/filters
      matched nothing" empty states, which keep their own dashed-border treatment. -->
-<div class="flex flex-col items-center justify-center max-w-sm mx-auto text-center p-8 bg-brand-sidebar/40 rounded-xl border border-brand-border select-none">
-  <div class="w-14 h-14 flex items-center justify-center mb-4">
-    {#if dbNewer}
-      <div class="w-14 h-14 rounded-full bg-brand-accent/15 border border-brand-accent/30 flex items-center justify-center">
-        <RefreshCw class="w-7 h-7 text-brand-accent-text" />
-      </div>
-    {:else}
-      <img src="/luminous-mark.svg" alt="" class="w-14 h-14" />
-    {/if}
-  </div>
+<div class="flex flex-col items-center justify-center max-w-md mx-auto text-center p-8 bg-brand-sidebar/40 rounded-xl border border-brand-border select-none">
   {#if dbNewer}
+    <div class="w-14 h-14 rounded-full bg-brand-accent/15 border border-brand-accent/30 flex items-center justify-center mb-4">
+      <RefreshCw class="w-7 h-7 text-brand-accent-text" />
+    </div>
     <h3 class="text-base font-semibold text-brand-text-primary mb-1.5 text-balance">{i18n.t('dbNewerThanApp.title')}</h3>
     <p class="text-xs text-brand-text-secondary mb-5 leading-relaxed text-pretty">
       {i18n.t('dbNewerThanApp.text', {
@@ -41,20 +41,50 @@
     <!-- The very first launch (before the tour has ever been completed) shows
          the full-screen WelcomeScreen instead — this stays a plain, non-
          "Welcome"-branded empty state so it doesn't duplicate that greeting
-         for returning users whose library later empties out (folders removed). -->
-    <h3 class="text-base font-semibold text-brand-text-primary mb-1.5 text-balance">{i18n.t('emptyLibrary.title')}</h3>
-    <p class="text-xs text-brand-text-secondary mb-5 leading-relaxed text-pretty">{i18n.t('emptyLibrary.text')}</p>
-    <div class="flex items-center gap-2">
-      <Button onclick={() => collectionStore.addDirectoryDialog()} variant="primary" size="sm">
-        <FolderClosed class="w-3.5 h-3.5" />
-        {i18n.t('settings.addFolder')}
-      </Button>
-      <Button onclick={() => { navigationStore.activeTab = 'help'; }} variant="secondary" size="sm">
-        {i18n.t('sidebar.help')}
-      </Button>
-      <Button onclick={() => walkthroughStore.start()} variant="secondary" size="sm">
-        {i18n.t('walkthrough.takeTour', {}, 'Take a quick tour')}
-      </Button>
+         for returning users whose library later empties out (folders removed).
+         A library is optional: playing files straight from disk is offered
+         first, on equal footing, so nobody has to hand Luminous a folder to
+         scan just to hear a song. -->
+    <div class="w-full flex flex-col gap-5">
+      <section class="flex flex-col items-center gap-2">
+        <h4 class="text-[11px] font-semibold uppercase tracking-wider text-brand-text-secondary text-pretty">{i18n.t('emptyLibrary.playHeading')}</h4>
+        <div class="flex flex-wrap items-center justify-center gap-2">
+          <Button onclick={() => playerStore.openFileDialog()} variant="primary" size="sm">
+            <FileAudio class="w-3.5 h-3.5" />
+            {i18n.t('emptyLibrary.openFiles')}
+          </Button>
+          <Button onclick={() => playerStore.openFolderDialog()} variant="secondary" size="sm">
+            <FolderOpen class="w-3.5 h-3.5" />
+            {i18n.t('emptyLibrary.playFolder')}
+          </Button>
+        </div>
+        <p class="text-[11px] text-brand-text-secondary/80 leading-relaxed text-pretty">{i18n.t('emptyLibrary.dropHint')}</p>
+      </section>
+
+      <div class="h-px w-full bg-brand-border/60" aria-hidden="true"></div>
+
+      <section class="flex flex-col items-center gap-2">
+        <h4 class="text-[11px] font-semibold uppercase tracking-wider text-brand-text-secondary text-pretty">{i18n.t('emptyLibrary.libraryHeading')}</h4>
+        <Button onclick={() => collectionStore.addDirectoryDialog()} variant="secondary" size="sm">
+          <FolderPlus class="w-3.5 h-3.5" />
+          {i18n.t('emptyLibrary.addFolder')}
+        </Button>
+        <p class="text-[11px] text-brand-text-secondary/80 leading-relaxed text-pretty whitespace-pre-line">{i18n.t('emptyLibrary.libraryHint')}</p>
+      </section>
+    </div>
+
+    <div class="flex items-center gap-3 mt-6 text-xs">
+      <button
+        type="button"
+        onclick={() => { navigationStore.activeTab = 'help'; }}
+        class="text-brand-text-secondary underline-offset-2 hover:underline hover:text-brand-accent-text transition-colors"
+      >{i18n.t('sidebar.help')}</button>
+      <span class="text-brand-border" aria-hidden="true">·</span>
+      <button
+        type="button"
+        onclick={() => walkthroughStore.start()}
+        class="text-brand-text-secondary underline-offset-2 hover:underline hover:text-brand-accent-text transition-colors"
+      >{i18n.t('walkthrough.takeTour', {}, 'Take a quick tour')}</button>
     </div>
   {/if}
 </div>

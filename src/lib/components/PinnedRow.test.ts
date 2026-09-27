@@ -154,4 +154,27 @@ describe("PinnedRow.svelte", () => {
 
     expect(toggleSpy).toHaveBeenCalledWith("album", "OK Computer");
   });
+
+  it("hides pinned playlists and auto-playlists that have no songs", () => {
+    pinnedStore.items = [
+      { type: "album", album: mockAlbum },
+      { type: "playlist", playlist: { ...mockPlaylist, track_count: 0 } },
+      { type: "auto_playlist", autoPlaylist: { kind: "favourites", trackCount: 0 } },
+    ];
+    const { getByText, queryByText } = render(PinnedRow);
+
+    expect(getByText("OK Computer")).toBeInTheDocument();
+    expect(queryByText("My Best Songs")).not.toBeInTheDocument();
+    expect(queryByText("Favourite Songs")).not.toBeInTheDocument();
+  });
+
+  it("hides the whole row when every pin is an empty playlist", () => {
+    pinnedStore.items = [
+      { type: "auto_playlist", autoPlaylist: { kind: "daypart", trackCount: 0 } },
+      { type: "auto_playlist", autoPlaylist: { kind: "favourites", trackCount: 0 } },
+    ];
+    const { queryByText } = render(PinnedRow);
+
+    expect(queryByText("Pinned")).not.toBeInTheDocument();
+  });
 });

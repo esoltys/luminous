@@ -31,6 +31,16 @@
     return `${item.type}:${pinnedRefKeyFor(item)}`;
   }
 
+  // Empty playlists stay pinned but aren't shown, so the default pins (Moment
+  // Mix, Favourites) only appear on Home once they have songs to play.
+  function hasContent(item: PinnedItem): boolean {
+    if (item.type === "playlist") return item.playlist.track_count > 0;
+    if (item.type === "auto_playlist") return item.autoPlaylist.trackCount > 0;
+    return true;
+  }
+
+  const visibleItems = $derived(pinnedStore.items.filter(hasContent));
+
   // Mirrors PlaylistsCollectionView's autoDefs label derivation — Favourites/
   // Recently Added/Most Played/History use fixed i18n labels, while genre/
   // decade/bpm/artist_tag defer to the materialized playlist's own display
@@ -104,11 +114,15 @@
   let pointerDragPointerId: number | null = null;
   let pointerDragEl: HTMLElement | null = null;
 
+  // Drag indices are positions in visibleItems; hidden (empty) pins keep
+  // their place in the full order around the moved card.
   function commitReorder(targetIndex: number) {
     if (draggedIndex === null || targetIndex === draggedIndex) return;
-    const items = [...pinnedStore.items];
-    const [moved] = items.splice(draggedIndex, 1);
-    items.splice(targetIndex, 0, moved);
+    const moved = visibleItems[draggedIndex];
+    const target = visibleItems[targetIndex];
+    const items = pinnedStore.items.filter((item) => item !== moved);
+    const targetPos = items.indexOf(target);
+    items.splice(targetIndex > draggedIndex ? targetPos + 1 : targetPos, 0, moved);
     const order: Array<[PinnedItemType, string]> = items.map((item) => [item.type, pinnedRefKeyFor(item)]);
     pinnedStore.reorder(order);
   }
@@ -177,9 +191,9 @@
   }
 </script>
 
-{#if pinnedStore.items.length > 0}
+{#if visibleItems.length > 0}
   <HorizontalScrollRow title={i18n.t('home.pinned')}>
-    {#each pinnedStore.items as item, index (keyFor(item))}
+    {#each visibleItems as item, index (keyFor(item))}
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div
         data-pinned-index={index}

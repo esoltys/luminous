@@ -327,7 +327,10 @@
     </div>
   </div>
 
-  <div bind:this={searchContainerRef} class="relative flex-1 max-w-2xl">
+  <!-- Search + Open share the width search alone used to take, so adding the
+       button shrinks the search box rather than pushing the header wider. -->
+  <div class="flex-1 max-w-2xl flex items-center gap-3 min-w-0">
+  <div bind:this={searchContainerRef} class="relative flex-1 min-w-0">
     <form onsubmit={handleSearch} class="w-full flex items-center gap-3 bg-brand-main rounded-lg px-4 py-2 border border-brand-border focus-within:border-brand-accent focus-within:transition-colors duration-150">
       <Search class="w-4 h-4 text-brand-text-secondary flex-shrink-0" />
       <input
@@ -343,15 +346,6 @@
         placeholder={i18n.t('topNav.searchPlaceholder')}
         class="flex-1 bg-transparent text-brand-text-primary text-sm focus:outline-none placeholder-brand-text-secondary/50"
       />
-
-      <button
-        type="button"
-        onclick={() => playerStore.openFileDialog()}
-        class="p-1 text-brand-text-secondary hover:text-brand-accent-text transition-colors flex-shrink-0"
-        title={i18n.t('topNav.openFilesTooltip')}
-      >
-        <FolderOpen class="w-4 h-4" />
-      </button>
 
       {#if collectionStore.searchLoading}
         <div class="animate-spin rounded-full h-4 w-4 border-2 border-brand-accent border-t-transparent flex-shrink-0" title={i18n.t('topNav.searching')}></div>
@@ -752,6 +746,19 @@
         {/if}
       </div>
     {/if}
+  </div>
+
+  <!-- Kept outside the search box with a text label: tucked inside as a bare
+       icon it read as a search option, not as the way to play loose files. -->
+  <button
+    type="button"
+    onclick={() => playerStore.openFileDialog()}
+    class="flex items-center gap-2 px-3 py-2 rounded-lg border border-brand-border bg-brand-main text-sm text-brand-text-secondary hover:text-brand-text-primary hover:border-brand-accent transition-colors flex-shrink-0"
+    title={i18n.t('topNav.openFilesTooltip')}
+  >
+    <FolderOpen class="w-4 h-4" />
+    {i18n.t('topNav.open')}
+  </button>
   </div>
 
   <!-- overflow-hidden + isolate scoped to just this wrapper (not the header,

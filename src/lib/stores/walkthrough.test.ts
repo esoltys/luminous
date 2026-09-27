@@ -169,6 +169,26 @@ describe("WalkthroughStore", () => {
     expect(windowLayoutStore.rightPanelOpen).toBe(false);
   });
 
+  it("returns to Home when the tour ends on the library-folders step", () => {
+    walkthroughStore.start();
+    while (walkthroughStore.currentStep.id !== "library-folders") walkthroughStore.next();
+    expect(navigationStore.activeTab).toBe("settings");
+
+    walkthroughStore.next(); // finishes the tour
+
+    expect(walkthroughStore.isActive).toBe(false);
+    expect(navigationStore.activeTab).toBe("home");
+  });
+
+  it("returns to Home when the tour is skipped on the library-folders step", () => {
+    walkthroughStore.start();
+    while (walkthroughStore.currentStep.id !== "library-folders") walkthroughStore.next();
+
+    walkthroughStore.skip();
+
+    expect(navigationStore.activeTab).toBe("home");
+  });
+
   it("doesn't reopen a panel the user closed themselves mid-step", () => {
     windowLayoutStore.rightPanelOpen = false;
     walkthroughStore.start();

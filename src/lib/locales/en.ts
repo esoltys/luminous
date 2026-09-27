@@ -24,6 +24,7 @@ export const en = {
     goBack: "Go back",
     goForward: "Go forward",
     searchPlaceholder: "Search and filter... (Ctrl+L)",
+    open: "Open…",
     openFilesTooltip: "Open Audio Files or Playlists (*.m3u)",
     openFilesTitle: "Open Audio Files or Playlists",
     searching: "Searching...",
@@ -71,8 +72,13 @@ export const en = {
     emptyState: "Start adding music to see your personalized collections"
   },
   emptyLibrary: {
-    title: "No Music Yet",
-    text: "Your music library is currently empty. Check out Help in the sidebar to get started, or add a folder to begin scanning your music."
+    playHeading: "Play music",
+    openFiles: "Open Files",
+    playFolder: "Play a Folder",
+    dropHint: "Or drop files and folders anywhere in this window to play them.",
+    libraryHeading: "Build a library",
+    addFolder: "Add Folder to Library",
+    libraryHint: "Add a folder to browse by album, artist, or genre.\nLuminous keeps it in sync as your files change."
   },
   welcome: {
     title: "Welcome to Luminous",
@@ -1499,8 +1505,8 @@ export const en = {
         description: "Jump between Home, your Collection, Playlists, Stats, Settings, and Help from here."
       },
       topNavigation: {
-        title: "Search and go back",
-        description: "Search your library instantly, and move back and forward through your browsing history."
+        title: "Find and open music",
+        description: "Search your library, or choose Open… to play files from anywhere on your computer. Use the arrows to go back to where you were, like in a web browser."
       },
       collectionView: {
         title: "Browse your collection",
@@ -1523,8 +1529,8 @@ export const en = {
         description: "See the current song's artist bio, MusicBrainz links, and technical details like format and bitrate."
       },
       libraryFolders: {
-        title: "Add your music",
-        description: "Add folders to scan from Settings, and Luminous keeps your library up to date automatically."
+        title: "Make Luminous yours",
+        description: "Open Settings to add music folders, choose a theme, and connect integrations. Luminous keeps your library up to date as your folders change."
       }
     }
   },
