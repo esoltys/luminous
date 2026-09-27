@@ -504,11 +504,16 @@ mod tests {
         );
 
         // Folder path with spaces and internal quotes (e.g. station name in path)
-        let q3 = parse_query("folder:\"/home/esoltys/Music/Shortwave/CKLZ-FM 104.7 \\\"The Lizard\\\" Kelowna, BC\"");
+        let q3 = parse_query(
+            "folder:\"/home/esoltys/Music/Shortwave/CKLZ-FM 104.7 \\\"The Lizard\\\" Kelowna, BC\"",
+        );
         assert_eq!(q3.field_filters.len(), 1);
         assert_eq!(
             q3.field_filters[0].value,
-            FilterValue::Text("%/home/esoltys/Music/Shortwave/CKLZ-FM 104.7 \"The Lizard\" Kelowna, BC%".to_string())
+            FilterValue::Text(
+                "%/home/esoltys/Music/Shortwave/CKLZ-FM 104.7 \"The Lizard\" Kelowna, BC%"
+                    .to_string()
+            )
         );
 
         // Exact folder match with equals operator
@@ -548,16 +553,23 @@ mod tests {
         assert_eq!(q7.field_filters[0].op, Op::Eq);
         assert_eq!(
             q7.field_filters[0].value,
-            FilterValue::Text("/home/esoltys/Music/Shortwave/CKLZ-FM 104.7 \"The Lizard\" Kelowna, BC".to_string())
+            FilterValue::Text(
+                "/home/esoltys/Music/Shortwave/CKLZ-FM 104.7 \"The Lizard\" Kelowna, BC"
+                    .to_string()
+            )
         );
 
         // Windows path with equals operator and internal quotes
-        let q8 = parse_query("path:=\"C:\\Music\\Shortwave\\CKLZ-FM 104.7 \\\"The Lizard\\\" Kelowna, BC\"");
+        let q8 = parse_query(
+            "path:=\"C:\\Music\\Shortwave\\CKLZ-FM 104.7 \\\"The Lizard\\\" Kelowna, BC\"",
+        );
         assert_eq!(q8.field_filters.len(), 1);
         assert_eq!(q8.field_filters[0].op, Op::Eq);
         assert_eq!(
             q8.field_filters[0].value,
-            FilterValue::Text("C:/Music/Shortwave/CKLZ-FM 104.7 \"The Lizard\" Kelowna, BC".to_string())
+            FilterValue::Text(
+                "C:/Music/Shortwave/CKLZ-FM 104.7 \"The Lizard\" Kelowna, BC".to_string()
+            )
         );
 
         // Not equals folder filter
@@ -575,7 +587,10 @@ mod tests {
         assert_eq!(q10.field_filters[0].op, Op::Eq);
         assert_eq!(
             q10.field_filters[0].value,
-            FilterValue::Text("/home/esoltys/Music/Shortwave/CKLZ-FM 104.7 \"The Lizard\" Kelowna, BC".to_string())
+            FilterValue::Text(
+                "/home/esoltys/Music/Shortwave/CKLZ-FM 104.7 \"The Lizard\" Kelowna, BC"
+                    .to_string()
+            )
         );
     }
 }

@@ -210,9 +210,33 @@ describe("TopTenList.svelte", () => {
       },
     });
 
-    const movementIndicators = getAllByRole("button").filter((b) => /Rising|Steady|New|Falling/.test(b.getAttribute("aria-label") ?? ""));
+    const movementIndicators = getAllByRole("button").filter((b) => /Rising|Steady|New|Re-entry|Falling/.test(b.getAttribute("aria-label") ?? ""));
     expect(movementIndicators).toHaveLength(1);
     expect(movementIndicators[0]).toHaveAccessibleName("Rising · 2 weeks");
+  });
+
+  it("labels an album back on the chart after missing last week as a re-entry with its peak", () => {
+    const items: StatsTopItem[] = [
+      {
+        key: "album_1",
+        label: "Returning Album",
+        secondary: "Some Artist",
+        play_count: 0,
+        minutes: 0,
+        excluded: false,
+        album: null,
+        sample_song_id: 1,
+        movement: "reentry",
+        previous_rank: null,
+        peak_rank: 2,
+        weeks_on_chart: 2,
+      },
+    ];
+
+    const { getByRole, getByText } = render(TopTenList, { props: { items, kind: "album" } });
+
+    expect(getByRole("button", { name: "Re-entry · 2 weeks" })).toBeInTheDocument();
+    expect(getByText("Peak #2")).toBeInTheDocument();
   });
 
   it("renders custom emptyText when items array is empty", () => {

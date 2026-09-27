@@ -51,7 +51,7 @@ const SECONDS_PER_DAY: i64 = 86_400;
 
 /// Start of a rolling range ending `now` — plain `now - N*86400` arithmetic,
 /// no calendar alignment needed (unlike the Monday-aligned weekly chart in
-/// `collection::query::week_start_utc`). Split out with an explicit `now`
+/// `collection::query::chart_week`). Split out with an explicit `now`
 /// so tests can drive it deterministically.
 pub fn range_start_unix(range: StatsRange, now: i64) -> i64 {
     now - range.days() * SECONDS_PER_DAY

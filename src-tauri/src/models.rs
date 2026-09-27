@@ -1042,7 +1042,7 @@ pub struct AlbumItem {
 pub struct TopAlbumItem {
     pub album: AlbumItem,
     pub rank: i32,
-    /// Rank in the prior UTC calendar week, or `None` if the album wasn't in
+    /// Rank in the prior local calendar week, or `None` if the album wasn't in
     /// last week's top chart (shown as "new" rather than a numeric jump).
     pub previous_rank: Option<i32>,
     /// Best (lowest) rank this album has ever held across all recorded weeks,
@@ -1051,7 +1051,8 @@ pub struct TopAlbumItem {
     /// Number of distinct weeks this album has appeared in the chart,
     /// including the current one.
     pub weeks_on_chart: i32,
-    /// "new" | "rising" | "falling" | "steady".
+    /// "new" | "reentry" | "rising" | "falling" | "steady" — "reentry" is off
+    /// last week's chart but on an earlier week's.
     pub movement: String,
     /// Unix timestamp (UTC midnight) of this chart week's first day, per the
     /// `week_start` setting — lets the UI show the week's actual date range

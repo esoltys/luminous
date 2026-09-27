@@ -175,6 +175,21 @@ describe("HomeView.svelte", () => {
     });
   });
 
+  it("refreshes Top Albums when an album is excluded from or restored to stats", async () => {
+    render(HomeView);
+
+    await waitFor(() => {
+      expect(listenCallbacks["stats-exclusions-changed"]).toBeDefined();
+    });
+    vi.mocked(invoke).mockClear();
+
+    listenCallbacks["stats-exclusions-changed"]({ payload: undefined });
+
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("get_top_albums", { limit: 10 });
+    });
+  });
+
   it("debounces rapid library-changed events into a single refresh", async () => {
     vi.useFakeTimers();
     try {

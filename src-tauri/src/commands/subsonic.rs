@@ -664,13 +664,12 @@ mod tests {
 
     #[test]
     fn connection_test_error_carries_the_api_code() {
-        let err: ConnectionTestError = anyhow::Error::new(SubsonicApiError(
-            crate::subsonic::ApiError {
+        let err: ConnectionTestError =
+            anyhow::Error::new(SubsonicApiError(crate::subsonic::ApiError {
                 code: 41,
                 message: "x".into(),
-            },
-        ))
-        .into();
+            }))
+            .into();
         assert_eq!(err.code, Some(41));
         assert!(err.message.contains("Password sign-in method"));
         let json = serde_json::to_string(&err).unwrap();

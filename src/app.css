@@ -189,9 +189,14 @@
     user-select: none;
   }
 
-  /* Desktop application cursor defaults: remove hand/pointer cursor everywhere */
-  *, ::before, ::after {
+  /* Desktop application cursor defaults: remove hand/pointer cursor everywhere.
+     `inherit` (not `default`) on descendants so a cursor-help/cursor-grab
+     parent's cursor covers its icon children too. */
+  html {
     cursor: default;
+  }
+  *, ::before, ::after {
+    cursor: inherit;
   }
 
   button, a, select, input, label, summary, [role="button"] {
