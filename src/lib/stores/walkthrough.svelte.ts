@@ -131,6 +131,13 @@ const STEPS: WalkthroughStep[] = [
       navigationStore.activeTab = "settings";
       invoke("set_app_setting", { key: "active_settings_tab", value: "folders" });
     },
+    // Land back on Home when the tour ends (finish or skip) rather than
+    // leaving a new user in Settings.
+    afterStep: () => {
+      if (navigationStore.activeTab === "settings") {
+        navigationStore.activeTab = "home";
+      }
+    },
   },
 ];
 
