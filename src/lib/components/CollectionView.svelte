@@ -27,6 +27,7 @@
   import { tagsStore } from "../stores/tags.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
   import AlbumContextMenu from "./AlbumContextMenu.svelte";
+  import ArtistContextMenu from "./ArtistContextMenu.svelte";
   import AlbumCard from "./AlbumCard.svelte";
   import ArtistCard from "./ArtistCard.svelte";
   import AlbumRowCard from "./AlbumRowCard.svelte";
@@ -45,6 +46,7 @@
   let showColumnsMenu = $state(false);
   let contextMenuState = $state<{ x: number; y: number; song: Song } | null>(null);
   let albumContextMenuState = $state<{ x: number; y: number; album: AlbumItem } | null>(null);
+  let artistContextMenuState = $state<{ x: number; y: number; artist: ArtistItem } | null>(null);
 
   let selectedKeys = $state<Set<string>>(new Set());
 
@@ -55,6 +57,11 @@
   function handleAlbumContextMenu(event: MouseEvent, album: AlbumItem) {
     event.preventDefault();
     albumContextMenuState = { x: event.clientX, y: event.clientY, album };
+  }
+
+  function handleArtistContextMenu(event: MouseEvent, artist: ArtistItem) {
+    event.preventDefault();
+    artistContextMenuState = { x: event.clientX, y: event.clientY, artist };
   }
 
   async function handleBulkAddToPlaylist() {
@@ -598,6 +605,7 @@
                 {artistAlbums}
                 {artistSongs}
                 onclick={() => navigationStore.viewArtist(artist.name || "")}
+                oncontextmenu={(e) => handleArtistContextMenu(e, artist)}
               />
             {/each}
             {@render artistEmptyState()}
@@ -612,6 +620,7 @@
                 {artistAlbums}
                 {artistSongs}
                 onclick={() => navigationStore.viewArtist(artist.name || "")}
+                oncontextmenu={(e) => handleArtistContextMenu(e, artist)}
               />
             {/each}
             {@render artistEmptyState()}
@@ -684,6 +693,15 @@
     }}
     onGoToArtist={album.artist ? () => navigationStore.viewArtist(album.artist || "") : undefined}
     onClose={() => { albumContextMenuState = null; }}
+  />
+{/if}
+
+{#if artistContextMenuState}
+  <ArtistContextMenu
+    x={artistContextMenuState.x}
+    y={artistContextMenuState.y}
+    artistName={artistContextMenuState.artist.name || ""}
+    onClose={() => { artistContextMenuState = null; }}
   />
 {/if}
 

@@ -105,4 +105,16 @@ describe("ArtistRowCard.svelte", () => {
     expect(portrait.tagName).toBe("IMG");
     expect(portrait.getAttribute("src")).toBe("luminous-art://local/C:/Music/Dave Hawkins/artist.jpg");
   });
+  it("forwards right-click to the oncontextmenu prop", async () => {
+    const oncontextmenu = vi.fn();
+    const onclick = vi.fn();
+    const { getByRole } = render(ArtistRowCard, {
+      props: { artist: mockArtist, artistAlbums: [mockAlbum], onclick, oncontextmenu },
+    });
+
+    await fireEvent.contextMenu(getByRole("button", { name: /Dave Hawkins/ }));
+
+    expect(oncontextmenu).toHaveBeenCalledTimes(1);
+    expect(onclick).not.toHaveBeenCalled();
+  });
 });
