@@ -120,13 +120,6 @@ class WindowLayoutStore {
     }
   }
 
-  toggleSidebar() {
-    this.sidebarOpen = !this.sidebarOpen;
-    if (typeof window !== "undefined") {
-      localStorage.setItem("layout_sidebarOpen", this.sidebarOpen.toString());
-    }
-  }
-
   toggleSidebarCompact() {
     if (!this.sidebarOpen) {
       this.sidebarOpen = true;

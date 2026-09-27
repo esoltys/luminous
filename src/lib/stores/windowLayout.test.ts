@@ -31,11 +31,12 @@ describe("CollectionStore - sidebar/right-panel layout and responsive breakpoint
   });
 
   it("toggles and persists layout states (sidebar, right panel, immersive mode)", () => {
-    const initialSidebar = windowLayoutStore.sidebarOpen;
-    windowLayoutStore.toggleSidebar();
-    expect(windowLayoutStore.sidebarOpen).toBe(!initialSidebar);
-
+    windowLayoutStore.sidebarOpen = false;
     windowLayoutStore.setSidebarWidth(300);
+    windowLayoutStore.toggleSidebarCompact();
+    expect(windowLayoutStore.sidebarOpen).toBe(true);
+    expect(windowLayoutStore.sidebarWidth).toBeLessThan(300);
+    windowLayoutStore.toggleSidebarCompact();
     expect(windowLayoutStore.sidebarWidth).toBe(300);
 
     const initialRight = windowLayoutStore.rightPanelOpen;
