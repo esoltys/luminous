@@ -78,7 +78,7 @@
     <div
       in:fly={{ x: 24, duration: 200 }}
       out:fade={{ duration: 150 }}
-      class="pointer-events-auto flex items-start gap-2.5 px-4 py-2.5 rounded-lg border shadow-2xl backdrop-blur-md text-sm font-semibold max-w-md
+      class="pointer-events-auto flex items-start gap-2.5 px-4 py-2.5 rounded-lg border shadow-2xl text-sm font-semibold max-w-md
         {toast.variant === 'error'
           ? 'bg-[#1f1013] border-red-500/50 text-red-400 anim-warn-shake'
           : toast.variant === 'warning'
