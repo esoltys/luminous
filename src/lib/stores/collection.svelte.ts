@@ -346,7 +346,7 @@ class CollectionStore {
             : event.payload.phase === "reading_tags"
               ? i18n.t("settings.phaseReadingTags", {}, "Reading metadata...")
               : i18n.t("settings.phaseUpdating", {}, "Updating library...");
-          const taskName = i18n.t("settings.rescanTitle", {}, "Library Scanning & Maintenance");
+          const taskName = i18n.t("tasks.libraryScan", {}, "Refreshing library");
           const label = `${taskName} (${phaseName})`;
           if (!tasksStore.isTaskActive(scanTaskId)) {
             tasksStore.startTask({
@@ -364,7 +364,7 @@ class CollectionStore {
         }
 
         if (event.payload.phase === "done") {
-          tasksStore.completeTask(scanTaskId);
+          tasksStore.completeTask(scanTaskId, i18n.t("tasks.libraryScanDone", {}, "Library refreshed"));
           const nowStr = new Date().toLocaleString();
           this.lastScanTime = nowStr;
           this.refreshDirectories();
