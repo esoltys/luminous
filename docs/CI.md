@@ -2,8 +2,8 @@
 
 This documents the actual GitHub Actions pipeline as it exists in `.github/workflows/`.
 There are four workflow files: `ci.yml`, `audit.yml`, `codeql.yml`, and `release.yml`.
-`ci.yml` runs `bun run check` (svelte-check), `bun run test:run` (Vitest), `cargo test`, and
-`cargo clippy --all-targets -- -D warnings` on every PR — see below. The full local
+`ci.yml` runs `bun run check` (svelte-check), `bun run test:run` (Vitest), `cargo test`,
+`cargo clippy --all-targets -- -D warnings`, and `cargo fmt --check` on every PR — see below. The full local
 pre-release re-run of these plus a manual QA pass still lives in
 [`docs/RELEASE_CHECKLIST.md`](./RELEASE_CHECKLIST.md) as a belt-and-suspenders step before
 cutting a release, not because CI skips them.
@@ -20,6 +20,8 @@ separate private repo `esoltys/luminous-store`, triggered manually against a pub
   - `frontend_test` job: `bun run test:run` (Vitest).
   - `backend_test` job: `cargo test`, then `cargo clippy --all-targets -- -D warnings`
     (from `src-tauri/`) — any clippy warning fails the PR, not just errors.
+  - `rust_fmt` job: `cargo fmt --check` (from `src-tauri/`). The pre-commit hook is opt-in
+    per clone, so this is what stops formatting drift reaching `main`. No build needed.
   - `dependabot_regression_gate` job (Dependabot PRs only, `if: github.actor ==
     'dependabot[bot]'`): a real production build (`bun run build`), the Vitest suite
     against it, and `cargo test --locked` to catch a version bump that left `Cargo.lock`
@@ -115,7 +117,7 @@ flowchart TD
     TagPush["Push tag v*"]
     ManualDispatch1["Manual workflow_dispatch"]
 
-    CI["ci.yml\ncheck + test + clippy (+ Dependabot gate)"]
+    CI["ci.yml\ncheck + test + clippy + fmt (+ Dependabot gate)"]
     Audit["audit.yml\nSecurity Audit + bun.lock check"]
     CodeQL["codeql.yml\nCodeQL Advanced"]
     Release["release.yml\nRelease Build (builds + drafts release)"]
