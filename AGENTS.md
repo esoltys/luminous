@@ -136,6 +136,12 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config libayatana-appind
   `$effect` or a prop-change watcher — doing so causes false positives when the track changes and a
   different (already-favourited) song loads.
 
+- **Reduced motion**: import `fly`/`slide`/`scale`/`fade` from `src/lib/utils/motion.ts`, never from
+  `svelte/transition` — the wrappers drop transforms (and make `slide` instant) under
+  `prefers-reduced-motion`, which CSS can't do for JS transitions. CSS transitions are covered by the
+  `!important` reduce block at the end of `animations.css`; `bun run test:e2e:windows` proves it still
+  reaches every transform transition. Reduced means fewer and gentler, never zero: keep opacity/colour.
+
 - **Context-aware completion messages**: End-of-queue or completion toasts must include the name of what
   finished (e.g., "Jazz Classics complete"), not generic text. The `playerStore.activeContextName` field
   carries this name; auto-playlists (Favourites, Recently Added, etc.) must pass their `displayName` to

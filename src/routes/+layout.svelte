@@ -4,7 +4,7 @@
   import Sidebar from '../lib/components/Sidebar.svelte';
   import RightPanel from '../lib/components/RightPanel.svelte';
   import PlayerBar from '../lib/components/PlayerBar.svelte';
-  import { slide, fly, fade } from 'svelte/transition';
+  import { slide, fly, fade, prefersReducedMotion } from '../lib/utils/motion';
   import { cubicOut } from 'svelte/easing';
   import { collectionStore } from '../lib/stores/collection.svelte';
   import { navigationStore } from '../lib/stores/navigation.svelte';
@@ -451,7 +451,7 @@
     <!-- 3D Flip Container fills the full window height; the PlayerBar floats
          on top of it (absolute, below) so scrolled content passes underneath
          the glass footer instead of stopping above it. -->
-    <div class="flex-1 relative overflow-hidden flip-perspective" class:no-3d={themeStore.gpuCompositing === false}>
+    <div class="flex-1 relative overflow-hidden flip-perspective" class:no-3d={themeStore.gpuCompositing === false || prefersReducedMotion()}>
       <!-- Inner Card Wrapper -->
       <div class="w-full h-full relative flip-card" class:flipped={windowLayoutStore.effectiveImmersiveMode}>
 
@@ -707,7 +707,8 @@
      `perspective` alone (with no rotation left to apply) still forces its
      subtree into a separate 3D compositing layer, which is enough to break
      WebKitGTK's backdrop-filter sampling for elements outside that subtree
-     (e.g. the glass PlayerBar) — so drop it here too, not just the transform. */
+     (e.g. the glass PlayerBar) — so drop it here too, not just the transform.
+     The same cross-fade stands in for the flip under prefers-reduced-motion. */
   .flip-perspective.no-3d {
     perspective: none;
   }

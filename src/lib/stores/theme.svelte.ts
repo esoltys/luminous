@@ -16,6 +16,7 @@ import {
   type ColorCount
 } from "../utils/colorUtils";
 import { LIGHTNESS_STEP } from "../constants";
+import { prefersReducedMotion } from "../utils/motion";
 
 const MAX_READABILITY_ADJUST_STEPS = 30;
 
@@ -190,10 +191,6 @@ function yieldViewTransitionToInput(transition: ViewTransition | undefined) {
         window.removeEventListener(type, onInput, { capture: true });
       }
     });
-}
-
-function prefersReducedMotion(): boolean {
-  return typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 }
 
 const RUBY_RED_COLORS: ThemeColors = {

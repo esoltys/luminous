@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { fly } from 'svelte/transition';
+  import { fly, prefersReducedMotion } from '../utils/motion';
   import { cubicOut } from 'svelte/easing';
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
@@ -256,7 +256,9 @@
     const marginProp = marginSide === 'left' ? 'margin-left' : 'margin-right';
 
     return {
-      duration,
+      // Animates layout width, like `slide` — so under reduced motion it
+      // collapses instantly rather than fading while neighbours shift.
+      duration: prefersReducedMotion() ? 0 : duration,
       easing,
       css: (t: number) => `
         overflow: hidden;

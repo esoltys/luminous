@@ -27,6 +27,9 @@
 //   bunx tsx scripts/inspect-app.ts click --text "<visible text>"
 //   bunx tsx scripts/inspect-app.ts hover --css "<selector>"
 //   bunx tsx scripts/inspect-app.ts type --css "<selector>" "<text>"
+//   bunx tsx scripts/inspect-app.ts eval "<js function body>"
+//     Runs the script in the page and prints its (JSON) return value, e.g.
+//     eval "return getComputedStyle(document.body).transitionProperty"
 //   bunx tsx scripts/inspect-app.ts source
 //   bunx tsx scripts/inspect-app.ts url
 //   bunx tsx scripts/inspect-app.ts stop
@@ -35,8 +38,10 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  APP_EXE,
   clickElement,
   elementScreenshot,
+  executeScript,
   getSource,
   getUrl,
   hoverElement,
@@ -49,7 +54,6 @@ import {
 } from '../e2e/webdriver-client';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const APP_EXE = path.join(REPO_ROOT, 'target', 'debug', 'LuminousMusicPlayer.exe');
 const STATE_FILE = path.join(REPO_ROOT, '.inspect-session.json');
 
 interface PersistedState {
@@ -158,6 +162,13 @@ async function cmdType(args: string[]) {
   console.log(`Typed into ${using}=${value}`);
 }
 
+async function cmdEval(args: string[]) {
+  const script = args[0];
+  if (!script) throw new Error('Usage: eval "<js function body>"');
+  const session = asSession(loadState());
+  console.log(JSON.stringify(await executeScript(session, script), null, 2));
+}
+
 async function cmdSource() {
   const session = asSession(loadState());
   console.log(await getSource(session));
@@ -189,12 +200,14 @@ async function main() {
       return cmdHover(args);
     case 'type':
       return cmdType(args);
+    case 'eval':
+      return cmdEval(args);
     case 'source':
       return cmdSource();
     case 'url':
       return cmdUrl();
     default:
-      console.error('Usage: inspect-app.ts <start [--real]|stop|screenshot <path>|click --css/--text <sel>|hover --css/--text <sel>|type --css/--text <sel> <text>|source|url>');
+      console.error('Usage: inspect-app.ts <start [--real]|stop|screenshot <path>|click --css/--text <sel>|hover --css/--text <sel>|type --css/--text <sel> <text>|eval <js>|source|url>');
       process.exitCode = 1;
   }
 }

@@ -9,7 +9,7 @@
   import { tagsStore } from "../stores/tags.svelte";
   import { walkthroughStore } from "../stores/walkthrough.svelte";
   import { untrack } from "svelte";
-  import { fade } from "svelte/transition";
+  import { fade } from "../utils/motion";
   import {
     BooksIcon as Library,
     PlaylistIcon as ListMusic,

@@ -29,7 +29,7 @@
   import CoverArt from "./CoverArt.svelte";
   import FavouriteCornerFlag from "./FavouriteCornerFlag.svelte";
   import ReactiveLogoBrand from "./ReactiveLogoBrand.svelte";
-  import { fade } from "svelte/transition";
+  import { fade } from "../utils/motion";
   import { MAX_SEARCH_SUGGESTIONS_PER_CATEGORY } from "../constants";
 
   let searchInput: HTMLInputElement | undefined;

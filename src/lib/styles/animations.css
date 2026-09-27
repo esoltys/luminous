@@ -195,3 +195,32 @@
     animation: none;
   }
 }
+
+/* Reduced motion for everything else that moves via CSS transitions —
+   Tailwind's transition-transform/transition-all utilities and component
+   <style> blocks. Colour, opacity and shadow transitions keep playing
+   ("fewer and gentler, never zero"); transform, size and position changes
+   apply instantly. !important because this has to beat every real selector
+   that sets `transition`: Tailwind utilities, scoped Svelte rules with
+   higher specificity, and inline styles. Scoped to body so :root's theme
+   morph (custom-property transitions in app.css) is untouched.
+   Svelte JS transitions can't be reached from CSS — those go through
+   src/lib/utils/motion.ts. */
+@media (prefers-reduced-motion: reduce) {
+  body,
+  body *,
+  body *::before,
+  body *::after,
+  body input::-webkit-slider-thumb {
+    transition-property: color, background-color, border-color, outline-color,
+      text-decoration-color, fill, stroke, opacity, box-shadow, visibility,
+      filter, backdrop-filter, --tw-gradient-from, --tw-gradient-via,
+      --tw-gradient-to !important;
+  }
+
+  /* NowPlayingBars: a bouncing equaliser glyph — static bars still read as
+     "now playing". */
+  .animate-bounce {
+    animation: none;
+  }
+}

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { isRemoteSource } from "../utils/remoteSource";
   import { onMount } from "svelte";
-  import { fade } from "svelte/transition";
+  import { fade } from "../utils/motion";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { pinnedStore } from "../stores/pinned.svelte";
   import { playerStore } from "../stores/player.svelte";
