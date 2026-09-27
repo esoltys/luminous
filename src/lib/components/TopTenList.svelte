@@ -18,6 +18,7 @@
     TrendUpIcon,
     TrendDownIcon,
     AsteriskIcon,
+    ArrowCounterClockwiseIcon,
     MinusIcon,
     ShareNetworkIcon as Share,
   } from "phosphor-svelte";
@@ -95,6 +96,7 @@
   function movementTooltip(item: StatsTopItem): string {
     const movementLabels: Record<NonNullable<StatsTopItem["movement"]>, string> = {
       new: i18n.t("home.chartNew", {}, "New"),
+      reentry: i18n.t("home.chartReentry", {}, "Re-entry"),
       rising: i18n.t("home.chartRising", {}, "Rising"),
       falling: i18n.t("home.chartFalling", {}, "Falling"),
       steady: i18n.t("home.chartSteady", {}, "Steady"),
@@ -128,6 +130,8 @@
       <TrendDownIcon class="w-4 h-4 text-red-400" weight="bold" />
     {:else if item.movement === "new"}
       <AsteriskIcon class="w-4 h-4 text-brand-accent-text" weight="bold" />
+    {:else if item.movement === "reentry"}
+      <ArrowCounterClockwiseIcon class="w-4 h-4 text-brand-accent-text" weight="bold" />
     {:else}
       <MinusIcon class="w-4 h-4 text-brand-text-secondary" />
     {/if}

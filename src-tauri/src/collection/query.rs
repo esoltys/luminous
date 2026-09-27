@@ -1295,8 +1295,9 @@ impl CollectionScanner {
     /// prior week, peak rank, and weeks-on-chart. Backed by a snapshot table
     /// (`album_chart_history`, migration 22) written lazily on each call —
     /// there's no scheduler in this codebase, so the current week's rows are
-    /// upserted here every time, which is idempotent and keeps the snapshot
-    /// current as new plays land during the week.
+    /// replaced here every time, keeping the snapshot current as new plays
+    /// land during the week. Past weeks are rebuilt from play_history
+    /// whenever they weren't built under the current `week_start` setting.
     pub fn get_top_albums(&self, limit: i64) -> Result<Vec<TopAlbumItem>> {
         self.get_top_albums_at(limit, chrono::Utc::now().timestamp(), &chrono::Local)
     }
@@ -1322,6 +1323,7 @@ impl CollectionScanner {
             period_start,
             starts_at,
         } = chart_week(now, start_sunday, tz);
+        rebuild_chart_history_if_stale(&conn, start_sunday, starts_at, limit, tz)?;
 
         // Rank this week's albums by listening time, as Stats does. Every result must be an
         // Album card regardless of track count (unlike
@@ -1425,33 +1427,12 @@ impl CollectionScanner {
         // setting (or in UTC, before this was local) sits under a different
         // key than the week before `period_start`.
         let previous_starts_at = chart_week(starts_at - 1, start_sunday, tz).starts_at;
-        let previous_ranks: std::collections::HashMap<String, i32> = {
-            let sql = format!(
-                "SELECT s.album
-                 FROM play_history ph
-                 JOIN songs s ON s.id = ph.song_id
-                 WHERE ph.played_at >= ?1 AND ph.played_at < ?2
-                   AND s.source IN ({lib}) AND s.unavailable = 0
-                   AND s.album IS NOT NULL AND TRIM(s.album) != ''
-                 GROUP BY s.album
-                 ORDER BY COALESCE(SUM(COALESCE(NULLIF(ph.duration_secs, 0), s.length_nanosec / 1000000000, 0)), 0) DESC,
-                          COUNT(*) DESC, MAX(s.added) DESC
-                 LIMIT ?3",
-                lib = *LIBRARY_SOURCES_SQL
-            );
-            let mut stmt = conn.prepare(&sql)?;
-            let albums: Vec<String> = stmt
-                .query_map(params![previous_starts_at, starts_at, limit], |row| {
-                    row.get(0)
-                })?
-                .filter_map(|r| r.ok())
-                .collect();
-            albums
+        let previous_ranks: std::collections::HashMap<String, i32> =
+            rank_albums_between(&conn, previous_starts_at, starts_at, limit)?
                 .into_iter()
                 .enumerate()
-                .map(|(i, album)| (album, (i + 1) as i32))
-                .collect()
-        };
+                .map(|(i, (album, _))| (album, (i + 1) as i32))
+                .collect();
         let mut result = Vec::with_capacity(ranked.len());
         for (i, (mut album, _week_plays)) in ranked.into_iter().enumerate() {
             let rank = (i + 1) as i32;
@@ -1473,7 +1454,10 @@ impl CollectionScanner {
                     |r| r.get(0),
                 )
                 .unwrap_or(1);
+            // Off last week's chart: "new" the first time, "reentry" when
+            // it charted in some earlier week and came back.
             let movement = match previous_rank {
+                None if weeks_on_chart > 1 => "reentry",
                 None => "new",
                 Some(prev) if prev > rank => "rising",
                 Some(prev) if prev < rank => "falling",
@@ -1493,6 +1477,103 @@ impl CollectionScanner {
         }
         Ok(result)
     }
+}
+
+/// `app_state` key recording which `week_start` setting the past weeks in
+/// `album_chart_history` were built under.
+const CHART_HISTORY_WEEK_START_KEY: &str = "album_chart_history_week_start";
+
+/// The top `limit` albums by minutes played (then play count) among plays in
+/// `[from, to)`, as `(album, play_count)` — the same order as the current
+/// week's chart and Stats' Top Albums.
+fn rank_albums_between(
+    conn: &rusqlite::Connection,
+    from: i64,
+    to: i64,
+    limit: i64,
+) -> Result<Vec<(String, i64)>> {
+    let sql = format!(
+        "SELECT s.album, COUNT(*)
+         FROM play_history ph
+         JOIN songs s ON s.id = ph.song_id
+         WHERE ph.played_at >= ?1 AND ph.played_at < ?2
+           AND s.source IN ({lib}) AND s.unavailable = 0
+           AND s.album IS NOT NULL AND TRIM(s.album) != ''
+         GROUP BY s.album
+         ORDER BY COALESCE(SUM(COALESCE(NULLIF(ph.duration_secs, 0), s.length_nanosec / 1000000000, 0)), 0) DESC,
+                  COUNT(*) DESC, MAX(s.added) DESC
+         LIMIT ?3",
+        lib = *LIBRARY_SOURCES_SQL
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt
+        .query_map(params![from, to, limit], |row| {
+            Ok((row.get(0)?, row.get(1)?))
+        })?
+        .filter_map(|r| r.ok())
+        .collect();
+    Ok(rows)
+}
+
+/// Rebuild every past week of `album_chart_history` from play_history unless
+/// it was already built under the current `week_start` setting. Snapshots
+/// written under the other setting — or by the old UTC week boundaries,
+/// which could file tonight's plays under next week — key the same week
+/// under several dates, so one week on the chart counted as several in
+/// weeks-on-chart and peak rank. The table is purely derived, so rebuilding
+/// loses nothing; the current week is replaced on every call anyway.
+fn rebuild_chart_history_if_stale<Tz: chrono::TimeZone>(
+    conn: &rusqlite::Connection,
+    start_sunday: bool,
+    current_starts_at: i64,
+    limit: i64,
+    tz: &Tz,
+) -> Result<()> {
+    let setting = if start_sunday { "sunday" } else { "monday" };
+    let built_for: Option<String> = conn
+        .query_row(
+            "SELECT value FROM app_state WHERE key = ?1",
+            params![CHART_HISTORY_WEEK_START_KEY],
+            |row| row.get(0),
+        )
+        .optional()?;
+    if built_for.as_deref() == Some(setting) {
+        return Ok(());
+    }
+
+    let tx = conn.unchecked_transaction()?;
+    tx.execute("DELETE FROM album_chart_history", [])?;
+    let first_play: Option<i64> = tx.query_row(
+        "SELECT MIN(played_at) FROM play_history WHERE played_at < ?1",
+        params![current_starts_at],
+        |row| row.get(0),
+    )?;
+    if let Some(first_play) = first_play {
+        let mut week = chart_week(first_play, start_sunday, tz);
+        while week.starts_at < current_starts_at {
+            // Seven days plus a few hours lands inside the next week even
+            // when a DST change makes this one 167 or 169 hours long.
+            let next = chart_week(week.starts_at + 7 * 86_400 + 4 * 3_600, start_sunday, tz);
+            let ends_at = next.starts_at.min(current_starts_at);
+            for (i, (album, plays)) in rank_albums_between(&tx, week.starts_at, ends_at, limit)?
+                .into_iter()
+                .enumerate()
+            {
+                tx.execute(
+                    "INSERT INTO album_chart_history (period_start, album_key, rank, play_count)
+                     VALUES (?1, ?2, ?3, ?4)",
+                    params![week.period_start, album, (i + 1) as i32, plays],
+                )?;
+            }
+            week = next;
+        }
+    }
+    tx.execute(
+        "INSERT OR REPLACE INTO app_state (key, value) VALUES (?1, ?2)",
+        params![CHART_HISTORY_WEEK_START_KEY, setting],
+    )?;
+    tx.commit()?;
+    Ok(())
 }
 
 /// The calendar week containing `now`, as seen in the user's time zone.
@@ -3966,6 +4047,96 @@ mod tests {
         let _ = std::fs::remove_dir_all(temp_dir);
     }
 
+    /// History written under the other week-start setting, or by the old
+    /// UTC boundaries (tonight's plays filed under next week), keyed one week
+    /// under three dates; it's rebuilt from play_history so an album heard
+    /// only this week is "new" and on the chart for one week, not three.
+    #[test]
+    fn test_get_top_albums_rebuilds_misfiled_history() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_top_albums_rebuild_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "INSERT OR REPLACE INTO app_state (key, value) VALUES ('week_start', 'sunday')",
+            [],
+        )
+        .unwrap();
+        let seed = |path: &str, album: &str| -> i64 {
+            upsert_song(
+                &conn,
+                &Song {
+                    artist: Some("Some Artist".to_string()),
+                    album: Some(album.to_string()),
+                    title: Some(path.to_string()),
+                    source: SongSource::LocalFile,
+                    path: Some(path.to_string()),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+            conn.query_row(
+                "SELECT id FROM songs WHERE path = ?1",
+                params![path],
+                |row| row.get(0),
+            )
+            .unwrap()
+        };
+        let record_play = |song_id: i64, played_at: i64| {
+            conn.execute(
+                "INSERT INTO play_history (context_type, song_id, played_at) VALUES ('song', ?1, ?2)",
+                params![song_id, played_at],
+            )
+            .unwrap();
+        };
+        let old = seed(r"C:\Music\old.mp3", "Old Favourite");
+        let fresh = seed(r"C:\Music\fresh.mp3", "Afterburner");
+
+        // Sundays 2026-09-13 / 09-20 (UTC); keys for Mon 09-21 and Sun 09-27.
+        let (sep13, sep20, sep21, sep27) =
+            (1_789_257_600, 1_789_862_400, 1_789_948_800, 1_790_467_200);
+        record_play(old, sep13 + 60);
+        record_play(fresh, sep20 + 5 * 86_400);
+        for key in [sep20, sep21, sep27] {
+            conn.execute(
+                "INSERT INTO album_chart_history (period_start, album_key, rank, play_count)
+                 VALUES (?1, 'Afterburner', 1, 1)",
+                params![key],
+            )
+            .unwrap();
+        }
+
+        let chart = CollectionScanner::new(db.clone())
+            .get_top_albums_at(10, sep20 + 6 * 86_400, &chrono::Utc)
+            .unwrap();
+        assert_eq!(chart.len(), 1);
+        assert_eq!(chart[0].movement, "new");
+        assert_eq!(chart[0].weeks_on_chart, 1);
+        let history: Vec<(i64, String)> = conn
+            .prepare(
+                "SELECT period_start, album_key FROM album_chart_history ORDER BY period_start",
+            )
+            .unwrap()
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect();
+        assert_eq!(
+            history,
+            vec![
+                (sep13, "Old Favourite".to_string()),
+                (sep20, "Afterburner".to_string())
+            ]
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
     /// Movement comes from last week's plays, not last week's snapshot: here
     /// Home was never opened last week (so no snapshot exists), and "now" is
     /// Saturday night at UTC-7 — already Sunday in UTC, which used to roll the
@@ -4015,8 +4186,8 @@ mod tests {
                 .unwrap();
             }
         };
-        let a = seed(r"C:\Music.mp3", "Album A");
-        let b = seed(r"C:\Music.mp3", "Album B");
+        let a = seed(r"C:\Music\a.mp3", "Album A");
+        let b = seed(r"C:\Music\b.mp3", "Album B");
 
         let tz = chrono::FixedOffset::west_opt(7 * 3600).unwrap();
         // Local Sundays 2026-09-13 and 2026-09-20, 00:00 at UTC-7.
@@ -4052,6 +4223,25 @@ mod tests {
             )
             .unwrap();
         assert_eq!(rows, 1);
+
+        // An album that charted two weeks ago, missed last week and is back
+        // this week is a re-entry, not new.
+        let c = seed(r"C:\Music\c.mp3", "Album C");
+        record_plays(c, last_week - 7 * 86_400 + 3600, 1);
+        record_plays(c, this_week + 3600, 1);
+        conn.execute(
+            "DELETE FROM app_state WHERE key = ?1",
+            params![CHART_HISTORY_WEEK_START_KEY],
+        )
+        .unwrap();
+        let chart = scanner.get_top_albums_at(10, now, &tz).unwrap();
+        let returning = chart
+            .iter()
+            .find(|i| i.album.album.as_deref() == Some("Album C"))
+            .unwrap();
+        assert_eq!(returning.previous_rank, None);
+        assert_eq!(returning.weeks_on_chart, 2);
+        assert_eq!(returning.movement, "reentry");
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

@@ -436,13 +436,14 @@ export interface AlbumItem {
 export interface TopAlbumItem {
   album: AlbumItem;
   rank: number;
-  /** Rank in the prior UTC calendar week, or null if not in last week's chart ("new"). */
+  /** Rank in the prior local calendar week, or null if not in last week's chart
+   * ("new", or "reentry" when it charted in an earlier week). */
   previous_rank: number | null;
   /** Best (lowest) rank this album has ever held, including the current week. */
   peak_rank: number;
   /** Distinct weeks this album has appeared in the chart, including the current one. */
   weeks_on_chart: number;
-  movement: "new" | "rising" | "falling" | "steady";
+  movement: "new" | "reentry" | "rising" | "falling" | "steady";
   /** This chart week's first local calendar date, encoded as that date's UTC midnight. */
   period_start: number;
 }
@@ -470,9 +471,9 @@ export interface StatsTopItem {
   art_manual?: string | null;
   year?: number | null;
   rating?: number;
-  /** Rank movement against the prior UTC calendar week, set only when this row
+  /** Rank movement against the prior local calendar week, set only when this row
    * came from the weekly "Top Albums" chart (`get_top_albums`, #662). */
-  movement?: "new" | "rising" | "falling" | "steady";
+  movement?: "new" | "reentry" | "rising" | "falling" | "steady";
   previous_rank?: number | null;
   peak_rank?: number;
   weeks_on_chart?: number;

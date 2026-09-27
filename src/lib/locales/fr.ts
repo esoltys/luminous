@@ -58,6 +58,7 @@ export const fr = {
     topArtists: "Artistes populaires",
     topAlbums: "Top des albums",
     chartNew: "Nouveau",
+    chartReentry: "Retour",
     chartRising: "En hausse",
     chartFalling: "En baisse",
     chartSteady: "Stable",

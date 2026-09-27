@@ -58,6 +58,7 @@ export const en = {
     topArtists: "Top Artists",
     topAlbums: "Top Albums",
     chartNew: "New",
+    chartReentry: "Re-entry",
     chartRising: "Rising",
     chartFalling: "Falling",
     chartSteady: "Steady",
