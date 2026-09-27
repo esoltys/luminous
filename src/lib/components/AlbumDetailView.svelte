@@ -571,7 +571,7 @@
     </div>
   {/if}
 
-  <div class="relative z-30 w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 {windowLayoutStore.isDetailHeaderCollapsed ? 'py-3' : 'pt-6 pb-6'}">
+  <div class="relative z-30 w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md table-surface-blur px-6 {windowLayoutStore.isDetailHeaderCollapsed ? 'py-3' : 'pt-6 pb-6'}">
     <div class="flex items-start justify-between gap-6 relative z-10">
       <div class="flex flex-col justify-end min-w-0 max-w-xl">
         {#if !windowLayoutStore.isDetailHeaderCollapsed}

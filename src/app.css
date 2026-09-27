@@ -318,6 +318,9 @@
  * pinning it to its own GPU layer the backdrop-filter can be re-rasterized
  * against a stale frame, leaving a smeared/blurred patch behind a hovered row
  * that doesn't clear until something else forces a full repaint.
+ * The sticky detail headers (Album/Artist/AutoPlaylist) use it too: a hover
+ * repaint in the header toast (portaled above them) re-rasterized their
+ * backdrop-blur-md region stale, blanking the title block into a dark patch.
  */
 .table-surface-blur {
   will-change: backdrop-filter;
