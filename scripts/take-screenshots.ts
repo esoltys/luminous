@@ -3,11 +3,11 @@
 // mock-config.json via Playwright, then kills the dev server. See
 // .claude/CLAUDE.md for the mock-config.json setup trap in a fresh worktree.
 // Usage: bun run take-screenshots [--name=<entry>]
-import { spawn, execSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { compileMockScript } from "./compile-mock-script";
+import { DEV_SERVER_URL, startViteDevServer } from "./vite-dev-server";
 import { loadMockConfig, loadMockLibrary, resolveFeatured, resolveScreenshotSettings } from "./mock-library";
 import type { FeaturedSelection } from "./mock-library";
 import { en } from "../src/lib/locales/en";
@@ -73,82 +73,19 @@ async function main() {
     process.exit(0);
   }
 
-  // 2. Start Vite server in background
+  // 2. Start Vite server and wait until it is serving
   console.log("Starting Vite dev server on port 1420...");
-  // A single command string (rather than a separate args array) avoids
-  // Node's DEP0190 warning — passing an args array alongside shell: true is
-  // deprecated because the args get concatenated into the shell command
-  // unescaped. Not a real risk here (no untrusted input), but this form is
-  // the sanctioned way to invoke a shell built-in like `bun run dev` while
-  // still using shell: true (needed on Windows to resolve bun's .cmd shim).
-  const devServer = spawn("bun run dev", {
-    stdio: "pipe",
-    shell: true,
-  });
-
-  // Keep track of server output for debugging if needed
-  devServer.stdout.on("data", (data) => {
-    // console.log(`[Vite stdout] ${data}`);
-  });
-  devServer.stderr.on("data", (data) => {
-    // console.error(`[Vite stderr] ${data}`);
-  });
-
-  // Ensure devServer is terminated when process exits. It's spawned with
-  // shell: true, so on Windows devServer.kill() only kills the cmd.exe
-  // wrapper and leaves the actual bun/vite process (and port 1420) orphaned;
-  // taskkill /t walks the whole process tree instead.
-  const killDevServer = () => {
-    if (!devServer.pid) return;
-    if (process.platform === "win32") {
-      try {
-        execSync(`taskkill /pid ${devServer.pid} /t /f`, { stdio: "ignore" });
-      } catch {
-        // Already exited.
-      }
-    } else {
-      devServer.kill("SIGTERM");
-    }
-  };
-
-  const cleanup = () => {
-    console.log("Cleaning up Vite server process...");
-    killDevServer();
-  };
-
-  process.on("exit", cleanup);
-  process.on("SIGINT", () => { process.exit(0); });
-  process.on("SIGTERM", () => { process.exit(0); });
-
-  // 3. Poll server until active and dependency optimization is complete
-  console.log("Waiting for Vite server on http://localhost:1420...");
-  let ready = false;
-  for (let i = 0; i < 100; i++) {
-    try {
-      const res = await fetch("http://localhost:1420");
-      if (res.ok) {
-        // Probe the root layout component so Vite completes its initial optimizeDeps
-        // pass before launching the browser. During cold startup, Vite optimizes
-        // dependencies and returns 504 on in-flight requests until the bundle is written.
-        const layoutRes = await fetch("http://localhost:1420/src/routes/+layout.svelte");
-        if (layoutRes.ok) {
-          ready = true;
-          break;
-        }
-      }
-    } catch (e) {}
-    await new Promise((resolve) => setTimeout(resolve, 250));
-  }
-
-  if (!ready) {
-    logError("[ERROR] Vite server failed to respond on port 1420.");
-    killDevServer();
+  let killDevServer: () => void;
+  try {
+    killDevServer = await startViteDevServer();
+  } catch (err) {
+    logError(`[ERROR] ${(err as Error).message}`);
     process.exit(1);
   }
 
   console.log("Vite server is ready. Launching headless browser...");
 
-  // 4. Run Playwright automation
+  // 3. Run Playwright automation
   const { chromium } = playwright;
   const browser = await chromium.launch({ headless: true });
 
@@ -302,7 +239,7 @@ async function main() {
       }
     `);
 
-    await page.goto("http://localhost:1420");
+    await page.goto(DEV_SERVER_URL);
 
     // Wait for Svelte app container to mount. Generous timeout: on a cold
     // dev-server start, navigating into a view can make Vite discover
