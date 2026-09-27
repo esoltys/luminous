@@ -1,13 +1,14 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
-  import { InfoIcon as Info } from "phosphor-svelte";
+  import HelpTip from "./HelpTip.svelte";
+  import { i18n } from "../stores/i18n.svelte";
 
   interface Props {
     label: string;
     for: string;
     /** Spans both columns of the enclosing 2-column form grid. */
     span2?: boolean;
-    /** Brief explanation shown via an info icon next to the label. */
+    /** Brief explanation shown via an info icon next to the label (hover or keyboard focus), and read as the field's description. */
     tooltip?: string;
     children: Snippet;
   }
@@ -19,9 +20,7 @@
   <div class="flex items-center gap-1">
     <label for={htmlFor} class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">{label}</label>
     {#if tooltip}
-      <span title={tooltip} class="inline-flex cursor-help">
-        <Info class="w-3 h-3 text-brand-text-secondary/50 hover:text-brand-text-secondary" />
-      </span>
+      <HelpTip text={tooltip} label={i18n.t("common.aboutField", { field: label })} describes={htmlFor} />
     {/if}
   </div>
   {@render children()}

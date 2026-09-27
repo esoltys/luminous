@@ -142,6 +142,12 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config libayatana-appind
   `!important` reduce block at the end of `animations.css`; `bun run test:e2e:windows` proves it still
   reaches every transform transition. Reduced means fewer and gentler, never zero: keep opacity/colour.
 
+- **No hover-only information**: a native `title=` is fine when it repeats something already visible
+  (a button's own text/`aria-label`, truncated text whose full value is shown elsewhere). When the hint
+  is the only place that information appears, use `HelpTip.svelte` (focusable, opens on hover *and*
+  keyboard focus, closes on Escape/press/wheel, read as a description) or show the text inline — a
+  `title` on a non-focusable element never appears for keyboard users.
+
 - **Context-aware completion messages**: End-of-queue or completion toasts must include the name of what
   finished (e.g., "Jazz Classics complete"), not generic text. The `playerStore.activeContextName` field
   carries this name; auto-playlists (Favourites, Recently Added, etc.) must pass their `displayName` to

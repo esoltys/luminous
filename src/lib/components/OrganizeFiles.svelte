@@ -20,6 +20,7 @@
   import { VirtualList } from "svelte-virtual-list-ts";
   import Toggle from "./Toggle.svelte";
   import Button from "./Button.svelte";
+  import HelpTip from "./HelpTip.svelte";
 
   const PREVIEW_DEBOUNCE_MS = 300;
   const COL_MIN_WIDTH_PX = 150;
@@ -799,20 +800,29 @@
                           {i18n.t("organizer.statusUnchanged")}
                         </span>
                       {:else if st === "duplicate"}
-                        <span class="inline-flex items-center justify-center w-6 h-6 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40" title={item.error_message || i18n.t("organizer.statusCollision")}>
+                        <HelpTip
+                          text={item.error_message || i18n.t("organizer.statusCollision")}
+                          label={item.error_message ? i18n.t("organizer.statusCollision") : undefined}
+                          class="w-6 h-6 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40"
+                        >
                           <Duplicate class="w-3.5 h-3.5" />
-                          <span class="sr-only">{i18n.t("organizer.statusCollision")}</span>
-                        </span>
+                        </HelpTip>
                       {:else if st === "missing_tag"}
-                        <span class="inline-flex items-center justify-center w-6 h-6 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40" title={item.error_message || i18n.t("organizer.statusMissingTag")}>
+                        <HelpTip
+                          text={item.error_message || i18n.t("organizer.statusMissingTag")}
+                          label={item.error_message ? i18n.t("organizer.statusMissingTag") : undefined}
+                          class="w-6 h-6 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40"
+                        >
                           <AlertTriangle class="w-3.5 h-3.5" />
-                          <span class="sr-only">{i18n.t("organizer.statusMissingTag")}</span>
-                        </span>
+                        </HelpTip>
                       {:else}
-                        <span class="inline-flex items-center justify-center w-6 h-6 rounded bg-rose-500/20 text-rose-400 border border-rose-500/40" title={item.error_message || i18n.t("organizer.statusError")}>
+                        <HelpTip
+                          text={item.error_message || i18n.t("organizer.statusError")}
+                          label={item.error_message ? i18n.t("organizer.statusError") : undefined}
+                          class="w-6 h-6 rounded bg-rose-500/20 text-rose-400 border border-rose-500/40"
+                        >
                           <ErrorIcon class="w-3.5 h-3.5" />
-                          <span class="sr-only">{i18n.t("organizer.statusError")}</span>
-                        </span>
+                        </HelpTip>
                       {/if}
                     </div>
 

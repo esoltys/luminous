@@ -1204,6 +1204,7 @@ export const en = {
     clearTooltip: "Clear rating"
   },
   common: {
+    aboutField: "About {field}",
     scrollLeft: "Scroll left",
     scrollRight: "Scroll right",
     albumArtAlt: "Album Art",

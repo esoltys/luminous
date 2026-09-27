@@ -1246,6 +1246,7 @@ export const fr = {
     clearTooltip: "Effacer la note"
   },
   common: {
+    aboutField: "À propos de {field}",
     scrollLeft: "Défiler vers la gauche",
     scrollRight: "Défiler vers la droite",
     albumArtAlt: "Pochette d'album",

@@ -98,7 +98,7 @@
 
         <div class="flex flex-col">
           <span class="text-[10px] uppercase font-semibold text-brand-text-secondary">{i18n.t('audioPipeline.decoder', {}, 'Decoder')}</span>
-          <span class="text-brand-text-primary font-semibold truncate" title={pipeline.decoder_name}>{pipeline.decoder_name}</span>
+          <span class="text-brand-text-primary font-semibold wrap-anywhere">{pipeline.decoder_name}</span>
         </div>
       </div>
     </div>
@@ -178,7 +178,7 @@
       <div class="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs bg-brand-bg p-2.5 rounded-lg border border-brand-border/30">
         <div class="col-span-2 flex flex-col">
           <span class="text-[10px] uppercase font-semibold text-brand-text-secondary">{i18n.t('audioPipeline.outputDevice', {}, 'Device')}</span>
-          <span class="text-brand-text-primary font-semibold truncate" title={pipeline.output_device_name}>
+          <span class="text-brand-text-primary font-semibold wrap-anywhere">
             {pipeline.output_device_name || 'Default Output Device'}
           </span>
         </div>
