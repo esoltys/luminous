@@ -1289,7 +1289,8 @@ impl CollectionScanner {
     }
 
     /// Weekly "Top Albums" chart (#662): albums ranked by minutes played
-    /// (then play count), matching the Stats view's Top Albums, within
+    /// (then play count), matching the Stats view's Top Albums (including
+    /// its "Don't include in stats" album exclusions), within
     /// the current local calendar week (starting local midnight on the
     /// user's chosen Sunday or Monday), with movement (new/rising/falling/steady) against the
     /// prior week, peak rank, and weeks-on-chart. Backed by a snapshot table
@@ -1343,12 +1344,14 @@ impl CollectionScanner {
                  WHERE ph.played_at >= ?1
                    AND s2.source IN ({lib}) AND s2.unavailable = 0
                    AND s2.album IS NOT NULL AND s2.album != ''
+                   AND NOT EXISTS ({excluded})
                  GROUP BY s2.album
              ) wc ON wc.album = s.album
              WHERE s.source IN ({lib}) AND s.unavailable = 0
              ORDER BY wc.week_secs DESC, wc.week_plays DESC, s.added DESC
              LIMIT ?2",
-            lib = *LIBRARY_SOURCES_SQL
+            lib = *LIBRARY_SOURCES_SQL,
+            excluded = excluded_album_sql("s2.album"),
         );
         let mut stmt = conn.prepare(&sql)?;
         let rows: Vec<(Song, i64, i64, i64)> = stmt
@@ -1479,9 +1482,40 @@ impl CollectionScanner {
     }
 }
 
-/// `app_state` key recording which `week_start` setting the past weeks in
-/// `album_chart_history` were built under.
+/// `app_state` key recording what the past weeks in `album_chart_history`
+/// were built under — the `week_start` setting plus the albums excluded from
+/// stats (see `chart_history_build_key`).
 const CHART_HISTORY_WEEK_START_KEY: &str = "album_chart_history_week_start";
+
+/// Subquery matching a "Don't include in stats" album exclusion for
+/// `album_col` — the same test Stats' Top Albums applies, so the Home chart
+/// and Stats agree on which albums can chart.
+fn excluded_album_sql(album_col: &str) -> String {
+    format!(
+        "SELECT 1 FROM stats_exclusions se
+         WHERE se.entity_type = 'album' AND se.entity_key = {album_col} COLLATE NOCASE"
+    )
+}
+
+/// What the chart history must have been built under to be reused: the
+/// week-start setting, plus the excluded albums when there are any (so
+/// excluding or re-including an album re-ranks the past weeks around it, and
+/// history built before exclusions applied still matches when none exist).
+fn chart_history_build_key(conn: &rusqlite::Connection, start_sunday: bool) -> Result<String> {
+    let setting = if start_sunday { "sunday" } else { "monday" };
+    let excluded: Option<String> = conn.query_row(
+        "SELECT group_concat(k, char(31)) FROM (
+             SELECT DISTINCT lower(entity_key) AS k FROM stats_exclusions
+             WHERE entity_type = 'album' ORDER BY k
+         )",
+        [],
+        |row| row.get(0),
+    )?;
+    Ok(match excluded {
+        Some(keys) => format!("{setting}|{keys}"),
+        None => setting.to_string(),
+    })
+}
 
 /// The top `limit` albums by minutes played (then play count) among plays in
 /// `[from, to)`, as `(album, play_count)` — the same order as the current
@@ -1499,11 +1533,13 @@ fn rank_albums_between(
          WHERE ph.played_at >= ?1 AND ph.played_at < ?2
            AND s.source IN ({lib}) AND s.unavailable = 0
            AND s.album IS NOT NULL AND TRIM(s.album) != ''
+           AND NOT EXISTS ({excluded})
          GROUP BY s.album
          ORDER BY COALESCE(SUM(COALESCE(NULLIF(ph.duration_secs, 0), s.length_nanosec / 1000000000, 0)), 0) DESC,
                   COUNT(*) DESC, MAX(s.added) DESC
          LIMIT ?3",
-        lib = *LIBRARY_SOURCES_SQL
+        lib = *LIBRARY_SOURCES_SQL,
+        excluded = excluded_album_sql("s.album"),
     );
     let mut stmt = conn.prepare(&sql)?;
     let rows = stmt
@@ -1516,7 +1552,8 @@ fn rank_albums_between(
 }
 
 /// Rebuild every past week of `album_chart_history` from play_history unless
-/// it was already built under the current `week_start` setting. Snapshots
+/// it was already built under the current `week_start` setting and album
+/// exclusions. Snapshots
 /// written under the other setting — or by the old UTC week boundaries,
 /// which could file tonight's plays under next week — key the same week
 /// under several dates, so one week on the chart counted as several in
@@ -1529,7 +1566,7 @@ fn rebuild_chart_history_if_stale<Tz: chrono::TimeZone>(
     limit: i64,
     tz: &Tz,
 ) -> Result<()> {
-    let setting = if start_sunday { "sunday" } else { "monday" };
+    let build_key = chart_history_build_key(conn, start_sunday)?;
     let built_for: Option<String> = conn
         .query_row(
             "SELECT value FROM app_state WHERE key = ?1",
@@ -1537,7 +1574,7 @@ fn rebuild_chart_history_if_stale<Tz: chrono::TimeZone>(
             |row| row.get(0),
         )
         .optional()?;
-    if built_for.as_deref() == Some(setting) {
+    if built_for.as_deref() == Some(build_key.as_str()) {
         return Ok(());
     }
 
@@ -1570,7 +1607,7 @@ fn rebuild_chart_history_if_stale<Tz: chrono::TimeZone>(
     }
     tx.execute(
         "INSERT OR REPLACE INTO app_state (key, value) VALUES (?1, ?2)",
-        params![CHART_HISTORY_WEEK_START_KEY, setting],
+        params![CHART_HISTORY_WEEK_START_KEY, build_key],
     )?;
     tx.commit()?;
     Ok(())
@@ -4043,6 +4080,22 @@ mod tests {
         assert_eq!(chart[0].movement, "steady");
         assert_eq!(chart[1].album.album.as_deref(), Some("Short Album"));
         assert_eq!(chart[1].movement, "steady");
+
+        // Excluding an album from stats (any case) drops it from this week
+        // and re-ranks the past weeks without it, as Stats does.
+        conn.execute(
+            "INSERT INTO stats_exclusions (entity_type, entity_key) VALUES ('album', 'long album')",
+            [],
+        )
+        .unwrap();
+        let chart = CollectionScanner::new(db.clone())
+            .get_top_albums_at(10, now, &chrono::Utc)
+            .unwrap();
+        assert_eq!(chart.len(), 1);
+        assert_eq!(chart[0].album.album.as_deref(), Some("Short Album"));
+        assert_eq!(chart[0].previous_rank, Some(1));
+        assert_eq!(chart[0].peak_rank, 1);
+        assert_eq!(chart[0].movement, "steady");
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

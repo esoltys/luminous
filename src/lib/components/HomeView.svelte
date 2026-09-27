@@ -102,6 +102,9 @@
       libraryChangedDebounce = setTimeout(loadCuratedData, 500);
     });
 
+    // Top Albums leaves out albums excluded from stats.
+    const unlistenExclusions = listen("stats-exclusions-changed", () => loadCuratedData());
+
     daypartPollTimer = setInterval(() => {
       daypartBucket = getDaypartBucket();
     }, 60_000);
@@ -111,6 +114,7 @@
       clearInterval(daypartPollTimer);
       unlistenScan.then((fn) => fn());
       unlistenLibrary.then((fn) => fn());
+      unlistenExclusions.then((fn) => fn());
     };
   });
 </script>
