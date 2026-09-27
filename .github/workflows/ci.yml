@@ -78,6 +78,20 @@ jobs:
         working-directory: src-tauri
         run: cargo clippy --all-targets -- -D warnings
 
+  # The pre-commit hook (`bun run install:git-hooks`) is opt-in per clone, so
+  # this is the only guard against formatting drift reaching main (#1234).
+  # Needs no build or system deps, so it fails in seconds.
+  rust_fmt:
+    name: Rust Format
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Check formatting
+        working-directory: src-tauri
+        run: cargo fmt --check
+
   # Machine-checked Lean models of the player/playlist state machines
   # (verification/lean/, epic #1224). `--wfail` turns warnings into failures,
   # so an unfinished proof (`sorry`, reported only as a warning) fails the job.
