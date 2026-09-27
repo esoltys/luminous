@@ -42,6 +42,9 @@ scripts/mock-config.local.json
 # Session state for scripts/inspect-app.ts (dev-time app inspection tool)
 /.inspect-session.json
 
+# Captures and diff images from scripts/style-diff.ts
+/.style-diff/
+
 # Scratch file for Claude's per-task walkthrough summaries (see .claude/CLAUDE.md) —
 # always local-only, never meant to land in a commit.
 /WALKTHROUGH.md

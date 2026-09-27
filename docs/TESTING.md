@@ -119,6 +119,23 @@ This causes Luminous to initialize a brand new `luminous.db`, `covers/`, and `lo
   For known failure modes of these two tools (flaky `--real` sessions, blank/crashing windows
   under GPU/session isolation), see [docs/TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
+## Proving a change is visually neutral (`bun run style-diff`)
+
+For "no visual change" work (Tailwind/dependency upgrades, theme-store or component refactors),
+`scripts/style-diff.ts` diffs the computed style and box of every visible element, plus a
+screenshot, on the mocked IPC harness (same as `take-screenshots.ts`, so no backend or data dir).
+It covers the system theme in light and dark, the playbar-only layout and the Miniplayer
+(`bun run style-diff states`). Playback is paused, animations are frozen and visualisers hidden.
+
+1. On the unchanged code: `bun run style-diff capture base`, then `capture base2`. The second
+   run is the noise baseline: anything that differs between the two is masked.
+2. Make the change, then `bun run style-diff capture after`.
+3. `bun run style-diff compare base after --noise=base2`. It exits 1 on any remaining difference,
+   listing elements whose authored properties changed (reflow-only moves are counted, not
+   listed) and writing `.style-diff/after/<state>.diff.png` with changed pixels in red.
+
+Captures live in `.style-diff/` (gitignored). `--states=a,b` limits a capture to some states.
+
 ## Remote devtools for headless/agent debugging
 
 An agent (or a developer without desktop access to the running window) can inspect the live

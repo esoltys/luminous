@@ -92,6 +92,8 @@ declare global {
   interface Window {
     mockSettings?: AppSettings;
     mockPlaybackPositionSec?: number;
+    /** Overrides the reported play state (default "playing"); style-diff pauses so nothing animates. */
+    mockPlayState?: PlayState;
     __LUMINOUS_MOCK_LIBRARY__?: MockLibrary;
     __LUMINOUS_MOCK_FEATURED__?: { song?: Song; artist?: string; album?: string };
     __LUMINOUS_MOCK_CONFIG__?: {
@@ -648,7 +650,7 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     get_playback_state: () => {
       const posSec = window.mockPlaybackPositionSec ?? 122;
       return {
-        state: "playing" as PlayState,
+        state: window.mockPlayState ?? ("playing" as PlayState),
         current_song: featuredSong,
         playlist_id: 1,
         playlist_item_uuid: "item-uuid-1",
