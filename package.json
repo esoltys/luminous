@@ -27,7 +27,7 @@
     "test:e2e:windows": "tauri build --debug --no-bundle && bunx tsx e2e/run-smoke.ts",
     "release": "bun run scripts/release.ts",
     "bump-version": "bun run scripts/bump-version.ts",
-    "tauri:windows:build": "tauri-windows-bundle build",
+    "tauri:windows:build": "tauri-windows-bundle build --runner bun",
     "measure-memory": "bun run scripts/measure-memory.ts",
     "perf:memory": "bun run scripts/perf-memory-scenarios.ts",
     "perf:chart": "python scripts/perf-chart.py",
