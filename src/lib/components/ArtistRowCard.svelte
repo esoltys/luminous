@@ -11,6 +11,7 @@
     artistAlbums: AlbumItem[];
     artistSongs?: Song[];
     onclick?: (e: MouseEvent) => void;
+    oncontextmenu?: (e: MouseEvent) => void;
     prefix?: import("svelte").Snippet;
     suffix?: import("svelte").Snippet;
   }
@@ -20,6 +21,7 @@
     artistAlbums,
     artistSongs = [],
     onclick: customClick,
+    oncontextmenu: customContextMenu,
     prefix,
     suffix,
   }: Props = $props();
@@ -58,6 +60,7 @@
   role="button"
   tabindex="0"
   onclick={(e) => customClick?.(e)}
+  oncontextmenu={(e) => customContextMenu?.(e)}
   onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); customClick?.(e as unknown as MouseEvent); } }}
   class="group flex items-center gap-3 px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 select-none cursor-pointer w-full"
 >

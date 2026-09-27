@@ -5,6 +5,8 @@ import CollectionView from "./CollectionView.svelte";
 import { collectionStore } from "../stores/collection.svelte";
 import { navigationStore } from "../stores/navigation.svelte";
 import { prefs } from "../stores/prefs.svelte";
+import { pinnedStore } from "../stores/pinned.svelte";
+import { invoke } from "@tauri-apps/api/core";
 import type { Song, AlbumItem, ArtistItem } from "../types";
 
 vi.mock("svelte-virtual-list-ts", async () => {
@@ -178,6 +180,49 @@ describe("CollectionView.svelte", () => {
     expect(getByText("Play Song")).toBeInTheDocument();
     expect(getAllByText("Add to Active Playlist")[0]).toBeInTheDocument();
   });
+
+  it.each(["cards", "rows"] as const)(
+    "opens the artist context menu on right-click of an artist in %s view, and pins/unpins it",
+    async (mode) => {
+      // Stateful pin backend, so the menu's pin label reflects what the
+      // Pin click actually persisted rather than a pre-seeded fixture.
+      const pinned = new Set<string>();
+      vi.mocked(invoke).mockImplementation(async (cmd: string, args?: any) => {
+        switch (cmd) {
+          case "pin_item":
+            pinned.add(args.refKey);
+            return null;
+          case "unpin_item":
+            pinned.delete(args.refKey);
+            return null;
+          case "get_pinned_items":
+            return [...pinned].map((name) => ({ type: "artist", artist: { name } }));
+          default:
+            return [];
+        }
+      });
+      await pinnedStore.refresh();
+
+      navigationStore.activeSubTab = "artists";
+      prefs.artistsViewMode = mode;
+      const { getByText, queryByText, findByText } = render(CollectionView);
+
+      const card = getByText("Band A").closest('[role="button"]')!;
+      await fireEvent.contextMenu(card);
+
+      expect(getByText("Play Artist")).toBeInTheDocument();
+      expect(getByText("Add to Queue")).toBeInTheDocument();
+      await fireEvent.click(getByText("Pin to Home"));
+      expect(queryByText("Play Artist")).toBeNull();
+
+      await vi.waitFor(() => expect(pinnedStore.isPinned("artist", "Band A")).toBe(true));
+      await fireEvent.contextMenu(card);
+      await fireEvent.click(await findByText("Unpin from Home"));
+
+      await vi.waitFor(() => expect(pinnedStore.isPinned("artist", "Band A")).toBe(false));
+      expect(navigationStore.selectedArtistName).toBeNull();
+    }
+  );
 
   it("defaults to Cards view in Albums sub-tab", () => {
     navigationStore.activeSubTab = "albums";
