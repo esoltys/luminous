@@ -13,29 +13,40 @@
  *   - a fixed window size (--window, default 1400x900), on screen
  *   - settle time before sampling, and the median of --samples readings
  *   - the same IPC calls the UI's buttons make (Force Full Scan, Play)
+ *   - the same baseline track (--track), played from 0:00 — decode cost
+ *     differs by format, so an MP3 run and a FLAC run aren't comparable
  *
  * It runs against your real library and settings. Everything it changes —
- * the restored view, window placement, EQ enabled state, play/pause state and
- * position — is put back before the app closes. If the run dies partway,
- * the saved view/window state is in the backup file it prints at startup.
- * Playback is audible at your current volume for about a minute, from 0:00 of
- * whatever track is loaded, and stops before the track's halfway mark so it
- * never records a play or scrobble (it refuses a track too short for that).
+ * the restored view, window placement, EQ enabled state, and the loaded
+ * track and position — is put back before the app closes. If the run dies
+ * partway, the saved state is in the backup file it prints at startup.
+ * Playback is audible at your current volume for about a minute and stops
+ * before the track's halfway mark, so it never records a play or scrobble
+ * (it refuses a track too short for that).
+ *
+ * The baseline track is loaded by writing the player's saved-state keys in
+ * app_state while the app is closed, so it launches cued at 0:00. No seek is
+ * needed, which keeps older builds comparable: before 2.6.0 a seek made
+ * before the first Play after launch was dropped.
  *
  * Usage (build first: `bun run tauri build --no-bundle`):
- *   bun run scripts/perf-memory-scenarios.ts --app-version 2.5.0
+ *   bun run scripts/perf-memory-scenarios.ts --app-version 2.5.0 --track "D:/Music/Artist/Album/01 Song.flac"
  *
  * Options:
+ *   --track <path>       the baseline track, as stored in the library (required — docs/PERFORMANCE.md
+ *                        names the one the recorded history uses)
  *   --app-version <ver>  version recorded in the CSV (default: package.json's — pass the upcoming
  *                        release's version when measuring before the version bump)
  *   --csv <path>         default docs/performance-history.csv
  *   --window <WxH>       pinned outer window size in physical pixels (default 1400x900)
  *   --samples <n>        readings per scenario, median recorded (default 5)
  *   --interval <sec>     seconds between readings (default 5)
- *   --exe <path>         default target/release/LuminousMusicPlayer.exe
+ *   --exe <path>         default target/release/LuminousMusicPlayer.exe; a build from another checkout
+ *                        (e.g. a baseline worktree) is checked and labelled against that checkout
  *   --dry-run            run everything but print the rows instead of appending them
  */
 
+import { Database } from "bun:sqlite";
 import { execFileSync, spawn } from "node:child_process";
 import { existsSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -53,6 +64,7 @@ import {
   type CsvRow,
   type Snapshot,
 } from "./measure-memory";
+import { defaultDbPath } from "./mock-library";
 import { CdpClient } from "./monitor-cdp";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -74,7 +86,11 @@ function parseArgs() {
   const window = get("--window") ?? "1400x900";
   const [width, height] = window.split("x").map(Number);
   if (!width || !height) throw new Error(`--window must look like 1400x900, got "${window}"`);
+  const track = get("--track");
+  if (!track) throw new Error("--track <path> is required — docs/PERFORMANCE.md names the baseline track.");
+  const exe = get("--exe") ?? path.join(REPO_ROOT, "target", "release", "LuminousMusicPlayer.exe");
   return {
+    track,
     appVersion: get("--app-version") ?? packageVersion(),
     csv: get("--csv") ?? path.join(REPO_ROOT, "docs", "performance-history.csv"),
     window,
@@ -82,9 +98,19 @@ function parseArgs() {
     height,
     samples: Number(get("--samples") ?? "5"),
     intervalSec: Number(get("--interval") ?? "5"),
-    exe: get("--exe") ?? path.join(REPO_ROOT, "target", "release", "LuminousMusicPlayer.exe"),
+    exe,
+    // The checkout the exe was built in (e.g. a baseline worktree), for the staleness check and commit column.
+    exeRepo: exeRepoRoot(exe),
     dryRun: args.includes("--dry-run"),
   };
+}
+
+function exeRepoRoot(exe: string): string {
+  try {
+    return execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: path.dirname(exe), encoding: "utf8" }).trim();
+  } catch {
+    return REPO_ROOT;
+  }
 }
 
 const sleep = (sec: number) => new Promise((r) => setTimeout(r, sec * 1000));
@@ -256,11 +282,97 @@ async function writeNavigationSettings(cdp: CdpClient, settings: Record<string, 
 const CANONICAL_VIEW = { navigation_activeTab: "collection", navigation_activeSubTab: "songs" };
 const CANONICAL_SETTINGS = { active_tab: "collection", active_sub_tab: "songs" };
 
+// ── Baseline track (app_state, written only while the app is closed) ──────
+
+// The keys Player::new restores the loaded track and position from.
+const PLAYER_KEYS = ["last_song_id", "last_playlist_id", "last_item_uuid", "last_position_nanosec", "last_adhoc_song_ids"];
+// models.rs FileType
+const FILE_TYPES: Record<number, string> = {
+  1: "MP3",
+  2: "FLAC",
+  3: "Ogg FLAC",
+  4: "Ogg Vorbis",
+  5: "Opus",
+  6: "Speex",
+  7: "AAC",
+  8: "ALAC",
+  9: "AIFF",
+  10: "WAV",
+};
+
+interface BaselineTrack {
+  id: number;
+  title: string;
+  filetype: number;
+  samplerate: number;
+  bitdepth: number | null;
+  bitrate: number;
+  length_nanosec: number;
+}
+
+function openDb(): Database {
+  const dbPath = defaultDbPath();
+  if (!dbPath || !existsSync(dbPath)) throw new Error(`Luminous database not found at ${dbPath}.`);
+  const db = new Database(dbPath);
+  db.exec("PRAGMA busy_timeout = 5000");
+  return db;
+}
+
+function findTrack(trackPath: string): BaselineTrack {
+  const db = openDb();
+  try {
+    const t = db
+      .query(
+        `SELECT id, title, filetype, samplerate, bitdepth, bitrate, length_nanosec FROM songs
+         WHERE path = ?1 COLLATE NOCASE AND unavailable = 0 AND cue_path IS NULL`,
+      )
+      .get(path.normalize(trackPath)) as BaselineTrack | null;
+    if (!t) throw new Error(`--track "${trackPath}" isn't an available, non-CUE song in your library.`);
+    return t;
+  } finally {
+    db.close();
+  }
+}
+
+const describeTrack = (t: BaselineTrack) =>
+  `"${t.title}" (${FILE_TYPES[t.filetype] ?? `filetype ${t.filetype}`}, ${t.samplerate} Hz` +
+  `${t.bitdepth ? `/${t.bitdepth}-bit` : ""}, ${t.bitrate} kbps, ${Math.round(t.length_nanosec / 1e9)}s)`;
+
+function readPlayerKeys(): Record<string, string | null> {
+  const db = openDb();
+  try {
+    const q = db.query("SELECT value FROM app_state WHERE key = ?1");
+    return Object.fromEntries(PLAYER_KEYS.map((k) => [k, (q.get(k) as { value: string } | null)?.value ?? null]));
+  } finally {
+    db.close();
+  }
+}
+
+/** Writes (or, for null, deletes) player keys. The app must be closed, or it overwrites them on exit. */
+function writePlayerKeys(keys: Record<string, string | null>) {
+  if (isRunning()) throw new Error("Refusing to write app_state while Luminous is running.");
+  const db = openDb();
+  try {
+    const del = db.query("DELETE FROM app_state WHERE key = ?1");
+    const set = db.query(
+      "INSERT INTO app_state (key, value) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+    );
+    db.transaction(() => {
+      for (const [k, v] of Object.entries(keys)) {
+        if (v === null) del.run(k);
+        else set.run(k, v);
+      }
+    })();
+  } finally {
+    db.close();
+  }
+}
+
 // ── Run ───────────────────────────────────────────────────────────────────
 
 interface PlaybackState {
   state: "stopped" | "playing" | "paused";
-  current_song: { title: string; length_nanosec: number | null } | null;
+  current_song: { id: number; title: string } | null;
   position_nanosec: number;
 }
 interface EqualizerConfig {
@@ -279,12 +391,12 @@ function checkPreconditions(opts: ReturnType<typeof parseArgs>) {
     throw new Error(`No release build at ${opts.exe}. Build one first: bun run tauri build --no-bundle`);
   }
   const lastSourceChange = Number(
-    execFileSync("git", ["log", "-1", "--format=%ct", "--", ...APP_SOURCE_PATHS], { cwd: REPO_ROOT, encoding: "utf8" }).trim(),
+    execFileSync("git", ["log", "-1", "--format=%ct", "--", ...APP_SOURCE_PATHS], { cwd: opts.exeRepo, encoding: "utf8" }).trim(),
   );
   if (statSync(opts.exe).mtimeMs / 1000 < lastSourceChange) {
     throw new Error(`${opts.exe} is older than the last app-source commit — rebuild it (bun run tauri build --no-bundle).`);
   }
-  if (appCommit().endsWith("-dirty")) {
+  if (appCommit(opts.exeRepo).endsWith("-dirty")) {
     log("warning: app source has uncommitted changes; the commit column will be marked -dirty.");
   }
 }
@@ -292,11 +404,22 @@ function checkPreconditions(opts: ReturnType<typeof parseArgs>) {
 async function main() {
   const opts = parseArgs();
   checkPreconditions(opts);
+  const track = findTrack(opts.track);
+  // The playback scenario must stop short of the halfway mark, where a listen
+  // gets recorded to play stats (and scrobbled) — see Player::on_position_update.
+  const playSeconds = SETTLE_PLAYBACK_SEC + opts.samples * (opts.intervalSec + 2) + 10;
+  if (track.length_nanosec / 2e9 <= playSeconds) {
+    throw new Error(
+      `${describeTrack(track)} is too short: the playback scenario plays ~${playSeconds}s, which would pass its halfway ` +
+        `mark and record a play. Pick a track longer than ${Math.ceil((playSeconds * 2) / 60)} minutes.`,
+    );
+  }
+  log(`baseline track: ${describeTrack(track)}`);
 
   const rows: CsvRow[] = [];
   const base = {
     app_version: opts.appVersion,
-    commit: appCommit(),
+    commit: appCommit(opts.exeRepo),
     os: osLabel(),
     window: opts.window,
   };
@@ -321,20 +444,35 @@ async function main() {
   const savedNav = await readNavigationKeys(cdp);
   const savedNavSettings = await readNavigationSettings(cdp);
   const savedPlacement = saveWindowPlacement();
-  writeFileSync(
-    BACKUP_FILE,
-    JSON.stringify({ navigation: savedNav, navigationSettings: savedNavSettings, windowPlacement: savedPlacement }, null, 2),
-  );
-  log(`saved your view/window state (backup: ${BACKUP_FILE})`);
   await writeNavigationKeys(cdp, CANONICAL_VIEW);
   await writeNavigationSettings(cdp, CANONICAL_SETTINGS);
   pinWindow(opts.width, opts.height);
   cdp.close();
   await closeGracefully();
+  // Read after the close, which is when the app saves its final position.
+  const savedPlayer = readPlayerKeys();
+  writeFileSync(
+    BACKUP_FILE,
+    JSON.stringify(
+      { navigation: savedNav, navigationSettings: savedNavSettings, windowPlacement: savedPlacement, appState: savedPlayer },
+      null,
+      2,
+    ),
+  );
+  log(`saved your view/window/player state (backup: ${BACKUP_FILE})`);
 
   let savedEq: EqualizerConfig | null = null;
-  let savedPlayback: PlaybackState | null = null;
   try {
+    // Cue the baseline track at 0:00 on the next launch, on its own (playlist
+    // 0 with no ad-hoc list makes Player::new restore it as a one-item queue).
+    writePlayerKeys({
+      last_song_id: String(track.id),
+      last_position_nanosec: "0",
+      last_playlist_id: "0",
+      last_item_uuid: null,
+      last_adhoc_song_ids: null,
+    });
+
     // 2. Idle
     log("relaunching into the canonical view");
     cdp = await launch(opts.exe);
@@ -365,49 +503,42 @@ async function main() {
     const afterScan = await sampleMedian(opts.samples, opts.intervalSec, { onSample });
     rows.push(row("after-full-scan", afterScan, { library_tracks: tracks, scan_seconds: scanSeconds }));
 
-    // 4. Playback with EQ + analyzer on. Plays the loaded track from 0:00
-    //    and stops well short of its halfway mark, which is where a listen
-    //    gets recorded to play stats (and scrobbled) — see
-    //    Player::on_position_update. Seeking while paused doesn't count.
-    const playSeconds = SETTLE_PLAYBACK_SEC + opts.samples * (opts.intervalSec + 2) + 10;
+    // 4. Playback with EQ + analyzer on: the baseline track, from 0:00, for
+    //    playSeconds (checked against its halfway mark above).
     await withCdp(async (c) => {
-      savedPlayback = await invoke<PlaybackState>(c, "get_playback_state");
-      const song = savedPlayback.current_song;
-      if (!song) {
-        throw new Error("Nothing is loaded in the player — load a track in Luminous (and pause it), then re-run.");
-      }
-      const halfway = (song.length_nanosec ?? 0) / 2e9;
-      if (halfway <= playSeconds) {
+      const cued = await invoke<PlaybackState>(c, "get_playback_state");
+      if (cued.current_song?.id !== track.id || cued.position_nanosec > 1e9) {
         throw new Error(
-          `"${song.title}" is too short: this scenario plays ~${playSeconds}s, which would pass its halfway mark ` +
-            `(${halfway.toFixed(0)}s) and record a play. Load a track longer than ${Math.ceil((playSeconds * 2) / 60)} minutes and re-run.`,
+          `Expected "${track.title}" cued at 0:00, but the player has "${cued.current_song?.title ?? "nothing"}" ` +
+            `at ${(cued.position_nanosec / 1e9).toFixed(1)}s.`,
         );
       }
       savedEq = await invoke<EqualizerConfig>(c, "get_equalizer_state");
       if (!savedEq.enabled) await invoke(c, "apply_equalizer_config", { config: { ...savedEq, enabled: true } });
-      await invoke(c, "pause");
-      await invoke(c, "seek_to", { positionNanosec: 0 });
       await invoke(c, "resume");
-      log(`playing "${song.title}" from 0:00; settling ${SETTLE_PLAYBACK_SEC}s`);
+      log(`playing "${track.title}" from 0:00; settling ${SETTLE_PLAYBACK_SEC}s`);
     });
     await sleep(SETTLE_PLAYBACK_SEC);
     const playback = await sampleMedian(opts.samples, opts.intervalSec, { onSample });
-    await withCdp((c) => invoke(c, "pause"));
+    const played = await withCdp(async (c) => {
+      await invoke(c, "pause");
+      return invoke<PlaybackState>(c, "get_playback_state");
+    });
+    if (played.current_song?.id !== track.id) {
+      throw new Error(`Playback moved off the baseline track (to "${played.current_song?.title}") — not recording this run.`);
+    }
     rows.push(row("playback-eq-analyzer", playback, { library_tracks: tracks }));
   } finally {
-    // 5. Put back everything the run changed, then close so the app saves it.
-    //    (Relaunch first if a failure left it closed — step 1 already
-    //    overwrote the saved view and window size.)
-    if (!isRunning()) (await launch(opts.exe)).close();
+    // 5. Put back everything the run changed. The loaded track and position
+    //    go back into app_state while the app is closed (it launches paused
+    //    wherever that says); the rest is set in one more launch, and the
+    //    close saves it. This runs even when a failure left the app closed,
+    //    since step 1 already overwrote the saved view and window size.
+    if (isRunning()) await closeGracefully();
+    writePlayerKeys(savedPlayer);
+    (await launch(opts.exe)).close();
     {
       await withCdp(async (c) => {
-        // The app always launches paused, so "restore" means paused at the
-        // saved position (seeking while paused never records a play).
-        const pb = savedPlayback as PlaybackState | null;
-        if (pb) {
-          await invoke(c, "pause");
-          await invoke(c, "seek_to", { positionNanosec: pb.position_nanosec });
-        }
         const eq = savedEq as EqualizerConfig | null;
         if (eq && !eq.enabled) await invoke(c, "apply_equalizer_config", { config: eq });
         await writeNavigationKeys(c, savedNav);
@@ -415,6 +546,11 @@ async function main() {
       });
       restoreWindowPlacement(savedPlacement);
       await closeGracefully();
+      const after = readPlayerKeys();
+      const drifted = PLAYER_KEYS.filter((k) => after[k] !== savedPlayer[k]);
+      if (drifted.length) {
+        log(`warning: player state differs after restore (${drifted.join(", ")}) — the originals are in ${BACKUP_FILE}`);
+      }
       log("restored your view, window, EQ and playback state");
     }
   }

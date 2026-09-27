@@ -29,17 +29,23 @@ scenario to `docs/performance-history.csv`:
 
 ```bash
 bun run tauri build --no-bundle
-bun run perf:memory -- --app-version 2.5.0
+bun run perf:memory -- --app-version 2.6.0 --track "<path to the baseline track>"
 ```
 
 `scripts/perf-memory-scenarios.ts` launches the release exe with WebView2's DevTools port open and
 triggers each scenario through the same IPC calls the UI's buttons make (Force Full Scan, Play). It
 runs against your real library and settings, and restores the view, window placement, EQ state and
-playback position it changed before closing the app. Playback is audible for about a minute. It
-starts from 0:00 of whatever track is loaded and stops before the track's halfway mark, so it never
-records a play or scrobble. Pass `--app-version` when measuring before the version bump, since
-`package.json` still has the previous version then. It refuses to run if Luminous is already open or
-the exe is older than the last app-source commit.
+playback position it changed before closing the app. Playback is audible for about a minute.
+
+`--track` names the baseline track, which must already be in the library. The decoder's cost
+depends on the format, so every version is measured playing the same file: since 2.6 that's
+"Nevidal" by Arkona, a 274s FLAC at 44.1kHz/16-bit. The script cues it at 0:00 and stops before
+its halfway mark, so it never records a play or scrobble. Pass `--app-version` when measuring
+before the version bump, since `package.json` still has the previous version then. It refuses to
+run if Luminous is already open or the exe is older than the last app-source commit.
+
+To measure an older release, build it in its own worktree and pass that exe with `--exe`. The
+staleness check and the CSV's commit column then use that worktree's checkout, not this one.
 
 **Linux**: the scenario script needs WebView2's DevTools protocol, so drive the app by hand and
 take each reading with `measure-memory`, keeping the window on screen at a consistent size:
@@ -50,10 +56,11 @@ bun run measure-memory -- --label idle --samples 5 --app-version 2.5.0 --tracks 
 
 **Comparing versions**: `scripts/perf-chart.py` (needs `pip install matplotlib`) draws the chart
 below and prints the Markdown delta table from the CSV. For each version and scenario it uses the
-newest row, so a re-run supersedes an earlier one without deleting history:
+newest row, so a re-run supersedes an earlier one without deleting history. `--runs N` averages
+the newest N runs per version instead, for when a single run is too noisy to judge:
 
 ```bash
-bun run perf:chart -- --baseline 2.0.0 --candidate 2.5.0
+bun run perf:chart -- --baseline 2.5.0 --candidate 2.6.0 --runs 2
 ```
 
 ## Scenarios
@@ -66,7 +73,8 @@ bun run perf:chart -- --baseline 2.0.0 --candidate 2.5.0
 ## Baseline results
 
 Dates are UTC. Each figure is the newest row for that version/OS/scenario in
-`docs/performance-history.csv`, which also has every raw reading.
+`docs/performance-history.csv`, which also has every raw reading. The 2026-09-27 rows are the mean
+of two runs each, playing the baseline track.
 
 | Date | App version | OS | Library size | Window | Scenario | Working set (MB) | Private bytes (MB) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -79,6 +87,12 @@ Dates are UTC. Each figure is the newest row for that version/OS/scenario in
 | 2026-09-25 | 2.5.0 (`1d562877`) | Windows 11 | 2,480 tracks | 1400x900 | Idle | 534.4 | 460.2 |
 | 2026-09-25 | 2.5.0 (`1d562877`) | Windows 11 | 2,480 tracks | 1400x900 | After full scan | 547.6 | 479.3 |
 | 2026-09-25 | 2.5.0 (`1d562877`) | Windows 11 | 2,480 tracks | 1400x900 | During playback (EQ + analyzer on) | 576.0 | 443.7 |
+| 2026-09-27 | 2.5.0 (`a74deadc`) | Windows 11 | 2,620 tracks | 1400x900 | Idle | 491.2 | 432.9 |
+| 2026-09-27 | 2.5.0 (`a74deadc`) | Windows 11 | 2,620 tracks | 1400x900 | After full scan | 499.9 | 350.3 |
+| 2026-09-27 | 2.5.0 (`a74deadc`) | Windows 11 | 2,620 tracks | 1400x900 | During playback (EQ + analyzer on) | 521.3 | 384.2 |
+| 2026-09-27 | 2.6.0 (`b7609915`) | Windows 11 | 2,620 tracks | 1400x900 | Idle | 498.6 | 390.4 |
+| 2026-09-27 | 2.6.0 (`b7609915`) | Windows 11 | 2,620 tracks | 1400x900 | After full scan | 504.6 | 352.9 |
+| 2026-09-27 | 2.6.0 (`b7609915`) | Windows 11 | 2,620 tracks | 1400x900 | During playback (EQ + analyzer on) | 523.9 | 389.4 |
 
 Process count was 7 in every Windows scenario (main process + 6 WebView2 subprocesses — renderer,
 GPU, network, etc. — a fixed cost of the WebView2 runtime, not something Luminous's own code
@@ -129,6 +143,29 @@ compare future releases against. Two back-to-back scripted runs differed by 2-13
 per scenario, so a change under ~3% is within run-to-run noise. Measuring against a fixed test
 library instead of the real one would remove library drift and allow a controlled re-run of 2.0.0
 (#1197).
+
+### 2.6 vs. 2.5 (Windows)
+
+![Memory: 2.6.0 vs. 2.5.0](performance-2.5.0-vs-2.6.0.png)
+
+| Scenario | Private bytes Δ | Working set Δ |
+| --- | --- | --- |
+| Idle | −42.5 MB (−9.8%) | +7.5 MB (+1.5%) |
+| After full scan | +2.6 MB (+0.8%) | +4.7 MB (+0.9%) |
+| During playback (EQ + analyzer on) | +5.2 MB (+1.4%) | +2.5 MB (+0.5%) |
+
+No regression. Both versions were re-measured back to back on the same library, alternating
+2.6, 2.5, 2.6, 2.5, and both played the baseline track. The settled scenarios agree within 1.5%,
+and the forced full scan of 2,620 tracks took 3.1s on each.
+
+The idle drop is noise, not an improvement. Idle private bytes jump between two levels from one
+launch to the next, about 345MB or 415-450MB, in both versions: 2.6 read 436 then 344, and 2.5 read
+415 then 450. After-scan and playback readings don't show this, which points to WebView2's startup
+state rather than Luminous. Compare idle private bytes over several runs, or rely on the settled
+scenarios.
+
+These 2.5 rows replace the 2026-09-25 ones as the newest 2.5 baseline, so re-running the 2.5 vs. 2.0
+comparison now draws on them.
 
 ## Candidate areas if numbers look high in the future
 
