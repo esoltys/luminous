@@ -173,6 +173,23 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config libayatana-appind
   carries this name; auto-playlists (Favourites, Recently Added, etc.) must pass their `displayName` to
   `playerStore.playSongs()` so the context propagates correctly.
 
+- **The UI never re-derives a law the backend owns**: show the backend's own value or call its
+  accessor — never reimplement its formula in a component. A copy drifts, and is usually right only
+  at the endpoints nobody spot-checks (e.g. the EQ curve drew shelf bands as bells, #1248). Slider
+  bounds are part of the law: read them from the backend rather than retyping them.
+
+- **A cached verdict is shown only next to what it answered**: if a control's label or enabled state
+  depends on an expensive check, key the result on its inputs, re-check the key on each read, and
+  show "stale" or disable the control when it no longer matches.
+
+- **`<select>`: assignment or reload?** Re-picking the selected option fires no `change`. If picking
+  re-applies something, give a second path — a reload button, or a "Custom" state that makes
+  re-picking a real change (as the EQ preset picker does).
+
+- **No hand-typed versions, counts or dates in the UI**: derive them from one constant or the build.
+
+- **A disabled or inert control is a defect**: don't ship a control whose value nothing consumes.
+
 - **Icon semantics**: Avoid icons that imply system-level tracking or achievement recording (e.g.,
   `<Trophy>`). For milestone/completion moments, prefer neutral icons like `<Star>` that convey
   "special" without implying a leaderboard or achievement system.
@@ -189,6 +206,17 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config libayatana-appind
   in the same change. `i18n.t()` silently falls back to the English string when a key is missing from a
   non-English locale, so a skipped `fr.ts` update won't fail CI or show up in testing — it just quietly
   ships English text to French users. Don't rely on that fallback as a substitute for translating.
+
+## Code Conventions
+
+- **Protections run before what they protect against**: on the boot path, check order, not presence —
+  anything that plays, moves or notifies at startup must follow state restore and any prompt the user
+  must answer first.
+- **Fix the module, not the caller**: a local workaround for a defect in a shared module is a smell;
+  fix the module and its tests.
+- **State a guarantee at the strength the mechanism provides**: if a comment promises something the
+  code below can't enforce, move enforcement to the layer that can, and name that layer in both places
+  (e.g. a UI slider's range isn't a guarantee — the backend clamp is, #1249).
 
 ## Development Workflow
 
