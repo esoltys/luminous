@@ -64,11 +64,11 @@ export function formatRelativeDate(timestampSec: number | undefined | null): str
     : i18n.t("playlists.relativeYearsAgo", { count: years });
 }
 
-/** Formats a UTC calendar week (as computed by the backend's `week_start_utc`,
- * #662) as a compact date range, e.g. "Sep 21-27" or "Sep 27-Oct 3" when
- * crossing a monthly boundary. Renders in UTC rather than the viewer's local
- * time zone, since the week boundary itself is UTC-anchored regardless of where
- * the app is running. */
+/** Formats a chart week (as computed by the backend's `chart_week`, #662) as a
+ * compact date range, e.g. "Sep 21-27" or "Sep 27-Oct 3" when crossing a
+ * monthly boundary. The backend already resolved the week on the user's local
+ * calendar and encodes its first date as that date's UTC midnight, so this
+ * renders with `timeZone: "UTC"` to read the date back unshifted. */
 export function formatWeekRange(periodStartSec: number, locale: string): string {
   const start = new Date(periodStartSec * 1000);
   const end = new Date((periodStartSec + 6 * 86_400) * 1000);

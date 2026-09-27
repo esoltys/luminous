@@ -1110,7 +1110,10 @@ mod tests {
         };
         assert_eq!(describe_api_error(&e(40)), "Wrong username or password");
         assert!(describe_api_error(&e(41)).contains("Password sign-in method"));
-        assert_eq!(describe_api_error(&e(44)), "The server rejected the API key");
+        assert_eq!(
+            describe_api_error(&e(44)),
+            "The server rejected the API key"
+        );
         assert_eq!(describe_api_error(&e(999)), "Server error: x");
     }
 
@@ -1136,7 +1139,8 @@ mod tests {
             assert_eq!(url.path(), "/rest/ping.view", "input: {input}");
         }
         // Sub-path installs keep their prefix.
-        let c = SubsonicClient::new("https://example.com/navidrome/", Auth::token("u", "p")).unwrap();
+        let c =
+            SubsonicClient::new("https://example.com/navidrome/", Auth::token("u", "p")).unwrap();
         assert_eq!(
             c.signed_url("ping", &[]).unwrap().path(),
             "/navidrome/rest/ping.view"
@@ -1146,7 +1150,8 @@ mod tests {
 
     #[test]
     fn signed_url_carries_extra_params_and_no_password() {
-        let c = SubsonicClient::new("https://music.example.com", Auth::token("alice", "hunter2")).unwrap();
+        let c = SubsonicClient::new("https://music.example.com", Auth::token("alice", "hunter2"))
+            .unwrap();
         let url = c
             .signed_url("stream", &[("id", "abc"), ("format", "raw")])
             .unwrap();
@@ -1188,7 +1193,9 @@ mod tests {
 
             let uri = server.uri();
             let probe = tokio::task::spawn_blocking(move || {
-                SubsonicClient::new(&uri, Auth::token("alice", "pw")).unwrap().probe()
+                SubsonicClient::new(&uri, Auth::token("alice", "pw"))
+                    .unwrap()
+                    .probe()
             })
             .await
             .unwrap()
@@ -1219,7 +1226,9 @@ mod tests {
 
             let uri = server.uri();
             let probe = tokio::task::spawn_blocking(move || {
-                SubsonicClient::new(&uri, Auth::token("alice", "pw")).unwrap().probe()
+                SubsonicClient::new(&uri, Auth::token("alice", "pw"))
+                    .unwrap()
+                    .probe()
             })
             .await
             .unwrap()
@@ -1241,7 +1250,9 @@ mod tests {
 
             let uri = server.uri();
             let err = tokio::task::spawn_blocking(move || {
-                SubsonicClient::new(&uri, Auth::token("alice", "wrong")).unwrap().ping()
+                SubsonicClient::new(&uri, Auth::token("alice", "wrong"))
+                    .unwrap()
+                    .ping()
             })
             .await
             .unwrap()
@@ -1259,7 +1270,9 @@ mod tests {
 
             let uri = server.uri();
             let err = tokio::task::spawn_blocking(move || {
-                SubsonicClient::new(&uri, Auth::token("alice", "pw")).unwrap().ping()
+                SubsonicClient::new(&uri, Auth::token("alice", "pw"))
+                    .unwrap()
+                    .ping()
             })
             .await
             .unwrap()
@@ -1327,7 +1340,11 @@ mod tests {
                 .iter()
                 .find(|r| r.url.path().ends_with("getOpenSubsonicExtensions.view"))
                 .unwrap();
-            let q: Vec<_> = public.url.query_pairs().map(|(k, _)| k.into_owned()).collect();
+            let q: Vec<_> = public
+                .url
+                .query_pairs()
+                .map(|(k, _)| k.into_owned())
+                .collect();
             for k in ["u", "t", "s", "p", "apiKey"] {
                 assert!(!q.contains(&k.to_string()), "{k} sent to public endpoint");
             }
@@ -1357,7 +1374,10 @@ mod tests {
             .await
             .unwrap()
             .unwrap_err();
-            assert_eq!(err.to_string(), "This server doesn't support API key sign-in");
+            assert_eq!(
+                err.to_string(),
+                "This server doesn't support API key sign-in"
+            );
         }
 
         #[tokio::test]
@@ -1373,9 +1393,7 @@ mod tests {
 
             let uri = server.uri();
             let supported = tokio::task::spawn_blocking(move || {
-                SubsonicClient::anonymous(&uri)
-                    .unwrap()
-                    .supports_api_key()
+                SubsonicClient::anonymous(&uri).unwrap().supports_api_key()
             })
             .await
             .unwrap()

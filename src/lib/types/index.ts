@@ -443,7 +443,7 @@ export interface TopAlbumItem {
   /** Distinct weeks this album has appeared in the chart, including the current one. */
   weeks_on_chart: number;
   movement: "new" | "rising" | "falling" | "steady";
-  /** Unix timestamp (UTC midnight) of this chart week's first day. */
+  /** This chart week's first local calendar date, encoded as that date's UTC midnight. */
   period_start: number;
 }
 

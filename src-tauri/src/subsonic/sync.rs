@@ -963,7 +963,10 @@ mod tests {
 
         let uri = server.uri();
         let lib = tokio::task::spawn_blocking(move || {
-            fetch_library(&SubsonicClient::new(&uri, Auth::token("u", "p")).unwrap(), |_| {})
+            fetch_library(
+                &SubsonicClient::new(&uri, Auth::token("u", "p")).unwrap(),
+                |_| {},
+            )
         })
         .await
         .unwrap()
@@ -988,7 +991,10 @@ mod tests {
 
         let uri = server.uri();
         let result = tokio::task::spawn_blocking(move || {
-            fetch_library(&SubsonicClient::new(&uri, Auth::token("u", "p")).unwrap(), |_| {})
+            fetch_library(
+                &SubsonicClient::new(&uri, Auth::token("u", "p")).unwrap(),
+                |_| {},
+            )
         })
         .await
         .unwrap();

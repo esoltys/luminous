@@ -1289,20 +1289,25 @@ impl CollectionScanner {
     }
 
     /// Weekly "Top Albums" chart (#662): albums ranked by play count within
-    /// the current UTC calendar week (Monday 00:00 UTC through Sunday
-    /// 23:59:59 UTC), with movement (new/rising/falling/steady) against the
+    /// the current local calendar week (starting local midnight on the
+    /// user's chosen Sunday or Monday), with movement (new/rising/falling/steady) against the
     /// prior week, peak rank, and weeks-on-chart. Backed by a snapshot table
     /// (`album_chart_history`, migration 22) written lazily on each call —
     /// there's no scheduler in this codebase, so the current week's rows are
     /// upserted here every time, which is idempotent and keeps the snapshot
     /// current as new plays land during the week.
     pub fn get_top_albums(&self, limit: i64) -> Result<Vec<TopAlbumItem>> {
-        self.get_top_albums_at(limit, chrono::Utc::now().timestamp())
+        self.get_top_albums_at(limit, chrono::Utc::now().timestamp(), &chrono::Local)
     }
 
-    /// `now`-parameterized core of `get_top_albums`, split out so tests can
-    /// drive multiple synthetic weeks deterministically.
-    fn get_top_albums_at(&self, limit: i64, now: i64) -> Result<Vec<TopAlbumItem>> {
+    /// `now`/time-zone-parameterized core of `get_top_albums`, split out so
+    /// tests can drive multiple synthetic weeks deterministically.
+    fn get_top_albums_at<Tz: chrono::TimeZone>(
+        &self,
+        limit: i64,
+        now: i64,
+        tz: &Tz,
+    ) -> Result<Vec<TopAlbumItem>> {
         let conn = self.db.pool.get()?;
         let start_sunday: bool = conn
             .query_row(
@@ -1312,7 +1317,10 @@ impl CollectionScanner {
             )
             .map(|v| v == "sunday")
             .unwrap_or(true);
-        let period_start = week_start_utc(now, start_sunday);
+        let ChartWeek {
+            period_start,
+            starts_at,
+        } = chart_week(now, start_sunday, tz);
 
         // Rank this week's albums by play count. Every result must be an
         // Album card regardless of track count (unlike
@@ -1340,7 +1348,7 @@ impl CollectionScanner {
         );
         let mut stmt = conn.prepare(&sql)?;
         let rows: Vec<(Song, i64, i64, i64)> = stmt
-            .query_map(params![period_start, query_limit], |row| {
+            .query_map(params![starts_at, query_limit], |row| {
                 let song = row_to_song(row)?;
                 let album_track_count: i64 = row.get(SONG_SELECT_COL_COUNT)?;
                 let album_disc_count: i64 = row.get(SONG_SELECT_COL_COUNT + 1)?;
@@ -1386,36 +1394,68 @@ impl CollectionScanner {
             ));
         }
 
-        // Upsert this week's snapshot before reading history, so a "new"
+        // Replace this week's snapshot before reading history, so a "new"
         // entry's own row already counts toward its weeks-on-chart/peak-rank
-        // below.
-        for (i, (album, week_plays)) in ranked.iter().enumerate() {
-            let rank = (i + 1) as i32;
-            if let Some(ref name) = album.album {
-                conn.execute(
-                    "INSERT INTO album_chart_history (period_start, album_key, rank, play_count)
-                     VALUES (?1, ?2, ?3, ?4)
-                     ON CONFLICT(period_start, album_key)
-                     DO UPDATE SET rank = excluded.rank, play_count = excluded.play_count",
-                    params![period_start, name, rank, week_plays],
-                )?;
+        // below. Replace rather than upsert: an album that has since dropped
+        // out of the top `limit` must not keep its earlier rank this week.
+        {
+            let tx = conn.unchecked_transaction()?;
+            tx.execute(
+                "DELETE FROM album_chart_history WHERE period_start = ?1",
+                params![period_start],
+            )?;
+            for (i, (album, week_plays)) in ranked.iter().enumerate() {
+                let rank = (i + 1) as i32;
+                if let Some(ref name) = album.album {
+                    tx.execute(
+                        "INSERT INTO album_chart_history (period_start, album_key, rank, play_count)
+                         VALUES (?1, ?2, ?3, ?4)",
+                        params![period_start, name, rank, week_plays],
+                    )?;
+                }
             }
+            tx.commit()?;
         }
 
-        let previous_period_start = period_start - SECONDS_PER_WEEK;
+        // Rank the previous week live from play_history rather than reading
+        // its snapshot: a snapshot is only as fresh as the last time Home was
+        // opened that week, and one written under the other week-start
+        // setting (or in UTC, before this was local) sits under a different
+        // key than the week before `period_start`.
+        let previous_starts_at = chart_week(starts_at - 1, start_sunday, tz).starts_at;
+        let previous_ranks: std::collections::HashMap<String, i32> = {
+            let sql = format!(
+                "SELECT s.album
+                 FROM play_history ph
+                 JOIN songs s ON s.id = ph.song_id
+                 WHERE ph.played_at >= ?1 AND ph.played_at < ?2
+                   AND s.source IN ({lib}) AND s.unavailable = 0
+                   AND s.album IS NOT NULL AND TRIM(s.album) != ''
+                 GROUP BY s.album
+                 ORDER BY COUNT(*) DESC, MAX(s.added) DESC
+                 LIMIT ?3",
+                lib = *LIBRARY_SOURCES_SQL
+            );
+            let mut stmt = conn.prepare(&sql)?;
+            let albums: Vec<String> = stmt
+                .query_map(params![previous_starts_at, starts_at, limit], |row| {
+                    row.get(0)
+                })?
+                .filter_map(|r| r.ok())
+                .collect();
+            albums
+                .into_iter()
+                .enumerate()
+                .map(|(i, album)| (album, (i + 1) as i32))
+                .collect()
+        };
         let mut result = Vec::with_capacity(ranked.len());
         for (i, (mut album, _week_plays)) in ranked.into_iter().enumerate() {
             let rank = (i + 1) as i32;
             let name = album.album.clone().unwrap_or_default();
             album.rating = crate::stats::get_album_rating(&conn, &name)?;
 
-            let previous_rank: Option<i32> = conn
-                .query_row(
-                    "SELECT rank FROM album_chart_history WHERE period_start = ?1 AND album_key = ?2",
-                    params![previous_period_start, name],
-                    |r| r.get(0),
-                )
-                .ok();
+            let previous_rank = previous_ranks.get(&name).copied();
             let peak_rank: i32 = conn
                 .query_row(
                     "SELECT MIN(rank) FROM album_chart_history WHERE album_key = ?1",
@@ -1452,20 +1492,54 @@ impl CollectionScanner {
     }
 }
 
-/// Start (UTC unix timestamp, 00:00:00) of the calendar week containing
-/// `now`, rounding down to either the most recent Sunday or Monday depending
-/// on `start_sunday`. Pure integer arithmetic on the UTC unix timestamp — no
-/// DST to account for in UTC, so no need for chrono here. 1970-01-01 (day 0)
-/// was a Thursday, i.e. Monday-based weekday index 3 (Sunday-based index 4).
-fn week_start_utc(now: i64, start_sunday: bool) -> i64 {
-    const SECONDS_PER_DAY: i64 = 86_400;
-    let days_since_epoch = now.div_euclid(SECONDS_PER_DAY);
-    let epoch_offset = if start_sunday { 4 } else { 3 };
-    let weekday = (days_since_epoch + epoch_offset).rem_euclid(7);
-    (days_since_epoch - weekday) * SECONDS_PER_DAY
+/// The calendar week containing `now`, as seen in the user's time zone.
+struct ChartWeek {
+    /// The week's first calendar date, encoded as that date's UTC midnight.
+    /// A time-zone-independent key for `album_chart_history` (so the prior
+    /// week is always exactly seven days earlier, across DST) that
+    /// the frontend renders as a date with `timeZone: "UTC"`.
+    period_start: i64,
+    /// The instant the week began: local midnight on that first date. Plays
+    /// at or after this count toward the week.
+    starts_at: i64,
 }
 
-const SECONDS_PER_WEEK: i64 = 7 * 86_400;
+/// Round `now` down to the most recent Sunday or Monday (per `start_sunday`)
+/// on the local calendar of `tz`. Using the UTC calendar instead rolls the
+/// chart into next week early (or late) by the zone's UTC offset.
+fn chart_week<Tz: chrono::TimeZone>(now: i64, start_sunday: bool, tz: &Tz) -> ChartWeek {
+    use chrono::{Datelike, NaiveTime, Timelike};
+    let today = tz
+        .timestamp_opt(now, 0)
+        .single()
+        .map(|dt| dt.naive_local().date())
+        .unwrap_or_else(|| {
+            chrono::DateTime::from_timestamp(now, 0)
+                .unwrap_or_default()
+                .date_naive()
+        });
+    let weekday = today.weekday();
+    let days_back = if start_sunday {
+        weekday.num_days_from_sunday()
+    } else {
+        weekday.num_days_from_monday()
+    };
+    let first_day = today - chrono::Duration::days(days_back as i64);
+    let period_start = first_day.and_time(NaiveTime::MIN).and_utc().timestamp();
+    // Local midnight can fall in a DST gap in zones that spring forward at
+    // 00:00; the week then starts at the first local time that exists.
+    let starts_at = (0..3)
+        .find_map(|hour| {
+            let t = NaiveTime::MIN.with_hour(hour)?;
+            tz.from_local_datetime(&first_day.and_time(t)).earliest()
+        })
+        .map(|dt| dt.timestamp())
+        .unwrap_or(period_start);
+    ChartWeek {
+        period_start,
+        starts_at,
+    }
+}
 
 fn group_songs_into_home_items(
     songs_with_counts: Vec<(Song, i64, i64)>,
@@ -3636,24 +3710,66 @@ mod tests {
         let _ = std::fs::remove_dir_all(temp_dir);
     }
 
-    #[test]
-    fn test_week_start_utc_rounds_down_to_monday() {
-        // Wed 2024-01-10 12:00:00 UTC -> Mon 2024-01-08 00:00:00 UTC.
-        assert_eq!(week_start_utc(1_704_888_000, false), 1_704_672_000);
-        // Exactly a Monday midnight is its own week start.
-        assert_eq!(week_start_utc(1_704_672_000, false), 1_704_672_000);
-        // Sun 2024-01-14 23:59:59 UTC is still the same week as the above Monday.
-        assert_eq!(week_start_utc(1_705_276_799, false), 1_704_672_000);
+    fn week_of(now: i64, start_sunday: bool, offset_hours: i32) -> (i64, i64) {
+        let tz = chrono::FixedOffset::east_opt(offset_hours * 3600).unwrap();
+        let w = chart_week(now, start_sunday, &tz);
+        (w.period_start, w.starts_at)
     }
 
     #[test]
-    fn test_week_start_utc_rounds_down_to_sunday() {
+    fn test_chart_week_rounds_down_to_monday() {
+        // Wed 2024-01-10 12:00:00 UTC -> Mon 2024-01-08.
+        assert_eq!(
+            week_of(1_704_888_000, false, 0),
+            (1_704_672_000, 1_704_672_000)
+        );
+        // Exactly a Monday midnight is its own week start.
+        assert_eq!(
+            week_of(1_704_672_000, false, 0),
+            (1_704_672_000, 1_704_672_000)
+        );
+        // Sun 2024-01-14 23:59:59 UTC is still the same week as the above Monday.
+        assert_eq!(
+            week_of(1_705_276_799, false, 0),
+            (1_704_672_000, 1_704_672_000)
+        );
+    }
+
+    #[test]
+    fn test_chart_week_rounds_down_to_sunday() {
         // Sun 2024-01-07 00:00:00 UTC is its own (Sunday-based) week start.
-        assert_eq!(week_start_utc(1_704_585_600, true), 1_704_585_600);
-        // Wed 2024-01-10 12:00:00 UTC -> Sun 2024-01-07 00:00:00 UTC.
-        assert_eq!(week_start_utc(1_704_888_000, true), 1_704_585_600);
+        assert_eq!(
+            week_of(1_704_585_600, true, 0),
+            (1_704_585_600, 1_704_585_600)
+        );
+        // Wed 2024-01-10 12:00:00 UTC -> Sun 2024-01-07.
+        assert_eq!(
+            week_of(1_704_888_000, true, 0),
+            (1_704_585_600, 1_704_585_600)
+        );
         // Sat 2024-01-13 23:59:59 UTC is still the same Sunday-based week.
-        assert_eq!(week_start_utc(1_705_190_399, true), 1_704_585_600);
+        assert_eq!(
+            week_of(1_705_190_399, true, 0),
+            (1_704_585_600, 1_704_585_600)
+        );
+    }
+
+    #[test]
+    fn test_chart_week_uses_local_calendar_west_of_utc() {
+        // Sat 2026-09-26 22:34 at UTC-7 is already Sun 2026-09-27 05:34 UTC,
+        // but the local week (Sunday-based) still began Sun 2026-09-20.
+        let now = 1_790_487_240; // 2026-09-27T05:34:00Z
+        let sep_20 = 1_789_862_400; // 2026-09-20T00:00:00Z
+        assert_eq!(week_of(now, true, -7), (sep_20, sep_20 + 7 * 3600));
+    }
+
+    #[test]
+    fn test_chart_week_uses_local_calendar_east_of_utc() {
+        // Sat 2026-09-26 15:00 UTC is already Sun 2026-09-27 01:00 at UTC+10,
+        // so a new Sunday-based week has begun locally.
+        let now = 1_790_434_800; // 2026-09-26T15:00:00Z
+        let sep_27 = 1_790_467_200; // 2026-09-27T00:00:00Z
+        assert_eq!(week_of(now, true, 10), (sep_27, sep_27 - 10 * 3600));
     }
 
     #[test]
@@ -3722,7 +3838,9 @@ mod tests {
         for _ in 0..3 {
             record_play(steady_id, 1_704_153_600 + 30);
         }
-        let week1 = scanner.get_top_albums_at(10, week1_now).unwrap();
+        let week1 = scanner
+            .get_top_albums_at(10, week1_now, &chrono::Utc)
+            .unwrap();
         let by_album = |items: &[TopAlbumItem], album: &str| -> TopAlbumItem {
             items
                 .iter()
@@ -3751,7 +3869,9 @@ mod tests {
         for _ in 0..2 {
             record_play(new_id, week2_base + 40);
         }
-        let week2 = scanner.get_top_albums_at(10, week2_now).unwrap();
+        let week2 = scanner
+            .get_top_albums_at(10, week2_now, &chrono::Utc)
+            .unwrap();
 
         let rising = by_album(&week2, "Rising Album");
         assert_eq!(rising.rank, 1);
@@ -3775,6 +3895,96 @@ mod tests {
         assert_eq!(brand_new.previous_rank, None);
         assert_eq!(brand_new.movement, "new");
         assert_eq!(brand_new.weeks_on_chart, 1);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// Movement comes from last week's plays, not last week's snapshot: here
+    /// Home was never opened last week (so no snapshot exists), and "now" is
+    /// Saturday night at UTC-7 — already Sunday in UTC, which used to roll the
+    /// chart into next week and leave only the last few hours of plays.
+    #[test]
+    fn test_get_top_albums_uses_local_week_and_live_previous_ranks() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_top_albums_local_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "INSERT OR REPLACE INTO app_state (key, value) VALUES ('week_start', 'sunday')",
+            [],
+        )
+        .unwrap();
+        let seed = |path: &str, album: &str| -> i64 {
+            upsert_song(
+                &conn,
+                &Song {
+                    artist: Some("Some Artist".to_string()),
+                    album: Some(album.to_string()),
+                    title: Some(path.to_string()),
+                    source: SongSource::LocalFile,
+                    path: Some(path.to_string()),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+            conn.query_row(
+                "SELECT id FROM songs WHERE path = ?1",
+                params![path],
+                |row| row.get(0),
+            )
+            .unwrap()
+        };
+        let record_plays = |song_id: i64, played_at: i64, n: usize| {
+            for _ in 0..n {
+                conn.execute(
+                    "INSERT INTO play_history (context_type, song_id, played_at) VALUES ('song', ?1, ?2)",
+                    params![song_id, played_at],
+                )
+                .unwrap();
+            }
+        };
+        let a = seed(r"C:\Music.mp3", "Album A");
+        let b = seed(r"C:\Music.mp3", "Album B");
+
+        let tz = chrono::FixedOffset::west_opt(7 * 3600).unwrap();
+        // Local Sundays 2026-09-13 and 2026-09-20, 00:00 at UTC-7.
+        let last_week = 1_789_282_800;
+        let this_week = 1_789_887_600;
+        let now = 1_790_487_240; // Sat 2026-09-26 22:34 local
+
+        record_plays(a, last_week + 3600, 5); // last week: A #1, B #2
+        record_plays(b, last_week + 3600, 2);
+        record_plays(b, this_week + 3600, 6); // this week: B #1, A #2
+        record_plays(a, this_week + 3600, 1);
+
+        let scanner = CollectionScanner::new(db.clone());
+        let chart = scanner.get_top_albums_at(10, now, &tz).unwrap();
+        assert_eq!(chart.len(), 2);
+        assert_eq!(chart[0].album.album.as_deref(), Some("Album B"));
+        assert_eq!(chart[0].previous_rank, Some(2));
+        assert_eq!(chart[0].movement, "rising");
+        assert_eq!(chart[1].previous_rank, Some(1));
+        assert_eq!(chart[1].movement, "falling");
+        assert_eq!(chart[0].period_start, 1_789_862_400); // 2026-09-20
+
+        // An album that drops out of the top `limit` loses its row for this
+        // week instead of keeping its earlier rank.
+        record_plays(a, this_week + 7200, 10);
+        let top1 = scanner.get_top_albums_at(1, now, &tz).unwrap();
+        assert_eq!(top1[0].album.album.as_deref(), Some("Album A"));
+        let rows: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM album_chart_history WHERE period_start = ?1",
+                params![1_789_862_400_i64],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(rows, 1);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
