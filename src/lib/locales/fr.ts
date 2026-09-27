@@ -1544,7 +1544,8 @@ export const fr = {
     savingAlbumTags: "Enregistrement des balises pour {album}…",
     savingTagsCount: "Enregistrement des balises ({current}/{total})…",
     albumTagsSaved: "Balises enregistrées pour {album}",
-    libraryScanDone: "Analyse de la bibliothèque terminée"
+    libraryScan: "Actualisation de la bibliothèque",
+    libraryScanDone: "Bibliothèque actualisée"
   },
   audioPipeline: {
     title: "Chaîne audio",

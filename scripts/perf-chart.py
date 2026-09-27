@@ -10,15 +10,19 @@ Needs matplotlib (`pip install matplotlib`).
 Usage:
     python scripts/perf-chart.py --baseline 2.0.0 --candidate 2.5.0
     python scripts/perf-chart.py --baseline 2.0.0 --candidate 2.5.0 --os linux --out docs/x.png
+    python scripts/perf-chart.py --baseline 2.5.0 --candidate 2.6.0 --runs 2
 
 For each version/OS/scenario it uses the newest row whose label is the
 scenario name (legacy runs' "-recheck" rows count as the same scenario), so a
-re-run supersedes an earlier one without deleting history.
+re-run supersedes an earlier one without deleting history. With --runs N it
+averages the newest N rows instead, for scenarios too noisy to judge from one
+run (idle private bytes can differ by ~100MB between runs of the same build).
 """
 
 import argparse
 import csv
 import sys
+import textwrap
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -37,18 +41,24 @@ BASE_COLOR = "#b4b2a9"  # recessive neutral for the reference version
 NEW_COLOR = "#2a78d6"
 
 
-def latest_rows(rows, version, os_name):
+def latest_rows(rows, version, os_name, runs=1):
     picked = {}
-    for r in rows:  # file order is chronological, so later rows win
+    for r in rows:  # file order is chronological, so the newest rows come last
         if r["app_version"] != version or r["os"] != os_name:
             continue
         label = r["label"].removesuffix("-recheck")
         if label in dict(SCENARIOS):
-            picked[label] = r
-    missing = [s for s, _ in SCENARIOS if s not in picked]
-    if missing:
-        raise SystemExit(f"No {os_name} rows for {version} scenario(s): {', '.join(missing)}")
-    return picked
+            picked.setdefault(label, []).append(r)
+    short = [s for s, _ in SCENARIOS if len(picked.get(s, [])) < runs]
+    if short:
+        raise SystemExit(f"Fewer than {runs} {os_name} row(s) for {version} scenario(s): {', '.join(short)}")
+    averaged = {}
+    for label, found in picked.items():
+        newest = found[-runs:]
+        averaged[label] = dict(newest[-1])
+        for metric, _ in METRICS:
+            averaged[label][metric] = sum(float(r[metric]) for r in newest) / runs
+    return averaged
 
 
 def describe(rows):
@@ -111,11 +121,15 @@ def chart(base, cand, args, out):
     fig.suptitle(f"Luminous memory: {args.candidate} vs. {args.baseline} ({os_title}, release build)",
                  x=0.012, ha="left", fontsize=13, fontweight="bold", color=INK, y=0.985)
     note = "Total across the main process and its WebView child processes. Labels show the change from baseline."
-    sizes = [f"{name} window {rows['idle']['window'] or 'not recorded'}"
-             for name, rows in ((args.baseline, base), (args.candidate, cand))]
-    note += f" {'; '.join(sizes)}."
-    fig.text(0.012, 0.015, note, fontsize=8.5, color=INK_2)
-    fig.tight_layout(rect=(0, 0.04, 1, 0.9))
+    if args.runs > 1:
+        note += f" Mean of the newest {args.runs} runs per version."
+    windows = [rows["idle"]["window"] or "not recorded" for rows in (base, cand)]
+    if windows[0] == windows[1]:
+        note += f" Window {windows[0]}."
+    else:
+        note += f" {args.baseline} window {windows[0]}; {args.candidate} window {windows[1]}."
+    fig.text(0.012, 0.015, textwrap.fill(note, 170), fontsize=8.5, color=INK_2, va="bottom")
+    fig.tight_layout(rect=(0, 0.06, 1, 0.9))
     fig.savefig(out, dpi=150, facecolor=SURFACE)
 
 
@@ -126,12 +140,13 @@ def main():
     p.add_argument("--os", default="windows")
     p.add_argument("--csv", default=REPO_ROOT / "docs" / "performance-history.csv", type=Path)
     p.add_argument("--out", type=Path, help="default: docs/performance-<baseline>-vs-<candidate>.png")
+    p.add_argument("--runs", type=int, default=1, help="average the newest N runs per version (default 1)")
     args = p.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")  # the delta table uses Δ/−, which cp1252 consoles can't encode
 
     rows = list(csv.DictReader(args.csv.open(encoding="utf8")))
-    base = latest_rows(rows, args.baseline, args.os)
-    cand = latest_rows(rows, args.candidate, args.os)
+    base = latest_rows(rows, args.baseline, args.os, args.runs)
+    cand = latest_rows(rows, args.candidate, args.os, args.runs)
 
     out = args.out or REPO_ROOT / "docs" / f"performance-{args.baseline}-vs-{args.candidate}.png"
     chart(base, cand, args, out)

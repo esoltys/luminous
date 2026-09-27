@@ -30,7 +30,7 @@ const TAURI_WINDOWS_CONF_PATH = path.join(__dirname, "../src-tauri/tauri.windows
  * tauri.conf.json (plus any platform override) instead of hardcoding it
  * keeps this in sync automatically.
  */
-function defaultDbPath(): string | undefined {
+export function defaultDbPath(): string | undefined {
   let identifier: string;
   try {
     identifier = JSON.parse(readFileSync(TAURI_CONF_PATH, "utf8")).identifier;

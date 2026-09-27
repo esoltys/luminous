@@ -272,15 +272,16 @@ export const APP_SOURCE_PATHS = ["src", "src-tauri", "bun.lock"];
 /**
  * Short hash of the last commit that touched the app's own source (not
  * docs/scripts), suffixed `-dirty` when those paths have uncommitted changes.
+ * `repoRoot` is the checkout the measured build came from (default: this one).
  */
-export function appCommit(): string {
+export function appCommit(repoRoot: string = REPO_ROOT): string {
   try {
     const hash = execFileSync("git", ["log", "-1", "--format=%h", "--", ...APP_SOURCE_PATHS], {
-      cwd: REPO_ROOT,
+      cwd: repoRoot,
       encoding: "utf8",
     }).trim();
     const dirty = execFileSync("git", ["status", "--porcelain", "--", ...APP_SOURCE_PATHS], {
-      cwd: REPO_ROOT,
+      cwd: repoRoot,
       encoding: "utf8",
     }).trim();
     return dirty ? `${hash}-dirty` : hash;

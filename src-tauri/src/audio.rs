@@ -1445,6 +1445,19 @@ fn decode_thread(
                         let _ = event_tx.send(AudioEvent::Stopped);
                         continue;
                     }
+                    // A seek on a cued (restored at startup, never resumed)
+                    // track only moves the start point — `Resume` above
+                    // opens the track from `shared.position`.
+                    Ok(AudioCommand::SeekTo(target_ns)) if paused_req.is_some() => {
+                        if let Some(out) = output.as_ref() {
+                            out.played_samples.store(
+                                samples_for_ns(target_ns, out.sample_rate, out.channels),
+                                Ordering::Relaxed,
+                            );
+                        }
+                        shared.position.store(target_ns, Ordering::Relaxed);
+                        continue;
+                    }
                     Ok(_) => continue, // Ignore other commands when stopped
                     Err(_) => break,   // Channel disconnected
                 }

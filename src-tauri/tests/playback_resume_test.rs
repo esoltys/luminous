@@ -2,15 +2,11 @@ use luminous_lib::{audio::AudioEngine, db::Database, models::PlayState, player::
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-fn setup_test_db() -> (Database, std::path::PathBuf) {
-    let temp_dir = std::env::temp_dir().join(format!(
-        "luminous_resume_test_{}",
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-    ));
-    let db = Database::new(temp_dir.clone()).unwrap();
+fn setup_test_db() -> (Database, tempfile::TempDir) {
+    // tempdir() guarantees a unique path per test; a timestamp-based name collided
+    // between these parallel tests on Windows' coarse clock and shared one DB.
+    let temp_dir = tempfile::tempdir().unwrap();
+    let db = Database::new(temp_dir.path().to_path_buf()).unwrap();
     (db, temp_dir)
 }
 
@@ -68,7 +64,7 @@ async fn test_playback_resume_on_startup() {
     );
     assert_eq!(engine_loudness, 1.0);
 
-    let _ = std::fs::remove_dir_all(temp_dir);
+    drop(temp_dir);
 }
 
 #[tokio::test]
@@ -127,7 +123,7 @@ async fn test_playback_resume_with_volume_and_analyzed_loudness() {
     );
     assert!((engine_loudness - 0.5011872).abs() < 1e-4);
 
-    let _ = std::fs::remove_dir_all(temp_dir);
+    drop(temp_dir);
 }
 
 #[tokio::test]
@@ -173,5 +169,5 @@ async fn test_playback_resume_with_fallback_loudness() {
     );
     assert!((engine_loudness - 0.5011872).abs() < 1e-4);
 
-    let _ = std::fs::remove_dir_all(temp_dir);
+    drop(temp_dir);
 }

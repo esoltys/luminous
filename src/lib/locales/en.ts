@@ -1545,7 +1545,8 @@ export const en = {
     savingAlbumTags: "Saving tags for {album}…",
     savingTagsCount: "Saving tags ({current}/{total})…",
     albumTagsSaved: "Saved tags for {album}",
-    libraryScanDone: "Library scan complete"
+    libraryScan: "Refreshing library",
+    libraryScanDone: "Library refreshed"
   },
   audioPipeline: {
     title: "Audio Pipeline",
