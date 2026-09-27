@@ -239,8 +239,22 @@ async function writeNavigationKeys(cdp: CdpClient, keys: Record<string, string>)
   );
 }
 
+// +page.svelte restores the tab/sub-tab from these backend app settings at
+// boot, overriding localStorage — so both have to be saved, set and restored.
+const NAV_SETTINGS = ["active_tab", "active_sub_tab"];
+
+async function readNavigationSettings(cdp: CdpClient): Promise<Record<string, string>> {
+  const all = await invoke<Record<string, string>>(cdp, "get_all_app_settings");
+  return Object.fromEntries(NAV_SETTINGS.filter((k) => k in all).map((k) => [k, all[k]]));
+}
+
+async function writeNavigationSettings(cdp: CdpClient, settings: Record<string, string>) {
+  for (const [key, value] of Object.entries(settings)) await invoke(cdp, "set_app_setting", { key, value });
+}
+
 // The fixed view every run measures: Collection → Songs, nothing selected.
 const CANONICAL_VIEW = { navigation_activeTab: "collection", navigation_activeSubTab: "songs" };
+const CANONICAL_SETTINGS = { active_tab: "collection", active_sub_tab: "songs" };
 
 // ── Run ───────────────────────────────────────────────────────────────────
 
@@ -305,10 +319,15 @@ async function main() {
   log(`launching ${opts.exe}`);
   let cdp = await launch(opts.exe);
   const savedNav = await readNavigationKeys(cdp);
+  const savedNavSettings = await readNavigationSettings(cdp);
   const savedPlacement = saveWindowPlacement();
-  writeFileSync(BACKUP_FILE, JSON.stringify({ navigation: savedNav, windowPlacement: savedPlacement }, null, 2));
+  writeFileSync(
+    BACKUP_FILE,
+    JSON.stringify({ navigation: savedNav, navigationSettings: savedNavSettings, windowPlacement: savedPlacement }, null, 2),
+  );
   log(`saved your view/window state (backup: ${BACKUP_FILE})`);
   await writeNavigationKeys(cdp, CANONICAL_VIEW);
+  await writeNavigationSettings(cdp, CANONICAL_SETTINGS);
   pinWindow(opts.width, opts.height);
   cdp.close();
   await closeGracefully();
@@ -392,6 +411,7 @@ async function main() {
         const eq = savedEq as EqualizerConfig | null;
         if (eq && !eq.enabled) await invoke(c, "apply_equalizer_config", { config: eq });
         await writeNavigationKeys(c, savedNav);
+        await writeNavigationSettings(c, savedNavSettings);
       });
       restoreWindowPlacement(savedPlacement);
       await closeGracefully();
