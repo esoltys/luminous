@@ -15,6 +15,34 @@ suites), see [AGENTS.md](../AGENTS.md#testing). For "this broke, here's the fix"
   ```
   (run from `src-tauri/`)
 
+## Test design rules
+
+Each of these describes a test that passed while the bug it named was live.
+
+1. **A setup that makes the hazard impossible proves nothing.** Ask what state the bug needs,
+   and check the fixture didn't remove it.
+   `test_reconcile_appends_new_matches_and_evicts_stale_without_reordering`
+   (`playlist/dynamic.rs`) starts from a populated playlist; an empty one can't show reordering.
+   `equalizer.feature` scenarios start from `Given the equalizer is enabled`. For live-app
+   measurements, confirm nothing covers the element (the first-run walkthrough, a modal), and
+   that the input is realistic: audio actually playing and not muted, a real library rather
+   than an empty one.
+2. **Cover every ordering of the actors.** When operations interact (a user drag, a backend
+   event, state restore, `library-changed` vs. a playlist edit), list the orderings and test
+   each. A test of one ordering says nothing about the others.
+3. **Assert from the outside, on values.** Check the resulting state (the reconcile test checks
+   titles, UUIDs and positions), not only that `invoke` or a store method was called.
+4. **Test the configuration that ships.** If a test must use another configuration, say so in
+   the test name.
+5. **Report measurements honestly.** Give the sample size, how much of the space was covered,
+   and the failure count. "It passed" without those is anecdote. Sweep small spaces
+   exhaustively. Tell apart *refused*, *no-op* and *silently wrong*; only the last is a defect.
+   (The reconcile test's second pass asserts an explicit no-op.)
+6. **Each test sets up the state it measures.** Never rely on an earlier test, step or probe
+   having left the app in the right state.
+7. **A test that pins a defect is part of the defect.** If fixing a module breaks tests that
+   encoded its wrong behaviour, fix the tests. Don't route around the module in its caller.
+
 ## Re-testing the first-run welcome screen / walkthrough tour
 
 Both are gated by one-off flags in the `app_state` table of your dev database (`welcome_seen`,

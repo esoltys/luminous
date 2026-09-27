@@ -111,6 +111,7 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config libayatana-appind
 
 - **Frontend**: Vitest + @testing-library/svelte; test files are `src/**/*.test.ts` / `*.spec.ts`. Run a single file with `bun run test -- player.test.ts`; watch mode is `bun run test` (no `run` suffix).
 - **Backend**: inline unit tests (`#[cfg(test)]`) plus Cucumber BDD in `features/` + `src-tauri/tests/`. Run BDD suites like `cargo test --test equalizer_bdd`.
+- Before writing a test, read the design rules in [docs/TESTING.md](docs/TESTING.md#test-design-rules).
 
 ## Architecture Invariants
 
