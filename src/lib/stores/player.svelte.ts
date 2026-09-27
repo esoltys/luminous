@@ -326,6 +326,27 @@ export class PlayerStore {
     }
   }
 
+  /** Plays every audio file under the picked folder(s) (recursively) without
+   * adding the folder to the watched library — the button counterpart to
+   * dropping a folder on the window. */
+  async openFolderDialog() {
+    try {
+      const selected = await open({
+        multiple: true,
+        directory: true,
+        title: i18n.t('emptyLibrary.playFolder'),
+      });
+      if (selected) {
+        const paths = Array.isArray(selected) ? selected : [selected];
+        if (paths.length > 0) {
+          await this.openAndPlay(paths);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to open folder:", err);
+    }
+  }
+
   async playSongs(songIds: number[], startIndex: number, playlistId?: number, context?: PlayContext, contextName?: string) {
     const queuePl = await playlistsStore.requireQueue();
     const effectivePlaylistId = playlistId ?? queuePl?.id;

@@ -24,6 +24,7 @@ export const fr = {
     goBack: "Retour",
     goForward: "Avancer",
     searchPlaceholder: "Rechercher et filtrer... (Ctrl+L)",
+    open: "Ouvrir…",
     openFilesTooltip: "Ouvrir des fichiers audio ou listes de lecture (*.m3u)",
     openFilesTitle: "Ouvrir des fichiers audio ou des listes de lecture",
     searching: "Recherche...",
@@ -71,8 +72,13 @@ export const fr = {
     emptyState: "Commencez à ajouter de la musique pour voir vos collections personnalisées"
   },
   emptyLibrary: {
-    title: "Aucune musique pour l'instant",
-    text: "Votre bibliothèque musicale est actuellement vide. Consultez l'Aide dans la barre latérale pour commencer, ou ajoutez un dossier pour analyser votre musique."
+    playHeading: "Écouter de la musique",
+    openFiles: "Ouvrir des fichiers",
+    playFolder: "Lire un dossier",
+    dropHint: "Ou déposez des fichiers et dossiers n'importe où dans cette fenêtre pour les lire.",
+    libraryHeading: "Créer une bibliothèque",
+    addFolder: "Ajouter un dossier à la bibliothèque",
+    libraryHint: "Ajoutez un dossier pour parcourir par album, artiste ou genre.\nLuminous le garde synchronisé quand vos fichiers changent."
   },
   welcome: {
     title: "Bienvenue dans Luminous",
@@ -1498,8 +1504,8 @@ export const fr = {
         description: "Passez d'Accueil à Collection, Listes de lecture, Statistiques, Paramètres et Aide depuis ici."
       },
       topNavigation: {
-        title: "Recherchez et revenez en arrière",
-        description: "Recherchez instantanément dans votre bibliothèque, et naviguez dans votre historique."
+        title: "Trouvez et ouvrez de la musique",
+        description: "Recherchez dans votre bibliothèque, ou choisissez Ouvrir… pour lire des fichiers depuis n’importe où sur votre ordinateur. Utilisez les flèches pour revenir là où vous étiez, comme dans un navigateur web."
       },
       collectionView: {
         title: "Parcourez votre collection",
@@ -1522,8 +1528,8 @@ export const fr = {
         description: "Consultez la biographie de l'artiste, les liens MusicBrainz et les détails techniques comme le format et le débit."
       },
       libraryFolders: {
-        title: "Ajoutez votre musique",
-        description: "Ajoutez des dossiers à analyser depuis les Paramètres, et Luminous maintient votre bibliothèque à jour automatiquement."
+        title: "Personnalisez Luminous",
+        description: "Ouvrez les Paramètres pour ajouter des dossiers de musique, choisir un thème et connecter des intégrations. Luminous garde votre bibliothèque à jour quand vos dossiers changent."
       }
     }
   },
