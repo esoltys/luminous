@@ -622,7 +622,7 @@
   {#if currentCoverUrl && isQueue}
     <div class="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden">
       {#key currentCoverUrl}
-        <div class="absolute inset-0" in:fade={{ duration: 400 }}>
+        <div class="absolute inset-0" in:fade={{ duration: 300 }}>
           <BlurredCover src={currentCoverUrl} class="w-full h-full" style="transform: scale(1.5);" />
         </div>
       {/key}

@@ -136,6 +136,25 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config libayatana-appind
   `$effect` or a prop-change watcher — doing so causes false positives when the track changes and a
   different (already-favourited) song loads.
 
+- **Motion budget**: every animation must name its purpose — feedback, spatial continuity, state
+  legibility, bridging a jarring change, first-run explanation, or rare delight. If it has none,
+  don't build it.
+  - **Frequency decides whether it animates.** 100+/day (seek, volume drag, scroll, column resize,
+    row selection): none. Tens/day (panel toggle, view switch): near-imperceptible. Occasional
+    (dialogs, theme switch): standard. Rare/first-run (welcome, celebrations): the only place for delight.
+  - **Keyboard shortcuts snap.** The key asks for the result, not the journey — wrap layout changes
+    triggered from a hotkey in `instantly()` in `+layout.svelte`.
+  - **Durations**: press/toggle 100–160 ms, tooltip/popover 125–200 ms, menu/list 150–250 ms,
+    panel/drawer/dialog 200–300 ms. Nothing ordinary exceeds 300 ms; only rare-tier
+    `animations.css` celebrations may.
+  - **Easing**: ease-out for entrances *and* exits (`cubicOut` on `out:` too — Svelte eases the
+    outro's progress, so `cubicIn` there is an ease-in exit), ease-in-out for movement, `ease` for
+    hover/colour. Never ease-in.
+  - **Retriggerable effects use CSS transitions, not keyframes**, so a re-trigger continues from
+    where the element is instead of restarting.
+  - **Visualisers are signal.** Decorative chrome must never pulse, breathe or drift in a way that
+    could be mistaken for the spectrum or waveform.
+
 - **Reduced motion**: import `fly`/`slide`/`scale`/`fade` from `src/lib/utils/motion.ts`, never from
   `svelte/transition` — the wrappers drop transforms (and make `slide` instant) under
   `prefers-reduced-motion`, which CSS can't do for JS transitions. CSS transitions are covered by the
