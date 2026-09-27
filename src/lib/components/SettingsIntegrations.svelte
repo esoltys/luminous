@@ -314,7 +314,7 @@
             {/if}
           </div>
           {#if scrobblerStore.lastError}
-            <span class="text-[11px] text-amber-500 truncate" title={scrobblerStore.lastError}>
+            <span class="text-[11px] text-amber-500 wrap-anywhere">
               {scrobblerStore.lastError}
             </span>
           {:else}
@@ -389,7 +389,7 @@
     <div class="flex items-center gap-2 text-xs font-medium pt-1">
       {#if picardStore.available}
         <Check class="w-3.5 h-3.5 text-brand-accent-text shrink-0" />
-        <span class="text-brand-accent-text truncate" title={picardStore.path ?? undefined}>
+        <span class="text-brand-accent-text min-w-0 wrap-anywhere">
           {i18n.t('picard.foundAt', { path: picardStore.path ?? '' })}
         </span>
       {:else}

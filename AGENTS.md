@@ -111,6 +111,7 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config libayatana-appind
 
 - **Frontend**: Vitest + @testing-library/svelte; test files are `src/**/*.test.ts` / `*.spec.ts`. Run a single file with `bun run test -- player.test.ts`; watch mode is `bun run test` (no `run` suffix).
 - **Backend**: inline unit tests (`#[cfg(test)]`) plus Cucumber BDD in `features/` + `src-tauri/tests/`. Run BDD suites like `cargo test --test equalizer_bdd`.
+- Before writing a test, read the design rules in [docs/TESTING.md](docs/TESTING.md#test-design-rules).
 
 ## Architecture Invariants
 
@@ -136,10 +137,58 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config libayatana-appind
   `$effect` or a prop-change watcher — doing so causes false positives when the track changes and a
   different (already-favourited) song loads.
 
+- **Motion budget**: every animation must name its purpose — feedback, spatial continuity, state
+  legibility, bridging a jarring change, first-run explanation, or rare delight. If it has none,
+  don't build it.
+  - **Frequency decides whether it animates.** 100+/day (seek, volume drag, scroll, column resize,
+    row selection): none. Tens/day (panel toggle, view switch): near-imperceptible. Occasional
+    (dialogs, theme switch): standard. Rare/first-run (welcome, celebrations): the only place for delight.
+  - **Keyboard shortcuts snap.** The key asks for the result, not the journey — wrap layout changes
+    triggered from a hotkey in `instantly()` in `+layout.svelte`.
+  - **Durations**: press/toggle 100–160 ms, tooltip/popover 125–200 ms, menu/list 150–250 ms,
+    panel/drawer/dialog 200–300 ms. Nothing ordinary exceeds 300 ms; only rare-tier
+    `animations.css` celebrations may.
+  - **Easing**: ease-out for entrances *and* exits (`cubicOut` on `out:` too — Svelte eases the
+    outro's progress, so `cubicIn` there is an ease-in exit), ease-in-out for movement, `ease` for
+    hover/colour. Never ease-in.
+  - **Retriggerable effects use CSS transitions, not keyframes**, so a re-trigger continues from
+    where the element is instead of restarting.
+  - **Visualisers are signal.** Decorative chrome must never pulse, breathe or drift in a way that
+    could be mistaken for the spectrum or waveform.
+
+- **Reduced motion**: import `fly`/`slide`/`scale`/`fade` from `src/lib/utils/motion.ts`, never from
+  `svelte/transition` — the wrappers drop transforms (and make `slide` instant) under
+  `prefers-reduced-motion`, which CSS can't do for JS transitions. CSS transitions are covered by the
+  `!important` reduce block at the end of `animations.css`; `bun run test:e2e:windows` proves it still
+  reaches every transform transition. Reduced means fewer and gentler, never zero: keep opacity/colour.
+
+- **No hover-only information**: a native `title=` is fine when it repeats something already visible
+  (a button's own text/`aria-label`, truncated text whose full value is shown elsewhere). When the hint
+  is the only place that information appears, use `HelpTip.svelte` (focusable, opens on hover *and*
+  keyboard focus, closes on Escape/press/wheel, read as a description) or show the text inline — a
+  `title` on a non-focusable element never appears for keyboard users.
+
 - **Context-aware completion messages**: End-of-queue or completion toasts must include the name of what
   finished (e.g., "Jazz Classics complete"), not generic text. The `playerStore.activeContextName` field
   carries this name; auto-playlists (Favourites, Recently Added, etc.) must pass their `displayName` to
   `playerStore.playSongs()` so the context propagates correctly.
+
+- **The UI never re-derives a law the backend owns**: show the backend's own value or call its
+  accessor — never reimplement its formula in a component. A copy drifts, and is usually right only
+  at the endpoints nobody spot-checks (e.g. the EQ curve drew shelf bands as bells, #1248). Slider
+  bounds are part of the law: read them from the backend rather than retyping them.
+
+- **A cached verdict is shown only next to what it answered**: if a control's label or enabled state
+  depends on an expensive check, key the result on its inputs, re-check the key on each read, and
+  show "stale" or disable the control when it no longer matches.
+
+- **`<select>`: assignment or reload?** Re-picking the selected option fires no `change`. If picking
+  re-applies something, give a second path — a reload button, or a "Custom" state that makes
+  re-picking a real change (as the EQ preset picker does).
+
+- **No hand-typed versions, counts or dates in the UI**: derive them from one constant or the build.
+
+- **A disabled or inert control is a defect**: don't ship a control whose value nothing consumes.
 
 - **Icon semantics**: Avoid icons that imply system-level tracking or achievement recording (e.g.,
   `<Trophy>`). For milestone/completion moments, prefer neutral icons like `<Star>` that convey
@@ -157,6 +206,17 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config libayatana-appind
   in the same change. `i18n.t()` silently falls back to the English string when a key is missing from a
   non-English locale, so a skipped `fr.ts` update won't fail CI or show up in testing — it just quietly
   ships English text to French users. Don't rely on that fallback as a substitute for translating.
+
+## Code Conventions
+
+- **Protections run before what they protect against**: on the boot path, check order, not presence —
+  anything that plays, moves or notifies at startup must follow state restore and any prompt the user
+  must answer first.
+- **Fix the module, not the caller**: a local workaround for a defect in a shared module is a smell;
+  fix the module and its tests.
+- **State a guarantee at the strength the mechanism provides**: if a comment promises something the
+  code below can't enforce, move enforcement to the layer that can, and name that layer in both places
+  (e.g. a UI slider's range isn't a guarantee — the backend clamp is, #1249).
 
 ## Development Workflow
 

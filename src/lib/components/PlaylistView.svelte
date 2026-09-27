@@ -1,7 +1,7 @@
 <script lang="ts">
   import { isRemoteSource } from "../utils/remoteSource";
   import { onMount } from "svelte";
-  import { fade } from "svelte/transition";
+  import { fade } from "../utils/motion";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { pinnedStore } from "../stores/pinned.svelte";
   import { playerStore } from "../stores/player.svelte";
@@ -622,7 +622,7 @@
   {#if currentCoverUrl && isQueue}
     <div class="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden">
       {#key currentCoverUrl}
-        <div class="absolute inset-0" in:fade={{ duration: 400 }}>
+        <div class="absolute inset-0" in:fade={{ duration: 300 }}>
           <BlurredCover src={currentCoverUrl} class="w-full h-full" style="transform: scale(1.5);" />
         </div>
       {/key}
@@ -842,7 +842,7 @@
   </div>
 
     {#if selectedUuids.size > 0}
-      <div data-floating-toolbar="true" class="absolute left-1/2 -translate-x-1/2 z-40 bg-brand-sidebar/95 border border-brand-border/80 shadow-2xl rounded-full px-5 py-2.5 flex items-center gap-4 text-xs font-semibold backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4 duration-200" class:bottom-6={!playerStore.currentSong} class:bottom-28={!!playerStore.currentSong}>
+      <div data-floating-toolbar="true" class="absolute left-1/2 -translate-x-1/2 z-40 bg-brand-sidebar/95 border border-brand-border/80 shadow-2xl rounded-full px-5 py-2.5 flex items-center gap-4 text-xs font-semibold backdrop-blur-xl" class:bottom-6={!playerStore.currentSong} class:bottom-28={!!playerStore.currentSong}>
         <span class="text-brand-accent-text font-bold">
           {i18n.t("playlists.selectedCount", { count: selectedUuids.size })}
         </span>

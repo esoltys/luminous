@@ -4,7 +4,7 @@
   import Sidebar from '../lib/components/Sidebar.svelte';
   import RightPanel from '../lib/components/RightPanel.svelte';
   import PlayerBar from '../lib/components/PlayerBar.svelte';
-  import { slide, fly, fade } from 'svelte/transition';
+  import { slide, fly, fade, prefersReducedMotion } from '../lib/utils/motion';
   import { cubicOut } from 'svelte/easing';
   import { collectionStore } from '../lib/stores/collection.svelte';
   import { navigationStore } from '../lib/stores/navigation.svelte';
@@ -61,6 +61,19 @@
   // titlebar/taskbar — the Rust setup() hook can't set this once itself
   // because the $effect below re-asserts the title on every playback change.
   let windowTitleAppName = $state("Luminous");
+
+  // Set for the couple of frames after a keyboard shortcut changes the
+  // layout, so the panel slides, sidebar width and immersive flip snap
+  // straight to the result — the key asks for the result, not the journey.
+  let instantLayout = $state(false);
+  function instantly(change: () => void) {
+    instantLayout = true;
+    change();
+    // Two frames: the first style recalc after the change must still see
+    // `.instant-layout`, or the transition starts anyway.
+    requestAnimationFrame(() => requestAnimationFrame(() => (instantLayout = false)));
+  }
+  const PANEL_SLIDE_MS = 250;
 
   // Visual-only override: never touches the stored sidebarWidth preference,
   // so widening the window back out restores exactly the width the user had.
@@ -163,16 +176,16 @@
           break;
         case '1':
           e.preventDefault();
-          windowLayoutStore.toggleSidebarCompact();
+          instantly(() => windowLayoutStore.toggleSidebarCompact());
           break;
         case '2':
           e.preventDefault();
-          windowLayoutStore.toggleImmersiveMode();
+          instantly(() => windowLayoutStore.toggleImmersiveMode());
           break;
         case '3':
         case 'i':
           e.preventDefault();
-          windowLayoutStore.toggleRightPanel();
+          instantly(() => windowLayoutStore.toggleRightPanel());
           break;
         case '/':
           e.preventDefault();
@@ -451,7 +464,7 @@
     <!-- 3D Flip Container fills the full window height; the PlayerBar floats
          on top of it (absolute, below) so scrolled content passes underneath
          the glass footer instead of stopping above it. -->
-    <div class="flex-1 relative overflow-hidden flip-perspective" class:no-3d={themeStore.gpuCompositing === false}>
+    <div class="flex-1 relative overflow-hidden flip-perspective" class:no-3d={themeStore.gpuCompositing === false || prefersReducedMotion()} class:instant-layout={instantLayout}>
       <!-- Inner Card Wrapper -->
       <div class="w-full h-full relative flip-card" class:flipped={windowLayoutStore.effectiveImmersiveMode}>
 
@@ -466,7 +479,7 @@
           <div class="flex flex-1 overflow-hidden">
             <!-- Left Sidebar -->
             {#if windowLayoutStore.sidebarOpen}
-              <div transition:slide={{ axis: 'x', duration: 350 }} class="h-full flex-shrink-0 flex overflow-hidden">
+              <div transition:slide={{ axis: 'x', duration: instantLayout ? 0 : PANEL_SLIDE_MS }} class="h-full flex-shrink-0 flex overflow-hidden">
                 <Sidebar width={effectiveSidebarWidth} resizing={isResizingSidebar} />
 
                 <!-- Left Resize Handle: hidden while auto-collapsed — dragging
@@ -501,7 +514,7 @@
 
             <!-- Right Contextual Panel -->
             {#if windowLayoutStore.rightPanelOpen && !windowLayoutStore.isRightPanelAutoHidden}
-              <div transition:slide={{ axis: 'x', duration: 350 }} class="h-full flex-shrink-0 flex overflow-hidden">
+              <div transition:slide={{ axis: 'x', duration: instantLayout ? 0 : PANEL_SLIDE_MS }} class="h-full flex-shrink-0 flex overflow-hidden">
                 <!-- Right Resize Handle -->
                 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
                 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
@@ -540,7 +553,7 @@
                genuine cross-dissolve rather than a hard cut. -->
           {#if playerStore.currentSong}
             {#key playerStore.currentSong.id}
-              <div class="absolute inset-0 z-0 opacity-30 pointer-events-none immersive-ambient" transition:fade={{ duration: 900 }}>
+              <div class="absolute inset-0 z-0 opacity-30 pointer-events-none immersive-ambient" transition:fade={{ duration: 300 }}>
                 {@html immersiveAmbientSvg}
               </div>
             {/key}
@@ -554,7 +567,7 @@
           <div class="relative z-10 flex flex-col md:flex-row items-center gap-12 max-w-4xl w-full justify-center">
             {#if playerStore.currentSong}
               <!-- Floating Cover Art Frame -->
-              <div class="w-56 h-56 min-[420px]:w-72 min-[420px]:h-72 md:w-[380px] md:h-[380px] overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)] border border-brand-border/40 hover:scale-[1.02] transition-transform duration-500 bg-brand-sidebar flex items-center justify-center relative select-none">
+              <div class="w-56 h-56 min-[420px]:w-72 min-[420px]:h-72 md:w-[380px] md:h-[380px] overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)] border border-brand-border/40 hover:scale-[1.02] transition-transform duration-200 bg-brand-sidebar flex items-center justify-center relative select-none">
                 <CoverArt
                   songId={playerStore.currentSong?.id}
                   artEmbedded={playerStore.currentSong?.art_embedded}
@@ -655,6 +668,10 @@
     perspective: none;
   }
 
+  .instant-layout :global(*) {
+    transition: none !important;
+  }
+
   .flip-card {
     transform-style: preserve-3d;
     transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
@@ -707,7 +724,8 @@
      `perspective` alone (with no rotation left to apply) still forces its
      subtree into a separate 3D compositing layer, which is enough to break
      WebKitGTK's backdrop-filter sampling for elements outside that subtree
-     (e.g. the glass PlayerBar) — so drop it here too, not just the transform. */
+     (e.g. the glass PlayerBar) — so drop it here too, not just the transform.
+     The same cross-fade stands in for the flip under prefers-reduced-motion. */
   .flip-perspective.no-3d {
     perspective: none;
   }
@@ -759,18 +777,5 @@
 
   :global(html) {
     height: 100%;
-  }
-
-  :global(.animate-spin-slow) {
-    animation: spin-slow 12s linear infinite;
-  }
-
-  @keyframes spin-slow {
-    from {
-      transform: rotate(0deg);
-    }
-    to {
-      transform: rotate(360deg);
-    }
   }
 </style>

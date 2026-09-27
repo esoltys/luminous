@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { fade, scale } from "svelte/transition";
+  import { fade, scale } from "../utils/motion";
   import { i18n } from "../stores/i18n.svelte";
   import { openExternalUrl } from "../utils/openExternalUrl";
   import Button from "./Button.svelte";

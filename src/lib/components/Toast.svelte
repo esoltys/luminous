@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { fly, fade } from "svelte/transition";
+  import { fly, fade } from "../utils/motion";
   import {
     WarningIcon as AlertTriangle,
     CheckCircleIcon as CheckCircle2,

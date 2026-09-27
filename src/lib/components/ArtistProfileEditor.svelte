@@ -155,7 +155,7 @@
     onclick={handleBackdropClick}
   >
     <div
-      class="w-full max-w-xl bg-brand-sidebar border border-brand-border rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] sm:max-h-[90vh] my-auto animate-in fade-in zoom-in-95 duration-150"
+      class="w-full max-w-xl bg-brand-sidebar border border-brand-border rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] sm:max-h-[90vh] my-auto"
       role="dialog"
       aria-modal="true"
       aria-labelledby="artist-editor-title"

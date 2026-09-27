@@ -59,7 +59,7 @@
   use:portal
   bind:this={menuEl}
   style="left: {adjustedX}px; top: {adjustedY}px;"
-  class="fixed z-50 w-52 bg-brand-sidebar border border-brand-border/80 rounded-xl shadow-2xl py-1.5 text-xs text-brand-text-primary backdrop-blur-xl animate-in fade-in zoom-in-95 duration-100 select-none"
+  class="fixed z-50 w-52 bg-brand-sidebar border border-brand-border/80 rounded-xl shadow-2xl py-1.5 text-xs text-brand-text-primary backdrop-blur-xl select-none"
   role="menu"
   tabindex="-1"
 >

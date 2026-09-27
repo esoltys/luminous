@@ -258,7 +258,7 @@
           >
             <div class="flex-1 w-full flex items-end">
               <div
-                class="relative w-full rounded-t-sm transition-[height] duration-500 ease-out"
+                class="relative w-full rounded-t-sm transition-[height] duration-300 ease-out"
                 style="height: {barsRevealed ? barHeightPercent(cell) : 0}%; {cellStyle(cell)}"
               >
                 {#if cell.date === peakDate}

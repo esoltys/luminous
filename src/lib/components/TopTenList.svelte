@@ -5,6 +5,7 @@
   import { collectionStore } from "../stores/collection.svelte";
   import { invoke } from "@tauri-apps/api/core";
   import CoverArt from "./CoverArt.svelte";
+  import HelpTip from "./HelpTip.svelte";
   import SongRating from "./SongRating.svelte";
   import FavouriteCornerFlag from "./FavouriteCornerFlag.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
@@ -120,7 +121,7 @@
 {/snippet}
 
 {#snippet movementSnippet(item: StatsTopItem)}
-  <div class="w-5 shrink-0 flex items-center justify-center" title={movementTooltip(item)}>
+  <HelpTip text={movementTooltip(item)} class="w-5 shrink-0">
     {#if item.movement === "rising"}
       <TrendUpIcon class="w-4 h-4 text-green-400" weight="bold" />
     {:else if item.movement === "falling"}
@@ -130,7 +131,7 @@
     {:else}
       <MinusIcon class="w-4 h-4 text-brand-text-secondary" />
     {/if}
-  </div>
+  </HelpTip>
 {/snippet}
 
 {#snippet durationSnippet(item: StatsTopItem)}

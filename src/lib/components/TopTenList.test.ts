@@ -175,7 +175,7 @@ describe("TopTenList.svelte", () => {
     expect(onHeaderClick).toHaveBeenCalledOnce();
   });
 
-  it("shows a movement indicator title for chart items but not for items without movement data", () => {
+  it("shows a keyboard-reachable movement indicator for chart items but not for items without movement data", () => {
     const items: StatsTopItem[] = [
       {
         key: "album_1",
@@ -203,15 +203,16 @@ describe("TopTenList.svelte", () => {
       },
     ];
 
-    const { container } = render(TopTenList, {
+    const { getAllByRole } = render(TopTenList, {
       props: {
         items,
         kind: "album",
       },
     });
 
-    const movementColumns = container.querySelectorAll("[title*='Rising']");
-    expect(movementColumns).toHaveLength(1);
+    const movementIndicators = getAllByRole("button").filter((b) => /Rising|Steady|New|Falling/.test(b.getAttribute("aria-label") ?? ""));
+    expect(movementIndicators).toHaveLength(1);
+    expect(movementIndicators[0]).toHaveAccessibleName("Rising · 2 weeks");
   });
 
   it("renders custom emptyText when items array is empty", () => {

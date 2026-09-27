@@ -3,6 +3,21 @@
 // (run-smoke.ts) and the dev-time inspection tool (scripts/inspect-app.ts).
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createConnection } from 'node:net';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+/**
+ * The debug app binary built by `tauri build --debug --no-bundle`. Honours
+ * CARGO_TARGET_DIR, so a worktree sharing the main checkout's cargo cache
+ * finds the binary it just built rather than a missing/stale one.
+ */
+export const APP_EXE = path.join(
+  process.env.CARGO_TARGET_DIR ? path.resolve(process.env.CARGO_TARGET_DIR) : path.join(REPO_ROOT, 'target'),
+  'debug',
+  'LuminousMusicPlayer.exe',
+);
 
 const TAURI_DRIVER_PORT = 4444;
 const DRIVER_BASE = `http://127.0.0.1:${TAURI_DRIVER_PORT}`;
@@ -136,6 +151,16 @@ export function getUrl(session: DriverSession): Promise<string> {
 
 export function getTitle(session: DriverSession): Promise<string> {
   return webdriverRequest('GET', `/session/${session.sessionId}/title`);
+}
+
+/**
+ * Runs `script` as the body of a function in the page (WebDriver
+ * execute/sync) and returns its JSON-serializable result. `args` are
+ * available to the script as `arguments[0..]`. Async work is awaited: a
+ * returned Promise resolves before the command completes.
+ */
+export function executeScript<T = unknown>(session: DriverSession, script: string, args: unknown[] = []): Promise<T> {
+  return webdriverRequest('POST', `/session/${session.sessionId}/execute/sync`, { script, args });
 }
 
 const ELEMENT_KEY = 'element-6066-11e4-a52e-4f735466cecf';

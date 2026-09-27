@@ -1,13 +1,13 @@
 // Windows-only e2e smoke test: launches the real Tauri app (real Rust
 // backend, real IPC, real SQLite) through tauri-driver + msedgedriver and
-// verifies the main window renders. See issue #779.
+// verifies the main window renders (#779) and that the reduced-motion CSS
+// reaches every transform transition in it (#1210).
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { getSource, getTitle, startSession, stopSession, type DriverSession } from './webdriver-client';
+import { checkReducedMotion } from './reduced-motion';
+import { APP_EXE, getSource, getTitle, startSession, stopSession, type DriverSession } from './webdriver-client';
 
-const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // Must be built via `tauri build --debug` (not plain `cargo build`, and not
 // `tauri build` in release mode):
 //   - Only the tauri CLI's build pipeline embeds `frontendDist` into the
@@ -19,7 +19,7 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..
 //     msedgedriver needs to control the page, so it hangs at about:blank.
 //     `--debug` keeps `cfg!(debug_assertions)` true, which carves out
 //     DEV_TOOLS from that flag set.
-const APP_EXE = path.join(REPO_ROOT, 'target', 'debug', 'LuminousMusicPlayer.exe');
+// APP_EXE (webdriver-client) is where that build lands.
 
 async function runSmokeTest(): Promise<void> {
   if (!existsSync(APP_EXE)) {
@@ -56,7 +56,9 @@ async function runSmokeTest(): Promise<void> {
       );
     }
 
-    console.log('✅ Smoke test passed: app launched and sidebar rendered.');
+    await checkReducedMotion(session);
+
+    console.log('✅ Smoke test passed: app launched, sidebar rendered, reduced-motion rules reach every transition.');
   } finally {
     if (session) await stopSession(session);
     rmSync(dataDir, { recursive: true, force: true });

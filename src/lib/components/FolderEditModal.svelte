@@ -74,7 +74,7 @@
   onclick={(e) => { if (e.target === e.currentTarget) onClose(); }}
 >
   <div
-    class="bg-brand-sidebar border border-brand-border rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150"
+    class="bg-brand-sidebar border border-brand-border rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col"
     style="max-height: min(90vh, calc(100vh - {dockClearance + 32}px))"
   >
     <div class="flex items-center justify-between px-6 py-4 border-b border-brand-border/60 bg-brand-main/50">

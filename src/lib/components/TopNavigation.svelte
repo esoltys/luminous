@@ -29,7 +29,7 @@
   import CoverArt from "./CoverArt.svelte";
   import FavouriteCornerFlag from "./FavouriteCornerFlag.svelte";
   import ReactiveLogoBrand from "./ReactiveLogoBrand.svelte";
-  import { fade } from "svelte/transition";
+  import { fade } from "../utils/motion";
   import { MAX_SEARCH_SUGGESTIONS_PER_CATEGORY } from "../constants";
 
   let searchInput: HTMLInputElement | undefined;
@@ -293,7 +293,7 @@
 
 <svelte:window on:keydown={handleKeyDown} on:mouseup={handleMouseUp} on:mousedown={handleWindowMouseDown} />
 
-<header data-walkthrough-target="top-navigation" in:fade={{ duration: 600 }} class="w-full h-20 bg-brand-sidebar flex items-center px-6 gap-6 z-50 overflow-visible {themeStore.isGlassTheme ? 'glass-surface' : ''}">
+<header data-walkthrough-target="top-navigation" in:fade={{ duration: 200 }} class="w-full h-20 bg-brand-sidebar flex items-center px-6 gap-6 z-50 overflow-visible {themeStore.isGlassTheme ? 'glass-surface' : ''}">
   <div class="flex items-center gap-2">
     {#if !windowLayoutStore.isSidebarAutoCollapsed}
       <button

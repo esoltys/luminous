@@ -417,7 +417,7 @@
         sizeClass="w-7 h-7 rounded shrink-0"
       />
       {#if rowDisabled(row)}
-        <span title={row.disabledTooltip}>
+        <span title={row.disabledTooltip} role="img" aria-label={row.disabledTooltip}>
           <AlertTriangle class="w-3.5 h-3.5 shrink-0 text-amber-400/80" />
         </span>
       {/if}

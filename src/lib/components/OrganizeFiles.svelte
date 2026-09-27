@@ -20,6 +20,7 @@
   import { VirtualList } from "svelte-virtual-list-ts";
   import Toggle from "./Toggle.svelte";
   import Button from "./Button.svelte";
+  import HelpTip from "./HelpTip.svelte";
 
   const PREVIEW_DEBOUNCE_MS = 300;
   const COL_MIN_WIDTH_PX = 150;
@@ -799,20 +800,29 @@
                           {i18n.t("organizer.statusUnchanged")}
                         </span>
                       {:else if st === "duplicate"}
-                        <span class="inline-flex items-center justify-center w-6 h-6 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40" title={item.error_message || i18n.t("organizer.statusCollision")}>
+                        <HelpTip
+                          text={item.error_message || i18n.t("organizer.statusCollision")}
+                          label={item.error_message ? i18n.t("organizer.statusCollision") : undefined}
+                          class="w-6 h-6 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40"
+                        >
                           <Duplicate class="w-3.5 h-3.5" />
-                          <span class="sr-only">{i18n.t("organizer.statusCollision")}</span>
-                        </span>
+                        </HelpTip>
                       {:else if st === "missing_tag"}
-                        <span class="inline-flex items-center justify-center w-6 h-6 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40" title={item.error_message || i18n.t("organizer.statusMissingTag")}>
+                        <HelpTip
+                          text={item.error_message || i18n.t("organizer.statusMissingTag")}
+                          label={item.error_message ? i18n.t("organizer.statusMissingTag") : undefined}
+                          class="w-6 h-6 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40"
+                        >
                           <AlertTriangle class="w-3.5 h-3.5" />
-                          <span class="sr-only">{i18n.t("organizer.statusMissingTag")}</span>
-                        </span>
+                        </HelpTip>
                       {:else}
-                        <span class="inline-flex items-center justify-center w-6 h-6 rounded bg-rose-500/20 text-rose-400 border border-rose-500/40" title={item.error_message || i18n.t("organizer.statusError")}>
+                        <HelpTip
+                          text={item.error_message || i18n.t("organizer.statusError")}
+                          label={item.error_message ? i18n.t("organizer.statusError") : undefined}
+                          class="w-6 h-6 rounded bg-rose-500/20 text-rose-400 border border-rose-500/40"
+                        >
                           <ErrorIcon class="w-3.5 h-3.5" />
-                          <span class="sr-only">{i18n.t("organizer.statusError")}</span>
-                        </span>
+                        </HelpTip>
                       {/if}
                     </div>
 
@@ -913,12 +923,12 @@
   {:else}
     <div
       use:portal
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md"
       role="dialog"
       aria-modal="true"
     >
       <div
-        class="w-full max-w-4xl max-h-[90vh] bg-brand-sidebar border border-brand-border/80 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 text-brand-text-primary"
+        class="w-full max-w-4xl max-h-[90vh] bg-brand-sidebar border border-brand-border/80 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-brand-text-primary"
       >
         <div class="px-6 py-4 border-b border-brand-border/40 flex items-center justify-between shrink-0">
           <div class="flex items-center gap-3">

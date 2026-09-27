@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
-  import { cubicIn, cubicOut } from "svelte/easing";
+  import { cubicOut } from "svelte/easing";
   import { portal } from "$lib/utils/portal";
+  import { prefersReducedMotion } from "$lib/utils/motion";
   import { playerStore } from "$lib/stores/player.svelte";
   import { i18n } from "$lib/stores/i18n.svelte";
   import AudioPipelineStages from "./AudioPipelineStages.svelte";
@@ -80,16 +81,21 @@
     return parts.join('; ');
   });
 
+  // Hand-rolled rather than motion.ts's scale/fly because the bloom grows
+  // from the anchor; under reduced motion it drops to a plain fade.
+  function bloom(t: number, isAbove: boolean) {
+    if (prefersReducedMotion()) return `opacity: ${t};`;
+    const scale = 0.88 + 0.12 * t;
+    const y = (isAbove ? 8 : -8) * (1 - t);
+    return `transform: scale(${scale}) translateY(${y}px); opacity: ${t};`;
+  }
+
   function bloomIn(_node: HTMLElement) {
     const isAbove = coords.isAbove;
     return {
       duration: 180,
       easing: cubicOut,
-      css: (t: number) => {
-        const scale = 0.88 + 0.12 * t;
-        const y = (isAbove ? 8 : -8) * (1 - t);
-        return `transform: scale(${scale}) translateY(${y}px); opacity: ${t};`;
-      },
+      css: (t: number) => bloom(t, isAbove),
     };
   }
 
@@ -97,12 +103,8 @@
     const isAbove = coords.isAbove;
     return {
       duration: 150,
-      easing: cubicIn,
-      css: (t: number) => {
-        const scale = 0.88 + 0.12 * t;
-        const y = (isAbove ? 8 : -8) * (1 - t);
-        return `transform: scale(${scale}) translateY(${y}px); opacity: ${t};`;
-      },
+      easing: cubicOut,
+      css: (t: number) => bloom(t, isAbove),
     };
   }
 
