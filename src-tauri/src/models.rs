@@ -1042,7 +1042,7 @@ pub struct AlbumItem {
 pub struct TopAlbumItem {
     pub album: AlbumItem,
     pub rank: i32,
-    /// Rank in the prior UTC calendar week, or `None` if the album wasn't in
+    /// Rank in the prior local calendar week, or `None` if the album wasn't in
     /// last week's top chart (shown as "new" rather than a numeric jump).
     pub previous_rank: Option<i32>,
     /// Best (lowest) rank this album has ever held across all recorded weeks,

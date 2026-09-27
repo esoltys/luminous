@@ -1288,7 +1288,8 @@ impl CollectionScanner {
         Ok(items)
     }
 
-    /// Weekly "Top Albums" chart (#662): albums ranked by play count within
+    /// Weekly "Top Albums" chart (#662): albums ranked by minutes played
+    /// (then play count), matching the Stats view's Top Albums, within
     /// the current local calendar week (starting local midnight on the
     /// user's chosen Sunday or Monday), with movement (new/rising/falling/steady) against the
     /// prior week, peak rank, and weeks-on-chart. Backed by a snapshot table
@@ -1322,7 +1323,7 @@ impl CollectionScanner {
             starts_at,
         } = chart_week(now, start_sunday, tz);
 
-        // Rank this week's albums by play count. Every result must be an
+        // Rank this week's albums by listening time, as Stats does. Every result must be an
         // Album card regardless of track count (unlike
         // group_songs_into_home_items, which falls back to a Song card for
         // single-track "albums"), so this dedups by album name directly
@@ -1333,7 +1334,8 @@ impl CollectionScanner {
             "SELECT {home_item_select_cols}, wc.week_plays
              FROM songs s
              JOIN (
-                 SELECT s2.album AS album, COUNT(*) AS week_plays
+                 SELECT s2.album AS album, COUNT(*) AS week_plays,
+                        COALESCE(SUM(COALESCE(NULLIF(ph.duration_secs, 0), s2.length_nanosec / 1000000000, 0)), 0) AS week_secs
                  FROM play_history ph
                  JOIN songs s2 ON s2.id = ph.song_id
                  WHERE ph.played_at >= ?1
@@ -1342,7 +1344,7 @@ impl CollectionScanner {
                  GROUP BY s2.album
              ) wc ON wc.album = s.album
              WHERE s.source IN ({lib}) AND s.unavailable = 0
-             ORDER BY wc.week_plays DESC, s.added DESC
+             ORDER BY wc.week_secs DESC, wc.week_plays DESC, s.added DESC
              LIMIT ?2",
             lib = *LIBRARY_SOURCES_SQL
         );
@@ -1432,7 +1434,8 @@ impl CollectionScanner {
                    AND s.source IN ({lib}) AND s.unavailable = 0
                    AND s.album IS NOT NULL AND TRIM(s.album) != ''
                  GROUP BY s.album
-                 ORDER BY COUNT(*) DESC, MAX(s.added) DESC
+                 ORDER BY COALESCE(SUM(COALESCE(NULLIF(ph.duration_secs, 0), s.length_nanosec / 1000000000, 0)), 0) DESC,
+                          COUNT(*) DESC, MAX(s.added) DESC
                  LIMIT ?3",
                 lib = *LIBRARY_SOURCES_SQL
             );
@@ -3895,6 +3898,70 @@ mod tests {
         assert_eq!(brand_new.previous_rank, None);
         assert_eq!(brand_new.movement, "new");
         assert_eq!(brand_new.weeks_on_chart, 1);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// Like Stats' Top Albums, the chart ranks by minutes played: one long
+    /// listen outranks several short ones, in both this week and last.
+    #[test]
+    fn test_get_top_albums_ranks_by_minutes_played() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_top_albums_minutes_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+        let seed = |path: &str, album: &str| -> i64 {
+            upsert_song(
+                &conn,
+                &Song {
+                    artist: Some("Some Artist".to_string()),
+                    album: Some(album.to_string()),
+                    title: Some(path.to_string()),
+                    source: SongSource::LocalFile,
+                    path: Some(path.to_string()),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+            conn.query_row(
+                "SELECT id FROM songs WHERE path = ?1",
+                params![path],
+                |row| row.get(0),
+            )
+            .unwrap()
+        };
+        let record_plays = |song_id: i64, played_at: i64, secs: i64, n: usize| {
+            for _ in 0..n {
+                conn.execute(
+                    "INSERT INTO play_history (context_type, song_id, played_at, duration_secs) VALUES ('song', ?1, ?2, ?3)",
+                    params![song_id, played_at, secs],
+                )
+                .unwrap();
+            }
+        };
+        let long = seed(r"C:\Music\long.mp3", "Long Album");
+        let short = seed(r"C:\Music\short.mp3", "Short Album");
+
+        let last_week = 1_789_257_600; // Sun 2026-09-13 00:00 UTC
+        let this_week = 1_789_862_400; // Sun 2026-09-20 00:00 UTC
+        let now = this_week + 86_400;
+        record_plays(short, last_week + 60, 60, 5); // 5 min
+        record_plays(long, last_week + 60, 600, 1); // 10 min
+        record_plays(short, this_week + 60, 60, 5); // 5 min
+        record_plays(long, this_week + 60, 1200, 1); // 20 min
+
+        let chart = CollectionScanner::new(db.clone())
+            .get_top_albums_at(10, now, &chrono::Utc)
+            .unwrap();
+        assert_eq!(chart[0].album.album.as_deref(), Some("Long Album"));
+        assert_eq!(chart[0].movement, "steady");
+        assert_eq!(chart[1].album.album.as_deref(), Some("Short Album"));
+        assert_eq!(chart[1].movement, "steady");
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
