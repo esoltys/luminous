@@ -148,9 +148,12 @@ jobs:
             ~/.cargo/.crates2.json
           key: tauri-cli-windows-${{ env.TAURI_CLI_VERSION }}
 
+      # --locked builds against tauri-cli's own Cargo.lock: without it cargo
+      # resolves the newest semver-compatible deps, and a newer tauri-bundler
+      # broke the 2.11.4 build on a cache miss (v2.6.0).
       - name: Install tauri-cli (Windows)
         if: matrix.platform == 'windows-latest'
-        run: cargo install tauri-cli --version "${{ env.TAURI_CLI_VERSION }}"
+        run: cargo install tauri-cli --version "${{ env.TAURI_CLI_VERSION }}" --locked
 
       - name: Build MSIX Package (Windows)
         if: matrix.platform == 'windows-latest'
