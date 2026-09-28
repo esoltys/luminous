@@ -84,6 +84,11 @@ class PlaylistsStore {
     return pl && !pl.dynamic_enabled ? pl : null;
   });
 
+  /** All user-created custom playlists (not dynamic, not queue). */
+  customPlaylists = $derived.by((): Playlist[] => {
+    return this.playlists.filter((p) => !p.dynamic_enabled && !p.is_queue);
+  });
+
   constructor() {
     this.init();
   }
