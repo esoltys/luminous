@@ -1317,6 +1317,19 @@ pub struct AlbumProfile {
     /// Whether album details/links have already been automatically fetched (#1143).
     #[serde(default)]
     pub details_fetched: bool,
+    /// Cached fanart.tv album cover filename in the covers dir (#1277). Shown
+    /// only when the album has no embedded, local or iTunes cover.
+    #[serde(default)]
+    pub fetched_cover_filename: Option<String>,
+    /// Cached fanart.tv disc art filename in the covers dir (#1277).
+    #[serde(default)]
+    pub fetched_disc_filename: Option<String>,
+    /// Whether fanart.tv has been asked for this album's cover (#1277).
+    #[serde(default)]
+    pub cover_fetched: bool,
+    /// Whether fanart.tv has been asked for this album's disc art (#1277).
+    #[serde(default)]
+    pub disc_fetched: bool,
 }
 
 /// A Luminous-native song tag (#224), independent of the embedded

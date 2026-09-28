@@ -587,6 +587,18 @@ export interface AlbumProfile {
   links: AlbumLink[];
   /** Whether album details/links have already been automatically fetched (#1143). */
   details_fetched?: boolean;
+  /** Cached fanart.tv album cover and disc art filenames (#1277). */
+  fetched_cover_filename?: string | null;
+  fetched_disc_filename?: string | null;
+  /** Whether fanart.tv was asked for each type, so the automatic backfill doesn't repeat. */
+  cover_fetched?: boolean;
+  disc_fetched?: boolean;
+}
+
+export interface AlbumArtRetrievalResult {
+  cover_uri: string | null;
+  disc_uri: string | null;
+  profile: AlbumProfile;
 }
 
 export interface AlbumDetailsRetrievalResult {

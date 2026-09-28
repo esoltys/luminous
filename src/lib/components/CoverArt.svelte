@@ -7,6 +7,8 @@
   } from "phosphor-svelte";
   import { getCoverArtUrl, resolveArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
+  import { prefs } from "../stores/prefs.svelte";
+  import { collectionStore } from "../stores/collection.svelte";
 
   interface Props {
     songId: number | undefined;
@@ -88,6 +90,16 @@
       const uri = await invoke<string | null>("fetch_remote_cover", { songId });
       if (uri) {
         imgSrc = getCoverArtUrl(`luminous-art://${uri}`);
+        hasFailed = false;
+        return;
+      }
+      // iTunes has now missed too, which makes the fanart.tv cover the
+      // fallback (#1277): ask once more rather than re-running
+      // loadCoverArt, which would loop back here.
+      const fallback = await invoke<string | null>("get_cover_art_uri", { songId });
+      if (fallback) {
+        imgSrc = getCoverArtUrl(fallback);
+        hasFailed = false;
       }
     } catch (e) {
       console.error("Failed to fetch remote cover:", e);
@@ -100,6 +112,9 @@
     const _manual = artManual;
     const _embed = artEmbedded;
     const _full = fullResolution;
+    // A fanart.tv cover arriving or its toggle changing re-resolves (#1277).
+    const _fanart = prefs.fanartFetchAlbumCover;
+    const _version = collectionStore.coverArtVersion;
     loadCoverArt();
   });
 </script>

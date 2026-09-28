@@ -597,6 +597,8 @@
       { label: 'settings.fanartFetchPhoto', hint: 'settings.fanartFetchPhotoHint', checked: prefs.fanartFetchPhoto, set: (v: boolean) => prefs.setFanartFetchPhoto(v) },
       { label: 'settings.fanartFetchLogo', hint: 'settings.fanartFetchLogoHint', checked: prefs.fanartFetchLogo, set: (v: boolean) => prefs.setFanartFetchLogo(v) },
       { label: 'settings.fanartFetchBackground', hint: 'settings.fanartFetchBackgroundHint', checked: prefs.fanartFetchBackground, set: (v: boolean) => prefs.setFanartFetchBackground(v) },
+      { label: 'settings.fanartFetchAlbumCover', hint: 'settings.fanartFetchAlbumCoverHint', checked: prefs.fanartFetchAlbumCover, set: (v: boolean) => prefs.setFanartFetchAlbumCover(v) },
+      { label: 'settings.fanartFetchDiscArt', hint: 'settings.fanartFetchDiscArtHint', checked: prefs.fanartFetchDiscArt, set: (v: boolean) => prefs.setFanartFetchDiscArt(v) },
     ] as row (row.label)}
       <div class="flex items-center justify-between gap-4 py-1">
         <div class="flex flex-col gap-0.5 min-w-0">
