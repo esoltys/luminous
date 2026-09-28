@@ -233,7 +233,7 @@ mod tests {
     #[test]
     fn dispatch_summary_counts_only_the_window_busiest_first() {
         let t0 = Instant::now();
-        let d = vec![
+        let d = [
             (t0, "too_early".to_owned()),
             (t0 + ms(100), "get_cover".to_owned()),
             (t0 + ms(110), "get_songs".to_owned()),
