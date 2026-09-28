@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="fr">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -396,7 +396,13 @@
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Réanalyser au démarrage</b> fait vérifier vos dossiers par Luminous à chaque lancement.</div></div>
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Analyse incrémentielle</b> ne recherche que ce qui a changé; <b style="color:#f1f3f8;">Analyse complète forcée</b> relit tout depuis le début. Les deux affichent une progression en direct.</div></div>
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Un panneau de statistiques indique la dernière analyse de votre bibliothèque, ainsi que le nombre de chansons, d'albums, d'artistes et la taille totale.</div></div>
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Vous pouvez aussi ajouter des serveurs multimédias distants <b style="color:#f1f3f8;">WebDAV</b> ou <b style="color:#f1f3f8;">OpenSubsonic</b> comme source. Les dossiers distants sont en lecture seule — toute modification d'étiquette ou d'organisation reste locale à Luminous et n'est jamais réécrite sur le serveur.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Vous pouvez aussi ajouter des serveurs multimédias distants pour diffuser votre musique sur le réseau&nbsp;:
+            <div style="margin-top:8px; display:flex; flex-direction:column; gap:6px;">
+              <div>– <b style="color:#f1f3f8;">WebDAV&nbsp;:</b> Un protocole de fichiers basé sur HTTP pris en charge par les hébergements cloud personnels et les NAS (comme Nextcloud, ownCloud ou Synology). Il permet à Luminous de lire vos fichiers audio distants directement sans avoir à monter de lecteur réseau.</div>
+              <div>– <b style="color:#f1f3f8;">OpenSubsonic&nbsp;:</b> Un standard d'API ouvert très répandu pour les serveurs de streaming musical personnels (tels que Navidrome, Gonic, LMS ou Subsonic). Luminous synchronise la bibliothèque du serveur, diffuse la musique sur le réseau et peut transmettre vos écoutes et statistiques au serveur.</div>
+              <div style="color:#a6adc4; font-size:13px; margin-top:2px;">Les dossiers et serveurs distants sont strictement en lecture seule — toute modification d'étiquette, d'illustration ou d'organisation reste locale à Luminous et n'est jamais réécrite sur le serveur.</div>
+            </div>
+          </div></div>
         </div>
         <div style="max-width:640px; border-radius:14px; overflow:hidden; border:1px solid #23262f;">
           <image-slot id="settings-folders-fr" src="screenshots/settings-folders-FR.png?v=1790533502112" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/1100;" placeholder="Paramètres des dossiers"></image-slot>
