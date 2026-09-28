@@ -59,6 +59,14 @@ describe("CollectionStore - artist/album navigation and history", () => {
     expect(collectionStore.searchQuery).toBe("");
   });
 
+  it("viewAlbum sets a one-shot focus-song signal only when given a song id (#1280)", () => {
+    navigationStore.viewAlbum("Dark Side", 7);
+    expect(navigationStore.pendingFocusSongId).toBe(7);
+
+    navigationStore.viewAlbum("Wish You Were Here");
+    expect(navigationStore.pendingFocusSongId).toBeNull();
+  });
+
   it("persists the selected album/artist detail view to localStorage so a relaunch restores it", () => {
     navigationStore.viewAlbum("Dark Side of the Moon");
     expect(localStorage.getItem("navigation_selectedAlbumName")).toBe("Dark Side of the Moon");

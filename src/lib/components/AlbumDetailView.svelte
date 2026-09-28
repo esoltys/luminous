@@ -1,5 +1,6 @@
 <script lang="ts">
   import { isRemoteSource } from "../utils/remoteSource";
+  import { tick } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { applySongStats, type SongStatsPayload, applyAlbumStats, type AlbumStatsPayload } from "../utils/stats";
@@ -339,6 +340,9 @@
     }
   }
 
+  /** Which album `songs` currently holds — lags `albumName` until its fetch lands. */
+  let loadedAlbumName = $state<string | null>(null);
+
   $effect(() => {
     const requested = albumName;
     loading = true;
@@ -353,13 +357,33 @@
           return (a.track ?? 0) - (b.track ?? 0);
         });
         songs = filtered;
+        loadedAlbumName = requested;
       })
       .catch((err) => {
         console.error("Failed to load album detail:", err);
+        if (requested === albumName) navigationStore.pendingFocusSongId = null;
       })
       .finally(() => {
         if (requested === albumName) loading = false;
       });
+  });
+
+  let scrollContainerEl = $state<HTMLDivElement | undefined>(undefined);
+
+  // A song picked from search (#1280): once this album's tracks are in, select
+  // it and centre it — scrollIntoView also stops rememberScroll's restores.
+  $effect(() => {
+    const focusId = navigationStore.pendingFocusSongId;
+    if (focusId === null || loading || loadedAlbumName !== albumName || !scrollContainerEl) return;
+    navigationStore.pendingFocusSongId = null;
+    if (!songs.some((s) => s.id === focusId)) return;
+    const key = String(focusId);
+    selectedKeys = new Set([key]);
+    tick().then(() => {
+      scrollContainerEl
+        ?.querySelector<HTMLElement>(`[data-song-row][data-key="${key}"]`)
+        ?.scrollIntoView({ block: "center" });
+    });
   });
 
   type AlbumSortField = keyof Song | "track";
@@ -561,6 +585,7 @@
 </script>
 
 <div
+  bind:this={scrollContainerEl}
   class="relative flex-1 flex flex-col overflow-y-auto text-brand-text-secondary h-full {backdropUrl ? '' : 'bg-brand-main'}"
   use:rememberScroll={`album-detail:${albumName}`}
 >

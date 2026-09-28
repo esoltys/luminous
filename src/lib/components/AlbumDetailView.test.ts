@@ -336,6 +336,37 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
 
     expect(invokeMock).not.toHaveBeenCalledWith("retrieve_album_details", expect.anything());
   });
+
+  describe("song picked from search (#1280)", () => {
+    const scrollIntoView = vi.fn();
+    beforeEach(() => {
+      scrollIntoView.mockClear();
+      Element.prototype.scrollIntoView = scrollIntoView;
+    });
+
+    it("selects the focused song's row, scrolls it into view, and clears the signal", async () => {
+      navigationStore.pendingFocusSongId = 2;
+      const { container } = render(AlbumDetailView, { props: { albumName: mockAlbumName } });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      const row = container.querySelector<HTMLElement>('[data-song-row][data-key="2"]')!;
+      expect(row.className).toContain("bg-brand-accent/20");
+      expect(container.querySelector('[data-song-row][data-key="1"]')!.className).not.toContain("bg-brand-accent/20");
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+      expect(scrollIntoView.mock.contexts[0]).toBe(row);
+      expect(navigationStore.pendingFocusSongId).toBeNull();
+    });
+
+    it("clears the signal without selecting anything when the song isn't on this album", async () => {
+      navigationStore.pendingFocusSongId = 999;
+      const { container } = render(AlbumDetailView, { props: { albumName: mockAlbumName } });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      for (const row of container.querySelectorAll("[data-song-row]")) {
+        expect(row.className).not.toContain("bg-brand-accent/20");
+      }
+      expect(scrollIntoView).not.toHaveBeenCalled();
+      expect(navigationStore.pendingFocusSongId).toBeNull();
+    });
+  });
 });
-
-
