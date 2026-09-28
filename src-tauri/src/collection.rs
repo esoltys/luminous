@@ -3406,15 +3406,12 @@ Official DR value: DR13\n",
         let song = read_and_prepare_song(&cover_manager, &audio_path).unwrap();
 
         assert!(song.art_embedded);
+        // Compare canonical forms: on Windows the stored path has the `\\?\`
+        // verbatim prefix stripped, which `canonicalize()` adds back.
+        let art_automatic = song.art_automatic.as_deref().expect("folder art path");
         assert_eq!(
-            song.art_automatic.as_deref(),
-            Some(
-                folder_art_path
-                    .canonicalize()
-                    .unwrap()
-                    .to_string_lossy()
-                    .as_ref()
-            )
+            std::path::Path::new(art_automatic).canonicalize().unwrap(),
+            folder_art_path.canonicalize().unwrap()
         );
         assert_eq!(
             std::fs::read_dir(cover_manager.covers_dir())

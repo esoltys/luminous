@@ -1875,43 +1875,39 @@ pub fn get_all_artist_profiles_conn(conn: &rusqlite::Connection) -> Result<Vec<A
     Ok(profiles)
 }
 
+const ALBUM_PROFILE_COLUMNS: &str = "album_key, artist_key, description, website, links, details_fetched, fetched_cover_filename, fetched_disc_filename, cover_fetched, disc_fetched";
+
+fn album_profile_from_row(row: &rusqlite::Row) -> rusqlite::Result<AlbumProfile> {
+    let album_key: String = row.get(0)?;
+    let links_json: String = row.get(4)?;
+    let links: Vec<AlbumLink> = serde_json::from_str(&links_json).unwrap_or_else(|e| {
+        log::warn!("Failed to parse album_profiles.links for '{album_key}': {e}");
+        Vec::new()
+    });
+    Ok(AlbumProfile {
+        album_key,
+        artist_key: row.get(1)?,
+        description: row.get(2)?,
+        website: row.get(3)?,
+        links,
+        details_fetched: row.get(5)?,
+        fetched_cover_filename: row.get(6)?,
+        fetched_disc_filename: row.get(7)?,
+        cover_fetched: row.get(8)?,
+        disc_fetched: row.get(9)?,
+    })
+}
+
 /// Retrieve customizable profile and liner notes for an album from SQLite (#950).
 pub fn get_album_profile_conn(conn: &rusqlite::Connection, album: &str) -> Result<AlbumProfile> {
-    let mut stmt = conn.prepare(
-        "SELECT album_key, artist_key, description, website, links, details_fetched FROM album_profiles WHERE album_key = ?1 COLLATE NOCASE",
-    )?;
-    let result = stmt.query_row(params![album], |row| {
-        let album_key: String = row.get(0)?;
-        let artist_key: Option<String> = row.get(1)?;
-        let description: Option<String> = row.get(2)?;
-        let website: Option<String> = row.get(3)?;
-        let links_json: String = row.get(4)?;
-        let details_fetched: bool = row.get(5)?;
-
-        let links: Vec<AlbumLink> = serde_json::from_str(&links_json).unwrap_or_else(|e| {
-            log::warn!("Failed to parse album_profiles.links for '{album_key}': {e}");
-            Vec::new()
-        });
-
-        Ok(AlbumProfile {
-            album_key,
-            artist_key,
-            description,
-            website,
-            links,
-            details_fetched,
-        })
-    });
-
-    match result {
+    let mut stmt = conn.prepare(&format!(
+        "SELECT {ALBUM_PROFILE_COLUMNS} FROM album_profiles WHERE album_key = ?1 COLLATE NOCASE"
+    ))?;
+    match stmt.query_row(params![album], album_profile_from_row) {
         Ok(profile) => Ok(profile),
         Err(rusqlite::Error::QueryReturnedNoRows) => Ok(AlbumProfile {
             album_key: album.to_string(),
-            artist_key: None,
-            description: None,
-            website: None,
-            links: Vec::new(),
-            details_fetched: false,
+            ..Default::default()
         }),
         Err(e) => Err(e.into()),
     }
@@ -1925,21 +1921,29 @@ pub fn set_album_profile_conn(
     let links_json = serde_json::to_string(&profile.links)?;
 
     conn.execute(
-        "INSERT INTO album_profiles (album_key, artist_key, description, website, links, details_fetched)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+        "INSERT INTO album_profiles (album_key, artist_key, description, website, links, details_fetched, fetched_cover_filename, fetched_disc_filename, cover_fetched, disc_fetched)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
          ON CONFLICT(album_key) DO UPDATE SET
             artist_key = excluded.artist_key,
             description = excluded.description,
             website = excluded.website,
             links = excluded.links,
-            details_fetched = excluded.details_fetched",
+            details_fetched = excluded.details_fetched,
+            fetched_cover_filename = excluded.fetched_cover_filename,
+            fetched_disc_filename = excluded.fetched_disc_filename,
+            cover_fetched = excluded.cover_fetched,
+            disc_fetched = excluded.disc_fetched",
         params![
             profile.album_key,
             profile.artist_key,
             profile.description,
             profile.website,
             links_json,
-            profile.details_fetched as i32
+            profile.details_fetched as i32,
+            profile.fetched_cover_filename,
+            profile.fetched_disc_filename,
+            profile.cover_fetched as i32,
+            profile.disc_fetched as i32
         ],
     )?;
 
@@ -1948,32 +1952,11 @@ pub fn set_album_profile_conn(
 
 /// Retrieve all saved album profiles in SQLite (#950).
 pub fn get_all_album_profiles_conn(conn: &rusqlite::Connection) -> Result<Vec<AlbumProfile>> {
-    let mut stmt = conn.prepare(
-        "SELECT album_key, artist_key, description, website, links, details_fetched FROM album_profiles ORDER BY album_key COLLATE NOCASE",
-    )?;
+    let mut stmt = conn.prepare(&format!(
+        "SELECT {ALBUM_PROFILE_COLUMNS} FROM album_profiles ORDER BY album_key COLLATE NOCASE"
+    ))?;
     let profiles = stmt
-        .query_map([], |row| {
-            let album_key: String = row.get(0)?;
-            let artist_key: Option<String> = row.get(1)?;
-            let description: Option<String> = row.get(2)?;
-            let website: Option<String> = row.get(3)?;
-            let links_json: String = row.get(4)?;
-            let details_fetched: bool = row.get(5)?;
-
-            let links: Vec<AlbumLink> = serde_json::from_str(&links_json).unwrap_or_else(|e| {
-                log::warn!("Failed to parse album_profiles.links for '{album_key}': {e}");
-                Vec::new()
-            });
-
-            Ok(AlbumProfile {
-                album_key,
-                artist_key,
-                description,
-                website,
-                links,
-                details_fetched,
-            })
-        })?
+        .query_map([], album_profile_from_row)?
         .filter_map(|r| r.ok())
         .collect();
 
@@ -3645,6 +3628,7 @@ mod tests {
                 },
             ],
             details_fetched: false,
+            ..Default::default()
         };
 
         set_album_profile_conn(&conn, &profile).unwrap();

@@ -701,6 +701,21 @@ fn save_album_profile_with_sidecar(
     Ok(saved)
 }
 
+/// Applies a user's edit to the stored album profile. The editor only sends
+/// the fields it shows, so everything the app fetched itself (fanart.tv
+/// images and their attempted flags, `details_fetched`) is kept from the
+/// stored row instead of being reset by the upsert (#1277).
+fn merge_album_profile_edit(stored: AlbumProfile, edit: AlbumProfile) -> AlbumProfile {
+    AlbumProfile {
+        album_key: edit.album_key,
+        artist_key: edit.artist_key,
+        description: edit.description,
+        website: edit.website,
+        links: edit.links,
+        ..stored
+    }
+}
+
 #[tauri::command]
 pub async fn set_album_profile(
     profile: AlbumProfile,
@@ -710,7 +725,8 @@ pub async fn set_album_profile(
     // `album.md` (#1123).
     let _watcher_pause_guard = WatcherPauseGuard::new(Arc::clone(&state.watcher_paused));
     crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
-        save_album_profile_with_sidecar(scanner, &profile)
+        let stored = scanner.get_album_profile(&profile.album_key)?;
+        save_album_profile_with_sidecar(scanner, &merge_album_profile_edit(stored, profile))
     })
     .await
     .map_err(|e| e.to_string())
@@ -1464,6 +1480,139 @@ pub async fn retrieve_artist_image(
     Ok(result)
 }
 
+#[derive(Serialize, Clone, Debug, Default)]
+pub struct AlbumArtRetrievalResult {
+    /// `luminous-art://` URI for an album cover fetched this call (#1277).
+    pub cover_uri: Option<String>,
+    /// `luminous-art://` URI for disc art fetched this call (#1277).
+    pub disc_uri: Option<String>,
+    /// The album's profile as saved by this call, so the frontend replaces
+    /// its cached copy instead of re-deriving it.
+    pub profile: AlbumProfile,
+}
+
+/// Fetches an album's fanart.tv cover and disc art (#1277) by its
+/// representative MusicBrainz release-group MBID, caching each under
+/// `covers_dir` and recording the filename and an attempted flag on the
+/// album's profile. Run by "Retrieve Album Details" and the album view's
+/// automatic enrichment. Needs a fanart.tv key: without one nothing is
+/// asked and nothing is marked attempted, so adding a key later still fills
+/// them in.
+///
+/// `only_missing` (the automatic path) fetches only the types enabled in
+/// Settings › Integrations › fanart.tv that haven't been attempted yet; the
+/// manual action fetches both regardless. The cover is only ever shown as a
+/// fallback for an album with no embedded, folder or iTunes cover (see
+/// `CoverManager::fanart_album_art`).
+#[tauri::command]
+pub async fn retrieve_album_art(
+    album: String,
+    only_missing: Option<bool>,
+    state: State<'_, AppState>,
+) -> Result<AlbumArtRetrievalResult, String> {
+    let only_missing = only_missing.unwrap_or(false);
+    let (enrichment_enabled, prefs) = crate::db::run_blocking(&state.db, |conn| {
+        Ok((
+            crate::commands::context::context_enrichment_enabled(conn),
+            crate::commands::settings::load_ui_preferences(conn),
+        ))
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    if !enrichment_enabled {
+        return Err("Online context enrichment is disabled".to_string());
+    }
+
+    let album_for_lookup = album.clone();
+    let (release_group_id, album_artist, current_profile) =
+        crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+            Ok((
+                scanner.get_representative_release_group_id_for_album(&album_for_lookup)?,
+                scanner.get_representative_artist_for_album(&album_for_lookup)?,
+                scanner.get_album_profile(&album_for_lookup)?,
+            ))
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let want_cover =
+        !only_missing || (prefs.fanart_fetch_album_cover && !current_profile.cover_fetched);
+    let want_disc = !only_missing || (prefs.fanart_fetch_disc_art && !current_profile.disc_fetched);
+    let fanart_key = resolve_fanart_api_key(&state).await;
+    let (Some(key), true) = (fanart_key, want_cover || want_disc) else {
+        return Ok(AlbumArtRetrievalResult {
+            profile: current_profile,
+            ..Default::default()
+        });
+    };
+    let Some(release_group_id) = release_group_id else {
+        return Err(
+            "No MusicBrainz release group ID found for this album — tag it with Picard first."
+                .to_string(),
+        );
+    };
+
+    let client = crate::artist_image::new_http_client().map_err(|e| e.to_string())?;
+    let fanart = crate::artist_image::fetch_fanart_album_images(&client, &release_group_id, &key)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let stem = state
+        .cover_manager
+        .get_album_hash(album_artist.as_deref().unwrap_or_default(), &album);
+    let mut result = AlbumArtRetrievalResult::default();
+    let mut download_error = None;
+    let mut profile = current_profile;
+    profile.album_key = album;
+
+    if want_cover {
+        match fanart.cover {
+            None => profile.cover_fetched = true,
+            Some(url) => {
+                let stem = format!("{stem}_fanart_cover");
+                match cache_fetched_artist_image(&state, &client, &url, &stem).await {
+                    Ok(filename) => {
+                        result.cover_uri = Some(format!("luminous-art://{filename}"));
+                        profile.fetched_cover_filename = Some(filename);
+                        profile.cover_fetched = true;
+                    }
+                    Err(e) => download_error = Some(e),
+                }
+            }
+        }
+    }
+    if want_disc {
+        match fanart.disc {
+            None => profile.disc_fetched = true,
+            Some(url) => {
+                let stem = format!("{stem}_fanart_disc");
+                match cache_fetched_artist_image(&state, &client, &url, &stem).await {
+                    Ok(filename) => {
+                        result.disc_uri = Some(format!("luminous-art://{filename}"));
+                        profile.fetched_disc_filename = Some(filename);
+                        profile.disc_fetched = true;
+                    }
+                    Err(e) => download_error = download_error.or(Some(e)),
+                }
+            }
+        }
+    }
+
+    let to_save = profile.clone();
+    let saved = crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        save_album_profile_with_sidecar(scanner, &to_save)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let saved_any = result.cover_uri.is_some() || result.disc_uri.is_some();
+    if let (Some(e), false) = (download_error, saved_any) {
+        return Err(e);
+    }
+    result.profile = saved;
+    Ok(result)
+}
+
 /// Every artist tag in the library with its song count, for the Genres
 /// page's browsable-only "Artist Tags" section (see `get_artist_tag_counts`
 /// doc comment for why artist tags don't get a full mergeable/colorable
@@ -2036,6 +2185,7 @@ mod tests {
                 handle_or_url: "https://www.discogs.com/master/132556".to_string(),
             }],
             details_fetched: false,
+            ..Default::default()
         };
 
         let content = build_album_md_content(&profile).unwrap();
@@ -2045,6 +2195,32 @@ mod tests {
              - [Website](https://shaniatwain.com/music/come-on-over)\n\
              - [Discogs](https://www.discogs.com/master/132556)"
         );
+    }
+
+    #[test]
+    fn test_album_profile_edit_keeps_fetched_artwork() {
+        let stored = AlbumProfile {
+            album_key: "Oceanborn".to_string(),
+            description: Some("Old".to_string()),
+            details_fetched: true,
+            fetched_cover_filename: Some("abc_fanart_cover.jpg".to_string()),
+            fetched_disc_filename: Some("abc_fanart_disc.png".to_string()),
+            cover_fetched: true,
+            disc_fetched: true,
+            ..Default::default()
+        };
+        let edit = AlbumProfile {
+            album_key: "Oceanborn".to_string(),
+            description: Some("New".to_string()),
+            ..Default::default()
+        };
+
+        let merged = merge_album_profile_edit(stored.clone(), edit);
+
+        assert_eq!(merged.description.as_deref(), Some("New"));
+        assert_eq!(merged.fetched_cover_filename, stored.fetched_cover_filename);
+        assert_eq!(merged.fetched_disc_filename, stored.fetched_disc_filename);
+        assert!(merged.cover_fetched && merged.disc_fetched && merged.details_fetched);
     }
 
     #[test]

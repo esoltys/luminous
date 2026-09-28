@@ -15,6 +15,8 @@ interface UiPreferences {
   fanart_fetch_photo: boolean;
   fanart_fetch_logo: boolean;
   fanart_fetch_background: boolean;
+  fanart_fetch_album_cover: boolean;
+  fanart_fetch_disc_art: boolean;
   albums_view_mode: CollectionViewMode;
   artists_view_mode: CollectionViewMode;
   playlists_auto_view_mode: CollectionViewMode;
@@ -34,9 +36,12 @@ class PrefsStore {
    * Turning one off also hides already-fetched images of that type; local
    * files always show. */
   fanartFetchPhoto = $state<boolean>(true);
-  // Logo and background are opt-in: both are visually intrusive.
   fanartFetchLogo = $state<boolean>(true);
   fanartFetchBackground = $state<boolean>(true);
+  /** Album image types, same rule (#1277). The cover only ever fills in for
+   * an album with no cover of its own. */
+  fanartFetchAlbumCover = $state<boolean>(true);
+  fanartFetchDiscArt = $state<boolean>(true);
   albumsViewMode = $state<CollectionViewMode>("cards");
   artistsViewMode = $state<CollectionViewMode>("cards");
   playlistsAutoViewMode = $state<CollectionViewMode>("cards");
@@ -62,6 +67,8 @@ class PrefsStore {
     this.fanartFetchPhoto = prefs.fanart_fetch_photo;
     this.fanartFetchLogo = prefs.fanart_fetch_logo;
     this.fanartFetchBackground = prefs.fanart_fetch_background;
+    this.fanartFetchAlbumCover = prefs.fanart_fetch_album_cover;
+    this.fanartFetchDiscArt = prefs.fanart_fetch_disc_art;
     this.albumsViewMode = prefs.albums_view_mode;
     this.artistsViewMode = prefs.artists_view_mode;
     this.playlistsAutoViewMode = prefs.playlists_auto_view_mode;
@@ -87,6 +94,8 @@ class PrefsStore {
       fanart_fetch_photo: this.fanartFetchPhoto,
       fanart_fetch_logo: this.fanartFetchLogo,
       fanart_fetch_background: this.fanartFetchBackground,
+      fanart_fetch_album_cover: this.fanartFetchAlbumCover,
+      fanart_fetch_disc_art: this.fanartFetchDiscArt,
       albums_view_mode: this.albumsViewMode,
       artists_view_mode: this.artistsViewMode,
       playlists_auto_view_mode: this.playlistsAutoViewMode,
@@ -122,6 +131,16 @@ class PrefsStore {
 
   setFanartFetchBackground(enabled: boolean) {
     this.fanartFetchBackground = enabled;
+    this.save();
+  }
+
+  setFanartFetchAlbumCover(enabled: boolean) {
+    this.fanartFetchAlbumCover = enabled;
+    this.save();
+  }
+
+  setFanartFetchDiscArt(enabled: boolean) {
+    this.fanartFetchDiscArt = enabled;
     this.save();
   }
 

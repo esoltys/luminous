@@ -1,5 +1,5 @@
 use crate::covermanager::{
-    local_artwork_uri, scan_extended_artwork, ArtworkCategory, ExtendedArtworkSet,
+    local_artwork_uri, scan_extended_artwork, ArtworkCategory, ArtworkEntry, ExtendedArtworkSet,
 };
 use crate::AppState;
 use rusqlite::{params, OptionalExtension};
@@ -139,7 +139,7 @@ pub async fn get_extended_artwork_for_song(
     };
 
     let set = scan_extended_artwork_blocking(path, album).await?;
-    let album_only = ExtendedArtworkSet {
+    let mut album_only = ExtendedArtworkSet {
         entries: set
             .entries
             .into_iter()
@@ -147,6 +147,27 @@ pub async fn get_extended_artwork_for_song(
             .collect(),
     }
     .sorted();
+
+    // fanart.tv disc art (#1277) goes after any local disc image.
+    let manager = state.cover_manager.clone();
+    let (_, fanart_disc) = tokio::task::spawn_blocking(move || manager.fanart_album_art(song_id))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())?;
+    if let Some(disc) = fanart_disc {
+        let at = album_only
+            .entries
+            .iter()
+            .position(|e| e.category > ArtworkCategory::DiscMedia)
+            .unwrap_or(album_only.entries.len());
+        album_only.entries.insert(
+            at,
+            ArtworkEntry {
+                category: ArtworkCategory::DiscMedia,
+                path: state.cover_manager.covers_dir().join(disc),
+            },
+        );
+    }
 
     Ok(build_extended_artwork_response(album_only))
 }
