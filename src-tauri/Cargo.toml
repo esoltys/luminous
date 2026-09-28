@@ -17,6 +17,11 @@ path = "src/main.rs"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+# Decodes/resizes cover art: downscales the covers cache (#1272, every
+# platform) and builds the Windows taskbar's iconic thumbnail (#852).
+# Already pulled in transitively by Tauri's "image-png" feature (see
+# Cargo.lock) — added directly since both call into it themselves.
+image = "0.25"
 # --- Tauri ---
 # "unstable" gates `Manager::get_window`, needed to reach the lower-level
 # `Window::start_resize_dragging` from a `WebviewWindow` command handler.
@@ -149,11 +154,6 @@ windows = { version = "0.62", features = [
     "Win32_Graphics_Dwm",
     "Win32_Graphics_Gdi",
 ] }
-# Decodes/resizes cover art into the RGBA buffer used for the taskbar's
-# iconic thumbnail (#852). Already pulled in transitively by Tauri's
-# "image-png" feature (see Cargo.lock) — added directly here since taskbar.rs
-# calls into it itself rather than through Tauri.
-image = "0.25"
 # tauri-plugin-notification hardcodes the toast's AppUserModelID to the Tauri
 # `identifier` config value, which Windows only accepts for apps registered
 # under that exact AUMID — an MSIX/Store install's real AUMID is
