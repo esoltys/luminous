@@ -163,9 +163,13 @@ impl PlaylistManager {
             }
             _ => return Ok(()),
         };
+        // `songs_for_spec` takes its own connection; re-acquire for the
+        // writes instead of holding two.
+        drop(conn);
 
         let songs = self.songs_for_spec(&spec, mode)?;
 
+        let conn = self.db.pool.get()?;
         let now = chrono::Utc::now().timestamp();
         conn.execute(
             "UPDATE playlists SET updated = ?1 WHERE id = ?2",
@@ -195,6 +199,9 @@ impl PlaylistManager {
             "UPDATE playlists SET dynamic_spec = ?1, dynamic_enabled = ?2 WHERE id = ?3",
             params![spec, enabled, id],
         )?;
+        // Populating takes its own connection; holding this one meanwhile
+        // needs two at once and can exhaust the pool under load.
+        drop(conn);
         if enabled {
             self.populate_dynamic_playlist(id)?;
         }
@@ -681,6 +688,55 @@ mod tests {
             5,
             "an empty genre match in a daypart spec must fall back to random library fill rather than returning 0 songs"
         );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_playlist_paths_never_hold_one_connection_while_taking_another() {
+        // Regression test: each of these held a pooled connection while a
+        // helper took a second, so enough concurrent callers could exhaust
+        // the pool and stall every DB caller for r2d2's 30s timeout. With a
+        // one-connection pool, any nested acquisition times out instead.
+        let (db, temp_dir) = setup_test_db();
+        {
+            let conn = db.pool.get().unwrap();
+            for i in 1..=30 {
+                conn.execute(
+                    "INSERT INTO songs (title, artist, genre, path, source, unavailable) VALUES (?1, 'A', 'Rock', ?2, 1, 0)",
+                    params![format!("Song {i}"), format!("/s{i}.mp3")],
+                )
+                .unwrap();
+            }
+        }
+        let single = std::sync::Arc::new(Database {
+            pool: r2d2::Pool::builder()
+                .max_size(1)
+                .connection_timeout(std::time::Duration::from_secs(2))
+                .build(r2d2_sqlite::SqliteConnectionManager::file(
+                    temp_dir.join("luminous.db"),
+                ))
+                .unwrap(),
+            schema_version: db.schema_version,
+        });
+        drop(db);
+
+        let mut manager = PlaylistManager::new(single).unwrap();
+        let pl = manager.create_playlist("Rock Smart").unwrap();
+        manager
+            .set_playlist_dynamic_spec(pl.id, "genre:Rock")
+            .unwrap();
+
+        let items = manager.get_playlist_tracks(pl.id).unwrap();
+        manager
+            .reorder_playlist_item_by_uuid(pl.id, &items[0].uuid, &items[2].uuid)
+            .unwrap();
+
+        manager
+            .export_playlist(pl.id, temp_dir.join("out.m3u"), false)
+            .unwrap();
+
+        manager.sync_daypart_auto_playlist().unwrap();
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

@@ -213,6 +213,8 @@ impl PlaylistManager {
             params![playlist_id],
             |row| row.get(0),
         )?;
+        // `get_playlist_tracks` takes its own connection.
+        drop(conn);
 
         let items = self.get_playlist_tracks(playlist_id)?;
         let export_tracks: Vec<ExportTrack> = items

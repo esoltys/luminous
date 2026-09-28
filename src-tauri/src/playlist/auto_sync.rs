@@ -839,6 +839,9 @@ impl PlaylistManager {
                 |r| r.get(0),
             )
             .unwrap_or(0);
+        // The genre pick and `songs_for_spec` below take their own
+        // connections; re-acquire for the writes instead of holding two.
+        drop(conn);
 
         if let Some((_, Some(spec), _, track_count)) = &existing_row {
             let healthy_min = total_library_songs.min(MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST);
@@ -882,6 +885,7 @@ impl PlaylistManager {
             return Ok(());
         }
 
+        let conn = self.db.pool.get()?;
         let playlist_id = match &existing_row {
             Some((id, _, _, _)) => {
                 conn.execute(

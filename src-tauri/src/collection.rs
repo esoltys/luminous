@@ -697,6 +697,10 @@ impl CollectionScanner {
             );
         }
 
+        // `get_directories` takes its own connection, and the empty-folder
+        // sweep is disk I/O — neither should hold this one.
+        drop(stmt_unavail);
+        drop(conn);
         let mut removed_folders = 0;
         for dir in self.get_directories()? {
             removed_folders += crate::organizer::remove_empty_dirs_under_root(Path::new(&dir.path));
