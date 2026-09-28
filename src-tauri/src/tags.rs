@@ -383,8 +383,9 @@ impl TagManager {
         limit: i64,
         mode: QueuePopulationMode,
     ) -> Result<Vec<Song>> {
-        let conn = self.db.pool.get()?;
-        let is_group: bool = conn.query_row(
+        // Release the connection before dispatching: both lookups take their
+        // own, and holding one while waiting on another can exhaust the pool.
+        let is_group: bool = self.db.pool.get()?.query_row(
             "SELECT EXISTS(SELECT 1 FROM tag_groups WHERE name = ?1 COLLATE NOCASE)",
             params![name],
             |r| r.get(0),
@@ -416,8 +417,9 @@ impl TagManager {
     /// of some `tag_groups` row never appears as a child here —
     /// `reconcile_hierarchy` strips that link before this is read.
     pub fn get_tag_hierarchy(&self) -> Result<Vec<TagGroup>> {
-        let conn = self.db.pool.get()?;
+        // Before taking `conn`: it takes its own connection (see reconcile_hierarchy).
         let lists = self.all_song_genre_lists()?;
+        let conn = self.db.pool.get()?;
         let counts = Self::compute_tags(&lists)
             .into_iter()
             .map(|t| (t.name.to_lowercase(), t.song_count))
@@ -484,8 +486,12 @@ impl TagManager {
     /// curated (or auto-assigned), an assignment is sticky. Returns whether
     /// anything changed, so the caller can skip emitting a refresh event.
     pub fn reconcile_hierarchy(&self) -> Result<bool> {
-        let conn = self.db.pool.get()?;
+        // Read the genre lists before taking `conn` — `all_song_genre_lists`
+        // takes its own connection, and a burst of `library-changed` events
+        // running this concurrently while each held one exhausted the pool,
+        // stalling every DB caller for r2d2's 30s timeout.
         let lists = self.all_song_genre_lists()?;
+        let conn = self.db.pool.get()?;
 
         let mut usage: HashMap<String, String> = HashMap::new();
         let mut is_root: HashMap<String, bool> = HashMap::new();
@@ -1425,9 +1431,8 @@ impl TagManager {
 /// hierarchy has nothing to do with playback stats).
 pub async fn reconcile_hierarchy_and_notify(app: tauri::AppHandle) {
     use tauri::{Emitter, Manager};
-    let state = app.state::<crate::AppState>();
-    let manager = TagManager::new(state.db.clone());
-    match manager.reconcile_hierarchy() {
+    let db = app.state::<crate::AppState>().db.clone();
+    match with_tag_manager(db, |manager| manager.reconcile_hierarchy()).await {
         Ok(true) => {
             let _ = app.emit("tags-changed", ());
         }
@@ -1440,9 +1445,8 @@ pub async fn reconcile_hierarchy_and_notify(app: tauri::AppHandle) {
 /// anything changed, emits `artist-tags-changed` so the frontend can refresh (#1105).
 pub async fn reconcile_artist_hierarchy_and_notify(app: tauri::AppHandle) {
     use tauri::{Emitter, Manager};
-    let state = app.state::<crate::AppState>();
-    let manager = TagManager::new(state.db.clone());
-    match manager.reconcile_artist_hierarchy() {
+    let db = app.state::<crate::AppState>().db.clone();
+    match with_tag_manager(db, |manager| manager.reconcile_artist_hierarchy()).await {
         Ok(true) => {
             let _ = app.emit("artist-tags-changed", ());
         }
@@ -1728,6 +1732,35 @@ mod tests {
         assert!(child_names.contains(&"Progressive Metal"));
         assert!(child_names.contains(&"Symphonic Metal"));
         assert!(hierarchy.iter().any(|g| g.name == "Ambient"));
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_hierarchy_reads_never_hold_one_connection_while_taking_another() {
+        // Regression test: holding a connection while `all_song_genre_lists`
+        // took a second let concurrent reconciles exhaust the pool, stalling
+        // every DB caller for r2d2's 30s timeout. With a one-connection pool,
+        // any nested acquisition times out instead of succeeding.
+        let (db, dir) = test_db();
+        insert_song(&db, "/a.mp3", "Metal; Symphonic Metal");
+        let single = Arc::new(Database {
+            pool: r2d2::Pool::builder()
+                .max_size(1)
+                .connection_timeout(std::time::Duration::from_secs(2))
+                .build(r2d2_sqlite::SqliteConnectionManager::file(
+                    dir.join("luminous.db"),
+                ))
+                .unwrap(),
+            schema_version: db.schema_version,
+        });
+
+        let manager = TagManager::new(single);
+        manager.reconcile_hierarchy().unwrap();
+        manager.get_tag_hierarchy().unwrap();
+        manager
+            .get_songs_by_curated_tag("Metal", 50, QueuePopulationMode::All)
+            .unwrap();
 
         let _ = std::fs::remove_dir_all(dir);
     }
