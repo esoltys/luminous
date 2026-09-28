@@ -96,6 +96,9 @@ class NavigationStore {
       if (val !== null) localStorage.setItem("navigation_selectedPlaylistId", String(val));
       else localStorage.removeItem("navigation_selectedPlaylistId");
     }
+    if (val !== null && playlistsStore.activePlaylistId !== val) {
+      playlistsStore.selectPlaylist(val);
+    }
     this.scheduleRecordHistory();
   }
 
@@ -344,6 +347,7 @@ class NavigationStore {
     this.playlistsSubTab = "custom";
     this.selectedAutoPlaylist = null;
     this.selectedPlaylistId = id;
+    playlistsStore.selectPlaylist(id);
   }
 
   viewAutoPlaylist(ref: AutoPlaylistRef) {

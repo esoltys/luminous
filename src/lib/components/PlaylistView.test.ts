@@ -368,5 +368,23 @@ describe("PlaylistView.svelte", () => {
     expect(coverStackContainer).toHaveClass("items-start");
     expect(coverStackContainer).not.toHaveClass("self-stretch");
   });
+
+  it("synchronizes activePlaylist from navigationStore.selectedPlaylistId when mounted with mismatched activePlaylistId", () => {
+    const queuePlaylist: Playlist = {
+      id: 99,
+      name: "Queue",
+      track_count: 0,
+      created: 1700000000,
+      updated: 1700000000,
+      dynamic_enabled: false,
+      is_queue: true,
+    };
+    playlistsStore.playlists = [queuePlaylist, mockPlaylist];
+    playlistsStore.activePlaylistId = 99; // Queue was previously active
+    navigationStore.selectedPlaylistId = 1; // Custom playlist is selected in navigation
+
+    const { getByText } = render(PlaylistView);
+    expect(getByText("My Playlist")).toBeInTheDocument();
+  });
 });
 

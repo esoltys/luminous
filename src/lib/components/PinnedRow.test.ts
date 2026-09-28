@@ -3,6 +3,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent, screen } from "@testing-library/svelte";
 import PinnedRow from "./PinnedRow.svelte";
 import { pinnedStore } from "../stores/pinned.svelte";
+import { playlistsStore } from "../stores/playlists.svelte";
+import { navigationStore } from "../stores/navigation.svelte";
 import type { PinnedItem, Song, AlbumItem, ArtistItem, Playlist, AutoPlaylistItem } from "../types";
 
 describe("PinnedRow.svelte", () => {
@@ -176,5 +178,22 @@ describe("PinnedRow.svelte", () => {
     const { queryByText } = render(PinnedRow);
 
     expect(queryByText("Pinned")).not.toBeInTheDocument();
+  });
+
+  it("navigates to and selects custom playlist when clicking a pinned playlist card", async () => {
+    playlistsStore.playlists = [
+      { id: 1, name: "Queue", is_queue: true, track_count: 0 } as Playlist,
+      { id: 42, name: "My Best Songs", is_queue: false, track_count: 15 } as Playlist,
+    ];
+    playlistsStore.activePlaylistId = 1;
+    navigationStore.activeTab = "home";
+
+    const { getByText } = render(PinnedRow);
+    const playlistCard = getByText("My Best Songs");
+    await fireEvent.click(playlistCard);
+
+    expect(navigationStore.activeTab).toBe("playlists");
+    expect(navigationStore.selectedPlaylistId).toBe(42);
+    expect(playlistsStore.activePlaylistId).toBe(42);
   });
 });
