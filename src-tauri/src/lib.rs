@@ -1160,8 +1160,8 @@ pub fn run() {
             // definition the moment the library or song stats change —
             // additions from scans/tag edits and stat-driven moves
             // (favourite/unfavourite, deep-cut played) all land immediately.
-            // Runs serialized behind the playlists mutex; redundant passes
-            // triggered by event bursts reconcile to a no-op.
+            // `reconcile_and_sync` coalesces event bursts into at most one
+            // follow-up pass, and holds the playlists mutex only to apply.
             {
                 use tauri::Listener;
                 let handle = app.handle().clone();
