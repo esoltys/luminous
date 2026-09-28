@@ -1915,13 +1915,37 @@ mod tests {
     use crate::db::Database;
     use std::sync::Arc;
 
-    pub(super) fn setup_test_db() -> (tempfile::TempDir, Database) {
+    /// Test database directory, removed on drop. `Player` hands a database
+    /// clone to a detached waveform-preload task that can outlive the test,
+    /// and Windows can't delete a directory with open SQLite files, so drop
+    /// retries until that task has released the database.
+    pub(super) struct TestDir(Option<tempfile::TempDir>);
+
+    impl TestDir {
+        pub(super) fn path(&self) -> &std::path::Path {
+            self.0.as_ref().unwrap().path()
+        }
+    }
+
+    impl Drop for TestDir {
+        fn drop(&mut self) {
+            let path = self.0.take().unwrap().keep();
+            for _ in 0..100 {
+                if std::fs::remove_dir_all(&path).is_ok() || !path.exists() {
+                    return;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+        }
+    }
+
+    pub(super) fn setup_test_db() -> (TestDir, Database) {
         let temp_dir = tempfile::Builder::new()
             .prefix("luminous_player_test_")
             .tempdir()
             .unwrap();
         let db = Database::new(temp_dir.path().to_path_buf()).unwrap();
-        (temp_dir, db)
+        (TestDir(Some(temp_dir)), db)
     }
 
     #[tokio::test]
@@ -3205,10 +3229,7 @@ mod tests {
 
     /// A `Player` over songs `1..=count` (all on one album/artist), with the
     /// given ids flagged `unavailable`, plus the matching playlist items.
-    fn player_with_songs(
-        count: i64,
-        unavailable: &[i64],
-    ) -> (tempfile::TempDir, Player, Vec<PlaylistItem>) {
+    fn player_with_songs(count: i64, unavailable: &[i64]) -> (TestDir, Player, Vec<PlaylistItem>) {
         let (temp_dir, db) = setup_test_db();
         let db_arc = Arc::new(db);
         let conn = db_arc.pool.get().unwrap();
