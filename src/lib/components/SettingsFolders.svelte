@@ -209,8 +209,7 @@
     try {
       const playlist = await playlistsStore.createPlaylist(name);
       await playlistsStore.updatePlaylistSpec(playlist.id, `folder:="${escapedPath}"`);
-      navigationStore.activeTab = "playlists";
-      navigationStore.selectedPlaylistId = playlist.id;
+      navigationStore.viewPlaylist(playlist.id);
     } catch (err) {
       console.error("Failed to create smart playlist from folder:", err);
     }

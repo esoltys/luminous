@@ -194,8 +194,19 @@
     }
   }
 
+  $effect(() => {
+    if (
+      navigationStore.selectedPlaylistId !== null &&
+      navigationStore.selectedPlaylistId !== playlistsStore.activePlaylistId
+    ) {
+      playlistsStore.selectPlaylist(navigationStore.selectedPlaylistId);
+    }
+  });
+
   let activePlaylist = $derived(
-    playlistsStore.playlists.find((p) => p.id === playlistsStore.activePlaylistId)
+    playlistsStore.playlists.find(
+      (p) => p.id === (navigationStore.selectedPlaylistId ?? playlistsStore.activePlaylistId)
+    )
   );
 
   let isActive = $derived(

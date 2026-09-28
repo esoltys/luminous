@@ -146,4 +146,20 @@ describe("CollectionStore - artist/album navigation and history", () => {
     expect(navigationStore.selectedArtistName).toBeNull();
     expect(navigationStore.selectedPlaylistId).toBeNull();
   });
+
+  it("synchronizes playlistsStore when viewPlaylist is called or selectedPlaylistId is set", async () => {
+    playlistsStore.playlists = [
+      { id: 1, name: "Queue", is_queue: true } as Playlist,
+      { id: 42, name: "Custom Playlist", is_queue: false } as Playlist,
+    ];
+    playlistsStore.activePlaylistId = 1;
+
+    navigationStore.viewPlaylist(42);
+    expect(navigationStore.selectedPlaylistId).toBe(42);
+    expect(playlistsStore.activePlaylistId).toBe(42);
+
+    playlistsStore.activePlaylistId = 1;
+    navigationStore.selectedPlaylistId = 42;
+    expect(playlistsStore.activePlaylistId).toBe(42);
+  });
 });
