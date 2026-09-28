@@ -169,7 +169,15 @@ pub fn launch_picard(exe: &Path, paths: &[PathBuf]) -> Result<()> {
 }
 
 fn spawn_chunk<P: AsRef<std::ffi::OsStr>>(exe: &Path, chunk: &[P]) -> Result<()> {
-    Command::new(exe).args(chunk).spawn()?;
+    // Picard would otherwise inherit our stdout/stderr, so its Qt chatter
+    // ("QEventDispatcherWin32::wakeUp ...") lands in Luminous's log looking
+    // like ours.
+    Command::new(exe)
+        .args(chunk)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()?;
     Ok(())
 }
 
