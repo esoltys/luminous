@@ -378,6 +378,10 @@ pub fn serve_art_request(covers_dir: &Path, uri: &str) -> tauri::http::Response<
     // Webviews normalize empty paths to trailing slashes (e.g. URI/ -> path/)
     trimmed = trimmed.trim_end_matches('/');
 
+    if let Some(rest) = trimmed.strip_prefix("embedded/") {
+        return serve_embedded_art(covers_dir, rest);
+    }
+
     let file_path = if trimmed.starts_with("local/") {
         let local_path = trimmed.strip_prefix("local/").unwrap_or(trimmed);
         let decoded = percent_encoding::percent_decode_str(local_path)
@@ -398,29 +402,78 @@ pub fn serve_art_request(covers_dir: &Path, uri: &str) -> tauri::http::Response<
         file_path.exists()
     );
 
+    serve_image_file(&file_path)
+}
+
+fn serve_image_file(file_path: &Path) -> tauri::http::Response<Vec<u8>> {
     if file_path.exists() && file_path.is_file() {
-        if let Ok(data) = std::fs::read(&file_path) {
-            let (cleaned_data, mime, _) = detect_image_format_and_clean(&data);
-            tauri::http::Response::builder()
-                .status(200)
-                .header("content-type", mime)
-                .header("access-control-allow-origin", "*")
-                .body(cleaned_data.to_vec())
-                .unwrap()
+        if let Ok(data) = std::fs::read(file_path) {
+            image_response(&data)
         } else {
-            tauri::http::Response::builder()
-                .status(500)
-                .header("access-control-allow-origin", "*")
-                .body(Vec::new())
-                .unwrap()
+            empty_response(500)
         }
     } else {
-        tauri::http::Response::builder()
-            .status(404)
-            .header("access-control-allow-origin", "*")
-            .body(Vec::new())
-            .unwrap()
+        empty_response(404)
     }
+}
+
+fn image_response(data: &[u8]) -> tauri::http::Response<Vec<u8>> {
+    let (cleaned_data, mime, _) = detect_image_format_and_clean(data);
+    tauri::http::Response::builder()
+        .status(200)
+        .header("content-type", mime)
+        .header("access-control-allow-origin", "*")
+        .body(cleaned_data.to_vec())
+        .unwrap()
+}
+
+fn empty_response(status: u16) -> tauri::http::Response<Vec<u8>> {
+    tauri::http::Response::builder()
+        .status(status)
+        .header("access-control-allow-origin", "*")
+        .body(Vec::new())
+        .unwrap()
+}
+
+/// Build the `luminous-art://embedded/` URI that serves a song's
+/// full-resolution embedded picture (#1272): `cache_file` is the downscaled
+/// covers-cache copy served instead if the audio file can't be read (moved,
+/// drive asleep), and `audio_path` is percent-encoded whole — slashes
+/// included — so it stays one path segment after the cache filename.
+pub fn embedded_art_uri(cache_file: &str, audio_path: &str) -> String {
+    let encoded =
+        percent_encoding::utf8_percent_encode(audio_path, percent_encoding::NON_ALPHANUMERIC);
+    format!("luminous-art://embedded/{cache_file}/{encoded}")
+}
+
+/// Serve the `embedded/<cache file>/<encoded audio path>` form built by
+/// `embedded_art_uri`: the audio file's top-ranked embedded picture at full
+/// resolution, read on demand rather than cached, falling back to the
+/// downscaled cache file.
+fn serve_embedded_art(covers_dir: &Path, rest: &str) -> tauri::http::Response<Vec<u8>> {
+    let Some((cache_file, encoded_path)) = rest.split_once('/') else {
+        return empty_response(404);
+    };
+    let audio_path = percent_encoding::percent_decode_str(encoded_path)
+        .decode_utf8_lossy()
+        .into_owned();
+    match CoverManager::extract_all_embedded_pictures(Path::new(&audio_path)) {
+        Ok(pictures) => {
+            if let Some((_category, data)) = pictures.into_iter().min_by_key(|(c, _)| *c) {
+                return image_response(&data);
+            }
+        }
+        Err(e) => log::debug!("Full-resolution embedded art unavailable for {audio_path}: {e}"),
+    }
+    let cache_file = percent_encoding::percent_decode_str(cache_file)
+        .decode_utf8_lossy()
+        .into_owned();
+    // Only a bare cache filename — never let the fallback segment walk out
+    // of `covers_dir`.
+    if cache_file.contains(['/', '\\']) || cache_file.contains("..") {
+        return empty_response(404);
+    }
+    serve_image_file(&covers_dir.join(cache_file))
 }
 
 #[derive(Debug)]
@@ -477,6 +530,108 @@ pub fn detect_image_format_and_clean(data: &[u8]) -> (&[u8], &'static str, &'sta
 
     // 4. Fallback if no magic bytes found
     (data, "image/jpeg", "jpg")
+}
+
+/// Longest edge, in pixels, of cover art written to the covers cache (#1272).
+/// Matches the 600x600 the iTunes fallback already downloads; the large
+/// "Now Playing" view reads the full-resolution picture straight from the
+/// audio file instead (see `get_full_resolution_cover_art_uri`).
+pub const CACHE_MAX_EDGE: u32 = 600;
+const CACHE_JPEG_QUALITY: u8 = 85;
+
+/// The bytes and extension to write to the covers cache for image `data`:
+/// decoded, shrunk to fit `CACHE_MAX_EDGE`, and re-encoded as JPEG (PNG when
+/// the image has an alpha channel). Images already within the bound are
+/// cached as-is, so no generation loss. Anything the `image` crate can't
+/// decode is cached as-is too — a cache entry the webview may still manage
+/// to render beats none at all.
+pub fn downscale_for_cache(data: &[u8]) -> (Vec<u8>, &'static str) {
+    let (cleaned, _mime, ext) = detect_image_format_and_clean(data);
+    let Ok(img) = image::load_from_memory(cleaned) else {
+        return (cleaned.to_vec(), ext);
+    };
+    if img.width() <= CACHE_MAX_EDGE && img.height() <= CACHE_MAX_EDGE {
+        return (cleaned.to_vec(), ext);
+    }
+    let format = if img.color().has_alpha() {
+        image::ImageFormat::Png
+    } else {
+        image::ImageFormat::Jpeg
+    };
+    match encode_downscaled(&img, format) {
+        Some(encoded) if encoded.len() < cleaned.len() => (encoded, cache_ext_for(format)),
+        _ => (cleaned.to_vec(), ext),
+    }
+}
+
+fn cache_ext_for(format: image::ImageFormat) -> &'static str {
+    if format == image::ImageFormat::Png {
+        "png"
+    } else {
+        "jpg"
+    }
+}
+
+/// Resize `img` to fit `CACHE_MAX_EDGE` (keeping its aspect ratio) and encode
+/// it as `format` — JPEG at `CACHE_JPEG_QUALITY`, or PNG.
+fn encode_downscaled(img: &image::DynamicImage, format: image::ImageFormat) -> Option<Vec<u8>> {
+    let resized = img.resize(
+        CACHE_MAX_EDGE,
+        CACHE_MAX_EDGE,
+        image::imageops::FilterType::CatmullRom,
+    );
+    let mut out = Vec::new();
+    if format == image::ImageFormat::Png {
+        resized
+            .write_to(&mut std::io::Cursor::new(&mut out), image::ImageFormat::Png)
+            .ok()?;
+    } else {
+        let encoder =
+            image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, CACHE_JPEG_QUALITY);
+        resized.to_rgb8().write_with_encoder(encoder).ok()?;
+    }
+    Some(out)
+}
+
+/// Shrink an existing oversized cache file in place, keeping its filename —
+/// and so its format, since the filename is what `songs.art_automatic`
+/// stores. Returns the bytes saved, or `None` when the file is already within
+/// `CACHE_MAX_EDGE`, isn't a JPEG/PNG, or re-encoding wouldn't make it
+/// smaller. Only the image header is read for files that are already small,
+/// so sweeping an already-downscaled cache stays cheap.
+fn recompress_cache_file(path: &Path) -> Option<u64> {
+    let format = match path.extension()?.to_str()?.to_ascii_lowercase().as_str() {
+        "jpg" | "jpeg" => image::ImageFormat::Jpeg,
+        "png" => image::ImageFormat::Png,
+        _ => return None,
+    };
+    let (width, height) = image::image_dimensions(path).ok()?;
+    if width <= CACHE_MAX_EDGE && height <= CACHE_MAX_EDGE {
+        return None;
+    }
+    let data = std::fs::read(path).ok()?;
+    let img = image::load_from_memory(&data).ok()?;
+    let encoded = encode_downscaled(&img, format)?;
+    if encoded.len() >= data.len() {
+        return None;
+    }
+    // Write-then-rename so a crash mid-write never leaves a truncated cover
+    // behind. A leftover `.tmp` is unreferenced, so the next sweep prunes it.
+    let tmp = path.with_extension("tmp");
+    std::fs::write(&tmp, &encoded).ok()?;
+    if std::fs::rename(&tmp, path).is_err() {
+        let _ = std::fs::remove_file(&tmp);
+        return None;
+    }
+    Some((data.len() - encoded.len()) as u64)
+}
+
+/// Outcome of `CoverManager::sweep_cache`.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct CacheSweepResult {
+    pub pruned: usize,
+    pub recompressed: usize,
+    pub bytes_reclaimed: u64,
 }
 
 impl CoverManager {
@@ -579,12 +734,12 @@ impl CoverManager {
             return Ok(None);
         };
 
-        let (cleaned_data, _mime, ext) = detect_image_format_and_clean(&raw_data);
+        let (cache_data, ext) = downscale_for_cache(&raw_data);
 
         let filename = format!("{}.{}", hash_name, ext);
         let dest_path = self.covers_dir.join(&filename);
 
-        std::fs::write(&dest_path, cleaned_data)
+        std::fs::write(&dest_path, cache_data)
             .context("failed to write cover art file to cache")?;
 
         log::info!("Extracted embedded cover art to: {}", dest_path.display());
@@ -689,12 +844,12 @@ impl CoverManager {
     /// over HTTP, #1082). Returns the cache filename to store in
     /// `songs.art_automatic`.
     pub fn cache_art_bytes(&self, album_artist: &str, album: &str, data: &[u8]) -> Result<String> {
-        let (cleaned_data, _mime, ext) = detect_image_format_and_clean(data);
+        let (cache_data, ext) = downscale_for_cache(data);
         let hash_name = self.get_album_hash(album_artist, album);
         let filename = format!("{}.{}", hash_name, ext);
         let dest_path = self.covers_dir.join(&filename);
 
-        std::fs::write(&dest_path, cleaned_data)
+        std::fs::write(&dest_path, cache_data)
             .context("failed to write cover art file to cache")?;
 
         Ok(filename)
@@ -782,12 +937,12 @@ impl CoverManager {
                     log::info!("Downloading remote cover art from: {}", url_600);
 
                     let img_bytes = client.get(&url_600).send().await?.bytes().await?;
-                    let (cleaned_bytes, _mime, ext) = detect_image_format_and_clean(&img_bytes);
+                    let (cache_bytes, ext) = downscale_for_cache(&img_bytes);
                     let hash_name = self.get_album_hash(query_artist, query_album);
                     let filename = format!("{}.{}", hash_name, ext);
                     let dest_path = self.covers_dir.join(&filename);
 
-                    std::fs::write(&dest_path, cleaned_bytes)?;
+                    std::fs::write(&dest_path, cache_bytes)?;
                     log::info!("Saved remote cover art to: {}", dest_path.display());
 
                     let conn = self.db.pool.get()?;
@@ -885,6 +1040,100 @@ impl CoverManager {
         }
 
         Ok(None)
+    }
+
+    /// `get_cover_art_uri` for views that show art large (the immersive Now
+    /// Playing view, #1272). The covers cache holds only a
+    /// `CACHE_MAX_EDGE`-bounded copy, so when that copy came from the song's
+    /// own embedded picture this returns an `embedded_art_uri` that reads
+    /// the original picture from the audio file on demand. Every other case —
+    /// a manual pick, folder art (already served at full size, in place), a
+    /// remote cover, a non-local song — gets the same URI as
+    /// `get_cover_art_uri`.
+    pub fn get_full_resolution_cover_art_uri(&self, song_id: i64) -> Result<Option<String>> {
+        let conn = self.db.pool.get()?;
+        let sql = format!(
+            "SELECT art_embedded, art_automatic, art_manual, art_unset, path,
+                    source IN ({lib})
+             FROM songs WHERE id = ?1",
+            lib = *crate::models::LOCAL_SOURCES_SQL
+        );
+        let (art_embedded, art_automatic, art_manual, art_unset, path, is_local) =
+            conn.query_row(&sql, params![song_id], |row| {
+                Ok((
+                    row.get::<_, bool>(0)?,
+                    row.get::<_, Option<String>>(1)?,
+                    row.get::<_, Option<String>>(2)?,
+                    row.get::<_, bool>(3)?,
+                    row.get::<_, Option<String>>(4)?,
+                    row.get::<_, bool>(5)?,
+                ))
+            })?;
+        drop(conn);
+
+        if !art_unset && art_manual.is_none() && art_embedded && is_local {
+            if let (Some(auto), Some(path)) = (art_automatic, path) {
+                if auto.starts_with("album-") && !path.contains("://") {
+                    return Ok(Some(embedded_art_uri(&auto, &path)));
+                }
+            }
+        }
+        self.get_cover_art_uri(song_id)
+    }
+
+    /// Post-scan covers-cache maintenance (#1272). Deletes `album-*` files no
+    /// song references any more (left behind by retags, removed albums, or a
+    /// write whose extension changed), and shrinks referenced files cached
+    /// before downscaling existed. Unreferenced files younger than
+    /// `orphan_grace` are kept: a WebDAV/Subsonic sync or a watcher event may
+    /// have just written one and not yet stored its filename on the row.
+    /// `artist-*` images and anything else in `covers_dir` are never touched.
+    pub fn sweep_cache(&self, orphan_grace: std::time::Duration) -> Result<CacheSweepResult> {
+        let referenced: std::collections::HashSet<String> = {
+            let conn = self.db.pool.get()?;
+            let mut stmt = conn.prepare(
+                "SELECT art_automatic FROM songs WHERE art_automatic LIKE 'album-%'
+                 UNION
+                 SELECT art_manual FROM songs WHERE art_manual LIKE 'album-%'",
+            )?;
+            let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+            rows.collect::<rusqlite::Result<_>>()?
+        };
+
+        let mut result = CacheSweepResult::default();
+        let now = std::time::SystemTime::now();
+        for entry in std::fs::read_dir(&self.covers_dir)?.flatten() {
+            let Ok(name) = entry.file_name().into_string() else {
+                continue;
+            };
+            if !name.starts_with("album-") {
+                continue;
+            }
+            let Ok(meta) = entry.metadata() else {
+                continue;
+            };
+            if !meta.is_file() {
+                continue;
+            }
+            let path = entry.path();
+            if referenced.contains(&name) {
+                if let Some(saved) = recompress_cache_file(&path) {
+                    result.recompressed += 1;
+                    result.bytes_reclaimed += saved;
+                }
+                continue;
+            }
+            let age = meta
+                .modified()
+                .ok()
+                .and_then(|m| now.duration_since(m).ok())
+                .unwrap_or_default();
+            if age >= orphan_grace && std::fs::remove_file(&path).is_ok() {
+                result.pruned += 1;
+                result.bytes_reclaimed += meta.len();
+            }
+        }
+        Ok(result)
     }
 }
 
@@ -1127,6 +1376,145 @@ mod tests {
 
         let missing = serve_art_request(&covers_dir, "luminous-art://album-missing.jpg");
         assert_eq!(missing.status(), 404);
+    }
+
+    fn jpeg_bytes(width: u32, height: u32) -> Vec<u8> {
+        let img = image::RgbImage::from_fn(width, height, |x, y| {
+            image::Rgb([(x % 256) as u8, (y % 256) as u8, ((x + y) % 256) as u8])
+        });
+        let mut out = Vec::new();
+        image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, 95)
+            .encode_image(&img)
+            .unwrap();
+        out
+    }
+
+    #[test]
+    fn test_downscale_for_cache_bounds_longest_edge() {
+        let (bytes, ext) = downscale_for_cache(&jpeg_bytes(1200, 800));
+        assert_eq!(ext, "jpg");
+        let img = image::load_from_memory(&bytes).unwrap();
+        assert_eq!((img.width(), img.height()), (CACHE_MAX_EDGE, 400));
+    }
+
+    #[test]
+    fn test_downscale_for_cache_passes_small_and_undecodable_through() {
+        let small = jpeg_bytes(300, 300);
+        assert_eq!(downscale_for_cache(&small), (small.clone(), "jpg"));
+
+        let stub = b"\x89PNG\r\n\x1a\n\x00\x00\x00\x0dIHDR".to_vec();
+        assert_eq!(downscale_for_cache(&stub), (stub.clone(), "png"));
+    }
+
+    #[test]
+    fn test_sweep_cache_prunes_orphans_and_shrinks_referenced_files() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db = Arc::new(Database::new(temp_dir.path().to_path_buf()).unwrap());
+        let manager = CoverManager::new(Arc::clone(&db), temp_dir.path().to_path_buf());
+        let covers = manager.covers_dir().to_path_buf();
+
+        let big = jpeg_bytes(1200, 1200);
+        std::fs::write(covers.join("album-kept.jpg"), &big).unwrap();
+        std::fs::write(covers.join("album-orphan.jpg"), b"\xFF\xD8\xFF\xE0").unwrap();
+        std::fs::write(covers.join("album-stale.tmp"), b"partial").unwrap();
+        std::fs::write(covers.join("artist-x.jpg"), b"\xFF\xD8\xFF\xE0").unwrap();
+        db.pool
+            .get()
+            .unwrap()
+            .execute(
+                "INSERT INTO songs (title, art_automatic) VALUES ('t', 'album-kept.jpg')",
+                [],
+            )
+            .unwrap();
+
+        // Within the grace period nothing unreferenced is removed.
+        let fresh = manager
+            .sweep_cache(std::time::Duration::from_secs(600))
+            .unwrap();
+        assert_eq!(fresh.pruned, 0);
+        assert_eq!(fresh.recompressed, 1);
+        assert!(covers.join("album-orphan.jpg").exists());
+
+        let swept = manager.sweep_cache(std::time::Duration::ZERO).unwrap();
+        assert_eq!(swept.pruned, 2);
+        assert_eq!(swept.recompressed, 0, "already-shrunk file is left alone");
+        assert!(!covers.join("album-orphan.jpg").exists());
+        assert!(!covers.join("album-stale.tmp").exists());
+        assert!(covers.join("artist-x.jpg").exists());
+
+        let kept = image::open(covers.join("album-kept.jpg")).unwrap();
+        assert_eq!((kept.width(), kept.height()), (CACHE_MAX_EDGE, CACHE_MAX_EDGE));
+    }
+
+    #[test]
+    fn test_serve_embedded_art_reads_audio_file_and_falls_back_to_cache() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let covers_dir = temp_dir.path().join("covers");
+        std::fs::create_dir_all(&covers_dir).unwrap();
+        std::fs::write(covers_dir.join("album-1.png"), b"\x89PNG\r\n\x1a\n").unwrap();
+        let track = temp_dir.path().join("Track #1 & 50%.wav");
+        write_wav_with_embedded_art(&track);
+
+        let embedded = serve_art_request(
+            &covers_dir,
+            &embedded_art_uri("album-1.png", &track.to_string_lossy()),
+        );
+        assert_eq!(embedded.status(), 200);
+        assert_eq!(embedded.body().as_slice(), &[0xFF, 0xD8, 0xFF, 0xE0]);
+
+        let missing_audio = temp_dir.path().join("gone.wav");
+        let fallback = serve_art_request(
+            &covers_dir,
+            &embedded_art_uri("album-1.png", &missing_audio.to_string_lossy()),
+        );
+        assert_eq!(fallback.status(), 200);
+        assert_eq!(fallback.headers()["content-type"], "image/png");
+
+        let traversal = serve_art_request(
+            &covers_dir,
+            &embedded_art_uri("..\\secret.png", &missing_audio.to_string_lossy()),
+        );
+        assert_eq!(traversal.status(), 404);
+    }
+
+    #[test]
+    fn test_full_resolution_uri_only_redirects_local_embedded_art() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db = Arc::new(Database::new(temp_dir.path().to_path_buf()).unwrap());
+        let manager = CoverManager::new(Arc::clone(&db), temp_dir.path().to_path_buf());
+        let local = crate::models::SongSource::LocalFile as i32;
+        let insert = |path: &str, embedded: bool, manual: Option<&str>, source: i32| -> i64 {
+            let conn = db.pool.get().unwrap();
+            conn.execute(
+                "INSERT INTO songs (title, path, source, art_embedded, art_automatic, art_manual)
+                 VALUES ('t', ?1, ?2, ?3, 'album-1.jpg', ?4)",
+                params![path, source, embedded, manual],
+            )
+            .unwrap();
+            conn.last_insert_rowid()
+        };
+
+        let embedded = insert("C:\\Music\\a.flac", true, None, local);
+        assert_eq!(
+            manager.get_full_resolution_cover_art_uri(embedded).unwrap(),
+            Some(embedded_art_uri("album-1.jpg", "C:\\Music\\a.flac"))
+        );
+
+        for id in [
+            insert("C:\\Music\\b.flac", false, None, local),
+            insert("C:\\Music\\c.flac", true, Some("album-2.jpg"), local),
+            insert(
+                "C:\\Music\\d.flac",
+                true,
+                None,
+                crate::models::SongSource::SUBSONIC_ID,
+            ),
+        ] {
+            assert_eq!(
+                manager.get_full_resolution_cover_art_uri(id).unwrap(),
+                manager.get_cover_art_uri(id).unwrap()
+            );
+        }
     }
 
     fn write_wav_with_embedded_art(path: &Path) {

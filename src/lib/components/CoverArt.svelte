@@ -15,6 +15,8 @@
     artManual?: string | null;
     sizeClass?: string; // e.g. "w-12 h-12" or "w-full h-full"
     animateSpin?: boolean;
+    /** Show the original embedded picture rather than the downscaled cache copy (#1272). */
+    fullResolution?: boolean;
   }
 
   let {
@@ -23,14 +25,17 @@
     artAutomatic = null,
     artManual = null,
     sizeClass = "w-12 h-12",
-    animateSpin = false
+    animateSpin = false,
+    fullResolution = false
   }: Props = $props();
 
   let imgSrc = $state<string | null>(null);
   let isLoading = $state(false);
   let hasFailed = $state(false);
+  let loadToken = 0;
 
   async function loadCoverArt() {
+    const token = ++loadToken;
     if (artManual) {
       imgSrc = resolveArtUrl(artManual);
       hasFailed = false;
@@ -39,6 +44,16 @@
     if (artAutomatic) {
       imgSrc = resolveArtUrl(artAutomatic);
       hasFailed = false;
+      // The cache holds a downscaled copy; show it at once, then swap in the
+      // original embedded picture for large views.
+      if (fullResolution && artEmbedded && songId !== undefined && artAutomatic.startsWith("album-")) {
+        try {
+          const uri = await invoke<string | null>("get_cover_art_uri", { songId, fullResolution: true });
+          if (uri && token === loadToken) imgSrc = getCoverArtUrl(uri);
+        } catch (e) {
+          console.error("Failed to load full-resolution cover art URI:", e);
+        }
+      }
       return;
     }
 
@@ -51,7 +66,8 @@
     isLoading = true;
     hasFailed = false;
     try {
-      const uri = await invoke<string | null>("get_cover_art_uri", { songId });
+      const uri = await invoke<string | null>("get_cover_art_uri", { songId, fullResolution });
+      if (token !== loadToken) return;
       if (uri) {
         imgSrc = getCoverArtUrl(uri);
       } else {
@@ -83,6 +99,7 @@
     const _auto = artAutomatic;
     const _manual = artManual;
     const _embed = artEmbedded;
+    const _full = fullResolution;
     loadCoverArt();
   });
 </script>
