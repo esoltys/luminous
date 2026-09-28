@@ -46,6 +46,12 @@ pub struct UiPreferences {
     pub genre_sort_field: String,
     pub genre_sort_asc: bool,
     pub week_start: String,
+    /// Which fanart.tv artist image types "Retrieve Artist Image" and the
+    /// artist view's automatic batch fetch (#1276). Unchecking one also hides
+    /// an already-fetched image of that type; local files are always shown.
+    pub fanart_fetch_photo: bool,
+    pub fanart_fetch_logo: bool,
+    pub fanart_fetch_background: bool,
 }
 
 impl Default for UiPreferences {
@@ -63,6 +69,10 @@ impl Default for UiPreferences {
             genre_sort_field: "name".into(),
             genre_sort_asc: true,
             week_start: "sunday".into(),
+            fanart_fetch_photo: true,
+            // Logo and background are opt-in: both are visually intrusive.
+            fanart_fetch_logo: false,
+            fanart_fetch_background: false,
         }
     }
 }
@@ -104,23 +114,35 @@ impl UiPreferences {
             ("week_start", &mut self.week_start, WEEK_START),
         ]
     }
+
+    /// Bool fields, persisted as a literal "true"/"false" string the same
+    /// way the FadeSettings bools are — not part of `fields()` since they
+    /// aren't domain-checked Strings.
+    fn bool_fields(&mut self) -> [(&'static str, &mut bool); 4] {
+        [
+            ("genre_sort_asc", &mut self.genre_sort_asc),
+            ("fanart_fetch_photo", &mut self.fanart_fetch_photo),
+            ("fanart_fetch_logo", &mut self.fanart_fetch_logo),
+            ("fanart_fetch_background", &mut self.fanart_fetch_background),
+        ]
+    }
 }
 
-#[tauri::command]
-pub fn get_ui_preferences(state: State<'_, AppState>) -> UiPreferences {
+/// Reads every UI preference from `app_state`, falling back to the default
+/// for anything unset or out of domain. Also used backend-side where a
+/// command has to honour a preference (e.g. the fanart.tv image types).
+pub fn load_ui_preferences(conn: &rusqlite::Connection) -> UiPreferences {
     let mut prefs = UiPreferences::default();
-    let Ok(conn) = state.db.pool.get() else {
-        return prefs;
+    let read = |key: &str| -> Option<String> {
+        conn.query_row(
+            "SELECT value FROM app_state WHERE key = ?1",
+            rusqlite::params![key],
+            |row| row.get(0),
+        )
+        .ok()
     };
     for (key, slot, allowed) in prefs.fields() {
-        let stored: Option<String> = conn
-            .query_row(
-                "SELECT value FROM app_state WHERE key = ?1",
-                rusqlite::params![key],
-                |row| row.get(0),
-            )
-            .ok();
-        if let Some(v) = stored {
+        if let Some(v) = read(key) {
             // An out-of-domain stored value falls back to the default rather
             // than leaking into the UI.
             if allowed.is_empty() || allowed.contains(&v.as_str()) {
@@ -128,17 +150,20 @@ pub fn get_ui_preferences(state: State<'_, AppState>) -> UiPreferences {
             }
         }
     }
-    // `genre_sort_asc` is a bool, not a domain-checked String, so it's not
-    // part of the `fields()` mapping above — persisted the same way the
-    // FadeSettings bools are (a literal "true"/"false" string).
-    if let Ok(v) = conn.query_row(
-        "SELECT value FROM app_state WHERE key = 'genre_sort_asc'",
-        [],
-        |row| row.get::<_, String>(0),
-    ) {
-        prefs.genre_sort_asc = v == "true";
+    for (key, slot) in prefs.bool_fields() {
+        if let Some(v) = read(key) {
+            *slot = v == "true";
+        }
     }
     prefs
+}
+
+#[tauri::command]
+pub fn get_ui_preferences(state: State<'_, AppState>) -> UiPreferences {
+    match state.db.pool.get() {
+        Ok(conn) => load_ui_preferences(&conn),
+        Err(_) => UiPreferences::default(),
+    }
 }
 
 /// Fire-and-forget like [`set_app_setting`] — always `Ok`. Values outside a
@@ -149,7 +174,6 @@ pub async fn set_ui_preferences(
     mut prefs: UiPreferences,
 ) -> Result<(), String> {
     let result = crate::db::run_blocking(&state.db, move |conn| {
-        let genre_sort_asc = prefs.genre_sort_asc;
         for (key, slot, _) in prefs.fields() {
             if let Err(e) = conn.execute(
                 "INSERT OR REPLACE INTO app_state (key, value) VALUES (?1, ?2)",
@@ -158,11 +182,13 @@ pub async fn set_ui_preferences(
                 log::error!("Failed to persist UI preference '{key}': {e}");
             }
         }
-        if let Err(e) = conn.execute(
-            "INSERT OR REPLACE INTO app_state (key, value) VALUES ('genre_sort_asc', ?1)",
-            rusqlite::params![genre_sort_asc.to_string()],
-        ) {
-            log::error!("Failed to persist UI preference 'genre_sort_asc': {e}");
+        for (key, slot) in prefs.bool_fields() {
+            if let Err(e) = conn.execute(
+                "INSERT OR REPLACE INTO app_state (key, value) VALUES (?1, ?2)",
+                rusqlite::params![key, slot.to_string()],
+            ) {
+                log::error!("Failed to persist UI preference '{key}': {e}");
+            }
         }
         Ok(())
     })
@@ -354,5 +380,35 @@ mod tests {
             .find(|(key, _, _)| *key == "genre_sort_field")
             .expect("genre_sort_field must be part of the persisted field mapping");
         assert_eq!(mapped.2, &["name", "count"]);
+    }
+
+    fn app_state_conn() -> rusqlite::Connection {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch("CREATE TABLE app_state (key TEXT PRIMARY KEY, value TEXT)")
+            .unwrap();
+        conn
+    }
+
+    #[test]
+    fn fanart_fetches_only_the_photo_by_default() {
+        let prefs = load_ui_preferences(&app_state_conn());
+        assert!(prefs.fanart_fetch_photo);
+        assert!(!prefs.fanart_fetch_logo);
+        assert!(!prefs.fanart_fetch_background);
+    }
+
+    #[test]
+    fn stored_bool_prefs_override_defaults() {
+        let conn = app_state_conn();
+        conn.execute_batch(
+            "INSERT INTO app_state VALUES ('fanart_fetch_logo', 'true');
+             INSERT INTO app_state VALUES ('genre_sort_asc', 'false');",
+        )
+        .unwrap();
+        let prefs = load_ui_preferences(&conn);
+        assert!(prefs.fanart_fetch_logo);
+        assert!(!prefs.genre_sort_asc);
+        assert!(prefs.fanart_fetch_photo);
+        assert!(!prefs.fanart_fetch_background);
     }
 }

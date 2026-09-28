@@ -1,5 +1,6 @@
 //! Artist profile image fetch (#1127): resolves an artist's MusicBrainz ID to
-//! a portrait image via fanart.tv's artist-images API (if an API key is
+//! a portrait image (plus, since #1276, a band logo and header background)
+//! via fanart.tv's artist-images API (if an API key is
 //! configured) or, lacking a key or a match, Wikidata's `P18` (image)
 //! property — the same two-tier "best source, then a no-key-required
 //! fallback" shape `context.rs` uses elsewhere. Distinct from the locally-
@@ -46,11 +47,17 @@ struct FanartImageEntry {
 struct FanartArtistResponse {
     #[serde(default)]
     artistthumb: Vec<FanartImageEntry>,
+    #[serde(default)]
+    hdmusiclogo: Vec<FanartImageEntry>,
+    #[serde(default)]
+    musiclogo: Vec<FanartImageEntry>,
+    #[serde(default)]
+    musicbanner: Vec<FanartImageEntry>,
 }
 
-/// Picks fanart.tv's highest-liked `artistthumb` entry, if any. An
-/// unparseable/missing `likes` value defaults to 0 rather than dropping the
-/// entry — fanart.tv's own UI treats a missing like-count the same way.
+/// Picks fanart.tv's highest-liked entry, if any. An unparseable/missing
+/// `likes` value defaults to 0 rather than dropping the entry — fanart.tv's
+/// own UI treats a missing like-count the same way.
 fn best_fanart_image(entries: Vec<FanartImageEntry>) -> Option<String> {
     entries
         .into_iter()
@@ -63,14 +70,41 @@ fn best_fanart_image(entries: Vec<FanartImageEntry>) -> Option<String> {
         .map(|(url, _)| url)
 }
 
-/// Looks up an artist's top fanart.tv `artistthumb` image URL. `Ok(None)` —
-/// not an error — both on a 404 (fanart.tv has no entry for this MBID) and
-/// when the entry exists but has no `artistthumb` images.
-pub async fn fetch_fanart_artist_image_url(
+/// The best image URL fanart.tv has for each artist image type (#1276). All
+/// three come from the one `/v3/music/{mbid}` response, so fetching the logo
+/// and background costs no extra requests over the photo alone.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct FanartArtistImages {
+    pub photo: Option<String>,
+    pub logo: Option<String>,
+    pub background: Option<String>,
+}
+
+impl From<FanartArtistResponse> for FanartArtistImages {
+    fn from(r: FanartArtistResponse) -> Self {
+        // The HD logo (800x310) is preferred; the older 400x155 `musiclogo`
+        // only fills in when an artist has no HD one.
+        let logo = best_fanart_image(r.hdmusiclogo).or_else(|| best_fanart_image(r.musiclogo));
+        FanartArtistImages {
+            photo: best_fanart_image(r.artistthumb),
+            logo,
+            // The header is a short strip: the 1000x185 `musicbanner` fits it,
+            // and its low resolution doesn't show at the header's low opacity.
+            // The 16:9 `artistbackground` is deliberately not used — any crop of
+            // it to that strip loses the subject.
+            background: best_fanart_image(r.musicbanner),
+        }
+    }
+}
+
+/// Looks up an artist's top fanart.tv photo, logo and background URLs. A
+/// 404 (fanart.tv has no entry for this MBID) is not an error — it returns
+/// all-`None`, same as an entry with no images of any type.
+pub async fn fetch_fanart_artist_images(
     client: &Client,
     artist_mbid: &str,
     api_key: &str,
-) -> Result<Option<String>> {
+) -> Result<FanartArtistImages> {
     let url = format!(
         "https://webservice.fanart.tv/v3/music/{}?api_key={}",
         percent_encoding::utf8_percent_encode(artist_mbid, percent_encoding::NON_ALPHANUMERIC),
@@ -78,7 +112,7 @@ pub async fn fetch_fanart_artist_image_url(
     );
     let response = client.get(&url).send().await?;
     if response.status() == reqwest::StatusCode::NOT_FOUND {
-        return Ok(None);
+        return Ok(FanartArtistImages::default());
     }
     if !response.status().is_success() {
         return Err(anyhow!(
@@ -87,7 +121,7 @@ pub async fn fetch_fanart_artist_image_url(
         ));
     }
     let parsed: FanartArtistResponse = response.json().await?;
-    Ok(best_fanart_image(parsed.artistthumb))
+    Ok(parsed.into())
 }
 
 /// MBID of an artist near-certain to have fanart.tv images, used purely to
@@ -231,6 +265,64 @@ mod tests {
             },
         ];
         assert!(best_fanart_image(entries).is_some());
+    }
+
+    fn entry(url: &str, likes: &str) -> FanartImageEntry {
+        FanartImageEntry {
+            url: Some(url.to_string()),
+            likes: Some(likes.to_string()),
+        }
+    }
+
+    #[test]
+    fn test_fanart_artist_images_picks_best_of_each_type() {
+        let images: FanartArtistImages = FanartArtistResponse {
+            artistthumb: vec![entry("https://thumb-a", "1"), entry("https://thumb-b", "4")],
+            hdmusiclogo: vec![entry("https://hd-logo", "0")],
+            musiclogo: vec![entry("https://sd-logo", "50")],
+            musicbanner: vec![
+                entry("https://banner-a", "7"),
+                entry("https://banner-b", "3"),
+            ],
+        }
+        .into();
+        assert_eq!(
+            images,
+            FanartArtistImages {
+                photo: Some("https://thumb-b".to_string()),
+                // HD wins even with fewer likes than the SD logo.
+                logo: Some("https://hd-logo".to_string()),
+                background: Some("https://banner-a".to_string()),
+            }
+        );
+    }
+
+    #[test]
+    fn test_fanart_artist_images_falls_back_to_sd_logo() {
+        let images: FanartArtistImages = FanartArtistResponse {
+            musiclogo: vec![entry("https://sd-logo", "2")],
+            ..Default::default()
+        }
+        .into();
+        assert_eq!(images.logo, Some("https://sd-logo".to_string()));
+        assert_eq!(images.photo, None);
+        assert_eq!(images.background, None);
+    }
+
+    #[test]
+    fn test_fanart_artist_response_parses_wire_format() {
+        let json = r#"{
+            "name": "Nirvana",
+            "artistthumb": [{"id": "1", "url": "https://thumb", "likes": "3"}],
+            "hdmusiclogo": [{"id": "2", "url": "https://logo", "likes": "1"}],
+            "artistbackground": [{"id": "3", "url": "https://bg", "likes": "0"}],
+            "musicbanner": [{"id": "4", "url": "https://banner", "likes": "9"}]
+        }"#;
+        let parsed: FanartArtistResponse = serde_json::from_str(json).unwrap();
+        let images: FanartArtistImages = parsed.into();
+        assert_eq!(images.photo.as_deref(), Some("https://thumb"));
+        assert_eq!(images.logo.as_deref(), Some("https://logo"));
+        assert_eq!(images.background.as_deref(), Some("https://banner"));
     }
 
     #[test]

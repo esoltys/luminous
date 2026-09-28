@@ -1,4 +1,20 @@
 import { getCoverArtUrl } from "../types";
+import { prefs } from "../stores/prefs.svelte";
+
+/** A locally-discovered image always wins; a fetched one (cache filename,
+ * served by `luminous-art://`) fills in only when there's no local file and
+ * its type is still enabled in Settings › Integrations › fanart.tv (#1276) —
+ * turning a type off hides what was already fetched. */
+function resolveLocalOrFetched(
+  localUri: string | null | undefined,
+  fetchedFilename: string | null | undefined,
+  fetchedEnabled: boolean
+): string | null {
+  return (
+    getCoverArtUrl(localUri) ??
+    (fetchedEnabled && fetchedFilename ? getCoverArtUrl(`luminous-art://${fetchedFilename}`) : null)
+  );
+}
 
 /**
  * Resolves the display URL for an artist's portrait: a locally-discovered
@@ -13,10 +29,23 @@ export function resolveArtistPortraitUrl(
   localPortraitUri: string | null | undefined,
   fetchedImageFilename: string | null | undefined
 ): string | null {
-  return (
-    getCoverArtUrl(localPortraitUri) ??
-    (fetchedImageFilename ? getCoverArtUrl(`luminous-art://${fetchedImageFilename}`) : null)
-  );
+  return resolveLocalOrFetched(localPortraitUri, fetchedImageFilename, prefs.fanartFetchPhoto);
+}
+
+/** The artist header's band logo: a local logo file, else a fanart.tv one (#1276). */
+export function resolveArtistLogoUrl(
+  localLogoUri: string | null | undefined,
+  fetchedLogoFilename: string | null | undefined
+): string | null {
+  return resolveLocalOrFetched(localLogoUri, fetchedLogoFilename, prefs.fanartFetchLogo);
+}
+
+/** The artist header's backdrop: a local fanart file, else a fanart.tv banner (#1276). */
+export function resolveArtistBackgroundUrl(
+  localFanartUri: string | null | undefined,
+  fetchedBackgroundFilename: string | null | undefined
+): string | null {
+  return resolveLocalOrFetched(localFanartUri, fetchedBackgroundFilename, prefs.fanartFetchBackground);
 }
 
 export interface CoverSource {

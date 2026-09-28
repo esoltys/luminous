@@ -552,11 +552,23 @@ export interface ArtistProfile {
   details_fetched?: boolean;
   /** Whether artist image has already been automatically fetched or attempted (#1143). */
   image_fetched?: boolean;
+  /** Cache filename of a band logo fetched from fanart.tv (#1276). */
+  fetched_logo_filename?: string | null;
+  /** Cache filename of a header background fetched from fanart.tv (#1276). */
+  fetched_background_filename?: string | null;
+  /** Whether a fanart.tv logo has already been fetched or attempted (#1276). */
+  logo_fetched?: boolean;
+  /** Whether a fanart.tv background has already been fetched or attempted (#1276). */
+  background_fetched?: boolean;
 }
 
 export interface ArtistImageRetrievalResult {
   uri: string | null;
   source: string | null;
+  logo_uri: string | null;
+  background_uri: string | null;
+  /** The artist's profile as saved by the call — replaces the cached copy. */
+  profile: ArtistProfile;
 }
 
 export interface AlbumLink {

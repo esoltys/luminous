@@ -20,6 +20,7 @@
   import PlaylistCardContextMenu from "./PlaylistCardContextMenu.svelte";
   import { tagsStore } from "../stores/tags.svelte";
   import { tasksStore } from "../stores/tasks.svelte";
+  import { prefs } from "../stores/prefs.svelte";
   import TagEditor from "./TagEditor.svelte";
   import IconActionButton from "./IconActionButton.svelte";
   import HorizontalScrollRow from "./HorizontalScrollRow.svelte";
@@ -49,7 +50,6 @@
   const ExternalLink = OpenInPicard;
   import ShareModal from "./ShareModal.svelte";
   import type { Song, Playlist, AlbumItem, PlayContext, ArtistProfile, ExtendedArtworkResponse, SongContextEnrichment } from "../types";
-  import { getCoverArtUrl } from "../types";
   import {
     resolveSocialUrl,
     formatDisplayLabel,
@@ -60,7 +60,12 @@
     deriveFanartTvUrlFromMbid,
   } from "../utils/artistSocials";
   import { getArtistAlbums, classifyRelease } from "../utils/artist";
-  import { songsToCoverStack, resolveArtistPortraitUrl } from "../utils/covers";
+  import {
+    songsToCoverStack,
+    resolveArtistPortraitUrl,
+    resolveArtistLogoUrl,
+    resolveArtistBackgroundUrl,
+  } from "../utils/covers";
   import { parseMultiValue, joinMultiValue } from "../utils/multiValue";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
   import { i18n } from "../stores/i18n.svelte";
@@ -191,8 +196,12 @@
   let artistPortraitUrl = $derived(
     resolveArtistPortraitUrl(artistArtwork?.artist_portrait_uri, artistProfile?.fetched_image_filename)
   );
-  let bandLogoUrl = $derived(getCoverArtUrl(artistArtwork?.band_logo_uri));
-  let fanartBannerUrl = $derived(getCoverArtUrl(artistArtwork?.fanart_uri));
+  let bandLogoUrl = $derived(
+    resolveArtistLogoUrl(artistArtwork?.band_logo_uri, artistProfile?.fetched_logo_filename)
+  );
+  let fanartBannerUrl = $derived(
+    resolveArtistBackgroundUrl(artistArtwork?.fanart_uri, artistProfile?.fetched_background_filename)
+  );
 
   interface ArtistLinkItem {
     key: string;
@@ -392,7 +401,7 @@
         current: 2,
         label: i18n.t("artistDetail.retrievingImage", {}, "Retrieving artist image..."),
       });
-      await collectionStore.retrieveArtistImage(artistName).catch((e) => {
+      await collectionStore.retrieveArtistImage(artistName, { onlyMissing: true }).catch((e) => {
         console.warn("Failed to retrieve artist image:", e);
       });
 
@@ -415,15 +424,29 @@
     if (lastAutoFetchedArtist === currentArtist) return;
 
     const profile = artistProfile;
-    if (profile?.details_fetched && profile?.image_fetched) {
+    // Image types enabled in Settings that haven't been attempted yet (#1276)
+    // — also backfills a logo/background for artists fetched before those
+    // existed, or after a type is switched back on.
+    const imagesMissing =
+      (prefs.fanartFetchPhoto && !profile?.image_fetched) ||
+      (prefs.fanartFetchLogo && !profile?.logo_fetched) ||
+      (prefs.fanartFetchBackground && !profile?.background_fetched);
+    if (profile?.details_fetched && !imagesMissing) {
       lastAutoFetchedArtist = currentArtist;
       return;
     }
     if (!hasMusicbrainzArtistId) return;
 
     lastAutoFetchedArtist = currentArtist;
+    const detailsFetched = !!profile?.details_fetched;
     collectionStore.isContextEnrichmentEnabled().then((enabled) => {
-      if (enabled && !retrievingAll && !tasksStore.isTaskActive(`artist-enrichment-${currentArtist.toLowerCase()}`)) {
+      if (!enabled || retrievingAll || tasksStore.isTaskActive(`artist-enrichment-${currentArtist.toLowerCase()}`)) return;
+      if (detailsFetched) {
+        // Details are done — quietly fill in just the missing images.
+        collectionStore.retrieveArtistImage(currentArtist, { onlyMissing: true }).catch((e) => {
+          console.warn("Failed to retrieve artist images:", e);
+        });
+      } else {
         handleRetrieveArtistAll();
       }
     });
@@ -457,9 +480,9 @@
     }
   }
 
-  // Artist detail overflow menu's "Retrieve Artist Image" (#1127) — fetches a
-  // portrait from fanart.tv (if a key is configured) or, lacking one, the
-  // Wikidata fallback.
+  // Artist detail overflow menu's "Retrieve Artist Image" (#1127) — fetches the
+  // photo, logo and background from fanart.tv (if a key is configured), whatever
+  // the Settings toggles say, with Wikidata as the photo fallback.
   async function handleRetrieveArtistImage() {
     if (retrievingImage || !hasMusicbrainzArtistId) return;
     retrievingImage = true;
@@ -476,7 +499,9 @@
         ? (result.source === "fanart"
             ? i18n.t("artistDetail.retrieveImageSuccessFanart", {}, "Artist image retrieved from fanart.tv")
             : i18n.t("artistDetail.retrieveImageSuccessWikidata", {}, "Artist image retrieved from Wikidata"))
-        : i18n.t("artistDetail.retrieveImageNoResults", {}, "No artist image found");
+        : result.logo_uri || result.background_uri
+          ? i18n.t("artistDetail.retrieveArtworkSuccessFanart", {}, "Artist artwork retrieved from fanart.tv")
+          : i18n.t("artistDetail.retrieveImageNoResults", {}, "No artist image found");
       tasksStore.completeTask(taskId, label);
     } catch (err) {
       console.error("Failed to retrieve artist image:", err);
@@ -764,15 +789,7 @@
     <div class="flex items-start justify-between gap-6 relative z-10">
       <div class="flex flex-col justify-end gap-1.5 min-w-0 max-w-xl">
         {#if !windowLayoutStore.isDetailHeaderCollapsed}
-        {#if bandLogoUrl}
-          <img
-            src={bandLogoUrl}
-            alt={artistName}
-            class="h-10 sm:h-12 w-auto max-w-full object-contain object-left"
-          />
-        {:else}
-          <h1 class="text-3xl sm:text-4xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5">{artistName}</h1>
-        {/if}
+        <h1 class="text-3xl sm:text-4xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5">{artistName}</h1>
 
         <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-primary font-medium">
           <span>{songsText}</span>
@@ -817,9 +834,21 @@
         </div>
       </div>
 
-      {#if !windowLayoutStore.isDetailHeaderCollapsed && (artistPortraitUrl || headerCovers.length > 0)}
-        <div class="hidden sm:flex items-start shrink-0 shadow-xl">
-          <CoverMosaic covers={headerCovers} heroImageUrl={artistPortraitUrl} heroImageAlt={artistName} sizeClass="h-36" />
+      {#if !windowLayoutStore.isDetailHeaderCollapsed && (bandLogoUrl || artistPortraitUrl || headerCovers.length > 0)}
+        <!-- The logo sits beside the photo rather than replacing the name: logos are often hard to read. -->
+        <div class="hidden sm:flex items-center gap-6 min-w-0">
+          {#if bandLogoUrl}
+            <img
+              src={bandLogoUrl}
+              alt=""
+              class="h-16 w-auto max-w-64 min-w-0 object-contain object-right"
+            />
+          {/if}
+          {#if artistPortraitUrl || headerCovers.length > 0}
+            <div class="flex items-start shrink-0 shadow-xl">
+              <CoverMosaic covers={headerCovers} heroImageUrl={artistPortraitUrl} heroImageAlt={artistName} sizeClass="h-36" />
+            </div>
+          {/if}
         </div>
       {/if}
     </div>

@@ -810,27 +810,25 @@ class CollectionStore {
     return result;
   }
 
-  /** Artist detail overflow menu's "Retrieve Artist Image" (#1127): fetches a
-   * portrait from fanart.tv (if an API key is configured) or, lacking a key
-   * or a match, Wikidata's image property, caches it, and persists the
-   * result onto the artist's profile. Updates the cached profile locally
-   * from the returned filename rather than re-fetching the whole profile,
+  /** Artist detail overflow menu's "Retrieve Artist Image" (#1127), also
+   * the enrichment batch's image step: fetches whichever image types are
+   * enabled in Settings (photo, logo, background — #1276) from fanart.tv,
+   * with Wikidata as the photo fallback, caches them, and persists the
+   * result onto the artist's profile. `onlyMissing` skips types already
+   * attempted. Replaces the cached profile with the one the backend saved,
    * same convention as `retrieveArtistDetails`. */
-  async retrieveArtistImage(artistName: string): Promise<ArtistImageRetrievalResult> {
+  async retrieveArtistImage(
+    artistName: string,
+    options: { onlyMissing?: boolean } = {}
+  ): Promise<ArtistImageRetrievalResult> {
     const result = await invoke<ArtistImageRetrievalResult>("retrieve_artist_image", {
       artist: artistName,
+      onlyMissing: options.onlyMissing ?? false,
     });
-    const key = artistName.toLowerCase();
-    const existing = this.artistProfiles[key];
-    if (existing) {
+    if (result?.profile) {
       this.artistProfiles = {
         ...this.artistProfiles,
-        [key]: {
-          ...existing,
-          fetched_image_filename: result?.uri ? result.uri.replace("luminous-art://", "") : existing.fetched_image_filename,
-          fetched_image_source: result?.source ?? existing.fetched_image_source,
-          image_fetched: true,
-        },
+        [artistName.toLowerCase()]: result.profile,
       };
     }
     return result;

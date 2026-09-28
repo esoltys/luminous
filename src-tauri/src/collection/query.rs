@@ -1730,54 +1730,42 @@ fn attach_album_ratings(conn: &rusqlite::Connection, items: &mut [HomeItem]) -> 
     Ok(())
 }
 
+/// Column list shared by every `artist_profiles` read, in the order
+/// `artist_profile_from_row` expects.
+const ARTIST_PROFILE_COLUMNS: &str = "artist_key, website, tags, social_links, bio, musicbrainz_artist_id, fetched_image_filename, fetched_image_source, details_fetched, image_fetched, fetched_logo_filename, fetched_background_filename, logo_fetched, background_fetched";
+
+fn artist_profile_from_row(row: &rusqlite::Row) -> rusqlite::Result<ArtistProfile> {
+    let tags_json: String = row.get(2)?;
+    let social_links_json: String = row.get(3)?;
+    Ok(ArtistProfile {
+        artist_key: row.get(0)?,
+        website: row.get(1)?,
+        tags: serde_json::from_str(&tags_json).unwrap_or_default(),
+        social_links: serde_json::from_str::<Vec<ArtistSocialLink>>(&social_links_json)
+            .unwrap_or_default(),
+        bio: row.get(4)?,
+        musicbrainz_artist_id: row.get(5)?,
+        fetched_image_filename: row.get(6)?,
+        fetched_image_source: row.get(7)?,
+        details_fetched: row.get(8)?,
+        image_fetched: row.get(9)?,
+        fetched_logo_filename: row.get(10)?,
+        fetched_background_filename: row.get(11)?,
+        logo_fetched: row.get(12)?,
+        background_fetched: row.get(13)?,
+    })
+}
+
 /// Retrieve customizable profile for an artist from SQLite (#473).
 pub fn get_artist_profile_conn(conn: &rusqlite::Connection, artist: &str) -> Result<ArtistProfile> {
-    let mut stmt = conn.prepare(
-        "SELECT artist_key, website, tags, social_links, bio, musicbrainz_artist_id, fetched_image_filename, fetched_image_source, details_fetched, image_fetched FROM artist_profiles WHERE artist_key = ?1 COLLATE NOCASE",
-    )?;
-    let result = stmt.query_row(params![artist], |row| {
-        let artist_key: String = row.get(0)?;
-        let website: Option<String> = row.get(1)?;
-        let tags_json: String = row.get(2)?;
-        let social_links_json: String = row.get(3)?;
-        let bio: Option<String> = row.get(4)?;
-        let musicbrainz_artist_id: Option<String> = row.get(5)?;
-        let fetched_image_filename: Option<String> = row.get(6)?;
-        let fetched_image_source: Option<String> = row.get(7)?;
-        let details_fetched: bool = row.get(8)?;
-        let image_fetched: bool = row.get(9)?;
-
-        let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
-        let social_links: Vec<ArtistSocialLink> =
-            serde_json::from_str(&social_links_json).unwrap_or_default();
-
-        Ok(ArtistProfile {
-            artist_key,
-            website,
-            tags,
-            social_links,
-            bio,
-            musicbrainz_artist_id,
-            fetched_image_filename,
-            fetched_image_source,
-            details_fetched,
-            image_fetched,
-        })
-    });
-
-    match result {
+    let mut stmt = conn.prepare(&format!(
+        "SELECT {ARTIST_PROFILE_COLUMNS} FROM artist_profiles WHERE artist_key = ?1 COLLATE NOCASE"
+    ))?;
+    match stmt.query_row(params![artist], artist_profile_from_row) {
         Ok(profile) => Ok(profile),
         Err(rusqlite::Error::QueryReturnedNoRows) => Ok(ArtistProfile {
             artist_key: artist.to_string(),
-            website: None,
-            tags: Vec::new(),
-            social_links: Vec::new(),
-            bio: None,
-            musicbrainz_artist_id: None,
-            fetched_image_filename: None,
-            fetched_image_source: None,
-            details_fetched: false,
-            image_fetched: false,
+            ..Default::default()
         }),
         Err(e) => Err(e.into()),
     }
@@ -1833,8 +1821,8 @@ pub fn set_artist_profile_conn(
     let social_links_json = serde_json::to_string(&profile.social_links)?;
 
     conn.execute(
-        "INSERT INTO artist_profiles (artist_key, website, tags, social_links, bio, musicbrainz_artist_id, fetched_image_filename, fetched_image_source, details_fetched, image_fetched)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+        "INSERT INTO artist_profiles (artist_key, website, tags, social_links, bio, musicbrainz_artist_id, fetched_image_filename, fetched_image_source, details_fetched, image_fetched, fetched_logo_filename, fetched_background_filename, logo_fetched, background_fetched)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
          ON CONFLICT(artist_key) DO UPDATE SET
             website = excluded.website,
             tags = excluded.tags,
@@ -1844,7 +1832,11 @@ pub fn set_artist_profile_conn(
             fetched_image_filename = excluded.fetched_image_filename,
             fetched_image_source = excluded.fetched_image_source,
             details_fetched = excluded.details_fetched,
-            image_fetched = excluded.image_fetched",
+            image_fetched = excluded.image_fetched,
+            fetched_logo_filename = excluded.fetched_logo_filename,
+            fetched_background_filename = excluded.fetched_background_filename,
+            logo_fetched = excluded.logo_fetched,
+            background_fetched = excluded.background_fetched",
         params![
             profile.artist_key,
             profile.website,
@@ -1855,7 +1847,11 @@ pub fn set_artist_profile_conn(
             profile.fetched_image_filename,
             profile.fetched_image_source,
             profile.details_fetched as i32,
-            profile.image_fetched as i32
+            profile.image_fetched as i32,
+            profile.fetched_logo_filename,
+            profile.fetched_background_filename,
+            profile.logo_fetched as i32,
+            profile.background_fetched as i32
         ],
     )?;
 
@@ -1868,39 +1864,11 @@ pub fn set_artist_profile_conn(
 
 /// Retrieve all saved artist profiles in SQLite (#473).
 pub fn get_all_artist_profiles_conn(conn: &rusqlite::Connection) -> Result<Vec<ArtistProfile>> {
-    let mut stmt = conn.prepare(
-        "SELECT artist_key, website, tags, social_links, bio, musicbrainz_artist_id, fetched_image_filename, fetched_image_source, details_fetched, image_fetched FROM artist_profiles ORDER BY artist_key COLLATE NOCASE",
-    )?;
+    let mut stmt = conn.prepare(&format!(
+        "SELECT {ARTIST_PROFILE_COLUMNS} FROM artist_profiles ORDER BY artist_key COLLATE NOCASE"
+    ))?;
     let profiles = stmt
-        .query_map([], |row| {
-            let artist_key: String = row.get(0)?;
-            let website: Option<String> = row.get(1)?;
-            let tags_json: String = row.get(2)?;
-            let social_links_json: String = row.get(3)?;
-            let bio: Option<String> = row.get(4)?;
-            let musicbrainz_artist_id: Option<String> = row.get(5)?;
-            let fetched_image_filename: Option<String> = row.get(6)?;
-            let fetched_image_source: Option<String> = row.get(7)?;
-            let details_fetched: bool = row.get(8)?;
-            let image_fetched: bool = row.get(9)?;
-
-            let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
-            let social_links: Vec<ArtistSocialLink> =
-                serde_json::from_str(&social_links_json).unwrap_or_default();
-
-            Ok(ArtistProfile {
-                artist_key,
-                website,
-                tags,
-                social_links,
-                bio,
-                musicbrainz_artist_id,
-                fetched_image_filename,
-                fetched_image_source,
-                details_fetched,
-                image_fetched,
-            })
-        })?
+        .query_map([], artist_profile_from_row)?
         .filter_map(|r| r.ok())
         .collect();
 
@@ -3461,6 +3429,7 @@ mod tests {
             fetched_image_source: None,
             details_fetched: false,
             image_fetched: false,
+            ..Default::default()
         };
 
         set_artist_profile_conn(&conn, &profile).unwrap();
@@ -3588,6 +3557,7 @@ mod tests {
                 fetched_image_source: None,
                 details_fetched: false,
                 image_fetched: false,
+                ..Default::default()
             },
         )
         .unwrap();
@@ -3604,6 +3574,7 @@ mod tests {
                 fetched_image_source: None,
                 details_fetched: false,
                 image_fetched: false,
+                ..Default::default()
             },
         )
         .unwrap();
@@ -3624,6 +3595,7 @@ mod tests {
                 fetched_image_source: None,
                 details_fetched: false,
                 image_fetched: false,
+                ..Default::default()
             },
         )
         .unwrap();

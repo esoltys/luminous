@@ -1232,12 +1232,20 @@ pub async fn validate_fanart_api_key(api_key: String) -> Result<(), String> {
 
 #[derive(Serialize, Clone, Debug, Default)]
 pub struct ArtistImageRetrievalResult {
-    /// `luminous-art://` URI for the fetched (and now cached) image, or
-    /// `None` when neither fanart.tv nor the Wikidata fallback had one —
-    /// not an error, just nothing found.
+    /// `luminous-art://` URI for the photo fetched this call, or `None` when
+    /// neither fanart.tv nor the Wikidata fallback had one (or the photo
+    /// wasn't requested) — not an error, just nothing found.
     pub uri: Option<String>,
     /// `"fanart"` or `"wikidata"`, matching `ArtistProfile.fetched_image_source`.
     pub source: Option<String>,
+    /// `luminous-art://` URI for a band logo fetched this call (#1276).
+    pub logo_uri: Option<String>,
+    /// `luminous-art://` URI for a header background fetched this call (#1276).
+    pub background_uri: Option<String>,
+    /// The artist's profile as saved by this call (fetched filenames and
+    /// attempted flags), so the frontend replaces its cached copy instead of
+    /// re-deriving it.
+    pub profile: ArtistProfile,
 }
 
 /// Reads the settings-stored fanart.tv API key (`fanart_api_key` in the
@@ -1263,31 +1271,76 @@ async fn resolve_fanart_api_key(state: &State<'_, AppState>) -> Option<String> {
         .or_else(|| std::env::var("FANART_API_KEY").ok())
 }
 
-/// The artist detail overflow menu's "Retrieve Artist Image" action (#1127):
-/// resolves the artist's MusicBrainz MBID (same lookup
-/// `retrieve_artist_details` uses), then tries fanart.tv's artist-images API
-/// first (if a key is configured — settings or `FANART_API_KEY` env var),
-/// falling back to Wikidata's `P18` (image) property when no key is
-/// available or fanart.tv has no thumbnail for this artist. The winning
-/// image is downloaded and cached under `CoverManager`'s `covers_dir` (same
-/// directory the `luminous-art://` protocol handler already serves), and the
-/// cache filename + source are persisted onto the artist's profile so it
-/// doesn't need to be re-fetched on every visit.
+/// Downloads one fetched artist image into the covers cache and returns its
+/// cache filename.
+async fn cache_fetched_artist_image(
+    state: &State<'_, AppState>,
+    client: &reqwest::Client,
+    url: &str,
+    filename_stem: &str,
+) -> Result<String, String> {
+    crate::artist_image::download_and_cache_artist_image(
+        client,
+        url,
+        state.cover_manager.covers_dir(),
+        filename_stem,
+    )
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// The artist detail overflow menu's "Retrieve Artist Image" action (#1127),
+/// also run by the artist view's automatic enrichment batch: resolves the
+/// artist's MusicBrainz MBID (same lookup `retrieve_artist_details` uses),
+/// then fetches the artist's images (#1276) — photo, band logo, header
+/// background. All three come
+/// from one fanart.tv request (if a key is configured — settings or
+/// `FANART_API_KEY` env var); the photo alone falls back to Wikidata's `P18`
+/// (image) property when there's no key or fanart.tv has no thumbnail. Each
+/// winning image is downloaded and cached under `CoverManager`'s
+/// `covers_dir` (same directory the `luminous-art://` protocol handler
+/// already serves), and its cache filename + an attempted flag per type are
+/// persisted onto the artist's profile so it isn't re-fetched on every visit.
+///
+/// `only_missing` (the automatic batch) fetches only the types enabled in
+/// Settings › Integrations › fanart.tv that haven't been attempted yet. The
+/// manual action leaves it unset and re-fetches every type regardless of
+/// those toggles — they still decide which fetched images are shown. The logo
+/// and background are only marked attempted once fanart.tv was actually
+/// asked, so adding a key later still fills them in. A failed download
+/// leaves that type unattempted (retried next visit) and is returned as the
+/// error only when nothing else was saved.
 #[tauri::command]
 pub async fn retrieve_artist_image(
     artist: String,
+    only_missing: Option<bool>,
     state: State<'_, AppState>,
 ) -> Result<ArtistImageRetrievalResult, String> {
-    let enrichment_enabled = crate::db::run_blocking(&state.db, |conn| {
-        Ok(crate::commands::context::context_enrichment_enabled(conn))
+    let only_missing = only_missing.unwrap_or(false);
+    let (enrichment_enabled, prefs) = crate::db::run_blocking(&state.db, |conn| {
+        Ok((
+            crate::commands::context::context_enrichment_enabled(conn),
+            crate::commands::settings::load_ui_preferences(conn),
+        ))
     })
     .await
-    .unwrap_or(true);
+    .map_err(|e| e.to_string())?;
     if !enrichment_enabled {
         return Err("Online context enrichment is disabled".to_string());
     }
 
     let (artist_mbid, current_profile) = resolve_artist_mbid_and_profile(&state, &artist).await?;
+
+    let want_photo = !only_missing || (prefs.fanart_fetch_photo && !current_profile.image_fetched);
+    let want_logo = !only_missing || (prefs.fanart_fetch_logo && !current_profile.logo_fetched);
+    let want_background =
+        !only_missing || (prefs.fanart_fetch_background && !current_profile.background_fetched);
+    if !(want_photo || want_logo || want_background) {
+        return Ok(ArtistImageRetrievalResult {
+            profile: current_profile,
+            ..Default::default()
+        });
+    }
 
     let Some(artist_mbid) = artist_mbid else {
         return Err(
@@ -1298,73 +1351,117 @@ pub async fn retrieve_artist_image(
 
     let client = crate::artist_image::new_http_client().map_err(|e| e.to_string())?;
     let fanart_key = resolve_fanart_api_key(&state).await;
+    let fanart_asked = fanart_key.is_some();
+    if only_missing && !want_photo && !fanart_asked {
+        // Only a keyless logo/background is outstanding: nothing to ask,
+        // and nothing to mark attempted until a key is added.
+        return Ok(ArtistImageRetrievalResult {
+            profile: current_profile,
+            ..Default::default()
+        });
+    }
 
-    let mut image_url = None;
-    let mut source = None;
+    let mut fanart = crate::artist_image::FanartArtistImages::default();
     if let Some(key) = fanart_key {
-        image_url = crate::artist_image::fetch_fanart_artist_image_url(&client, &artist_mbid, &key)
+        fanart = crate::artist_image::fetch_fanart_artist_images(&client, &artist_mbid, &key)
             .await
             .map_err(|e| e.to_string())?;
-        if image_url.is_some() {
-            source = Some(crate::artist_image::ArtistImageSource::Fanart);
-        }
     }
-    if image_url.is_none() {
-        image_url = crate::artist_image::fetch_wikidata_artist_image_url(
+
+    let mut photo = None;
+    if want_photo {
+        if let Some(url) = fanart.photo.take() {
+            photo = Some((url, crate::artist_image::ArtistImageSource::Fanart));
+        } else if let Some(url) = crate::artist_image::fetch_wikidata_artist_image_url(
             &ContextManager::new(),
             &artist_mbid,
         )
         .await
-        .map_err(|e| e.to_string())?;
-        if image_url.is_some() {
-            source = Some(crate::artist_image::ArtistImageSource::Wikidata);
+        .map_err(|e| e.to_string())?
+        {
+            photo = Some((url, crate::artist_image::ArtistImageSource::Wikidata));
         }
     }
 
-    let Some(image_url) = image_url else {
-        let mut updated_profile = current_profile;
-        updated_profile.artist_key = artist;
-        if updated_profile.musicbrainz_artist_id.is_none() {
-            updated_profile.musicbrainz_artist_id = Some(artist_mbid);
-        }
-        updated_profile.image_fetched = true;
-        let _ = crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
-            save_artist_profile_with_sidecar(scanner, &updated_profile)
-        })
-        .await;
-        return Ok(ArtistImageRetrievalResult::default());
-    };
-    let source = source.expect("source is set whenever image_url is Some");
-
-    let filename_stem = state.cover_manager.get_artist_image_hash(&artist_mbid);
-    let filename = crate::artist_image::download_and_cache_artist_image(
-        &client,
-        &image_url,
-        state.cover_manager.covers_dir(),
-        &filename_stem,
-    )
-    .await
-    .map_err(|e| e.to_string())?;
-
-    let mut updated_profile = current_profile;
-    updated_profile.artist_key = artist;
-    if updated_profile.musicbrainz_artist_id.is_none() {
-        updated_profile.musicbrainz_artist_id = Some(artist_mbid);
+    let stem = state.cover_manager.get_artist_image_hash(&artist_mbid);
+    let mut result = ArtistImageRetrievalResult::default();
+    let mut download_error = None;
+    let mut profile = current_profile;
+    profile.artist_key = artist;
+    if profile.musicbrainz_artist_id.is_none() {
+        profile.musicbrainz_artist_id = Some(artist_mbid);
     }
-    updated_profile.fetched_image_filename = Some(filename.clone());
-    updated_profile.fetched_image_source = Some(source.as_str().to_string());
-    updated_profile.image_fetched = true;
 
+    if want_photo {
+        match photo {
+            None => profile.image_fetched = true,
+            Some((url, source)) => {
+                match cache_fetched_artist_image(&state, &client, &url, &stem).await {
+                    Ok(filename) => {
+                        result.uri = Some(format!("luminous-art://{filename}"));
+                        result.source = Some(source.as_str().to_string());
+                        profile.fetched_image_filename = Some(filename);
+                        profile.fetched_image_source = Some(source.as_str().to_string());
+                        profile.image_fetched = true;
+                    }
+                    Err(e) => download_error = Some(e),
+                }
+            }
+        }
+    }
+    if want_logo && fanart_asked {
+        match fanart.logo {
+            None => profile.logo_fetched = true,
+            Some(url) => {
+                match cache_fetched_artist_image(&state, &client, &url, &format!("{stem}_logo"))
+                    .await
+                {
+                    Ok(filename) => {
+                        result.logo_uri = Some(format!("luminous-art://{filename}"));
+                        profile.fetched_logo_filename = Some(filename);
+                        profile.logo_fetched = true;
+                    }
+                    Err(e) => download_error = download_error.or(Some(e)),
+                }
+            }
+        }
+    }
+    if want_background && fanart_asked {
+        match fanart.background {
+            None => {
+                // Also drops an image cached before banners replaced 16:9
+                // backdrops, which the header can't fit.
+                profile.fetched_background_filename = None;
+                profile.background_fetched = true;
+            }
+            Some(url) => {
+                let stem = format!("{stem}_background");
+                match cache_fetched_artist_image(&state, &client, &url, &stem).await {
+                    Ok(filename) => {
+                        result.background_uri = Some(format!("luminous-art://{filename}"));
+                        profile.fetched_background_filename = Some(filename);
+                        profile.background_fetched = true;
+                    }
+                    Err(e) => download_error = download_error.or(Some(e)),
+                }
+            }
+        }
+    }
+
+    let to_save = profile.clone();
     crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
-        save_artist_profile_with_sidecar(scanner, &updated_profile)
+        save_artist_profile_with_sidecar(scanner, &to_save)
     })
     .await
     .map_err(|e| e.to_string())?;
 
-    Ok(ArtistImageRetrievalResult {
-        uri: Some(format!("luminous-art://{filename}")),
-        source: Some(source.as_str().to_string()),
-    })
+    let saved_any =
+        result.uri.is_some() || result.logo_uri.is_some() || result.background_uri.is_some();
+    if let (Some(e), false) = (download_error, saved_any) {
+        return Err(e);
+    }
+    result.profile = profile;
+    Ok(result)
 }
 
 /// Every artist tag in the library with its song count, for the Genres
@@ -1912,6 +2009,7 @@ mod tests {
             fetched_image_source: None,
             details_fetched: false,
             image_fetched: false,
+            ..Default::default()
         };
 
         let content = build_artist_md_content(&profile).unwrap();
