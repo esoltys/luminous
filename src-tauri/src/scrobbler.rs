@@ -1035,25 +1035,23 @@ impl ScrobblerManager {
                 log::info!("Successfully flushed {flushed_count} scrobbles to ListenBrainz");
                 Ok(flushed_count)
             }
+            // Callers report the returned error (the background flush logs it,
+            // the Settings flush shows it), so these arms only record it.
             Ok(r) => {
-                let status = r.status().as_u16();
-                let err_text = r
-                    .text()
-                    .await
-                    .unwrap_or_else(|_| format!("HTTP error {status}"));
-                log::warn!("ListenBrainz returned {status} on submit: {err_text}");
+                let status = r.status();
+                let body = r.text().await.unwrap_or_default();
+                let err_msg = describe_error_response(status, &body);
 
                 for e in &entries {
                     let _ = conn.execute(
                         "UPDATE scrobble_cache SET attempts = attempts + 1, last_attempt = ?1, last_error = ?2 WHERE id = ?3",
-                        params![now, format!("HTTP {status}: {err_text}"), e.id],
+                        params![now, err_msg, e.id],
                     );
                 }
-                Err(format!("HTTP {status}: {err_text}"))
+                Err(err_msg)
             }
             Err(e) => {
-                let err_msg = e.to_string();
-                log::warn!("Failed to send scrobbles to ListenBrainz: {err_msg}");
+                let err_msg = format!("Network request failed: {e}");
 
                 for e in &entries {
                     let _ = conn.execute(
@@ -1067,9 +1065,42 @@ impl ScrobblerManager {
     }
 }
 
+/// One-line description of a failed ListenBrainz response. The API's own
+/// errors are JSON with an `error` field worth keeping; anything else (a
+/// proxy's HTML 502 page) is reduced to the status line.
+fn describe_error_response(status: reqwest::StatusCode, body: &str) -> String {
+    #[derive(Deserialize)]
+    struct ApiError {
+        error: String,
+    }
+    match serde_json::from_str::<ApiError>(body) {
+        Ok(api) => format!("HTTP {}: {}", status.as_u16(), api.error),
+        Err(_) => format!("HTTP {status}"),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn error_response_keeps_api_message_but_drops_html_pages() {
+        assert_eq!(
+            describe_error_response(
+                reqwest::StatusCode::BAD_REQUEST,
+                r#"{"code": 400, "error": "Invalid listened_at"}"#
+            ),
+            "HTTP 400: Invalid listened_at"
+        );
+        assert_eq!(
+            describe_error_response(
+                reqwest::StatusCode::BAD_GATEWAY,
+                "<!DOCTYPE html>
+<html><title>502 Bad Gateway</title></html>"
+            ),
+            "HTTP 502 Bad Gateway"
+        );
+    }
 
     #[test]
     fn feedback_loves_only_four_stars_and_up() {
