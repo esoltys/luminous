@@ -196,4 +196,29 @@ describe("PinnedRow.svelte", () => {
     expect(navigationStore.selectedPlaylistId).toBe(42);
     expect(playlistsStore.activePlaylistId).toBe(42);
   });
+
+  it("navigates to a different custom playlist from Home when Queue was previously active", async () => {
+    const playlistA: Playlist = { id: 42, name: "Playlist A", is_queue: false, track_count: 10 } as Playlist;
+    const playlistB: Playlist = { id: 84, name: "Playlist B", is_queue: false, track_count: 5 } as Playlist;
+    const queuePlaylist: Playlist = { id: 1, name: "Queue", is_queue: true, track_count: 0 } as Playlist;
+
+    playlistsStore.playlists = [queuePlaylist, playlistA, playlistB];
+    pinnedStore.items = [
+      { type: "playlist", playlist: playlistA },
+      { type: "playlist", playlist: playlistB },
+    ];
+
+    // Simulate scenario: User played Playlist A, so Queue is active
+    playlistsStore.activePlaylistId = 1;
+    navigationStore.selectedPlaylistId = 1;
+    navigationStore.activeTab = "home";
+
+    const { getByText } = render(PinnedRow);
+    const playlistBCard = getByText("Playlist B");
+    await fireEvent.click(playlistBCard);
+
+    expect(navigationStore.activeTab).toBe("playlists");
+    expect(navigationStore.selectedPlaylistId).toBe(84);
+    expect(playlistsStore.activePlaylistId).toBe(84);
+  });
 });
