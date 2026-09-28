@@ -106,6 +106,8 @@ class CollectionStore {
     total_albums: 0,
     total_duration_nanosec: 0,
     total_filesize_bytes: 0,
+    album_art_bytes: 0,
+    artist_art_bytes: 0,
   });
   /** False until the first refreshStats() resolves — `stats.total_songs` starts at 0
    *  before that, so code gating on "library is empty" must wait for this to avoid

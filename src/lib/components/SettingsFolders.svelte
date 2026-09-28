@@ -7,6 +7,7 @@
   import { tasksStore } from "../stores/tasks.svelte";
   import { onMount } from "svelte";
   import Toggle from "./Toggle.svelte";
+  import HelpTip from "./HelpTip.svelte";
   import Button from "./Button.svelte";
   import LibraryBadge from "./LibraryBadge.svelte";
   import FolderEditModal from "./FolderEditModal.svelte";
@@ -15,6 +16,7 @@
   import type { MusicDirectory, SubsonicServer, SubsonicSyncStats, WebDavServer } from "../types";
   import { combineWebdavPath } from "../webdavDisplay";
   import { stripEnclosingQuotes } from "../utils/filterParser";
+  import { formatFileSize } from "../utils/formatters";
   import { invoke } from "@tauri-apps/api/core";
   import {
     FolderIcon as Folder,
@@ -110,6 +112,24 @@
   }
 
   // OpenSubsonic media servers (#916) — mirrors the WebDAV list above.
+  // Disk Size covers the music files plus the covers cache; the tooltip
+  // breaks the total down (values come from get_library_stats).
+  // GB at the headline's two decimals so the parts visibly add up to it.
+  const formatDiskSize = (bytes: number) =>
+    bytes >= 1073741824 ? `${(bytes / 1073741824).toFixed(2)} GB` : formatFileSize(bytes);
+  const diskSizeLabel = $derived.by(() => {
+    const { total_filesize_bytes, album_art_bytes, artist_art_bytes } = collectionStore.stats;
+    const total = total_filesize_bytes + (album_art_bytes ?? 0) + (artist_art_bytes ?? 0);
+    return `${(total / 1073741824).toFixed(2)} GB`;
+  });
+  const diskSizeBreakdown = $derived(
+    [
+      i18n.t('settings.statsSizeMusic', { size: formatDiskSize(collectionStore.stats.total_filesize_bytes) }),
+      i18n.t('settings.statsSizeAlbumArt', { size: formatDiskSize(collectionStore.stats.album_art_bytes) }),
+      i18n.t('settings.statsSizeArtistArt', { size: formatDiskSize(collectionStore.stats.artist_art_bytes) }),
+    ].join("\n"),
+  );
+
   let isSubsonicModalOpen = $state(false);
   let editingSubsonicServer = $state<SubsonicServer | null>(null);
   let syncingSubsonicId = $state<number | null>(null);
@@ -721,10 +741,16 @@
       <span class="text-xs text-brand-text-secondary uppercase font-semibold">{i18n.t('settings.statsArtists')}</span>
       <p class="text-base font-bold text-brand-text-primary mt-0.5">{collectionStore.stats.total_artists.toLocaleString()}</p>
     </div>
-    <div class="bg-brand-main/40 border border-brand-border rounded-lg p-3">
-      <span class="text-xs text-brand-text-secondary uppercase font-semibold">{i18n.t('settings.statsSize')}</span>
-      <p class="text-base font-bold text-brand-text-primary mt-0.5">{(collectionStore.stats.total_filesize_bytes / (1024 * 1024 * 1024)).toFixed(2)} GB</p>
-    </div>
+    <HelpTip
+      text={diskSizeBreakdown}
+      label={`${i18n.t('settings.statsSize')}: ${diskSizeLabel}`}
+      class="w-full bg-brand-main/40 border border-brand-border rounded-lg"
+    >
+      <div class="w-full p-3 text-left">
+        <span class="text-xs text-brand-text-secondary uppercase font-semibold">{i18n.t('settings.statsSize')}</span>
+        <p class="text-base font-bold text-brand-text-primary mt-0.5">{diskSizeLabel}</p>
+      </div>
+    </HelpTip>
   </div>
 </div>
 </div>

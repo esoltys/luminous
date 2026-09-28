@@ -25,6 +25,8 @@ describe("Sidebar.svelte", () => {
       total_artists: 2,
       total_duration_nanosec: 1000,
       total_filesize_bytes: 1000,
+      album_art_bytes: 0,
+      artist_art_bytes: 0,
     };
   });
 

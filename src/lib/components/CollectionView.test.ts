@@ -112,6 +112,8 @@ describe("CollectionView.svelte", () => {
       total_artists: 2,
       total_duration_nanosec: 380_000_000_000,
       total_filesize_bytes: 10_000_000,
+      album_art_bytes: 0,
+      artist_art_bytes: 0,
     };
     navigationStore.activeSubTab = "songs";
     navigationStore.selectedAlbumName = null;

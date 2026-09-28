@@ -1116,6 +1116,7 @@ impl CollectionScanner {
                 total_albums: row.get(2)?,
                 total_duration_nanosec: row.get(3)?,
                 total_filesize_bytes: row.get(4)?,
+                ..Default::default()
             })
         })?;
         Ok(stats)

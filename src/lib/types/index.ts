@@ -399,7 +399,10 @@ export interface LibraryStats {
   total_artists: number;
   total_albums: number;
   total_duration_nanosec: number;
+  /** Music files only; the covers cache is split out below. */
   total_filesize_bytes: number;
+  album_art_bytes: number;
+  artist_art_bytes: number;
 }
 
 /** Whether the on-disk database's schema is ahead of what this build understands —

@@ -119,7 +119,7 @@
     use:portal
     use:clampToViewport
     aria-hidden="true"
-    class="fixed z-[130] max-w-xs -translate-x-1/2 px-2.5 py-1.5 rounded-md border border-brand-border bg-brand-sidebar text-brand-text-primary text-xs font-normal normal-case tracking-normal leading-snug shadow-xl pointer-events-none whitespace-normal {position.placeAbove ? '-translate-y-full' : ''}"
+    class="fixed z-[130] w-max max-w-xs -translate-x-1/2 px-2.5 py-1.5 rounded-md border border-brand-border bg-brand-sidebar text-brand-text-primary text-xs font-normal normal-case tracking-normal leading-snug shadow-xl pointer-events-none whitespace-pre-line {position.placeAbove ? '-translate-y-full' : ''}"
     style="left: {position.left}px; top: {position.top}px;"
   >
     {text}

@@ -1189,6 +1189,25 @@ impl CollectionScanner {
             }
         }
 
+        // Prune orphaned covers-cache files and shrink ones cached at full
+        // resolution before #1272. The grace period spares files a concurrent
+        // WebDAV/Subsonic sync has written but not yet recorded on its row.
+        match tokio::task::spawn_blocking(move || {
+            cover_manager.sweep_cache(std::time::Duration::from_secs(10 * 60))
+        })
+        .await
+        {
+            Ok(Ok(swept)) if swept.pruned > 0 || swept.recompressed > 0 => log::info!(
+                "Covers cache sweep: pruned {} orphaned, recompressed {}, reclaimed {} bytes",
+                swept.pruned,
+                swept.recompressed,
+                swept.bytes_reclaimed
+            ),
+            Ok(Ok(_)) => {}
+            Ok(Err(e)) => log::warn!("Covers cache sweep failed: {e}"),
+            Err(e) => log::warn!("Covers cache sweep task failed: {e}"),
+        }
+
         // Done
         on_progress(ScanProgress {
             phase: ScanPhase::Done,

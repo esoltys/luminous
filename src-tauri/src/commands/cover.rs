@@ -12,11 +12,15 @@ use tauri_plugin_opener::OpenerExt;
 pub async fn get_cover_art_uri(
     state: State<'_, AppState>,
     song_id: i64,
+    full_resolution: Option<bool>,
 ) -> Result<Option<String>, String> {
-    state
-        .cover_manager
-        .get_cover_art_uri(song_id)
-        .map_err(|e| e.to_string())
+    let manager = &state.cover_manager;
+    if full_resolution.unwrap_or(false) {
+        manager.get_full_resolution_cover_art_uri(song_id)
+    } else {
+        manager.get_cover_art_uri(song_id)
+    }
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]

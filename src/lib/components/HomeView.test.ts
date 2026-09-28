@@ -80,6 +80,8 @@ describe("HomeView.svelte", () => {
       total_albums: 0,
       total_duration_nanosec: 0,
       total_filesize_bytes: 0,
+      album_art_bytes: 0,
+      artist_art_bytes: 0,
     };
     collectionStore.songs = [];
     collectionStore.albums = [];
