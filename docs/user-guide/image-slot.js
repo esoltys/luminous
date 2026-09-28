@@ -422,7 +422,17 @@
     '.attr-error svg{opacity:.55}' +
     '.attr-error .cap{max-width:92%;font-weight:500;letter-spacing:.01em}' +
     ':host([data-attribution-error]) .attr-error{display:flex}' +
-    ':host([data-attribution-error]) .ring{display:none}';
+    ':host([data-attribution-error]) .ring{display:none}' +
+    ':host([data-filled]:not([data-reframe])){cursor:zoom-in}' +
+    ':host([data-filled]:not([data-reframe])) .frame{cursor:zoom-in}' +
+    '.frame.is-filled{cursor:zoom-in}' +
+    '.zoom-hint{position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:6px;' +
+    '  background:rgba(10,11,16,.75);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.15);' +
+    '  color:#f1f3f8;display:flex;align-items:center;justify-content:center;opacity:0;transform:scale(.9);' +
+    '  transition:opacity .15s ease,transform .15s ease;pointer-events:none;z-index:2}' +
+    ':host([data-filled]:not([data-reframe]):hover) .zoom-hint,' +
+    '.frame.is-filled:hover .zoom-hint{opacity:1;transform:scale(1)}' +
+    ':host([data-editable]) .zoom-hint{display:none !important}';
 
   const icon =
     '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
@@ -435,6 +445,233 @@
     'stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' +
     '<path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/>' +
     '<path d="M12 9v4"/><path d="M12 17h.01"/></svg>';
+
+  const zoomIcon =
+    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+    'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+    '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>' +
+    '<line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>';
+
+  let lightboxInstance = null;
+
+  function ensureLightbox() {
+    if (lightboxInstance) return lightboxInstance;
+
+    const style = document.createElement('style');
+    style.id = 'image-slot-lightbox-style';
+    style.textContent = `
+      .lb-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 999999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        box-sizing: border-box;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      }
+      .lb-overlay.lb-active {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .lb-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(6, 8, 12, 0.88);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        cursor: pointer;
+      }
+      .lb-modal {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        flex-direction: column;
+        max-width: 95vw;
+        max-height: 94vh;
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid #2a2e3d;
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.05);
+        background: #0d0f14;
+        animation: lbScaleIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      @keyframes lbScaleIn {
+        from { transform: scale(0.96); opacity: 0; }
+        to { transform: scale(1); opacity: 1; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .lb-modal { animation: none; }
+        .lb-overlay { transition: opacity 0.1s ease; }
+      }
+      .lb-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 16px;
+        background: #141720;
+        border-bottom: 1px solid #232734;
+        gap: 16px;
+        user-select: none;
+      }
+      .lb-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: #f1f3f8;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .lb-controls {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+      }
+      .lb-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 255, 255, 0.07);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 6px;
+        color: #c5cbd8;
+        width: 30px;
+        height: 30px;
+        padding: 0;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+      .lb-btn:hover {
+        background: rgba(255, 255, 255, 0.16);
+        color: #fff;
+        border-color: rgba(255, 255, 255, 0.25);
+      }
+      .lb-stage {
+        overflow: auto;
+        max-width: 95vw;
+        max-height: calc(94vh - 52px);
+        background: #08090c;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .lb-img {
+        display: block;
+        max-width: 95vw;
+        max-height: calc(94vh - 52px);
+        object-fit: contain;
+        cursor: zoom-in;
+        transition: max-width 0.18s ease, max-height 0.18s ease;
+      }
+      .lb-img.lb-zoomed {
+        max-width: none;
+        max-height: none;
+        cursor: zoom-out;
+      }
+    `;
+    document.head.appendChild(style);
+
+    const overlay = document.createElement('div');
+    overlay.className = 'lb-overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.innerHTML = `
+      <div class="lb-backdrop"></div>
+      <div class="lb-modal">
+        <div class="lb-bar">
+          <div class="lb-title"></div>
+          <div class="lb-controls">
+            <button type="button" class="lb-btn lb-btn-toggle" aria-label="Toggle zoom">
+              <svg class="lb-icon-expand" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+              <svg class="lb-icon-collapse" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+            </button>
+            <button type="button" class="lb-btn lb-btn-close" aria-label="Close">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+          </div>
+        </div>
+        <div class="lb-stage">
+          <img class="lb-img" alt="" />
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const backdrop = overlay.querySelector('.lb-backdrop');
+    const closeBtn = overlay.querySelector('.lb-btn-close');
+    const toggleBtn = overlay.querySelector('.lb-btn-toggle');
+    const titleEl = overlay.querySelector('.lb-title');
+    const imgEl = overlay.querySelector('.lb-img');
+    const stageEl = overlay.querySelector('.lb-stage');
+    const iconExpand = overlay.querySelector('.lb-icon-expand');
+    const iconCollapse = overlay.querySelector('.lb-icon-collapse');
+
+    let prevOverflow = '';
+
+    function toggleZoom(force) {
+      const zoomed = force !== undefined ? force : !imgEl.classList.contains('lb-zoomed');
+      imgEl.classList.toggle('lb-zoomed', zoomed);
+      iconExpand.style.display = zoomed ? 'none' : 'block';
+      iconCollapse.style.display = zoomed ? 'block' : 'none';
+      const isFr = (document.documentElement.lang || '').startsWith('fr') || (location.pathname || '').includes('-FR');
+      toggleBtn.title = zoomed ? (isFr ? 'Ajuster à l’écran' : 'Fit to screen') : (isFr ? 'Taille réelle (1:1)' : 'Actual size (1:1)');
+      if (!zoomed) {
+        stageEl.scrollTop = 0;
+        stageEl.scrollLeft = 0;
+      }
+    }
+
+    function close() {
+      overlay.classList.remove('lb-active');
+      document.body.style.overflow = prevOverflow;
+      toggleZoom(false);
+      window.removeEventListener('keydown', onKeyDown);
+    }
+
+    function onKeyDown(e) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        close();
+      }
+    }
+
+    backdrop.addEventListener('click', close);
+    closeBtn.addEventListener('click', close);
+    toggleBtn.addEventListener('click', () => toggleZoom());
+    imgEl.addEventListener('click', () => toggleZoom());
+    stageEl.addEventListener('click', (e) => {
+      if (e.target === stageEl) close();
+    });
+
+    lightboxInstance = {
+      open(url, title) {
+        const isFr = (document.documentElement.lang || '').startsWith('fr') || (location.pathname || '').includes('-FR');
+        titleEl.textContent = title || '';
+        closeBtn.title = isFr ? 'Fermer (Échap)' : 'Close (Esc)';
+        toggleBtn.title = isFr ? 'Taille réelle (1:1)' : 'Actual size (1:1)';
+        imgEl.src = url;
+        toggleZoom(false);
+        prevOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        overlay.classList.add('lb-active');
+        window.addEventListener('keydown', onKeyDown);
+        closeBtn.focus();
+      }
+    };
+
+    return lightboxInstance;
+  }
+
+  function openImageLightbox(url, title) {
+    const lb = ensureLightbox();
+    lb.open(url, title);
+  }
 
   class ImageSlot extends HTMLElement {
     static get observedAttributes() {
@@ -509,6 +746,7 @@
         '    <div class="cap">This photo needs attribution</div></div>' +
         '  <div class="loading" part="loading"></div>' +
         '  <div class="ring" part="ring"></div>' +
+        '  <div class="zoom-hint" part="zoom-hint">' + zoomIcon + '</div>' +
         '</div>' +
         // Outside .frame, like .spill/.ctl — the frame's overflow:hidden +
         // border-radius/clip-path would cut the credit off on circle/pill/mask.
@@ -566,27 +804,48 @@
       this._hidShowing = false;
       this._view = { s: 1, x: 0, y: 0 };
       this._subFn = () => this._render();
+      this._isFilled = false;
       // Shadow-DOM listeners live with the shadow DOM — bound once here so
       // disconnect/reconnect (e.g. React remount) doesn't stack handlers.
       this._empty.addEventListener('click', () => this._input.click());
       root.addEventListener('click', (e) => {
         const act = e.target && e.target.getAttribute && e.target.getAttribute('data-act');
-        if (!act) return;
-        // The hidden controls are opacity-0 but still tabbable — without
-        // this gate a keyboard user could drive them on a read-only share
-        // link (mirrors the dblclick handler's editable gate).
-        if (!this.hasAttribute('data-editable')) return;
-        if (act === 'replace') {
-          this._exitReframe(true);
-          // Host-owned picker (Unsplash modal; it also offers local import).
-          this.dispatchEvent(new CustomEvent('image-slot:pick', {
-            bubbles: true, composed: true, detail: { id: this.id || null }
-          }));
+        if (act && this.hasAttribute('data-editable')) {
+          if (act === 'replace') {
+            this._exitReframe(true);
+            // Host-owned picker (Unsplash modal; it also offers local import).
+            this.dispatchEvent(new CustomEvent('image-slot:pick', {
+              bubbles: true, composed: true, detail: { id: this.id || null }
+            }));
+          }
+          if (act === 'edit') {
+            if (!this._reframes()) return;
+            if (this.hasAttribute('data-reframe')) this._exitReframe(true);
+            else this._enterReframe();
+          }
+          return;
         }
-        if (act === 'edit') {
-          if (!this._reframes()) return;
-          if (this.hasAttribute('data-reframe')) this._exitReframe(true);
-          else this._enterReframe();
+
+        // Non-reframe click on filled slot: open full-size lightbox
+        if (this._isFilled || this.hasAttribute('data-filled') || (this._img && this._img.src && this._img.style.display !== 'none')) {
+          if (!this.hasAttribute('data-reframe')) {
+            const url = this._userUrl || this.getAttribute('src') || (this._img && this._img.src);
+            if (url) {
+              const title = this.getAttribute('placeholder') || '';
+              openImageLightbox(url, title);
+            }
+          }
+        }
+      });
+      this.addEventListener('click', () => {
+        if (this._isFilled || this.hasAttribute('data-filled') || (this._img && this._img.src && this._img.style.display !== 'none')) {
+          if (!this.hasAttribute('data-reframe')) {
+            const url = this._userUrl || this.getAttribute('src') || (this._img && this._img.src);
+            if (url) {
+              const title = this.getAttribute('placeholder') || '';
+              openImageLightbox(url, title);
+            }
+          }
         }
       });
       this._input.addEventListener('change', () => {
@@ -1150,6 +1409,10 @@
         this._img.style.display = 'block';
         this._empty.style.display = 'none';
         this.setAttribute('data-filled', '');
+        this._isFilled = true;
+        this._frame.classList.add('is-filled');
+        const isFr = (document.documentElement.lang || '').startsWith('fr') || (location.pathname || '').includes('-FR');
+        this._frame.setAttribute('title', isFr ? 'Cliquer pour agrandir' : 'Click to view full size');
         this._clampView();
         this._applyView();
       } else {
@@ -1169,6 +1432,9 @@
         // the genuinely-empty slot.
         this._empty.style.display = attrError ? 'none' : 'flex';
         this.removeAttribute('data-filled');
+        this._isFilled = false;
+        this._frame.classList.remove('is-filled');
+        this._frame.removeAttribute('title');
       }
 
       // Credit belongs to the author src, so a user drop hides it.

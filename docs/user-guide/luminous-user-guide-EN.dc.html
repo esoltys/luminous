@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -392,7 +392,13 @@
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Rescan on startup</b> has Luminous check your folders every time it launches.</div></div>
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Incremental Rescan</b> looks only for what's changed; <b style="color:#f1f3f8;">Force Full Scan</b> re-reads everything from scratch. Both show live progress as they run.</div></div>
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>A stats panel shows when your library was last scanned, plus running counts of songs, albums, artists, and total size.</div></div>
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>You can also add remote <b style="color: rgb(241, 243, 248);">WebDAV</b>&nbsp;or <b>OpenSubsonic</b>&nbsp;media servers as a source. Remote folders are read-only — any tag edits or organizing you do stay local to Luminous and are never written back to the server.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>You can also add remote media servers as a source to stream music across your network:
+            <div style="margin-top:8px; display:flex; flex-direction:column; gap:6px;">
+              <div>– <b style="color:#f1f3f8;">WebDAV:</b> An HTTP-based file protocol supported by cloud storage services and personal NAS units (such as Nextcloud, ownCloud, or Synology). It lets Luminous stream your remote audio files directly without needing to mount a network drive.</div>
+              <div>– <b style="color:#f1f3f8;">OpenSubsonic:</b> A popular open API standard for self-hosted music servers like Navidrome, Gonic, LMS, or Subsonic. Luminous syncs your server's library, streams music over the network, and can report your scrobbles and play counts back to the server.</div>
+              <div style="color:#a6adc4; font-size:13px; margin-top:2px;">Remote folders and servers are strictly read-only — any tag edits, artwork tweaks, or organizing you do stay local to Luminous and are never written back to the server.</div>
+            </div>
+          </div></div>
         </div>
         <div style="max-width:640px; border-radius:14px; overflow:hidden; border:1px solid #23262f;">
           <image-slot id="settings-folders" src="screenshots/settings-folders-EN.png?v=1790533502112" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/1100;" placeholder="Folders settings"></image-slot>
