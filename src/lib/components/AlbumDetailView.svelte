@@ -51,6 +51,7 @@
   import { getCoverArtUrl, resolveArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import { picardStore } from "../stores/picard.svelte";
+  import { prefs } from "../stores/prefs.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { compareSongs } from "../utils/songSort";
   import { rememberScroll } from "../utils/scrollMemory";
@@ -109,7 +110,21 @@
     songs.some((s) => (s.musicbrainz_release_group_id ?? "").trim().length > 0)
   );
 
-  async function handleRetrieveAlbumDetails() {
+  /** fanart.tv cover and disc art (#1277). New disc art re-scans the cover
+   * stack so it's counted. Failures only warn: art is a bonus on top of
+   * the details. */
+  async function retrieveAlbumArt(onlyMissing: boolean) {
+    try {
+      const result = await collectionStore.retrieveAlbumArt(albumName, { onlyMissing });
+      if (result.disc_uri) artworkRefreshToken++;
+    } catch (e) {
+      console.warn("Failed to retrieve album art:", e);
+    }
+  }
+
+  // The manual action fetches every art type; the automatic one
+  // (`onlyMissing`) only the enabled types not yet attempted.
+  async function handleRetrieveAlbumDetails(onlyMissingArt = false) {
     if (retrievingDetails || !hasReleaseGroupMbid) return;
     retrievingDetails = true;
     const taskId = `album-enrichment-${albumName.toLowerCase()}`;
@@ -126,6 +141,7 @@
         : result.added_count > 1
           ? i18n.t("albumDetail.retrieveDetailsSuccessMany", { count: result.added_count }, `Added ${result.added_count} links from MusicBrainz`)
           : i18n.t("albumDetail.retrieveDetailsNoResults", {}, "No additional details found on MusicBrainz");
+      await retrieveAlbumArt(onlyMissingArt);
       tasksStore.completeTask(taskId, label);
     } catch (err) {
       console.error("Failed to retrieve album details:", err);
@@ -186,6 +202,9 @@
   $effect(() => {
     const item = albumItem;
     const fallbackSongId = item?.sample_song_id ?? songs[0]?.id;
+    // A fanart.tv cover arriving or its toggle changing re-resolves (#1277).
+    void prefs.fanartFetchAlbumCover;
+    void collectionStore.coverArtVersion;
     let cancelled = false;
 
     async function resolve() {
@@ -194,7 +213,8 @@
         url = resolveArtUrl(item.art_manual);
       } else if (item?.art_automatic) {
         url = resolveArtUrl(item.art_automatic);
-      } else if (item?.art_embedded && fallbackSongId !== undefined) {
+      } else if (fallbackSongId !== undefined) {
+        // Embedded art, or with none at all the fanart.tv fallback (#1277).
         try {
           const uri = await invoke<string | null>("get_cover_art_uri", { songId: fallbackSongId });
           if (uri) url = getCoverArtUrl(uri);
@@ -261,16 +281,27 @@
     if (lastAutoFetchedAlbum === currentAlbum) return;
 
     const profile = albumProfile;
-    if (profile?.details_fetched) {
+    // Art types enabled in Settings that haven't been attempted yet (#1277)
+    // — also backfills albums whose details were fetched before this existed,
+    // or after a type is switched back on.
+    const artMissing =
+      (prefs.fanartFetchAlbumCover && !profile?.cover_fetched) ||
+      (prefs.fanartFetchDiscArt && !profile?.disc_fetched);
+    if (profile?.details_fetched && !artMissing) {
       lastAutoFetchedAlbum = currentAlbum;
       return;
     }
     if (!hasReleaseGroupMbid) return;
 
     lastAutoFetchedAlbum = currentAlbum;
+    const detailsFetched = !!profile?.details_fetched;
     collectionStore.isContextEnrichmentEnabled().then((enabled) => {
-      if (enabled && !retrievingDetails && !tasksStore.isTaskActive(`album-enrichment-${currentAlbum.toLowerCase()}`)) {
-        handleRetrieveAlbumDetails();
+      if (!enabled || retrievingDetails || tasksStore.isTaskActive(`album-enrichment-${currentAlbum.toLowerCase()}`)) return;
+      if (detailsFetched) {
+        // Details are done — quietly fill in just the missing art.
+        retrieveAlbumArt(true);
+      } else {
+        handleRetrieveAlbumDetails(true);
       }
     });
   });

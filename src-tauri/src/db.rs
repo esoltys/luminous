@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 48;
+pub const CURRENT_SCHEMA_VERSION: i32 = 49;
 
 struct Migration {
     version: i32,
@@ -413,6 +413,21 @@ const MIGRATIONS: &[Migration] = &[
                 .exists([])?;
             if !has_logo {
                 conn.execute_batch(MIGRATION_48)?;
+            }
+            Ok(())
+        },
+    },
+    Migration {
+        version: 49,
+        description: "fetched cover/disc filenames and attempted flags on album_profiles for fanart.tv artwork (#1277)",
+        apply: |conn| {
+            let has_cover: bool = conn
+                .prepare(
+                    "SELECT 1 FROM pragma_table_info('album_profiles') WHERE name = 'fetched_cover_filename'",
+                )?
+                .exists([])?;
+            if !has_cover {
+                conn.execute_batch(MIGRATION_49)?;
             }
             Ok(())
         },
@@ -1652,6 +1667,15 @@ ALTER TABLE artist_profiles ADD COLUMN logo_fetched INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE artist_profiles ADD COLUMN background_fetched INTEGER NOT NULL DEFAULT 0;
 ";
 
+// Migration 49: fanart.tv album cover and disc art (#1277) — cached filenames
+// plus per-type attempted flags, mirroring migration 48's artist columns.
+const MIGRATION_49: &str = "
+ALTER TABLE album_profiles ADD COLUMN fetched_cover_filename TEXT;
+ALTER TABLE album_profiles ADD COLUMN fetched_disc_filename TEXT;
+ALTER TABLE album_profiles ADD COLUMN cover_fetched INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE album_profiles ADD COLUMN disc_fetched INTEGER NOT NULL DEFAULT 0;
+";
+
 fn seed_artist_tag_hierarchy(conn: &rusqlite::Connection) -> Result<()> {
     let mut stmt = conn.prepare(
         "SELECT DISTINCT json_each.value
@@ -2421,6 +2445,39 @@ mod tests {
             .unwrap();
         assert_eq!(filename.as_deref(), Some("artist-abc123.jpg"));
         assert_eq!(source.as_deref(), Some("fanart"));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_migration_49_adds_album_cover_and_disc_columns() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_migration49_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Database::new(temp_dir.clone()).unwrap();
+        assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
+
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO album_profiles (album_key, fetched_cover_filename, fetched_disc_filename) VALUES (?1, ?2, ?3)",
+            params!["Once", "abc_cover.jpg", "abc_disc.png"],
+        )
+        .unwrap();
+
+        let row: (Option<String>, Option<String>, bool, bool) = conn
+            .query_row(
+                "SELECT fetched_cover_filename, fetched_disc_filename, cover_fetched, disc_fetched FROM album_profiles WHERE album_key = 'Once'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+            )
+            .unwrap();
+        assert_eq!(row.0.as_deref(), Some("abc_cover.jpg"));
+        assert_eq!(row.1.as_deref(), Some("abc_disc.png"));
+        assert!(!row.2 && !row.3, "attempted flags default to not attempted");
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

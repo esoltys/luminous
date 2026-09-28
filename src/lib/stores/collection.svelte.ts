@@ -4,6 +4,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { stripEnclosingQuotes } from "../utils/filterParser";
 import { i18n } from "./i18n.svelte";
 import type {
+  AlbumArtRetrievalResult,
   Song,
   MusicDirectory,
   LibraryStats,
@@ -33,6 +34,7 @@ import { playlistsStore } from "./playlists.svelte";
 import { tagsStore } from "./tags.svelte";
 import { toastStore } from "./toast.svelte";
 import { tasksStore } from "./tasks.svelte";
+import { prefs } from "./prefs.svelte";
 import { MAX_RECENT_SEARCHES } from "../constants";
 
 export interface VisibleColumns {
@@ -137,6 +139,12 @@ class CollectionStore {
    * up in multiple places (e.g. a cover-stack re-rendering) doesn't re-scan
    * the filesystem every time. */
   extendedArtworkBySong = $state<Record<number, ExtendedArtworkResponse>>({});
+  /** Bumped when a fanart.tv album cover arrives (#1277), so covers showing
+   * the "no art" placeholder re-resolve and pick up the fallback. */
+  coverArtVersion = $state(0);
+  /** The disc-art toggle {@link extendedArtworkBySong} was scanned under —
+   * fanart.tv disc art is in the scan only while it's on (#1277). */
+  private extendedArtworkDiscPref: boolean | null = null;
   /** Same idea as {@link extendedArtworkBySong}, keyed by lowercased artist
    * name (matching `artistProfiles`' key convention) via
    * `getExtendedArtworkForArtist()`. */
@@ -902,6 +910,31 @@ class CollectionStore {
     return result;
   }
 
+  /** fanart.tv album cover and disc art (#1277), run after "Retrieve Album
+   * Details" and by the album view's automatic enrichment. `onlyMissing`
+   * fetches only the types enabled in Settings that haven't been attempted.
+   * Replaces the cached profile with the one the backend saved; a new cover
+   * bumps `coverArtVersion`, and new disc art drops the extended-artwork
+   * cache so cover stacks re-scan and count it. */
+  async retrieveAlbumArt(
+    albumName: string,
+    options: { onlyMissing?: boolean } = {}
+  ): Promise<AlbumArtRetrievalResult> {
+    const result = await invoke<AlbumArtRetrievalResult>("retrieve_album_art", {
+      album: albumName,
+      onlyMissing: options.onlyMissing ?? false,
+    });
+    if (result?.profile?.album_key) {
+      this.albumProfiles = {
+        ...this.albumProfiles,
+        [result.profile.album_key.toLowerCase()]: result.profile,
+      };
+    }
+    if (result?.cover_uri) this.coverArtVersion++;
+    if (result?.disc_uri) this.extendedArtworkBySong = {};
+    return result;
+  }
+
   /** Cached extended-artwork lookup for a song's album (#98/#760) — returns
    * the cached result if already fetched, otherwise scans on demand via
    * `get_extended_artwork_for_song` and caches the result. Concurrent calls
@@ -911,6 +944,16 @@ class CollectionStore {
    * deleted on disk. */
   async getExtendedArtworkForSong(songId: number, force = false): Promise<ExtendedArtworkResponse> {
     const fetchKey = `song:${songId}`;
+
+    // Read synchronously so a caller's $effect re-runs on a toggle.
+    const discPref = prefs.fanartFetchDiscArt;
+    if (this.extendedArtworkDiscPref !== discPref) {
+      if (this.extendedArtworkDiscPref !== null) {
+        this.extendedArtworkBySong = {};
+        this.extendedArtworkFetches.clear();
+      }
+      this.extendedArtworkDiscPref = discPref;
+    }
 
     if (!force) {
       const cached = this.extendedArtworkBySong[songId];
