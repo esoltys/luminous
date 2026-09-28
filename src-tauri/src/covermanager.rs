@@ -16,7 +16,7 @@
 use crate::db::Database;
 use anyhow::{Context, Result};
 use lofty::{file::TaggedFileExt, picture::PictureType, probe::Probe};
-use rusqlite::params;
+use rusqlite::{params, OptionalExtension};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -830,7 +830,9 @@ impl CoverManager {
         )?;
 
         if art_unset {
-            return Ok(None);
+            // No embedded, folder or iTunes cover: fall back to fanart.tv's.
+            let (cover, _) = self.fanart_album_art(song_id)?;
+            return Ok(cover.map(|f| self.covers_dir.join(f)));
         }
 
         if let Some(manual) = art_manual {
@@ -867,7 +869,9 @@ impl CoverManager {
         )?;
 
         if art_unset {
-            return Ok(None);
+            // No embedded, folder or iTunes cover: fall back to fanart.tv's.
+            let (cover, _) = self.fanart_album_art(song_id)?;
+            return Ok(cover.map(|f| format!("luminous-art://{f}")));
         }
 
         if let Some(ref manual) = art_manual {
@@ -885,6 +889,42 @@ impl CoverManager {
         }
 
         Ok(None)
+    }
+
+    /// Cache filenames of the fanart.tv cover and disc art fetched for this
+    /// song's album (#1277), each `None` unless fetched and its type is
+    /// enabled in Settings › Integrations › fanart.tv, so unchecking a type
+    /// hides what was already fetched.
+    ///
+    /// The cover is only a fallback: the resolvers above consult it only
+    /// once the song is `art_unset` (no embedded or folder art, and iTunes
+    /// missed), so it never displaces a cover found any other way.
+    pub fn fanart_album_art(&self, song_id: i64) -> Result<(Option<String>, Option<String>)> {
+        let conn = self.db.pool.get()?;
+        let prefs = crate::commands::settings::load_ui_preferences(&conn);
+        if !prefs.fanart_fetch_album_cover && !prefs.fanart_fetch_disc_art {
+            return Ok((None, None));
+        }
+        let fetched = conn
+            .query_row(
+                "SELECT p.fetched_cover_filename, p.fetched_disc_filename
+                 FROM songs s
+                 JOIN album_profiles p ON p.album_key = s.album COLLATE NOCASE
+                 WHERE s.id = ?1",
+                params![song_id],
+                |row| {
+                    Ok((
+                        row.get::<_, Option<String>>(0)?,
+                        row.get::<_, Option<String>>(1)?,
+                    ))
+                },
+            )
+            .optional()?;
+        let (cover, disc) = fetched.unwrap_or_default();
+        Ok((
+            cover.filter(|_| prefs.fanart_fetch_album_cover),
+            disc.filter(|_| prefs.fanart_fetch_disc_art),
+        ))
     }
 }
 
@@ -1433,6 +1473,80 @@ mod tests {
         let set = scan_extended_artwork(&audio_path, None);
 
         assert_eq!(set.entries.len(), 10);
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    /// #1277: fanart.tv album art is a fallback only, and each type hides
+    /// when unchecked in Settings.
+    #[test]
+    fn test_fanart_album_cover_is_fallback_and_follows_prefs() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_covermanager_fanart_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let song_id: i64 = {
+            let conn = db.pool.get().unwrap();
+            crate::collection::upsert_song(
+                &conn,
+                &crate::models::Song {
+                    artist: Some("Nightwish".to_string()),
+                    album: Some("Oceanborn".to_string()),
+                    title: Some("Stargazers".to_string()),
+                    source: crate::models::SongSource::LocalFile,
+                    path: Some(r"C:\Music\stargazers.flac".to_string()),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+            conn.execute_batch(
+                "INSERT INTO album_profiles (album_key, fetched_cover_filename, fetched_disc_filename)
+                 VALUES ('oceanborn', 'fan_cover.jpg', 'fan_disc.png');",
+            )
+            .unwrap();
+            conn.query_row("SELECT id FROM songs", [], |r| r.get(0))
+                .unwrap()
+        };
+        let manager = CoverManager::new(db.clone(), temp_dir.clone());
+        let set = |sql: &str| db.pool.get().unwrap().execute_batch(sql).unwrap();
+
+        // Not yet tried remotely: iTunes still gets its turn first.
+        assert_eq!(manager.get_cover_art_uri(song_id).unwrap(), None);
+
+        set("UPDATE songs SET art_unset = 1");
+        assert_eq!(
+            manager.get_cover_art_uri(song_id).unwrap().as_deref(),
+            Some("luminous-art://fan_cover.jpg")
+        );
+        assert_eq!(
+            manager.get_cover_art_path(song_id).unwrap(),
+            Some(manager.covers_dir().join("fan_cover.jpg"))
+        );
+        assert_eq!(
+            manager.fanart_album_art(song_id).unwrap(),
+            (Some("fan_cover.jpg".into()), Some("fan_disc.png".into()))
+        );
+
+        set("INSERT INTO app_state VALUES ('fanart_fetch_album_cover', 'false');");
+        assert_eq!(manager.get_cover_art_uri(song_id).unwrap(), None);
+        assert_eq!(
+            manager.fanart_album_art(song_id).unwrap(),
+            (None, Some("fan_disc.png".into()))
+        );
+
+        // A cover found any other way always wins.
+        set(
+            "DELETE FROM app_state WHERE key = 'fanart_fetch_album_cover';
+             UPDATE songs SET art_unset = 0, art_automatic = 'album-abc.jpg';",
+        );
+        assert_eq!(
+            manager.get_cover_art_uri(song_id).unwrap().as_deref(),
+            Some("luminous-art://album-abc.jpg")
+        );
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }

@@ -11,6 +11,7 @@ vi.mock("@tauri-apps/api/window", () => ({
 }));
 
 import { collectionStore } from "./collection.svelte";
+import { prefs } from "./prefs.svelte";
 
 const SAMPLE_RESPONSE: ExtendedArtworkResponse = {
   count: 2,
@@ -119,5 +120,71 @@ describe("CollectionStore - extended artwork (#98/#759)", () => {
     const invokeMock = vi.mocked(invoke).mockResolvedValue(undefined);
     await collectionStore.openArtworkPath("C:/Music/Artist/Album/cover.jpg");
     expect(invokeMock).toHaveBeenCalledWith("open_artwork_path", { path: "C:/Music/Artist/Album/cover.jpg" });
+  });
+});
+
+describe("CollectionStore - fanart.tv album art (#1277)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    collectionStore.extendedArtworkBySong = {};
+    collectionStore.albumProfiles = {};
+    prefs.fanartFetchDiscArt = true;
+  });
+
+  it("defaults both album art types to on", () => {
+    expect(prefs.fanartFetchAlbumCover).toBe(true);
+    expect(prefs.fanartFetchDiscArt).toBe(true);
+  });
+
+  it("stores the saved profile, refreshes covers and drops cached artwork for new art", async () => {
+    collectionStore.extendedArtworkBySong = { 42: SAMPLE_RESPONSE };
+    const version = collectionStore.coverArtVersion;
+    const invokeMock = vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "retrieve_album_art") {
+        return {
+          cover_uri: "luminous-art://abc_fanart_cover.jpg",
+          disc_uri: "luminous-art://abc_fanart_disc.png",
+          profile: { album_key: "Oceanborn", links: [], cover_fetched: true, disc_fetched: true },
+        };
+      }
+      return null;
+    });
+
+    await collectionStore.retrieveAlbumArt("Oceanborn", { onlyMissing: true });
+
+    expect(invokeMock).toHaveBeenCalledWith("retrieve_album_art", { album: "Oceanborn", onlyMissing: true });
+    expect(collectionStore.albumProfiles["oceanborn"]?.disc_fetched).toBe(true);
+    expect(collectionStore.coverArtVersion).toBe(version + 1);
+    expect(collectionStore.extendedArtworkBySong).toEqual({});
+  });
+
+  it("keeps covers and cached artwork when nothing new was fetched", async () => {
+    collectionStore.extendedArtworkBySong = { 42: SAMPLE_RESPONSE };
+    const version = collectionStore.coverArtVersion;
+    vi.mocked(invoke).mockImplementation(async () => ({
+      cover_uri: null,
+      disc_uri: null,
+      profile: { album_key: "Oceanborn", links: [], cover_fetched: true, disc_fetched: true },
+    }));
+
+    await collectionStore.retrieveAlbumArt("Oceanborn");
+
+    expect(collectionStore.coverArtVersion).toBe(version);
+    expect(collectionStore.extendedArtworkBySong[42]).toEqual(SAMPLE_RESPONSE);
+  });
+
+  it("re-scans artwork after the disc art toggle changes", async () => {
+    const invokeMock = vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_extended_artwork_for_song") return SAMPLE_RESPONSE;
+      return null;
+    });
+
+    await collectionStore.getExtendedArtworkForSong(42);
+    await collectionStore.getExtendedArtworkForSong(42);
+    expect(invokeMock).toHaveBeenCalledTimes(1);
+
+    prefs.fanartFetchDiscArt = false;
+    await collectionStore.getExtendedArtworkForSong(42);
+    expect(invokeMock).toHaveBeenCalledTimes(2);
   });
 });

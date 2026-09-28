@@ -7,6 +7,7 @@ import { navigationStore } from "../stores/navigation.svelte";
 import { playerStore } from "../stores/player.svelte";
 import { playlistsStore } from "../stores/playlists.svelte";
 import { picardStore } from "../stores/picard.svelte";
+import { prefs } from "../stores/prefs.svelte";
 import { invoke } from "@tauri-apps/api/core";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -302,6 +303,10 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     await vi.waitFor(() => {
       expect(invokeMock).toHaveBeenCalledWith("retrieve_album_details", { album: "Abbey Road" });
     });
+    // The automatic pass also backfills fanart.tv art, but only what's missing (#1277).
+    await vi.waitFor(() => {
+      expect(invokeMock).toHaveBeenCalledWith("retrieve_album_art", { album: "Abbey Road", onlyMissing: true });
+    });
   });
 
   it("does not auto-fetch album details when details_fetched is already true (#1143)", async () => {
@@ -367,6 +372,79 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
       }
       expect(scrollIntoView).not.toHaveBeenCalled();
       expect(navigationStore.pendingFocusSongId).toBeNull();
+    });
+  });
+
+  function renderWithFetchedDetails(profile: Record<string, unknown>) {
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockClear();
+    collectionStore.albumProfiles = {
+      "abbey road": { album_key: "abbey road", details_fetched: true, links: [], ...profile },
+    };
+    invokeMock.mockImplementation((cmd: string) => {
+      if (cmd === "get_songs_by_album") {
+        return Promise.resolve([
+          { id: 1, title: "Come Together", artist: "The Beatles", album: "Abbey Road", musicbrainz_release_group_id: "rg-123" },
+        ]);
+      }
+      if (cmd === "is_context_enrichment_enabled") return Promise.resolve(true);
+      if (cmd === "retrieve_album_art") {
+        return Promise.resolve({
+          cover_uri: null,
+          disc_uri: null,
+          profile: { album_key: "abbey road", details_fetched: true, links: [], cover_fetched: true, disc_fetched: true },
+        });
+      }
+      return Promise.resolve();
+    });
+    const view = render(AlbumDetailView, { props: { albumName: mockAlbumName } });
+    return { invokeMock, view };
+  }
+
+  it("backfills only fanart.tv art when details were already fetched (#1277)", async () => {
+    const { invokeMock } = renderWithFetchedDetails({ cover_fetched: true, disc_fetched: false });
+
+    await vi.waitFor(() => {
+      expect(invokeMock).toHaveBeenCalledWith("retrieve_album_art", { album: "Abbey Road", onlyMissing: true });
+    });
+    expect(invokeMock).not.toHaveBeenCalledWith("retrieve_album_details", expect.anything());
+  });
+
+  it("does not backfill fanart.tv art that was attempted or whose type is off (#1277)", async () => {
+    prefs.fanartFetchDiscArt = false;
+    try {
+      const { invokeMock } = renderWithFetchedDetails({ cover_fetched: true, disc_fetched: false });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(invokeMock).not.toHaveBeenCalledWith("retrieve_album_art", expect.anything());
+    } finally {
+      prefs.fanartFetchDiscArt = true;
+    }
+  });
+
+  it("fetches every fanart.tv art type from a manual Retrieve Album Details (#1277)", async () => {
+    const { invokeMock, view } = renderWithFetchedDetails({ cover_fetched: true, disc_fetched: true });
+    invokeMock.mockImplementation((cmd: string) => {
+      if (cmd === "get_songs_by_album") {
+        return Promise.resolve([
+          { id: 1, title: "Come Together", artist: "The Beatles", album: "Abbey Road", musicbrainz_release_group_id: "rg-123" },
+        ]);
+      }
+      if (cmd === "is_context_enrichment_enabled") return Promise.resolve(true);
+      if (cmd === "retrieve_album_details") {
+        return Promise.resolve({ added_count: 0, profile: { album_key: "abbey road", details_fetched: true, links: [] } });
+      }
+      if (cmd === "retrieve_album_art") {
+        return Promise.resolve({ cover_uri: null, disc_uri: null, profile: { album_key: "abbey road", details_fetched: true, links: [] } });
+      }
+      return Promise.resolve();
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    await fireEvent.click(view.getByTitle("More actions"));
+    await fireEvent.click(await view.findByText("Retrieve Album Details"));
+
+    await vi.waitFor(() => {
+      expect(invokeMock).toHaveBeenCalledWith("retrieve_album_art", { album: "Abbey Road", onlyMissing: false });
     });
   });
 });

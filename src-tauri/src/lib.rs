@@ -1264,6 +1264,7 @@ pub fn run() {
             commands::collection::retrieve_album_details,
             commands::collection::retrieve_artist_details,
             commands::collection::retrieve_artist_image,
+            commands::collection::retrieve_album_art,
             commands::collection::has_fanart_env_key,
             commands::collection::validate_fanart_api_key,
             commands::collection::get_artist_tags_overview,

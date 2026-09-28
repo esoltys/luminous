@@ -52,6 +52,10 @@ pub struct UiPreferences {
     pub fanart_fetch_photo: bool,
     pub fanart_fetch_logo: bool,
     pub fanart_fetch_background: bool,
+    /// Which fanart.tv album image types the album view fetches automatically
+    /// (#1277); the same hiding rule as the artist types above applies.
+    pub fanart_fetch_album_cover: bool,
+    pub fanart_fetch_disc_art: bool,
 }
 
 impl Default for UiPreferences {
@@ -70,9 +74,10 @@ impl Default for UiPreferences {
             genre_sort_asc: true,
             week_start: "sunday".into(),
             fanart_fetch_photo: true,
-            // Logo and background are opt-in: both are visually intrusive.
             fanart_fetch_logo: true,
             fanart_fetch_background: true,
+            fanart_fetch_album_cover: true,
+            fanart_fetch_disc_art: true,
         }
     }
 }
@@ -118,12 +123,17 @@ impl UiPreferences {
     /// Bool fields, persisted as a literal "true"/"false" string the same
     /// way the FadeSettings bools are — not part of `fields()` since they
     /// aren't domain-checked Strings.
-    fn bool_fields(&mut self) -> [(&'static str, &mut bool); 4] {
+    fn bool_fields(&mut self) -> [(&'static str, &mut bool); 6] {
         [
             ("genre_sort_asc", &mut self.genre_sort_asc),
             ("fanart_fetch_photo", &mut self.fanart_fetch_photo),
             ("fanart_fetch_logo", &mut self.fanart_fetch_logo),
             ("fanart_fetch_background", &mut self.fanart_fetch_background),
+            (
+                "fanart_fetch_album_cover",
+                &mut self.fanart_fetch_album_cover,
+            ),
+            ("fanart_fetch_disc_art", &mut self.fanart_fetch_disc_art),
         ]
     }
 }
@@ -395,6 +405,8 @@ mod tests {
         assert!(prefs.fanart_fetch_photo);
         assert!(prefs.fanart_fetch_logo);
         assert!(prefs.fanart_fetch_background);
+        assert!(prefs.fanart_fetch_album_cover);
+        assert!(prefs.fanart_fetch_disc_art);
     }
 
     #[test]

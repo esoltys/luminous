@@ -124,6 +124,75 @@ pub async fn fetch_fanart_artist_images(
     Ok(parsed.into())
 }
 
+#[derive(Deserialize, Debug, Default)]
+struct FanartAlbumEntry {
+    #[serde(default)]
+    albumcover: Vec<FanartImageEntry>,
+    #[serde(default)]
+    cdart: Vec<FanartImageEntry>,
+}
+
+#[derive(Deserialize, Debug, Default)]
+struct FanartAlbumResponse {
+    /// Keyed by release-group MBID.
+    #[serde(default)]
+    albums: std::collections::HashMap<String, FanartAlbumEntry>,
+}
+
+/// The best album cover and disc art fanart.tv has for one release group
+/// (#1277).
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct FanartAlbumImages {
+    pub cover: Option<String>,
+    pub disc: Option<String>,
+}
+
+impl FanartAlbumImages {
+    fn from_response(r: FanartAlbumResponse, release_group_mbid: &str) -> Self {
+        let Some(entry) = r
+            .albums
+            .into_iter()
+            .find(|(mbid, _)| mbid.eq_ignore_ascii_case(release_group_mbid))
+            .map(|(_, entry)| entry)
+        else {
+            return Self::default();
+        };
+        FanartAlbumImages {
+            cover: best_fanart_image(entry.albumcover),
+            disc: best_fanart_image(entry.cdart),
+        }
+    }
+}
+
+/// Looks up a release group's top fanart.tv album cover and disc art URLs.
+/// A 404 returns all-`None`, as for [`fetch_fanart_artist_images`].
+pub async fn fetch_fanart_album_images(
+    client: &Client,
+    release_group_mbid: &str,
+    api_key: &str,
+) -> Result<FanartAlbumImages> {
+    let url = format!(
+        "https://webservice.fanart.tv/v3/music/albums/{}?api_key={}",
+        percent_encoding::utf8_percent_encode(
+            release_group_mbid,
+            percent_encoding::NON_ALPHANUMERIC
+        ),
+        percent_encoding::utf8_percent_encode(api_key, percent_encoding::NON_ALPHANUMERIC)
+    );
+    let response = client.get(&url).send().await?;
+    if response.status() == reqwest::StatusCode::NOT_FOUND {
+        return Ok(FanartAlbumImages::default());
+    }
+    if !response.status().is_success() {
+        return Err(anyhow!(
+            "fanart.tv album image lookup failed: HTTP {}",
+            response.status()
+        ));
+    }
+    let parsed: FanartAlbumResponse = response.json().await?;
+    Ok(FanartAlbumImages::from_response(parsed, release_group_mbid))
+}
+
 /// MBID of an artist near-certain to have fanart.tv images, used purely to
 /// exercise an API key against a real endpoint — its images are discarded.
 const KEY_VALIDATION_PROBE_ARTIST_MBID: &str = "5b11f4ce-a62d-471e-81fc-a69a8278c7da"; // Nirvana
@@ -323,6 +392,45 @@ mod tests {
         assert_eq!(images.photo.as_deref(), Some("https://thumb"));
         assert_eq!(images.logo.as_deref(), Some("https://logo"));
         assert_eq!(images.background.as_deref(), Some("https://banner"));
+    }
+
+    #[test]
+    fn test_fanart_album_response_picks_best_cover_and_disc_for_the_release_group() {
+        let json = r#"{
+            "name": "Nirvana",
+            "albums": {
+                "1B022E01-4DA6-387B-8658-8678046E4CEF": {
+                    "albumcover": [
+                        {"id": "1", "url": "https://cover-a", "likes": "2"},
+                        {"id": "2", "url": "https://cover-b", "likes": "5"}
+                    ],
+                    "cdart": [{"id": "3", "url": "https://disc", "likes": "0", "disc": "1", "size": "1000"}]
+                },
+                "other-rg": {
+                    "albumcover": [{"id": "4", "url": "https://other-cover", "likes": "99"}]
+                }
+            }
+        }"#;
+        let parsed: FanartAlbumResponse = serde_json::from_str(json).unwrap();
+        let images =
+            FanartAlbumImages::from_response(parsed, "1b022e01-4da6-387b-8658-8678046e4cef");
+        assert_eq!(
+            images,
+            FanartAlbumImages {
+                cover: Some("https://cover-b".to_string()),
+                disc: Some("https://disc".to_string()),
+            }
+        );
+    }
+
+    #[test]
+    fn test_fanart_album_response_without_the_release_group_is_empty() {
+        let json = r#"{"albums": {"other-rg": {"cdart": [{"url": "https://disc"}]}}}"#;
+        let parsed: FanartAlbumResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(
+            FanartAlbumImages::from_response(parsed, "rg-1"),
+            FanartAlbumImages::default()
+        );
     }
 
     #[test]
