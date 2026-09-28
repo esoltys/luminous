@@ -35,8 +35,8 @@ class PrefsStore {
    * files always show. */
   fanartFetchPhoto = $state<boolean>(true);
   // Logo and background are opt-in: both are visually intrusive.
-  fanartFetchLogo = $state<boolean>(false);
-  fanartFetchBackground = $state<boolean>(false);
+  fanartFetchLogo = $state<boolean>(true);
+  fanartFetchBackground = $state<boolean>(true);
   albumsViewMode = $state<CollectionViewMode>("cards");
   artistsViewMode = $state<CollectionViewMode>("cards");
   playlistsAutoViewMode = $state<CollectionViewMode>("cards");

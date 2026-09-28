@@ -508,8 +508,6 @@ describe("ArtistDetailView", () => {
     it("backfills only the missing image types, without re-fetching details, when details are already fetched (#1276)", async () => {
       const invokeMock = vi.mocked(invoke);
       invokeMock.mockClear();
-      prefs.fanartFetchLogo = true;
-      prefs.fanartFetchBackground = true;
       collectionStore.artistProfiles = {
         "shania twain": {
           artist_key: "Shania Twain",
@@ -544,21 +542,18 @@ describe("ArtistDetailView", () => {
         return Promise.resolve();
       });
 
-      try {
-        render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
-        await waitFor(() => {
-          expect(invokeMock).toHaveBeenCalledWith("retrieve_artist_image", expect.objectContaining({ artist: "Shania Twain", onlyMissing: true }));
-        });
-        expect(invokeMock).not.toHaveBeenCalledWith("retrieve_artist_details", expect.anything());
-      } finally {
-        prefs.fanartFetchLogo = false;
-        prefs.fanartFetchBackground = false;
-      }
+      render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
+      await waitFor(() => {
+        expect(invokeMock).toHaveBeenCalledWith("retrieve_artist_image", expect.objectContaining({ artist: "Shania Twain", onlyMissing: true }));
+      });
+      expect(invokeMock).not.toHaveBeenCalledWith("retrieve_artist_details", expect.anything());
     });
 
-    it("does not backfill the logo or background while they're off, as they are by default (#1276)", async () => {
+    it("does not backfill the logo or background while they're turned off (#1276)", async () => {
       const invokeMock = vi.mocked(invoke);
       invokeMock.mockClear();
+      prefs.fanartFetchLogo = false;
+      prefs.fanartFetchBackground = false;
       collectionStore.artistProfiles = {
         "shania twain": {
           artist_key: "Shania Twain",
@@ -584,8 +579,13 @@ describe("ArtistDetailView", () => {
         return Promise.resolve();
       });
 
-      render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
-      await new Promise((resolve) => setTimeout(resolve, 50));
-      expect(invokeMock).not.toHaveBeenCalledWith("retrieve_artist_image", expect.anything());
+      try {
+        render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        expect(invokeMock).not.toHaveBeenCalledWith("retrieve_artist_image", expect.anything());
+      } finally {
+        prefs.fanartFetchLogo = true;
+        prefs.fanartFetchBackground = true;
+      }
     });
 });

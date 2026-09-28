@@ -38,14 +38,14 @@ describe("getArtistCoverStack", () => {
 describe("artist image resolvers (#1276)", () => {
   afterEach(() => {
     prefs.fanartFetchPhoto = true;
-    prefs.fanartFetchLogo = false;
-    prefs.fanartFetchBackground = false;
+    prefs.fanartFetchLogo = true;
+    prefs.fanartFetchBackground = true;
   });
 
-  it("shows only a fetched photo by default, not a fetched logo or background", () => {
+  it("shows a fetched photo, logo and background by default", () => {
     expect(resolveArtistPortraitUrl(null, "abc.jpg")).toContain("abc.jpg");
-    expect(resolveArtistLogoUrl(null, "abc.jpg")).toBeNull();
-    expect(resolveArtistBackgroundUrl(null, "abc.jpg")).toBeNull();
+    expect(resolveArtistLogoUrl(null, "abc.jpg")).toContain("abc.jpg");
+    expect(resolveArtistBackgroundUrl(null, "abc.jpg")).toContain("abc.jpg");
   });
 
   const cases = [

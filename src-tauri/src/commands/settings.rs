@@ -71,8 +71,8 @@ impl Default for UiPreferences {
             week_start: "sunday".into(),
             fanart_fetch_photo: true,
             // Logo and background are opt-in: both are visually intrusive.
-            fanart_fetch_logo: false,
-            fanart_fetch_background: false,
+            fanart_fetch_logo: true,
+            fanart_fetch_background: true,
         }
     }
 }
@@ -390,25 +390,25 @@ mod tests {
     }
 
     #[test]
-    fn fanart_fetches_only_the_photo_by_default() {
+    fn fanart_fetches_every_type_by_default() {
         let prefs = load_ui_preferences(&app_state_conn());
         assert!(prefs.fanart_fetch_photo);
-        assert!(!prefs.fanart_fetch_logo);
-        assert!(!prefs.fanart_fetch_background);
+        assert!(prefs.fanart_fetch_logo);
+        assert!(prefs.fanart_fetch_background);
     }
 
     #[test]
     fn stored_bool_prefs_override_defaults() {
         let conn = app_state_conn();
         conn.execute_batch(
-            "INSERT INTO app_state VALUES ('fanart_fetch_logo', 'true');
+            "INSERT INTO app_state VALUES ('fanart_fetch_logo', 'false');
              INSERT INTO app_state VALUES ('genre_sort_asc', 'false');",
         )
         .unwrap();
         let prefs = load_ui_preferences(&conn);
-        assert!(prefs.fanart_fetch_logo);
+        assert!(!prefs.fanart_fetch_logo);
         assert!(!prefs.genre_sort_asc);
         assert!(prefs.fanart_fetch_photo);
-        assert!(!prefs.fanart_fetch_background);
+        assert!(prefs.fanart_fetch_background);
     }
 }
