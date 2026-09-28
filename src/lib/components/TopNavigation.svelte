@@ -266,7 +266,7 @@
     } else if (item.kind === "playlist" && item.entityId) {
       navigationStore.viewPlaylist(Number(item.entityId));
     } else if (item.kind === "song" && item.query) {
-      navigationStore.viewAlbum(item.query);
+      navigationStore.viewAlbum(item.query, item.entityId !== undefined ? Number(item.entityId) : undefined);
     } else {
       collectionStore.searchQuery = item.query || item.title;
       collectionStore.search(item.query || item.title);
@@ -588,7 +588,7 @@
                     onclick={() => {
                       const songTitle = song.title || i18n.t('collection.unknownSong');
                       if (song.album) {
-                        navigationStore.viewAlbum(song.album);
+                        navigationStore.viewAlbum(song.album, song.id);
                       } else {
                         collectionStore.searchQuery = songTitle;
                         collectionStore.search(songTitle);
@@ -598,13 +598,14 @@
                         title: songTitle,
                         subtitle: `${i18n.t('collection.songLabel', {}, 'Song')} • ${song.artist || i18n.t('collection.unknownArtist')}`,
                         query: song.album || songTitle,
-                        artUrl: song.art_manual || song.art_automatic
+                        artUrl: song.art_manual || song.art_automatic,
+                        entityId: song.id
                       });
                       isSearchFocused = false;
                     }}
                     onkeydown={(e) => {
                       if (e.key === 'Enter') {
-                        if (song.album) navigationStore.viewAlbum(song.album);
+                        if (song.album) navigationStore.viewAlbum(song.album, song.id);
                         else collectionStore.search(song.title || "");
                         isSearchFocused = false;
                       } else {

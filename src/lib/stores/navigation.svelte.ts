@@ -331,13 +331,17 @@ class NavigationStore {
     this.selectedArtistName = name;
   }
 
-  viewAlbum(name: string) {
+  /** Opens an album's detail view. Pass `focusSongId` (e.g. a song picked
+   * from search) to have AlbumDetailView select that track and scroll it into
+   * view once the album's tracks load (#1280). */
+  viewAlbum(name: string, focusSongId?: number) {
     collectionStore.searchQuery = "";
     collectionStore.searchResults = [];
     this.selectedArtistName = null;
     this.activeTab = "collection";
     this.activeSubTab = "albums";
     this.selectedAlbumName = name;
+    this.pendingFocusSongId = focusSongId ?? null;
   }
 
   viewPlaylist(id: number) {
@@ -368,6 +372,12 @@ class NavigationStore {
   requestScrollToCurrentSong() {
     this.pendingScrollToCurrentSong = true;
   }
+
+  /** One-shot signal (not persisted, not part of Back/Forward history) naming
+   * the song AlbumDetailView should select and scroll to once it has loaded
+   * `selectedAlbumName`'s tracks. Set by `viewAlbum`; consumed and cleared by
+   * the view whether or not the song is on that album. */
+  pendingFocusSongId = $state<number | null>(null);
 }
 
 export const navigationStore = new NavigationStore();
