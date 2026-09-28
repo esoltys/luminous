@@ -131,14 +131,7 @@ impl ExtendedArtworkSet {
     }
 }
 
-const PRIMARY_COVER_NAMES: &[&str] = &[
-    "cover",
-    "folder",
-    "front",
-    "album",
-    "albumart",
-    "albumartsmall",
-];
+const PRIMARY_COVER_NAMES: &[&str] = &["cover", "folder", "front", "album", "albumart"];
 const BACK_COVER_NAMES: &[&str] = &["back", "rear", "backcover"];
 const DISC_MEDIA_NAMES: &[&str] = &["disc", "cd", "discart", "medium"];
 const BOOKLET_NAMES: &[&str] = &["booklet", "insert", "inlay", "liner"];
@@ -207,6 +200,27 @@ fn has_extended_artwork_extension(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
+/// Windows Media Player's album-art cache: alongside `Folder.jpg` it writes
+/// `AlbumArtSmall.jpg` and `AlbumArt_{GUID}_Large.jpg`/`_Small.jpg`, which are
+/// resized copies of the same cover. Counting them would show one cover as
+/// four images, so the extended-artwork scan skips them and keeps `Folder.jpg`.
+fn is_wmp_album_art_thumbnail(stem_lower: &str) -> bool {
+    stem_lower == "albumartsmall"
+        || (stem_lower.starts_with("albumart_{")
+            && (stem_lower.ends_with("}_large") || stem_lower.ends_with("}_small")))
+}
+
+/// A file the extended-artwork scan should consider: a supported image
+/// extension, and not one of WMP's derived thumbnails.
+fn is_extended_artwork_candidate(path: &Path) -> bool {
+    path.is_file()
+        && has_extended_artwork_extension(path)
+        && !path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .is_some_and(|stem| is_wmp_album_art_thumbnail(&stem.to_lowercase()))
+}
+
 /// Map a lofty embedded-picture `PictureType` onto the same hierarchy used
 /// for filesystem finds, so an embedded `CoverFront` picture and a
 /// `cover.jpg` on disk sort identically. Unmapped/`Other` types fall back to
@@ -236,7 +250,7 @@ fn scan_dir_for_category(
     };
     for entry in entries.filter_map(|e| e.ok()) {
         let path = entry.path();
-        if !path.is_file() || !has_extended_artwork_extension(&path) {
+        if !is_extended_artwork_candidate(&path) {
             continue;
         }
         let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
@@ -265,7 +279,7 @@ fn scan_dir_for_category_with_fallback(
     };
     for entry in entries.filter_map(|e| e.ok()) {
         let path = entry.path();
-        if !path.is_file() || !has_extended_artwork_extension(&path) {
+        if !is_extended_artwork_candidate(&path) {
             continue;
         }
         let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
@@ -288,7 +302,7 @@ fn scan_subfolder(dir: &Path, album_name: Option<&str>, out: &mut Vec<ArtworkEnt
     };
     for entry in entries.filter_map(|e| e.ok()) {
         let path = entry.path();
-        if !path.is_file() || !has_extended_artwork_extension(&path) {
+        if !is_extended_artwork_candidate(&path) {
             continue;
         }
         let stem_lower = path
@@ -1546,6 +1560,35 @@ mod tests {
         assert_eq!(
             manager.get_cover_art_uri(song_id).unwrap().as_deref(),
             Some("luminous-art://album-abc.jpg")
+        );
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_scan_extended_artwork_skips_wmp_thumbnails() {
+        // Windows Media Player leaves resized copies of the cover next to
+        // Folder.jpg; they must not be counted as separate images.
+        let temp_dir = unique_temp_dir("wmp_thumbnails");
+        let _ = std::fs::create_dir_all(&temp_dir);
+
+        let audio_path = temp_dir.join("song.mp3");
+        std::fs::write(&audio_path, b"fake audio").unwrap();
+        for name in [
+            "AlbumArt_{F10C7A6B-3B4E-4506-B7EB-53E2A1D4C9F0}_Large.jpg",
+            "AlbumArt_{F10C7A6B-3B4E-4506-B7EB-53E2A1D4C9F0}_Small.jpg",
+            "AlbumArtSmall.jpg",
+            "Folder.jpg",
+        ] {
+            std::fs::write(temp_dir.join(name), b"scan").unwrap();
+        }
+
+        let set = scan_extended_artwork(&audio_path, None).sorted();
+
+        assert_eq!(set.entries.len(), 1);
+        assert_eq!(
+            set.primary().and_then(|e| e.path.file_name()),
+            Some(std::ffi::OsStr::new("Folder.jpg"))
         );
 
         let _ = std::fs::remove_dir_all(&temp_dir);
