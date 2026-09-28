@@ -53,7 +53,7 @@ pub fn should_notify_update(format: &str, stored: Option<&str>, current: &str) -
 /// Returns `None` if the call fails, e.g. because the process isn't running
 /// with package identity (not an MSIX/APPX install).
 #[cfg(target_os = "windows")]
-fn current_application_user_model_id() -> Option<String> {
+pub(crate) fn current_application_user_model_id() -> Option<String> {
     use windows::core::PWSTR;
     use windows::Win32::Foundation::{ERROR_INSUFFICIENT_BUFFER, ERROR_SUCCESS};
     use windows::Win32::Storage::Packaging::Appx::GetCurrentApplicationUserModelId;

@@ -5,6 +5,13 @@ import SettingsGeneral from "./SettingsGeneral.svelte";
 import { invoke } from "@tauri-apps/api/core";
 import { prefs } from "../stores/prefs.svelte";
 
+const platform = vi.hoisted(() => ({ isWindows: false }));
+vi.mock("../platform", () => ({
+  get isWindows() {
+    return platform.isWindows;
+  },
+}));
+
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockImplementation((cmd: string) => {
     if (cmd === "get_commit_hash") {
@@ -46,5 +53,22 @@ describe("SettingsGeneral.svelte", () => {
 
     expect(prefs.autostartEnabled).toBe(true);
     expect(invoke).toHaveBeenCalledWith("set_autostart_enabled", { enabled: true });
+  });
+
+  it("opens Windows Default Apps from the default player row", async () => {
+    platform.isWindows = true;
+    const { findByRole } = render(SettingsGeneral);
+
+    await fireEvent.click(await findByRole("button", { name: "Open Default Apps" }));
+
+    expect(invoke).toHaveBeenCalledWith("open_default_apps_settings");
+  });
+
+  it("hides the default player row outside Windows", async () => {
+    platform.isWindows = false;
+    const { findByText, queryByText } = render(SettingsGeneral);
+
+    await findByText(/v0\.75\.0/);
+    expect(queryByText("Make Luminous the default music player")).not.toBeInTheDocument();
   });
 });

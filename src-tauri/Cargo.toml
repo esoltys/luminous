@@ -147,6 +147,8 @@ windows = { version = "0.62", features = [
     "Win32_System_Com",
     "Win32_System_WinRT",
     "Win32_System_Recovery",
+    # --- Default Apps deep link: RegisteredApplications lookup (#1265) ---
+    "Win32_System_Registry",
     "Win32_Storage_Packaging_Appx",
     # --- Taskbar thumbnail toolbar + iconic (album art) preview (#852) ---
     "Win32_UI_Shell",

@@ -23,6 +23,7 @@ pub mod covermanager;
 pub mod cue;
 pub mod db;
 pub mod diagnostics;
+pub mod default_apps;
 pub mod discord;
 pub mod dr_parser;
 pub mod equalizer;
@@ -1369,6 +1370,7 @@ pub fn run() {
             commands::theme::export_theme,
             // Settings commands
             commands::settings::set_app_setting,
+            commands::settings::open_default_apps_settings,
             commands::settings::get_all_app_settings,
             commands::settings::get_ui_preferences,
             commands::settings::set_ui_preferences,
