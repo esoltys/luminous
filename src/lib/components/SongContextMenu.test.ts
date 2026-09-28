@@ -1,9 +1,10 @@
 import "@testing-library/jest-dom";
-import { describe, it, expect, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/svelte";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/svelte";
 import SongContextMenu from "./SongContextMenu.svelte";
 import { picardStore } from "../stores/picard.svelte";
-import type { Song } from "../types";
+import { playlistsStore } from "../stores/playlists.svelte";
+import type { Song, Playlist } from "../types";
 
 describe("SongContextMenu.svelte", () => {
   const baseSong: Omit<Song, "id" | "source"> = {
@@ -128,5 +129,176 @@ describe("SongContextMenu.svelte", () => {
       "title",
       "MusicBrainz Picard not found. Install it from picard.musicbrainz.org, or set a custom path in Settings."
     );
+  });
+
+  it("renders Add to Playlist and opens submenu listing custom playlists", async () => {
+    playlistsStore.playlists = [
+      { id: 10, name: "Queue", track_count: 0, created: 0, updated: 0, dynamic_enabled: false, is_queue: true },
+      { id: 20, name: "Indie Pop", track_count: 5, created: 0, updated: 0, dynamic_enabled: false, is_queue: false },
+      { id: 30, name: "Heavy Metal", track_count: 12, created: 0, updated: 0, dynamic_enabled: false, is_queue: false },
+    ];
+    playlistsStore.pinnedPlaylistId = null;
+
+    render(SongContextMenu, {
+      x: 0,
+      y: 0,
+      song: localSong,
+      onPlay: () => {},
+      onClose: () => {},
+    });
+
+    const addToPlaylistBtn = await screen.findByText("Add to Playlist");
+    expect(addToPlaylistBtn).toBeInTheDocument();
+
+    await fireEvent.click(addToPlaylistBtn);
+
+    expect(await screen.findByText("Indie Pop")).toBeInTheDocument();
+    expect(await screen.findByText("Heavy Metal")).toBeInTheDocument();
+    expect(await screen.findByText("New Playlist...")).toBeInTheDocument();
+  });
+
+  it("adds song directly to a non-active custom playlist", async () => {
+    const addSongsSpy = vi.spyOn(playlistsStore, "addSongsToPlaylist").mockResolvedValue();
+    const onClose = vi.fn();
+
+    playlistsStore.playlists = [
+      { id: 10, name: "Queue", track_count: 0, created: 0, updated: 0, dynamic_enabled: false, is_queue: true },
+      { id: 20, name: "Active Playlist", track_count: 5, created: 0, updated: 0, dynamic_enabled: false, is_queue: false },
+      { id: 30, name: "Target Playlist", track_count: 12, created: 0, updated: 0, dynamic_enabled: false, is_queue: false },
+    ];
+    playlistsStore.pinnedPlaylistId = 20;
+
+    render(SongContextMenu, {
+      x: 0,
+      y: 0,
+      song: localSong,
+      onPlay: () => {},
+      onClose,
+    });
+
+    const addToPlaylistBtn = await screen.findByText("Add to Playlist");
+    await fireEvent.click(addToPlaylistBtn);
+
+    const targetPlBtn = await screen.findByText("Target Playlist");
+    await fireEvent.click(targetPlBtn);
+
+    expect(addSongsSpy).toHaveBeenCalledWith(30, [1]);
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("marks active custom playlist with an Active badge", async () => {
+    playlistsStore.playlists = [
+      { id: 10, name: "Queue", track_count: 0, created: 0, updated: 0, dynamic_enabled: false, is_queue: true },
+      { id: 20, name: "Road Trip", track_count: 5, created: 0, updated: 0, dynamic_enabled: false, is_queue: false },
+    ];
+    playlistsStore.pinnedPlaylistId = 20;
+
+    render(SongContextMenu, {
+      x: 0,
+      y: 0,
+      song: localSong,
+      onPlay: () => {},
+      onClose: () => {},
+    });
+
+    const addToPlaylistBtn = await screen.findByText("Add to Playlist");
+    await fireEvent.click(addToPlaylistBtn);
+
+    expect(await screen.findByText("Active")).toBeInTheDocument();
+  });
+
+  it("displays No custom playlists when user has no custom playlists", async () => {
+    playlistsStore.playlists = [
+      { id: 10, name: "Queue", track_count: 0, created: 0, updated: 0, dynamic_enabled: false, is_queue: true },
+      { id: 20, name: "Rock Genre", track_count: 5, created: 0, updated: 0, dynamic_enabled: true, is_queue: false },
+    ];
+    playlistsStore.pinnedPlaylistId = null;
+
+    render(SongContextMenu, {
+      x: 0,
+      y: 0,
+      song: localSong,
+      onPlay: () => {},
+      onClose: () => {},
+    });
+
+    const addToPlaylistBtn = await screen.findByText("Add to Playlist");
+    await fireEvent.click(addToPlaylistBtn);
+
+    expect(await screen.findByText("No custom playlists")).toBeInTheDocument();
+    expect(await screen.findByText("New Playlist...")).toBeInTheDocument();
+  });
+
+  it("adds multiple selected songs directly to a custom playlist", async () => {
+    const addSongsSpy = vi.spyOn(playlistsStore, "addSongsToPlaylist").mockResolvedValue();
+    const onClose = vi.fn();
+
+    playlistsStore.playlists = [
+      { id: 10, name: "Queue", track_count: 0, created: 0, updated: 0, dynamic_enabled: false, is_queue: true },
+      { id: 20, name: "Favorites", track_count: 2, created: 0, updated: 0, dynamic_enabled: false, is_queue: false },
+    ];
+    playlistsStore.pinnedPlaylistId = null;
+
+    render(SongContextMenu, {
+      x: 0,
+      y: 0,
+      song: localSong,
+      selectedCount: 3,
+      selectedSongIds: [1, 2, 3],
+      onPlay: () => {},
+      onClose,
+    });
+
+    const addToPlaylistBtn = await screen.findByText("Add to Playlist");
+    await fireEvent.click(addToPlaylistBtn);
+
+    const favPlBtn = await screen.findByText("Favorites");
+    await fireEvent.click(favPlBtn);
+
+    expect(addSongsSpy).toHaveBeenCalledWith(20, [1, 2, 3]);
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("creates new playlist and adds song via New Playlist modal", async () => {
+    const createPlaylistSpy = vi.spyOn(playlistsStore, "createPlaylist").mockResolvedValue({
+      id: 99,
+      name: "Chill Sunset",
+      track_count: 0,
+      created: 0,
+      updated: 0,
+      dynamic_enabled: false,
+      is_queue: false,
+    });
+    const addSongsSpy = vi.spyOn(playlistsStore, "addSongsToPlaylist").mockResolvedValue();
+    const onClose = vi.fn();
+
+    playlistsStore.playlists = [
+      { id: 10, name: "Queue", track_count: 0, created: 0, updated: 0, dynamic_enabled: false, is_queue: true },
+    ];
+    playlistsStore.pinnedPlaylistId = null;
+
+    render(SongContextMenu, {
+      x: 0,
+      y: 0,
+      song: localSong,
+      onPlay: () => {},
+      onClose,
+    });
+
+    const addToPlaylistBtn = await screen.findByText("Add to Playlist");
+    await fireEvent.click(addToPlaylistBtn);
+
+    const newPlBtn = await screen.findByText("New Playlist...");
+    await fireEvent.click(newPlBtn);
+
+    const input = await screen.findByLabelText("Enter a name for the new playlist:");
+    await fireEvent.input(input, { target: { value: "Chill Sunset" } });
+
+    const createBtn = await screen.findByRole("button", { name: "Create" });
+    await fireEvent.click(createBtn);
+
+    expect(createPlaylistSpy).toHaveBeenCalledWith("Chill Sunset");
+    expect(addSongsSpy).toHaveBeenCalledWith(99, [1]);
+    expect(onClose).toHaveBeenCalled();
   });
 });

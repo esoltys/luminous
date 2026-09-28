@@ -178,7 +178,7 @@ describe("CollectionView.svelte", () => {
     await fireEvent.contextMenu(songRow);
 
     expect(getByText("Play Song")).toBeInTheDocument();
-    expect(getAllByText("Add to Active Playlist")[0]).toBeInTheDocument();
+    expect(getAllByText("Add to Playlist")[0]).toBeInTheDocument();
   });
 
   it.each(["cards", "rows"] as const)(

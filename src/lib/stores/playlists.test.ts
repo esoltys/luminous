@@ -283,4 +283,14 @@ describe("PlaylistsStore", () => {
     await playlistsStore.pinPlaylist(101);
     expect(playlistsStore.pinnedPlaylistId).toBe(101);
   });
+
+  it("filters out dynamic playlists and queue in customPlaylists", () => {
+    playlistsStore.playlists = [
+      { id: 1, name: "Queue", track_count: 0, created: 1700000000, updated: 1700000000, dynamic_enabled: false, is_queue: true },
+      { id: 2, name: "80s Rock", track_count: 10, created: 1700000001, updated: 1700000001, dynamic_enabled: true, is_queue: false },
+      { id: 3, name: "Road Trip", track_count: 5, created: 1700000002, updated: 1700000002, dynamic_enabled: false, is_queue: false },
+      { id: 4, name: "Chill Beats", track_count: 8, created: 1700000003, updated: 1700000003, dynamic_enabled: false, is_queue: false },
+    ];
+    expect(playlistsStore.customPlaylists.map((p) => p.name)).toEqual(["Road Trip", "Chill Beats"]);
+  });
 });
