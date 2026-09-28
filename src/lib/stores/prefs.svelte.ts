@@ -12,6 +12,9 @@ interface UiPreferences {
   rating_style: RatingStyle;
   seekbar_mode: SeekBarMode;
   fanart_api_key: string;
+  fanart_fetch_photo: boolean;
+  fanart_fetch_logo: boolean;
+  fanart_fetch_background: boolean;
   albums_view_mode: CollectionViewMode;
   artists_view_mode: CollectionViewMode;
   playlists_auto_view_mode: CollectionViewMode;
@@ -27,6 +30,13 @@ class PrefsStore {
   ratingStyle = $state<RatingStyle>("heart");
   seekBarMode = $state<SeekBarMode>("waveform");
   fanartApiKey = $state<string>("");
+  /** Which artist image types the enrichment batch retrieves (#1276).
+   * Turning one off also hides already-fetched images of that type; local
+   * files always show. */
+  fanartFetchPhoto = $state<boolean>(true);
+  // Logo and background are opt-in: both are visually intrusive.
+  fanartFetchLogo = $state<boolean>(true);
+  fanartFetchBackground = $state<boolean>(true);
   albumsViewMode = $state<CollectionViewMode>("cards");
   artistsViewMode = $state<CollectionViewMode>("cards");
   playlistsAutoViewMode = $state<CollectionViewMode>("cards");
@@ -49,6 +59,9 @@ class PrefsStore {
     this.ratingStyle = prefs.rating_style;
     this.seekBarMode = prefs.seekbar_mode;
     this.fanartApiKey = prefs.fanart_api_key;
+    this.fanartFetchPhoto = prefs.fanart_fetch_photo;
+    this.fanartFetchLogo = prefs.fanart_fetch_logo;
+    this.fanartFetchBackground = prefs.fanart_fetch_background;
     this.albumsViewMode = prefs.albums_view_mode;
     this.artistsViewMode = prefs.artists_view_mode;
     this.playlistsAutoViewMode = prefs.playlists_auto_view_mode;
@@ -71,6 +84,9 @@ class PrefsStore {
       rating_style: this.ratingStyle,
       seekbar_mode: this.seekBarMode,
       fanart_api_key: this.fanartApiKey,
+      fanart_fetch_photo: this.fanartFetchPhoto,
+      fanart_fetch_logo: this.fanartFetchLogo,
+      fanart_fetch_background: this.fanartFetchBackground,
       albums_view_mode: this.albumsViewMode,
       artists_view_mode: this.artistsViewMode,
       playlists_auto_view_mode: this.playlistsAutoViewMode,
@@ -91,6 +107,21 @@ class PrefsStore {
 
   setFanartApiKey(key: string) {
     this.fanartApiKey = key;
+    this.save();
+  }
+
+  setFanartFetchPhoto(enabled: boolean) {
+    this.fanartFetchPhoto = enabled;
+    this.save();
+  }
+
+  setFanartFetchLogo(enabled: boolean) {
+    this.fanartFetchLogo = enabled;
+    this.save();
+  }
+
+  setFanartFetchBackground(enabled: boolean) {
+    this.fanartFetchBackground = enabled;
     this.save();
   }
 

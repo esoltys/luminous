@@ -1,5 +1,12 @@
-import { describe, it, expect } from "vitest";
-import { getArtistCoverStack, songsToCoverStack } from "./covers";
+import { describe, it, expect, afterEach } from "vitest";
+import {
+  getArtistCoverStack,
+  songsToCoverStack,
+  resolveArtistPortraitUrl,
+  resolveArtistLogoUrl,
+  resolveArtistBackgroundUrl,
+} from "./covers";
+import { prefs } from "../stores/prefs.svelte";
 
 describe("getArtistCoverStack", () => {
   it("prefers real album art, front cover first", () => {
@@ -26,4 +33,44 @@ describe("getArtistCoverStack", () => {
   it("returns an empty array when the artist has no art anywhere", () => {
     expect(getArtistCoverStack([], [])).toEqual([]);
   });
+});
+
+describe("artist image resolvers (#1276)", () => {
+  afterEach(() => {
+    prefs.fanartFetchPhoto = true;
+    prefs.fanartFetchLogo = true;
+    prefs.fanartFetchBackground = true;
+  });
+
+  it("shows a fetched photo, logo and background by default", () => {
+    expect(resolveArtistPortraitUrl(null, "abc.jpg")).toContain("abc.jpg");
+    expect(resolveArtistLogoUrl(null, "abc.jpg")).toContain("abc.jpg");
+    expect(resolveArtistBackgroundUrl(null, "abc.jpg")).toContain("abc.jpg");
+  });
+
+  const cases = [
+    { name: "photo", resolve: resolveArtistPortraitUrl, pref: "fanartFetchPhoto" },
+    { name: "logo", resolve: resolveArtistLogoUrl, pref: "fanartFetchLogo" },
+    { name: "background", resolve: resolveArtistBackgroundUrl, pref: "fanartFetchBackground" },
+  ] as const;
+
+  for (const { name, resolve, pref } of cases) {
+    it(`shows a fetched ${name} when no local file exists and its type is on`, () => {
+      prefs[pref] = true;
+      expect(resolve(null, "abc.jpg")).toContain("abc.jpg");
+    });
+
+    it(`prefers a local ${name} file over a fetched one`, () => {
+      prefs[pref] = true;
+      const url = resolve("C:/Music/Artist/local.jpg", "abc.jpg");
+      expect(url).toContain("local.jpg");
+      expect(url).not.toContain("abc.jpg");
+    });
+
+    it(`hides a fetched ${name} but keeps a local one when its type is turned off`, () => {
+      prefs[pref] = false;
+      expect(resolve(null, "abc.jpg")).toBeNull();
+      expect(resolve("C:/Music/Artist/local.jpg", "abc.jpg")).toContain("local.jpg");
+    });
+  }
 });

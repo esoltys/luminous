@@ -1266,6 +1266,20 @@ pub struct ArtistProfile {
     /// Whether artist image has already been automatically fetched or attempted (#1143).
     #[serde(default)]
     pub image_fetched: bool,
+    /// Cache filename of a band logo fetched from fanart.tv (#1276) — shown
+    /// only when no local `logo.png`/`clearlogo.png` exists.
+    #[serde(default)]
+    pub fetched_logo_filename: Option<String>,
+    /// Cache filename of a header background fetched from fanart.tv (#1276) —
+    /// shown only when no local `fanart.jpg`/`backdrop.jpg` exists.
+    #[serde(default)]
+    pub fetched_background_filename: Option<String>,
+    /// Whether the fanart.tv logo has been fetched or attempted (#1276).
+    #[serde(default)]
+    pub logo_fetched: bool,
+    /// Whether the fanart.tv background has been fetched or attempted (#1276).
+    #[serde(default)]
+    pub background_fetched: bool,
 }
 
 /// An external platform or web link associated with an album release (#950).

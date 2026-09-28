@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 47;
+pub const CURRENT_SCHEMA_VERSION: i32 = 48;
 
 struct Migration {
     version: i32,
@@ -398,6 +398,21 @@ const MIGRATIONS: &[Migration] = &[
                 .exists([])?;
             if !has_auth_mode {
                 conn.execute_batch(MIGRATION_47)?;
+            }
+            Ok(())
+        },
+    },
+    Migration {
+        version: 48,
+        description: "fetched logo/background filenames and attempted flags on artist_profiles for fanart.tv artwork (#1276)",
+        apply: |conn| {
+            let has_logo: bool = conn
+                .prepare(
+                    "SELECT 1 FROM pragma_table_info('artist_profiles') WHERE name = 'fetched_logo_filename'",
+                )?
+                .exists([])?;
+            if !has_logo {
+                conn.execute_batch(MIGRATION_48)?;
             }
             Ok(())
         },
@@ -1624,6 +1639,19 @@ const MIGRATION_47: &str = "
 ALTER TABLE subsonic_servers ADD COLUMN auth_mode TEXT NOT NULL DEFAULT 'token';
 ";
 
+// ---------------------------------------------------------------------------
+// Migration 48: fanart.tv band logo and background on artist_profiles (#1276).
+// `image_fetched` (migration 43) keeps tracking the photo; the logo and
+// background get their own attempted flags so artists whose photo was
+// already fetched still pick them up on their next visit.
+// ---------------------------------------------------------------------------
+const MIGRATION_48: &str = "
+ALTER TABLE artist_profiles ADD COLUMN fetched_logo_filename TEXT;
+ALTER TABLE artist_profiles ADD COLUMN fetched_background_filename TEXT;
+ALTER TABLE artist_profiles ADD COLUMN logo_fetched INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE artist_profiles ADD COLUMN background_fetched INTEGER NOT NULL DEFAULT 0;
+";
+
 fn seed_artist_tag_hierarchy(conn: &rusqlite::Connection) -> Result<()> {
     let mut stmt = conn.prepare(
         "SELECT DISTINCT json_each.value
@@ -2393,6 +2421,39 @@ mod tests {
             .unwrap();
         assert_eq!(filename.as_deref(), Some("artist-abc123.jpg"));
         assert_eq!(source.as_deref(), Some("fanart"));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_migration_48_adds_artist_logo_and_background_columns() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_migration48_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Database::new(temp_dir.clone()).unwrap();
+        assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
+
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO artist_profiles (artist_key, fetched_logo_filename, fetched_background_filename) VALUES (?1, ?2, ?3)",
+            params!["Nightwish", "abc_logo.png", "abc_background.jpg"],
+        )
+        .unwrap();
+
+        let row: (Option<String>, Option<String>, bool, bool) = conn
+            .query_row(
+                "SELECT fetched_logo_filename, fetched_background_filename, logo_fetched, background_fetched FROM artist_profiles WHERE artist_key = 'Nightwish'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+            )
+            .unwrap();
+        assert_eq!(row.0.as_deref(), Some("abc_logo.png"));
+        assert_eq!(row.1.as_deref(), Some("abc_background.jpg"));
+        assert!(!row.2 && !row.3, "attempted flags default to not attempted");
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

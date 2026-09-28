@@ -585,4 +585,26 @@
       </div>
     {/if}
   </div>
+
+  <div class="space-y-2 pt-2 border-t border-brand-border/60">
+    <div class="space-y-0.5">
+      <span class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
+        {i18n.t('settings.fanartImagesLabel')}
+      </span>
+      <p class="text-xs text-brand-text-secondary">{i18n.t('settings.fanartImagesHint')}</p>
+    </div>
+    {#each [
+      { label: 'settings.fanartFetchPhoto', hint: 'settings.fanartFetchPhotoHint', checked: prefs.fanartFetchPhoto, set: (v: boolean) => prefs.setFanartFetchPhoto(v) },
+      { label: 'settings.fanartFetchLogo', hint: 'settings.fanartFetchLogoHint', checked: prefs.fanartFetchLogo, set: (v: boolean) => prefs.setFanartFetchLogo(v) },
+      { label: 'settings.fanartFetchBackground', hint: 'settings.fanartFetchBackgroundHint', checked: prefs.fanartFetchBackground, set: (v: boolean) => prefs.setFanartFetchBackground(v) },
+    ] as row (row.label)}
+      <div class="flex items-center justify-between gap-4 py-1">
+        <div class="flex flex-col gap-0.5 min-w-0">
+          <span class="text-sm font-medium text-brand-text-primary">{i18n.t(row.label)}</span>
+          <p class="text-xs text-brand-text-secondary">{i18n.t(row.hint)}</p>
+        </div>
+        <Toggle checked={row.checked} onchange={row.set} label={i18n.t(row.label)} />
+      </div>
+    {/each}
+  </div>
 </div>

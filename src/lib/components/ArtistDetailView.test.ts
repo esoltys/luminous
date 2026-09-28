@@ -5,6 +5,7 @@ import { collectionStore } from "../stores/collection.svelte";
 import { navigationStore } from "../stores/navigation.svelte";
 import { picardStore } from "../stores/picard.svelte";
 import { windowLayoutStore } from "../stores/windowLayout.svelte";
+import { prefs } from "../stores/prefs.svelte";
 import { invoke } from "@tauri-apps/api/core";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -239,7 +240,7 @@ describe("ArtistDetailView", () => {
   });
 
   describe("extended artist artwork (#98/#761)", () => {
-    it("renders a discovered artist portrait and band logo instead of the album-art composite and text heading", async () => {
+    it("renders a discovered band logo beside the portrait while keeping the text heading", async () => {
       const invokeMock = vi.mocked(invoke);
       invokeMock.mockImplementation((cmd: string, args?: any) => {
         if (cmd === "get_songs_by_artist") return Promise.resolve([]);
@@ -269,12 +270,14 @@ describe("ArtistDetailView", () => {
 
       render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
 
-      const images = await screen.findAllByAltText("Shania Twain");
-      expect(images.length).toBe(2); // portrait + band logo
-      expect(screen.queryByRole("heading", { name: "Shania Twain" })).toBeNull();
+      await waitFor(() => {
+        expect(document.querySelector('img[src*="logo.png"]')).toBeTruthy();
+      });
+      expect(await screen.findByAltText("Shania Twain")).toBeTruthy(); // portrait
+      expect(screen.getByRole("heading", { name: "Shania Twain" })).toBeTruthy();
     });
 
-    it("falls back to the plain text heading when no band logo was discovered", async () => {
+    it("shows the text heading when no band logo was discovered", async () => {
       render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
 
       expect(await screen.findByRole("heading", { name: "Shania Twain" })).toBeTruthy();
@@ -449,7 +452,15 @@ describe("ArtistDetailView", () => {
         if (cmd === "is_context_enrichment_enabled") return Promise.resolve(true);
         if (cmd === "retrieve_artist_details") return Promise.resolve({ added_count: 2 });
         if (cmd === "get_song_context") return Promise.resolve({ wikipedia_extract: "Bio summary" });
-        if (cmd === "retrieve_artist_image") return Promise.resolve({ uri: "luminous-art://shania.jpg", source: "fanart" });
+        if (cmd === "retrieve_artist_image") {
+          return Promise.resolve({
+            uri: "luminous-art://shania.jpg",
+            source: "fanart",
+            logo_uri: null,
+            background_uri: null,
+            profile: { ...collectionStore.artistProfiles["shania twain"], image_fetched: true, logo_fetched: true, background_fetched: true },
+          });
+        }
         return Promise.resolve();
       });
 
@@ -460,7 +471,7 @@ describe("ArtistDetailView", () => {
       });
     });
 
-    it("does not auto-fetch artist info or image when details_fetched and image_fetched are already true (#1143)", async () => {
+    it("does not auto-fetch artist info or images when details and every image type are already fetched (#1143)", async () => {
       const invokeMock = vi.mocked(invoke);
       invokeMock.mockClear();
       collectionStore.artistProfiles = {
@@ -470,6 +481,8 @@ describe("ArtistDetailView", () => {
           social_links: [],
           details_fetched: true,
           image_fetched: true,
+          logo_fetched: true,
+          background_fetched: true,
         },
       };
 
@@ -491,5 +504,88 @@ describe("ArtistDetailView", () => {
 
       expect(invokeMock).not.toHaveBeenCalledWith("retrieve_artist_details", expect.anything());
       expect(invokeMock).not.toHaveBeenCalledWith("retrieve_artist_image", expect.anything());
+    });
+    it("backfills only the missing image types, without re-fetching details, when details are already fetched (#1276)", async () => {
+      const invokeMock = vi.mocked(invoke);
+      invokeMock.mockClear();
+      collectionStore.artistProfiles = {
+        "shania twain": {
+          artist_key: "Shania Twain",
+          tags: [],
+          social_links: [],
+          details_fetched: true,
+          image_fetched: true,
+          logo_fetched: false,
+          background_fetched: false,
+        },
+      };
+
+      invokeMock.mockImplementation((cmd: string) => {
+        if (cmd === "get_songs_by_artist") {
+          return Promise.resolve([
+            { id: 1, title: "Man! I Feel Like a Woman!", artist: "Shania Twain", musicbrainz_artist_id: "mbid-123" } as any,
+          ]);
+        }
+        if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
+        if (cmd === "get_compilations_by_artist") return Promise.resolve([]);
+        if (cmd === "get_artist_profile") return Promise.resolve(collectionStore.artistProfiles["shania twain"]);
+        if (cmd === "is_context_enrichment_enabled") return Promise.resolve(true);
+        if (cmd === "retrieve_artist_image") {
+          return Promise.resolve({
+            uri: null,
+            source: null,
+            logo_uri: "luminous-art://shania_logo.png",
+            background_uri: null,
+            profile: { ...collectionStore.artistProfiles["shania twain"], logo_fetched: true, background_fetched: true, fetched_logo_filename: "shania_logo.png" },
+          });
+        }
+        return Promise.resolve();
+      });
+
+      render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
+      await waitFor(() => {
+        expect(invokeMock).toHaveBeenCalledWith("retrieve_artist_image", expect.objectContaining({ artist: "Shania Twain", onlyMissing: true }));
+      });
+      expect(invokeMock).not.toHaveBeenCalledWith("retrieve_artist_details", expect.anything());
+    });
+
+    it("does not backfill the logo or background while they're turned off (#1276)", async () => {
+      const invokeMock = vi.mocked(invoke);
+      invokeMock.mockClear();
+      prefs.fanartFetchLogo = false;
+      prefs.fanartFetchBackground = false;
+      collectionStore.artistProfiles = {
+        "shania twain": {
+          artist_key: "Shania Twain",
+          tags: [],
+          social_links: [],
+          details_fetched: true,
+          image_fetched: true,
+          logo_fetched: false,
+          background_fetched: false,
+        },
+      };
+
+      invokeMock.mockImplementation((cmd: string) => {
+        if (cmd === "get_songs_by_artist") {
+          return Promise.resolve([
+            { id: 1, title: "Man! I Feel Like a Woman!", artist: "Shania Twain", musicbrainz_artist_id: "mbid-123" } as any,
+          ]);
+        }
+        if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
+        if (cmd === "get_compilations_by_artist") return Promise.resolve([]);
+        if (cmd === "get_artist_profile") return Promise.resolve(collectionStore.artistProfiles["shania twain"]);
+        if (cmd === "is_context_enrichment_enabled") return Promise.resolve(true);
+        return Promise.resolve();
+      });
+
+      try {
+        render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        expect(invokeMock).not.toHaveBeenCalledWith("retrieve_artist_image", expect.anything());
+      } finally {
+        prefs.fanartFetchLogo = true;
+        prefs.fanartFetchBackground = true;
+      }
     });
 });
