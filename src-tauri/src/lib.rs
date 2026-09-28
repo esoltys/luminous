@@ -897,75 +897,21 @@ pub fn run() {
     }
 
     tauri::Builder::default()
-        .register_uri_scheme_protocol("luminous-art", move |ctx, request| {
-            let app_handle = ctx.app_handle();
-            let covers_dir = crate::paths::resolve_app_data_dir(app_handle).join("covers");
-
-            let uri_str = request.uri().to_string();
-            let mut trimmed = &uri_str[..];
-            // On Windows WebView2, requests are made to `http://luminous-art.localhost/`
-            // via the frontend rewrite in `getCoverArtUrl()`. wry intercepts the HTTP request
-            // and runs `revert_uri_work_around` which rewrites the URI to `luminous-art://localhost/`
-            // before calling this handler (see #715). We strip either prefix here.
-            if let Some(t) = uri_str.strip_prefix("http://luminous-art.localhost/") {
-                trimmed = t;
-            } else if let Some(t) = uri_str.strip_prefix("luminous-art://") {
-                trimmed = t;
-            }
-
-            // If the webview prepends localhost/ to the authority, strip it
-            if trimmed.starts_with("localhost/") {
-                trimmed = trimmed.strip_prefix("localhost/").unwrap_or(trimmed);
-            }
-
-            // Webviews normalize empty paths to trailing slashes (e.g. URI/ -> path/)
-            trimmed = trimmed.trim_end_matches('/');
-
-            let file_path = if trimmed.starts_with("local/") {
-                let local_path = trimmed.strip_prefix("local/").unwrap_or(trimmed);
-                let decoded = percent_encoding::percent_decode_str(local_path)
-                    .decode_utf8_lossy()
-                    .into_owned();
-                std::path::PathBuf::from(decoded)
-            } else {
-                let decoded = percent_encoding::percent_decode_str(trimmed)
-                    .decode_utf8_lossy()
-                    .into_owned();
-                covers_dir.join(decoded)
-            };
-
-            log::trace!(
-                "Custom protocol: URI = {}, Resolved path = {:?} (exists: {})",
-                uri_str,
-                file_path,
-                file_path.exists()
-            );
-
-            if file_path.exists() && file_path.is_file() {
-                if let Ok(data) = std::fs::read(&file_path) {
-                    let (cleaned_data, mime, _) =
-                        crate::covermanager::detect_image_format_and_clean(&data);
-                    tauri::http::Response::builder()
-                        .status(200)
-                        .header("content-type", mime)
-                        .header("access-control-allow-origin", "*")
-                        .body(cleaned_data.to_vec())
-                        .unwrap()
-                } else {
-                    tauri::http::Response::builder()
-                        .status(500)
-                        .header("access-control-allow-origin", "*")
-                        .body(Vec::new())
-                        .unwrap()
-                }
-            } else {
-                tauri::http::Response::builder()
-                    .status(404)
-                    .header("access-control-allow-origin", "*")
-                    .body(Vec::new())
-                    .unwrap()
-            }
-        })
+        // Asynchronous so the file read happens off the main thread: on Windows
+        // WebView2 a synchronous protocol handler runs on the UI thread, and
+        // reading folder art from a slow or sleeping library drive would stall
+        // the window (see `covermanager::serve_art_request`).
+        .register_asynchronous_uri_scheme_protocol(
+            "luminous-art",
+            move |ctx, request, responder| {
+                let covers_dir =
+                    crate::paths::resolve_app_data_dir(ctx.app_handle()).join("covers");
+                let uri = request.uri().to_string();
+                tauri::async_runtime::spawn_blocking(move || {
+                    responder.respond(crate::covermanager::serve_art_request(&covers_dir, &uri));
+                });
+            },
+        )
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())

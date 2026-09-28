@@ -760,7 +760,8 @@ impl CollectionScanner {
             return Ok(());
         }
 
-        let cover_manager = CoverManager::new(Arc::clone(&self.db), app_data_dir);
+        let cover_manager =
+            CoverManager::new(Arc::clone(&self.db), app_data_dir).with_per_scan_album_dedup();
 
         let results: Vec<(PathBuf, Result<Song>)> =
             tauri::async_runtime::spawn_blocking(move || {
@@ -880,7 +881,8 @@ impl CollectionScanner {
         });
 
         let mut scanned = 0u64;
-        let cover_manager = CoverManager::new(Arc::clone(&self.db), app_data_dir);
+        let cover_manager =
+            CoverManager::new(Arc::clone(&self.db), app_data_dir).with_per_scan_album_dedup();
 
         {
             let conn = self.db.pool.get()?;
@@ -1135,8 +1137,25 @@ impl CollectionScanner {
             let path = Path::new(&path_str);
             let mut resolved = false;
 
-            // 1. Try embedded art
-            if art_embedded {
+            // Folder art before embedded art, except for albumless singles —
+            // see the `covermanager` module docs.
+            let folder_first = !album.trim().is_empty();
+            let try_folder_art = || {
+                let folder_art_path = cover_manager.scan_folder_art(path)?;
+                if let Ok(conn) = self.db.pool.get() {
+                    let _ = conn.execute(
+                        "UPDATE songs SET art_automatic = ?1, art_unset = 0 WHERE COALESCE(NULLIF(album_artist, ''), artist) = ?2 AND album = ?3",
+                        params![folder_art_path.to_string_lossy(), effective_artist, album],
+                    );
+                }
+                Some(())
+            };
+
+            if folder_first {
+                resolved = try_folder_art().is_some();
+            }
+
+            if !resolved && art_embedded {
                 if let Ok(Some(cached_filename)) =
                     cover_manager.extract_embedded_art(path, &effective_artist, &album)
                 {
@@ -1150,21 +1169,11 @@ impl CollectionScanner {
                 }
             }
 
-            // 2. Try folder art
-            if !resolved {
-                if let Some(folder_art_path) = cover_manager.scan_folder_art(path) {
-                    let folder_art_str = folder_art_path.to_string_lossy().to_string();
-                    if let Ok(conn) = self.db.pool.get() {
-                        let _ = conn.execute(
-                            "UPDATE songs SET art_automatic = ?1, art_unset = 0 WHERE COALESCE(NULLIF(album_artist, ''), artist) = ?2 AND album = ?3",
-                            params![folder_art_str, effective_artist, album],
-                        );
-                    }
-                    resolved = true;
-                }
+            if !resolved && !folder_first {
+                resolved = try_folder_art().is_some();
             }
 
-            // 3. Try remote fetch (limit to 50 to avoid long scans / rate limits)
+            // Last, try remote fetch (limit to 50 to avoid long scans / rate limits)
             if !resolved && resolve_remote_art && remote_fetch_count < 50 {
                 remote_fetch_count += 1;
                 std::thread::sleep(std::time::Duration::from_millis(150));
@@ -1598,7 +1607,14 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
 pub(crate) fn read_and_prepare_song(cover_manager: &CoverManager, path: &Path) -> Result<Song> {
     let mut song = read_tags(path)?;
 
-    if song.art_embedded {
+    // Folder art before embedded art for album tracks — see the
+    // `covermanager` module docs for the order and the singles exception.
+    let has_album = song.album.as_deref().is_some_and(|a| !a.trim().is_empty());
+    if has_album {
+        use_folder_art(cover_manager, path, &mut song);
+    }
+
+    if song.art_automatic.is_none() && song.art_embedded {
         let artist = song
             .album_artist
             .as_deref()
@@ -1620,14 +1636,18 @@ pub(crate) fn read_and_prepare_song(cover_manager: &CoverManager, path: &Path) -
         }
     }
 
-    if song.art_automatic.is_none() {
-        if let Some(folder_art_path) = cover_manager.scan_folder_art(path) {
-            song.art_automatic = Some(folder_art_path.to_string_lossy().to_string());
-            song.art_unset = false;
-        }
+    if song.art_automatic.is_none() && !has_album {
+        use_folder_art(cover_manager, path, &mut song);
     }
 
     Ok(song)
+}
+
+fn use_folder_art(cover_manager: &CoverManager, path: &Path, song: &mut Song) {
+    if let Some(folder_art_path) = cover_manager.scan_folder_art(path) {
+        song.art_automatic = Some(folder_art_path.to_string_lossy().to_string());
+        song.art_unset = false;
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -3339,6 +3359,83 @@ Official DR value: DR13\n",
         );
 
         let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    /// A test WAV carrying an embedded CoverFront picture, tagged with
+    /// `album` when given (an albumless single otherwise).
+    fn write_test_wav_with_embedded_art(path: &Path, album: Option<&str>) {
+        use lofty::{
+            config::WriteOptions,
+            picture::{MimeType, Picture, PictureType},
+        };
+        write_test_wav(path);
+        let mut tagged_file = Probe::open(path).unwrap().read().unwrap();
+        let mut tag = Tag::new(tagged_file.primary_tag_type());
+        tag.set_artist("Artist".to_string());
+        tag.set_title("Title".to_string());
+        if let Some(album) = album {
+            tag.set_album(album.to_string());
+        }
+        tag.push_picture(
+            Picture::unchecked(vec![0xFF, 0xD8, 0xFF, 0xE0])
+                .pic_type(PictureType::CoverFront)
+                .mime_type(MimeType::Jpeg)
+                .build(),
+        );
+        tagged_file.insert_tag(tag);
+        tagged_file
+            .save_to_path(path, WriteOptions::default())
+            .unwrap();
+    }
+
+    #[test]
+    fn test_read_and_prepare_song_prefers_folder_art_over_embedded_for_album_tracks() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let audio_path = temp_dir.path().join("track.wav");
+        let folder_art_path = temp_dir.path().join("cover.jpg");
+        write_test_wav_with_embedded_art(&audio_path, Some("Album"));
+        std::fs::write(&folder_art_path, b"JPEG image content").unwrap();
+
+        let db = Arc::new(Database::new(temp_dir.path().to_path_buf()).unwrap());
+        let cover_manager = CoverManager::new(db, temp_dir.path().to_path_buf());
+
+        let song = read_and_prepare_song(&cover_manager, &audio_path).unwrap();
+
+        assert!(song.art_embedded);
+        assert_eq!(
+            song.art_automatic.as_deref(),
+            Some(
+                folder_art_path
+                    .canonicalize()
+                    .unwrap()
+                    .to_string_lossy()
+                    .as_ref()
+            )
+        );
+        assert_eq!(
+            std::fs::read_dir(cover_manager.covers_dir())
+                .unwrap()
+                .count(),
+            0,
+            "embedded art must not be copied into the cache when folder art exists"
+        );
+    }
+
+    #[test]
+    fn test_read_and_prepare_song_prefers_embedded_art_for_albumless_singles() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let audio_path = temp_dir.path().join("single.wav");
+        write_test_wav_with_embedded_art(&audio_path, None);
+        std::fs::write(temp_dir.path().join("cover.jpg"), b"JPEG image content").unwrap();
+
+        let db = Arc::new(Database::new(temp_dir.path().to_path_buf()).unwrap());
+        let cover_manager = CoverManager::new(db, temp_dir.path().to_path_buf());
+
+        let song = read_and_prepare_song(&cover_manager, &audio_path).unwrap();
+
+        let cached = song.art_automatic.expect("embedded art should be cached");
+        assert!(cached.starts_with("album-"), "got {cached}");
+        assert!(cover_manager.covers_dir().join(&cached).exists());
     }
 
     #[test]
