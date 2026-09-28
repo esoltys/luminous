@@ -250,6 +250,7 @@ export const en = {
     aboutTechBs1770: "EBU R128 / ITU BS.1770 loudness normalization.",
     aboutTechRustfft: "Real-time spectrum analysis, frequency-band waveforms, and audio tag reading/writing.",
     generalTitle: "General Settings",
+    generalSubtitle: "Configure application language and formatting preferences.",
     selectLanguage: "Language / Langue",
     languageEnglish: "English",
     languageFrench: "Français",

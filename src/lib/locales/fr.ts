@@ -250,6 +250,7 @@ export const fr = {
     aboutTechBs1770: "Normalisation du volume EBU R128 / ITU BS.1770.",
     aboutTechRustfft: "Analyse spectrale en temps réel, bandes de fréquences et lecture/écriture de tags audio.",
     generalTitle: "Paramètres généraux",
+    generalSubtitle: "Configurer la langue de l'application et les préférences de format.",
     selectLanguage: "Langue / Language",
     languageEnglish: "English",
     languageFrench: "Français",
