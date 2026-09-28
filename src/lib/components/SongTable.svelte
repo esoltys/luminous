@@ -661,6 +661,7 @@
   <div
     data-song-row="true"
     data-index={row.underlyingIndex}
+    data-key={row.key}
     role="row"
     tabindex="0"
     onclick={(e) => song && (!disabled || interactiveWhenDisabled) && handleRowClick(e, row)}
