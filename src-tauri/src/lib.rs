@@ -43,6 +43,7 @@ pub mod playlist_parsers;
 pub mod remote_scheduler;
 pub mod restart_manager;
 pub mod scrobbler;
+pub mod stall_monitor;
 pub mod stats;
 pub mod stats_summary;
 pub mod subsonic;
@@ -357,39 +358,6 @@ fn restore_equalizer_from_db(db: &Database, audio_engine: &AudioEngine) {
             });
         }
     }
-}
-
-/// Watches for Tokio scheduler delay: sleeps for a nominal 20ms (chosen to
-/// match a typical audio-frame window, since that's the granularity where a
-/// scheduling stall would first become audible) and compares it against the
-/// actual elapsed time. A large overshoot means the runtime's worker threads
-/// were too busy/blocked to poll this task promptly — the same condition
-/// that would delay IPC command handlers waiting on `AppState`'s locks.
-/// This is a cheap, dependency-free first signal for "is the runtime
-/// actually falling behind" per issue #1002 — not a replacement for proper
-/// tokio-console instrumentation, which needs a `tokio_unstable` build-wide
-/// cfg flag and is a separate decision.
-fn spawn_scheduler_latency_monitor() {
-    const PROBE_INTERVAL: std::time::Duration = std::time::Duration::from_millis(20);
-    const WARN_THRESHOLD: std::time::Duration = std::time::Duration::from_millis(40);
-
-    tauri::async_runtime::spawn(async move {
-        loop {
-            let start = std::time::Instant::now();
-            tokio::time::sleep(PROBE_INTERVAL).await;
-            let elapsed = start.elapsed();
-            if let Some(overshoot) = elapsed.checked_sub(PROBE_INTERVAL) {
-                if overshoot > WARN_THRESHOLD {
-                    log::warn!(
-                        "Tokio scheduler delay detected: {}ms probe took {}ms (overshoot {}ms) — IPC commands and UI ticks may be lagging",
-                        PROBE_INTERVAL.as_millis(),
-                        elapsed.as_millis(),
-                        overshoot.as_millis()
-                    );
-                }
-            }
-        }
-    });
 }
 
 /// Spawns the ~30 FPS spectrum-emission loop that pushes `spectrum-data`
@@ -1074,8 +1042,8 @@ pub fn run() {
             // Spawn real-time visualizer spectrum emission loop (Tokio)
             spawn_visualizer_loop(app.handle().clone(), Arc::clone(&audio));
 
-            // Spawn scheduler-delay watchdog (Tokio) — see #1002.
-            spawn_scheduler_latency_monitor();
+            // Spawn Tokio/UI stall watchdog — see #1002.
+            stall_monitor::spawn();
 
             let args: Vec<String> = std::env::args().collect();
             let startup_path = if args.len() > 1 {
@@ -1229,7 +1197,8 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![
+        // Instrumented so stall warnings can name the commands around them (#1002).
+        .invoke_handler(stall_monitor::instrument(tauri::generate_handler![
             // Collection commands
             commands::collection::scan_directories,
             commands::collection::rescan_songs,
@@ -1450,7 +1419,7 @@ pub fn run() {
             commands::window::webview_gpu_compositing,
             commands::window::start_window_drag,
             commands::window::start_window_resize,
-        ])
+        ]))
         .run(tauri::generate_context!())
         .expect("error while running Luminous");
 }

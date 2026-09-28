@@ -217,7 +217,7 @@ every Tokio task — poll count, total busy time, idle time, and warnings for a 
 worker thread for a long single poll. No manual `#[tracing::instrument]` annotations are needed to
 get started: `tokio::spawn`/`spawn_blocking` already emit the tracing events `console-subscriber`
 reads, so every IPC command handler and background loop (`spawn_visualizer_loop`,
-`spawn_position_tick_loop`, `spawn_scheduler_latency_monitor`, the bridge server's per-connection
+`spawn_position_tick_loop`, the `stall_monitor` probe, the bridge server's per-connection
 tasks, etc.) shows up automatically.
 
 ### Using it for A/B comparisons
@@ -284,11 +284,13 @@ log-based watchdog.
 
 ### The always-on watchdog
 
-`spawn_scheduler_latency_monitor()` (`src-tauri/src/lib.rs`) is a dependency-free proxy for the
-same signal — it logs a warning if a 20ms sleep overshoots by more than 40ms, indicating the
-runtime fell behind. It's coarser than `tokio-console` (no per-task breakdown, just "the runtime
-was late") but runs in every debug build with no special flags or features, so it's the first
-thing to check before reaching for the full `tokio-console` setup above.
+`src-tauri/src/stall_monitor.rs` is a dependency-free proxy for the same signal — it logs a
+warning if a 20ms Tokio sleep overshoots by more than 40ms. Each warning names the likely cause (a
+plain OS-thread probe running alongside tells a blocked Tokio worker apart from the whole process
+being starved) and the IPC commands dispatched around the stall. It also warns when a synchronous
+command blocks the main thread for 32ms or more. It's coarser than `tokio-console` (it correlates
+rather than naming the exact task) but runs in every build with no special flags or features, so
+it's the first thing to check before reaching for the full `tokio-console` setup above.
 
 It's just a `log::warn!` call, so it shows up like any other backend log line:
 
@@ -296,10 +298,10 @@ It's just a `log::warn!` call, so it shows up like any other backend log line:
 bun run tauri dev
 ```
 
-Watch the terminal for lines containing `Tokio scheduler delay detected` while you run
+Watch the terminal for lines containing `Tokio stall:` or `UI stall:` while you run
 `scripts/perf-scenario-bridge.sh` (or drive the app by hand) — the default log level (`info`, see
 `env_logger::Builder` in `run()`) already includes `warn`, so no `RUST_LOG` override is needed.
-Each line reports the probe's actual elapsed time and overshoot in ms.
+Each line reports the overshoot in ms, the likely cause, and the nearby IPC commands.
 
 For an A/B comparison without `tokio-console`, redirect to a file and count occurrences over an
 identical run of the scenario script on each build:
@@ -307,7 +309,7 @@ identical run of the scenario script on each build:
 ```bash
 bun run tauri dev 2>&1 | tee /tmp/luminous-dev.log &
 ./scripts/perf-scenario-bridge.sh skip-tracks 50
-grep -c "Tokio scheduler delay detected" /tmp/luminous-dev.log
+grep -c "Tokio stall:" /tmp/luminous-dev.log
 ```
 
 Fewer (or zero) hits on the "after" build than the "before" build is evidence the fix reduced
