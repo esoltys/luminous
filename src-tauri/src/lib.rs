@@ -812,6 +812,12 @@ pub fn run() {
         // logs unless someone explicitly asked for codec-level debugging via
         // `RUST_LOG`.
         logger_builder.filter_module("symphonia_bundle_mp3::layer3", log::LevelFilter::Error);
+        // Same for lofty: its `warn`s ("MPEG: Using bitrate to estimate
+        // duration", duplicate ID3v2 frames, empty MP4 atoms, ID3v2 in FLAC)
+        // describe quirks it already recovered from, once per file per scan,
+        // and never name the file. Real read failures come back as `Err`,
+        // which Luminous logs itself with the path.
+        logger_builder.filter_module("lofty", log::LevelFilter::Error);
     }
     logger_builder.init();
 
