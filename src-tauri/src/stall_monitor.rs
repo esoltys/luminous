@@ -80,7 +80,9 @@ where
         let took = started.elapsed();
         if took >= SYNC_COMMAND_THRESHOLD {
             log::warn!(
-                "UI stall: IPC command `{command}` ran {}ms synchronously on the main thread —                  the window could not repaint or take input meanwhile. Make it `async` or move                  the slow part off the main thread.",
+                "UI stall: IPC command `{command}` ran {}ms synchronously on the main thread — \
+                 the window could not repaint or take input meanwhile. Make it `async` or move \
+                 the slow part off the main thread.",
                 took.as_millis()
             );
         }
@@ -112,6 +114,14 @@ pub fn spawn() {
             }
         }
     });
+
+    // Silent when healthy, so say once that it's watching — otherwise a quiet
+    // log can't be told apart from a monitor that never started.
+    log::info!(
+        "Stall monitor started: warns on Tokio stalls over {}ms and synchronous IPC commands over {}ms",
+        STALL_THRESHOLD.as_millis(),
+        SYNC_COMMAND_THRESHOLD.as_millis()
+    );
 }
 
 fn report_tokio_stall(start: Instant, end: Instant, overshoot: Duration) {
