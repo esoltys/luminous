@@ -279,7 +279,7 @@ fn ensure_writable(path: &Path) {
     }
 }
 
-fn format_error_chain(err: &dyn std::error::Error) -> String {
+pub(crate) fn format_error_chain(err: &dyn std::error::Error) -> String {
     let mut parts = vec![err.to_string()];
     let mut current = err.source();
     while let Some(cause) = current {

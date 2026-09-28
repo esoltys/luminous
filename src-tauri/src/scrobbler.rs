@@ -6,6 +6,7 @@
 
 use crate::db::Database;
 use crate::models::{Song, SongSource, LIBRARY_SOURCES_SQL};
+use crate::tageditor::format_error_chain;
 use anyhow::Result;
 use reqwest::Client;
 use rusqlite::params;
@@ -358,7 +359,7 @@ impl ScrobblerManager {
             .get(&url)
             .send()
             .await
-            .map_err(|e| format!("Network request failed: {e}"))?;
+            .map_err(|e| format!("Network request failed: {}", format_error_chain(&e)))?;
 
         if !resp.status().is_success() {
             return Err(format!("ListenBrainz returned HTTP {}", resp.status()));
@@ -631,7 +632,10 @@ impl ScrobblerManager {
                     );
                 }
                 Err(e) => {
-                    log::warn!("Failed to submit now-playing to ListenBrainz: {e}");
+                    log::warn!(
+                        "Failed to submit now-playing to ListenBrainz: {}",
+                        format_error_chain(&e)
+                    );
                 }
             }
         });
@@ -765,7 +769,10 @@ impl ScrobblerManager {
                 .await;
 
             if let Err(e) = res {
-                log::warn!("Failed to submit rating feedback to ListenBrainz: {e}");
+                log::warn!(
+                    "Failed to submit rating feedback to ListenBrainz: {}",
+                    format_error_chain(&e)
+                );
             }
         });
     }
@@ -844,7 +851,10 @@ impl ScrobblerManager {
                     failed += 1;
                 }
                 Err(e) => {
-                    log::warn!("Failed to submit feedback to ListenBrainz: {e}");
+                    log::warn!(
+                        "Failed to submit feedback to ListenBrainz: {}",
+                        format_error_chain(&e)
+                    );
                     failed += 1;
                 }
             }
@@ -1051,7 +1061,7 @@ impl ScrobblerManager {
                 Err(err_msg)
             }
             Err(e) => {
-                let err_msg = format!("Network request failed: {e}");
+                let err_msg = format!("Network request failed: {}", format_error_chain(&e));
 
                 for e in &entries {
                     let _ = conn.execute(
