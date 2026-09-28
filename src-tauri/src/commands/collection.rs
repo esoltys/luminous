@@ -611,6 +611,22 @@ fn save_artist_profile_with_sidecar(
     Ok(saved)
 }
 
+/// Applies a user's edit to the stored artist profile. The editor only sends
+/// the fields it shows, so everything the app fetched itself (MBID, fanart.tv
+/// images and their attempted flags, `details_fetched`) is kept from the
+/// stored row instead of being reset by the upsert (#1286) — same as
+/// `merge_album_profile_edit`.
+fn merge_artist_profile_edit(stored: ArtistProfile, edit: ArtistProfile) -> ArtistProfile {
+    ArtistProfile {
+        artist_key: edit.artist_key,
+        website: edit.website,
+        tags: edit.tags,
+        social_links: edit.social_links,
+        bio: edit.bio,
+        ..stored
+    }
+}
+
 #[tauri::command]
 pub async fn set_artist_profile(
     profile: ArtistProfile,
@@ -623,7 +639,8 @@ pub async fn set_artist_profile(
     // in-memory update this command's return value already applies (#1123).
     let _watcher_pause_guard = WatcherPauseGuard::new(Arc::clone(&state.watcher_paused));
     crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
-        save_artist_profile_with_sidecar(scanner, &profile)
+        let stored = scanner.get_artist_profile(&profile.artist_key)?;
+        save_artist_profile_with_sidecar(scanner, &merge_artist_profile_edit(stored, profile))
     })
     .await
     .map_err(|e| e.to_string())
@@ -2228,6 +2245,51 @@ mod tests {
         assert_eq!(merged.fetched_cover_filename, stored.fetched_cover_filename);
         assert_eq!(merged.fetched_disc_filename, stored.fetched_disc_filename);
         assert!(merged.cover_fetched && merged.disc_fetched && merged.details_fetched);
+    }
+
+    #[test]
+    fn test_artist_profile_edit_keeps_fetched_data() {
+        let stored = ArtistProfile {
+            artist_key: "Nightwish".to_string(),
+            bio: Some("Old".to_string()),
+            musicbrainz_artist_id: Some("00a9f935-ba93-4fc8-a33a-993abe9c936b".to_string()),
+            fetched_image_filename: Some("abc_fanart_thumb.jpg".to_string()),
+            fetched_image_source: Some("fanart".to_string()),
+            fetched_logo_filename: Some("abc_fanart_logo.png".to_string()),
+            fetched_background_filename: Some("abc_fanart_background.jpg".to_string()),
+            details_fetched: true,
+            image_fetched: true,
+            logo_fetched: true,
+            background_fetched: true,
+            ..Default::default()
+        };
+        let edit = ArtistProfile {
+            artist_key: "Nightwish".to_string(),
+            website: Some("https://nightwish.com".to_string()),
+            tags: vec!["Symphonic Metal".to_string()],
+            bio: Some("New".to_string()),
+            ..Default::default()
+        };
+
+        let merged = merge_artist_profile_edit(stored.clone(), edit.clone());
+
+        assert_eq!(merged.bio, edit.bio);
+        assert_eq!(merged.website, edit.website);
+        assert_eq!(merged.tags, edit.tags);
+        assert_eq!(merged.musicbrainz_artist_id, stored.musicbrainz_artist_id);
+        assert_eq!(merged.fetched_image_filename, stored.fetched_image_filename);
+        assert_eq!(merged.fetched_image_source, stored.fetched_image_source);
+        assert_eq!(merged.fetched_logo_filename, stored.fetched_logo_filename);
+        assert_eq!(
+            merged.fetched_background_filename,
+            stored.fetched_background_filename
+        );
+        assert!(
+            merged.details_fetched
+                && merged.image_fetched
+                && merged.logo_fetched
+                && merged.background_fetched
+        );
     }
 
     #[test]
