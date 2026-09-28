@@ -354,6 +354,75 @@ pub fn local_artwork_uri(path: &Path) -> String {
     format!("luminous-art://local/{}", path.to_string_lossy())
 }
 
+/// Serves a `luminous-art://` request: `local/<percent-encoded absolute path>`
+/// for folder art used in place, anything else a filename in `covers_dir`.
+/// Blocking file I/O — the protocol handler in `lib.rs` runs it on the
+/// blocking pool, never on the UI thread.
+pub fn serve_art_request(covers_dir: &Path, uri: &str) -> tauri::http::Response<Vec<u8>> {
+    let mut trimmed = uri;
+    // On Windows WebView2, requests are made to `http://luminous-art.localhost/`
+    // via the frontend rewrite in `getCoverArtUrl()`. wry intercepts the HTTP request
+    // and runs `revert_uri_work_around` which rewrites the URI to `luminous-art://localhost/`
+    // before calling this handler (see #715). We strip either prefix here.
+    if let Some(t) = uri.strip_prefix("http://luminous-art.localhost/") {
+        trimmed = t;
+    } else if let Some(t) = uri.strip_prefix("luminous-art://") {
+        trimmed = t;
+    }
+
+    // If the webview prepends localhost/ to the authority, strip it
+    if trimmed.starts_with("localhost/") {
+        trimmed = trimmed.strip_prefix("localhost/").unwrap_or(trimmed);
+    }
+
+    // Webviews normalize empty paths to trailing slashes (e.g. URI/ -> path/)
+    trimmed = trimmed.trim_end_matches('/');
+
+    let file_path = if trimmed.starts_with("local/") {
+        let local_path = trimmed.strip_prefix("local/").unwrap_or(trimmed);
+        let decoded = percent_encoding::percent_decode_str(local_path)
+            .decode_utf8_lossy()
+            .into_owned();
+        std::path::PathBuf::from(decoded)
+    } else {
+        let decoded = percent_encoding::percent_decode_str(trimmed)
+            .decode_utf8_lossy()
+            .into_owned();
+        covers_dir.join(decoded)
+    };
+
+    log::trace!(
+        "Custom protocol: URI = {}, Resolved path = {:?} (exists: {})",
+        uri,
+        file_path,
+        file_path.exists()
+    );
+
+    if file_path.exists() && file_path.is_file() {
+        if let Ok(data) = std::fs::read(&file_path) {
+            let (cleaned_data, mime, _) = detect_image_format_and_clean(&data);
+            tauri::http::Response::builder()
+                .status(200)
+                .header("content-type", mime)
+                .header("access-control-allow-origin", "*")
+                .body(cleaned_data.to_vec())
+                .unwrap()
+        } else {
+            tauri::http::Response::builder()
+                .status(500)
+                .header("access-control-allow-origin", "*")
+                .body(Vec::new())
+                .unwrap()
+        }
+    } else {
+        tauri::http::Response::builder()
+            .status(404)
+            .header("access-control-allow-origin", "*")
+            .body(Vec::new())
+            .unwrap()
+    }
+}
+
 #[derive(Debug)]
 pub struct CoverManager {
     db: Arc<Database>,
@@ -1026,6 +1095,38 @@ mod tests {
         assert!(manager.covers_dir.join(&filename).exists());
 
         let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_serve_art_request_resolves_cache_and_local_paths() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let covers_dir = temp_dir.path().join("covers");
+        std::fs::create_dir_all(&covers_dir).unwrap();
+        let png = b"\x89PNG\r\n\x1a\n\x00\x00\x00\x0dIHDR";
+        std::fs::write(covers_dir.join("album-1.png"), png).unwrap();
+        let folder = temp_dir.path().join("Def Leppard").join("Hysteria");
+        std::fs::create_dir_all(&folder).unwrap();
+        std::fs::write(folder.join("Folder.jpg"), b"\xFF\xD8\xFF\xE0").unwrap();
+
+        let cached = serve_art_request(&covers_dir, "http://luminous-art.localhost/album-1.png");
+        assert_eq!(cached.status(), 200);
+        assert_eq!(cached.headers()["content-type"], "image/png");
+        assert_eq!(cached.body().as_slice(), png);
+
+        let encoded = percent_encoding::utf8_percent_encode(
+            &folder.join("Folder.jpg").to_string_lossy(),
+            percent_encoding::NON_ALPHANUMERIC,
+        )
+        .to_string();
+        let local = serve_art_request(
+            &covers_dir,
+            &format!("luminous-art://localhost/local/{encoded}"),
+        );
+        assert_eq!(local.status(), 200);
+        assert_eq!(local.headers()["content-type"], "image/jpeg");
+
+        let missing = serve_art_request(&covers_dir, "luminous-art://album-missing.jpg");
+        assert_eq!(missing.status(), 404);
     }
 
     fn write_wav_with_embedded_art(path: &Path) {
