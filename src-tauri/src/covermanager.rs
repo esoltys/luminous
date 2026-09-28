@@ -1,10 +1,14 @@
 //! Cover art acquisition, caching, and lookup.
 //!
 //! Art comes from three sources, tried in this order by the collection
-//! scanner: embedded tag pictures (`extract_embedded_art`), image files
-//! sitting next to the song (`scan_folder_art`), then an iTunes Search API
-//! fallback (`fetch_remote_cover`). Whichever source succeeds writes into
-//! `songs.art_automatic`; a user-picked cover instead goes in
+//! scanner: image files sitting next to the song (`scan_folder_art`),
+//! embedded tag pictures (`extract_embedded_art`), then an iTunes Search API
+//! fallback (`fetch_remote_cover`). Folder art goes first because it's used
+//! in place, while embedded art costs a copy in the cache — so a library
+//! that has both doesn't duplicate every cover. Albumless singles are the
+//! exception: they check embedded art first, since a shared `cover.jpg` in
+//! a singles folder isn't any one single's cover. Whichever source succeeds
+//! writes into `songs.art_automatic`; a user-picked cover instead goes in
 //! `art_manual` and always takes precedence (see `get_cover_art_path`/
 //! `get_cover_art_uri`). Extracted/downloaded images are cached as files
 //! under `covers_dir`, keyed by `get_album_hash`.
@@ -355,6 +359,11 @@ pub struct CoverManager {
     db: Arc<Database>,
     covers_dir: PathBuf,
     itunes_base_url: String,
+    /// Album hash -> cache filename for embedded art already extracted by
+    /// this instance. `None` unless `with_per_scan_album_dedup` enabled it:
+    /// only a scan's short-lived manager may skip re-extraction, since the
+    /// long-lived watcher/app managers must pick up art changed by a retag.
+    extracted_albums: Option<parking_lot::Mutex<std::collections::HashMap<String, String>>>,
 }
 
 /// Inspects raw image bytes to detect magic headers for PNG, JPEG, WEBP, GIF, BMP.
@@ -411,7 +420,16 @@ impl CoverManager {
             db,
             covers_dir,
             itunes_base_url: "https://itunes.apple.com".to_string(),
+            extracted_albums: None,
         }
+    }
+
+    /// Extract each album's embedded art at most once for this manager's
+    /// lifetime, instead of re-reading and re-writing the same cache file for
+    /// every track. For managers scoped to a single library scan only.
+    pub fn with_per_scan_album_dedup(mut self) -> Self {
+        self.extracted_albums = Some(parking_lot::Mutex::new(std::collections::HashMap::new()));
+        self
     }
 
     /// Override the iTunes Search API base URL — used by BDD tests to point
@@ -480,6 +498,13 @@ impl CoverManager {
         album_artist: &str,
         album: &str,
     ) -> Result<Option<String>> {
+        let hash_name = self.get_album_hash(album_artist, album);
+        if let Some(extracted) = &self.extracted_albums {
+            if let Some(filename) = extracted.lock().get(&hash_name) {
+                return Ok(Some(filename.clone()));
+            }
+        }
+
         let pictures = Self::extract_all_embedded_pictures(audio_path)?;
         let Some((_category, raw_data)) = pictures.into_iter().min_by_key(|(c, _)| *c) else {
             return Ok(None);
@@ -487,7 +512,6 @@ impl CoverManager {
 
         let (cleaned_data, _mime, ext) = detect_image_format_and_clean(&raw_data);
 
-        let hash_name = self.get_album_hash(album_artist, album);
         let filename = format!("{}.{}", hash_name, ext);
         let dest_path = self.covers_dir.join(&filename);
 
@@ -495,6 +519,9 @@ impl CoverManager {
             .context("failed to write cover art file to cache")?;
 
         log::info!("Extracted embedded cover art to: {}", dest_path.display());
+        if let Some(extracted) = &self.extracted_albums {
+            extracted.lock().insert(hash_name, filename.clone());
+        }
         Ok(Some(filename))
     }
 
@@ -999,6 +1026,80 @@ mod tests {
         assert!(manager.covers_dir.join(&filename).exists());
 
         let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    fn write_wav_with_embedded_art(path: &Path) {
+        use lofty::{
+            config::WriteOptions,
+            file::AudioFile,
+            picture::{MimeType, Picture},
+            tag::Tag,
+        };
+        let data = [0u8; 1600];
+        let mut wav = Vec::new();
+        wav.extend_from_slice(b"RIFF");
+        wav.extend_from_slice(&(36 + data.len() as u32).to_le_bytes());
+        wav.extend_from_slice(b"WAVEfmt ");
+        wav.extend_from_slice(&16u32.to_le_bytes());
+        wav.extend_from_slice(&1u16.to_le_bytes()); // PCM
+        wav.extend_from_slice(&1u16.to_le_bytes()); // mono
+        wav.extend_from_slice(&8_000u32.to_le_bytes());
+        wav.extend_from_slice(&16_000u32.to_le_bytes());
+        wav.extend_from_slice(&2u16.to_le_bytes());
+        wav.extend_from_slice(&16u16.to_le_bytes());
+        wav.extend_from_slice(b"data");
+        wav.extend_from_slice(&(data.len() as u32).to_le_bytes());
+        wav.extend_from_slice(&data);
+        std::fs::write(path, wav).unwrap();
+
+        let mut tagged_file = Probe::open(path).unwrap().read().unwrap();
+        let mut tag = Tag::new(tagged_file.primary_tag_type());
+        tag.push_picture(
+            Picture::unchecked(vec![0xFF, 0xD8, 0xFF, 0xE0])
+                .pic_type(PictureType::CoverFront)
+                .mime_type(MimeType::Jpeg)
+                .build(),
+        );
+        tagged_file.insert_tag(tag);
+        tagged_file
+            .save_to_path(path, WriteOptions::default())
+            .unwrap();
+    }
+
+    #[test]
+    fn test_per_scan_album_dedup_extracts_each_album_once() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let track_1 = temp_dir.path().join("01.wav");
+        let track_2 = temp_dir.path().join("02.wav");
+        write_wav_with_embedded_art(&track_1);
+        write_wav_with_embedded_art(&track_2);
+        let db = Arc::new(Database::new(temp_dir.path().to_path_buf()).unwrap());
+
+        let scan_manager = CoverManager::new(Arc::clone(&db), temp_dir.path().to_path_buf())
+            .with_per_scan_album_dedup();
+        let filename = scan_manager
+            .extract_embedded_art(&track_1, "Artist", "Album")
+            .unwrap()
+            .unwrap();
+        let cached = scan_manager.covers_dir().join(&filename);
+        std::fs::remove_file(&cached).unwrap();
+
+        // Second track of the same album: same filename, no second write.
+        assert_eq!(
+            scan_manager
+                .extract_embedded_art(&track_2, "Artist", "Album")
+                .unwrap(),
+            Some(filename.clone())
+        );
+        assert!(!cached.exists());
+
+        // A long-lived manager (watcher/app) still re-extracts, so a retag
+        // is picked up.
+        let manager = CoverManager::new(db, temp_dir.path().to_path_buf());
+        manager
+            .extract_embedded_art(&track_2, "Artist", "Album")
+            .unwrap();
+        assert!(cached.exists());
     }
 
     fn unique_temp_dir(label: &str) -> PathBuf {
