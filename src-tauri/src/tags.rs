@@ -1456,16 +1456,13 @@ mod tests {
     use super::*;
     use crate::db::Database;
 
-    fn test_db() -> (Arc<Database>, std::path::PathBuf) {
-        let dir = std::env::temp_dir().join(format!(
-            "luminous_tags_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-        let db = Database::new(dir.clone()).unwrap();
-        (Arc::new(db), dir)
+    fn test_db() -> (tempfile::TempDir, Arc<Database>) {
+        let dir = tempfile::Builder::new()
+            .prefix("luminous_tags_test_")
+            .tempdir()
+            .unwrap();
+        let db = Database::new(dir.path().to_path_buf()).unwrap();
+        (dir, Arc::new(db))
     }
 
     fn insert_song(db: &Database, path: &str, genre: &str) -> i64 {
@@ -1480,7 +1477,7 @@ mod tests {
 
     #[test]
     fn test_list_all_tags_splits_and_dedupes_case_insensitively() {
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         insert_song(&db, "/a.mp3", "Metal; Symphonic Metal");
         insert_song(&db, "/b.mp3", "metal");
 
@@ -1492,13 +1489,11 @@ mod tests {
             .find(|t| t.name.eq_ignore_ascii_case("metal"))
             .unwrap();
         assert_eq!(metal.song_count, 2);
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
     fn test_get_tags_overview_matches_separate_calls() {
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         insert_song(&db, "/a.mp3", "Metal; Symphonic Metal");
         insert_song(&db, "/b.mp3", "Ambient");
 
@@ -1507,13 +1502,11 @@ mod tests {
         assert_eq!(tags, manager.list_all_tags().unwrap());
         assert_eq!(graph, manager.get_genre_graph().unwrap());
         assert_eq!(no_genre_count, 0);
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
     fn test_songs_without_genre() {
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         insert_song(&db, "/a.mp3", "Metal");
         insert_song(&db, "/b.mp3", "");
 
@@ -1526,13 +1519,11 @@ mod tests {
             .unwrap();
         assert_eq!(songs.len(), 1);
         assert_eq!(songs[0].path.as_deref(), Some("/b.mp3"));
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
     fn test_genre_graph_star_relationship_and_lone_root() {
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         insert_song(&db, "/a.mp3", "Metal; Progressive Metal; Symphonic Metal");
         insert_song(&db, "/b.mp3", "Ambient");
 
@@ -1548,13 +1539,11 @@ mod tests {
         let ambient = graph.iter().find(|g| g.main_tag == "Ambient").unwrap();
         assert_eq!(ambient.song_count, 1);
         assert!(ambient.children.is_empty());
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
     fn test_genre_graph_same_tag_under_multiple_parents() {
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         insert_song(&db, "/a.mp3", "Metal; Symphonic Metal");
         insert_song(&db, "/b.mp3", "Classical; Symphonic Metal");
 
@@ -1568,13 +1557,11 @@ mod tests {
             .children
             .iter()
             .any(|c| c.name == "Symphonic Metal"));
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
     fn test_get_songs_by_tag_matches_exact_component_not_substring() {
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         insert_song(&db, "/a.mp3", "Rock");
         insert_song(&db, "/b.mp3", "Prog Rock");
 
@@ -1584,13 +1571,11 @@ mod tests {
             .unwrap();
         assert_eq!(songs.len(), 1);
         assert_eq!(songs[0].genre.as_deref(), Some("Rock"));
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
     fn test_get_songs_by_curated_group_matches_self_and_children_not_substrings() {
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         // "Doom" doesn't contain "Metal" as a substring — regression test for
         // the LIKE-prefilter trap get_songs_by_curated_group deliberately
         // avoids (see its doc comment). It starts out as its own root card
@@ -1620,13 +1605,11 @@ mod tests {
         assert!(genres.contains(&Some("Metal".to_string())));
         assert!(genres.contains(&Some("Metal; Progressive Metal".to_string())));
         assert!(genres.contains(&Some("Doom".to_string())));
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
     fn test_get_songs_by_curated_group_reflects_live_reparenting() {
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         insert_song(&db, "/a.mp3", "Metal");
         insert_song(&db, "/b.mp3", "Ambient");
         insert_song(&db, "/c.mp3", "Drone");
@@ -1650,13 +1633,11 @@ mod tests {
             .get_songs_by_curated_group("Metal", 50, QueuePopulationMode::All)
             .unwrap();
         assert_eq!(under_metal.len(), 2, "Drone moved under Metal");
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
     fn test_get_songs_by_curated_tag_dispatches_group_vs_child() {
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         insert_song(&db, "/a.mp3", "Metal; Progressive Metal");
         insert_song(&db, "/b.mp3", "Ambient");
 
@@ -1680,8 +1661,6 @@ mod tests {
             1,
             "child dispatch is an exact any-position match"
         );
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     /// A genre value containing a literal colon (e.g. from a source that
@@ -1690,7 +1669,7 @@ mod tests {
     /// same as any other tag name.
     #[test]
     fn test_get_songs_by_curated_tag_handles_colon_in_genre_value() {
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         insert_song(&db, "/a.mp3", "Sci-Fi: Space Opera");
 
         let manager = TagManager::new(db.clone());
@@ -1700,8 +1679,6 @@ mod tests {
             .get_songs_by_curated_tag("Sci-Fi: Space Opera", 50, QueuePopulationMode::All)
             .unwrap();
         assert_eq!(songs.len(), 1);
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     // -----------------------------------------------------------------
@@ -1710,7 +1687,7 @@ mod tests {
 
     #[test]
     fn test_hierarchy_reflects_existing_genres_after_reconcile() {
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         insert_song(&db, "/a.mp3", "Metal; Progressive Metal");
         insert_song(&db, "/b.mp3", "Metal; Symphonic Metal");
         insert_song(&db, "/c.mp3", "Ambient");
@@ -1728,13 +1705,11 @@ mod tests {
         assert!(child_names.contains(&"Progressive Metal"));
         assert!(child_names.contains(&"Symphonic Metal"));
         assert!(hierarchy.iter().any(|g| g.name == "Ambient"));
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
     fn test_reconcile_hierarchy_adds_new_tags_and_evicts_stale_ones() {
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         insert_song(&db, "/a.mp3", "Metal; Symphonic Metal");
         let manager = TagManager::new(db.clone());
         // First call builds the hierarchy from scratch; a second call with
@@ -1759,8 +1734,6 @@ mod tests {
         assert!(manager.reconcile_hierarchy().unwrap());
         let hierarchy = manager.get_tag_hierarchy().unwrap();
         assert!(!hierarchy.iter().any(|g| g.name == "Metal"));
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     /// A tag that's a top-level genre on its own can never also be curated
@@ -1768,7 +1741,7 @@ mod tests {
     /// very same reconcile pass, only the top-level card should result.
     #[test]
     fn test_reconcile_hierarchy_never_links_a_top_level_genre_as_a_subgenre() {
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         insert_song(&db, "/a.mp3", "Electronic; Pop");
         insert_song(&db, "/b.mp3", "Pop");
 
@@ -1784,8 +1757,6 @@ mod tests {
             !electronic.children.iter().any(|c| c.name == "Pop"),
             "Pop must never be linked as a sub-genre of Electronic since it's already a top-level genre"
         );
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     /// Regression test for stale/legacy data (or any write path that isn't
@@ -1794,7 +1765,7 @@ mod tests {
     /// own — must get purged too, and stay purged on the next reconcile.
     #[test]
     fn test_reconcile_hierarchy_purges_a_cross_group_conflicting_assignment() {
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         insert_song(&db, "/a.mp3", "Metal");
         insert_song(&db, "/b.mp3", "Rock");
 
@@ -1823,13 +1794,11 @@ mod tests {
         );
         let metal = hierarchy.iter().find(|g| g.name == "Metal").unwrap();
         assert!(!metal.children.iter().any(|c| c.name == "Rock"));
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
     fn test_reparent_and_promote_tag() {
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         insert_song(&db, "/a.mp3", "Metal; Progressive Metal");
         insert_song(&db, "/b.mp3", "Ambient");
 
@@ -1855,8 +1824,6 @@ mod tests {
             .children
             .iter()
             .any(|c| c.name == "Progressive Metal"));
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     /// #651: a card's own `song_count` must be a rollup of itself plus its
@@ -1865,7 +1832,7 @@ mod tests {
     /// totals instead of leaving both unchanged.
     #[test]
     fn test_card_song_count_is_a_rollup_of_its_curated_children() {
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         let manager = TagManager::new(db.clone());
 
         // Seed the hierarchy first so "Soft Rock" gets curated under "Pop"
@@ -1911,8 +1878,6 @@ mod tests {
              the dedicated Soft-Rock-only song and the seed song, which \
              also carries Soft Rock even though its main tag is Pop"
         );
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
@@ -1921,7 +1886,7 @@ mod tests {
         // name — there's no separate "child instance" of the same literal
         // genre value, so the drill-down would show 0 songs despite the
         // chip's own displayed count. Both operations should be no-ops.
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         insert_song(&db, "/a.mp3", "Electronic");
         insert_song(&db, "/b.mp3", "Rock; Electronic");
 
@@ -1944,8 +1909,6 @@ mod tests {
             hierarchy.iter().any(|g| g.name == "Electronic"),
             "demote_group_to_child onto a same-named group should be a no-op, not delete the card"
         );
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
@@ -1953,7 +1916,7 @@ mod tests {
         // Simulates data from before the reparent/demote guards existed —
         // reconcile should clean this up rather than leave a chip that
         // always shows 0 songs despite its own displayed count.
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         insert_song(&db, "/a.mp3", "Electronic");
 
         let manager = TagManager::new(db.clone());
@@ -1979,13 +1942,11 @@ mod tests {
         let hierarchy = manager.get_tag_hierarchy().unwrap();
         let electronic = hierarchy.iter().find(|g| g.name == "Electronic").unwrap();
         assert!(!electronic.children.iter().any(|c| c.name == "Electronic"));
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
     fn test_demote_group_to_child_removes_own_card_and_reassigns_its_children() {
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         insert_song(&db, "/a.mp3", "Electronic");
         insert_song(&db, "/b.mp3", "Synth-Pop; Electronic");
         insert_song(&db, "/c.mp3", "Synth-Pop; New Retro Wave");
@@ -2013,8 +1974,6 @@ mod tests {
             .iter()
             .flat_map(|g| &g.children)
             .any(|c| c.name == "New Retro Wave"));
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
@@ -2024,7 +1983,7 @@ mod tests {
         // touches the curated tables — never the raw songs.genre text, which
         // still has this tag at position 0 — must survive that next
         // reconcile pass, not get its root silently recreated by it.
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         insert_song(&db, "/a.mp3", "Alternative");
         insert_song(&db, "/b.mp3", "Shoegaze");
 
@@ -2045,13 +2004,11 @@ mod tests {
         );
         let alternative = hierarchy.iter().find(|g| g.name == "Alternative").unwrap();
         assert!(alternative.children.iter().any(|c| c.name == "Shoegaze"));
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
     fn test_reorder_tag_in_group() {
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         insert_song(
             &db,
             "/a.mp3",
@@ -2064,8 +2021,6 @@ mod tests {
         let hierarchy = manager.get_tag_hierarchy().unwrap();
         let metal = hierarchy.iter().find(|g| g.name == "Metal").unwrap();
         assert_eq!(metal.children[0].name, "Doom Metal");
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
@@ -2107,7 +2062,7 @@ mod tests {
 
     #[test]
     fn test_merge_tags_rewrites_genre_and_hierarchy() {
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         insert_song(&db, "/a.mp3", "Metal; Prog Metal");
         insert_song(&db, "/b.mp3", "Metal; Progressive Metal");
 
@@ -2140,8 +2095,6 @@ mod tests {
         let metal = hierarchy.iter().find(|g| g.name == "Metal").unwrap();
         assert!(!metal.children.iter().any(|c| c.name == "Prog Metal"));
         assert!(metal.children.iter().any(|c| c.name == "Progressive Metal"));
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     /// Regression test for a genre card showing up as its own sub-genre
@@ -2150,7 +2103,7 @@ mod tests {
     /// that child assigned under a group sharing its own literal name.
     #[test]
     fn test_merge_hierarchy_purges_self_referential_child() {
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         insert_song(&db, "/a.mp3", "IDM");
         insert_song(&db, "/b.mp3", "Electronic");
 
@@ -2194,8 +2147,6 @@ mod tests {
                 .any(|c| c.name.eq_ignore_ascii_case("Electronic")),
             "Electronic must not be nested as its own sub-genre"
         );
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
@@ -2203,7 +2154,7 @@ mod tests {
         use crate::collection::CollectionScanner;
         use crate::models::{ArtistProfile, QueuePopulationMode};
 
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         let conn = db.pool.get().unwrap();
         let manager = TagManager::new(db.clone());
         let scanner = CollectionScanner::new(db.clone());
@@ -2334,7 +2285,5 @@ mod tests {
             .find(|g| g.name == "Award-Winning")
             .unwrap();
         assert!(award_group3.children.iter().any(|c| c.name == "Canadian"));
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 }

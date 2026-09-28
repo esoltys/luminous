@@ -589,21 +589,18 @@ mod tests {
     use crate::models::ArtistProfile;
     use std::sync::Arc;
 
-    fn temp_db(name: &str) -> Database {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_{}_{}",
-            name,
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-        Database::new(temp_dir).unwrap()
+    fn temp_db(name: &str) -> (tempfile::TempDir, Database) {
+        let temp_dir = tempfile::Builder::new()
+            .prefix(&format!("luminous_{name}_"))
+            .tempdir()
+            .unwrap();
+        let db = Database::new(temp_dir.path().to_path_buf()).unwrap();
+        (temp_dir, db)
     }
 
     #[test]
     fn test_resolve_song_context_artist_mbid_prefers_tagged_mbid() {
-        let db = temp_db("context_resolve_tagged");
+        let (_temp_dir, db) = temp_db("context_resolve_tagged");
         let conn = db.pool.get().unwrap();
         assert_eq!(
             resolve_song_context_artist_mbid(
@@ -622,7 +619,7 @@ mod tests {
         // Reproduces a reported gap (#1123): a song with no tagged MBID
         // still couldn't get a Wikipedia bio, even after "Retrieve Artist
         // Details" had persisted the artist's MBID onto their profile.
-        let db = temp_db("context_resolve_profile_fallback");
+        let (_temp_dir, db) = temp_db("context_resolve_profile_fallback");
         let conn = db.pool.get().unwrap();
         crate::collection::set_artist_profile_conn(
             &conn,
@@ -654,7 +651,7 @@ mod tests {
 
     #[test]
     fn test_resolve_song_context_artist_mbid_none_when_nothing_resolves() {
-        let db = temp_db("context_resolve_none");
+        let (_temp_dir, db) = temp_db("context_resolve_none");
         let conn = db.pool.get().unwrap();
         assert_eq!(
             resolve_song_context_artist_mbid(&conn, None, None, None, None),
@@ -669,7 +666,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_write_and_read_artist_cache_with_mb_details() {
-        let db = Arc::new(temp_db("artist_cache_mb_details"));
+        let (_temp_dir, db) = temp_db("artist_cache_mb_details");
+        let db = Arc::new(db);
         let details = crate::context::MusicBrainzArtistDetails {
             sort_name: Some("Twain, Shania".to_string()),
             artist_type: Some("Person".to_string()),
@@ -726,7 +724,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_artist_cache_without_sort_name_is_stale() {
-        let db = Arc::new(temp_db("artist_cache_no_sort_name"));
+        let (_temp_dir, db) = temp_db("artist_cache_no_sort_name");
+        let db = Arc::new(db);
         let bio = crate::context::WikipediaSummary {
             extract: "Bio only".to_string(),
             page_url: None,

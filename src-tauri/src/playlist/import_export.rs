@@ -266,24 +266,21 @@ mod tests {
     use super::*;
     use crate::db::Database;
 
-    fn setup_test_db() -> (Database, std::path::PathBuf) {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_playlist_import_export_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-        let db = Database::new(temp_dir.clone()).unwrap();
-        (db, temp_dir)
+    fn setup_test_db() -> (tempfile::TempDir, Database) {
+        let temp_dir = tempfile::Builder::new()
+            .prefix("luminous_playlist_import_export_test_")
+            .tempdir()
+            .unwrap();
+        let db = Database::new(temp_dir.path().to_path_buf()).unwrap();
+        (temp_dir, db)
     }
 
     #[test]
     fn test_import_relative_pls_resolution() {
-        let (db, temp_dir) = setup_test_db();
+        let (temp_dir, db) = setup_test_db();
         let db_arc = std::sync::Arc::new(db);
 
-        let music_dir = temp_dir.join("Music");
+        let music_dir = temp_dir.path().join("Music");
         std::fs::create_dir_all(&music_dir).unwrap();
         let song_file = music_dir.join("song1.mp3");
         std::fs::write(&song_file, b"dummy audio").unwrap();
@@ -299,7 +296,7 @@ mod tests {
             .unwrap();
         }
 
-        let downloads_dir = temp_dir.join("Downloads");
+        let downloads_dir = temp_dir.path().join("Downloads");
         std::fs::create_dir_all(&downloads_dir).unwrap();
         let pls_file = downloads_dir.join("playlist.pls");
 
@@ -315,7 +312,5 @@ mod tests {
             tracks[0].song.as_ref().unwrap().title.as_deref(),
             Some("Song One")
         );
-
-        let _ = std::fs::remove_dir_all(temp_dir);
     }
 }

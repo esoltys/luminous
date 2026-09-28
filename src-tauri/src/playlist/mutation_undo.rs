@@ -609,21 +609,18 @@ mod tests {
     use super::*;
     use crate::db::Database;
 
-    fn setup_test_db() -> (Database, std::path::PathBuf) {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_playlist_mutation_undo_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-        let db = Database::new(temp_dir.clone()).unwrap();
-        (db, temp_dir)
+    fn setup_test_db() -> (tempfile::TempDir, Database) {
+        let temp_dir = tempfile::Builder::new()
+            .prefix("luminous_playlist_mutation_undo_test_")
+            .tempdir()
+            .unwrap();
+        let db = Database::new(temp_dir.path().to_path_buf()).unwrap();
+        (temp_dir, db)
     }
 
     #[test]
     fn test_undo_redo_on_empty_stack_returns_false() {
-        let (db, temp_dir) = setup_test_db();
+        let (_temp_dir, db) = setup_test_db();
         let db_arc = std::sync::Arc::new(db);
         let mut manager = PlaylistManager::new(db_arc.clone()).unwrap();
 
@@ -633,13 +630,11 @@ mod tests {
         // something a user can trigger just by clicking one time too many.
         assert!(!manager.undo().unwrap());
         assert!(!manager.redo().unwrap());
-
-        let _ = std::fs::remove_dir_all(temp_dir);
     }
 
     #[test]
     fn test_clear_playlist_undo_redo() {
-        let (db, temp_dir) = setup_test_db();
+        let (_temp_dir, db) = setup_test_db();
         let db_arc = std::sync::Arc::new(db);
 
         {
@@ -672,13 +667,11 @@ mod tests {
         manager.redo().unwrap();
         let tracks_after_redo = manager.get_playlist_tracks(pl.id).unwrap();
         assert_eq!(tracks_after_redo.len(), 0);
-
-        let _ = std::fs::remove_dir_all(temp_dir);
     }
 
     #[test]
     fn test_remove_middle_item_undo_restores_exact_position() {
-        let (db, temp_dir) = setup_test_db();
+        let (_temp_dir, db) = setup_test_db();
         let db_arc = std::sync::Arc::new(db);
 
         {
@@ -732,13 +725,11 @@ mod tests {
         for (idx, track) in after_undo.iter().enumerate() {
             assert_eq!(track.position, idx as i32);
         }
-
-        let _ = std::fs::remove_dir_all(temp_dir);
     }
 
     #[test]
     fn test_reorder_playlist_item_by_uuid() {
-        let (db, temp_dir) = setup_test_db();
+        let (_temp_dir, db) = setup_test_db();
         let db_arc = std::sync::Arc::new(db);
 
         {
@@ -769,13 +760,11 @@ mod tests {
         assert_eq!(reordered[0].song.as_ref().unwrap().id, 2);
         assert_eq!(reordered[1].song.as_ref().unwrap().id, 3);
         assert_eq!(reordered[2].song.as_ref().unwrap().id, 1);
-
-        let _ = std::fs::remove_dir_all(temp_dir);
     }
 
     #[test]
     fn test_deduplicate_playlist_removes_repeat_songs_keeping_first_occurrence() {
-        let (db, temp_dir) = setup_test_db();
+        let (_temp_dir, db) = setup_test_db();
         let db_arc = std::sync::Arc::new(db);
 
         {
@@ -803,8 +792,6 @@ mod tests {
         // No duplicates left — a second pass is a no-op.
         let removed_again = manager.deduplicate_playlist(pl.id).unwrap();
         assert!(removed_again.is_empty());
-
-        let _ = std::fs::remove_dir_all(temp_dir);
     }
 
     #[test]
@@ -815,7 +802,7 @@ mod tests {
         // the Queue view showed "—" in the Added column while the Collection
         // view (backed by a different, complete query) showed a real date
         // for the exact same songs.
-        let (db, temp_dir) = setup_test_db();
+        let (_temp_dir, db) = setup_test_db();
         let db_arc = std::sync::Arc::new(db);
 
         {
@@ -834,13 +821,11 @@ mod tests {
             tracks[0].song.as_ref().unwrap().added.is_some(),
             "song.added should be populated from the `songs.added` column, not left at its Default::default() of None"
         );
-
-        let _ = std::fs::remove_dir_all(temp_dir);
     }
 
     #[test]
     fn test_reorder_playlist_items_batch() {
-        let (db, temp_dir) = setup_test_db();
+        let (_temp_dir, db) = setup_test_db();
         let db_arc = std::sync::Arc::new(db);
 
         {
@@ -878,8 +863,6 @@ mod tests {
             .map(|t| t.song.as_ref().unwrap().title.as_deref().unwrap())
             .collect();
         assert_eq!(titles_undo, vec!["Song 1", "Song 2", "Song 3", "Song 4"]);
-
-        let _ = std::fs::remove_dir_all(temp_dir);
     }
 
     proptest::proptest! {
@@ -893,7 +876,7 @@ mod tests {
         fn prop_move_undo_redo_walks_every_state(
             moves in proptest::collection::vec((0..6i32, 0..6i32), 1..12),
         ) {
-            let (db, temp_dir) = setup_test_db();
+            let (_temp_dir, db) = setup_test_db();
             let db_arc = std::sync::Arc::new(db);
             {
                 let conn = db_arc.pool.get().unwrap();
@@ -932,7 +915,6 @@ mod tests {
                 }
                 Ok(())
             })();
-            let _ = std::fs::remove_dir_all(temp_dir);
             result?;
         }
     }

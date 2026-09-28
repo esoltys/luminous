@@ -163,7 +163,7 @@ fn run(unavailable: Vec<bool>, ops: Vec<Op>) -> Result<(), TestCaseError> {
         .build()
         .unwrap();
     rt.block_on(async {
-        let (db, temp_dir) = setup_test_db();
+        let (_temp_dir, db) = setup_test_db();
         let db = Arc::new(db);
         {
             let conn = db.pool.get().unwrap();
@@ -223,7 +223,6 @@ fn run(unavailable: Vec<bool>, ops: Vec<Op>) -> Result<(), TestCaseError> {
         }
         .await;
 
-        let _ = std::fs::remove_dir_all(temp_dir);
         result
     })
 }

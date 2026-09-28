@@ -1245,13 +1245,11 @@ mod tests {
 
     #[test]
     fn test_get_album_hash_distinguishes_same_artist_by_second_key() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_covermanager_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_covermanager_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let manager = CoverManager::new(db, temp_dir.clone());
 
@@ -1279,13 +1277,11 @@ mod tests {
     /// must short-circuit before doing any network I/O.
     #[tokio::test]
     async fn test_fetch_remote_cover_marks_untagged_song_unset_without_network() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_covermanager_untagged_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_covermanager_untagged_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         {
             let conn = db.pool.get().unwrap();
@@ -1383,13 +1379,11 @@ mod tests {
 
     #[test]
     fn test_scan_folder_art_supports_webp() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_cover_webp_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_cover_webp_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let _ = std::fs::create_dir_all(&temp_dir);
 
         let audio_path = temp_dir.join("song.mp3");
@@ -1419,13 +1413,11 @@ mod tests {
     /// picture would be.
     #[test]
     fn test_cache_art_bytes_writes_to_covers_dir_keyed_by_album_hash() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_cover_webdav_art_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_cover_webdav_art_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let manager = CoverManager::new(db, temp_dir.clone());
 
@@ -1729,15 +1721,11 @@ mod tests {
         assert!(cached.exists());
     }
 
-    fn unique_temp_dir(label: &str) -> PathBuf {
-        std::env::temp_dir().join(format!(
-            "luminous_extended_art_{}_{}",
-            label,
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ))
+    fn unique_temp_dir(label: &str) -> tempfile::TempDir {
+        tempfile::Builder::new()
+            .prefix(&format!("luminous_extended_art_{label}_"))
+            .tempdir()
+            .unwrap()
     }
 
     #[test]
@@ -1822,7 +1810,8 @@ mod tests {
 
     #[test]
     fn test_scan_extended_artwork_categorizes_album_level_hierarchy() {
-        let temp_dir = unique_temp_dir("album_hierarchy");
+        let temp_dir_guard = unique_temp_dir("album_hierarchy");
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let _ = std::fs::create_dir_all(&temp_dir);
 
         let audio_path = temp_dir.join("song.mp3");
@@ -1859,7 +1848,8 @@ mod tests {
 
     #[test]
     fn test_scan_extended_artwork_matches_exact_album_name() {
-        let temp_dir = unique_temp_dir("album_name_match");
+        let temp_dir_guard = unique_temp_dir("album_name_match");
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let _ = std::fs::create_dir_all(&temp_dir);
 
         let audio_path = temp_dir.join("song.mp3");
@@ -1878,7 +1868,8 @@ mod tests {
     fn test_scan_extended_artwork_finds_artist_folder_media() {
         // Layout: {artist_dir}/{album_dir}/song.mp3, artist-level images
         // (artist.jpg, logo.png, fanart.jpg) sit in {artist_dir}.
-        let artist_dir = unique_temp_dir("artist_media");
+        let artist_dir_guard = unique_temp_dir("artist_media");
+        let artist_dir = artist_dir_guard.path().to_path_buf();
         let album_dir = artist_dir.join("Greatest Hits");
         let _ = std::fs::create_dir_all(&album_dir);
 
@@ -1905,7 +1896,8 @@ mod tests {
 
     #[test]
     fn test_scan_extended_artwork_recurses_named_subfolders() {
-        let temp_dir = unique_temp_dir("subfolder");
+        let temp_dir_guard = unique_temp_dir("subfolder");
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let artwork_dir = temp_dir.join("Artwork");
         let scans_dir = temp_dir.join("Scans");
         let _ = std::fs::create_dir_all(&artwork_dir);
@@ -1936,7 +1928,8 @@ mod tests {
         // scan set (numbered/compound filenames living directly in the album
         // directory, not a named subfolder) was being silently dropped down
         // to only the 2-3 exactly-named files instead of all of them.
-        let temp_dir = unique_temp_dir("compound_named_scans");
+        let temp_dir_guard = unique_temp_dir("compound_named_scans");
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let _ = std::fs::create_dir_all(&temp_dir);
 
         let audio_path = temp_dir.join("song.mp3");
@@ -1967,13 +1960,11 @@ mod tests {
     /// when unchecked in Settings.
     #[test]
     fn test_fanart_album_cover_is_fallback_and_follows_prefs() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_covermanager_fanart_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_covermanager_fanart_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let song_id: i64 = {
             let conn = db.pool.get().unwrap();
@@ -2041,7 +2032,8 @@ mod tests {
     fn test_scan_extended_artwork_skips_wmp_thumbnails() {
         // Windows Media Player leaves resized copies of the cover next to
         // Folder.jpg; they must not be counted as separate images.
-        let temp_dir = unique_temp_dir("wmp_thumbnails");
+        let temp_dir_guard = unique_temp_dir("wmp_thumbnails");
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let _ = std::fs::create_dir_all(&temp_dir);
 
         let audio_path = temp_dir.join("song.mp3");

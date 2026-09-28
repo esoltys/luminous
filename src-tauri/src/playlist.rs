@@ -273,21 +273,18 @@ mod tests {
     use super::*;
     use crate::db::Database;
 
-    fn setup_test_db() -> (Database, std::path::PathBuf) {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_playlist_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-        let db = Database::new(temp_dir.clone()).unwrap();
-        (db, temp_dir)
+    fn setup_test_db() -> (tempfile::TempDir, Database) {
+        let temp_dir = tempfile::Builder::new()
+            .prefix("luminous_playlist_test_")
+            .tempdir()
+            .unwrap();
+        let db = Database::new(temp_dir.path().to_path_buf()).unwrap();
+        (temp_dir, db)
     }
 
     #[test]
     fn test_reserved_playlist_names() {
-        let (db, temp_dir) = setup_test_db();
+        let (_temp_dir, db) = setup_test_db();
         let db_arc = std::sync::Arc::new(db);
         let manager = PlaylistManager::new(db_arc.clone()).unwrap();
 
@@ -314,13 +311,11 @@ mod tests {
             playlists.iter().find(|p| p.id == queue.id).unwrap().name,
             "Queue"
         );
-
-        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 
     #[test]
     fn test_queue_is_idempotent_and_flagged() {
-        let (db, temp_dir) = setup_test_db();
+        let (_temp_dir, db) = setup_test_db();
         let db_arc = std::sync::Arc::new(db);
         let manager = PlaylistManager::new(db_arc.clone()).unwrap();
 
@@ -336,13 +331,11 @@ mod tests {
         let listed = manager.get_playlists().unwrap();
         assert!(listed.iter().find(|p| p.id == q1.id).unwrap().is_queue);
         assert!(!listed.iter().find(|p| p.id == other.id).unwrap().is_queue);
-
-        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 
     #[test]
     fn test_replace_queue_swaps_contents_and_is_undoable() {
-        let (db, temp_dir) = setup_test_db();
+        let (_temp_dir, db) = setup_test_db();
         let db_arc = std::sync::Arc::new(db);
         {
             let conn = db_arc.pool.get().unwrap();
@@ -376,13 +369,11 @@ mod tests {
         manager.undo().unwrap(); // undo removal of [1, 2]
         let tracks = manager.get_playlist_tracks(queue_id).unwrap();
         assert_eq!(tracks.len(), 2);
-
-        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 
     #[test]
     fn test_playlist_crud() {
-        let (db, temp_dir) = setup_test_db();
+        let (_temp_dir, db) = setup_test_db();
         let db_arc = std::sync::Arc::new(db);
         let manager = PlaylistManager::new(db_arc.clone()).unwrap();
 
@@ -401,7 +392,5 @@ mod tests {
         manager.delete_playlist(pl_id).unwrap();
         let playlists = manager.get_playlists().unwrap();
         assert_eq!(playlists.len(), 0);
-
-        let _ = std::fs::remove_dir_all(temp_dir);
     }
 }

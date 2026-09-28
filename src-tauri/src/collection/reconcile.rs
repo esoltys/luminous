@@ -201,13 +201,11 @@ mod tests {
 
     #[test]
     fn test_reconcile_moved_songs_repaths_unique_match() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_reconcile_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_reconcile_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let old_dir = temp_dir.join("old");
         let new_dir = temp_dir.join("new");
         std::fs::create_dir_all(&old_dir).unwrap();
@@ -271,13 +269,11 @@ mod tests {
         // because `Path::exists()` on the stale-cased path still resolved to the
         // real (renamed) file. The next scan would then insert a second row for
         // the same physical file instead of repathing the first.
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_reconcile_case_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_reconcile_case_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let album_dir = temp_dir.join("Hero");
         std::fs::create_dir_all(&album_dir).unwrap();
 
@@ -326,13 +322,11 @@ mod tests {
 
     #[test]
     fn test_resolve_case_insensitive_path_finds_real_casing() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_resolve_case_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_resolve_case_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let album_dir = temp_dir.join("HERO");
         std::fs::create_dir_all(&album_dir).unwrap();
         let real_path = album_dir.join("Track.mp3");
@@ -350,13 +344,11 @@ mod tests {
 
     #[test]
     fn test_resolve_case_insensitive_path_none_when_truly_missing() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_resolve_case_missing_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_resolve_case_missing_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         std::fs::create_dir_all(&temp_dir).unwrap();
 
         let missing_path = temp_dir.join("Nonexistent").join("track.mp3");
@@ -367,13 +359,11 @@ mod tests {
 
     #[test]
     fn test_reconcile_moved_songs_skips_ambiguous_matches() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_reconcile_ambiguous_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_reconcile_ambiguous_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let old_dir = temp_dir.join("old");
         let new_dir_a = temp_dir.join("new_a");
         let new_dir_b = temp_dir.join("new_b");
@@ -436,13 +426,11 @@ mod tests {
 
     #[test]
     fn test_reconcile_moved_songs_refreshes_folder_cover_art() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_reconcile_folder_art_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_reconcile_folder_art_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let old_dir = temp_dir.join("old");
         let new_dir = temp_dir.join("new");
         std::fs::create_dir_all(&old_dir).unwrap();
@@ -490,13 +478,11 @@ mod tests {
 
     #[test]
     fn test_reconcile_moved_songs_clears_folder_cover_art_when_new_folder_has_none() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_reconcile_clear_art_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_reconcile_clear_art_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let old_dir = temp_dir.join("old");
         let new_dir = temp_dir.join("new");
         std::fs::create_dir_all(&old_dir).unwrap();
@@ -540,13 +526,11 @@ mod tests {
 
     #[test]
     fn test_reconcile_moved_songs_preserves_embedded_cover_art() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_reconcile_embedded_art_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_reconcile_embedded_art_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let old_dir = temp_dir.join("old");
         let new_dir = temp_dir.join("new");
         std::fs::create_dir_all(&old_dir).unwrap();

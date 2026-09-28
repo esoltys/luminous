@@ -402,15 +402,12 @@ mod tests {
     }
 
     /// A temp DB with server 1 pointing at `url`.
-    fn temp_db(tag: &str, url: &str, report_plays: bool) -> (Arc<Database>, std::path::PathBuf) {
-        let dir = std::env::temp_dir().join(format!(
-            "luminous_subsonic_report_{tag}_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-        let db = Arc::new(Database::new(dir.clone()).unwrap());
+    fn temp_db(tag: &str, url: &str, report_plays: bool) -> (tempfile::TempDir, Arc<Database>) {
+        let dir = tempfile::Builder::new()
+            .prefix(&format!("luminous_subsonic_report_{tag}_"))
+            .tempdir()
+            .unwrap();
+        let db = Arc::new(Database::new(dir.path().to_path_buf()).unwrap());
         db.pool
             .get()
             .unwrap()
@@ -420,7 +417,7 @@ mod tests {
                 params![url, report_plays],
             )
             .unwrap();
-        (db, dir)
+        (dir, db)
     }
 
     async fn blocking<F: FnOnce() + Send + 'static>(f: F) {
@@ -482,7 +479,7 @@ mod tests {
             .mount(&server)
             .await;
 
-        let (db, dir) = temp_db("now_playing", &server.uri(), true);
+        let (_dir, db) = temp_db("now_playing", &server.uri(), true);
         db.pool
             .get()
             .unwrap()
@@ -494,7 +491,6 @@ mod tests {
         let db2 = db.clone();
         blocking(move || report_now_playing(&db2, &track_uri(1, "t1"))).await;
         assert!(queue(&db).is_empty());
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[tokio::test]
@@ -506,7 +502,7 @@ mod tests {
             .mount(&server)
             .await;
 
-        let (db, dir) = temp_db("report_off", &server.uri(), false);
+        let (_dir, db) = temp_db("report_off", &server.uri(), false);
         let db2 = db.clone();
         blocking(move || {
             report_now_playing(&db2, &track_uri(1, "t1"));
@@ -516,7 +512,6 @@ mod tests {
         })
         .await;
         assert!(queue(&db).is_empty());
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[tokio::test]
@@ -529,7 +524,7 @@ mod tests {
             .mount(&server)
             .await;
 
-        let (db, dir) = temp_db("retry", &server.uri(), true);
+        let (_dir, db) = temp_db("retry", &server.uri(), true);
         let db2 = db.clone();
         blocking(move || report_play(&db2, &track_uri(1, "t1"), 100)).await;
         assert_eq!(queue(&db), vec![("t1".to_string(), 100, 1)]);
@@ -543,7 +538,6 @@ mod tests {
         let db2 = db.clone();
         blocking(move || report_play(&db2, &track_uri(1, "t2"), 200)).await;
         assert!(queue(&db).is_empty());
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[tokio::test]
@@ -555,11 +549,10 @@ mod tests {
             .mount(&server)
             .await;
 
-        let (db, dir) = temp_db("permanent", &server.uri(), true);
+        let (_dir, db) = temp_db("permanent", &server.uri(), true);
         let db2 = db.clone();
         blocking(move || report_play(&db2, &track_uri(1, "gone"), 100)).await;
         assert!(queue(&db).is_empty());
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[tokio::test]
@@ -579,7 +572,7 @@ mod tests {
             .mount(&server)
             .await;
 
-        let (db, dir) = temp_db("song_rating", &server.uri(), false);
+        let (_dir, db) = temp_db("song_rating", &server.uri(), false);
         db.pool
             .get()
             .unwrap()
@@ -623,7 +616,6 @@ mod tests {
         let db2 = db.clone();
         blocking(move || push_song_rating(&db2, &track_uri(1, "t1"), -1.0)).await;
         assert_eq!(song_cache(&db, "t1"), (None, false));
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[tokio::test]
@@ -643,7 +635,7 @@ mod tests {
             .mount(&server)
             .await;
 
-        let (db, dir) = temp_db("album_rating", &server.uri(), false);
+        let (_dir, db) = temp_db("album_rating", &server.uri(), false);
         db.pool
             .get()
             .unwrap()
@@ -672,6 +664,5 @@ mod tests {
             )
             .unwrap();
         assert_eq!(cached, (Some(4), true));
-        let _ = std::fs::remove_dir_all(dir);
     }
 }
