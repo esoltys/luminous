@@ -135,11 +135,18 @@ pub async fn prune_missing_songs(state: State<'_, AppState>) -> Result<PruneResu
 
 #[tauri::command]
 pub async fn get_library_stats(state: State<'_, AppState>) -> Result<LibraryStats, String> {
-    crate::collection::with_collection_scanner(state.db.clone(), |scanner| {
+    let mut stats = crate::collection::with_collection_scanner(state.db.clone(), |scanner| {
         scanner.get_library_stats()
     })
     .await
-    .map_err(|e| e.to_string())
+    .map_err(|e| e.to_string())?;
+    let cover_manager = state.cover_manager.clone();
+    let usage = tokio::task::spawn_blocking(move || cover_manager.cache_usage())
+        .await
+        .map_err(|e| e.to_string())?;
+    stats.album_art_bytes = usage.album_art_bytes as i64;
+    stats.artist_art_bytes = usage.artist_art_bytes as i64;
+    Ok(stats)
 }
 
 /// Runs the backend-consistency steps a completed scan requires: persist

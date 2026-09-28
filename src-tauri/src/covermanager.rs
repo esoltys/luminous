@@ -634,6 +634,15 @@ pub struct CacheSweepResult {
     pub bytes_reclaimed: u64,
 }
 
+/// Bytes the covers cache occupies on disk, split by what the files are:
+/// `album-*` cover art vs. everything else (artist photos, band logos and
+/// header banners cached under `artist-*`).
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct CacheUsage {
+    pub album_art_bytes: u64,
+    pub artist_art_bytes: u64,
+}
+
 impl CoverManager {
     pub fn new(db: Arc<Database>, app_data_dir: PathBuf) -> Self {
         let covers_dir = app_data_dir.join("covers");
@@ -1081,6 +1090,30 @@ impl CoverManager {
         self.get_cover_art_uri(song_id)
     }
 
+    /// Sum the on-disk size of the covers cache for the Folders settings'
+    /// Disk Size breakdown. A missing cache dir (nothing cached yet) is zero,
+    /// not an error.
+    pub fn cache_usage(&self) -> CacheUsage {
+        let mut usage = CacheUsage::default();
+        let Ok(entries) = std::fs::read_dir(&self.covers_dir) else {
+            return usage;
+        };
+        for entry in entries.flatten() {
+            let Ok(meta) = entry.metadata() else {
+                continue;
+            };
+            if !meta.is_file() {
+                continue;
+            }
+            if entry.file_name().to_string_lossy().starts_with("album-") {
+                usage.album_art_bytes += meta.len();
+            } else {
+                usage.artist_art_bytes += meta.len();
+            }
+        }
+        usage
+    }
+
     /// Post-scan covers-cache maintenance (#1272). Deletes `album-*` files no
     /// song references any more (left behind by retags, removed albums, or a
     /// write whose extension changed), and shrinks referenced files cached
@@ -1404,6 +1437,27 @@ mod tests {
 
         let stub = b"\x89PNG\r\n\x1a\n\x00\x00\x00\x0dIHDR".to_vec();
         assert_eq!(downscale_for_cache(&stub), (stub.clone(), "png"));
+    }
+
+    #[test]
+    fn test_cache_usage_splits_album_art_from_artist_images() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db = Arc::new(Database::new(temp_dir.path().to_path_buf()).unwrap());
+        let manager = CoverManager::new(Arc::clone(&db), temp_dir.path().to_path_buf());
+        let covers = manager.covers_dir().to_path_buf();
+
+        std::fs::write(covers.join("album-a.jpg"), [0u8; 100]).unwrap();
+        std::fs::write(covers.join("album-b.png"), [0u8; 50]).unwrap();
+        std::fs::write(covers.join("artist-x.jpg"), [0u8; 30]).unwrap();
+        std::fs::write(covers.join("artist-x-logo.png"), [0u8; 7]).unwrap();
+
+        assert_eq!(
+            manager.cache_usage(),
+            CacheUsage {
+                album_art_bytes: 150,
+                artist_art_bytes: 37,
+            }
+        );
     }
 
     #[test]

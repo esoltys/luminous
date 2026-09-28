@@ -148,3 +148,25 @@ describe("SettingsFolders.svelte - Media servers section", () => {
     expect(await findByText("Report Plays")).toBeInTheDocument();
   });
 });
+
+describe("SettingsFolders.svelte - Disk Size breakdown", () => {
+  it("totals music and artwork, and breaks the total down in the card's hint", async () => {
+    const { collectionStore } = await import("../stores/collection.svelte");
+    collectionStore.stats = {
+      total_songs: 120,
+      total_albums: 10,
+      total_artists: 5,
+      total_duration_nanosec: 0,
+      total_filesize_bytes: 2 * 1073741824,
+      album_art_bytes: 25 * 1048576,
+      artist_art_bytes: 64 * 1048576,
+    };
+    const { getByRole } = render(SettingsFolders);
+
+    const card = getByRole("button", { name: "Disk Size: 2.09 GB" });
+    expect(card).toHaveClass("cursor-help");
+    expect(card).toHaveAccessibleDescription(
+      "Music files: 2.00 GB\nAlbum art: 25.0 MB\nArtist images: 64.0 MB"
+    );
+  });
+});

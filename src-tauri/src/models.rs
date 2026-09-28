@@ -1007,7 +1007,14 @@ pub struct LibraryStats {
     pub total_artists: i64,
     pub total_albums: i64,
     pub total_duration_nanosec: i64,
+    /// Music files only — the covers cache is reported separately below.
     pub total_filesize_bytes: i64,
+    /// Covers-cache bytes for album art (`album-*` files).
+    #[serde(default)]
+    pub album_art_bytes: i64,
+    /// Covers-cache bytes for artist photos, logos and banners.
+    #[serde(default)]
+    pub artist_art_bytes: i64,
 }
 
 /// Represents an album summary on the Home page.
