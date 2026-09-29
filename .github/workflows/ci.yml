@@ -32,6 +32,9 @@ jobs:
       - name: Run svelte-check
         run: bun run check
 
+      - name: Check architecture invariants (ast-grep)
+        run: bun run lint:ast
+
   frontend_test:
     name: Frontend Tests
     runs-on: ubuntu-latest

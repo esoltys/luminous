@@ -1231,8 +1231,12 @@ fn build_output(shared: &Arc<AudioShared>) -> Result<AudioOutput, String> {
                     mono_scratch.clear();
                     for chunk in output[..played].chunks(channels_u) {
                         let sum: f32 = chunk.iter().sum();
+                        // Reserved to buffer_capacity up front and cleared per callback.
+                        // ast-grep-ignore: audio-callback-no-alloc
                         mono_scratch.push(sum / target_channels as f32);
                     }
+                    // Bounded ring buffer: evicts the oldest block at max_size.
+                    // ast-grep-ignore: audio-callback-no-alloc
                     visualizer_buf_cpal.push(&mono_scratch);
                 }
 

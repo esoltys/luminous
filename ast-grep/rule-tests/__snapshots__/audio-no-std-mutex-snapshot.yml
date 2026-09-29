@@ -1,0 +1,25 @@
+id: audio-no-std-mutex
+snapshots:
+  ? |
+    struct S { state: Arc<std::sync::Mutex<u32>> }
+  : labels:
+    - source: std::sync::Mutex
+      style: primary
+      start: 22
+      end: 38
+  use std::sync::Mutex;:
+    labels:
+    - source: std::sync::Mutex
+      style: primary
+      start: 4
+      end: 20
+  use std::sync::{Arc, Mutex};:
+    labels:
+    - source: Mutex
+      style: primary
+      start: 21
+      end: 26
+    - source: use std::sync::{Arc, Mutex};
+      style: secondary
+      start: 0
+      end: 28

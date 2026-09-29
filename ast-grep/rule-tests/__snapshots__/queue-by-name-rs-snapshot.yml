@@ -1,0 +1,14 @@
+id: queue-by-name-rs
+snapshots:
+  if playlist.name != "queue" {}:
+    labels:
+    - source: playlist.name != "queue"
+      style: primary
+      start: 3
+      end: 27
+  let q = playlists.iter().find(|p| p.name == "Queue");:
+    labels:
+    - source: p.name == "Queue"
+      style: primary
+      start: 34
+      end: 51
