@@ -37,7 +37,8 @@ plus a weekly `schedule`:
     known-vulnerable Rust dependencies.
   - `lockfile_check` job: runs `bun install --frozen-lockfile` to fail if `bun.lock` has
     drifted from `package.json` (i.e. someone changed a dependency range without
-    regenerating the lockfile).
+    regenerating the lockfile), and runs `scripts/check-tauri-versions.ts` to ensure
+    `@tauri-apps/*` npm packages and matching Rust crates in `Cargo.lock` have not drifted (#1208).
 - **`codeql.yml` — CodeQL Advanced**
   - Runs GitHub's CodeQL static analysis across three language matrix legs: `actions`,
     `javascript-typescript`, and `rust` (all `build-mode: none`, i.e. CodeQL's own

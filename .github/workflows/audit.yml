@@ -69,7 +69,7 @@ jobs:
             RUSTSEC-2024-0429
 
   lockfile_check:
-    name: bun.lock Drift Check
+    name: Lockfile Drift Check
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -85,3 +85,9 @@ jobs:
       # normally prevents (it runs `bun install` during the version bump).
       - name: Verify bun.lock is in sync with package.json
         run: bun install --frozen-lockfile
+
+      # Fails if @tauri-apps/* npm packages and matching Rust crates in
+      # Cargo.lock have drifted in major/minor version (#1208).
+      - name: Check Tauri npm/crate version pairing
+        run: bun run scripts/check-tauri-versions.ts
+
