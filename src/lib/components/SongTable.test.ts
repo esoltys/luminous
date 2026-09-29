@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render } from "@testing-library/svelte";
 import SongTable, { type SongTableRow } from "./SongTable.svelte";
 import { collectionStore } from "../stores/collection.svelte";
@@ -102,6 +102,14 @@ describe("SongTable.svelte — Last Played column", () => {
 
   beforeEach(() => {
     collectionStore.visibleColumns.lastplayed = true;
+    // Local midday, so "15 minutes ago" can't cross midnight and read as
+    // "Yesterday" when the suite runs just after 00:00.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 8, 13, 12, 0, 0));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   function renderTable(rows: SongTableRow[]) {
