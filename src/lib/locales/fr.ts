@@ -327,6 +327,7 @@ export const fr = {
     folderCreatePlaylist: "Créer une liste intelligente à partir du dossier",
     folderItemUnavailable: "Indisponible (Disque déconnecté ?)",
     editFolderTitle: "Modifier les détails du dossier",
+    folderSaveFailedPrefix: "Impossible d'enregistrer les détails du dossier : ",
     folderNickname: "Surnom",
     folderNicknamePlaceholder: "ex. SSD rapide, NAS, Vinyles",
     folderIcon: "Icône",

@@ -327,6 +327,7 @@ export const en = {
     folderCreatePlaylist: "Create Smart Playlist from folder",
     folderItemUnavailable: "Unavailable (Drive disconnected?)",
     editFolderTitle: "Edit Folder Details",
+    folderSaveFailedPrefix: "Failed to save folder details: ",
     folderNickname: "Nickname",
     folderNicknamePlaceholder: "e.g. Fast SSD, NAS, Vinyl Rips",
     folderIcon: "Icon",
