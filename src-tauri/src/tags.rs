@@ -1717,14 +1717,14 @@ mod tests {
         // took a second let concurrent reconciles exhaust the pool, stalling
         // every DB caller for r2d2's 30s timeout. With a one-connection pool,
         // any nested acquisition times out instead of succeeding.
-        let (db, dir) = test_db();
+        let (dir, db) = test_db();
         insert_song(&db, "/a.mp3", "Metal; Symphonic Metal");
         let single = Arc::new(Database {
             pool: r2d2::Pool::builder()
                 .max_size(1)
                 .connection_timeout(std::time::Duration::from_secs(2))
                 .build(r2d2_sqlite::SqliteConnectionManager::file(
-                    dir.join("luminous.db"),
+                    dir.path().join("luminous.db"),
                 ))
                 .unwrap(),
             schema_version: db.schema_version,
@@ -1736,8 +1736,6 @@ mod tests {
         manager
             .get_songs_by_curated_tag("Metal", 50, QueuePopulationMode::All)
             .unwrap();
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
