@@ -87,6 +87,33 @@ pub fn status(app: &AppHandle) -> Result<DefaultLibraryStatus> {
     })
 }
 
+/// Why [`set_default_library`] refused a folder. Attached as context to the
+/// detailed error, so the command can send the UI just the kind and log the rest.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LinkRefusal {
+    Unavailable,
+    Broken,
+}
+
+impl LinkRefusal {
+    /// The code the UI maps to a message.
+    pub fn code(self) -> &'static str {
+        match self {
+            LinkRefusal::Unavailable => "unavailable",
+            LinkRefusal::Broken => "broken",
+        }
+    }
+}
+
+impl std::fmt::Display for LinkRefusal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            LinkRefusal::Unavailable => "folder unavailable",
+            LinkRefusal::Broken => "hierarchy file broken",
+        })
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct SidecarError {
     pub path: String,
@@ -516,24 +543,7 @@ pub fn set_default_library(app: &AppHandle, dir: Option<String>) -> Result<()> {
         let _ = app.emit(CHANGED_EVENT, ());
         return Ok(());
     };
-    let known: bool = conn.query_row(
-        "SELECT EXISTS(SELECT 1 FROM directories WHERE path = ?1)",
-        params![dir],
-        |r| r.get(0),
-    )?;
-    if !known {
-        bail!("{dir} is not a watched folder");
-    }
-    if !Path::new(&dir).is_dir() {
-        bail!("{dir} is not available");
-    }
-    let path = sidecar_path(&dir);
-    if path.exists() {
-        // Validate before committing to the link.
-        let content = std::fs::read_to_string(&path)
-            .with_context(|| format!("reading {}", path.display()))?;
-        parse(&content).with_context(|| format!("{} can't be used", path.display()))?;
-    }
+    check_linkable(&conn, &dir)?;
     conn.execute(
         "INSERT OR REPLACE INTO app_state (key, value) VALUES (?1, ?2)",
         params![SETTING_KEY, dir],
@@ -543,6 +553,32 @@ pub fn set_default_library(app: &AppHandle, dir: Option<String>) -> Result<()> {
     sync_from_disk(app, true);
     sidecar.start_watching(app, &dir);
     let _ = app.emit(CHANGED_EVENT, ());
+    Ok(())
+}
+
+/// Refuses, with a [`LinkRefusal`] context, a folder that isn't watched or
+/// available, or whose sidecar doesn't parse.
+fn check_linkable(conn: &Connection, dir: &str) -> Result<()> {
+    let known: bool = conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM directories WHERE path = ?1)",
+        params![dir],
+        |r| r.get(0),
+    )?;
+    if !known {
+        return Err(anyhow!("{dir} is not a watched folder").context(LinkRefusal::Unavailable));
+    }
+    if !Path::new(dir).is_dir() {
+        return Err(anyhow!("{dir} is not available").context(LinkRefusal::Unavailable));
+    }
+    let path = sidecar_path(dir);
+    if path.exists() {
+        std::fs::read_to_string(&path)
+            .with_context(|| format!("reading {}", path.display()))
+            .and_then(|content| {
+                parse(&content).with_context(|| format!("{} can't be used", path.display()))
+            })
+            .context(LinkRefusal::Broken)?;
+    }
     Ok(())
 }
 
@@ -766,6 +802,31 @@ mod tests {
     fn watch(conn: &Connection, path: &str) {
         conn.execute("INSERT INTO directories (path) VALUES (?1)", params![path])
             .unwrap();
+    }
+
+    fn refusal(conn: &Connection, dir: &str) -> Option<LinkRefusal> {
+        check_linkable(conn, dir)
+            .err()
+            .map(|e| *e.downcast_ref::<LinkRefusal>().expect("refusal kind"))
+    }
+
+    #[test]
+    fn link_refusals_carry_their_kind_for_the_ui() {
+        let (_d, db) = test_db();
+        let conn = db.pool.get().unwrap();
+        let lib = tempfile::tempdir().unwrap();
+        let lib_path = lib.path().to_string_lossy().to_string();
+        assert_eq!(refusal(&conn, &lib_path), Some(LinkRefusal::Unavailable));
+
+        watch(&conn, &lib_path);
+        assert_eq!(refusal(&conn, &lib_path), None);
+
+        std::fs::write(sidecar_path(&lib_path), "{ not json").unwrap();
+        assert_eq!(refusal(&conn, &lib_path), Some(LinkRefusal::Broken));
+
+        let offline = "Z:\\Nowhere\\Music";
+        watch(&conn, offline);
+        assert_eq!(refusal(&conn, offline), Some(LinkRefusal::Unavailable));
     }
 
     #[test]

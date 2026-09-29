@@ -18,7 +18,7 @@ Music/                       <- the default library
   yourself. Choosing **None** is also a choice, and it's respected.
 - **Linking:** if the folder already has a `luminous-hierarchy.json`, Luminous adopts it and
   it replaces the local hierarchy. Otherwise Luminous writes the local hierarchy out. A file
-  that can't be read refuses the link, and the picker shows the reason.
+  that can't be read refuses the link, and the picker says the file is broken.
 - **Writing:** every change is written to the file straight away: grouping, reordering,
   colours, merges and deletes, plus new genres placed automatically. Writes are atomic (a temp
   file, then a rename). When two installs edit the file, the last writer wins.
@@ -28,7 +28,7 @@ Music/                       <- the default library
   stays in the file and is only hidden. Another install whose library has those songs still
   sees it. Merging or deleting still removes the entry.
 - **Malformed file:** Luminous never overwrites a file it can't parse. It keeps the current
-  hierarchy and shows an error until the file is fixed.
+  hierarchy and shows an error until the file is fixed. The parser's details are in the log.
 - **Unlinking:** choose **None**, or remove the folder from Watched Folders. The local
   hierarchy stays as it is, and the file is left in place. Removing the folder doesn't count
   as choosing **None**, so if a single folder remains it becomes the default.

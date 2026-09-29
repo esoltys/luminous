@@ -70,7 +70,7 @@ vi.mock("@tauri-apps/api/core", () => ({
       return Promise.resolve({ path: null, error: null });
     }
     if (cmd === "set_default_library") {
-      return Promise.reject("D:\Music\luminous-hierarchy.json can't be used: expected value at line 1");
+      return Promise.reject("broken");
     }
     if (cmd === "get_all_app_settings") {
       return Promise.resolve({});
@@ -196,7 +196,7 @@ describe("SettingsFolders.svelte - Default library", () => {
 
     expect(invoke).toHaveBeenCalledWith("set_default_library", { path: "D:\Music" });
     expect(await findByRole("alert")).toHaveTextContent(
-      "D:\Music\luminous-hierarchy.json can't be used: expected value at line 1"
+      "The genre hierarchy file in D:\Music is broken."
     );
     expect(select.value).toBe("");
   });

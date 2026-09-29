@@ -47,11 +47,19 @@ class HierarchySidecarStore {
     if (!this.error) this.toasted = null;
   }
 
-  /** Links (or with `null`, unlinks) the default library. Rejects with the
-   * backend's reason when the folder or its file can't be used. */
+  /** What to show while the linked file can't be loaded. The parser's details
+   * stay in the backend log. */
+  get errorText(): string | null {
+    return this.path && this.error ? brokenText(this.path) : null;
+  }
+
+  /** Links (or with `null`, unlinks) the default library. Rejects with a
+   * message saying why when the folder or its file can't be used. */
   async set(path: string | null) {
     try {
       await invoke("set_default_library", { path });
+    } catch (code) {
+      throw refusalText(String(code), path);
     } finally {
       await this.refresh();
     }
@@ -60,15 +68,25 @@ class HierarchySidecarStore {
   private toast(path: string, message: string) {
     if (this.toasted === message) return;
     this.toasted = message;
-    toastStore.show(
-      i18n.t(
-        "settings.defaultLibraryLoadFailed",
-        { path, message },
-        `Couldn't load the genre hierarchy from ${path}: ${message}`
-      ),
-      "error"
-    );
+    toastStore.show(brokenText(path), "error");
   }
+}
+
+function brokenText(path: string) {
+  return i18n.t(
+    "settings.defaultLibraryFileBroken",
+    { path },
+    `The genre hierarchy file in ${path} is broken.`
+  );
+}
+
+/** `code` is the backend's `LinkRefusal` code. */
+function refusalText(code: string, path: string | null) {
+  if (path && code === "broken") return brokenText(path);
+  if (path && code === "unavailable") {
+    return i18n.t("settings.defaultLibraryUnavailable", { path }, `${path} isn't available.`);
+  }
+  return i18n.t("settings.defaultLibraryChangeFailed", undefined, "Couldn't change the default library.");
 }
 
 export const hierarchySidecarStore = new HierarchySidecarStore();

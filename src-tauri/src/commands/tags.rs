@@ -194,13 +194,20 @@ pub async fn get_default_library(
 /// Designates a watched folder as the default library (adopting its
 /// `luminous-hierarchy.json`, or writing the local hierarchy there), or
 /// detaches with `None`. Fails without changing anything if the folder isn't
-/// watched or available, or its sidecar doesn't parse.
+/// watched or available, or its sidecar doesn't parse. Rejects with a
+/// [`LinkRefusal`](crate::hierarchy_sidecar::LinkRefusal) code (or `failed`);
+/// the details go to the log.
 #[tauri::command]
 pub async fn set_default_library(app: AppHandle, path: Option<String>) -> Result<(), String> {
     tokio::task::spawn_blocking(move || crate::hierarchy_sidecar::set_default_library(&app, path))
         .await
         .map_err(|e| e.to_string())?
-        .map_err(|e| format!("{e:#}"))
+        .map_err(|e| {
+            log::warn!("Default library not changed: {e:#}");
+            e.downcast_ref::<crate::hierarchy_sidecar::LinkRefusal>()
+                .map_or("failed", |r| r.code())
+                .to_string()
+        })
 }
 
 // ---------------------------------------------------------------------------

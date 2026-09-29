@@ -228,10 +228,10 @@
     }
   }
 
-  /** A failed link shows the backend's reason; otherwise a load error on the
-   * linked file (malformed JSON) stays visible here until it's fixed. */
+  /** A failed link says why; otherwise a linked file that can't be loaded
+   * (malformed JSON) stays flagged here until it's fixed. */
   let linkError = $state<string | null>(null);
-  let defaultLibraryError = $derived(linkError ?? hierarchySidecarStore.error);
+  let defaultLibraryError = $derived(linkError ?? hierarchySidecarStore.errorText);
 
   async function handleDefaultLibraryChange(select: HTMLSelectElement) {
     linkError = null;
