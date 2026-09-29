@@ -6,7 +6,9 @@
   import { loudnessStore } from "../stores/loudness.svelte";
   import { tasksStore } from "../stores/tasks.svelte";
   import { onMount } from "svelte";
+  import { hierarchySidecarStore } from "../stores/hierarchySidecar.svelte";
   import Toggle from "./Toggle.svelte";
+  import Select from "./Select.svelte";
   import HelpTip from "./HelpTip.svelte";
   import Button from "./Button.svelte";
   import LibraryBadge from "./LibraryBadge.svelte";
@@ -214,11 +216,30 @@
     loudnessStore.init();
     loadWebdavServers();
     loadSubsonicServers();
+    hierarchySidecarStore.refresh().catch((e) => console.error("Failed to load the default library:", e));
   });
 
   async function handleRemoveDirectory(path: string) {
     if (confirm(i18n.t('settings.confirmRemoveFolder', { path }))) {
       await collectionStore.removeDirectory(path);
+      // Removing the default library's folder unlinks it backend-side.
+      await hierarchySidecarStore.refresh().catch(() => {});
+    }
+  }
+
+  /** A failed link shows the backend's reason; otherwise a load error on the
+   * linked file (malformed JSON) stays visible here until it's fixed. */
+  let linkError = $state<string | null>(null);
+  let defaultLibraryError = $derived(linkError ?? hierarchySidecarStore.error);
+
+  async function handleDefaultLibraryChange(select: HTMLSelectElement) {
+    linkError = null;
+    try {
+      await hierarchySidecarStore.set(select.value || null);
+    } catch (e) {
+      linkError = String(e);
+      // The link was refused — put the picker back on what's actually linked.
+      select.value = hierarchySidecarStore.path ?? '';
     }
   }
 
@@ -351,6 +372,29 @@
         </div>
       </div>
     {/each}
+
+    {#if collectionStore.directories.length > 0}
+      <div class="flex items-center justify-between gap-4 pt-2">
+        <div class="flex flex-col gap-0.5 min-w-0">
+          <label for="default-library-select" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.defaultLibraryLabel')}</label>
+          <p class="text-xs text-brand-text-secondary">{i18n.t('settings.defaultLibraryHint')}</p>
+          {#if defaultLibraryError}
+            <p class="text-xs text-red-400 break-words" role="alert">{defaultLibraryError}</p>
+          {/if}
+        </div>
+        <Select
+          id="default-library-select"
+          value={hierarchySidecarStore.path ?? ''}
+          onchange={(e) => handleDefaultLibraryChange(e.currentTarget)}
+          class="shrink-0 max-w-[45%] truncate bg-brand-main border border-brand-border hover:border-brand-accent/60 text-brand-text-primary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+        >
+          <option value="">{i18n.t('settings.defaultLibraryNone')}</option>
+          {#each collectionStore.directories as dir (dir.path)}
+            <option value={dir.path}>{dir.nickname || dir.path}</option>
+          {/each}
+        </Select>
+      </div>
+    {/if}
 
     {#if editingDirectory}
       <FolderEditModal
