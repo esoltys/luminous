@@ -9,6 +9,8 @@ const projectRoot = path.resolve(__dirname, "..");
 const srcTauriDir = path.join(projectRoot, "src-tauri");
 const tauriIconsDir = path.join(srcTauriDir, "icons");
 const assetsDir = path.join(srcTauriDir, "gen", "windows", "Assets");
+const fileTypeIconsDir = path.join(tauriIconsDir, "filetypes");
+const fileTypeAssetsDir = path.join(assetsDir, "FileTypes");
 
 const SCALE_FACTORS = [100, 125, 150, 200, 400];
 const TARGET_SIZES = [16, 24, 32, 48, 256];
@@ -106,6 +108,44 @@ async function generateTargetSizeVariants(sourcePath: string, altform: string | 
   }
 }
 
+/** Centres a non-square image on a transparent square canvas, so resizing keeps its aspect. */
+function padToSquare(src: Image): Image {
+  const side = Math.max(src.width, src.height);
+  if (src.width === side && src.height === side) return src;
+  const canvas = new Image(side, side, { colorModel: "RGBA" });
+  canvas.data.fill(0);
+  const xOffset = Math.floor((side - src.width) / 2);
+  const yOffset = Math.floor((side - src.height) / 2);
+  for (let y = 0; y < src.height; y++) {
+    for (let x = 0; x < src.width; x++) {
+      canvas.setPixel(x + xOffset, y + yOffset, src.getPixel(x, y));
+    }
+  }
+  return canvas;
+}
+
+/**
+ * File-type association logos (the manifest's uap:Logo) need targetsize variants
+ * like Square44x44Logo does — with only an unqualified image, Explorer renders
+ * the icon from a small cached size and upscales it, so it looks blurry (#1305).
+ * Written under Assets/FileTypes so the NSIS bundle's icons/filetypes stays as is.
+ */
+async function generateFileTypeVariants() {
+  fs.mkdirSync(fileTypeAssetsDir, { recursive: true });
+  const sources = fs.readdirSync(fileTypeIconsDir).filter((f) => /^luminous-file-.*\.png$/i.test(f));
+  for (const name of sources) {
+    const source = padToSquare(await read(path.join(fileTypeIconsDir, name)));
+    await write(path.join(fileTypeAssetsDir, name), resizeAreaAverage(source, 256, 256));
+    for (const size of TARGET_SIZES) {
+      const resized = resizeAreaAverage(source, size, size);
+      for (const suffix of [`targetsize-${size}`, `targetsize-${size}_altform-unplated`]) {
+        await write(path.join(fileTypeAssetsDir, variantFilename(name, suffix)), resized);
+      }
+    }
+  }
+  return sources.length;
+}
+
 async function generateWideTile(sourceIconsDir: string, outputPath: string) {
   const sourceIcons = ["Square150x150Logo.png", "Square142x142Logo.png", "icon.png", "128x128.png"];
   for (const iconName of sourceIcons) {
@@ -189,6 +229,9 @@ export async function generateMsixAssets() {
 
   await generateTargetSizeVariants(sourcePath, "lightunplated");
   console.log("    - Light-unplated targetsize variants written (16, 24, 32, 48, 256)");
+
+  const fileTypeCount = await generateFileTypeVariants();
+  console.log(`    - File-type logo targetsize variants written for ${fileTypeCount} icons`);
 
   console.log("[MSIX Assets] All MSIX asset variants successfully generated!");
 }
