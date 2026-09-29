@@ -1365,6 +1365,7 @@ pub fn run() {
             commands::settings::get_ui_preferences,
             commands::settings::set_ui_preferences,
             commands::settings::get_commit_hash,
+            commands::settings::get_audio_setting_ranges,
             commands::settings::get_db_schema_status,
             commands::settings::get_fade_settings,
             commands::settings::set_fade_settings,

@@ -52,7 +52,8 @@ pub fn get_settings(db: &Database) -> Result<LoudnessSettings> {
         target_lufs,
         mode: LoudnessMode::from(mode_str.as_str()),
         fallback_gain_db,
-    })
+    }
+    .clamped())
 }
 
 pub fn save_settings(db: &Database, settings: &LoudnessSettings) -> Result<()> {
@@ -359,6 +360,28 @@ mod tests {
             mode,
             fallback_gain_db,
         }
+    }
+
+    /// A fallback gain saved under the old -24 dB floor loads inside the
+    /// range the UI can show and set (#1249).
+    #[test]
+    fn out_of_range_settings_row_is_clamped_on_load() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = Database::new(dir.path().to_path_buf()).unwrap();
+        db.pool
+            .get()
+            .unwrap()
+            .execute(
+                "UPDATE loudness_settings SET target_lufs = -30.0, fallback_gain_db = -20.0 WHERE id = 1",
+                [],
+            )
+            .unwrap();
+        let s = get_settings(&db).unwrap();
+        assert_eq!(s.target_lufs, crate::models::TARGET_LUFS_RANGE.min);
+        assert_eq!(
+            s.fallback_gain_db,
+            crate::models::FALLBACK_GAIN_DB_RANGE.min
+        );
     }
 
     #[test]

@@ -323,6 +323,14 @@ pub fn get_db_schema_status(state: State<'_, crate::AppState>) -> DbSchemaStatus
     }
 }
 
+/// Bounds of the numeric loudness/fade settings, which the backend clamps
+/// to on load and save — the settings UI reads its slider ranges from here
+/// rather than retyping them (#1249).
+#[tauri::command]
+pub fn get_audio_setting_ranges() -> crate::models::AudioSettingRanges {
+    crate::models::AUDIO_SETTING_RANGES
+}
+
 #[tauri::command]
 pub async fn get_fade_settings(
     state: State<'_, AppState>,
@@ -339,6 +347,7 @@ pub async fn set_fade_settings(
     state: State<'_, AppState>,
     settings: crate::models::FadeSettings,
 ) -> Result<(), String> {
+    let settings = settings.clamped();
     let result = crate::db::run_blocking(&state.db, move |conn| {
         let pairs = [
             (

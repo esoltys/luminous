@@ -716,6 +716,67 @@ pub struct LoudnessSettings {
     pub fallback_gain_db: f32,
 }
 
+/// Inclusive bounds of a numeric audio setting. The backend clamps with
+/// these on load and save, and the settings UI reads them over IPC
+/// (`get_audio_setting_ranges`) for its slider/knob min and max, so the
+/// range is stated once, at the layer that enforces it (#1249).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct SettingRange {
+    pub min: f32,
+    pub max: f32,
+}
+
+impl SettingRange {
+    /// Clamps `value` into range; NaN (e.g. a hand-edited `"NaN"` row)
+    /// falls to `min` rather than passing through `f32::clamp` unchanged.
+    pub fn clamp(self, value: f32) -> f32 {
+        if value.is_nan() {
+            self.min
+        } else {
+            value.clamp(self.min, self.max)
+        }
+    }
+}
+
+pub const TARGET_LUFS_RANGE: SettingRange = SettingRange {
+    min: -23.0,
+    max: -9.0,
+};
+pub const FALLBACK_GAIN_DB_RANGE: SettingRange = SettingRange {
+    min: -12.0,
+    max: 0.0,
+};
+pub const FADE_PAUSE_DURATION_MS_RANGE: SettingRange = SettingRange {
+    min: 0.0,
+    max: 1000.0,
+};
+pub const CROSSFADE_AUTO_DURATION_SECS_RANGE: SettingRange = SettingRange { min: 0.0, max: 8.0 };
+
+/// Every range above, in one payload for the settings UI.
+#[derive(Debug, Clone, Copy, Serialize)]
+pub struct AudioSettingRanges {
+    pub target_lufs: SettingRange,
+    pub fallback_gain_db: SettingRange,
+    pub fade_pause_duration_ms: SettingRange,
+    pub crossfade_auto_duration_secs: SettingRange,
+}
+
+pub const AUDIO_SETTING_RANGES: AudioSettingRanges = AudioSettingRanges {
+    target_lufs: TARGET_LUFS_RANGE,
+    fallback_gain_db: FALLBACK_GAIN_DB_RANGE,
+    fade_pause_duration_ms: FADE_PAUSE_DURATION_MS_RANGE,
+    crossfade_auto_duration_secs: CROSSFADE_AUTO_DURATION_SECS_RANGE,
+};
+
+impl LoudnessSettings {
+    /// This settings value with every numeric field inside its range.
+    pub fn clamped(mut self) -> Self {
+        self.target_lufs = TARGET_LUFS_RANGE.clamp(self.target_lufs);
+        self.fallback_gain_db = FALLBACK_GAIN_DB_RANGE.clamp(self.fallback_gain_db);
+        self
+    }
+}
+
 impl Default for LoudnessSettings {
     fn default() -> Self {
         Self {
@@ -831,6 +892,17 @@ pub struct FadeSettings {
     pub crossfade_auto_enabled: bool,
     pub crossfade_auto_duration_secs: f32,
     pub crossfade_suppress_same_album: bool,
+}
+
+impl FadeSettings {
+    /// This settings value with every numeric field inside its range.
+    pub fn clamped(mut self) -> Self {
+        self.fade_pause_duration_ms =
+            FADE_PAUSE_DURATION_MS_RANGE.clamp(self.fade_pause_duration_ms as f32) as u32;
+        self.crossfade_auto_duration_secs =
+            CROSSFADE_AUTO_DURATION_SECS_RANGE.clamp(self.crossfade_auto_duration_secs);
+        self
+    }
 }
 
 impl Default for FadeSettings {
@@ -1390,6 +1462,88 @@ pub struct TagGroup {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn loudness_settings_clamp_into_their_ranges() {
+        let s = LoudnessSettings {
+            enabled: true,
+            target_lufs: -40.0,
+            mode: LoudnessMode::Track,
+            fallback_gain_db: -20.0,
+        }
+        .clamped();
+        assert_eq!(s.target_lufs, TARGET_LUFS_RANGE.min);
+        assert_eq!(s.fallback_gain_db, FALLBACK_GAIN_DB_RANGE.min);
+
+        let s = LoudnessSettings {
+            target_lufs: 3.0,
+            fallback_gain_db: 6.0,
+            ..s
+        }
+        .clamped();
+        assert_eq!(s.target_lufs, TARGET_LUFS_RANGE.max);
+        assert_eq!(s.fallback_gain_db, FALLBACK_GAIN_DB_RANGE.max);
+    }
+
+    #[test]
+    fn fade_settings_clamp_into_their_ranges() {
+        let s = FadeSettings {
+            fade_pause_duration_ms: 60_000,
+            crossfade_auto_duration_secs: 30.0,
+            ..FadeSettings::default()
+        }
+        .clamped();
+        assert_eq!(s.fade_pause_duration_ms, 1000);
+        assert_eq!(s.crossfade_auto_duration_secs, 8.0);
+
+        let s = FadeSettings {
+            crossfade_auto_duration_secs: -2.0,
+            ..s
+        }
+        .clamped();
+        assert_eq!(s.crossfade_auto_duration_secs, 0.0);
+    }
+
+    #[test]
+    fn in_range_settings_are_unchanged_by_clamping() {
+        let fade = FadeSettings::default();
+        assert_eq!(
+            fade.clone().clamped().fade_pause_duration_ms,
+            fade.fade_pause_duration_ms
+        );
+        let loudness = LoudnessSettings::default();
+        assert_eq!(
+            loudness.clamped().fallback_gain_db,
+            loudness.fallback_gain_db
+        );
+    }
+
+    #[test]
+    fn nan_setting_falls_to_the_range_minimum() {
+        assert_eq!(CROSSFADE_AUTO_DURATION_SECS_RANGE.clamp(f32::NAN), 0.0);
+    }
+
+    /// Defaults must sit inside the ranges the UI draws, or a fresh install
+    /// would show a knob pinned past its end.
+    #[test]
+    fn defaults_are_inside_their_ranges() {
+        let l = LoudnessSettings::default();
+        let f = FadeSettings::default();
+        for (v, r) in [
+            (l.target_lufs, TARGET_LUFS_RANGE),
+            (l.fallback_gain_db, FALLBACK_GAIN_DB_RANGE),
+            (
+                f.fade_pause_duration_ms as f32,
+                FADE_PAUSE_DURATION_MS_RANGE,
+            ),
+            (
+                f.crossfade_auto_duration_secs,
+                CROSSFADE_AUTO_DURATION_SECS_RANGE,
+            ),
+        ] {
+            assert!(r.min <= v && v <= r.max, "{v} outside {r:?}");
+        }
+    }
 
     /// Guards the wire format the frontend's `SongSource` TS union depends
     /// on (`src/lib/types/index.ts`) — `#[serde(rename_all = "snake_case")]`

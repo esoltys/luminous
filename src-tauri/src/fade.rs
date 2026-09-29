@@ -48,5 +48,32 @@ pub fn get_fade_settings_from_db(db: &Database) -> Result<FadeSettings, String> 
             .get("crossfade_suppress_same_album")
             .map(|v| v == "true")
             .unwrap_or(defaults.crossfade_suppress_same_album),
-    })
+    }
+    .clamped())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A row that didn't come from the settings UI (hand-edited, migrated,
+    /// or written by a future caller) is clamped on load, not applied as-is
+    /// (#1249).
+    #[test]
+    fn out_of_range_rows_are_clamped_on_load() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = Database::new(dir.path().to_path_buf()).unwrap();
+        {
+            let conn = db.pool.get().unwrap();
+            conn.execute_batch(
+                "INSERT OR REPLACE INTO app_state (key, value) VALUES
+                   ('fade_pause_duration_ms', '60000'),
+                   ('crossfade_auto_duration_secs', '42.5');",
+            )
+            .unwrap();
+        }
+        let s = get_fade_settings_from_db(&db).unwrap();
+        assert_eq!(s.fade_pause_duration_ms, 1000);
+        assert_eq!(s.crossfade_auto_duration_secs, 8.0);
+    }
 }

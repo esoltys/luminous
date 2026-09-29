@@ -17,10 +17,9 @@ pub async fn get_loudness_settings(state: State<'_, AppState>) -> Result<Loudnes
 #[tauri::command]
 pub async fn set_loudness_settings(
     state: State<'_, AppState>,
-    mut settings: LoudnessSettings,
+    settings: LoudnessSettings,
 ) -> Result<(), String> {
-    settings.target_lufs = settings.target_lufs.clamp(-23.0, -9.0);
-    settings.fallback_gain_db = settings.fallback_gain_db.clamp(-24.0, 0.0);
+    let settings = settings.clamped();
     let db = state.db.clone();
     tokio::task::spawn_blocking(move || crate::loudness::save_settings(&db, &settings))
         .await
