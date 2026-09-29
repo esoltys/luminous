@@ -22,7 +22,7 @@
   <Dependencies>
     <TargetDeviceFamily Name="Windows.Desktop"
       MinVersion="{{MIN_VERSION}}"
-      MaxVersionTested="10.0.22621.0" />
+      MaxVersionTested="10.0.22621.1555" />
   </Dependencies>
 
   <Resources>

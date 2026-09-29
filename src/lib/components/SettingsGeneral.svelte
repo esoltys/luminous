@@ -7,6 +7,7 @@
   import { save } from "@tauri-apps/plugin-dialog";
   import { openExternalUrl } from "../utils/openExternalUrl";
   import { toastStore } from "../stores/toast.svelte";
+  import { isWindows } from "../platform";
   import Toggle from "./Toggle.svelte";
   import Select from "./Select.svelte";
   import Button from "./Button.svelte";
@@ -145,6 +146,18 @@
     }
   }
 
+  async function openDefaultAppsSettings() {
+    try {
+      await invoke("open_default_apps_settings");
+    } catch (err) {
+      console.error("Failed to open Default Apps settings:", err);
+      toastStore.show(
+        i18n.t("settings.defaultPlayerError", {}, "Couldn't open Windows Default Apps"),
+        "error"
+      );
+    }
+  }
+
   function getFormatName(fmt: string, fallback: string): string {
     switch (fmt) {
       case "windows_setup": return i18n.t('settings.formatWindowsSetup', {}, fallback);
@@ -225,6 +238,18 @@
       <option value="fr">{i18n.t('settings.languageFrench')}</option>
     </Select>
   </div>
+
+  {#if isWindows}
+    <div class="flex items-center justify-between gap-4 py-4">
+      <div class="flex flex-col gap-0.5 min-w-0">
+        <span class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.defaultPlayerLabel', {}, 'Make Luminous the default music player')}</span>
+        <p class="text-xs text-brand-text-secondary">{i18n.t('settings.defaultPlayerHint', {}, 'Open Windows Default Apps and choose which file types Luminous opens.')}</p>
+      </div>
+      <Button onclick={openDefaultAppsSettings} class="shrink-0 text-xs px-3.5 py-1.5">
+        {i18n.t('settings.defaultPlayerButton', {}, 'Open Default Apps')}
+      </Button>
+    </div>
+  {/if}
 
   <div class="flex items-center justify-between gap-4 py-4">
     <div class="flex flex-col gap-0.5 min-w-0">

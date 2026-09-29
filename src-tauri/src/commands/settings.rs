@@ -380,6 +380,28 @@ pub async fn set_fade_settings(
     Ok(())
 }
 
+/// Opens Windows' Default Apps settings on Luminous's own page (#1265),
+/// picking the deep link for however this copy was installed — see
+/// `default_apps`. Windows only; the Settings row is hidden elsewhere.
+#[tauri::command]
+pub async fn open_default_apps_settings(app: tauri::AppHandle) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        use tauri_plugin_opener::OpenerExt;
+        let target = crate::default_apps::current_target();
+        let uri = crate::default_apps::default_apps_uri(&target);
+        log::info!("Opening Default Apps settings ({target:?}): {uri}");
+        app.opener()
+            .open_url(uri, None::<&str>)
+            .map_err(|e| e.to_string())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = app;
+        Err("Default Apps settings are only available on Windows".to_string())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
