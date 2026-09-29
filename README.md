@@ -32,7 +32,7 @@ Luminous doesn't accept PRs as this is a hobby project that I enjoy working on i
 | Platform    | Download |
 | ----------- | -------- |
 | **Windows** | [Microsoft Store](https://apps.microsoft.com/detail/9PNQ2NFSQ7XW) (recommended — installs and updates automatically) &#124; [.exe / .msix](https://github.com/esoltys/luminous/releases/latest) (manual/sideloaded install) |
-| **Linux**   | [.deb / .rpm](https://github.com/esoltys/luminous/releases/latest) for your distro |
+| **Linux**   | [.deb / .rpm / AppImage](https://github.com/esoltys/luminous/releases/latest) for your distro |
 
 ## Architecture
 
@@ -128,12 +128,8 @@ Production bundles include updater artifacts, which must be signed. If you haven
 ```bash
 bun run tauri build
 ```
-This produces `.deb`/`.rpm` on Linux — `appimage` was dropped from the default bundle targets (see [Quick Install](#quick-install)) because CI-built AppImages hit an unfixable upstream WebKitGTK/EGL bug. To build an AppImage anyway for local use, which links against your own system libraries and doesn't hit that bug:
-```bash
-bun run tauri build -b appimage
-```
-> [!CAUTION]
-> AppImage builds aren't recommended. Luminous always runs an AppImage with WebKitGTK's GPU compositing disabled, so everything is painted on the CPU: expect noticeably laggier scrolling, theme changes and typing (especially on HiDPI displays), plus an opaque player bar and a plain fade instead of the immersive flip. Prefer the `.deb`/`.rpm` or Flatpak.
+This produces `.deb`/`.rpm`/AppImage on Linux.
+> [!NOTE]
 > On rolling-release distros (Arch/CachyOS), the AppImage step bundles `strip` binaries too old to handle the RELR relocations in current system libraries. `bun run tauri build` sets `NO_STRIP=true` for this automatically, so no extra steps are needed here — it only skips stripping debug symbols from vendored libraries, slightly increasing AppImage size.
 
 ---

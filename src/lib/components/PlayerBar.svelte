@@ -583,7 +583,7 @@
     box-shadow: var(--glass-shadow, none), var(--glass-glow, none);
   }
 
-  /* No GPU compositing (the AppImage's WebKitGTK — see
+  /* No GPU compositing (WebKitGTK with GPU rendering disabled — see
      ThemeStore.gpuCompositing): backdrop-filter doesn't render there, so the
      dock goes opaque with a stronger glow instead of see-through. */
   :global(footer.glass-surface.no-backdrop) {

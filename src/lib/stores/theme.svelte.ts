@@ -895,8 +895,8 @@ export class ThemeStore {
 
   /**
    * Whether the webview renders with GPU compositing (see
-   * webview_gpu_compositing in commands/window.rs) — false only for the
-   * AppImage, whose WebKitGTK runs with GPU rendering disabled. `null` until
+   * webview_gpu_compositing in commands/window.rs) — false only when the user
+   * has disabled WebKitGTK's GPU rendering by env var. `null` until
    * init() hears back. Chrome styling treats only an explicit `false` as
    * "no GPU" (opaque panels instead of backdrop-filter, a fade instead of
    * the 3D flip), so Linux and Windows otherwise look the same. View

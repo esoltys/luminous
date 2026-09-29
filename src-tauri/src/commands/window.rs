@@ -52,7 +52,7 @@ pub fn is_remote_devtools_enabled() -> bool {
 }
 
 /// Whether the webview renders with GPU compositing. False only for WebKitGTK
-/// with its GPU rendering disabled — which the AppImage always does (see
+/// with its GPU rendering disabled by the user (see
 /// `LINUX_WEBKITGTK_RENDERING_ENV_VARS` in lib.rs). There, backdrop-filter
 /// and 3D transforms don't render, and View Transitions segfault the app, so
 /// the frontend swaps in opaque/flat fallbacks; everywhere else, Linux and

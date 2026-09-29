@@ -425,8 +425,8 @@
     backdrop-filter: blur(20px) saturate(180%);
   }
 
-  /* backdrop-filter doesn't render without GPU compositing (the AppImage's
-     WebKitGTK), leaving the panel see-through instead of frosted — same
+  /* backdrop-filter doesn't render without GPU compositing (WebKitGTK with
+     its GPU rendering disabled by env var), leaving the panel see-through instead of frosted — same
      fallback as PlayerBar's footer.no-backdrop. */
   :global(.glass-surface.no-backdrop) {
     background-color: var(--bg-main, #08090c) !important;

@@ -507,7 +507,7 @@
       — {updaterStore.installFormat.supports_self_update
         ? i18n.t('settings.updateAutoSupportedFooter')
         : updaterStore.installFormat.format === 'appimage'
-          ? i18n.t('settings.updateNotifyOnlyAppImageFooter', {}, 'notify only, rebuild AppImage locally')
+          ? i18n.t('settings.updateNotifyOnlyAppImageFooter', {}, 'notify only, download the new AppImage')
           : i18n.t('settings.updateNotifyOnlyFooter')}
     </span>
     <button onclick={() => openExternalUrl(updaterStore.releaseUrl)} class="text-brand-accent-text hover:underline font-medium shrink-0">

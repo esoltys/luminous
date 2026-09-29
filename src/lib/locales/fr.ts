@@ -313,7 +313,7 @@ export const fr = {
     updateInstalledAsFooter: "Installé en tant que {format}",
     updateAutoSupportedFooter: "mise à jour automatique prise en charge",
     updateNotifyOnlyFooter: "notification uniquement, installation manuelle",
-    updateNotifyOnlyAppImageFooter: "notification uniquement, recompiler l'AppImage localement",
+    updateNotifyOnlyAppImageFooter: "notification uniquement, téléchargez la nouvelle AppImage",
     releaseNotesLink: "Notes de version",
     updateManagedByStoreDesc: "Les mises à jour sont installées automatiquement.",
     updateViewInStore: "Voir dans le Microsoft Store",
