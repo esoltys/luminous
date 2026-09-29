@@ -6,6 +6,7 @@
   import { loudnessStore } from "../stores/loudness.svelte";
   import { tasksStore } from "../stores/tasks.svelte";
   import { onMount } from "svelte";
+  import { confirm } from "@tauri-apps/plugin-dialog";
   import Toggle from "./Toggle.svelte";
   import HelpTip from "./HelpTip.svelte";
   import Button from "./Button.svelte";
@@ -63,7 +64,7 @@
   }
 
   async function handleRemoveWebdavServer(server: WebDavServer) {
-    if (confirm(i18n.t("settings.confirmRemoveWebdavServer", { name: server.name }))) {
+    if (await confirm(i18n.t("settings.confirmRemoveWebdavServer", { name: server.name }))) {
       try {
         await invoke("delete_webdav_server", { id: server.id });
         await loadWebdavServers();
@@ -179,7 +180,7 @@
   }
 
   async function handleRemoveSubsonicServer(server: SubsonicServer) {
-    if (!confirm(i18n.t("settings.confirmRemoveSubsonicServer", { name: server.name }))) return;
+    if (!(await confirm(i18n.t("settings.confirmRemoveSubsonicServer", { name: server.name })))) return;
     try {
       await invoke("delete_subsonic_server", { id: server.id });
       await loadSubsonicServers();
@@ -217,7 +218,7 @@
   });
 
   async function handleRemoveDirectory(path: string) {
-    if (confirm(i18n.t('settings.confirmRemoveFolder', { path }))) {
+    if (await confirm(i18n.t('settings.confirmRemoveFolder', { path }))) {
       await collectionStore.removeDirectory(path);
     }
   }

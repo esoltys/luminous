@@ -299,6 +299,59 @@ fn is_mutating_watcher_event(kind: &notify::EventKind) -> bool {
     !matches!(kind, notify::EventKind::Access(_))
 }
 
+/// What one path of a watcher event asks the batch handler to do.
+#[derive(Debug, PartialEq, Eq)]
+enum WatchedPathChange {
+    Removed,
+    Audio,
+    /// A directory appeared (created, or renamed/moved in) — its contents may
+    /// never get per-file events of their own, so it needs a rescan.
+    NewDir,
+    Ignore,
+}
+
+fn classify_watched_path(kind: &notify::EventKind, path: &Path) -> WatchedPathChange {
+    use notify::event::ModifyKind;
+    use notify::EventKind;
+
+    if !path.exists() {
+        WatchedPathChange::Removed
+    } else if path.is_file() && super::is_audio_file(path) {
+        WatchedPathChange::Audio
+    } else if path.is_dir()
+        && matches!(
+            kind,
+            EventKind::Create(_) | EventKind::Modify(ModifyKind::Name(_))
+        )
+    {
+        WatchedPathChange::NewDir
+    } else {
+        // A directory's own "modified" event only says a child changed (e.g.
+        // a torrent client writing into it), and that child gets its own
+        // event. Rescanning the whole library for it kept "Refreshing
+        // library" permanently busy on an active download folder.
+        WatchedPathChange::Ignore
+    }
+}
+
+/// Whether the library already holds `path` exactly as it is on disk (same
+/// mtime and size) — an event for it then changed nothing worth re-reading.
+fn is_unchanged_on_disk(conn: &rusqlite::Connection, path: &Path) -> bool {
+    let Ok(meta) = std::fs::metadata(path) else {
+        return false;
+    };
+    let Some(mtime) = super::get_mtime(path) else {
+        return false;
+    };
+    conn.query_row(
+        "SELECT mtime, filesize FROM songs WHERE path = ?1 AND unavailable = 0",
+        params![path.to_string_lossy()],
+        |row| Ok((row.get::<_, Option<i64>>(0)?, row.get::<_, Option<i64>>(1)?)),
+    )
+    .map(|(db_mtime, db_size)| db_mtime == Some(mtime) && db_size == Some(meta.len() as i64))
+    .unwrap_or(false)
+}
+
 /// Start background directory watching using notify.
 pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
     let db = Arc::clone(&state.db);
@@ -461,12 +514,17 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                         if self_writes.contains_recent(&path) {
                             continue;
                         }
-                        if !path.exists() {
-                            removed_paths.insert(path);
-                        } else if path.is_file() && super::is_audio_file(&path) {
-                            added_paths.insert(path);
-                        } else if path.is_dir() {
-                            dir_paths.insert(path);
+                        match classify_watched_path(&event.kind, &path) {
+                            WatchedPathChange::Removed => {
+                                removed_paths.insert(path);
+                            }
+                            WatchedPathChange::Audio => {
+                                added_paths.insert(path);
+                            }
+                            WatchedPathChange::NewDir => {
+                                dir_paths.insert(path);
+                            }
+                            WatchedPathChange::Ignore => {}
                         }
                     }
                 }
@@ -482,6 +540,13 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                                 (removed_paths.clone(), added_paths.clone())
                             }
                         };
+                    // Seeding, indexing or antivirus touching a file can raise a
+                    // "modified" event without changing it; re-reading it would
+                    // only flash a "Processing songs (0/1)" toast.
+                    let still_added: Vec<PathBuf> = still_added
+                        .into_iter()
+                        .filter(|p| !is_unchanged_on_disk(&conn, p))
+                        .collect();
 
                     let reconciled_count = removed_paths.len() - still_removed.len();
                     if reconciled_count > 0 {
@@ -736,6 +801,91 @@ mod tests {
 
         assert!(!tracker.contains_recent_at(&stale_path, now));
         assert!(tracker.contains_recent_at(&fresh_path, now));
+    }
+
+    #[test]
+    fn test_directory_modify_events_do_not_trigger_a_rescan() {
+        use notify::event::{CreateKind, DataChange, ModifyKind, RenameMode};
+        use notify::EventKind;
+
+        let dir = tempfile::tempdir().unwrap();
+        let album = dir.path().join("Album");
+        std::fs::create_dir(&album).unwrap();
+        let track = album.join("01.flac");
+        std::fs::write(&track, b"x").unwrap();
+        let partial = album.join("02.flac.part");
+        std::fs::write(&partial, b"x").unwrap();
+
+        let classify = |kind, path: &Path| classify_watched_path(&kind, path);
+
+        assert_eq!(
+            classify(EventKind::Create(CreateKind::Folder), &album),
+            WatchedPathChange::NewDir
+        );
+        assert_eq!(
+            classify(EventKind::Modify(ModifyKind::Name(RenameMode::To)), &album),
+            WatchedPathChange::NewDir
+        );
+        // A child being written bumps the directory's own mtime — not a new folder.
+        assert_eq!(
+            classify(EventKind::Modify(ModifyKind::Any), &album),
+            WatchedPathChange::Ignore
+        );
+        assert_eq!(
+            classify(
+                EventKind::Modify(ModifyKind::Data(DataChange::Content)),
+                &album
+            ),
+            WatchedPathChange::Ignore
+        );
+        assert_eq!(
+            classify(EventKind::Modify(ModifyKind::Any), &track),
+            WatchedPathChange::Audio
+        );
+        assert_eq!(
+            classify(EventKind::Modify(ModifyKind::Any), &partial),
+            WatchedPathChange::Ignore
+        );
+        assert_eq!(
+            classify(EventKind::Any, &album.join("gone.flac")),
+            WatchedPathChange::Removed
+        );
+    }
+
+    #[test]
+    fn test_is_unchanged_on_disk_matches_mtime_and_size() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = Database::new(dir.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+        let track = dir.path().join("01.flac");
+        std::fs::write(&track, b"abc").unwrap();
+
+        // Not in the library yet: a genuine addition.
+        assert!(!is_unchanged_on_disk(&conn, &track));
+
+        let song = Song {
+            path: Some(track.to_string_lossy().to_string()),
+            source: SongSource::LocalFile,
+            mtime: super::super::get_mtime(&track),
+            filesize: Some(3),
+            ..Default::default()
+        };
+        super::super::upsert_song(&conn, &song).unwrap();
+        assert!(is_unchanged_on_disk(&conn, &track));
+
+        // Same mtime second, different size — a write in progress.
+        std::fs::write(&track, b"abcdef").unwrap();
+        conn.execute(
+            "UPDATE songs SET mtime = ?1",
+            params![super::super::get_mtime(&track)],
+        )
+        .unwrap();
+        assert!(!is_unchanged_on_disk(&conn, &track));
+
+        // An unavailable row (drive was offline) must be re-read when it returns.
+        conn.execute("UPDATE songs SET filesize = 6, unavailable = 1", [])
+            .unwrap();
+        assert!(!is_unchanged_on_disk(&conn, &track));
     }
 
     #[test]

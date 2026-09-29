@@ -14,6 +14,7 @@
     "install:git-hooks": "git config core.hooksPath .githooks",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --tsgo --fail-on-warnings && bun run knip && bun run lint:css-vars",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --tsgo --watch",
+    "check:tauri-versions": "bun run scripts/check-tauri-versions.ts",
     "knip": "knip",
     "lint:css-vars": "bun run scripts/lint-css-vars.ts",
     "tauri": "bun scripts/tauri.ts",

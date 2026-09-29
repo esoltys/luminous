@@ -797,10 +797,10 @@ impl CoverManager {
     }
 
     /// Look for a same-named-by-convention image file (`cover.jpg`,
-    /// `folder.png`, etc.) next to `audio_path` and return its canonical
-    /// absolute path, or `None` if the song has embedded/manual art already
-    /// or no match exists. Doesn't copy into the covers cache — the
-    /// returned path is used directly (see `get_cover_art_path`).
+    /// `folder.png`, etc.) next to `audio_path` and return its path, or
+    /// `None` if the song has embedded/manual art already or no match
+    /// exists. Doesn't copy into the covers cache — the returned path is used
+    /// directly (see `get_cover_art_path`).
     pub fn scan_folder_art(&self, audio_path: &Path) -> Option<PathBuf> {
         Self::scan_folder_art_static(audio_path)
     }
@@ -819,16 +819,13 @@ impl CoverManager {
                     let ext = path.extension().and_then(|e| e.to_str());
                     if let (Some(stem), Some(ext)) = (stem, ext) {
                         if Self::is_folder_art_filename(stem, ext) {
-                            let canonical = path.canonicalize().unwrap_or(path);
-                            let s = canonical.to_string_lossy();
-                            #[cfg(windows)]
-                            let cleaned_s = match s.strip_prefix(r"\\?\") {
-                                Some(stripped) => stripped.to_string(),
-                                None => s.to_string(),
-                            };
-                            #[cfg(not(windows))]
-                            let cleaned_s = s.to_string();
-                            return Some(PathBuf::from(cleaned_s));
+                            // Deliberately not canonicalized: `audio_path` is
+                            // already absolute in the same form as `songs.path`,
+                            // and on Windows `canonicalize()` rewrites a mapped
+                            // network drive (`Z:\...`) to `\\?\UNC\server\...`,
+                            // which stripping `\\?\` left as the relative,
+                            // unservable `UNC\server\...`.
+                            return Some(path);
                         }
                     }
                 }

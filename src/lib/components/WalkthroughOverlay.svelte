@@ -87,9 +87,18 @@
     if (!walkthroughStore.isActive || !targetRect) return;
     const el = resolveTarget();
     if (!el) return;
-    const observer = new ResizeObserver(() => updateTargetRect());
+    let rafId: number | undefined;
+    const observer = new ResizeObserver(() => {
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        if (walkthroughStore.isActive) updateTargetRect();
+      });
+    });
     observer.observe(el);
-    return () => observer.disconnect();
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      observer.disconnect();
+    };
   });
 
   function handleWindowChange() {

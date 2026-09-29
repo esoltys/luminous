@@ -8,6 +8,8 @@ import { playerStore } from "../stores/player.svelte";
 import { playlistsStore } from "../stores/playlists.svelte";
 import { picardStore } from "../stores/picard.svelte";
 import { prefs } from "../stores/prefs.svelte";
+import { tasksStore } from "../stores/tasks.svelte";
+import { toastStore } from "../stores/toast.svelte";
 import { invoke } from "@tauri-apps/api/core";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -307,6 +309,31 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     await vi.waitFor(() => {
       expect(invokeMock).toHaveBeenCalledWith("retrieve_album_art", { album: "Abbey Road", onlyMissing: true });
     });
+  });
+
+  it("does not toast when the automatic album details fetch fails", async () => {
+    const invokeMock = vi.mocked(invoke);
+    collectionStore.albumProfiles = {
+      "abbey road": { album_key: "abbey road", details_fetched: false, links: [] },
+    };
+    invokeMock.mockImplementation((cmd: string) => {
+      if (cmd === "get_songs_by_album") {
+        return Promise.resolve([
+          { id: 1, title: "Come Together", artist: "The Beatles", album: "Abbey Road", musicbrainz_release_group_id: "rg-123" },
+        ]);
+      }
+      if (cmd === "is_context_enrichment_enabled") return Promise.resolve(true);
+      if (cmd === "retrieve_album_details") return Promise.reject("error sending request for url");
+      return Promise.resolve();
+    });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    render(AlbumDetailView, { props: { albumName: mockAlbumName } });
+
+    await vi.waitFor(() => expect(warnSpy).toHaveBeenCalled());
+    expect(tasksStore.tasks.some((t) => t.id === "album-enrichment-abbey road")).toBe(false);
+    expect(toastStore.messages.some((m) => m.task?.taskId === "album-enrichment-abbey road")).toBe(false);
+    warnSpy.mockRestore();
   });
 
   it("does not auto-fetch album details when details_fetched is already true (#1143)", async () => {

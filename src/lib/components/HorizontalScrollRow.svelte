@@ -43,11 +43,16 @@
       el.addEventListener("scroll", updateScrollButtons);
       // ResizeObserver catches layout changes a one-shot check on mount can
       // miss: cover art images loading in, window resize, sidebar toggling.
-      const observer = new ResizeObserver(updateScrollButtons);
+      let rafId: number | undefined;
+      const observer = new ResizeObserver(() => {
+        if (rafId) cancelAnimationFrame(rafId);
+        rafId = requestAnimationFrame(updateScrollButtons);
+      });
       observer.observe(el);
       updateScrollButtons();
       return () => {
         el.removeEventListener("scroll", updateScrollButtons);
+        if (rafId) cancelAnimationFrame(rafId);
         observer.disconnect();
       };
     }

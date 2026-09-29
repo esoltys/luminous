@@ -37,7 +37,7 @@
   // Whether the server at `url` offers API-key sign-in (asked without credentials).
   let apiKeySupported = $state(false);
   let enabled = $state(untrack(() => server?.enabled ?? true));
-  let autoSyncEnabled = $state(untrack(() => server?.autoSyncEnabled ?? false));
+  let autoSyncEnabled = $state(untrack(() => server?.autoSyncEnabled ?? true));
   let syncIntervalMinutes = $state(untrack(() => server?.syncIntervalMinutes ?? 60));
   let reportPlays = $state(untrack(() => server?.reportPlays ?? true));
   let selectedIcon = $state(untrack(() => server?.icon ?? "cloud"));
