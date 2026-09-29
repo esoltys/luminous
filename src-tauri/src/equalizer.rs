@@ -207,6 +207,24 @@ impl BiquadFilter {
 
         y
     }
+
+    /// Magnitude of this filter's frequency response |H(e^jω)| at `freq`,
+    /// in dB, evaluated from the coefficients `process` actually runs.
+    pub fn magnitude_db(&self, freq: f32, fs: f32) -> f32 {
+        let w = 2.0 * std::f64::consts::PI * freq as f64 / fs as f64;
+        let (c1, s1) = (w.cos(), w.sin());
+        let (c2, s2) = ((2.0 * w).cos(), (2.0 * w).sin());
+        let (b0, b1, b2) = (self.b0 as f64, self.b1 as f64, self.b2 as f64);
+        let (a1, a2) = (self.a1 as f64, self.a2 as f64);
+        // H(z) = (b0 + b1 z^-1 + b2 z^-2) / (1 + a1 z^-1 + a2 z^-2), z = e^jω
+        let num_re = b0 + b1 * c1 + b2 * c2;
+        let num_im = -(b1 * s1 + b2 * s2);
+        let den_re = 1.0 + a1 * c1 + a2 * c2;
+        let den_im = -(a1 * s1 + a2 * s2);
+        let num = num_re * num_re + num_im * num_im;
+        let den = den_re * den_re + den_im * den_im;
+        (10.0 * (num / den).log10()) as f32
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -506,6 +524,25 @@ impl Equalizer {
         }
     }
 
+    /// Combined magnitude response of the parametric cascade (preamp
+    /// excluded) at each of `freqs`, in dB — evaluated from the live filter
+    /// coefficients at the engine's real sample rate, so the UI's curve
+    /// preview shows exactly what `process_interleaved` applies (#1248).
+    pub fn parametric_response_db(&self, freqs: &[f32]) -> Vec<f32> {
+        let fs = self.sample_rate as f32;
+        let nyquist = fs / 2.0;
+        let Some(filters) = self.parametric_filters.first() else {
+            return vec![0.0; freqs.len()];
+        };
+        freqs
+            .iter()
+            .map(|&f| {
+                let f = f.clamp(1.0, nyquist * 0.999);
+                filters.iter().map(|flt| flt.magnitude_db(f, fs)).sum()
+            })
+            .collect()
+    }
+
     /// Apply preamp + the active band cascade (graphic or parametric,
     /// whichever `mode` selects) to `output` in place, sample by sample —
     /// the EQ stage of the CPAL output callback's per-buffer DSP chain (see
@@ -700,6 +737,85 @@ mod tests {
         assert!(
             proc_rms > orig_rms * 2.0,
             "expected shelf boost to hold above 16 kHz: orig {orig_rms}, processed {proc_rms}"
+        );
+    }
+
+    fn parametric_eq_48k() -> Equalizer {
+        let mut eq = Equalizer::new();
+        eq.update_format(48000, 2);
+        eq.enabled = true;
+        eq.set_mode(EqMode::Parametric20);
+        eq
+    }
+
+    #[test]
+    fn response_of_low_shelf_holds_gain_below_corner_and_ignores_q() {
+        let mut eq = parametric_eq_48k();
+        eq.set_parametric_band(0, 6.0, 3.0);
+        let probes = [10.0, 20.0];
+        let resp = eq.parametric_response_db(&probes);
+        assert!(resp[0] >= 5.5, "low shelf at 10 Hz read {} dB", resp[0]);
+        assert!(resp[1] >= 4.5, "low shelf at 20 Hz read {} dB", resp[1]);
+
+        eq.set_parametric_band(0, 6.0, 0.3);
+        let resp_other_q = eq.parametric_response_db(&probes);
+        for (a, b) in resp.iter().zip(resp_other_q.iter()) {
+            assert!((a - b).abs() < 1e-4, "Q changed the shelf response");
+        }
+    }
+
+    #[test]
+    fn response_of_high_shelf_holds_gain_above_corner() {
+        let mut eq = parametric_eq_48k();
+        eq.set_parametric_band(PARAMETRIC_BAND_COUNT - 1, 6.0, 3.0);
+        let resp = eq.parametric_response_db(&[20000.0]);
+        assert!(resp[0] >= 5.0, "high shelf at 20 kHz read {} dB", resp[0]);
+    }
+
+    #[test]
+    fn response_of_peaking_band_reads_gain_at_center_only() {
+        let mut eq = parametric_eq_48k();
+        let center = eq.parametric[10].freq;
+        eq.set_parametric_band(10, 6.0, 3.0);
+        let resp = eq.parametric_response_db(&[center, center / 100.0]);
+        assert!(
+            (resp[0] - 6.0).abs() < 0.1,
+            "peak at center read {} dB",
+            resp[0]
+        );
+        assert!(
+            resp[1].abs() < 0.1,
+            "peak two decades away read {} dB",
+            resp[1]
+        );
+    }
+
+    #[test]
+    fn response_of_flat_eq_is_zero_everywhere() {
+        let eq = parametric_eq_48k();
+        let freqs: Vec<f32> = (0..96)
+            .map(|i| 20.0 * 1000f32.powf(i as f32 / 95.0))
+            .collect();
+        for db in eq.parametric_response_db(&freqs) {
+            assert!(db.abs() < 1e-3, "flat EQ read {db} dB");
+        }
+    }
+
+    #[test]
+    fn response_matches_measured_gain_through_process() {
+        let mut eq = parametric_eq_48k();
+        eq.set_parametric_band(0, 6.0, 1.0);
+        eq.set_parametric_band(8, -4.0, 2.0);
+        let probe = eq.parametric[8].freq * 1.1;
+        let predicted = eq.parametric_response_db(&[probe])[0];
+
+        let original = sine(probe, 48000.0, 16384, 2);
+        let mut processed = original.clone();
+        eq.process_interleaved(&mut processed);
+        let measured = 20.0 * (rms(&processed[16384..]) / rms(&original[16384..])).log10();
+        assert!(
+            (measured - predicted).abs() < 0.2,
+            "predicted {predicted} dB, measured {measured} dB at {probe} Hz"
         );
     }
 }

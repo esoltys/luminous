@@ -53,7 +53,57 @@ describe("Equalizer.svelte", () => {
       if (cmd === "get_audio_setting_ranges") return defaultRanges;
       if (cmd === "get_loudness_analysis_remaining") return 0;
       if (cmd === "load_equalizer_preset") return { gains: [4, 3, 1, -1, -2, -1, 1, 3, 3.5, 3.5], parametric: [] };
+      if (cmd === "get_parametric_response") return args.frequencies.map(() => 0);
       return null;
+    });
+  });
+
+  describe("parametric response curve (#1248)", () => {
+    const parametricConfig = { ...defaultEqConfig, mode: "parametric20" };
+
+    function mockResponse(respond: (freqs: number[]) => number[]) {
+      vi.mocked(invoke).mockImplementation(async (cmd: string, args?: any) => {
+        if (cmd === "get_equalizer_state") return parametricConfig;
+        if (cmd === "apply_equalizer_config") return args?.config;
+        if (cmd === "get_loudness_settings") return defaultLoudness;
+        if (cmd === "get_fade_settings") return defaultFadeSettings;
+        if (cmd === "get_audio_setting_ranges") return defaultRanges;
+        if (cmd === "get_parametric_response") return respond(args.frequencies);
+        return null;
+      });
+    }
+
+    function curveYs(container: HTMLElement): number[] {
+      const d = container.querySelector('svg[viewBox="0 0 100 40"] path')?.getAttribute("d") ?? "";
+      // Every segment ends at "x y" — the on-curve sample points.
+      return [...d.matchAll(/(?:M|,)\s*([\d.]+) ([\d.-]+)(?=\s*(?:C|$))/g)].map((m) => Number(m[2]));
+    }
+
+    it("plots the backend's evaluated response instead of re-deriving it", async () => {
+      mockResponse((freqs) => freqs.map(() => 12));
+      const { container } = render(Equalizer);
+      await waitFor(() => expect(curveYs(container).length).toBe(96));
+      // +12 dB everywhere maps every sample to the top of the plot.
+      for (const y of curveYs(container)) expect(y).toBeCloseTo(3);
+      const call = vi.mocked(invoke).mock.calls.find(([cmd]) => cmd === "get_parametric_response");
+      const freqs = (call![1] as { frequencies: number[] }).frequencies;
+      expect(freqs[0]).toBeCloseTo(20);
+      expect(freqs[freqs.length - 1]).toBeCloseTo(20000);
+    });
+
+    it("re-fetches the response after a band change", async () => {
+      let level = 0;
+      mockResponse((freqs) => freqs.map(() => level));
+      const { container } = render(Equalizer);
+      await waitFor(() => expect(curveYs(container).length).toBe(96));
+      for (const y of curveYs(container)) expect(y).toBeCloseTo(20);
+
+      level = -12;
+      const slider = container.querySelector<HTMLInputElement>('input[type="range"][orient="vertical"]')!;
+      await fireEvent.input(slider, { target: { value: "-6" } });
+      await waitFor(() => {
+        for (const y of curveYs(container)) expect(y).toBeCloseTo(37);
+      });
     });
   });
 
