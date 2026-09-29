@@ -21,12 +21,15 @@
 //   and fallback-guarded reads whose name is written nowhere — a typo hidden
 //   behind a fallback.
 import { readdirSync, readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = path.join(ROOT, "src");
-const TAILWIND_THEME = path.join(ROOT, "node_modules", "tailwindcss", "theme.css");
+// Resolve through module lookup, not a hard-coded path: a worktree has no
+// node_modules of its own and finds packages in the main checkout's (#1282).
+const TAILWIND_THEME = createRequire(import.meta.url).resolve("tailwindcss/theme.css");
 
 /** Properties provided by something other than our source, each with its reason. */
 const HOST_PROVIDED: { pattern: RegExp; reason: string }[] = [
