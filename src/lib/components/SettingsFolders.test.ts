@@ -1,6 +1,7 @@
 import "@testing-library/jest-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, fireEvent } from "@testing-library/svelte";
+import { render, fireEvent, waitFor } from "@testing-library/svelte";
+import { confirm } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import SettingsFolders from "./SettingsFolders.svelte";
 
@@ -75,6 +76,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({
   open: vi.fn().mockResolvedValue(null),
+  confirm: vi.fn(),
 }));
 
 describe("SettingsFolders.svelte - WebDAV section", () => {
@@ -126,18 +128,18 @@ describe("SettingsFolders.svelte - Media servers section", () => {
   });
 
   it("removes a server only after confirmation", async () => {
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true);
+    vi.mocked(confirm).mockResolvedValueOnce(false).mockResolvedValueOnce(true);
     const { findByTestId } = render(SettingsFolders);
 
     const row = await findByTestId("subsonic-server-row");
     const removeBtn = row.querySelector('button[aria-label="Remove media server"]')!;
 
     await fireEvent.click(removeBtn);
+    await waitFor(() => expect(confirm).toHaveBeenCalledTimes(1));
     expect(invoke).not.toHaveBeenCalledWith("delete_subsonic_server", expect.anything());
 
     await fireEvent.click(removeBtn);
-    expect(invoke).toHaveBeenCalledWith("delete_subsonic_server", { id: 7 });
-    confirmSpy.mockRestore();
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith("delete_subsonic_server", { id: 7 }));
   });
 
   it("opens SubsonicModal when clicking Add Server", async () => {
