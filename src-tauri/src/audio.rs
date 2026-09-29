@@ -21,7 +21,9 @@
 //! track becomes current and the old one's tail is mixed into it on the
 //! decode thread with an equal-power curve. The handover is tracked exactly
 //! like a gapless one, so `TrackTransitioned` fires when the overlap becomes
-//! audible.
+//! audible. The loudness gain switches to the incoming track's at the
+//! overlap's first sample (scheduled into the callback), and the tail is
+//! pre-scaled by the ratio of the two gains so it keeps its own level.
 //!
 //! ## DSP chain (contract shared with #77/#79)
 //! `decode → loudness gain (#77) → EQ preamp → EQ bands → fade envelope (#79)
@@ -173,7 +175,9 @@ pub enum AudioCommand {
     /// Prime the next track for a gapless transition after the current one.
     PreloadNext(PlayRequest),
     /// Prime the next track for an auto-crossfade transition (#79).
-    PreloadNextCrossfade(PlayRequest, f32),
+    /// Carries the crossfade length in seconds and the incoming track's
+    /// loudness-normalization gain, which takes over when the overlap starts.
+    PreloadNextCrossfade(PlayRequest, f32, f32),
     /// Drop a primed next track (playback context changed) and re-arm the
     /// `AboutToFinish` signal so a fresh preload can be requested.
     ClearPreload,
@@ -234,7 +238,34 @@ pub(crate) struct AudioShared {
     active_decoder_name: Arc<parking_lot::RwLock<Option<String>>>,
     equalizer: Arc<Mutex<crate::equalizer::Equalizer>>,
     loudness_gain: Arc<AtomicU32>,
+    /// A loudness-gain change scheduled at an exact played-sample index
+    /// (`AudioOutput::played_samples` space), applied by the output callback
+    /// mid-buffer so a crossfade's incoming track takes over its gain at the
+    /// sample the overlap starts (#1238). `NO_LOUDNESS_SWITCH` when idle.
+    loudness_switch_at: AtomicU64,
+    /// The gain `loudness_switch_at` switches to; written before it.
+    loudness_switch_gain: AtomicU32,
     fade_gain: Arc<AtomicU32>,
+}
+
+/// `AudioShared::loudness_switch_at` value meaning no switch is scheduled.
+const NO_LOUDNESS_SWITCH: u64 = u64::MAX;
+
+impl AudioShared {
+    /// Switch the loudness gain to `gain` when the output callback plays
+    /// sample `at`, replacing any switch already scheduled.
+    fn schedule_loudness_switch(&self, at: u64, gain: f32) {
+        self.loudness_switch_gain
+            .store(gain.max(0.0).to_bits(), Ordering::Relaxed);
+        self.loudness_switch_at.store(at, Ordering::Release);
+    }
+
+    /// Drop a scheduled loudness switch: the played-sample space it was
+    /// measured in has been reset (seek, new track, device rebuild).
+    fn cancel_loudness_switch(&self) {
+        self.loudness_switch_at
+            .store(NO_LOUDNESS_SWITCH, Ordering::Release);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -306,6 +337,8 @@ impl AudioEngine {
             active_decoder_name: Arc::clone(&active_decoder_name),
             equalizer: Arc::clone(&equalizer),
             loudness_gain: Arc::clone(&loudness_gain),
+            loudness_switch_at: AtomicU64::new(NO_LOUDNESS_SWITCH),
+            loudness_switch_gain: AtomicU32::new(1.0f32.to_bits()),
             fade_gain: Arc::clone(&fade_gain),
         });
         let shared_clone = Arc::clone(&shared);
@@ -372,6 +405,7 @@ impl AudioEngine {
         song: Box<Song>,
         start_nanosec: u64,
         crossfade_secs: f32,
+        loudness_gain: f32,
     ) -> Result<()> {
         self.send_cmd(AudioCommand::PreloadNextCrossfade(
             PlayRequest {
@@ -379,6 +413,7 @@ impl AudioEngine {
                 start_nanosec,
             },
             crossfade_secs,
+            loudness_gain,
         ))
     }
 
@@ -1087,9 +1122,25 @@ struct CrossfadeTail {
     total: usize,
     /// Interleaved samples of the overlap already mixed.
     mixed: usize,
+    /// Pre-scale for the tail: its own loudness gain over the incoming
+    /// track's. The output callback applies the incoming track's gain to the
+    /// mixed stream, so this keeps the tail at its own normalized level.
+    gain: f32,
     /// Decoded tail samples not yet consumed by a mix (packets from the two
     /// tracks don't line up).
     fifo: Vec<f32>,
+}
+
+/// Offset into a callback buffer of `played` samples, which starts at
+/// played-sample index `played_before`, where a loudness switch scheduled at
+/// `switch_at` takes effect; `None` if it lies beyond this buffer. The end is
+/// inclusive so a switch landing exactly on a buffer boundary fires in the
+/// buffer that reached it, before the decode thread can rebase the counter.
+fn loudness_switch_offset(switch_at: u64, played_before: u64, played: usize) -> Option<usize> {
+    if switch_at == NO_LOUDNESS_SWITCH || switch_at > played_before + played as u64 {
+        return None;
+    }
+    Some(switch_at.saturating_sub(played_before) as usize)
 }
 
 /// Equal-power crossfade gains `(outgoing, incoming)` at progress `p` in
@@ -1104,10 +1155,12 @@ fn equal_power_gains(p: f32) -> (f32, f32) {
 /// part of `b` that falls inside the overlap. `mixed_before` is how many
 /// interleaved samples of the `total`-sample overlap were mixed by earlier
 /// calls. Missing `a` samples (a tail shorter than its tagged length) count
-/// as silence. Returns how many samples of `b` were inside the overlap.
+/// as silence. `a_gain` pre-scales `a` (see `CrossfadeTail::gain`). Returns
+/// how many samples of `b` were inside the overlap.
 fn mix_crossfade(
     b: &mut [f32],
     a: &[f32],
+    a_gain: f32,
     mixed_before: usize,
     total: usize,
     channels: usize,
@@ -1117,7 +1170,7 @@ fn mix_crossfade(
     for (i, sample) in b[..n].iter_mut().enumerate() {
         let frame = (mixed_before + i) / channels.max(1);
         let (ga, gb) = equal_power_gains(frame as f32 / total_frames);
-        let a_val = a.get(i).copied().unwrap_or(0.0);
+        let a_val = a.get(i).copied().unwrap_or(0.0) * a_gain;
         *sample = a_val * ga + *sample * gb;
     }
     n
@@ -1232,6 +1285,7 @@ fn build_output(shared: &Arc<AudioShared>) -> Result<AudioOutput, String> {
     let visualizer_buf_cpal = Arc::clone(&shared.visualizer_buf);
     let eq_cpal = Arc::clone(&shared.equalizer);
     let loudness_cpal = Arc::clone(&shared.loudness_gain);
+    let shared_cpal = Arc::clone(shared);
     let fade_cpal = Arc::clone(&shared.fade_gain);
 
     // Pre-allocated scratch for the visualizer's mono downmix — the output
@@ -1247,7 +1301,8 @@ fn build_output(shared: &Arc<AudioShared>) -> Result<AudioOutput, String> {
             config,
             move |output: &mut [f32], _| {
                 let vol = f32::from_bits(vol_ref.load(Ordering::Relaxed));
-                let loudness = f32::from_bits(loudness_cpal.load(Ordering::Relaxed));
+                let mut loudness = f32::from_bits(loudness_cpal.load(Ordering::Relaxed));
+                let played_before = played_samples_cpal.load(Ordering::Relaxed);
                 let fade = f32::from_bits(fade_cpal.load(Ordering::Relaxed));
                 let mut played = 0;
 
@@ -1272,9 +1327,37 @@ fn build_output(shared: &Arc<AudioShared>) -> Result<AudioOutput, String> {
                 // with the EQ disabled and all gains at 1.0 the decoded
                 // samples reach the device untouched (bit-perfect).
 
-                // 1) Per-track loudness normalization gain (#77)
+                // 1) Per-track loudness normalization gain (#77). A switch
+                // scheduled inside this buffer (crossfade start, #1238)
+                // splits it: the old gain up to the switch sample, the new
+                // one from there on.
+                let loudness_before = loudness;
+                let mut split = 0;
+                let switch_at = shared_cpal.loudness_switch_at.load(Ordering::Acquire);
+                if let Some(k) = loudness_switch_offset(switch_at, played_before, played) {
+                    if shared_cpal
+                        .loudness_switch_at
+                        .compare_exchange(
+                            switch_at,
+                            NO_LOUDNESS_SWITCH,
+                            Ordering::AcqRel,
+                            Ordering::Relaxed,
+                        )
+                        .is_ok()
+                    {
+                        let new_bits = shared_cpal.loudness_switch_gain.load(Ordering::Relaxed);
+                        loudness_cpal.store(new_bits, Ordering::Relaxed);
+                        loudness = f32::from_bits(new_bits);
+                        split = k;
+                    }
+                }
+                if loudness_before != 1.0 {
+                    for sample in output[..split].iter_mut() {
+                        *sample *= loudness_before;
+                    }
+                }
                 if loudness != 1.0 {
-                    for sample in output[..played].iter_mut() {
+                    for sample in output[split..played].iter_mut() {
                         *sample *= loudness;
                     }
                 }
@@ -1308,7 +1391,7 @@ fn build_output(shared: &Arc<AudioShared>) -> Result<AudioOutput, String> {
                 // clipping during D/A reconstruction.
                 // When both loudness normalization and EQ are neutral/disabled, the signal
                 // passes through unaltered for bit-perfect output.
-                if loudness != 1.0 || eq_applied {
+                if loudness_before != 1.0 || loudness != 1.0 || eq_applied {
                     for sample in output[..played].iter_mut() {
                         *sample = sample.clamp(-TRUE_PEAK_CEILING, TRUE_PEAK_CEILING);
                     }
@@ -1409,6 +1492,9 @@ struct DecodeSession {
     /// Auto-crossfade length requested for the handover into `next`, in
     /// seconds; 0 for a plain gapless handover.
     crossfade_secs: f32,
+    /// Loudness gain of the preloaded crossfade track, applied from the
+    /// overlap's first sample.
+    crossfade_incoming_gain: f32,
     /// The outgoing track while an auto-crossfade overlap is being mixed.
     outgoing: Option<CrossfadeTail>,
     /// Absolute count of samples pushed to the ring buffer, in the same
@@ -1647,6 +1733,7 @@ fn decode_thread(
         }
         let start_samples = samples_for_ns(current.start_ns, target_sample_rate, target_channels);
         out.played_samples.store(start_samples, Ordering::Relaxed);
+        shared.cancel_loudness_switch();
 
         if let Err(e) = out.stream.play() {
             let _ = event_tx.send(AudioEvent::Error {
@@ -1667,6 +1754,7 @@ fn decode_thread(
             next: None,
             transition: None,
             crossfade_secs: 0.0,
+            crossfade_incoming_gain: 1.0,
             outgoing: None,
             pushed_samples: start_samples,
             target_sample_rate,
@@ -1700,7 +1788,7 @@ fn decode_thread(
 
             advance_transition_and_preload_signal(out, &mut session, &shared.position, &event_tx);
 
-            maybe_start_crossfade(&mut session);
+            maybe_start_crossfade(&mut session, &shared);
 
             match handle_eof(out, &mut session, &shared.play_state, &event_tx) {
                 EofOutcome::NotEof => {}
@@ -1767,6 +1855,7 @@ fn check_and_rebuild_output(
                     session.target_channels = new_out.channels;
 
                     session.outgoing = None;
+                    shared.cancel_loudness_switch();
                     if let Some(t) = session.transition.take() {
                         // Mid-handover: `cur_pos` is still on the finished
                         // track's timeline, so reopen that track there (as
@@ -1924,6 +2013,7 @@ fn handle_decode_command(
 
             // A seek cuts any crossfade tail still being mixed in.
             session.outgoing = None;
+            shared.cancel_loudness_switch();
             if let Some(t) = session.transition.take() {
                 // Mid-handover seek: the audible position is still in
                 // the finished track but its decoder is gone — reopen
@@ -2005,7 +2095,7 @@ fn handle_decode_command(
             }
             CmdOutcome::Continue
         }
-        Ok(AudioCommand::PreloadNextCrossfade(preq, secs)) => {
+        Ok(AudioCommand::PreloadNextCrossfade(preq, secs, gain)) => {
             match ActiveTrack::open(
                 preq.song,
                 preq.start_nanosec,
@@ -2016,6 +2106,7 @@ fn handle_decode_command(
                     log::debug!("Preloaded next track {} for crossfade", t.song.id);
                     session.next = Some(t);
                     session.crossfade_secs = secs;
+                    session.crossfade_incoming_gain = gain;
                 }
                 Err(e) => {
                     log::warn!("Crossfade preload failed: {e}");
@@ -2288,10 +2379,28 @@ fn mix_outgoing_tail(tail: &mut CrossfadeTail, b: &mut [f32], channels: usize) -
         }
     }
     let avail = tail.fifo.len().min(need);
-    let n = mix_crossfade(b, &tail.fifo[..avail], tail.mixed, tail.total, channels);
+    let n = mix_crossfade(
+        b,
+        &tail.fifo[..avail],
+        tail.gain,
+        tail.mixed,
+        tail.total,
+        channels,
+    );
     tail.fifo.drain(..avail);
     tail.mixed += n;
     tail.mixed >= tail.total
+}
+
+/// Gain that keeps a crossfade tail at `old_gain` once the mix is scaled by
+/// `new_gain`. A (near-)silent incoming gain leaves the tail unscaled rather
+/// than blowing it up.
+fn tail_gain_ratio(old_gain: f32, new_gain: f32) -> f32 {
+    if new_gain > 1e-4 {
+        old_gain / new_gain
+    } else {
+        1.0
+    }
 }
 
 /// Start an auto-crossfade (#1238) once the current track's decode position
@@ -2302,7 +2411,7 @@ fn mix_outgoing_tail(tail: &mut CrossfadeTail, b: &mut [f32], channels: usize) -
 /// `TrackTransitioned` fire exactly as for a gapless handover — just when the
 /// crossfade becomes audible. If the overlap works out to zero the preload
 /// stays in `next` and `handle_eof` hands over gaplessly.
-fn maybe_start_crossfade(session: &mut DecodeSession) {
+fn maybe_start_crossfade(session: &mut DecodeSession, shared: &AudioShared) {
     if session.crossfade_secs <= 0.0
         || session.outgoing.is_some()
         || session.transition.is_some()
@@ -2346,10 +2455,17 @@ fn maybe_start_crossfade(session: &mut DecodeSession) {
         boundary_samples: session.pushed_samples,
         finished_song: old.song.clone(),
     });
+    // The loudness gain is one global slot applied after mixing: switch it to
+    // the incoming track's at the overlap's first sample, and pre-scale the
+    // tail so it still plays at its own normalized level.
+    let old_gain = f32::from_bits(shared.loudness_gain.load(Ordering::Relaxed));
+    let new_gain = session.crossfade_incoming_gain;
+    shared.schedule_loudness_switch(session.pushed_samples, new_gain);
     session.outgoing = Some(CrossfadeTail {
         track: old,
         total,
         mixed: 0,
+        gain: tail_gain_ratio(old_gain, new_gain),
         fifo: Vec::with_capacity(total.min(1 << 16)),
     });
 }
@@ -2488,7 +2604,7 @@ mod tests {
         for chunk in [74, 500, 2, 1_200, 800] {
             let mut b = vec![0.0f32; chunk];
             let a = vec![1.0f32; chunk];
-            mixed += mix_crossfade(&mut b, &a, mixed, total, channels);
+            mixed += mix_crossfade(&mut b, &a, 1.0, mixed, total, channels);
             out.extend(b);
         }
         assert_eq!(mixed, total);
@@ -2510,13 +2626,49 @@ mod tests {
     fn mix_crossfade_short_tail_fades_in_from_silence() {
         let mut b = vec![1.0f32; 8];
         let a = [1.0f32; 2];
-        let n = mix_crossfade(&mut b, &a, 0, 8, 2);
+        let n = mix_crossfade(&mut b, &a, 1.0, 0, 8, 2);
         assert_eq!(n, 8);
         // Past the tail the outgoing contribution is silence, so only the
         // incoming ramp remains.
         let (_, gb) = equal_power_gains(2.0 / 4.0);
         assert!((b[4] - gb).abs() < 1e-6);
         assert!(b[4] < 1.0);
+    }
+
+    #[test]
+    fn crossfade_keeps_each_track_at_its_own_loudness_gain() {
+        // A loud outgoing track (gain 0.475) into a quiet incoming one (gain
+        // 1.41): after the callback scales the mix by the incoming gain, each
+        // track must still sit at its own gain — not the tail at 1.41.
+        let (old_gain, new_gain) = (0.475f32, 1.41f32);
+        let (a_val, b_val) = (0.8f32, 0.3f32);
+        let mut b = vec![b_val; 8];
+        let a = [a_val; 8];
+        mix_crossfade(&mut b, &a, tail_gain_ratio(old_gain, new_gain), 0, 8, 2);
+        for (frame, pair) in b.chunks(2).enumerate() {
+            let (ga, gb) = equal_power_gains(frame as f32 / 4.0);
+            let expected = a_val * ga * old_gain + b_val * gb * new_gain;
+            assert!((pair[0] * new_gain - expected).abs() < 1e-5);
+        }
+    }
+
+    #[test]
+    fn tail_gain_ratio_ignores_silent_incoming_gain() {
+        assert_eq!(tail_gain_ratio(0.5, 0.0), 1.0);
+        assert!((tail_gain_ratio(0.5, 2.0) - 0.25).abs() < 1e-6);
+    }
+
+    #[test]
+    fn loudness_switch_offset_lands_on_the_scheduled_sample() {
+        // Buffer covers played-sample indices 1000..1512.
+        assert_eq!(loudness_switch_offset(1200, 1000, 512), Some(200));
+        // Exactly at the buffer's end: fires now (offset = whole buffer), so
+        // the next buffer isn't racing the decode thread's counter rebase.
+        assert_eq!(loudness_switch_offset(1512, 1000, 512), Some(512));
+        assert_eq!(loudness_switch_offset(1513, 1000, 512), None);
+        // Already passed (e.g. a buffer with no output): apply immediately.
+        assert_eq!(loudness_switch_offset(900, 1000, 512), Some(0));
+        assert_eq!(loudness_switch_offset(NO_LOUDNESS_SWITCH, 1000, 512), None);
     }
 
     #[test]
