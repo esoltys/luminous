@@ -3,7 +3,7 @@ interface LyricWord {
   text: string;
 }
 
-export interface LyricLine {
+interface LyricLine {
   timeMs: number;
   text: string;
   words?: LyricWord[];
@@ -128,7 +128,7 @@ export function parseLrc(lyricsText: string, userOffsetMs: number = 0): ParsedLr
     while ((match = WORD_TIME_REGEX.exec(lineContent)) !== null) {
       const rawMs = parseTimestamp(match[1], match[2], match[3]);
       wordTags.push({
-        index: mIndex(match),
+        index: match.index,
         rawMs,
         tagLength: match[0].length,
       });
@@ -204,8 +204,4 @@ export function parseLrc(lyricsText: string, userOffsetMs: number = 0): ParsedLr
     lines: sorted,
     fileOffsetMs,
   };
-}
-
-function mIndex(match: RegExpExecArray): number {
-  return match.index;
 }

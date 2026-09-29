@@ -167,17 +167,17 @@ describe("LyricsView.svelte", () => {
   });
 
   it("renders offset nudge buttons and calls set_lyrics_offset when clicked", async () => {
+    getOffsetResult = 0;
     playerStore.currentSong = mockSong;
-    const { getByTitle } = render(LyricsView);
+    const { getByRole } = render(LyricsView);
 
     await waitFor(() => {
-      expect(getByTitle("Lyrics appear earlier (+0.5s)")).toBeInTheDocument();
-      expect(getByTitle("Lyrics appear later (-0.5s)")).toBeInTheDocument();
-      expect(getByTitle("Sync Offset")).toHaveTextContent("0.0s");
+      expect(getByRole("button", { name: "Show lyrics 0.5 s earlier" })).toBeInTheDocument();
+      expect(getByRole("button", { name: "Show lyrics 0.5 s later" })).toBeInTheDocument();
+      expect(document.getElementById("lyrics-offset-value")).toHaveTextContent("0.0s");
     });
 
-    const plusBtn = getByTitle("Lyrics appear earlier (+0.5s)");
-    await fireEvent.click(plusBtn);
+    await fireEvent.click(getByRole("button", { name: "Show lyrics 0.5 s earlier" }));
 
     expect(invoke).toHaveBeenCalledWith("set_lyrics_offset", {
       songId: mockSong.id,
@@ -185,8 +185,34 @@ describe("LyricsView.svelte", () => {
     });
 
     await waitFor(() => {
-      expect(getByTitle("Sync Offset")).toHaveTextContent("+0.5s");
+      expect(document.getElementById("lyrics-offset-value")).toHaveTextContent("+0.5s");
     });
+  });
+
+  it("drops a previous song's offset that resolves after the song changed", async () => {
+    let resolveOldOffset!: (ms: number) => void;
+    vi.mocked(invoke).mockImplementation(((cmd: string, args?: { songId?: number }) => {
+      if (cmd === "get_lyrics") return Promise.resolve(getLyricsResult);
+      if (cmd === "get_lyrics_offset") {
+        if (args?.songId === mockSong.id) {
+          return new Promise<number>((resolve) => (resolveOldOffset = resolve));
+        }
+        return Promise.resolve(0);
+      }
+      return Promise.resolve(null);
+    }) as typeof invoke);
+
+    playerStore.currentSong = mockSong;
+    const { getByText, queryByText } = render(LyricsView);
+    await waitFor(() => expect(resolveOldOffset).toBeDefined());
+
+    playerStore.currentSong = { ...mockSong, id: mockSong.id + 1 };
+    await waitFor(() => expect(getByText("0.0s")).toBeInTheDocument());
+
+    resolveOldOffset(1500);
+    await Promise.resolve();
+    await waitFor(() => expect(queryByText("+1.5s")).not.toBeInTheDocument());
+    expect(getByText("0.0s")).toBeInTheDocument();
   });
 });
 

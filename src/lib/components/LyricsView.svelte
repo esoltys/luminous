@@ -12,11 +12,11 @@
   } from "phosphor-svelte";
   import LoadingSpinner from "./LoadingSpinner.svelte";
   import Button from "./Button.svelte";
+  import HelpTip from "./HelpTip.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { rememberScroll } from "../utils/scrollMemory";
-
-  import { parseLrc, type LyricLine } from "../utils/lrc";
+  import { parseLrc } from "../utils/lrc";
 
   let lyricsText = $state("");
   let userOffsetMs = $state(0);
@@ -152,14 +152,16 @@
   }
 
   async function loadOffset(songId: number | undefined) {
-    if (songId === undefined) {
-      userOffsetMs = 0;
-      return;
-    }
+    // Reset immediately so the previous song's offset never applies to this
+    // one while the lookup is in flight.
+    userOffsetMs = 0;
+    if (songId === undefined) return;
     try {
-      userOffsetMs = await invoke<number>("get_lyrics_offset", { songId });
+      const offset = await invoke<number>("get_lyrics_offset", { songId });
+      // Drop the result if the song changed while we were waiting.
+      if (playerStore.currentSong?.id === songId) userOffsetMs = offset;
     } catch {
-      userOffsetMs = 0;
+      // Keep the zero offset.
     }
   }
 
@@ -259,24 +261,27 @@
               <button
                 onclick={() => adjustOffset(-500)}
                 class="hover:text-brand-text-primary px-1 font-mono font-bold transition-colors cursor-pointer"
-                title={i18n.t('lyrics.offsetLater', {}, 'Lyrics appear later (-0.5s)')}
+                title={i18n.t('lyrics.offsetLater', {}, 'Show lyrics 0.5 s later')}
+                aria-label={i18n.t('lyrics.offsetLater', {}, 'Show lyrics 0.5 s later')}
               >
                 -0.5s
               </button>
               <button
                 onclick={resetOffset}
                 class="text-[11px] font-mono px-1 hover:text-brand-accent-text transition-colors cursor-pointer {userOffsetMs !== 0 ? 'text-brand-accent-text font-bold' : 'text-brand-text-secondary/70'}"
-                title={i18n.t('lyrics.syncOffsetLabel', {}, 'Sync Offset')}
+                id="lyrics-offset-value"
               >
                 {userOffsetMs > 0 ? `+${(userOffsetMs / 1000).toFixed(1)}s` : `${(userOffsetMs / 1000).toFixed(1)}s`}
               </button>
               <button
                 onclick={() => adjustOffset(500)}
                 class="hover:text-brand-text-primary px-1 font-mono font-bold transition-colors cursor-pointer"
-                title={i18n.t('lyrics.offsetEarlier', {}, 'Lyrics appear earlier (+0.5s)')}
+                title={i18n.t('lyrics.offsetEarlier', {}, 'Show lyrics 0.5 s earlier')}
+                aria-label={i18n.t('lyrics.offsetEarlier', {}, 'Show lyrics 0.5 s earlier')}
               >
                 +0.5s
               </button>
+              <HelpTip text={i18n.t('lyrics.offsetHelp')} label={i18n.t('lyrics.syncOffsetLabel', {}, 'Sync Offset')} describes="lyrics-offset-value" />
             </div>
           {/if}
           <Button onclick={() => loadLyrics(playerStore.currentSong?.id, true)} variant="secondary" size="sm" title={i18n.t('lyrics.refetchTooltip', {}, "Refetch lyrics online")}>

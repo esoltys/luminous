@@ -58,6 +58,28 @@ pub struct NetEaseLyricData {
     pub lyric: Option<String>,
 }
 
+/// NetEase search results only count as a match when their duration is within
+/// this many milliseconds of the local file's.
+const NETEASE_DURATION_TOLERANCE_MS: i64 = 8000;
+
+/// Picks the search result whose duration is closest to `duration_sec`. When
+/// the duration is known, a candidate outside the tolerance is never chosen —
+/// a same-titled song of a different length (cover, live, remix) would give
+/// lyrics timed for the wrong recording. With no known duration, the top
+/// result is taken.
+fn pick_netease_song(songs: &[NetEaseSong], duration_sec: u32) -> Option<&NetEaseSong> {
+    if duration_sec == 0 {
+        return songs.first();
+    }
+    let target_ms = i64::from(duration_sec) * 1000;
+    songs
+        .iter()
+        .filter_map(|s| s.dt.map(|dt| (s, (dt - target_ms).abs())))
+        .filter(|(_, diff)| *diff <= NETEASE_DURATION_TOLERANCE_MS)
+        .min_by_key(|(_, diff)| *diff)
+        .map(|(s, _)| s)
+}
+
 /// Holds the shared HTTP client used for every provider request. Cheap to
 /// construct (no state beyond the client), so callers can create one
 /// per-lookup rather than needing to share an instance.
@@ -254,31 +276,8 @@ impl LyricsManager {
             return Err(anyhow!("NetEase returned no songs for query"));
         }
 
-        // Pick song with duration closest to duration_sec if duration is provided,
-        // or the first song if duration_sec is 0.
-        let target_dur_ms = (duration_sec as i64) * 1000;
-        let chosen_song = if duration_sec > 0 {
-            songs
-                .iter()
-                .filter(|s| {
-                    if let Some(dt) = s.dt {
-                        // Allow tolerance of ±8 seconds
-                        (dt - target_dur_ms).abs() <= 8000
-                    } else {
-                        true
-                    }
-                })
-                .min_by_key(|s| {
-                    s.dt.map(|dt| (dt - target_dur_ms).abs())
-                        .unwrap_or(i64::MAX)
-                })
-                .or_else(|| songs.first())
-        } else {
-            songs.first()
-        };
-
-        let Some(song) = chosen_song else {
-            return Err(anyhow!("No matching NetEase song candidate"));
+        let Some(song) = pick_netease_song(&songs, duration_sec) else {
+            return Err(anyhow!("No NetEase candidate within duration tolerance"));
         };
 
         let lyric_url = format!(
@@ -812,7 +811,7 @@ pub async fn get_lyrics_for_song(
 
     let duration_sec = (len_ns / 1_000_000_000) as u32;
 
-    // 3. Query online APIs (LRCLIB -> Lyrics.ovh)
+    // 3. Query online APIs (LRCLIB -> NetEase -> Lyrics.ovh)
     match lyrics_manager
         .fetch_lyrics(&artist, &title, &album, duration_sec)
         .await
@@ -1157,6 +1156,40 @@ mod tests {
             .query_row("SELECT lyrics FROM songs WHERE id = 1", [], |r| r.get(0))
             .unwrap();
         assert_eq!(cached, Some("[00:10.00] Sidecar lyrics line".to_string()));
+    }
+
+    fn netease_song(id: i64, dt: Option<i64>) -> NetEaseSong {
+        NetEaseSong {
+            id,
+            name: None,
+            ar: None,
+            dt,
+        }
+    }
+
+    #[test]
+    fn test_pick_netease_song_prefers_closest_duration_within_tolerance() {
+        let songs = vec![
+            netease_song(1, Some(240_000)),
+            netease_song(2, Some(201_000)),
+            netease_song(3, Some(205_000)),
+        ];
+        assert_eq!(pick_netease_song(&songs, 200).map(|s| s.id), Some(2));
+    }
+
+    #[test]
+    fn test_pick_netease_song_rejects_candidates_outside_tolerance() {
+        let songs = vec![netease_song(1, Some(300_000)), netease_song(2, None)];
+        assert!(pick_netease_song(&songs, 200).is_none());
+    }
+
+    #[test]
+    fn test_pick_netease_song_takes_first_when_duration_unknown() {
+        let songs = vec![
+            netease_song(7, Some(300_000)),
+            netease_song(8, Some(200_000)),
+        ];
+        assert_eq!(pick_netease_song(&songs, 0).map(|s| s.id), Some(7));
     }
 
     #[test]
