@@ -13,16 +13,20 @@ function diffDaysFromNow(timestampSec: number): number {
   return Math.floor(diffMs / (1000 * 60 * 60 * 24));
 }
 
-// Today / Yesterday / "N days ago" through 6 days, then falls back to the
-// absolute date — used for the Date Added and Last Played columns, where older
-// entries read better as a real date than as "3 weeks ago". Today's entries drill
-// down further into minutes/hours ago rather than just reading "Today".
+// Anything this recent reads as minutes/hours ago even across midnight, so a song
+// played at 23:50 shows "15 minutes ago" at 00:05 rather than "Yesterday" (#1299).
+const ELAPSED_TIME_WINDOW_MINUTES = 6 * 60;
+
+// Minutes/hours ago for today's (or the last few hours') entries, then Yesterday /
+// "N days ago" through 6 days, then falls back to the absolute date — used for the
+// Date Added and Last Played columns, where older entries read better as a real
+// date than as "3 weeks ago".
 export function formatDateAdded(timestampSec: number | undefined | null): string {
   if (!timestampSec) return "—";
   const diffDays = diffDaysFromNow(timestampSec);
+  const diffMinutes = Math.floor((Date.now() / 1000 - timestampSec) / 60);
 
-  if (diffDays <= 0) {
-    const diffMinutes = Math.floor((Date.now() / 1000 - timestampSec) / 60);
+  if (diffDays <= 0 || diffMinutes < ELAPSED_TIME_WINDOW_MINUTES) {
     if (diffMinutes < 1) return i18n.t("playlists.relativeJustNow");
     if (diffMinutes < 60) {
       return diffMinutes === 1
