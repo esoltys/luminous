@@ -4,6 +4,7 @@
   import { collectionStore } from "../stores/collection.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { i18n } from "../stores/i18n.svelte";
+  import { toastStore } from "../stores/toast.svelte";
   import { PLAYER_DOCK_CLEARANCE_PX } from "../constants";
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
@@ -58,6 +59,10 @@
       onClose();
     } catch (err) {
       console.error("Failed to update directory metadata:", err);
+      toastStore.show(
+        i18n.t("settings.folderSaveFailedPrefix", {}, "Failed to save folder details: ") + String(err),
+        "error",
+      );
     } finally {
       saving = false;
     }

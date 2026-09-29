@@ -959,8 +959,14 @@ impl CollectionScanner {
             // Each write batch is read in smaller parallel sub-chunks with a
             // progress event after each, so the counter advances steadily
             // instead of jumping once per whole write batch (#1243).
+            //
+            // Tags are read with no transaction open; only the upserts run
+            // inside one. Holding SQLite's single write lock across tag reads
+            // (slow on network drives) starved every other writer — e.g.
+            // saving a folder's nickname mid-scan hit `busy_timeout` and
+            // failed.
             for chunk in needs_update.chunks(SCAN_WRITE_BATCH_SIZE) {
-                let tx = conn.unchecked_transaction()?;
+                let mut songs = Vec::with_capacity(chunk.len());
                 for read_chunk in chunk.chunks(SCAN_PROGRESS_INTERVAL) {
                     let prepared: Vec<(PathBuf, Result<Song>)> = scan_pool.install(|| {
                         read_chunk
@@ -974,11 +980,7 @@ impl CollectionScanner {
                     let mut last_path = None;
                     for (path, result) in prepared {
                         match result {
-                            Ok(song) => {
-                                if let Err(e) = upsert_song(&tx, &song) {
-                                    log::warn!("Failed to save tags for {}: {e}", path.display());
-                                }
-                            }
+                            Ok(song) => songs.push((path.clone(), song)),
                             Err(e) => {
                                 log::warn!("Failed to read tags for {}: {e}", path.display())
                             }
@@ -995,6 +997,13 @@ impl CollectionScanner {
                         silent,
                     });
                 }
+
+                let tx = conn.unchecked_transaction()?;
+                for (path, song) in &songs {
+                    if let Err(e) = upsert_song(&tx, song) {
+                        log::warn!("Failed to save tags for {}: {e}", path.display());
+                    }
+                }
                 tx.commit()?;
             }
 
@@ -1002,9 +1011,11 @@ impl CollectionScanner {
             // loop above because one CUE sheet fans out into N `songs` rows
             // that all share its media file's `path`, so it can't go through
             // `read_and_prepare_song`/`upsert_song`'s one-row-per-path shape.
-            if !cue_jobs.is_empty() {
-                let tx = conn.unchecked_transaction()?;
-                for job in &cue_jobs {
+            // Like the main loop, the media file's tags are read outside the
+            // transaction so the write lock is only held for the writes.
+            for cue_chunk in cue_jobs.chunks(SCAN_PROGRESS_INTERVAL) {
+                let mut built = Vec::with_capacity(cue_chunk.len());
+                for job in cue_chunk {
                     let path_str = job.media_path.to_string_lossy().to_string();
                     let combined_mtime = get_mtime(&job.media_path)
                         .unwrap_or(0)
@@ -1015,8 +1026,8 @@ impl CollectionScanner {
                         continue;
                     }
 
-                    match sync_cue_tracks(&tx, &cover_manager, job, combined_mtime) {
-                        Ok(()) => {}
+                    match build_cue_songs(&cover_manager, job, combined_mtime) {
+                        Ok(songs) => built.push((job, songs)),
                         Err(e) => {
                             log::warn!("Failed to parse CUE sheet {}: {e}", job.cue_path.display())
                         }
@@ -1031,6 +1042,16 @@ impl CollectionScanner {
                             current_path: Some(job.cue_path.to_string_lossy().to_string()),
                             silent,
                         });
+                    }
+                }
+
+                if built.is_empty() {
+                    continue;
+                }
+                let tx = conn.unchecked_transaction()?;
+                for (job, songs) in &built {
+                    if let Err(e) = write_cue_tracks(&tx, job, songs) {
+                        log::warn!("Failed to save CUE sheet {}: {e}", job.cue_path.display())
                     }
                 }
                 tx.commit()?;
@@ -1785,17 +1806,11 @@ fn build_cue_songs(cover_manager: &CoverManager, job: &CueJob, mtime: i64) -> Re
     Ok(songs)
 }
 
-/// Re-parses `job`'s CUE sheet and upserts one row per track, deleting any
+/// Upserts one row per track built by `build_cue_songs`, deleting any
 /// previously-stored CUE track for this (media file, CUE sheet) pair whose
 /// start offset no longer appears in the freshly parsed sheet — e.g. the CUE
 /// was hand-edited to merge or drop a track since the last scan.
-fn sync_cue_tracks(
-    conn: &rusqlite::Connection,
-    cover_manager: &CoverManager,
-    job: &CueJob,
-    mtime: i64,
-) -> Result<()> {
-    let songs = build_cue_songs(cover_manager, job, mtime)?;
+fn write_cue_tracks(conn: &rusqlite::Connection, job: &CueJob, songs: &[Song]) -> Result<()> {
     let path_str = job.media_path.to_string_lossy().to_string();
     let cue_path_str = job.cue_path.to_string_lossy().to_string();
 
@@ -1812,7 +1827,7 @@ fn sync_cue_tracks(
         conn.execute(&sql, sql_params.as_slice())?;
     }
 
-    for song in &songs {
+    for song in songs {
         upsert_song(conn, song)?;
     }
     Ok(())
@@ -2472,6 +2487,50 @@ mod tests {
             assert!(phases.contains(&ScanPhase::Updating));
             assert_eq!(phases.last(), Some(&ScanPhase::Done));
         }
+    }
+
+    #[tokio::test]
+    async fn test_scan_does_not_hold_write_lock_while_reading_tags() {
+        // Regression test: the scan used to open its write transaction before
+        // reading a batch's tags, so on a slow drive every other writer — e.g.
+        // saving a folder's nickname mid-scan — waited out `busy_timeout` and
+        // failed. Each progress event fires between tag reads, so a write
+        // attempted from inside the callback must not contend with the scan.
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let music_dir = temp_dir.path().join("music");
+        std::fs::create_dir_all(&music_dir).unwrap();
+        for i in 0..120 {
+            write_test_wav(&music_dir.join(format!("song{i:03}.wav")));
+        }
+
+        let db = Arc::new(Database::new(temp_dir.path().to_path_buf()).unwrap());
+        let scanner = CollectionScanner::new(Arc::clone(&db));
+        scanner.add_directory(&music_dir.to_string_lossy()).unwrap();
+        let dir_id = scanner.get_directories().unwrap()[0].id;
+
+        let mut write_results = Vec::new();
+        scanner
+            .scan_all_core(temp_dir.path().to_path_buf(), false, false, false, |p| {
+                if p.phase == ScanPhase::ReadingTags && p.scanned > 0 {
+                    write_results.push(scanner.update_directory_metadata(
+                        dir_id,
+                        Some(format!("Library {}", p.scanned)),
+                        None,
+                        None,
+                    ));
+                }
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(write_results.len(), 3);
+        for result in write_results {
+            result.expect("folder metadata write blocked by scan");
+        }
+        assert_eq!(
+            scanner.get_directories().unwrap()[0].nickname.as_deref(),
+            Some("Library 120")
+        );
     }
 
     #[test]
