@@ -1430,10 +1430,20 @@ impl Player {
                 "Auto-crossfade armed for track transition to song {}",
                 target.song.id
             );
+            // The engine switches to the incoming track's loudness gain at
+            // the overlap's first sample, so it needs that gain up front.
+            let incoming_gain = match Self::load_loudness_settings(&self._db).await {
+                Ok(settings) => Self::compute_loudness_gain(&settings, &target.song).0,
+                Err(e) => {
+                    log::warn!("Failed to load loudness settings: {e}");
+                    1.0
+                }
+            };
             self.audio.lock().await.preload_next_with_crossfade(
                 Box::new(target.song),
                 start_ns,
                 fade_settings.crossfade_auto_duration_secs,
+                incoming_gain,
             )
         } else {
             self.audio
