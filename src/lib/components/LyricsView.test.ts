@@ -15,10 +15,12 @@ const SYNCED_LYRICS = [
 ].join("\n");
 
 let getLyricsResult: string = SYNCED_LYRICS;
+let getOffsetResult: number = 0;
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockImplementation((cmd: string) => {
     if (cmd === "get_lyrics") return Promise.resolve(getLyricsResult);
+    if (cmd === "get_lyrics_offset") return Promise.resolve(getOffsetResult);
     return Promise.resolve(null);
   }),
 }));
@@ -129,4 +131,62 @@ describe("LyricsView.svelte", () => {
       isInstrumental: false,
     });
   });
+
+  it("renders dir='auto' on synced and plain lyric elements for RTL support", async () => {
+    playerStore.currentSong = mockSong;
+    const { container } = render(LyricsView);
+
+    await waitFor(() => {
+      const lineEls = container.querySelectorAll("p[data-index]");
+      expect(lineEls.length).toBeGreaterThan(0);
+      expect(lineEls[0].getAttribute("dir")).toBe("auto");
+    });
+  });
+
+  it("highlights words individually when Enhanced LRC word tags are present", async () => {
+    getLyricsResult = "[00:10.00]<00:10.00>First <00:10.50>Second <00:11.00>Third";
+    playerStore.currentSong = mockSong;
+    // Position at 10.7s: First and Second are sung, Third is future
+    playerStore.positionNanosec = 10_700_000_000;
+
+    const { getByText } = render(LyricsView);
+
+    await waitFor(() => {
+      expect(getByText("First")).toBeInTheDocument();
+      expect(getByText("Second")).toBeInTheDocument();
+      expect(getByText("Third")).toBeInTheDocument();
+    });
+
+    const firstWord = getByText("First");
+    const secondWord = getByText("Second");
+    const thirdWord = getByText("Third");
+
+    expect(firstWord.className).toContain("opacity-100");
+    expect(secondWord.className).toContain("opacity-100");
+    expect(thirdWord.className).toContain("opacity-40");
+  });
+
+  it("renders offset nudge buttons and calls set_lyrics_offset when clicked", async () => {
+    playerStore.currentSong = mockSong;
+    const { getByTitle } = render(LyricsView);
+
+    await waitFor(() => {
+      expect(getByTitle("Lyrics appear earlier (+0.5s)")).toBeInTheDocument();
+      expect(getByTitle("Lyrics appear later (-0.5s)")).toBeInTheDocument();
+      expect(getByTitle("Sync Offset")).toHaveTextContent("0.0s");
+    });
+
+    const plusBtn = getByTitle("Lyrics appear earlier (+0.5s)");
+    await fireEvent.click(plusBtn);
+
+    expect(invoke).toHaveBeenCalledWith("set_lyrics_offset", {
+      songId: mockSong.id,
+      offsetMs: 500,
+    });
+
+    await waitFor(() => {
+      expect(getByTitle("Sync Offset")).toHaveTextContent("+0.5s");
+    });
+  });
 });
+

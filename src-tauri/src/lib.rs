@@ -1298,6 +1298,8 @@ pub fn run() {
             commands::lyrics::get_lyrics,
             commands::lyrics::save_lyrics,
             commands::lyrics::set_instrumental,
+            commands::lyrics::get_lyrics_offset,
+            commands::lyrics::set_lyrics_offset,
             // Details pane context enrichment (#23)
             commands::context::get_song_context,
             commands::context::is_context_enrichment_enabled,

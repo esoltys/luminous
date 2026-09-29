@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 49;
+pub const CURRENT_SCHEMA_VERSION: i32 = 50;
 
 struct Migration {
     version: i32,
@@ -431,6 +431,11 @@ const MIGRATIONS: &[Migration] = &[
             }
             Ok(())
         },
+    },
+    Migration {
+        version: 50,
+        description: "song_lyrics_offsets table for per-song timing offset (#1237)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_50)?),
     },
 ];
 
@@ -1676,6 +1681,15 @@ ALTER TABLE album_profiles ADD COLUMN cover_fetched INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE album_profiles ADD COLUMN disc_fetched INTEGER NOT NULL DEFAULT 0;
 ";
 
+// Migration 50: per-song lyrics timing offset in milliseconds (#1237)
+const MIGRATION_50: &str = "
+CREATE TABLE IF NOT EXISTS song_lyrics_offsets (
+    song_id INTEGER PRIMARY KEY,
+    offset_ms INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY(song_id) REFERENCES songs(id) ON DELETE CASCADE
+);
+";
+
 fn seed_artist_tag_hierarchy(conn: &rusqlite::Connection) -> Result<()> {
     let mut stmt = conn.prepare(
         "SELECT DISTINCT json_each.value
@@ -2610,6 +2624,52 @@ mod tests {
             )
             .unwrap();
         assert!(album_details_fetched);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_migration_50_adds_song_lyrics_offsets() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_migration50_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
+        let db = Database::new(temp_dir.clone()).unwrap();
+        assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
+
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO songs (id, title, artist, path) VALUES (1, 'Test Song', 'Test Artist', '/tmp/test.mp3')",
+            [],
+        )
+        .unwrap();
+
+        conn.execute(
+            "INSERT INTO song_lyrics_offsets (song_id, offset_ms) VALUES (1, 500)",
+            [],
+        )
+        .unwrap();
+
+        let offset: i32 = conn
+            .query_row(
+                "SELECT offset_ms FROM song_lyrics_offsets WHERE song_id = 1",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(offset, 500);
+
+        // Verify foreign key ON DELETE CASCADE
+        conn.execute("DELETE FROM songs WHERE id = 1", []).unwrap();
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM song_lyrics_offsets WHERE song_id = 1",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 0);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

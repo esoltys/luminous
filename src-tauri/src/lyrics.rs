@@ -1,6 +1,6 @@
 //! Online lyrics lookup — tries LRCLIB (synced `.lrc` lyrics, preferred)
-//! before falling back to Lyrics.ovh (plain text only). See
-//! `LyricsManager::fetch_lyrics` for the fallback chain.
+//! and NetEase Cloud Music before falling back to Lyrics.ovh (plain text only).
+//! See `LyricsManager::fetch_lyrics` for the fallback chain.
 
 use anyhow::{anyhow, Result};
 use reqwest::Client;
@@ -23,6 +23,39 @@ pub struct LrcLibResponse {
 #[derive(Deserialize, Debug)]
 pub struct LyricsOvhResponse {
     pub lyrics: Option<String>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct NetEaseSearchResponse {
+    pub result: Option<NetEaseSearchResult>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct NetEaseSearchResult {
+    pub songs: Option<Vec<NetEaseSong>>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct NetEaseSong {
+    pub id: i64,
+    pub name: Option<String>,
+    pub ar: Option<Vec<NetEaseArtist>>,
+    pub dt: Option<i64>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct NetEaseArtist {
+    pub name: Option<String>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct NetEaseLyricResponse {
+    pub lrc: Option<NetEaseLyricData>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct NetEaseLyricData {
+    pub lyric: Option<String>,
 }
 
 /// Holds the shared HTTP client used for every provider request. Cheap to
@@ -49,11 +82,11 @@ impl LyricsManager {
         }
     }
 
-    /// Search LRCLIB and Lyrics.ovh in priority order, returning the first
-    /// **synced** result found (short-circuits immediately). If none of the
-    /// providers return synced lyrics, falls back to whichever plain-text
-    /// result was found first rather than failing outright. Errs only if
-    /// every provider — including retries with the title's "(feat. ...)"
+    /// Search LRCLIB, NetEase Cloud Music, and Lyrics.ovh in priority order,
+    /// returning the first **synced** result found (short-circuits immediately).
+    /// If none of the providers return synced lyrics, falls back to whichever
+    /// plain-text result was found first rather than failing outright. Errs only
+    /// if every provider — including retries with the title's "(feat. ...)"
     /// annotation stripped — comes back empty.
     pub async fn fetch_lyrics(
         &self,
@@ -87,7 +120,17 @@ impl LyricsManager {
             }
         }
 
-        // 2. Try Lyrics.ovh fallback (only needs artist & title, returns plain text)
+        // 2. Try NetEase Cloud Music (strong coverage for East Asian and international synced lyrics)
+        if let Ok(lyrics) = self.fetch_netease(artist, title, duration_sec).await {
+            if is_synced_lrc(&lyrics) {
+                return Ok(lyrics);
+            }
+            if best_lyrics.is_none() {
+                best_lyrics = Some(lyrics);
+            }
+        }
+
+        // 3. Try Lyrics.ovh fallback (only needs artist & title, returns plain text)
         if let Ok(lyrics) = self.fetch_lyrics_ovh(artist, title).await {
             if is_synced_lrc(&lyrics) {
                 return Ok(lyrics);
@@ -97,11 +140,22 @@ impl LyricsManager {
             }
         }
 
-        // 3. Clean title of featured artist annotations (e.g., "(feat. ...)") and retry online search
+        // 4. Clean title of featured artist annotations (e.g., "(feat. ...)") and retry online search
         let cleaned_title = clean_featured_title(title);
         if cleaned_title != title {
             if let Ok(lyrics) = self
                 .fetch_lrclib(artist, &cleaned_title, None, duration_sec)
+                .await
+            {
+                if is_synced_lrc(&lyrics) {
+                    return Ok(lyrics);
+                }
+                if best_lyrics.is_none() {
+                    best_lyrics = Some(lyrics);
+                }
+            }
+            if let Ok(lyrics) = self
+                .fetch_netease(artist, &cleaned_title, duration_sec)
                 .await
             {
                 if is_synced_lrc(&lyrics) {
@@ -167,6 +221,92 @@ impl LyricsManager {
         }
 
         Err(anyhow!("LRCLIB returned no lyrics"))
+    }
+
+    async fn fetch_netease(&self, artist: &str, title: &str, duration_sec: u32) -> Result<String> {
+        let query = format!("{artist} {title}");
+        let search_url = "https://music.163.com/api/cloudsearch/pc";
+
+        let response = self
+            .client
+            .post(search_url)
+            .header("Referer", "https://music.163.com/")
+            .form(&[
+                ("s", query.as_str()),
+                ("type", "1"),
+                ("offset", "0"),
+                ("limit", "5"),
+            ])
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            return Err(anyhow!(
+                "NetEase search request failed with status: {}",
+                response.status()
+            ));
+        }
+
+        let res: NetEaseSearchResponse = response.json().await?;
+        let songs = res.result.and_then(|r| r.songs).unwrap_or_default();
+
+        if songs.is_empty() {
+            return Err(anyhow!("NetEase returned no songs for query"));
+        }
+
+        // Pick song with duration closest to duration_sec if duration is provided,
+        // or the first song if duration_sec is 0.
+        let target_dur_ms = (duration_sec as i64) * 1000;
+        let chosen_song = if duration_sec > 0 {
+            songs
+                .iter()
+                .filter(|s| {
+                    if let Some(dt) = s.dt {
+                        // Allow tolerance of ±8 seconds
+                        (dt - target_dur_ms).abs() <= 8000
+                    } else {
+                        true
+                    }
+                })
+                .min_by_key(|s| {
+                    s.dt.map(|dt| (dt - target_dur_ms).abs())
+                        .unwrap_or(i64::MAX)
+                })
+                .or_else(|| songs.first())
+        } else {
+            songs.first()
+        };
+
+        let Some(song) = chosen_song else {
+            return Err(anyhow!("No matching NetEase song candidate"));
+        };
+
+        let lyric_url = format!(
+            "https://music.163.com/api/song/lyric?id={}&lv=1&kv=1&tv=-1",
+            song.id
+        );
+
+        let lyric_resp = self
+            .client
+            .get(&lyric_url)
+            .header("Referer", "https://music.163.com/")
+            .send()
+            .await?;
+
+        if !lyric_resp.status().is_success() {
+            return Err(anyhow!("NetEase lyric request failed"));
+        }
+
+        let lyric_data: NetEaseLyricResponse = lyric_resp.json().await?;
+        if let Some(lrc) = lyric_data.lrc {
+            if let Some(lyric) = lrc.lyric {
+                if !lyric.trim().is_empty() {
+                    return Ok(lyric);
+                }
+            }
+        }
+
+        Err(anyhow!("NetEase returned empty lyrics"))
     }
 
     async fn fetch_lyrics_ovh(&self, artist: &str, title: &str) -> Result<String> {
@@ -1017,5 +1157,24 @@ mod tests {
             .query_row("SELECT lyrics FROM songs WHERE id = 1", [], |r| r.get(0))
             .unwrap();
         assert_eq!(cached, Some("[00:10.00] Sidecar lyrics line".to_string()));
+    }
+
+    #[test]
+    fn test_netease_response_deserialization() {
+        let search_json = r#"{"result":{"songs":[{"id":123456,"name":"夜に駆ける","ar":[{"name":"YOASOBI"}],"dt":261013}]},"code":200}"#;
+        let search_res: NetEaseSearchResponse = serde_json::from_str(search_json).unwrap();
+        let songs = search_res.result.unwrap().songs.unwrap();
+        assert_eq!(songs.len(), 1);
+        assert_eq!(songs[0].id, 123456);
+        assert_eq!(songs[0].name.as_deref(), Some("夜に駆ける"));
+        assert_eq!(songs[0].dt, Some(261013));
+
+        let lyric_json =
+            r#"{"lrc":{"version":1,"lyric":"[00:01.00]沈むように溶けてゆくように\n"},"code":200}"#;
+        let lyric_res: NetEaseLyricResponse = serde_json::from_str(lyric_json).unwrap();
+        assert_eq!(
+            lyric_res.lrc.unwrap().lyric.as_deref(),
+            Some("[00:01.00]沈むように溶けてゆくように\n")
+        );
     }
 }
