@@ -742,7 +742,7 @@ export const fr = {
     unmarkInstrumental: "Démarquer l'instrumental",
     adjustTiming: "Ajuster la synchronisation",
     syncOffsetLabel: "Décalage de synchro",
-    offsetSeconds: "{seconds}s",
+    offsetSeconds: "{seconds} s",
     offsetEarlier: "Afficher les paroles 0,5 s plus tôt",
     offsetLater: "Afficher les paroles 0,5 s plus tard",
     offsetHelp: "Décalez la synchronisation des paroles de cette chanson si elles sont en avance ou en retard sur la musique. Cliquez sur la valeur pour la remettre à zéro.",

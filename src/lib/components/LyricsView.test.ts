@@ -4,6 +4,7 @@ import { render, waitFor, fireEvent } from "@testing-library/svelte";
 import { invoke } from "@tauri-apps/api/core";
 import LyricsView from "./LyricsView.svelte";
 import { playerStore } from "../stores/player.svelte";
+import { i18n } from "../stores/i18n.svelte";
 import type { Song } from "../types";
 
 const SYNCED_LYRICS = [
@@ -187,6 +188,24 @@ describe("LyricsView.svelte", () => {
     await waitFor(() => {
       expect(document.getElementById("lyrics-offset-value")).toHaveTextContent("+0.5s");
     });
+  });
+
+  it("formats the offset controls for the French locale", async () => {
+    i18n.currentLocale = "fr";
+    try {
+      getOffsetResult = 1500;
+      playerStore.currentSong = mockSong;
+      const { getByRole } = render(LyricsView);
+
+      await waitFor(() => {
+        expect(document.getElementById("lyrics-offset-value")).toHaveTextContent("+1,5 s");
+      });
+      expect(getByRole("button", { name: "Afficher les paroles 0,5 s plus tôt" })).toHaveTextContent("+0,5 s");
+      expect(getByRole("button", { name: "Afficher les paroles 0,5 s plus tard" })).toHaveTextContent(/^[-−]0,5 s$/);
+    } finally {
+      i18n.currentLocale = "en";
+      getOffsetResult = 0;
+    }
   });
 
   it("drops a previous song's offset that resolves after the song changed", async () => {

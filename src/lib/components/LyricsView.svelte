@@ -26,6 +26,16 @@
   let editText = $state("");
   let containerEl = $state<HTMLDivElement | null>(null);
 
+  // Locale-aware so French reads "+0,5 s"; "always" signs the nudge buttons, "exceptZero" the value.
+  function formatOffset(ms: number, signDisplay: "always" | "exceptZero") {
+    const seconds = new Intl.NumberFormat(i18n.currentLocale, {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+      signDisplay,
+    }).format(ms / 1000);
+    return i18n.t('lyrics.offsetSeconds', { seconds });
+  }
+
   let parsed = $derived(parseLrc(lyricsText, userOffsetMs));
   let parsedLines = $derived(parsed.lines);
   let isSynced = $derived(parsedLines.length > 0);
@@ -264,14 +274,14 @@
                 title={i18n.t('lyrics.offsetLater', {}, 'Show lyrics 0.5 s later')}
                 aria-label={i18n.t('lyrics.offsetLater', {}, 'Show lyrics 0.5 s later')}
               >
-                -0.5s
+                {formatOffset(-500, "always")}
               </button>
               <button
                 onclick={resetOffset}
                 class="text-[11px] font-mono px-1 hover:text-brand-accent-text transition-colors cursor-pointer {userOffsetMs !== 0 ? 'text-brand-accent-text font-bold' : 'text-brand-text-secondary/70'}"
                 id="lyrics-offset-value"
               >
-                {userOffsetMs > 0 ? `+${(userOffsetMs / 1000).toFixed(1)}s` : `${(userOffsetMs / 1000).toFixed(1)}s`}
+                {formatOffset(userOffsetMs, "exceptZero")}
               </button>
               <button
                 onclick={() => adjustOffset(500)}
@@ -279,7 +289,7 @@
                 title={i18n.t('lyrics.offsetEarlier', {}, 'Show lyrics 0.5 s earlier')}
                 aria-label={i18n.t('lyrics.offsetEarlier', {}, 'Show lyrics 0.5 s earlier')}
               >
-                +0.5s
+                {formatOffset(500, "always")}
               </button>
               <HelpTip text={i18n.t('lyrics.offsetHelp')} label={i18n.t('lyrics.syncOffsetLabel', {}, 'Sync Offset')} describes="lyrics-offset-value" />
             </div>
