@@ -23,12 +23,14 @@ left out.
    - `bun add <pkg>@^<new>` for dependencies, `bun add -d <pkg>@^<new>` for devDependencies.
    - For lockfile-only bumps, restore the original range in `package.json` afterwards and run
      `bun install`; confirm the new version landed in `bun.lock`.
+   - If bumping any `@tauri-apps/*` package, also bump the paired Cargo crate (`@tauri-apps/api` ↔ `tauri`, `@tauri-apps/plugin-<x>` ↔ `tauri-plugin-<x>`) via `cargo update -p <crate> --precise <ver>` so major/minor versions stay aligned (#1208).
    - Respect the ignores in `.github/dependabot.yml` (e.g. no TypeScript major, see #522).
 4. **Apply the cargo bumps**: edit `src-tauri/Cargo.toml`, then `cargo update -p <crate>` from
-   `src-tauri/`. For breaking (0.x minor / major) bumps, grep for the crate's usages and read its
+   `src-tauri/`. If bumping a Tauri crate, also bump the matching `@tauri-apps/*` npm package. For breaking (0.x minor / major) bumps, grep for the crate's usages and read its
    changelog — adapt call sites in the same commit.
 5. **Verify** (synchronously, one at a time):
    - `bun run check` (svelte-check + knip)
+   - `bun run check:tauri-versions`
    - `bun run test:run`
    - `cd src-tauri && cargo test` and `cargo clippy --all-targets -- -D warnings`
 6. **Drop bumps that can't land**: if a bump breaks a check and the fix isn't a small call-site
