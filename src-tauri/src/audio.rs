@@ -15,6 +15,14 @@
 //! callback, `TrackTransitioned` is emitted so the player can advance its
 //! bookkeeping without issuing a new `Play`.
 //!
+//! ## Auto-crossfade (#1238)
+//! When the player answers with `PreloadNextCrossfade` instead, the handover
+//! starts that many seconds before the current track's end: the preloaded
+//! track becomes current and the old one's tail is mixed into it on the
+//! decode thread with an equal-power curve. The handover is tracked exactly
+//! like a gapless one, so `TrackTransitioned` fires when the overlap becomes
+//! audible.
+//!
 //! ## DSP chain (contract shared with #77/#79)
 //! `decode → loudness gain (#77) → EQ preamp → EQ bands → fade envelope (#79)
 //! → volume → clip guard → output`. Each gain stage is a single precomputed
@@ -79,8 +87,12 @@ use symphonia::core::{
 
 /// How far before the end boundary the `AboutToFinish` signal fires.
 /// Consumers: gapless preload (here), auto-crossfade (#79), CUE
-/// sibling-track continuation (#78).
-pub const PRELOAD_LEAD_NS: u64 = 8_000_000_000;
+/// sibling-track continuation (#78). Measured from the *audible* position,
+/// while decode runs up to ~1.5s ahead of it, so this must exceed the longest
+/// auto-crossfade (`CROSSFADE_AUTO_DURATION_SECS_RANGE`, 8s) plus that lead
+/// plus time to open the next track — otherwise the crossfade window has
+/// already been decoded by the time the preload arrives (#1238).
+pub const PRELOAD_LEAD_NS: u64 = 12_000_000_000;
 
 /// Maximum linear amplitude allowed when dynamic processing (loudness normalization
 /// or equalizer) is active. Set to -1.0 dBTP (True Peak) ≈ 0.8912509 linear amplitude
@@ -1065,6 +1077,82 @@ struct PendingTransition {
     finished_song: Box<Song>,
 }
 
+/// The outgoing track of an auto-crossfade (#1238). Once the crossfade
+/// starts, the incoming track becomes `DecodeSession::current` and this
+/// track's remaining audio is mixed into it on the decode thread — the
+/// output callback only ever sees the already-mixed stream.
+struct CrossfadeTail {
+    track: ActiveTrack,
+    /// Overlap length in interleaved output samples.
+    total: usize,
+    /// Interleaved samples of the overlap already mixed.
+    mixed: usize,
+    /// Decoded tail samples not yet consumed by a mix (packets from the two
+    /// tracks don't line up).
+    fifo: Vec<f32>,
+}
+
+/// Equal-power crossfade gains `(outgoing, incoming)` at progress `p` in
+/// `0.0..=1.0`: `cos(p·π/2)` and `sin(p·π/2)`, whose powers always sum to 1
+/// so the overlap keeps a constant perceived loudness.
+fn equal_power_gains(p: f32) -> (f32, f32) {
+    let angle = p.clamp(0.0, 1.0) * std::f32::consts::FRAC_PI_2;
+    (angle.cos(), angle.sin())
+}
+
+/// Mix the outgoing tail `a` into the incoming samples `b` in place, for the
+/// part of `b` that falls inside the overlap. `mixed_before` is how many
+/// interleaved samples of the `total`-sample overlap were mixed by earlier
+/// calls. Missing `a` samples (a tail shorter than its tagged length) count
+/// as silence. Returns how many samples of `b` were inside the overlap.
+fn mix_crossfade(
+    b: &mut [f32],
+    a: &[f32],
+    mixed_before: usize,
+    total: usize,
+    channels: usize,
+) -> usize {
+    let n = b.len().min(total.saturating_sub(mixed_before));
+    let total_frames = (total / channels.max(1)).max(1) as f32;
+    for (i, sample) in b[..n].iter_mut().enumerate() {
+        let frame = (mixed_before + i) / channels.max(1);
+        let (ga, gb) = equal_power_gains(frame as f32 / total_frames);
+        let a_val = a.get(i).copied().unwrap_or(0.0);
+        *sample = a_val * ga + *sample * gb;
+    }
+    n
+}
+
+/// Overlap length (interleaved output samples) for a crossfade of `secs`
+/// between an outgoing track with `outgoing_remaining_ns` left to decode and
+/// an incoming track of `incoming_len_ns`. Returns 0 — a plain gapless
+/// handover — when the crossfade is off, the outgoing end is unknown, or the
+/// incoming track is shorter than twice the window (it would be fading out
+/// before it had finished fading in). A late start shortens the overlap to
+/// whatever of the outgoing track is left rather than cutting its tail.
+fn crossfade_overlap_samples(
+    secs: f32,
+    outgoing_remaining_ns: Option<u64>,
+    incoming_len_ns: Option<u64>,
+    rate: u32,
+    channels: u16,
+) -> usize {
+    if secs.is_nan() || secs <= 0.0 {
+        return 0;
+    }
+    let window_ns = (secs as f64 * 1_000_000_000.0) as u64;
+    let Some(remaining) = outgoing_remaining_ns else {
+        return 0;
+    };
+    if incoming_len_ns.is_some_and(|len| len < window_ns.saturating_mul(2)) {
+        return 0;
+    }
+    let ns = window_ns.min(remaining);
+    // Whole frames only, so the gain curve stays aligned across channels.
+    let frames = samples_for_ns(ns, rate, 1);
+    (frames * channels as u64) as usize
+}
+
 // ---------------------------------------------------------------------------
 // Decode thread — runs on a plain OS thread to avoid Send constraints
 // ---------------------------------------------------------------------------
@@ -1318,6 +1406,11 @@ struct DecodeSession {
     current: ActiveTrack,
     next: Option<ActiveTrack>,
     transition: Option<PendingTransition>,
+    /// Auto-crossfade length requested for the handover into `next`, in
+    /// seconds; 0 for a plain gapless handover.
+    crossfade_secs: f32,
+    /// The outgoing track while an auto-crossfade overlap is being mixed.
+    outgoing: Option<CrossfadeTail>,
     /// Absolute count of samples pushed to the ring buffer, in the same
     /// "space" as `AudioOutput::played_samples` (kept in sync at every
     /// buffer clear).
@@ -1573,6 +1666,8 @@ fn decode_thread(
             current,
             next: None,
             transition: None,
+            crossfade_secs: 0.0,
+            outgoing: None,
             pushed_samples: start_samples,
             target_sample_rate,
             target_channels,
@@ -1604,6 +1699,8 @@ fn decode_thread(
             }
 
             advance_transition_and_preload_signal(out, &mut session, &shared.position, &event_tx);
+
+            maybe_start_crossfade(&mut session);
 
             match handle_eof(out, &mut session, &shared.play_state, &event_tx) {
                 EofOutcome::NotEof => {}
@@ -1669,22 +1766,42 @@ fn check_and_rebuild_output(
                     session.target_sample_rate = new_out.sample_rate;
                     session.target_channels = new_out.channels;
 
-                    let target_time = symphonia::core::units::Time::from_nanos(cur_pos as i64);
-                    let _ = session.current.format.seek(
-                        symphonia::core::formats::SeekMode::Accurate,
-                        symphonia::core::formats::SeekTo::Time {
-                            time: target_time,
-                            track_id: Some(session.current.track_id),
-                        },
-                    );
-                    session.current.decoder.reset();
-                    session.current.decoded_pos_ns = cur_pos;
-                    session.current.eof = false;
-                    session.current.resampler = Resampler::new(
-                        session.current.src_rate,
-                        session.target_sample_rate,
-                        session.target_channels as usize,
-                    );
+                    session.outgoing = None;
+                    if let Some(t) = session.transition.take() {
+                        // Mid-handover: `cur_pos` is still on the finished
+                        // track's timeline, so reopen that track there (as
+                        // SeekTo does) rather than seeking the new one to it.
+                        session.next = None;
+                        match ActiveTrack::open(
+                            t.finished_song,
+                            cur_pos,
+                            session.target_sample_rate,
+                            session.target_channels as usize,
+                        ) {
+                            Ok(t) => session.current = t,
+                            Err(message) => {
+                                let _ = event_tx.send(AudioEvent::Error { message });
+                                return DeviceCheckOutcome::BreakDecode;
+                            }
+                        }
+                    } else {
+                        let target_time = symphonia::core::units::Time::from_nanos(cur_pos as i64);
+                        let _ = session.current.format.seek(
+                            symphonia::core::formats::SeekMode::Accurate,
+                            symphonia::core::formats::SeekTo::Time {
+                                time: target_time,
+                                track_id: Some(session.current.track_id),
+                            },
+                        );
+                        session.current.decoder.reset();
+                        session.current.decoded_pos_ns = cur_pos;
+                        session.current.eof = false;
+                        session.current.resampler = Resampler::new(
+                            session.current.src_rate,
+                            session.target_sample_rate,
+                            session.target_channels as usize,
+                        );
+                    }
 
                     if let Some(n) = session.next.as_mut() {
                         n.resampler = Resampler::new(
@@ -1707,7 +1824,6 @@ fn check_and_rebuild_output(
                         .played_samples
                         .store(start_samples, Ordering::Relaxed);
                     session.pushed_samples = start_samples;
-                    session.transition = None;
 
                     if let Err(e) = new_out.stream.play() {
                         let _ = event_tx.send(AudioEvent::Error {
@@ -1806,6 +1922,8 @@ fn handle_decode_command(
         Ok(AudioCommand::SeekTo(target_ns)) => {
             log::debug!("SeekTo command received. target_ns: {target_ns}");
 
+            // A seek cuts any crossfade tail still being mixed in.
+            session.outgoing = None;
             if let Some(t) = session.transition.take() {
                 // Mid-handover seek: the audible position is still in
                 // the finished track but its decoder is gone — reopen
@@ -1876,6 +1994,7 @@ fn handle_decode_command(
                 Ok(t) => {
                     log::debug!("Preloaded next track {} for gapless", t.song.id);
                     session.next = Some(t);
+                    session.crossfade_secs = 0.0;
                 }
                 Err(e) => {
                     // Fall back to the drain + TrackFinished path;
@@ -1886,7 +2005,7 @@ fn handle_decode_command(
             }
             CmdOutcome::Continue
         }
-        Ok(AudioCommand::PreloadNextCrossfade(preq, _secs)) => {
+        Ok(AudioCommand::PreloadNextCrossfade(preq, secs)) => {
             match ActiveTrack::open(
                 preq.song,
                 preq.start_nanosec,
@@ -1896,10 +2015,12 @@ fn handle_decode_command(
                 Ok(t) => {
                     log::debug!("Preloaded next track {} for crossfade", t.song.id);
                     session.next = Some(t);
+                    session.crossfade_secs = secs;
                 }
                 Err(e) => {
                     log::warn!("Crossfade preload failed: {e}");
                     session.next = None;
+                    session.crossfade_secs = 0.0;
                 }
             }
             CmdOutcome::Continue
@@ -1907,6 +2028,7 @@ fn handle_decode_command(
         Ok(AudioCommand::ClearPreload) => {
             if session.transition.is_none() {
                 session.next = None;
+                session.crossfade_secs = 0.0;
                 session.current.about_to_finish_sent = false;
             }
             CmdOutcome::Continue
@@ -1990,6 +2112,9 @@ fn handle_eof(
     if !session.current.eof {
         return EofOutcome::NotEof;
     }
+    // The incoming track ended inside its own crossfade window (its tagged
+    // length overstated it) — nothing left to mix the tail into.
+    session.outgoing = None;
 
     if session.transition.is_some() {
         // Waiting for the boundary to be consumed before the next (already
@@ -1999,7 +2124,9 @@ fn handle_eof(
     }
     if let Some(n) = session.next.take() {
         // Gapless handover: continue decoding the preloaded track into the
-        // same ring buffer — no drain, no pause.
+        // same ring buffer — no drain, no pause. Also the fallback when a
+        // crossfade never started (the track ended before its tagged length).
+        session.crossfade_secs = 0.0;
         session.transition = Some(PendingTransition {
             boundary_samples: session.pushed_samples,
             finished_song: std::mem::replace(&mut session.current, n).song,
@@ -2043,12 +2170,61 @@ fn decode_one_packet(
         return DecodeStepOutcome::ContinueDecode;
     }
 
-    match session.current.format.next_packet() {
+    let channels = session.target_channels as usize;
+    let mut resampled = match decode_track_packet(&mut session.current, channels) {
+        PacketStep::Samples(samples) => samples,
+        PacketStep::Skip => return DecodeStepOutcome::ContinueDecode,
+        PacketStep::DecoderFailed => return DecodeStepOutcome::BreakDecode,
+        PacketStep::ReadFailed(message) => {
+            let _ = event_tx.send(AudioEvent::Error { message });
+            return DecodeStepOutcome::BreakDecode;
+        }
+    };
+
+    if let Some(tail) = session.outgoing.as_mut() {
+        if mix_outgoing_tail(tail, &mut resampled, channels) {
+            session.outgoing = None;
+        }
+    }
+
+    let mut pushed = 0;
+    while pushed < resampled.len() {
+        let written = out.producer.push_slice(&resampled[pushed..]);
+        if written == 0 {
+            // Ring buffer is full, sleep a bit and try again
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        } else {
+            pushed += written;
+        }
+    }
+    session.pushed_samples += resampled.len() as u64;
+    DecodeStepOutcome::Decoded
+}
+
+/// Result of reading and decoding one packet of an `ActiveTrack`.
+enum PacketStep {
+    /// Output-format samples (target channel count and rate), ready to push.
+    Samples(Vec<f32>),
+    /// Nothing to push this time: a packet of another stream, a recoverable
+    /// decode error, or end of track (`track.eof` is set).
+    Skip,
+    /// The decoder failed unrecoverably.
+    DecoderFailed,
+    /// Reading the container failed; carries the message for `AudioEvent::Error`.
+    ReadFailed(String),
+}
+
+/// Read and decode one packet of `track`: CUE end-boundary truncation,
+/// channel conversion and resampling to the output format. Sets `track.eof`
+/// at the end of the stream or the CUE boundary. Shared by the current track
+/// and the outgoing tail of a crossfade.
+fn decode_track_packet(track: &mut ActiveTrack, target_channels: usize) -> PacketStep {
+    match track.format.next_packet() {
         Ok(Some(packet)) => {
-            if packet.track_id != session.current.track_id {
-                return DecodeStepOutcome::ContinueDecode;
+            if packet.track_id != track.track_id {
+                return PacketStep::Skip;
             }
-            match session.current.decoder.decode(&packet) {
+            match track.decoder.decode(&packet) {
                 Ok(decoded) => {
                     let mut sample_vec: Vec<f32> = Vec::new();
                     decoded.copy_to_vec_interleaved(&mut sample_vec);
@@ -2057,64 +2233,125 @@ fn decode_one_packet(
                     // Enforce the CUE end boundary (`end_nanosec`):
                     // truncate the packet at the cut and treat the
                     // remainder of the file as EOF.
-                    let frames = samples.len() / session.current.src_channels;
+                    let frames = samples.len() / track.src_channels;
                     let packet_ns =
-                        (frames as f64 * 1_000_000_000.0 / session.current.src_rate as f64) as u64;
-                    if let Some(end_ns) = session.current.end_ns {
-                        if session.current.decoded_pos_ns >= end_ns {
-                            session.current.eof = true;
-                            return DecodeStepOutcome::ContinueDecode;
+                        (frames as f64 * 1_000_000_000.0 / track.src_rate as f64) as u64;
+                    if let Some(end_ns) = track.end_ns {
+                        if track.decoded_pos_ns >= end_ns {
+                            track.eof = true;
+                            return PacketStep::Skip;
                         }
-                        if session.current.decoded_pos_ns + packet_ns > end_ns {
-                            let keep_frames = ((end_ns - session.current.decoded_pos_ns) as f64
-                                * session.current.src_rate as f64
-                                / 1_000_000_000.0)
-                                as usize;
-                            samples = &samples[..keep_frames * session.current.src_channels];
-                            session.current.eof = true;
-                        }
-                    }
-                    session.current.decoded_pos_ns += packet_ns;
-
-                    let channel_converted = convert_channels(
-                        samples,
-                        session.current.src_channels,
-                        session.target_channels as usize,
-                    );
-                    let resampled = session.current.resampler.resample(&channel_converted);
-
-                    let mut pushed = 0;
-                    while pushed < resampled.len() {
-                        let written = out.producer.push_slice(&resampled[pushed..]);
-                        if written == 0 {
-                            // Ring buffer is full, sleep a bit and try again
-                            std::thread::sleep(std::time::Duration::from_millis(5));
-                        } else {
-                            pushed += written;
+                        if track.decoded_pos_ns + packet_ns > end_ns {
+                            let keep_frames =
+                                ((end_ns - track.decoded_pos_ns) as f64 * track.src_rate as f64
+                                    / 1_000_000_000.0) as usize;
+                            samples = &samples[..keep_frames * track.src_channels];
+                            track.eof = true;
                         }
                     }
-                    session.pushed_samples += resampled.len() as u64;
-                    DecodeStepOutcome::Decoded
+                    track.decoded_pos_ns += packet_ns;
+
+                    let channel_converted =
+                        convert_channels(samples, track.src_channels, target_channels);
+                    PacketStep::Samples(track.resampler.resample(&channel_converted))
                 }
-                Err(SymphoniaError::DecodeError(_)) => DecodeStepOutcome::ContinueDecode,
-                Err(_) => DecodeStepOutcome::BreakDecode,
+                Err(SymphoniaError::DecodeError(_)) => PacketStep::Skip,
+                Err(_) => PacketStep::DecoderFailed,
             }
         }
         Ok(None) => {
-            session.current.eof = true;
-            DecodeStepOutcome::ContinueDecode
+            track.eof = true;
+            PacketStep::Skip
         }
         Err(SymphoniaError::IoError(ref e)) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
-            session.current.eof = true;
-            DecodeStepOutcome::ContinueDecode
+            track.eof = true;
+            PacketStep::Skip
         }
-        Err(e) => {
-            let _ = event_tx.send(AudioEvent::Error {
-                message: format!("Decode error: {e}"),
-            });
-            DecodeStepOutcome::BreakDecode
+        Err(e) => PacketStep::ReadFailed(format!("Decode error: {e}")),
+    }
+}
+
+/// Mix the next stretch of a crossfade's outgoing tail into the incoming
+/// samples `b`, decoding more of the tail as needed. A tail that ends or
+/// fails early is mixed as silence, so the incoming track still ramps up
+/// over the whole window. Returns true once the overlap is complete.
+fn mix_outgoing_tail(tail: &mut CrossfadeTail, b: &mut [f32], channels: usize) -> bool {
+    let need = b.len().min(tail.total.saturating_sub(tail.mixed));
+    while tail.fifo.len() < need && !tail.track.eof {
+        match decode_track_packet(&mut tail.track, channels) {
+            PacketStep::Samples(samples) => tail.fifo.extend_from_slice(&samples),
+            PacketStep::Skip => {}
+            PacketStep::DecoderFailed | PacketStep::ReadFailed(_) => {
+                log::warn!("Crossfade tail decode failed; fading in from silence");
+                tail.track.eof = true;
+            }
         }
     }
+    let avail = tail.fifo.len().min(need);
+    let n = mix_crossfade(b, &tail.fifo[..avail], tail.mixed, tail.total, channels);
+    tail.fifo.drain(..avail);
+    tail.mixed += n;
+    tail.mixed >= tail.total
+}
+
+/// Start an auto-crossfade (#1238) once the current track's decode position
+/// enters the crossfade window before its end: the preloaded `next` becomes
+/// `current` and the old track is kept as `outgoing`, to be mixed into the
+/// incoming audio by `decode_one_packet`. The handover is recorded as a
+/// `PendingTransition` at the overlap's start, so the position rebase and
+/// `TrackTransitioned` fire exactly as for a gapless handover — just when the
+/// crossfade becomes audible. If the overlap works out to zero the preload
+/// stays in `next` and `handle_eof` hands over gaplessly.
+fn maybe_start_crossfade(session: &mut DecodeSession) {
+    if session.crossfade_secs <= 0.0
+        || session.outgoing.is_some()
+        || session.transition.is_some()
+        || session.current.eof
+    {
+        return;
+    }
+    let Some(next) = session.next.as_ref() else {
+        return;
+    };
+    let Some(about_end) = session.current.about_end_ns else {
+        return;
+    };
+    let window_ns = (session.crossfade_secs as f64 * 1_000_000_000.0) as u64;
+    if session.current.decoded_pos_ns.saturating_add(window_ns) < about_end {
+        return;
+    }
+    let total = crossfade_overlap_samples(
+        session.crossfade_secs,
+        Some(about_end.saturating_sub(session.current.decoded_pos_ns)),
+        next.about_end_ns
+            .map(|end| end.saturating_sub(next.start_ns)),
+        session.target_sample_rate,
+        session.target_channels,
+    );
+    session.crossfade_secs = 0.0;
+    if total == 0 {
+        return;
+    }
+    let Some(incoming) = session.next.take() else {
+        return;
+    };
+    let old = std::mem::replace(&mut session.current, incoming);
+    log::debug!(
+        "Crossfading {} -> {} over {} samples",
+        old.song.id,
+        session.current.song.id,
+        total
+    );
+    session.transition = Some(PendingTransition {
+        boundary_samples: session.pushed_samples,
+        finished_song: old.song.clone(),
+    });
+    session.outgoing = Some(CrossfadeTail {
+        track: old,
+        total,
+        mixed: 0,
+        fifo: Vec::with_capacity(total.min(1 << 16)),
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -2227,6 +2464,104 @@ impl Resampler {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn equal_power_gains_keep_constant_power() {
+        assert_eq!(equal_power_gains(0.0), (1.0, 0.0));
+        let (a_end, b_end) = equal_power_gains(1.0);
+        assert!(a_end.abs() < 1e-6 && (b_end - 1.0).abs() < 1e-6);
+        for step in 0..=100 {
+            let (a, b) = equal_power_gains(step as f32 / 100.0);
+            assert!((a * a + b * b - 1.0).abs() < 1e-6, "p = {step}/100");
+        }
+    }
+
+    #[test]
+    fn mix_crossfade_overlap_matches_configured_length() {
+        // Outgoing = 1.0, incoming = 0.0, stereo: a sample differs from pure
+        // incoming exactly where the outgoing tail is still audible.
+        let channels = 2;
+        let total = 1_000 * channels;
+        let mut mixed = 0;
+        let mut out = Vec::new();
+        // Uneven chunk sizes, as packets from two files never line up.
+        for chunk in [74, 500, 2, 1_200, 800] {
+            let mut b = vec![0.0f32; chunk];
+            let a = vec![1.0f32; chunk];
+            mixed += mix_crossfade(&mut b, &a, mixed, total, channels);
+            out.extend(b);
+        }
+        assert_eq!(mixed, total);
+        assert!(out[..total].iter().all(|&s| s > 0.0));
+        assert!(out[total..].iter().all(|&s| s == 0.0));
+        // Both channels of a frame share one gain; the curve falls monotonically.
+        for frame in out[..total].chunks(channels) {
+            assert_eq!(frame[0], frame[1]);
+        }
+        assert!(out[..total]
+            .windows(2 * channels)
+            .step_by(channels)
+            .all(|w| w[channels] <= w[0]));
+        assert_eq!(out[0], 1.0);
+        assert!(out[total - 1] < 0.01);
+    }
+
+    #[test]
+    fn mix_crossfade_short_tail_fades_in_from_silence() {
+        let mut b = vec![1.0f32; 8];
+        let a = [1.0f32; 2];
+        let n = mix_crossfade(&mut b, &a, 0, 8, 2);
+        assert_eq!(n, 8);
+        // Past the tail the outgoing contribution is silence, so only the
+        // incoming ramp remains.
+        let (_, gb) = equal_power_gains(2.0 / 4.0);
+        assert!((b[4] - gb).abs() < 1e-6);
+        assert!(b[4] < 1.0);
+    }
+
+    #[test]
+    fn crossfade_overlap_samples_follows_window_and_falls_back_to_gapless() {
+        let s = 1_000_000_000u64;
+        let minute = Some(60 * s);
+        assert_eq!(
+            crossfade_overlap_samples(3.0, minute, minute, 44_100, 2),
+            264_600
+        );
+        assert_eq!(
+            crossfade_overlap_samples(3.0, minute, minute, 48_000, 2),
+            288_000
+        );
+        // Off, or unknown outgoing end: gapless.
+        assert_eq!(crossfade_overlap_samples(0.0, minute, minute, 48_000, 2), 0);
+        assert_eq!(
+            crossfade_overlap_samples(-1.0, minute, minute, 48_000, 2),
+            0
+        );
+        assert_eq!(
+            crossfade_overlap_samples(f32::NAN, minute, minute, 48_000, 2),
+            0
+        );
+        assert_eq!(crossfade_overlap_samples(3.0, None, minute, 48_000, 2), 0);
+        // Incoming shorter than twice the window: gapless.
+        assert_eq!(
+            crossfade_overlap_samples(8.0, minute, Some(15 * s), 48_000, 2),
+            0
+        );
+        assert_eq!(
+            crossfade_overlap_samples(8.0, minute, Some(16 * s), 48_000, 2),
+            768_000
+        );
+        // Unknown incoming length doesn't block the crossfade.
+        assert_eq!(
+            crossfade_overlap_samples(1.0, minute, None, 48_000, 2),
+            96_000
+        );
+        // A late start clamps to what's left of the outgoing track.
+        assert_eq!(
+            crossfade_overlap_samples(8.0, Some(2 * s), minute, 48_000, 2),
+            192_000
+        );
+    }
 
     #[test]
     fn samples_for_ns_maps_time_to_interleaved_samples() {
