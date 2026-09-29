@@ -61,6 +61,7 @@
     formatDisplayLabel,
     normalizeWebsitePlatform,
     deriveListenbrainzAlbumUrl,
+    isBlacklistedLink,
   } from "../utils/artistSocials";
 
   let { albumName }: { albumName: string } = $props();
@@ -264,8 +265,13 @@
   let isEditorOpen = $state(false);
   let albumProfile = $derived(collectionStore.getAlbumProfile(albumName));
   let hasDescription = $derived(!!albumProfile?.description?.trim());
-  let hasWebsite = $derived(!!albumProfile?.website?.trim());
-  let hasLinks = $derived(!!albumProfile?.links && albumProfile.links.length > 0);
+  let hasWebsite = $derived(
+    !!albumProfile?.website?.trim() && !isBlacklistedLink(albumProfile?.website, "website")
+  );
+  let hasLinks = $derived(
+    !!albumProfile?.links &&
+      albumProfile.links.some((l) => !isBlacklistedLink(l.handle_or_url, l.platform))
+  );
   let hasChips = $derived(Boolean(rawGenre?.trim()));
 
   // Derived ListenBrainz album URL (#950): derived from representative songs
@@ -328,7 +334,7 @@
   // as source-ordered clutter once an album has a dozen retrieved links (#1122).
   let releaseLinkItems = $derived.by((): ReleaseLinkItem[] => {
     const items: ReleaseLinkItem[] = [];
-    if (hasWebsite) {
+    if (hasWebsite && !isBlacklistedLink(albumProfile?.website, "website")) {
       const website = albumProfile?.website ?? "";
       const url = resolveSocialUrl("website", website);
       items.push({
@@ -340,6 +346,7 @@
       });
     }
     for (const link of albumProfile?.links ?? []) {
+      if (isBlacklistedLink(link.handle_or_url, link.platform)) continue;
       const url = resolveSocialUrl(link.platform, link.handle_or_url);
       items.push({
         key: `${link.platform}:${link.handle_or_url}`,

@@ -58,6 +58,7 @@
     deriveMusicbrainzArtistUrl,
     deriveListenbrainzArtistUrl,
     deriveFanartTvUrlFromMbid,
+    isBlacklistedLink,
   } from "../utils/artistSocials";
   import { getArtistAlbums, classifyRelease } from "../utils/artist";
   import {
@@ -115,9 +116,14 @@
   }
 
   let artistProfile = $derived(collectionStore.getArtistProfile(artistName));
-  let hasWebsite = $derived(!!artistProfile?.website);
+  let hasWebsite = $derived(
+    !!artistProfile?.website?.trim() && !isBlacklistedLink(artistProfile?.website, "website")
+  );
   let hasTags = $derived((artistProfile?.tags?.length ?? 0) > 0);
-  let hasSocials = $derived((artistProfile?.social_links?.length ?? 0) > 0);
+  let hasSocials = $derived(
+    !!artistProfile?.social_links &&
+      artistProfile.social_links.some((l) => !isBlacklistedLink(l.handle_or_url, l.platform))
+  );
 
   // "Retrieve Artist Details" needs a MusicBrainz artist MBID: either
   // already captured on the profile (via "Retrieve Album Details" or a
@@ -223,7 +229,7 @@
   // more retrieved link.
   let artistLinkItems = $derived.by((): ArtistLinkItem[] => {
     const items: ArtistLinkItem[] = [];
-    if (hasWebsite) {
+    if (hasWebsite && !isBlacklistedLink(artistProfile?.website, "website")) {
       const website = artistProfile?.website ?? "";
       const url = resolveSocialUrl("website", website);
       items.push({
@@ -235,6 +241,7 @@
       });
     }
     for (const link of artistProfile?.social_links ?? []) {
+      if (isBlacklistedLink(link.handle_or_url, link.platform)) continue;
       const url = resolveSocialUrl(link.platform, link.handle_or_url);
       items.push({
         key: `${link.platform}:${link.handle_or_url}`,

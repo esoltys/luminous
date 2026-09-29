@@ -785,13 +785,48 @@ pub async fn get_all_album_profiles(
     .map_err(|e| e.to_string())
 }
 
+/// Shared domain blacklist for external links (artist social links, album release links).
+/// URLs matching these domains are filtered out during metadata retrieval.
+const BLOCKED_LINK_DOMAINS: &[&str] = &["x.com", "twitter.com", "rateyourmusic.com"];
+
+fn is_blacklisted_link_url(url: &str) -> bool {
+    let host = match url.split("://").nth(1) {
+        Some(after_scheme) => after_scheme
+            .split('/')
+            .next()
+            .unwrap_or("")
+            .split(':')
+            .next()
+            .unwrap_or("")
+            .trim_start_matches("www.")
+            .to_lowercase(),
+        None => url
+            .split('/')
+            .next()
+            .unwrap_or("")
+            .split(':')
+            .next()
+            .unwrap_or("")
+            .trim_start_matches("www.")
+            .to_lowercase(),
+    };
+    BLOCKED_LINK_DOMAINS
+        .iter()
+        .any(|&domain| host == *domain || host.ends_with(&format!(".{domain}")))
+}
+
 /// Maps a MusicBrainz release-group `url-rels` relation type to the album
 /// link platform id we render it under. Only the relation types the album
 /// details overflow menu's "Retrieve Album Details" action is scoped to
 /// (Discogs, AllMusic, Wikidata, lyrics sites, other databases) are
 /// recognized — MusicBrainz returns many more relation types (streaming,
 /// purchase links, etc.) that are out of scope here and are simply dropped.
-fn platform_for_release_group_rel_type(rel_type: &str) -> Option<&'static str> {
+/// URLs matching blacklisted domains (such as rateyourmusic.com or x.com/twitter.com)
+/// return `None`.
+fn platform_for_release_group_rel_type(rel_type: &str, url: &str) -> Option<&'static str> {
+    if is_blacklisted_link_url(url) {
+        return None;
+    }
     match rel_type {
         "discogs" => Some("discogs"),
         "allmusic" => Some("allmusic"),
@@ -938,7 +973,7 @@ pub async fn retrieve_album_details(
         .relations
         .into_iter()
         .filter_map(|(rel_type, url)| {
-            platform_for_release_group_rel_type(&rel_type).map(|platform| AlbumLink {
+            platform_for_release_group_rel_type(&rel_type, &url).map(|platform| AlbumLink {
                 platform: platform.to_string(),
                 handle_or_url: url,
             })
@@ -1013,6 +1048,9 @@ pub async fn retrieve_album_details(
 /// keeps rendering as the artist's primary site instead of one more icon
 /// among the social links (#1123).
 fn platform_for_artist_rel_type(rel_type: &str, url: &str) -> Option<&'static str> {
+    if is_blacklisted_link_url(url) {
+        return None;
+    }
     match rel_type {
         "discogs" => Some("discogs"),
         "allmusic" => Some("allmusic"),
@@ -1054,12 +1092,14 @@ fn platform_for_social_network_url(url: &str) -> Option<&'static str> {
 /// `retrieve_artist_details` before deciding which one becomes the primary
 /// `ArtistProfile.website` and which (if any more) become additional
 /// "website" social links, since MusicBrainz can list more than one (#1123).
+/// URLs matching blacklisted domains are dropped.
 fn dedupe_official_homepages(relations: &[(String, String)]) -> Vec<String> {
     let mut seen = std::collections::HashSet::new();
     relations
         .iter()
         .filter(|(rel_type, _)| rel_type == "official homepage")
         .map(|(_, url)| url.clone())
+        .filter(|url| !is_blacklisted_link_url(url))
         .filter(|url| seen.insert(normalize_url_for_dedup(url)))
         .collect()
 }
@@ -1749,27 +1789,49 @@ mod tests {
     #[test]
     fn test_platform_for_release_group_rel_type_maps_recognized_types() {
         assert_eq!(
-            platform_for_release_group_rel_type("discogs"),
+            platform_for_release_group_rel_type("discogs", "https://discogs.com/master/1"),
             Some("discogs")
         );
         assert_eq!(
-            platform_for_release_group_rel_type("allmusic"),
+            platform_for_release_group_rel_type("allmusic", "https://allmusic.com/album/mw1"),
             Some("allmusic")
         );
         assert_eq!(
-            platform_for_release_group_rel_type("wikidata"),
+            platform_for_release_group_rel_type("wikidata", "https://wikidata.org/wiki/Q1"),
             Some("wikidata")
         );
         assert_eq!(
-            platform_for_release_group_rel_type("lyrics"),
+            platform_for_release_group_rel_type("lyrics", "https://genius.com/albums/x"),
             Some("lyrics")
         );
         assert_eq!(
-            platform_for_release_group_rel_type("other databases"),
+            platform_for_release_group_rel_type("other databases", "https://vgmdb.net/album/1"),
             Some("other_databases")
         );
-        assert_eq!(platform_for_release_group_rel_type("streaming"), None);
-        assert_eq!(platform_for_release_group_rel_type("free streaming"), None);
+        // rateyourmusic.com, twitter.com, and x.com are blacklisted
+        assert_eq!(
+            platform_for_release_group_rel_type(
+                "other databases",
+                "https://rateyourmusic.com/release/album/x"
+            ),
+            None
+        );
+        assert_eq!(
+            platform_for_release_group_rel_type("other databases", "https://twitter.com/album"),
+            None
+        );
+        assert_eq!(
+            platform_for_release_group_rel_type("other databases", "https://x.com/album"),
+            None
+        );
+        assert_eq!(
+            platform_for_release_group_rel_type("streaming", "https://spotify.com/x"),
+            None
+        );
+        assert_eq!(
+            platform_for_release_group_rel_type("free streaming", "https://youtube.com/x"),
+            None
+        );
     }
 
     #[test]
@@ -1936,6 +1998,11 @@ mod tests {
         );
         assert_eq!(
             platform_for_artist_rel_type("social network", "https://twitter.com/artist"),
+            None
+        );
+        // rateyourmusic.com is blacklisted
+        assert_eq!(
+            platform_for_artist_rel_type("discogs", "https://rateyourmusic.com/artist/1"),
             None
         );
         assert_eq!(

@@ -68,6 +68,30 @@ describe("ArtistDetailView", () => {
     expect(screen.getByText("Instagram")).toBeTruthy();
   });
 
+  it("does not show blacklisted links (rateyourmusic.com, twitter.com, x.com) in Artist Info", async () => {
+    collectionStore.artistProfiles = {
+      "shania twain": {
+        artist_key: "Shania Twain",
+        website: "https://rateyourmusic.com/artist/shania-twain",
+        tags: ["country"],
+        social_links: [
+          { platform: "other_databases", handle_or_url: "https://rateyourmusic.com/artist/shania-twain" },
+          { platform: "twitter", handle_or_url: "https://twitter.com/shaniatwain" },
+          { platform: "x", handle_or_url: "https://x.com/shaniatwain" },
+          { platform: "instagram", handle_or_url: "@shaniatwain" },
+        ],
+        bio: "Bio",
+      },
+    };
+
+    render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
+
+    expect(screen.getByText("Instagram")).toBeTruthy();
+    expect(screen.queryByText(/rateyourmusic/i)).toBeNull();
+    expect(screen.queryByText(/twitter/i)).toBeNull();
+    expect(screen.queryByText(/^x$/i)).toBeNull();
+  });
+
   it("clicking tag sets search query to artist-tag filter", async () => {
     render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
 

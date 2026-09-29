@@ -230,7 +230,7 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
         links: [
           {
             platform: "other_databases",
-            handle_or_url: "https://rateyourmusic.com/release/album/the-beatles/abbey-road/",
+            handle_or_url: "https://vgmdb.net/album/12345/",
           },
           {
             platform: "allmusic",
@@ -253,19 +253,61 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     expect(details?.classList.contains("group")).toBe(false);
 
     // Unrecognized / other_databases link must show only domain name
-    expect(getByText("rateyourmusic.com")).toBeInTheDocument();
+    expect(getByText("vgmdb.net")).toBeInTheDocument();
     // Branded platform link shows its label
     expect(getByText("AllMusic")).toBeInTheDocument();
 
     // Release link buttons should use group/link scoping
-    const rymButton = getByText("rateyourmusic.com").closest("button")!;
-    expect(rymButton.classList.contains("group/link")).toBe(true);
-    expect(rymButton.classList.contains("group")).toBe(false);
+    const vgmdbButton = getByText("vgmdb.net").closest("button")!;
+    expect(vgmdbButton.classList.contains("group/link")).toBe(true);
+    expect(vgmdbButton.classList.contains("group")).toBe(false);
 
     // External link icon should have group-hover/link:opacity-100
-    const extIcon = rymButton.querySelector("svg.opacity-0");
+    const extIcon = vgmdbButton.querySelector("svg.opacity-0");
     expect(extIcon?.classList.contains("group-hover/link:opacity-100")).toBe(true);
     expect(extIcon?.classList.contains("group-hover:opacity-100")).toBe(false);
+  });
+
+  it("does not show blacklisted links (rateyourmusic.com, twitter.com, x.com) in Album Info", async () => {
+    collectionStore.albumProfiles = {
+      "abbey road": {
+        album_key: "abbey road",
+        artist_key: "the beatles",
+        description: "Classic album",
+        website: "https://thebeatles.com",
+        links: [
+          {
+            platform: "other_databases",
+            handle_or_url: "https://rateyourmusic.com/release/album/the-beatles/abbey-road/",
+          },
+          {
+            platform: "custom",
+            handle_or_url: "https://twitter.com/thebeatles",
+          },
+          {
+            platform: "x",
+            handle_or_url: "https://x.com/thebeatles",
+          },
+          {
+            platform: "allmusic",
+            handle_or_url: "https://www.allmusic.com/album/mw0000192938",
+          },
+        ],
+      },
+    };
+
+    const { getByText, queryByText } = render(AlbumDetailView, {
+      props: { albumName: mockAlbumName },
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(queryByText("rateyourmusic.com")).toBeNull();
+    expect(queryByText("twitter.com")).toBeNull();
+    expect(queryByText("x.com")).toBeNull();
+    expect(queryByText("X (Twitter)")).toBeNull();
+    expect(getByText("AllMusic")).toBeInTheDocument();
+    expect(getByText("thebeatles.com")).toBeInTheDocument();
   });
 
   it("auto-fetches album details on visit when details_fetched is false and context enrichment is enabled (#1143)", async () => {
