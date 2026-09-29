@@ -2742,14 +2742,12 @@ mod tests {
         assert_eq!(detect_mp3_vbr(&path), Some(false));
     }
 
-    fn write_temp_file(name: &str, chunks: &[&[u8]]) -> PathBuf {
-        let path = std::env::temp_dir().join(format!(
-            "luminous_vbr_test_{name}_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+    fn write_temp_file(name: &str, chunks: &[&[u8]]) -> tempfile::TempPath {
+        let path = tempfile::Builder::new()
+            .prefix(&format!("luminous_vbr_test_{name}_"))
+            .tempfile()
+            .unwrap()
+            .into_temp_path();
         let mut data = Vec::new();
         for chunk in chunks {
             data.extend_from_slice(chunk);
@@ -2760,13 +2758,12 @@ mod tests {
 
     #[test]
     fn test_read_tags_id3v1() {
-        let path = std::env::temp_dir().join(format!(
-            "luminous_id3v1_test_{}.mp3",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let path = tempfile::Builder::new()
+            .prefix("luminous_id3v1_test_")
+            .suffix(".mp3")
+            .tempfile()
+            .unwrap()
+            .into_temp_path();
 
         // Create 10 valid MPEG-1 Layer 3 frames (128kbps, 44.1kHz, stereo = 417 bytes each)
         let mut mp3_bytes = Vec::new();
@@ -2817,13 +2814,12 @@ mod tests {
 
     #[test]
     fn test_read_tags_fallback_to_secondary_tags() {
-        let path = std::env::temp_dir().join(format!(
-            "luminous_id3v1_fallback_test_{}.mp3",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let path = tempfile::Builder::new()
+            .prefix("luminous_id3v1_fallback_test_")
+            .suffix(".mp3")
+            .tempfile()
+            .unwrap()
+            .into_temp_path();
 
         // Create 10 valid MPEG-1 Layer 3 frames
         let mut mp3_bytes = Vec::new();
@@ -2863,13 +2859,11 @@ mod tests {
 
     #[test]
     fn test_upsert_song_round_trips_compilation_flag() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_compilation_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_compilation_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let conn = db.pool.get().unwrap();
 
@@ -2926,13 +2920,11 @@ mod tests {
 
     #[test]
     fn test_get_songs_by_tag_population_modes() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_population_mode_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_population_mode_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let conn = db.pool.get().unwrap();
 
@@ -3041,13 +3033,11 @@ mod tests {
 
     #[test]
     fn test_prune_missing_songs_hard_deletes() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_hard_delete_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_hard_delete_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let conn = db.pool.get().unwrap();
         conn.execute(
@@ -3098,13 +3088,11 @@ mod tests {
         // unmounted at scan time: the root itself can't be read, so every song under it
         // must NOT be treated as user-deleted, even though a plain `Path::exists()` check
         // on each song's path would say "gone" just the same as if the folder were removed.
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_unreachable_root_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_unreachable_root_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let conn = db.pool.get().unwrap();
 
@@ -3196,13 +3184,11 @@ mod tests {
 
     #[test]
     fn test_merge_duplicate_songs_by_case_insensitive_path() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_merge_dup_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_merge_dup_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let conn = db.pool.get().unwrap();
 
@@ -3277,13 +3263,11 @@ mod tests {
 
     #[test]
     fn test_resolve_dynamic_range_logs_parses_and_matches_by_track_number() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_dr_log_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_dr_log_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let album_dir = temp_dir.join("album");
         std::fs::create_dir_all(&album_dir).unwrap();
 
@@ -3355,13 +3339,11 @@ Official DR value: DR13\n",
 
     #[test]
     fn test_read_and_prepare_song_falls_back_to_folder_art() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_prep_song_art_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_prep_song_art_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let _ = std::fs::create_dir_all(&temp_dir);
 
         let audio_path = temp_dir.join("track.wav");
@@ -3460,13 +3442,11 @@ Official DR value: DR13\n",
 
     #[test]
     fn test_read_tags_loads_sidecar_lrc() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_sidecar_lrc_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_sidecar_lrc_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let _ = std::fs::create_dir_all(&temp_dir);
 
         let audio_path = temp_dir.join("track.wav");
@@ -3488,13 +3468,11 @@ Official DR value: DR13\n",
     #[tokio::test]
     async fn test_scan_classic_cue_sheet_produces_one_row_per_track_and_suppresses_whole_file_row()
     {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_cue_scan_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_cue_scan_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let _ = std::fs::create_dir_all(&temp_dir);
 
         let audio_path = temp_dir.join("album.wav");
@@ -3617,13 +3595,11 @@ Official DR value: DR13\n",
 
     #[test]
     fn test_prune_missing_songs_removes_songs_from_removed_webdav_server() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_webdav_prune_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_webdav_prune_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let conn = db.pool.get().unwrap();
 
@@ -3653,13 +3629,11 @@ Official DR value: DR13\n",
 
     #[test]
     fn test_prune_missing_songs_preserves_songs_from_existing_webdav_server() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_webdav_preserve_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_webdav_preserve_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let conn = db.pool.get().unwrap();
 
@@ -3712,13 +3686,11 @@ Official DR value: DR13\n",
         // Verifies the user requirement: "Not unavailable or detached, but the WebDAV was actually removed."
         // A song from an existing server that is unavailable or detached (e.g. disabled or marked unavailable)
         // must NOT be pruned.
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_webdav_unavailable_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_webdav_unavailable_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let conn = db.pool.get().unwrap();
 
@@ -3791,13 +3763,11 @@ Official DR value: DR13\n",
     /// `Path::exists()` check on their `subsonic://` path.
     #[test]
     fn test_prune_missing_songs_subsonic_only_removes_orphans() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_subsonic_prune_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_subsonic_prune_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let conn = db.pool.get().unwrap();
 

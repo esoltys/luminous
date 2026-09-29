@@ -1915,16 +1915,42 @@ mod tests {
     use crate::db::Database;
     use std::sync::Arc;
 
-    pub(super) fn setup_test_db() -> (Database, std::path::PathBuf) {
-        let temp_dir =
-            std::env::temp_dir().join(format!("luminous_player_test_{}", uuid::Uuid::new_v4()));
-        let db = Database::new(temp_dir.clone()).unwrap();
-        (db, temp_dir)
+    /// Test database directory, removed on drop. `Player` hands a database
+    /// clone to a detached waveform-preload task that can outlive the test,
+    /// and Windows can't delete a directory with open SQLite files, so drop
+    /// retries until that task has released the database.
+    pub(super) struct TestDir(Option<tempfile::TempDir>);
+
+    impl TestDir {
+        pub(super) fn path(&self) -> &std::path::Path {
+            self.0.as_ref().unwrap().path()
+        }
+    }
+
+    impl Drop for TestDir {
+        fn drop(&mut self) {
+            let path = self.0.take().unwrap().keep();
+            for _ in 0..100 {
+                if std::fs::remove_dir_all(&path).is_ok() || !path.exists() {
+                    return;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+        }
+    }
+
+    pub(super) fn setup_test_db() -> (TestDir, Database) {
+        let temp_dir = tempfile::Builder::new()
+            .prefix("luminous_player_test_")
+            .tempdir()
+            .unwrap();
+        let db = Database::new(temp_dir.path().to_path_buf()).unwrap();
+        (TestDir(Some(temp_dir)), db)
     }
 
     #[tokio::test]
     async fn note_playback_error_never_flags_webdav_songs_unavailable() {
-        let (db, _temp_dir) = setup_test_db();
+        let (_temp_dir, db) = setup_test_db();
         let db_arc = Arc::new(db);
 
         {
@@ -1959,7 +1985,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_player_state_persistence_and_restoration() {
-        let (db, temp_dir) = setup_test_db();
+        let (_temp_dir, db) = setup_test_db();
         let db_arc = Arc::new(db);
 
         {
@@ -2006,13 +2032,11 @@ mod tests {
             |r| r.get(0),
         );
         assert!(song_id_exists.is_err());
-
-        let _ = std::fs::remove_dir_all(temp_dir);
     }
 
     #[tokio::test]
     async fn test_adhoc_queue_survives_restart() {
-        let (db, temp_dir) = setup_test_db();
+        let (_temp_dir, db) = setup_test_db();
         let db_arc = Arc::new(db);
 
         {
@@ -2055,8 +2079,6 @@ mod tests {
         assert_eq!(restarted.current_song.as_ref().unwrap().id, 2);
         assert_eq!(restarted.playlist_items.len(), 3);
         assert_eq!(restarted.current_index, Some(1));
-
-        let _ = std::fs::remove_dir_all(temp_dir);
     }
 
     /// Regression test for the "album skips first track, file not found"
@@ -2070,7 +2092,8 @@ mod tests {
     /// healed and playing.
     #[tokio::test]
     async fn test_duplicate_error_after_successful_heal_is_not_treated_as_failure() {
-        let (db, temp_dir) = setup_test_db();
+        let (temp_dir_guard, db) = setup_test_db();
+        let temp_dir = temp_dir_guard.path();
         let db_arc = Arc::new(db);
         let album_dir = temp_dir.join("Album");
         std::fs::create_dir_all(&album_dir).unwrap();
@@ -2127,13 +2150,11 @@ mod tests {
             "a stale duplicate Error for an already-healed track must be treated as handled, \
              not fall through to the skip-and-toast failure path"
         );
-
-        let _ = std::fs::remove_dir_all(temp_dir);
     }
 
     #[tokio::test]
     async fn test_previous_track_walks_back_through_playlist() {
-        let (db, temp_dir) = setup_test_db();
+        let (_temp_dir, db) = setup_test_db();
         let db_arc = Arc::new(db);
 
         {
@@ -2182,8 +2203,6 @@ mod tests {
         player.previous_track().await.unwrap();
         assert_eq!(player.current_song.as_ref().unwrap().id, 1);
         assert_eq!(player.current_index, Some(0));
-
-        let _ = std::fs::remove_dir_all(temp_dir);
     }
 
     /// Pressing Previous at the very first track must not wrap around to the
@@ -2194,7 +2213,7 @@ mod tests {
     /// earlier than the user expected.
     #[tokio::test]
     async fn test_previous_track_does_not_wrap_at_start_without_repeat() {
-        let (db, temp_dir) = setup_test_db();
+        let (_temp_dir, db) = setup_test_db();
         let db_arc = Arc::new(db);
 
         {
@@ -2244,8 +2263,6 @@ mod tests {
         player.previous_track().await.unwrap();
         assert_eq!(player.current_index, Some(2));
         assert_eq!(player.current_song.as_ref().unwrap().id, 3);
-
-        let _ = std::fs::remove_dir_all(temp_dir);
     }
 
     /// Same scenario as `test_previous_track_walks_back_through_playlist`,
@@ -2255,7 +2272,7 @@ mod tests {
     /// reported in #105 ("Previous song works on albums, but not playlists").
     #[tokio::test]
     async fn test_previous_track_walks_back_through_saved_playlist() {
-        let (db, temp_dir) = setup_test_db();
+        let (_temp_dir, db) = setup_test_db();
         let db_arc = Arc::new(db);
 
         {
@@ -2298,8 +2315,6 @@ mod tests {
             "previous should move to the prior playlist track, not replay the current one"
         );
         assert_eq!(player.current_index, Some(1));
-
-        let _ = std::fs::remove_dir_all(temp_dir);
     }
 
     /// Root-caused #105's "Previous restarts the current song instead of
@@ -2309,7 +2324,7 @@ mod tests {
     /// naive top-of-stack pop in `previous_track` just replayed it.
     #[tokio::test]
     async fn test_previous_track_in_shuffle_mode_does_not_replay_current() {
-        let (db, temp_dir) = setup_test_db();
+        let (_temp_dir, db) = setup_test_db();
         let db_arc = Arc::new(db);
 
         {
@@ -2368,13 +2383,11 @@ mod tests {
             first_song_id,
             "a second previous press should keep walking back, not stay put"
         );
-
-        let _ = std::fs::remove_dir_all(temp_dir);
     }
 
     #[tokio::test]
     async fn test_play_playlist_with_shuffle_mode_plays_correct_requested_track() {
-        let (db, temp_dir) = setup_test_db();
+        let (_temp_dir, db) = setup_test_db();
         let db_arc = Arc::new(db);
 
         {
@@ -2424,8 +2437,6 @@ mod tests {
             4,
             "play_playlist should play requested start_index track even when shuffle mode is active"
         );
-
-        let _ = std::fs::remove_dir_all(temp_dir);
     }
 
     /// Regression coverage for the get_next_index/find_playable_from/
@@ -2434,7 +2445,7 @@ mod tests {
     /// still wrap back to the first track with RepeatMode::Playlist.
     #[tokio::test]
     async fn test_next_track_stops_at_end_then_wraps_with_repeat_playlist() {
-        let (db, temp_dir) = setup_test_db();
+        let (_temp_dir, db) = setup_test_db();
         let db_arc = Arc::new(db);
 
         {
@@ -2496,8 +2507,6 @@ mod tests {
             1,
             "advancing past the last track with RepeatMode::Playlist must wrap to the first"
         );
-
-        let _ = std::fs::remove_dir_all(temp_dir);
     }
 
     /// Regression coverage for #1070: `RepeatMode::Album` used to fall
@@ -2513,7 +2522,7 @@ mod tests {
     /// test below (a real bug this exact confusion caused).
     #[tokio::test]
     async fn test_repeat_album_stays_within_album_and_wraps() {
-        let (db, temp_dir) = setup_test_db();
+        let (_temp_dir, db) = setup_test_db();
         let db_arc = Arc::new(db);
 
         {
@@ -2573,8 +2582,6 @@ mod tests {
             "RepeatMode::Album must wrap back to the album's first track, not stop or \
              spill into the next album"
         );
-
-        let _ = std::fs::remove_dir_all(temp_dir);
     }
 
     /// Regression coverage for a real bug caught in manual testing: an
@@ -2589,7 +2596,7 @@ mod tests {
     /// governs natural track-end, never user-initiated navigation).
     #[tokio::test]
     async fn test_repeat_album_does_not_confine_manual_skip() {
-        let (db, temp_dir) = setup_test_db();
+        let (_temp_dir, db) = setup_test_db();
         let db_arc = Arc::new(db);
 
         {
@@ -2639,8 +2646,6 @@ mod tests {
 
         player.next_track().await.unwrap();
         assert_eq!(player.current_song.as_ref().unwrap().id, 3);
-
-        let _ = std::fs::remove_dir_all(temp_dir);
     }
 
     /// Regression coverage for #1073: `next_track`'s ad-hoc queue branch
@@ -2653,7 +2658,7 @@ mod tests {
     /// longer skip a step.
     #[tokio::test]
     async fn test_skipping_into_queued_track_persists_for_restart() {
-        let (db, temp_dir) = setup_test_db();
+        let (_temp_dir, db) = setup_test_db();
         let db_arc = Arc::new(db);
 
         {
@@ -2741,8 +2746,6 @@ mod tests {
             )
             .unwrap();
         assert_eq!(persisted_position, expected_start_ns.to_string());
-
-        let _ = std::fs::remove_dir_all(temp_dir);
     }
 
     /// Coverage for the #1073 design decision: under `RepeatMode::Playlist`,
@@ -2753,7 +2756,7 @@ mod tests {
     /// while repeat-playlist was on.
     #[tokio::test]
     async fn test_repeat_playlist_drains_queue_before_wrapping() {
-        let (db, temp_dir) = setup_test_db();
+        let (_temp_dir, db) = setup_test_db();
         let db_arc = Arc::new(db);
 
         {
@@ -2821,8 +2824,6 @@ mod tests {
             1,
             "once the queue is drained, RepeatMode::Playlist still wraps to the first track"
         );
-
-        let _ = std::fs::remove_dir_all(temp_dir);
     }
 
     /// Coverage for #1077: none of the file's tests previously touched
@@ -2833,7 +2834,7 @@ mod tests {
     /// for a gapless commit).
     #[tokio::test]
     async fn test_gapless_transition_commits_index_and_scrobble_bookkeeping() {
-        let (db, temp_dir) = setup_test_db();
+        let (_temp_dir, db) = setup_test_db();
         let db_arc = Arc::new(db);
 
         {
@@ -2912,8 +2913,6 @@ mod tests {
             persisted_position, "0",
             "a gapless commit persists position 0 — the new track just started"
         );
-
-        let _ = std::fs::remove_dir_all(temp_dir);
     }
 
     /// Coverage for #1077: `on_gapless_transition`'s doc comment promises a
@@ -2922,7 +2921,7 @@ mod tests {
     /// after the preload was armed) — previously untested.
     #[tokio::test]
     async fn test_gapless_transition_mismatch_falls_back_to_on_track_finished() {
-        let (db, temp_dir) = setup_test_db();
+        let (_temp_dir, db) = setup_test_db();
         let db_arc = Arc::new(db);
 
         {
@@ -2970,8 +2969,6 @@ mod tests {
              leave playback stuck or desynced"
         );
         assert_eq!(player.current_index, Some(1));
-
-        let _ = std::fs::remove_dir_all(temp_dir);
     }
 
     /// Coverage for #1077: scrobble-point computation and the `scrobbled`
@@ -2980,7 +2977,7 @@ mod tests {
     /// scrobble point, and do nothing before or after that first crossing.
     #[tokio::test]
     async fn test_scrobble_point_reached_records_once() {
-        let (db, temp_dir) = setup_test_db();
+        let (_temp_dir, db) = setup_test_db();
         let db_arc = Arc::new(db);
 
         {
@@ -3026,8 +3023,6 @@ mod tests {
 
         // Already scrobbled: must not double-record even well past the point.
         assert!(player.on_position_update(120_000_000_000).is_none());
-
-        let _ = std::fs::remove_dir_all(temp_dir);
     }
 
     /// Regression coverage for the shuffle_grouped extraction (#577 item
@@ -3040,7 +3035,7 @@ mod tests {
     /// makes `Albums`'s exact resulting order deterministic and assertable.
     #[tokio::test]
     async fn test_shuffle_grouped_albums_keeps_track_order_inside_each_group() {
-        let (db, temp_dir) = setup_test_db();
+        let (_temp_dir, db) = setup_test_db();
         let db_arc = Arc::new(db);
 
         {
@@ -3122,13 +3117,11 @@ mod tests {
             vec![2, 4, 6],
             "InsideAlbum must keep Album B as a contiguous group after Album A"
         );
-
-        let _ = std::fs::remove_dir_all(temp_dir);
     }
 
     #[tokio::test]
     async fn test_remove_songs_preserves_shuffle_order() {
-        let (db, temp_dir) = setup_test_db();
+        let (_temp_dir, db) = setup_test_db();
         let db_arc = Arc::new(db);
 
         {
@@ -3181,13 +3174,11 @@ mod tests {
         // Shuffle order should be: Song 1 (0), Song 4 (2), Song 5 (3), Song 3 (1) -> vec![0, 2, 3, 1]
         assert_eq!(player.shuffle_order, vec![0, 2, 3, 1]);
         assert_eq!(player.current_index, Some(0));
-
-        let _ = std::fs::remove_dir_all(temp_dir);
     }
 
     #[tokio::test]
     async fn test_get_playlist_tracks_in_playback_order_includes_already_played_items() {
-        let (db, temp_dir) = setup_test_db();
+        let (_temp_dir, db) = setup_test_db();
         let db_arc = Arc::new(db);
 
         {
@@ -3234,17 +3225,12 @@ mod tests {
         assert_eq!(result[0].uuid, items[0].uuid);
         assert_eq!(result[1].uuid, items[1].uuid);
         assert_eq!(result[2].uuid, items[2].uuid);
-
-        let _ = std::fs::remove_dir_all(temp_dir);
     }
 
     /// A `Player` over songs `1..=count` (all on one album/artist), with the
     /// given ids flagged `unavailable`, plus the matching playlist items.
-    fn player_with_songs(
-        count: i64,
-        unavailable: &[i64],
-    ) -> (Player, Vec<PlaylistItem>, std::path::PathBuf) {
-        let (db, temp_dir) = setup_test_db();
+    fn player_with_songs(count: i64, unavailable: &[i64]) -> (TestDir, Player, Vec<PlaylistItem>) {
+        let (temp_dir, db) = setup_test_db();
         let db_arc = Arc::new(db);
         let conn = db_arc.pool.get().unwrap();
         for id in 1..=count {
@@ -3273,14 +3259,14 @@ mod tests {
             .collect();
         drop(conn);
         let audio = Arc::new(Mutex::new(AudioEngine::new()));
-        (Player::new(db_arc, audio), items, temp_dir)
+        (temp_dir, Player::new(db_arc, audio), items)
     }
 
     /// #1221: turning shuffle off must leave `current_index` on the playing
     /// track, so Next continues from it in playlist order.
     #[tokio::test]
     async fn test_shuffle_off_keeps_next_relative_to_current_track() {
-        let (mut player, items, temp_dir) = player_with_songs(6, &[]);
+        let (_temp_dir, mut player, items) = player_with_songs(6, &[]);
 
         for _ in 0..10 {
             player.set_shuffle_mode(ShuffleMode::All);
@@ -3307,15 +3293,13 @@ mod tests {
                 "Next after turning shuffle off must play the track after {playing}"
             );
         }
-
-        let _ = std::fs::remove_dir_all(temp_dir);
     }
 
     /// #1222: re-shuffling (switching shuffle modes) must keep Previous
     /// walking back through the songs that actually played.
     #[tokio::test]
     async fn test_reshuffle_keeps_previous_history() {
-        let (mut player, items, temp_dir) = player_with_songs(8, &[]);
+        let (_temp_dir, mut player, items) = player_with_songs(8, &[]);
 
         for mode in [ShuffleMode::Artists, ShuffleMode::Albums, ShuffleMode::All] {
             for _ in 0..10 {
@@ -3342,8 +3326,6 @@ mod tests {
                 assert_eq!(player.current_song.as_ref().unwrap().id, first);
             }
         }
-
-        let _ = std::fs::remove_dir_all(temp_dir);
     }
 
     /// #1223: under RepeatMode::Playlist, Previous wraps past the start even
@@ -3351,7 +3333,7 @@ mod tests {
     /// it still stays put.
     #[tokio::test]
     async fn test_previous_wraps_past_unavailable_tracks_with_repeat_playlist() {
-        let (mut player, items, temp_dir) = player_with_songs(3, &[1]);
+        let (_temp_dir, mut player, items) = player_with_songs(3, &[1]);
 
         player.set_repeat_mode(RepeatMode::Playlist);
         player
@@ -3374,7 +3356,5 @@ mod tests {
             2,
             "without repeat, Previous must not wrap past the start"
         );
-
-        let _ = std::fs::remove_dir_all(temp_dir);
     }
 }

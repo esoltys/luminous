@@ -1702,13 +1702,11 @@ mod tests {
 
     #[test]
     fn test_database_initialization() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Database::new(temp_dir.clone()).unwrap();
 
         let conn = db.pool.get().unwrap();
@@ -1724,13 +1722,11 @@ mod tests {
 
     #[test]
     fn test_schema_newer_than_app_detected_without_running_migrations_backward() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Database::new(temp_dir.clone()).unwrap();
         assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
         assert!(!db.is_newer_than_app());
@@ -1760,13 +1756,11 @@ mod tests {
 
     #[test]
     fn test_reopen_heals_a_gap_left_by_an_interrupted_migration() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_migration_gap_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_migration_gap_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Database::new(temp_dir.clone()).unwrap();
         assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
 
@@ -1803,13 +1797,11 @@ mod tests {
 
     #[test]
     fn test_migration_34_relaxes_path_uniqueness_for_cue_tracks() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_migration34_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_migration34_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         std::fs::create_dir_all(&temp_dir).unwrap();
         let db_path = temp_dir.join("luminous.db");
 
@@ -1941,13 +1933,11 @@ mod tests {
 
     #[test]
     fn test_migration_19_discards_old_bare_genre_rows_but_keeps_others() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_migration19_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_migration19_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Database::new(temp_dir.clone()).unwrap();
         assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
 
@@ -2034,13 +2024,11 @@ mod tests {
 
     #[test]
     fn test_migration_25_adds_directory_metadata_columns() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_migration25_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_migration25_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Database::new(temp_dir.clone()).unwrap();
         assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
 
@@ -2068,13 +2056,11 @@ mod tests {
 
     #[test]
     fn test_migration_28_context_enrichment_tables_round_trip() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_migration28_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_migration28_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Database::new(temp_dir.clone()).unwrap();
         assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
 
@@ -2114,13 +2100,11 @@ mod tests {
 
     #[test]
     fn test_migration_29_webdav_tables_round_trip() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_migration29_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_migration29_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Database::new(temp_dir.clone()).unwrap();
         assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
 
@@ -2161,13 +2145,11 @@ mod tests {
 
     #[test]
     fn test_migration_40_webdav_auto_sync_columns() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_migration40_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_migration40_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Database::new(temp_dir.clone()).unwrap();
         assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
 
@@ -2215,13 +2197,11 @@ mod tests {
 
     #[test]
     fn test_migration_44_subsonic_tables() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_migration44_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_migration44_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Database::new(temp_dir.clone()).unwrap();
         assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
 
@@ -2315,13 +2295,11 @@ mod tests {
 
     #[test]
     fn test_migration_35_target_lufs_and_crossfade_cleanup() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_migration35_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_migration35_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Database::new(temp_dir.clone()).unwrap();
         assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
 
@@ -2359,13 +2337,11 @@ mod tests {
 
     #[test]
     fn test_migration_38_artist_tag_hierarchy() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_migration38_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_migration38_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Database::new(temp_dir.clone()).unwrap();
         assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
 
@@ -2385,13 +2361,11 @@ mod tests {
 
     #[test]
     fn test_migration_39_adds_artist_profiles_musicbrainz_artist_id_column() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_migration39_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_migration39_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Database::new(temp_dir.clone()).unwrap();
         assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
 
@@ -2419,13 +2393,11 @@ mod tests {
 
     #[test]
     fn test_migration_41_adds_artist_profiles_fetched_image_columns() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_migration40_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_migration40_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Database::new(temp_dir.clone()).unwrap();
         assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
 
@@ -2451,13 +2423,11 @@ mod tests {
 
     #[test]
     fn test_migration_49_adds_album_cover_and_disc_columns() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_migration49_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_migration49_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Database::new(temp_dir.clone()).unwrap();
         assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
 
@@ -2484,13 +2454,11 @@ mod tests {
 
     #[test]
     fn test_migration_48_adds_artist_logo_and_background_columns() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_migration48_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_migration48_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Database::new(temp_dir.clone()).unwrap();
         assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
 
@@ -2517,13 +2485,11 @@ mod tests {
 
     #[test]
     fn test_migration_42_adds_artist_context_enrichment_columns() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_migration42_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_migration42_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Database::new(temp_dir.clone()).unwrap();
         assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
 
@@ -2605,13 +2571,11 @@ mod tests {
 
     #[test]
     fn test_migration_43_adds_auto_fetch_flags() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_migration43_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_migration43_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Database::new(temp_dir.clone()).unwrap();
         assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
 

@@ -166,15 +166,13 @@ mod tests {
     use super::*;
     use crate::db::Database;
 
-    fn test_db() -> (Database, std::path::PathBuf) {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_stats_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-        (Database::new(temp_dir.clone()).unwrap(), temp_dir)
+    fn test_db() -> (tempfile::TempDir, Database) {
+        let temp_dir = tempfile::Builder::new()
+            .prefix("luminous_stats_test_")
+            .tempdir()
+            .unwrap();
+        let db = Database::new(temp_dir.path().to_path_buf()).unwrap();
+        (temp_dir, db)
     }
 
     fn insert_song(conn: &Connection, path: &str) -> i64 {
@@ -197,7 +195,7 @@ mod tests {
 
     #[test]
     fn test_record_play_increments_and_stamps() {
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         let conn = db.pool.get().unwrap();
         let id = insert_song(&conn, "/tmp/a.flac");
 
@@ -208,13 +206,11 @@ mod tests {
         assert_eq!(playcount, 2);
         assert_eq!(skipcount, 0);
         assert!(lastplayed.is_some());
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
     fn test_record_play_context_persists_by_type() {
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         let conn = db.pool.get().unwrap();
         let id = insert_song(&conn, "/tmp/context.flac");
         conn.execute(
@@ -255,13 +251,11 @@ mod tests {
                 ("playlist".to_string(), Some(playlist_id)),
             ]
         );
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
     fn test_record_play_context_persists_duration_secs() {
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         let conn = db.pool.get().unwrap();
         let id = insert_song(&conn, "/tmp/duration.flac");
 
@@ -275,13 +269,11 @@ mod tests {
             )
             .unwrap();
         assert_eq!(duration, 245);
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
     fn test_record_skip_increments_only_skipcount() {
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         let conn = db.pool.get().unwrap();
         let id = insert_song(&conn, "/tmp/b.flac");
 
@@ -291,13 +283,11 @@ mod tests {
         assert_eq!(playcount, 0);
         assert_eq!(skipcount, 1);
         assert!(lastplayed.is_none());
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
     fn test_set_rating_persists_normalized_value() {
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         let conn = db.pool.get().unwrap();
         let id = insert_song(&conn, "/tmp/c.flac");
 
@@ -310,13 +300,11 @@ mod tests {
         assert_eq!(cleared, RATING_UNRATED);
         let (_, _, _, rating) = stats_row(&conn, id);
         assert_eq!(rating, RATING_UNRATED);
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
     fn test_set_album_rating_persists_normalized_value_independent_of_songs() {
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         let conn = db.pool.get().unwrap();
         let id = insert_song(&conn, "/tmp/album_song.flac");
         set_rating(&conn, id, 2.0).unwrap();
@@ -332,21 +320,17 @@ mod tests {
         let updated = set_album_rating(&conn, "Test Album", 1.0).unwrap();
         assert_eq!(updated, 1.0);
         assert_eq!(get_album_rating(&conn, "Test Album").unwrap(), 1.0);
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
     fn test_get_album_rating_defaults_to_unrated() {
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         let conn = db.pool.get().unwrap();
 
         assert_eq!(
             get_album_rating(&conn, "Never Rated").unwrap(),
             RATING_UNRATED
         );
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
