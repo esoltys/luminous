@@ -49,10 +49,10 @@ export interface ShareCardOptions {
   seed: string;
   backgroundColors?: string[];
   coverDataUri: string | null;
-  /** Up to 4 cover data URIs, front-to-back, rendered as a fanned stack
-   * (mirroring CoverStack.svelte's "right" direction transform) instead of
-   * the single `coverDataUri` image — used for playlist cards, where a
-   * single cover would misrepresent a multi-artist/multi-album mix.
+  /** Up to 5 cover data URIs, front-to-back, rendered as a CoverMosaic
+   * grid on horizontal cards (or a fanned stack of up to 4 on portrait cards)
+   * instead of the single `coverDataUri` image — used for playlist and stats
+   * cards, where a single cover would misrepresent a multi-artist/multi-album mix.
    * Ignored when it has fewer than 2 entries; falls back to `coverDataUri`. */
   coverStackDataUris?: (string | null)[] | null;
   title: string;
@@ -358,8 +358,9 @@ export interface StatsShareCardSection {
   title: string;
   /** Pre-capped by the caller (e.g. top 5) — this builder renders whatever it's given. */
   items: StatsShareCardItem[];
-  /** Up to 4 cover data URIs (album art, or per-artist images for the Top
-   * Artists section) shown as a fanned stack on the right of this section's
+  /** Up to 5 cover data URIs (album art, or per-artist images for the Top
+   * Artists section) shown as a CoverMosaic grid on horizontal cards or a
+   * fanned stack of up to 4 on portrait cards on the right of this section's
    * list — omitted or empty renders the section as text-only (e.g. Top
    * Genres, which has no natural image). */
   coverStackDataUris?: string[];
