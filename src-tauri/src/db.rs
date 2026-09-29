@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 50;
+pub const CURRENT_SCHEMA_VERSION: i32 = 51;
 
 struct Migration {
     version: i32,
@@ -436,6 +436,11 @@ const MIGRATIONS: &[Migration] = &[
         version: 50,
         description: "default auto_sync_enabled to 1 on webdav_servers and subsonic_servers (#1205)",
         apply: rebuild_remote_servers_auto_sync_default,
+    },
+    Migration {
+        version: 51,
+        description: "repair folder art paths stored as relative `UNC\\...`",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_51)?),
     },
 ];
 
@@ -1755,6 +1760,16 @@ DROP TABLE subsonic_servers;
 ALTER TABLE subsonic_servers_new RENAME TO subsonic_servers;
 ";
 
+/// Folder art on a mapped network drive used to be stored canonicalized with
+/// only `\\?\` stripped, leaving `\\?\UNC\server\share\...` as the relative,
+/// unservable `UNC\server\share\...`. Restore the UNC `\\` prefix so it
+/// serves again without a rescan.
+const MIGRATION_51: &str = r"
+UPDATE songs
+SET art_automatic = '\\' || substr(art_automatic, 5)
+WHERE substr(art_automatic, 1, 4) = 'UNC\';
+";
+
 fn rebuild_remote_servers_auto_sync_default(conn: &rusqlite::Connection) -> Result<()> {
     use rusqlite::OptionalExtension;
 
@@ -2745,6 +2760,50 @@ mod tests {
 
         drop(conn);
         let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_migration_51_restores_unc_prefix_on_folder_art() {
+        let temp_dir = tempfile::Builder::new()
+            .prefix("luminous_migration51_test_")
+            .tempdir()
+            .unwrap();
+        let conn = rusqlite::Connection::open(temp_dir.path().join("luminous.db")).unwrap();
+        for m in MIGRATIONS.iter().filter(|m| m.version < 51) {
+            (m.apply)(&conn).unwrap();
+        }
+        let rows = [
+            (r"Z:\Music\a.flac", Some(r"UNC\nas\music\Album\folder.jpg")),
+            (r"Z:\Music\b.flac", Some(r"Z:\Music\Album\folder.jpg")),
+            (r"Z:\Music\c.flac", Some("album-abc.jpg")),
+            (r"Z:\Music\d.flac", None),
+        ];
+        for (path, art) in rows {
+            conn.execute(
+                "INSERT INTO songs (path, art_automatic) VALUES (?1, ?2)",
+                params![path, art],
+            )
+            .unwrap();
+        }
+
+        conn.execute_batch(MIGRATION_51).unwrap();
+
+        let art: Vec<Option<String>> = conn
+            .prepare("SELECT art_automatic FROM songs ORDER BY path")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect();
+        assert_eq!(
+            art,
+            vec![
+                Some(r"\\nas\music\Album\folder.jpg".to_string()),
+                Some(r"Z:\Music\Album\folder.jpg".to_string()),
+                Some("album-abc.jpg".to_string()),
+                None,
+            ]
+        );
     }
 
     #[test]
