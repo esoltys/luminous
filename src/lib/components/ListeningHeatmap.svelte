@@ -67,11 +67,23 @@
 
   $effect(() => {
     if (!gridEl) return;
+    let rafId: number | undefined;
     const observer = new ResizeObserver(([entry]) => {
-      if (entry) gridWidth = entry.contentRect.width;
+      if (entry) {
+        const w = entry.contentRect.width;
+        if (Math.abs(w - gridWidth) >= 1) {
+          if (rafId) cancelAnimationFrame(rafId);
+          rafId = requestAnimationFrame(() => {
+            gridWidth = w;
+          });
+        }
+      }
     });
     observer.observe(gridEl);
-    return () => observer.disconnect();
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      observer.disconnect();
+    };
   });
 
   // Only the heatmap (1-year) view extends how much history is *shown* to

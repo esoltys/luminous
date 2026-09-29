@@ -189,9 +189,16 @@
 
   onMount(() => {
     checkClamp();
-    const observer = new ResizeObserver(checkClamp);
+    let rafId: number | undefined;
+    const observer = new ResizeObserver(() => {
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(checkClamp);
+    });
     if (paragraphEl) observer.observe(paragraphEl);
-    return () => observer.disconnect();
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      observer.disconnect();
+    };
   });
 </script>
 

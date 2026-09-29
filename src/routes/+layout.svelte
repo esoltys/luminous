@@ -30,6 +30,7 @@
   import { themeStore } from '../lib/stores/theme.svelte';
   import { generateEllipseGradientSvg } from '../lib/utils/ellipseGradient';
   import { formatWindowTitle } from '../lib/utils/formatters';
+  import { FrontendErrorReporter } from '../lib/utils/frontendError';
   import { onMount } from 'svelte';
   import { getCurrentWebview } from '@tauri-apps/api/webview';
   import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -301,29 +302,19 @@
     window.addEventListener('keydown', handleGlobalHotkeys);
 
     // Forwards uncaught JS errors/rejections to the backend crash log (#684)
-    // — without this, a frontend crash a user hits when not running from a
-    // terminal leaves no trace anywhere for a bug report to point to.
-    const handleWindowError = (e: ErrorEvent) => {
-      void invoke('log_frontend_error', {
-        message: e.message || String(e.error),
-        stack: e.error?.stack,
-      }).catch(() => {});
-    };
-    const handleUnhandledRejection = (e: PromiseRejectionEvent) => {
-      const reason = e.reason;
-      void invoke('log_frontend_error', {
-        message: reason instanceof Error ? reason.message : String(reason),
-        stack: reason instanceof Error ? reason.stack : undefined,
-      }).catch(() => {});
-    };
-    window.addEventListener('error', handleWindowError);
-    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+    // with benign notice filtering and burst repeat-collapsing (#1261) — without
+    // this, a frontend crash a user hits when not running from a terminal
+    // leaves no trace anywhere for a bug report to point to.
+    const errorReporter = new FrontendErrorReporter();
+    window.addEventListener('error', errorReporter.handleWindowError);
+    window.addEventListener('unhandledrejection', errorReporter.handleUnhandledRejection);
 
     return () => {
       window.removeEventListener('keydown', handleGlobalHotkeys);
       window.removeEventListener('focus', handleWindowFocus);
-      window.removeEventListener('error', handleWindowError);
-      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+      window.removeEventListener('error', errorReporter.handleWindowError);
+      window.removeEventListener('unhandledrejection', errorReporter.handleUnhandledRejection);
+      errorReporter.flush();
       stopShiftPolling();
       dragDropUnlisten?.();
       focusUnlisten?.();

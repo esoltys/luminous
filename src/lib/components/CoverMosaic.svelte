@@ -83,11 +83,26 @@
   $effect(() => {
     if (!rootEl) return;
     const el = rootEl;
-    const update = () => { measuredHeight = el.getBoundingClientRect().height; };
-    update();
+    let rafId: number | undefined;
+    const initialH = el.getBoundingClientRect().height;
+    if (initialH > 0) {
+      measuredHeight = initialH;
+    }
+    const update = () => {
+      const h = el.getBoundingClientRect().height;
+      if (Math.abs(h - measuredHeight) >= 0.5) {
+        if (rafId) cancelAnimationFrame(rafId);
+        rafId = requestAnimationFrame(() => {
+          measuredHeight = h;
+        });
+      }
+    };
     const ro = new ResizeObserver(update);
     ro.observe(el);
-    return () => ro.disconnect();
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      ro.disconnect();
+    };
   });
 
   let measuredWidth = $derived(measuredHeight > 0 ? measuredHeight * ratio : 0);
