@@ -71,15 +71,22 @@ describe("MSIX AppxManifest file type associations (#471/#472)", () => {
       const logoMatch = block.match(/<uap:Logo>([^<]*)<\/uap:Logo>/);
       expect(logoMatch, `${_name}: missing <uap:Logo>`).toBeTruthy();
 
-      // Manifest paths use Windows backslashes and are relative to
-      // src-tauri/ (two levels up from gen/windows/, the manifest's own
-      // asset root).
+      // Manifest paths use Windows backslashes and are package-relative. The
+      // package's Assets\ is copied from gen/windows/Assets; everything else
+      // is a bundle resource, relative to src-tauri/ (two levels up).
       const relPath = logoMatch![1].trim().replace(/\\/g, path.sep);
-      const absPath = path.resolve(genWindowsDir, "..", "..", relPath);
+      const root = /^Assets[\\/]/.test(relPath) ? genWindowsDir : path.resolve(genWindowsDir, "..", "..");
+      const absPath = path.resolve(root, relPath);
       expect(
         fs.existsSync(absPath),
         `${_name}: Logo file does not exist on disk: ${absPath}`
       ).toBe(true);
+
+      // Without targetsize variants Explorer upscales a small cached size (#1305).
+      for (const suffix of ["targetsize-16", "targetsize-256_altform-unplated"]) {
+        const variant = absPath.replace(/\.png$/i, `.${suffix}.png`);
+        expect(fs.existsSync(variant), `${_name}: missing ${path.basename(variant)}`).toBe(true);
+      }
     }
   );
 });
