@@ -14,21 +14,28 @@ use uuid::Uuid;
 /// songs by exact string comparison. Prefers `canonicalize` (resolves
 /// symlinks too, and strips Windows' `\\?\` verbatim prefix so the result
 /// matches how `collection.rs` stores paths); if the path doesn't exist on
-/// disk yet, falls back to lexically collapsing `.`/`..` components without
-/// touching the filesystem.
+/// disk yet, or lives on a mapped network drive, falls back to lexically
+/// collapsing `.`/`..` components without touching the filesystem.
 fn clean_path<P: AsRef<std::path::Path>>(path: P) -> std::path::PathBuf {
     let p = path.as_ref();
     if let Ok(canonical) = std::fs::canonicalize(p) {
         let s = canonical.to_string_lossy();
         #[cfg(windows)]
-        let cleaned_s = match s.strip_prefix(r"\\?\") {
-            Some(stripped) => stripped.to_string(),
-            None => s.to_string(),
+        let cleaned_s = match s.strip_prefix(r"\\?\UNC\") {
+            // A mapped network drive (`Z:\...`) canonicalizes to its UNC
+            // target, which never matches the drive-letter form the scanner
+            // stored — fall through to the lexical cleanup instead. A path
+            // that was already UNC gets its `\\` prefix back.
+            Some(unc) if p.to_string_lossy().starts_with(r"\\") => Some(format!(r"\\{unc}")),
+            Some(_) => None,
+            None => Some(s.strip_prefix(r"\\?\").unwrap_or(&s).to_string()),
         };
         #[cfg(not(windows))]
-        let cleaned_s = s.to_string();
+        let cleaned_s = Some(s.to_string());
 
-        return std::path::PathBuf::from(cleaned_s);
+        if let Some(cleaned_s) = cleaned_s {
+            return std::path::PathBuf::from(cleaned_s);
+        }
     }
 
     use std::path::Component;

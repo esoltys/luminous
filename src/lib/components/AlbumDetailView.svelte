@@ -123,8 +123,10 @@
   }
 
   // The manual action fetches every art type; the automatic one
-  // (`onlyMissing`) only the enabled types not yet attempted.
-  async function handleRetrieveAlbumDetails(onlyMissingArt = false) {
+  // (`auto`) only the enabled types not yet attempted, and fails quietly —
+  // the user didn't ask for it, so a network error isn't worth a toast;
+  // `details_fetched` stays unset and the next visit retries.
+  async function handleRetrieveAlbumDetails(auto = false) {
     if (retrievingDetails || !hasReleaseGroupMbid) return;
     retrievingDetails = true;
     const taskId = `album-enrichment-${albumName.toLowerCase()}`;
@@ -141,11 +143,16 @@
         : result.added_count > 1
           ? i18n.t("albumDetail.retrieveDetailsSuccessMany", { count: result.added_count }, `Added ${result.added_count} links from MusicBrainz`)
           : i18n.t("albumDetail.retrieveDetailsNoResults", {}, "No additional details found on MusicBrainz");
-      await retrieveAlbumArt(onlyMissingArt);
+      await retrieveAlbumArt(auto);
       tasksStore.completeTask(taskId, label);
     } catch (err) {
-      console.error("Failed to retrieve album details:", err);
-      tasksStore.failTask(taskId, String(err));
+      if (auto) {
+        console.warn("Automatic album details retrieval failed:", err);
+        tasksStore.clearTask(taskId);
+      } else {
+        console.error("Failed to retrieve album details:", err);
+        tasksStore.failTask(taskId, String(err));
+      }
     } finally {
       retrievingDetails = false;
     }
