@@ -102,6 +102,10 @@ describe("SongTable.svelte — Last Played column", () => {
 
   beforeEach(() => {
     collectionStore.visibleColumns.lastplayed = true;
+    // Relative times depend on the clock: pin it to midday so "N minutes ago" can't
+    // cross midnight into "Yesterday" and results don't vary between runs.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2024, 5, 15, 12, 0, 0));
   });
 
   function renderTable(rows: SongTableRow[]) {
@@ -134,9 +138,6 @@ describe("SongTable.svelte — Last Played column", () => {
   });
 
   it("renders relative time for a recently played song", () => {
-    // Pin the clock to midday so "15 minutes ago" can't cross midnight into "Yesterday".
-    vi.useFakeTimers({ toFake: ["Date"] });
-    vi.setSystemTime(new Date(2024, 5, 15, 12, 0, 0));
     const nowSec = Math.floor(Date.now() / 1000);
     const song: Song = { ...baseSong, lastplayed: nowSec - 15 * 60 }; // 15 mins ago
     const { getByText } = renderTable([{ key: "1", song }]);
