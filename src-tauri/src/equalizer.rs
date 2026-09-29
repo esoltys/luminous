@@ -274,30 +274,6 @@ pub fn default_parametric_bands() -> [ParametricBand; PARAMETRIC_BAND_COUNT] {
     bands
 }
 
-/// Interpolate a 10-band graphic preset (gains defined at the `EQ_BANDS`
-/// frequencies) at an arbitrary frequency, in log-frequency space. Values
-/// below the first / above the last band clamp to the endpoint gains.
-fn interp_preset_gain(gains: &[f32; 10], freq: f32) -> f32 {
-    let lf = freq.max(1.0).log2();
-    let first = EQ_BANDS[0].log2();
-    let last = EQ_BANDS[9].log2();
-    if lf <= first {
-        return gains[0];
-    }
-    if lf >= last {
-        return gains[9];
-    }
-    for i in 0..9 {
-        let f0 = EQ_BANDS[i].log2();
-        let f1 = EQ_BANDS[i + 1].log2();
-        if lf >= f0 && lf <= f1 {
-            let t = (lf - f0) / (f1 - f0);
-            return gains[i] + t * (gains[i + 1] - gains[i]);
-        }
-    }
-    gains[9]
-}
-
 /// Snapshot of the user-adjustable EQ state — the value type crossing the
 /// IPC boundary in both directions. The frontend edits a config and applies
 /// it whole; the echoed snapshot (post-clamping) is the canonical state.
@@ -322,9 +298,9 @@ impl EqualizerConfig {
     }
 }
 
-/// Named 10-band presets. Mapped onto the parametric bands by interpolation
-/// when that mode is active (see `load_preset_into_parametric`). Unknown
-/// names fall back to flat.
+/// Named 10-band graphic presets. The parametric mode has its own sparse
+/// versions of the same names (`parametric_preset`). Unknown names fall back
+/// to flat.
 pub fn preset_gains(name: &str) -> [f32; 10] {
     match name.to_lowercase().as_str() {
         "rock" => [4.0, 3.0, 1.0, -1.0, -2.0, -1.0, 1.0, 3.0, 3.5, 3.5],
@@ -334,6 +310,58 @@ pub fn preset_gains(name: &str) -> [f32; 10] {
         "headphones" => [2.0, 1.5, 0.5, 0.0, 0.0, 0.0, -0.5, -1.0, -0.5, 1.0],
         _ => [0.0; 10], // Flat
     }
+}
+
+/// Named presets for the parametric mode, written the way a parametric EQ is
+/// used: a few broad moves (wide Q, shelves at the edges) rather than every
+/// band nudged to trace the 10-band curve. Each entry is
+/// `(band index, gain dB, Q)`; unlisted bands stay flat at the default Q.
+/// Bands 0 and 19 are shelves (`filter_kind_for_band`), so their Q is unused.
+/// Band centers: 0=31, 2=60, 3=84, 5=161, 7=311, 8=432, 9=600, 11=1.2k,
+/// 13=2.2k, 14=3.1k, 15=4.3k, 16=6k, 17=8.3k, 19=16k Hz.
+fn parametric_preset_moves(name: &str) -> &'static [(usize, f32, f32)] {
+    match name.to_lowercase().as_str() {
+        "rock" => &[
+            (0, 4.0, 0.0),
+            (2, 2.5, 0.7),
+            (9, -2.0, 0.7),
+            (16, 3.0, 0.6),
+            (19, 4.0, 0.0),
+        ],
+        "pop" => &[
+            (2, 2.5, 0.6),
+            (7, -1.0, 0.8),
+            (14, 2.5, 0.5),
+            (19, 2.5, 0.0),
+        ],
+        "bass boost" | "bassboost" => &[(0, 9.0, 0.0), (2, 4.5, 0.6)],
+        "vocal boost" | "vocalboost" => &[
+            (0, -2.0, 0.0),
+            (3, -2.0, 0.6),
+            (12, 4.5, 0.6),
+            (19, -2.0, 0.0),
+        ],
+        "headphones" => &[
+            (0, 2.0, 0.0),
+            (2, 1.0, 0.7),
+            (17, -1.0, 1.2),
+            (19, 2.5, 0.0),
+        ],
+        _ => &[], // Flat
+    }
+}
+
+/// The full 20-band layout for a named parametric preset (see
+/// `parametric_preset_moves`). Unknown names fall back to flat.
+pub fn parametric_preset(name: &str) -> [ParametricBand; PARAMETRIC_BAND_COUNT] {
+    let mut bands = default_parametric_bands();
+    for &(idx, gain_db, q) in parametric_preset_moves(name) {
+        bands[idx].gain_db = gain_db;
+        if q > 0.0 {
+            bands[idx].q = q;
+        }
+    }
+    bands
 }
 
 // ---------------------------------------------------------------------------
@@ -456,22 +484,10 @@ impl Equalizer {
     }
 
     /// Replace the 10 graphic-mode band gains wholesale (e.g. from a named
-    /// preset). For applying the same presets under parametric mode, see
-    /// `load_preset_into_parametric`.
+    /// preset). The parametric mode loads its own presets via
+    /// `load_parametric(parametric_preset(name))`.
     pub fn load_preset(&mut self, gains: [f32; 10]) {
         self.gains = gains;
-        self.recalculate();
-    }
-
-    /// Apply a 10-band graphic preset to the parametric bands by interpolating
-    /// the preset curve (in log-frequency space) at each parametric band's
-    /// center frequency, resetting Q to the default. Lets the parametric mode
-    /// reuse the same named presets as the graphic mode.
-    pub fn load_preset_into_parametric(&mut self, gains: [f32; 10]) {
-        for band in self.parametric.iter_mut() {
-            band.gain_db = interp_preset_gain(&gains, band.freq).clamp(-12.0, 12.0);
-            band.q = PARAMETRIC_DEFAULT_Q;
-        }
         self.recalculate();
     }
 
@@ -657,32 +673,43 @@ mod tests {
     }
 
     #[test]
-    fn preset_maps_onto_parametric_bands() {
-        let mut eq = Equalizer::new();
-        eq.update_format(44100, 2);
-        // Bass-boost-ish preset: strong low end, flat top.
-        let gains = [6.0, 5.0, 4.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
-        eq.load_preset_into_parametric(gains);
-        // Lowest parametric band (~31 Hz) should track the preset's low gain,
-        // and the highest (~16 kHz) should sit at the flat top.
-        assert!(eq.parametric[0].gain_db > 4.0);
-        assert!(eq.parametric[19].gain_db.abs() < 0.5);
-        // Q reset to default on every band.
-        for band in eq.parametric.iter() {
-            assert!((band.q - PARAMETRIC_DEFAULT_Q).abs() < 1e-4);
+    fn parametric_presets_are_a_few_broad_moves() {
+        for name in ["rock", "pop", "bass boost", "vocal boost", "headphones"] {
+            let bands = parametric_preset(name);
+            let moved: Vec<_> = bands.iter().filter(|b| b.gain_db != 0.0).collect();
+            assert!(
+                (2..=5).contains(&moved.len()),
+                "{name}: {} bands moved",
+                moved.len()
+            );
+            // Peaking moves are broad; the edge shelves ignore Q.
+            for band in &bands[1..PARAMETRIC_BAND_COUNT - 1] {
+                if band.gain_db != 0.0 {
+                    assert!(
+                        band.q <= 1.2,
+                        "{name}: {} Hz has narrow Q {}",
+                        band.freq,
+                        band.q
+                    );
+                }
+            }
         }
+        assert!(parametric_preset("flat").iter().all(|b| b.gain_db == 0.0));
     }
 
     #[test]
-    fn interp_preset_gain_clamps_and_interpolates() {
-        let gains = [3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 9.0];
-        // Below first band clamps to gains[0]
-        assert_eq!(interp_preset_gain(&gains, 10.0), 3.0);
-        // Above last band clamps to gains[9]
-        assert_eq!(interp_preset_gain(&gains, 20000.0), 9.0);
-        // Midpoint between 8 kHz (3.0) and 16 kHz (9.0) in log space ≈ 6.0
-        let mid = interp_preset_gain(&gains, (8000.0f32 * 16000.0).sqrt());
-        assert!((mid - 6.0).abs() < 0.2);
+    fn parametric_presets_track_their_graphic_counterparts() {
+        for name in ["rock", "pop", "bass boost", "vocal boost", "headphones"] {
+            let mut eq = parametric_eq_48k();
+            eq.load_parametric(parametric_preset(name));
+            let response = eq.parametric_response_db(&EQ_BANDS);
+            for ((freq, got), want) in EQ_BANDS.iter().zip(response).zip(preset_gains(name)) {
+                assert!(
+                    (got - want).abs() <= 2.0,
+                    "{name} @ {freq} Hz: parametric {got:.1} dB vs graphic {want:.1} dB"
+                );
+            }
+        }
     }
 
     #[test]
