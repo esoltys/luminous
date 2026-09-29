@@ -578,7 +578,7 @@
                   {i18n.t('playerBar.nowPlaying')}
                 </span>
                 <h1 class="mt-3 text-4xl md:text-6xl font-black text-brand-text-primary leading-[0.95] tracking-tight select-text text-balance">
-                  {playerStore.currentSong.title || i18n.t('collection.unknownSong')}
+                  {playerStore.currentSongDisplayTitle}
                 </h1>
                 <p class="mt-3 text-lg md:text-xl text-brand-text-secondary select-text font-semibold">
                   {playerStore.currentSong.album || i18n.t('collection.unknownAlbum')}

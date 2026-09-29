@@ -251,7 +251,7 @@
       <Lyrics class="w-6 h-6 text-brand-accent-text shrink-0" />
       <div class="min-w-0">
         <h2 class="text-sm font-bold truncate max-w-xs md:max-w-md text-brand-text-primary py-0.5 leading-snug">
-          {playerStore.currentSong ? playerStore.currentSong.title : i18n.t('playerBar.notPlaying')}
+          {playerStore.currentSongDisplayTitle}
         </h2>
         <p class="text-[10px] text-brand-text-secondary/70 truncate max-w-xs md:max-w-md">
           {playerStore.currentSong ? `${playerStore.currentSong.artist || i18n.t('collection.unknownArtist')} — ${playerStore.currentSong.album || i18n.t('collection.unknownAlbum')}` : i18n.t('lyrics.lyricsHelpText')}

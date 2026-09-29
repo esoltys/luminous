@@ -77,6 +77,16 @@ describe("PlayerBar.svelte", () => {
     expect(getByText("Test Artist")).toBeInTheDocument();
   });
 
+  it("shows 'Unknown Song', not 'Nothing playing', for a playing song with no title tag (#1246)", () => {
+    playerStore.currentSong = { ...mockSong, title: "", artist: "" };
+    playerStore.state = "playing";
+
+    const { getByText, queryByText } = render(PlayerBar);
+    expect(getByText("Unknown Song")).toBeInTheDocument();
+    expect(getByText("Unknown Artist")).toBeInTheDocument();
+    expect(queryByText(/nothing playing/i)).not.toBeInTheDocument();
+  });
+
   it("hides the album row entirely when the current song has no album (#428)", () => {
     playerStore.currentSong = { ...mockSong, album: "" };
     playerStore.state = "playing";

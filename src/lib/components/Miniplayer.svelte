@@ -264,7 +264,7 @@
 
     <div class="w-full text-center px-2 py-1 flex flex-col items-center justify-center flex-shrink-0">
       <span class="text-sm font-bold text-brand-text-primary truncate w-full" title={playerStore.currentSong?.title}>
-        {playerStore.currentSong?.title || i18n.t('playerBar.notPlaying')}
+        {playerStore.currentSongDisplayTitle}
       </span>
       <span class="text-xs text-brand-text-secondary/70 truncate w-full mt-0.5" title={playerStore.currentSong?.artist}>
         {playerStore.currentSong?.artist || (playerStore.currentSong ? i18n.t('collection.unknownArtist') : '')}
@@ -292,7 +292,7 @@
 
     <div class="w-full text-center px-1 py-0.5 flex flex-col items-center justify-center flex-shrink-0 mt-auto">
       <span class="text-sm font-bold text-brand-text-primary truncate w-full" title={playerStore.currentSong?.title}>
-        {playerStore.currentSong?.title || i18n.t('playerBar.notPlaying')}
+        {playerStore.currentSongDisplayTitle}
       </span>
       <span class="text-xs text-brand-text-secondary/80 truncate w-full" title={playerStore.currentSong?.artist}>
         {playerStore.currentSong?.artist || (playerStore.currentSong ? i18n.t('collection.unknownArtist') : '')}
