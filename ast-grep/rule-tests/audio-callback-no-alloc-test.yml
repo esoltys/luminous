@@ -1,0 +1,25 @@
+id: audio-callback-no-alloc
+valid:
+  - |
+    fn setup() {
+        let mut scratch = Vec::with_capacity(1024);
+        let stream = device.build_output_stream(&config, move |output: &mut [f32], _| {
+            for s in output.iter_mut() { *s = 0.0; }
+        }, err_fn, None);
+    }
+  - |
+    fn not_audio() { let v = vec![1, 2, 3]; items.push(4); }
+invalid:
+  - |
+    fn setup() {
+        let stream = device.build_output_stream(&config, move |output: &mut [f32], _| {
+            let mut tmp = Vec::new();
+            tmp.push(output[0]);
+        }, err_fn, None);
+    }
+  - |
+    fn setup() {
+        let stream = device.build_output_stream(&config, move |output: &mut [f32], _| {
+            log(format!("{}", output.len()));
+        }, err_fn, None);
+    }

@@ -102,6 +102,7 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config libayatana-appind
 - **Dev server** (frontend hot reload + Rust backend): `bun run tauri dev`
 - **Frontend-only dev** (faster, no backend): `bun run dev`
 - **Type check / lint**: `bun run check`
+- **Architecture-invariant lint** (ast-grep rules in `ast-grep/rules/`): `bun run lint:ast`
 - **Frontend tests**: `bun run test:run` (Vitest)
 - **Backend tests**: `cd src-tauri && cargo test`
 - **Windows UI automation smoke test** (real backend/IPC/SQLite, Windows only): `bun run test:e2e:windows`. One-time setup needed — see [docs/TESTING.md](docs/TESTING.md).
@@ -116,11 +117,11 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config libayatana-appind
 
 ## Architecture Invariants
 
-- **Allocation-free audio thread**: the playback callback in `audio.rs` must never allocate (no `Vec::push`, `String`, or other heap ops). Pre-allocate buffers on init; use `parking_lot::Mutex` (no poisoning) over `std::sync::Mutex`.
+- **Allocation-free audio thread**: the playback callback in `audio.rs` must never allocate (no `Vec::push`, `String`, or other heap ops). Pre-allocate buffers on init; use `parking_lot::Mutex` (no poisoning) over `std::sync::Mutex`. Enforced by `audio-callback-no-alloc` / `audio-no-std-mutex` — a pre-reserved or bounded push needs a justified `// ast-grep-ignore:` comment.
 - **Event-driven state**: the frontend always reacts to backend events (e.g. `playback-state`, `track-changed`) and never assumes state after an `invoke()`. This keeps the UI consistent with backend reality.
 - **Database migrations**: any schema change in `db.rs` must bump the migration version and stay backwards-compatible during rollout.
 - **Command pattern**: IPC handlers in `src-tauri/src/commands/*.rs` are `async`, return `Result<T, String>` (errors serialize to `String`), and access shared state via `AppState` (thread-safe through Arc + Mutex/parking_lot). Prefer *deep* commands that own a whole workflow (e.g. `apply_equalizer_config`, `add_songs_to_queue`) over per-field setters; persistence-only writes the UI can't act on (`set_app_setting`, `set_fade_settings`, EQ saves) are fire-and-forget — they log failures backend-side and never reject.
-- **Queue abstraction**: the built-in Queue is bootstrapped at startup and owned by `PlaylistManager::queue()` / `replace_queue()`. Branch on `Playlist.is_queue` (frontend: `playlistsStore.queuePlaylist` / `requireQueue()`); never match the playlist name.
+- **Queue abstraction**: the built-in Queue is bootstrapped at startup and owned by `PlaylistManager::queue()` / `replace_queue()`. Branch on `Playlist.is_queue` (frontend: `playlistsStore.queuePlaylist` / `requireQueue()`); never match the playlist name (enforced by `queue-by-name-ts` / `queue-by-name-rs`).
 - **Dynamic playlists are always complete**: a genre/decade/BPM auto playlist or user smart playlist always contains exactly the songs matching its definition. Backend listeners on `library-changed` / `song-stats-changed` run `playlist::reconcile_and_sync`, which appends new matches (ordered by the playlist's population-mode rules) and evicts stale rows immediately — without reordering survivors or the live play order; only the explicit Refresh re-sorts. There is no refill mechanism or Auto-Refill setting; do not reintroduce one.
 
 ## Design Principles
@@ -136,7 +137,7 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config libayatana-appind
 - **Explicit-action-only celebrations**: Micro-animations (heart pulse, confetti, etc.) must fire only in
   response to a deliberate user interaction (e.g., a click handler). Never trigger them from a reactive
   `$effect` or a prop-change watcher — doing so causes false positives when the track changes and a
-  different (already-favourited) song loads.
+  different (already-favourited) song loads. Enforced by `celebration-in-effect`.
 
 - **Motion budget**: every animation must name its purpose — feedback, spatial continuity, state
   legibility, bridging a jarring change, first-run explanation, or rare delight. If it has none,

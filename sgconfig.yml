@@ -1,0 +1,10 @@
+# Structural lint rules for the AGENTS.md architecture invariants (#1239).
+# Run with `bun run lint:ast` (scans the tree, then runs each rule's tests).
+ruleDirs:
+  - ast-grep/rules
+testConfigs:
+  - testDir: ast-grep/rule-tests
+languageGlobs:
+  # Svelte's `<script lang="ts">` is injected as TypeScript, so TypeScript
+  # rules also apply to component scripts.
+  html: ["*.svelte"]

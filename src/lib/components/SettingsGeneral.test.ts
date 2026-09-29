@@ -4,6 +4,8 @@ import { render, fireEvent } from "@testing-library/svelte";
 import SettingsGeneral from "./SettingsGeneral.svelte";
 import { invoke } from "@tauri-apps/api/core";
 import { prefs } from "../stores/prefs.svelte";
+import { updaterStore } from "../stores/updater.svelte";
+import { flushSync } from "svelte";
 
 const platform = vi.hoisted(() => ({ isWindows: false }));
 vi.mock("../platform", () => ({
@@ -70,5 +72,30 @@ describe("SettingsGeneral.svelte", () => {
 
     await findByText(/v0\.75\.0/);
     expect(queryByText("Make Luminous the default music player")).not.toBeInTheDocument();
+  });
+
+  it("pops the up-to-date check after a manual Check for Updates (#1239)", async () => {
+    vi.spyOn(updaterStore, "checkForUpdates").mockImplementation(async () => {
+      updaterStore.checkStatus = "up-to-date";
+    });
+    updaterStore.checkStatus = "idle";
+    const { findByRole, container } = render(SettingsGeneral);
+
+    await fireEvent.click(await findByRole("button", { name: "Check for Updates" }));
+
+    await vi.waitFor(() => expect(container.querySelector(".anim-check-pop")).not.toBeNull());
+  });
+
+  it("does not pop the check when a background check comes back up-to-date (#1239)", async () => {
+    updaterStore.checkStatus = "idle";
+    const { findByText, container } = render(SettingsGeneral);
+    await findByText(/v0\.75\.0/);
+
+    updaterStore.checkStatus = "checking";
+    flushSync();
+    updaterStore.checkStatus = "up-to-date";
+    flushSync();
+
+    expect(container.querySelector(".anim-check-pop")).toBeNull();
   });
 });

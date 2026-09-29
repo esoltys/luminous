@@ -39,6 +39,14 @@ describe("formatDateAdded", () => {
     expect(formatDateAdded(nowSec - 5 * 3600)).toBe("5 hours ago");
   });
 
+  it("counts minutes and hours across midnight instead of reading 'Yesterday' (#1299)", () => {
+    vi.setSystemTime(new Date(2026, 8, 13, 0, 5));
+    const nowSec = Math.floor(Date.now() / 1000);
+    expect(formatDateAdded(nowSec - 15 * 60)).toBe("15 minutes ago");
+    expect(formatDateAdded(nowSec - 5 * 3600)).toBe("5 hours ago");
+    expect(formatDateAdded(nowSec - 6 * 3600)).toBe("Yesterday");
+  });
+
   it("returns 'Yesterday' for 1 calendar day ago", () => {
     const yesterday = new Date("2026-09-12T12:00:00Z");
     const yesterdaySec = Math.floor(yesterday.getTime() / 1000);

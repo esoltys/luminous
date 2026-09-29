@@ -1,0 +1,11 @@
+id: audio-no-std-mutex
+valid:
+  - use parking_lot::Mutex;
+  - use std::sync::Arc;
+  - |
+    struct S { state: Arc<parking_lot::Mutex<u32>> }
+invalid:
+  - use std::sync::Mutex;
+  - use std::sync::{Arc, Mutex};
+  - |
+    struct S { state: Arc<std::sync::Mutex<u32>> }

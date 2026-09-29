@@ -298,7 +298,7 @@
     <div class="flex flex-col truncate">
       <div class="flex items-center gap-2">
         <span class="text-sm font-semibold text-brand-text-primary truncate" title={playerStore.currentSong?.title}>
-          {playerStore.currentSong?.title || i18n.t('playerBar.notPlaying')}
+          {playerStore.currentSongDisplayTitle}
         </span>
         {#if playerStore.currentSong}
           <SongRating

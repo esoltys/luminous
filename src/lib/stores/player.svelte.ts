@@ -33,6 +33,12 @@ export class PlayerStore {
   queueJustCompleted = $state<boolean>(false);
   /** The name of the active playlist, album, or source context being played. */
   activeContextName = $state<string | undefined>(undefined);
+  /** Title to display for the current song: "Nothing playing" when there is no
+   *  song, "Unknown Song" when the song has no title tag (#1246). */
+  get currentSongDisplayTitle(): string {
+    if (!this.currentSong) return i18n.t("playerBar.notPlaying");
+    return this.currentSong.title || i18n.t("collection.unknownSong");
+  }
   /** Previous playback state for detecting playing→stopped transitions. */
   private _previousState: PlayState = "stopped";
 

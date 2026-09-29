@@ -1,0 +1,8 @@
+id: queue-by-name-ts
+valid:
+  - const q = playlists.find((p) => p.is_queue);
+  - if (playlist.name === "Favourites") {}
+invalid:
+  - const q = playlists.find((p) => p.name === "Queue");
+  - if (playlist.name !== 'queue') {}
+  - if ("Queue" == current.name) {}

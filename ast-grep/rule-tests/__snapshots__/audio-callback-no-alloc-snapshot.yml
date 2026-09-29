@@ -1,0 +1,70 @@
+id: audio-callback-no-alloc
+snapshots:
+  ? |
+    fn setup() {
+        let stream = device.build_output_stream(&config, move |output: &mut [f32], _| {
+            let mut tmp = Vec::new();
+            tmp.push(output[0]);
+        }, err_fn, None);
+    }
+  : labels:
+    - source: Vec::new()
+      style: primary
+      start: 119
+      end: 129
+    - source: |-
+        device.build_output_stream(&config, move |output: &mut [f32], _| {
+                let mut tmp = Vec::new();
+                tmp.push(output[0]);
+            }, err_fn, None)
+      style: secondary
+      start: 30
+      end: 180
+    - source: |-
+        (&config, move |output: &mut [f32], _| {
+                let mut tmp = Vec::new();
+                tmp.push(output[0]);
+            }, err_fn, None)
+      style: secondary
+      start: 56
+      end: 180
+    - source: |-
+        move |output: &mut [f32], _| {
+                let mut tmp = Vec::new();
+                tmp.push(output[0]);
+            }
+      style: secondary
+      start: 66
+      end: 165
+  ? |
+    fn setup() {
+        let stream = device.build_output_stream(&config, move |output: &mut [f32], _| {
+            log(format!("{}", output.len()));
+        }, err_fn, None);
+    }
+  : labels:
+    - source: format!("{}", output.len())
+      style: primary
+      start: 109
+      end: 136
+    - source: |-
+        device.build_output_stream(&config, move |output: &mut [f32], _| {
+                log(format!("{}", output.len()));
+            }, err_fn, None)
+      style: secondary
+      start: 30
+      end: 159
+    - source: |-
+        (&config, move |output: &mut [f32], _| {
+                log(format!("{}", output.len()));
+            }, err_fn, None)
+      style: secondary
+      start: 56
+      end: 159
+    - source: |-
+        move |output: &mut [f32], _| {
+                log(format!("{}", output.len()));
+            }
+      style: secondary
+      start: 66
+      end: 144

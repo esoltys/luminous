@@ -1,0 +1,20 @@
+id: queue-by-name-ts
+language: TypeScript
+severity: error
+message: Don't identify the Queue by its name.
+note: |
+  AGENTS.md "Queue abstraction": branch on `Playlist.is_queue`
+  (`playlistsStore.queuePlaylist` / `requireQueue()`), never the name.
+rule:
+  any:
+    - pattern: $P.name === $S
+    - pattern: $P.name == $S
+    - pattern: $P.name !== $S
+    - pattern: $P.name != $S
+    - pattern: $S === $P.name
+    - pattern: $S == $P.name
+    - pattern: $S !== $P.name
+    - pattern: $S != $P.name
+constraints:
+  S:
+    regex: ^["'`](?i:queue)["'`]$

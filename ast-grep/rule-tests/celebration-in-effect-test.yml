@@ -1,0 +1,20 @@
+id: celebration-in-effect
+valid:
+  - |
+    function onFavouriteClick() {
+      justFavourited = true;
+      el.classList.add("anim-heart-pulse");
+    }
+  - |
+    $effect(() => {
+      isFavourite = song.favourite;
+    });
+invalid:
+  - |
+    $effect(() => {
+      if (song.favourite) justFavourited = true;
+    });
+  - |
+    $effect.pre(() => {
+      el.classList.add("anim-heart-pulse");
+    });

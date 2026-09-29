@@ -1,0 +1,29 @@
+id: audio-callback-no-alloc
+language: Rust
+severity: error
+message: The audio output callback must never allocate.
+note: |
+  AGENTS.md "Allocation-free audio thread": pre-allocate buffers outside the
+  `build_output_stream` callback and only reuse them inside it.
+files:
+  - src-tauri/src/audio.rs
+rule:
+  any:
+    - pattern: Vec::new()
+    - pattern: Vec::with_capacity($$$)
+    - pattern: vec![$$$]
+    - pattern: $V.push($$$)
+    - pattern: String::new()
+    - pattern: String::from($$$)
+    - pattern: format!($$$)
+    - pattern: $V.to_string()
+    - pattern: $V.to_vec()
+    - pattern: $V.to_owned()
+    - pattern: Box::new($$$)
+  inside:
+    kind: closure_expression
+    inside:
+      kind: arguments
+      inside:
+        pattern: $D.build_output_stream($$$)
+    stopBy: end

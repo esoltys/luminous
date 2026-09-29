@@ -1,0 +1,34 @@
+id: celebration-in-effect
+snapshots:
+  ? |
+    $effect(() => {
+      if (song.favourite) justFavourited = true;
+    });
+  : labels:
+    - source: justFavourited = true
+      style: primary
+      start: 38
+      end: 59
+    - source: |-
+        $effect(() => {
+          if (song.favourite) justFavourited = true;
+        })
+      style: secondary
+      start: 0
+      end: 63
+  ? |
+    $effect.pre(() => {
+      el.classList.add("anim-heart-pulse");
+    });
+  : labels:
+    - source: '"anim-heart-pulse"'
+      style: primary
+      start: 39
+      end: 57
+    - source: |-
+        $effect.pre(() => {
+          el.classList.add("anim-heart-pulse");
+        })
+      style: secondary
+      start: 0
+      end: 62

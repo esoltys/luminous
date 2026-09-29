@@ -1,0 +1,7 @@
+id: queue-by-name-rs
+valid:
+  - let q = playlists.iter().find(|p| p.is_queue);
+  - if playlist.name == "Favourites" {}
+invalid:
+  - let q = playlists.iter().find(|p| p.name == "Queue");
+  - if playlist.name != "queue" {}

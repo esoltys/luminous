@@ -242,6 +242,33 @@
     fallback_gain_db: number;
   }
 
+  // Bounds of the loudness/fade controls. The backend clamps to these and
+  // owns them (#1249), so the controls wait for them rather than retyping them.
+  interface SettingRange {
+    min: number;
+    max: number;
+  }
+  interface AudioSettingRanges {
+    target_lufs: SettingRange;
+    fallback_gain_db: SettingRange;
+    fade_pause_duration_ms: SettingRange;
+    crossfade_auto_duration_secs: SettingRange;
+  }
+  let ranges = $state<AudioSettingRanges | null>(null);
+
+  async function loadSettingRanges() {
+    try {
+      ranges = await invoke<AudioSettingRanges>("get_audio_setting_ranges");
+    } catch (e) {
+      console.error("Failed to load audio setting ranges:", e);
+    }
+  }
+
+  /** Tick values from `min` to `max` inclusive, `count` intervals apart. */
+  function rangeTicks({ min, max }: SettingRange, count: number): number[] {
+    return Array.from({ length: count + 1 }, (_, i) => min + ((max - min) * i) / count);
+  }
+
   let targetLufs = $state(-16.0);
   let loudnessMode = $state<LoudnessMode>("track");
   let fallbackGainDb = $state(-6.0);
@@ -338,6 +365,7 @@
 
   onMount(async () => {
     loadConfig();
+    loadSettingRanges();
     loadLoudnessSettings();
     loadFadeSettings();
     loudnessStore.init();
@@ -586,17 +614,19 @@
 
       <div class="grid grid-cols-1 md:grid-cols-3 gap-12">
         <div class="flex flex-col items-center justify-center gap-1.5 h-full">
-          <Knob
-            min={-23.0}
-            max={-9.0}
-            step={0.25}
-            bind:value={targetLufs}
-            oninput={handleTargetLufsChange}
-            disabled={!loudnessStore.enabled}
-            label={i18n.t('loudness.targetLevel')}
-            suffix="LUFS"
-            size={80}
-          />
+          {#if ranges}
+            <Knob
+              min={ranges.target_lufs.min}
+              max={ranges.target_lufs.max}
+              step={0.25}
+              bind:value={targetLufs}
+              oninput={handleTargetLufsChange}
+              disabled={!loudnessStore.enabled}
+              label={i18n.t('loudness.targetLevel')}
+              suffix="LUFS"
+              size={80}
+            />
+          {/if}
         </div>
 
         <div class="flex flex-col items-center justify-center gap-1.5 h-full">
@@ -627,17 +657,19 @@
         </div>
 
         <div class="flex flex-col items-center justify-center gap-1.5 h-full">
-          <Knob
-            min={-12.0}
-            max={0.0}
-            step={0.25}
-            bind:value={fallbackGainDb}
-            oninput={handleFallbackGainChange}
-            disabled={!loudnessStore.enabled}
-            label={i18n.t('loudness.fallbackGain')}
-            suffix="dB"
-            size={80}
-          />
+          {#if ranges}
+            <Knob
+              min={ranges.fallback_gain_db.min}
+              max={ranges.fallback_gain_db.max}
+              step={0.25}
+              bind:value={fallbackGainDb}
+              oninput={handleFallbackGainChange}
+              disabled={!loudnessStore.enabled}
+              label={i18n.t('loudness.fallbackGain')}
+              suffix="dB"
+              size={80}
+            />
+          {/if}
           <span class="text-[11px] text-brand-text-secondary text-center mt-2 px-4 text-pretty">{i18n.t('loudness.fallbackGainHint')}</span>
         </div>
       </div>
@@ -674,25 +706,26 @@
             label={i18n.t('fades.fadePause')}
           />
         </div>
-        {#if fadePauseEnabled}
+        {#if fadePauseEnabled && ranges}
+          {@const fadeRange = ranges.fade_pause_duration_ms}
           <div class="flex items-center justify-between text-xs text-brand-text-secondary">
             <span>{i18n.t('fades.fadeDuration')}</span>
             <span class="font-mono font-bold text-brand-text-primary">{fadePauseDurationMs}ms</span>
           </div>
           <input
             type="range"
-            min="0"
-            max="1000"
+            min={fadeRange.min}
+            max={fadeRange.max}
             step="100"
             bind:value={fadePauseDurationMs}
             onchange={saveFadeSettings}
             class="themed-range w-full h-1.5 rounded-lg"
-            style={rangeFillStyle(fadePauseDurationMs, 0, 1000)}
+            style={rangeFillStyle(fadePauseDurationMs, fadeRange.min, fadeRange.max)}
           />
           <div class="px-[7px]">
             <div class="relative w-full h-4 text-[9px] text-brand-text-secondary/60 font-medium mt-0.5">
-              {#each [0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000] as val}
-                <div class="absolute top-0 flex flex-col items-center -translate-x-1/2" style="left: {(val / 1000) * 100}%">
+              {#each rangeTicks(fadeRange, 10) as val}
+                <div class="absolute top-0 flex flex-col items-center -translate-x-1/2" style="left: {((val - fadeRange.min) / (fadeRange.max - fadeRange.min)) * 100}%">
                   <div class="h-1 w-[1px] bg-brand-border mb-0.5"></div>
                   <span>{val}</span>
                 </div>
@@ -711,27 +744,28 @@
             label={i18n.t('fades.crossfadeAuto')}
           />
         </div>
-        {#if crossfadeAutoEnabled}
+        {#if crossfadeAutoEnabled && ranges}
+          {@const crossfadeRange = ranges.crossfade_auto_duration_secs}
           <div class="flex items-center justify-between text-xs text-brand-text-secondary">
             <span>{i18n.t('fades.crossfadeDuration')}</span>
             <span class="font-mono font-bold text-brand-text-primary">{crossfadeAutoDurationSecs.toFixed(1)}s</span>
           </div>
           <input
             type="range"
-            min="0.0"
-            max="8.0"
+            min={crossfadeRange.min}
+            max={crossfadeRange.max}
             step="0.25"
             bind:value={crossfadeAutoDurationSecs}
             onchange={saveFadeSettings}
             class="themed-range w-full h-1.5 rounded-lg"
-            style={rangeFillStyle(crossfadeAutoDurationSecs, 0.0, 8.0)}
+            style={rangeFillStyle(crossfadeAutoDurationSecs, crossfadeRange.min, crossfadeRange.max)}
           />
           <div class="px-[7px]">
             <div class="relative w-full h-4 text-[9px] text-brand-text-secondary/60 font-medium mt-0.5">
-              {#each [0, 1, 2, 3, 4, 5, 6, 7, 8] as val}
-                <div class="absolute top-0 flex flex-col items-center -translate-x-1/2" style="left: {(val / 8) * 100}%">
+              {#each rangeTicks(crossfadeRange, crossfadeRange.max - crossfadeRange.min) as val}
+                <div class="absolute top-0 flex flex-col items-center -translate-x-1/2" style="left: {((val - crossfadeRange.min) / (crossfadeRange.max - crossfadeRange.min)) * 100}%">
                   <div class="h-1 w-[1px] bg-brand-border mb-0.5"></div>
-                  <span>{val}.0s</span>
+                  <span>{val.toFixed(1)}s</span>
                 </div>
               {/each}
             </div>

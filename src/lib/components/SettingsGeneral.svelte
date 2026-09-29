@@ -27,9 +27,8 @@
   let versionCopied = $state(false);
 
   // "Import finished"-style success flash for a manual "Check Now" that
-  // comes back up-to-date — only on the checking -> up-to-date transition
-  // this view is mounted to watch, not on a silent background check.
-  let previousCheckStatus: typeof updaterStore.checkStatus | undefined;
+  // comes back up-to-date — fired from the click handler only, never for a
+  // silent background check.
   let justConfirmedUpToDate = $state(false);
   let downloadPercent = $derived(
     updaterStore.downloadProgress?.total
@@ -96,15 +95,15 @@
     { id: "auto", labelKey: "settings.updatePolicyAuto", hintKey: "settings.updatePolicyAutoHint" },
   ];
 
-  $effect(() => {
-    const wasChecking = previousCheckStatus === "checking";
-    previousCheckStatus = updaterStore.checkStatus;
-    if (updaterStore.checkStatus === "up-to-date" && wasChecking) {
-      justConfirmedUpToDate = true;
-      const timeout = setTimeout(() => { justConfirmedUpToDate = false; }, 320);
-      return () => clearTimeout(timeout);
-    }
-  });
+  let confirmedTimer: ReturnType<typeof setTimeout> | undefined;
+
+  async function checkNow() {
+    await updaterStore.checkForUpdates();
+    if (updaterStore.checkStatus !== "up-to-date") return;
+    clearTimeout(confirmedTimer);
+    justConfirmedUpToDate = true;
+    confirmedTimer = setTimeout(() => { justConfirmedUpToDate = false; }, 320);
+  }
 
   async function copyVersion() {
     try {
@@ -406,7 +405,7 @@
         </p>
       </button>
     </div>
-    <Button onclick={() => updaterStore.checkForUpdates()} disabled={updaterStore.checkStatus === 'checking'} variant="secondary" size="sm" class="shrink-0">
+    <Button onclick={checkNow} disabled={updaterStore.checkStatus === 'checking'} variant="secondary" size="sm" class="shrink-0">
       <RefreshCw class="w-3.5 h-3.5 {updaterStore.checkStatus === 'checking' ? 'animate-spin text-brand-accent-text' : ''}" />
       {updaterStore.checkStatus === 'checking' ? i18n.t('settings.updateChecking') : i18n.t('settings.updateCheckNowBtn')}
     </Button>

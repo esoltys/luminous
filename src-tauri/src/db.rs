@@ -459,6 +459,41 @@ pub struct Database {
     pub schema_version: i32,
 }
 
+const POOL_SIZE: u32 = 8;
+
+/// Builds the connection pool for `db_path`, applying the app's pragmas to every
+/// connection. `builder` lets tests attach their own error handler.
+///
+/// The database is switched to WAL on a single connection before the pool exists:
+/// r2d2 opens all `POOL_SIZE` connections at once, and on a brand-new database the
+/// first WAL switch needs an exclusive lock. Connections racing for it can deadlock
+/// on the SHARED-to-EXCLUSIVE upgrade, where SQLite returns "database is locked"
+/// without consulting `busy_timeout` (#1317). Once the file is in WAL mode the
+/// per-connection `journal_mode=WAL` is a no-op that takes no lock.
+fn build_pool(
+    builder: r2d2::Builder<SqliteConnectionManager>,
+    db_path: &std::path::Path,
+) -> Result<Pool<SqliteConnectionManager>> {
+    rusqlite::Connection::open(db_path)
+        .and_then(|conn| conn.execute_batch("PRAGMA journal_mode=WAL;"))
+        .context("failed to switch database to WAL mode")?;
+
+    let manager = SqliteConnectionManager::file(db_path).with_init(|conn| {
+        conn.execute_batch(
+            "PRAGMA busy_timeout=5000;
+                 PRAGMA journal_mode=WAL;
+                 PRAGMA synchronous=NORMAL;
+                 PRAGMA foreign_keys=ON;
+                 PRAGMA cache_size=-32000;  -- 32 MB page cache
+                 PRAGMA temp_store=MEMORY;",
+        )
+    });
+    builder
+        .max_size(POOL_SIZE)
+        .build(manager)
+        .context("failed to create connection pool")
+}
+
 impl Database {
     /// True when this database's schema is ahead of what this build knows how to
     /// read/write — e.g. a newer build ran migrations this older binary has never
@@ -475,22 +510,7 @@ impl Database {
         let db_path = app_data_dir.join("luminous.db");
         log::info!("Opening database: {}", db_path.display());
 
-        let manager = SqliteConnectionManager::file(&db_path).with_init(|conn| {
-            // Performance pragmas applied to every new connection
-            conn.execute_batch(
-                "PRAGMA journal_mode=WAL;
-                     PRAGMA synchronous=NORMAL;
-                     PRAGMA foreign_keys=ON;
-                     PRAGMA busy_timeout=5000;
-                     PRAGMA cache_size=-32000;  -- 32 MB page cache
-                     PRAGMA temp_store=MEMORY;",
-            )
-        });
-
-        let pool = r2d2::Pool::builder()
-            .max_size(8)
-            .build(manager)
-            .context("failed to create connection pool")?;
+        let pool = build_pool(r2d2::Pool::builder(), &db_path)?;
 
         let db = Self {
             pool,
@@ -1857,6 +1877,32 @@ fn seed_artist_tag_hierarchy(conn: &rusqlite::Connection) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[derive(Debug, Default, Clone)]
+    struct RecordingErrorHandler(Arc<std::sync::Mutex<Vec<String>>>);
+
+    impl r2d2::HandleError<rusqlite::Error> for RecordingErrorHandler {
+        fn handle_error(&self, error: rusqlite::Error) {
+            self.0.lock().unwrap().push(error.to_string());
+        }
+    }
+
+    #[test]
+    fn test_pool_on_new_database_opens_every_connection_without_lock_errors() {
+        // The race only shows on a database that isn't in WAL mode yet, so each
+        // round uses a fresh file.
+        for _ in 0..10 {
+            let temp_dir = tempfile::tempdir().unwrap();
+            let errors = RecordingErrorHandler::default();
+            let pool = build_pool(
+                r2d2::Pool::builder().error_handler(Box::new(errors.clone())),
+                &temp_dir.path().join("luminous.db"),
+            )
+            .unwrap();
+            assert_eq!(pool.state().connections, POOL_SIZE);
+            assert_eq!(*errors.0.lock().unwrap(), Vec::<String>::new());
+        }
+    }
 
     #[test]
     fn test_database_initialization() {

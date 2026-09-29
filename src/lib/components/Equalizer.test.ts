@@ -35,6 +35,13 @@ describe("Equalizer.svelte", () => {
     crossfade_suppress_same_album: true,
   };
 
+  const defaultRanges = {
+    target_lufs: { min: -23, max: -9 },
+    fallback_gain_db: { min: -12, max: 0 },
+    fade_pause_duration_ms: { min: 0, max: 1000 },
+    crossfade_auto_duration_secs: { min: 0, max: 8 },
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(invoke).mockImplementation(async (cmd: string, args?: any) => {
@@ -43,10 +50,31 @@ describe("Equalizer.svelte", () => {
       if (cmd === "apply_equalizer_config") return args?.config;
       if (cmd === "get_loudness_settings") return defaultLoudness;
       if (cmd === "get_fade_settings") return defaultFadeSettings;
+      if (cmd === "get_audio_setting_ranges") return defaultRanges;
       if (cmd === "get_loudness_analysis_remaining") return 0;
       if (cmd === "load_equalizer_preset") return { gains: [4, 3, 1, -1, -2, -1, 1, 3, 3.5, 3.5], parametric: [] };
       return null;
     });
+  });
+
+  it("draws the fade slider's range from the backend, not a retyped literal (#1249)", async () => {
+    const backendRanges = {
+      ...defaultRanges,
+      fade_pause_duration_ms: { min: 0, max: 2000 },
+    };
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_audio_setting_ranges") return backendRanges;
+      if (cmd === "get_fade_settings") return defaultFadeSettings;
+      if (cmd === "get_loudness_settings") return defaultLoudness;
+      if (cmd === "get_equalizer_state") return defaultEqConfig;
+      return null;
+    });
+    const { container, getByText } = render(Equalizer);
+    await waitFor(() => {
+      const slider = container.querySelector<HTMLInputElement>('input[type="range"][max="2000"]');
+      expect(slider).not.toBeNull();
+    });
+    expect(getByText("2000")).toBeInTheDocument();
   });
 
   it("renders equalizer title and preset selector", async () => {

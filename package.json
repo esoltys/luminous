@@ -22,6 +22,7 @@
     "generate:msix-assets": "bun run scripts/generate-msix-assets.ts",
     "test": "vitest",
     "test:run": "vitest run",
+    "lint:ast": "ast-grep scan && ast-grep test",
     "test:perf": "vitest run --config vite.perf.config.js",
     "take-screenshots": "bunx tsx scripts/take-screenshots.ts",
     "style-diff": "bunx tsx scripts/style-diff.ts",
@@ -47,6 +48,7 @@
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
+    "@ast-grep/cli": "^0.45.3",
     "@choochmeque/tauri-windows-bundle": "^0.2.0",
     "@sveltejs/adapter-static": "^3.0.6",
     "@sveltejs/kit": "^2.70.3",

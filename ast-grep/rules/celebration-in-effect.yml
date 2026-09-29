@@ -1,0 +1,23 @@
+id: celebration-in-effect
+language: TypeScript
+severity: error
+message: Celebrations fire only from an explicit user action, never inside $effect.
+note: |
+  AGENTS.md "Explicit-action-only celebrations": set the `just*` flag or apply
+  the `anim-*` class from the click handler, not a reactive effect, so a
+  track change to an already-favourited song doesn't celebrate.
+rule:
+  any:
+    - pattern: $L = true
+    - kind: string
+      regex: \banim-
+    - kind: template_string
+      regex: \banim-
+  inside:
+    any:
+      - pattern: $effect($$$)
+      - pattern: $effect.pre($$$)
+    stopBy: end
+constraints:
+  L:
+    regex: (^|\.)just[A-Z]\w*$
