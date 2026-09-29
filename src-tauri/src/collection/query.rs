@@ -2154,13 +2154,11 @@ mod tests {
 
     #[test]
     fn test_get_albums_artist_resolution() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_coll_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_coll_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let scanner = CollectionScanner::new(db.clone());
         let conn = db.pool.get().unwrap();
@@ -2288,13 +2286,11 @@ mod tests {
         // singles from unrelated artists collapse into one bogus "Unknown
         // Album" / "Various Artists" card (#issue: singles without an album
         // title showing up in the Albums grid).
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_empty_album_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_empty_album_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let scanner = CollectionScanner::new(db.clone());
         let conn = db.pool.get().unwrap();
@@ -2336,13 +2332,11 @@ mod tests {
 
     #[test]
     fn test_get_compilations_by_artist() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_compilations_by_artist_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_compilations_by_artist_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let scanner = CollectionScanner::new(db.clone());
         let conn = db.pool.get().unwrap();
@@ -2424,13 +2418,11 @@ mod tests {
 
     #[test]
     fn test_get_artists_album_count_filtering() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_artist_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_artist_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let conn = db.pool.get().unwrap();
 
@@ -2483,13 +2475,11 @@ mod tests {
     /// `get_top_artists()`, so the two views agree on ranking.
     #[test]
     fn test_get_artists_exposes_total_playcount() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_artists_playcount_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_artists_playcount_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let conn = db.pool.get().unwrap();
 
@@ -2539,13 +2529,11 @@ mod tests {
     /// into a single artist entry rather than shown as two separate artists.
     #[test]
     fn test_get_artists_merges_case_only_variants() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_artist_case_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_artist_case_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let conn = db.pool.get().unwrap();
 
@@ -2604,13 +2592,11 @@ mod tests {
     /// equaled `''` and the click-through returned zero songs.
     #[test]
     fn test_untagged_song_reachable_via_get_artists_grouping() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_untagged_artist_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_untagged_artist_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let conn = db.pool.get().unwrap();
 
@@ -2658,13 +2644,11 @@ mod tests {
     /// effective one) is what actually fixes this.
     #[test]
     fn test_get_songs_by_artist_finds_individual_values_in_a_multi_artist_credit() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_multi_artist_click_through_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_multi_artist_click_through_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let conn = db.pool.get().unwrap();
 
@@ -2722,13 +2706,11 @@ mod tests {
     /// `get_compilations_by_artist` album-card query.
     #[test]
     fn test_get_songs_by_artist_finds_various_artists_compilation_track() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_compilation_click_through_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_compilation_click_through_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let conn = db.pool.get().unwrap();
 
@@ -2764,13 +2746,11 @@ mod tests {
     /// "Stan Getz".
     #[test]
     fn test_get_songs_by_artist_does_not_match_substrings_of_unrelated_names() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_artist_substring_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_artist_substring_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let conn = db.pool.get().unwrap();
 
@@ -2801,13 +2781,11 @@ mod tests {
 
     #[test]
     fn test_get_top_artists_ranks_by_playcount_and_ranks_zero_plays_last() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_top_artists_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_top_artists_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let conn = db.pool.get().unwrap();
 
@@ -2881,13 +2859,11 @@ mod tests {
 
     #[test]
     fn test_get_most_played_songs_ranks_by_play_history_count() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_most_played_songs_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_most_played_songs_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let conn = db.pool.get().unwrap();
 
@@ -2943,13 +2919,11 @@ mod tests {
 
     #[test]
     fn test_get_top_artists_falls_back_to_song_count_when_library_has_no_plays() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_top_artists_fallback_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_top_artists_fallback_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let conn = db.pool.get().unwrap();
 
@@ -2991,13 +2965,11 @@ mod tests {
 
     #[test]
     fn test_get_library_decades_and_songs() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_decade_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_decade_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let conn = db.pool.get().unwrap();
 
@@ -3038,13 +3010,11 @@ mod tests {
     /// `mode_query_fragments` this test targets.
     #[test]
     fn test_get_recently_played_groups_by_play_context() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_recent_played_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_recent_played_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let scanner = CollectionScanner::new(db.clone());
         let conn = db.pool.get().unwrap();
@@ -3148,13 +3118,11 @@ mod tests {
 
     #[test]
     fn test_recently_added_collapses_album_with_varying_track_artists() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_rec_added_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_rec_added_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let scanner = CollectionScanner::new(db.clone());
         let conn = db.pool.get().unwrap();
@@ -3217,13 +3185,11 @@ mod tests {
 
     #[test]
     fn test_get_featured_albums_returns_albums_without_play_history() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_featured_albums_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_featured_albums_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let scanner = CollectionScanner::new(db.clone());
         let conn = db.pool.get().unwrap();
@@ -3280,13 +3246,11 @@ mod tests {
 
     #[test]
     fn test_get_featured_albums_respects_limit() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_featured_albums_limit_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_featured_albums_limit_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let scanner = CollectionScanner::new(db.clone());
         let conn = db.pool.get().unwrap();
@@ -3323,13 +3287,11 @@ mod tests {
 
     #[test]
     fn test_recently_added_surfaces_existing_album_rating() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_rec_added_rating_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_rec_added_rating_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let scanner = CollectionScanner::new(db.clone());
         let conn = db.pool.get().unwrap();
@@ -3369,13 +3331,11 @@ mod tests {
 
     #[test]
     fn test_artist_profile_crud() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_artist_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_artist_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Database::new(temp_dir.clone()).unwrap();
         let conn = db.pool.get().unwrap();
 
@@ -3445,13 +3405,11 @@ mod tests {
 
     #[test]
     fn test_get_representative_artist_for_album_prefers_album_artist() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_representative_artist_for_album_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_representative_artist_for_album_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let scanner = CollectionScanner::new(db.clone());
         let conn = db.pool.get().unwrap();
@@ -3481,13 +3439,11 @@ mod tests {
 
     #[test]
     fn test_get_representative_artist_mbid_for_artist_falls_back_to_tagged_song() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_representative_artist_mbid_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_representative_artist_mbid_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let scanner = CollectionScanner::new(db.clone());
         let conn = db.pool.get().unwrap();
@@ -3518,13 +3474,11 @@ mod tests {
 
     #[test]
     fn test_artist_tag_casing_propagates_across_artists() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_artist_tag_casing_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_artist_tag_casing_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Database::new(temp_dir.clone()).unwrap();
         let conn = db.pool.get().unwrap();
 
@@ -3592,13 +3546,11 @@ mod tests {
 
     #[test]
     fn test_album_profile_crud() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_album_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_album_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Database::new(temp_dir.clone()).unwrap();
         let conn = db.pool.get().unwrap();
 
@@ -3669,13 +3621,11 @@ mod tests {
     /// whole array silently dropped to empty via `.unwrap_or_default()`.
     #[test]
     fn test_album_profile_links_from_external_writer_shape() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_album_ext_links_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_album_ext_links_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Database::new(temp_dir.clone()).unwrap();
         let conn = db.pool.get().unwrap();
 
@@ -3712,13 +3662,11 @@ mod tests {
 
     #[test]
     fn test_get_artist_tag_counts_joins_songs_by_effective_artist() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_artist_tag_counts_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_artist_tag_counts_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let scanner = CollectionScanner::new(db.clone());
         let conn = db.pool.get().unwrap();
@@ -3852,13 +3800,11 @@ mod tests {
 
     #[test]
     fn test_get_top_albums_tracks_movement_peak_and_weeks_on_chart() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_top_albums_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_top_albums_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let conn = db.pool.get().unwrap();
         // This test's timestamps are all Monday-aligned; pin week_start
@@ -3981,13 +3927,11 @@ mod tests {
     /// listen outranks several short ones, in both this week and last.
     #[test]
     fn test_get_top_albums_ranks_by_minutes_played() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_top_albums_minutes_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_top_albums_minutes_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let conn = db.pool.get().unwrap();
         let seed = |path: &str, album: &str| -> i64 {
@@ -4063,13 +4007,11 @@ mod tests {
     /// only this week is "new" and on the chart for one week, not three.
     #[test]
     fn test_get_top_albums_rebuilds_misfiled_history() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_top_albums_rebuild_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_top_albums_rebuild_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let conn = db.pool.get().unwrap();
         conn.execute(
@@ -4153,13 +4095,11 @@ mod tests {
     /// chart into next week and leave only the last few hours of plays.
     #[test]
     fn test_get_top_albums_uses_local_week_and_live_previous_ranks() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_top_albums_local_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_top_albums_local_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let conn = db.pool.get().unwrap();
         conn.execute(
@@ -4264,13 +4204,11 @@ mod tests {
     /// intentional asymmetry this test documents).
     #[test]
     fn test_not_included_songs_are_excluded_from_auto_playlist_queries() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_not_included_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_not_included_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let scanner = CollectionScanner::new(db.clone());
         let conn = db.pool.get().unwrap();

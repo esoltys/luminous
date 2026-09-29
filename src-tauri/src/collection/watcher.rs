@@ -740,13 +740,11 @@ mod tests {
 
     #[test]
     fn test_delete_path_and_subpaths_windows_separators() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_prune_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_prune_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let conn = db.pool.get().unwrap();
 
@@ -780,13 +778,11 @@ mod tests {
 
     #[test]
     fn test_reconcile_watcher_batch_refreshes_folder_cover_art() {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_watcher_reconcile_art_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_watcher_reconcile_art_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let old_dir = temp_dir.join("old");
         let new_dir = temp_dir.join("new");
         std::fs::create_dir_all(&old_dir).unwrap();

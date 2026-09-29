@@ -1548,13 +1548,11 @@ mod tests {
         use crate::models::{FileType, SongSource};
         use std::sync::Arc;
 
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_organizer_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_organizer_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let conn = db.pool.get().unwrap();
 
@@ -1613,13 +1611,11 @@ mod tests {
         use crate::db::Database;
         use crate::models::{FileType, SongSource};
 
-        let base = std::env::temp_dir().join(format!(
-            "luminous_organizer_apply_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let base_guard = tempfile::Builder::new()
+            .prefix("luminous_organizer_apply_test_")
+            .tempdir()
+            .unwrap();
+        let base = base_guard.path().to_path_buf();
         let src_dir = base.join("src_album");
         let dst_dir = base.join("dst_album");
         fs::create_dir_all(&src_dir).unwrap();
@@ -1697,13 +1693,11 @@ mod tests {
         use crate::db::Database;
         use crate::models::{FileType, SongSource};
 
-        let base = std::env::temp_dir().join(format!(
-            "luminous_organizer_case_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let base_guard = tempfile::Builder::new()
+            .prefix("luminous_organizer_case_test_")
+            .tempdir()
+            .unwrap();
+        let base = base_guard.path().to_path_buf();
         let src_dir = base.join("Hero");
         fs::create_dir_all(&src_dir).unwrap();
 
@@ -1790,13 +1784,11 @@ mod tests {
         use crate::models::{FileType, SongSource};
         use std::sync::Arc;
 
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_organizer_remote_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_organizer_remote_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let conn = db.pool.get().unwrap();
 
@@ -1846,13 +1838,11 @@ mod tests {
         use crate::db::Database;
         use crate::models::{FileType, SongSource};
 
-        let base = std::env::temp_dir().join(format!(
-            "luminous_organizer_casing_convergence_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let base_guard = tempfile::Builder::new()
+            .prefix("luminous_organizer_casing_convergence_test_")
+            .tempdir()
+            .unwrap();
+        let base = base_guard.path().to_path_buf();
         // On-disk folders start out lowercase ("on"/"in the"), while the majority
         // of tags use the differently-cased forms.
         let src_dir = base.join("The War on Drugs").join("Lost in the Dream");

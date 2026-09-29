@@ -587,15 +587,12 @@ mod tests {
         }
     }
 
-    fn temp_db(tag: &str) -> (Arc<Database>, std::path::PathBuf) {
-        let dir = std::env::temp_dir().join(format!(
-            "luminous_subsonic_sync_{tag}_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-        let db = Arc::new(Database::new(dir.clone()).unwrap());
+    fn temp_db(tag: &str) -> (tempfile::TempDir, Arc<Database>) {
+        let dir = tempfile::Builder::new()
+            .prefix(&format!("luminous_subsonic_sync_{tag}_"))
+            .tempdir()
+            .unwrap();
+        let db = Arc::new(Database::new(dir.path().to_path_buf()).unwrap());
         db.pool
             .get()
             .unwrap()
@@ -604,7 +601,7 @@ mod tests {
                 [],
             )
             .unwrap();
-        (db, dir)
+        (dir, db)
     }
 
     fn song_id(conn: &Connection, remote_id: &str) -> i64 {
@@ -744,7 +741,7 @@ mod tests {
 
     #[test]
     fn apply_imports_updates_skips_unchanged_and_marks_removed() {
-        let (db, dir) = temp_db("apply");
+        let (_dir, db) = temp_db("apply");
         let conn = db.pool.get().unwrap();
         let mut lib = RemoteLibrary {
             albums: vec![album("al1", "Album al1")],
@@ -787,12 +784,11 @@ mod tests {
         assert!(!unavailable(&conn, "s2"));
 
         drop(conn);
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
     fn apply_imports_ratings_and_respects_local_edits() {
-        let (db, dir) = temp_db("ratings");
+        let (_dir, db) = temp_db("ratings");
         let conn = db.pool.get().unwrap();
         let mut fav = child("fav", "al1", "Fav");
         fav.starred = Some("2026-09-23T15:19:04Z".into());
@@ -825,12 +821,11 @@ mod tests {
         );
 
         drop(conn);
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
     fn apply_imports_album_stars_and_skips_conflicting_titles() {
-        let (db, dir) = temp_db("albums");
+        let (_dir, db) = temp_db("albums");
         let conn = db.pool.get().unwrap();
         let mut bloom = album("al1", "Bloom");
         bloom.starred = Some("2026-09-23T15:16:26Z".into());
@@ -858,7 +853,6 @@ mod tests {
         );
 
         drop(conn);
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     fn envelope(body: serde_json::Value) -> ResponseTemplate {
@@ -906,10 +900,10 @@ mod tests {
             .mount(&server)
             .await;
 
-        let (db, dir) = temp_db("full");
+        let (dir, db) = temp_db("full");
         let uri = server.uri();
         let db2 = Arc::clone(&db);
-        let dir2 = dir.clone();
+        let dir2 = dir.path().to_path_buf();
         let stats = tokio::task::spawn_blocking(move || {
             let client = SubsonicClient::new(&uri, Auth::token("u", "p")).unwrap();
             let covers = CoverManager::new(Arc::clone(&db2), dir2);
@@ -930,8 +924,6 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(stats.added, 2);
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[tokio::test]

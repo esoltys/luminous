@@ -435,15 +435,13 @@ mod tests {
     use super::*;
     use crate::db::Database;
 
-    fn test_db() -> (Database, std::path::PathBuf) {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_stats_summary_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-        (Database::new(temp_dir.clone()).unwrap(), temp_dir)
+    fn test_db() -> (tempfile::TempDir, Database) {
+        let temp_dir = tempfile::Builder::new()
+            .prefix("luminous_stats_summary_test_")
+            .tempdir()
+            .unwrap();
+        let db = Database::new(temp_dir.path().to_path_buf()).unwrap();
+        (temp_dir, db)
     }
 
     fn insert_song(
@@ -507,7 +505,7 @@ mod tests {
 
     #[test]
     fn test_top_songs_excludes_out_of_range_and_flagged_songs() {
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         let conn = db.pool.get().unwrap();
         let now = 1_700_000_000;
         let range_start = range_start_unix(StatsRange::SevenDays, now);
@@ -528,13 +526,11 @@ mod tests {
         let songs = top_songs(&conn, range_start).unwrap();
         let labels: Vec<&str> = songs.iter().map(|s| s.label.as_str()).collect();
         assert_eq!(labels, vec!["In Range"]);
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
     fn test_top_albums_sums_album_plays_and_minutes() {
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         let conn = db.pool.get().unwrap();
         let now = 1_700_000_000;
         let range_start = range_start_unix(StatsRange::SevenDays, now);
@@ -552,13 +548,11 @@ mod tests {
         assert_eq!(albums.len(), 1);
         assert_eq!(albums[0].play_count, 6);
         assert_eq!(albums[0].minutes, 11);
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
     fn test_top_artists_ranks_by_duration() {
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         let conn = db.pool.get().unwrap();
         let now = 1_700_000_000;
         let range_start = range_start_unix(StatsRange::SevenDays, now);
@@ -582,13 +576,11 @@ mod tests {
         assert_eq!(artists[1].label, "Artist B");
         assert_eq!(artists[1].minutes, 3);
         assert_eq!(artists[1].play_count, 3);
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
     fn test_top_albums_ranks_by_duration() {
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         let conn = db.pool.get().unwrap();
         let now = 1_700_000_000;
         let range_start = range_start_unix(StatsRange::SevenDays, now);
@@ -612,13 +604,11 @@ mod tests {
         assert_eq!(albums[1].label, "Album B");
         assert_eq!(albums[1].minutes, 4);
         assert_eq!(albums[1].play_count, 4);
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
     fn test_top_genres_ranks_by_duration() {
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         let conn = db.pool.get().unwrap();
         let now = 1_700_000_000;
         let range_start = range_start_unix(StatsRange::SevenDays, now);
@@ -642,13 +632,11 @@ mod tests {
         assert_eq!(genres[1].label, "Pop");
         assert_eq!(genres[1].minutes, 3);
         assert_eq!(genres[1].play_count, 3);
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
     fn test_top_songs_ranks_by_duration() {
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         let conn = db.pool.get().unwrap();
         let now = 1_700_000_000;
         let range_start = range_start_unix(StatsRange::SevenDays, now);
@@ -672,13 +660,11 @@ mod tests {
         assert_eq!(songs[1].label, "Song B");
         assert_eq!(songs[1].minutes, 4);
         assert_eq!(songs[1].play_count, 4);
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
     fn test_top_genres_splits_multi_value_and_respects_exclusions() {
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         let conn = db.pool.get().unwrap();
         let now = 1_700_000_000;
         let range_start = range_start_unix(StatsRange::SevenDays, now);
@@ -701,13 +687,11 @@ mod tests {
         let genres = top_genres(&conn, range_start).unwrap();
         let labels: Vec<&str> = genres.iter().map(|g| g.label.as_str()).collect();
         assert_eq!(labels, vec!["Metal"]);
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
     fn test_listening_activity_excludes_out_of_range_and_flagged_songs() {
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         let conn = db.pool.get().unwrap();
         let now = 1_700_000_000;
         let range_start = range_start_unix(StatsRange::SevenDays, now);
@@ -729,13 +713,11 @@ mod tests {
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].played_at, range_start + 10);
         assert_eq!(events[0].duration_secs, 200);
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
     fn test_get_summary_at_returns_all_sections() {
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         let conn = db.pool.get().unwrap();
         let now = 1_700_000_000;
         let range_start = range_start_unix(StatsRange::SevenDays, now);
@@ -751,13 +733,11 @@ mod tests {
         assert_eq!(summary.top_genres.len(), 1);
         assert_eq!(summary.play_timestamps, vec![range_start + 10]);
         assert_eq!(summary.total_minutes, 3);
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
     fn test_total_minutes_excludes_out_of_range_and_flagged_songs() {
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         let conn = db.pool.get().unwrap();
         let now = 1_700_000_000;
         let range_start = range_start_unix(StatsRange::SevenDays, now);
@@ -776,13 +756,11 @@ mod tests {
         .unwrap();
 
         assert_eq!(total_minutes(&conn, range_start).unwrap(), 2);
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
     fn test_top_albums_and_songs_populate_art_and_ratings() {
-        let (db, dir) = test_db();
+        let (_dir, db) = test_db();
         let conn = db.pool.get().unwrap();
         let now = 1_700_000_000;
         let range_start = range_start_unix(StatsRange::SevenDays, now);
@@ -818,7 +796,5 @@ mod tests {
         assert_eq!(albums[0].art_manual.as_deref(), Some("cover.jpg"));
         assert_eq!(albums[0].year, Some(2024));
         assert_eq!(albums[0].rating, 5.0);
-
-        let _ = std::fs::remove_dir_all(dir);
     }
 }

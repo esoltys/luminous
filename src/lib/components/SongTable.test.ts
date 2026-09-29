@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render } from "@testing-library/svelte";
 import SongTable, { type SongTableRow } from "./SongTable.svelte";
 import { collectionStore } from "../stores/collection.svelte";
@@ -102,6 +102,10 @@ describe("SongTable.svelte — Last Played column", () => {
 
   beforeEach(() => {
     collectionStore.visibleColumns.lastplayed = true;
+    // Relative times depend on the clock: pin it to midday so "N minutes ago" can't
+    // cross midnight into "Yesterday" and results don't vary between runs.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2024, 5, 15, 12, 0, 0));
   });
 
   function renderTable(rows: SongTableRow[]) {
@@ -127,6 +131,10 @@ describe("SongTable.svelte — Last Played column", () => {
     const { getByText } = renderTable([{ key: "1", song }]);
 
     expect(getByText("—")).toBeInTheDocument();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("renders relative time for a recently played song", () => {
