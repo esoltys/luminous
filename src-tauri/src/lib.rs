@@ -1303,6 +1303,7 @@ pub fn run() {
             // Equalizer commands
             commands::equalizer::get_equalizer_state,
             commands::equalizer::apply_equalizer_config,
+            commands::equalizer::get_parametric_response,
             commands::equalizer::reset_parametric_bands,
             commands::equalizer::load_equalizer_preset,
             // Loudness normalization commands

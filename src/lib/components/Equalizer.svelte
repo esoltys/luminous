@@ -73,6 +73,7 @@
       gains = config.gains;
       parametric = config.parametric ?? [];
       determinePresetName();
+      await refreshCurve();
     } catch (e) {
       console.error("Failed to load equalizer state:", e);
     }
@@ -110,6 +111,7 @@
     preamp = canonical.preamp;
     gains = canonical.gains;
     parametric = canonical.parametric;
+    await refreshCurve();
   }
 
   async function ensureEnabled() {
@@ -150,6 +152,7 @@
     try {
       const config = await invoke<EqConfig>("reset_parametric_bands");
       parametric = config.parametric;
+      await refreshCurve();
     } catch (e) {
       console.error("Failed to reset parametric bands:", e);
     }
@@ -163,6 +166,7 @@
       gains = config.gains;
       parametric = config.parametric;
       activePreset = preset;
+      await refreshCurve();
     } catch (e) {
       console.error("Failed to load preset:", e);
     }
@@ -203,28 +207,35 @@
 
   // Parametric-only curve preview. Unlike the graphic bands (fixed Q), each
   // parametric band's Q changes its bandwidth — the gain sliders alone can't
-  // show that, but the combined response curve can. We approximate the
-  // response by summing each band's peaking-filter gain (in dB) across a log
-  // frequency sweep, so widening Q visibly broadens the bump.
-  function bandGainDb(band: ParametricBand, freq: number): number {
-    if (Math.abs(band.gain_db) < 0.01) return 0;
-    // Bell shape in log-frequency: full gain at center, falling off over a
-    // width set by Q (higher Q = narrower).
-    const octaves = Math.log2(freq / band.freq);
-    const bandwidth = 1 / Math.max(band.q, 0.1); // ~octaves to half-gain
-    const falloff = Math.exp(-((octaves / bandwidth) ** 2));
-    return band.gain_db * falloff;
+  // show that, but the combined response curve can. The backend evaluates
+  // the magnitude response of the filters it is actually running (shelves at
+  // the edges, peaking bands between); this only plots it (#1248).
+  const CURVE_SAMPLES = 96;
+  const curveFreqs = Array.from(
+    { length: CURVE_SAMPLES },
+    (_, i) => FREQ_MIN * Math.exp((i / (CURVE_SAMPLES - 1)) * FREQ_SPAN)
+  );
+  let responseDb = $state<number[]>([]);
+  let curveRequest = 0;
+
+  /** Re-fetch the evaluated response after canonical state lands. Slider
+   * drags fire many applies, so a response older than the latest request is
+   * discarded. */
+  async function refreshCurve() {
+    const request = ++curveRequest;
+    try {
+      const db = await invoke<number[]>("get_parametric_response", { frequencies: curveFreqs });
+      if (request === curveRequest) responseDb = db;
+    } catch (e) {
+      console.error("Failed to get parametric response:", e);
+    }
   }
 
   let curvePath = $derived.by(() => {
-    if (parametric.length === 0) return "";
-    const SAMPLES = 96;
-    const pts = Array.from({ length: SAMPLES }, (_, i) => {
-      const unit = i / (SAMPLES - 1);
-      const freq = unitToFreq(unit);
-      const total = parametric.reduce((sum, b) => sum + bandGainDb(b, freq), 0);
-      const clamped = Math.max(-12, Math.min(12, total));
-      return { x: unit * 100, y: 20 - (clamped / 12.0) * 17 };
+    if (parametric.length === 0 || responseDb.length !== CURVE_SAMPLES) return "";
+    const pts = responseDb.map((db, i) => {
+      const clamped = Math.max(-12, Math.min(12, db));
+      return { x: (i / (CURVE_SAMPLES - 1)) * 100, y: 20 - (clamped / 12.0) * 17 };
     });
     return splinePath(pts);
   });
@@ -471,7 +482,8 @@
 
     {#if mode === "parametric20"}
       <!-- Response curve preview — parametric only, because Q (bandwidth)
-           can't be read off the gain sliders but shapes the curve here. -->
+           can't be read off the gain sliders but shapes the curve here.
+           The curve is the backend's evaluated filter response. -->
       <div class="h-24 bg-brand-main border border-brand-border rounded-xl p-3 flex flex-col justify-between relative overflow-hidden">
         <div class="absolute left-0 right-0 top-1/2 border-t border-dashed border-brand-border pointer-events-none"></div>
         <svg class="w-full h-full" viewBox="0 0 100 40" preserveAspectRatio="none">

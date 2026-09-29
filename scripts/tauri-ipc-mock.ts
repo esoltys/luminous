@@ -1363,6 +1363,9 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
       parametric: defaultParametricBands(),
     }),
 
+    // No DSP in the mock — report a flat response for any sweep.
+    get_parametric_response: (args) => (args.frequencies as number[]).map(() => 0),
+
     get_loudness_settings: () => ({
       enabled: true,
       target_lufs: -18.0,

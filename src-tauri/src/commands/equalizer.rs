@@ -82,16 +82,29 @@ pub async fn load_equalizer_preset(
     Ok(crate::audio::with_audio(&state.audio, move |engine| {
         engine.with_equalizer(|eq| {
             // Always update the graphic gains so the preset is intact if the
-            // user switches back to 10-band; additionally map it onto the
-            // parametric bands when that mode is active so the same named
-            // presets work there too.
+            // user switches back to 10-band; additionally load the named
+            // preset's own sparse parametric layout when that mode is active.
             eq.load_preset(gains);
             if eq.mode == crate::equalizer::EqMode::Parametric20 {
-                eq.load_preset_into_parametric(gains);
+                eq.load_parametric(crate::equalizer::parametric_preset(&preset_name));
             }
             save_eq_settings(&db, eq);
             EqualizerConfig::snapshot(eq)
         })
+    })
+    .await)
+}
+
+/// Evaluated magnitude response (dB, preamp excluded) of the parametric
+/// cascade the engine is running, at each requested frequency — the curve
+/// preview plots this instead of re-deriving the filter law (#1248).
+#[tauri::command]
+pub async fn get_parametric_response(
+    state: State<'_, AppState>,
+    frequencies: Vec<f32>,
+) -> Result<Vec<f32>, String> {
+    Ok(crate::audio::with_audio(&state.audio, move |engine| {
+        engine.with_equalizer(|eq| eq.parametric_response_db(&frequencies))
     })
     .await)
 }
