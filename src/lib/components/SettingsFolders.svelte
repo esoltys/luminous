@@ -7,6 +7,7 @@
   import { tasksStore } from "../stores/tasks.svelte";
   import { onMount } from "svelte";
   import { hierarchySidecarStore } from "../stores/hierarchySidecar.svelte";
+  import { confirm } from "@tauri-apps/plugin-dialog";
   import Toggle from "./Toggle.svelte";
   import Select from "./Select.svelte";
   import HelpTip from "./HelpTip.svelte";
@@ -66,7 +67,7 @@
   }
 
   async function handleRemoveWebdavServer(server: WebDavServer) {
-    if (confirm(i18n.t("settings.confirmRemoveWebdavServer", { name: server.name }))) {
+    if (await confirm(i18n.t("settings.confirmRemoveWebdavServer", { name: server.name }))) {
       try {
         await invoke("delete_webdav_server", { id: server.id });
         await loadWebdavServers();
@@ -182,7 +183,7 @@
   }
 
   async function handleRemoveSubsonicServer(server: SubsonicServer) {
-    if (!confirm(i18n.t("settings.confirmRemoveSubsonicServer", { name: server.name }))) return;
+    if (!(await confirm(i18n.t("settings.confirmRemoveSubsonicServer", { name: server.name })))) return;
     try {
       await invoke("delete_subsonic_server", { id: server.id });
       await loadSubsonicServers();
@@ -221,7 +222,7 @@
   });
 
   async function handleRemoveDirectory(path: string) {
-    if (confirm(i18n.t('settings.confirmRemoveFolder', { path }))) {
+    if (await confirm(i18n.t('settings.confirmRemoveFolder', { path }))) {
       await collectionStore.removeDirectory(path);
       // Removing the default library's folder unlinks it backend-side.
       await hierarchySidecarStore.refresh().catch(() => {});

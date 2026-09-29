@@ -734,6 +734,14 @@ export function getCoverArtUrl(uri: string | null | undefined): string | null {
     // protocol handler (which is why backend logs display `URI = luminous-art://...`).
     // Do not remove this rewrite (see #715).
     if (isWindows) {
+      // A `local/` filesystem path is percent-encoded into the URL: as an
+      // http URL, `#`/`?` in a folder name would otherwise be cut off as a
+      // fragment/query and a literal `%` misdecoded. `serve_art_request`
+      // percent-decodes `local/` paths.
+      const localPrefix = "luminous-art://local/";
+      if (uri.startsWith(localPrefix)) {
+        return `http://luminous-art.localhost/local/${encodeURIComponent(uri.slice(localPrefix.length))}`;
+      }
       return uri.replace("luminous-art://", "http://luminous-art.localhost/");
     }
   }
