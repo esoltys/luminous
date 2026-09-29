@@ -117,6 +117,26 @@ describe("buildShareCardSvg", () => {
     }
   });
 
+  it("renders all 5 covers in the mosaic on horizontal frames when 5 covers are provided", () => {
+    const { svg } = buildShareCardSvg({
+      ...baseOptions,
+      aspectRatio: "16:9",
+      coverStackDataUris: [
+        "data:image/png;base64,1",
+        "data:image/png;base64,2",
+        "data:image/png;base64,3",
+        "data:image/png;base64,4",
+        "data:image/png;base64,5",
+      ],
+    });
+    expect(svg).toContain("data:image/png;base64,1");
+    expect(svg).toContain("data:image/png;base64,2");
+    expect(svg).toContain("data:image/png;base64,3");
+    expect(svg).toContain("data:image/png;base64,4");
+    expect(svg).toContain("data:image/png;base64,5");
+    expect(svg).toMatch(/grid-template-columns:[\d.]+px repeat\(2, /);
+  });
+
   it("keeps the fanned stack on portrait aspect ratios (9:16, 3:4)", () => {
     for (const ratio of ["9:16", "3:4"] as const) {
       const { svg } = buildShareCardSvg({
@@ -308,6 +328,29 @@ describe("buildStatsShareCardSvg", () => {
       });
       expect(svg).toContain("rotate(-5deg)");
     }
+  });
+
+  it("renders 5 covers in a section mosaic on horizontal aspect ratios", () => {
+    const { svg } = buildStatsShareCardSvg({
+      ...baseStatsOptions,
+      aspectRatio: "16:9",
+      sections: [
+        {
+          title: "Top Artists",
+          items: [{ label: "Artist 1" }],
+          coverStackDataUris: [
+            "data:image/png;base64,1",
+            "data:image/png;base64,2",
+            "data:image/png;base64,3",
+            "data:image/png;base64,4",
+            "data:image/png;base64,5",
+          ],
+        },
+      ],
+    });
+    expect(svg).toContain("data:image/png;base64,1");
+    expect(svg).toContain("data:image/png;base64,5");
+    expect(svg).toMatch(/grid-template-columns:[\d.]+px repeat\(2, /);
   });
 });
 

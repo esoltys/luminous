@@ -312,22 +312,25 @@
     return stack[0] ? resolveCoverUrl(stack[0]) : null;
   }
 
-  /** Resolves up to 4 cover URLs for a stats Top N section — top_albums/
+  /** Resolves up to 5 cover URLs for a stats Top N section — top_albums/
    * top_songs rows already carry their own art fields (see stats_summary.rs),
    * top_artists rows don't (an "artist" has no single canonical image column)
    * so those go through resolveArtistImageUrl by name instead; genres have
-   * no natural image at all. */
+   * no natural image at all. Candidate items are inspected beyond the top 5
+   * (up to 10) so any missing image higher in the rank is filled by the next
+   * ranked item rather than leaving an empty mosaic slot. */
   async function resolveTopItemsCoverUrls(
     items: StatsTopItem[],
-    kind: "artist" | "album" | "song" | "genre"
+    kind: "artist" | "album" | "song" | "genre",
+    maxCovers = 5
   ): Promise<string[]> {
     if (kind === "genre") return [];
-    const top = items.slice(0, 4);
+    const candidates = items.slice(0, 10);
     const urls =
       kind === "artist"
-        ? await Promise.all(top.map((it) => resolveArtistImageUrl(it.label)))
+        ? await Promise.all(candidates.map((it) => resolveArtistImageUrl(it.label)))
         : await Promise.all(
-            top.map((it) =>
+            candidates.map((it) =>
               resolveCoverUrl({
                 songId: it.sample_song_id ?? it.song_id ?? undefined,
                 artManual: it.art_manual,
@@ -336,7 +339,7 @@
               })
             )
           );
-    return urls.filter((u): u is string => !!u);
+    return urls.filter((u): u is string => !!u).slice(0, maxCovers);
   }
 
   let coverUrl = $state<string | null>(null);
@@ -364,7 +367,7 @@
         // exists, it serves as the big tile and the artist's album covers fill
         // the mosaic quarter tiles (or the fanned stack behind it). When no
         // portrait exists, the album covers themselves form the stack/mosaic.
-        const stackItems = getArtistCoverStack(artistAlbums, artistSongs, 4);
+        const stackItems = getArtistCoverStack(artistAlbums, artistSongs, 5);
         const urls = (await Promise.all(stackItems.map(resolveCoverUrl))).filter((u): u is string => !!u);
         if (!cancelled) {
           if (artistPortraitUrl) {
@@ -376,7 +379,7 @@
           }
         }
       } else if (entity.kind === "playlist") {
-        const stackItems = songsToCoverStack(entity.songs, 4);
+        const stackItems = songsToCoverStack(entity.songs, 5);
         const urls = (await Promise.all(stackItems.map(resolveCoverUrl))).filter((u): u is string => !!u);
         if (!cancelled) {
           coverUrl = urls[0] ?? null;
