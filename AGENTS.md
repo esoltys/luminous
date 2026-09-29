@@ -88,13 +88,14 @@ into Picard's territory; it's a different, complementary axis Picard was never m
 Required before `cargo check` / `bun run tauri dev`:
 
 ```bash
-pkexec apt-get install -y libasound2-dev libssl-dev pkg-config libayatana-appindicator3-dev
+pkexec apt-get install -y libasound2-dev libssl-dev pkg-config libayatana-appindicator3-dev cmake
 ```
 
 - `libasound2-dev` — ALSA headers needed by the `cpal` audio crate
 - `libssl-dev` — OpenSSL headers (needed by some Tauri transitive deps)
 - `libayatana-appindicator3-dev` — links the system tray icon (`tray-icon` Cargo feature)
 - `pkg-config` — used by build scripts to locate system libraries
+- `cmake` — builds the bundled libopus for the `opusic-sys` crate (preinstalled on GitHub's Ubuntu runners, so CI won't catch it missing)
 
 ## Quick Start Commands
 
