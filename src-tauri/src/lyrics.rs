@@ -243,26 +243,41 @@ fn extract_track_and_title_from_stem(stem: &str) -> (Option<i32>, Option<String>
     (None, None)
 }
 
-/// Look for a sidecar `.lrc` file in the same directory as `audio_path`.
+/// Sidecar lyric extensions in precedence order. Within each lookup step of
+/// `find_sidecar_lyrics`, an earlier extension wins; an earlier step always
+/// beats a later one regardless of extension.
+const SIDECAR_EXTS: [&str; 3] = ["lrc", "vtt", "srt"];
+
+/// Index of `path`'s extension in `SIDECAR_EXTS` (case-insensitive), or
+/// `None` if it isn't a sidecar lyric file.
+fn sidecar_ext_rank(path: &Path) -> Option<usize> {
+    let ext = path.extension()?.to_str()?;
+    SIDECAR_EXTS
+        .iter()
+        .position(|e| ext.eq_ignore_ascii_case(e))
+}
+
+/// Look for a sidecar lyrics file (`.lrc`, `.vtt` or `.srt`) in the same
+/// directory as `audio_path`.
 ///
-/// Precedence:
-/// 1. Direct match: `<audio_stem>.lrc` and `<audio_stem>.LRC`.
-/// 2. Disc prefix strip: e.g. `1-01 Track.flac` -> `01 - Track.lrc`, `01 Track.lrc`.
-/// 3. Sibling directory scan: matches files in the parent folder ending with `.lrc`/`.LRC`
-///    against track number and/or title (e.g. `Artist - Album - 02 Track.lrc`, `Artist_Album_01_Track.lrc`).
-pub fn find_sidecar_lrc(
+/// Precedence — steps first, then format (`.lrc` > `.vtt` > `.srt` within a step):
+/// 1. Direct match: `<audio_stem>.<ext>`, lower- or uppercase extension.
+/// 2. Disc prefix strip / title candidates: e.g. `1-01 Track.flac` -> `01 - Track.lrc`, `01 Track.srt`.
+/// 3. Sibling directory scan: matches sidecar files in the parent folder against track
+///    number and/or title (e.g. `Artist - Album - 02 Track.lrc`, `Artist_Album_01_Track.vtt`).
+pub fn find_sidecar_lyrics(
     audio_path: &Path,
     title: Option<&str>,
     track: Option<i32>,
 ) -> Option<PathBuf> {
-    // 1. Direct match with .lrc or .LRC
-    let direct_lrc = audio_path.with_extension("lrc");
-    if direct_lrc.is_file() {
-        return Some(direct_lrc);
-    }
-    let direct_upper = audio_path.with_extension("LRC");
-    if direct_upper.is_file() {
-        return Some(direct_upper);
+    // 1. Direct match
+    for ext in SIDECAR_EXTS {
+        for variant in [ext.to_string(), ext.to_ascii_uppercase()] {
+            let direct = audio_path.with_extension(variant);
+            if direct.is_file() {
+                return Some(direct);
+            }
+        }
     }
 
     let parent = audio_path.parent()?;
@@ -291,33 +306,31 @@ pub fn find_sidecar_lrc(
         }
     }
 
-    for cand_stem in &candidate_stems {
-        let p_lrc = parent.join(format!("{cand_stem}.lrc"));
-        if p_lrc.is_file() {
-            return Some(p_lrc);
-        }
-        let p_upper = parent.join(format!("{cand_stem}.LRC"));
-        if p_upper.is_file() {
-            return Some(p_upper);
+    for ext in SIDECAR_EXTS {
+        for cand_stem in &candidate_stems {
+            for variant in [ext.to_string(), ext.to_ascii_uppercase()] {
+                let p = parent.join(format!("{cand_stem}.{variant}"));
+                if p.is_file() {
+                    return Some(p);
+                }
+            }
         }
     }
 
     // 3. Scan sibling files in parent directory for tag-prefixed conventions
     // (e.g. "Dorothy - Gifts From the Holy Ghost - 02 Big Guns.lrc")
     let entries = std::fs::read_dir(parent).ok()?;
-    let mut lrc_files: Vec<PathBuf> = Vec::new();
+    let mut sidecar_files: Vec<(usize, PathBuf)> = Vec::new();
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_file() {
-            if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                if ext.eq_ignore_ascii_case("lrc") {
-                    lrc_files.push(path);
-                }
+            if let Some(rank) = sidecar_ext_rank(&path) {
+                sidecar_files.push((rank, path));
             }
         }
     }
 
-    if lrc_files.is_empty() {
+    if sidecar_files.is_empty() {
         return None;
     }
 
@@ -334,30 +347,35 @@ pub fn find_sidecar_lrc(
         }
     };
 
-    let mut best_match: Option<(u8, PathBuf)> = None;
+    // (score, extension rank, path): higher score wins, then the preferred extension.
+    let mut best_match: Option<(u8, usize, PathBuf)> = None;
 
-    for lrc_path in lrc_files {
-        let Some(lrc_stem) = lrc_path.file_stem().and_then(|s| s.to_str()) else {
+    for (rank, sidecar_path) in sidecar_files {
+        let Some(sidecar_stem) = sidecar_path.file_stem().and_then(|s| s.to_str()) else {
             continue;
         };
-        let lrc_norm = normalize_stem(lrc_stem);
-        let lrc_tokens: Vec<&str> = lrc_norm.split_whitespace().collect();
+        let sidecar_norm = normalize_stem(sidecar_stem);
+        let sidecar_tokens: Vec<&str> = sidecar_norm.split_whitespace().collect();
 
         let track_matches = target_track_num.is_some_and(|trk| {
             let trk_2 = format!("{:02}", trk);
             let trk_1 = format!("{}", trk);
-            lrc_tokens.iter().any(|&tok| tok == trk_2 || tok == trk_1)
+            sidecar_tokens
+                .iter()
+                .any(|&tok| tok == trk_2 || tok == trk_1)
         });
 
         let title_matches = target_title_norm.as_ref().is_some_and(|norm_title| {
             if norm_title.is_empty() {
                 return false;
             }
-            if lrc_norm.contains(norm_title) {
+            if sidecar_norm.contains(norm_title) {
                 return true;
             }
             let title_tokens: Vec<&str> = norm_title.split_whitespace().collect();
-            if !title_tokens.is_empty() && title_tokens.iter().all(|&tt| lrc_tokens.contains(&tt)) {
+            if !title_tokens.is_empty()
+                && title_tokens.iter().all(|&tt| sidecar_tokens.contains(&tt))
+            {
                 return true;
             }
             false
@@ -382,38 +400,189 @@ pub fn find_sidecar_lrc(
         };
 
         if score > 0 {
-            if let Some((best_score, _)) = best_match {
-                if score > best_score {
-                    best_match = Some((score, lrc_path));
+            let better = match &best_match {
+                Some((best_score, best_rank, _)) => {
+                    score > *best_score || (score == *best_score && rank < *best_rank)
                 }
-            } else {
-                best_match = Some((score, lrc_path));
+                None => true,
+            };
+            if better {
+                best_match = Some((score, rank, sidecar_path));
             }
         }
     }
 
-    best_match.map(|(_, path)| path)
+    best_match.map(|(_, _, path)| path)
 }
 
-/// Read and return the contents of a sidecar `.lrc` file if one exists next to `audio_path`.
+/// Where an edit to `audio_path`'s lyrics should be written back to disk, or
+/// `None` when the song has no sidecar (edits then stay in the database only).
+/// A `.lrc` sidecar is overwritten in place; a `.srt`/`.vtt` one is never
+/// touched — the edit goes to `<audio_stem>.lrc` instead, which step 1 of
+/// `find_sidecar_lyrics` then prefers on the next read.
+pub fn sidecar_lyrics_save_path(
+    audio_path: &Path,
+    title: Option<&str>,
+    track: Option<i32>,
+) -> Option<PathBuf> {
+    let found = find_sidecar_lyrics(audio_path, title, track)?;
+    if sidecar_ext_rank(&found) == Some(0) {
+        Some(found)
+    } else {
+        Some(audio_path.with_extension("lrc"))
+    }
+}
+
+/// Read and return the contents of a sidecar lyrics file if one exists next to `audio_path`.
 /// Handles UTF-8 BOM if present, strips trailing/leading whitespace, and ignores empty files.
-/// Synced LRC content is returned as-is; plain text is marked with `[synced:false]\n`.
-pub fn read_sidecar_lrc(
+/// `.srt`/`.vtt` subtitles are converted to synced LRC text; `.lrc` content is returned
+/// as-is when synced, and plain text is marked with `[synced:false]\n`.
+pub fn read_sidecar_lyrics(
     audio_path: &Path,
     title: Option<&str>,
     track: Option<i32>,
 ) -> Option<String> {
-    let lrc_path = find_sidecar_lrc(audio_path, title, track)?;
-    let content = std::fs::read_to_string(&lrc_path).ok()?;
+    let sidecar_path = find_sidecar_lyrics(audio_path, title, track)?;
+    let content = std::fs::read_to_string(&sidecar_path).ok()?;
     let trimmed = content.strip_prefix('\u{feff}').unwrap_or(&content).trim();
     if trimmed.is_empty() {
         return None;
+    }
+    if sidecar_ext_rank(&sidecar_path) != Some(0) {
+        let converted = subtitles_to_lrc(trimmed);
+        return (!converted.is_empty()).then_some(converted);
     }
     if is_synced_lrc(trimmed) || trimmed.starts_with("[synced:false]") {
         Some(trimmed.to_string())
     } else {
         Some(format!("[synced:false]\n{trimmed}"))
     }
+}
+
+/// A cue gap longer than this gets an empty LRC line at the previous cue's
+/// end, so the last line doesn't stay highlighted through an instrumental break.
+const SUBTITLE_GAP_MS: u64 = 4000;
+
+/// Parse an SRT (`HH:MM:SS,mmm`) or WebVTT (`HH:MM:SS.mmm` / `MM:SS.mmm`)
+/// cue timestamp into milliseconds.
+fn parse_cue_timestamp(s: &str) -> Option<u64> {
+    let (clock, frac) = s.trim().split_once([',', '.'])?;
+    let parts: Vec<&str> = clock.split(':').collect();
+    let nums: Vec<u64> = parts
+        .iter()
+        .map(|p| p.trim().parse::<u64>().ok())
+        .collect::<Option<_>>()?;
+    let secs = match nums.as_slice() {
+        [h, m, s] => h * 3600 + m * 60 + s,
+        [m, s] => m * 60 + s,
+        _ => return None,
+    };
+    let frac = frac.trim();
+    if frac.is_empty() || frac.len() > 3 || !frac.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    // Right-pad to milliseconds: "5" -> 500, "05" -> 50, "005" -> 5.
+    let ms = frac.parse::<u64>().ok()? * 10u64.pow(3 - frac.len() as u32);
+    Some(secs * 1000 + ms)
+}
+
+/// Parse a cue timing line (`start --> end [cue settings]`) into `(start_ms, end_ms)`.
+fn parse_cue_timing(line: &str) -> Option<(u64, u64)> {
+    let (start, rest) = line.split_once("-->")?;
+    let end = rest.split_whitespace().next()?;
+    Some((parse_cue_timestamp(start)?, parse_cue_timestamp(end)?))
+}
+
+/// Strip markup from a cue text line: `<b>`/`<i>`/`<font …>`/`<v Speaker>`/
+/// `<c.class>` tags and the common HTML entities.
+fn strip_cue_markup(line: &str) -> String {
+    let mut out = String::with_capacity(line.len());
+    let mut in_tag = false;
+    for ch in line.chars() {
+        match ch {
+            '<' => in_tag = true,
+            '>' if in_tag => in_tag = false,
+            _ if !in_tag => out.push(ch),
+            _ => {}
+        }
+    }
+    out.replace("&nbsp;", " ")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&apos;", "'")
+        .replace("&amp;", "&")
+}
+
+fn format_lrc_timestamp(ms: u64) -> String {
+    format!(
+        "[{:02}:{:02}.{:02}]",
+        ms / 60_000,
+        (ms / 1000) % 60,
+        (ms % 1000) / 10
+    )
+}
+
+/// Convert SRT or WebVTT subtitle text into synced LRC (`[MM:SS.xx] line`).
+///
+/// Both formats are a series of cues: a timing line (`start --> end`) followed
+/// by text lines up to a blank line. Everything outside a cue — SRT indices,
+/// VTT cue identifiers, the `WEBVTT` header, `NOTE`/`STYLE`/`REGION` blocks —
+/// is dropped. Multi-line cues are joined with a space. Returns an empty
+/// string if no cue has text.
+pub fn subtitles_to_lrc(content: &str) -> String {
+    let lines: Vec<&str> = content.lines().map(str::trim).collect();
+    // (start_ms, end_ms, text)
+    let mut cues: Vec<(u64, u64, String)> = Vec::new();
+    let mut current: Option<(u64, u64, Vec<String>)> = None;
+
+    let flush = |current: &mut Option<(u64, u64, Vec<String>)>, cues: &mut Vec<_>| {
+        if let Some((start, end, parts)) = current.take() {
+            let text = parts.join(" ");
+            let text = text.split_whitespace().collect::<Vec<_>>().join(" ");
+            if !text.is_empty() {
+                cues.push((start, end, text));
+            }
+        }
+    };
+
+    for (i, line) in lines.iter().enumerate() {
+        if let Some((start, end)) = line
+            .contains("-->")
+            .then(|| parse_cue_timing(line))
+            .flatten()
+        {
+            flush(&mut current, &mut cues);
+            current = Some((start, end, Vec::new()));
+        } else if line.is_empty() {
+            flush(&mut current, &mut cues);
+        } else if let Some((_, _, parts)) = current.as_mut() {
+            // A missing blank line before the next cue would otherwise pull
+            // its SRT index / VTT identifier into this cue's text.
+            let next_is_timing = lines
+                .get(i + 1)
+                .is_some_and(|next| next.contains("-->") && parse_cue_timing(next).is_some());
+            if !next_is_timing {
+                parts.push(strip_cue_markup(line));
+            }
+        }
+    }
+    flush(&mut current, &mut cues);
+
+    cues.sort_by_key(|(start, _, _)| *start);
+
+    let mut out: Vec<String> = Vec::with_capacity(cues.len() * 2);
+    for (idx, (start, _, text)) in cues.iter().enumerate() {
+        if idx > 0 {
+            let prev_end = cues[idx - 1].1;
+            if *start > prev_end && start - prev_end > SUBTITLE_GAP_MS {
+                out.push(format_lrc_timestamp(prev_end));
+            }
+        }
+        out.push(format!("{} {}", format_lrc_timestamp(*start), text));
+    }
+    out.join("\n")
 }
 
 /// Resolve lyrics for `song_id`: return cached lyrics immediately when the
@@ -449,10 +618,10 @@ pub async fn get_lyrics_for_song(
         return Err("Song is marked as instrumental".to_string());
     }
 
-    // 2. Check for local sidecar .lrc file next to the audio file (#155)
+    // 2. Check for a local sidecar .lrc/.vtt/.srt file next to the audio file (#155, #1190)
     if let Some(ref path_str) = path_str {
         let audio_path = Path::new(path_str);
-        if let Some(sidecar_lyrics) = read_sidecar_lrc(audio_path, title.as_deref(), track) {
+        if let Some(sidecar_lyrics) = read_sidecar_lyrics(audio_path, title.as_deref(), track) {
             // If cached lyrics differ from the sidecar file (or on force refresh), update the database
             if cached_lyrics.as_deref() != Some(&sidecar_lyrics) {
                 let _ = conn.execute(
@@ -635,7 +804,7 @@ mod tests {
         std::fs::write(&lrc_path, b"[00:01.00] test").unwrap();
 
         assert_eq!(
-            find_sidecar_lrc(&audio_path, None, None),
+            find_sidecar_lyrics(&audio_path, None, None),
             Some(lrc_path.clone())
         );
 
@@ -643,7 +812,7 @@ mod tests {
         std::fs::remove_file(&lrc_path).unwrap();
         let lrc_upper = temp_dir.path().join("song.LRC");
         std::fs::write(&lrc_upper, b"[00:01.00] test upper").unwrap();
-        let found = find_sidecar_lrc(&audio_path, None, None);
+        let found = find_sidecar_lyrics(&audio_path, None, None);
         assert!(found.is_some());
         assert_eq!(
             found.unwrap().to_string_lossy().to_lowercase(),
@@ -662,17 +831,17 @@ mod tests {
         std::fs::write(&lrc_path, b"[00:07.61] Not gonna play the fool").unwrap();
 
         // Should find via sibling matching on track (2) and title ("Big Guns")
-        let found = find_sidecar_lrc(&audio_path, Some("Big Guns"), Some(2));
+        let found = find_sidecar_lyrics(&audio_path, Some("Big Guns"), Some(2));
         assert_eq!(found, Some(lrc_path.clone()));
 
         // Should also find via extracted stem info when metadata is not provided
-        let found_from_stem = find_sidecar_lrc(&audio_path, None, None);
+        let found_from_stem = find_sidecar_lyrics(&audio_path, None, None);
         assert_eq!(found_from_stem, Some(lrc_path));
 
         // Different track should NOT match
         let other_audio = temp_dir.path().join("1-01 A Beautiful Life.flac");
         std::fs::write(&other_audio, b"dummy audio").unwrap();
-        let not_found = find_sidecar_lrc(&other_audio, Some("A Beautiful Life"), Some(1));
+        let not_found = find_sidecar_lyrics(&other_audio, Some("A Beautiful Life"), Some(1));
         assert_eq!(not_found, None);
     }
 
@@ -686,7 +855,7 @@ mod tests {
         // Synced LRC with UTF-8 BOM
         let bom_lrc = "\u{feff}[00:15.00] Synced line\n[00:20.00] Next line".to_string();
         std::fs::write(&lrc_path, bom_lrc.as_bytes()).unwrap();
-        let read = read_sidecar_lrc(&audio_path, None, None);
+        let read = read_sidecar_lyrics(&audio_path, None, None);
         assert_eq!(
             read,
             Some("[00:15.00] Synced line\n[00:20.00] Next line".to_string())
@@ -694,7 +863,7 @@ mod tests {
 
         // Plain text LRC (no timestamps) should get [synced:false] prefix
         std::fs::write(&lrc_path, b"Just plain text lyrics").unwrap();
-        let read_plain = read_sidecar_lrc(&audio_path, None, None);
+        let read_plain = read_sidecar_lyrics(&audio_path, None, None);
         assert_eq!(
             read_plain,
             Some("[synced:false]\nJust plain text lyrics".to_string())
@@ -702,7 +871,124 @@ mod tests {
 
         // Empty file should return None
         std::fs::write(&lrc_path, b"   \n\t  ").unwrap();
-        assert_eq!(read_sidecar_lrc(&audio_path, None, None), None);
+        assert_eq!(read_sidecar_lyrics(&audio_path, None, None), None);
+    }
+
+    #[test]
+    fn test_subtitles_to_lrc_srt() {
+        let srt = "1\r\n00:00:07,610 --> 00:00:10,000\r\n<i>Not gonna</i> <b>play</b>\r\nthe fool\r\n\r\n\
+                   2\r\n00:00:10,500 --> 00:00:12,000\r\n<font color=\"#fff\">Next line</font>\r\n\r\n\
+                   3\r\n00:01:20,000 --> 00:01:22,000\r\nAfter the break\r\n";
+        assert_eq!(
+            subtitles_to_lrc(srt),
+            "[00:07.61] Not gonna play the fool\n\
+             [00:10.50] Next line\n\
+             [00:12.00]\n\
+             [01:20.00] After the break"
+        );
+    }
+
+    #[test]
+    fn test_subtitles_to_lrc_vtt() {
+        let vtt = "WEBVTT - some title\n\n\
+                   STYLE\n::cue { color: lime }\n\n\
+                   NOTE this is a comment\nspanning --> two lines\n\n\
+                   intro\n00:01.000 --> 00:03.500 align:start position:10%\n<v Singer>Hello</v> <c.loud>world</c> &amp; more\n\n\
+                   01:02:03.450 --> 01:02:05.000\nLate line\n";
+        assert_eq!(
+            subtitles_to_lrc(vtt),
+            "[00:01.00] Hello world & more\n[00:03.50]\n[62:03.45] Late line"
+        );
+    }
+
+    #[test]
+    fn test_subtitles_to_lrc_missing_blank_line_and_empty() {
+        let srt =
+            "1\n00:00:01,000 --> 00:00:02,000\nFirst\n2\n00:00:02,000 --> 00:00:03,000\nSecond\n";
+        assert_eq!(subtitles_to_lrc(srt), "[00:01.00] First\n[00:02.00] Second");
+        assert_eq!(subtitles_to_lrc("WEBVTT\n\nNOTE nothing here\n"), "");
+    }
+
+    #[test]
+    fn test_find_sidecar_lyrics_format_precedence() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let audio_path = temp_dir.path().join("1-02 Big Guns.flac");
+        std::fs::write(&audio_path, b"dummy audio").unwrap();
+
+        // Within step 3 (sibling scan), .lrc beats .vtt beats .srt
+        let sib_srt = temp_dir.path().join("Dorothy - 02 Big Guns.srt");
+        let sib_vtt = temp_dir.path().join("Dorothy - 02 Big Guns.vtt");
+        let sib_lrc = temp_dir.path().join("Dorothy - 02 Big Guns.lrc");
+        std::fs::write(&sib_srt, b"x").unwrap();
+        assert_eq!(
+            find_sidecar_lyrics(&audio_path, Some("Big Guns"), Some(2)),
+            Some(sib_srt.clone())
+        );
+        std::fs::write(&sib_vtt, b"x").unwrap();
+        assert_eq!(
+            find_sidecar_lyrics(&audio_path, Some("Big Guns"), Some(2)),
+            Some(sib_vtt.clone())
+        );
+        std::fs::write(&sib_lrc, b"x").unwrap();
+        assert_eq!(
+            find_sidecar_lyrics(&audio_path, Some("Big Guns"), Some(2)),
+            Some(sib_lrc)
+        );
+
+        // An earlier step wins over a better format: a direct .srt beats a fuzzy .lrc
+        let direct_srt = audio_path.with_extension("srt");
+        std::fs::write(&direct_srt, b"x").unwrap();
+        assert_eq!(
+            find_sidecar_lyrics(&audio_path, Some("Big Guns"), Some(2)),
+            Some(direct_srt)
+        );
+    }
+
+    #[test]
+    fn test_read_sidecar_lyrics_converts_subtitles() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let audio_path = temp_dir.path().join("track.mp3");
+        std::fs::write(&audio_path, b"dummy").unwrap();
+
+        let vtt_path = temp_dir.path().join("track.VTT");
+        std::fs::write(
+            &vtt_path,
+            "\u{feff}WEBVTT\n\n00:00:05.000 --> 00:00:06.000\nFrom VTT\n",
+        )
+        .unwrap();
+        let read = read_sidecar_lyrics(&audio_path, None, None).unwrap();
+        assert_eq!(read, "[00:05.00] From VTT");
+        assert!(is_synced_lrc(&read));
+
+        // A subtitle file with no cue text yields nothing
+        std::fs::write(&vtt_path, "WEBVTT\n").unwrap();
+        assert_eq!(read_sidecar_lyrics(&audio_path, None, None), None);
+    }
+
+    #[test]
+    fn test_sidecar_lyrics_save_path_never_overwrites_subtitles() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let audio_path = temp_dir.path().join("track.flac");
+        std::fs::write(&audio_path, b"dummy").unwrap();
+
+        // No sidecar: edits stay in the database only
+        assert_eq!(sidecar_lyrics_save_path(&audio_path, None, None), None);
+
+        // .srt sidecar: edits go to <stem>.lrc, leaving the subtitle untouched
+        std::fs::write(temp_dir.path().join("track.srt"), b"x").unwrap();
+        assert_eq!(
+            sidecar_lyrics_save_path(&audio_path, None, None),
+            Some(temp_dir.path().join("track.lrc"))
+        );
+
+        // A fuzzy-matched .lrc sidecar is overwritten in place
+        std::fs::remove_file(temp_dir.path().join("track.srt")).unwrap();
+        let fuzzy_lrc = temp_dir.path().join("Artist - track.lrc");
+        std::fs::write(&fuzzy_lrc, b"x").unwrap();
+        assert_eq!(
+            sidecar_lyrics_save_path(&audio_path, Some("track"), None),
+            Some(fuzzy_lrc)
+        );
     }
 
     #[tokio::test]

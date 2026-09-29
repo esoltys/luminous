@@ -1605,10 +1605,11 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
 
     song.art_embedded = candidate_tags.iter().any(|t| !t.pictures().is_empty());
 
-    // Check for sidecar .lrc lyrics next to the audio file (#155).
-    // Sidecar .lrc files take precedence over embedded tags because they are
+    // Check for sidecar .lrc/.vtt/.srt lyrics next to the audio file (#155, #1190).
+    // Sidecar files take precedence over embedded tags because they are
     // typically high-confidence synced lyrics intentionally placed by the user.
-    if let Some(sidecar) = crate::lyrics::read_sidecar_lrc(path, song.title.as_deref(), song.track)
+    if let Some(sidecar) =
+        crate::lyrics::read_sidecar_lyrics(path, song.title.as_deref(), song.track)
     {
         song.lyrics = Some(sidecar);
     }
