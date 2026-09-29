@@ -656,9 +656,12 @@ pub struct PlaybackState {
     /// The applied gain in dB, when normalization is active for this track.
     pub loudness_gain_db: Option<f32>,
     /// How many playlist items remain after the current track.
-    /// Used by the frontend Auto-Play refill logic (#26).
     #[serde(default)]
     pub remaining_playlist_items: usize,
+    /// Auto Continue (#1235) is on — the Queue tops itself up instead of
+    /// ending, so the frontend skips its "Queue is done" toast.
+    #[serde(default)]
+    pub auto_continue: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]

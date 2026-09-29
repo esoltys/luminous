@@ -13,6 +13,8 @@
     isDuplicate?: boolean;
     /** Position of this row in the caller's underlying (unfiltered) order — required when `onReorder` is provided. */
     underlyingIndex?: number;
+    /** Label for a divider drawn above this row (e.g. where Auto Continue's songs start in the Queue). Not supported with `virtualized`, whose rows have a fixed height. */
+    dividerBefore?: string;
   }
 </script>
 
@@ -657,6 +659,17 @@
 {#snippet row_(row: SongTableRow, displayIndex: number)}
   {@const song = row.song}
   {@const disabled = rowDisabled(row)}
+  {#if row.dividerBefore && !virtualized}
+    <div
+      data-row-divider="true"
+      role="separator"
+      aria-label={row.dividerBefore}
+      class="flex items-center gap-3 px-4 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-brand-accent-text select-none"
+    >
+      <span>{row.dividerBefore}</span>
+      <div class="h-px flex-1 bg-brand-accent/30"></div>
+    </div>
+  {/if}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     data-song-row="true"

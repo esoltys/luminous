@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { getPlaylistDisplayName, getPopulationModeSuffix } from "./playlist";
-import type { Playlist } from "../types";
+import { autoContinueRunStarts, getPlaylistDisplayName, getPopulationModeSuffix, isAutoContinueItem } from "./playlist";
+import type { Playlist, PlaylistItem } from "../types";
 
 describe("playlist utils", () => {
   it("returns base name for non-dynamic playlists", () => {
@@ -171,5 +171,23 @@ describe("playlist utils", () => {
       is_queue: false,
     };
     expect(getPlaylistDisplayName(playlist)).toBe("Missing Metadata");
+  });
+});
+
+describe("Auto Continue rows (#1235)", () => {
+  const item = (uuid: string, metadata?: string): PlaylistItem =>
+    ({ id: 0, playlist_id: 1, position: 0, item_type: "song", uuid, additional_metadata: metadata });
+  const AUTO = '{"autoContinue":true}';
+
+  it("recognises only rows tagged autoContinue", () => {
+    expect(isAutoContinueItem(item("a", AUTO))).toBe(true);
+    expect(isAutoContinueItem(item("b"))).toBe(false);
+    expect(isAutoContinueItem(item("c", '{"autoContinue":false}'))).toBe(false);
+    expect(isAutoContinueItem(item("d", "not json"))).toBe(false);
+  });
+
+  it("marks the first row of each run of Auto Continue songs", () => {
+    const rows = [item("u1"), item("a1", AUTO), item("a2", AUTO), item("u2"), item("a3", AUTO)];
+    expect([...autoContinueRunStarts(rows)]).toEqual(["a1", "a3"]);
   });
 });

@@ -136,6 +136,49 @@ impl PlaylistManager {
         Ok(())
     }
 
+    /// Appends Auto Continue (#1235) picks to the end of `playlist_id`,
+    /// marking each row with `continue_mix::MARKER_JSON` so the Queue view
+    /// can set them apart, and returns the new items for the live player.
+    /// Pushes no undo op: the user didn't make this change, so Ctrl+Z
+    /// shouldn't silently take it back (the rows remove like any other).
+    pub fn append_auto_continue_songs(
+        &mut self,
+        playlist_id: i64,
+        song_ids: &[i64],
+    ) -> Result<Vec<PlaylistItem>> {
+        let mut conn = self.db.pool.get()?;
+        let tx = conn.transaction()?;
+        let max_pos: i32 = tx.query_row(
+            "SELECT COALESCE(MAX(position), -1) FROM playlist_items WHERE playlist_id = ?1",
+            params![playlist_id],
+            |row| row.get(0),
+        )?;
+        let mut uuids = HashSet::new();
+        for (i, &song_id) in song_ids.iter().enumerate() {
+            let uuid = Uuid::new_v4().to_string();
+            tx.execute(
+                "INSERT INTO playlist_items
+                     (playlist_id, song_id, position, uuid, type, additional_metadata)
+                 VALUES (?1, ?2, ?3, ?4, 0, ?5)",
+                params![
+                    playlist_id,
+                    song_id,
+                    max_pos + 1 + i as i32,
+                    uuid,
+                    crate::continue_mix::MARKER_JSON
+                ],
+            )?;
+            uuids.insert(uuid);
+        }
+        self.touch_updated(&tx, playlist_id)?;
+        tx.commit()?;
+
+        Ok(Self::get_playlist_tracks_from_conn(&conn, playlist_id)?
+            .into_iter()
+            .filter(|item| uuids.contains(&item.uuid))
+            .collect())
+    }
+
     pub fn remove_from_playlist(&mut self, playlist_id: i64, uuids: &[String]) -> Result<()> {
         let conn = self.db.pool.get()?;
         let mut removed = Vec::new();

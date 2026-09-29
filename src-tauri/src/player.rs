@@ -153,6 +153,9 @@ pub struct Player {
     pub shuffle_mode: ShuffleMode,
     pub repeat_mode: RepeatMode,
     pub stop_after_current: bool,
+    /// Auto Continue (#1235): top the Queue up with fitting library songs
+    /// as it nears its end. Persisted as `auto_continue`.
+    pub auto_continue: bool,
     pub volume: f32,
 
     // Loudness normalization (#77) — where the currently applied gain came
@@ -207,6 +210,7 @@ impl Player {
         let mut volume = 1.0f32;
         let mut shuffle_mode = ShuffleMode::Off;
         let mut repeat_mode = RepeatMode::Off;
+        let mut auto_continue = false;
         let mut restored_song: Option<Song> = None;
         let mut restored_playlist_id: Option<i64> = None;
         let mut restored_item_uuid: Option<String> = None;
@@ -228,6 +232,7 @@ impl Player {
             if let Some(s) = app_state_get(&conn, "repeat_mode") {
                 repeat_mode = repeat_mode_from_key(&s);
             }
+            auto_continue = app_state_get(&conn, "auto_continue").as_deref() == Some("true");
 
             // Restore last played song & position
             if let Some(song_id) = app_state_get_parsed::<i64>(&conn, "last_song_id") {
@@ -354,6 +359,7 @@ impl Player {
             shuffle_mode,
             repeat_mode,
             stop_after_current: false,
+            auto_continue,
             volume,
             current_loudness_source: loudness_source,
             current_loudness_gain_db: loudness_gain_db,
@@ -496,8 +502,9 @@ impl Player {
     }
 
     /// Append songs directly to the in-memory `playlist_items` so the player
-    /// can continue playing them seamlessly.  Called by the Auto-Play refill
-    /// path after the backend has already persisted the new items to the DB.
+    /// can continue playing them seamlessly.  Called by Auto Continue (#1235,
+    /// `continue_mix::extend`) after it has already persisted the new items
+    /// to the DB.
     pub fn append_songs_to_playlist_items(&mut self, items: Vec<PlaylistItem>) {
         self.playlist_items.extend(items);
         // Keep the shuffle order in sync (append new indices at the end
@@ -1756,6 +1763,50 @@ impl Player {
             .collect()
     }
 
+    pub fn set_auto_continue(&mut self, enabled: bool) {
+        self.auto_continue = enabled;
+        if let Ok(conn) = self._db.pool.get() {
+            app_state_set(
+                &conn,
+                "auto_continue",
+                if enabled { "true" } else { "false" },
+            );
+        }
+    }
+
+    /// When Auto Continue should top up the playing list right now, returns
+    /// its playlist id and the seed songs: the current song and the ones
+    /// before it in playback order, most recent first, up to
+    /// `continue_mix::SEED_COUNT`. Requires Auto Continue on, Repeat off, and
+    /// at most `continue_mix::TOP_UP_THRESHOLD` songs left (play-next items
+    /// included). The caller still checks the playlist is the Queue — that
+    /// needs the playlists lock, which must not nest inside this one.
+    pub fn auto_continue_seed(&self) -> Option<(i64, Vec<i64>)> {
+        if !self.auto_continue || self.repeat_mode != RepeatMode::Off {
+            return None;
+        }
+        let playlist_id = self.current_playlist_id?;
+        self.current_song.as_ref()?;
+        if self.remaining_playlist_items() + self.queue.len()
+            > crate::continue_mix::TOP_UP_THRESHOLD
+        {
+            return None;
+        }
+        let mut seeds: Vec<i64> = self.current_song.iter().map(|s| s.id).collect();
+        if let Some(pos) = self.current_index {
+            seeds.extend(
+                self.shuffle_order[..pos.min(self.shuffle_order.len())]
+                    .iter()
+                    .rev()
+                    .filter_map(|&real| self.playlist_items.get(real)?.song.as_ref())
+                    .map(|s| s.id)
+                    .filter(|id| Some(*id) != self.current_song.as_ref().map(|s| s.id)),
+            );
+        }
+        seeds.truncate(crate::continue_mix::SEED_COUNT);
+        Some((playlist_id, seeds))
+    }
+
     pub fn set_repeat_mode(&mut self, mode: RepeatMode) {
         self.repeat_mode = mode;
         if let Ok(conn) = self._db.pool.get() {
@@ -1819,6 +1870,7 @@ impl Player {
             loudness_source: self.current_loudness_source,
             loudness_gain_db: self.current_loudness_gain_db,
             remaining_playlist_items: self.remaining_playlist_items(),
+            auto_continue: self.auto_continue,
         }
     }
 
@@ -1981,6 +2033,43 @@ mod tests {
             })
             .unwrap();
         assert_eq!(unavailable, 0);
+    }
+
+    /// Auto Continue (#1235) tops up only when it's on, Repeat is off and
+    /// at most one song is left; its seeds are the current song followed by
+    /// the songs played just before it, most recent first.
+    #[tokio::test]
+    async fn auto_continue_seed_requires_toggle_repeat_off_and_near_end() {
+        let (_temp_dir, db) = setup_test_db();
+        let audio = Arc::new(Mutex::new(AudioEngine::new()));
+        let mut player = Player::new(Arc::new(db), audio);
+
+        let song = |id: i64| crate::models::Song {
+            id,
+            ..Default::default()
+        };
+        player.playlist_items = (1..=5)
+            .map(|id| PlaylistItem::new_song(7, id as i32, song(id)))
+            .collect();
+        player.shuffle_order = (0..5).collect();
+        player.current_playlist_id = Some(7);
+        player.current_index = Some(2);
+        player.current_song = Some(song(3));
+
+        assert_eq!(player.auto_continue_seed(), None, "off by default");
+        player.auto_continue = true;
+        assert_eq!(player.auto_continue_seed(), None, "two songs still left");
+
+        player.current_index = Some(3);
+        player.current_song = Some(song(4));
+        assert_eq!(player.auto_continue_seed(), Some((7, vec![4, 3, 2])));
+
+        player.repeat_mode = RepeatMode::Playlist;
+        assert_eq!(
+            player.auto_continue_seed(),
+            None,
+            "repeat keeps its meaning"
+        );
     }
 
     #[tokio::test]

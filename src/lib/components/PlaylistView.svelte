@@ -32,12 +32,13 @@
     FolderPlusIcon as FolderPlus,
     PushPinIcon as Pin,
     PushPinSlashIcon as PinOff,
-    ShareNetworkIcon as Share
+    ShareNetworkIcon as Share,
+    InfinityIcon as Infinity
   } from "phosphor-svelte";
   import { resolveArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import type { PlaylistItem, Song } from "../types";
-  import { getPlaylistDisplayName } from "../utils/playlist";
+  import { autoContinueRunStarts, getPlaylistDisplayName } from "../utils/playlist";
   import { parseSearchRules, isSmartPlaylistSpec } from "../utils/filterParser";
   import { rememberScroll } from "../utils/scrollMemory";
   import { openInPicard } from "../utils/picard";
@@ -362,6 +363,14 @@
 
   let duplicateCount = $derived(duplicateUuids.length);
 
+  // The divider only means something in playlist order: sorted or filtered,
+  // Auto Continue's songs are no longer a contiguous run.
+  let autoContinueStarts = $derived(
+    isQueue && sortField === "position" && sortAsc && !collectionStore.searchQuery.trim()
+      ? autoContinueRunStarts(playlistsStore.activePlaylistTracks)
+      : new Set<string>()
+  );
+
   function itemToRow(item: PlaylistItem): SongTableRow {
     const trueUnavailable = isItemUnavailable(item);
     const disconnected = !trueUnavailable && collectionStore.isPathOnDisconnectedDrive(item.song?.path);
@@ -377,6 +386,7 @@
       disabledVariant: trueUnavailable ? "strikethrough" : "dim",
       isDuplicate: duplicateUuids.includes(item.uuid),
       underlyingIndex: playlistsStore.activePlaylistTracks.findIndex((t) => t.uuid === item.uuid),
+      dividerBefore: autoContinueStarts.has(item.uuid) ? i18n.t("playlists.autoContinue") : undefined,
     };
   }
 
@@ -724,6 +734,14 @@
               <Shuffle class="w-4 h-4" /> {i18n.t("artistDetail.shuffleAndPlay")}
             </Button>
             {#if isQueue}
+              <Button
+                onclick={() => playerStore.setAutoContinue(!playerStore.autoContinue)}
+                variant={playerStore.autoContinue ? "accent-soft" : "secondary"}
+                pressed={playerStore.autoContinue}
+              >
+                <Infinity class="w-4 h-4" />
+                <span>{i18n.t("playlists.autoContinue")}</span>
+              </Button>
               <IconActionButton
                 onclick={handleSaveQueueAsCustomPlaylist}
                 disabled={playlistsStore.activePlaylistTracks.length === 0}

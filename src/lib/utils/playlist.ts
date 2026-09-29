@@ -194,3 +194,28 @@ export async function addAutoPlaylistToQueue(ap: AutoPlaylistItem, label: string
   }
 }
 
+
+/** True for a Queue row Auto Continue appended (#1235) — the backend tags it `{"autoContinue":true}`. */
+export function isAutoContinueItem(item: PlaylistItem): boolean {
+  if (!item.additional_metadata) return false;
+  try {
+    return JSON.parse(item.additional_metadata)?.autoContinue === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * UUIDs of the rows where a run of Auto Continue songs starts, in playlist
+ * order — the Queue draws its "Auto Continue" divider above each one.
+ */
+export function autoContinueRunStarts(items: PlaylistItem[]): Set<string> {
+  const starts = new Set<string>();
+  let previousWasAuto = false;
+  for (const item of items) {
+    const auto = isAutoContinueItem(item);
+    if (auto && !previousWasAuto) starts.add(item.uuid);
+    previousWasAuto = auto;
+  }
+  return starts;
+}
