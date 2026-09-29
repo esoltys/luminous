@@ -719,7 +719,7 @@
     transition: visibility 0s linear 0.8s;
   }
 
-  /* Without GPU compositing (the AppImage's WebKitGTK — see
+  /* Without GPU compositing (WebKitGTK with GPU rendering disabled — see
      ThemeStore.gpuCompositing), 3D transforms mirror faces and misroute
      pointer events, so the flip becomes a plain opacity cross-fade.
      `perspective` alone (with no rotation left to apply) still forces its

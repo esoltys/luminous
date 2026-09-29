@@ -250,7 +250,7 @@
  * snapshot of the old frame fades into the live new one on the compositor.
  * The @property morph above would instead restyle and repaint the entire
  * document, every glass panel's backdrop-filter included, on every frame.
- * Not used while WebKitGTK's GPU rendering is disabled (the AppImage), where
+ * Not used while WebKitGTK's GPU rendering is disabled (by env var), where
  * View Transitions crash it (ThemeStore.gpuCompositing).
  * `pointer-events: none` lets input reach the live page during the fade in
  * Chromium.

@@ -313,7 +313,7 @@ export const en = {
     updateInstalledAsFooter: "Installed as {format}",
     updateAutoSupportedFooter: "auto-update supported",
     updateNotifyOnlyFooter: "notify only, install manually",
-    updateNotifyOnlyAppImageFooter: "notify only, rebuild AppImage locally",
+    updateNotifyOnlyAppImageFooter: "notify only, download the new AppImage",
     releaseNotesLink: "Release notes",
     updateManagedByStoreDesc: "Updates are installed automatically.",
     updateViewInStore: "View in Microsoft Store",
