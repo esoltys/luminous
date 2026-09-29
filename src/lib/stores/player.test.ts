@@ -312,4 +312,61 @@ describe("PlayerStore", () => {
     if (originalListenImpl) vi.mocked(listen).mockImplementation(originalListenImpl);
   });
 
+  describe("Auto Continue (#1235)", () => {
+    // Plays the last track of `playlistId` with Auto Continue on, then stops
+    // naturally; returns the milestone toasts shown.
+    async function finishWithAutoContinue(playlistId: number, contextName: string) {
+      const originalListenImpl = vi.mocked(listen).getMockImplementation();
+      let playbackStateCallback: ((event: { payload: any }) => Promise<void>) | undefined;
+      vi.mocked(listen).mockImplementation(async (event: string, callback: any) => {
+        if (event === "playback-state") playbackStateCallback = callback;
+        return () => {};
+      });
+      const showSpy = vi.spyOn(toastStore, "show");
+      try {
+        store = new PlayerStore();
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        playlistsStore.playlists = [
+          { id: 1, name: "Queue", dynamic_enabled: false, created: 0, updated: 0, track_count: 1, is_queue: true },
+          { id: 2, name: "Rock Classics", dynamic_enabled: false, created: 0, updated: 0, track_count: 5, is_queue: false },
+        ];
+        const base = { position_nanosec: 0, volume: 1, shuffle_mode: "off", repeat_mode: "off", auto_continue: true };
+        await playbackStateCallback?.({
+          payload: {
+            ...base,
+            state: "playing",
+            current_song: { id: 1, title: "Last Track" },
+            playlist_id: playlistId,
+            playlist_item_uuid: "uuid-last",
+            remaining_playlist_items: 0,
+          },
+        });
+        store.activeContextName = contextName;
+        expect(store.autoContinue).toBe(true);
+        showSpy.mockClear();
+        await playbackStateCallback?.({
+          payload: { ...base, state: "stopped", current_song: null, playlist_id: null, playlist_item_uuid: null, remaining_playlist_items: 0 },
+        });
+        return showSpy.mock.calls.filter(([, variant]) => variant === "milestone");
+      } finally {
+        showSpy.mockRestore();
+        if (originalListenImpl) vi.mocked(listen).mockImplementation(originalListenImpl);
+      }
+    }
+
+    it("suppresses the Queue-done toast when the Queue ends with Auto Continue on", async () => {
+      expect(await finishWithAutoContinue(1, "Queue")).toEqual([]);
+    });
+
+    it("still shows the completion toast for a playlist that isn't the Queue", async () => {
+      const toasts = await finishWithAutoContinue(2, "Rock Classics");
+      expect(toasts).toHaveLength(1);
+      expect(toasts[0][0]).toContain("Rock Classics");
+    });
+
+    it("sends the toggle to the backend", async () => {
+      await store.setAutoContinue(true);
+      expect(invoke).toHaveBeenCalledWith("set_auto_continue", { enabled: true });
+    });
+  });
 });

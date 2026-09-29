@@ -5,6 +5,8 @@ import PlaylistView from "./PlaylistView.svelte";
 import { playlistsStore } from "../stores/playlists.svelte";
 import { collectionStore } from "../stores/collection.svelte";
 import { navigationStore } from "../stores/navigation.svelte";
+import { playerStore } from "../stores/player.svelte";
+import { invoke } from "@tauri-apps/api/core";
 import type { Playlist, PlaylistItem } from "../types";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -143,6 +145,57 @@ describe("PlaylistView.svelte", () => {
     playlistsStore.playlists = [{ ...mockPlaylist, name: "Queue", is_queue: true }];
     const { queryByTitle } = render(PlaylistView);
     expect(queryByTitle("Rename playlist")).toBeNull();
+  });
+
+  describe("Auto Continue (#1235)", () => {
+    const queue = { ...mockPlaylist, name: "Queue", is_queue: true };
+    const AUTO = '{"autoContinue":true}';
+
+    beforeEach(() => {
+      playerStore.autoContinue = false;
+    });
+
+    it("offers the toggle only on the Queue", () => {
+      const { queryByRole, unmount } = render(PlaylistView);
+      expect(queryByRole("button", { name: "Auto Continue" })).toBeNull();
+      unmount();
+
+      playlistsStore.playlists = [queue];
+      const { getByRole } = render(PlaylistView);
+      expect(getByRole("button", { name: "Auto Continue" })).toHaveAttribute("aria-pressed", "false");
+    });
+
+    it("reflects the backend's state and asks it to flip", async () => {
+      playlistsStore.playlists = [queue];
+      playerStore.autoContinue = true;
+      const { getByRole } = render(PlaylistView);
+      const toggle = getByRole("button", { name: "Auto Continue" });
+      expect(toggle).toHaveAttribute("aria-pressed", "true");
+
+      await fireEvent.click(toggle);
+      expect(invoke).toHaveBeenCalledWith("set_auto_continue", { enabled: false });
+    });
+
+    it("draws a divider above the songs Auto Continue added", () => {
+      playlistsStore.playlists = [queue];
+      playlistsStore.activePlaylistTracks = [
+        mockTracks[0],
+        { ...mockTracks[1], additional_metadata: AUTO },
+        { ...mockTracks[2], additional_metadata: AUTO },
+      ];
+      const { getAllByRole } = render(PlaylistView);
+      const dividers = getAllByRole("separator", { name: "Auto Continue" });
+      expect(dividers).toHaveLength(1);
+      expect(dividers[0].nextElementSibling).toHaveTextContent("Track Two");
+    });
+
+    it("drops the divider when the Queue is sorted, since the added songs are no longer a run", async () => {
+      playlistsStore.playlists = [queue];
+      playlistsStore.activePlaylistTracks = [mockTracks[0], { ...mockTracks[1], additional_metadata: AUTO }];
+      const { getByText, queryByRole } = render(PlaylistView);
+      await fireEvent.click(getByText("Title").closest("button")!);
+      expect(queryByRole("separator", { name: "Auto Continue" })).toBeNull();
+    });
   });
 
   it("handles pointer-based drag reordering of playlist items", async () => {

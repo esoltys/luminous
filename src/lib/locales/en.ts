@@ -704,6 +704,7 @@ export const en = {
     newPlaylistModalTitle: "New Playlist",
     newPlaylistPrompt: "Enter a name for the new playlist:",
     saveQueueAsPlaylist: "Save as Custom Playlist",
+    autoContinue: "Auto Continue",
     saveQueuePrompt: "Enter a name for the new custom playlist:",
     contextMenuRemove: "Remove from Playlist",
     contextMenuGoArtist: "Go to Artist",

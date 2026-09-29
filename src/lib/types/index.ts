@@ -261,6 +261,8 @@ export interface PlaybackState {
   loudness_source: LoudnessGainSource;
   loudness_gain_db?: number;
   remaining_playlist_items?: number;
+  /** Auto Continue (#1235): top up the Queue with similar songs near its end. */
+  auto_continue?: boolean;
 }
 
 /** Shared shape for anything rendered as a `LibraryBadge` — a music source's

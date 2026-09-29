@@ -25,6 +25,9 @@ export class PlayerStore {
   /** Tracks remaining after the current one; populated from PlaybackState.
    * Only read for the queue-completion celebration (#182). */
   remainingPlaylistItems = $state<number>(0);
+  /** Auto Continue (#1235): the backend tops up the Queue with similar songs
+   * as it nears its end, so the Queue never "finishes". */
+  autoContinue = $state<boolean>(false);
 
   /** Celebration: queue just finished naturally (#182, Milestone tier). */
   queueJustCompleted = $state<boolean>(false);
@@ -82,10 +85,14 @@ export class PlayerStore {
               : undefined;
           const isQueue = playedPl ? playedPl.is_queue : (!oldContextName || oldContextName === "Queue");
 
-          const toastText = isQueue
-            ? i18n.t("celebrations.queueComplete", {}, "Your Queue is done")
-            : i18n.t("celebrations.contextComplete", { name: oldContextName }, `${oldContextName} complete`);
-          toastStore.show(toastText, "milestone");
+          // With Auto Continue on the Queue has no end to celebrate — it only
+          // stops here if nothing in the library could be added.
+          if (!(isQueue && this.autoContinue)) {
+            const toastText = isQueue
+              ? i18n.t("celebrations.queueComplete", {}, "Your Queue is done")
+              : i18n.t("celebrations.contextComplete", { name: oldContextName }, `${oldContextName} complete`);
+            toastStore.show(toastText, "milestone");
+          }
           setTimeout(() => { this.queueJustCompleted = false; }, 650);
 
           if (isQueue) {
@@ -215,6 +222,7 @@ export class PlayerStore {
     this.loudnessSource = state.loudness_source;
     this.loudnessGainDb = state.loudness_gain_db;
     this.remainingPlaylistItems = state.remaining_playlist_items ?? 0;
+    this.autoContinue = state.auto_continue ?? false;
     if (!state.current_song) {
       this.audioPipeline = null;
     } else if (this.audioPipeline) {
@@ -447,6 +455,11 @@ export class PlayerStore {
   async setRepeatMode(mode: RepeatMode) {
     this.repeatMode = mode;
     await invoke("set_repeat_mode", { mode });
+  }
+
+  /** The backend persists the flag and echoes it back via `playback-state`. */
+  async setAutoContinue(enabled: boolean) {
+    await invoke("set_auto_continue", { enabled });
   }
 
   /** Rate the current track (-1 clears; hearts map to 5.0 via SongRating). */

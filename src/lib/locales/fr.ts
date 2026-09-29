@@ -703,6 +703,7 @@ export const fr = {
     newPlaylistModalTitle: "Nouvelle liste de lecture",
     newPlaylistPrompt: "Entrez un nom pour la nouvelle liste de lecture :",
     saveQueueAsPlaylist: "Enregistrer comme liste personnalisée",
+    autoContinue: "Lecture continue",
     saveQueuePrompt: "Entrez un nom pour la nouvelle liste de lecture personnalisée :",
     contextMenuRemove: "Retirer de la liste",
     contextMenuGoArtist: "Aller à l'artiste",
