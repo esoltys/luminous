@@ -113,7 +113,7 @@ describe("buildShareCardSvg", () => {
       expect(svg).not.toContain("rotate(5deg)");
       expect(svg).toContain("data:image/png;base64,AAA");
       expect(svg).toContain("data:image/png;base64,BBB");
-      expect(svg).toContain("grid-template-columns:2fr 1fr");
+      expect(svg).toMatch(/grid-template-columns:[\d.]+px repeat\(1, /);
     }
   });
 
@@ -289,7 +289,7 @@ describe("buildStatsShareCardSvg", () => {
       expect(svg).not.toContain("rotate(5deg)");
       expect(svg).toContain("data:image/png;base64,AAA");
       expect(svg).toContain("data:image/png;base64,BBB");
-      expect(svg).toContain("grid-template-columns:2fr 1fr");
+      expect(svg).toMatch(/grid-template-columns:[\d.]+px repeat\(1, /);
     }
   });
 
@@ -323,28 +323,28 @@ describe("buildMosaicCoverHtml", () => {
     expect(html).not.toContain("grid-template-columns");
   });
 
-  it("renders 1 full tile + 1 quarter tile for 2 covers (ratio 1.5)", () => {
+  it("renders 1 full tile + 1 quarter tile for 2 covers (1 quarter column)", () => {
     const html = buildMosaicCoverHtml(null, ["data:image/png;base64,1", "data:image/png;base64,2"], 100);
-    expect(html).toContain("grid-template-columns:2fr 1fr");
-    expect(html).toContain("width:150px;height:100px");
+    expect(html).toContain("grid-template-columns:100px repeat(1, 49px)");
+    expect(html).toContain("width:151px;height:100px");
     expect(html).toContain('src="data:image/png;base64,1"');
     expect(html).toContain('src="data:image/png;base64,2"');
   });
 
-  it("renders 1 full tile + 2 stacked quarter tiles for 3 covers (ratio 1.5)", () => {
+  it("renders 1 full tile + 2 stacked quarter tiles for 3 covers (1 quarter column)", () => {
     const html = buildMosaicCoverHtml(
       null,
       ["data:image/png;base64,1", "data:image/png;base64,2", "data:image/png;base64,3"],
       100
     );
-    expect(html).toContain("grid-template-columns:2fr 1fr");
-    expect(html).toContain("width:150px;height:100px");
+    expect(html).toContain("grid-template-columns:100px repeat(1, 49px)");
+    expect(html).toContain("width:151px;height:100px");
     expect(html).toContain('src="data:image/png;base64,1"');
     expect(html).toContain('src="data:image/png;base64,2"');
     expect(html).toContain('src="data:image/png;base64,3"');
   });
 
-  it("renders 1 full tile + 3 quarter tiles for 4 covers (ratio 2.0)", () => {
+  it("renders 1 full tile + 3 quarter tiles for 4 covers (2 quarter columns)", () => {
     const html = buildMosaicCoverHtml(
       null,
       [
@@ -355,12 +355,11 @@ describe("buildMosaicCoverHtml", () => {
       ],
       100
     );
-    expect(html).toContain("grid-template-columns:2fr 2fr");
-    expect(html).toContain("grid-template-columns:1fr 1fr");
-    expect(html).toContain("width:200px;height:100px");
+    expect(html).toContain("grid-template-columns:100px repeat(2, 49px)");
+    expect(html).toContain("width:202px;height:100px");
   });
 
-  it("renders 1 full tile + 4 quarter tiles for 5 covers (ratio 2.0)", () => {
+  it("renders 1 full tile + 4 quarter tiles for 5 covers (2 quarter columns)", () => {
     const html = buildMosaicCoverHtml(
       null,
       [
@@ -372,10 +371,20 @@ describe("buildMosaicCoverHtml", () => {
       ],
       100
     );
-    expect(html).toContain("grid-template-columns:2fr 2fr");
-    expect(html).toContain("grid-template-columns:1fr 1fr");
-    expect(html).toContain("width:200px;height:100px");
+    expect(html).toContain("grid-template-columns:100px repeat(2, 49px)");
+    expect(html).toContain("width:202px;height:100px");
     expect(html).toContain('src="data:image/png;base64,5"');
+  });
+
+  it("gives every tile an explicit square pixel size so non-square art can't stretch its track", () => {
+    const html = buildMosaicCoverHtml(
+      null,
+      ["data:image/png;base64,1", "data:image/png;base64,2", "data:image/png;base64,3", "data:image/png;base64,4"],
+      100
+    );
+    expect(html).not.toMatch(/\dfr\b/);
+    const sizes = [...html.matchAll(/<img [^>]*style="width:([\d.]+)px;height:([\d.]+)px/g)].map((m) => [m[1], m[2]]);
+    expect(sizes).toEqual([["100", "100"], ["49", "49"], ["49", "49"], ["49", "49"]]);
   });
 
   it("caps the mosaic at 5 covers when more are supplied", () => {
