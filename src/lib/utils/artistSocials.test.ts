@@ -10,6 +10,8 @@ import {
   deriveListenbrainzArtistUrl,
   deriveFanartTvUrlFromMbid,
   normalizeWebsitePlatform,
+  isBlacklistedLink,
+  BLOCKED_LINK_DOMAINS,
 } from "./artistSocials";
 
 describe("artistSocials", () => {
@@ -96,7 +98,7 @@ describe("artistSocials", () => {
         "internet_archive"
       );
       expect(
-        normalizeWebsitePlatform("other_databases", "https://web.archive.org/web/2020/https://rateyourmusic.com/x")
+        normalizeWebsitePlatform("other_databases", "https://web.archive.org/web/2020/https://vgmdb.net/x")
       ).toBe("internet_archive");
       expect(
         normalizeWebsitePlatform("custom", "https://web.archive.org/web/2020/https://pitchfork.com/x")
@@ -176,6 +178,75 @@ describe("artistSocials", () => {
 
     it("returns null when the musicbrainz link has no recognizable MBID", () => {
       expect(deriveFanartTvUrl([{ platform: "musicbrainz", handle_or_url: "not-a-valid-mbid" }])).toBeNull();
+    });
+  });
+
+  describe("isBlacklistedLink", () => {
+    it("contains expected blocked domains", () => {
+      expect(BLOCKED_LINK_DOMAINS).toContain("rateyourmusic.com");
+      expect(BLOCKED_LINK_DOMAINS).toContain("x.com");
+      expect(BLOCKED_LINK_DOMAINS).toContain("twitter.com");
+    });
+
+    it("identifies rateyourmusic.com URLs as blacklisted", () => {
+      expect(
+        isBlacklistedLink("https://rateyourmusic.com/release/album/artist/album/", "other_databases")
+      ).toBe(true);
+      expect(
+        isBlacklistedLink("https://www.rateyourmusic.com/artist/name", "website")
+      ).toBe(true);
+      expect(
+        isBlacklistedLink("rateyourmusic.com/release/album/...", "custom")
+      ).toBe(true);
+    });
+
+    it("identifies twitter.com and x.com URLs as blacklisted", () => {
+      expect(
+        isBlacklistedLink("https://twitter.com/someartist", "custom")
+      ).toBe(true);
+      expect(
+        isBlacklistedLink("https://mobile.twitter.com/someartist", "website")
+      ).toBe(true);
+      expect(
+        isBlacklistedLink("https://x.com/someartist", "custom")
+      ).toBe(true);
+      expect(
+        isBlacklistedLink("https://www.x.com/someartist", "website")
+      ).toBe(true);
+    });
+
+    it("identifies 'x' and 'twitter' platforms as blacklisted regardless of handle/URL", () => {
+      expect(isBlacklistedLink("@artist", "x")).toBe(true);
+      expect(isBlacklistedLink("@artist", "twitter")).toBe(true);
+      expect(isBlacklistedLink("artist", "X")).toBe(true);
+    });
+
+    it("does not blacklist legitimate domains and platforms", () => {
+      expect(
+        isBlacklistedLink("https://www.discogs.com/release/123", "discogs")
+      ).toBe(false);
+      expect(
+        isBlacklistedLink("https://www.allmusic.com/album/mw0001", "allmusic")
+      ).toBe(false);
+      expect(
+        isBlacklistedLink("https://vgmdb.net/album/123", "other_databases")
+      ).toBe(false);
+      expect(
+        isBlacklistedLink("https://en.wikipedia.org/wiki/Album", "wikipedia")
+      ).toBe(false);
+      expect(
+        isBlacklistedLink("https://artist-official.com", "website")
+      ).toBe(false);
+      expect(
+        isBlacklistedLink("@artist", "instagram")
+      ).toBe(false);
+    });
+
+    it("handles null, undefined, or empty values gracefully", () => {
+      expect(isBlacklistedLink(null, null)).toBe(false);
+      expect(isBlacklistedLink(undefined, undefined)).toBe(false);
+      expect(isBlacklistedLink("", "")).toBe(false);
+      expect(isBlacklistedLink("   ", "website")).toBe(false);
     });
   });
 });

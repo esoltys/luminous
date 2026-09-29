@@ -210,6 +210,57 @@ export function resolveSocialUrl(platformId: string, input: string): string {
   }
 }
 
+/**
+ * Domains excluded from artist social links and album info links.
+ * Twitter/X is blocked by policy (#1123); Rate Your Music is excluded from
+ * album/release link lists.
+ */
+export const BLOCKED_LINK_DOMAINS = [
+  "x.com",
+  "twitter.com",
+  "rateyourmusic.com",
+] as const;
+
+const BLOCKED_LINK_PLATFORMS = new Set([
+  "x",
+  "twitter",
+]);
+
+/**
+ * Checks whether an external link (URL, handle, or platform) matches the
+ * shared blacklist for artist profiles and album info links.
+ */
+export function isBlacklistedLink(
+  handleOrUrl: string | null | undefined,
+  platform?: string | null
+): boolean {
+  if (platform && BLOCKED_LINK_PLATFORMS.has(platform.trim().toLowerCase())) {
+    return true;
+  }
+  const input = (handleOrUrl || "").trim();
+  if (!input) return false;
+
+  try {
+    const resolved = resolveSocialUrl(platform || "", input);
+    const parsed = new URL(resolved.startsWith("http") ? resolved : `https://${resolved}`);
+    const hostname = parsed.hostname.replace(/^www\./i, "").toLowerCase();
+    for (const domain of BLOCKED_LINK_DOMAINS) {
+      if (hostname === domain || hostname.endsWith(`.${domain}`)) {
+        return true;
+      }
+    }
+  } catch {
+    const lower = input.toLowerCase();
+    for (const domain of BLOCKED_LINK_DOMAINS) {
+      if (lower.includes(domain)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 const KNOWN_FIXED_PLATFORMS = new Set([
   "bandcamp",
   "soundcloud",
@@ -459,8 +510,8 @@ export const ALBUM_LINK_PLATFORMS: SocialPlatformInfo[] = [
   {
     id: "other_databases",
     label: "Other Databases",
-    placeholder: "https://... (e.g. Rate Your Music, VGMdb)",
-    example: "https://rateyourmusic.com/release/album/...",
+    placeholder: "https://... (e.g. VGMdb)",
+    example: "https://vgmdb.net/album/...",
   },
   {
     id: "custom",
