@@ -132,7 +132,10 @@ mod tests {
             serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
         let hook = include_str!("../windows/installer-hooks.nsh");
         let hook_name = format!("!define LUMINOUS_REGISTERED_APP \"{REGISTERED_APP_NAME}\"");
-        assert!(hook.contains(&hook_name), "hook must register {REGISTERED_APP_NAME:?}");
+        assert!(
+            hook.contains(&hook_name),
+            "hook must register {REGISTERED_APP_NAME:?}"
+        );
 
         for assoc in conf["bundle"]["fileAssociations"].as_array().unwrap() {
             let class = assoc["name"].as_str().unwrap();
