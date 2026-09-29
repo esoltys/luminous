@@ -734,14 +734,6 @@
               <Shuffle class="w-4 h-4" /> {i18n.t("artistDetail.shuffleAndPlay")}
             </Button>
             {#if isQueue}
-              <IconActionButton
-                onclick={handleSaveQueueAsCustomPlaylist}
-                disabled={playlistsStore.activePlaylistTracks.length === 0}
-                title={i18n.t("playlists.saveQueueAsPlaylist", {}, "Save as Custom Playlist")}
-                class="shrink-0"
-              >
-                {#snippet icon()}<FolderPlus class="w-4 h-4" />{/snippet}
-              </IconActionButton>
               <Button
                 onclick={() => playerStore.setAutoContinue(!playerStore.autoContinue)}
                 variant={playerStore.autoContinue ? "accent-soft" : "secondary"}
@@ -750,6 +742,14 @@
                 <Infinity class="w-4 h-4" />
                 <span>{i18n.t("playlists.autoContinue")}</span>
               </Button>
+              <IconActionButton
+                onclick={handleSaveQueueAsCustomPlaylist}
+                disabled={playlistsStore.activePlaylistTracks.length === 0}
+                title={i18n.t("playlists.saveQueueAsPlaylist", {}, "Save as Custom Playlist")}
+                class="shrink-0"
+              >
+                {#snippet icon()}<FolderPlus class="w-4 h-4" />{/snippet}
+              </IconActionButton>
             {/if}
             {#if isSmartPlaylist}
               <Button onclick={handleEditSmartPlaylist} variant="secondary" title={i18n.t("playlists.editSmartPlaylistBtn")}>
