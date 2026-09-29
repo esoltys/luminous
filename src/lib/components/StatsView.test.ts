@@ -127,14 +127,10 @@ describe("StatsView.svelte", () => {
 
 describe("bucketListeningClock", () => {
   it("buckets local hours into morning/afternoon/evening/late-night", () => {
-    const morning = new Date();
-    morning.setHours(9, 0, 0, 0);
-    const afternoon = new Date();
-    afternoon.setHours(14, 0, 0, 0);
-    const evening = new Date();
-    evening.setHours(19, 0, 0, 0);
-    const lateNight = new Date();
-    lateNight.setHours(2, 0, 0, 0);
+    const morning = new Date(2026, 5, 15, 9, 0, 0, 0);
+    const afternoon = new Date(2026, 5, 15, 14, 0, 0, 0);
+    const evening = new Date(2026, 5, 15, 19, 0, 0, 0);
+    const lateNight = new Date(2026, 5, 15, 2, 0, 0, 0);
 
     const timestamps = [morning, afternoon, evening, lateNight].map((d) => Math.floor(d.getTime() / 1000));
     const counts = bucketListeningClock(timestamps);
@@ -150,8 +146,7 @@ describe("bucketListeningClock", () => {
   });
 
   it("agrees with getDaypartBucket at the evening/late-night boundary (21:00)", () => {
-    const boundary = new Date();
-    boundary.setHours(21, 0, 0, 0);
+    const boundary = new Date(2026, 5, 15, 21, 0, 0, 0);
     const counts = bucketListeningClock([Math.floor(boundary.getTime() / 1000)]);
     expect(counts.latenight).toBe(1);
     expect(counts.evening).toBe(0);

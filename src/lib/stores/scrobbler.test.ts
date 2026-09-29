@@ -76,7 +76,7 @@ describe("scrobblerStore", () => {
         return Promise.resolve({
           pending_count: 0,
           last_error: null,
-          last_attempt: Date.now(),
+          last_attempt: 1_700_000_000_000,
         });
       }
       return Promise.resolve(null);

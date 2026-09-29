@@ -1480,12 +1480,17 @@ fn seed_tag_hierarchy(conn: &rusqlite::Connection) -> Result<()> {
     }
 
     let mut sort_order = 0i32;
-    for (name, per_root) in child_roots.into_values() {
-        let best_root_key = per_root
-            .into_iter()
-            .max_by_key(|(_, count)| *count)
-            .map(|(root_key, _)| root_key);
-        let Some(group_id) = best_root_key.and_then(|k| group_ids.get(&k)) else {
+    let mut entries: Vec<(String, HashMap<String, i64>)> = child_roots.into_values().collect();
+    entries.sort_by(|a, b| {
+        a.0.to_lowercase()
+            .cmp(&b.0.to_lowercase())
+            .then_with(|| a.0.cmp(&b.0))
+    });
+    for (name, per_root) in entries {
+        let mut sorted_roots: Vec<(String, i64)> = per_root.into_iter().collect();
+        sorted_roots.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+        let best_root_key = sorted_roots.first().map(|(root_key, _)| root_key);
+        let Some(group_id) = best_root_key.and_then(|k| group_ids.get(k)) else {
             continue;
         };
         conn.execute(

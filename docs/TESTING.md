@@ -42,6 +42,13 @@ Each of these describes a test that passed while the bug it named was live.
    having left the app in the right state.
 7. **A test that pins a defect is part of the defect.** If fixing a module breaks tests that
    encoded its wrong behaviour, fix the tests. Don't route around the module in its caller.
+8. **Every date or time a test depends on comes from a mocked clock or a fixed constant, never the real clock.**
+   A test reading the real clock (`Date.now()`, `new Date()`, `chrono::Local::now()`) produces different
+   values across runs, changes behaviour around midnight or bucket transitions, and fails silently across
+   calendar or DST shifts. For example, `SongTable.test.ts` built its fixture with `Date.now() - 15 min`;
+   when CI ran at 00:11 UTC the timestamp fell on the previous calendar day and rendered "Yesterday" instead
+   of "15 minutes ago". Mock the clock (`vi.useFakeTimers` / `vi.setSystemTime`), pass fixed timestamps,
+   or use fixed constants.
 
 ## Re-testing the first-run welcome screen / walkthrough tour
 

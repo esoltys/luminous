@@ -75,7 +75,7 @@ describe("TopNavigation.svelte", () => {
 
   it("shows a discovered artist portrait instead of the generic icon in Recent Searches (#98/#761)", async () => {
     collectionStore.recentSearches = [
-      { id: "1", kind: "artist", title: "Dave Hawkins", subtitle: "Artist", timestamp: Date.now() },
+      { id: "1", kind: "artist", title: "Dave Hawkins", subtitle: "Artist", timestamp: 1_700_000_000_000 },
     ];
     vi.mocked(invoke).mockImplementation(async (cmd: string) => {
       if (cmd === "get_extended_artwork_for_artist") {
@@ -109,7 +109,7 @@ describe("TopNavigation.svelte", () => {
         title: "Old Style Artist",
         subtitle: "Artist",
         artUrl: "luminous-art://album-abc123.jpg",
-        timestamp: Date.now(),
+        timestamp: 1_700_000_000_000,
       },
     ];
     vi.mocked(invoke).mockImplementation(async (cmd: string) => {

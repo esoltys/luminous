@@ -669,13 +669,29 @@ impl TagManager {
         // touches the curated tables, never the raw `songs.genre` text, so
         // the tag is still literally position-0 somewhere and this loop
         // would otherwise recreate its root on the spot.
-        for (key, name) in usage.clone() {
-            if *is_root.get(&key).unwrap_or(&false)
-                && !existing_groups.contains_key(&key)
-                && !existing_assignments.contains(&key)
+        let mut entries: Vec<(String, String)> = usage.into_iter().collect();
+        entries.sort_by(|a, b| {
+            a.1.to_lowercase()
+                .cmp(&b.1.to_lowercase())
+                .then_with(|| a.1.cmp(&b.1))
+        });
+
+        // Auto-create a group for any tag ever used as a main/position-0
+        // value, that doesn't have one yet — UNLESS it already has a curated
+        // assignment from a *previous* reconcile or an explicit demote (see
+        // `demote_group_to_child`). Without this exception, demoting a card
+        // would get silently undone the very next time the hierarchy is read
+        // (`get_tag_hierarchy` reconciles before every read): the demote only
+        // touches the curated tables, never the raw `songs.genre` text, so
+        // the tag is still literally position-0 somewhere and this loop
+        // would otherwise recreate its root on the spot.
+        for (key, name) in &entries {
+            if *is_root.get(key).unwrap_or(&false)
+                && !existing_groups.contains_key(key)
+                && !existing_assignments.contains(key)
             {
-                let id = create_group(&conn, &name, &mut next_group_sort, &mut group_count)?;
-                existing_groups.insert(key, id);
+                let id = create_group(&conn, name, &mut next_group_sort, &mut group_count)?;
+                existing_groups.insert(key.clone(), id);
                 changed = true;
             }
         }
@@ -693,30 +709,29 @@ impl TagManager {
             [],
             |r| r.get(0),
         )?;
-        for (key, name) in usage {
-            if existing_assignments.contains(&key) || existing_groups.contains_key(&key) {
+        for (key, name) in &entries {
+            if existing_assignments.contains(key) || existing_groups.contains_key(key) {
                 continue;
             }
-            let Some(root_counts) = child_root_counts.get(&key) else {
+            let Some(root_counts) = child_root_counts.get(key) else {
                 continue; // never observed as a subgenre — nothing to assign.
             };
-            let best_root = root_counts
-                .iter()
-                .max_by_key(|(_, c)| **c)
-                .map(|(k, _)| k.clone());
+            let mut sorted_roots: Vec<(&String, &i64)> = root_counts.iter().collect();
+            sorted_roots.sort_by(|a, b| b.1.cmp(a.1).then_with(|| a.0.cmp(b.0)));
+            let best_root = sorted_roots.first().map(|(k, _)| (*k).clone());
             let group_id = match best_root.and_then(|rk| existing_groups.get(&rk).copied()) {
                 Some(id) => id,
                 // Shouldn't normally happen (every root got a group above),
                 // but fall back to giving the tag its own group rather than
                 // silently dropping it.
-                None => create_group(&conn, &name, &mut next_group_sort, &mut group_count)?,
+                None => create_group(&conn, name, &mut next_group_sort, &mut group_count)?,
             };
             existing_groups.entry(key.clone()).or_insert(group_id);
             conn.execute(
                 "INSERT OR IGNORE INTO tag_assignments (tag_name, group_id, sort_order) VALUES (?1, ?2, ?3)",
                 params![name, group_id, next_assignment_sort],
             )?;
-            existing_assignments.insert(key);
+            existing_assignments.insert(key.clone());
             next_assignment_sort += 1;
             changed = true;
         }
@@ -1233,7 +1248,14 @@ impl TagManager {
         let mut group_count: i32 =
             conn.query_row("SELECT COUNT(*) FROM artist_tag_groups", [], |r| r.get(0))?;
 
-        for (tag_lower, display_name) in &active_tag_map {
+        let mut sorted_active: Vec<(&String, &String)> = active_tag_map.iter().collect();
+        sorted_active.sort_by(|a, b| {
+            a.1.to_lowercase()
+                .cmp(&b.1.to_lowercase())
+                .then_with(|| a.1.cmp(b.1))
+        });
+
+        for (tag_lower, display_name) in sorted_active {
             if !existing_groups.contains_key(tag_lower)
                 && !existing_assignments.contains_key(tag_lower)
             {
@@ -2461,5 +2483,59 @@ mod tests {
             .find(|g| g.name == "Award-Winning")
             .unwrap();
         assert!(award_group3.children.iter().any(|c| c.name == "Canadian"));
+    }
+
+    #[test]
+    fn test_reconcile_hierarchy_deterministic_sort_order() {
+        let (_dir, db) = test_db();
+        insert_song(
+            &db,
+            "/1.mp3",
+            "Rock; Hard Rock; Classic Rock; Acid Rock; Blues Rock; Punk Rock; Folk Rock; Glam Rock; Indie Rock; Pop Rock",
+        );
+        insert_song(
+            &db,
+            "/2.mp3",
+            "Electronic; Synthpop; Ambient; Techno; Trance; House; Downtempo; Breakbeat",
+        );
+        let manager = TagManager::new(db.clone());
+        manager.reconcile_hierarchy().unwrap();
+
+        let hierarchy = manager.get_tag_hierarchy().unwrap();
+        let group_names: Vec<String> = hierarchy.iter().map(|g| g.name.clone()).collect();
+        assert_eq!(group_names, vec!["Electronic", "Rock"]);
+
+        let rock = hierarchy.iter().find(|g| g.name == "Rock").unwrap();
+        let rock_children: Vec<String> = rock.children.iter().map(|c| c.name.clone()).collect();
+        assert_eq!(
+            rock_children,
+            vec![
+                "Acid Rock",
+                "Blues Rock",
+                "Classic Rock",
+                "Folk Rock",
+                "Glam Rock",
+                "Hard Rock",
+                "Indie Rock",
+                "Pop Rock",
+                "Punk Rock",
+            ]
+        );
+
+        let electronic = hierarchy.iter().find(|g| g.name == "Electronic").unwrap();
+        let electronic_children: Vec<String> =
+            electronic.children.iter().map(|c| c.name.clone()).collect();
+        assert_eq!(
+            electronic_children,
+            vec![
+                "Ambient",
+                "Breakbeat",
+                "Downtempo",
+                "House",
+                "Synthpop",
+                "Techno",
+                "Trance",
+            ]
+        );
     }
 }
