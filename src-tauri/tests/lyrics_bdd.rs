@@ -77,6 +77,31 @@ fn sidecar_lrc_exists(w: &mut LyricsWorld) {
     w.expected_sidecar_lyrics = Some(lyrics.to_string());
 }
 
+#[given("a sidecar .srt subtitle file exists next to the audio file")]
+fn sidecar_srt_exists(w: &mut LyricsWorld) {
+    let sidecar_file = w._temp_dir.path().join("1-02 Big Guns.srt");
+    let srt = "1\r\n00:00:07,610 --> 00:00:11,000\r\n<i>Not gonna play the fool,</i>\r\nbig boss\r\n\r\n2\r\n00:00:11,400 --> 00:00:14,000\r\nNot gonna be the sad wife\r\n";
+    std::fs::write(&sidecar_file, srt.as_bytes()).expect("failed to write sidecar srt");
+    w.expected_sidecar_lyrics = Some(
+        "[00:07.61] Not gonna play the fool, big boss\n[00:11.40] Not gonna be the sad wife"
+            .to_string(),
+    );
+}
+
+#[given("a sidecar .vtt subtitle file exists next to the audio file")]
+fn sidecar_vtt_exists(w: &mut LyricsWorld) {
+    let sidecar_file = w
+        ._temp_dir
+        .path()
+        .join("Dorothy - Gifts From the Holy Ghost - 02 Big Guns.vtt");
+    let vtt = "WEBVTT\n\nNOTE exported by a karaoke tool\n\nline-1\n00:07.610 --> 00:11.000 align:start\n<v Dorothy>Not gonna play the fool, big boss</v>\n\n00:11.400 --> 00:14.000\nNot gonna be the sad wife\n";
+    std::fs::write(&sidecar_file, vtt.as_bytes()).expect("failed to write sidecar vtt");
+    w.expected_sidecar_lyrics = Some(
+        "[00:07.61] Not gonna play the fool, big boss\n[00:11.40] Not gonna be the sad wife"
+            .to_string(),
+    );
+}
+
 #[given("the database already has cached lyrics for this song")]
 fn db_has_cached_lyrics(w: &mut LyricsWorld) {
     let lyrics = "[00:12.00] Look at the stars\n[00:18.00] Look how they shine for you";

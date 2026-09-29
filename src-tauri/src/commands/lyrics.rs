@@ -39,7 +39,7 @@ pub async fn save_lyrics(
         if let Some(ref path_str) = path_str {
             let audio_path = std::path::Path::new(path_str);
             if let Some(lrc_path) =
-                crate::lyrics::find_sidecar_lrc(audio_path, title.as_deref(), track)
+                crate::lyrics::sidecar_lyrics_save_path(audio_path, title.as_deref(), track)
             {
                 let clean_lyrics = if let Some(rest) = lyrics.strip_prefix("[synced:false]\n") {
                     rest

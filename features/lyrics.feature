@@ -15,6 +15,18 @@ Feature: Lyrics View
     When I open the lyrics panel
     Then the system should display the sidecar lyrics immediately without making a network request
 
+  Scenario: Loading sidecar .srt subtitles as synced lyrics
+    Given a song is playing with a local audio file
+    And a sidecar .srt subtitle file exists next to the audio file
+    When I open the lyrics panel
+    Then the system should display the sidecar lyrics immediately without making a network request
+
+  Scenario: Loading sidecar .vtt subtitles as synced lyrics
+    Given a song is playing with a local audio file
+    And a sidecar .vtt subtitle file exists next to the audio file
+    When I open the lyrics panel
+    Then the system should display the sidecar lyrics immediately without making a network request
+
   Scenario: Sidecar .lrc takes priority over embedded lyrics and online fetch
     Given a song is playing with a local audio file
     And the database already has cached lyrics for this song
