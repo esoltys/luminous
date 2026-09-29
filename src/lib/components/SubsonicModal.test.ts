@@ -239,4 +239,40 @@ describe("SubsonicModal.svelte", () => {
     await fireEvent.input(getByPlaceholderText("API key"), { target: { value: "key-123" } });
     expect(getByRole("button", { name: "Save Changes" })).toBeEnabled();
   });
+
+  it("defaults auto-sync to on for a new server and sends autoSyncEnabled: true", async () => {
+    mockCommands({ save_subsonic_server: () => existing });
+    const onSaved = vi.fn();
+    const { getByPlaceholderText, getByRole } = render(SubsonicModal, {
+      props: { server: null, onClose: vi.fn(), onSaved },
+    });
+
+    const toggle = getByRole("switch", { name: "Auto-Sync" });
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+
+    await fillNewServer(getByPlaceholderText);
+    await fireEvent.click(getByRole("button", { name: "Add Server" }));
+
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+    const [, args] = callsOf("save_subsonic_server")[0] as [string, { input: Record<string, unknown> }];
+    expect(args.input).toMatchObject({ autoSyncEnabled: true });
+  });
+
+  it("preserves auto-sync disabled state when editing an existing server with auto-sync off", async () => {
+    mockCommands({ save_subsonic_server: () => existing });
+    const onSaved = vi.fn();
+    const { getByRole } = render(SubsonicModal, {
+      props: { server: existing, onClose: vi.fn(), onSaved },
+    });
+
+    const toggle = getByRole("switch", { name: "Auto-Sync" });
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+
+    await fireEvent.click(getByRole("button", { name: "Save Changes" }));
+
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+    const [, args] = callsOf("save_subsonic_server")[0] as [string, { input: Record<string, unknown> }];
+    expect(args.input).toMatchObject({ autoSyncEnabled: false });
+  });
 });
+
