@@ -30,6 +30,7 @@ pub mod dr_parser;
 pub mod equalizer;
 pub mod fade;
 pub mod filter_parser;
+pub mod hierarchy_sidecar;
 pub mod install_format;
 pub mod loudness;
 pub mod lyrics;
@@ -100,6 +101,8 @@ pub struct AppState {
     pub scrobbler: Arc<scrobbler::ScrobblerManager>,
     /// Per-server periodic auto-sync timers for remote servers (WebDAV #1082, OpenSubsonic #1162).
     pub remote_auto_sync: Arc<remote_scheduler::AutoSyncScheduler>,
+    /// Portable Genres/Artist Tags hierarchy in the default library (#1312).
+    pub hierarchy_sidecar: Arc<hierarchy_sidecar::HierarchySidecar>,
 }
 
 /// Suppresses stock webview browser chrome — reload/find/print keybindings and
@@ -1077,6 +1080,7 @@ pub fn run() {
                 minimize_to_tray,
                 scrobbler,
                 remote_auto_sync: Arc::new(remote_scheduler::AutoSyncScheduler::new()),
+                hierarchy_sidecar: Arc::new(hierarchy_sidecar::HierarchySidecar::new()),
             };
 
             crate::collection::start_watcher(app.handle().clone(), &state);
@@ -1161,6 +1165,17 @@ pub fn run() {
                         handle.clone(),
                     ));
                 });
+            }
+
+            // Load the shared hierarchy sidecar (#1312) off the main thread —
+            // the default library may be a slow network share. Registered
+            // after the `library-changed` reconcile listener so a reconcile
+            // it triggers is written back through the attached sidecar.
+            {
+                let handle = app.handle().clone();
+                let _ = std::thread::Builder::new()
+                    .name("luminous-hierarchy-init".into())
+                    .spawn(move || hierarchy_sidecar::init(&handle));
             }
 
             // Startup is done: everything above (DB/migrations, playlist
@@ -1336,6 +1351,8 @@ pub fn run() {
             commands::tags::create_artist_tag_group,
             commands::tags::merge_artist_tags,
             commands::tags::delete_artist_tags,
+            commands::tags::get_default_library,
+            commands::tags::set_default_library,
             // Theme commands (#165)
             commands::theme::import_theme,
             commands::theme::export_theme,

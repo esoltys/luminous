@@ -89,7 +89,7 @@ pub async fn get_songs_by_curated_tag(
 
 #[tauri::command]
 pub async fn get_tag_hierarchy(state: State<'_, AppState>) -> Result<Vec<TagGroup>, String> {
-    crate::tags::with_tag_manager(state.db.clone(), |manager| {
+    let result = crate::tags::with_tag_manager(state.db.clone(), |manager| {
         // Self-heals on every read rather than relying solely on the
         // `library-changed` listener having already caught up — cheap (a no-op
         // pass over already-in-sync data) and guarantees the Genres tab never
@@ -101,7 +101,8 @@ pub async fn get_tag_hierarchy(state: State<'_, AppState>) -> Result<Vec<TagGrou
         manager.get_tag_hierarchy()
     })
     .await
-    .map_err(|e| e.to_string())
+    .map_err(|e| e.to_string());
+    persisted(&state, result).await
 }
 
 #[tauri::command]
@@ -110,11 +111,12 @@ pub async fn set_tag_group_color(
     name: String,
     color_index: i32,
 ) -> Result<(), String> {
-    crate::tags::with_tag_manager(state.db.clone(), move |manager| {
+    let result = crate::tags::with_tag_manager(state.db.clone(), move |manager| {
         manager.set_group_color(&name, color_index)
     })
     .await
-    .map_err(|e| e.to_string())
+    .map_err(|e| e.to_string());
+    persisted(&state, result).await
 }
 
 #[tauri::command]
@@ -123,20 +125,22 @@ pub async fn reparent_tag(
     tag_name: String,
     new_group_name: String,
 ) -> Result<(), String> {
-    crate::tags::with_tag_manager(state.db.clone(), move |manager| {
+    let result = crate::tags::with_tag_manager(state.db.clone(), move |manager| {
         manager.reparent_tag(&tag_name, &new_group_name)
     })
     .await
-    .map_err(|e| e.to_string())
+    .map_err(|e| e.to_string());
+    persisted(&state, result).await
 }
 
 #[tauri::command]
 pub async fn promote_tag(state: State<'_, AppState>, tag_name: String) -> Result<(), String> {
-    crate::tags::with_tag_manager(state.db.clone(), move |manager| {
+    let result = crate::tags::with_tag_manager(state.db.clone(), move |manager| {
         manager.promote_tag(&tag_name)
     })
     .await
-    .map_err(|e| e.to_string())
+    .map_err(|e| e.to_string());
+    persisted(&state, result).await
 }
 
 #[tauri::command]
@@ -145,11 +149,12 @@ pub async fn demote_group_to_child(
     tag_name: String,
     new_group_name: String,
 ) -> Result<(), String> {
-    crate::tags::with_tag_manager(state.db.clone(), move |manager| {
+    let result = crate::tags::with_tag_manager(state.db.clone(), move |manager| {
         manager.demote_group_to_child(&tag_name, &new_group_name)
     })
     .await
-    .map_err(|e| e.to_string())
+    .map_err(|e| e.to_string());
+    persisted(&state, result).await
 }
 
 #[tauri::command]
@@ -158,11 +163,44 @@ pub async fn reorder_tag_in_group(
     tag_name: String,
     new_index: i32,
 ) -> Result<(), String> {
-    crate::tags::with_tag_manager(state.db.clone(), move |manager| {
+    let result = crate::tags::with_tag_manager(state.db.clone(), move |manager| {
         manager.reorder_tag_in_group(&tag_name, new_index)
     })
     .await
-    .map_err(|e| e.to_string())
+    .map_err(|e| e.to_string());
+    persisted(&state, result).await
+}
+
+/// Mirrors a successful hierarchy mutation into the default library's
+/// sidecar (#1312) — a no-op when none is attached or nothing changed, so
+/// reads that reconcile can pass through here too.
+async fn persisted<T>(state: &AppState, result: Result<T, String>) -> Result<T, String> {
+    if result.is_ok() {
+        crate::hierarchy_sidecar::write_through(state).await;
+    }
+    result
+}
+
+#[tauri::command]
+pub async fn get_default_library(
+    app: AppHandle,
+) -> Result<crate::hierarchy_sidecar::DefaultLibraryStatus, String> {
+    tokio::task::spawn_blocking(move || crate::hierarchy_sidecar::status(&app))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+}
+
+/// Designates a watched folder as the default library (adopting its
+/// `luminous-hierarchy.json`, or writing the local hierarchy there), or
+/// detaches with `None`. Fails without changing anything if the folder isn't
+/// watched or available, or its sidecar doesn't parse.
+#[tauri::command]
+pub async fn set_default_library(app: AppHandle, path: Option<String>) -> Result<(), String> {
+    tokio::task::spawn_blocking(move || crate::hierarchy_sidecar::set_default_library(&app, path))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| format!("{e:#}"))
 }
 
 // ---------------------------------------------------------------------------
@@ -172,9 +210,10 @@ pub async fn reorder_tag_in_group(
 #[tauri::command]
 pub async fn get_artist_tag_hierarchy(state: State<'_, AppState>) -> Result<Vec<TagGroup>, String> {
     let manager = TagManager::new(state.db.clone());
-    manager
+    let result = manager
         .get_artist_tag_hierarchy()
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string());
+    persisted(&state, result).await
 }
 
 #[tauri::command]
@@ -184,9 +223,10 @@ pub async fn set_artist_group_color(
     color_index: i32,
 ) -> Result<(), String> {
     let manager = TagManager::new(state.db.clone());
-    manager
+    let result = manager
         .set_artist_group_color(&name, color_index)
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string());
+    persisted(&state, result).await
 }
 
 #[tauri::command]
@@ -196,9 +236,10 @@ pub async fn reparent_artist_tag(
     new_group_name: String,
 ) -> Result<(), String> {
     let manager = TagManager::new(state.db.clone());
-    manager
+    let result = manager
         .reparent_artist_tag(&tag_name, &new_group_name)
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string());
+    persisted(&state, result).await
 }
 
 #[tauri::command]
@@ -207,9 +248,10 @@ pub async fn promote_artist_tag(
     tag_name: String,
 ) -> Result<(), String> {
     let manager = TagManager::new(state.db.clone());
-    manager
+    let result = manager
         .promote_artist_tag(&tag_name)
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string());
+    persisted(&state, result).await
 }
 
 #[tauri::command]
@@ -219,9 +261,10 @@ pub async fn demote_artist_group_to_child(
     new_group_name: String,
 ) -> Result<(), String> {
     let manager = TagManager::new(state.db.clone());
-    manager
+    let result = manager
         .demote_artist_group_to_child(&tag_name, &new_group_name)
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string());
+    persisted(&state, result).await
 }
 
 #[tauri::command]
@@ -231,9 +274,10 @@ pub async fn reorder_artist_tag_in_group(
     new_index: i32,
 ) -> Result<(), String> {
     let manager = TagManager::new(state.db.clone());
-    manager
+    let result = manager
         .reorder_artist_tag_in_group(&tag_name, new_index)
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string());
+    persisted(&state, result).await
 }
 
 #[tauri::command]
@@ -242,9 +286,10 @@ pub async fn create_artist_tag_group(
     name: String,
 ) -> Result<(), String> {
     let manager = TagManager::new(state.db.clone());
-    manager
+    let result = manager
         .create_artist_tag_group(&name)
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string());
+    persisted(&state, result).await
 }
 
 #[tauri::command]
@@ -254,9 +299,10 @@ pub async fn merge_artist_tags(
     into: String,
 ) -> Result<usize, String> {
     let manager = TagManager::new(state.db.clone());
-    manager
+    let result = manager
         .merge_artist_tags(&from, &into)
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string());
+    persisted(&state, result).await
 }
 
 #[tauri::command]
@@ -265,9 +311,10 @@ pub async fn delete_artist_tags(
     names: Vec<String>,
 ) -> Result<usize, String> {
     let manager = TagManager::new(state.db.clone());
-    manager
+    let result = manager
         .delete_artist_tags(&names)
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string());
+    persisted(&state, result).await
 }
 
 /// Every field [`crate::tageditor::write_tags`] needs, read fresh per song so
@@ -495,6 +542,7 @@ pub async fn merge_tags(
     .await
     .map_err(|e| e.to_string())?;
 
+    crate::hierarchy_sidecar::write_through(&state).await;
     let _ = app.emit("library-changed", ());
 
     Ok(updated_count)
@@ -543,6 +591,7 @@ pub async fn delete_tags(
     .await
     .map_err(|e| e.to_string())?;
 
+    crate::hierarchy_sidecar::write_through(&state).await;
     let _ = app.emit("library-changed", ());
 
     Ok(updated_count)

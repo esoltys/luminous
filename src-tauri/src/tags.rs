@@ -571,9 +571,13 @@ impl TagManager {
             }
         }
 
-        // Evict rows for tags no longer used anywhere in the library.
+        // Evict rows for tags no longer used anywhere in the library — unless
+        // a hierarchy sidecar is attached: a half-scanned library or an
+        // instance that sees only part of it must not erase curation shared
+        // through the file. The UI hides zero-song nodes instead (#1312).
+        let evict = !crate::hierarchy_sidecar::is_attached(&conn);
         for key in existing_groups.keys().cloned().collect::<Vec<_>>() {
-            if !usage.contains_key(&key) {
+            if evict && !usage.contains_key(&key) {
                 conn.execute(
                     "DELETE FROM tag_groups WHERE name = ?1 COLLATE NOCASE",
                     params![key],
@@ -583,7 +587,7 @@ impl TagManager {
             }
         }
         for key in existing_assignments.iter().cloned().collect::<Vec<_>>() {
-            if !usage.contains_key(&key) {
+            if evict && !usage.contains_key(&key) {
                 conn.execute(
                     "DELETE FROM tag_assignments WHERE tag_name = ?1 COLLATE NOCASE",
                     params![key],
@@ -1135,9 +1139,11 @@ impl TagManager {
             }
         }
 
-        // Evict child assignments for tags no longer used by any artist
+        // Evict child assignments for tags no longer used by any artist —
+        // never while a hierarchy sidecar is attached (see reconcile_hierarchy).
+        let evict = !crate::hierarchy_sidecar::is_attached(&conn);
         for key in existing_assignments.keys().cloned().collect::<Vec<_>>() {
-            if !active_tag_map.contains_key(&key) {
+            if evict && !active_tag_map.contains_key(&key) {
                 conn.execute(
                     "DELETE FROM artist_tag_assignments WHERE tag_name = ?1 COLLATE NOCASE",
                     params![key],
@@ -1154,7 +1160,7 @@ impl TagManager {
                 params![group_id],
                 |r| r.get(0),
             )?;
-            if is_custom == 0 && !has_children && !active_tag_map.contains_key(&key) {
+            if evict && is_custom == 0 && !has_children && !active_tag_map.contains_key(&key) {
                 conn.execute(
                     "DELETE FROM artist_tag_groups WHERE id = ?1",
                     params![group_id],
@@ -1434,6 +1440,7 @@ pub async fn reconcile_hierarchy_and_notify(app: tauri::AppHandle) {
     let db = app.state::<crate::AppState>().db.clone();
     match with_tag_manager(db, |manager| manager.reconcile_hierarchy()).await {
         Ok(true) => {
+            crate::hierarchy_sidecar::write_through(&app.state::<crate::AppState>()).await;
             let _ = app.emit("tags-changed", ());
         }
         Ok(false) => {}
@@ -1448,6 +1455,7 @@ pub async fn reconcile_artist_hierarchy_and_notify(app: tauri::AppHandle) {
     let db = app.state::<crate::AppState>().db.clone();
     match with_tag_manager(db, |manager| manager.reconcile_artist_hierarchy()).await {
         Ok(true) => {
+            crate::hierarchy_sidecar::write_through(&app.state::<crate::AppState>()).await;
             let _ = app.emit("artist-tags-changed", ());
         }
         Ok(false) => {}
