@@ -1,4 +1,10 @@
-export const fr = {
+import type { en } from "./en";
+
+type DeepStringRecord<T> = {
+  [K in keyof T]: T[K] extends object ? DeepStringRecord<T[K]> : string;
+};
+
+export const fr: DeepStringRecord<typeof en> = {
   sidebar: {
     home: "Accueil",
     collection: "Collection",
@@ -391,6 +397,7 @@ export const fr = {
     bordersLabel: "Bordures",
     saveChanges: "Enregistrer les modifications",
     saveCustom: "Enregistrer le thème personnalisé",
+    applyTheme: "Appliquer le thème",
     livePreviewInfo: "Les couleurs s'appliquent instantanément au fur et à mesure que vous les choisissez !",
     selectMusicDirectory: "Sélectionner le répertoire de musique",
     confirmRemoveFolder: "Arrêter de surveiller le dossier : {path} ?\nLes chansons de ce dossier ne seront pas supprimées de vos listes de lecture mais seront marquées comme indisponibles.",
@@ -867,6 +874,7 @@ export const fr = {
     releasedLabel: "Sortie",
     genreLabel: "Genre",
     composerLabel: "Compositeur",
+    restoreInterface: "Restaurer l'interface complète",
     formatLabel: "Format",
     miniplayer: "Mini-lecteur Picture-in-Picture",
     loudnessLabel: "Volume",
@@ -935,7 +943,7 @@ export const fr = {
   },
 
   songTags: {
-    genresTabDescription: "Parcourir les chansons par tags que vous avez ajoutés",
+    genresTabDescription: "Affichage de {count} genres",
     viewGenre: "Genre",
     viewTags: "Tags",
     emptyTitle: "Aucun tag pour l'instant",
