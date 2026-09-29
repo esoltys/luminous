@@ -48,6 +48,7 @@ export interface ShareCardOptions {
   theme: ShareCardTheme;
   seed: string;
   backgroundColors?: string[];
+  primaryColor?: string;
   coverDataUri: string | null;
   /** Up to 5 cover data URIs, front-to-back, rendered as a CoverMosaic
    * grid on horizontal cards (or a fanned stack of up to 4 on portrait cards)
@@ -206,6 +207,7 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
   const textSecondary = isDark ? "rgba(245,246,248,0.78)" : "rgba(11,12,15,0.72)";
   const scrimFrom = isDark ? "rgba(0,0,0,0)" : "rgba(255,255,255,0)";
   const scrimTo = isDark ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.55)";
+  const baseBg = isDark ? (options.primaryColor ?? "#0a0b0e") : "#ffffff";
   const cardPad = Math.round(width * 0.06);
   // Portrait/square frames stack cover-then-text centered in the middle of
   // the canvas (a bigger cover, since there's little horizontal room);
@@ -247,8 +249,6 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
   );
 
   const background = generateEllipseGradientSvg({
-    width,
-    height,
     colors: options.backgroundColors,
     seed: options.seed,
   });
@@ -337,7 +337,8 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
 
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">` +
-      `<g>${backgroundInner}</g>` +
+      `<rect x="0" y="0" width="${width}" height="${height}" fill="${baseBg}"/>` +
+      `<svg x="0" y="0" width="${width}" height="${height}" viewBox="0 0 600 600" preserveAspectRatio="xMidYMid slice" opacity="0.30">${backgroundInner}</svg>` +
       `<defs>${fontFace}<linearGradient id="scrim" x1="0" y1="0" x2="0" y2="1">` +
         `<stop offset="0%" stop-color="${scrimFrom}"/>` +
         `<stop offset="100%" stop-color="${scrimTo}"/>` +
@@ -376,6 +377,7 @@ export interface StatsShareCardOptions {
   theme: ShareCardTheme;
   seed: string;
   backgroundColors?: string[];
+  primaryColor?: string;
   rangeLabel: string;
   totalMinutesLabel: string;
   /** Top Artists/Albums/Songs/Genres, in that order, laid out as a 2x2 grid. */
@@ -402,6 +404,7 @@ export function buildStatsShareCardSvg(options: StatsShareCardOptions): { svg: s
   const cardBg = isDark ? "rgba(0,0,0,0.28)" : "rgba(255,255,255,0.4)";
   const scrimFrom = isDark ? "rgba(0,0,0,0)" : "rgba(255,255,255,0)";
   const scrimTo = isDark ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.55)";
+  const baseBg = isDark ? (options.primaryColor ?? "#0a0b0e") : "#ffffff";
   // Unlike the entity card (which only ever stacks a cover next to a short
   // text block), this card's content — title, a 2x2 grid of up to 5 rows
   // each, and a chart — is tall enough that sizing every metric off `width`
@@ -415,7 +418,7 @@ export function buildStatsShareCardSvg(options: StatsShareCardOptions): { svg: s
   const scaleBasis = Math.min(width, height);
   const pad = Math.round(scaleBasis * 0.055);
 
-  const background = generateEllipseGradientSvg({ width, height, colors: options.backgroundColors, seed: options.seed });
+  const background = generateEllipseGradientSvg({ colors: options.backgroundColors, seed: options.seed });
   const backgroundInner = background.replace(/^<svg[^>]*>/, "").replace(/<\/svg>$/, "");
 
   const titleSize = Math.round(scaleBasis * 0.05);
@@ -506,7 +509,8 @@ export function buildStatsShareCardSvg(options: StatsShareCardOptions): { svg: s
 
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">` +
-      `<g>${backgroundInner}</g>` +
+      `<rect x="0" y="0" width="${width}" height="${height}" fill="${baseBg}"/>` +
+      `<svg x="0" y="0" width="${width}" height="${height}" viewBox="0 0 600 600" preserveAspectRatio="xMidYMid slice" opacity="0.30">${backgroundInner}</svg>` +
       `<defs>${fontFace}<linearGradient id="scrim" x1="0" y1="0" x2="0" y2="1">` +
         `<stop offset="0%" stop-color="${scrimFrom}"/>` +
         `<stop offset="100%" stop-color="${scrimTo}"/>` +
@@ -530,6 +534,7 @@ async function loadImage(src: string): Promise<HTMLImageElement | null> {
 
 /** Converts an arbitrary image URL (including Tauri asset URLs) to a data URI so it can be safely embedded in an SVG foreignObject and rasterized without tainting the canvas. */
 export async function toDataUri(url: string): Promise<string | null> {
+  if (url.startsWith("data:")) return url;
   try {
     const response = await fetch(url);
     const blob = await response.blob();

@@ -204,6 +204,31 @@ describe("buildShareCardSvg", () => {
     const long = buildShareCardSvg({ ...withCover, aspectRatio: "1:1", tracks: longList, includeTrackList: true });
     expect(coverPixelWidth(long.svg)).toBeLessThan(coverPixelWidth(short.svg));
   });
+
+  it("renders an ambient layered-ellipse gradient at 30% opacity over a base surface matching immersive view", () => {
+    const { svg } = buildShareCardSvg({
+      ...baseOptions,
+      aspectRatio: "1:1",
+      primaryColor: "#1a241b",
+      backgroundColors: ["#4a6741", "#2d4427", "#8fa785", "#5c7155"],
+    });
+    expect(svg).toContain('fill="#1a241b"');
+    expect(svg).toContain('opacity="0.30"');
+    expect(svg).toContain('viewBox="0 0 600 600"');
+    expect(svg).toContain('preserveAspectRatio="xMidYMid slice"');
+  });
+
+  it("uses default dark surface when primaryColor is omitted in dark theme", () => {
+    const { svg } = buildShareCardSvg({ ...baseOptions, aspectRatio: "1:1", theme: "dark" });
+    expect(svg).toContain('fill="#0a0b0e"');
+    expect(svg).toContain('opacity="0.30"');
+  });
+
+  it("uses white surface for light theme cards", () => {
+    const { svg } = buildShareCardSvg({ ...baseOptions, aspectRatio: "1:1", theme: "light" });
+    expect(svg).toContain('fill="#ffffff"');
+    expect(svg).toContain('opacity="0.30"');
+  });
 });
 
 describe("buildStatsShareCardSvg", () => {
@@ -351,6 +376,18 @@ describe("buildStatsShareCardSvg", () => {
     expect(svg).toContain("data:image/png;base64,1");
     expect(svg).toContain("data:image/png;base64,5");
     expect(svg).toMatch(/grid-template-columns:[\d.]+px repeat\(2, /);
+  });
+
+  it("renders an ambient layered-ellipse gradient at 30% opacity over a base surface on stats cards", () => {
+    const { svg } = buildStatsShareCardSvg({
+      ...baseStatsOptions,
+      aspectRatio: "1:1",
+      primaryColor: "#20252b",
+    });
+    expect(svg).toContain('fill="#20252b"');
+    expect(svg).toContain('opacity="0.30"');
+    expect(svg).toContain('viewBox="0 0 600 600"');
+    expect(svg).toContain('preserveAspectRatio="xMidYMid slice"');
   });
 });
 
