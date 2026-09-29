@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Component } from "svelte";
   import type { BadgeSource } from "../types";
+  import { getDirectoryDisplayName } from "../utils/pathUtils";
   import {
     FolderIcon,
     HardDriveIcon,
@@ -46,14 +47,7 @@
     directory.icon && ICONS[directory.icon] ? ICONS[directory.icon] : FolderIcon
   );
 
-  let displayName = $derived.by(() => {
-    if (directory.nickname && directory.nickname.trim() !== "") {
-      return directory.nickname.trim();
-    }
-    const p = directory.path.replace(/\\/g, "/").replace(/\/+$/, "");
-    const parts = p.split("/");
-    return parts[parts.length - 1] || directory.path;
-  });
+  let displayName = $derived(getDirectoryDisplayName(directory));
 
   let isUnavailable = $derived(directory.is_available === false);
   let customColor = $derived(directory.color?.trim() || null);

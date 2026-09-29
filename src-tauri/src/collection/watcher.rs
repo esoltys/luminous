@@ -430,7 +430,7 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                 // Check if real-time folder watching is disabled in app settings
                 let realtime_enabled = if let Ok(conn) = db_for_thread.pool.get() {
                     conn.query_row(
-                        "SELECT value FROM app_settings WHERE key = 'watch_folders_realtime'",
+                        "SELECT value FROM app_state WHERE key = 'watch_folders_realtime'",
                         [],
                         |row| row.get::<_, String>(0),
                     )

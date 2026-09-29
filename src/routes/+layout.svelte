@@ -21,6 +21,7 @@
   import { i18n } from '../lib/stores/i18n.svelte';
   import { prefs } from '../lib/stores/prefs.svelte';
   import { tagsStore } from '../lib/stores/tags.svelte';
+  import { hierarchySidecarStore } from '../lib/stores/hierarchySidecar.svelte';
   import { updaterStore } from '../lib/stores/updater.svelte';
   import { picardStore } from '../lib/stores/picard.svelte';
   import { scrobblerStore } from '../lib/stores/scrobbler.svelte';
@@ -145,6 +146,7 @@
     welcomeStore.init();
     walkthroughStore.init();
     tagsStore.load().catch((err) => console.error('Failed to load tags:', err));
+    hierarchySidecarStore.init().catch((err) => console.error('Failed to load the default library:', err));
     updaterStore.init();
     picardStore.init();
     scrobblerStore.init();

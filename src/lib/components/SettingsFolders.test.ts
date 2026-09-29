@@ -67,6 +67,12 @@ vi.mock("@tauri-apps/api/core", () => ({
         total_duration_ns: 0,
       });
     }
+    if (cmd === "get_default_library") {
+      return Promise.resolve({ path: null, error: null });
+    }
+    if (cmd === "set_default_library") {
+      return Promise.reject("broken");
+    }
     if (cmd === "get_all_app_settings") {
       return Promise.resolve({});
     }
@@ -170,5 +176,30 @@ describe("SettingsFolders.svelte - Disk Size breakdown", () => {
     expect(card).toHaveAccessibleDescription(
       "Music files: 2.00 GB\nAlbum art: 25.0 MB\nArtist images: 64.0 MB"
     );
+  });
+});
+
+describe("SettingsFolders.svelte - Default library", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("offers the watched folders and shows why a link was refused, keeping the picker on None", async () => {
+    const { collectionStore } = await import("../stores/collection.svelte");
+    collectionStore.directories = [
+      { id: 1, path: "D:\Music", nickname: "", subdirs: true } as never,
+    ];
+    const { findByLabelText, findByRole } = render(SettingsFolders);
+
+    const select = (await findByLabelText("Default Library")) as HTMLSelectElement;
+    expect([...select.options].map((o) => o.text)).toEqual(["None", "D:\Music"]);
+
+    await fireEvent.change(select, { target: { value: "D:\Music" } });
+
+    expect(invoke).toHaveBeenCalledWith("set_default_library", { path: "D:\Music" });
+    expect(await findByRole("alert")).toHaveTextContent(
+      "The genre hierarchy file in D:\Music is broken."
+    );
+    expect(select.value).toBe("");
   });
 });
