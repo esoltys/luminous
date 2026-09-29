@@ -99,7 +99,7 @@ Ensure the required build tools, GTK, WebKit, ALSA, and SSL development headers 
 *   **Ubuntu/Debian**:
     ```bash
     sudo apt update
-    sudo apt install -y build-essential curl wget file libssl-dev libgtk-3-dev libwebkit2gtk-4.1-dev libsoup-3.0-dev libayatanaloop-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev pkg-config
+    sudo apt install -y build-essential curl wget file libssl-dev libgtk-3-dev libwebkit2gtk-4.1-dev libsoup-3.0-dev libayatanaloop-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev pkg-config cmake
     ```
 *   **Arch/CachyOS**:
     ```bash
