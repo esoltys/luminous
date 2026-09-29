@@ -6,10 +6,13 @@
 
 use super::{PlaylistManager, NO_SONG_LIMIT};
 use crate::collection::CollectionScanner;
+use crate::db::Database;
 use crate::models::{PlaylistItem, QueuePopulationMode, Song};
 use crate::tags::TagManager;
 use anyhow::Result;
 use rusqlite::{params, OptionalExtension};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use uuid::Uuid;
 
 /// Size of the random-fill fallback for a Daypart Mix (#223) whose picked
@@ -26,20 +29,83 @@ pub struct DynamicPlaylistDelta {
     pub removed_uuids: Vec<String>,
 }
 
+/// One dynamic playlist's current matches, resolved without the playlists
+/// lock — the read half of a reconcile pass (see [`match_dynamic_playlists`]).
+#[derive(Debug)]
+pub struct DynamicPlaylistMatch {
+    playlist_id: i64,
+    /// The spec the match was resolved from, so the write half can skip a
+    /// playlist whose definition changed in between.
+    spec: String,
+    /// Matching song ids, in population-mode order.
+    song_ids: Vec<i64>,
+}
+
+/// The songs a dynamic spec resolves to, and whether they're its definition
+/// or just a stand-in sample.
+struct SpecSongs {
+    songs: Vec<Song>,
+    /// The spec has no membership definition to hold the playlist to — a
+    /// Daypart Mix's random-fill fallback draws a fresh sample each call.
+    random_sample: bool,
+}
+
+/// Set while a reconcile pass runs; a request arriving meanwhile sets
+/// [`RECONCILE_REQUESTED`] instead of starting a second, overlapping pass.
+static RECONCILE_RUNNING: AtomicBool = AtomicBool::new(false);
+static RECONCILE_REQUESTED: AtomicBool = AtomicBool::new(false);
+
 /// Runs a reconcile pass and mirrors the outcome into the running app: a
 /// currently-playing playlist gets new items appended to the live queue
 /// (evicted rows removed — the playing item itself is protected by the
 /// player), and the frontend learns which playlists changed. Spawned from
 /// the `library-changed` / `song-stats-changed` listeners in lib.rs, so
 /// "everything is immediate" without any per-call-site wiring.
+///
+/// Those events arrive in bursts (a scan, a run of stat updates), so calls
+/// coalesce: while a pass runs, any number of new requests queue exactly one
+/// follow-up pass, which sees every change they announced.
 pub async fn reconcile_and_sync(app: tauri::AppHandle) {
+    RECONCILE_REQUESTED.store(true, Ordering::Release);
+    loop {
+        if RECONCILE_RUNNING.swap(true, Ordering::AcqRel) {
+            return; // the running pass picks the request up
+        }
+        while RECONCILE_REQUESTED.swap(false, Ordering::AcqRel) {
+            reconcile_pass(&app).await;
+        }
+        RECONCILE_RUNNING.store(false, Ordering::Release);
+        // A request that landed between the last swap and the store above
+        // would otherwise wait for the next event.
+        if !RECONCILE_REQUESTED.load(Ordering::Acquire) {
+            return;
+        }
+    }
+}
+
+async fn reconcile_pass(app: &tauri::AppHandle) {
     use tauri::{Emitter, Manager};
 
     let state = app.state::<crate::AppState>();
-    // `with_playlists` runs the synchronous rusqlite reconcile pass via
+    // Resolving every spec is the expensive half — a full-library query per
+    // dynamic playlist — and only reads, so it runs on the blocking pool
+    // without the playlists lock; playlist IPC stays responsive meanwhile.
+    let db = state.db.clone();
+    let matches = match tokio::task::spawn_blocking(move || match_dynamic_playlists(&db)).await {
+        Ok(Ok(matches)) => matches,
+        Ok(Err(e)) => {
+            log::error!("Dynamic playlist reconcile failed: {e}");
+            return;
+        }
+        Err(e) => {
+            log::error!("Dynamic playlist reconcile task failed: {e}");
+            return;
+        }
+    };
+    // `with_playlists` runs the synchronous rusqlite writes via
     // `block_in_place` (#1097) — see its doc comment in playlist.rs.
     let deltas = match crate::playlist::with_playlists(&state.playlists, |pm| {
-        pm.reconcile_dynamic_playlists()
+        pm.apply_dynamic_matches(matches)
     })
     .await
     {
@@ -74,6 +140,117 @@ pub async fn reconcile_and_sync(app: tauri::AppHandle) {
     let _ = app.emit("playlists-changed", changed_ids);
 }
 
+/// The read half of a reconcile pass: every dynamic playlist's current
+/// matches. Needs only the database, not the `PlaylistManager`, so callers
+/// can run it without holding the playlists lock. Random-sample specs are
+/// left out — there's no membership to hold them to, and reconciling one
+/// would swap in a fresh sample on every library change.
+pub fn match_dynamic_playlists(db: &Arc<Database>) -> Result<Vec<DynamicPlaylistMatch>> {
+    let targets = dynamic_playlist_specs(db)?;
+    let mut matches = Vec::with_capacity(targets.len());
+    for (playlist_id, spec, mode) in targets {
+        match spec_songs(db, &spec, mode) {
+            Ok(resolved) if resolved.random_sample => {}
+            Ok(resolved) => matches.push(DynamicPlaylistMatch {
+                playlist_id,
+                spec,
+                song_ids: resolved.songs.iter().map(|s| s.id).collect(),
+            }),
+            Err(e) => log::error!("Failed to reconcile dynamic playlist {playlist_id}: {e}"),
+        }
+    }
+    Ok(matches)
+}
+
+/// Every enabled dynamic playlist with a non-empty spec, as
+/// `(id, spec, population_mode)`.
+fn dynamic_playlist_specs(db: &Database) -> Result<Vec<(i64, String, QueuePopulationMode)>> {
+    let conn = db.pool.get()?;
+    let mut stmt = conn.prepare(
+        "SELECT id, dynamic_spec, COALESCE(population_mode, 'all') FROM playlists
+         WHERE dynamic_enabled = 1 AND TRIM(COALESCE(dynamic_spec, '')) != ''",
+    )?;
+    let rows = stmt
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+            ))
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(rows
+        .into_iter()
+        .map(|(id, spec, mode)| (id, spec, QueuePopulationMode::from(mode.as_str())))
+        .collect())
+}
+
+/// Every library song matching a dynamic spec, in the order the spec's
+/// population mode dictates. The single dispatch point for all spec kinds
+/// (decade:, bpmrange:, artisttag:, missingmeta, tag:, daypart:, smart-rule
+/// query).
+fn spec_songs(db: &Arc<Database>, spec: &str, mode: QueuePopulationMode) -> Result<SpecSongs> {
+    let matched = |songs| {
+        Ok(SpecSongs {
+            songs,
+            random_sample: false,
+        })
+    };
+    let random_fill = |scanner: &CollectionScanner| {
+        // Unlike a genre match (naturally bounded by how many songs carry
+        // that genre), "random songs from anywhere" has no natural size —
+        // cap it to a real mix-sized sample rather than shuffling the
+        // entire library into one playlist.
+        Ok(SpecSongs {
+            songs: scanner.get_random_songs(DAYPART_RANDOM_FILL_LIMIT)?,
+            random_sample: true,
+        })
+    };
+    let scanner = CollectionScanner::new(db.clone());
+    if let Some(decade) = spec.strip_prefix("decade:") {
+        matched(scanner.get_songs_by_decade(decade, NO_SONG_LIMIT, mode)?)
+    } else if let Some((min, max)) = spec
+        .strip_prefix("bpmrange:")
+        .and_then(crate::collection::parse_bpm_range_spec)
+    {
+        matched(scanner.get_songs_by_bpm_range(min, max, NO_SONG_LIMIT, mode)?)
+    } else if let Some(tag) = spec.strip_prefix("artisttag:") {
+        matched(scanner.get_songs_by_artist_tag(tag, NO_SONG_LIMIT, mode)?)
+    } else if spec == "missingmeta" {
+        matched(scanner.get_songs_missing_core_tags(NO_SONG_LIMIT, mode)?)
+    } else if spec == "missingmbid" {
+        matched(scanner.get_songs_missing_musicbrainz_id(NO_SONG_LIMIT, mode)?)
+    } else if let Some(name) = spec.strip_prefix("tag:") {
+        // A system genre auto-playlist, keyed on a curated tag name (#548)
+        // rather than a Smart Playlist rule spec (which always contains a
+        // "field:" rule).
+        let tag_manager = TagManager::new(db.clone());
+        matched(tag_manager.get_songs_by_curated_tag(name, NO_SONG_LIMIT, mode)?)
+    } else if let Some(rest) = spec.strip_prefix("daypart:") {
+        // "<bucket>:<date>:<resolved-name>" — bucket/date are only the
+        // reroll cache key `sync_daypart_auto_playlist` checks; here we only
+        // care about the already-resolved trailing name (empty means the
+        // random-fill fallback was chosen). This never re-picks anything
+        // itself, so calling this via `populate_dynamic_playlist`/reconcile
+        // does not reroll the mix.
+        let name = rest.splitn(3, ':').nth(2).unwrap_or("");
+        if name.is_empty() {
+            random_fill(&scanner)
+        } else {
+            let tag_manager = TagManager::new(db.clone());
+            let songs = tag_manager.get_songs_by_curated_tag(name, NO_SONG_LIMIT, mode)?;
+            if songs.is_empty() {
+                random_fill(&scanner)
+            } else {
+                matched(songs)
+            }
+        }
+    } else {
+        let query = spec.replace(';', " ");
+        matched(scanner.search_songs_by_mode(&query, NO_SONG_LIMIT, mode)?)
+    }
+}
+
 impl PlaylistManager {
     /// Persist the `population_mode` bias for a playlist row (see #120).
     pub fn set_playlist_population_mode(&self, id: i64, mode: QueuePopulationMode) -> Result<()> {
@@ -85,64 +262,16 @@ impl PlaylistManager {
         Ok(())
     }
 
-    /// Every library song matching a dynamic spec, in the order the spec's
-    /// population mode dictates. The single dispatch point for all spec
-    /// kinds (decade:, bpmrange:, artisttag:, missingmeta, tag:, daypart:,
-    /// smart-rule query). `pub(super)` so `auto_sync.rs`'s
-    /// `sync_daypart_auto_playlist` can materialize a freshly-resolved
-    /// `daypart:` spec through the same path every other category uses.
+    /// Every library song matching a dynamic spec — see [`spec_songs`].
+    /// `pub(super)` so `auto_sync.rs`'s `sync_daypart_auto_playlist` can
+    /// materialize a freshly-resolved `daypart:` spec through the same path
+    /// every other category uses.
     pub(super) fn songs_for_spec(
         &self,
         spec: &str,
         mode: QueuePopulationMode,
     ) -> Result<Vec<Song>> {
-        let scanner = CollectionScanner::new(self.db.clone());
-        if let Some(decade) = spec.strip_prefix("decade:") {
-            scanner.get_songs_by_decade(decade, NO_SONG_LIMIT, mode)
-        } else if let Some((min, max)) = spec
-            .strip_prefix("bpmrange:")
-            .and_then(crate::collection::parse_bpm_range_spec)
-        {
-            scanner.get_songs_by_bpm_range(min, max, NO_SONG_LIMIT, mode)
-        } else if let Some(tag) = spec.strip_prefix("artisttag:") {
-            scanner.get_songs_by_artist_tag(tag, NO_SONG_LIMIT, mode)
-        } else if spec == "missingmeta" {
-            scanner.get_songs_missing_core_tags(NO_SONG_LIMIT, mode)
-        } else if spec == "missingmbid" {
-            scanner.get_songs_missing_musicbrainz_id(NO_SONG_LIMIT, mode)
-        } else if let Some(name) = spec.strip_prefix("tag:") {
-            // A system genre auto-playlist, keyed on a curated tag name
-            // (#548) rather than a Smart Playlist rule spec (which always
-            // contains a "field:" rule).
-            let tag_manager = TagManager::new(self.db.clone());
-            tag_manager.get_songs_by_curated_tag(name, NO_SONG_LIMIT, mode)
-        } else if let Some(rest) = spec.strip_prefix("daypart:") {
-            // "<bucket>:<date>:<resolved-name>" — bucket/date are only the
-            // reroll cache key `sync_daypart_auto_playlist` checks; here we
-            // only care about the already-resolved trailing name (empty
-            // means the random-fill fallback was chosen). This never
-            // re-picks anything itself, so calling this via
-            // `populate_dynamic_playlist`/reconcile does not reroll the mix.
-            let name = rest.splitn(3, ':').nth(2).unwrap_or("");
-            if name.is_empty() {
-                // Unlike a genre match (naturally bounded by how many songs
-                // carry that genre), "random songs from anywhere" has no
-                // natural size — cap it to a real mix-sized sample rather
-                // than shuffling the entire library into one playlist.
-                scanner.get_random_songs(DAYPART_RANDOM_FILL_LIMIT)
-            } else {
-                let tag_manager = TagManager::new(self.db.clone());
-                let songs = tag_manager.get_songs_by_curated_tag(name, NO_SONG_LIMIT, mode)?;
-                if songs.is_empty() {
-                    scanner.get_random_songs(DAYPART_RANDOM_FILL_LIMIT)
-                } else {
-                    Ok(songs)
-                }
-            }
-        } else {
-            let query = spec.replace(';', " ");
-            scanner.search_songs_by_mode(&query, NO_SONG_LIMIT, mode)
-        }
+        Ok(spec_songs(&self.db, spec, mode)?.songs)
     }
 
     /// Populate/refresh tracks for any dynamic playlist based on its `dynamic_spec`,
@@ -163,9 +292,13 @@ impl PlaylistManager {
             }
             _ => return Ok(()),
         };
+        // `songs_for_spec` takes its own connection; re-acquire for the
+        // writes instead of holding two.
+        drop(conn);
 
         let songs = self.songs_for_spec(&spec, mode)?;
 
+        let conn = self.db.pool.get()?;
         let now = chrono::Utc::now().timestamp();
         conn.execute(
             "UPDATE playlists SET updated = ?1 WHERE id = ?2",
@@ -195,6 +328,9 @@ impl PlaylistManager {
             "UPDATE playlists SET dynamic_spec = ?1, dynamic_enabled = ?2 WHERE id = ?3",
             params![spec, enabled, id],
         )?;
+        // Populating takes its own connection; holding this one meanwhile
+        // needs two at once and can exhaust the pool under load.
+        drop(conn);
         if enabled {
             self.populate_dynamic_playlist(id)?;
         }
@@ -223,16 +359,27 @@ impl PlaylistManager {
     /// re-sort only ever happens on the explicit Refresh path
     /// (`populate_dynamic_playlist`). Maintenance writes bypass the undo
     /// stack: only user edits belong there.
-    fn reconcile_dynamic_playlist(
+    fn apply_dynamic_match(
         &mut self,
-        playlist_id: i64,
-        spec: &str,
-        mode: QueuePopulationMode,
+        m: &DynamicPlaylistMatch,
     ) -> Result<Option<DynamicPlaylistDelta>> {
-        let matching = self.songs_for_spec(spec, mode)?;
-        let matching_ids: std::collections::HashSet<i64> = matching.iter().map(|s| s.id).collect();
-
+        let playlist_id = m.playlist_id;
         let conn = self.db.pool.get()?;
+        // The match was resolved without the playlists lock; skip a playlist
+        // deleted or redefined since — its own edit already repopulated it.
+        let still_current: bool = conn
+            .query_row(
+                "SELECT 1 FROM playlists WHERE id = ?1 AND dynamic_enabled = 1 AND dynamic_spec = ?2",
+                params![playlist_id, m.spec],
+                |_| Ok(()),
+            )
+            .optional()?
+            .is_some();
+        if !still_current {
+            return Ok(None);
+        }
+
+        let matching_ids: std::collections::HashSet<i64> = m.song_ids.iter().copied().collect();
         let mut stmt = conn.prepare(
             "SELECT song_id, uuid, position FROM playlist_items
              WHERE playlist_id = ?1 AND song_id IS NOT NULL",
@@ -252,9 +399,11 @@ impl PlaylistManager {
             .filter(|(id, _, _)| !matching_ids.contains(id))
             .map(|(_, uuid, _)| uuid.clone())
             .collect();
-        let to_add: Vec<&Song> = matching
+        let to_add: Vec<i64> = m
+            .song_ids
             .iter()
-            .filter(|s| !current_ids.contains(&s.id))
+            .copied()
+            .filter(|id| !current_ids.contains(id))
             .collect();
 
         if removed_uuids.is_empty() && to_add.is_empty() {
@@ -270,11 +419,11 @@ impl PlaylistManager {
 
         let start_pos: i32 = current.iter().map(|(_, _, p)| *p).max().unwrap_or(-1) + 1;
         let mut added_uuids = std::collections::HashSet::new();
-        for (next_pos, song) in (start_pos..).zip(to_add.iter()) {
+        for (next_pos, song_id) in (start_pos..).zip(to_add.iter()) {
             let uuid = Uuid::new_v4().to_string();
             conn.execute(
                 "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type) VALUES (?1, ?2, ?3, ?4, 0)",
-                params![playlist_id, song.id, next_pos, uuid],
+                params![playlist_id, song_id, next_pos, uuid],
             )?;
             added_uuids.insert(uuid);
         }
@@ -296,33 +445,34 @@ impl PlaylistManager {
         }))
     }
 
-    /// Reconcile every dynamic playlist (auto categories and user smart
-    /// playlists alike) against the current library. Returns one delta per
-    /// playlist that actually changed.
-    pub fn reconcile_dynamic_playlists(&mut self) -> Result<Vec<DynamicPlaylistDelta>> {
-        let targets: Vec<(i64, String, QueuePopulationMode)> = self
-            .get_playlists()?
-            .into_iter()
-            .filter(|p| p.dynamic_enabled)
-            .filter_map(|p| {
-                let spec = p.dynamic_spec.unwrap_or_default();
-                if spec.trim().is_empty() {
-                    None
-                } else {
-                    Some((p.id, spec, p.population_mode))
-                }
-            })
-            .collect();
-
+    /// The write half of a reconcile pass: applies matches from
+    /// [`match_dynamic_playlists`]. Returns one delta per playlist that
+    /// actually changed.
+    pub fn apply_dynamic_matches(
+        &mut self,
+        matches: Vec<DynamicPlaylistMatch>,
+    ) -> Result<Vec<DynamicPlaylistDelta>> {
         let mut deltas = Vec::new();
-        for (id, spec, mode) in targets {
-            match self.reconcile_dynamic_playlist(id, &spec, mode) {
+        for m in &matches {
+            match self.apply_dynamic_match(m) {
                 Ok(Some(delta)) => deltas.push(delta),
                 Ok(None) => {}
-                Err(e) => log::error!("Failed to reconcile dynamic playlist {id}: {e}"),
+                Err(e) => log::error!(
+                    "Failed to reconcile dynamic playlist {}: {e}",
+                    m.playlist_id
+                ),
             }
         }
         Ok(deltas)
+    }
+
+    /// Reconcile every dynamic playlist (auto categories and user smart
+    /// playlists alike) against the current library in one call — both
+    /// halves back to back. The app's listener runs them separately so the
+    /// read half doesn't hold the playlists lock (see [`reconcile_and_sync`]).
+    pub fn reconcile_dynamic_playlists(&mut self) -> Result<Vec<DynamicPlaylistDelta>> {
+        let matches = match_dynamic_playlists(&self.db)?;
+        self.apply_dynamic_matches(matches)
     }
 
     /// Force-regenerates a dynamic/auto playlist's tracks (e.g. when user clicks
@@ -508,6 +658,99 @@ mod tests {
     }
 
     #[test]
+    fn test_reconcile_leaves_random_fill_daypart_mix_alone() {
+        // A random-fill Daypart Mix gets a fresh random sample on each query,
+        // so reconciling it against one would swap its whole membership on
+        // every library/stats event.
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for i in 1..=20 {
+                conn.execute(
+                    "INSERT INTO songs (title, artist, genre, path, source, unavailable) VALUES (?1, 'A', 'Jazz', ?2, 1, 0)",
+                    params![format!("Song {i}"), format!("/s{i}.mp3")],
+                )
+                .unwrap();
+            }
+        }
+        let mut manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        let pl = manager.create_playlist("Morning Mix").unwrap();
+        manager
+            .set_playlist_dynamic_spec(pl.id, "daypart:morning:2026-09-03:")
+            .unwrap();
+        let before: Vec<_> = manager
+            .get_playlist_tracks(pl.id)
+            .unwrap()
+            .into_iter()
+            .map(|i| i.uuid)
+            .collect();
+        assert!(!before.is_empty());
+
+        let deltas = manager.reconcile_dynamic_playlists().unwrap();
+        assert!(deltas.is_empty(), "random-fill mix must not be reconciled");
+        let after: Vec<_> = manager
+            .get_playlist_tracks(pl.id)
+            .unwrap()
+            .into_iter()
+            .map(|i| i.uuid)
+            .collect();
+        assert_eq!(before, after);
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_apply_skips_match_whose_spec_changed_after_it_was_computed() {
+        // Matching runs without the playlists lock, so the spec can change
+        // between computing a match and applying it.
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for (i, genre) in ["Rock", "Jazz"].iter().enumerate() {
+                conn.execute(
+                    "INSERT INTO songs (title, artist, genre, path) VALUES (?1, 'A', ?2, ?3)",
+                    params![format!("Song {}", i + 1), genre, format!("/s{}.mp3", i + 1)],
+                )
+                .unwrap();
+            }
+        }
+        let mut manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        let pl = manager.create_playlist("Smart").unwrap();
+        manager
+            .set_playlist_dynamic_spec(pl.id, "genre:Rock")
+            .unwrap();
+        {
+            let conn = db_arc.pool.get().unwrap();
+            conn.execute("UPDATE songs SET genre = 'Rock' WHERE title = 'Song 2'", [])
+                .unwrap();
+        }
+        let matches = match_dynamic_playlists(&db_arc).unwrap();
+
+        manager
+            .set_playlist_dynamic_spec(pl.id, "genre:Jazz")
+            .unwrap();
+        let jazz: Vec<_> = manager
+            .get_playlist_tracks(pl.id)
+            .unwrap()
+            .into_iter()
+            .map(|i| i.uuid)
+            .collect();
+
+        let deltas = manager.apply_dynamic_matches(matches).unwrap();
+        assert!(deltas.is_empty(), "stale genre:Rock match must be dropped");
+        let after: Vec<_> = manager
+            .get_playlist_tracks(pl.id)
+            .unwrap()
+            .into_iter()
+            .map(|i| i.uuid)
+            .collect();
+        assert_eq!(jazz, after);
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+    #[test]
     fn test_smart_playlist_genre_rule_populates_via_filter_not_exact_genre_match() {
         let (db, temp_dir) = setup_test_db();
         let db_arc = std::sync::Arc::new(db);
@@ -681,6 +924,55 @@ mod tests {
             5,
             "an empty genre match in a daypart spec must fall back to random library fill rather than returning 0 songs"
         );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_playlist_paths_never_hold_one_connection_while_taking_another() {
+        // Regression test: each of these held a pooled connection while a
+        // helper took a second, so enough concurrent callers could exhaust
+        // the pool and stall every DB caller for r2d2's 30s timeout. With a
+        // one-connection pool, any nested acquisition times out instead.
+        let (db, temp_dir) = setup_test_db();
+        {
+            let conn = db.pool.get().unwrap();
+            for i in 1..=30 {
+                conn.execute(
+                    "INSERT INTO songs (title, artist, genre, path, source, unavailable) VALUES (?1, 'A', 'Rock', ?2, 1, 0)",
+                    params![format!("Song {i}"), format!("/s{i}.mp3")],
+                )
+                .unwrap();
+            }
+        }
+        let single = std::sync::Arc::new(Database {
+            pool: r2d2::Pool::builder()
+                .max_size(1)
+                .connection_timeout(std::time::Duration::from_secs(2))
+                .build(r2d2_sqlite::SqliteConnectionManager::file(
+                    temp_dir.join("luminous.db"),
+                ))
+                .unwrap(),
+            schema_version: db.schema_version,
+        });
+        drop(db);
+
+        let mut manager = PlaylistManager::new(single).unwrap();
+        let pl = manager.create_playlist("Rock Smart").unwrap();
+        manager
+            .set_playlist_dynamic_spec(pl.id, "genre:Rock")
+            .unwrap();
+
+        let items = manager.get_playlist_tracks(pl.id).unwrap();
+        manager
+            .reorder_playlist_item_by_uuid(pl.id, &items[0].uuid, &items[2].uuid)
+            .unwrap();
+
+        manager
+            .export_playlist(pl.id, temp_dir.join("out.m3u"), false)
+            .unwrap();
+
+        manager.sync_daypart_auto_playlist().unwrap();
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

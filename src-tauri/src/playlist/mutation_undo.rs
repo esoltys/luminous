@@ -287,14 +287,19 @@ impl PlaylistManager {
             return Ok(());
         }
 
-        let conn = self.db.pool.get()?;
-        let mut stmt = conn.prepare(
-            "SELECT uuid, position FROM playlist_items WHERE playlist_id = ?1 ORDER BY position",
-        )?;
-        let items: Vec<(String, i32)> = stmt
-            .query_map(params![playlist_id], |row| Ok((row.get(0)?, row.get(1)?)))?
-            .filter_map(|r| r.ok())
-            .collect();
+        // Scoped so the connection is back in the pool before
+        // `reorder_playlist_item` takes its own.
+        let items: Vec<(String, i32)> = {
+            let conn = self.db.pool.get()?;
+            let mut stmt = conn.prepare(
+                "SELECT uuid, position FROM playlist_items WHERE playlist_id = ?1 ORDER BY position",
+            )?;
+            let items = stmt
+                .query_map(params![playlist_id], |row| Ok((row.get(0)?, row.get(1)?)))?
+                .filter_map(|r| r.ok())
+                .collect();
+            items
+        };
 
         let from_idx = items.iter().position(|(u, _)| u == source_uuid);
         let to_idx = items.iter().position(|(u, _)| u == target_uuid);

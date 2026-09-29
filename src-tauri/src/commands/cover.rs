@@ -89,6 +89,19 @@ fn build_extended_artwork_response(set: ExtendedArtworkSet) -> ExtendedArtworkRe
     response
 }
 
+/// Runs [`scan_extended_artwork`] on the blocking pool: it lists and stats
+/// directories, and the artist grid requests one per visible card, so on a
+/// Tokio worker a burst of them stalls every async command. Kept apart from
+/// the DB lookup so no pooled connection is held during the disk I/O.
+async fn scan_extended_artwork_blocking(
+    path: String,
+    album: Option<String>,
+) -> Result<ExtendedArtworkSet, String> {
+    tokio::task::spawn_blocking(move || scan_extended_artwork(Path::new(&path), album.as_deref()))
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// Album-level slice of the hierarchical scan (#98/#757/#760) for one song's
 /// album directory, exposed over IPC. Artist-level categories (portrait,
 /// band logo, fanart banner) and media residing in parent directories are
@@ -129,7 +142,7 @@ pub async fn get_extended_artwork_for_song(
         return Ok(ExtendedArtworkResponse::default());
     };
 
-    let set = scan_extended_artwork(Path::new(&path), album.as_deref());
+    let set = scan_extended_artwork_blocking(path, album).await?;
     let mut album_only = ExtendedArtworkSet {
         entries: set
             .entries
@@ -193,7 +206,7 @@ pub async fn get_extended_artwork_for_artist(
         return Ok(ExtendedArtworkResponse::default());
     };
 
-    let set = scan_extended_artwork(Path::new(&path), None);
+    let set = scan_extended_artwork_blocking(path, None).await?;
     let artist_only = ExtendedArtworkSet {
         entries: set
             .entries
