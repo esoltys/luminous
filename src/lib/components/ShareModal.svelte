@@ -15,7 +15,8 @@
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { collectionStore } from "../stores/collection.svelte";
-  import { extractColorsFromImage } from "../stores/theme.svelte";
+  import { extractColorsFromImage, themeStore } from "../stores/theme.svelte";
+  import { playerStore } from "../stores/player.svelte";
   import { getCoverArtUrl, resolveArtUrl, type Song, type StatsSummary, type StatsRange, type StatsTopItem } from "../types";
   import { getArtistAlbums, classifyRelease } from "../utils/artist";
   import { songsToCoverStack, getArtistCoverStack, resolveArtistPortraitUrl, type CoverStackItem } from "../utils/covers";
@@ -406,29 +407,58 @@
   let coverDataUri = $state<string | null>(null);
   let coverStackDataUris = $state<string[]>([]);
   let backgroundColors = $state<string[] | undefined>(undefined);
+  let primaryColor = $state<string | undefined>(undefined);
 
   $effect(() => {
     const url = coverUrl;
     const stackUrls = coverStackUrls;
     let cancelled = false;
+
+    // Check if the currently playing track/album matches what we are sharing
+    const currentSong = playerStore.currentSong;
+    const matchesCurrent =
+      (entity.kind === "album" && currentSong?.album && entity.albumName.toLowerCase() === currentSong.album.toLowerCase()) ||
+      (entity.kind === "artist" && currentSong?.artist && entity.artistName.toLowerCase() === currentSong.artist.toLowerCase());
+
+    if (matchesCurrent && themeStore.artworkColors) {
+      const art = themeStore.artworkColors;
+      backgroundColors = [art.vibrant, art.darkVibrant, art.lightVibrant, art.muted].filter((c): c is string => !!c);
+      primaryColor = art.primary;
+    }
+
     if (!url && stackUrls.length === 0) {
       coverDataUri = null;
       coverStackDataUris = [];
-      backgroundColors = undefined;
+      if (!matchesCurrent) {
+        backgroundColors = undefined;
+        primaryColor = undefined;
+      }
       return;
     }
+
     Promise.all([
       url ? toDataUri(url) : Promise.resolve(null),
       Promise.all(stackUrls.map((u) => toDataUri(u))),
-      extractColorsFromImage((url ?? stackUrls[0])!),
-    ]).then(([dataUri, stackDataUris, colors]) => {
+    ]).then(async ([dataUri, stackDataUris]) => {
       if (cancelled) return;
       coverDataUri = dataUri;
       coverStackDataUris = stackDataUris.filter((u): u is string => !!u);
-      backgroundColors = [colors.vibrant, colors.darkVibrant, colors.lightVibrant, colors.muted].filter(
-        (c): c is string => !!c
-      );
+
+      if (!matchesCurrent || !themeStore.artworkColors) {
+        // Extract from dataUri first (guaranteed no CORS taint in canvas), fallback to url
+        const imageSource = dataUri ?? stackDataUris[0] ?? url ?? stackUrls[0];
+        if (imageSource) {
+          const colors = await extractColorsFromImage(imageSource);
+          if (!cancelled) {
+            backgroundColors = [colors.vibrant, colors.darkVibrant, colors.lightVibrant, colors.muted].filter(
+              (c): c is string => !!c
+            );
+            primaryColor = colors.primary;
+          }
+        }
+      }
     });
+
     return () => {
       cancelled = true;
     };
@@ -475,6 +505,18 @@
       statsArtistsCoverStack = artistDataUris.filter((u): u is string => !!u);
       statsAlbumsCoverStack = albumDataUris.filter((u): u is string => !!u);
       statsSongsCoverStack = songDataUris.filter((u): u is string => !!u);
+
+      const topCover = statsAlbumsCoverStack[0] ?? statsArtistsCoverStack[0] ?? statsSongsCoverStack[0];
+      if (topCover && !backgroundColors) {
+        extractColorsFromImage(topCover).then((colors) => {
+          if (!cancelled) {
+            backgroundColors = [colors.vibrant, colors.darkVibrant, colors.lightVibrant, colors.muted].filter(
+              (c): c is string => !!c
+            );
+            primaryColor = colors.primary;
+          }
+        });
+      }
     });
     return () => {
       cancelled = true;
@@ -517,6 +559,7 @@
           theme,
           seed: cardSeed,
           backgroundColors,
+          primaryColor,
           rangeLabel: entity.rangeLabel,
           totalMinutesLabel: statsTotalMinutesLabel,
           sections: statsSections,
@@ -531,6 +574,7 @@
         theme,
         seed: cardSeed,
         backgroundColors,
+        primaryColor,
         coverDataUri,
         coverStackDataUris,
         title: cardTitle,
@@ -553,6 +597,7 @@
     void coverDataUri;
     void coverStackDataUris;
     void backgroundColors;
+    void primaryColor;
     void trackCards;
     void cardTitle;
     void cardSubtitle;
