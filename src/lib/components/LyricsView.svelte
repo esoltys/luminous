@@ -12,73 +12,37 @@
   } from "phosphor-svelte";
   import LoadingSpinner from "./LoadingSpinner.svelte";
   import Button from "./Button.svelte";
+  import HelpTip from "./HelpTip.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { rememberScroll } from "../utils/scrollMemory";
-
-  interface LyricLine {
-    timeMs: number;
-    text: string;
-  }
+  import { parseLrc } from "../utils/lrc";
 
   let lyricsText = $state("");
+  let userOffsetMs = $state(0);
   let isLoading = $state(false);
   let errorMsg = $state("");
   let isEditing = $state(false);
   let editText = $state("");
   let containerEl = $state<HTMLDivElement | null>(null);
 
-  // Parse lyrics from LRC string supporting multiple timestamps per line
-  let parsedLines = $derived.by<LyricLine[]>(() => {
-    if (!lyricsText) {
-      console.log("[LyricsView] parsedLines: lyricsText is empty");
-      return [];
-    }
-    
-    let cleanText = lyricsText;
-    if (cleanText.startsWith("[synced:false]\n")) {
-      cleanText = cleanText.substring("[synced:false]\n".length);
-    } else if (cleanText.startsWith("[synced:false]")) {
-      cleanText = cleanText.substring("[synced:false]".length);
-    }
+  // Locale-aware so French reads "+0,5 s"; "always" signs the nudge buttons, "exceptZero" the value.
+  function formatOffset(ms: number, signDisplay: "always" | "exceptZero") {
+    const seconds = new Intl.NumberFormat(i18n.currentLocale, {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+      signDisplay,
+    }).format(ms / 1000);
+    return i18n.t('lyrics.offsetSeconds', { seconds });
+  }
 
-    const lines = cleanText.split("\n");
-    const parsed: LyricLine[] = [];
-    const timeRegex = /\[(\d+):(\d+)(?:[.:](\d+))?\]/g;
-
-    for (const line of lines) {
-      const matches: { timeMs: number }[] = [];
-      let match;
-      
-      // Reset the regex state before scanning
-      timeRegex.lastIndex = 0;
-      
-      while ((match = timeRegex.exec(line)) !== null) {
-        const minutes = parseInt(match[1], 10);
-        const seconds = parseInt(match[2], 10);
-        const hundredths = match[3] ? parseInt(match[3], 10) : 0;
-
-        const timeMs = minutes * 60 * 1000 + seconds * 1000 + (match[3] && match[3].length === 2 ? hundredths * 10 : hundredths);
-        matches.push({ timeMs });
-      }
-
-      if (matches.length > 0) {
-        const text = line.replace(timeRegex, "").trim();
-        for (const m of matches) {
-          parsed.push({ timeMs: m.timeMs, text });
-        }
-      }
-    }
-    const sorted = parsed.sort((a, b) => a.timeMs - b.timeMs);
-    console.log(`[LyricsView] parsedLines: parsed ${sorted.length} lines. isSynced: ${sorted.length > 0}`);
-    return sorted;
-  });
-
+  let parsed = $derived(parseLrc(lyricsText, userOffsetMs));
+  let parsedLines = $derived(parsed.lines);
   let isSynced = $derived(parsedLines.length > 0);
+  let currentMs = $derived(playerStore.positionNanosec / 1_000_000);
 
   let activeLineIndex = $derived.by(() => {
     if (!isSynced || parsedLines.length === 0) return -1;
-    const currentMs = playerStore.positionNanosec / 1_000_000;
 
     let matchIdx = -1;
     for (let i = 0; i < parsedLines.length; i++) {
@@ -197,14 +161,56 @@
     }
   }
 
+  async function loadOffset(songId: number | undefined) {
+    // Reset immediately so the previous song's offset never applies to this
+    // one while the lookup is in flight.
+    userOffsetMs = 0;
+    if (songId === undefined) return;
+    try {
+      const offset = await invoke<number>("get_lyrics_offset", { songId });
+      // Drop the result if the song changed while we were waiting.
+      if (playerStore.currentSong?.id === songId) userOffsetMs = offset;
+    } catch {
+      // Keep the zero offset.
+    }
+  }
+
+  async function adjustOffset(deltaMs: number) {
+    if (!playerStore.currentSong) return;
+    userOffsetMs += deltaMs;
+    try {
+      await invoke("set_lyrics_offset", {
+        songId: playerStore.currentSong.id,
+        offsetMs: userOffsetMs,
+      });
+    } catch (e) {
+      console.error("[LyricsView] Failed to save lyrics offset:", e);
+    }
+  }
+
+  async function resetOffset() {
+    if (!playerStore.currentSong) return;
+    userOffsetMs = 0;
+    try {
+      await invoke("set_lyrics_offset", {
+        songId: playerStore.currentSong.id,
+        offsetMs: 0,
+      });
+    } catch (e) {
+      console.error("[LyricsView] Failed to reset lyrics offset:", e);
+    }
+  }
+
   function startEditing() {
     editText = lyricsText;
     isEditing = true;
   }
 
   $effect(() => {
-    console.log("[LyricsView] Song changed. Reloading lyrics for song ID:", playerStore.currentSong?.id);
-    loadLyrics(playerStore.currentSong?.id);
+    const id = playerStore.currentSong?.id;
+    console.log("[LyricsView] Song changed. Reloading lyrics for song ID:", id);
+    loadLyrics(id);
+    loadOffset(id);
   });
 
   // Whether we've already done the initial jump-to-active-line for the
@@ -240,10 +246,10 @@
 </script>
 
 <div class="flex-1 flex flex-col h-full bg-brand-main text-brand-text-primary select-none overflow-hidden relative">
-  <div class="h-16 flex items-center justify-between px-8 border-b border-brand-border bg-brand-main/40 backdrop-blur-md shrink-0">
-    <div class="flex items-center gap-3">
-      <Lyrics class="w-6 h-6 text-brand-accent-text" />
-      <div>
+  <div class="h-16 flex items-center justify-between gap-4 px-8 border-b border-brand-border bg-brand-main/40 backdrop-blur-md shrink-0">
+    <div class="flex items-center gap-3 min-w-0 flex-1">
+      <Lyrics class="w-6 h-6 text-brand-accent-text shrink-0" />
+      <div class="min-w-0">
         <h2 class="text-sm font-bold truncate max-w-xs md:max-w-md text-brand-text-primary py-0.5 leading-snug">
           {playerStore.currentSong ? playerStore.currentSong.title : i18n.t('playerBar.notPlaying')}
         </h2>
@@ -254,12 +260,40 @@
     </div>
 
     {#if playerStore.currentSong}
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2 shrink-0">
         {#if playerStore.currentSong.is_instrumental}
           <Button onclick={() => toggleInstrumental(false)} variant="secondary" size="sm">
             <Music2 class="w-3.5 h-3.5" /> {i18n.t('lyrics.unmarkInstrumental', {}, "Unmark Instrumental")}
           </Button>
         {:else if !isEditing}
+          {#if isSynced}
+            <div class="flex items-center bg-brand-sidebar border border-brand-border rounded-lg px-2 py-1 text-xs text-brand-text-secondary gap-1.5 shadow-sm">
+              <button
+                onclick={() => adjustOffset(-500)}
+                class="hover:text-brand-text-primary px-1 font-mono font-bold transition-colors cursor-pointer"
+                title={i18n.t('lyrics.offsetLater', {}, 'Show lyrics 0.5 s later')}
+                aria-label={i18n.t('lyrics.offsetLater', {}, 'Show lyrics 0.5 s later')}
+              >
+                {formatOffset(-500, "always")}
+              </button>
+              <button
+                onclick={resetOffset}
+                class="text-[11px] font-mono px-1 hover:text-brand-accent-text transition-colors cursor-pointer {userOffsetMs !== 0 ? 'text-brand-accent-text font-bold' : 'text-brand-text-secondary/70'}"
+                id="lyrics-offset-value"
+              >
+                {formatOffset(userOffsetMs, "exceptZero")}
+              </button>
+              <button
+                onclick={() => adjustOffset(500)}
+                class="hover:text-brand-text-primary px-1 font-mono font-bold transition-colors cursor-pointer"
+                title={i18n.t('lyrics.offsetEarlier', {}, 'Show lyrics 0.5 s earlier')}
+                aria-label={i18n.t('lyrics.offsetEarlier', {}, 'Show lyrics 0.5 s earlier')}
+              >
+                {formatOffset(500, "always")}
+              </button>
+              <HelpTip text={i18n.t('lyrics.offsetHelp')} label={i18n.t('lyrics.syncOffsetLabel', {}, 'Sync Offset')} describes="lyrics-offset-value" />
+            </div>
+          {/if}
           <Button onclick={() => loadLyrics(playerStore.currentSong?.id, true)} variant="secondary" size="sm" title={i18n.t('lyrics.refetchTooltip', {}, "Refetch lyrics online")}>
             <RefreshCw class="w-3.5 h-3.5" /> {i18n.t('lyrics.refetchBtn', {}, "Refetch")}
           </Button>
@@ -317,10 +351,20 @@
               <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
               <p
                 data-index={idx}
+                dir="auto"
                 onclick={() => playerStore.seek(line.timeMs * 1_000_000)}
                 class="text-xl md:text-2xl font-bold transition-all duration-300 transform text-balance {isActive ? 'text-brand-text-primary scale-105 filter drop-shadow-[0_0_8px_var(--color-brand-accent)] font-extrabold' : 'text-brand-text-secondary/30 hover:text-brand-text-secondary/60'}"
               >
-                {line.text || "•••"}
+                {#if isActive && line.words && line.words.length > 0}
+                  {#each line.words as word}
+                    {@const isWordSung = currentMs >= word.timeMs}
+                    <span
+                      class="inline-block whitespace-pre-wrap transition-all duration-150 {isWordSung ? 'text-brand-text-primary opacity-100 filter drop-shadow-[0_0_6px_var(--color-brand-accent)]' : 'text-brand-text-primary/40 opacity-40'}"
+                    >{word.text}</span>
+                  {/each}
+                {:else}
+                  {line.text || "•••"}
+                {/if}
               </p>
             {/each}
           </div>
@@ -329,7 +373,7 @@
             <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
             {i18n.t('lyrics.plainTextNotice', {}, "Synced lyrics not available. Showing plain text.")}
           </div>
-          <div class="whitespace-pre-line text-lg leading-relaxed text-brand-text-secondary/80 select-text pb-20 font-medium font-sans text-pretty">
+          <div dir="auto" class="whitespace-pre-line text-lg leading-relaxed text-brand-text-secondary/80 select-text pb-20 font-medium font-sans text-pretty">
             {lyricsText.startsWith("[synced:false]\n")
               ? lyricsText.substring("[synced:false]\n".length)
               : (lyricsText.startsWith("[synced:false]") ? lyricsText.substring("[synced:false]".length) : lyricsText)}

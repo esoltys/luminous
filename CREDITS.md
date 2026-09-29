@@ -24,7 +24,7 @@ Created by [Eric Soltys](https://esoltys.github.io/), a Canadian software develo
 - **Tag Reading & Writing**: [lofty](https://github.com/Serial-Scanner/lofty-rs) (FLAC, ID3, MP4, Ogg Vorbis, WAV metadata)
 
 ### External APIs & Web Services (Active)
-- **Synced Lyrics**: [LRCLIB](https://lrclib.net/) and [Lyrics.ovh](https://lyricsovh.docs.apiary.io/)
+- **Synced Lyrics**: [LRCLIB](https://lrclib.net/), [NetEase Cloud Music](https://music.163.com/), and [Lyrics.ovh](https://lyricsovh.docs.apiary.io/)
 - **Cover Art Fallback**: [iTunes Search API](https://performance-partners.apple.com/)
 
 ---

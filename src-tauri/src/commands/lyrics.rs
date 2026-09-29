@@ -82,3 +82,41 @@ pub async fn set_instrumental(
     player.update_song_instrumental(song_id, is_instrumental);
     Ok(())
 }
+
+#[tauri::command]
+pub async fn get_lyrics_offset(state: State<'_, AppState>, song_id: i64) -> Result<i32, String> {
+    crate::db::run_blocking(&state.db, move |conn| {
+        let offset: i32 = conn
+            .query_row(
+                "SELECT offset_ms FROM song_lyrics_offsets WHERE song_id = ?1",
+                rusqlite::params![song_id],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
+        Ok(offset)
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// Fire-and-forget like `set_app_setting` — logs failures backend-side and never rejects.
+#[tauri::command]
+pub async fn set_lyrics_offset(
+    state: State<'_, AppState>,
+    song_id: i64,
+    offset_ms: i32,
+) -> Result<(), String> {
+    let result = crate::db::run_blocking(&state.db, move |conn| {
+        conn.execute(
+            "INSERT INTO song_lyrics_offsets (song_id, offset_ms) VALUES (?1, ?2)
+             ON CONFLICT(song_id) DO UPDATE SET offset_ms = ?2",
+            rusqlite::params![song_id, offset_ms],
+        )?;
+        Ok(())
+    })
+    .await;
+    if let Err(e) = result {
+        log::error!("Failed to persist lyrics offset for song {song_id}: {e}");
+    }
+    Ok(())
+}

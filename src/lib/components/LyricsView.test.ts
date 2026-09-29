@@ -4,6 +4,7 @@ import { render, waitFor, fireEvent } from "@testing-library/svelte";
 import { invoke } from "@tauri-apps/api/core";
 import LyricsView from "./LyricsView.svelte";
 import { playerStore } from "../stores/player.svelte";
+import { i18n } from "../stores/i18n.svelte";
 import type { Song } from "../types";
 
 const SYNCED_LYRICS = [
@@ -15,10 +16,12 @@ const SYNCED_LYRICS = [
 ].join("\n");
 
 let getLyricsResult: string = SYNCED_LYRICS;
+let getOffsetResult: number = 0;
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockImplementation((cmd: string) => {
     if (cmd === "get_lyrics") return Promise.resolve(getLyricsResult);
+    if (cmd === "get_lyrics_offset") return Promise.resolve(getOffsetResult);
     return Promise.resolve(null);
   }),
 }));
@@ -129,4 +132,106 @@ describe("LyricsView.svelte", () => {
       isInstrumental: false,
     });
   });
+
+  it("renders dir='auto' on synced and plain lyric elements for RTL support", async () => {
+    playerStore.currentSong = mockSong;
+    const { container } = render(LyricsView);
+
+    await waitFor(() => {
+      const lineEls = container.querySelectorAll("p[data-index]");
+      expect(lineEls.length).toBeGreaterThan(0);
+      expect(lineEls[0].getAttribute("dir")).toBe("auto");
+    });
+  });
+
+  it("highlights words individually when Enhanced LRC word tags are present", async () => {
+    getLyricsResult = "[00:10.00]<00:10.00>First <00:10.50>Second <00:11.00>Third";
+    playerStore.currentSong = mockSong;
+    // Position at 10.7s: First and Second are sung, Third is future
+    playerStore.positionNanosec = 10_700_000_000;
+
+    const { getByText } = render(LyricsView);
+
+    await waitFor(() => {
+      expect(getByText("First")).toBeInTheDocument();
+      expect(getByText("Second")).toBeInTheDocument();
+      expect(getByText("Third")).toBeInTheDocument();
+    });
+
+    const firstWord = getByText("First");
+    const secondWord = getByText("Second");
+    const thirdWord = getByText("Third");
+
+    expect(firstWord.className).toContain("opacity-100");
+    expect(secondWord.className).toContain("opacity-100");
+    expect(thirdWord.className).toContain("opacity-40");
+  });
+
+  it("renders offset nudge buttons and calls set_lyrics_offset when clicked", async () => {
+    getOffsetResult = 0;
+    playerStore.currentSong = mockSong;
+    const { getByRole } = render(LyricsView);
+
+    await waitFor(() => {
+      expect(getByRole("button", { name: "Show lyrics 0.5 s earlier" })).toBeInTheDocument();
+      expect(getByRole("button", { name: "Show lyrics 0.5 s later" })).toBeInTheDocument();
+      expect(document.getElementById("lyrics-offset-value")).toHaveTextContent("0.0s");
+    });
+
+    await fireEvent.click(getByRole("button", { name: "Show lyrics 0.5 s earlier" }));
+
+    expect(invoke).toHaveBeenCalledWith("set_lyrics_offset", {
+      songId: mockSong.id,
+      offsetMs: 500,
+    });
+
+    await waitFor(() => {
+      expect(document.getElementById("lyrics-offset-value")).toHaveTextContent("+0.5s");
+    });
+  });
+
+  it("formats the offset controls for the French locale", async () => {
+    i18n.currentLocale = "fr";
+    try {
+      getOffsetResult = 1500;
+      playerStore.currentSong = mockSong;
+      const { getByRole } = render(LyricsView);
+
+      await waitFor(() => {
+        expect(document.getElementById("lyrics-offset-value")).toHaveTextContent("+1,5 s");
+      });
+      expect(getByRole("button", { name: "Afficher les paroles 0,5 s plus tôt" })).toHaveTextContent("+0,5 s");
+      expect(getByRole("button", { name: "Afficher les paroles 0,5 s plus tard" })).toHaveTextContent(/^[-−]0,5 s$/);
+    } finally {
+      i18n.currentLocale = "en";
+      getOffsetResult = 0;
+    }
+  });
+
+  it("drops a previous song's offset that resolves after the song changed", async () => {
+    let resolveOldOffset!: (ms: number) => void;
+    vi.mocked(invoke).mockImplementation(((cmd: string, args?: { songId?: number }) => {
+      if (cmd === "get_lyrics") return Promise.resolve(getLyricsResult);
+      if (cmd === "get_lyrics_offset") {
+        if (args?.songId === mockSong.id) {
+          return new Promise<number>((resolve) => (resolveOldOffset = resolve));
+        }
+        return Promise.resolve(0);
+      }
+      return Promise.resolve(null);
+    }) as typeof invoke);
+
+    playerStore.currentSong = mockSong;
+    const { getByText, queryByText } = render(LyricsView);
+    await waitFor(() => expect(resolveOldOffset).toBeDefined());
+
+    playerStore.currentSong = { ...mockSong, id: mockSong.id + 1 };
+    await waitFor(() => expect(getByText("0.0s")).toBeInTheDocument());
+
+    resolveOldOffset(1500);
+    await Promise.resolve();
+    await waitFor(() => expect(queryByText("+1.5s")).not.toBeInTheDocument());
+    expect(getByText("0.0s")).toBeInTheDocument();
+  });
 });
+

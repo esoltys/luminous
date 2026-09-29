@@ -151,6 +151,32 @@
     </div>
 
     <h4 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase border-b border-brand-border pb-2 pt-2">
+      {i18n.t('settings.aboutMetadataServices')}
+    </h4>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+      <div class="bg-brand-main/40 border border-brand-border/60 rounded-xl p-3.5 space-y-1">
+        <p class="font-bold text-brand-text-primary">LRCLIB</p>
+        <p class="text-brand-text-secondary leading-relaxed">{i18n.t('settings.aboutTechLrcLib')}</p>
+      </div>
+
+      <div class="bg-brand-main/40 border border-brand-border/60 rounded-xl p-3.5 space-y-1">
+        <p class="font-bold text-brand-text-primary">NetEase Cloud Music</p>
+        <p class="text-brand-text-secondary leading-relaxed">{i18n.t('settings.aboutTechNetEase')}</p>
+      </div>
+
+      <div class="bg-brand-main/40 border border-brand-border/60 rounded-xl p-3.5 space-y-1">
+        <p class="font-bold text-brand-text-primary">Lyrics.ovh</p>
+        <p class="text-brand-text-secondary leading-relaxed">{i18n.t('settings.aboutTechLyricsOvh')}</p>
+      </div>
+
+      <div class="bg-brand-main/40 border border-brand-border/60 rounded-xl p-3.5 space-y-1">
+        <p class="font-bold text-brand-text-primary">iTunes Search API</p>
+        <p class="text-brand-text-secondary leading-relaxed">{i18n.t('settings.aboutTechItunes')}</p>
+      </div>
+    </div>
+
+    <h4 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase border-b border-brand-border pb-2 pt-2">
       {i18n.t('settings.aboutInfluences')}
     </h4>
 
