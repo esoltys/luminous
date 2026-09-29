@@ -148,10 +148,10 @@ function buildCoverHtml(
  * Sizing rules mirror CoverMosaic.svelte:
  * - Height H = `size`.
  * - 0 quarter covers (1 cover total): single square tile (H × H), ratio 1.
- * - 1–2 quarter covers (2–3 covers total): 1 quarter column, ratio 1.5,
- *   width = round(H * 1.5).
- * - 3–4 quarter covers (4–5 covers total): 2 quarter columns, ratio 2.0,
- *   width = round(H * 2).
+ * - 1–2 quarter covers (2–3 covers total): 1 quarter column, ratio ~1.5.
+ * - 3–4 quarter covers (4–5 covers total): 2 quarter columns, ratio ~2.0.
+ * - Quarter edge Q = (H - gap) / 2, so two stacked quarters exactly span H;
+ *   width = H + cols * (Q + gap).
  * - Capped at 5 covers total (1 big + 4 quarters).
  */
 export function buildMosaicCoverHtml(
@@ -171,25 +171,25 @@ export function buildMosaicCoverHtml(
   const bigCover = stack[0];
   const quarterCovers = stack.slice(1);
   const quarterCols = quarterCovers.length <= 2 ? 1 : 2;
-  const ratio = (2 + quarterCols) / 2;
-  const width = Math.round(size * ratio);
   const radius = Math.round(size * 0.06);
   const gap = 2;
+  // Every track and tile gets an explicit pixel size. `fr` tracks (i.e.
+  // `minmax(auto, 1fr)`) around bare `<img>`s let each image's intrinsic
+  // size inflate its track, so non-square quarter covers came out as
+  // unequal, non-square rows.
+  const quarter = (size - gap) / 2;
+  const width = size + quarterCols * (quarter + gap);
+  const tile = (edge: number) => `width:${edge}px;height:${edge}px;object-fit:cover;display:block;`;
 
   const quarterImages = quarterCovers
-    .map(
-      (uri) =>
-        `<img decoding="sync" src="${uri}" style="width:100%;height:100%;object-fit:cover;display:block;" />`
-    )
+    .map((uri) => `<img decoding="sync" src="${uri}" style="${tile(quarter)}" />`)
     .join("");
 
   return (
     `<div style="${COVER_SHADOW};flex-shrink:0;">` +
-    `<div style="display:grid;grid-template-columns:2fr ${quarterCols}fr;gap:${gap}px;width:${width}px;height:${size}px;border-radius:${radius}px;overflow:hidden;background:rgba(0,0,0,0.2);">` +
-      `<img decoding="sync" src="${bigCover}" style="width:100%;height:100%;object-fit:cover;display:block;" />` +
-      `<div style="display:grid;grid-template-rows:1fr 1fr;grid-template-columns:${quarterCols === 2 ? "1fr 1fr" : "1fr"};gap:${gap}px;height:100%;">` +
-        quarterImages +
-      `</div>` +
+    `<div style="display:grid;grid-template-columns:${size}px repeat(${quarterCols}, ${quarter}px);grid-template-rows:${quarter}px ${quarter}px;gap:${gap}px;width:${width}px;height:${size}px;border-radius:${radius}px;overflow:hidden;background:rgba(0,0,0,0.2);">` +
+      `<img decoding="sync" src="${bigCover}" style="${tile(size)}grid-column:1;grid-row:1 / span 2;" />` +
+      quarterImages +
     `</div>` +
     `</div>`
   );
