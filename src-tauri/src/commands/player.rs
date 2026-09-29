@@ -444,9 +444,43 @@ pub async fn set_shuffle_mode(mode: ShuffleMode, state: State<'_, AppState>) -> 
 }
 
 #[tauri::command]
-pub async fn set_repeat_mode(mode: RepeatMode, state: State<'_, AppState>) -> Result<(), String> {
-    state.player.lock().await.set_repeat_mode(mode);
+pub async fn set_repeat_mode(
+    mode: RepeatMode,
+    state: State<'_, AppState>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    let due = crate::player::with_player(&state.player, |p| {
+        p.set_repeat_mode(mode);
+        p.auto_continue_seed().is_some()
+    })
+    .await;
     let _ = state.audio.lock().await.clear_preload();
+    // Turning Repeat off near the end of the Queue: Auto Continue can top
+    // up now rather than waiting for the next track to start.
+    if due {
+        tauri::async_runtime::spawn(crate::continue_mix::maybe_extend(app));
+    }
+    Ok(())
+}
+
+/// Turns Auto Continue (#1235) on or off. Persisted and fire-and-forget;
+/// switching it on with the Queue already near its end tops it up at once.
+#[tauri::command]
+pub async fn set_auto_continue(
+    enabled: bool,
+    state: State<'_, AppState>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    use tauri::Emitter;
+    let (snapshot, due) = {
+        let mut p = state.player.lock().await;
+        tokio::task::block_in_place(|| p.set_auto_continue(enabled));
+        (p.get_state().await, p.auto_continue_seed().is_some())
+    };
+    let _ = app.emit("playback-state", snapshot);
+    if due {
+        tauri::async_runtime::spawn(crate::continue_mix::maybe_extend(app));
+    }
     Ok(())
 }
 

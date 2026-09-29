@@ -19,6 +19,7 @@ pub mod codecs;
 pub mod collection;
 pub mod commands;
 pub mod context;
+pub mod continue_mix;
 pub mod covermanager;
 pub mod cue;
 pub mod db;
@@ -501,6 +502,15 @@ fn sync_window_title(app: &tauri::AppHandle, song: Option<&crate::models::Song>,
     }
 }
 
+/// Starts an Auto Continue top-up (#1235) when one is due. Spawned rather
+/// than awaited: the event loop holds the player lock here, and the top-up
+/// takes the playlists lock, which must never nest inside it.
+fn spawn_auto_continue_if_due(player: &Player, app: &tauri::AppHandle) {
+    if player.auto_continue_seed().is_some() {
+        tauri::async_runtime::spawn(crate::continue_mix::maybe_extend(app.clone()));
+    }
+}
+
 /// Spawns the OS thread that drains `AudioEngine`'s event channel and turns
 /// each `AudioEvent` into player-state transitions, OS media-session
 /// mirroring, and frontend events. A blocking OS thread rather than a Tokio
@@ -557,6 +567,7 @@ fn spawn_audio_event_loop(
                             );
                             crate::media_session::mirror_state(&app, &state).await;
                             let _ = app.emit("playback-state", state);
+                            spawn_auto_continue_if_due(&p, &app);
                         }
                         crate::audio::AudioEvent::Paused => {
                             let state = p.get_state().await;
@@ -633,6 +644,7 @@ fn spawn_audio_event_loop(
                             );
                             crate::media_session::mirror_state(&app, &state).await;
                             let _ = app.emit("playback-state", state);
+                            spawn_auto_continue_if_due(&p, &app);
                         }
                         crate::audio::AudioEvent::PipelineChanged => {
                             let pipeline = {
@@ -1268,6 +1280,7 @@ pub fn run() {
             commands::player::refresh_playback_queue,
             commands::player::set_shuffle_mode,
             commands::player::set_repeat_mode,
+            commands::player::set_auto_continue,
             commands::player::get_audio_pipeline_info,
             // Pinned Home shelf commands (#222)
             commands::pins::pin_item,
