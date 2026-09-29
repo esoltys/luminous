@@ -34,7 +34,7 @@
   let password = $state("");
   let remotePath = $state(untrack(() => server?.remotePath ?? "/"));
   let enabled = $state(untrack(() => server?.enabled ?? true));
-  let autoSyncEnabled = $state(untrack(() => server?.autoSyncEnabled ?? false));
+  let autoSyncEnabled = $state(untrack(() => server?.autoSyncEnabled ?? true));
   let syncIntervalMinutes = $state(untrack(() => server?.syncIntervalMinutes ?? 60));
   let selectedIcon = $state(untrack(() => server?.icon ?? "cloud"));
   let selectedColor = $state<string | null>(untrack(() => server?.color ?? null));

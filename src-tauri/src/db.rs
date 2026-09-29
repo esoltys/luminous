@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 49;
+pub const CURRENT_SCHEMA_VERSION: i32 = 50;
 
 struct Migration {
     version: i32,
@@ -431,6 +431,11 @@ const MIGRATIONS: &[Migration] = &[
             }
             Ok(())
         },
+    },
+    Migration {
+        version: 50,
+        description: "default auto_sync_enabled to 1 on webdav_servers and subsonic_servers (#1205)",
+        apply: rebuild_remote_servers_auto_sync_default,
     },
 ];
 
@@ -1676,6 +1681,125 @@ ALTER TABLE album_profiles ADD COLUMN cover_fetched INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE album_profiles ADD COLUMN disc_fetched INTEGER NOT NULL DEFAULT 0;
 ";
 
+// ---------------------------------------------------------------------------
+// Migration 50: turn on auto_sync_enabled by default for newly added WebDAV
+// and OpenSubsonic servers (#1205). Existing servers keep their saved setting.
+// ---------------------------------------------------------------------------
+const MIGRATION_50_WEBDAV: &str = "
+CREATE TABLE webdav_servers_new (
+    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+    name                  TEXT NOT NULL,
+    url                   TEXT NOT NULL,
+    username              TEXT,
+    password              TEXT,
+    remote_path           TEXT NOT NULL DEFAULT '/',
+    enabled               BOOLEAN NOT NULL DEFAULT 1,
+    sync_status           TEXT NOT NULL DEFAULT 'idle',
+    last_synced_at        INTEGER,
+    created_at            INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+    nickname              TEXT,
+    icon                  TEXT,
+    color                 TEXT,
+    auto_sync_enabled     INTEGER NOT NULL DEFAULT 1,
+    sync_interval_minutes INTEGER NOT NULL DEFAULT 60
+);
+
+INSERT INTO webdav_servers_new (
+    id, name, url, username, password, remote_path, enabled, sync_status,
+    last_synced_at, created_at, nickname, icon, color, auto_sync_enabled, sync_interval_minutes
+)
+SELECT
+    id, name, url, username, password, remote_path, enabled, sync_status,
+    last_synced_at, created_at, nickname, icon, color, auto_sync_enabled, sync_interval_minutes
+FROM webdav_servers;
+
+DROP TABLE webdav_servers;
+ALTER TABLE webdav_servers_new RENAME TO webdav_servers;
+";
+
+const MIGRATION_50_SUBSONIC: &str = "
+CREATE TABLE subsonic_servers_new (
+    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+    name                  TEXT NOT NULL,
+    url                   TEXT NOT NULL,
+    username              TEXT NOT NULL,
+    password              TEXT,
+    enabled               BOOLEAN NOT NULL DEFAULT 1,
+    sync_status           TEXT NOT NULL DEFAULT 'idle',
+    last_synced_at        INTEGER,
+    created_at            INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+    nickname              TEXT,
+    icon                  TEXT,
+    color                 TEXT,
+    auto_sync_enabled     INTEGER NOT NULL DEFAULT 1,
+    sync_interval_minutes INTEGER NOT NULL DEFAULT 60,
+    report_plays          INTEGER NOT NULL DEFAULT 1,
+    server_type           TEXT,
+    server_version        TEXT,
+    extensions_json       TEXT NOT NULL DEFAULT '[]',
+    auth_mode             TEXT NOT NULL DEFAULT 'token'
+);
+
+INSERT INTO subsonic_servers_new (
+    id, name, url, username, password, enabled, sync_status, last_synced_at,
+    created_at, nickname, icon, color, auto_sync_enabled, sync_interval_minutes,
+    report_plays, server_type, server_version, extensions_json, auth_mode
+)
+SELECT
+    id, name, url, username, password, enabled, sync_status, last_synced_at,
+    created_at, nickname, icon, color, auto_sync_enabled, sync_interval_minutes,
+    report_plays, server_type, server_version, extensions_json, auth_mode
+FROM subsonic_servers;
+
+DROP TABLE subsonic_servers;
+ALTER TABLE subsonic_servers_new RENAME TO subsonic_servers;
+";
+
+fn rebuild_remote_servers_auto_sync_default(conn: &rusqlite::Connection) -> Result<()> {
+    use rusqlite::OptionalExtension;
+
+    conn.execute_batch("PRAGMA foreign_keys=OFF;")?;
+    let rebuild = (|| -> Result<()> {
+        conn.execute_batch("BEGIN TRANSACTION;")?;
+
+        let webdav_default: Option<String> = conn
+            .query_row(
+                "SELECT dflt_value FROM pragma_table_info('webdav_servers') WHERE name = 'auto_sync_enabled'",
+                [],
+                |r| r.get(0),
+            )
+            .optional()?;
+        if let Some(dflt) = webdav_default {
+            if dflt != "1" && dflt != "(1)" {
+                conn.execute_batch("DROP TABLE IF EXISTS webdav_servers_new;")?;
+                conn.execute_batch(MIGRATION_50_WEBDAV)?;
+            }
+        }
+
+        let subsonic_default: Option<String> = conn
+            .query_row(
+                "SELECT dflt_value FROM pragma_table_info('subsonic_servers') WHERE name = 'auto_sync_enabled'",
+                [],
+                |r| r.get(0),
+            )
+            .optional()?;
+        if let Some(dflt) = subsonic_default {
+            if dflt != "1" && dflt != "(1)" {
+                conn.execute_batch("DROP TABLE IF EXISTS subsonic_servers_new;")?;
+                conn.execute_batch(MIGRATION_50_SUBSONIC)?;
+            }
+        }
+
+        conn.execute_batch("COMMIT;")?;
+        Ok(())
+    })();
+    if rebuild.is_err() {
+        let _ = conn.execute_batch("ROLLBACK;");
+    }
+    conn.execute_batch("PRAGMA foreign_keys=ON;")?;
+    rebuild
+}
+
 fn seed_artist_tag_hierarchy(conn: &rusqlite::Connection) -> Result<()> {
     let mut stmt = conn.prepare(
         "SELECT DISTINCT json_each.value
@@ -2155,7 +2279,7 @@ mod tests {
 
         let conn = db.pool.get().unwrap();
 
-        // New rows default to auto-sync disabled with a 60-minute interval.
+        // New rows default to auto-sync enabled with a 60-minute interval (#1205).
         conn.execute(
             "INSERT INTO webdav_servers (name, url, remote_path) VALUES (?1, ?2, ?3)",
             params![
@@ -2174,11 +2298,11 @@ mod tests {
                 |r| Ok((r.get(0)?, r.get(1)?)),
             )
             .unwrap();
-        assert!(!auto_sync_enabled);
+        assert!(auto_sync_enabled);
         assert_eq!(sync_interval_minutes, 60);
 
         conn.execute(
-            "UPDATE webdav_servers SET auto_sync_enabled = 1, sync_interval_minutes = 15 WHERE id = ?1",
+            "UPDATE webdav_servers SET auto_sync_enabled = 0, sync_interval_minutes = 15 WHERE id = ?1",
             params![server_id],
         )
         .unwrap();
@@ -2189,7 +2313,7 @@ mod tests {
                 |r| Ok((r.get(0)?, r.get(1)?)),
             )
             .unwrap();
-        assert!(auto_sync_enabled);
+        assert!(!auto_sync_enabled);
         assert_eq!(sync_interval_minutes, 15);
 
         let _ = std::fs::remove_dir_all(temp_dir);
@@ -2230,7 +2354,7 @@ mod tests {
             )
             .unwrap();
         assert!(enabled);
-        assert!(!auto_sync);
+        assert!(auto_sync);
         assert_eq!(interval, 60);
         assert!(report_plays);
         assert_eq!(sync_status, "idle");
@@ -2418,6 +2542,208 @@ mod tests {
         assert_eq!(filename.as_deref(), Some("artist-abc123.jpg"));
         assert_eq!(source.as_deref(), Some("fanart"));
 
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_migration_50_auto_sync_defaults() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_migration50_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
+        let db = Database::new(temp_dir.clone()).unwrap();
+        assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
+
+        let conn = db.pool.get().unwrap();
+
+        // 1. Newly inserted WebDAV server defaults auto_sync_enabled to true (1)
+        conn.execute(
+            "INSERT INTO webdav_servers (name, url, remote_path) VALUES (?1, ?2, ?3)",
+            params!["Nextcloud", "https://cloud.example.com", "/Music"],
+        )
+        .unwrap();
+        let webdav_id = conn.last_insert_rowid();
+        let webdav_auto_sync: bool = conn
+            .query_row(
+                "SELECT auto_sync_enabled FROM webdav_servers WHERE id = ?1",
+                params![webdav_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert!(
+            webdav_auto_sync,
+            "new WebDAV server defaults auto_sync_enabled to true"
+        );
+
+        // 2. Newly inserted Subsonic server defaults auto_sync_enabled to true (1)
+        conn.execute(
+            "INSERT INTO subsonic_servers (name, url, username, password) VALUES (?1, ?2, ?3, ?4)",
+            params!["Navidrome", "https://music.example.com", "user", "pass"],
+        )
+        .unwrap();
+        let subsonic_id = conn.last_insert_rowid();
+        let subsonic_auto_sync: bool = conn
+            .query_row(
+                "SELECT auto_sync_enabled FROM subsonic_servers WHERE id = ?1",
+                params![subsonic_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert!(
+            subsonic_auto_sync,
+            "new Subsonic server defaults auto_sync_enabled to true"
+        );
+
+        // 3. Updating or inserting with explicit auto_sync_enabled = false is respected
+        conn.execute(
+            "INSERT INTO webdav_servers (name, url, remote_path, auto_sync_enabled) VALUES (?1, ?2, ?3, 0)",
+            params!["Manual WebDAV", "https://cloud2.example.com", "/Music"],
+        )
+        .unwrap();
+        let manual_id = conn.last_insert_rowid();
+        let manual_auto_sync: bool = conn
+            .query_row(
+                "SELECT auto_sync_enabled FROM webdav_servers WHERE id = ?1",
+                params![manual_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert!(
+            !manual_auto_sync,
+            "explicit auto_sync_enabled=0 on WebDAV is preserved"
+        );
+
+        // 4. Updating or inserting with explicit auto_sync_enabled = false on Subsonic is respected
+        conn.execute(
+            "INSERT INTO subsonic_servers (name, url, username, password, auto_sync_enabled) VALUES (?1, ?2, ?3, ?4, 0)",
+            params!["Manual Subsonic", "https://music2.example.com", "user2", "pass2"],
+        )
+        .unwrap();
+        let manual_sub_id = conn.last_insert_rowid();
+        let manual_sub_auto_sync: bool = conn
+            .query_row(
+                "SELECT auto_sync_enabled FROM subsonic_servers WHERE id = ?1",
+                params![manual_sub_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert!(
+            !manual_sub_auto_sync,
+            "explicit auto_sync_enabled=0 on Subsonic is preserved"
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_migration_50_does_not_flip_existing_servers() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_migration50_flip_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
+        let db_path = temp_dir.join("luminous.db");
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute_batch("CREATE TABLE schema_version (version INTEGER PRIMARY KEY);")
+            .unwrap();
+        for m in MIGRATIONS.iter().filter(|m| m.version < 50) {
+            (m.apply)(&conn).unwrap();
+            conn.execute(
+                "INSERT INTO schema_version (version) VALUES (?1)",
+                params![m.version],
+            )
+            .unwrap();
+        }
+
+        // Insert servers while default was 0 (v49)
+        conn.execute(
+            "INSERT INTO webdav_servers (name, url, remote_path) VALUES ('Old WebDAV', 'http://old.local', '/Music')",
+            [],
+        ).unwrap();
+        let old_webdav_id = conn.last_insert_rowid();
+
+        conn.execute(
+            "INSERT INTO subsonic_servers (name, url, username, password) VALUES ('Old Subsonic', 'http://old.subsonic', 'u', 'p')",
+            [],
+        ).unwrap();
+        let old_subsonic_id = conn.last_insert_rowid();
+
+        // Verify that under v49 they defaulted to 0
+        let (w_sync, s_sync): (bool, bool) = (
+            conn.query_row(
+                "SELECT auto_sync_enabled FROM webdav_servers WHERE id = ?1",
+                params![old_webdav_id],
+                |r| r.get(0),
+            )
+            .unwrap(),
+            conn.query_row(
+                "SELECT auto_sync_enabled FROM subsonic_servers WHERE id = ?1",
+                params![old_subsonic_id],
+                |r| r.get(0),
+            )
+            .unwrap(),
+        );
+        assert!(!w_sync);
+        assert!(!s_sync);
+
+        // Now run migration 50
+        rebuild_remote_servers_auto_sync_default(&conn).unwrap();
+        conn.execute("INSERT INTO schema_version (version) VALUES (50)", [])
+            .unwrap();
+
+        // Existing servers must still be 0 (false)
+        let (w_sync_after, s_sync_after): (bool, bool) = (
+            conn.query_row(
+                "SELECT auto_sync_enabled FROM webdav_servers WHERE id = ?1",
+                params![old_webdav_id],
+                |r| r.get(0),
+            )
+            .unwrap(),
+            conn.query_row(
+                "SELECT auto_sync_enabled FROM subsonic_servers WHERE id = ?1",
+                params![old_subsonic_id],
+                |r| r.get(0),
+            )
+            .unwrap(),
+        );
+        assert!(
+            !w_sync_after,
+            "existing WebDAV server must not flip to enabled"
+        );
+        assert!(
+            !s_sync_after,
+            "existing Subsonic server must not flip to enabled"
+        );
+
+        // But new servers added after migration 50 default to 1 (true)
+        conn.execute(
+            "INSERT INTO webdav_servers (name, url, remote_path) VALUES ('New WebDAV', 'http://new.local', '/Music')",
+            [],
+        ).unwrap();
+        let new_w_sync: bool = conn
+            .query_row(
+                "SELECT auto_sync_enabled FROM webdav_servers WHERE name = 'New WebDAV'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert!(new_w_sync, "new WebDAV server defaults to enabled");
+
+        conn.execute(
+            "INSERT INTO subsonic_servers (name, url, username, password) VALUES ('New Subsonic', 'http://new.subsonic', 'u', 'p')",
+            [],
+        ).unwrap();
+        let new_s_sync: bool = conn
+            .query_row(
+                "SELECT auto_sync_enabled FROM subsonic_servers WHERE name = 'New Subsonic'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert!(new_s_sync, "new Subsonic server defaults to enabled");
+
+        drop(conn);
         let _ = std::fs::remove_dir_all(temp_dir);
     }
 
