@@ -69,6 +69,42 @@ where
     .map_err(|e| anyhow::anyhow!("tag manager task panicked: {e}"))?
 }
 
+/// Drops nodes no song (or, for artist tags, no artist) uses from a
+/// hierarchy read for display. With a hierarchy sidecar attached, reconcile
+/// keeps unused tags rather than evicting them (#1312), so the views hide
+/// them here instead — a group survives while `keep_group` says so or any
+/// child is still in use (its count is the roll-up, so zero means none is).
+fn hide_unused(groups: Vec<TagGroup>, keep_group: impl Fn(&str) -> bool) -> Vec<TagGroup> {
+    groups
+        .into_iter()
+        .filter_map(|mut group| {
+            group.children.retain(|c| c.song_count > 0);
+            (group.song_count > 0 || keep_group(&group.name)).then_some(group)
+        })
+        .collect()
+}
+
+/// Lowercased names of every child a display read shows.
+fn visible_children(groups: Vec<TagGroup>) -> HashSet<String> {
+    groups
+        .into_iter()
+        .flat_map(|g| g.children)
+        .map(|c| c.name.to_lowercase())
+        .collect()
+}
+
+/// Maps an index among the visible `siblings` to one in the full list, so a
+/// drag lands before the same visible neighbour the user dropped it on;
+/// past the last visible sibling it goes to the end.
+fn full_index(siblings: &[String], visible: &HashSet<String>, visible_index: i32) -> usize {
+    siblings
+        .iter()
+        .enumerate()
+        .filter(|(_, name)| visible.contains(&name.to_lowercase()))
+        .nth(visible_index.max(0) as usize)
+        .map_or(siblings.len(), |(i, _)| i)
+}
+
 impl TagManager {
     /// Self-heals `tag_groups`/`tag_assignments` on every construction rather
     /// than trusting migration 18's `schema_version` bookkeeping alone to
@@ -473,7 +509,7 @@ impl TagManager {
                 }
             })
             .collect();
-        Ok(groups)
+        Ok(hide_unused(groups, |_| false))
     }
 
     /// Reconciles `tag_groups`/`tag_assignments` against tags currently in
@@ -791,8 +827,11 @@ impl TagManager {
         Ok(())
     }
 
-    /// Reorders `tag_name` to `new_index` among its group's other children.
+    /// Reorders `tag_name` to `new_index` among its group's other *visible*
+    /// children — the index the UI dragged to (see [`hide_unused`]).
     pub fn reorder_tag_in_group(&self, tag_name: &str, new_index: i32) -> Result<()> {
+        // Before taking `conn`: the getter takes its own connection.
+        let visible = visible_children(self.get_tag_hierarchy()?);
         let conn = self.db.pool.get()?;
         let group_id: i64 = conn.query_row(
             "SELECT group_id FROM tag_assignments WHERE tag_name = ?1 COLLATE NOCASE",
@@ -813,7 +852,7 @@ impl TagManager {
             return Ok(());
         };
         let moved = siblings.remove(pos);
-        let target = (new_index.max(0) as usize).min(siblings.len());
+        let target = full_index(&siblings, &visible, new_index);
         siblings.insert(target, moved);
 
         let tx = conn.unchecked_transaction()?;
@@ -1005,11 +1044,23 @@ impl TagManager {
         }
 
         let mut group_stmt = conn.prepare(
-            "SELECT id, name, color_index FROM artist_tag_groups ORDER BY sort_order, name COLLATE NOCASE",
+            "SELECT id, name, color_index, is_custom FROM artist_tag_groups ORDER BY sort_order, name COLLATE NOCASE",
         )?;
-        let groups_raw: Vec<(i64, String, i32)> = group_stmt
-            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?
+        let groups_raw: Vec<(i64, String, i32, bool)> = group_stmt
+            .query_map([], |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get::<_, i64>(3)? != 0,
+                ))
+            })?
             .filter_map(|r| r.ok())
+            .collect();
+        let custom_groups: HashSet<String> = groups_raw
+            .iter()
+            .filter(|(_, _, _, is_custom)| *is_custom)
+            .map(|(_, name, _, _)| name.to_lowercase())
             .collect();
 
         let mut child_stmt = conn.prepare(
@@ -1022,7 +1073,7 @@ impl TagManager {
 
         let groups = groups_raw
             .into_iter()
-            .map(|(id, name, color_index)| {
+            .map(|(id, name, color_index, _)| {
                 let children: Vec<TagGroupChild> = children_raw
                     .iter()
                     .filter(|(group_id, _)| *group_id == id)
@@ -1058,7 +1109,10 @@ impl TagManager {
             })
             .collect();
 
-        Ok(groups)
+        // A user-created group starts empty on purpose — it's a drop target.
+        Ok(hide_unused(groups, |name| {
+            custom_groups.contains(&name.to_lowercase())
+        }))
     }
 
     /// Reconciles `artist_tag_groups`/`artist_tag_assignments` against artist
@@ -1281,6 +1335,8 @@ impl TagManager {
     }
 
     pub fn reorder_artist_tag_in_group(&self, tag_name: &str, new_index: i32) -> Result<()> {
+        // Before taking `conn`: the getter takes its own connection.
+        let visible = visible_children(self.get_artist_tag_hierarchy()?);
         let conn = self.db.pool.get()?;
         let group_id: i64 = conn.query_row(
             "SELECT group_id FROM artist_tag_assignments WHERE tag_name = ?1 COLLATE NOCASE",
@@ -1300,7 +1356,7 @@ impl TagManager {
             .position(|s| s.eq_ignore_ascii_case(tag_name))
         {
             let item = siblings.remove(pos);
-            let target = (new_index.max(0) as usize).min(siblings.len());
+            let target = full_index(&siblings, &visible, new_index);
             siblings.insert(target, item);
             for (i, name) in siblings.iter().enumerate() {
                 conn.execute(
@@ -2060,6 +2116,87 @@ mod tests {
         let hierarchy = manager.get_tag_hierarchy().unwrap();
         let metal = hierarchy.iter().find(|g| g.name == "Metal").unwrap();
         assert_eq!(metal.children[0].name, "Doom Metal");
+    }
+
+    #[test]
+    fn test_unused_tags_are_kept_while_attached_but_hidden_and_skipped_by_reorder() {
+        let (_dir, db) = test_db();
+        let id = insert_song(
+            &db,
+            "/a.mp3",
+            "Metal; Progressive Metal; Symphonic Metal; Doom Metal",
+        );
+        let manager = TagManager::new(db.clone());
+        manager.reconcile_hierarchy().unwrap();
+        manager.reorder_tag_in_group("Symphonic Metal", 0).unwrap();
+
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO app_state (key, value) VALUES (?1, '/library')",
+            params![crate::hierarchy_sidecar::SETTING_KEY],
+        )
+        .unwrap();
+        conn.execute(
+            "UPDATE songs SET genre = 'Metal; Progressive Metal; Doom Metal' WHERE id = ?1",
+            params![id],
+        )
+        .unwrap();
+        manager.reconcile_hierarchy().unwrap();
+
+        let stored: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM tag_assignments WHERE tag_name = 'Symphonic Metal'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(stored, 1, "attached: an unused tag is not evicted");
+
+        let children = |m: &TagManager| -> Vec<String> {
+            let hierarchy = m.get_tag_hierarchy().unwrap();
+            let metal = hierarchy.iter().find(|g| g.name == "Metal").unwrap();
+            metal.children.iter().map(|c| c.name.clone()).collect()
+        };
+        assert_eq!(children(&manager), ["Doom Metal", "Progressive Metal"]);
+
+        // Visible index 1 = after "Progressive Metal", though the hidden
+        // "Symphonic Metal" sits first in the stored order.
+        manager.reorder_tag_in_group("Doom Metal", 1).unwrap();
+        assert_eq!(children(&manager), ["Progressive Metal", "Doom Metal"]);
+    }
+
+    #[test]
+    fn test_hide_unused_keeps_used_nodes_and_flagged_empty_groups() {
+        let group = |name: &str, count: i64, children: &[(&str, i64)]| TagGroup {
+            name: name.into(),
+            color_index: 0,
+            song_count: count,
+            children: children
+                .iter()
+                .map(|(n, c)| TagGroupChild {
+                    name: (*n).into(),
+                    song_count: *c,
+                })
+                .collect(),
+        };
+        let shown = hide_unused(
+            vec![
+                group("Rock", 2, &[("Punk", 2), ("Grunge", 0)]),
+                group("Jazz", 0, &[("Bebop", 0)]),
+                group("Favourites", 0, &[]),
+            ],
+            |name| name == "Favourites",
+        );
+        let names: Vec<(&str, Vec<&str>)> = shown
+            .iter()
+            .map(|g| {
+                (
+                    g.name.as_str(),
+                    g.children.iter().map(|c| c.name.as_str()).collect(),
+                )
+            })
+            .collect();
+        assert_eq!(names, [("Rock", vec!["Punk"]), ("Favourites", vec![])]);
     }
 
     #[test]
