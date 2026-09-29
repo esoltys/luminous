@@ -344,7 +344,7 @@
                   {#each line.words as word}
                     {@const isWordSung = currentMs >= word.timeMs}
                     <span
-                      class="inline-block transition-all duration-150 {isWordSung ? 'text-brand-text-primary opacity-100 font-extrabold filter drop-shadow-[0_0_6px_var(--color-brand-accent)]' : 'text-brand-text-primary/40 opacity-40 font-bold'}"
+                      class="inline-block whitespace-pre-wrap transition-all duration-150 {isWordSung ? 'text-brand-text-primary opacity-100 filter drop-shadow-[0_0_6px_var(--color-brand-accent)]' : 'text-brand-text-primary/40 opacity-40'}"
                     >{word.text}</span>
                   {/each}
                 {:else}
