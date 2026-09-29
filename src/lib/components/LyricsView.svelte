@@ -236,10 +236,10 @@
 </script>
 
 <div class="flex-1 flex flex-col h-full bg-brand-main text-brand-text-primary select-none overflow-hidden relative">
-  <div class="h-16 flex items-center justify-between px-8 border-b border-brand-border bg-brand-main/40 backdrop-blur-md shrink-0">
-    <div class="flex items-center gap-3">
-      <Lyrics class="w-6 h-6 text-brand-accent-text" />
-      <div>
+  <div class="h-16 flex items-center justify-between gap-4 px-8 border-b border-brand-border bg-brand-main/40 backdrop-blur-md shrink-0">
+    <div class="flex items-center gap-3 min-w-0 flex-1">
+      <Lyrics class="w-6 h-6 text-brand-accent-text shrink-0" />
+      <div class="min-w-0">
         <h2 class="text-sm font-bold truncate max-w-xs md:max-w-md text-brand-text-primary py-0.5 leading-snug">
           {playerStore.currentSong ? playerStore.currentSong.title : i18n.t('playerBar.notPlaying')}
         </h2>
@@ -250,7 +250,7 @@
     </div>
 
     {#if playerStore.currentSong}
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2 shrink-0">
         {#if playerStore.currentSong.is_instrumental}
           <Button onclick={() => toggleInstrumental(false)} variant="secondary" size="sm">
             <Music2 class="w-3.5 h-3.5" /> {i18n.t('lyrics.unmarkInstrumental', {}, "Unmark Instrumental")}
