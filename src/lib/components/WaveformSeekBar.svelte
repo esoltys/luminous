@@ -366,11 +366,18 @@
 
   $effect(() => {
     if (typeof ResizeObserver === "undefined" || !containerEl) return;
+    let rafId: number | undefined;
     const observer = new ResizeObserver(() => {
-      draw();
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        draw();
+      });
     });
     observer.observe(containerEl);
-    return () => observer.disconnect();
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      observer.disconnect();
+    };
   });
 
   // Handle seek actions (click / drag)

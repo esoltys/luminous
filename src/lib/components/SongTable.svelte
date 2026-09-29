@@ -169,13 +169,23 @@
     if (!virtualized || !bodyContainer) return;
     const viewport = bodyContainer.querySelector<HTMLElement>("svelte-virtual-list-viewport");
     if (!viewport) return;
+    let rafId: number | undefined;
     const update = () => {
-      scrollbarWidth = viewport.offsetWidth - viewport.clientWidth;
+      const diff = viewport.offsetWidth - viewport.clientWidth;
+      if (diff !== scrollbarWidth) {
+        scrollbarWidth = diff;
+      }
     };
     update();
-    const observer = new ResizeObserver(update);
+    const observer = new ResizeObserver(() => {
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(update);
+    });
     observer.observe(viewport);
-    return () => observer.disconnect();
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      observer.disconnect();
+    };
   });
 
   $effect(() => {
