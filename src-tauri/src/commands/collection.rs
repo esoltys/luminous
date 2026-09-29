@@ -24,8 +24,16 @@ pub async fn add_directory(
     })
     .await
     .map_err(|e| e.to_string())?;
-    crate::collection::start_watcher(app, &state);
+    crate::collection::start_watcher(app.clone(), &state);
+    link_default_library_if_unchosen(app).await;
     Ok(res)
+}
+
+/// A lone watched folder becomes the default library unless the user has
+/// chosen one (or chosen none) — see `hierarchy_sidecar::ensure_default`.
+async fn link_default_library_if_unchosen(app: AppHandle) {
+    let _ =
+        tokio::task::spawn_blocking(move || crate::hierarchy_sidecar::ensure_default(&app)).await;
 }
 
 #[tauri::command]
@@ -48,7 +56,8 @@ pub async fn remove_directory(
     })
     .await
     .map_err(|e| e.to_string())?;
-    crate::collection::start_watcher(app, &state);
+    crate::collection::start_watcher(app.clone(), &state);
+    link_default_library_if_unchosen(app).await;
     Ok(())
 }
 

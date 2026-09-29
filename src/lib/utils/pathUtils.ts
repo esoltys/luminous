@@ -83,6 +83,14 @@ export function getFolderName(folderPath: string): string {
 }
 
 /**
+ * The name a watched folder goes by in the UI: its nickname, or else its
+ * folder name (or the whole path when it has no separators, e.g. a drive root).
+ */
+export function getDirectoryDisplayName(dir: { nickname?: string | null; path: string }): string {
+  return dir.nickname?.trim() || getFolderName(dir.path) || dir.path;
+}
+
+/**
  * Resolves the album folder path for a collection of song paths.
  * If the songs live inside disc subfolders (e.g. `Album/Disc 1/track.flac` or
  * `Album/CD2/track.flac`), this steps up to the containing album directory.

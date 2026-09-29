@@ -13,6 +13,9 @@ Music/                       <- the default library
 
 ## Behaviour
 
+- **Automatic default:** when you have exactly one watched folder (your first, or the one
+  left after removing the others), it becomes the default library unless you've picked one
+  yourself. Choosing **None** is also a choice, and it's respected.
 - **Linking:** if the folder already has a `luminous-hierarchy.json`, Luminous adopts it and
   it replaces the local hierarchy. Otherwise Luminous writes the local hierarchy out. A file
   that can't be read refuses the link, and the picker shows the reason.
@@ -27,7 +30,8 @@ Music/                       <- the default library
 - **Malformed file:** Luminous never overwrites a file it can't parse. It keeps the current
   hierarchy and shows an error until the file is fixed.
 - **Unlinking:** choose **None**, or remove the folder from Watched Folders. The local
-  hierarchy stays as it is, and the file is left in place.
+  hierarchy stays as it is, and the file is left in place. Removing the folder doesn't count
+  as choosing **None**, so if a single folder remains it becomes the default.
 
 ## Format
 

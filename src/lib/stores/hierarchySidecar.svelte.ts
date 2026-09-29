@@ -31,6 +31,9 @@ class HierarchySidecarStore {
       this.error = payload.message;
       this.toast(payload.path, payload.message);
     });
+    // The backend links a lone watched folder on its own when folders are
+    // added or removed.
+    await listen("default-library-changed", () => this.refresh());
     // An error from the startup load can be emitted before the listener above
     // is attached — the status call reports it too.
     await this.refresh();

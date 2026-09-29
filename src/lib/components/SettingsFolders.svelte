@@ -18,6 +18,7 @@
   import type { MusicDirectory, SubsonicServer, SubsonicSyncStats, WebDavServer } from "../types";
   import { combineWebdavPath } from "../webdavDisplay";
   import { stripEnclosingQuotes } from "../utils/filterParser";
+  import { getDirectoryDisplayName } from "../utils/pathUtils";
   import { formatFileSize } from "../utils/formatters";
   import { invoke } from "@tauri-apps/api/core";
   import {
@@ -245,7 +246,7 @@
 
   async function handleCreateFolderPlaylist(dir: MusicDirectory) {
     const cleanPath = stripEnclosingQuotes(dir.path);
-    const name = dir.nickname || cleanPath.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || cleanPath;
+    const name = getDirectoryDisplayName({ nickname: dir.nickname, path: cleanPath });
     const escapedPath = cleanPath.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
     try {
       const playlist = await playlistsStore.createPlaylist(name);
@@ -390,7 +391,7 @@
         >
           <option value="">{i18n.t('settings.defaultLibraryNone')}</option>
           {#each collectionStore.directories as dir (dir.path)}
-            <option value={dir.path}>{dir.nickname || dir.path}</option>
+            <option value={dir.path}>{getDirectoryDisplayName(dir)}</option>
           {/each}
         </Select>
       </div>

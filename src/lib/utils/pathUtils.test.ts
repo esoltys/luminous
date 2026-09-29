@@ -4,6 +4,7 @@ import {
   getFolderName,
   isDiscFolder,
   getAlbumFolderPath,
+  getDirectoryDisplayName,
 } from "./pathUtils";
 
 describe("pathUtils", () => {
@@ -77,6 +78,21 @@ describe("pathUtils", () => {
       ).toBe("2012 - Albatross");
       expect(getFolderName("/music/Big Wreck/Disc 1")).toBe("Disc 1");
       expect(getFolderName("Disc 2")).toBe("Disc 2");
+    });
+  });
+
+  describe("getDirectoryDisplayName", () => {
+    it("prefers a non-blank nickname, trimmed", () => {
+      expect(getDirectoryDisplayName({ nickname: " BandCamp ", path: "Z:\\BandCamp" })).toBe("BandCamp");
+    });
+
+    it("falls back to the folder name when the nickname is missing or blank", () => {
+      expect(getDirectoryDisplayName({ path: "Z:\\Music Library\\" })).toBe("Music Library");
+      expect(getDirectoryDisplayName({ nickname: "  ", path: "/home/me/Music" })).toBe("Music");
+    });
+
+    it("falls back to the whole path when there is no folder name", () => {
+      expect(getDirectoryDisplayName({ nickname: null, path: "/" })).toBe("/");
     });
   });
 

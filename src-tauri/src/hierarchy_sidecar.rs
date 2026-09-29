@@ -41,6 +41,9 @@ const PALETTE_SIZE: i32 = 10;
 const WATCH_DEBOUNCE: Duration = Duration::from_millis(1000);
 /// Emitted with a [`SidecarError`] when the file on disk can't be loaded.
 pub const ERROR_EVENT: &str = "hierarchy-sidecar-error";
+/// Emitted whenever the default library is linked or unlinked, including
+/// automatically — the frontend re-reads [`status`].
+pub const CHANGED_EVENT: &str = "default-library-changed";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HierarchyFile {
@@ -465,9 +468,21 @@ fn sync_from_disk(app: &AppHandle, create_if_missing: bool) {
     let _ = app.emit("artist-tags-changed", ());
 }
 
-/// Startup: load the attached sidecar (if any) and start watching it.
+/// Startup: link a lone watched folder if no default was ever chosen, then
+/// load the attached sidecar (if any) and start watching it.
 pub fn init(app: &AppHandle) {
     let state = app.state::<crate::AppState>();
+    let unchosen = state
+        .db
+        .pool
+        .get()
+        .ok()
+        .and_then(|conn| auto_default_candidate(&conn).ok().flatten());
+    if unchosen.is_some() {
+        // Linking loads and starts watching.
+        ensure_default(app);
+        return;
+    }
     let dir = state
         .db
         .pool
@@ -491,7 +506,14 @@ pub fn set_default_library(app: &AppHandle, dir: Option<String>) -> Result<()> {
 
     let conn = db.pool.get()?;
     let Some(dir) = dir.filter(|d| !d.trim().is_empty()) else {
-        conn.execute("DELETE FROM app_state WHERE key = ?1", params![SETTING_KEY])?;
+        // An empty value records "None" as a choice, so a lone watched folder
+        // isn't linked again behind the user's back (see `ensure_default`).
+        conn.execute(
+            "INSERT OR REPLACE INTO app_state (key, value) VALUES (?1, '')",
+            params![SETTING_KEY],
+        )?;
+        drop(conn);
+        let _ = app.emit(CHANGED_EVENT, ());
         return Ok(());
     };
     let known: bool = conn.query_row(
@@ -520,24 +542,75 @@ pub fn set_default_library(app: &AppHandle, dir: Option<String>) -> Result<()> {
 
     sync_from_disk(app, true);
     sidecar.start_watching(app, &dir);
+    let _ = app.emit(CHANGED_EVENT, ());
     Ok(())
 }
 
-/// Detaches when the default library's folder stops being watched.
-pub fn on_directory_removed(app: &AppHandle, removed: &str) {
+/// The folder to link automatically: the only watched folder, while the user
+/// has never chosen a default library (no `app_state` row — an explicit
+/// "None" is stored as an empty value and is respected).
+pub fn auto_default_candidate(conn: &Connection) -> Result<Option<String>> {
+    let chosen: bool = conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM app_state WHERE key = ?1)",
+        params![SETTING_KEY],
+        |r| r.get(0),
+    )?;
+    if chosen {
+        return Ok(None);
+    }
+    let mut stmt = conn.prepare("SELECT path FROM directories LIMIT 2")?;
+    let dirs: Vec<String> = stmt
+        .query_map([], |r| r.get(0))?
+        .collect::<rusqlite::Result<_>>()?;
+    Ok(match dirs.as_slice() {
+        [only] => Some(only.clone()),
+        _ => None,
+    })
+}
+
+/// Links the only watched folder as the default library if the user hasn't
+/// chosen one. Runs at startup and whenever the watched folders change. A
+/// folder that can't be linked (offline, malformed sidecar) is left unlinked
+/// and retried next time.
+pub fn ensure_default(app: &AppHandle) {
     let state = app.state::<crate::AppState>();
-    let is_default = state
+    let candidate = state
         .db
         .pool
         .get()
-        .ok()
-        .and_then(|conn| default_library(&conn).ok().flatten())
-        .is_some_and(|d| d == removed);
-    if is_default {
-        if let Err(e) = set_default_library(app, None) {
-            log::warn!("Failed to detach hierarchy sidecar: {e}");
+        .map_err(anyhow::Error::from)
+        .and_then(|conn| auto_default_candidate(&conn));
+    match candidate {
+        Ok(Some(dir)) => {
+            if let Err(e) = set_default_library(app, Some(dir.clone())) {
+                log::warn!("Not linking {dir} as the default library: {e:#}");
+            }
         }
+        Ok(None) => {}
+        Err(e) => log::warn!("Default library check failed: {e:#}"),
     }
+}
+
+/// Detaches when the default library's folder stops being watched — back to
+/// "never chosen", so a single remaining folder becomes the default.
+pub fn on_directory_removed(app: &AppHandle, removed: &str) {
+    let state = app.state::<crate::AppState>();
+    let Ok(conn) = state.db.pool.get() else {
+        return;
+    };
+    let is_default = default_library(&conn)
+        .ok()
+        .flatten()
+        .is_some_and(|d| d == removed);
+    if !is_default {
+        return;
+    }
+    state.hierarchy_sidecar.forget();
+    if let Err(e) = conn.execute("DELETE FROM app_state WHERE key = ?1", params![SETTING_KEY]) {
+        log::warn!("Failed to detach hierarchy sidecar: {e}");
+    }
+    drop(conn);
+    let _ = app.emit(CHANGED_EVENT, ());
 }
 
 /// Write-through for async callers holding `AppState`.
@@ -688,6 +761,46 @@ mod tests {
                 params![SETTING_KEY, lib.to_string_lossy()],
             )
             .unwrap();
+    }
+
+    fn watch(conn: &Connection, path: &str) {
+        conn.execute("INSERT INTO directories (path) VALUES (?1)", params![path])
+            .unwrap();
+    }
+
+    #[test]
+    fn only_watched_folder_is_the_auto_default_until_a_choice_is_made() {
+        let (_d, db) = test_db();
+        let conn = db.pool.get().unwrap();
+        assert_eq!(auto_default_candidate(&conn).unwrap(), None);
+
+        watch(&conn, "Z:\\Music Library");
+        assert_eq!(
+            auto_default_candidate(&conn).unwrap().as_deref(),
+            Some("Z:\\Music Library")
+        );
+
+        watch(&conn, "Z:\\BandCamp");
+        assert_eq!(auto_default_candidate(&conn).unwrap(), None);
+
+        conn.execute("DELETE FROM directories WHERE path = 'Z:\\BandCamp'", [])
+            .unwrap();
+        assert!(auto_default_candidate(&conn).unwrap().is_some());
+    }
+
+    #[test]
+    fn explicit_none_is_not_overridden_by_the_auto_default() {
+        let (_d, db) = test_db();
+        let conn = db.pool.get().unwrap();
+        watch(&conn, "Z:\\Music Library");
+        // What `set_default_library(None)` stores.
+        conn.execute(
+            "INSERT OR REPLACE INTO app_state (key, value) VALUES (?1, '')",
+            params![SETTING_KEY],
+        )
+        .unwrap();
+        assert_eq!(default_library(&conn).unwrap(), None);
+        assert_eq!(auto_default_candidate(&conn).unwrap(), None);
     }
 
     #[test]

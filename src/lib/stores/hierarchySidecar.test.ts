@@ -53,6 +53,21 @@ describe("hierarchySidecarStore", () => {
     expect(toastStore.messages).toHaveLength(1);
   });
 
+  it("picks up a default library the backend linked on its own", async () => {
+    let changed: (() => void) | undefined;
+    vi.mocked(listen).mockImplementation(async (event, cb) => {
+      if (event === "default-library-changed") changed = cb as () => void;
+      return () => {};
+    });
+    mockStatus({ path: null, error: null });
+    await hierarchySidecarStore.init();
+    expect(hierarchySidecarStore.path).toBeNull();
+
+    mockStatus({ path: LIBRARY, error: null });
+    changed!();
+    await vi.waitFor(() => expect(hierarchySidecarStore.path).toBe(LIBRARY));
+  });
+
   it("refreshes the status after a refused link and passes the backend's reason on", async () => {
     vi.mocked(invoke).mockImplementation(async (cmd: string) => {
       if (cmd === "set_default_library") throw `${LIBRARY} is not available`;
