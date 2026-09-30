@@ -50,17 +50,21 @@ describe("Equalizer.svelte", () => {
     },
   };
 
+  const defaultPresets = { builtin: ["Flat", "Rock", "Pop"], user: [] };
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(invoke).mockImplementation(async (cmd: string, args?: any) => {
       if (cmd === "get_equalizer_state") return defaultEqConfig;
+      if (cmd === "list_eq_presets") return defaultPresets;
       // The backend echoes the applied config back (post-clamping).
       if (cmd === "apply_equalizer_config") return args?.config;
       if (cmd === "get_loudness_settings") return defaultLoudness;
       if (cmd === "get_fade_settings") return defaultFadeSettings;
       if (cmd === "get_audio_setting_ranges") return defaultRanges;
       if (cmd === "get_loudness_analysis_remaining") return 0;
-      if (cmd === "load_equalizer_preset") return { gains: [4, 3, 1, -1, -2, -1, 1, 3, 3.5, 3.5], parametric: [] };
+      if (cmd === "load_equalizer_preset")
+        return { ...defaultEqConfig, gains: [4, 3, 1, -1, -2, -1, 1, 3, 3.5, 3.5], active_preset: args.presetName };
       if (cmd === "get_parametric_response") return args.frequencies.map(() => 0);
       return null;
     });
@@ -72,6 +76,7 @@ describe("Equalizer.svelte", () => {
     function mockResponse(respond: (freqs: number[]) => number[]) {
       vi.mocked(invoke).mockImplementation(async (cmd: string, args?: any) => {
         if (cmd === "get_equalizer_state") return parametricConfig;
+        if (cmd === "list_eq_presets") return defaultPresets;
         if (cmd === "apply_equalizer_config") return args?.config;
         if (cmd === "get_loudness_settings") return defaultLoudness;
         if (cmd === "get_fade_settings") return defaultFadeSettings;
@@ -166,6 +171,134 @@ describe("Equalizer.svelte", () => {
     });
   });
 
+  describe("user presets (#1335)", () => {
+    const studio = { id: 7, name: "Studio" };
+    let state: Record<string, unknown>;
+    let presets: { builtin: string[]; user: { id: number; name: string }[] };
+
+    function mockPresetBackend(overrides: Record<string, (args: any) => unknown> = {}) {
+      state = { ...defaultEqConfig, mode: "parametric", active_preset: "user:7" };
+      presets = { builtin: ["Flat", "Rock"], user: [studio] };
+      vi.mocked(invoke).mockImplementation(async (cmd: string, args?: any) => {
+        if (overrides[cmd]) return overrides[cmd](args);
+        if (cmd === "get_equalizer_state") return state;
+        if (cmd === "list_eq_presets") return presets;
+        // Like the engine: any edit leaves the preset, so the echo is Custom.
+        if (cmd === "apply_equalizer_config") return { ...args.config, active_preset: null };
+        if (cmd === "get_loudness_settings") return defaultLoudness;
+        if (cmd === "get_fade_settings") return defaultFadeSettings;
+        if (cmd === "get_audio_setting_ranges") return defaultRanges;
+        if (cmd === "get_parametric_response") return args.frequencies.map(() => 0);
+        return null;
+      });
+    }
+
+    async function renderPicker() {
+      const view = render(Equalizer);
+      let picker!: HTMLSelectElement;
+      await waitFor(() => {
+        picker = view.getByLabelText("Preset:") as HTMLSelectElement;
+        expect(picker.value).toBe("user:7");
+      });
+      return { ...view, picker };
+    }
+
+    it("lists user presets beside the built-ins and selects the active one", async () => {
+      mockPresetBackend();
+      const { picker, getByRole } = await renderPicker();
+      const groups = [...picker.querySelectorAll("optgroup")].map((g) => g.label);
+      expect(groups).toEqual(["Built-in", "My presets"]);
+      expect(picker.selectedOptions[0].textContent).toBe("Studio");
+      expect(getByRole("button", { name: "Rename" })).toBeInTheDocument();
+      expect(getByRole("button", { name: "Delete" })).toBeInTheDocument();
+    });
+
+    it("shows Custom once an edit's echo leaves the preset", async () => {
+      mockPresetBackend();
+      const { picker, getByLabelText, queryByRole } = await renderPicker();
+      await fireEvent.change(getByLabelText("Gain 1"), { target: { value: "-6" } });
+      await waitFor(() => expect(picker.value).toBe(""));
+      expect(picker.selectedOptions[0].textContent).toBe("Custom");
+      expect(queryByRole("button", { name: "Rename" })).toBeNull();
+    });
+
+    it("saves the current bands under a new name and lists it", async () => {
+      mockPresetBackend({
+        save_eq_user_preset: ({ name }) => {
+          presets = { ...presets, user: [...presets.user, { id: 8, name }] };
+          return { ...state, active_preset: "user:8" };
+        },
+      });
+      const { picker, getByRole, getByLabelText } = await renderPicker();
+      await fireEvent.click(getByRole("button", { name: "Save as…" }));
+      await fireEvent.input(getByLabelText("Preset name"), { target: { value: "Late night" } });
+      await fireEvent.click(getByRole("button", { name: "Save" }));
+      expect(invoke).toHaveBeenCalledWith("save_eq_user_preset", { name: "Late night" });
+      await waitFor(() => expect(picker.value).toBe("user:8"));
+      expect(picker.selectedOptions[0].textContent).toBe("Late night");
+    });
+
+    it("explains a rejected name next to the field", async () => {
+      mockPresetBackend({
+        save_eq_user_preset: () => {
+          throw "duplicate_name";
+        },
+      });
+      const { getByRole, getByLabelText } = await renderPicker();
+      await fireEvent.click(getByRole("button", { name: "Save as…" }));
+      await fireEvent.input(getByLabelText("Preset name"), { target: { value: "studio" } });
+      await fireEvent.click(getByRole("button", { name: "Save" }));
+      await waitFor(() =>
+        expect(getByRole("alert")).toHaveTextContent("A preset with this name already exists")
+      );
+      expect(getByLabelText("Preset name")).toHaveAttribute("aria-invalid", "true");
+    });
+
+    it("renames the active preset", async () => {
+      mockPresetBackend({
+        rename_eq_user_preset: ({ id, name }) => {
+          presets = { ...presets, user: [{ id, name }] };
+          return null;
+        },
+      });
+      const { picker, getByRole, getByLabelText } = await renderPicker();
+      await fireEvent.click(getByRole("button", { name: "Rename" }));
+      const field = getByLabelText("New name") as HTMLInputElement;
+      expect(field.value).toBe("Studio");
+      await fireEvent.input(field, { target: { value: "Studio monitors" } });
+      await fireEvent.click(getByRole("button", { name: "Save" }));
+      expect(invoke).toHaveBeenCalledWith("rename_eq_user_preset", { id: 7, name: "Studio monitors" });
+      await waitFor(() => expect(picker.selectedOptions[0].textContent).toBe("Studio monitors"));
+    });
+
+    it("deletes the active preset only after confirming", async () => {
+      mockPresetBackend({
+        delete_eq_user_preset: () => {
+          presets = { ...presets, user: [] };
+          return { ...state, active_preset: null };
+        },
+      });
+      const { picker, getByRole, getAllByRole } = await renderPicker();
+      await fireEvent.click(getByRole("button", { name: "Delete" }));
+      expect(invoke).not.toHaveBeenCalledWith("delete_eq_user_preset", expect.anything());
+      // The dialog's confirm button is the last "Delete" on the page.
+      const deletes = getAllByRole("button", { name: "Delete" });
+      await fireEvent.click(deletes[deletes.length - 1]);
+      expect(invoke).toHaveBeenCalledWith("delete_eq_user_preset", { id: 7 });
+      await waitFor(() => expect(picker.value).toBe(""));
+      expect(picker.querySelectorAll("optgroup")).toHaveLength(1);
+    });
+
+    it("hides user presets in graphic mode, which they can't describe", async () => {
+      mockPresetBackend();
+      state = { ...state, mode: "graphic10", active_preset: "Rock" };
+      const { getByRole, queryByRole } = render(Equalizer);
+      await waitFor(() => expect((getByRole("combobox") as HTMLSelectElement).value).toBe("Rock"));
+      expect(getByRole("combobox").querySelectorAll("optgroup")).toHaveLength(1);
+      expect(queryByRole("button", { name: "Save as…" })).toBeNull();
+    });
+  });
+
   it("draws the fade slider's range from the backend, not a retyped literal (#1249)", async () => {
     const backendRanges = {
       ...defaultRanges,
@@ -176,6 +309,7 @@ describe("Equalizer.svelte", () => {
       if (cmd === "get_fade_settings") return defaultFadeSettings;
       if (cmd === "get_loudness_settings") return defaultLoudness;
       if (cmd === "get_equalizer_state") return defaultEqConfig;
+      if (cmd === "list_eq_presets") return defaultPresets;
       return null;
     });
     const { container, getByText } = render(Equalizer);
@@ -196,6 +330,7 @@ describe("Equalizer.svelte", () => {
       if (cmd === "get_fade_settings") return defaultFadeSettings;
       if (cmd === "get_loudness_settings") return defaultLoudness;
       if (cmd === "get_equalizer_state") return defaultEqConfig;
+      if (cmd === "list_eq_presets") return defaultPresets;
       return null;
     });
     const { container } = render(Equalizer);

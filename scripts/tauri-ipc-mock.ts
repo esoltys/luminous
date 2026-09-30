@@ -50,6 +50,7 @@ interface EqualizerState {
   preamp: number;
   gains: number[];
   parametric: ParametricBand[];
+  active_preset: string | null;
 }
 
 // 20 log-spaced default bands mirroring equalizer::default_parametric_bands().
@@ -292,6 +293,27 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     "Vocal Boost": [-3.0, -2.0, -1.0, 0.0, 2.0, 4.0, 4.5, 3.5, 1.0, -1.0],
     Headphones: [2.0, 1.5, 0.5, 0.0, 0.0, 0.0, -0.5, -1.0, -0.5, 1.0],
   };
+  let eqUserPresets = [{ id: 1, name: "Studio Monitors" }];
+  // A demo headphone-style correction so the parametric screenshot shows a
+  // realistic curve; apply_equalizer_config keeps it current.
+  let eqBands: ParametricBand[] = [
+    { kind: "low_shelf", freq: 105, gain_db: 5.5, q: 0.7, enabled: true },
+    { kind: "peak", freq: 220, gain_db: -2.5, q: 1.2, enabled: true },
+    { kind: "peak", freq: 1400, gain_db: 1.5, q: 1.8, enabled: true },
+    { kind: "peak", freq: 3200, gain_db: -4.0, q: 2.5, enabled: true },
+    { kind: "peak", freq: 6000, gain_db: 3.0, q: 3.0, enabled: true },
+    { kind: "high_shelf", freq: 10000, gain_db: -2.0, q: 0.7, enabled: true },
+  ];
+
+  // Rough stand-in for the backend's biquad law, good enough for a preview
+  // curve — the real app plots equalizer::parametric_response_db.
+  function mockBandDb(b: ParametricBand, f: number): number {
+    if (!b.enabled) return 0;
+    const octaves = Math.log2(f / b.freq);
+    if (b.kind === "peak") return b.gain_db * Math.exp(-2 * (octaves * b.q) ** 2);
+    const rise = 1 / (1 + Math.exp(-4 * b.q * octaves));
+    return b.gain_db * (b.kind === "high_shelf" ? rise : 1 - rise);
+  }
 
   function makeWaveform(): number[] {
     const peaks: number[] = [];
@@ -1338,19 +1360,13 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     },
 
     get_equalizer_state: (): EqualizerState => {
-      // Shape a demo "smiley" parametric curve so the preview/screenshot
-      // shows structure rather than a flat line.
-      const shaped = defaultParametricBands();
-      const demoGains = [
-        9, 8, 6, 4, 2, 0, -2, -4, -5, -5, -4, -2, 0, 2, 4, 6, 7, 8, 9, 10,
-      ];
-      shaped.forEach((b, i) => (b.gain_db = demoGains[i] ?? 0));
       return {
         enabled: true,
         mode: "graphic10",
         preamp: 3.0,
         gains: [10.0, 8.0, 5.0, -3.0, -6.0, -4.0, 3.0, 6.0, 8.0, 10.0],
-        parametric: shaped,
+        parametric: eqBands,
+        active_preset: null,
       };
     },
 
@@ -1360,7 +1376,42 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
       preamp: 3.0,
       gains: EQ_PRESETS[args.presetName as string] ?? Array(10).fill(0.0),
       parametric: defaultParametricBands(),
+      active_preset: args.presetName as string,
     }),
+
+    // A demo saved preset so the picker's "My presets" group is populated.
+    list_eq_presets: () => ({
+      builtin: ["Flat", ...Object.keys(EQ_PRESETS)],
+      user: eqUserPresets,
+    }),
+    save_eq_user_preset: (args): EqualizerState => {
+      const id = Math.max(0, ...eqUserPresets.map((p) => p.id)) + 1;
+      eqUserPresets.push({ id, name: args.name as string });
+      return {
+        enabled: true,
+        mode: "parametric",
+        preamp: 3.0,
+        gains: Array(10).fill(0.0),
+        parametric: defaultParametricBands(),
+        active_preset: `user:${id}`,
+      };
+    },
+    rename_eq_user_preset: (args) => {
+      const preset = eqUserPresets.find((p) => p.id === args.id);
+      if (preset) preset.name = args.name as string;
+      return null;
+    },
+    delete_eq_user_preset: (args): EqualizerState => {
+      eqUserPresets = eqUserPresets.filter((p) => p.id !== args.id);
+      return {
+        enabled: true,
+        mode: "parametric",
+        preamp: 3.0,
+        gains: Array(10).fill(0.0),
+        parametric: defaultParametricBands(),
+        active_preset: null,
+      };
+    },
 
     reset_parametric_bands: (): EqualizerState => ({
       enabled: true,
@@ -1368,6 +1419,7 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
       preamp: 3.0,
       gains: Array(10).fill(0.0),
       parametric: defaultParametricBands(),
+      active_preset: "Flat",
     }),
 
     // Mirrors models::AudioSettingRanges / equalizer::EqualizerRanges.
@@ -1387,7 +1439,13 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     }),
 
     // No DSP in the mock — report a flat response for any sweep.
-    get_parametric_response: (args) => (args.frequencies as number[]).map(() => 0),
+    get_parametric_response: (args) => {
+      const band = args.band as number | undefined;
+      const bands = band === undefined ? eqBands : eqBands.slice(band, band + 1);
+      return (args.frequencies as number[]).map((f) =>
+        bands.reduce((db, b) => db + mockBandDb(b, f), 0)
+      );
+    },
 
     get_loudness_settings: () => ({
       enabled: true,
@@ -1443,7 +1501,10 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
 
   // The engine echoes the applied (clamped) config back; the component
   // assigns from the echo, so a bare noop would blank the EQ UI.
-  commands["apply_equalizer_config"] = (args) => args.config;
+  commands["apply_equalizer_config"] = (args) => {
+    eqBands = (args.config as EqualizerState).parametric;
+    return { ...(args.config as EqualizerState), active_preset: null };
+  };
   commands["validate_playlist_name"] = () => ({ valid: true, reason: null });
   // Defaults to enabled (unlike the real app's fresh-install default of
   // false) so the System Tray settings screenshot documents the feature in
