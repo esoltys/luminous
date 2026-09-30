@@ -1,11 +1,10 @@
+use crate::models::SettingRange;
 use serde::{Deserialize, Serialize};
 use std::f32::consts::PI;
 
 pub const EQ_BANDS: [f32; 10] = [
     31.25, 62.5, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0,
 ];
-
-pub const PARAMETRIC_BAND_COUNT: usize = 20;
 
 /// Default Q for graphic-mode bands. The 10 bands are spaced 1 octave apart
 /// (9 octaves / 9 gaps across 31.25 Hz – 16 kHz), and the textbook Q for a
@@ -14,34 +13,69 @@ pub const PARAMETRIC_BAND_COUNT: usize = 20;
 /// `sqrt(2) ≈ 1.414` — the standard value used by octave-band graphic EQs.
 const GRAPHIC_Q: f32 = std::f32::consts::SQRT_2;
 
-/// Shelf slope (RBJ cookbook `S`) for the outermost low/high-shelf bands.
-/// `S = 1.0` is the cookbook's "as steep as it can be without overshoot"
-/// default — a smooth, monotonic shelf rather than a peaky corner.
-const SHELF_SLOPE: f32 = 1.0;
+/// Shelf Q giving the RBJ cookbook's slope `S = 1` shelf — "as steep as it
+/// can be without overshoot", a smooth monotonic corner. The graphic mode's
+/// edge bands use it, as do default/migrated parametric shelves; a
+/// parametric shelf may set any Q (higher overshoots, lower is gentler).
+pub const SHELF_Q: f32 = std::f32::consts::FRAC_1_SQRT_2;
 
-/// Which RBJ cookbook filter shape a band uses. The outermost band on each
-/// side of the spectrum shelves (holds its gain flat below/above the corner
-/// frequency, like a true bass/treble control) instead of peaking (which
-/// rolls back to 0 dB away from center) — see `filter_kind_for_band`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum FilterKind {
-    Peaking,
-    LowShelf,
-    HighShelf,
+/// Hard bounds of every EQ value. `Equalizer` clamps with these, and the UI
+/// reads them over IPC (`get_audio_setting_ranges().eq`) for its controls'
+/// min and max (#1249).
+pub const EQ_FREQ_RANGE: SettingRange = SettingRange {
+    min: 20.0,
+    max: 20000.0,
+};
+pub const EQ_GAIN_RANGE: SettingRange = SettingRange {
+    min: -12.0,
+    max: 12.0,
+};
+pub const EQ_Q_RANGE: SettingRange = SettingRange {
+    min: 0.1,
+    max: 10.0,
+};
+pub const EQ_PREAMP_RANGE: SettingRange = SettingRange {
+    min: -12.0,
+    max: 12.0,
+};
+
+/// A parametric layout holds between `PARAMETRIC_MIN_BANDS` and
+/// `PARAMETRIC_MAX_BANDS` bands. The cap keeps the audio thread's cascade a
+/// fixed, pre-allocated size.
+pub const PARAMETRIC_MAX_BANDS: usize = 20;
+pub const PARAMETRIC_MIN_BANDS: usize = 1;
+
+/// The EQ bounds in one payload, nested in `AudioSettingRanges`.
+#[derive(Debug, Clone, Copy, Serialize)]
+pub struct EqualizerRanges {
+    pub freq: SettingRange,
+    pub gain_db: SettingRange,
+    pub q: SettingRange,
+    pub preamp: SettingRange,
+    pub max_bands: usize,
+    pub min_bands: usize,
 }
 
-/// The first band in a cascade is a low shelf, the last is a high shelf,
-/// and everything in between peaks. Applies to both the 10-band graphic and
-/// 20-band parametric cascades, whose outermost bands sit at the same fixed
-/// 31.25 Hz / 16 kHz corners.
-fn filter_kind_for_band(idx: usize, band_count: usize) -> FilterKind {
-    if idx == 0 {
-        FilterKind::LowShelf
-    } else if idx == band_count - 1 {
-        FilterKind::HighShelf
-    } else {
-        FilterKind::Peaking
-    }
+pub const EQUALIZER_RANGES: EqualizerRanges = EqualizerRanges {
+    freq: EQ_FREQ_RANGE,
+    gain_db: EQ_GAIN_RANGE,
+    q: EQ_Q_RANGE,
+    preamp: EQ_PREAMP_RANGE,
+    max_bands: PARAMETRIC_MAX_BANDS,
+    min_bands: PARAMETRIC_MIN_BANDS,
+};
+
+/// Which RBJ cookbook filter shape a band uses: a peak (bell that rolls back
+/// to 0 dB away from center) or a shelf (holds its gain flat below/above the
+/// corner, like a bass/treble control). The same set as Equalizer APO's
+/// `PK` / `LSC` / `HSC`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ParametricKind {
+    #[default]
+    Peak,
+    LowShelf,
+    HighShelf,
 }
 
 // ---------------------------------------------------------------------------
@@ -85,19 +119,23 @@ impl BiquadFilter {
         }
     }
 
-    /// Set this filter's coefficients for the given band shape. Peaking uses
-    /// `q`; the shelf shapes use the fixed `SHELF_SLOPE` instead (shelf slope
-    /// isn't the same quantity as peaking Q, and a fixed gentle slope keeps
-    /// the outermost bands from ringing/overshooting at high gain).
-    pub fn calculate_for_kind(&mut self, kind: FilterKind, f0: f32, fs: f32, gain_db: f32, q: f32) {
+    /// Set this filter's coefficients for the given band shape.
+    pub fn calculate_for_kind(
+        &mut self,
+        kind: ParametricKind,
+        f0: f32,
+        fs: f32,
+        gain_db: f32,
+        q: f32,
+    ) {
         match kind {
-            FilterKind::Peaking => self.calculate_coefficients_q(f0, fs, gain_db, q),
-            FilterKind::LowShelf => self.calculate_low_shelf(f0, fs, gain_db),
-            FilterKind::HighShelf => self.calculate_high_shelf(f0, fs, gain_db),
+            ParametricKind::Peak => self.calculate_coefficients_q(f0, fs, gain_db, q),
+            ParametricKind::LowShelf => self.calculate_low_shelf(f0, fs, gain_db, q),
+            ParametricKind::HighShelf => self.calculate_high_shelf(f0, fs, gain_db, q),
         }
     }
 
-    /// Peaking EQ coefficients with an explicit Q (parametric mode).
+    /// Peaking EQ coefficients with an explicit Q.
     pub fn calculate_coefficients_q(&mut self, f0: f32, fs: f32, gain_db: f32, q: f32) {
         if self.bypass_if_flat(gain_db) {
             return;
@@ -119,10 +157,11 @@ impl BiquadFilter {
         self.normalize(b0, b1, b2, a0, a1, a2);
     }
 
-    /// Low-shelf coefficients (RBJ cookbook). Holds `gain_db` flat below
-    /// `f0` instead of rolling back to 0 dB, so a bass-band boost lifts
-    /// everything under it rather than just a bell around 31 Hz.
-    pub fn calculate_low_shelf(&mut self, f0: f32, fs: f32, gain_db: f32) {
+    /// Low-shelf coefficients (RBJ cookbook, Q form — the Equalizer APO /
+    /// AutoEq `LSC` semantics). Holds `gain_db` flat below `f0` instead of
+    /// rolling back to 0 dB; `q` sets the corner's steepness (`SHELF_Q` is
+    /// the overshoot-free cookbook `S = 1` shelf).
+    pub fn calculate_low_shelf(&mut self, f0: f32, fs: f32, gain_db: f32, q: f32) {
         if self.bypass_if_flat(gain_db) {
             return;
         }
@@ -130,8 +169,7 @@ impl BiquadFilter {
         let a = 10.0f32.powf(gain_db / 40.0);
         let w0 = 2.0 * PI * f0 / fs;
         let cos_w0 = w0.cos();
-        let sin_w0 = w0.sin();
-        let alpha = sin_w0 / 2.0 * ((a + 1.0 / a) * (1.0 / SHELF_SLOPE - 1.0) + 2.0).sqrt();
+        let alpha = w0.sin() / (2.0 * q);
         let two_sqrt_a_alpha = 2.0 * a.sqrt() * alpha;
 
         let b0 = a * ((a + 1.0) - (a - 1.0) * cos_w0 + two_sqrt_a_alpha);
@@ -144,10 +182,9 @@ impl BiquadFilter {
         self.normalize(b0, b1, b2, a0, a1, a2);
     }
 
-    /// High-shelf coefficients (RBJ cookbook). Holds `gain_db` flat above
-    /// `f0` instead of rolling back to 0 dB, so a treble-band boost lifts
-    /// everything above it rather than just a bell around 16 kHz.
-    pub fn calculate_high_shelf(&mut self, f0: f32, fs: f32, gain_db: f32) {
+    /// High-shelf coefficients (RBJ cookbook, Q form — `HSC`). Holds
+    /// `gain_db` flat above `f0` instead of rolling back to 0 dB.
+    pub fn calculate_high_shelf(&mut self, f0: f32, fs: f32, gain_db: f32, q: f32) {
         if self.bypass_if_flat(gain_db) {
             return;
         }
@@ -155,8 +192,7 @@ impl BiquadFilter {
         let a = 10.0f32.powf(gain_db / 40.0);
         let w0 = 2.0 * PI * f0 / fs;
         let cos_w0 = w0.cos();
-        let sin_w0 = w0.sin();
-        let alpha = sin_w0 / 2.0 * ((a + 1.0 / a) * (1.0 / SHELF_SLOPE - 1.0) + 2.0).sqrt();
+        let alpha = w0.sin() / (2.0 * q);
         let two_sqrt_a_alpha = 2.0 * a.sqrt() * alpha;
 
         let b0 = a * ((a + 1.0) + (a - 1.0) * cos_w0 + two_sqrt_a_alpha);
@@ -169,16 +205,21 @@ impl BiquadFilter {
         self.normalize(b0, b1, b2, a0, a1, a2);
     }
 
+    /// Identity (pass-through) coefficients — a flat or disabled band.
+    fn set_identity(&mut self) {
+        self.b0 = 1.0;
+        self.b1 = 0.0;
+        self.b2 = 0.0;
+        self.a1 = 0.0;
+        self.a2 = 0.0;
+    }
+
     /// Flat (identity) response if gain is zero — every filter shape
     /// converges to a no-op here, so short-circuiting avoids feeding the
     /// trig/sqrt work a degenerate `A = 1` case. Returns whether it bypassed.
     fn bypass_if_flat(&mut self, gain_db: f32) -> bool {
         if gain_db.abs() < 0.05 {
-            self.b0 = 1.0;
-            self.b1 = 0.0;
-            self.b2 = 0.0;
-            self.a1 = 0.0;
-            self.a2 = 0.0;
+            self.set_identity();
             true
         } else {
             false
@@ -235,43 +276,77 @@ impl BiquadFilter {
 #[serde(rename_all = "snake_case")]
 pub enum EqMode {
     Graphic10,
-    Parametric20,
+    /// Stored as `"parametric20"` before #1332; still accepted on load.
+    #[serde(alias = "parametric20")]
+    Parametric,
 }
 
+fn default_true() -> bool {
+    true
+}
+
+/// One band of the parametric layout. `kind` and `enabled` default so a
+/// pre-#1332 `{freq, gain_db, q}` band still parses (as an enabled peak).
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ParametricBand {
+    #[serde(default)]
+    pub kind: ParametricKind,
     pub freq: f32,
     pub gain_db: f32,
     pub q: f32,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
 }
 
-pub const PARAMETRIC_FREQ_MIN: f32 = 20.0;
-pub const PARAMETRIC_FREQ_MAX: f32 = 20000.0;
-pub const PARAMETRIC_Q_MIN: f32 = 0.1;
-pub const PARAMETRIC_Q_MAX: f32 = 10.0;
-/// The 20 bands are spaced 9/19 ≈ 0.474 octaves apart (see
+impl ParametricBand {
+    /// A flat (0 dB) peak — the neutral band layouts are padded with.
+    pub const fn flat_peak(freq: f32) -> Self {
+        Self {
+            kind: ParametricKind::Peak,
+            freq,
+            gain_db: 0.0,
+            q: PARAMETRIC_DEFAULT_Q,
+            enabled: true,
+        }
+    }
+
+    /// This band with every numeric field inside its `EQ_*_RANGE`.
+    pub fn clamped(self) -> Self {
+        Self {
+            freq: EQ_FREQ_RANGE.clamp(self.freq),
+            gain_db: EQ_GAIN_RANGE.clamp(self.gain_db),
+            q: EQ_Q_RANGE.clamp(self.q),
+            ..self
+        }
+    }
+}
+
+/// The default layout's 20 bands are spaced 9/19 ≈ 0.474 octaves apart (see
 /// `default_parametric_bands`). Plugging that into the same Q-vs-bandwidth
 /// relation used for `GRAPHIC_Q` gives the "critically spaced" Q whose -3 dB
-/// points just meet each neighbor (≈3.03) — rounded to a clean default so
-/// adjacent bands cover the spectrum without excessive overlap, while still
-/// leaving the full `PARAMETRIC_Q_MIN..=PARAMETRIC_Q_MAX` range for the user
-/// to go narrower (surgical) or wider (smoother) per band.
+/// points just meet each neighbor (≈3.03) — rounded to a clean default.
 const PARAMETRIC_DEFAULT_Q: f32 = 3.0;
+const DEFAULT_LAYOUT_BANDS: usize = 20;
 
-/// 20 default center frequencies, log-spaced across the same 31.25 Hz – 16 kHz
-/// span as the graphic bands (9 octaves / 19 steps ≈ half-octave spacing).
-pub fn default_parametric_bands() -> [ParametricBand; PARAMETRIC_BAND_COUNT] {
-    let mut bands = [ParametricBand {
-        freq: 0.0,
-        gain_db: 0.0,
-        q: PARAMETRIC_DEFAULT_Q,
-    }; PARAMETRIC_BAND_COUNT];
+/// The default layout: 20 flat bands log-spaced across the same 31.25 Hz –
+/// 16 kHz span as the graphic bands (≈ half-octave spacing), with a low
+/// shelf at the bottom, a high shelf at the top and peaks in between.
+pub fn default_parametric_bands() -> Vec<ParametricBand> {
     let octaves = (16000.0f32 / 31.25).log2(); // = 9 octaves
-    for (i, band) in bands.iter_mut().enumerate() {
-        let exp = octaves * i as f32 / (PARAMETRIC_BAND_COUNT - 1) as f32;
-        band.freq = (31.25 * 2.0f32.powf(exp)).round();
-    }
-    bands
+    (0..DEFAULT_LAYOUT_BANDS)
+        .map(|i| {
+            let exp = octaves * i as f32 / (DEFAULT_LAYOUT_BANDS - 1) as f32;
+            let mut band = ParametricBand::flat_peak((31.25 * 2.0f32.powf(exp)).round());
+            if i == 0 {
+                band.kind = ParametricKind::LowShelf;
+                band.q = SHELF_Q;
+            } else if i == DEFAULT_LAYOUT_BANDS - 1 {
+                band.kind = ParametricKind::HighShelf;
+                band.q = SHELF_Q;
+            }
+            band
+        })
+        .collect()
 }
 
 /// Snapshot of the user-adjustable EQ state — the value type crossing the
@@ -293,7 +368,7 @@ impl EqualizerConfig {
             mode: eq.mode,
             gains: eq.gains,
             preamp: eq.preamp,
-            parametric: eq.parametric.to_vec(),
+            parametric: eq.parametric_bands().to_vec(),
         }
     }
 }
@@ -315,10 +390,10 @@ pub fn preset_gains(name: &str) -> [f32; 10] {
 /// Named presets for the parametric mode, written the way a parametric EQ is
 /// used: a few broad moves (wide Q, shelves at the edges) rather than every
 /// band nudged to trace the 10-band curve. Each entry is
-/// `(band index, gain dB, Q)`; unlisted bands stay flat at the default Q.
-/// Bands 0 and 19 are shelves (`filter_kind_for_band`), so their Q is unused.
-/// Band centers: 0=31, 2=60, 3=84, 5=161, 7=311, 8=432, 9=600, 11=1.2k,
-/// 13=2.2k, 14=3.1k, 15=4.3k, 16=6k, 17=8.3k, 19=16k Hz.
+/// `(band index, gain dB, Q)` into `default_parametric_bands`; unlisted bands
+/// stay flat, and a Q of 0 keeps the band's default Q.
+/// Band centers: 0=31 (low shelf), 2=60, 3=84, 5=161, 7=311, 8=432, 9=600,
+/// 11=1.2k, 13=2.2k, 14=3.1k, 15=4.3k, 16=6k, 17=8.3k, 19=16k (high shelf) Hz.
 fn parametric_preset_moves(name: &str) -> &'static [(usize, f32, f32)] {
     match name.to_lowercase().as_str() {
         "rock" => &[
@@ -351,9 +426,9 @@ fn parametric_preset_moves(name: &str) -> &'static [(usize, f32, f32)] {
     }
 }
 
-/// The full 20-band layout for a named parametric preset (see
+/// The full band layout for a named parametric preset (see
 /// `parametric_preset_moves`). Unknown names fall back to flat.
-pub fn parametric_preset(name: &str) -> [ParametricBand; PARAMETRIC_BAND_COUNT] {
+pub fn parametric_preset(name: &str) -> Vec<ParametricBand> {
     let mut bands = default_parametric_bands();
     for &(idx, gain_db, q) in parametric_preset_moves(name) {
         bands[idx].gain_db = gain_db;
@@ -365,19 +440,22 @@ pub fn parametric_preset(name: &str) -> [ParametricBand; PARAMETRIC_BAND_COUNT] 
 }
 
 // ---------------------------------------------------------------------------
-// Equalizer — 10-band graphic or 20-band parametric cascade
+// Equalizer — 10-band graphic or up-to-20-band parametric cascade
 // ---------------------------------------------------------------------------
 
 #[derive(Debug)]
 pub struct Equalizer {
     pub enabled: bool,
     pub mode: EqMode,
-    pub gains: [f32; 10], // graphic dB gains per band (-12.0 to +12.0)
-    pub preamp: f32,      // Pre-amp gain (-12.0 to +12.0), shared by both modes
-    pub parametric: [ParametricBand; PARAMETRIC_BAND_COUNT],
+    pub gains: [f32; 10], // graphic dB gains per band (EQ_GAIN_RANGE)
+    pub preamp: f32,      // Pre-amp gain (EQ_PREAMP_RANGE), shared by both modes
+    /// Fixed-size so the audio thread never allocates; only the first
+    /// `parametric_len` entries are live.
+    parametric: [ParametricBand; PARAMETRIC_MAX_BANDS],
+    parametric_len: usize,
     channels: usize,
     channel_filters: Vec<Vec<BiquadFilter>>, // graphic cascade, per channel
-    parametric_filters: Vec<Vec<BiquadFilter>>, // parametric cascade, per channel
+    parametric_filters: Vec<Vec<BiquadFilter>>, // parametric cascade (MAX slots), per channel
     sample_rate: u32,
 }
 
@@ -389,17 +467,25 @@ impl Default for Equalizer {
 
 impl Equalizer {
     pub fn new() -> Self {
-        Self {
+        let mut eq = Self {
             enabled: false,
             mode: EqMode::Graphic10,
             gains: [0.0; 10],
             preamp: 0.0,
-            parametric: default_parametric_bands(),
+            parametric: [ParametricBand::flat_peak(1000.0); PARAMETRIC_MAX_BANDS],
+            parametric_len: 0,
             channels: 2,
             channel_filters: vec![vec![BiquadFilter::new(); 10]; 2],
-            parametric_filters: vec![vec![BiquadFilter::new(); PARAMETRIC_BAND_COUNT]; 2],
+            parametric_filters: vec![vec![BiquadFilter::new(); PARAMETRIC_MAX_BANDS]; 2],
             sample_rate: 44100,
-        }
+        };
+        eq.load_parametric(&default_parametric_bands());
+        eq
+    }
+
+    /// The live parametric layout, in the order the user arranged it.
+    pub fn parametric_bands(&self) -> &[ParametricBand] {
+        &self.parametric[..self.parametric_len]
     }
 
     /// Re-tune the filter cascade for the output device's actual sample
@@ -421,7 +507,7 @@ impl Equalizer {
             self.channels = channels;
             self.channel_filters = vec![vec![BiquadFilter::new(); 10]; channels];
             self.parametric_filters =
-                vec![vec![BiquadFilter::new(); PARAMETRIC_BAND_COUNT]; channels];
+                vec![vec![BiquadFilter::new(); PARAMETRIC_MAX_BANDS]; channels];
             changed = true;
         }
         if changed {
@@ -436,35 +522,24 @@ impl Equalizer {
             // state memory instead of stale samples from a previous session.
             self.channel_filters = vec![vec![BiquadFilter::new(); 10]; self.channels];
             self.parametric_filters =
-                vec![vec![BiquadFilter::new(); PARAMETRIC_BAND_COUNT]; self.channels];
+                vec![vec![BiquadFilter::new(); PARAMETRIC_MAX_BANDS]; self.channels];
             self.recalculate();
         }
     }
 
     pub fn set_gain(&mut self, band_idx: usize, gain_db: f32) {
         if band_idx < 10 {
-            self.gains[band_idx] = gain_db.clamp(-12.0, 12.0);
+            self.gains[band_idx] = EQ_GAIN_RANGE.clamp(gain_db);
             self.recalculate_band(band_idx);
         }
     }
 
-    /// Update a parametric band's gain and Q. The center frequency is fixed
-    /// (set from `default_parametric_bands`) and is not user-adjustable.
-    pub fn set_parametric_band(&mut self, band_idx: usize, gain_db: f32, q: f32) {
-        if band_idx < PARAMETRIC_BAND_COUNT {
-            self.parametric[band_idx].gain_db = gain_db.clamp(-12.0, 12.0);
-            self.parametric[band_idx].q = q.clamp(PARAMETRIC_Q_MIN, PARAMETRIC_Q_MAX);
-            self.recalculate_parametric_band(band_idx);
-        }
-    }
-
     pub fn set_preamp(&mut self, preamp_db: f32) {
-        self.preamp = preamp_db.clamp(-12.0, 12.0);
+        self.preamp = EQ_PREAMP_RANGE.clamp(preamp_db);
     }
 
-    /// Apply a whole config in one step, clamping every field through the
-    /// individual setters. Parametric center frequencies are fixed and not
-    /// taken from the config. Returns the canonical post-clamp snapshot.
+    /// Apply a whole config in one step, clamping every field. Returns the
+    /// canonical post-clamp snapshot.
     pub fn apply(&mut self, config: &EqualizerConfig) -> EqualizerConfig {
         self.enabled = config.enabled;
         self.set_mode(config.mode);
@@ -472,37 +547,32 @@ impl Equalizer {
             self.set_gain(idx, *gain_db);
         }
         self.set_preamp(config.preamp);
-        for (idx, band) in config
-            .parametric
-            .iter()
-            .take(PARAMETRIC_BAND_COUNT)
-            .enumerate()
-        {
-            self.set_parametric_band(idx, band.gain_db, band.q);
-        }
+        self.load_parametric(&config.parametric);
         EqualizerConfig::snapshot(self)
     }
 
     /// Replace the 10 graphic-mode band gains wholesale (e.g. from a named
     /// preset). The parametric mode loads its own presets via
-    /// `load_parametric(parametric_preset(name))`.
+    /// `load_parametric(&parametric_preset(name))`.
     pub fn load_preset(&mut self, gains: [f32; 10]) {
-        self.gains = gains;
+        self.gains = gains.map(|g| EQ_GAIN_RANGE.clamp(g));
         self.recalculate();
     }
 
-    /// Replace all 20 parametric bands wholesale — unlike
-    /// `set_parametric_band`, this also accepts new center frequencies
-    /// (clamped to `PARAMETRIC_FREQ_MIN..=PARAMETRIC_FREQ_MAX`), since a full
-    /// load can come from a saved user layout rather than just a gain tweak.
-    pub fn load_parametric(&mut self, bands: [ParametricBand; PARAMETRIC_BAND_COUNT]) {
-        for (idx, band) in bands.iter().enumerate() {
-            self.parametric[idx] = ParametricBand {
-                freq: band.freq.clamp(PARAMETRIC_FREQ_MIN, PARAMETRIC_FREQ_MAX),
-                gain_db: band.gain_db.clamp(-12.0, 12.0),
-                q: band.q.clamp(PARAMETRIC_Q_MIN, PARAMETRIC_Q_MAX),
+    /// Replace the parametric layout wholesale. Keeps the given band order,
+    /// truncates past `PARAMETRIC_MAX_BANDS`, pads an empty list up to
+    /// `PARAMETRIC_MIN_BANDS` with a flat peak, and clamps every field.
+    pub fn load_parametric(&mut self, bands: &[ParametricBand]) {
+        let len = bands
+            .len()
+            .clamp(PARAMETRIC_MIN_BANDS, PARAMETRIC_MAX_BANDS);
+        for idx in 0..PARAMETRIC_MAX_BANDS {
+            self.parametric[idx] = match bands.get(idx) {
+                Some(band) if idx < len => band.clamped(),
+                _ => ParametricBand::flat_peak(1000.0),
             };
         }
+        self.parametric_len = len;
         self.recalculate();
     }
 
@@ -510,7 +580,7 @@ impl Equalizer {
         for idx in 0..10 {
             self.recalculate_band(idx);
         }
-        for idx in 0..PARAMETRIC_BAND_COUNT {
+        for idx in 0..PARAMETRIC_MAX_BANDS {
             self.recalculate_parametric_band(idx);
         }
     }
@@ -519,23 +589,35 @@ impl Equalizer {
         let f0 = EQ_BANDS[idx];
         let gain_db = self.gains[idx];
         let fs = self.sample_rate as f32;
-        let kind = filter_kind_for_band(idx, EQ_BANDS.len());
+        // The graphic bands' outermost corners shelve (a true bass/treble
+        // control) at the overshoot-free `SHELF_Q`; the rest peak.
+        let (kind, q) = if idx == 0 {
+            (ParametricKind::LowShelf, SHELF_Q)
+        } else if idx == EQ_BANDS.len() - 1 {
+            (ParametricKind::HighShelf, SHELF_Q)
+        } else {
+            (ParametricKind::Peak, GRAPHIC_Q)
+        };
 
         for ch in 0..self.channels {
             if let Some(filters) = self.channel_filters.get_mut(ch) {
-                filters[idx].calculate_for_kind(kind, f0, fs, gain_db, GRAPHIC_Q);
+                filters[idx].calculate_for_kind(kind, f0, fs, gain_db, q);
             }
         }
     }
 
     fn recalculate_parametric_band(&mut self, idx: usize) {
         let band = self.parametric[idx];
+        let live = idx < self.parametric_len && band.enabled;
         let fs = self.sample_rate as f32;
-        let kind = filter_kind_for_band(idx, PARAMETRIC_BAND_COUNT);
 
         for ch in 0..self.channels {
             if let Some(filters) = self.parametric_filters.get_mut(ch) {
-                filters[idx].calculate_for_kind(kind, band.freq, fs, band.gain_db, band.q);
+                if live {
+                    filters[idx].calculate_for_kind(band.kind, band.freq, fs, band.gain_db, band.q);
+                } else {
+                    filters[idx].set_identity();
+                }
             }
         }
     }
@@ -550,11 +632,12 @@ impl Equalizer {
         let Some(filters) = self.parametric_filters.first() else {
             return vec![0.0; freqs.len()];
         };
+        let live = &filters[..self.parametric_len];
         freqs
             .iter()
             .map(|&f| {
                 let f = f.clamp(1.0, nyquist * 0.999);
-                filters.iter().map(|flt| flt.magnitude_db(f, fs)).sum()
+                live.iter().map(|flt| flt.magnitude_db(f, fs)).sum()
             })
             .collect()
     }
@@ -571,9 +654,9 @@ impl Equalizer {
         }
 
         let preamp_linear = 10.0f32.powf(self.preamp / 20.0);
-        let filters = match self.mode {
-            EqMode::Graphic10 => &mut self.channel_filters,
-            EqMode::Parametric20 => &mut self.parametric_filters,
+        let (filters, active) = match self.mode {
+            EqMode::Graphic10 => (&mut self.channel_filters, EQ_BANDS.len()),
+            EqMode::Parametric => (&mut self.parametric_filters, self.parametric_len),
         };
 
         for (i, sample) in output.iter_mut().enumerate() {
@@ -581,7 +664,7 @@ impl Equalizer {
             let mut out = *sample * preamp_linear;
 
             if let Some(filters) = filters.get_mut(ch) {
-                for filter in filters {
+                for filter in filters.iter_mut().take(active) {
                     out = filter.process(out);
                 }
             }
@@ -589,6 +672,70 @@ impl Equalizer {
             *sample = out;
         }
     }
+}
+
+/// Pre-#1332 slope-form (`S = 1`) shelf coefficients, kept only as the
+/// reference that proves the Q-form shelves reproduce the old response.
+#[cfg(test)]
+pub(crate) fn legacy_slope_shelf(high: bool, f0: f32, fs: f32, gain_db: f32) -> BiquadFilter {
+    let mut f = BiquadFilter::new();
+    if f.bypass_if_flat(gain_db) {
+        return f;
+    }
+    let a = 10.0f32.powf(gain_db / 40.0);
+    let w0 = 2.0 * PI * f0 / fs;
+    let cos_w0 = w0.cos();
+    let slope = 1.0f32;
+    let alpha = w0.sin() / 2.0 * ((a + 1.0 / a) * (1.0 / slope - 1.0) + 2.0).sqrt();
+    let t = 2.0 * a.sqrt() * alpha;
+    if high {
+        f.normalize(
+            a * ((a + 1.0) + (a - 1.0) * cos_w0 + t),
+            -2.0 * a * ((a - 1.0) + (a + 1.0) * cos_w0),
+            a * ((a + 1.0) + (a - 1.0) * cos_w0 - t),
+            (a + 1.0) - (a - 1.0) * cos_w0 + t,
+            2.0 * ((a - 1.0) - (a + 1.0) * cos_w0),
+            (a + 1.0) - (a - 1.0) * cos_w0 - t,
+        );
+    } else {
+        f.normalize(
+            a * ((a + 1.0) - (a - 1.0) * cos_w0 + t),
+            2.0 * a * ((a - 1.0) - (a + 1.0) * cos_w0),
+            a * ((a + 1.0) - (a - 1.0) * cos_w0 - t),
+            (a + 1.0) + (a - 1.0) * cos_w0 + t,
+            -2.0 * ((a - 1.0) + (a + 1.0) * cos_w0),
+            (a + 1.0) + (a - 1.0) * cos_w0 - t,
+        );
+    }
+    f
+}
+
+/// Response (dB) of a pre-#1332 parametric layout — `{freq, gain_db, q}`
+/// bands whose first and last entries were slope shelves ignoring `q`.
+#[cfg(test)]
+pub(crate) fn legacy_parametric_response_db(
+    bands: &[(f32, f32, f32)],
+    fs: f32,
+    freqs: &[f32],
+) -> Vec<f32> {
+    let last = bands.len() - 1;
+    let filters: Vec<BiquadFilter> = bands
+        .iter()
+        .enumerate()
+        .map(|(i, &(freq, gain_db, q))| {
+            if i == 0 || i == last {
+                legacy_slope_shelf(i == last, freq, fs, gain_db)
+            } else {
+                let mut f = BiquadFilter::new();
+                f.calculate_coefficients_q(freq, fs, gain_db, q);
+                f
+            }
+        })
+        .collect();
+    freqs
+        .iter()
+        .map(|&f| filters.iter().map(|flt| flt.magnitude_db(f, fs)).sum())
+        .collect()
 }
 
 #[cfg(test)]
@@ -610,15 +757,60 @@ mod tests {
         (samples.iter().map(|s| s * s).sum::<f32>() / samples.len() as f32).sqrt()
     }
 
+    fn band(kind: ParametricKind, freq: f32, gain_db: f32, q: f32) -> ParametricBand {
+        ParametricBand {
+            kind,
+            freq,
+            gain_db,
+            q,
+            enabled: true,
+        }
+    }
+
+    fn log_freqs(n: usize) -> Vec<f32> {
+        (0..n)
+            .map(|i| 20.0 * 1000f32.powf(i as f32 / (n - 1) as f32))
+            .collect()
+    }
+
+    fn parametric_eq_48k() -> Equalizer {
+        let mut eq = Equalizer::new();
+        eq.update_format(48000, 2);
+        eq.enabled = true;
+        eq.set_mode(EqMode::Parametric);
+        eq
+    }
+
     #[test]
-    fn default_parametric_bands_span_graphic_range() {
+    fn default_parametric_bands_span_graphic_range_with_edge_shelves() {
         let bands = default_parametric_bands();
-        assert_eq!(bands.len(), PARAMETRIC_BAND_COUNT);
+        assert_eq!(bands.len(), 20);
         assert!((bands[0].freq - 31.0).abs() < 2.0);
         assert!((bands[19].freq - 16000.0).abs() < 50.0);
         for pair in bands.windows(2) {
             assert!(pair[1].freq > pair[0].freq);
         }
+        assert_eq!(bands[0].kind, ParametricKind::LowShelf);
+        assert_eq!(bands[19].kind, ParametricKind::HighShelf);
+        assert!(bands[1..19].iter().all(|b| b.kind == ParametricKind::Peak));
+        assert!(bands.iter().all(|b| b.enabled && b.gain_db == 0.0));
+    }
+
+    #[test]
+    fn legacy_band_json_parses_as_enabled_peak_and_old_mode_name_loads() {
+        let bands: Vec<ParametricBand> =
+            serde_json::from_str(r#"[{"freq":100.0,"gain_db":3.0,"q":2.0}]"#).unwrap();
+        assert_eq!(bands[0], band(ParametricKind::Peak, 100.0, 3.0, 2.0));
+        let mode: EqMode = serde_json::from_str(r#""parametric20""#).unwrap();
+        assert_eq!(mode, EqMode::Parametric);
+        assert_eq!(
+            serde_json::to_string(&EqMode::Parametric).unwrap(),
+            r#""parametric""#
+        );
+        assert_eq!(
+            serde_json::to_string(&ParametricKind::LowShelf).unwrap(),
+            r#""low_shelf""#
+        );
     }
 
     #[test]
@@ -626,7 +818,7 @@ mod tests {
         let mut eq = Equalizer::new();
         eq.update_format(44100, 2);
         eq.enabled = true;
-        eq.set_mode(EqMode::Parametric20);
+        eq.set_mode(EqMode::Parametric);
 
         let original = sine(1000.0, 44100.0, 1024, 2);
         let mut processed = original.clone();
@@ -642,10 +834,9 @@ mod tests {
         let mut eq = Equalizer::new();
         eq.update_format(44100, 2);
         eq.enabled = true;
-        eq.set_mode(EqMode::Parametric20);
-        // Boost band 10 and probe at its fixed center frequency.
-        let center = eq.parametric[10].freq;
-        eq.set_parametric_band(10, 9.0, 2.0);
+        eq.set_mode(EqMode::Parametric);
+        let center = 1234.0;
+        eq.load_parametric(&[band(ParametricKind::Peak, center, 9.0, 2.0)]);
 
         let original = sine(center, 44100.0, 4096, 2);
         let mut processed = original.clone();
@@ -663,13 +854,111 @@ mod tests {
     #[test]
     fn parametric_band_values_are_clamped() {
         let mut eq = Equalizer::new();
-        let fixed_freq = eq.parametric[0].freq;
-        eq.set_parametric_band(0, 40.0, 100.0);
-        let band = eq.parametric[0];
-        // Frequency is fixed — gain and Q clamp to their limits.
-        assert_eq!(band.freq, fixed_freq);
-        assert_eq!(band.gain_db, 12.0);
-        assert_eq!(band.q, PARAMETRIC_Q_MAX);
+        eq.load_parametric(&[
+            band(ParametricKind::Peak, 5.0, 40.0, 100.0),
+            band(ParametricKind::HighShelf, 99999.0, -40.0, 0.0),
+            band(ParametricKind::Peak, f32::NAN, f32::NAN, f32::NAN),
+        ]);
+        let got = eq.parametric_bands();
+        assert_eq!(
+            got[0],
+            band(
+                ParametricKind::Peak,
+                EQ_FREQ_RANGE.min,
+                12.0,
+                EQ_Q_RANGE.max
+            )
+        );
+        assert_eq!(
+            got[1],
+            band(
+                ParametricKind::HighShelf,
+                EQ_FREQ_RANGE.max,
+                -12.0,
+                EQ_Q_RANGE.min
+            )
+        );
+        assert_eq!(
+            got[2],
+            band(
+                ParametricKind::Peak,
+                EQ_FREQ_RANGE.min,
+                EQ_GAIN_RANGE.min,
+                EQ_Q_RANGE.min
+            )
+        );
+    }
+
+    #[test]
+    fn band_count_clamped_to_bounds() {
+        let mut eq = Equalizer::new();
+        let many: Vec<_> = (0..25)
+            .map(|i| band(ParametricKind::Peak, 100.0 + i as f32, 1.0, 1.0))
+            .collect();
+        eq.load_parametric(&many);
+        assert_eq!(eq.parametric_bands(), &many[..PARAMETRIC_MAX_BANDS]);
+
+        eq.load_parametric(&[]);
+        assert_eq!(eq.parametric_bands().len(), PARAMETRIC_MIN_BANDS);
+        assert_eq!(eq.parametric_bands()[0].gain_db, 0.0);
+    }
+
+    #[test]
+    fn apply_keeps_band_order_and_echoes_clamped_layout() {
+        let mut eq = Equalizer::new();
+        let bands = vec![
+            band(ParametricKind::Peak, 5000.0, 3.0, 1.0),
+            band(ParametricKind::LowShelf, 80.0, 50.0, 0.7),
+        ];
+        let echoed = eq.apply(&EqualizerConfig {
+            enabled: true,
+            mode: EqMode::Parametric,
+            gains: [0.0; 10],
+            preamp: -40.0,
+            parametric: bands,
+        });
+        assert_eq!(echoed.parametric[0].freq, 5000.0);
+        assert_eq!(echoed.parametric[1].kind, ParametricKind::LowShelf);
+        assert_eq!(echoed.parametric[1].gain_db, 12.0);
+        assert_eq!(echoed.preamp, EQ_PREAMP_RANGE.min);
+    }
+
+    #[test]
+    fn parametric_len_limits_active_filters() {
+        let mut eq = parametric_eq_48k();
+        eq.load_parametric(&[band(ParametricKind::Peak, 1000.0, 6.0, 1.0); 20]);
+        assert!(eq.parametric_response_db(&[1000.0])[0] > 100.0);
+
+        // Shrinking the layout must leave the dropped slots silent — both in
+        // the response and in what `process_interleaved` applies.
+        eq.load_parametric(&[band(ParametricKind::Peak, 1000.0, 6.0, 1.0)]);
+        let predicted = eq.parametric_response_db(&[1000.0])[0];
+        assert!((predicted - 6.0).abs() < 0.1, "read {predicted} dB");
+
+        let original = sine(1000.0, 48000.0, 8192, 2);
+        let mut processed = original.clone();
+        eq.process_interleaved(&mut processed);
+        let measured = 20.0 * (rms(&processed[8192..]) / rms(&original[8192..])).log10();
+        assert!((measured - 6.0).abs() < 0.2, "measured {measured} dB");
+    }
+
+    #[test]
+    fn disabled_band_is_passthrough() {
+        let mut eq = parametric_eq_48k();
+        let mut boost = band(ParametricKind::Peak, 1000.0, 9.0, 1.0);
+        boost.enabled = false;
+        eq.load_parametric(&[boost]);
+        assert!(eq.parametric_bands()[0].gain_db == 9.0, "gain is kept");
+        for db in eq.parametric_response_db(&log_freqs(48)) {
+            assert!(db.abs() < 1e-4, "disabled band read {db} dB");
+        }
+
+        let original = sine(1000.0, 48000.0, 1024, 2);
+        let mut processed = original.clone();
+        eq.process_interleaved(&mut processed);
+        for (p, o) in processed.iter().zip(original.iter()) {
+            assert!((p - o).abs() < 1e-5, "disabled band altered samples");
+        }
     }
 
     #[test]
@@ -682,16 +971,13 @@ mod tests {
                 "{name}: {} bands moved",
                 moved.len()
             );
-            // Peaking moves are broad; the edge shelves ignore Q.
-            for band in &bands[1..PARAMETRIC_BAND_COUNT - 1] {
-                if band.gain_db != 0.0 {
-                    assert!(
-                        band.q <= 1.2,
-                        "{name}: {} Hz has narrow Q {}",
-                        band.freq,
-                        band.q
-                    );
-                }
+            for band in moved {
+                assert!(
+                    band.q <= 1.2,
+                    "{name}: {} Hz has narrow Q {}",
+                    band.freq,
+                    band.q
+                );
             }
         }
         assert!(parametric_preset("flat").iter().all(|b| b.gain_db == 0.0));
@@ -701,7 +987,7 @@ mod tests {
     fn parametric_presets_track_their_graphic_counterparts() {
         for name in ["rock", "pop", "bass boost", "vocal boost", "headphones"] {
             let mut eq = parametric_eq_48k();
-            eq.load_parametric(parametric_preset(name));
+            eq.load_parametric(&parametric_preset(name));
             let response = eq.parametric_response_db(&EQ_BANDS);
             for ((freq, got), want) in EQ_BANDS.iter().zip(response).zip(preset_gains(name)) {
                 assert!(
@@ -717,7 +1003,7 @@ mod tests {
         let mut eq = Equalizer::new();
         eq.update_format(44100, 2);
         eq.set_gain(3, 6.0);
-        eq.set_mode(EqMode::Parametric20);
+        eq.set_mode(EqMode::Parametric);
         eq.set_mode(EqMode::Graphic10);
         assert_eq!(eq.gains[3], 6.0);
         assert_eq!(eq.mode, EqMode::Graphic10);
@@ -745,16 +1031,52 @@ mod tests {
     }
 
     #[test]
-    fn parametric_high_band_shelves_instead_of_peaking() {
+    fn graphic_response_unchanged_by_q_shelf_refactor() {
+        // The graphic edge bands moved from the slope-form shelf (S = 1) to
+        // the Q-form shelf at SHELF_Q; the two must be the same filter.
+        let fs = 48000.0;
+        let freqs = log_freqs(64);
+        for name in ["rock", "bass boost", "vocal boost", "headphones"] {
+            let mut eq = Equalizer::new();
+            eq.update_format(48000, 2);
+            eq.load_preset(preset_gains(name));
+            let gains = preset_gains(name);
+            let legacy: Vec<BiquadFilter> = (0..10)
+                .map(|i| match i {
+                    0 => legacy_slope_shelf(false, EQ_BANDS[0], fs, gains[0]),
+                    9 => legacy_slope_shelf(true, EQ_BANDS[9], fs, gains[9]),
+                    _ => {
+                        let mut f = BiquadFilter::new();
+                        f.calculate_coefficients_q(EQ_BANDS[i], fs, gains[i], GRAPHIC_Q);
+                        f
+                    }
+                })
+                .collect();
+            for &f in &freqs {
+                let now: f32 = eq.channel_filters[0]
+                    .iter()
+                    .map(|flt| flt.magnitude_db(f, fs))
+                    .sum();
+                let was: f32 = legacy.iter().map(|flt| flt.magnitude_db(f, fs)).sum();
+                assert!(
+                    (now - was).abs() < 1e-3,
+                    "{name} @ {f} Hz: {now} dB now vs {was} dB before"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn parametric_high_shelf_holds_boost_above_corner() {
         let mut eq = Equalizer::new();
         eq.update_format(44100, 2);
         eq.enabled = true;
-        eq.set_mode(EqMode::Parametric20);
-        eq.set_parametric_band(19, 9.0, PARAMETRIC_DEFAULT_Q); // boost the ~16 kHz band
+        eq.set_mode(EqMode::Parametric);
+        eq.load_parametric(&[band(ParametricKind::HighShelf, 16000.0, 9.0, SHELF_Q)]);
 
-        // A peaking filter centered at ~16 kHz would have rolled back toward
-        // 0 dB well past 20 kHz (the top of human hearing); a high shelf
-        // holds the boost. Probe near Nyquist for a 44.1 kHz stream.
+        // A peaking filter centered at 16 kHz would have rolled back toward
+        // 0 dB well past 20 kHz; a high shelf holds the boost. Probe near
+        // Nyquist for a 44.1 kHz stream.
         let probe = sine(21000.0, 44100.0, 8192, 2);
         let mut processed = probe.clone();
         eq.process_interleaved(&mut processed);
@@ -767,34 +1089,43 @@ mod tests {
         );
     }
 
-    fn parametric_eq_48k() -> Equalizer {
-        let mut eq = Equalizer::new();
-        eq.update_format(48000, 2);
-        eq.enabled = true;
-        eq.set_mode(EqMode::Parametric20);
-        eq
+    #[test]
+    fn response_of_low_shelf_holds_gain_below_corner() {
+        let mut eq = parametric_eq_48k();
+        eq.load_parametric(&[band(ParametricKind::LowShelf, 31.0, 6.0, SHELF_Q)]);
+        let resp = eq.parametric_response_db(&[10.0, 20.0]);
+        assert!(resp[0] >= 5.5, "low shelf at 10 Hz read {} dB", resp[0]);
+        assert!(resp[1] >= 4.5, "low shelf at 20 Hz read {} dB", resp[1]);
     }
 
     #[test]
-    fn response_of_low_shelf_holds_gain_below_corner_and_ignores_q() {
+    fn low_shelf_q_changes_transition_steepness() {
+        let probes = [10.0, 100.0, 200.0, 400.0];
         let mut eq = parametric_eq_48k();
-        eq.set_parametric_band(0, 6.0, 3.0);
-        let probes = [10.0, 20.0];
-        let resp = eq.parametric_response_db(&probes);
-        assert!(resp[0] >= 5.5, "low shelf at 10 Hz read {} dB", resp[0]);
-        assert!(resp[1] >= 4.5, "low shelf at 20 Hz read {} dB", resp[1]);
+        eq.load_parametric(&[band(ParametricKind::LowShelf, 100.0, 6.0, 0.4)]);
+        let gentle = eq.parametric_response_db(&probes);
+        eq.load_parametric(&[band(ParametricKind::LowShelf, 100.0, 6.0, 2.0)]);
+        let steep = eq.parametric_response_db(&probes);
 
-        eq.set_parametric_band(0, 6.0, 0.3);
-        let resp_other_q = eq.parametric_response_db(&probes);
-        for (a, b) in resp.iter().zip(resp_other_q.iter()) {
-            assert!((a - b).abs() < 1e-4, "Q changed the shelf response");
+        // Both shelves hold the full gain far below the corner and read half
+        // of it at the corner...
+        for resp in [&gentle, &steep] {
+            assert!((resp[0] - 6.0).abs() < 0.3, "far below read {}", resp[0]);
+            assert!((resp[1] - 3.0).abs() < 0.1, "corner read {}", resp[1]);
         }
+        // ...but a higher Q falls off faster above it (overshooting past 0).
+        assert!(
+            steep[3] < gentle[3] - 0.5,
+            "Q 2 read {} dB vs Q 0.4 {} dB at 400 Hz",
+            steep[3],
+            gentle[3]
+        );
     }
 
     #[test]
     fn response_of_high_shelf_holds_gain_above_corner() {
         let mut eq = parametric_eq_48k();
-        eq.set_parametric_band(PARAMETRIC_BAND_COUNT - 1, 6.0, 3.0);
+        eq.load_parametric(&[band(ParametricKind::HighShelf, 16000.0, 6.0, SHELF_Q)]);
         let resp = eq.parametric_response_db(&[20000.0]);
         assert!(resp[0] >= 5.0, "high shelf at 20 kHz read {} dB", resp[0]);
     }
@@ -802,8 +1133,8 @@ mod tests {
     #[test]
     fn response_of_peaking_band_reads_gain_at_center_only() {
         let mut eq = parametric_eq_48k();
-        let center = eq.parametric[10].freq;
-        eq.set_parametric_band(10, 6.0, 3.0);
+        let center = 1000.0;
+        eq.load_parametric(&[band(ParametricKind::Peak, center, 6.0, 3.0)]);
         let resp = eq.parametric_response_db(&[center, center / 100.0]);
         assert!(
             (resp[0] - 6.0).abs() < 0.1,
@@ -820,10 +1151,7 @@ mod tests {
     #[test]
     fn response_of_flat_eq_is_zero_everywhere() {
         let eq = parametric_eq_48k();
-        let freqs: Vec<f32> = (0..96)
-            .map(|i| 20.0 * 1000f32.powf(i as f32 / 95.0))
-            .collect();
-        for db in eq.parametric_response_db(&freqs) {
+        for db in eq.parametric_response_db(&log_freqs(96)) {
             assert!(db.abs() < 1e-3, "flat EQ read {db} dB");
         }
     }
@@ -831,9 +1159,11 @@ mod tests {
     #[test]
     fn response_matches_measured_gain_through_process() {
         let mut eq = parametric_eq_48k();
-        eq.set_parametric_band(0, 6.0, 1.0);
-        eq.set_parametric_band(8, -4.0, 2.0);
-        let probe = eq.parametric[8].freq * 1.1;
+        eq.load_parametric(&[
+            band(ParametricKind::LowShelf, 31.0, 6.0, 1.0),
+            band(ParametricKind::Peak, 432.0, -4.0, 2.0),
+        ]);
+        let probe = 432.0 * 1.1;
         let predicted = eq.parametric_response_db(&[probe])[0];
 
         let original = sine(probe, 48000.0, 16384, 2);

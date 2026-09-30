@@ -15,8 +15,8 @@ describe("Equalizer.svelte", () => {
     preamp: 0.0,
     gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     parametric: [
-      { freq: 60, gain_db: 0, q: 1.0 },
-      { freq: 1000, gain_db: 0, q: 1.0 },
+      { kind: "peak", freq: 60, gain_db: 0, q: 1.0, enabled: true },
+      { kind: "peak", freq: 1000, gain_db: 0, q: 1.0, enabled: true },
     ],
   };
 
@@ -40,6 +40,14 @@ describe("Equalizer.svelte", () => {
     fallback_gain_db: { min: -12, max: 0 },
     fade_pause_duration_ms: { min: 0, max: 1000 },
     crossfade_auto_duration_secs: { min: 0, max: 8 },
+    eq: {
+      freq: { min: 20, max: 20000 },
+      gain_db: { min: -12, max: 12 },
+      q: { min: 0.1, max: 10 },
+      preamp: { min: -12, max: 12 },
+      max_bands: 20,
+      min_bands: 1,
+    },
   };
 
   beforeEach(() => {
@@ -59,7 +67,7 @@ describe("Equalizer.svelte", () => {
   });
 
   describe("parametric response curve (#1248)", () => {
-    const parametricConfig = { ...defaultEqConfig, mode: "parametric20" };
+    const parametricConfig = { ...defaultEqConfig, mode: "parametric" };
 
     function mockResponse(respond: (freqs: number[]) => number[]) {
       vi.mocked(invoke).mockImplementation(async (cmd: string, args?: any) => {
@@ -127,6 +135,29 @@ describe("Equalizer.svelte", () => {
     expect(getByText("2000")).toBeInTheDocument();
   });
 
+  it("draws the EQ gain sliders' range from the backend, not a retyped ±12 (#1332)", async () => {
+    const backendRanges = {
+      ...defaultRanges,
+      eq: { ...defaultRanges.eq, gain_db: { min: -15, max: 15 } },
+    };
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_audio_setting_ranges") return backendRanges;
+      if (cmd === "get_fade_settings") return defaultFadeSettings;
+      if (cmd === "get_loudness_settings") return defaultLoudness;
+      if (cmd === "get_equalizer_state") return defaultEqConfig;
+      return null;
+    });
+    const { container } = render(Equalizer);
+    await waitFor(() => {
+      const sliders = container.querySelectorAll<HTMLInputElement>('input[type="range"][orient="vertical"]');
+      expect(sliders).toHaveLength(10);
+      for (const s of sliders) {
+        expect(s.min).toBe("-15");
+        expect(s.max).toBe("15");
+      }
+    });
+  });
+
   it("renders equalizer title and preset selector", async () => {
     const { getByText, getByRole } = render(Equalizer);
     await waitFor(() => {
@@ -151,17 +182,17 @@ describe("Equalizer.svelte", () => {
   });
 
   it("switches between Graphic and Parametric modes", async () => {
-    const { getByText } = render(Equalizer);
+    const { getByRole } = render(Equalizer);
+    let parametricBtn: HTMLElement;
     await waitFor(() => {
-      expect(getByText(/20-band/i)).toBeInTheDocument();
+      parametricBtn = getByRole("button", { name: /^parametric$/i });
     });
 
-    const parametricBtn = getByText(/20-band/i);
-    await fireEvent.click(parametricBtn);
+    await fireEvent.click(parametricBtn!);
 
     expect(invoke).toHaveBeenCalledWith(
       "apply_equalizer_config",
-      expect.objectContaining({ config: expect.objectContaining({ mode: "parametric20" }) })
+      expect.objectContaining({ config: expect.objectContaining({ mode: "parametric" }) })
     );
   });
 
