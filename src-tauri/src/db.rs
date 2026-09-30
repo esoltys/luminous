@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 53;
+pub const CURRENT_SCHEMA_VERSION: i32 = 54;
 
 struct Migration {
     version: i32,
@@ -452,6 +452,11 @@ const MIGRATIONS: &[Migration] = &[
         description: "typed, toggleable parametric EQ bands and the 'parametric' mode name (#1332)",
         apply: migrate_parametric_band_kinds,
     },
+    Migration {
+        version: 54,
+        description: "user EQ presets and the persisted active preset (#1335)",
+        apply: migrate_eq_presets,
+    },
 ];
 
 /// Migration 53: the legacy parametric layout was a positional list of
@@ -497,6 +502,61 @@ fn migrate_parametric_band_kinds(conn: &rusqlite::Connection) -> Result<()> {
         "UPDATE equalizer_settings SET mode = 'parametric' WHERE mode = 'parametric20'",
         [],
     )?;
+    Ok(())
+}
+
+/// Migration 54: user parametric presets, plus the active preset name so the
+/// picker is restored rather than re-derived from gains. An existing graphic
+/// config whose gains match a built-in keeps that name; anything else starts
+/// as '' (Custom). A fresh database gets 'Flat', matching `Equalizer::new`.
+fn migrate_eq_presets(conn: &rusqlite::Connection) -> Result<()> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS eq_user_presets (
+             id INTEGER PRIMARY KEY,
+             name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+             bands TEXT NOT NULL,
+             preamp REAL NOT NULL
+         );",
+    )?;
+    let has_active_preset: bool = conn
+        .prepare(
+            "SELECT 1 FROM pragma_table_info('equalizer_settings') WHERE name = 'active_preset'",
+        )?
+        .exists([])?;
+    if has_active_preset {
+        return Ok(());
+    }
+    conn.execute_batch(
+        "ALTER TABLE equalizer_settings ADD COLUMN active_preset TEXT NOT NULL DEFAULT '';",
+    )?;
+    let rows: Vec<(i64, String, String)> = conn
+        .prepare("SELECT id, mode, gains FROM equalizer_settings")?
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
+        .collect::<rusqlite::Result<_>>()?;
+    for (id, mode, gains_str) in rows {
+        if mode != "graphic10" {
+            continue;
+        }
+        let gains: Vec<f32> = gains_str
+            .split(',')
+            .filter_map(|g| g.trim().parse().ok())
+            .collect();
+        if gains.len() != 10 {
+            continue;
+        }
+        let matched = crate::equalizer::BUILTIN_PRESETS.iter().find(|name| {
+            crate::equalizer::preset_gains(name)
+                .iter()
+                .zip(&gains)
+                .all(|(a, b)| (a - b).abs() < 0.1)
+        });
+        if let Some(name) = matched {
+            conn.execute(
+                "UPDATE equalizer_settings SET active_preset = ?1 WHERE id = ?2",
+                rusqlite::params![name, id],
+            )?;
+        }
+    }
     Ok(())
 }
 
@@ -3185,6 +3245,70 @@ mod tests {
             .unwrap();
         assert_eq!(mode, "graphic10");
         assert_eq!(parametric, "");
+    }
+
+    #[test]
+    fn migration_54_names_a_matching_graphic_preset_and_leaves_others_custom() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch(MIGRATION_2).unwrap();
+        conn.execute_batch(MIGRATION_4).unwrap();
+        let rock = crate::equalizer::preset_gains("Rock")
+            .iter()
+            .map(|g| g.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+        conn.execute("UPDATE equalizer_settings SET gains = ?1", params![rock])
+            .unwrap();
+        migrate_eq_presets(&conn).unwrap();
+        let active: String = conn
+            .query_row("SELECT active_preset FROM equalizer_settings", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(active, "Rock");
+
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch(MIGRATION_2).unwrap();
+        conn.execute_batch(MIGRATION_4).unwrap();
+        conn.execute(
+            "UPDATE equalizer_settings SET gains = '1,0,0,0,0,0,0,0,0,0'",
+            [],
+        )
+        .unwrap();
+        migrate_eq_presets(&conn).unwrap();
+        let active: String = conn
+            .query_row("SELECT active_preset FROM equalizer_settings", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(active, "");
+        conn.execute(
+            "INSERT INTO eq_user_presets (name, bands, preamp) VALUES ('Mine', '[]', 0)",
+            [],
+        )
+        .unwrap();
+        assert!(conn
+            .execute(
+                "INSERT INTO eq_user_presets (name, bands, preamp) VALUES ('MINE', '[]', 0)",
+                [],
+            )
+            .is_err());
+    }
+
+    #[test]
+    fn fresh_database_starts_on_the_flat_preset() {
+        let dir = tempfile::Builder::new()
+            .prefix("luminous_migration54_test_")
+            .tempdir()
+            .unwrap();
+        let db = Database::new(dir.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+        let active: String = conn
+            .query_row("SELECT active_preset FROM equalizer_settings", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(active, "Flat");
     }
 
     #[test]

@@ -19,7 +19,23 @@ export interface EqConfig {
   preamp: number;
   gains: number[];
   parametric: ParametricBand[];
+  /** Backend-owned: a built-in preset name, `user:<id>`, or null (Custom). */
+  active_preset?: string | null;
 }
+
+/** A saved user preset (parametric filter list + preamp), by id. */
+interface UserPreset {
+  id: number;
+  name: string;
+}
+
+export interface EqPresetList {
+  builtin: string[];
+  user: UserPreset[];
+}
+
+/** The picker key for a user preset — mirrors `equalizer::user_preset_key`. */
+export const userPresetKey = (id: number): string => `user:${id}`;
 
 export interface SettingRange {
   min: number;

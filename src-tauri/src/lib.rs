@@ -27,6 +27,7 @@ pub mod default_apps;
 pub mod diagnostics;
 pub mod discord;
 pub mod dr_parser;
+pub mod eq_presets;
 pub mod equalizer;
 pub mod fade;
 pub mod filter_parser;
@@ -295,20 +296,23 @@ fn with_webview2_remote_debugging(current: &str, port: u16) -> String {
 /// with the user's last-saved EQ state instead of engine defaults.
 fn restore_equalizer_from_db(db: &Database, audio_engine: &AudioEngine) {
     if let Ok(conn) = db.pool.get() {
-        if let Ok((enabled, preamp, gains_str, mode_str, parametric_json)) = conn.query_row(
-            "SELECT enabled, preamp, gains, mode, parametric
+        if let Ok((enabled, preamp, gains_str, mode_str, parametric_json, active_preset)) = conn
+            .query_row(
+                "SELECT enabled, preamp, gains, mode, parametric, active_preset
                  FROM equalizer_settings WHERE id = 1",
-            [],
-            |row| {
-                Ok((
-                    row.get::<_, i32>(0)? != 0,
-                    row.get::<_, f64>(1)? as f32,
-                    row.get::<_, String>(2)?,
-                    row.get::<_, String>(3)?,
-                    row.get::<_, String>(4)?,
-                ))
-            },
-        ) {
+                [],
+                |row| {
+                    Ok((
+                        row.get::<_, i32>(0)? != 0,
+                        row.get::<_, f64>(1)? as f32,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, String>(3)?,
+                        row.get::<_, String>(4)?,
+                        row.get::<_, String>(5)?,
+                    ))
+                },
+            )
+        {
             let mut gains = [0.0f32; 10];
             for (i, val) in gains_str.split(',').enumerate() {
                 if i < 10 {
@@ -334,6 +338,8 @@ fn restore_equalizer_from_db(db: &Database, audio_engine: &AudioEngine) {
                 if mode_str == "parametric" || mode_str == "parametric20" {
                     eq.set_mode(crate::equalizer::EqMode::Parametric);
                 }
+                // '' is Custom.
+                eq.active_preset = Some(active_preset).filter(|p| !p.is_empty());
             });
         }
     }
@@ -1307,6 +1313,10 @@ pub fn run() {
             commands::equalizer::get_parametric_response,
             commands::equalizer::reset_parametric_bands,
             commands::equalizer::load_equalizer_preset,
+            commands::equalizer::list_eq_presets,
+            commands::equalizer::save_eq_user_preset,
+            commands::equalizer::rename_eq_user_preset,
+            commands::equalizer::delete_eq_user_preset,
             // Loudness normalization commands
             commands::loudness::get_loudness_settings,
             commands::loudness::set_loudness_settings,

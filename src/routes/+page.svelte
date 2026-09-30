@@ -6,21 +6,15 @@
   import { navigationStore, type ActiveTab, type ActiveSubTab } from "../lib/stores/navigation.svelte";
   import { playerStore } from "../lib/stores/player.svelte";
   import { playlistsStore } from "../lib/stores/playlists.svelte";
+  import { shouldSkipGlobalShortcut } from "../lib/utils/globalShortcuts";
 
   let isInitialized = $state(false);
 
   const SEEK_STEP_NS = 10_000_000_000;
   const VOLUME_STEP = 0.05;
 
-  function isEditableTarget(target: EventTarget | null): boolean {
-    if (!(target instanceof HTMLElement)) return false;
-
-    const editable = target.closest("input, textarea, select, [contenteditable]");
-    return editable !== null;
-  }
-
   function handleKeyboardShortcut(event: KeyboardEvent) {
-    if (event.repeat || isEditableTarget(event.target)) return;
+    if (shouldSkipGlobalShortcut(event)) return;
 
     switch (event.code) {
       case "Space":

@@ -13,9 +13,18 @@
   import Knob from "./Knob.svelte";
   import ParametricGraph from "./ParametricGraph.svelte";
   import ParametricBandStrip from "./ParametricBandStrip.svelte";
+  import ConfirmDialog from "./ConfirmDialog.svelte";
   import { logSpacedFreqs } from "../utils/eqScale";
 
-  import type { EqConfig, EqMode, EqRanges, ParametricBand, SettingRange } from "../types/equalizer";
+  import {
+    userPresetKey,
+    type EqConfig,
+    type EqMode,
+    type EqPresetList,
+    type EqRanges,
+    type ParametricBand,
+    type SettingRange,
+  } from "../types/equalizer";
 
   // Matches PlayerBar's volume-slider gradient recipe so every horizontal
   // range input in the app shows the same accent-filled "active range" look.
@@ -30,19 +39,16 @@
   let gains = $state<number[]>(Array(10).fill(0.0));
   let parametric = $state<ParametricBand[]>([]);
   let selectedBand = $state(0);
-  let activePreset = $state("Flat");
+  /** The backend's `active_preset`: a built-in name, `user:<id>`, or null (Custom). */
+  let activePreset = $state<string | null>(null);
+  let presetList = $state<EqPresetList>({ builtin: [], user: [] });
 
   const bandLabels = [
     "31.5 Hz", "63 Hz", "125 Hz", "250 Hz", "500 Hz",
     "1 kHz", "2 kHz", "4 kHz", "8 kHz", "16 kHz"
   ];
 
-  const presets = [
-    "Flat", "Rock", "Pop",
-    "Bass Boost", "Vocal Boost", "Headphones"
-  ];
-
-  function getPresetTranslationKey(presetName: string): string {
+  function presetLabel(presetName: string): string {
     const keyMap: Record<string, string> = {
       "Flat": "flatPreset",
       "Pop": "popPreset",
@@ -52,40 +58,35 @@
       "Treble Boost": "trebleBoostPreset",
       "Headphones": "headphonesPreset"
     };
-    return "equalizer." + (keyMap[presetName] || "customPreset");
+    const key = keyMap[presetName];
+    return key ? i18n.t(`equalizer.${key}`) : presetName;
+  }
+
+  /** Take every field of a backend echo, including which preset it is. */
+  function assignConfig(config: EqConfig) {
+    enabled = config.enabled;
+    mode = config.mode ?? "graphic10";
+    preamp = config.preamp;
+    gains = config.gains;
+    parametric = config.parametric ?? [];
+    activePreset = config.active_preset ?? null;
+    selectedBand = Math.min(selectedBand, Math.max(0, parametric.length - 1));
   }
 
   async function loadConfig() {
     try {
-      const config = await invoke<EqConfig>("get_equalizer_state");
-      enabled = config.enabled;
-      mode = config.mode ?? "graphic10";
-      preamp = config.preamp;
-      gains = config.gains;
-      parametric = config.parametric ?? [];
-      determinePresetName();
+      assignConfig(await invoke<EqConfig>("get_equalizer_state"));
     } catch (e) {
       console.error("Failed to load equalizer state:", e);
     }
   }
 
-  function determinePresetName() {
-    const rockGains = [4.0, 3.0, 1.0, -1.0, -2.0, -1.0, 1.0, 3.0, 3.5, 3.5];
-    const popGains = [1.5, 2.5, 1.0, -1.0, -0.5, 1.0, 2.5, 3.0, 2.5, 2.0];
-    const bassBoostGains = [9.0, 7.0, 4.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
-    const vocalBoostGains = [-3.0, -2.0, -1.0, 0.0, 2.0, 4.0, 4.5, 3.5, 1.0, -1.0];
-    const headphonesGains = [2.0, 1.5, 0.5, 0.0, 0.0, 0.0, -0.5, -1.0, -0.5, 1.0];
-    const flatGains = Array(10).fill(0.0);
-
-    const matches = (a: number[], b: number[]) => a.every((v, i) => Math.abs(v - b[i]) < 0.1);
-
-    if (matches(gains, flatGains)) activePreset = "Flat";
-    else if (matches(gains, rockGains)) activePreset = "Rock";
-    else if (matches(gains, popGains)) activePreset = "Pop";
-    else if (matches(gains, bassBoostGains)) activePreset = "Bass Boost";
-    else if (matches(gains, vocalBoostGains)) activePreset = "Vocal Boost";
-    else if (matches(gains, headphonesGains)) activePreset = "Headphones";
-    else activePreset = "Custom";
+  async function loadPresetList() {
+    try {
+      presetList = await invoke<EqPresetList>("list_eq_presets");
+    } catch (e) {
+      console.error("Failed to list equalizer presets:", e);
+    }
   }
 
   /** The single EQ mutation path: send the whole edited config; the engine
@@ -107,12 +108,7 @@
             config: { enabled, mode, preamp, gains, parametric },
           });
           if (applyPending) continue;
-          enabled = canonical.enabled;
-          mode = canonical.mode;
-          preamp = canonical.preamp;
-          gains = canonical.gains;
-          parametric = canonical.parametric;
-          selectedBand = Math.min(selectedBand, Math.max(0, parametric.length - 1));
+          assignConfig(canonical);
           await refreshCurves();
         }
       } catch (e) {
@@ -143,15 +139,13 @@
     await applyConfig();
   }
 
-  async function handleBandChange(index: number) {
-    activePreset = "Custom";
+  async function handleBandChange() {
     await ensureEnabled();
     await applyConfig();
   }
 
   function updateBand(idx: number, band: ParametricBand): Promise<void> {
     parametric[idx] = band;
-    activePreset = "Custom";
     ensureEnabled();
     return applyConfig();
   }
@@ -159,14 +153,12 @@
   function addBand(freq: number) {
     parametric = [...parametric, { kind: "peak", freq, gain_db: 0, q: 1, enabled: true }];
     selectedBand = parametric.length - 1;
-    activePreset = "Custom";
     applyConfig();
   }
 
   function removeBand(idx: number) {
     parametric = parametric.filter((_, i) => i !== idx);
     if (selectedBand > idx || selectedBand >= parametric.length) selectedBand = Math.max(0, selectedBand - 1);
-    activePreset = "Custom";
     applyConfig();
   }
 
@@ -177,9 +169,7 @@
 
   async function resetParametric() {
     try {
-      const config = await invoke<EqConfig>("reset_parametric_bands");
-      parametric = config.parametric;
-      selectedBand = Math.min(selectedBand, parametric.length - 1);
+      assignConfig(await invoke<EqConfig>("reset_parametric_bands"));
       await refreshCurves();
     } catch (e) {
       console.error("Failed to reset parametric bands:", e);
@@ -187,17 +177,74 @@
   }
 
   async function selectPreset(preset: string) {
-    if (preset === "Custom") return;
+    if (!preset) return;
     try {
-      await ensureEnabled();
-      const config = await invoke<EqConfig>("load_equalizer_preset", { presetName: preset });
-      gains = config.gains;
-      parametric = config.parametric;
-      activePreset = preset;
-      selectedBand = Math.min(selectedBand, parametric.length - 1);
+      // Turn the EQ on in the engine, not just locally — the preset's echo
+      // carries the engine's `enabled` and would switch it straight back off.
+      if (!enabled) {
+        enabled = true;
+        await applyConfig();
+      }
+      assignConfig(await invoke<EqConfig>("load_equalizer_preset", { presetName: preset }));
       await refreshCurves();
     } catch (e) {
       console.error("Failed to load preset:", e);
+    }
+  }
+
+  // --- User presets (#1335) ---
+  let activeUserPreset = $derived(
+    presetList.user.find((p) => activePreset === userPresetKey(p.id)) ?? null
+  );
+  /** The inline name field: saving a new preset or renaming the active one. */
+  let nameEditor = $state<{ action: "save" | "rename"; name: string } | null>(null);
+  let nameError = $state<string | null>(null);
+  let confirmingDelete = $state(false);
+
+  const PRESET_ERRORS: Record<string, string> = {
+    empty_name: "equalizer.presetErrorEmptyName",
+    duplicate_name: "equalizer.presetErrorDuplicateName",
+    not_found: "equalizer.presetErrorNotFound",
+  };
+
+  function openNameEditor(action: "save" | "rename") {
+    nameEditor = { action, name: action === "rename" ? (activeUserPreset?.name ?? "") : "" };
+    nameError = null;
+  }
+
+  function closeNameEditor() {
+    nameEditor = null;
+    nameError = null;
+  }
+
+  async function submitName() {
+    if (!nameEditor) return;
+    try {
+      if (nameEditor.action === "save") {
+        assignConfig(await invoke<EqConfig>("save_eq_user_preset", { name: nameEditor.name }));
+      } else if (activeUserPreset) {
+        await invoke("rename_eq_user_preset", { id: activeUserPreset.id, name: nameEditor.name });
+      }
+      await loadPresetList();
+      closeNameEditor();
+    } catch (e) {
+      nameError = i18n.t(PRESET_ERRORS[String(e)] ?? "equalizer.presetErrorGeneric");
+    }
+  }
+
+  function focusOnMount(node: HTMLInputElement) {
+    node.focus();
+    node.select();
+  }
+
+  async function deleteActiveUserPreset() {
+    confirmingDelete = false;
+    if (!activeUserPreset) return;
+    try {
+      assignConfig(await invoke<EqConfig>("delete_eq_user_preset", { id: activeUserPreset.id }));
+      await loadPresetList();
+    } catch (e) {
+      console.error("Failed to delete preset:", e);
     }
   }
 
@@ -378,10 +425,21 @@
     loadLoudnessSettings();
     loadFadeSettings();
     loudnessStore.init();
-    await Promise.all([loadConfig(), loadSettingRanges()]);
+    await Promise.all([loadConfig(), loadSettingRanges(), loadPresetList()]);
     await refreshCurves();
   });
 </script>
+
+{#if confirmingDelete && activeUserPreset}
+  <ConfirmDialog
+    title={i18n.t('equalizer.deletePresetTitle')}
+    message={i18n.t('equalizer.deletePresetMessage', { name: activeUserPreset.name })}
+    confirmLabel={i18n.t('equalizer.deletePreset')}
+    cancelLabel={i18n.t('equalizer.cancelPreset')}
+    onConfirm={deleteActiveUserPreset}
+    onCancel={() => (confirmingDelete = false)}
+  />
+{/if}
 
 <div class="flex flex-col gap-6 text-brand-text-primary">
   <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 flex flex-col gap-6">
@@ -435,20 +493,28 @@
       </div>
 
       <div class="flex items-center gap-2 bg-brand-main border border-brand-border rounded-[2rem] px-4 py-1.5">
-        <span class="text-xs font-semibold text-brand-text-secondary">{i18n.t('equalizer.presetLabel')}:</span>
+        <label for="eq-preset-picker" class="text-xs font-semibold text-brand-text-secondary">{i18n.t('equalizer.presetLabel')}:</label>
         <Select
-          value={activePreset}
-          onchange={(e) => { activePreset = e.currentTarget.value; selectPreset(activePreset); }}
+          id="eq-preset-picker"
+          value={activePreset ?? ""}
+          onchange={(e) => selectPreset(e.currentTarget.value)}
           class="bg-brand-main text-xs text-brand-text-primary border border-brand-border rounded pl-3.5 pr-6 py-1 outline-none focus:border-brand-accent font-medium"
           chevronPosition="0.375rem"
         >
-          {#each presets as preset}
-            <option value={preset} class="bg-brand-main text-brand-text-primary">
-              {i18n.t(getPresetTranslationKey(preset), {}, preset)}
-            </option>
-          {/each}
-          {#if activePreset === "Custom"}
-            <option value="Custom" class="bg-brand-main text-brand-text-primary" disabled>{i18n.t('equalizer.customPreset')}</option>
+          {#if activePreset === null}
+            <option value="" class="bg-brand-main text-brand-text-primary" disabled>{i18n.t('equalizer.customPreset')}</option>
+          {/if}
+          <optgroup label={i18n.t('equalizer.builtinPresets')} class="bg-brand-main text-brand-text-secondary">
+            {#each presetList.builtin as preset}
+              <option value={preset} class="bg-brand-main text-brand-text-primary">{presetLabel(preset)}</option>
+            {/each}
+          </optgroup>
+          {#if mode === "parametric" && presetList.user.length > 0}
+            <optgroup label={i18n.t('equalizer.userPresets')} class="bg-brand-main text-brand-text-secondary">
+              {#each presetList.user as preset (preset.id)}
+                <option value={userPresetKey(preset.id)} class="bg-brand-main text-brand-text-primary">{preset.name}</option>
+              {/each}
+            </optgroup>
           {/if}
         </Select>
       </div>
@@ -478,8 +544,67 @@
         >
           {i18n.t('equalizer.resetBands')}
         </button>
+        <button
+          class="text-xs font-semibold px-4 py-1.5 bg-brand-main border border-brand-border rounded-full text-brand-text-secondary hover:text-brand-text-primary transition-colors"
+          onclick={() => openNameEditor("save")}
+        >
+          {i18n.t('equalizer.savePresetAs')}
+        </button>
+        {#if activeUserPreset}
+          <button
+            class="text-xs font-semibold px-4 py-1.5 bg-brand-main border border-brand-border rounded-full text-brand-text-secondary hover:text-brand-text-primary transition-colors"
+            onclick={() => openNameEditor("rename")}
+          >
+            {i18n.t('equalizer.renamePreset')}
+          </button>
+          <button
+            class="text-xs font-semibold px-4 py-1.5 bg-brand-main border border-brand-border rounded-full text-brand-text-secondary hover:text-red-400 transition-colors"
+            onclick={() => (confirmingDelete = true)}
+          >
+            {i18n.t('equalizer.deletePreset')}
+          </button>
+        {/if}
       {/if}
     </div>
+
+    {#if nameEditor && mode === "parametric"}
+      <form
+        class="flex flex-col gap-1"
+        onsubmit={(e) => { e.preventDefault(); submitName(); }}
+      >
+        <div class="flex items-center gap-2 flex-wrap">
+          <label for="eq-preset-name" class="text-xs font-semibold text-brand-text-secondary">
+            {nameEditor.action === "save" ? i18n.t('equalizer.savePresetLabel') : i18n.t('equalizer.renamePresetLabel')}
+          </label>
+          <input
+            id="eq-preset-name"
+            type="text"
+            bind:value={nameEditor.name}
+            use:focusOnMount
+            onkeydown={(e) => { if (e.key === "Escape") closeNameEditor(); }}
+            aria-invalid={nameError !== null}
+            aria-describedby={nameError ? "eq-preset-name-error" : undefined}
+            class="bg-brand-main text-xs text-brand-text-primary border border-brand-border rounded px-3 py-1 outline-none focus:border-brand-accent min-w-48"
+          />
+          <button
+            type="submit"
+            class="text-xs font-semibold px-4 py-1.5 bg-brand-accent text-brand-accent-contrast rounded-full hover:bg-brand-accent-hover transition-colors"
+          >
+            {i18n.t('equalizer.savePreset')}
+          </button>
+          <button
+            type="button"
+            class="text-xs font-semibold px-4 py-1.5 bg-brand-main border border-brand-border rounded-full text-brand-text-secondary hover:text-brand-text-primary transition-colors"
+            onclick={closeNameEditor}
+          >
+            {i18n.t('equalizer.cancelPreset')}
+          </button>
+        </div>
+        {#if nameError}
+          <p id="eq-preset-name-error" class="text-xs text-red-400" role="alert">{nameError}</p>
+        {/if}
+      </form>
+    {/if}
     </div>
 
     <!-- Slider bounds are the backend's clamp range (#1249), so wait for them. -->
@@ -499,7 +624,7 @@
                 step="0.25"
                 use:verticalOrient
                 bind:value={gains[idx]}
-                oninput={() => handleBandChange(idx)}
+                oninput={handleBandChange}
                 class="accent-brand-accent cursor-ns-resize"
                 style="appearance: slider-vertical; -webkit-appearance: slider-vertical; width: 12px; height: 100%;"
               />
