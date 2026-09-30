@@ -562,16 +562,16 @@ impl AudioEngine {
             let eq = self.equalizer.lock();
             let mode_str = match eq.mode {
                 crate::equalizer::EqMode::Graphic10 => "10-band Graphic",
-                crate::equalizer::EqMode::Parametric20 => "20-band Parametric",
+                crate::equalizer::EqMode::Parametric => "Parametric",
             };
             let active_bands = match eq.mode {
                 crate::equalizer::EqMode::Graphic10 => {
                     eq.gains.iter().filter(|&&g| g.abs() > 0.01).count()
                 }
-                crate::equalizer::EqMode::Parametric20 => eq
-                    .parametric
+                crate::equalizer::EqMode::Parametric => eq
+                    .parametric_bands()
                     .iter()
-                    .filter(|f| f.gain_db.abs() > 0.01)
+                    .filter(|b| b.enabled && b.gain_db.abs() > 0.01)
                     .count(),
             };
             (

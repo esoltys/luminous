@@ -12,19 +12,7 @@
   import Select from "./Select.svelte";
   import Knob from "./Knob.svelte";
 
-  type EqMode = "graphic10" | "parametric20";
-  interface ParametricBand {
-    freq: number;
-    gain_db: number;
-    q: number;
-  }
-  interface EqConfig {
-    enabled: boolean;
-    mode: EqMode;
-    preamp: number;
-    gains: number[];
-    parametric: ParametricBand[];
-  }
+  import type { EqConfig, EqMode, EqRanges, ParametricBand, SettingRange } from "../types/equalizer";
 
   // Matches PlayerBar's volume-slider gradient recipe so every horizontal
   // range input in the app shows the same accent-filled "active range" look.
@@ -143,8 +131,6 @@
     if (!parametric[index]) return;
     activePreset = "Custom";
     await ensureEnabled();
-    // Band center frequencies are fixed — the backend ignores them and only
-    // applies gain and Q.
     await applyConfig();
   }
 
@@ -232,10 +218,11 @@
   }
 
   let curvePath = $derived.by(() => {
-    if (parametric.length === 0 || responseDb.length !== CURVE_SAMPLES) return "";
+    const gainRange = ranges?.eq.gain_db;
+    if (!gainRange || parametric.length === 0 || responseDb.length !== CURVE_SAMPLES) return "";
     const pts = responseDb.map((db, i) => {
-      const clamped = Math.max(-12, Math.min(12, db));
-      return { x: (i / (CURVE_SAMPLES - 1)) * 100, y: 20 - (clamped / 12.0) * 17 };
+      const clamped = Math.max(gainRange.min, Math.min(gainRange.max, db));
+      return { x: (i / (CURVE_SAMPLES - 1)) * 100, y: 20 - (clamped / gainRange.max) * 17 };
     });
     return splinePath(pts);
   });
@@ -255,15 +242,12 @@
 
   // Bounds of the loudness/fade controls. The backend clamps to these and
   // owns them (#1249), so the controls wait for them rather than retyping them.
-  interface SettingRange {
-    min: number;
-    max: number;
-  }
   interface AudioSettingRanges {
     target_lufs: SettingRange;
     fallback_gain_db: SettingRange;
     fade_pause_duration_ms: SettingRange;
     crossfade_auto_duration_secs: SettingRange;
+    eq: EqRanges;
   }
   let ranges = $state<AudioSettingRanges | null>(null);
 
@@ -393,10 +377,10 @@
         </div>
         <div class="space-y-1 min-w-0">
           <h3 class="font-bold text-sm text-brand-text-primary">
-            {mode === "parametric20" ? i18n.t('equalizer.titleParametric') : i18n.t('equalizer.title')}
+            {mode === "parametric" ? i18n.t('equalizer.titleParametric') : i18n.t('equalizer.title')}
           </h3>
           <p class="text-xs text-brand-text-secondary leading-relaxed text-pretty">
-            {mode === "parametric20" ? i18n.t('equalizer.subtitleParametric') : i18n.t('equalizer.subtitle')}
+            {mode === "parametric" ? i18n.t('equalizer.subtitleParametric') : i18n.t('equalizer.subtitle')}
           </p>
         </div>
       </div>
@@ -415,7 +399,7 @@
       <div class="relative flex items-center bg-brand-main border border-brand-border rounded-[2rem] p-0.5" role="group" aria-label={i18n.t('equalizer.modeLabel')}>
         <!-- Sliding background pill -->
         <span
-          class="absolute top-0.5 bottom-0.5 left-0.5 w-[calc(50%-2px)] rounded-full bg-brand-accent shadow-sm pointer-events-none transition-transform duration-200 ease-out {mode === 'parametric20' ? 'translate-x-full' : 'translate-x-0'}"
+          class="absolute top-0.5 bottom-0.5 left-0.5 w-[calc(50%-2px)] rounded-full bg-brand-accent shadow-sm pointer-events-none transition-transform duration-200 ease-out {mode === 'parametric' ? 'translate-x-full' : 'translate-x-0'}"
           aria-hidden="true"
         ></span>
         <button
@@ -426,9 +410,9 @@
           {i18n.t('equalizer.modeGraphic')}
         </button>
         <button
-          class="relative z-10 flex-1 whitespace-nowrap text-xs font-semibold px-4 py-1.5 rounded-full transition-colors duration-200 {mode === 'parametric20' ? 'text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-          onclick={() => handleModeChange("parametric20")}
-          aria-pressed={mode === "parametric20"}
+          class="relative z-10 flex-1 whitespace-nowrap text-xs font-semibold px-4 py-1.5 rounded-full transition-colors duration-200 {mode === 'parametric' ? 'text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+          onclick={() => handleModeChange("parametric")}
+          aria-pressed={mode === "parametric"}
         >
           {i18n.t('equalizer.modeParametric')}
         </button>
@@ -455,21 +439,23 @@
 
       <div class="flex items-center gap-3 bg-brand-main border border-brand-border rounded-[2rem] px-4 py-1.5">
         <span class="text-xs font-semibold text-brand-text-secondary">{i18n.t('equalizer.preamp')}:</span>
-        <Knob
-          min={-12.0}
-          max={12.0}
-          step={0.25}
-          bind:value={preamp}
-          oninput={handlePreampChange}
-          showValue={false}
-          size={24}
-        />
+        {#if ranges}
+          <Knob
+            min={ranges.eq.preamp.min}
+            max={ranges.eq.preamp.max}
+            step={0.25}
+            bind:value={preamp}
+            oninput={handlePreampChange}
+            showValue={false}
+            size={24}
+          />
+        {/if}
         <span class="text-xs font-mono font-medium {preamp > 0 ? 'text-green-400' : preamp < 0 ? 'text-red-400' : 'text-brand-text-primary'}">
           {preamp > 0 ? "+" : ""}{preamp.toFixed(1)} dB
         </span>
       </div>
 
-      {#if mode === "parametric20"}
+      {#if mode === "parametric"}
         <button
           class="text-xs font-semibold px-4 py-1.5 bg-brand-main border border-brand-border rounded-full text-brand-text-secondary hover:text-brand-text-primary transition-colors"
           onclick={resetParametric}
@@ -480,7 +466,7 @@
     </div>
     </div>
 
-    {#if mode === "parametric20"}
+    {#if mode === "parametric"}
       <!-- Response curve preview — parametric only, because Q (bandwidth)
            can't be read off the gain sliders but shapes the curve here.
            The curve is the backend's evaluated filter response. -->
@@ -511,7 +497,8 @@
       </div>
     {/if}
 
-    {#if mode === "graphic10"}
+    <!-- Slider bounds are the backend's clamp range (#1249), so wait for them. -->
+    {#if ranges && mode === "graphic10"}
       <div class="grid grid-cols-5 md:grid-cols-10 gap-3 md:gap-5 min-h-64 h-auto md:h-72 items-center bg-brand-main/50 border border-brand-border/50 rounded-xl p-4 md:p-6">
         {#each gains as gain, idx}
           <div class="flex flex-col items-center justify-between h-full group">
@@ -522,8 +509,8 @@
             <div class="h-40 md:h-48 flex items-center justify-center relative">
               <input
                 type="range"
-                min="-12.0"
-                max="12.0"
+                min={ranges.eq.gain_db.min}
+                max={ranges.eq.gain_db.max}
                 step="0.25"
                 use:verticalOrient
                 bind:value={gains[idx]}
@@ -542,7 +529,7 @@
       <p class="text-xs text-brand-text-secondary px-1 -mt-2">
         {i18n.t('equalizer.isoStandard')}
       </p>
-    {:else}
+    {:else if ranges}
       <div class="grid grid-cols-10 md:grid-cols-[repeat(20,minmax(0,1fr))] gap-1 md:gap-1.5 min-h-64 h-auto md:h-72 items-center bg-brand-main/50 border border-brand-border/50 rounded-xl p-3 md:p-4">
         {#each parametric as band, idx}
           <div
@@ -560,8 +547,8 @@
             <div class="h-40 md:h-48 flex items-center justify-center relative">
               <input
                 type="range"
-                min="-12.0"
-                max="12.0"
+                min={ranges.eq.gain_db.min}
+                max={ranges.eq.gain_db.max}
                 step="0.25"
                 use:verticalOrient
                 bind:value={parametric[idx].gain_db}
@@ -578,8 +565,8 @@
         {/each}
       </div>
 
-      <!-- Selected band detail: Q only (band frequencies are fixed) -->
-      {#if parametric[selectedBand]}
+      <!-- Selected band detail: Q -->
+      {#if parametric[selectedBand] && ranges}
         <div class="flex flex-col gap-2 bg-brand-sidebar border border-brand-border rounded-xl p-4">
           <div class="flex justify-between items-center text-xs font-bold text-brand-text-secondary">
             <span>
@@ -591,8 +578,8 @@
           </div>
           <input
             type="range"
-            min="0.1"
-            max="10"
+            min={ranges.eq.q.min}
+            max={ranges.eq.q.max}
             step="0.1"
             bind:value={parametric[selectedBand].q}
             oninput={() => pushParametricBand(selectedBand)}

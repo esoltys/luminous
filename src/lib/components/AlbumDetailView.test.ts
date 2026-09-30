@@ -10,6 +10,7 @@ import { picardStore } from "../stores/picard.svelte";
 import { prefs } from "../stores/prefs.svelte";
 import { tasksStore } from "../stores/tasks.svelte";
 import { toastStore } from "../stores/toast.svelte";
+import { statsExclusionsStore } from "../stores/statsExclusions.svelte";
 import { invoke } from "@tauri-apps/api/core";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -218,6 +219,47 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
 
     await fireEvent.click(picardItem);
     expect(invoke).toHaveBeenCalledWith("open_in_picard", { songIds: [1, 2] });
+  });
+
+  it("toggles album stats exclusion from the overflow menu (#1252)", async () => {
+    let excluded: [string, string][] = [];
+    vi.mocked(invoke).mockImplementation(async (cmd: string, args?: unknown) => {
+      const a = args as { entityType: string; entityKey: string; excluded: boolean } | undefined;
+      if (cmd === "set_stats_excluded" && a) {
+        excluded = a.excluded ? [[a.entityType, a.entityKey]] : [];
+      }
+      if (cmd === "get_stats_exclusions") return excluded;
+      if (cmd === "get_songs_by_album") return mockSongs;
+      if (cmd === "get_all_app_settings") return {};
+      return [];
+    });
+    await statsExclusionsStore.refresh();
+
+    const { getByTitle, getByText, queryByText } = render(AlbumDetailView, {
+      props: { albumName: mockAlbumName },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const moreBtn = getByTitle("More actions");
+    await fireEvent.click(moreBtn);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const excludeItem = getByText("Don't Include in Stats");
+    expect(excludeItem).toBeInTheDocument();
+
+    await fireEvent.click(excludeItem);
+    await vi.waitFor(() => expect(statsExclusionsStore.isExcluded("album", mockAlbumName)).toBe(true));
+    expect(invoke).toHaveBeenCalledWith("set_stats_excluded", {
+      entityType: "album",
+      entityKey: mockAlbumName,
+      excluded: true,
+    });
+
+    // Reopen menu to verify label flips to "Include in Stats"
+    await fireEvent.click(moreBtn);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(getByText("Include in Stats")).toBeInTheDocument();
+    expect(queryByText("Don't Include in Stats")).toBeNull();
   });
 
   it("scopes Album Info card to group/overview, buttons to group/link, and shows domain-only for unrecognized sites (#1133)", async () => {

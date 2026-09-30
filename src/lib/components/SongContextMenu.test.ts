@@ -4,6 +4,8 @@ import { render, screen, fireEvent } from "@testing-library/svelte";
 import SongContextMenu from "./SongContextMenu.svelte";
 import { picardStore } from "../stores/picard.svelte";
 import { playlistsStore } from "../stores/playlists.svelte";
+import { statsExclusionsStore } from "../stores/statsExclusions.svelte";
+import { invoke } from "@tauri-apps/api/core";
 import type { Song, Playlist } from "../types";
 
 describe("SongContextMenu.svelte", () => {
@@ -299,6 +301,74 @@ describe("SongContextMenu.svelte", () => {
 
     expect(createPlaylistSpy).toHaveBeenCalledWith("Chill Sunset");
     expect(addSongsSpy).toHaveBeenCalledWith(99, [1]);
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("displays 'Include in Stats' and un-excludes album when song belongs to excluded album", async () => {
+    let exclusions: [string, string][] = [["album", "OK Computer"]];
+    vi.mocked(invoke).mockImplementation(async (cmd: string, args?: unknown) => {
+      const a = args as { entityType: string; entityKey: string; excluded: boolean } | undefined;
+      if (cmd === "set_stats_excluded" && a) {
+        if (a.excluded) exclusions = [[a.entityType, a.entityKey]];
+        else exclusions = [];
+      }
+      if (cmd === "get_stats_exclusions") return exclusions;
+      return [];
+    });
+    await statsExclusionsStore.refresh();
+
+    const onClose = vi.fn();
+    render(SongContextMenu, {
+      x: 0,
+      y: 0,
+      song: localSong,
+      onPlay: () => {},
+      onClose,
+    });
+
+    const item = await screen.findByText("Include in Stats");
+    expect(item).toBeInTheDocument();
+
+    await fireEvent.click(item);
+    expect(invoke).toHaveBeenCalledWith("set_stats_excluded", {
+      entityType: "album",
+      entityKey: "OK Computer",
+      excluded: false,
+    });
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("displays 'Include in Stats' and un-excludes artist when song belongs to excluded artist", async () => {
+    let exclusions: [string, string][] = [["artist", "Radiohead"]];
+    vi.mocked(invoke).mockImplementation(async (cmd: string, args?: unknown) => {
+      const a = args as { entityType: string; entityKey: string; excluded: boolean } | undefined;
+      if (cmd === "set_stats_excluded" && a) {
+        if (a.excluded) exclusions = [[a.entityType, a.entityKey]];
+        else exclusions = [];
+      }
+      if (cmd === "get_stats_exclusions") return exclusions;
+      return [];
+    });
+    await statsExclusionsStore.refresh();
+
+    const onClose = vi.fn();
+    render(SongContextMenu, {
+      x: 0,
+      y: 0,
+      song: localSong,
+      onPlay: () => {},
+      onClose,
+    });
+
+    const item = await screen.findByText("Include in Stats");
+    expect(item).toBeInTheDocument();
+
+    await fireEvent.click(item);
+    expect(invoke).toHaveBeenCalledWith("set_stats_excluded", {
+      entityType: "artist",
+      entityKey: "Radiohead",
+      excluded: false,
+    });
     expect(onClose).toHaveBeenCalled();
   });
 });

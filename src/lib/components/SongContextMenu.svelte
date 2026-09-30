@@ -187,13 +187,21 @@
   let menuVisible = $state(true);
 
   async function handleToggleStatsExcluded() {
-    const excluded = !statsExclusionsStore.isExcluded("song", String(song.id));
-    await statsExclusionsStore.setExcluded("song", String(song.id), excluded);
-    const name = song.title || i18n.t("collection.unknownSong");
-    const message = excluded
-      ? i18n.t("stats.excludedToast", { name })
-      : i18n.t("stats.includedToast", { name });
-    toastStore.show(message);
+    const reason = statsExclusionsStore.getSongExclusionReason(song);
+    if (reason === "album" && song.album) {
+      await statsExclusionsStore.toggleWithToast("album", song.album);
+    } else if (reason === "artist") {
+      const artist = song.album_artist || song.artist;
+      if (artist) {
+        await statsExclusionsStore.toggleWithToast("artist", artist);
+      }
+    } else {
+      await statsExclusionsStore.toggleWithToast(
+        "song",
+        String(song.id),
+        song.title || i18n.t("collection.unknownSong")
+      );
+    }
   }
 </script>
 
@@ -341,7 +349,7 @@
   {#if selectedCount === 1}
     <ContextMenuItem
       icon={BarChart2}
-      label={statsExclusionsStore.isExcluded("song", String(song.id))
+      label={statsExclusionsStore.isSongExcluded(song)
         ? i18n.t("stats.includeInStats")
         : i18n.t("stats.excludeFromStats")}
       onmouseenter={closeSubmenuImmediately}

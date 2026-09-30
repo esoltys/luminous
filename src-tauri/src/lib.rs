@@ -319,19 +319,20 @@ fn restore_equalizer_from_db(db: &Database, audio_engine: &AudioEngine) {
             }
             audio_engine.with_equalizer(|eq| {
                 eq.enabled = enabled;
-                eq.preamp = preamp;
+                eq.set_preamp(preamp);
                 eq.load_preset(gains);
+                // `load_parametric` bounds the band count and clamps every
+                // field; an empty/unparseable row keeps the default layout.
                 if let Ok(bands) =
                     serde_json::from_str::<Vec<crate::equalizer::ParametricBand>>(&parametric_json)
                 {
-                    if bands.len() == crate::equalizer::PARAMETRIC_BAND_COUNT {
-                        let mut arr = crate::equalizer::default_parametric_bands();
-                        arr.copy_from_slice(&bands);
-                        eq.load_parametric(arr);
+                    if !bands.is_empty() {
+                        eq.load_parametric(&bands);
                     }
                 }
-                if mode_str == "parametric20" {
-                    eq.set_mode(crate::equalizer::EqMode::Parametric20);
+                // "parametric20" is the pre-#1332 name (migration 53 rewrites it).
+                if mode_str == "parametric" || mode_str == "parametric20" {
+                    eq.set_mode(crate::equalizer::EqMode::Parametric);
                 }
             });
         }

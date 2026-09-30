@@ -28,12 +28,7 @@
   let { x, y, name, isRoot, onRename, onPromote, onDelete, onClose }: Props = $props();
 
   async function handleToggleStatsExcluded() {
-    const excluded = !statsExclusionsStore.isExcluded("genre", name);
-    await statsExclusionsStore.setExcluded("genre", name, excluded);
-    const message = excluded
-      ? i18n.t("stats.excludedToast", { name })
-      : i18n.t("stats.includedToast", { name });
-    toastStore.show(message);
+    await statsExclusionsStore.toggleWithToast("genre", name);
   }
 </script>
 

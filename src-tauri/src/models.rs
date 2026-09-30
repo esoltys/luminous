@@ -759,6 +759,7 @@ pub struct AudioSettingRanges {
     pub fallback_gain_db: SettingRange,
     pub fade_pause_duration_ms: SettingRange,
     pub crossfade_auto_duration_secs: SettingRange,
+    pub eq: crate::equalizer::EqualizerRanges,
 }
 
 pub const AUDIO_SETTING_RANGES: AudioSettingRanges = AudioSettingRanges {
@@ -766,6 +767,7 @@ pub const AUDIO_SETTING_RANGES: AudioSettingRanges = AudioSettingRanges {
     fallback_gain_db: FALLBACK_GAIN_DB_RANGE,
     fade_pause_duration_ms: FADE_PAUSE_DURATION_MS_RANGE,
     crossfade_auto_duration_secs: CROSSFADE_AUTO_DURATION_SECS_RANGE,
+    eq: crate::equalizer::EQUALIZER_RANGES,
 };
 
 impl LoudnessSettings {
