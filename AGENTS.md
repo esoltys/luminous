@@ -77,6 +77,13 @@ into Picard's territory; it's a different, complementary axis Picard was never m
 - `tageditor.rs` — lofty tag reader/writer
 - `commands/` — all `#[tauri::command]` IPC handlers (registry in `commands/mod.rs`)
 
+## User Guide
+
+- The in-app Help view loads the user manual from `docs/user-guide/`: `luminous-user-guide-{EN,FR}.html` plus shared `guide.css` / `guide.js`. It is plain HTML/CSS/JS maintained in this repo — edit it directly.
+- Update EN and FR together in the same change, like locale strings.
+- It must work offline: no CDN scripts, web fonts or other remote requests. Colours come from the app's theme variables (`guide.js` mirrors them from the parent window), so don't hard-code a palette.
+- `bun run sync-docs` copies it into `static/` (generated, gitignored).
+
 ## Package Manager
 
 - Use **bun** for all JavaScript/TypeScript package management in this project (not npm, yarn, or pnpm).

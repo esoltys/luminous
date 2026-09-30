@@ -53,8 +53,8 @@ scripts/mock-config.local.json
 # Synced from docs/user-guide/ by `bun run sync-docs` (see scripts/sync-docs.ts)
 /static/luminous-user-guide-EN.html
 /static/luminous-user-guide-FR.html
-/static/support.js
-/static/image-slot.js
+/static/guide.css
+/static/guide.js
 /static/luminous-mark.svg
 /static/expose-700.woff2
 /static/screenshots/
