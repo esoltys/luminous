@@ -59,6 +59,7 @@ const IDENTICAL_OK = new Set([
   "collection.tableHeaderMusicBrainzId", // "MBID"
   "collection.tableHeaderTrack", // "#"
   "discord.integrationTitle", // "Discord Rich Presence"
+  "equalizer.gain", // "Gain"
   "equalizer.isoStandard", // "ISO 266:1997"
   "equalizer.jazzPreset", // "Jazz"
   "equalizer.modeLabel", // "Mode"

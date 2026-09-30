@@ -627,12 +627,24 @@ impl Equalizer {
     /// coefficients at the engine's real sample rate, so the UI's curve
     /// preview shows exactly what `process_interleaved` applies (#1248).
     pub fn parametric_response_db(&self, freqs: &[f32]) -> Vec<f32> {
+        self.cascade_response_db(0..self.parametric_len, freqs)
+    }
+
+    /// Magnitude response of parametric band `idx` alone (dB) — the UI's
+    /// faint selected-band curve. A band past the live count, or a disabled
+    /// one (identity coefficients), reads flat.
+    pub fn band_response_db(&self, idx: usize, freqs: &[f32]) -> Vec<f32> {
+        let end = (idx + 1).min(self.parametric_len);
+        self.cascade_response_db(idx.min(end)..end, freqs)
+    }
+
+    fn cascade_response_db(&self, range: std::ops::Range<usize>, freqs: &[f32]) -> Vec<f32> {
         let fs = self.sample_rate as f32;
         let nyquist = fs / 2.0;
         let Some(filters) = self.parametric_filters.first() else {
             return vec![0.0; freqs.len()];
         };
-        let live = &filters[..self.parametric_len];
+        let live = &filters[range];
         freqs
             .iter()
             .map(|&f| {
@@ -940,6 +952,35 @@ mod tests {
         eq.process_interleaved(&mut processed);
         let measured = 20.0 * (rms(&processed[8192..]) / rms(&original[8192..])).log10();
         assert!((measured - 6.0).abs() < 0.2, "measured {measured} dB");
+    }
+
+    #[test]
+    fn band_response_matches_single_filter() {
+        let peak = band(ParametricKind::Peak, 1000.0, 6.0, 2.0);
+        let shelf = band(ParametricKind::HighShelf, 8000.0, -4.0, SHELF_Q);
+        let freqs = log_freqs(48);
+
+        let mut both = parametric_eq_48k();
+        both.load_parametric(&[peak, shelf]);
+        let mut alone = parametric_eq_48k();
+        alone.load_parametric(&[shelf]);
+
+        let isolated = both.band_response_db(1, &freqs);
+        for (a, b) in isolated.iter().zip(alone.parametric_response_db(&freqs)) {
+            assert!((a - b).abs() < 1e-4, "band 1 read {a} dB, alone {b} dB");
+        }
+        // The per-band curves sum to the combined response.
+        let summed: Vec<f32> = both
+            .band_response_db(0, &freqs)
+            .iter()
+            .zip(&isolated)
+            .map(|(a, b)| a + b)
+            .collect();
+        for (s, c) in summed.iter().zip(both.parametric_response_db(&freqs)) {
+            assert!((s - c).abs() < 1e-3);
+        }
+        // Out of range reads flat instead of panicking.
+        assert!(both.band_response_db(7, &freqs).iter().all(|db| *db == 0.0));
     }
 
     #[test]

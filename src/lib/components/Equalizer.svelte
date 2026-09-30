@@ -11,6 +11,9 @@
   import Toggle from "./Toggle.svelte";
   import Select from "./Select.svelte";
   import Knob from "./Knob.svelte";
+  import ParametricGraph from "./ParametricGraph.svelte";
+  import ParametricBandStrip from "./ParametricBandStrip.svelte";
+  import { logSpacedFreqs } from "../utils/eqScale";
 
   import type { EqConfig, EqMode, EqRanges, ParametricBand, SettingRange } from "../types/equalizer";
 
@@ -61,7 +64,6 @@
       gains = config.gains;
       parametric = config.parametric ?? [];
       determinePresetName();
-      await refreshCurve();
     } catch (e) {
       console.error("Failed to load equalizer state:", e);
     }
@@ -89,17 +91,37 @@
   /** The single EQ mutation path: send the whole edited config; the engine
    * clamps and echoes the canonical state back. Local edits already updated
    * the reactive fields, so the echo only matters when clamping changed a
-   * value. */
-  async function applyConfig() {
-    const canonical = await invoke<EqConfig>("apply_equalizer_config", {
-      config: { enabled, mode, preamp, gains, parametric },
-    });
-    enabled = canonical.enabled;
-    mode = canonical.mode;
-    preamp = canonical.preamp;
-    gains = canonical.gains;
-    parametric = canonical.parametric;
-    await refreshCurve();
+   * value. Drags fire faster than the round-trip, so at most one apply is in
+   * flight: edits made meanwhile coalesce into one follow-up with the latest
+   * state, and an echo that newer edits have overtaken is not assigned. */
+  let applyLoop: Promise<void> | null = null;
+  let applyPending = false;
+
+  function applyConfig(): Promise<void> {
+    applyPending = true;
+    applyLoop ??= (async () => {
+      try {
+        while (applyPending) {
+          applyPending = false;
+          const canonical = await invoke<EqConfig>("apply_equalizer_config", {
+            config: { enabled, mode, preamp, gains, parametric },
+          });
+          if (applyPending) continue;
+          enabled = canonical.enabled;
+          mode = canonical.mode;
+          preamp = canonical.preamp;
+          gains = canonical.gains;
+          parametric = canonical.parametric;
+          selectedBand = Math.min(selectedBand, Math.max(0, parametric.length - 1));
+          await refreshCurves();
+        }
+      } catch (e) {
+        console.error("Failed to apply equalizer config:", e);
+      } finally {
+        applyLoop = null;
+      }
+    })();
+    return applyLoop;
   }
 
   async function ensureEnabled() {
@@ -127,18 +149,38 @@
     await applyConfig();
   }
 
-  async function pushParametricBand(index: number) {
-    if (!parametric[index]) return;
+  function updateBand(idx: number, band: ParametricBand): Promise<void> {
+    parametric[idx] = band;
     activePreset = "Custom";
-    await ensureEnabled();
-    await applyConfig();
+    ensureEnabled();
+    return applyConfig();
+  }
+
+  function addBand(freq: number) {
+    parametric = [...parametric, { kind: "peak", freq, gain_db: 0, q: 1, enabled: true }];
+    selectedBand = parametric.length - 1;
+    activePreset = "Custom";
+    applyConfig();
+  }
+
+  function removeBand(idx: number) {
+    parametric = parametric.filter((_, i) => i !== idx);
+    if (selectedBand > idx || selectedBand >= parametric.length) selectedBand = Math.max(0, selectedBand - 1);
+    activePreset = "Custom";
+    applyConfig();
+  }
+
+  function selectBand(idx: number) {
+    selectedBand = idx;
+    refreshBandCurve();
   }
 
   async function resetParametric() {
     try {
       const config = await invoke<EqConfig>("reset_parametric_bands");
       parametric = config.parametric;
-      await refreshCurve();
+      selectedBand = Math.min(selectedBand, parametric.length - 1);
+      await refreshCurves();
     } catch (e) {
       console.error("Failed to reset parametric bands:", e);
     }
@@ -152,80 +194,12 @@
       gains = config.gains;
       parametric = config.parametric;
       activePreset = preset;
-      await refreshCurve();
+      selectedBand = Math.min(selectedBand, parametric.length - 1);
+      await refreshCurves();
     } catch (e) {
       console.error("Failed to load preset:", e);
     }
   }
-
-  // --- Log-frequency helpers (20 Hz – 20 kHz mapped to 0..1) ---
-  const FREQ_MIN = 20;
-  const FREQ_MAX = 20000;
-  const FREQ_SPAN = Math.log(FREQ_MAX / FREQ_MIN);
-
-  function unitToFreq(unit: number): number {
-    return Math.round(FREQ_MIN * Math.exp(unit * FREQ_SPAN));
-  }
-
-  function formatFreq(freq: number): string {
-    if (freq >= 10000) return `${(freq / 1000).toFixed(0)}k`;
-    if (freq >= 1000) return `${(freq / 1000).toFixed(1).replace(/\.0$/, "")}k`;
-    return `${Math.round(freq)}`;
-  }
-
-  // Smooth Catmull-Rom spline path for the SVG EQ envelope graphic.
-  function splinePath(pts: { x: number; y: number }[]): string {
-    if (pts.length === 0) return "";
-    let d = `M ${pts[0].x} ${pts[0].y}`;
-    for (let i = 0; i < pts.length - 1; i++) {
-      const p0 = i > 0 ? pts[i - 1] : pts[i];
-      const p1 = pts[i];
-      const p2 = pts[i + 1];
-      const p3 = i < pts.length - 2 ? pts[i + 2] : p2;
-      const cp1x = p1.x + (p2.x - p0.x) / 6;
-      const cp1y = p1.y + (p2.y - p0.y) / 6;
-      const cp2x = p2.x - (p3.x - p1.x) / 6;
-      const cp2y = p2.y - (p3.y - p1.y) / 6;
-      d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
-    }
-    return d;
-  }
-
-  // Parametric-only curve preview. Unlike the graphic bands (fixed Q), each
-  // parametric band's Q changes its bandwidth — the gain sliders alone can't
-  // show that, but the combined response curve can. The backend evaluates
-  // the magnitude response of the filters it is actually running (shelves at
-  // the edges, peaking bands between); this only plots it (#1248).
-  const CURVE_SAMPLES = 96;
-  const curveFreqs = Array.from(
-    { length: CURVE_SAMPLES },
-    (_, i) => FREQ_MIN * Math.exp((i / (CURVE_SAMPLES - 1)) * FREQ_SPAN)
-  );
-  let responseDb = $state<number[]>([]);
-  let curveRequest = 0;
-
-  /** Re-fetch the evaluated response after canonical state lands. Slider
-   * drags fire many applies, so a response older than the latest request is
-   * discarded. */
-  async function refreshCurve() {
-    const request = ++curveRequest;
-    try {
-      const db = await invoke<number[]>("get_parametric_response", { frequencies: curveFreqs });
-      if (request === curveRequest) responseDb = db;
-    } catch (e) {
-      console.error("Failed to get parametric response:", e);
-    }
-  }
-
-  let curvePath = $derived.by(() => {
-    const gainRange = ranges?.eq.gain_db;
-    if (!gainRange || parametric.length === 0 || responseDb.length !== CURVE_SAMPLES) return "";
-    const pts = responseDb.map((db, i) => {
-      const clamped = Math.max(gainRange.min, Math.min(gainRange.max, db));
-      return { x: (i / (CURVE_SAMPLES - 1)) * 100, y: 20 - (clamped / gainRange.max) * 17 };
-    });
-    return splinePath(pts);
-  });
 
   function verticalOrient(node: HTMLInputElement) {
     node.setAttribute("orient", "vertical");
@@ -257,6 +231,48 @@
     } catch (e) {
       console.error("Failed to load audio setting ranges:", e);
     }
+  }
+
+  // The graph plots the response the backend evaluates for the filters it is
+  // actually running (#1248) — the combined cascade, plus the selected band on
+  // its own. Drags fire many applies, so a response older than the latest
+  // request of its kind is discarded.
+  const CURVE_SAMPLES = 96;
+  let curveFreqs = $derived(ranges ? logSpacedFreqs(CURVE_SAMPLES, ranges.eq.freq) : []);
+  let responseDb = $state<number[]>([]);
+  let bandResponseDb = $state<number[]>([]);
+  let curveRequest = 0;
+  let bandCurveRequest = 0;
+
+  async function refreshCurve() {
+    if (mode !== "parametric" || curveFreqs.length === 0) return;
+    const request = ++curveRequest;
+    try {
+      const db = await invoke<number[]>("get_parametric_response", { frequencies: curveFreqs });
+      if (request === curveRequest) responseDb = db;
+    } catch (e) {
+      console.error("Failed to get parametric response:", e);
+    }
+  }
+
+  async function refreshBandCurve() {
+    if (mode !== "parametric" || curveFreqs.length === 0) return;
+    const request = ++bandCurveRequest;
+    const band = selectedBand;
+    if (!parametric[band]) {
+      bandResponseDb = [];
+      return;
+    }
+    try {
+      const db = await invoke<number[]>("get_parametric_response", { frequencies: curveFreqs, band });
+      if (request === bandCurveRequest) bandResponseDb = db;
+    } catch (e) {
+      console.error("Failed to get band response:", e);
+    }
+  }
+
+  function refreshCurves(): Promise<unknown> {
+    return Promise.all([refreshCurve(), refreshBandCurve()]);
   }
 
   /** Tick values from `min` to `max` inclusive, `count` intervals apart. */
@@ -359,11 +375,11 @@
   }
 
   onMount(async () => {
-    loadConfig();
-    loadSettingRanges();
     loadLoudnessSettings();
     loadFadeSettings();
     loudnessStore.init();
+    await Promise.all([loadConfig(), loadSettingRanges()]);
+    await refreshCurves();
   });
 </script>
 
@@ -466,37 +482,6 @@
     </div>
     </div>
 
-    {#if mode === "parametric"}
-      <!-- Response curve preview — parametric only, because Q (bandwidth)
-           can't be read off the gain sliders but shapes the curve here.
-           The curve is the backend's evaluated filter response. -->
-      <div class="h-24 bg-brand-main border border-brand-border rounded-xl p-3 flex flex-col justify-between relative overflow-hidden">
-        <div class="absolute left-0 right-0 top-1/2 border-t border-dashed border-brand-border pointer-events-none"></div>
-        <svg class="w-full h-full" viewBox="0 0 100 40" preserveAspectRatio="none">
-          {#if curvePath}
-            <path
-              d={curvePath}
-              fill="none"
-              stroke={enabled ? "url(#eqGrad)" : "var(--color-border)"}
-              stroke-width="1.5"
-              class="transition-all duration-200"
-            />
-          {/if}
-          <defs>
-            <linearGradient id="eqGrad" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stop-color="var(--color-accent)" />
-              <stop offset="100%" stop-color="var(--color-accent-hover)" />
-            </linearGradient>
-          </defs>
-        </svg>
-        <div class="flex justify-between text-[8px] text-brand-text-secondary/40 px-1 font-mono uppercase">
-          <span>{i18n.t('equalizer.bass')}</span>
-          <span>{i18n.t('equalizer.mid')}</span>
-          <span>{i18n.t('equalizer.treble')}</span>
-        </div>
-      </div>
-    {/if}
-
     <!-- Slider bounds are the backend's clamp range (#1249), so wait for them. -->
     {#if ranges && mode === "graphic10"}
       <div class="grid grid-cols-5 md:grid-cols-10 gap-3 md:gap-5 min-h-64 h-auto md:h-72 items-center bg-brand-main/50 border border-brand-border/50 rounded-xl p-4 md:p-6">
@@ -530,63 +515,27 @@
         {i18n.t('equalizer.isoStandard')}
       </p>
     {:else if ranges}
-      <div class="grid grid-cols-10 md:grid-cols-[repeat(20,minmax(0,1fr))] gap-1 md:gap-1.5 min-h-64 h-auto md:h-72 items-center bg-brand-main/50 border border-brand-border/50 rounded-xl p-3 md:p-4">
-        {#each parametric as band, idx}
-          <div
-            class="flex flex-col items-center justify-between h-full group rounded-md transition-colors {selectedBand === idx ? 'bg-brand-accent/10 ring-1 ring-brand-accent/50' : 'hover:bg-brand-sidebar/30'}"
-            onclick={() => (selectedBand = idx)}
-            role="button"
-            tabindex="0"
-            onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") selectedBand = idx; }}
-            aria-label={`${i18n.t('equalizer.bandLabel')} ${idx + 1}`}
-          >
-            <span class="text-[9px] font-bold w-full text-center transition-colors {band.gain_db > 0 ? 'text-green-400/80' : band.gain_db < 0 ? 'text-red-400/80' : 'text-brand-text-secondary/70'}">
-              {band.gain_db > 0 ? "+" : ""}{band.gain_db.toFixed(1)}
-            </span>
-
-            <div class="h-40 md:h-48 flex items-center justify-center relative">
-              <input
-                type="range"
-                min={ranges.eq.gain_db.min}
-                max={ranges.eq.gain_db.max}
-                step="0.25"
-                use:verticalOrient
-                bind:value={parametric[idx].gain_db}
-                oninput={() => { selectedBand = idx; pushParametricBand(idx); }}
-                class="accent-brand-accent cursor-ns-resize"
-                style="appearance: slider-vertical; -webkit-appearance: slider-vertical; width: 10px; height: 100%;"
-              />
-            </div>
-
-            <span class="text-[9px] font-medium text-center truncate w-full {selectedBand === idx ? 'text-brand-accent-text' : 'text-brand-text-secondary'}">
-              {formatFreq(band.freq)}
-            </span>
-          </div>
-        {/each}
-      </div>
-
-      <!-- Selected band detail: Q -->
-      {#if parametric[selectedBand] && ranges}
-        <div class="flex flex-col gap-2 bg-brand-sidebar border border-brand-border rounded-xl p-4">
-          <div class="flex justify-between items-center text-xs font-bold text-brand-text-secondary">
-            <span>
-              {i18n.t('equalizer.bandLabel')} {selectedBand + 1}
-              <span class="text-brand-text-secondary font-mono">· {formatFreq(parametric[selectedBand].freq)}Hz</span>
-              — {i18n.t('equalizer.qFactor').toUpperCase()}
-            </span>
-            <span class="text-brand-accent-text font-mono">{parametric[selectedBand].q.toFixed(1)}</span>
-          </div>
-          <input
-            type="range"
-            min={ranges.eq.q.min}
-            max={ranges.eq.q.max}
-            step="0.1"
-            bind:value={parametric[selectedBand].q}
-            oninput={() => pushParametricBand(selectedBand)}
-            class="w-full accent-brand-accent bg-brand-main h-1.5 rounded-lg appearance-none"
-          />
-        </div>
-      {/if}
+      <ParametricGraph
+        bands={parametric}
+        selected={selectedBand}
+        ranges={ranges.eq}
+        active={enabled}
+        response={responseDb}
+        bandResponse={bandResponseDb}
+        onselect={selectBand}
+        onchange={updateBand}
+        onadd={addBand}
+        onremove={removeBand}
+      />
+      <ParametricBandStrip
+        bands={parametric}
+        selected={selectedBand}
+        ranges={ranges.eq}
+        onselect={selectBand}
+        onchange={updateBand}
+        onadd={addBand}
+        onremove={removeBand}
+      />
     {/if}
   </div>
 

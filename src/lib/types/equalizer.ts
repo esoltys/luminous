@@ -3,7 +3,7 @@
 
 export type EqMode = "graphic10" | "parametric";
 
-type ParametricKind = "peak" | "low_shelf" | "high_shelf";
+export type ParametricKind = "peak" | "low_shelf" | "high_shelf";
 
 export interface ParametricBand {
   kind: ParametricKind;
