@@ -37,14 +37,16 @@ interface AppSettings {
 }
 
 interface ParametricBand {
+  kind: "peak" | "low_shelf" | "high_shelf";
   freq: number;
   gain_db: number;
   q: number;
+  enabled: boolean;
 }
 
 interface EqualizerState {
   enabled: boolean;
-  mode: "graphic10" | "parametric20";
+  mode: "graphic10" | "parametric";
   preamp: number;
   gains: number[];
   parametric: ParametricBand[];
@@ -53,11 +55,16 @@ interface EqualizerState {
 // 20 log-spaced default bands mirroring equalizer::default_parametric_bands().
 function defaultParametricBands(): ParametricBand[] {
   const octaves = Math.log2(16000 / 31.25); // 9 octaves
-  return Array.from({ length: 20 }, (_, i) => ({
-    freq: Math.round(31.25 * 2 ** ((octaves * i) / 19)),
-    gain_db: 0.0,
-    q: 1.1,
-  }));
+  return Array.from({ length: 20 }, (_, i) => {
+    const kind = i === 0 ? "low_shelf" : i === 19 ? "high_shelf" : "peak";
+    return {
+      kind,
+      freq: Math.round(31.25 * 2 ** ((octaves * i) / 19)),
+      gain_db: 0.0,
+      q: kind === "peak" ? 1.1 : Math.SQRT1_2,
+      enabled: true,
+    };
+  });
 }
 
 interface MockTagGroup {
@@ -1357,10 +1364,26 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
 
     reset_parametric_bands: (): EqualizerState => ({
       enabled: true,
-      mode: "parametric20",
+      mode: "parametric",
       preamp: 3.0,
       gains: Array(10).fill(0.0),
       parametric: defaultParametricBands(),
+    }),
+
+    // Mirrors models::AudioSettingRanges / equalizer::EqualizerRanges.
+    get_audio_setting_ranges: () => ({
+      target_lufs: { min: -23, max: -9 },
+      fallback_gain_db: { min: -12, max: 0 },
+      fade_pause_duration_ms: { min: 0, max: 1000 },
+      crossfade_auto_duration_secs: { min: 0, max: 8 },
+      eq: {
+        freq: { min: 20, max: 20000 },
+        gain_db: { min: -12, max: 12 },
+        q: { min: 0.1, max: 10 },
+        preamp: { min: -12, max: 12 },
+        max_bands: 20,
+        min_bands: 1,
+      },
     }),
 
     // No DSP in the mock — report a flat response for any sweep.

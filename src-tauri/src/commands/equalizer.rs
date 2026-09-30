@@ -14,9 +14,9 @@ fn save_eq_settings(db: &crate::db::Database, eq: &Equalizer) {
             .join(",");
         let mode_str = match eq.mode {
             crate::equalizer::EqMode::Graphic10 => "graphic10",
-            crate::equalizer::EqMode::Parametric20 => "parametric20",
+            crate::equalizer::EqMode::Parametric => "parametric",
         };
-        let parametric_json = serde_json::to_string(&eq.parametric.to_vec()).unwrap_or_default();
+        let parametric_json = serde_json::to_string(eq.parametric_bands()).unwrap_or_default();
         let _ = conn.execute(
             "UPDATE equalizer_settings
              SET enabled = ?1, preamp = ?2, gains = ?3, mode = ?4, parametric = ?5
@@ -63,7 +63,7 @@ pub async fn reset_parametric_bands(state: State<'_, AppState>) -> Result<Equali
     let db = state.db.clone();
     Ok(crate::audio::with_audio(&state.audio, move |engine| {
         engine.with_equalizer(|eq| {
-            eq.load_parametric(crate::equalizer::default_parametric_bands());
+            eq.load_parametric(&crate::equalizer::default_parametric_bands());
             save_eq_settings(&db, eq);
             EqualizerConfig::snapshot(eq)
         })
@@ -82,11 +82,11 @@ pub async fn load_equalizer_preset(
     Ok(crate::audio::with_audio(&state.audio, move |engine| {
         engine.with_equalizer(|eq| {
             // Always update the graphic gains so the preset is intact if the
-            // user switches back to 10-band; additionally load the named
+            // user switches back to graphic mode; additionally load the named
             // preset's own sparse parametric layout when that mode is active.
             eq.load_preset(gains);
-            if eq.mode == crate::equalizer::EqMode::Parametric20 {
-                eq.load_parametric(crate::equalizer::parametric_preset(&preset_name));
+            if eq.mode == crate::equalizer::EqMode::Parametric {
+                eq.load_parametric(&crate::equalizer::parametric_preset(&preset_name));
             }
             save_eq_settings(&db, eq);
             EqualizerConfig::snapshot(eq)

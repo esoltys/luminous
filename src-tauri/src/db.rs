@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 52;
+pub const CURRENT_SCHEMA_VERSION: i32 = 53;
 
 struct Migration {
     version: i32,
@@ -447,7 +447,58 @@ const MIGRATIONS: &[Migration] = &[
         description: "song_lyrics_offsets table for per-song timing offset (#1237)",
         apply: |conn| Ok(conn.execute_batch(MIGRATION_52)?),
     },
+    Migration {
+        version: 53,
+        description: "typed, toggleable parametric EQ bands and the 'parametric' mode name (#1332)",
+        apply: migrate_parametric_band_kinds,
+    },
 ];
+
+/// Migration 53: the legacy parametric layout was a positional list of
+/// `{freq, gain_db, q}` whose first band was implicitly a low shelf and last a
+/// high shelf (slope 1, Q ignored). Make those kinds explicit — Q = 1/√2 is
+/// the exact RBJ equivalent of slope 1, so the curve is unchanged — mark every
+/// band enabled, and rename the `parametric20` mode. An empty or unparseable
+/// value is left alone (it already means "defaults").
+fn migrate_parametric_band_kinds(conn: &rusqlite::Connection) -> Result<()> {
+    let rows: Vec<(i64, String)> = conn
+        .prepare("SELECT id, parametric FROM equalizer_settings")?
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .collect::<rusqlite::Result<_>>()?;
+    for (id, json) in rows {
+        let Ok(serde_json::Value::Array(mut bands)) = serde_json::from_str(&json) else {
+            continue;
+        };
+        let last = bands.len().saturating_sub(1);
+        for (i, band) in bands.iter_mut().enumerate() {
+            let Some(obj) = band.as_object_mut() else {
+                continue;
+            };
+            let kind = if i == 0 {
+                "low_shelf"
+            } else if i == last {
+                "high_shelf"
+            } else {
+                "peak"
+            };
+            if kind != "peak" {
+                obj.insert("q".into(), crate::equalizer::SHELF_Q.into());
+            }
+            obj.insert("kind".into(), kind.into());
+            obj.insert("enabled".into(), true.into());
+        }
+        let migrated = serde_json::Value::Array(bands).to_string();
+        conn.execute(
+            "UPDATE equalizer_settings SET parametric = ?1 WHERE id = ?2",
+            rusqlite::params![migrated, id],
+        )?;
+    }
+    conn.execute(
+        "UPDATE equalizer_settings SET mode = 'parametric' WHERE mode = 'parametric20'",
+        [],
+    )?;
+    Ok(())
+}
 
 #[derive(Debug)]
 pub struct Database {
@@ -804,8 +855,9 @@ ALTER TABLE songs ADD COLUMN unavailable BOOLEAN NOT NULL DEFAULT 0;
 
 // ---------------------------------------------------------------------------
 // Migration 4: parametric equalizer mode
-//   mode:       'graphic10' | 'parametric20'
-//   parametric: JSON array of 20 {freq, gain_db, q} bands ('' = defaults)
+//   mode:       'graphic10' | 'parametric20' (renamed 'parametric' by migration 53)
+//   parametric: JSON array of 20 {freq, gain_db, q} bands ('' = defaults);
+//               migration 53 adds explicit {kind, enabled} per band
 // ---------------------------------------------------------------------------
 
 const MIGRATION_4: &str = "
@@ -3062,6 +3114,77 @@ mod tests {
         assert!(album_details_fetched);
 
         let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn migration_53_converts_legacy_parametric_losslessly() {
+        use crate::equalizer::{legacy_parametric_response_db, Equalizer, ParametricBand};
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch(MIGRATION_2).unwrap();
+        conn.execute_batch(MIGRATION_4).unwrap();
+
+        // A deliberately non-default legacy layout: boosted/cut shelves whose
+        // stored q (ignored by the old slope shelves) is far from 1/√2.
+        let legacy: Vec<(f32, f32, f32)> = (0..20)
+            .map(|i| {
+                let freq = 25.0 * 1.4_f32.powi(i);
+                let gain = ((i as f32) * 1.7).sin() * 9.0;
+                (freq, gain, 0.5 + i as f32 * 0.3)
+            })
+            .collect();
+        let json = serde_json::to_string(
+            &legacy
+                .iter()
+                .map(|&(freq, gain_db, q)| serde_json::json!({"freq": freq, "gain_db": gain_db, "q": q}))
+                .collect::<Vec<_>>(),
+        )
+        .unwrap();
+        conn.execute(
+            "UPDATE equalizer_settings SET mode = 'parametric20', parametric = ?1",
+            params![json],
+        )
+        .unwrap();
+
+        migrate_parametric_band_kinds(&conn).unwrap();
+
+        let (mode, migrated): (String, String) = conn
+            .query_row("SELECT mode, parametric FROM equalizer_settings", [], |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })
+            .unwrap();
+        assert_eq!(mode, "parametric");
+        let bands: Vec<ParametricBand> = serde_json::from_str(&migrated).unwrap();
+        assert_eq!(bands.len(), 20);
+        assert!(bands.iter().all(|b| b.enabled));
+
+        let mut eq = Equalizer::new();
+        eq.load_parametric(&bands);
+        let freqs: Vec<f32> = (0..200)
+            .map(|i| 20.0 * 1000f32.powf(i as f32 / 199.0))
+            .collect();
+        let before = legacy_parametric_response_db(&legacy, 44_100.0, &freqs);
+        let after = eq.parametric_response_db(&freqs);
+        for ((f, b), a) in freqs.iter().zip(&before).zip(&after) {
+            assert!(
+                (b - a).abs() < 0.01,
+                "{f} Hz: legacy {b} dB, migrated {a} dB"
+            );
+        }
+    }
+
+    #[test]
+    fn migration_53_leaves_empty_parametric_as_defaults() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch(MIGRATION_2).unwrap();
+        conn.execute_batch(MIGRATION_4).unwrap();
+        migrate_parametric_band_kinds(&conn).unwrap();
+        let (mode, parametric): (String, String) = conn
+            .query_row("SELECT mode, parametric FROM equalizer_settings", [], |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })
+            .unwrap();
+        assert_eq!(mode, "graphic10");
+        assert_eq!(parametric, "");
     }
 
     #[test]
