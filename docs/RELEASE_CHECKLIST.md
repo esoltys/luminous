@@ -15,9 +15,8 @@ manual.
 
 ## Content
 
-- [ ] Update the user manual (`docs/user-guide/luminous-user-guide-*.dc.html`) for any
-      user-facing changes. These `.dc.html` files are externally managed — don't hand-edit
-      them directly; regenerate/export them the usual way.
+- [ ] Update the user manual (`docs/user-guide/luminous-user-guide-{EN,FR}.html`) for any
+      user-facing changes, editing both languages together.
 - [ ] Regenerate screenshots for any changed views:
   ```bash
   bun run take-screenshots
