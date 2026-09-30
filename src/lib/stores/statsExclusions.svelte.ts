@@ -27,14 +27,45 @@ class StatsExclusionsStore {
   async refresh() {
     try {
       const pairs = await invoke<[string, string][]>("get_stats_exclusions");
-      this.keys = new Set((pairs ?? []).map(([type, key]) => `${type}:${key}`));
+      this.keys = new Set(
+        (pairs ?? []).map(([type, key]) => `${type}:${type === "song" ? key : key.toLowerCase()}`)
+      );
     } catch (err) {
       console.error("Failed to load stats exclusions:", err);
     }
   }
 
   isExcluded(entityType: StatsEntityType, entityKey: string): boolean {
-    return this.keys.has(`${entityType}:${entityKey}`);
+    const k = entityType === "song" ? entityKey : entityKey.toLowerCase();
+    return this.keys.has(`${entityType}:${k}`);
+  }
+
+  getSongExclusionReason(song: {
+    id: number | string;
+    album?: string | null;
+    artist?: string | null;
+    album_artist?: string | null;
+  }): "song" | "album" | "artist" | null {
+    if (this.isExcluded("song", String(song.id))) {
+      return "song";
+    }
+    if (song.album && this.isExcluded("album", song.album)) {
+      return "album";
+    }
+    const artist = song.album_artist || song.artist;
+    if (artist && this.isExcluded("artist", artist)) {
+      return "artist";
+    }
+    return null;
+  }
+
+  isSongExcluded(song: {
+    id: number | string;
+    album?: string | null;
+    artist?: string | null;
+    album_artist?: string | null;
+  }): boolean {
+    return this.getSongExclusionReason(song) !== null;
   }
 
   async setExcluded(entityType: StatsEntityType, entityKey: string, excluded: boolean) {

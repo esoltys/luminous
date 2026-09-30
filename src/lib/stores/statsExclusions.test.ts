@@ -139,4 +139,38 @@ describe("StatsExclusionsStore", () => {
     await toggleStatsExcluded("artist", "Radiohead");
     expect(toggleSpy).toHaveBeenCalledWith("artist", "Radiohead", undefined);
   });
+
+  it("identifies inherited song exclusions via album or artist", async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_stats_exclusions") {
+        return [
+          ["song", "10"],
+          ["album", "Abbey Road"],
+          ["artist", "Radiohead"],
+        ];
+      }
+      return undefined;
+    });
+    await statsExclusionsStore.refresh();
+
+    // Directly excluded song
+    const directSong = { id: 10, title: "Track", album: "Other", artist: "Other" };
+    expect(statsExclusionsStore.getSongExclusionReason(directSong)).toBe("song");
+    expect(statsExclusionsStore.isSongExcluded(directSong)).toBe(true);
+
+    // Song excluded via album
+    const albumSong = { id: 11, title: "Come Together", album: "Abbey Road", artist: "The Beatles" };
+    expect(statsExclusionsStore.getSongExclusionReason(albumSong)).toBe("album");
+    expect(statsExclusionsStore.isSongExcluded(albumSong)).toBe(true);
+
+    // Song excluded via artist (checking case-insensitivity as well)
+    const artistSong = { id: 12, title: "Creep", album: "Pablo Honey", artist: "radiohead" };
+    expect(statsExclusionsStore.getSongExclusionReason(artistSong)).toBe("artist");
+    expect(statsExclusionsStore.isSongExcluded(artistSong)).toBe(true);
+
+    // Non-excluded song
+    const normalSong = { id: 13, title: "Normal", album: "Normal Album", artist: "Normal Artist" };
+    expect(statsExclusionsStore.getSongExclusionReason(normalSong)).toBeNull();
+    expect(statsExclusionsStore.isSongExcluded(normalSong)).toBe(false);
+  });
 });

@@ -59,6 +59,15 @@ pub fn range_start_unix(range: StatsRange, now: i64) -> i64 {
 
 const TOP_N: i64 = 10;
 
+/// SQL fragment excluding plays of songs that are flagged directly, or whose
+/// album or artist is flagged in `stats_exclusions`.
+const SONG_EXCLUSION_FILTER: &str = "NOT EXISTS (
+    SELECT 1 FROM stats_exclusions se
+    WHERE (se.entity_type = 'song' AND se.entity_key = CAST(s.id AS TEXT))
+       OR (se.entity_type = 'album' AND s.album IS NOT NULL AND s.album != '' AND se.entity_key = s.album COLLATE NOCASE)
+       OR (se.entity_type = 'artist' AND COALESCE(NULLIF(s.album_artist, ''), s.artist, '') != '' AND se.entity_key = COALESCE(NULLIF(s.album_artist, ''), s.artist, '') COLLATE NOCASE)
+)";
+
 /// Build a full Personal Stats summary for `range`, excluding any song,
 /// album, artist, or genre flagged in `stats_exclusions`.
 pub fn get_summary(conn: &Connection, range: StatsRange) -> Result<StatsSummary> {
@@ -95,10 +104,7 @@ pub fn top_songs_with_limit(
          JOIN songs s ON s.id = ph.song_id
          WHERE ph.played_at >= ?1
            AND s.source IN ({lib}) AND s.unavailable = 0
-           AND NOT EXISTS (
-               SELECT 1 FROM stats_exclusions se
-               WHERE se.entity_type = 'song' AND se.entity_key = CAST(s.id AS TEXT)
-           )
+           AND {SONG_EXCLUSION_FILTER}
          GROUP BY s.id
          ORDER BY total_secs DESC, play_count DESC, s.title COLLATE NOCASE ASC
          LIMIT ?2",
@@ -193,7 +199,8 @@ pub fn top_albums_with_limit(
            AND s.album IS NOT NULL AND s.album != ''
            AND NOT EXISTS (
                SELECT 1 FROM stats_exclusions se
-               WHERE se.entity_type = 'album' AND se.entity_key = s.album COLLATE NOCASE
+               WHERE (se.entity_type = 'album' AND se.entity_key = s.album COLLATE NOCASE)
+                  OR (se.entity_type = 'artist' AND COALESCE(NULLIF(s.album_artist, ''), s.artist, '') != '' AND se.entity_key = COALESCE(NULLIF(s.album_artist, ''), s.artist, '') COLLATE NOCASE)
            )
          GROUP BY s.album COLLATE NOCASE
          ORDER BY total_secs DESC, play_count DESC, s.album COLLATE NOCASE ASC
@@ -283,7 +290,8 @@ fn top_genres(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>> 
          JOIN songs s ON s.id = ph.song_id
          WHERE ph.played_at >= ?1
            AND s.source IN ({lib}) AND s.unavailable = 0
-           AND s.genre IS NOT NULL AND s.genre != ''",
+           AND s.genre IS NOT NULL AND s.genre != ''
+           AND {SONG_EXCLUSION_FILTER}",
         lib = *LIBRARY_SOURCES_SQL
     );
     let mut stmt = conn.prepare(&sql)?;
@@ -366,10 +374,7 @@ fn play_timestamps(conn: &Connection, range_start: i64) -> Result<Vec<i64>> {
          JOIN songs s ON s.id = ph.song_id
          WHERE ph.played_at >= ?1
            AND s.source IN ({lib}) AND s.unavailable = 0
-           AND NOT EXISTS (
-               SELECT 1 FROM stats_exclusions se
-               WHERE se.entity_type = 'song' AND se.entity_key = CAST(s.id AS TEXT)
-           )",
+           AND {SONG_EXCLUSION_FILTER}",
         lib = *LIBRARY_SOURCES_SQL
     );
     let mut stmt = conn.prepare(&sql)?;
@@ -390,10 +395,7 @@ fn total_minutes(conn: &Connection, range_start: i64) -> Result<i64> {
          JOIN songs s ON s.id = ph.song_id
          WHERE ph.played_at >= ?1
            AND s.source IN ({lib}) AND s.unavailable = 0
-           AND NOT EXISTS (
-               SELECT 1 FROM stats_exclusions se
-               WHERE se.entity_type = 'song' AND se.entity_key = CAST(s.id AS TEXT)
-           )",
+           AND {SONG_EXCLUSION_FILTER}",
         lib = *LIBRARY_SOURCES_SQL
     );
     let total_secs: i64 = conn.query_row(&sql, params![range_start], |row| row.get(0))?;
@@ -411,10 +413,7 @@ pub fn listening_activity(conn: &Connection, since_unix: i64) -> Result<Vec<List
          JOIN songs s ON s.id = ph.song_id
          WHERE ph.played_at >= ?1
            AND s.source IN ({lib}) AND s.unavailable = 0
-           AND NOT EXISTS (
-               SELECT 1 FROM stats_exclusions se
-               WHERE se.entity_type = 'song' AND se.entity_key = CAST(s.id AS TEXT)
-           )",
+           AND {SONG_EXCLUSION_FILTER}",
         lib = *LIBRARY_SOURCES_SQL
     );
     let mut stmt = conn.prepare(&sql)?;
@@ -796,5 +795,40 @@ mod tests {
         assert_eq!(albums[0].art_manual.as_deref(), Some("cover.jpg"));
         assert_eq!(albums[0].year, Some(2024));
         assert_eq!(albums[0].rating, 5.0);
+    }
+
+    #[test]
+    fn test_top_songs_and_total_minutes_exclude_songs_from_excluded_albums_and_artists() {
+        let (_dir, db) = test_db();
+        let conn = db.pool.get().unwrap();
+        let now = 1_700_000_000;
+        let range_start = range_start_unix(StatsRange::SevenDays, now);
+
+        let s_normal = insert_song(&conn, "/normal.flac", "Normal", "Normal Artist", "Normal Album", "Rock");
+        let s_album_ex = insert_song(&conn, "/album_ex.flac", "Track Ex", "Artist", "Excluded Album", "Rock");
+        let s_artist_ex = insert_song(&conn, "/artist_ex.flac", "Artist Ex", "Excluded Artist", "Some Album", "Rock");
+
+        insert_play_with_duration(&conn, s_normal, range_start + 10, 100);
+        insert_play_with_duration(&conn, s_album_ex, range_start + 10, 200);
+        insert_play_with_duration(&conn, s_artist_ex, range_start + 10, 300);
+
+        conn.execute(
+            "INSERT INTO stats_exclusions (entity_type, entity_key) VALUES ('album', 'Excluded Album')",
+            params![],
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO stats_exclusions (entity_type, entity_key) VALUES ('artist', 'Excluded Artist')",
+            params![],
+        ).unwrap();
+
+        let songs = top_songs(&conn, range_start).unwrap();
+        assert_eq!(songs.len(), 1);
+        assert_eq!(songs[0].label, "Normal");
+
+        assert_eq!(total_minutes(&conn, range_start).unwrap(), 1);
+
+        let albums = top_albums(&conn, range_start).unwrap();
+        assert_eq!(albums.len(), 1);
+        assert_eq!(albums[0].label, "Normal Album");
     }
 }
