@@ -804,9 +804,30 @@ mod tests {
         let now = 1_700_000_000;
         let range_start = range_start_unix(StatsRange::SevenDays, now);
 
-        let s_normal = insert_song(&conn, "/normal.flac", "Normal", "Normal Artist", "Normal Album", "Rock");
-        let s_album_ex = insert_song(&conn, "/album_ex.flac", "Track Ex", "Artist", "Excluded Album", "Rock");
-        let s_artist_ex = insert_song(&conn, "/artist_ex.flac", "Artist Ex", "Excluded Artist", "Some Album", "Rock");
+        let s_normal = insert_song(
+            &conn,
+            "/normal.flac",
+            "Normal",
+            "Normal Artist",
+            "Normal Album",
+            "Rock",
+        );
+        let s_album_ex = insert_song(
+            &conn,
+            "/album_ex.flac",
+            "Track Ex",
+            "Artist",
+            "Excluded Album",
+            "Rock",
+        );
+        let s_artist_ex = insert_song(
+            &conn,
+            "/artist_ex.flac",
+            "Artist Ex",
+            "Excluded Artist",
+            "Some Album",
+            "Rock",
+        );
 
         insert_play_with_duration(&conn, s_normal, range_start + 10, 100);
         insert_play_with_duration(&conn, s_album_ex, range_start + 10, 200);
