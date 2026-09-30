@@ -39,6 +39,7 @@
     DotsThreeIcon as MoreHorizontal,
     ArrowSquareOutIcon as OpenInPicard,
     ArrowSquareOutIcon as ExternalLink,
+    ChartBarIcon as BarChart2,
     ShareNetworkIcon as Share,
     ArrowDownLeftIcon as ArrowDownLeft,
     ArrowUpRightIcon as ArrowUpRight
@@ -50,6 +51,7 @@
   import type { Song, AlbumItem, PlayContext } from "../types";
   import { getCoverArtUrl, resolveArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
+  import { statsExclusionsStore } from "../stores/statsExclusions.svelte";
   import { picardStore } from "../stores/picard.svelte";
   import { prefs } from "../stores/prefs.svelte";
   import { toastStore } from "../stores/toast.svelte";
@@ -543,6 +545,10 @@
     openInPicard(songs.map((s) => s.id));
   }
 
+  async function handleToggleStatsExcluded() {
+    await statsExclusionsStore.toggleWithToast("album", albumName);
+  }
+
   async function handleTagEditorSaved(isAlbumEdit: boolean = false) {
     collectionStore.refreshLibrary();
     tagsStore.load();
@@ -931,6 +937,13 @@
         : songs.length > 0 && songs.every(isRemoteSource)
           ? i18n.t("picard.remoteNotSupportedTooltip")
           : undefined}
+    />
+    <ContextMenuItem
+      icon={BarChart2}
+      label={statsExclusionsStore.isExcluded("album", albumName)
+        ? i18n.t("stats.includeInStats")
+        : i18n.t("stats.excludeFromStats")}
+      onclick={() => { handleToggleStatsExcluded(); overflowMenuPos = null; }}
     />
   </ContextMenu>
 {/if}

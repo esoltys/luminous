@@ -1,7 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { toastStore } from "./toast.svelte";
+import { i18n } from "./i18n.svelte";
 
-type StatsEntityType = "song" | "album" | "artist" | "genre";
+export type StatsEntityType = "song" | "album" | "artist" | "genre";
 
 /** Personal Stats exclusion set (#130) — preloaded once and kept in sync via
  * `stats-exclusions-changed`, mirroring how `PinnedStore` preloads
@@ -43,6 +45,34 @@ class StatsExclusionsStore {
   async toggle(entityType: StatsEntityType, entityKey: string) {
     await this.setExcluded(entityType, entityKey, !this.isExcluded(entityType, entityKey));
   }
+
+  async toggleWithToast(
+    entityType: StatsEntityType,
+    entityKey: string,
+    displayName?: string
+  ) {
+    const excluded = !this.isExcluded(entityType, entityKey);
+    await this.setExcluded(entityType, entityKey, excluded);
+    const fallback =
+      entityType === "album" ? i18n.t("collection.unknownAlbum") :
+      entityType === "artist" ? i18n.t("collection.unknownArtist") :
+      entityType === "song" ? i18n.t("collection.unknownSong") :
+      entityKey;
+    const name = displayName || (entityKey ? entityKey : fallback);
+    const message = excluded
+      ? i18n.t("stats.excludedToast", { name })
+      : i18n.t("stats.includedToast", { name });
+    toastStore.show(message);
+  }
 }
 
 export const statsExclusionsStore = new StatsExclusionsStore();
+
+export async function toggleStatsExcluded(
+  entityType: StatsEntityType,
+  entityKey: string,
+  displayName?: string
+) {
+  return statsExclusionsStore.toggleWithToast(entityType, entityKey, displayName);
+}
+

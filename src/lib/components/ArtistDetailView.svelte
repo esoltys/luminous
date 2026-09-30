@@ -753,12 +753,7 @@
   }
 
   async function handleToggleStatsExcluded() {
-    const excluded = !statsExclusionsStore.isExcluded("artist", artistName);
-    await statsExclusionsStore.setExcluded("artist", artistName, excluded);
-    const message = excluded
-      ? i18n.t("stats.excludedToast", { name: artistName })
-      : i18n.t("stats.includedToast", { name: artistName });
-    toastStore.show(message);
+    await statsExclusionsStore.toggleWithToast("artist", artistName);
   }
 
   async function handlePlayAll() {

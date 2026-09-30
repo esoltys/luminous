@@ -187,13 +187,7 @@
   let menuVisible = $state(true);
 
   async function handleToggleStatsExcluded() {
-    const excluded = !statsExclusionsStore.isExcluded("song", String(song.id));
-    await statsExclusionsStore.setExcluded("song", String(song.id), excluded);
-    const name = song.title || i18n.t("collection.unknownSong");
-    const message = excluded
-      ? i18n.t("stats.excludedToast", { name })
-      : i18n.t("stats.includedToast", { name });
-    toastStore.show(message);
+    await statsExclusionsStore.toggleWithToast("song", String(song.id), song.title || i18n.t("collection.unknownSong"));
   }
 </script>
 
