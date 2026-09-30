@@ -97,14 +97,19 @@ pub async fn load_equalizer_preset(
 
 /// Evaluated magnitude response (dB, preamp excluded) of the parametric
 /// cascade the engine is running, at each requested frequency — the curve
-/// preview plots this instead of re-deriving the filter law (#1248).
+/// preview plots this instead of re-deriving the filter law (#1248). With
+/// `band`, only that band's filter is evaluated (the selected-band curve).
 #[tauri::command]
 pub async fn get_parametric_response(
     state: State<'_, AppState>,
     frequencies: Vec<f32>,
+    band: Option<usize>,
 ) -> Result<Vec<f32>, String> {
     Ok(crate::audio::with_audio(&state.audio, move |engine| {
-        engine.with_equalizer(|eq| eq.parametric_response_db(&frequencies))
+        engine.with_equalizer(|eq| match band {
+            Some(idx) => eq.band_response_db(idx, &frequencies),
+            None => eq.parametric_response_db(&frequencies),
+        })
     })
     .await)
 }

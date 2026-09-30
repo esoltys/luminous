@@ -81,8 +81,15 @@ describe("Equalizer.svelte", () => {
       });
     }
 
+    function responseCalls() {
+      return vi.mocked(invoke).mock.calls.filter(([cmd]) => cmd === "get_parametric_response") as [
+        string,
+        { frequencies: number[]; band?: number },
+      ][];
+    }
+
     function curveYs(container: HTMLElement): number[] {
-      const d = container.querySelector('svg[viewBox="0 0 100 40"] path')?.getAttribute("d") ?? "";
+      const d = container.querySelector('[data-testid="eq-response"]')?.getAttribute("d") ?? "";
       // Every segment ends at "x y" — the on-curve sample points.
       return [...d.matchAll(/(?:M|,)\s*([\d.]+) ([\d.-]+)(?=\s*(?:C|$))/g)].map((m) => Number(m[2]));
     }
@@ -102,16 +109,60 @@ describe("Equalizer.svelte", () => {
     it("re-fetches the response after a band change", async () => {
       let level = 0;
       mockResponse((freqs) => freqs.map(() => level));
-      const { container } = render(Equalizer);
+      const { container, getByLabelText } = render(Equalizer);
       await waitFor(() => expect(curveYs(container).length).toBe(96));
       for (const y of curveYs(container)) expect(y).toBeCloseTo(20);
 
       level = -12;
-      const slider = container.querySelector<HTMLInputElement>('input[type="range"][orient="vertical"]')!;
-      await fireEvent.input(slider, { target: { value: "-6" } });
+      const gain = getByLabelText("Gain 1") as HTMLInputElement;
+      await fireEvent.change(gain, { target: { value: "-6" } });
       await waitFor(() => {
         for (const y of curveYs(container)) expect(y).toBeCloseTo(37);
       });
+      expect(invoke).toHaveBeenCalledWith(
+        "apply_equalizer_config",
+        expect.objectContaining({
+          config: expect.objectContaining({
+            parametric: [expect.objectContaining({ freq: 60, gain_db: -6 }), expect.objectContaining({ freq: 1000 })],
+          }),
+        })
+      );
+    });
+
+    it("asks the backend for the selected band's own response (#1333)", async () => {
+      mockResponse((freqs) => freqs.map(() => 0));
+      const { container, getByRole } = render(Equalizer);
+      await waitFor(() => expect(responseCalls().some(([, a]) => a.band === 0)).toBe(true));
+
+      await fireEvent.pointerDown(getByRole("button", { name: /^Band 2:/ }), { pointerId: 1 });
+      await waitFor(() => expect(responseCalls().some(([, a]) => a.band === 1)).toBe(true));
+      expect(container.querySelector('[data-testid="eq-band-response"]')).not.toBeNull();
+    });
+
+    it("keeps the newest edit when an older apply echoes back late", async () => {
+      const echoes: Array<() => void> = [];
+      mockResponse((freqs) => freqs.map(() => 0));
+      const base = vi.mocked(invoke).getMockImplementation()!;
+      vi.mocked(invoke).mockImplementation(async (cmd: string, args?: any) => {
+        if (cmd !== "apply_equalizer_config") return base(cmd, args);
+        const config = JSON.parse(JSON.stringify(args.config));
+        return new Promise((resolve) => echoes.push(() => resolve(config)));
+      });
+      const { getByLabelText } = render(Equalizer);
+      let gain!: HTMLInputElement;
+      await waitFor(() => (gain = getByLabelText("Gain 1") as HTMLInputElement));
+
+      await fireEvent.change(gain, { target: { value: "3" } });
+      await fireEvent.change(gain, { target: { value: "5" } });
+      await fireEvent.change(gain, { target: { value: "7" } });
+      // One apply in flight; the two later edits coalesce into one follow-up.
+      expect(echoes).toHaveLength(1);
+      echoes[0]();
+      await waitFor(() => expect(echoes).toHaveLength(2));
+      echoes[1]();
+      await waitFor(() => expect(gain.value).toBe("7"));
+      const applies = vi.mocked(invoke).mock.calls.filter(([cmd]) => cmd === "apply_equalizer_config");
+      expect(applies).toHaveLength(2);
     });
   });
 
