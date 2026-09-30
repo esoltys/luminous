@@ -1,5 +1,7 @@
-use crate::equalizer::{Equalizer, EqualizerConfig};
+use crate::eq_presets::{self, UserPreset};
+use crate::equalizer::{EqMode, Equalizer, EqualizerConfig, BUILTIN_PRESETS};
 use crate::AppState;
+use serde::Serialize;
 use tauri::State;
 
 /// Fire-and-forget persistence — a failed EQ write is invisible to the user
@@ -19,14 +21,16 @@ fn save_eq_settings(db: &crate::db::Database, eq: &Equalizer) {
         let parametric_json = serde_json::to_string(eq.parametric_bands()).unwrap_or_default();
         let _ = conn.execute(
             "UPDATE equalizer_settings
-             SET enabled = ?1, preamp = ?2, gains = ?3, mode = ?4, parametric = ?5
+             SET enabled = ?1, preamp = ?2, gains = ?3, mode = ?4, parametric = ?5,
+                 active_preset = ?6
              WHERE id = 1",
             rusqlite::params![
                 if eq.enabled { 1 } else { 0 },
                 eq.preamp as f64,
                 gains_str,
                 mode_str,
-                parametric_json
+                parametric_json,
+                eq.active_preset.as_deref().unwrap_or("")
             ],
         );
     }
@@ -64,6 +68,10 @@ pub async fn reset_parametric_bands(state: State<'_, AppState>) -> Result<Equali
     Ok(crate::audio::with_audio(&state.audio, move |engine| {
         engine.with_equalizer(|eq| {
             eq.load_parametric(&crate::equalizer::default_parametric_bands());
+            // The default layout is the parametric Flat preset.
+            if eq.mode == EqMode::Parametric {
+                eq.active_preset = Some("Flat".to_string());
+            }
             save_eq_settings(&db, eq);
             EqualizerConfig::snapshot(eq)
         })
@@ -71,28 +79,106 @@ pub async fn reset_parametric_bands(state: State<'_, AppState>) -> Result<Equali
     .await)
 }
 
+/// Load a preset by picker key: a `BUILTIN_PRESETS` name or `user:<id>`.
 #[tauri::command]
 pub async fn load_equalizer_preset(
     state: State<'_, AppState>,
     preset_name: String,
 ) -> Result<EqualizerConfig, String> {
     let db = state.db.clone();
-    let gains = crate::equalizer::preset_gains(&preset_name);
-
-    Ok(crate::audio::with_audio(&state.audio, move |engine| {
+    let user = match crate::equalizer::parse_user_preset_key(&preset_name) {
+        Some(id) => {
+            let conn = db.pool.get().map_err(|e| e.to_string())?;
+            Some((id, eq_presets::get(&conn, id)?))
+        }
+        None => None,
+    };
+    crate::audio::with_audio(&state.audio, move |engine| {
         engine.with_equalizer(|eq| {
-            // Always update the graphic gains so the preset is intact if the
-            // user switches back to graphic mode; additionally load the named
-            // preset's own sparse parametric layout when that mode is active.
-            eq.load_preset(gains);
-            if eq.mode == crate::equalizer::EqMode::Parametric {
-                eq.load_parametric(&crate::equalizer::parametric_preset(&preset_name));
+            match user {
+                Some((id, preset)) => eq.load_user_preset(id, &preset.bands, preset.preamp),
+                None if eq.load_builtin_preset(&preset_name) => {}
+                None => return Err(format!("unknown preset: {preset_name}")),
             }
             save_eq_settings(&db, eq);
-            EqualizerConfig::snapshot(eq)
+            Ok(EqualizerConfig::snapshot(eq))
         })
     })
-    .await)
+    .await
+}
+
+#[derive(Serialize)]
+pub struct EqPresetList {
+    pub builtin: Vec<&'static str>,
+    pub user: Vec<UserPreset>,
+}
+
+#[tauri::command]
+pub async fn list_eq_presets(state: State<'_, AppState>) -> Result<EqPresetList, String> {
+    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
+    Ok(EqPresetList {
+        builtin: BUILTIN_PRESETS.to_vec(),
+        user: eq_presets::list(&conn)?,
+    })
+}
+
+/// Save the running parametric bands and preamp as a new user preset, which
+/// becomes the active one. Errors with an `eq_presets::ERR_*` code.
+#[tauri::command]
+pub async fn save_eq_user_preset(
+    state: State<'_, AppState>,
+    name: String,
+) -> Result<EqualizerConfig, String> {
+    let db = state.db.clone();
+    crate::audio::with_audio(&state.audio, move |engine| {
+        engine.with_equalizer(|eq| {
+            if eq.mode != EqMode::Parametric {
+                return Err("user presets are parametric-only".to_string());
+            }
+            let conn = db.pool.get().map_err(|e| e.to_string())?;
+            let id = eq_presets::create(&conn, &name, eq.parametric_bands(), eq.preamp)?;
+            eq.active_preset = Some(crate::equalizer::user_preset_key(id));
+            save_eq_settings(&db, eq);
+            Ok(EqualizerConfig::snapshot(eq))
+        })
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn rename_eq_user_preset(
+    state: State<'_, AppState>,
+    id: i64,
+    name: String,
+) -> Result<(), String> {
+    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
+    eq_presets::rename(&conn, id, &name)
+}
+
+/// Delete a user preset. If it was active, the current bands become Custom.
+#[tauri::command]
+pub async fn delete_eq_user_preset(
+    state: State<'_, AppState>,
+    id: i64,
+) -> Result<EqualizerConfig, String> {
+    let db = state.db.clone();
+    crate::audio::with_audio(&state.audio, move |engine| {
+        engine.with_equalizer(|eq| {
+            let conn = db.pool.get().map_err(|e| e.to_string())?;
+            eq_presets::delete(&conn, id)?;
+            if eq
+                .active_preset
+                .as_deref()
+                .and_then(crate::equalizer::parse_user_preset_key)
+                == Some(id)
+            {
+                eq.active_preset = None;
+                save_eq_settings(&db, eq);
+            }
+            Ok(EqualizerConfig::snapshot(eq))
+        })
+    })
+    .await
 }
 
 /// Evaluated magnitude response (dB, preamp excluded) of the parametric
