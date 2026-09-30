@@ -394,6 +394,31 @@ describe("Equalizer.svelte", () => {
     expect(invoke).toHaveBeenCalledWith("load_equalizer_preset", { presetName: "Rock" });
   });
 
+  it("turns the EQ on in the engine when a preset is picked while it's off", async () => {
+    let engine: Record<string, unknown> = { ...defaultEqConfig, enabled: false };
+    vi.mocked(invoke).mockImplementation(async (cmd: string, args?: any) => {
+      if (cmd === "get_equalizer_state") return engine;
+      if (cmd === "list_eq_presets") return defaultPresets;
+      if (cmd === "apply_equalizer_config") return (engine = { ...args.config, active_preset: null });
+      if (cmd === "load_equalizer_preset") return (engine = { ...engine, active_preset: args.presetName });
+      if (cmd === "get_loudness_settings") return defaultLoudness;
+      if (cmd === "get_fade_settings") return defaultFadeSettings;
+      if (cmd === "get_audio_setting_ranges") return defaultRanges;
+      return null;
+    });
+    const { getByRole } = render(Equalizer);
+    let selectEl!: HTMLSelectElement;
+    await waitFor(() => {
+      selectEl = getByRole("combobox") as HTMLSelectElement;
+      expect(selectEl).toBeInTheDocument();
+    });
+
+    await fireEvent.change(selectEl, { target: { value: "Rock" } });
+    await waitFor(() => expect(selectEl.value).toBe("Rock"));
+    expect(engine.enabled).toBe(true);
+    expect(getByRole("switch", { name: "Enable EQ" })).toBeChecked();
+  });
+
   it("handles loudness normalization toggle", async () => {
     const { getByLabelText } = render(Equalizer);
     let loudnessToggle: HTMLElement;

@@ -1187,6 +1187,37 @@ mod tests {
     }
 
     #[test]
+    fn switching_parametric_presets_changes_the_processed_signal() {
+        // Like the live engine: one Equalizer, presets swapped in turn while
+        // parametric. Each preset's filters must reach `process_interleaved`.
+        let mut eq = Equalizer::new();
+        eq.update_format(44100, 2);
+        eq.enabled = true;
+        eq.set_mode(EqMode::Parametric);
+
+        let level_db = |eq: &mut Equalizer, name: &str, freq: f32| {
+            assert!(eq.load_builtin_preset(name));
+            assert_eq!(eq.mode, EqMode::Parametric);
+            let probe = sine(freq, 44100.0, 16384, 2);
+            let mut processed = probe.clone();
+            eq.process_interleaved(&mut processed);
+            20.0 * (rms(&processed[8192..]) / rms(&probe[8192..])).log10()
+        };
+
+        let bass_low = level_db(&mut eq, "Bass Boost", 60.0);
+        let vocal_low = level_db(&mut eq, "Vocal Boost", 60.0);
+        let flat_low = level_db(&mut eq, "Flat", 60.0);
+        assert!(
+            bass_low - vocal_low > 3.0,
+            "Bass Boost should lift 60 Hz well above Vocal Boost: {bass_low} vs {vocal_low} dB"
+        );
+        assert!(
+            flat_low.abs() < 0.1,
+            "Flat should pass 60 Hz unchanged: {flat_low} dB"
+        );
+    }
+
+    #[test]
     fn graphic_low_band_shelves_instead_of_peaking() {
         let mut eq = Equalizer::new();
         eq.update_format(44100, 2);

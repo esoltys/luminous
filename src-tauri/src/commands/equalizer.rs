@@ -2,7 +2,7 @@ use crate::eq_presets::{self, UserPreset};
 use crate::equalizer::{EqMode, Equalizer, EqualizerConfig, BUILTIN_PRESETS};
 use crate::AppState;
 use serde::Serialize;
-use tauri::State;
+use tauri::{AppHandle, Emitter, State};
 
 /// Fire-and-forget persistence — a failed EQ write is invisible to the user
 /// mid-drag and nothing the UI can act on.
@@ -36,6 +36,15 @@ fn save_eq_settings(db: &crate::db::Database, eq: &Equalizer) {
     }
 }
 
+/// The pipeline popover summarises the EQ (on/off, mode, active bands), but
+/// the engine only re-emits pipeline info on track change or stream rebuild —
+/// so every command that can change that summary pushes a fresh copy.
+async fn emit_pipeline_changed(app: &AppHandle, state: &AppState) {
+    let player = state.player.lock().await;
+    let audio = state.audio.lock().await;
+    let _ = app.emit("audio-pipeline-changed", player.get_pipeline_info(&audio));
+}
+
 #[tauri::command]
 pub async fn get_equalizer_state(state: State<'_, AppState>) -> Result<EqualizerConfig, String> {
     Ok(crate::audio::with_audio(&state.audio, |engine| {
@@ -48,24 +57,30 @@ pub async fn get_equalizer_state(state: State<'_, AppState>) -> Result<Equalizer
 /// it whole; the engine clamps/normalizes and echoes the canonical state.
 #[tauri::command]
 pub async fn apply_equalizer_config(
+    app: AppHandle,
     state: State<'_, AppState>,
     config: EqualizerConfig,
 ) -> Result<EqualizerConfig, String> {
     let db = state.db.clone();
-    Ok(crate::audio::with_audio(&state.audio, move |engine| {
+    let canonical = crate::audio::with_audio(&state.audio, move |engine| {
         engine.with_equalizer(|eq| {
             let canonical = eq.apply(&config);
             save_eq_settings(&db, eq);
             canonical
         })
     })
-    .await)
+    .await;
+    emit_pipeline_changed(&app, &state).await;
+    Ok(canonical)
 }
 
 #[tauri::command]
-pub async fn reset_parametric_bands(state: State<'_, AppState>) -> Result<EqualizerConfig, String> {
+pub async fn reset_parametric_bands(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<EqualizerConfig, String> {
     let db = state.db.clone();
-    Ok(crate::audio::with_audio(&state.audio, move |engine| {
+    let canonical = crate::audio::with_audio(&state.audio, move |engine| {
         engine.with_equalizer(|eq| {
             eq.load_parametric(&crate::equalizer::default_parametric_bands());
             // The default layout is the parametric Flat preset.
@@ -76,12 +91,15 @@ pub async fn reset_parametric_bands(state: State<'_, AppState>) -> Result<Equali
             EqualizerConfig::snapshot(eq)
         })
     })
-    .await)
+    .await;
+    emit_pipeline_changed(&app, &state).await;
+    Ok(canonical)
 }
 
 /// Load a preset by picker key: a `BUILTIN_PRESETS` name or `user:<id>`.
 #[tauri::command]
 pub async fn load_equalizer_preset(
+    app: AppHandle,
     state: State<'_, AppState>,
     preset_name: String,
 ) -> Result<EqualizerConfig, String> {
@@ -93,7 +111,7 @@ pub async fn load_equalizer_preset(
         }
         None => None,
     };
-    crate::audio::with_audio(&state.audio, move |engine| {
+    let canonical = crate::audio::with_audio(&state.audio, move |engine| {
         engine.with_equalizer(|eq| {
             match user {
                 Some((id, preset)) => eq.load_user_preset(id, &preset.bands, preset.preamp),
@@ -104,7 +122,9 @@ pub async fn load_equalizer_preset(
             Ok(EqualizerConfig::snapshot(eq))
         })
     })
-    .await
+    .await?;
+    emit_pipeline_changed(&app, &state).await;
+    Ok(canonical)
 }
 
 #[derive(Serialize)]

@@ -179,7 +179,12 @@
   async function selectPreset(preset: string) {
     if (!preset) return;
     try {
-      await ensureEnabled();
+      // Turn the EQ on in the engine, not just locally — the preset's echo
+      // carries the engine's `enabled` and would switch it straight back off.
+      if (!enabled) {
+        enabled = true;
+        await applyConfig();
+      }
       assignConfig(await invoke<EqConfig>("load_equalizer_preset", { presetName: preset }));
       await refreshCurves();
     } catch (e) {
