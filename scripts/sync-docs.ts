@@ -24,19 +24,17 @@ function copyDir(src: string, dest: string) {
   }
 }
 
-const HTML_COPIES: Array<[string, string]> = [
-  ["luminous-user-guide-EN.dc.html", "luminous-user-guide-EN.html"],
-  ["luminous-user-guide-FR.dc.html", "luminous-user-guide-FR.html"],
+const FILE_COPIES = [
+  "luminous-user-guide-EN.html",
+  "luminous-user-guide-FR.html",
+  "guide.css",
+  "guide.js",
+  "luminous-mark.svg",
+  "expose-700.woff2",
 ];
 
-const ASSET_COPIES = ["support.js", "image-slot.js", "luminous-mark.svg", "expose-700.woff2"];
-
-for (const [src, dest] of HTML_COPIES) {
-  fs.copyFileSync(path.join(userGuideDir, src), path.join(staticDir, dest));
-}
-
-for (const asset of ASSET_COPIES) {
-  fs.copyFileSync(path.join(userGuideDir, asset), path.join(staticDir, asset));
+for (const file of FILE_COPIES) {
+  fs.copyFileSync(path.join(userGuideDir, file), path.join(staticDir, file));
 }
 
 copyDir(path.join(userGuideDir, "screenshots"), path.join(staticDir, "screenshots"));

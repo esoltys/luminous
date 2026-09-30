@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Guide d'utilisation de Luminous</title>
+  <link rel="stylesheet" href="guide.css">
+  <script src="guide.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <img src="luminous-mark.svg" alt="" width="28" height="28">
+  <div class="brand"><span class="wordmark">Luminous</span><span class="sub">Guide d'utilisation</span></div>
+</header>
+<div class="layout">
+  <nav class="sidebar" aria-label="Sections du guide">
+    <div class="nav-label">Les bases</div>
+    <div class="nav-group">
+      <a href="#getting-started"><span class="icon"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M219.31,108.68l-80-80a16,16,0,0,0-22.62,0l-80,80A15.87,15.87,0,0,0,32,120v96a8,8,0,0,0,8,8h64a8,8,0,0,0,8-8V160h32v56a8,8,0,0,0,8,8h64a8,8,0,0,0,8-8V120A15.87,15.87,0,0,0,219.31,108.68ZM208,208H160V152a8,8,0,0,0-8-8H104a8,8,0,0,0-8,8v56H48V120l80-80,80,80Z"/></svg></span>Prise en main</a>
+      <a href="#collection"><span class="icon"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M231.65,194.55,198.46,36.75a16,16,0,0,0-19-12.39L132.65,34.42a16.08,16.08,0,0,0-12.3,19l33.19,157.8A16,16,0,0,0,169.16,224a16.25,16.25,0,0,0,3.38-.36l46.81-10.06A16.09,16.09,0,0,0,231.65,194.55ZM136,50.15c0-.06,0-.09,0-.09l46.8-10,3.33,15.87L139.33,66Zm6.62,31.47,46.82-10.05,3.34,15.9L146,97.53Zm6.64,31.57,46.82-10.06,13.3,63.24-46.82,10.06ZM216,197.94l-46.8,10-3.33-15.87L212.67,182,216,197.85C216,197.91,216,197.94,216,197.94ZM104,32H56A16,16,0,0,0,40,48V208a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V48A16,16,0,0,0,104,32ZM56,48h48V64H56Zm0,32h48v96H56Zm48,128H56V192h48v16Z"/></svg></span>Votre collection</a>
+      <a href="#search"><span class="icon"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z"/></svg></span>Recherche et navigation</a>
+      <a href="#now-playing"><span class="icon"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M216,48H40A16,16,0,0,0,24,64V192a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V64A16,16,0,0,0,216,48ZM40,64H216v56H136a8,8,0,0,0-8,8v64H40ZM216,192H144V136h72v56Z"/></svg></span>Lecture en cours et mini lecteur</a>
+      <a href="#playlists"><span class="icon"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M32,64a8,8,0,0,1,8-8H216a8,8,0,0,1,0,16H40A8,8,0,0,1,32,64Zm8,72H160a8,8,0,0,0,0-16H40a8,8,0,0,0,0,16Zm72,48H40a8,8,0,0,0,0,16h72a8,8,0,0,0,0-16Zm135.66-57.7a8,8,0,0,1-10,5.36L208,122.75V192a32.05,32.05,0,1,1-16-27.69V112a8,8,0,0,1,10.3-7.66l40,12A8,8,0,0,1,247.66,126.3ZM192,192a16,16,0,1,0-16,16A16,16,0,0,0,192,192Z"/></svg></span>Listes de lecture</a>
+      <a href="#organize"><span class="icon"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M235.5,216.81c-22.56-11-35.5-34.58-35.5-64.8V134.73a15.94,15.94,0,0,0-10.09-14.87L165,110a8,8,0,0,1-4.48-10.34l21.32-53a28,28,0,0,0-16.1-37,28.14,28.14,0,0,0-35.82,16,.61.61,0,0,0,0,.12L108.9,79a8,8,0,0,1-10.37,4.49L73.11,73.14A15.89,15.89,0,0,0,55.74,76.8C34.68,98.45,24,123.75,24,152a111.45,111.45,0,0,0,31.18,77.53A8,8,0,0,0,61,232H232a8,8,0,0,0,3.5-15.19ZM67.14,88l25.41,10.3a24,24,0,0,0,31.23-13.45l21-53c2.56-6.11,9.47-9.27,15.43-7a12,12,0,0,1,6.88,15.92L145.69,93.76a24,24,0,0,0,13.43,31.14L184,134.73V152c0,.33,0,.66,0,1L55.77,101.71A108.84,108.84,0,0,1,67.14,88Zm48,128a87.53,87.53,0,0,1-24.34-42,8,8,0,0,0-15.49,4,105.16,105.16,0,0,0,18.36,38H64.44A95.54,95.54,0,0,1,40,152a85.9,85.9,0,0,1,7.73-36.29l137.8,55.12c3,18,10.56,33.48,21.89,45.16Z"/></svg></span>Organiser</a>
+      <a href="#stats"><span class="icon"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M224,200h-8V40a8,8,0,0,0-8-8H152a8,8,0,0,0-8,8V80H96a8,8,0,0,0-8,8v40H48a8,8,0,0,0-8,8v64H32a8,8,0,0,0,0,16H224a8,8,0,0,0,0-16ZM160,48h40V200H160ZM104,96h40V200H104ZM56,144H88v56H56Z"/></svg></span>Statistiques</a>
+      <a href="#lyrics"><span class="icon"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M224,48H32A16,16,0,0,0,16,64V192a16,16,0,0,0,16,16H224a16,16,0,0,0,16-16V64A16,16,0,0,0,224,48Zm0,144H32V64H224V192ZM48,136a8,8,0,0,1,8-8H72a8,8,0,0,1,0,16H56A8,8,0,0,1,48,136Zm160,0a8,8,0,0,1-8,8H104a8,8,0,0,1,0-16h96A8,8,0,0,1,208,136Zm-48,32a8,8,0,0,1-8,8H56a8,8,0,0,1,0-16h96A8,8,0,0,1,160,168Zm48,0a8,8,0,0,1-8,8H184a8,8,0,0,1,0-16h16A8,8,0,0,1,208,168Z"/></svg></span>Paroles</a>
+    </div>
+    <div class="nav-label">Avancé</div>
+    <div class="nav-group">
+      <a href="#advanced-search"><span class="icon"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M230.6,49.53A15.81,15.81,0,0,0,216,40H40A16,16,0,0,0,28.19,66.76l.08.09L96,139.17V216a16,16,0,0,0,24.87,13.32l32-21.34A16,16,0,0,0,160,194.66V139.17l67.74-72.32.08-.09A15.8,15.8,0,0,0,230.6,49.53ZM40,56h0Zm106.18,74.58A8,8,0,0,0,144,136v58.66L112,216V136a8,8,0,0,0-2.16-5.47L40,56H216Z"/></svg></span>Recherche avancée</a>
+    </div>
+    <div class="nav-label">Paramètres</div>
+    <div class="nav-group">
+      <a href="#general"><span class="icon"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Zm88-29.84q.06-2.16,0-4.32l14.92-18.64a8,8,0,0,0,1.48-7.06,107.21,107.21,0,0,0-10.88-26.25,8,8,0,0,0-6-3.93l-23.72-2.64q-1.48-1.56-3-3L186,40.54a8,8,0,0,0-3.94-6,107.71,107.71,0,0,0-26.25-10.87,8,8,0,0,0-7.06,1.49L130.16,40Q128,40,125.84,40L107.2,25.11a8,8,0,0,0-7.06-1.48A107.6,107.6,0,0,0,73.89,34.51a8,8,0,0,0-3.93,6L67.32,64.27q-1.56,1.49-3,3L40.54,70a8,8,0,0,0-6,3.94,107.71,107.71,0,0,0-10.87,26.25,8,8,0,0,0,1.49,7.06L40,125.84Q40,128,40,130.16L25.11,148.8a8,8,0,0,0-1.48,7.06,107.21,107.21,0,0,0,10.88,26.25,8,8,0,0,0,6,3.93l23.72,2.64q1.49,1.56,3,3L70,215.46a8,8,0,0,0,3.94,6,107.71,107.71,0,0,0,26.25,10.87,8,8,0,0,0,7.06-1.49L125.84,216q2.16.06,4.32,0l18.64,14.92a8,8,0,0,0,7.06,1.48,107.21,107.21,0,0,0,26.25-10.88,8,8,0,0,0,3.93-6l2.64-23.72q1.56-1.48,3-3L215.46,186a8,8,0,0,0,6-3.94,107.71,107.71,0,0,0,10.87-26.25,8,8,0,0,0-1.49-7.06Zm-16.1-6.5a73.93,73.93,0,0,1,0,8.68,8,8,0,0,0,1.74,5.48l14.19,17.73a91.57,91.57,0,0,1-6.23,15L187,173.11a8,8,0,0,0-5.1,2.64,74.11,74.11,0,0,1-6.14,6.14,8,8,0,0,0-2.64,5.1l-2.51,22.58a91.32,91.32,0,0,1-15,6.23l-17.74-14.19a8,8,0,0,0-5-1.75h-.48a73.93,73.93,0,0,1-8.68,0,8,8,0,0,0-5.48,1.74L100.45,215.8a91.57,91.57,0,0,1-15-6.23L82.89,187a8,8,0,0,0-2.64-5.1,74.11,74.11,0,0,1-6.14-6.14,8,8,0,0,0-5.1-2.64L46.43,170.6a91.32,91.32,0,0,1-6.23-15l14.19-17.74a8,8,0,0,0,1.74-5.48,73.93,73.93,0,0,1,0-8.68,8,8,0,0,0-1.74-5.48L40.2,100.45a91.57,91.57,0,0,1,6.23-15L69,82.89a8,8,0,0,0,5.1-2.64,74.11,74.11,0,0,1,6.14-6.14A8,8,0,0,0,82.89,69L85.4,46.43a91.32,91.32,0,0,1,15-6.23l17.74,14.19a8,8,0,0,0,5.48,1.74,73.93,73.93,0,0,1,8.68,0,8,8,0,0,0,5.48-1.74L155.55,40.2a91.57,91.57,0,0,1,15,6.23L173.11,69a8,8,0,0,0,2.64,5.1,74.11,74.11,0,0,1,6.14,6.14,8,8,0,0,0,5.1,2.64l22.58,2.51a91.32,91.32,0,0,1,6.23,15l-14.19,17.74A8,8,0,0,0,199.87,123.66Z"/></svg></span>Général</a>
+      <a href="#folders"><span class="icon"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M216,72H131.31L104,44.69A15.86,15.86,0,0,0,92.69,40H40A16,16,0,0,0,24,56V200.62A15.4,15.4,0,0,0,39.38,216H216.89A15.13,15.13,0,0,0,232,200.89V88A16,16,0,0,0,216,72ZM40,56H92.69l16,16H40ZM216,200H40V88H216Z"/></svg></span>Dossiers</a>
+      <a href="#integrations"><span class="icon"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M237.66,18.34a8,8,0,0,0-11.32,0l-52.4,52.41-5.37-5.38a32.05,32.05,0,0,0-45.26,0L100,88.69l-6.34-6.35A8,8,0,0,0,82.34,93.66L88.69,100,65.37,123.31a32,32,0,0,0,0,45.26l5.38,5.37-52.41,52.4a8,8,0,0,0,11.32,11.32l52.4-52.41,5.37,5.38a32,32,0,0,0,45.26,0L156,167.31l6.34,6.35a8,8,0,0,0,11.32-11.32L167.31,156l23.32-23.31a32,32,0,0,0,0-45.26l-5.38-5.37,52.41-52.4A8,8,0,0,0,237.66,18.34Zm-116.29,161a16,16,0,0,1-22.62,0L76.69,157.25a16,16,0,0,1,0-22.62L100,111.31,144.69,156Zm57.94-57.94L156,144.69,111.31,100l23.32-23.31a16,16,0,0,1,22.62,0l22.06,22A16,16,0,0,1,179.31,121.37ZM88.57,35A8,8,0,0,1,103.43,29l8,20A8,8,0,0,1,96.57,55ZM24.57,93A8,8,0,0,1,35,88.57l20,8A8,8,0,0,1,49,111.43l-20-8A8,8,0,0,1,24.57,93ZM231.43,163a8,8,0,0,1-10.4,4.46l-20-8A8,8,0,1,1,207,144.57l20,8A8,8,0,0,1,231.43,163Zm-64,58.06A8,8,0,0,1,152.57,227l-8-20A8,8,0,0,1,159.43,201Z"/></svg></span>Intégrations</a>
+      <a href="#ui-themes"><span class="icon"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M200.77,53.89A103.27,103.27,0,0,0,128,24h-1.07A104,104,0,0,0,24,128c0,43,26.58,79.06,69.36,94.17A32,32,0,0,0,136,192a16,16,0,0,1,16-16h46.21a31.81,31.81,0,0,0,31.2-24.88,104.43,104.43,0,0,0,2.59-24A103.28,103.28,0,0,0,200.77,53.89Zm13,93.71A15.89,15.89,0,0,1,198.21,160H152a32,32,0,0,0-32,32,16,16,0,0,1-21.31,15.07C62.49,194.3,40,164,40,128a88,88,0,0,1,87.09-88h.9a88.35,88.35,0,0,1,88,87.25A88.86,88.86,0,0,1,213.81,147.6ZM140,76a12,12,0,1,1-12-12A12,12,0,0,1,140,76ZM96,100A12,12,0,1,1,84,88,12,12,0,0,1,96,100Zm0,56a12,12,0,1,1-12-12A12,12,0,0,1,96,156Zm88-56a12,12,0,1,1-12-12A12,12,0,0,1,184,100Z"/></svg></span>Thèmes d'interface</a>
+      <a href="#equalizer"><span class="icon"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M64,105V40a8,8,0,0,0-16,0v65a32,32,0,0,0,0,62v49a8,8,0,0,0,16,0V167a32,32,0,0,0,0-62Zm-8,47a16,16,0,1,1,16-16A16,16,0,0,1,56,152Zm80-95V40a8,8,0,0,0-16,0V57a32,32,0,0,0,0,62v97a8,8,0,0,0,16,0V119a32,32,0,0,0,0-62Zm-8,47a16,16,0,1,1,16-16A16,16,0,0,1,128,104Zm104,64a32.06,32.06,0,0,0-24-31V40a8,8,0,0,0-16,0v97a32,32,0,0,0,0,62v17a8,8,0,0,0,16,0V199A32.06,32.06,0,0,0,232,168Zm-32,16a16,16,0,1,1,16-16A16,16,0,0,1,200,184Z"/></svg></span>Égaliseur</a>
+      <a href="#about"><span class="icon"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm16-40a8,8,0,0,1-8,8,16,16,0,0,1-16-16V128a8,8,0,0,1,0-16,16,16,0,0,1,16,16v40A8,8,0,0,1,144,176ZM112,84a12,12,0,1,1,12,12A12,12,0,0,1,112,84Z"/></svg></span>À propos et crédits</a>
+    </div>
+    <div class="nav-label">Trucs et astuces</div>
+    <div class="nav-group">
+      <a href="#shortcuts"><span class="icon"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M224,48H32A16,16,0,0,0,16,64V192a16,16,0,0,0,16,16H224a16,16,0,0,0,16-16V64A16,16,0,0,0,224,48Zm0,144H32V64H224V192Zm-16-64a8,8,0,0,1-8,8H56a8,8,0,0,1,0-16H200A8,8,0,0,1,208,128Zm0-32a8,8,0,0,1-8,8H56a8,8,0,0,1,0-16H200A8,8,0,0,1,208,96ZM72,160a8,8,0,0,1-8,8H56a8,8,0,0,1,0-16h8A8,8,0,0,1,72,160Zm96,0a8,8,0,0,1-8,8H96a8,8,0,0,1,0-16h64A8,8,0,0,1,168,160Zm40,0a8,8,0,0,1-8,8h-8a8,8,0,0,1,0-16h8A8,8,0,0,1,208,160Z"/></svg></span>Raccourcis clavier</a>
+      <a href="#context-menus"><span class="icon"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M88,24V16a8,8,0,0,1,16,0v8a8,8,0,0,1-16,0ZM16,104h8a8,8,0,0,0,0-16H16a8,8,0,0,0,0,16ZM124.42,39.16a8,8,0,0,0,10.74-3.58l8-16a8,8,0,0,0-14.31-7.16l-8,16A8,8,0,0,0,124.42,39.16Zm-96,81.69-16,8a8,8,0,0,0,7.16,14.31l16-8a8,8,0,1,0-7.16-14.31ZM219.31,184a16,16,0,0,1,0,22.63l-12.68,12.68a16,16,0,0,1-22.63,0L132.7,168,115,214.09c0,.1-.08.21-.13.32a15.83,15.83,0,0,1-14.6,9.59l-.79,0a15.83,15.83,0,0,1-14.41-11L32.8,52.92A16,16,0,0,1,52.92,32.8L213,85.07a16,16,0,0,1,1.41,29.8l-.32.13L168,132.69ZM208,195.31,156.69,144h0a16,16,0,0,1,4.93-26l.32-.14,45.95-17.64L48,48l52.2,159.86,17.65-46c0-.11.08-.22.13-.33a16,16,0,0,1,11.69-9.34,16.72,16.72,0,0,1,3-.28,16,16,0,0,1,11.3,4.69L195.31,208Z"/></svg></span>Menus contextuels et sélection multiple</a>
+    </div>
+  </nav>
+  <main class="content">
+    <section id="getting-started" data-section>
+      <div class="eyebrow">Les bases</div>
+      <h1>Prise en main</h1>
+      <p>Luminous joue la musique déjà présente sur votre ordinateur, et nul besoin d'une bibliothèque pour commencer. Tant que rien n'a été ajouté, l'écran d'accueil propose d'abord <b>Écouter de la musique</b> : <b>Ouvrir des fichiers</b>, <b>Lire un dossier</b>, ou déposez simplement des fichiers sur la fenêtre.</p>
+      <figure class="shot mw-640 mb-28">
+        <img src="screenshots/home-welcome-FR.png" alt="Écran d'accueil" width="1280" height="800" loading="lazy">
+      </figure>
+      <p>Pour organiser votre musique, choisissez <b>Ajouter un dossier à la bibliothèque</b> sous <b>Créer une bibliothèque</b> — ou suivez ces étapes. Indiquez un dossier à Luminous une seule fois, et il continue de surveiller les nouveaux fichiers par la suite.</p>
+      <div class="list">
+        <div class="row"><div class="mk">1</div><div>Ouvrez <b>Paramètres → Dossiers</b> et ajoutez le dossier où se trouve votre musique.</div></div>
+        <div class="row"><div class="mk">2</div><div>Luminous l'analyse, puis continue de le surveiller — déposez-y un nouvel album et il apparaît de lui-même.</div></div>
+        <div class="row"><div class="mk">3</div><div>Tout se retrouve sous <b>Collection</b> dans la barre latérale, classé en <b>Artistes</b>, <b>Albums</b> et <b>Chansons</b>.</div></div>
+        <div class="row"><div class="mk">4</div><div>Un fichier déplacé ou renommé sur le disque? Luminous remarque le changement de lui-même et met à jour votre bibliothèque — aucune nouvelle analyse requise.</div></div>
+      </div>
+      <p>Accueil est la première chose que vous voyez à l'ouverture de Luminous — un aperçu continu de votre bibliothèque qui se met à jour à mesure que vous écoutez. Le message d'accueil en haut change selon le moment de la journée.</p>
+      <div class="list">
+        <div class="row"><div class="mk">•</div><div><b>Top Artistes</b> — les artistes vers lesquels vous vous tournez le plus.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Top des albums</b> — classés selon les minutes écoutées dans votre semaine locale, d'après le réglage <b>Commencer la semaine le</b>. Les albums qui reviennent au palmarès portent un badge <b>Retour</b>.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Les plus jouées</b> — les chansons que vous avez le plus écoutées.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Ajouts récents</b> — ce qui vient d'arriver dans votre bibliothèque.</div></div>
+      </div>
+      <figure class="shot mw-640 mb-28">
+        <img src="screenshots/home-FR.png" alt="Écran d'accueil" width="1280" height="800" loading="lazy">
+      </figure>
+      <p>Nouveau sur Luminous? Une visite guidée de l'interface vous sera proposée. La visite se termine sur Accueil, et vous pouvez la revoir à tout moment depuis la section Aide.<br></p>
+      <figure class="shot mw-640">
+        <img src="screenshots/walkthrough-FR.png" alt="État initial d'Accueil" width="1641" height="1089" loading="lazy">
+      </figure>
+    </section>
+
+    <section id="collection" data-section>
+      <div class="eyebrow">Les bases</div>
+      <h1>Votre collection</h1>
+      <p class="mb-8"><b>Collection</b> dans la barre latérale se déploie en quatre vues — Artistes, Albums, Chansons et Genres — chacune affichant un compte à jour et un contrôle de tri en haut à droite :</p>
+      <figure class="shot mw-700 mb-32">
+        <img src="screenshots/albums-FR.png" alt="Grille des albums" width="1280" height="800" loading="lazy">
+      </figure>
+      <p>La vue Chansons liste toute votre bibliothèque sous forme de tableau triable. Cliquez sur <b>Colonnes</b> pour ajouter ou retirer les champs affichés — y compris <b>Nombre d'écoutes</b> et <b>Nombre de sauts</b>, si vous voulez un aperçu de vos propres habitudes d'écoute.</p>
+      <figure class="shot mw-700 mb-32">
+        <img src="screenshots/songs-FR.png" alt="Grille des chansons" width="1280" height="800" loading="lazy">
+      </figure>
+      <p>La vue <b>Genres</b> dans Collection regroupe chaque tag de votre bibliothèque en cartes personnalisables dotées de touches de couleur distinctes. Le nombre de chansons d'une carte regroupe automatiquement tous les morceaux du genre parent et de ses sous-genres.</p>
+      <div class="list">
+        <div class="row"><div class="mk">•</div><div><b>Organisation par glisser-déposer :</b> Glissez une puce de sous-genre sur une autre carte pour la reclasser, déplacez-la au sein d'une carte pour réorganiser, ou attrapez la poignée d'une carte pour rétrograder un genre entier en sous-genre.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Actions rapides sur les tags :</b> Faites un clic droit sur une puce ou sur l'en-tête d'une carte pour <b>Renommer</b>, <b>Promouvoir en genre principal</b>, ou <b>Supprimer</b> le tag de tous les morceaux. Cliquez sur la pastille de couleur d'une carte pour personnaliser sa teinte.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Lecture et listes instantanées :</b> Cliquez sur n'importe quelle carte de genre ou puce de sous-genre pour ouvrir sa liste de lecture automatique dédiée — avec Tout lire, Aléatoire, filtre de recherche et modes de sélection (<b>Tout</b>, <b>Favoris</b>, <b>Essentiels</b>, <b>Découverte</b>, <b>Pépites</b>).</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Vues Cartes et Lignes :</b> Basculez entre la grille de cartes et l'affichage compact en lignes, ou passez à la vue plate <b>Tags</b> en haut à droite pour parcourir un nuage de tags interactif dimensionné selon le nombre de chansons.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Gestion groupée des tags :</b> Cliquez sur <b>Sélectionner les tags</b> pour choisir plusieurs tags à la fois afin de <b>Fusionner la sélection</b> sous un nom unique ou <b>Supprimer la sélection</b> en lot.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Morceaux non étiquetés :</b> Les morceaux sans métadonnée de genre sont rassemblés dans un groupe dédié <b>Sans genre</b> au bas de la vue pour les retrouver et les étiqueter facilement.</div></div>
+      </div>
+      <figure class="shot mw-700 mb-20">
+        <img src="screenshots/genres-FR.png" alt="Vue Genres" width="1280" height="800" loading="lazy">
+      </figure>
+      <p>Ouvrez un album pour voir sa liste de pistes complète, ainsi qu'un panneau latéral avec les détails du fichier de la chanson en cours — format, débit binaire, fréquence d'échantillonnage et volume sonore. <b>Tout jouer</b> commence à la première piste; <b>Aléatoire et jouer</b> mélange l'ordre; le bouton <b>+</b> ajoute cet album ou cette chanson à la liste de lecture active — la file d'attente, par défaut.</p>
+      <figure class="shot mw-700 mb-32">
+        <img src="screenshots/album-detail-FR.png" alt="Détail de l'album" width="1280" height="800" loading="lazy">
+      </figure>
+      <p>Cliquez sur l'icône de crayon à côté de Tout jouer pour ouvrir <b>Modifier les étiquettes de l'album</b> — corrigez le titre, l'artiste, le genre ou l'année de sortie pour toutes les pistes de l'album à la fois. Le même éditeur est offert par piste depuis l'icône de crayon de chaque rangée. <b>Rechercher AcoustID</b> tente d'identifier la chanson et de récupérer automatiquement les bonnes étiquettes de métadonnées.</p>
+      <figure class="shot mw-700 mb-32">
+        <img src="screenshots/song-tag-editor-FR.png" alt="Modifier les étiquettes de la chanson" width="1280" height="800" loading="lazy">
+      </figure>
+      <p>Artiste, Artiste de l'album, Compositeur et Genre acceptent tous plusieurs valeurs — appuyez sur Entrée après chaque valeur pour l'ajouter, et Luminous les conserve comme des étiquettes distinctes et recherchables séparément plutôt qu'une seule longue chaîne. Chacun de ces champs (ainsi que Titre et Album) possède aussi son propre champ <b>Trier comme</b>, pour classer « The Beatles » sous « Beatles, The » ou un genre comme « Gothic Metal » sous un « Metal » plus large, sans changer l'étiquette elle-même. Luminous lit aussi les anciennes étiquettes ID3v1 sur les MP3 plus anciens, et <b>Effacer la pochette</b> retire la pochette intégrée d'une piste en un clic.</p>
+      <p>Une page d'artiste regroupe son travail en <b>Albums</b>, <b>EP</b> et <b>Singles</b> sous une bande d'onglets Discographie. Sous la Discographie se trouvent les listes de lecture qui incluent l'artiste. Cliquez sur <b>Modifier</b> pour ajouter une biographie, un site officiel, et des liens vers Bandcamp, Spotify, Instagram et d'autres plateformes — ils apparaissent dans un panneau À propos avec des liens cliquables directement sur la page de l'artiste.</p>
+      <figure class="shot mw-700">
+        <img src="screenshots/artist-detail-FR.png" alt="Détail de l'artiste" width="1280" height="800" loading="lazy">
+      </figure>
+    </section>
+
+    <section id="search" data-section>
+      <div class="eyebrow">Les bases</div>
+      <h1>Recherche et navigation</h1>
+      <p>La barre de recherche en haut de la fenêtre parcourt à la fois les chansons, les albums et les artistes — vous n'avez jamais à réfléchir à l'endroit où quelque chose est classé avant de partir à sa recherche.</p>
+      <figure class="shot mw-640 mb-20">
+        <img src="assets/searchbar-FR.png" alt="Barre de recherche" width="1636" height="115" loading="lazy">
+      </figure>
+      <div class="list mb-24">
+        <div class="row"><div class="mk">•</div><div>Le logo Luminous réagit à la musique en cours de lecture — cliquez dessus pour activer ou désactiver cet effet.</div></div>
+      </div>
+      <div class="list mb-32">
+        <div class="row"><div class="mk">1</div><div>Appuyez sur <kbd>Ctrl</kbd><kbd>L</kbd> (ou cliquez sur la barre de recherche) depuis n'importe où dans Luminous.</div></div>
+        <div class="row"><div class="mk">2</div><div>Commencez à taper — les chansons, albums, artistes et listes de lecture correspondants apparaissent au fur et à mesure.</div></div>
+        <div class="row"><div class="mk">3</div><div>Les flèches de retour et d'avance à côté de la barre de recherche parcourent votre historique de navigation, comme dans un navigateur.</div></div>
+        <div class="row"><div class="mk">4</div><div>Cliquez sur <b>Ouvrir…</b> (ou appuyez sur <kbd>Ctrl</kbd><kbd>O</kbd>) pour lire des fichiers depuis n'importe où sur votre ordinateur.</div></div>
+      </div>
+      <figure class="shot mw-640">
+        <img src="screenshots/search-FR.png" alt="Résultats de recherche" width="1280" height="800" loading="lazy">
+      </figure>
+    </section>
+
+    <section id="now-playing" data-section>
+      <div class="eyebrow">Les bases</div>
+      <h1>Lecture en cours et le mini lecteur</h1>
+      <p>Une barre de lecture apparaît au bas de la fenêtre lorsqu'une chanson joue, avec la forme d'onde, les commandes de lecture, le volume et un raccourci vers la vue Lecture en cours complète.</p>
+      <figure class="shot mw-640 mb-20">
+        <img src="assets/playbar-FR.png" alt="Barre de lecture" width="1629" height="145" loading="lazy">
+      </figure>
+      <p>Cliquez sur la pochette de l'album dans la barre de lecture pour activer le mode Immersif (<kbd>Ctrl</kbd><kbd>2</kbd> fonctionne aussi).</p><div class="row"><div class="mk">•</div><div>Cliquez sur le cœur pour ajouter la chanson à vos favoris, ou donnez-lui une note de 1 à 5 étoiles, selon vos paramètres.</div></div><div class="row"><div class="mk">•</div><div>Les touches multimédias lecture/pause, piste suivante et volume fonctionnent même lorsque Luminous n'est pas la fenêtre active, et la lecture apparaît dans les commandes multimédias de votre système — pour la voir et la piloter sans revenir à l'application.</div></div><div class="row"><div class="mk">•</div><div>Cliquez sur <b>Aléatoire</b> pour parcourir cinq modes :
+          <ul class="sublist">
+            <li><b>Tout mélanger</b> : lire toutes les pistes dans un ordre aléatoire.</li>
+            <li><b>Mélanger dans l'album</b> : lire les albums dans leur ordre normal, mais mélanger les pistes à l'intérieur de chaque album.</li>
+            <li><b>Mélanger les albums</b> : lire les albums dans un ordre aléatoire, mais garder les pistes de chaque album dans l'ordre.</li>
+            <li><b>Mélanger les artistes</b> : lire toutes les pistes d'un artiste avant de passer à un nouvel artiste choisi au hasard.</li>
+            <li><b>Aléatoire désactivé</b> : lire les pistes dans leur ordre séquentiel normal.</li>
+          </ul>
+        </div></div>
+        <div class="row"><div class="mk">•</div><div>Cliquez sur <b>Répéter</b> pour parcourir quatre modes :
+          <ul class="sublist">
+            <li><b>Répéter la chanson</b> : boucler indéfiniment sur la piste en cours.</li>
+            <li><b>Répéter l'album</b> : boucler indéfiniment sur l'album en cours.</li>
+            <li><b>Répéter la liste de lecture</b> : boucler indéfiniment sur la file d'attente ou la liste de lecture en cours.</li>
+            <li><b>Répétition désactivée</b> : lire la file d'attente en cours normalement et s'arrêter à la fin.</li>
+          </ul>
+        </div></div>
+      <div class="list">
+        <div class="row"><div class="mk">•</div><div>Cliquez sur la forme d'onde pour sauter à un autre moment de la chanson.</div></div>
+        <div class="row"><div class="mk">•</div><div>Un petit affichage du spectre à côté du contrôle de volume vous donne un aperçu en direct des fréquences de la chanson pendant sa lecture.</div></div>
+        <div class="row"><div class="mk">•</div><div>Cliquez sur l'icône à côté de la forme d'onde pour afficher plutôt les <b>bandes de fréquences</b>. Elles superposent les trois bandes à la fois — bleu pour les graves, ambre pour les médiums (voix, caisses claires, lignes principales), blanc pour les aigus (charleston, cymbales, transitoires) — les bandes plus hautes portant plus d'énergie.</div></div>
+        <div class="row"><div class="mk">•</div><div>Cinq icônes se trouvent à droite de la barre de lecture : un <b>menu</b> d'actions rapides pour la chanson en cours, un bouton pour afficher les <b>paroles</b>, un raccourci vers la <b>file d'attente</b>, le bouton du panneau d'informations, et le bouton du mini lecteur.</div></div><div class="row"><div class="mk">•</div><div>L'icône « info » affiche ou masque le panneau d'informations à droite. Son raccourci est <kbd>Ctrl</kbd><kbd>I</kbd> (ou <kbd>Ctrl</kbd><kbd>3</kbd>).</div></div>
+        <div class="row"><div class="mk">•</div><div>L'icône du mini lecteur à l'extrême droite détache le lecteur en un petit <b>mini lecteur</b> flottant — pratique pour garder un œil sur la lecture pendant que vous travaillez dans d'autres applications. <kbd>Ctrl</kbd><kbd>M</kbd> l'active ou le désactive depuis n'importe où.</div></div>
+      </div>
+      <figure class="shot mw-640 mt-24 mb-28">
+        <img src="screenshots/now-playing-FR.png" alt="Lecture en cours" width="1280" height="800" loading="lazy">
+      </figure>
+      <div class="grid2 mw-700 mb-20">
+        <div><figure class="shot"><img src="screenshots/miniplayer-FR.png" alt="Mini lecteur" width="340" height="420" loading="lazy"></figure><div class="caption">Mini lecteur, au repos</div></div>
+        <div><figure class="shot"><img src="screenshots/miniplayer-hover-FR.png" alt="Mini lecteur survolé" width="340" height="420" loading="lazy"></figure><div class="caption">Mini lecteur, au survol</div></div>
+      </div>
+      <div class="list mb-0">
+        <div class="row"><div class="mk">•</div><div>Survolez le mini lecteur pour révéler ses commandes de lecture et de fenêtre. Vous pouvez noter la chanson.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Déplacez</b> le mini lecteur en le saisissant n'importe où le long du haut.</div></div>
+        <div class="row"><div class="mk">•</div><div>Faites glisser le <b>curseur de volume</b> en bas à gauche pour régler le volume.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Restaurer la fenêtre complète</b> (<kbd>Ctrl</kbd><kbd>M</kbd>) en bas à droite.</div></div>
+      </div>
+    </section>
+
+    <section id="playlists" data-section>
+      <div class="eyebrow">Les bases</div>
+      <h1>Listes de lecture</h1>
+      <p>Si vous cliquez sur le <b>+</b> à côté d'une chanson ou d'un album, il se retrouve dans votre liste Queue par défaut. Vous créez une nouvelle liste et voulez y ajouter des éléments plutôt? Marquez-la <b>Active</b> d'abord, et tout ce que vous ajoutez avec <b>+</b> par la suite s'y retrouvera à la place.</p><p>Il en existe trois sortes : celles que vous créez vous-même, les listes intelligentes que Luminous remplit selon une règle que vous définissez, et les listes automatiques qu'il crée et actualise de lui-même.</p>
+      <div class="list">
+        <div class="row"><div class="mk">•</div><div><b>Personnalisée :</b> créez une liste de lecture, nommez-la, puis glissez-y des chansons depuis n'importe où dans votre collection.</div></div>
+      </div>
+      <div class="list">
+        <div class="row"><div class="mk">•</div><div><b>Intelligente :</b> définissez une règle comme « Genre est Rock et Année est après 2015 », et Luminous la garde à jour à mesure que votre collection grandit.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Automatique :</b> les listes par Genre, par Décennie et par BPM se créent d'elles-mêmes à partir de votre bibliothèque et s'actualisent chaque jour avec jusqu'à 25 pistes — chacune n'apparaît qu'une fois qu'elle compte au moins 25 chansons correspondantes. Cliquez sur une liste pour parcourir ses pistes, ou appuyez sur Actualiser à tout moment pour une nouvelle sélection.</div></div>
+      </div>
+      <p class="mb-16">Les listes par BPM répartissent les chansons dans cinq catégories de tempo fixes, selon l'étiquette BPM de chaque chanson :</p>
+      <div class="table mw-460 mb-20" style="--cols: 1fr 1fr">
+        <div class="tr th"><div>Catégorie</div><div>Plage BPM</div></div>
+        <div class="tr"><div>Tempo lent BPM</div><div>60–90</div></div>
+        <div class="tr"><div>Tempo moyen BPM</div><div>90–115</div></div>
+        <div class="tr"><div>Tempo enlevé BPM</div><div>115–130</div></div>
+        <div class="tr"><div>Haute énergie BPM</div><div>130–150</div></div>
+        <div class="tr"><div>Extrême BPM</div><div>150+</div></div>
+      </div>
+      <p>Luminous ne calcule pas le BPM lui-même — il lit l'étiquette BPM déjà présente sur chaque fichier. Ajoutez des étiquettes BPM avec l'éditeur d'étiquettes ou l'outil de votre choix; les chansons sans étiquette n'entreront dans aucune catégorie. Vous pouvez créer vos propres catégories de BPM avec les listes de lecture intelligentes.</p>
+      <div class="mw-700 mb-32">
+        <div><figure class="shot"><img src="screenshots/playlist-smart-edit-FR.png" alt="Modification d'une règle intelligente" width="1280" height="800" loading="lazy"></figure><div class="caption">Modification d'une règle intelligente</div></div>
+      </div>
+      <p>Vous pouvez aussi glisser des fichiers audio ou un dossier entier directement sur la fenêtre de Luminous pour les jouer ou les mettre en file d'attente — déposez normalement pour remplacer la file d'attente et démarrer la lecture, ou maintenez <b>Maj</b> en déposant pour les ajouter à la fin de la file d'attente à la place.</p>
+      <div class="mw-700 mb-32">
+        <div><figure class="shot"><img src="screenshots/playlist-auto-FR.png" alt="Une liste de lecture générée automatiquement" width="1280" height="800" loading="lazy"></figure><div class="caption">Vignette de liste automatique</div></div>
+      </div>
+      <div class="eyebrow mt-32">Gérer une liste de lecture</div>
+      <div class="list">
+        <div class="row"><div class="mk">•</div><div>Double-cliquez sur le nom d'une liste de lecture (ou utilisez son icône crayon) pour la renommer directement.</div></div>
+        <div class="row"><div class="mk">•</div><div>Faites glisser des rangées pour réorganiser une liste — sélectionnez-en plusieurs d'abord pour les déplacer en groupe. Cliquez sur l'en-tête d'une colonne pour trier selon celle-ci, ou utilisez le champ de recherche au-dessus de la liste de pistes pour filtrer les chansons correspondantes.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Supprimer les doublons</b> et <b>Supprimer les pistes indisponibles</b> nettoient une liste en un clic; <b>Vider la liste</b> la vide; <b>Supprimer la liste</b> la retire pour de bon.</div></div>
+        <div class="row"><div class="mk">•</div><div>Les tableaux de file d'attente et de liste de lecture peuvent afficher une colonne <b>Date d'ajout</b> via le sélecteur de colonnes, en plus des autres déjà présentes — pratique pour trier une liste selon la récence d'ajout de chaque piste.</div></div>
+      </div>
+      <div class="eyebrow">Importer et exporter</div>
+      <div class="list mb-0">
+        <div class="row"><div class="mk">•</div><div>Importez des listes de lecture depuis d'autres applications, ou exportez les vôtres, aux formats .m3u, .m3u8, .pls ou .xspf.</div></div>
+        <div class="row"><div class="mk">•</div><div>L'exportation propose une option <b>Chemins relatifs</b>, pour que la liste fonctionne toujours après l'avoir déplacée vers un autre dossier ou ordinateur.</div></div>
+      </div>
+    </section>
+
+    <section id="stats" data-section>
+      <div class="eyebrow">Les bases</div>
+      <h1>Statistiques</h1>
+      <p><b>Statistiques</b> dans la barre latérale montre vos habitudes d'écoute — calculées entièrement sur votre propre appareil à partir de votre historique de lecture local, jamais envoyées ailleurs. Basculez entre <b>7 derniers jours</b>, <b>28 derniers jours</b> et <b>Dernière année</b> pour changer la période.</p>
+      <div class="list">
+        <div class="row"><div class="mk">•</div><div><b>Meilleurs artistes</b>, <b>Meilleurs albums</b>, <b>Meilleurs titres</b> et <b>Meilleurs genres</b> classent ce que vous avez réellement écouté sur la période sélectionnée. Cliquez sur une entrée pour y accéder directement.</div></div>
+        <div class="row"><div class="mk">•</div><div>Une carte thermique suit les minutes d'écoute par jour, avec votre <b>Série en cours</b> et votre <b>Plus longue série</b> de jours d'écoute consécutifs.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Moment de la journée</b> répartit votre écoute en Matin, Après-midi, Soirée et Fin de nuit, pour voir quand vous écoutez vraiment.</div></div>
+        <div class="row"><div class="mk">•</div><div>Vous ne voulez pas qu'une chanson, un album, un artiste ou un genre fausse vos chiffres&nbsp;? Faites un clic droit dessus n'importe où dans votre collection et choisissez <b>Ne pas inclure dans les statistiques</b> — annulez plus tard depuis le même menu.</div></div>
+      </div>
+      <figure class="shot mw-700">
+        <img src="screenshots/stats-FR.png" alt="Vue Statistiques" width="1280" height="800" loading="lazy">
+      </figure>
+    </section>
+
+    <section id="lyrics" data-section>
+      <div class="eyebrow">Les bases</div>
+      <h1>Paroles</h1>
+      <p>Activez <b>Paroles</b> depuis la barre de lecture pour suivre ce qui joue — la ligne en cours est mise en surbrillance en synchronisation avec la musique, le reste étant estompé au-dessus et en dessous. Luminous recherche automatiquement les paroles de la chanson en cours; s'il s'agit d'un instrumental, vous pouvez le marquer comme tel pour que Luminous arrête de chercher.</p>
+      <div class="list">
+        <div class="row"><div class="mk">•</div><div>Si les paroles n'ont pas encore été trouvées, cliquez sur <b>Rechercher à nouveau</b> pour relancer la recherche.</div></div>
+        <div class="row"><div class="mk">•</div><div>Synchronisation décalée, ou une ligne erronée? <b>Modifier</b> vous permet de corriger le texte ou d'ajuster la synchronisation vous-même.</div></div>
+        <div class="row"><div class="mk">•</div><div>Toutes les paroles n'ont pas d'horodatage — dans ce cas, Luminous affiche plutôt les paroles en texte simple.</div></div>
+        <div class="row"><div class="mk">•</div><div>Cliquez sur une ligne des paroles pour sauter à ce moment de la chanson.</div></div>
+      </div>
+      <figure class="shot mw-640 mb-28">
+        <img src="screenshots/lyrics-FR.png" alt="Paroles synchronisées" width="1280" height="800" loading="lazy">
+      </figure>
+    </section>
+
+    <section id="advanced-search" data-section>
+      <div class="eyebrow">Avancé</div>
+      <h1>Recherche avancée</h1>
+      <p>Taper des termes <code>champ:valeur</code> dans la barre de recherche transforme une recherche normale en filtre précis sur toute votre bibliothèque — pas d'écran de recherche avancée séparé à ouvrir.</p>
+      <figure class="shot mw-700 mb-28">
+        <img src="screenshots/advanced-search-FR.png" alt="Recherche avancée" width="1280" height="800" loading="lazy">
+      </figure>
+      <div class="eyebrow">Syntaxe</div>
+      <div class="list">
+        <div class="row"><div class="mk">•</div><div>Sans opérateur sur un champ texte (artiste, album, genre…), le sens par défaut est <b>contient</b> : <code>genre:rock</code> correspond à tout genre contenant « jazz ».</div></div>
+        <div class="row"><div class="mk">•</div><div>Sans opérateur sur un champ numérique (année, note, bpm…), le sens par défaut est <b>correspondance exacte</b> : <code>year:1994</code> ne correspond qu'à 1994.</div></div>
+        <div class="row"><div class="mk">•</div><div>Plusieurs termes se combinent avec <b>ET</b> : <code>rating:&gt;=4 year:&lt;2000 genre:rock</code> — chansons notées 4 étoiles ou plus, sorties avant 2000, dans un genre contenant « rock ».</div></div>
+        <div class="row"><div class="mk">•</div><div>Les mots seuls sans deux-points sont du texte libre, combinés avec OU sur titre/artiste/album — mélangez-les librement : <code>rating:&gt;=4 "tom cochrane"</code>.</div></div>
+        <div class="row"><div class="mk">•</div><div>Entourez de guillemets une valeur contenant des espaces : <code>artist:"tom cochrane"</code>. Les noms de champs ne sont pas sensibles à la casse.</div></div>
+      </div>
+      <div class="eyebrow">Opérateurs</div>
+      <div class="table mw-460 mb-28" style="--cols: 100px 1fr">
+        <div class="tr th"><div>Symbole</div><div>Signification</div></div>
+        <div class="tr"><code>=</code><div>égal à</div></div>
+        <div class="tr"><code>!=</code><div>différent de</div></div>
+        <div class="tr"><code>&gt;</code><div>supérieur à</div></div>
+        <div class="tr"><code>&gt;=</code><div>supérieur ou égal</div></div>
+        <div class="tr"><code>&lt;</code><div>inférieur à</div></div>
+        <div class="tr"><code>&lt;=</code><div>inférieur ou égal</div></div>
+        <div class="tr"><i>(aucun)</i><div>contient (texte) / égal à (numérique)</div></div>
+      </div>
+      <div class="eyebrow">Référence des champs</div>
+      <p class="mb-18">Chaque champ ci-dessous fonctionne dans la barre de recherche et comme règle dans le créateur de liste intelligente. La fenêtre « Aide-mémoire de syntaxe » de l'application n'affiche qu'un sous-ensemble illustratif — voici la liste complète.</p>
+      <div class="table mw-820 mb-28" style="--cols: 220px 90px 1fr">
+        <div class="tr th"><div>Champ (alias)</div><div>Type</div><div>Correspond à</div></div>
+        <div class="tr"><code>artist</code><div>texte</div><div>Artiste (repli sur Artiste de l'album)</div></div>
+        <div class="tr"><code>artist_tag</code><div>texte</div><div>Étiquette Artiste</div></div>
+        <div class="tr"><code>album_artist</code><div>texte</div><div>Artiste de l'album seulement</div></div>
+        <div class="tr"><code>album</code><div>texte</div><div>Titre de l'album</div></div>
+        <div class="tr"><code>title</code><div>texte</div><div>Titre de la piste</div></div>
+        <div class="tr"><code>genre</code><div>texte</div><div>Genre</div></div>
+        <div class="tr"><code>composer</code><div>texte</div><div>Compositeur</div></div>
+        <div class="tr"><code>key / initial_key</code><div>texte</div><div>Tonalité (ex. « D », « Am », « D♭ »)</div></div>
+        <div class="tr"><code>bpm</code><div>nombre</div><div>Battements par minute</div></div>
+        <div class="tr"><code>year</code><div>nombre</div><div>Année de sortie</div></div>
+        <div class="tr"><code>originalyear / original_year</code><div>nombre</div><div>Année de sortie originale (vs. réédition)</div></div>
+        <div class="tr"><code>rating / stars</code><div>nombre</div><div>Note en étoiles, 0–5</div></div>
+        <div class="tr"><code>playcount / plays</code><div>nombre</div><div>Nombre d'écoutes</div></div>
+        <div class="tr"><code>skipcount / skips</code><div>nombre</div><div>Nombre de sauts</div></div>
+        <div class="tr"><code>lastplayed / last_played</code><div>nombre</div><div>Horodatage de dernière écoute (secondes Unix)</div></div>
+        <div class="tr"><code>added</code><div>nombre</div><div>Horodatage d'ajout (secondes Unix)</div></div>
+        <div class="tr"><code>track / track_number</code><div>nombre</div><div>Numéro de piste</div></div>
+        <div class="tr"><code>disc / disc_number</code><div>nombre</div><div>Numéro de disque</div></div>
+        <div class="tr"><code>bitrate</code><div>nombre</div><div>Débit binaire (kbps)</div></div>
+        <div class="tr"><code>samplerate / sample_rate</code><div>nombre</div><div>Fréquence d'échantillonnage (Hz)</div></div>
+        <div class="tr"><code>bitdepth / bit_depth</code><div>nombre</div><div>Profondeur de bits</div></div>
+        <div class="tr"><code>channels</code><div>nombre</div><div>Nombre de canaux</div></div>
+        <div class="tr"><code>compilation</code><div>0/1</div><div>Indicateur de compilation</div></div>
+        <div class="tr"><code>duration / length</code><div>durée</div><div>Longueur de la piste — voir ci-dessous</div></div>
+      </div>
+      <div class="eyebrow">Valeurs de durée</div>
+      <p class="mb-28">Le champ <code>duration</code>/<code>length</code> accepte des secondes simples (<code>duration:&gt;180</code>), <code>MM:SS</code> (<code>duration:&gt;3:30</code>), ou <code>H:MM:SS</code> (<code>duration:&lt;1:02:03</code>).</p>
+      <div class="eyebrow">Créer une liste intelligente depuis la recherche</div>
+      <p class="mb-28">Dès que votre requête contient au moins un terme <code>champ:valeur</code>, une carte <b>Créer une liste intelligente depuis la recherche</b> apparaît en haut du menu. Cliquez sur <b>Ouvrir le créateur →</b> pour ouvrir la fenêtre de liste intelligente avec chaque terme déjà ajouté comme règle — vous pouvez ensuite ajouter d'autres règles, nommer la liste, et enregistrer.</p>
+      <div class="eyebrow">Exemples pratiques</div>
+      <div class="table mw-700" style="--cols: 1fr 260px">
+        <div class="tr th"><div>Objectif</div><div>Requête</div></div>
+        <div class="tr"><div>Chansons rock notées 4+ étoiles d'avant 2000</div><code>rating:&gt;=4 year:&lt;2000 genre:rock</code></div>
+        <div class="tr"><div>Chansons en tonalité de D</div><code>key:d</code></div>
+        <div class="tr"><div>Pistes rapides (120–130 BPM)</div><code>bpm:&gt;=120 bpm:&lt;=130</code></div>
+        <div class="tr"><div>Mélange texte libre + champ</div><code>rating:&gt;=4 "tom cochrane"</code></div>
+        <div class="tr"><div>Albums compilation seulement</div><code>compilation:1</code></div>
+        <div class="tr"><div>Pistes de plus de 3:30</div><code>duration:&gt;3:30</code></div>
+      </div>
+    </section>
+
+    <section id="general" data-section>
+      <div class="eyebrow">Paramètres</div>
+      <h1>Général</h1>
+      <p>Les préférences à l'échelle de l'application — comportement au démarrage et autres paramètres par défaut du quotidien se trouvent ici.</p>
+      <div class="list">
+        <div class="row"><div class="mk">•</div><div><b>Langue :</b> basculez l'interface entre l'anglais et le français.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Style de notation :</b> choisissez si les chansons sont notées avec un cœur, ou sur une échelle de 1 à 5 étoiles — c'est le paramètre mentionné dans la section Lecture en cours.</div></div><div class="row"><div class="mk">•</div><div><b>Commencer la semaine le :</b> dimanche ou lundi. Choisissez quel jour les palmarès et statistiques hebdomadaires considèrent comme le début de la semaine.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Application et mises à jour :</b> vérifiez les mises à jour à la demande et consultez votre version installée. Les notifications et fonctionnalités disponibles dépendent de la façon dont Luminous a été installé. Les installations via le Microsoft Store gèrent les mises à jour automatiquement pour vous.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Réduire dans la barre d'état système :</b> lorsque cette option est activée, fermer la fenêtre masque Luminous dans la barre d'état système au lieu de quitter l'application. Le menu contextuel de l'icône dans la barre d'état propose Lecture/Pause, Suivant et Précédent, pour contrôler la lecture sans même rouvrir la fenêtre.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Lancer au démarrage :</b> démarre Luminous automatiquement quand vous ouvrez une session.</div></div>
+      </div>
+      <figure class="shot mw-640">
+        <img src="screenshots/settings-general-FR.png" alt="Paramètres généraux" width="1280" height="800" loading="lazy">
+      </figure>
+    </section>
+
+    <section id="folders" data-section>
+      <div class="eyebrow">Paramètres</div>
+      <h1>Dossiers</h1>
+      <p>Ajoutez ou retirez les dossiers que Luminous surveille pour la musique. Une fois un dossier ajouté, il reste surveillé — les nouveaux fichiers apparaissent d'eux-mêmes, sans nouvelle analyse.</p>
+      <div class="list">
+        <div class="row"><div class="mk">•</div><div><b>Surveiller les dossiers en temps réel</b> bascule si Luminous surveille les changements en direct, ou vérifie seulement quand vous le lui demandez.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Réanalyser au démarrage</b> fait vérifier vos dossiers par Luminous à chaque lancement.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Analyse incrémentielle</b> ne recherche que ce qui a changé; <b>Analyse complète forcée</b> relit tout depuis le début. Les deux affichent une progression en direct.</div></div>
+        <div class="row"><div class="mk">•</div><div>Un panneau de statistiques indique la dernière analyse de votre bibliothèque, ainsi que le nombre de chansons, d'albums, d'artistes et la taille totale.</div></div>
+        <div class="row"><div class="mk">•</div><div>Vous pouvez aussi ajouter des serveurs multimédias distants pour diffuser votre musique sur le réseau&nbsp;:
+          <div class="nested">
+            <div>– <b>WebDAV&nbsp;:</b> Un protocole de fichiers basé sur HTTP pris en charge par les hébergements cloud personnels et les NAS (comme Nextcloud, ownCloud ou Synology). Il permet à Luminous de lire vos fichiers audio distants directement sans avoir à monter de lecteur réseau.</div>
+            <div>– <b>OpenSubsonic&nbsp;:</b> Un standard d'API ouvert très répandu pour les serveurs de streaming musical personnels (tels que Navidrome, Gonic, LMS ou Subsonic). Luminous synchronise la bibliothèque du serveur, diffuse la musique sur le réseau et peut transmettre vos écoutes et statistiques au serveur.</div>
+            <div class="subnote">Les dossiers et serveurs distants sont strictement en lecture seule — toute modification d'étiquette, d'illustration ou d'organisation reste locale à Luminous et n'est jamais réécrite sur le serveur.</div>
+          </div>
+        </div></div>
+      </div>
+      <figure class="shot mw-640">
+        <img src="screenshots/settings-folders-FR.png" alt="Paramètres des dossiers" width="1280" height="1100" loading="lazy">
+      </figure>
+    </section>
+
+    <section id="integrations" data-section>
+      <div class="eyebrow">Paramètres</div>
+      <h1>Intégrations</h1>
+      <p><b>Paramètres → Intégrations</b> connecte Luminous à quelques outils et services externes — chacun est facultatif, et chacun peut être désactivé pour garder cette partie de Luminous entièrement hors ligne.</p>
+      <div class="list mb-12">
+        <div class="row"><div class="mk">•</div><div><b>Sources de données en ligne&nbsp;:</b> alimente le panneau d'informations et les pages d'artistes avec des notes, tags, avis et biographies récupérés depuis MusicBrainz, CritiqueBrainz et Wikipedia. Désactivez <b>Récupérer le contexte et les biographies</b> pour rester entièrement hors ligne.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Scrobbler ListenBrainz&nbsp;:</b> collez un jeton utilisateur ListenBrainz et cliquez sur <b>Valider et enregistrer</b> pour connecter votre compte. Une fois connecté, activez le scrobbling, et choisissez séparément de transmettre l'état <b>En cours de lecture</b> et les <b>notes</b> — avec les notes activées, un bouton <b>Synchroniser les favoris</b> ponctuel transmet aussi vos favoris existants.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Mettre en pause le scrobbling</b> arrête l'envoi des chansons écoutées sans déconnecter votre compte. Les chansons écoutées hors ligne sont mises en file d'attente localement et envoyées avec <b>Synchroniser</b> une fois de retour en ligne.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>MusicBrainz Picard&nbsp;:</b> Luminous détecte automatiquement une installation de Picard existante et indique où il l'a trouvée, ou vous laisse pointer vers un chemin personnalisé — pratique pour accéder aux outils de tagging de Picard sur un fichier sans quitter Luminous.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Discord Rich Presence&nbsp;:</b> affiche ce que vous écoutez sur votre profil Discord, avec en option le nom de l'album et un minuteur de progression en direct. Nécessite que l'application de bureau Discord soit ouverte.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>fanart.tv&nbsp;:</b> récupère les portraits d'artistes lorsqu'aucun n'est trouvé localement. Ajoutez votre propre clé API, puis cliquez sur Valider et enregistrer. Sans clé, Luminous utilise l'image Wikidata de l'artiste, s'il y en a une.</div></div>
+      </div>
+      <figure class="shot mw-640">
+        <img src="screenshots/settings-integrations-FR.png" alt="Paramètres Intégrations" width="1280" height="850" loading="lazy">
+      </figure>
+    </section>
+
+    <section id="organize" data-section>
+      <div class="eyebrow">Bases</div>
+      <h1>Organiser</h1>
+      <p>Des outils groupés pour renommer et déplacer les fichiers de votre bibliothèque selon leurs étiquettes.</p>
+      <div class="eyebrow">Modèle de nom</div>
+      <p>Choisissez une carte prédéfinie — <b>Par défaut</b> ou <b>Alternative</b> — ou optez pour <b>Personnalisé</b> pour écrire votre propre modèle avec le champ de texte libre et les variables ci-dessous. Un aperçu en arborescence se met à jour en direct selon votre choix, montrant artiste → album → pistes avec des données d'exemple pour voir l'effet immédiatement.</p>
+      <div class="eyebrow">Destination et options</div>
+      <p>Choisissez une destination avec un bouton à deux positions : <b>Dossier(s) d'origine de la bibliothèque</b> réorganise les fichiers sur place, ou passez à <b>Personnalisé...</b> pour afficher un champ de chemin de dossier et un bouton Parcourir. En dessous, trois options permettent de déplacer les fichiers connexes (pochettes, paroles, logs, fiches CUE) avec les pistes, de remplacer les espaces par des tirets bas, et de changer les lettres accentuées et la ponctuation.</p>
+      <div class="eyebrow">Aperçu</div>
+      <p>Cliquez sur <b>Actualiser l'aperçu</b> avant que quoi que ce soit ne bouge. La liste n'affiche toujours que les fichiers qui vont réellement se déplacer, chacun avec un statut et un chemin De → Vers, plus un compte prêts/inchangés suivi d'une ligne de chemin de base commun. Rien ne se passe avant de valider avec <b>Appliquer les modifications</b>.</p>
+      <p class="mb-28"><b>Nettoyer</b>, en bas de la page, supprime les chansons manquantes, les dossiers vides et les doublons en un clic.</p>
+      <figure class="shot mw-640 mb-28">
+        <img src="screenshots/organize-FR.png" alt="Page Organiser" width="1280" height="1600" loading="lazy">
+      </figure>
+      <div class="eyebrow">Variables de nommage des fichiers</div>
+      <p class="mb-18">Construisez un modèle de nommage ou de dossier en combinant ces variables avec vos propres espaces et textes. Placez un élément entre <b>{ }</b> pour le rendre facultatif — il est omis quand la piste n'a pas de valeur pour lui. Un <b>/</b> à la fin, à l'intérieur des accolades, fait de cet élément un dossier.</p>
+      <div class="table roomy mw-640 mb-24" style="--cols: 140px 1fr">
+        <div class="tr th">
+          <div>Variable</div>
+          <div>Remplie par</div>
+        </div>
+        <div class="tr"><code>%albumartist</code><div>L'artiste principal de l'album</div></div>
+        <div class="tr"><code>%artist</code><div>L'artiste de la piste</div></div>
+        <div class="tr"><code>%album</code><div>Titre de l'album</div></div>
+        <div class="tr"><code>%disc</code><div>Numéro de disque</div></div>
+        <div class="tr"><code>%track</code><div>Numéro de piste</div></div>
+        <div class="tr"><code>%title</code><div>Titre de la piste</div></div>
+        <div class="tr"><code>%year</code><div>Année de sortie</div></div>
+        <div class="tr"><code>%genre</code><div>Genre</div></div>
+        <div class="tr"><code>%track3</code><div>Numéro de piste, complété à trois chiffres</div></div>
+        <div class="tr"><code>%rawtrack</code><div>Numéro de piste tel qu'enregistré dans l'étiquette, sans complément</div></div>
+      </div>
+      <div class="eyebrow">Exemples</div>
+      <div class="table roomy mw-640 mb-8" style="--cols: 200px 1fr">
+        <div class="tr"><code>%disc-%track</code><div>2-07</div></div>
+        <div class="tr"><code>Disc %disc</code><div>Disc 2</div></div>
+        <div class="tr"><code>%year - %album</code><div>2019 - Reservoir</div></div>
+        <div class="tr"><code>{%album/}</code><div>Ajoute un dossier au nom de l'album, seulement si la piste en a un</div></div>
+        <div class="tr"><code>{%disc-}%track</code><div>Omet le « 1- » quand il n'y a pas de numéro de disque : 07, ou 1-07</div></div>
+        <div class="tr"><code>{%track }%title</code><div>Ajoute « 07 » avant le titre, seulement s'il y a un numéro de piste</div></div>
+      </div>
+      <div class="list gap-16">
+      </div>
+      <div class="list">
+      </div>
+    </section>
+
+    <section id="equalizer" data-section>
+      <div class="eyebrow">Paramètres</div>
+      <h1>Égaliseur</h1>
+      <p>Tout ceci se trouve sous <b>Paramètres → Égaliseur</b>. Vous n'avez pas besoin de connaître l'ingénierie audio pour l'utiliser — les réglages par défaut sonnent bien, et chaque changement s'applique instantanément, même en plein milieu d'une chanson. Le panneau se divise en trois parties : l'égaliseur lui-même, la normalisation du volume et les fondus de lecture — chacune peut être ajustée ou laissée telle quelle indépendamment.</p>
+      <div class="list">
+        <div class="row"><div class="mk">•</div><div>Activez <b>Activer l'égaliseur</b>, puis choisissez un préréglage dans le menu déroulant — Pop, Rock, Renfort de basses, Voix, et plus — ou tracez votre propre courbe en déplaçant les curseurs des bandes. Passez au mode <b>paramétrique à 20 bandes</b> si les 10 bandes par défaut ne sont pas assez précises ; chaque bande y a sa propre fréquence et son propre Q (largeur de bande) au lieu de l'échelle fixe à 10 bandes, ce qui permet de cibler une fréquence gênante sans toucher à ce qui l'entoure. Un bouton <b>Réinitialiser les bandes</b> apparaît dans cette vue pour tout remettre à plat en un clic. Le curseur <b>Préamplification</b> en haut relève ou abaisse le gain global en compensation avant qu'il n'atteigne les bandes, pour qu'une amplification n'écrête pas le signal.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Normalisation du volume</b> aplanit l'écart de volume entre les pistes silencieuses et fortes, pour que vous n'ayez pas à ajuster le volume à chaque chanson. Définissez un <b>Niveau cible</b> en LUFS, et choisissez de <b>Normaliser par</b> piste (chaque chanson atteint la cible individuellement) ou par album (l'album entier est ajusté ensemble, préservant les dynamiques voulues entre les pistes). Luminous analyse votre bibliothèque en arrière-plan — un message de progression indique combien de pistes restent à traiter — et se rabat sur les balises <b>ReplayGain</b> intégrées, puis sur un <b>Gain de repli</b> fixe, pour tout ce qui n'a pas encore été mesuré.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Fondus et enchaînés</b> adoucit le bouton pause/arrêt avec une courte <b>Durée de fondu</b> au lieu d'une coupure brutale, et peut fondre automatiquement la fin d'une chanson dans le début de la suivante sur une <b>Durée d'enchaînement</b> que vous définissez. <b>Préserver l'enchaînement sans coupure pour le même album</b> empêche l'enchaîné de s'activer entre les pistes d'un même album — utile pour les concerts live, les albums-concepts, ou tout ce qui est mixé pour s'enchaîner sans interruption.</div></div>
+      </div>
+      <div class="grid2 mw-900">
+        <div><figure class="shot"><img src="screenshots/equalizer-FR.png" alt="Égaliseur graphique à 10 bandes" width="1280" height="1500" loading="lazy"></figure><div class="caption">Graphique à 10 bandes — un curseur par fréquence fixe, la façon la plus rapide de façonner une courbe à l'oreille.</div></div>
+        <div><figure class="shot"><img src="screenshots/equalizer-parametric-FR.png" alt="Égaliseur paramétrique à 20 bandes" width="1280" height="1600" loading="lazy"></figure><div class="caption">Paramétrique à 20 bandes — bandes librement placées, avec fréquence et Q ajustables pour des corrections chirurgicales.</div></div>
+      </div>
+    </section>
+
+    <section id="ui-themes" data-section>
+      <div class="eyebrow">Paramètres</div>
+      <h1>Thèmes d'interface</h1>
+      <p>Choisissez parmi plusieurs thèmes intégrés, suivez le réglage clair/sombre de votre système, ou activez <b>Pochette dynamique</b> pour que toute l'application — y compris Lecture en cours et le mini lecteur — tire ses couleurs de la pochette d'album en cours de lecture. Toute l'application se met à jour immédiatement, sans redémarrage.</p>
+      <p>Pochette dynamique est aussi une excellente façon de découvrir de nouveaux thèmes — quand la pochette d'une chanson tombe sur une combinaison qui vous plaît, enregistrez-la comme Thème personnalisé pour la garder.</p>
+      <p>Si l'option de réduction des animations de votre système est activée, Luminous remplace les transitions de glissement et de mise à l'échelle par de simples fondus.</p>
+      <p class="mb-28">Vous voulez un contrôle total? Le créateur de thème personnalisé vous permet de définir vos propres couleurs.</p>
+      <figure class="shot mw-640">
+        <img src="screenshots/themes-FR.png" alt="Sélecteur de thème" width="1280" height="800" loading="lazy">
+      </figure>
+    </section>
+
+    <section id="shortcuts" data-section>
+      <div class="eyebrow">Trucs et astuces</div>
+      <h1>Raccourcis clavier</h1>
+      <div class="kb-label">Lecture</div>
+      <div class="kb-table">
+      <div class="kb-row"><div class="kb-keys"><kbd>Espace</kbd></div><div>Jouer / mettre en pause</div></div>
+      <div class="kb-row"><div class="kb-keys"><kbd>←</kbd></div><div>Piste précédente</div></div>
+      <div class="kb-row"><div class="kb-keys"><kbd>→</kbd></div><div>Piste suivante</div></div>
+      <div class="kb-row"><div class="kb-keys"><kbd>↑</kbd></div><div>Augmenter le volume</div></div>
+      <div class="kb-row"><div class="kb-keys"><kbd>↓</kbd></div><div>Baisser le volume</div></div>
+      <div class="kb-row"><div class="kb-keys"><kbd>Page préc.</kbd></div><div>Reculer de 10 s</div></div>
+      <div class="kb-row"><div class="kb-keys"><kbd>Page suiv.</kbd></div><div>Avancer de 10 s</div></div>
+      </div>
+      <div class="kb-label">Navigation</div>
+      <div class="kb-table">
+      <div class="kb-row"><div class="kb-keys"><kbd>Ctrl</kbd><kbd>L</kbd></div><div>Placer le curseur dans la barre de recherche</div></div>
+      <div class="kb-row"><div class="kb-keys"><kbd>Échap</kbd></div><div>Fermer le menu de recherche</div></div>
+      <div class="kb-row"><div class="kb-keys"><kbd>Ctrl</kbd><kbd>O</kbd></div><div>Ouvrir la chanson</div></div>
+      <div class="kb-row"><div class="kb-keys"><kbd>Ctrl</kbd><kbd>[</kbd></div><div>Reculer</div></div>
+      <div class="kb-row"><div class="kb-keys"><kbd>Ctrl</kbd><kbd>]</kbd></div><div>Avancer</div></div>
+      <div class="kb-row"><div class="kb-keys"><kbd>Ctrl</kbd><kbd>A</kbd></div><div>Tout sélectionner dans la vue de liste actuelle</div></div>
+      </div>
+      <div class="kb-label">Disposition et affichage</div>
+      <div class="kb-table">
+      <div class="kb-row"><div class="kb-keys"><kbd>Ctrl</kbd><kbd>1</kbd></div><div>Afficher/masquer la barre latérale gauche</div></div>
+      <div class="kb-row"><div class="kb-keys"><kbd>Ctrl</kbd><kbd>2</kbd></div><div>Activer/désactiver le mode immersif</div></div>
+      <div class="kb-row"><div class="kb-keys"><kbd>Ctrl</kbd><kbd>3</kbd><span class="kb-or">ou</span><kbd>Ctrl</kbd><kbd>I</kbd></div><div>Afficher/masquer le panneau d'informations</div></div>
+      <div class="kb-row"><div class="kb-keys"><kbd>Ctrl</kbd><kbd>M</kbd></div><div>Afficher/masquer le mini lecteur</div></div>
+      <div class="kb-row"><div class="kb-keys"><kbd>Ctrl</kbd><kbd>,</kbd></div><div>Ouvrir les paramètres</div></div>
+      <div class="kb-row"><div class="kb-keys"><kbd>Ctrl</kbd><kbd>/</kbd></div><div>Afficher cette liste</div></div>
+      </div>
+      <div class="footnote">Les boutons latéraux de la souris et les touches dédiées d'avance/retour du navigateur permettent aussi de naviguer dans l'historique. Les touches multimédias de votre clavier ou appareil contrôlent aussi la lecture.</div>
+    </section>
+
+    <section id="about" data-section>
+      <div class="eyebrow">Paramètres</div>
+      <h1>À propos et crédits</h1>
+      <p>Code source disponible sur <a href="https://github.com/esoltys/luminous" target="_blank" rel="noopener">GitHub</a>, avec des liens vers CREDITS.md et LICENSE pour la liste complète des bibliothèques utilisées par Luminous et les conditions de partage.</p>
+      <p class="mb-28">Sous le capot : un noyau Rust et Tauri, une interface Svelte 5, et des bibliothèques dédiées au décodage et à l'analyse audio.</p>
+      <figure class="shot mw-640">
+        <img src="screenshots/settings-about-FR.png" alt="À propos et crédits" width="1280" height="950" loading="lazy">
+      </figure>
+    </section>
+
+    <section id="context-menus" data-section>
+      <div class="eyebrow">Trucs et astuces</div>
+      <h1>Menus contextuels et sélection multiple</h1>
+      <p>La plupart des listes de Luminous prennent en charge les menus contextuels (clic droit) et la sélection multiple, pour agir sur plusieurs pistes à la fois plutôt qu'une par une.</p>
+      <div class="list mb-0">
+        <div class="row"><div class="mk">•</div><div>Clic droit sur une chanson ou une ligne de liste de lecture pour des actions rapides — Jouer, Ajouter à une liste de lecture, Aller à l'artiste/l'album, Organiser les fichiers, Modifier les étiquettes, Retirer.</div></div>
+        <div class="row"><div class="mk">•</div><div>Clic droit sur un album pour <b>Lire l'album</b>, <b>Ajouter à la file</b>, <b>Modifier les infos de l'album</b>, <b>Ouvrir dans Picard</b>, <b>Partager la carte…</b>, <b>Épingler à l'accueil</b> et <b>Ne pas inclure dans les statistiques</b>.</div></div>
+        <div class="row"><div class="mk">•</div><div>Maj-clic pour sélectionner une plage, Ctrl-clic pour ajouter des lignes individuelles, et <kbd>Ctrl</kbd><kbd>A</kbd> pour Tout sélectionner dans la vue de liste actuelle.</div></div>
+        <div class="row"><div class="mk">•</div><div>Avec une sélection active, une barre d'outils flottante apparaît avec Jouer la sélection, Ajouter à une liste de lecture, et Effacer la sélection.</div></div>
+      </div>
+    </section>
+  </main>
+</div>
+</body>
+</html>
