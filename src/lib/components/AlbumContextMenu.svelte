@@ -90,13 +90,7 @@
   }
 
   async function handleToggleStatsExcluded() {
-    const excluded = !statsExclusionsStore.isExcluded("album", albumName);
-    await statsExclusionsStore.setExcluded("album", albumName, excluded);
-    const name = albumName || i18n.t("collection.unknownAlbum");
-    const message = excluded
-      ? i18n.t("stats.excludedToast", { name })
-      : i18n.t("stats.includedToast", { name });
-    toastStore.show(message);
+    await statsExclusionsStore.toggleWithToast("album", albumName);
   }
 </script>
 
