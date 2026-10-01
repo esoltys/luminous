@@ -162,7 +162,9 @@ describe("PlaylistView.svelte", () => {
 
       playlistsStore.playlists = [queue];
       const { getByRole } = render(PlaylistView);
-      expect(getByRole("button", { name: "Auto Continue" })).toHaveAttribute("aria-pressed", "false");
+      const offToggle = getByRole("button", { name: "Auto Continue" });
+      expect(offToggle).toHaveAttribute("aria-pressed", "false");
+      expect(offToggle).toHaveAttribute("title", "Auto Continue: Off");
     });
 
     it("reflects the backend's state and asks it to flip", async () => {
@@ -171,6 +173,7 @@ describe("PlaylistView.svelte", () => {
       const { getByRole } = render(PlaylistView);
       const toggle = getByRole("button", { name: "Auto Continue" });
       expect(toggle).toHaveAttribute("aria-pressed", "true");
+      expect(toggle).toHaveAttribute("title", "Auto Continue: On");
 
       await fireEvent.click(toggle);
       expect(invoke).toHaveBeenCalledWith("set_auto_continue", { enabled: false });

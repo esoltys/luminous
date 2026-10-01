@@ -738,9 +738,20 @@
                 onclick={() => playerStore.setAutoContinue(!playerStore.autoContinue)}
                 variant={playerStore.autoContinue ? "accent-soft" : "secondary"}
                 pressed={playerStore.autoContinue}
+                title={`${i18n.t("playlists.autoContinue")}: ${playerStore.autoContinue ? i18n.t("common.on") : i18n.t("common.off")}`}
+                aria-label={i18n.t("playlists.autoContinue")}
+                class="transition-all {playerStore.autoContinue ? '' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
               >
-                <Infinity class="w-4 h-4" />
+                <Infinity class="w-4 h-4 shrink-0" />
                 <span>{i18n.t("playlists.autoContinue")}</span>
+                <span
+                  class="relative inline-flex h-4 w-7 shrink-0 items-center rounded-full p-0.5 transition-colors duration-200 ease-out {playerStore.autoContinue ? 'bg-brand-accent' : 'bg-white/20'}"
+                  aria-hidden="true"
+                >
+                  <span
+                    class="pointer-events-none inline-block h-3 w-3 rounded-full bg-white shadow-xs transition-transform duration-200 ease-out {playerStore.autoContinue ? 'translate-x-3' : 'translate-x-0'}"
+                  ></span>
+                </span>
               </Button>
               <IconActionButton
                 onclick={handleSaveQueueAsCustomPlaylist}
