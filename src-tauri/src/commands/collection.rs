@@ -397,7 +397,11 @@ pub async fn get_top_albums(
 fn is_generated_tags_section(section: &str) -> bool {
     let trimmed = section.trim();
     if let Some(rest) = trimmed.strip_prefix("## Tags") {
-        let lines: Vec<&str> = rest.lines().map(str::trim).filter(|l| !l.is_empty()).collect();
+        let lines: Vec<&str> = rest
+            .lines()
+            .map(str::trim)
+            .filter(|l| !l.is_empty())
+            .collect();
         !lines.is_empty() && lines.iter().all(|l| l.starts_with("- "))
     } else {
         false
@@ -407,7 +411,11 @@ fn is_generated_tags_section(section: &str) -> bool {
 fn is_generated_links_section(section: &str) -> bool {
     let trimmed = section.trim();
     if let Some(rest) = trimmed.strip_prefix("## Links") {
-        let lines: Vec<&str> = rest.lines().map(str::trim).filter(|l| !l.is_empty()).collect();
+        let lines: Vec<&str> = rest
+            .lines()
+            .map(str::trim)
+            .filter(|l| !l.is_empty())
+            .collect();
         !lines.is_empty() && lines.iter().all(|l| l.starts_with("- "))
     } else {
         false
