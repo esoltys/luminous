@@ -70,6 +70,7 @@ vi.mock("@tauri-apps/api/core", () => {
           artists_view_mode: "cards",
           playlists_auto_view_mode: "cards",
           playlists_custom_view_mode: "cards",
+          save_artwork_to_folders: false,
         };
       }
       if (cmd === "open_and_play") {

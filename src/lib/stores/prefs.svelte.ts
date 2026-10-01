@@ -17,6 +17,7 @@ interface UiPreferences {
   fanart_fetch_background: boolean;
   fanart_fetch_album_cover: boolean;
   fanart_fetch_disc_art: boolean;
+  save_artwork_to_folders: boolean;
   albums_view_mode: CollectionViewMode;
   artists_view_mode: CollectionViewMode;
   playlists_auto_view_mode: CollectionViewMode;
@@ -42,6 +43,8 @@ class PrefsStore {
    * an album with no cover of its own. */
   fanartFetchAlbumCover = $state<boolean>(true);
   fanartFetchDiscArt = $state<boolean>(true);
+  /** Save album covers and artist portraits into music folders as cover.jpg/artist.jpg (#1274). Off by default. */
+  saveArtworkToFolders = $state<boolean>(false);
   albumsViewMode = $state<CollectionViewMode>("cards");
   artistsViewMode = $state<CollectionViewMode>("cards");
   playlistsAutoViewMode = $state<CollectionViewMode>("cards");
@@ -69,6 +72,7 @@ class PrefsStore {
     this.fanartFetchBackground = prefs.fanart_fetch_background;
     this.fanartFetchAlbumCover = prefs.fanart_fetch_album_cover;
     this.fanartFetchDiscArt = prefs.fanart_fetch_disc_art;
+    this.saveArtworkToFolders = prefs.save_artwork_to_folders;
     this.albumsViewMode = prefs.albums_view_mode;
     this.artistsViewMode = prefs.artists_view_mode;
     this.playlistsAutoViewMode = prefs.playlists_auto_view_mode;
@@ -96,6 +100,7 @@ class PrefsStore {
       fanart_fetch_background: this.fanartFetchBackground,
       fanart_fetch_album_cover: this.fanartFetchAlbumCover,
       fanart_fetch_disc_art: this.fanartFetchDiscArt,
+      save_artwork_to_folders: this.saveArtworkToFolders,
       albums_view_mode: this.albumsViewMode,
       artists_view_mode: this.artistsViewMode,
       playlists_auto_view_mode: this.playlistsAutoViewMode,
@@ -141,6 +146,11 @@ class PrefsStore {
 
   setFanartFetchDiscArt(enabled: boolean) {
     this.fanartFetchDiscArt = enabled;
+    this.save();
+  }
+
+  setSaveArtworkToFolders(enabled: boolean) {
+    this.saveArtworkToFolders = enabled;
     this.save();
   }
 

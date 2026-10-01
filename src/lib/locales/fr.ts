@@ -492,6 +492,8 @@ export const fr: DeepStringRecord<typeof en> = {
     defaultLibraryChangeFailed: "Impossible de modifier la bibliothèque par défaut.",
     scanOnStartupLabel: "Analyser la bibliothèque au démarrage",
     scanOnStartupHint: "Exécutez automatiquement une réanalyse incrémentielle au lancement de Luminous.",
+    saveArtworkToFoldersLabel: "Enregistrer les illustrations dans les dossiers de musique",
+    saveArtworkToFoldersHint: "Enregistrez les pochettes d'album et les portraits d'artiste directement dans vos dossiers de musique sous les noms cover.jpg et artist.jpg.",
     statsSongs: "Chansons",
     statsAlbums: "Albums",
     statsArtists: "Artistes",

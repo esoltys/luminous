@@ -486,6 +486,8 @@ export const en = {
     defaultLibraryChangeFailed: "Couldn't change the default library.",
     scanOnStartupLabel: "Rescan Library on Startup",
     scanOnStartupHint: "Run an incremental rescan automatically each time Luminous launches.",
+    saveArtworkToFoldersLabel: "Save artwork next to your music",
+    saveArtworkToFoldersHint: "Save album covers and artist portraits directly into your music folders as cover.jpg and artist.jpg.",
     statsSongs: "Songs",
     statsAlbums: "Albums",
     statsArtists: "Artists",

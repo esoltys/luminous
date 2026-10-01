@@ -203,3 +203,12 @@ describe("SettingsFolders.svelte - Default library", () => {
     expect(select.value).toBe("");
   });
 });
+
+describe("SettingsFolders.svelte - Save artwork to folders", () => {
+  it("renders the save artwork to folders toggle", async () => {
+    const { findByLabelText } = render(SettingsFolders);
+    const toggle = await findByLabelText("Save artwork next to your music");
+    expect(toggle).toBeInTheDocument();
+  });
+});
+

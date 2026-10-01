@@ -7,6 +7,7 @@
   import { tasksStore } from "../stores/tasks.svelte";
   import { onMount } from "svelte";
   import { hierarchySidecarStore } from "../stores/hierarchySidecar.svelte";
+  import { prefs } from "../stores/prefs.svelte";
   import { confirm } from "@tauri-apps/plugin-dialog";
   import Toggle from "./Toggle.svelte";
   import Select from "./Select.svelte";
@@ -764,6 +765,18 @@
         checked={collectionStore.scanOnStartup}
         onchange={(v) => collectionStore.setScanOnStartup(v)}
         label={i18n.t('settings.scanOnStartupLabel')}
+      />
+    </div>
+
+    <div class="flex items-center justify-between gap-4">
+      <div class="flex flex-col gap-0.5 min-w-0">
+        <span class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.saveArtworkToFoldersLabel')}</span>
+        <p class="text-xs text-brand-text-secondary text-pretty">{i18n.t('settings.saveArtworkToFoldersHint')}</p>
+      </div>
+      <Toggle
+        checked={prefs.saveArtworkToFolders}
+        onchange={(v) => prefs.setSaveArtworkToFolders(v)}
+        label={i18n.t('settings.saveArtworkToFoldersLabel')}
       />
     </div>
   </div>
