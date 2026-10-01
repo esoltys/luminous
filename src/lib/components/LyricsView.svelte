@@ -13,7 +13,7 @@
   import LoadingSpinner from "./LoadingSpinner.svelte";
   import Button from "./Button.svelte";
   import HelpTip from "./HelpTip.svelte";
-  import { i18n } from "../stores/i18n.svelte";
+  import { i18n, formatNumber } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { rememberScroll } from "../utils/scrollMemory";
   import { parseLrc } from "../utils/lrc";
@@ -28,11 +28,11 @@
 
   // Locale-aware so French reads "+0,5 s"; "always" signs the nudge buttons, "exceptZero" the value.
   function formatOffset(ms: number, signDisplay: "always" | "exceptZero") {
-    const seconds = new Intl.NumberFormat(i18n.currentLocale, {
+    const seconds = formatNumber(ms / 1000, {
       minimumFractionDigits: 1,
       maximumFractionDigits: 1,
       signDisplay,
-    }).format(ms / 1000);
+    });
     return i18n.t('lyrics.offsetSeconds', { seconds });
   }
 

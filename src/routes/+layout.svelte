@@ -132,6 +132,12 @@
     }
   });
 
+  $effect(() => {
+    if (typeof document !== 'undefined') {
+      document.documentElement.lang = i18n.currentLocale;
+    }
+  });
+
   onMount(() => {
     i18n.init();
     prefs.init();

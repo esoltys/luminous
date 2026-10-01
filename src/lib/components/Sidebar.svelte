@@ -4,7 +4,7 @@
   import { playlistsStore } from "../stores/playlists.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { themeStore } from "../stores/theme.svelte";
-  import { i18n } from "../stores/i18n.svelte";
+  import { i18n, formatNumber } from "../stores/i18n.svelte";
   import { updaterStore } from "../stores/updater.svelte";
   import { tagsStore } from "../stores/tags.svelte";
   import { walkthroughStore } from "../stores/walkthrough.svelte";
@@ -155,7 +155,7 @@
               <span class="truncate">{i18n.t('sidebar.artists')}</span>
             </div>
             <span class="text-[10px] text-brand-text-secondary/60 ml-1">
-              ({collectionStore.searchQuery.trim() !== "" ? collectionStore.filteredArtists.length : collectionStore.stats.total_artists})
+              ({formatNumber(collectionStore.searchQuery.trim() !== "" ? collectionStore.filteredArtists.length : collectionStore.stats.total_artists)})
             </span>
           </button>
 
@@ -168,7 +168,7 @@
               <span class="truncate">{i18n.t('sidebar.albums')}</span>
             </div>
             <span class="text-[10px] text-brand-text-secondary/60 ml-1">
-              ({collectionStore.searchQuery.trim() !== "" ? collectionStore.filteredAlbums.length : collectionStore.stats.total_albums})
+              ({formatNumber(collectionStore.searchQuery.trim() !== "" ? collectionStore.filteredAlbums.length : collectionStore.stats.total_albums)})
             </span>
           </button>
 
@@ -181,7 +181,7 @@
               <span class="truncate">{i18n.t('sidebar.songs')}</span>
             </div>
             <span class="text-[10px] text-brand-text-secondary/60 ml-1">
-              ({collectionStore.searchQuery.trim() !== "" ? collectionStore.filteredSongs.length : collectionStore.stats.total_songs})
+              ({formatNumber(collectionStore.searchQuery.trim() !== "" ? collectionStore.filteredSongs.length : collectionStore.stats.total_songs)})
             </span>
           </button>
 
@@ -194,7 +194,7 @@
               <span class="truncate">{i18n.t('sidebar.genres')}</span>
             </div>
             <span class="text-[10px] text-brand-text-secondary/60 ml-1">
-              ({tagsStore.allTags.length})
+              ({formatNumber(tagsStore.allTags.length)})
             </span>
           </button>
         </div>
@@ -228,7 +228,7 @@
               <span class="truncate">{i18n.t('sidebar.playlistsAuto')}</span>
             </div>
             <span class="text-[10px] text-brand-text-secondary/60 ml-1">
-              ({playlistsStore.visibleAutoPlaylistCount})
+              ({formatNumber(playlistsStore.visibleAutoPlaylistCount)})
             </span>
           </button>
 
@@ -241,7 +241,7 @@
               <span class="truncate">{i18n.t('sidebar.playlistsCustom')}</span>
             </div>
             <span class="text-[10px] text-brand-text-secondary/60 ml-1">
-              ({playlistsStore.playlists.filter((p) => (!p.dynamic_enabled || isSmartPlaylistSpec(p.dynamic_spec)) && !p.is_queue).length})
+              ({formatNumber(playlistsStore.playlists.filter((p) => (!p.dynamic_enabled || isSmartPlaylistSpec(p.dynamic_spec)) && !p.is_queue).length)})
             </span>
           </button>
 
@@ -258,7 +258,7 @@
               <span class="truncate">{i18n.t('playerBar.queueTitle', {}, 'Queue')}</span>
             </div>
             <span class="text-[10px] text-brand-text-secondary/60 ml-1">
-              ({playlistsStore.queueTrackCount})
+              ({formatNumber(playlistsStore.queueTrackCount)})
             </span>
           </button>
         </div>

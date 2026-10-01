@@ -5,6 +5,7 @@ import Sidebar from "./Sidebar.svelte";
 import { collectionStore } from "../stores/collection.svelte";
 import { navigationStore } from "../stores/navigation.svelte";
 import { playlistsStore } from "../stores/playlists.svelte";
+import { i18n } from "../stores/i18n.svelte";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockResolvedValue([]),
@@ -17,6 +18,7 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 describe("Sidebar.svelte", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    i18n.currentLocale = "en";
     navigationStore.activeTab = "collection";
     navigationStore.activeSubTab = "songs";
     collectionStore.stats = {
@@ -87,5 +89,16 @@ describe("Sidebar.svelte", () => {
 
     rerender({ width: 200, resizing: true });
     expect(aside).toHaveClass("transition-none");
+  });
+
+  it("formats collection numbers according to the active locale", () => {
+    i18n.currentLocale = "fr";
+    collectionStore.stats = {
+      ...collectionStore.stats,
+      total_songs: 3095,
+    };
+    const { getByRole } = render(Sidebar, { props: { width: 256 } });
+    const songsBtn = getByRole("button", { name: /chansons|songs/i });
+    expect(songsBtn.textContent).toMatch(/3[\s\u202f]095/);
   });
 });

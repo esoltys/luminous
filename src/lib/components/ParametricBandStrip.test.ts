@@ -1,8 +1,9 @@
 import "@testing-library/jest-dom";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent, waitFor } from "@testing-library/svelte";
 import ParametricBandStrip from "./ParametricBandStrip.svelte";
 import type { EqRanges, ParametricBand } from "../types/equalizer";
+import { i18n } from "../stores/i18n.svelte";
 
 const ranges: EqRanges = {
   freq: { min: 20, max: 20000 },
@@ -29,6 +30,10 @@ function setup(bands: ParametricBand[] = [peak(60), peak(1000)]) {
 }
 
 describe("ParametricBandStrip.svelte", () => {
+  beforeEach(() => {
+    i18n.currentLocale = "en";
+  });
+
   it("bounds each input by the backend ranges", () => {
     const { getByLabelText } = setup();
     const freq = getByLabelText("Frequency 1");
@@ -42,11 +47,29 @@ describe("ParametricBandStrip.svelte", () => {
     expect(q).toHaveAttribute("max", "10");
   });
 
-  it("shows f32 values at a readable precision", () => {
+  it("shows f32 values at a readable precision in English", () => {
+    i18n.currentLocale = "en";
     const { getByLabelText } = setup([{ kind: "low_shelf", freq: 31.25, gain_db: -0.800000011920929, q: 0.70710677, enabled: true }]);
-    expect(getByLabelText("Frequency 1")).toHaveValue(31.3);
-    expect(getByLabelText("Gain 1")).toHaveValue(-0.8);
-    expect(getByLabelText(/^Q.* 1$/)).toHaveValue(0.71);
+    expect(getByLabelText("Frequency 1")).toHaveValue("31.3");
+    expect(getByLabelText("Gain 1")).toHaveValue("-0.8");
+    expect(getByLabelText(/^Q.* 1$/)).toHaveValue("0.71");
+  });
+
+  it("shows f32 values localized in French with commas", () => {
+    i18n.currentLocale = "fr";
+    const { getByLabelText } = setup([{ kind: "low_shelf", freq: 31.25, gain_db: -0.800000011920929, q: 0.70710677, enabled: true }]);
+    expect(getByLabelText(/Fréquence.* 1/)).toHaveValue("31,3");
+    expect(getByLabelText(/Gain.* 1/)).toHaveValue("-0,8");
+    expect(getByLabelText(/^Q.* 1$/)).toHaveValue("0,71");
+  });
+
+  it("accepts comma as decimal separator when committing in French", async () => {
+    i18n.currentLocale = "fr";
+    const { getByLabelText, props } = setup([peak(60, 0), peak(1000)]);
+    const gain = getByLabelText("Gain 1") as HTMLInputElement;
+    gain.value = "2,5";
+    await fireEvent.change(gain);
+    expect(props.onchange).toHaveBeenCalledWith(0, peak(60, 2.5));
   });
 
   it("commits on Enter and shows the value the backend echoed", async () => {

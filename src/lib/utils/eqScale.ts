@@ -4,6 +4,7 @@
 // (#1248) — nothing here models a filter.
 
 import type { SettingRange } from "../types/equalizer";
+import { formatNumber } from "../stores/i18n.svelte";
 
 /** Height of the plot's SVG viewBox; y runs 0 (top) to PLOT_HEIGHT. */
 export const PLOT_HEIGHT = 40;
@@ -28,9 +29,9 @@ export function logSpacedFreqs(count: number, range: SettingRange): number[] {
 
 /** Short axis label: 20, 200, 2k, 20k. */
 export function formatFreq(freq: number): string {
-  if (freq >= 10000) return `${(freq / 1000).toFixed(0)}k`;
-  if (freq >= 1000) return `${(freq / 1000).toFixed(1).replace(/\.0$/, "")}k`;
-  return `${Math.round(freq)}`;
+  if (freq >= 10000) return `${formatNumber(freq / 1000, { maximumFractionDigits: 0 })}k`;
+  if (freq >= 1000) return `${formatNumber(freq / 1000, { maximumFractionDigits: 1 })}k`;
+  return `${formatNumber(Math.round(freq), { maximumFractionDigits: 0 })}`;
 }
 
 /** Display precision for an edited frequency: 0.1 Hz in the bass, whole Hz above. */

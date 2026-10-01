@@ -40,6 +40,26 @@ describe("formatters", () => {
   it("formats duration", () => {
     expect(formatDuration(65_000_000_000)).toBe("1:05");
   });
+
+  it("formats file size according to active locale", () => {
+    i18n.currentLocale = "en";
+    expect(formatFileSize(1_342_177_280)).toBe("1.3 GB"); // 1.25 GB rounds to 1.3 with 1 fraction digit
+    expect(formatFileSize(52_428_800)).toBe("50.0 MB");
+
+    i18n.currentLocale = "fr";
+    expect(formatFileSize(1_342_177_280)).toBe("1,3 GB");
+    expect(formatFileSize(52_428_800)).toBe("50,0 MB");
+  });
+
+  it("formats sample rate according to active locale", () => {
+    i18n.currentLocale = "en";
+    expect(formatSampleRate(44100)).toBe("44.1 kHz");
+    expect(formatSampleRate(96000)).toBe("96.0 kHz");
+
+    i18n.currentLocale = "fr";
+    expect(formatSampleRate(44100)).toBe("44,1 kHz");
+    expect(formatSampleRate(96000)).toBe("96,0 kHz");
+  });
 });
 
 describe("formatWindowTitle", () => {

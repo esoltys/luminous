@@ -9,7 +9,7 @@
     ArrowsClockwiseIcon as RefreshCw,
     CaretDownIcon as CaretDown
   } from "phosphor-svelte";
-  import { i18n } from "../stores/i18n.svelte";
+  import { i18n, formatNumber } from "../stores/i18n.svelte";
   import { lyricsStatus } from "../utils/lyrics";
   import { openExternalUrl } from "../utils/openExternalUrl";
   import GenreChips from "./GenreChips.svelte";
@@ -105,10 +105,12 @@
     if (!currentSong?.dynamic_range) return "";
     const parts = [`DR${currentSong.dynamic_range}`];
     if (currentSong.dynamic_range_peak != null) {
-      parts.push(i18n.t('playerBar.dynamicRangePeak', { value: currentSong.dynamic_range_peak.toFixed(1) }, `Peak ${currentSong.dynamic_range_peak.toFixed(1)} dB`));
+      const peakFormatted = formatNumber(currentSong.dynamic_range_peak, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+      parts.push(i18n.t('playerBar.dynamicRangePeak', { value: peakFormatted }, `Peak ${peakFormatted} dB`));
     }
     if (currentSong.dynamic_range_rms != null) {
-      parts.push(i18n.t('playerBar.dynamicRangeRms', { value: currentSong.dynamic_range_rms.toFixed(1) }, `RMS ${currentSong.dynamic_range_rms.toFixed(1)} dB`));
+      const rmsFormatted = formatNumber(currentSong.dynamic_range_rms, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+      parts.push(i18n.t('playerBar.dynamicRangeRms', { value: rmsFormatted }, `RMS ${rmsFormatted} dB`));
     }
     return parts.join(" · ");
   });
@@ -373,7 +375,7 @@
               {#if contextData?.critiquebrainz_rating != null}
                 <div class="flex items-start justify-between gap-3">
                   <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.critiquebrainzRatingLabel', {}, 'Community Rating')}</span>
-                  <span class="text-brand-text-primary text-right">{contextData.critiquebrainz_rating.toFixed(1)} / 5</span>
+                  <span class="text-brand-text-primary text-right">{formatNumber(contextData.critiquebrainz_rating, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} / 5</span>
                 </div>
               {/if}
               {#each contextData?.critiquebrainz_review_links ?? [] as link, i (link)}
@@ -433,7 +435,7 @@
                 <div class="flex items-start justify-between gap-3">
                   <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.mbRatingLabel', {}, 'Community Rating')}</span>
                   <span class="text-brand-text-primary text-right">
-                    {contextData.mb_rating.toFixed(2)} / 5
+                    {formatNumber(contextData.mb_rating, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / 5
                     {#if contextData.mb_rating_votes}
                       <span class="text-brand-text-secondary/60">{i18n.t('playerBar.mbRatingVotes', { count: contextData.mb_rating_votes }, `(${contextData.mb_rating_votes} votes)`)}</span>
                     {/if}

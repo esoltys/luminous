@@ -1,6 +1,6 @@
 <script lang="ts">
   import { tick } from "svelte";
-  import { i18n } from "../stores/i18n.svelte";
+  import { i18n, formatNumber } from "../stores/i18n.svelte";
   import type { EqRanges, ParametricBand, ParametricKind, SettingRange } from "../types/equalizer";
   import {
     PLOT_HEIGHT,
@@ -191,7 +191,7 @@
   }
 
   function formatGain(db: number): string {
-    return `${db > 0 ? "+" : ""}${db.toFixed(1)}`;
+    return `${db > 0 ? "+" : ""}${formatNumber(db, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}`;
   }
 
   function nodeLabel(band: ParametricBand, idx: number): string {
@@ -200,7 +200,7 @@
       type: i18n.t(KIND_LABEL_KEYS[band.kind]),
       freq: `${roundFreq(band.freq)} Hz`,
       gain: formatGain(band.gain_db),
-      q: band.q.toFixed(2),
+      q: formatNumber(band.q, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
     });
   }
 

@@ -1,5 +1,7 @@
 import type { PlayState } from "../types";
-import { i18n } from "../stores/i18n.svelte";
+import { i18n, formatNumber } from "../stores/i18n.svelte";
+
+export { formatNumber };
 
 export function formatDuration(ns: number | undefined): string {
   if (!ns) return "0:00";
@@ -17,14 +19,14 @@ export function formatDate(timestamp?: number): string {
 export function formatFileSize(bytes?: number): string {
   if (!bytes) return "—";
   if (bytes >= 1073741824) {
-    return `${(bytes / 1073741824).toFixed(1)} GB`;
+    return `${formatNumber(bytes / 1073741824, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} GB`;
   }
-  return `${(bytes / 1048576).toFixed(1)} MB`;
+  return `${formatNumber(bytes / 1048576, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} MB`;
 }
 
 export function formatSampleRate(hz?: number): string {
   if (!hz) return "—";
-  return `${(hz / 1000).toFixed(1)} kHz`;
+  return `${formatNumber(hz / 1000, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kHz`;
 }
 
 export function formatBitDepth(bits?: number): string {

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { onMount } from "svelte";
-  import { i18n } from "../stores/i18n.svelte";
+  import { i18n, formatNumber } from "../stores/i18n.svelte";
   import { loudnessStore } from "../stores/loudness.svelte";
   import {
     SlidersIcon as Sliders,
@@ -533,7 +533,7 @@
           />
         {/if}
         <span class="text-xs font-mono font-medium {preamp > 0 ? 'text-green-400' : preamp < 0 ? 'text-red-400' : 'text-brand-text-primary'}">
-          {preamp > 0 ? "+" : ""}{preamp.toFixed(1)} dB
+          {preamp > 0 ? "+" : ""}{formatNumber(preamp, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} dB
         </span>
       </div>
 
@@ -613,7 +613,7 @@
         {#each gains as gain, idx}
           <div class="flex flex-col items-center justify-between h-full group">
             <span class="text-[10px] font-bold w-full text-center transition-colors {gain > 0 ? 'text-green-400/80' : gain < 0 ? 'text-red-400/80' : 'text-brand-text-secondary/70'}">
-              {gain > 0 ? "+" : ""}{gain.toFixed(1)}
+              {gain > 0 ? "+" : ""}{formatNumber(gain, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
             </span>
 
             <div class="h-40 md:h-48 flex items-center justify-center relative">
@@ -821,7 +821,7 @@
           {@const crossfadeRange = ranges.crossfade_auto_duration_secs}
           <div class="flex items-center justify-between text-xs text-brand-text-secondary">
             <span>{i18n.t('fades.crossfadeDuration')}</span>
-            <span class="font-mono font-bold text-brand-text-primary">{crossfadeAutoDurationSecs.toFixed(1)}s</span>
+            <span class="font-mono font-bold text-brand-text-primary">{formatNumber(crossfadeAutoDurationSecs, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}s</span>
           </div>
           <input
             type="range"
@@ -838,7 +838,7 @@
               {#each rangeTicks(crossfadeRange, crossfadeRange.max - crossfadeRange.min) as val}
                 <div class="absolute top-0 flex flex-col items-center -translate-x-1/2" style="left: {((val - crossfadeRange.min) / (crossfadeRange.max - crossfadeRange.min)) * 100}%">
                   <div class="h-1 w-[1px] bg-brand-border mb-0.5"></div>
-                  <span>{val.toFixed(1)}s</span>
+                  <span>{formatNumber(val, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}s</span>
                 </div>
               {/each}
             </div>

@@ -1,11 +1,13 @@
 <script lang="ts">
+  import { formatNumber } from "../stores/i18n.svelte";
+
   let {
     min = 0,
     max = 100,
     step = 1,
     value = $bindable(0),
     label = "",
-    format = (v: number) => v.toFixed(1),
+    format = (v: number) => formatNumber(v, { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
     suffix = "",
     size = 60,
     showValue = true,
