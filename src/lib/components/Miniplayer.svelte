@@ -22,8 +22,11 @@
     DiscIcon as DiscAlbum,
     MicrophoneStageIcon as Mic2,
     PlaylistIcon as ListMusic,
-    MusicNotesIcon as Music
+    MusicNotesIcon as Music,
+    SubtitlesIcon as Lyrics
   } from "phosphor-svelte";
+  import LoadingSpinner from "./LoadingSpinner.svelte";
+  import { parseLrc } from "../utils/lrc";
 
   // Volume slider gradient style (mirrors PlayerBar.svelte's volume control)
   let volumePercent = $derived(playerStore.volume * 100);
@@ -201,6 +204,116 @@
     };
   });
 
+  // View toggle between album artwork and live lyrics
+  let showLyrics = $state<boolean>(
+    typeof window !== "undefined" && localStorage.getItem("miniplayer_show_lyrics") === "true"
+  );
+
+  function toggleLyrics() {
+    showLyrics = !showLyrics;
+    if (typeof window !== "undefined") {
+      localStorage.setItem("miniplayer_show_lyrics", showLyrics ? "true" : "false");
+    }
+  }
+
+  let lyricsText = $state("");
+  let userOffsetMs = $state(0);
+  let isLoading = $state(false);
+  let lyricsContainerEl = $state<HTMLDivElement | null>(null);
+
+  let parsed = $derived(parseLrc(lyricsText, userOffsetMs));
+  let parsedLines = $derived(parsed.lines);
+  let isSynced = $derived(parsedLines.length > 0);
+  let currentMs = $derived(playerStore.positionNanosec / 1_000_000);
+
+  let activeLineIndex = $derived.by(() => {
+    if (!isSynced || parsedLines.length === 0) return -1;
+    let matchIdx = -1;
+    for (let i = 0; i < parsedLines.length; i++) {
+      if (currentMs >= parsedLines[i].timeMs) {
+        matchIdx = i;
+      } else {
+        break;
+      }
+    }
+    return matchIdx;
+  });
+
+  async function loadLyrics(songId: number | undefined) {
+    if (songId === undefined || playerStore.currentSong?.is_instrumental) {
+      lyricsText = "";
+      return;
+    }
+
+    if (playerStore.currentSong?.lyrics) {
+      lyricsText = playerStore.currentSong.lyrics;
+      return;
+    }
+
+    isLoading = true;
+    try {
+      const lyrics = await invoke<string>("get_lyrics", { songId, forceRefresh: false });
+      if (playerStore.currentSong?.id === songId) {
+        lyricsText = lyrics || "";
+        playerStore.currentSong.lyrics = lyrics;
+      }
+    } catch {
+      if (playerStore.currentSong?.id === songId) {
+        lyricsText = "";
+      }
+    } finally {
+      isLoading = false;
+    }
+  }
+
+  async function loadOffset(songId: number | undefined) {
+    userOffsetMs = 0;
+    if (songId === undefined) return;
+    try {
+      const offset = await invoke<number>("get_lyrics_offset", { songId });
+      if (playerStore.currentSong?.id === songId) {
+        userOffsetMs = offset;
+      }
+    } catch {
+      userOffsetMs = 0;
+    }
+  }
+
+  $effect(() => {
+    const songId = playerStore.currentSong?.id;
+    if (songId !== undefined && showLyrics) {
+      loadLyrics(songId);
+      loadOffset(songId);
+    } else if (songId === undefined) {
+      lyricsText = "";
+      userOffsetMs = 0;
+    }
+  });
+
+  $effect(() => {
+    if (showLyrics && playerStore.currentSong?.id !== undefined && !lyricsText && !isLoading) {
+      loadLyrics(playerStore.currentSong.id);
+      loadOffset(playerStore.currentSong.id);
+    }
+  });
+
+  let didInitialScroll = false;
+  $effect(() => {
+    playerStore.currentSong?.id;
+    didInitialScroll = false;
+  });
+
+  $effect(() => {
+    if (showLyrics && activeLineIndex !== -1 && lyricsContainerEl) {
+      const activeEl = lyricsContainerEl.querySelector(`[data-index="${activeLineIndex}"]`);
+      if (activeEl) {
+        const behavior = didInitialScroll ? "smooth" : "auto";
+        activeEl.scrollIntoView({ behavior, block: "center" });
+        didInitialScroll = true;
+      }
+    }
+  });
+
 </script>
 
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
@@ -250,16 +363,75 @@
 
   <!-- IDLE STATIC LAYOUT -->
   <div class="relative z-10 w-full h-full flex flex-col items-center justify-between pointer-events-auto">
-    <div class="flex-1 w-full flex items-center justify-center min-h-0 py-2">
-      <div class="relative aspect-square h-full max-h-full max-w-[90%] rounded-none overflow-hidden border border-brand-border/30 bg-brand-sidebar flex items-center justify-center {isHovered ? 'scale-[0.98]' : ''} transition-transform duration-300">
-        <CoverArt
-          songId={playerStore.currentSong?.id}
-          artEmbedded={playerStore.currentSong?.art_embedded}
-          artAutomatic={playerStore.currentSong?.art_automatic}
-          artManual={playerStore.currentSong?.art_manual}
-          sizeClass="w-full h-full object-cover"
-        />
-      </div>
+    <div class="flex-1 w-full flex items-center justify-center min-h-0 py-2 overflow-hidden">
+      {#if showLyrics}
+        <div
+          bind:this={lyricsContainerEl}
+          class="lyrics-container w-full h-full overflow-y-auto px-3 py-6 flex flex-col items-center text-center select-none"
+        >
+          {#if isLoading}
+            <div class="flex-1 flex flex-col items-center justify-center gap-2 text-brand-text-secondary/60">
+              <LoadingSpinner label={i18n.t('lyrics.fetching', {}, 'Fetching lyrics...')} />
+            </div>
+          {:else if playerStore.currentSong?.is_instrumental}
+            <div class="flex-1 flex flex-col items-center justify-center gap-2 p-4 text-center">
+              <div class="p-3 rounded-full bg-brand-sidebar/70 border border-brand-border/40 text-brand-accent">
+                <Music class="w-6 h-6" />
+              </div>
+              <p class="text-xs font-semibold text-brand-text-primary">
+                {i18n.t('lyrics.instrumentalTitle', {}, 'Instrumental Track')}
+              </p>
+              <p class="text-[11px] text-brand-text-secondary/70 max-w-xs">
+                {i18n.t('lyrics.instrumentalDesc', {}, 'This track is marked as instrumental. Online lyrics search is bypassed.')}
+              </p>
+            </div>
+          {:else if isSynced}
+            <div class="flex flex-col gap-4 py-16 w-full">
+              {#each parsedLines as line, idx}
+                {@const isActive = idx === activeLineIndex}
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+                <p
+                  data-index={idx}
+                  dir="auto"
+                  onclick={() => playerStore.seek(line.timeMs * 1_000_000)}
+                  class="text-sm font-bold transition-all duration-300 transform px-2 text-balance leading-relaxed cursor-pointer {isActive ? 'text-brand-text-primary scale-105 filter drop-shadow-[0_0_8px_var(--color-brand-accent)] font-extrabold' : 'text-brand-text-secondary/35 hover:text-brand-text-secondary/60'}"
+                >
+                  {#if isActive && line.words && line.words.length > 0}
+                    {#each line.words as word}
+                      {@const isWordSung = currentMs >= word.timeMs}
+                      <span
+                        class="inline-block whitespace-pre-wrap transition-all duration-150 {isWordSung ? 'text-brand-text-primary opacity-100 filter drop-shadow-[0_0_6px_var(--color-brand-accent)]' : 'text-brand-text-primary/40 opacity-40'}"
+                      >{word.text}</span>
+                    {/each}
+                  {:else}
+                    {line.text || "•••"}
+                  {/if}
+                </p>
+              {/each}
+            </div>
+          {:else}
+            <div class="flex-1 flex flex-col items-center justify-center gap-2 p-4 text-center">
+              <div class="p-3 rounded-full bg-brand-sidebar/50 border border-brand-border/30 text-brand-text-secondary/50">
+                <Lyrics class="w-6 h-6 stroke-[1.5]" />
+              </div>
+              <p class="text-xs font-medium text-brand-text-secondary/70">
+                {i18n.t('miniplayer.noLiveLyrics')}
+              </p>
+            </div>
+          {/if}
+        </div>
+      {:else}
+        <div class="relative aspect-square h-full max-h-full max-w-[90%] rounded-none overflow-hidden border border-brand-border/30 bg-brand-sidebar flex items-center justify-center {isHovered ? 'scale-[0.98]' : ''} transition-transform duration-300">
+          <CoverArt
+            songId={playerStore.currentSong?.id}
+            artEmbedded={playerStore.currentSong?.art_embedded}
+            artAutomatic={playerStore.currentSong?.art_automatic}
+            artManual={playerStore.currentSong?.art_manual}
+            sizeClass="w-full h-full object-cover"
+          />
+        </div>
+      {/if}
     </div>
 
     <div class="w-full text-center px-2 py-1 flex flex-col items-center justify-center flex-shrink-0">
@@ -408,13 +580,24 @@
         />
       </div>
 
-      <button
-        onclick={() => windowLayoutStore.exitMiniplayerMode()}
-        class="p-1 text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-border/40 rounded transition-colors"
-        title={i18n.t('miniplayer.exit', {}, 'Restore Full Window (Ctrl+M)')}
-      >
-        <Maximize2 class="w-3.5 h-3.5" />
-      </button>
+      <div class="flex items-center gap-1">
+        <button
+          onclick={toggleLyrics}
+          class="p-1 rounded transition-colors {showLyrics ? 'text-brand-accent-text hover:text-brand-accent-text bg-brand-border/40 font-bold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-border/40'}"
+          title={showLyrics ? i18n.t('miniplayer.showCoverArt') : i18n.t('miniplayer.showLyrics')}
+          aria-label={showLyrics ? i18n.t('miniplayer.showCoverArt') : i18n.t('miniplayer.showLyrics')}
+        >
+          <Lyrics class="w-3.5 h-3.5" />
+        </button>
+
+        <button
+          onclick={() => windowLayoutStore.exitMiniplayerMode()}
+          class="p-1 text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-border/40 rounded transition-colors"
+          title={i18n.t('miniplayer.exit', {}, 'Restore Full Window (Ctrl+M)')}
+        >
+          <Maximize2 class="w-3.5 h-3.5" />
+        </button>
+      </div>
     </div>
   </div>
 </div>
@@ -475,5 +658,14 @@
 
   .volume-slider::-moz-range-thumb:hover {
     border-color: var(--color-accent-hover);
+  }
+
+  .lyrics-container {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .lyrics-container::-webkit-scrollbar {
+    display: none;
   }
 </style>
