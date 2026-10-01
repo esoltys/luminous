@@ -586,7 +586,10 @@ fn build_pool(
     db_path: &std::path::Path,
 ) -> Result<Pool<SqliteConnectionManager>> {
     rusqlite::Connection::open(db_path)
-        .and_then(|conn| conn.execute_batch("PRAGMA journal_mode=WAL;"))
+        .and_then(|conn| {
+            conn.busy_timeout(std::time::Duration::from_millis(5000))?;
+            conn.execute_batch("PRAGMA journal_mode=WAL;")
+        })
         .context("failed to switch database to WAL mode")?;
 
     let manager = SqliteConnectionManager::file(db_path).with_init(|conn| {
@@ -2300,6 +2303,7 @@ mod tests {
             )
             .unwrap();
         }
+        drop(db);
 
         // Reopening runs migrations forward, including the new migration 19.
         let db = Database::new(temp_dir.clone()).unwrap();
@@ -2335,6 +2339,8 @@ mod tests {
             "the discarded playlist's items must go with it"
         );
 
+        drop(conn);
+        drop(db);
         let _ = std::fs::remove_dir_all(temp_dir);
     }
 
