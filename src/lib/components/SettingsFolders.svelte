@@ -281,6 +281,10 @@
         return i18n.t('settings.phaseDiscovering');
       case "reading_tags":
         return i18n.t('settings.phaseReadingTags');
+      case "checking_missing":
+        return i18n.t('settings.phaseCheckingMissing');
+      case "resolving_artwork":
+        return i18n.t('settings.phaseResolvingArtwork');
       case "updating":
         return i18n.t('settings.phaseUpdating');
       case "done":

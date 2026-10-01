@@ -444,6 +444,8 @@ export const fr: DeepStringRecord<typeof en> = {
     scanningPhase: "Phase : {phase}",
     phaseDiscovering: "Découverte des fichiers",
     phaseReadingTags: "Lecture des étiquettes",
+    phaseCheckingMissing: "Vérification des pistes manquantes",
+    phaseResolvingArtwork: "Résolution des pochettes",
     phaseUpdating: "Mise à jour de la bibliothèque",
     phaseDone: "Terminé",
     incrementalRescanBtn: "Réanalyser la bibliothèque",
@@ -1618,7 +1620,12 @@ export const fr: DeepStringRecord<typeof en> = {
     savingTagsCount: "Enregistrement des balises ({current}/{total})…",
     albumTagsSaved: "Balises enregistrées pour {album}",
     libraryScan: "Actualisation de la bibliothèque",
-    libraryScanDone: "Bibliothèque actualisée"
+    libraryScanDone: "Bibliothèque actualisée",
+    scanPhaseDiscovering: "découverte des fichiers",
+    scanPhaseReadingTags: "lecture des étiquettes",
+    scanPhaseCheckingMissing: "vérification des pistes manquantes",
+    scanPhaseResolvingArtwork: "résolution des pochettes",
+    scanPhaseUpdating: "mise à jour de la bibliothèque"
   },
   audioPipeline: {
     title: "Chaîne audio",

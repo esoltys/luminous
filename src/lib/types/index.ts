@@ -377,7 +377,13 @@ export interface TagBatchProgressPayload {
   done: boolean;
 }
 
-export type ScanPhase = "discovering" | "reading_tags" | "updating" | "done";
+export type ScanPhase =
+  | "discovering"
+  | "reading_tags"
+  | "checking_missing"
+  | "resolving_artwork"
+  | "updating"
+  | "done";
 
 export interface ScanProgress {
   phase: ScanPhase;
@@ -385,6 +391,8 @@ export interface ScanProgress {
   total: number;
   current_path?: string;
   silent: boolean;
+  directory_name?: string;
+  directory_id?: number;
 }
 
 export type BatchPhase = "removing" | "adding" | "done";

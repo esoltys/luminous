@@ -438,6 +438,8 @@ export const en = {
     scanningPhase: "Phase: {phase}",
     phaseDiscovering: "Discovering Files",
     phaseReadingTags: "Reading Tags",
+    phaseCheckingMissing: "Checking Missing Tracks",
+    phaseResolvingArtwork: "Resolving Artwork",
     phaseUpdating: "Updating Library",
     phaseDone: "Done",
     incrementalRescanBtn: "Rescan Library",
@@ -1610,7 +1612,12 @@ export const en = {
     savingTagsCount: "Saving tags ({current}/{total})…",
     albumTagsSaved: "Saved tags for {album}",
     libraryScan: "Refreshing library",
-    libraryScanDone: "Library refreshed"
+    libraryScanDone: "Library refreshed",
+    scanPhaseDiscovering: "discovering files",
+    scanPhaseReadingTags: "reading tags",
+    scanPhaseCheckingMissing: "checking missing tracks",
+    scanPhaseResolvingArtwork: "resolving artwork",
+    scanPhaseUpdating: "updating library"
   },
   audioPipeline: {
     title: "Audio Pipeline",

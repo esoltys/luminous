@@ -30,6 +30,7 @@ interface UpdateTaskOptions {
   label?: string;
   status?: TaskStatus;
   error?: string;
+  contextName?: string;
 }
 
 const DEFAULT_AGE_OUT_MS = 8000;
@@ -101,6 +102,7 @@ class TasksStore {
     if (update.error !== undefined) task.error = update.error;
     if (update.current !== undefined) task.current = update.current;
     if (update.total !== undefined) task.total = update.total;
+    if (update.contextName !== undefined) task.contextName = update.contextName;
 
     if (update.progress !== undefined) {
       task.progress = Math.max(0, Math.min(1, update.progress));

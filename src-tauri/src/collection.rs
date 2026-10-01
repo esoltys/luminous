@@ -206,6 +206,47 @@ pub(crate) fn is_subsonic_song_orphaned(
     }
 }
 
+/// Derives the display name for a watched music directory.
+/// Prefers `dir.nickname` if non-empty; falls back to the folder name
+/// (the last path segment of its path), or the full path if no segment.
+pub fn directory_display_name(dir: &MusicDirectory) -> String {
+    if let Some(ref nick) = dir.nickname {
+        let trimmed = nick.trim();
+        if !trimmed.is_empty() {
+            return trimmed.to_string();
+        }
+    }
+    let p = Path::new(&dir.path);
+    p.file_name()
+        .map(|f| f.to_string_lossy().to_string())
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| dir.path.clone())
+}
+
+/// Matches `path` against known `dirs` to find the owning directory's ID and display name.
+/// Falls back to the parent folder's name if no watched directory matches.
+pub fn resolve_path_directory(path: &Path, dirs: &[MusicDirectory]) -> (Option<i64>, Option<String>) {
+    if let Some(dir) = dirs.iter().find(|d| {
+        path.starts_with(Path::new(&d.path))
+            || path
+                .to_string_lossy()
+                .to_lowercase()
+                .replace('\\', "/")
+                .starts_with(&d.path.to_lowercase().replace('\\', "/"))
+    }) {
+        return (Some(dir.id), Some(directory_display_name(dir)));
+    }
+    if dirs.len() == 1 {
+        return (Some(dirs[0].id), Some(directory_display_name(&dirs[0])));
+    }
+    let parent_name = path
+        .parent()
+        .and_then(|p| p.file_name())
+        .map(|f| f.to_string_lossy().to_string())
+        .filter(|s| !s.trim().is_empty());
+    (None, parent_name)
+}
+
 impl CollectionScanner {
     pub fn new(db: Arc<Database>) -> Self {
         Self { db }
@@ -824,9 +865,17 @@ impl CollectionScanner {
                 total: 0,
                 current_path: None,
                 silent,
+                directory_name: None,
+                directory_id: None,
             });
             return Ok(());
         }
+
+        let default_dir_context = if dirs.len() == 1 {
+            (Some(dirs[0].id), Some(directory_display_name(&dirs[0])))
+        } else {
+            (None, None)
+        };
 
         // Phase 1: discover all files
         on_progress(ScanProgress {
@@ -835,11 +884,23 @@ impl CollectionScanner {
             total: 0,
             current_path: None,
             silent,
+            directory_name: default_dir_context.1.clone(),
+            directory_id: default_dir_context.0,
         });
 
         let mut all_paths: Vec<PathBuf> = Vec::new();
         let mut cue_paths: Vec<PathBuf> = Vec::new();
         for dir in &dirs {
+            let dir_name = directory_display_name(dir);
+            on_progress(ScanProgress {
+                phase: ScanPhase::Discovering,
+                scanned: all_paths.len() as u64,
+                total: 0,
+                current_path: Some(dir.path.clone()),
+                silent,
+                directory_name: Some(dir_name),
+                directory_id: Some(dir.id),
+            });
             let walker = WalkDir::new(&dir.path)
                 .follow_links(true)
                 .into_iter()
@@ -882,6 +943,8 @@ impl CollectionScanner {
             total,
             current_path: None,
             silent,
+            directory_name: default_dir_context.1.clone(),
+            directory_id: default_dir_context.0,
         });
 
         let mut scanned = 0u64;
@@ -928,12 +991,15 @@ impl CollectionScanner {
                     if known_mtimes.get(&path_str) == Some(&mtime) {
                         scanned += 1;
                         if scanned.is_multiple_of(SCAN_PROGRESS_INTERVAL as u64) {
+                            let (dir_id, dir_name) = resolve_path_directory(path, &dirs);
                             on_progress(ScanProgress {
                                 phase: ScanPhase::ReadingTags,
                                 scanned,
                                 total,
                                 current_path: Some(path_str),
                                 silent,
+                                directory_name: dir_name,
+                                directory_id: dir_id,
                             });
                         }
                         continue;
@@ -989,12 +1055,19 @@ impl CollectionScanner {
                         last_path = Some(path);
                     }
 
+                    let (dir_id, dir_name) = last_path
+                        .as_ref()
+                        .map(|p| resolve_path_directory(p, &dirs))
+                        .unwrap_or_else(|| default_dir_context.clone());
+
                     on_progress(ScanProgress {
                         phase: ScanPhase::ReadingTags,
                         scanned,
                         total,
                         current_path: last_path.map(|p| p.to_string_lossy().to_string()),
                         silent,
+                        directory_name: dir_name,
+                        directory_id: dir_id,
                     });
                 }
 
@@ -1035,12 +1108,15 @@ impl CollectionScanner {
 
                     scanned += 1;
                     if scanned.is_multiple_of(SCAN_PROGRESS_INTERVAL as u64) || scanned == total {
+                        let (cue_dir_id, cue_dir_name) = resolve_path_directory(&job.cue_path, &dirs);
                         on_progress(ScanProgress {
                             phase: ScanPhase::ReadingTags,
                             scanned,
                             total,
                             current_path: Some(job.cue_path.to_string_lossy().to_string()),
                             silent,
+                            directory_name: cue_dir_name,
+                            directory_id: cue_dir_id,
                         });
                     }
                 }
@@ -1058,16 +1134,18 @@ impl CollectionScanner {
             }
         }
 
-        // Tag reading is finished — switch to the Updating phase before the
+        // Tag reading is finished — switch to the CheckingMissing phase before the
         // maintenance passes below (missing-file check, DR logs, artwork
         // query), which can take a while on a large library and would
         // otherwise run under a stale "Reading Tags" label (#1243).
         on_progress(ScanProgress {
-            phase: ScanPhase::Updating,
+            phase: ScanPhase::CheckingMissing,
             scanned: total,
             total,
             current_path: None,
             silent,
+            directory_name: default_dir_context.1.clone(),
+            directory_id: default_dir_context.0,
         });
 
         // Mark songs from these directories that no longer exist as unavailable.
@@ -1151,12 +1229,16 @@ impl CollectionScanner {
                 format!("Cover art: {file_name}")
             };
 
+            let (art_dir_id, art_dir_name) = resolve_path_directory(Path::new(&path_str), &dirs);
+
             on_progress(ScanProgress {
-                phase: ScanPhase::Updating,
+                phase: ScanPhase::ResolvingArtwork,
                 scanned: updating_scanned,
                 total: total_updating_items,
                 current_path: Some(display_desc),
                 silent,
+                directory_name: art_dir_name,
+                directory_id: art_dir_id,
             });
 
             let path = Path::new(&path_str);
@@ -1240,6 +1322,8 @@ impl CollectionScanner {
             total,
             current_path: None,
             silent,
+            directory_name: default_dir_context.1,
+            directory_id: default_dir_context.0,
         });
 
         Ok(())
@@ -2484,9 +2568,59 @@ mod tests {
             let phases: Vec<ScanPhase> = events.iter().map(|p| p.phase).collect();
             let rank = |p: &ScanPhase| *p as u8;
             assert!(phases.windows(2).all(|w| rank(&w[0]) <= rank(&w[1])));
-            assert!(phases.contains(&ScanPhase::Updating));
+            assert!(phases.contains(&ScanPhase::CheckingMissing));
             assert_eq!(phases.last(), Some(&ScanPhase::Done));
+            assert!(events.iter().any(|p| p.directory_name.as_deref() == Some("music")));
         }
+    }
+
+    #[test]
+    fn test_directory_display_name_and_resolution() {
+        let dir_with_nickname = MusicDirectory {
+            id: 1,
+            path: "/path/to/my_music".to_string(),
+            subdirs: true,
+            is_available: true,
+            nickname: Some("Fast SSD".to_string()),
+            icon: None,
+            color: None,
+        };
+        assert_eq!(directory_display_name(&dir_with_nickname), "Fast SSD");
+
+        let dir_with_empty_nickname = MusicDirectory {
+            id: 2,
+            path: "/path/to/ambient".to_string(),
+            subdirs: true,
+            is_available: true,
+            nickname: Some("   ".to_string()),
+            icon: None,
+            color: None,
+        };
+        assert_eq!(directory_display_name(&dir_with_empty_nickname), "ambient");
+
+        let dir_without_nickname = MusicDirectory {
+            id: 3,
+            path: "/path/to/nas_storage".to_string(),
+            subdirs: true,
+            is_available: true,
+            nickname: None,
+            icon: None,
+            color: None,
+        };
+        assert_eq!(directory_display_name(&dir_without_nickname), "nas_storage");
+
+        let dirs = vec![dir_with_nickname, dir_without_nickname];
+        let (id1, name1) = resolve_path_directory(Path::new("/path/to/my_music/album/song.flac"), &dirs);
+        assert_eq!(id1, Some(1));
+        assert_eq!(name1, Some("Fast SSD".to_string()));
+
+        let (id2, name2) = resolve_path_directory(Path::new("/path/to/nas_storage/artist/track.mp3"), &dirs);
+        assert_eq!(id2, Some(3));
+        assert_eq!(name2, Some("nas_storage".to_string()));
+
+        let (id_orphan, name_orphan) = resolve_path_directory(Path::new("/other/folder/external.wav"), &dirs);
+        assert_eq!(id_orphan, None);
+        assert_eq!(name_orphan, Some("folder".to_string()));
     }
 
     #[tokio::test]
