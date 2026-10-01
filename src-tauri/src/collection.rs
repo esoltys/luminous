@@ -225,7 +225,10 @@ pub fn directory_display_name(dir: &MusicDirectory) -> String {
 
 /// Matches `path` against known `dirs` to find the owning directory's ID and display name.
 /// Falls back to the parent folder's name if no watched directory matches.
-pub fn resolve_path_directory(path: &Path, dirs: &[MusicDirectory]) -> (Option<i64>, Option<String>) {
+pub fn resolve_path_directory(
+    path: &Path,
+    dirs: &[MusicDirectory],
+) -> (Option<i64>, Option<String>) {
     if let Some(dir) = dirs.iter().find(|d| {
         path.starts_with(Path::new(&d.path))
             || path
@@ -1108,7 +1111,8 @@ impl CollectionScanner {
 
                     scanned += 1;
                     if scanned.is_multiple_of(SCAN_PROGRESS_INTERVAL as u64) || scanned == total {
-                        let (cue_dir_id, cue_dir_name) = resolve_path_directory(&job.cue_path, &dirs);
+                        let (cue_dir_id, cue_dir_name) =
+                            resolve_path_directory(&job.cue_path, &dirs);
                         on_progress(ScanProgress {
                             phase: ScanPhase::ReadingTags,
                             scanned,
@@ -2570,7 +2574,9 @@ mod tests {
             assert!(phases.windows(2).all(|w| rank(&w[0]) <= rank(&w[1])));
             assert!(phases.contains(&ScanPhase::CheckingMissing));
             assert_eq!(phases.last(), Some(&ScanPhase::Done));
-            assert!(events.iter().any(|p| p.directory_name.as_deref() == Some("music")));
+            assert!(events
+                .iter()
+                .any(|p| p.directory_name.as_deref() == Some("music")));
         }
     }
 
@@ -2610,15 +2616,18 @@ mod tests {
         assert_eq!(directory_display_name(&dir_without_nickname), "nas_storage");
 
         let dirs = vec![dir_with_nickname, dir_without_nickname];
-        let (id1, name1) = resolve_path_directory(Path::new("/path/to/my_music/album/song.flac"), &dirs);
+        let (id1, name1) =
+            resolve_path_directory(Path::new("/path/to/my_music/album/song.flac"), &dirs);
         assert_eq!(id1, Some(1));
         assert_eq!(name1, Some("Fast SSD".to_string()));
 
-        let (id2, name2) = resolve_path_directory(Path::new("/path/to/nas_storage/artist/track.mp3"), &dirs);
+        let (id2, name2) =
+            resolve_path_directory(Path::new("/path/to/nas_storage/artist/track.mp3"), &dirs);
         assert_eq!(id2, Some(3));
         assert_eq!(name2, Some("nas_storage".to_string()));
 
-        let (id_orphan, name_orphan) = resolve_path_directory(Path::new("/other/folder/external.wav"), &dirs);
+        let (id_orphan, name_orphan) =
+            resolve_path_directory(Path::new("/other/folder/external.wav"), &dirs);
         assert_eq!(id_orphan, None);
         assert_eq!(name_orphan, Some("folder".to_string()));
     }
