@@ -19,6 +19,7 @@
     onclick?: (e: MouseEvent) => void;
     ondblclick?: (e: MouseEvent) => void;
     oncontextmenu?: (e: MouseEvent) => void;
+    onRate?: (rating: number) => void;
   }
 
   let {
@@ -29,7 +30,15 @@
     onclick: customClick,
     ondblclick: customDblClick,
     oncontextmenu: customContextMenu,
+    onRate,
   }: Props = $props();
+
+  // svelte-ignore state_referenced_locally
+  let currentRating = $state(album.rating);
+
+  $effect(() => {
+    currentRating = album.rating;
+  });
 
   function handleCardClick(e: MouseEvent) {
     if (customClick) {
@@ -49,7 +58,10 @@
 
   async function rateAlbum(rating: number) {
     if (!album.album) return;
-    album.rating = await invoke<number>("set_album_rating", { album: album.album, rating });
+    const normalized = await invoke<number>("set_album_rating", { album: album.album, rating });
+    album.rating = normalized;
+    currentRating = normalized;
+    onRate?.(normalized);
   }
 </script>
 
@@ -68,7 +80,7 @@
       covers={covers && covers.length > 0 ? covers : [{ artEmbedded: album.art_embedded, artAutomatic: album.art_automatic, artManual: album.art_manual }]}
       sizeClass={covers && covers.length > 1 ? "w-24 h-24" : "w-full h-full"}
     />
-    {#if album.rating === 5}
+    {#if currentRating === 5}
       <FavouriteCornerFlag size="md" />
     {/if}
     {#if album.disc_count > 1}
@@ -103,7 +115,7 @@
     </div>
     <div class="flex items-center justify-between mt-0.5 gap-2">
       <div class="min-w-0"><GenreChips genre={album.genre} /></div>
-      <span class="shrink-0"><SongRating rating={album.rating} onRate={rateAlbum} size="sm" /></span>
+      <span class="shrink-0"><SongRating rating={currentRating} onRate={rateAlbum} size="sm" /></span>
     </div>
   </div>
   <div class="absolute inset-0 rounded-b-xl ring-2 ring-inset ring-transparent group-hover:ring-brand-accent transition-[box-shadow] duration-200 pointer-events-none"></div>

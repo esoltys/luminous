@@ -14,6 +14,7 @@
     onclick?: (e: MouseEvent) => void;
     ondblclick?: (e: MouseEvent) => void;
     oncontextmenu?: (e: MouseEvent) => void;
+    onRate?: (rating: number) => void;
     prefix?: import("svelte").Snippet;
     suffix?: import("svelte").Snippet;
   }
@@ -23,9 +24,17 @@
     onclick: customClick,
     ondblclick: customDblClick,
     oncontextmenu: customContextMenu,
+    onRate,
     prefix,
     suffix,
   }: Props = $props();
+
+  // svelte-ignore state_referenced_locally
+  let currentRating = $state(album.rating);
+
+  $effect(() => {
+    currentRating = album.rating;
+  });
 
   function handleClick(e: MouseEvent) {
     if (customClick) {
@@ -45,7 +54,10 @@
 
   async function rateAlbum(rating: number) {
     if (!album.album) return;
-    album.rating = await invoke<number>("set_album_rating", { album: album.album, rating });
+    const normalized = await invoke<number>("set_album_rating", { album: album.album, rating });
+    album.rating = normalized;
+    currentRating = normalized;
+    onRate?.(normalized);
   }
 </script>
 
@@ -72,7 +84,7 @@
       artManual={album.art_manual}
       sizeClass="w-11 h-11"
     />
-    {#if album.rating === 5}
+    {#if currentRating === 5}
       <FavouriteCornerFlag size="sm" />
     {/if}
   </div>
@@ -84,7 +96,7 @@
     </div>
     <div class="flex items-center justify-between gap-2">
       <p class="truncate text-xs text-brand-text-secondary font-medium min-w-0">{album.artist || i18n.t('collection.variousArtists')}</p>
-      <span class="shrink-0" onclick={(e) => e.stopPropagation()}><SongRating rating={album.rating} onRate={rateAlbum} size="sm" /></span>
+      <span class="shrink-0" onclick={(e) => e.stopPropagation()}><SongRating rating={currentRating} onRate={rateAlbum} size="sm" /></span>
     </div>
   </div>
 
