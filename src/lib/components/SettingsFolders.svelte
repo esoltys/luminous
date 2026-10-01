@@ -20,7 +20,7 @@
   import { combineWebdavPath } from "../webdavDisplay";
   import { stripEnclosingQuotes } from "../utils/filterParser";
   import { getDirectoryDisplayName } from "../utils/pathUtils";
-  import { formatFileSize } from "../utils/formatters";
+  import { formatFileSize, formatNumber } from "../utils/formatters";
   import { invoke } from "@tauri-apps/api/core";
   import {
     FolderIcon as Folder,
@@ -120,11 +120,11 @@
   // breaks the total down (values come from get_library_stats).
   // GB at the headline's two decimals so the parts visibly add up to it.
   const formatDiskSize = (bytes: number) =>
-    bytes >= 1073741824 ? `${(bytes / 1073741824).toFixed(2)} GB` : formatFileSize(bytes);
+    bytes >= 1073741824 ? `${formatNumber(bytes / 1073741824, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} GB` : formatFileSize(bytes);
   const diskSizeLabel = $derived.by(() => {
     const { total_filesize_bytes, album_art_bytes, artist_art_bytes } = collectionStore.stats;
     const total = total_filesize_bytes + (album_art_bytes ?? 0) + (artist_art_bytes ?? 0);
-    return `${(total / 1073741824).toFixed(2)} GB`;
+    return `${formatNumber(total / 1073741824, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} GB`;
   });
   const diskSizeBreakdown = $derived(
     [
@@ -777,15 +777,15 @@
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
     <div class="bg-brand-main/40 border border-brand-border rounded-lg p-3">
       <span class="text-xs text-brand-text-secondary uppercase font-semibold">{i18n.t('settings.statsSongs')}</span>
-      <p class="text-base font-bold text-brand-text-primary mt-0.5">{collectionStore.stats.total_songs.toLocaleString()}</p>
+      <p class="text-base font-bold text-brand-text-primary mt-0.5">{formatNumber(collectionStore.stats.total_songs)}</p>
     </div>
     <div class="bg-brand-main/40 border border-brand-border rounded-lg p-3">
       <span class="text-xs text-brand-text-secondary uppercase font-semibold">{i18n.t('settings.statsAlbums')}</span>
-      <p class="text-base font-bold text-brand-text-primary mt-0.5">{collectionStore.stats.total_albums.toLocaleString()}</p>
+      <p class="text-base font-bold text-brand-text-primary mt-0.5">{formatNumber(collectionStore.stats.total_albums)}</p>
     </div>
     <div class="bg-brand-main/40 border border-brand-border rounded-lg p-3">
       <span class="text-xs text-brand-text-secondary uppercase font-semibold">{i18n.t('settings.statsArtists')}</span>
-      <p class="text-base font-bold text-brand-text-primary mt-0.5">{collectionStore.stats.total_artists.toLocaleString()}</p>
+      <p class="text-base font-bold text-brand-text-primary mt-0.5">{formatNumber(collectionStore.stats.total_artists)}</p>
     </div>
     <HelpTip
       text={diskSizeBreakdown}

@@ -1,0 +1,14 @@
+id: no-to-fixed-in-svelte
+snapshots:
+  <script lang="ts">const x = (12.3).toFixed(1);</script>:
+    labels:
+    - source: const x = (12.3).toFixed(1);
+      style: primary
+      start: 18
+      end: 46
+  <span>{val.toFixed(1)}</span>:
+    labels:
+    - source: '{val.toFixed(1)}'
+      style: primary
+      start: 6
+      end: 22

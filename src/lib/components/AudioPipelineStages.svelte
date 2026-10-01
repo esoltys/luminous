@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { AudioPipelineInfo } from '$lib/types';
-  import { i18n } from '$lib/stores/i18n.svelte';
+  import { i18n, formatNumber } from '$lib/stores/i18n.svelte';
   import {
     CpuIcon as Cpu,
     SlidersIcon as Sliders,
@@ -24,7 +24,8 @@
 
   function formatSampleRate(rate?: number): string {
     if (!rate) return '—';
-    return `${(rate / 1000).toFixed(rate % 1000 === 0 ? 0 : 1)} kHz`;
+    const digits = rate % 1000 === 0 ? 0 : 1;
+    return `${formatNumber(rate / 1000, { minimumFractionDigits: digits, maximumFractionDigits: digits })} kHz`;
   }
 
   function getQualityTierLabel(tier: string): string {
@@ -140,7 +141,9 @@
           <span class="text-brand-text-secondary font-medium">{i18n.t('audioPipeline.volumeNormalization', {}, 'Volume Normalization')}</span>
           <span class="font-semibold text-right text-brand-text-primary">
             {#if pipeline.loudness_source !== 'disabled'}
-              {i18n.t('audioPipeline.normalizationGain', { gain: ((pipeline.loudness_gain_db ?? 0) >= 0 ? `+${(pipeline.loudness_gain_db ?? 0).toFixed(1)}` : (pipeline.loudness_gain_db ?? 0).toFixed(1)), source: pipeline.loudness_source }, `${(pipeline.loudness_gain_db ?? 0) >= 0 ? '+' : ''}${(pipeline.loudness_gain_db ?? 0).toFixed(1)} dB (${pipeline.loudness_source})`)}
+              {@const gain = pipeline.loudness_gain_db ?? 0}
+              {@const formattedGain = `${gain >= 0 ? '+' : ''}${formatNumber(gain, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}`}
+              {i18n.t('audioPipeline.normalizationGain', { gain: formattedGain, source: pipeline.loudness_source }, `${formattedGain} dB (${pipeline.loudness_source})`)}
             {:else}
               {i18n.t('audioPipeline.normalizationDisabled', {}, 'Disabled')}
             {/if}

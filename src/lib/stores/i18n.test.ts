@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { i18n } from "./i18n.svelte";
+import { i18n, formatNumber } from "./i18n.svelte";
 import { invoke } from "@tauri-apps/api/core";
 
 // Mock Tauri invoke for settings
@@ -82,5 +82,44 @@ describe("I18nStore", () => {
   it("should handle missing variables by leaving placeholders", () => {
     i18n.currentLocale = "en";
     expect(i18n.t("playlists.songsCount", {})).toBe("{count} songs");
+  });
+
+  it("should format numbers with locale decimal separator", () => {
+    i18n.currentLocale = "en";
+    expect(formatNumber(0.71, { minimumFractionDigits: 2 })).toBe("0.71");
+    expect(i18n.formatNumber(12.0, { minimumFractionDigits: 1 })).toBe("12.0");
+
+    i18n.currentLocale = "fr";
+    expect(formatNumber(0.71, { minimumFractionDigits: 2 })).toBe("0,71");
+    expect(i18n.formatNumber(12.0, { minimumFractionDigits: 1 })).toBe("12,0");
+  });
+
+  it("should format numbers with options like signDisplay", () => {
+    i18n.currentLocale = "en";
+    expect(formatNumber(1.5, { minimumFractionDigits: 1, signDisplay: "exceptZero" })).toBe("+1.5");
+    expect(formatNumber(-1.5, { minimumFractionDigits: 1, signDisplay: "exceptZero" })).toBe("-1.5");
+    expect(formatNumber(0.0, { minimumFractionDigits: 1, signDisplay: "exceptZero" })).toBe("0.0");
+
+    i18n.currentLocale = "fr";
+    expect(formatNumber(1.5, { minimumFractionDigits: 1, signDisplay: "exceptZero" })).toBe("+1,5");
+    expect(formatNumber(-1.5, { minimumFractionDigits: 1, signDisplay: "exceptZero" })).toBe("-1,5");
+    expect(formatNumber(0.0, { minimumFractionDigits: 1, signDisplay: "exceptZero" })).toBe("0,0");
+  });
+
+  it("should handle non-finite numbers safely", () => {
+    expect(formatNumber(NaN)).toBe("NaN");
+    expect(formatNumber(Infinity)).toBe("Infinity");
+  });
+
+  it("should sync document.documentElement.lang on setLocale", async () => {
+    await i18n.setLocale("fr");
+    if (typeof document !== "undefined") {
+      expect(document.documentElement.lang).toBe("fr");
+    }
+
+    await i18n.setLocale("en");
+    if (typeof document !== "undefined") {
+      expect(document.documentElement.lang).toBe("en");
+    }
   });
 });

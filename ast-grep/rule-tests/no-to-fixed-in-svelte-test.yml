@@ -1,0 +1,7 @@
+id: no-to-fixed-in-svelte
+valid:
+  - "<span>{formatNumber(val, { minimumFractionDigits: 1 })}</span>"
+  - "<script lang=\"ts\">const x = formatNumber(12.3);</script>"
+invalid:
+  - "<span>{val.toFixed(1)}</span>"
+  - "<script lang=\"ts\">const x = (12.3).toFixed(1);</script>"

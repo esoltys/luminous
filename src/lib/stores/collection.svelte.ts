@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { stripEnclosingQuotes } from "../utils/filterParser";
-import { i18n } from "./i18n.svelte";
+import { i18n, formatNumber } from "./i18n.svelte";
 import type {
   AlbumArtRetrievalResult,
   Song,
@@ -400,8 +400,9 @@ class CollectionStore {
             for (const threshold of MILESTONE_THRESHOLDS) {
               if (songCountBeforeRefresh < threshold && newTotal >= threshold) {
                 this.milestoneReached = threshold;
+                const thresholdFormatted = formatNumber(threshold);
                 toastStore.show(
-                  i18n.t("celebrations.milestone", { count: threshold.toLocaleString() }, `${threshold.toLocaleString()} songs in your library!`),
+                  i18n.t("celebrations.milestone", { count: thresholdFormatted }, `${thresholdFormatted} songs in your library!`),
                   "milestone"
                 );
                 setTimeout(() => { this.milestoneReached = null; }, 700);

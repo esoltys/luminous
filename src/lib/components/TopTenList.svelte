@@ -12,7 +12,7 @@
   import AlbumRowCard from "./AlbumRowCard.svelte";
   import ArtistRowCard from "./ArtistRowCard.svelte";
   import { getArtistAlbums, getArtistSongs } from "../utils/artist";
-  import { i18n } from "../stores/i18n.svelte";
+  import { i18n, formatNumber } from "../stores/i18n.svelte";
   import {
     CaretRightIcon as ChevronRight,
     TrendUpIcon,
@@ -148,7 +148,7 @@
     >
       {item.minutes === 0 && item.play_count > 0
         ? i18n.t("stats.minuteUnderOne", {}, "< 1 min")
-        : i18n.t("stats.minuteCount", { count: item.minutes.toLocaleString() }, `${item.minutes.toLocaleString()} min`)}
+        : i18n.t("stats.minuteCount", { count: formatNumber(item.minutes) }, `${formatNumber(item.minutes)} min`)}
     </span>
   </div>
 {/snippet}

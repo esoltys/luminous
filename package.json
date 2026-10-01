@@ -22,7 +22,7 @@
     "generate:msix-assets": "bun run scripts/generate-msix-assets.ts",
     "test": "vitest",
     "test:run": "vitest run",
-    "lint:ast": "ast-grep scan && ast-grep test",
+    "lint:ast": "bunx @ast-grep/cli scan && bunx @ast-grep/cli test",
     "test:perf": "vitest run --config vite.perf.config.js",
     "take-screenshots": "bunx tsx scripts/take-screenshots.ts",
     "style-diff": "bunx tsx scripts/style-diff.ts",

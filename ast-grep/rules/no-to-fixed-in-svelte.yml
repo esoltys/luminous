@@ -1,0 +1,15 @@
+id: no-to-fixed-in-svelte
+language: html
+severity: error
+message: Do not use toFixed() in Svelte components. Use formatNumber() to respect the active UI locale.
+note: |
+  Issue #1342: Number.prototype.toFixed() hard-codes a period as the decimal separator,
+  breaking locales like French which use commas. Use formatNumber() with the UI locale instead.
+rule:
+  any:
+    - kind: text
+      regex: '\.toFixed\('
+    - kind: raw_text
+      regex: '\.toFixed\('
+    - kind: attribute_value
+      regex: '\.toFixed\('
