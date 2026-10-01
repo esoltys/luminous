@@ -94,9 +94,12 @@ interface MockConfigDefaults {
 export interface ScreenshotConfig extends MockConfigDefaults {
   name: string;
   tab: string;
-  subTab: string;
+  subTab?: string;
   filename: string;
   action?: string;
+  selector?: string;
+  outDir?: string;
+  walkthroughCompleted?: boolean;
   isImmersive?: boolean;
   viewportWidth?: number;
   viewportHeight?: number;

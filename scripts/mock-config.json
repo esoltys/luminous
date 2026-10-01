@@ -122,6 +122,7 @@
       "subTab": "songs",
       "action": "toggle-miniplayer-hover",
       "theme": "dynamic-artwork",
+      "selector": "[role='group'][aria-label]",
       "viewportWidth": 340,
       "viewportHeight": 420
     },
@@ -132,8 +133,38 @@
       "subTab": "songs",
       "action": "toggle-miniplayer",
       "theme": "dynamic-artwork",
+      "selector": "[role='group'][aria-label]",
       "viewportWidth": 340,
       "viewportHeight": 420
+    },
+    {
+      "name": "playbar",
+      "filename": "playbar.png",
+      "tab": "collection",
+      "subTab": "songs",
+      "outDir": "docs/user-guide/assets",
+      "selector": "footer.bg-brand-playerbar",
+      "sidebarWidth": 220,
+      "viewportWidth": 1640,
+      "positionSeconds": 150
+    },
+    {
+      "name": "searchbar",
+      "filename": "searchbar.png",
+      "tab": "collection",
+      "subTab": "songs",
+      "outDir": "docs/user-guide/assets",
+      "selector": "header[data-walkthrough-target='top-navigation']",
+      "viewportWidth": 1200
+    },
+    {
+      "name": "walkthrough",
+      "filename": "walkthrough.png",
+      "tab": "help",
+      "action": "click-restart-walkthrough",
+      "sidebarWidth": 220,
+      "viewportWidth": 1640,
+      "viewportHeight": 1090
     },
     {
       "name": "band-waveform",

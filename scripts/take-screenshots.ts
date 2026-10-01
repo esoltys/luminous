@@ -106,7 +106,7 @@ async function main() {
 
   interface CaptureOptions {
     tab: string;
-    subTab: string;
+    subTab?: string;
     theme: string;
     filename: string;
     featured: FeaturedSelection;
@@ -120,13 +120,16 @@ async function main() {
     viewportWidth?: number;
     viewportHeight?: number;
     emptyLibrary?: boolean;
+    selector?: string;
+    outDir?: string;
+    walkthroughCompleted?: boolean;
     /** e.g. "[3/20]" — shown when running the full batch (no --name filter); omitted otherwise. */
     progressLabel?: string;
   }
 
   async function capture({
     tab,
-    subTab,
+    subTab = "",
     theme,
     filename,
     featured,
@@ -140,6 +143,9 @@ async function main() {
     viewportWidth = 1280,
     viewportHeight = 800,
     emptyLibrary = false,
+    selector,
+    outDir,
+    walkthroughCompleted = true,
     progressLabel,
   }: CaptureOptions) {
     console.log(`${progressLabel ? progressLabel + " " : ""}Capturing ${filename}...`);
@@ -217,7 +223,7 @@ async function main() {
         language: "${language}",
         // Otherwise +layout.svelte auto-starts the first-launch Walkthrough
         // tour, whose popover would cover every capture (see #897).
-        walkthrough_completed: "true",
+        walkthrough_completed: "${walkthroughCompleted ? 'true' : 'false'}",
         // Otherwise the first-run Welcome screen covers every capture behind
         // its full-screen overlay before the Walkthrough tour even starts.
         welcome_seen: "true"
@@ -294,7 +300,9 @@ async function main() {
     // Settle transitions
     await page.waitForTimeout(400);
 
-    const dir = path.join(__dirname, "../docs/user-guide/screenshots");
+    const dir = outDir
+      ? path.resolve(__dirname, "..", outDir)
+      : path.join(__dirname, "../docs/user-guide/screenshots");
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
@@ -306,7 +314,12 @@ async function main() {
         if (fs.existsSync(screenshotPath)) {
           fs.unlinkSync(screenshotPath);
         }
-        await page.screenshot({ path: screenshotPath });
+        if (selector) {
+          const locator = page.locator(selector).first();
+          await locator.screenshot({ path: screenshotPath });
+        } else {
+          await page.screenshot({ path: screenshotPath });
+        }
         break;
       } catch (err) {
         attempts++;
@@ -524,6 +537,13 @@ async function main() {
       await chip.click({ button: "right" });
       await page.waitForTimeout(400);
     },
+    "click-restart-walkthrough": async (page, _featured, language) => {
+      const restartBtn = page.getByRole("button", { name: t(language, "walkthrough.restartTour"), exact: true });
+      await restartBtn.waitFor({ state: "visible", timeout: 10000 });
+      await restartBtn.click();
+      await page.waitForSelector('[role="dialog"][aria-labelledby="walkthrough-step-title"]', { timeout: 10000 });
+      await page.waitForTimeout(600);
+    },
   };
 
   const withLanguageSuffix = (filename: string, language: string) => {
@@ -572,6 +592,9 @@ async function main() {
             viewportWidth: s.viewportWidth,
             viewportHeight: s.viewportHeight,
             emptyLibrary: s.emptyLibrary,
+            selector: s.selector,
+            outDir: s.outDir,
+            walkthroughCompleted: s.walkthroughCompleted ?? true,
             progressLabel: nameFilter ? undefined : `[${captureIndex}/${totalCaptures}]`,
           });
         }
