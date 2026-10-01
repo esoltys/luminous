@@ -4,6 +4,8 @@
   import { navigationStore } from "../stores/navigation.svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { invoke } from "@tauri-apps/api/core";
+  import { listen } from "@tauri-apps/api/event";
+  import type { AlbumStatsPayload, SongStatsPayload } from "../utils/stats";
   import CoverArt from "./CoverArt.svelte";
   import HelpTip from "./HelpTip.svelte";
   import SongRating from "./SongRating.svelte";
@@ -90,6 +92,36 @@
     if (!item.song_id) return;
     item.rating = await invoke<number>("set_song_rating", { songId: item.song_id, rating });
   }
+
+  $effect(() => {
+    let unlistenAlbum: (() => void) | undefined;
+    let unlistenSong: (() => void) | undefined;
+    let disposed = false;
+
+    if (kind === "album") {
+      listen<AlbumStatsPayload>("album-stats-changed", (event) => {
+        const match = items.find((it) => it.label === event.payload.album);
+        if (match && typeof event.payload.rating === "number") match.rating = event.payload.rating;
+      }).then((fn) => {
+        if (disposed) fn();
+        else unlistenAlbum = fn;
+      });
+    } else if (kind === "song") {
+      listen<SongStatsPayload>("song-stats-changed", (event) => {
+        const match = items.find((it) => it.song_id === event.payload.song_id);
+        if (match && typeof event.payload.rating === "number") match.rating = event.payload.rating;
+      }).then((fn) => {
+        if (disposed) fn();
+        else unlistenSong = fn;
+      });
+    }
+
+    return () => {
+      disposed = true;
+      unlistenAlbum?.();
+      unlistenSong?.();
+    };
+  });
 
   /** Tooltip for the weekly chart movement icon (#662): trend and weeks on chart
    * (peak rank is shown directly under the rank number, so it's left out here). */
@@ -207,6 +239,7 @@
             <AlbumRowCard
               album={albumItem}
               onclick={() => openItem(item)}
+              onRate={(r) => { item.rating = r; }}
             />
           {:else if kind === "artist"}
             {@const artist = collectionStore.artists.find((a) => a.name === item.label) ?? {

@@ -3,6 +3,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent } from "@testing-library/svelte";
 import TopTenList from "./TopTenList.svelte";
 import { navigationStore } from "../stores/navigation.svelte";
+import { prefs } from "../stores/prefs.svelte";
+import { invoke } from "@tauri-apps/api/core";
 import type { StatsTopItem } from "../types";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -249,5 +251,89 @@ describe("TopTenList.svelte", () => {
     });
 
     expect(getByText("Custom empty message")).toBeInTheDocument();
+  });
+
+  it("rates an album item and updates the rating in the UI (heart toggle)", async () => {
+    prefs.ratingStyle = "heart";
+    vi.mocked(invoke).mockImplementation((cmd, args: any) => {
+      if (cmd === "set_album_rating") return Promise.resolve(args.rating);
+      return Promise.resolve(null);
+    });
+
+    const items: StatsTopItem[] = [
+      {
+        key: "album_1",
+        label: "Los Ojos Del Cóndor",
+        secondary: "Hermanos Gutiérrez",
+        play_count: 10,
+        minutes: 40,
+        excluded: false,
+        album: null,
+        sample_song_id: 1,
+        rating: -1,
+      },
+    ];
+
+    const { getByTitle, queryByTestId, getByTestId } = render(TopTenList, {
+      props: { items, kind: "album" },
+    });
+
+    expect(queryByTestId("favourite-corner-flag")).toBeNull();
+
+    // Click to favorite
+    const favButton = getByTitle("Add to favourites");
+    await fireEvent.click(favButton);
+
+    expect(invoke).toHaveBeenCalledWith("set_album_rating", {
+      album: "Los Ojos Del Cóndor",
+      rating: 5,
+    });
+    expect(items[0].rating).toBe(5);
+    expect(getByTestId("favourite-corner-flag")).toBeInTheDocument();
+
+    // Click again to unfavorite / unset
+    const unfavButton = getByTitle("Remove from favourites");
+    await fireEvent.click(unfavButton);
+
+    expect(invoke).toHaveBeenCalledWith("set_album_rating", {
+      album: "Los Ojos Del Cóndor",
+      rating: -1,
+    });
+    expect(items[0].rating).toBe(-1);
+    expect(queryByTestId("favourite-corner-flag")).toBeNull();
+  });
+
+  it("rates an album item in star mode", async () => {
+    prefs.ratingStyle = "stars";
+    vi.mocked(invoke).mockImplementation((cmd, args: any) => {
+      if (cmd === "set_album_rating") return Promise.resolve(args.rating);
+      return Promise.resolve(null);
+    });
+
+    const items: StatsTopItem[] = [
+      {
+        key: "album_1",
+        label: "The ArchAndroid",
+        secondary: "Janelle Monáe",
+        play_count: 8,
+        minutes: 35,
+        excluded: false,
+        album: null,
+        sample_song_id: 2,
+        rating: -1,
+      },
+    ];
+
+    const { getByLabelText } = render(TopTenList, {
+      props: { items, kind: "album" },
+    });
+
+    await fireEvent.click(getByLabelText("Rate 4 of 5"));
+
+    expect(invoke).toHaveBeenCalledWith("set_album_rating", {
+      album: "The ArchAndroid",
+      rating: 4,
+    });
+    expect(items[0].rating).toBe(4);
   });
 });

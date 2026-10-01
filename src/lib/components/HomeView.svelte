@@ -5,6 +5,7 @@
   import { playerStore } from "../stores/player.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
   import type { HomeItem, StatsTopItem, TopAlbumItem, ScanProgress } from "../types";
+  import type { AlbumStatsPayload } from "../utils/stats";
   import HomeRowList from "./HomeRowList.svelte";
   import TopTenList from "./TopTenList.svelte";
   import PinnedRow from "./PinnedRow.svelte";
@@ -105,6 +106,25 @@
     // Top Albums leaves out albums excluded from stats.
     const unlistenExclusions = listen("stats-exclusions-changed", () => loadCuratedData());
 
+    const unlistenAlbumStats = listen<AlbumStatsPayload>("album-stats-changed", (event) => {
+      if (typeof event.payload.rating !== "number") return;
+      for (const item of topAlbums) {
+        if (item.label === event.payload.album) {
+          item.rating = event.payload.rating;
+        }
+      }
+      for (const item of featuredAlbums) {
+        if (item.type === "album" && item.album.album === event.payload.album) {
+          item.album.rating = event.payload.rating;
+        }
+      }
+      for (const item of recentlyAdded) {
+        if (item.type === "album" && item.album.album === event.payload.album) {
+          item.album.rating = event.payload.rating;
+        }
+      }
+    });
+
     daypartPollTimer = setInterval(() => {
       daypartBucket = getDaypartBucket();
     }, 60_000);
@@ -115,6 +135,7 @@
       unlistenScan.then((fn) => fn());
       unlistenLibrary.then((fn) => fn());
       unlistenExclusions.then((fn) => fn());
+      unlistenAlbumStats.then((fn) => fn());
     };
   });
 </script>
