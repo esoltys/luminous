@@ -15,6 +15,7 @@
     size?: ButtonSize;
     /** Set for a toggle button; rendered as `aria-pressed`. */
     pressed?: boolean;
+    "aria-label"?: string;
     class?: string;
     children: Snippet;
   }
@@ -27,6 +28,7 @@
     variant = "secondary",
     size = "md",
     pressed,
+    "aria-label": ariaLabel,
     class: className = "",
     children,
   }: Props = $props();
@@ -52,6 +54,7 @@
   {type}
   {disabled}
   {title}
+  aria-label={ariaLabel}
   aria-pressed={pressed}
   class="flex items-center justify-center rounded-full font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed {sizeClasses[size]} {variantClasses[variant]} {className}"
 >
