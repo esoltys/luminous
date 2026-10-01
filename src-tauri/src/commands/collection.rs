@@ -1485,7 +1485,7 @@ pub async fn retrieve_artist_image(
     let mut result = ArtistImageRetrievalResult::default();
     let mut download_error = None;
     let mut profile = current_profile;
-    profile.artist_key = artist;
+    profile.artist_key = artist.clone();
     if profile.musicbrainz_artist_id.is_none() {
         profile.musicbrainz_artist_id = Some(artist_mbid);
     }
@@ -1494,15 +1494,43 @@ pub async fn retrieve_artist_image(
         match photo {
             None => profile.image_fetched = true,
             Some((url, source)) => {
-                match cache_fetched_artist_image(&state, &client, &url, &stem).await {
-                    Ok(filename) => {
-                        result.uri = Some(format!("luminous-art://{filename}"));
-                        result.source = Some(source.as_str().to_string());
-                        profile.fetched_image_filename = Some(filename);
-                        profile.fetched_image_source = Some(source.as_str().to_string());
-                        profile.image_fetched = true;
+                let mut sidecar_written = false;
+                let scanner = CollectionScanner::new(Arc::clone(&state.db));
+                if let Ok(Some(song_path_str)) = scanner.get_representative_song_path_for_artist(&artist) {
+                    let song_path = Path::new(&song_path_str);
+                    if let Some(artist_dir) = biomanager::artist_dir(song_path) {
+                        if let Ok(resp) = client.get(&url).send().await {
+                            if let Ok(bytes) = resp.bytes().await {
+                                if let Some(sidecar_path) = state.cover_manager.try_save_artist_portrait_sidecar(
+                                    &artist_dir,
+                                    &artist,
+                                    &bytes,
+                                ) {
+                                    let local_uri = crate::covermanager::local_artwork_uri(&sidecar_path);
+                                    result.uri = Some(local_uri);
+                                    result.source = Some(source.as_str().to_string());
+                                    profile.fetched_image_filename = None;
+                                    profile.fetched_image_source = Some(source.as_str().to_string());
+                                    profile.image_fetched = true;
+                                    sidecar_written = true;
+                                    let _ = std::fs::remove_file(state.cover_manager.covers_dir().join(format!("{stem}.jpg")));
+                                    let _ = std::fs::remove_file(state.cover_manager.covers_dir().join(format!("{stem}.png")));
+                                }
+                            }
+                        }
                     }
-                    Err(e) => download_error = Some(e),
+                }
+                if !sidecar_written {
+                    match cache_fetched_artist_image(&state, &client, &url, &stem).await {
+                        Ok(filename) => {
+                            result.uri = Some(format!("luminous-art://{filename}"));
+                            result.source = Some(source.as_str().to_string());
+                            profile.fetched_image_filename = Some(filename);
+                            profile.fetched_image_source = Some(source.as_str().to_string());
+                            profile.image_fetched = true;
+                        }
+                        Err(e) => download_error = Some(e),
+                    }
                 }
             }
         }

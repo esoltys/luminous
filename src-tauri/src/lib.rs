@@ -1021,10 +1021,15 @@ pub fn run() {
             }
             let playlists = Arc::new(Mutex::new(manager));
 
-            let cover_manager = Arc::new(CoverManager::new(
-                Arc::clone(&db),
-                crate::paths::resolve_app_data_dir(app),
-            ));
+            let self_writes = Arc::new(collection::SelfWriteTracker::new());
+
+            let cover_manager = Arc::new(
+                CoverManager::new(
+                    Arc::clone(&db),
+                    crate::paths::resolve_app_data_dir(app),
+                )
+                .with_self_writes(Arc::clone(&self_writes)),
+            );
 
             // Spawn real-time visualizer spectrum emission loop (Tokio)
             spawn_visualizer_loop(app.handle().clone(), Arc::clone(&audio));
@@ -1070,7 +1075,6 @@ pub fn run() {
             let media_session = media_session::spawn(app.handle().clone(), media_hwnd);
 
             let watcher_paused = Arc::new(std::sync::atomic::AtomicU32::new(0));
-            let self_writes = Arc::new(collection::SelfWriteTracker::new());
 
             let state = AppState {
                 db,
