@@ -1945,6 +1945,13 @@ where
         drop(album_stmt);
 
         // 2. Sweep artists (portraits, logos, banners)
+        struct ArtistSweepEntry {
+            artist_key: String,
+            photo_fn: Option<String>,
+            logo_fn: Option<String>,
+            bg_fn: Option<String>,
+        }
+
         let mut artist_stmt = conn.prepare(
             "SELECT artist_key, fetched_image_filename, fetched_logo_filename, fetched_background_filename
              FROM artist_profiles
@@ -1953,14 +1960,14 @@ where
                 OR fetched_background_filename IS NOT NULL",
         )?;
 
-        let artists: Vec<(String, Option<String>, Option<String>, Option<String>)> = artist_stmt
+        let artists: Vec<ArtistSweepEntry> = artist_stmt
             .query_map([], |row| {
-                Ok((
-                    row.get::<_, String>(0)?,
-                    row.get::<_, Option<String>>(1)?,
-                    row.get::<_, Option<String>>(2)?,
-                    row.get::<_, Option<String>>(3)?,
-                ))
+                Ok(ArtistSweepEntry {
+                    artist_key: row.get::<_, String>(0)?,
+                    photo_fn: row.get::<_, Option<String>>(1)?,
+                    logo_fn: row.get::<_, Option<String>>(2)?,
+                    bg_fn: row.get::<_, Option<String>>(3)?,
+                })
             })?
             .filter_map(|r| r.ok())
             .collect();
@@ -1976,7 +1983,7 @@ where
 
         for (album, artist, song_path_str, cached_filename) in albums {
             current += 1;
-            if current % 5 == 0 || current == total {
+            if current.is_multiple_of(5) || current == total {
                 on_progress(ArtworkSweepProgressPayload {
                     current,
                     total,
@@ -2015,9 +2022,9 @@ where
         }
 
         let scanner = CollectionScanner::new(Arc::clone(&db_for_closure));
-        for (artist_key, photo_fn, logo_fn, bg_fn) in artists {
+        for entry in artists {
             current += 1;
-            if current % 5 == 0 || current == total {
+            if current.is_multiple_of(5) || current == total {
                 on_progress(ArtworkSweepProgressPayload {
                     current,
                     total,
@@ -2025,7 +2032,7 @@ where
                 });
             }
 
-            let song_path_str = scanner.get_representative_song_path_for_artist(&artist_key).ok().flatten();
+            let song_path_str = scanner.get_representative_song_path_for_artist(&entry.artist_key).ok().flatten();
             let Some(song_path_str) = song_path_str else {
                 continue;
             };
@@ -2034,15 +2041,15 @@ where
                 continue;
             };
 
-            let mut updated_photo = photo_fn.clone();
-            let mut updated_logo = logo_fn.clone();
-            let mut updated_bg = bg_fn.clone();
+            let mut updated_photo = entry.photo_fn.clone();
+            let mut updated_logo = entry.logo_fn.clone();
+            let mut updated_bg = entry.bg_fn.clone();
 
-            if let Some(ref filename) = photo_fn {
+            if let Some(ref filename) = entry.photo_fn {
                 let p = covers_dir.join(filename);
                 if p.exists() {
                     if let Ok(bytes) = std::fs::read(&p) {
-                        if cover_manager.try_save_artist_portrait_sidecar(&artist_dir, &artist_key, &bytes).is_some() {
+                        if cover_manager.try_save_artist_portrait_sidecar(&artist_dir, &entry.artist_key, &bytes).is_some() {
                             let _ = std::fs::remove_file(&p);
                             updated_photo = None;
                             result.artist_portraits_exported += 1;
@@ -2051,11 +2058,11 @@ where
                 }
             }
 
-            if let Some(ref filename) = logo_fn {
+            if let Some(ref filename) = entry.logo_fn {
                 let p = covers_dir.join(filename);
                 if p.exists() {
                     if let Ok(bytes) = std::fs::read(&p) {
-                        if cover_manager.try_save_band_logo_sidecar(&artist_dir, &artist_key, &bytes).is_some() {
+                        if cover_manager.try_save_band_logo_sidecar(&artist_dir, &entry.artist_key, &bytes).is_some() {
                             let _ = std::fs::remove_file(&p);
                             updated_logo = None;
                             result.band_logos_exported += 1;
@@ -2064,11 +2071,11 @@ where
                 }
             }
 
-            if let Some(ref filename) = bg_fn {
+            if let Some(ref filename) = entry.bg_fn {
                 let p = covers_dir.join(filename);
                 if p.exists() {
                     if let Ok(bytes) = std::fs::read(&p) {
-                        if cover_manager.try_save_fanart_banner_sidecar(&artist_dir, &artist_key, &bytes).is_some() {
+                        if cover_manager.try_save_fanart_banner_sidecar(&artist_dir, &entry.artist_key, &bytes).is_some() {
                             let _ = std::fs::remove_file(&p);
                             updated_bg = None;
                             result.banners_exported += 1;
@@ -2077,14 +2084,14 @@ where
                 }
             }
 
-            if updated_photo != photo_fn || updated_logo != logo_fn || updated_bg != bg_fn {
+            if updated_photo != entry.photo_fn || updated_logo != entry.logo_fn || updated_bg != entry.bg_fn {
                 let _ = conn.execute(
                     "UPDATE artist_profiles
                      SET fetched_image_filename = ?1,
                          fetched_logo_filename = ?2,
                          fetched_background_filename = ?3
                      WHERE artist_key = ?4",
-                    rusqlite::params![updated_photo, updated_logo, updated_bg, artist_key],
+                    rusqlite::params![updated_photo, updated_logo, updated_bg, entry.artist_key],
                 );
             }
         }
