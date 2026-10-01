@@ -140,9 +140,9 @@ Theming is **not static**: users can switch between several built-in themes (Lum
 
 ## Typography
 
-**Inter** (`src/app.css:58`) throughout, falling back to system UI sans. The only secondary face is **Space Grotesk** (700, `font-heading` utility), reserved for the Display tier — hierarchy elsewhere comes from size and weight, not typeface.
+**Fira Sans** (`src/app.css`) throughout, falling back to system UI sans. The only secondary face is **Expose** (700, `font-heading` utility), reserved for the Display tier — hierarchy elsewhere comes from size and weight, not typeface.
 
-- **Display (36px / 700, Space Grotesk):** Album/artist/playlist hero titles and the home page time-of-day greeting.
+- **Display (36px–60px / 700, Expose):** Album/artist/playlist hero titles, immersive view now-playing title, and the home page time-of-day greeting.
 - **Headline (24px–20px / 700–600):** Section headers and dialog titles.
 - **Title (18px / 600):** Card and list-group headers.
 - **Body (14px / 12px, 400):** The workhorse sizes — the large majority of UI text in Luminous is `body-sm` (12px) for metadata-dense lists (folders, tags, playlists) and `body-md` (14px) for primary row labels and buttons.

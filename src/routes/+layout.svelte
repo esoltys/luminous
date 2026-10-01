@@ -583,7 +583,7 @@
                 <span class="self-start px-3 py-1 text-xs font-semibold uppercase tracking-wider bg-brand-accent/15 text-brand-accent-text border border-brand-border rounded-full select-none">
                   {i18n.t('playerBar.nowPlaying')}
                 </span>
-                <h1 class="mt-3 text-4xl md:text-6xl font-black text-brand-text-primary leading-[0.95] tracking-tight select-text text-balance">
+                <h1 class="mt-3 text-4xl md:text-6xl font-heading font-bold text-brand-text-primary leading-[0.95] tracking-tight select-text text-balance">
                   {playerStore.currentSongDisplayTitle}
                 </h1>
                 <p class="mt-3 text-lg md:text-xl text-brand-text-secondary select-text font-semibold">
