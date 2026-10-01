@@ -312,7 +312,7 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
   const mosaicHeight = Math.min(coverSize, Math.round(maxMosaicWidth / mosaicRatio));
 
   const contentHtml = `
-    <div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;width:100%;height:100%;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:${cardPad}px;box-sizing:border-box;font-family:'Inter','Segoe UI',system-ui,sans-serif;">
+    <div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;width:100%;height:100%;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:${cardPad}px;box-sizing:border-box;font-family:'Fira Sans','Inter','Segoe UI',system-ui,sans-serif;">
       <div style="display:flex;flex-direction:${groupDirection};align-items:center;gap:${contentGap}px;max-width:100%;">
         ${!isPortrait
           ? buildMosaicCoverHtml(options.coverDataUri, options.coverStackDataUris, mosaicHeight, coverSize)
@@ -326,7 +326,7 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
       </div>
       <div style="position:absolute;left:${cardPad}px;bottom:${cardPad}px;display:flex;align-items:center;gap:${Math.round(width * 0.008)}px;opacity:0.85;">
         ${LUMINOUS_MARK_SVG(Math.round(width * 0.024))}
-        <span style="font-family:'Expose','Inter','Segoe UI',system-ui,sans-serif;font-size:${Math.round(width * 0.015)}px;font-weight:700;letter-spacing:0.04em;color:${textSecondary};">LUMINOUS</span>
+        <span style="font-family:'Expose','Fira Sans','Inter','Segoe UI',system-ui,sans-serif;font-size:${Math.round(width * 0.015)}px;font-weight:700;letter-spacing:0.04em;color:${textSecondary};">LUMINOUS</span>
       </div>
     </div>
   `;
@@ -489,7 +489,7 @@ export function buildStatsShareCardSvg(options: StatsShareCardOptions): { svg: s
   `;
 
   const contentHtml = `
-    <div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;width:100%;height:100%;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:${pad}px;box-sizing:border-box;font-family:'Inter','Segoe UI',system-ui,sans-serif;">
+    <div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;width:100%;height:100%;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:${pad}px;box-sizing:border-box;font-family:'Fira Sans','Inter','Segoe UI',system-ui,sans-serif;">
       <div style="font-size:${titleSize}px;font-weight:800;color:${textPrimary};text-align:center;">${escapeHtml(options.rangeLabel)}</div>
       <div style="font-size:${subtitleSize}px;font-weight:600;color:${textSecondary};margin-top:${Math.round(scaleBasis * 0.006)}px;margin-bottom:${Math.round(scaleBasis * 0.038)}px;text-align:center;">${escapeHtml(options.totalMinutesLabel)}</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:${Math.round(scaleBasis * 0.022)}px;width:100%;max-width:${Math.round(width * 0.86)}px;">
@@ -498,7 +498,7 @@ export function buildStatsShareCardSvg(options: StatsShareCardOptions): { svg: s
       ${clockHtml}
       <div style="position:absolute;left:${pad}px;bottom:${pad}px;display:flex;align-items:center;gap:${Math.round(scaleBasis * 0.008)}px;opacity:0.85;">
         ${LUMINOUS_MARK_SVG(Math.round(scaleBasis * 0.026))}
-        <span style="font-family:'Expose','Inter','Segoe UI',system-ui,sans-serif;font-size:${Math.round(scaleBasis * 0.016)}px;font-weight:700;letter-spacing:0.04em;color:${textSecondary};">LUMINOUS</span>
+        <span style="font-family:'Expose','Fira Sans','Inter','Segoe UI',system-ui,sans-serif;font-size:${Math.round(scaleBasis * 0.016)}px;font-weight:700;letter-spacing:0.04em;color:${textSecondary};">LUMINOUS</span>
       </div>
     </div>
   `;

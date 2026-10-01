@@ -24,6 +24,21 @@ function copyDir(src: string, dest: string) {
   }
 }
 
+const FIRA_FONT_FILES = [
+  "fira-sans-latin-400-normal.woff2",
+  "fira-sans-latin-ext-400-normal.woff2",
+  "fira-sans-latin-400-italic.woff2",
+  "fira-sans-latin-ext-400-italic.woff2",
+  "fira-sans-latin-500-normal.woff2",
+  "fira-sans-latin-ext-500-normal.woff2",
+  "fira-sans-latin-600-normal.woff2",
+  "fira-sans-latin-ext-600-normal.woff2",
+  "fira-sans-latin-700-normal.woff2",
+  "fira-sans-latin-ext-700-normal.woff2",
+  "fira-sans-latin-700-italic.woff2",
+  "fira-sans-latin-ext-700-italic.woff2",
+];
+
 const FILE_COPIES = [
   "luminous-user-guide-EN.html",
   "luminous-user-guide-FR.html",
@@ -31,6 +46,7 @@ const FILE_COPIES = [
   "guide.js",
   "luminous-mark.svg",
   "expose-700.woff2",
+  ...FIRA_FONT_FILES,
 ];
 
 for (const file of FILE_COPIES) {
