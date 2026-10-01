@@ -927,8 +927,10 @@ export const en = {
     title: "Miniplayer",
     toggleTooltip: "Picture-in-Picture Mode (Ctrl+M)",
     exit: "Restore Full Window (Ctrl+M)",
-
-    dragHint: "Drag window"
+    dragHint: "Drag window",
+    showLyrics: "Show Live Lyrics",
+    showCoverArt: "Show Cover Art",
+    noLiveLyrics: "No live lyrics available"
   },
 
   chipInput: {

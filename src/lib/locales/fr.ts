@@ -933,7 +933,10 @@ export const fr: DeepStringRecord<typeof en> = {
     title: "Mini-lecteur",
     toggleTooltip: "Mini-lecteur Picture-in-Picture (Ctrl+M)",
     exit: "Restaurer la fenêtre principale (Ctrl+M)",
-    dragHint: "Déplacer la fenêtre"
+    dragHint: "Déplacer la fenêtre",
+    showLyrics: "Afficher les paroles synchronisées",
+    showCoverArt: "Afficher la pochette",
+    noLiveLyrics: "Aucune parole synchronisée disponible"
   },
 
   chipInput: {

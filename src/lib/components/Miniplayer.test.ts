@@ -43,6 +43,8 @@ describe("Miniplayer.svelte", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
+    window.HTMLElement.prototype.scrollIntoView = vi.fn();
     playerStore.state = "stopped";
     playerStore.currentSong = undefined;
     playerStore.volume = 0.8;
@@ -175,5 +177,84 @@ describe("Miniplayer.svelte", () => {
     expect(hoverMask.className).toContain("bg-brand-main/85");
     expect(hoverMask.className).toContain("backdrop-blur-md");
   });
+
+  it("toggles lyrics view and persists in localStorage when lyrics button is clicked", async () => {
+    playerStore.currentSong = mockSong;
+    const { getByTitle } = render(Miniplayer);
+
+    const lyricsToggleBtn = getByTitle("Show Live Lyrics");
+    expect(lyricsToggleBtn).toBeInTheDocument();
+
+    await fireEvent.click(lyricsToggleBtn);
+    expect(localStorage.getItem("miniplayer_show_lyrics")).toBe("true");
+    expect(getByTitle("Show Cover Art")).toBeInTheDocument();
+
+    await fireEvent.click(getByTitle("Show Cover Art"));
+    expect(localStorage.getItem("miniplayer_show_lyrics")).toBe("false");
+    expect(getByTitle("Show Live Lyrics")).toBeInTheDocument();
+  });
+
+  it("renders synchronized live lyrics and highlights the active line", async () => {
+    localStorage.setItem("miniplayer_show_lyrics", "true");
+    playerStore.currentSong = {
+      ...mockSong,
+      lyrics: "[00:01.00] Starlight shining\n[00:05.00] Echoes in the dark\n[00:10.00] Fading away",
+    };
+    playerStore.positionNanosec = 6_000_000_000; // 6 seconds in -> line index 1 active
+
+    const { getByText } = render(Miniplayer);
+
+    const activeLine = getByText("Echoes in the dark");
+    expect(activeLine).toBeInTheDocument();
+    expect(activeLine.className).toContain("text-brand-text-primary");
+
+    const futureLine = getByText("Fading away");
+    expect(futureLine).toBeInTheDocument();
+    expect(futureLine.className).toContain("text-brand-text-secondary/35");
+  });
+
+  it("seeks playback position when a lyric line is clicked", async () => {
+    localStorage.setItem("miniplayer_show_lyrics", "true");
+    playerStore.currentSong = {
+      ...mockSong,
+      lyrics: "[00:01.00] First verse\n[00:10.00] Second verse",
+    };
+    const seekSpy = vi.spyOn(playerStore, "seek").mockResolvedValue();
+
+    const { getByText } = render(Miniplayer);
+    const lineTwo = getByText("Second verse");
+    await fireEvent.click(lineTwo);
+
+    // 10.00s = 10_000_000_000 ns
+    expect(seekSpy).toHaveBeenCalledWith(10_000_000_000);
+  });
+
+  it("does not render static plain-text lyrics and shows 'No live lyrics available'", () => {
+    localStorage.setItem("miniplayer_show_lyrics", "true");
+    playerStore.currentSong = {
+      ...mockSong,
+      lyrics: "[synced:false]\nThis is static plain text lyrics without timestamps.",
+    };
+
+    const { queryByText, getByText } = render(Miniplayer);
+
+    expect(queryByText("This is static plain text lyrics without timestamps.")).toBeNull();
+    expect(getByText("No live lyrics available")).toBeInTheDocument();
+  });
+
+  it("shows instrumental indicator when track is marked instrumental", () => {
+    localStorage.setItem("miniplayer_show_lyrics", "true");
+    playerStore.currentSong = {
+      ...mockSong,
+      is_instrumental: true,
+      lyrics: "[00:01.00] Some lyrics",
+    };
+
+    const { getByText, queryByText } = render(Miniplayer);
+
+    expect(getByText("Instrumental Song")).toBeInTheDocument();
+    expect(queryByText("Some lyrics")).toBeNull();
+  });
 });
+
 
