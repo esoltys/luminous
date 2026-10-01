@@ -9,7 +9,13 @@ vi.mock("@tauri-apps/api/window", () => ({
   })),
 }));
 
-import { collectionStore } from "./collection.svelte";
+import {
+  collectionStore,
+  getDirectoryDisplayName,
+  resolveScanLibraryName,
+  getScanPhaseLabel,
+} from "./collection.svelte";
+import { tasksStore } from "./tasks.svelte";
 
 describe("CollectionStore - directories, scanning, and library stats", () => {
   let eventCallbacks: Record<string, Function> = {};
@@ -169,16 +175,124 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
     expect(invoke).toHaveBeenCalledWith("scan_directories", { force: true });
 
     eventCallbacks["scan-progress"]({
-      payload: { phase: "reading_tags", current_path: "song.mp3", scanned: 5, total: 10 }
+      payload: {
+        phase: "reading_tags",
+        current_path: "song.mp3",
+        scanned: 5,
+        total: 10,
+        directory_name: "Fast SSD",
+        directory_id: 1,
+      }
     });
     expect(collectionStore.scanProgress?.scanned).toBe(5);
     expect(collectionStore.isScanning).toBe(true);
+    const activeTask = tasksStore.tasks.find((t) => t.id === "library-scan");
+    expect(activeTask).toBeDefined();
+    expect(activeTask?.label).toBe("Fast SSD: reading tags");
+    expect(activeTask?.contextName).toBe("Fast SSD");
+
+    // Phase: resolving artwork
+    eventCallbacks["scan-progress"]({
+      payload: {
+        phase: "resolving_artwork",
+        current_path: "Cover art: Album",
+        scanned: 8,
+        total: 10,
+        directory_name: "Fast SSD",
+        directory_id: 1,
+      }
+    });
+    expect(activeTask?.label).toBe("Fast SSD: resolving artwork");
+
+    // Phase: checking missing tracks
+    eventCallbacks["scan-progress"]({
+      payload: {
+        phase: "checking_missing",
+        current_path: "",
+        scanned: 10,
+        total: 10,
+        directory_name: "Fast SSD",
+        directory_id: 1,
+      }
+    });
+    expect(activeTask?.label).toBe("Fast SSD: checking missing tracks");
 
     eventCallbacks["scan-progress"]({
-      payload: { phase: "done", current_path: "", scanned: 10, total: 10 }
+      payload: { phase: "done", current_path: "", scanned: 10, total: 10, directory_name: "Fast SSD" }
     });
     expect(collectionStore.isScanning).toBe(false);
     expect(collectionStore.lastScanTime).not.toBeNull();
+    expect(activeTask?.status).toBe("done");
+    expect(activeTask?.label).toBe("Fast SSD: Library refreshed");
+  });
+
+  it("resolves directory display names and scan library names correctly", () => {
+    const dirWithNickname = {
+      id: 1,
+      path: "/media/music/flac",
+      subdirs: true,
+      is_available: true,
+      nickname: "Main Vault",
+    };
+    expect(getDirectoryDisplayName(dirWithNickname)).toBe("Main Vault");
+
+    const dirWithEmptyNickname = {
+      id: 2,
+      path: "/media/music/lossy",
+      subdirs: true,
+      is_available: true,
+      nickname: "   ",
+    };
+    expect(getDirectoryDisplayName(dirWithEmptyNickname)).toBe("lossy");
+
+    const dirWithoutNickname = {
+      id: 3,
+      path: "D:\\Audio\\Soundtracks",
+      subdirs: true,
+      is_available: true,
+    };
+    expect(getDirectoryDisplayName(dirWithoutNickname)).toBe("Soundtracks");
+
+    // resolveScanLibraryName priority
+    // 1. directory_name in payload
+    expect(
+      resolveScanLibraryName(
+        { phase: "reading_tags", scanned: 0, total: 0, silent: false, directory_name: "Explicit Name" },
+        [dirWithNickname, dirWithoutNickname]
+      )
+    ).toBe("Explicit Name");
+
+    // 2. directory_id matching
+    expect(
+      resolveScanLibraryName(
+        { phase: "reading_tags", scanned: 0, total: 0, silent: false, directory_id: 1 },
+        [dirWithNickname, dirWithoutNickname]
+      )
+    ).toBe("Main Vault");
+
+    // 3. current_path prefix matching
+    expect(
+      resolveScanLibraryName(
+        { phase: "reading_tags", scanned: 0, total: 0, silent: false, current_path: "/media/music/flac/artist/album/01.flac" },
+        [dirWithNickname, dirWithoutNickname]
+      )
+    ).toBe("Main Vault");
+
+    // 4. Single directory fallback
+    expect(
+      resolveScanLibraryName(
+        { phase: "reading_tags", scanned: 0, total: 0, silent: false },
+        [dirWithNickname]
+      )
+    ).toBe("Main Vault");
+  });
+
+  it("maps scan phases to descriptive localized strings", () => {
+    expect(getScanPhaseLabel("discovering")).toBe("discovering files");
+    expect(getScanPhaseLabel("reading_tags")).toBe("reading tags");
+    expect(getScanPhaseLabel("checking_missing")).toBe("checking missing tracks");
+    expect(getScanPhaseLabel("resolving_artwork")).toBe("resolving artwork");
+    expect(getScanPhaseLabel("updating")).toBe("updating library");
   });
 
   it("handles pruneMissing songs call", async () => {

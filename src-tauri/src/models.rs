@@ -1046,13 +1046,19 @@ pub struct ScanProgress {
     /// the watcher's own batch-processing events already cover the same
     /// filesystem activity with a per-file-accurate count (#233).
     pub silent: bool,
+    #[serde(default)]
+    pub directory_name: Option<String>,
+    #[serde(default)]
+    pub directory_id: Option<i64>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ScanPhase {
     Discovering,
     ReadingTags,
+    CheckingMissing,
+    ResolvingArtwork,
     Updating,
     Done,
 }

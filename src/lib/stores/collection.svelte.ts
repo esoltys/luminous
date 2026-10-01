@@ -10,6 +10,7 @@ import type {
   LibraryStats,
   DbSchemaStatus,
   ScanProgress,
+  ScanPhase,
   BatchProgress,
   AlbumItem,
   AlbumProfile,
@@ -95,6 +96,60 @@ const EMPTY_EXTENDED_ARTWORK: ExtendedArtworkResponse = {
   fanart_uri: null,
   items: [],
 };
+
+export function getDirectoryDisplayName(dir: MusicDirectory): string {
+  if (dir.nickname && dir.nickname.trim().length > 0) {
+    return dir.nickname.trim();
+  }
+  const cleanPath = dir.path.replace(/[\\/]+$/, "");
+  const lastSegment = cleanPath.split(/[\\/]/).pop();
+  return lastSegment && lastSegment.trim().length > 0 ? lastSegment.trim() : dir.path;
+}
+
+export function resolveScanLibraryName(
+  payload: ScanProgress,
+  directories: MusicDirectory[]
+): string {
+  if (payload.directory_name && payload.directory_name.trim().length > 0) {
+    return payload.directory_name.trim();
+  }
+  if (payload.directory_id !== undefined) {
+    const matched = directories.find((d) => d.id === payload.directory_id);
+    if (matched) return getDirectoryDisplayName(matched);
+  }
+  if (payload.current_path) {
+    const matched = directories.find((d) => {
+      const normDir = d.path.replace(/\\/g, "/").toLowerCase();
+      const normCur = payload.current_path!.replace(/\\/g, "/").toLowerCase();
+      return normCur.startsWith(normDir);
+    });
+    if (matched) return getDirectoryDisplayName(matched);
+    const parent = payload.current_path.replace(/[\\/][^\\/]+$/, "").split(/[\\/]/).pop();
+    if (parent && parent.trim().length > 0) {
+      return parent.trim();
+    }
+  }
+  if (directories.length === 1) {
+    return getDirectoryDisplayName(directories[0]);
+  }
+  return i18n.t("tasks.libraryScan", {}, "Library");
+}
+
+export function getScanPhaseLabel(phase: ScanPhase): string {
+  switch (phase) {
+    case "discovering":
+      return i18n.t("tasks.scanPhaseDiscovering", {}, "discovering files");
+    case "reading_tags":
+      return i18n.t("tasks.scanPhaseReadingTags", {}, "reading tags");
+    case "checking_missing":
+      return i18n.t("tasks.scanPhaseCheckingMissing", {}, "checking missing tracks");
+    case "resolving_artwork":
+      return i18n.t("tasks.scanPhaseResolvingArtwork", {}, "resolving artwork");
+    case "updating":
+    default:
+      return i18n.t("tasks.scanPhaseUpdating", {}, "updating library");
+  }
+}
 
 class CollectionStore {
   directories = $state<MusicDirectory[]>([]);
@@ -349,32 +404,33 @@ class CollectionStore {
         this.scanProgress = event.payload;
         this.isScanning = event.payload.phase !== "done";
 
+        const libraryName = resolveScanLibraryName(event.payload, this.directories);
         const scanTaskId = "library-scan";
+
         if (event.payload.phase !== "done") {
-          const phaseName = event.payload.phase === "discovering"
-            ? i18n.t("settings.phaseDiscovering", {}, "Discovering files...")
-            : event.payload.phase === "reading_tags"
-              ? i18n.t("settings.phaseReadingTags", {}, "Reading metadata...")
-              : i18n.t("settings.phaseUpdating", {}, "Updating library...");
-          const taskName = i18n.t("tasks.libraryScan", {}, "Refreshing library");
-          const label = `${taskName} (${phaseName})`;
+          const phaseName = getScanPhaseLabel(event.payload.phase);
+          const label = `${libraryName}: ${phaseName}`;
+
           if (!tasksStore.isTaskActive(scanTaskId)) {
             tasksStore.startTask({
               id: scanTaskId,
-              taskName,
+              taskName: libraryName,
               label,
               total: Number(event.payload.total) || undefined,
+              contextName: libraryName,
             });
           }
           tasksStore.updateTask(scanTaskId, {
             label,
             current: Number(event.payload.scanned),
             total: Number(event.payload.total) || undefined,
+            contextName: libraryName,
           });
         }
 
         if (event.payload.phase === "done") {
-          tasksStore.completeTask(scanTaskId, i18n.t("tasks.libraryScanDone", {}, "Library refreshed"));
+          const doneLabel = `${libraryName}: ${i18n.t("tasks.libraryScanDone", {}, "Library refreshed")}`;
+          tasksStore.completeTask(scanTaskId, doneLabel);
           const nowStr = new Date().toLocaleString();
           this.lastScanTime = nowStr;
           this.refreshDirectories();

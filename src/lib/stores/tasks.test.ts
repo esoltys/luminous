@@ -78,4 +78,12 @@ describe("TasksStore", () => {
     expect(tasksStore.isTaskActive(id)).toBe(false);
     expect(tasksStore.tasks[0].status).toBe("cancelled");
   });
+
+  it("tracks and updates contextName on tasks", () => {
+    const id = tasksStore.startTask({ label: "Scanning...", contextName: "My Library" });
+    expect(tasksStore.tasks[0].contextName).toBe("My Library");
+
+    tasksStore.updateTask(id, { contextName: "Fast SSD" });
+    expect(tasksStore.tasks[0].contextName).toBe("Fast SSD");
+  });
 });
