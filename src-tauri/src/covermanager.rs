@@ -813,7 +813,10 @@ impl CoverManager {
         for row in rows.flatten() {
             let (song_album, song_path_str) = row;
             let p = Path::new(&song_path_str);
-            if p.parent().map(|parent| normalize_path_cmp(parent, album_dir)).unwrap_or(false) {
+            if p.parent()
+                .map(|parent| normalize_path_cmp(parent, album_dir))
+                .unwrap_or(false)
+            {
                 song_count += 1;
                 match song_album {
                     Some(a) if !a.trim().is_empty() => {
@@ -889,7 +892,10 @@ impl CoverManager {
             let p = Path::new(&song_path_str);
             if let Some(parent) = p.parent() {
                 let in_artist_dir = normalize_path_cmp(parent, artist_dir)
-                    || parent.parent().map(|g| normalize_path_cmp(g, artist_dir)).unwrap_or(false);
+                    || parent
+                        .parent()
+                        .map(|g| normalize_path_cmp(g, artist_dir))
+                        .unwrap_or(false);
                 if in_artist_dir {
                     song_count += 1;
                     match song_artist {
@@ -930,7 +936,9 @@ impl CoverManager {
         }
 
         // Never overwrite existing folder art or existing cover.jpg
-        if Self::scan_folder_art_static(audio_path).is_some() || album_dir.join("cover.jpg").exists() {
+        if Self::scan_folder_art_static(audio_path).is_some()
+            || album_dir.join("cover.jpg").exists()
+        {
             return None;
         }
 
@@ -975,9 +983,9 @@ impl CoverManager {
 
         // Never overwrite an existing portrait
         if ARTIST_PORTRAIT_NAMES.iter().any(|stem| {
-            EXTENDED_ARTWORK_EXTENSIONS.iter().any(|ext| {
-                artist_dir.join(format!("{stem}.{ext}")).exists()
-            })
+            EXTENDED_ARTWORK_EXTENSIONS
+                .iter()
+                .any(|ext| artist_dir.join(format!("{stem}.{ext}")).exists())
         }) {
             return None;
         }
@@ -997,7 +1005,10 @@ impl CoverManager {
             return None;
         }
 
-        log::info!("Saved sidecar artist portrait to: {}", artist_path.display());
+        log::info!(
+            "Saved sidecar artist portrait to: {}",
+            artist_path.display()
+        );
         Some(artist_path)
     }
 
@@ -1021,9 +1032,9 @@ impl CoverManager {
 
         // Never overwrite an existing logo
         if BAND_LOGO_NAMES.iter().any(|stem| {
-            EXTENDED_ARTWORK_EXTENSIONS.iter().any(|ext| {
-                artist_dir.join(format!("{stem}.{ext}")).exists()
-            })
+            EXTENDED_ARTWORK_EXTENSIONS
+                .iter()
+                .any(|ext| artist_dir.join(format!("{stem}.{ext}")).exists())
         }) {
             return None;
         }
@@ -1036,7 +1047,11 @@ impl CoverManager {
         }
 
         if let Err(e) = std::fs::write(&logo_path, cleaned) {
-            log::warn!("Failed to write sidecar band logo to {:?}: {}", logo_path, e);
+            log::warn!(
+                "Failed to write sidecar band logo to {:?}: {}",
+                logo_path,
+                e
+            );
             return None;
         }
 
@@ -1064,9 +1079,9 @@ impl CoverManager {
 
         // Never overwrite an existing fanart banner
         if FANART_NAMES.iter().any(|stem| {
-            EXTENDED_ARTWORK_EXTENSIONS.iter().any(|ext| {
-                artist_dir.join(format!("{stem}.{ext}")).exists()
-            })
+            EXTENDED_ARTWORK_EXTENSIONS
+                .iter()
+                .any(|ext| artist_dir.join(format!("{stem}.{ext}")).exists())
         }) {
             return None;
         }
@@ -1122,7 +1137,9 @@ impl CoverManager {
             return Ok(None);
         };
 
-        if let Some(sidecar_path) = self.try_save_album_cover_sidecar(audio_path, album_artist, album, &raw_data) {
+        if let Some(sidecar_path) =
+            self.try_save_album_cover_sidecar(audio_path, album_artist, album, &raw_data)
+        {
             let filename = sidecar_path.to_string_lossy().to_string();
             if let Some(extracted) = &self.extracted_albums {
                 extracted.lock().insert(hash_name, filename.clone());
@@ -2477,7 +2494,8 @@ mod tests {
                 path: Some(song1.to_string_lossy().to_string()),
                 ..Default::default()
             },
-        ).unwrap();
+        )
+        .unwrap();
         crate::collection::upsert_song(
             &conn,
             &crate::models::Song {
@@ -2488,7 +2506,8 @@ mod tests {
                 path: Some(song2.to_string_lossy().to_string()),
                 ..Default::default()
             },
-        ).unwrap();
+        )
+        .unwrap();
 
         let manager = CoverManager::new(db.clone(), temp_dir.clone());
         assert!(manager.is_eligible_album_dir(&album_dir, "Album"));
@@ -2507,7 +2526,8 @@ mod tests {
                 path: Some(song3.to_string_lossy().to_string()),
                 ..Default::default()
             },
-        ).unwrap();
+        )
+        .unwrap();
 
         assert!(!manager.is_eligible_album_dir(&album_dir, "Album"));
     }
@@ -2535,7 +2555,8 @@ mod tests {
                 path: Some(song1.to_string_lossy().to_string()),
                 ..Default::default()
             },
-        ).unwrap();
+        )
+        .unwrap();
 
         let manager = CoverManager::new(db.clone(), temp_dir.clone());
         assert!(manager.is_eligible_artist_dir(&artist_dir, "Band"));
@@ -2544,7 +2565,8 @@ mod tests {
         conn.execute(
             "INSERT INTO directories (path) VALUES (?1)",
             params![artist_dir.to_string_lossy().to_string()],
-        ).unwrap();
+        )
+        .unwrap();
         assert!(!manager.is_eligible_artist_dir(&artist_dir, "Band"));
     }
 
@@ -2570,23 +2592,29 @@ mod tests {
                 path: Some(song1.to_string_lossy().to_string()),
                 ..Default::default()
             },
-        ).unwrap();
+        )
+        .unwrap();
 
         let self_writes = Arc::new(crate::collection::SelfWriteTracker::new());
         let manager = CoverManager::new(db.clone(), temp_dir.clone())
             .with_self_writes(Arc::clone(&self_writes));
 
-        let raw_art = b"\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01\x01\x01\x00`\x00`\x00\x00\xFF\xDB\x00C\x00";
+        let raw_art =
+            b"\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01\x01\x01\x00`\x00`\x00\x00\xFF\xDB\x00C\x00";
 
         // 1. Off by default: returns None, no file written
-        assert_eq!(manager.try_save_album_cover_sidecar(&song1, "Band", "Album", raw_art), None);
+        assert_eq!(
+            manager.try_save_album_cover_sidecar(&song1, "Band", "Album", raw_art),
+            None
+        );
         assert!(!album_dir.join("cover.jpg").exists());
 
         // 2. Enable save_artwork_to_folders
         conn.execute(
             "INSERT INTO app_state (key, value) VALUES ('save_artwork_to_folders', 'true')",
             [],
-        ).unwrap();
+        )
+        .unwrap();
 
         // Create a fake cache file in covers_dir to ensure it gets removed
         let hash = manager.get_album_hash("Band", "Album");
@@ -2597,7 +2625,10 @@ mod tests {
         let written = manager.try_save_album_cover_sidecar(&song1, "Band", "Album", raw_art);
         assert_eq!(written, Some(album_dir.join("cover.jpg")));
         assert!(album_dir.join("cover.jpg").exists());
-        assert!(!cached_path.exists(), "Cache copy should be dropped after sidecar write");
+        assert!(
+            !cached_path.exists(),
+            "Cache copy should be dropped after sidecar write"
+        );
 
         // 3. Never overwrite existing cover.jpg
         let written_again = manager.try_save_album_cover_sidecar(&song1, "Band", "Album", raw_art);
@@ -2627,23 +2658,29 @@ mod tests {
                 path: Some(song1.to_string_lossy().to_string()),
                 ..Default::default()
             },
-        ).unwrap();
+        )
+        .unwrap();
 
         let self_writes = Arc::new(crate::collection::SelfWriteTracker::new());
         let manager = CoverManager::new(db.clone(), temp_dir.clone())
             .with_self_writes(Arc::clone(&self_writes));
 
-        let raw_art = b"\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01\x01\x01\x00`\x00`\x00\x00\xFF\xDB\x00C\x00";
+        let raw_art =
+            b"\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01\x01\x01\x00`\x00`\x00\x00\xFF\xDB\x00C\x00";
 
         // 1. Off by default
-        assert_eq!(manager.try_save_artist_portrait_sidecar(&artist_dir, "Band", raw_art), None);
+        assert_eq!(
+            manager.try_save_artist_portrait_sidecar(&artist_dir, "Band", raw_art),
+            None
+        );
         assert!(!artist_dir.join("artist.jpg").exists());
 
         // 2. Enable
         conn.execute(
             "INSERT INTO app_state (key, value) VALUES ('save_artwork_to_folders', 'true')",
             [],
-        ).unwrap();
+        )
+        .unwrap();
 
         let written = manager.try_save_artist_portrait_sidecar(&artist_dir, "Band", raw_art);
         assert_eq!(written, Some(artist_dir.join("artist.jpg")));
@@ -2677,7 +2714,8 @@ mod tests {
                 path: Some(song1.to_string_lossy().to_string()),
                 ..Default::default()
             },
-        ).unwrap();
+        )
+        .unwrap();
 
         let self_writes = Arc::new(crate::collection::SelfWriteTracker::new());
         let manager = CoverManager::new(db.clone(), temp_dir.clone())
@@ -2686,14 +2724,18 @@ mod tests {
         let png_bytes = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00];
 
         // 1. Off by default
-        assert_eq!(manager.try_save_band_logo_sidecar(&artist_dir, "Band", png_bytes), None);
+        assert_eq!(
+            manager.try_save_band_logo_sidecar(&artist_dir, "Band", png_bytes),
+            None
+        );
         assert!(!artist_dir.join("logo.png").exists());
 
         // 2. Enable
         conn.execute(
             "INSERT INTO app_state (key, value) VALUES ('save_artwork_to_folders', 'true')",
             [],
-        ).unwrap();
+        )
+        .unwrap();
 
         let written = manager.try_save_band_logo_sidecar(&artist_dir, "Band", png_bytes);
         assert_eq!(written, Some(artist_dir.join("logo.png")));
@@ -2727,23 +2769,29 @@ mod tests {
                 path: Some(song1.to_string_lossy().to_string()),
                 ..Default::default()
             },
-        ).unwrap();
+        )
+        .unwrap();
 
         let self_writes = Arc::new(crate::collection::SelfWriteTracker::new());
         let manager = CoverManager::new(db.clone(), temp_dir.clone())
             .with_self_writes(Arc::clone(&self_writes));
 
-        let raw_art = b"\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01\x01\x01\x00`\x00`\x00\x00\xFF\xDB\x00C\x00";
+        let raw_art =
+            b"\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01\x01\x01\x00`\x00`\x00\x00\xFF\xDB\x00C\x00";
 
         // 1. Off by default
-        assert_eq!(manager.try_save_fanart_banner_sidecar(&artist_dir, "Band", raw_art), None);
+        assert_eq!(
+            manager.try_save_fanart_banner_sidecar(&artist_dir, "Band", raw_art),
+            None
+        );
         assert!(!artist_dir.join("banner.jpg").exists());
 
         // 2. Enable
         conn.execute(
             "INSERT INTO app_state (key, value) VALUES ('save_artwork_to_folders', 'true')",
             [],
-        ).unwrap();
+        )
+        .unwrap();
 
         let written = manager.try_save_fanart_banner_sidecar(&artist_dir, "Band", raw_art);
         assert_eq!(written, Some(artist_dir.join("banner.jpg")));

@@ -1024,11 +1024,8 @@ pub fn run() {
             let self_writes = Arc::new(collection::SelfWriteTracker::new());
 
             let cover_manager = Arc::new(
-                CoverManager::new(
-                    Arc::clone(&db),
-                    crate::paths::resolve_app_data_dir(app),
-                )
-                .with_self_writes(Arc::clone(&self_writes)),
+                CoverManager::new(Arc::clone(&db), crate::paths::resolve_app_data_dir(app))
+                    .with_self_writes(Arc::clone(&self_writes)),
             );
 
             // Spawn real-time visualizer spectrum emission loop (Tokio)
@@ -1127,28 +1124,36 @@ pub fn run() {
                 let covers_dir = cover_mgr.covers_dir().to_path_buf();
                 let app_handle = app.handle().clone();
                 tauri::async_runtime::spawn(async move {
-                    let has_pending = db_clone.pool.get().map(|conn| {
-                        let has_albums = conn.query_row(
-                            "SELECT 1 FROM songs
+                    let has_pending = db_clone
+                        .pool
+                        .get()
+                        .map(|conn| {
+                            let has_albums = conn
+                                .query_row(
+                                    "SELECT 1 FROM songs
                              WHERE art_automatic LIKE 'album-%'
                                AND (source IN (1, 2) OR source IS NULL)
                                AND album IS NOT NULL AND TRIM(album) != ''
                                AND path IS NOT NULL
                              LIMIT 1",
-                            [],
-                            |_| Ok(true),
-                        ).unwrap_or(false);
-                        let has_artists = conn.query_row(
-                            "SELECT 1 FROM artist_profiles
+                                    [],
+                                    |_| Ok(true),
+                                )
+                                .unwrap_or(false);
+                            let has_artists = conn
+                                .query_row(
+                                    "SELECT 1 FROM artist_profiles
                              WHERE fetched_image_filename IS NOT NULL
                                 OR fetched_logo_filename IS NOT NULL
                                 OR fetched_background_filename IS NOT NULL
                              LIMIT 1",
-                            [],
-                            |_| Ok(true),
-                        ).unwrap_or(false);
-                        has_albums || has_artists
-                    }).unwrap_or(false);
+                                    [],
+                                    |_| Ok(true),
+                                )
+                                .unwrap_or(false);
+                            has_albums || has_artists
+                        })
+                        .unwrap_or(false);
 
                     if has_pending {
                         log::info!("Resuming pending artwork sidecar sweep in background...");
@@ -1159,7 +1164,8 @@ pub fn run() {
                             move |payload| {
                                 let _ = app_handle.emit("artwork-sweep-progress", payload);
                             },
-                        ).await;
+                        )
+                        .await;
                     }
                 });
             }

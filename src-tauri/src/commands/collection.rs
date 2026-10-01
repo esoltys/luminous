@@ -1505,20 +1505,24 @@ pub async fn retrieve_artist_image(
                 if let Some(ref dir) = artist_dir {
                     if let Ok(resp) = client.get(&url).send().await {
                         if let Ok(bytes) = resp.bytes().await {
-                            if let Some(sidecar_path) = state.cover_manager.try_save_artist_portrait_sidecar(
-                                dir,
-                                &artist,
-                                &bytes,
-                            ) {
-                                let local_uri = crate::covermanager::local_artwork_uri(&sidecar_path);
+                            if let Some(sidecar_path) = state
+                                .cover_manager
+                                .try_save_artist_portrait_sidecar(dir, &artist, &bytes)
+                            {
+                                let local_uri =
+                                    crate::covermanager::local_artwork_uri(&sidecar_path);
                                 result.uri = Some(local_uri);
                                 result.source = Some(source.as_str().to_string());
                                 profile.fetched_image_filename = None;
                                 profile.fetched_image_source = Some(source.as_str().to_string());
                                 profile.image_fetched = true;
                                 sidecar_written = true;
-                                let _ = std::fs::remove_file(state.cover_manager.covers_dir().join(format!("{stem}.jpg")));
-                                let _ = std::fs::remove_file(state.cover_manager.covers_dir().join(format!("{stem}.png")));
+                                let _ = std::fs::remove_file(
+                                    state.cover_manager.covers_dir().join(format!("{stem}.jpg")),
+                                );
+                                let _ = std::fs::remove_file(
+                                    state.cover_manager.covers_dir().join(format!("{stem}.png")),
+                                );
                             }
                         }
                     }
@@ -1546,18 +1550,28 @@ pub async fn retrieve_artist_image(
                 if let Some(ref dir) = artist_dir {
                     if let Ok(resp) = client.get(&url).send().await {
                         if let Ok(bytes) = resp.bytes().await {
-                            if let Some(sidecar_path) = state.cover_manager.try_save_band_logo_sidecar(
-                                dir,
-                                &artist,
-                                &bytes,
-                            ) {
-                                let local_uri = crate::covermanager::local_artwork_uri(&sidecar_path);
+                            if let Some(sidecar_path) = state
+                                .cover_manager
+                                .try_save_band_logo_sidecar(dir, &artist, &bytes)
+                            {
+                                let local_uri =
+                                    crate::covermanager::local_artwork_uri(&sidecar_path);
                                 result.logo_uri = Some(local_uri);
                                 profile.fetched_logo_filename = None;
                                 profile.logo_fetched = true;
                                 sidecar_written = true;
-                                let _ = std::fs::remove_file(state.cover_manager.covers_dir().join(format!("{stem}_logo.jpg")));
-                                let _ = std::fs::remove_file(state.cover_manager.covers_dir().join(format!("{stem}_logo.png")));
+                                let _ = std::fs::remove_file(
+                                    state
+                                        .cover_manager
+                                        .covers_dir()
+                                        .join(format!("{stem}_logo.jpg")),
+                                );
+                                let _ = std::fs::remove_file(
+                                    state
+                                        .cover_manager
+                                        .covers_dir()
+                                        .join(format!("{stem}_logo.png")),
+                                );
                             }
                         }
                     }
@@ -1590,18 +1604,28 @@ pub async fn retrieve_artist_image(
                 if let Some(ref dir) = artist_dir {
                     if let Ok(resp) = client.get(&url).send().await {
                         if let Ok(bytes) = resp.bytes().await {
-                            if let Some(sidecar_path) = state.cover_manager.try_save_fanart_banner_sidecar(
-                                dir,
-                                &artist,
-                                &bytes,
-                            ) {
-                                let local_uri = crate::covermanager::local_artwork_uri(&sidecar_path);
+                            if let Some(sidecar_path) = state
+                                .cover_manager
+                                .try_save_fanart_banner_sidecar(dir, &artist, &bytes)
+                            {
+                                let local_uri =
+                                    crate::covermanager::local_artwork_uri(&sidecar_path);
                                 result.background_uri = Some(local_uri);
                                 profile.fetched_background_filename = None;
                                 profile.background_fetched = true;
                                 sidecar_written = true;
-                                let _ = std::fs::remove_file(state.cover_manager.covers_dir().join(format!("{stem}_background.jpg")));
-                                let _ = std::fs::remove_file(state.cover_manager.covers_dir().join(format!("{stem}_background.png")));
+                                let _ = std::fs::remove_file(
+                                    state
+                                        .cover_manager
+                                        .covers_dir()
+                                        .join(format!("{stem}_background.jpg")),
+                                );
+                                let _ = std::fs::remove_file(
+                                    state
+                                        .cover_manager
+                                        .covers_dir()
+                                        .join(format!("{stem}_background.png")),
+                                );
                             }
                         }
                     }
@@ -2721,14 +2745,19 @@ mod tests {
         let covers_dir = temp_dir.join("covers");
         std::fs::create_dir_all(&covers_dir).unwrap();
         let cached_cover = covers_dir.join("album-1234567890abcdef.jpg");
-        std::fs::write(&cached_cover, b"\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01\x01\x01\x00`\x00`\x00\x00\xFF\xDB\x00C\x00").unwrap();
+        std::fs::write(
+            &cached_cover,
+            b"\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01\x01\x01\x00`\x00`\x00\x00\xFF\xDB\x00C\x00",
+        )
+        .unwrap();
 
         {
             let conn = db.pool.get().unwrap();
             conn.execute(
                 "INSERT INTO app_state (key, value) VALUES ('save_artwork_to_folders', 'true')",
                 [],
-            ).unwrap();
+            )
+            .unwrap();
             crate::collection::upsert_song(
                 &conn,
                 &crate::models::Song {
@@ -2740,12 +2769,14 @@ mod tests {
                     art_automatic: Some("album-1234567890abcdef.jpg".into()),
                     ..Default::default()
                 },
-            ).unwrap();
+            )
+            .unwrap();
         }
 
-        let cover_manager = Arc::new(
-            crate::covermanager::CoverManager::new(Arc::clone(&db), temp_dir.clone())
-        );
+        let cover_manager = Arc::new(crate::covermanager::CoverManager::new(
+            Arc::clone(&db),
+            temp_dir.clone(),
+        ));
 
         let progress_events = Arc::new(std::sync::Mutex::new(Vec::new()));
         let progress_events_clone = Arc::clone(&progress_events);
@@ -2768,11 +2799,12 @@ mod tests {
         assert!(album_dir.join("cover.jpg").exists());
         assert!(!cached_cover.exists(), "Cached cover should be removed");
 
-        let updated_art: String = db.pool.get().unwrap().query_row(
-            "SELECT art_automatic FROM songs",
-            [],
-            |r| r.get(0),
-        ).unwrap();
+        let updated_art: String = db
+            .pool
+            .get()
+            .unwrap()
+            .query_row("SELECT art_automatic FROM songs", [], |r| r.get(0))
+            .unwrap();
         assert!(updated_art.ends_with("cover.jpg"));
     }
 }
