@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent, waitFor } from "@testing-library/svelte";
 import { confirm } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
+import { prefs } from "../stores/prefs.svelte";
 import SettingsFolders from "./SettingsFolders.svelte";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -75,6 +76,14 @@ vi.mock("@tauri-apps/api/core", () => ({
     }
     if (cmd === "get_all_app_settings") {
       return Promise.resolve({});
+    }
+    if (cmd === "sweep_artwork_to_folders") {
+      return Promise.resolve({
+        album_covers_exported: 2,
+        artist_portraits_exported: 1,
+        band_logos_exported: 1,
+        banners_exported: 1,
+      });
     }
     return Promise.resolve(null);
   }),
@@ -205,10 +214,51 @@ describe("SettingsFolders.svelte - Default library", () => {
 });
 
 describe("SettingsFolders.svelte - Save artwork to folders", () => {
+  beforeEach(() => {
+    prefs.saveArtworkToFolders = false;
+    vi.clearAllMocks();
+  });
+
   it("renders the save artwork to folders toggle", async () => {
     const { findByLabelText } = render(SettingsFolders);
     const toggle = await findByLabelText("Save artwork next to your music");
     expect(toggle).toBeInTheDocument();
+  });
+
+  it("opens confirmation dialog when toggling on and triggers sweep when confirmed", async () => {
+    const { findByLabelText, findByText, queryByText } = render(SettingsFolders);
+    const toggle = await findByLabelText("Save artwork next to your music");
+    expect(toggle).toBeInTheDocument();
+
+    await fireEvent.click(toggle);
+
+    // Modal should be visible
+    expect(await findByText("Export Artwork to Music Folders")).toBeInTheDocument();
+    expect(await findByText("Export Artwork")).toBeInTheDocument();
+
+    // Confirm
+    const confirmBtn = await findByText("Export Artwork");
+    await fireEvent.click(confirmBtn);
+
+    await waitFor(() => {
+      expect(queryByText("Export Artwork to Music Folders")).not.toBeInTheDocument();
+    });
+    expect(invoke).toHaveBeenCalledWith("sweep_artwork_to_folders");
+  });
+
+  it("closes confirmation dialog without enabling when cancelled", async () => {
+    const { findByLabelText, findByText, queryByText } = render(SettingsFolders);
+    const toggle = await findByLabelText("Save artwork next to your music");
+
+    await fireEvent.click(toggle);
+    expect(await findByText("Export Artwork to Music Folders")).toBeInTheDocument();
+
+    const cancelBtn = await findByText("Cancel");
+    await fireEvent.click(cancelBtn);
+
+    await waitFor(() => {
+      expect(queryByText("Export Artwork to Music Folders")).not.toBeInTheDocument();
+    });
   });
 });
 

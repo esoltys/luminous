@@ -1001,6 +1001,96 @@ impl CoverManager {
         Some(artist_path)
     }
 
+    /// Attempt to write a `logo.png` (or `.jpg`) sidecar file into `artist_dir`:
+    /// Returns `Some(PathBuf)` if written, or `None` if skipped/failed/disabled (#1274).
+    pub fn try_save_band_logo_sidecar(
+        &self,
+        artist_dir: &Path,
+        artist_name: &str,
+        raw_data: &[u8],
+    ) -> Option<PathBuf> {
+        let conn = self.db.pool.get().ok()?;
+        let prefs = crate::commands::settings::load_ui_preferences(&conn);
+        if !prefs.save_artwork_to_folders {
+            return None;
+        }
+
+        if !self.is_eligible_artist_dir(artist_dir, artist_name) {
+            return None;
+        }
+
+        // Never overwrite an existing logo
+        if BAND_LOGO_NAMES.iter().any(|stem| {
+            EXTENDED_ARTWORK_EXTENSIONS.iter().any(|ext| {
+                artist_dir.join(format!("{stem}.{ext}")).exists()
+            })
+        }) {
+            return None;
+        }
+
+        let (cleaned, _mime, ext) = detect_image_format_and_clean(raw_data);
+        let filename = format!("logo.{ext}");
+        let logo_path = artist_dir.join(&filename);
+        if let Some(tracker) = &self.self_writes {
+            tracker.mark_written([logo_path.clone()]);
+        }
+
+        if let Err(e) = std::fs::write(&logo_path, cleaned) {
+            log::warn!("Failed to write sidecar band logo to {:?}: {}", logo_path, e);
+            return None;
+        }
+
+        log::info!("Saved sidecar band logo to: {}", logo_path.display());
+        Some(logo_path)
+    }
+
+    /// Attempt to write a `banner.jpg` (or `.png`) sidecar file into `artist_dir`:
+    /// Returns `Some(PathBuf)` if written, or `None` if skipped/failed/disabled (#1274).
+    pub fn try_save_fanart_banner_sidecar(
+        &self,
+        artist_dir: &Path,
+        artist_name: &str,
+        raw_data: &[u8],
+    ) -> Option<PathBuf> {
+        let conn = self.db.pool.get().ok()?;
+        let prefs = crate::commands::settings::load_ui_preferences(&conn);
+        if !prefs.save_artwork_to_folders {
+            return None;
+        }
+
+        if !self.is_eligible_artist_dir(artist_dir, artist_name) {
+            return None;
+        }
+
+        // Never overwrite an existing fanart banner
+        if FANART_NAMES.iter().any(|stem| {
+            EXTENDED_ARTWORK_EXTENSIONS.iter().any(|ext| {
+                artist_dir.join(format!("{stem}.{ext}")).exists()
+            })
+        }) {
+            return None;
+        }
+
+        let (cleaned, _mime, ext) = detect_image_format_and_clean(raw_data);
+        let filename = format!("banner.{ext}");
+        let banner_path = artist_dir.join(&filename);
+        if let Some(tracker) = &self.self_writes {
+            tracker.mark_written([banner_path.clone()]);
+        }
+
+        if let Err(e) = std::fs::write(&banner_path, cleaned) {
+            log::warn!(
+                "Failed to write sidecar fanart banner to {:?}: {}",
+                banner_path,
+                e
+            );
+            return None;
+        }
+
+        log::info!("Saved sidecar fanart banner to: {}", banner_path.display());
+        Some(banner_path)
+    }
+
     /// Save the file's best embedded tag picture (if any) to the covers
     /// cache and return its cache filename. Returns `Ok(None)` — not an
     /// error — when the file has no tag or the tag has no picture; callers
@@ -2561,6 +2651,106 @@ mod tests {
 
         // 3. Never overwrite existing portrait
         let written_again = manager.try_save_artist_portrait_sidecar(&artist_dir, "Band", raw_art);
+        assert_eq!(written_again, None);
+    }
+
+    #[test]
+    fn test_try_save_band_logo_sidecar() {
+        let temp_dir_guard = unique_temp_dir("save_logo_sidecar");
+        let temp_dir = temp_dir_guard.path().to_path_buf();
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let artist_dir = temp_dir.join("Music").join("Band");
+        let album_dir = artist_dir.join("Album");
+        std::fs::create_dir_all(&album_dir).unwrap();
+
+        let song1 = album_dir.join("track1.flac");
+        std::fs::write(&song1, b"test").unwrap();
+
+        let conn = db.pool.get().unwrap();
+        crate::collection::upsert_song(
+            &conn,
+            &crate::models::Song {
+                artist: Some("Band".into()),
+                album: Some("Album".into()),
+                title: Some("Track 1".into()),
+                source: crate::models::SongSource::LocalFile,
+                path: Some(song1.to_string_lossy().to_string()),
+                ..Default::default()
+            },
+        ).unwrap();
+
+        let self_writes = Arc::new(crate::collection::SelfWriteTracker::new());
+        let manager = CoverManager::new(db.clone(), temp_dir.clone())
+            .with_self_writes(Arc::clone(&self_writes));
+
+        let png_bytes = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00];
+
+        // 1. Off by default
+        assert_eq!(manager.try_save_band_logo_sidecar(&artist_dir, "Band", png_bytes), None);
+        assert!(!artist_dir.join("logo.png").exists());
+
+        // 2. Enable
+        conn.execute(
+            "INSERT INTO app_state (key, value) VALUES ('save_artwork_to_folders', 'true')",
+            [],
+        ).unwrap();
+
+        let written = manager.try_save_band_logo_sidecar(&artist_dir, "Band", png_bytes);
+        assert_eq!(written, Some(artist_dir.join("logo.png")));
+        assert!(artist_dir.join("logo.png").exists());
+
+        // 3. Never overwrite existing logo
+        let written_again = manager.try_save_band_logo_sidecar(&artist_dir, "Band", png_bytes);
+        assert_eq!(written_again, None);
+    }
+
+    #[test]
+    fn test_try_save_fanart_banner_sidecar() {
+        let temp_dir_guard = unique_temp_dir("save_banner_sidecar");
+        let temp_dir = temp_dir_guard.path().to_path_buf();
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let artist_dir = temp_dir.join("Music").join("Band");
+        let album_dir = artist_dir.join("Album");
+        std::fs::create_dir_all(&album_dir).unwrap();
+
+        let song1 = album_dir.join("track1.flac");
+        std::fs::write(&song1, b"test").unwrap();
+
+        let conn = db.pool.get().unwrap();
+        crate::collection::upsert_song(
+            &conn,
+            &crate::models::Song {
+                artist: Some("Band".into()),
+                album: Some("Album".into()),
+                title: Some("Track 1".into()),
+                source: crate::models::SongSource::LocalFile,
+                path: Some(song1.to_string_lossy().to_string()),
+                ..Default::default()
+            },
+        ).unwrap();
+
+        let self_writes = Arc::new(crate::collection::SelfWriteTracker::new());
+        let manager = CoverManager::new(db.clone(), temp_dir.clone())
+            .with_self_writes(Arc::clone(&self_writes));
+
+        let raw_art = b"\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01\x01\x01\x00`\x00`\x00\x00\xFF\xDB\x00C\x00";
+
+        // 1. Off by default
+        assert_eq!(manager.try_save_fanart_banner_sidecar(&artist_dir, "Band", raw_art), None);
+        assert!(!artist_dir.join("banner.jpg").exists());
+
+        // 2. Enable
+        conn.execute(
+            "INSERT INTO app_state (key, value) VALUES ('save_artwork_to_folders', 'true')",
+            [],
+        ).unwrap();
+
+        let written = manager.try_save_fanart_banner_sidecar(&artist_dir, "Band", raw_art);
+        assert_eq!(written, Some(artist_dir.join("banner.jpg")));
+        assert!(artist_dir.join("banner.jpg").exists());
+
+        // 3. Never overwrite existing banner
+        let written_again = manager.try_save_fanart_banner_sidecar(&artist_dir, "Band", raw_art);
         assert_eq!(written_again, None);
     }
 }

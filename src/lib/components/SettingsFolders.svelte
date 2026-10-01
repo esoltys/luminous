@@ -17,6 +17,8 @@
   import FolderEditModal from "./FolderEditModal.svelte";
   import WebDavModal from "./WebDavModal.svelte";
   import SubsonicModal from "./SubsonicModal.svelte";
+  import ConfirmDialog from "./ConfirmDialog.svelte";
+  import { toastStore } from "../stores/toast.svelte";
   import type { MusicDirectory, SubsonicServer, SubsonicSyncStats, WebDavServer } from "../types";
   import { combineWebdavPath } from "../webdavDisplay";
   import { stripEnclosingQuotes } from "../utils/filterParser";
@@ -43,6 +45,48 @@
   let editingWebdavServer = $state<WebDavServer | null>(null);
   let syncingServerId = $state<number | null>(null);
   let syncFeedback = $state<string | null>(null);
+  let showSidecarConfirmModal = $state(false);
+  let isSweepingArtwork = $state(false);
+
+  function handleToggleSaveArtwork(v: boolean) {
+    if (v) {
+      showSidecarConfirmModal = true;
+    } else {
+      prefs.setSaveArtworkToFolders(false);
+    }
+  }
+
+  async function handleConfirmSaveArtwork() {
+    showSidecarConfirmModal = false;
+    await prefs.setSaveArtworkToFolders(true);
+    isSweepingArtwork = true;
+    try {
+      const res = await invoke<{
+        album_covers_exported: number;
+        artist_portraits_exported: number;
+        band_logos_exported: number;
+        banners_exported: number;
+      }>("sweep_artwork_to_folders");
+      const total =
+        (res?.album_covers_exported ?? 0) +
+        (res?.artist_portraits_exported ?? 0) +
+        (res?.band_logos_exported ?? 0) +
+        (res?.banners_exported ?? 0);
+      if (total > 0) {
+        toastStore.show(i18n.t("settings.artworkSweepSuccess", { count: total }), "success");
+      } else {
+        toastStore.show(i18n.t("settings.artworkSweepNone"), "info");
+      }
+    } catch (e) {
+      console.error("Failed to sweep artwork:", e);
+    } finally {
+      isSweepingArtwork = false;
+    }
+  }
+
+  function handleCancelSaveArtwork() {
+    showSidecarConfirmModal = false;
+  }
   /** Live reachability per server id, refreshed whenever the list loads —
    * `undefined` while the check is still in flight. This is a network call,
    * unlike a watched folder's `is_available` (a cheap local `Path::exists()`
@@ -775,7 +819,8 @@
       </div>
       <Toggle
         checked={prefs.saveArtworkToFolders}
-        onchange={(v) => prefs.setSaveArtworkToFolders(v)}
+        onchange={handleToggleSaveArtwork}
+        disabled={isSweepingArtwork}
         label={i18n.t('settings.saveArtworkToFoldersLabel')}
       />
     </div>
@@ -817,3 +862,15 @@
   </div>
 </div>
 </div>
+
+{#if showSidecarConfirmModal}
+  <ConfirmDialog
+    title={i18n.t('settings.saveArtworkToFoldersModalTitle')}
+    message={i18n.t('settings.saveArtworkToFoldersModalMessage')}
+    confirmLabel={i18n.t('settings.saveArtworkToFoldersModalConfirm')}
+    cancelLabel={i18n.t('settings.saveArtworkToFoldersModalCancel')}
+    danger={false}
+    onConfirm={handleConfirmSaveArtwork}
+    onCancel={handleCancelSaveArtwork}
+  />
+{/if}
