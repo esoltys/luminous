@@ -12,6 +12,7 @@ use serde::Serialize;
 use std::path::Path;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State};
+use tauri_plugin_opener::OpenerExt;
 
 #[tauri::command]
 pub async fn add_directory(
@@ -393,23 +394,74 @@ pub async fn get_top_albums(
     .map_err(|e| e.to_string())
 }
 
-/// Extracts just the prose portion of a sidecar file's content: everything
-/// before the first `## `-prefixed Markdown heading (`## Tags`, `## Links`)
-/// that `build_artist_md_content`/`build_album_md_content` append. Without
-/// this, reading back a file we wrote ourselves would fold the rendered
-/// Tags/Links sections into the plain-text bio/description field, corrupting
-/// it the moment only tags or links (no bio) were saved — the whole file
-/// content (e.g. `"## Tags\n- canadian"`) would get adopted as the bio.
-fn extract_bio_prose(content: &str) -> Option<String> {
-    let mut prose_sections: Vec<&str> = Vec::new();
-    for section in content.split("\n\n") {
-        if section.trim_start().starts_with("## ") {
-            break;
-        }
-        prose_sections.push(section);
+fn is_generated_tags_section(section: &str) -> bool {
+    let trimmed = section.trim();
+    if let Some(rest) = trimmed.strip_prefix("## Tags") {
+        let lines: Vec<&str> = rest
+            .lines()
+            .map(str::trim)
+            .filter(|l| !l.is_empty())
+            .collect();
+        !lines.is_empty() && lines.iter().all(|l| l.starts_with("- "))
+    } else {
+        false
     }
-    let joined = prose_sections.join("\n\n");
-    let trimmed = joined.trim();
+}
+
+fn is_generated_links_section(section: &str) -> bool {
+    let trimmed = section.trim();
+    if let Some(rest) = trimmed.strip_prefix("## Links") {
+        let lines: Vec<&str> = rest
+            .lines()
+            .map(str::trim)
+            .filter(|l| !l.is_empty())
+            .collect();
+        !lines.is_empty() && lines.iter().all(|l| l.starts_with("- "))
+    } else {
+        false
+    }
+}
+
+fn strip_trailing_links_section(text: &str) -> &str {
+    let trimmed = text.trim_end();
+    if let Some(pos) = trimmed.rfind("\n## Links") {
+        let section = &trimmed[pos + 1..];
+        if is_generated_links_section(section) {
+            return trimmed[..pos].trim_end();
+        }
+    } else if trimmed.starts_with("## Links") && is_generated_links_section(trimmed) {
+        return "";
+    }
+    trimmed
+}
+
+fn strip_trailing_tags_section(text: &str) -> &str {
+    let trimmed = text.trim_end();
+    if let Some(pos) = trimmed.rfind("\n## Tags") {
+        let section = &trimmed[pos + 1..];
+        if is_generated_tags_section(section) {
+            return trimmed[..pos].trim_end();
+        }
+    } else if trimmed.starts_with("## Tags") && is_generated_tags_section(trimmed) {
+        return "";
+    }
+    trimmed
+}
+
+/// Extracts the prose portion of a sidecar file's content.
+///
+/// In older Luminous versions, sidecars mirrored the whole profile by appending
+/// generated `## Tags` and `## Links` sections. To maintain backward compatibility
+/// with existing sidecars on disk, any trailing generated `## Links` or `## Tags`
+/// section produced by the old writer is stripped on read.
+///
+/// Unlike the legacy extractor which truncated at the very first `## ` heading,
+/// any headings authored by the user (e.g. `## Biography`, `### Discography`)
+/// are preserved in full.
+fn extract_bio_prose(content: &str) -> Option<String> {
+    let without_links = strip_trailing_links_section(content);
+    let without_tags = strip_trailing_tags_section(without_links);
+    let trimmed = without_tags.trim();
     if trimmed.is_empty() {
         None
     } else {
@@ -454,109 +506,26 @@ fn write_bio_sidecar(
     }
 }
 
-/// Renders a `## Links` section as a Markdown bullet list: `[label](url)`
-/// for anything URL-shaped, a plain `label: value` bullet otherwise. Shared
-/// by the artist (website + social links) and album (website + links)
-/// sidecar writers so both mirror the same visual convention.
-fn format_links_section(website: Option<&str>, links: &[(&str, &str)]) -> Option<String> {
-    let mut bullets: Vec<String> = Vec::new();
-    if let Some(site) = website {
-        let site = site.trim();
-        if !site.is_empty() {
-            bullets.push(format!("- [Website]({site})"));
-        }
-    }
-    for (platform, handle_or_url) in links {
-        let handle = handle_or_url.trim();
-        if handle.is_empty() {
-            continue;
-        }
-        let mut chars = platform.chars();
-        let label = match chars.next() {
-            Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
-            None => continue,
-        };
-        if handle.starts_with("http://") || handle.starts_with("https://") {
-            bullets.push(format!("- [{label}]({handle})"));
-        } else {
-            bullets.push(format!("- {label}: {handle}"));
-        }
-    }
-    if bullets.is_empty() {
-        None
-    } else {
-        Some(format!("## Links\n{}", bullets.join("\n")))
-    }
-}
-
-/// Renders a `## Tags` section as a Markdown bullet list, or `None` if
-/// there are no tags.
-fn format_tags_section(tags: &[String]) -> Option<String> {
-    let bullets: Vec<String> = tags
-        .iter()
-        .map(|t| t.trim())
-        .filter(|t| !t.is_empty())
-        .map(|t| format!("- {t}"))
-        .collect();
-    if bullets.is_empty() {
-        None
-    } else {
-        Some(format!("## Tags\n{}", bullets.join("\n")))
-    }
-}
-
-/// Builds the full text to write to `artist.md`: the bio, followed by tags
-/// and by the website/social links as Markdown lists. Keeps the sidecar file
-/// a complete, human-readable mirror of the profile rather than just the bio
-/// paragraph. Returns `None` when there's nothing to write.
+/// Builds the text to write to `artist.md`: the bio verbatim, without
+/// metadata sections. Tags and links stay in the database only.
 fn build_artist_md_content(profile: &ArtistProfile) -> Option<String> {
-    let mut sections: Vec<String> = Vec::new();
-    if let Some(bio) = profile.bio.as_deref() {
-        let trimmed = bio.trim();
-        if !trimmed.is_empty() {
-            sections.push(trimmed.to_string());
-        }
-    }
-    sections.extend(format_tags_section(&profile.tags));
-    let links: Vec<(&str, &str)> = profile
-        .social_links
-        .iter()
-        .map(|l| (l.platform.as_str(), l.handle_or_url.as_str()))
-        .collect();
-    sections.extend(format_links_section(profile.website.as_deref(), &links));
-
-    if sections.is_empty() {
-        None
-    } else {
-        Some(sections.join("\n\n"))
-    }
+    profile
+        .bio
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(ToString::to_string)
 }
 
-/// Same as `build_artist_md_content`, for `album.md` (#950's `description`/
-/// `links` fields). No "## Tags" section here, unlike the artist version —
-/// an album has no curated tag list of its own to mirror (#962 removed
-/// `album_profiles.tags`; the embedded `songs.genre` tag is the only tag
-/// list an album has, and it's already on disk in each track's own file).
+/// Same as `build_artist_md_content`, for `album.md`. The description verbatim,
+/// without metadata sections. Links stay in the database only.
 fn build_album_md_content(profile: &AlbumProfile) -> Option<String> {
-    let mut sections: Vec<String> = Vec::new();
-    if let Some(description) = profile.description.as_deref() {
-        let trimmed = description.trim();
-        if !trimmed.is_empty() {
-            sections.push(trimmed.to_string());
-        }
-    }
-    let links: Vec<(&str, &str)> = profile
-        .links
-        .iter()
-        .map(|l| (l.platform.as_str(), l.handle_or_url.as_str()))
-        .collect();
-    sections.extend(format_links_section(profile.website.as_deref(), &links));
-
-    if sections.is_empty() {
-        None
-    } else {
-        Some(sections.join("\n\n"))
-    }
+    profile
+        .description
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(ToString::to_string)
 }
 
 /// Retrieve an artist's customizable profile (#473). If the DB has no bio
@@ -783,6 +752,114 @@ pub async fn get_all_album_profiles(
     })
     .await
     .map_err(|e| e.to_string())
+}
+
+/// Opens an artist's `artist.md` bio sidecar file in the OS default editor.
+/// If the file does not exist yet on disk, writes `current_content` first.
+#[tauri::command]
+pub async fn open_artist_bio_file(
+    app: AppHandle,
+    artist: String,
+    current_content: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let song_path = crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        scanner.get_representative_song_path_for_artist(&artist)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .ok_or_else(|| "No local audio files found for this artist.".to_string())?;
+
+    let sidecar_path = biomanager::artist_bio_path(Path::new(&song_path))
+        .ok_or_else(|| "Could not determine folder for this artist.".to_string())?;
+
+    if !sidecar_path.exists() {
+        if let Some(parent) = sidecar_path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let content_to_write = current_content.unwrap_or_default();
+        std::fs::write(&sidecar_path, content_to_write).map_err(|e| e.to_string())?;
+    }
+
+    let path_str = sidecar_path.to_string_lossy().to_string();
+    app.opener()
+        .open_path(&path_str, None::<&str>)
+        .map_err(|e| e.to_string())?;
+
+    Ok(path_str)
+}
+
+/// Reads the current content of an artist's `artist.md` sidecar file from disk.
+#[tauri::command]
+pub async fn read_artist_bio_file(
+    artist: String,
+    state: State<'_, AppState>,
+) -> Result<Option<String>, String> {
+    let song_path = crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        scanner.get_representative_song_path_for_artist(&artist)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(read_bio_sidecar(
+        song_path,
+        biomanager::artist_dir,
+        biomanager::ARTIST_BIO_FILENAME,
+    ))
+}
+
+/// Opens an album's `album.md` bio sidecar file in the OS default editor.
+/// If the file does not exist yet on disk, writes `current_content` first.
+#[tauri::command]
+pub async fn open_album_bio_file(
+    app: AppHandle,
+    album: String,
+    current_content: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let song_path = crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        scanner.get_representative_song_path_for_album(&album)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .ok_or_else(|| "No local audio files found for this album.".to_string())?;
+
+    let sidecar_path = biomanager::album_bio_path(Path::new(&song_path))
+        .ok_or_else(|| "Could not determine folder for this album.".to_string())?;
+
+    if !sidecar_path.exists() {
+        if let Some(parent) = sidecar_path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let content_to_write = current_content.unwrap_or_default();
+        std::fs::write(&sidecar_path, content_to_write).map_err(|e| e.to_string())?;
+    }
+
+    let path_str = sidecar_path.to_string_lossy().to_string();
+    app.opener()
+        .open_path(&path_str, None::<&str>)
+        .map_err(|e| e.to_string())?;
+
+    Ok(path_str)
+}
+
+/// Reads the current content of an album's `album.md` sidecar file from disk.
+#[tauri::command]
+pub async fn read_album_bio_file(
+    album: String,
+    state: State<'_, AppState>,
+) -> Result<Option<String>, String> {
+    let song_path = crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        scanner.get_representative_song_path_for_album(&album)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(read_bio_sidecar(
+        song_path,
+        biomanager::album_dir,
+        biomanager::ALBUM_BIO_FILENAME,
+    ))
 }
 
 /// Shared domain blacklist for external links (artist social links, album release links).
@@ -2224,6 +2301,23 @@ mod tests {
     }
 
     #[test]
+    fn test_extract_bio_prose_preserves_custom_headings_in_bio() {
+        let text = "## Early Years\n\nStarted in Vancouver.\n\n### Solo Career\n\nReleased many albums.\n\n## Tags\n- progressive metal\n\n## Links\n- [Website](https://example.com)";
+        assert_eq!(
+            extract_bio_prose(text),
+            Some("## Early Years\n\nStarted in Vancouver.\n\n### Solo Career\n\nReleased many albums.".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_bio_prose_none_for_links_only_content() {
+        assert_eq!(
+            extract_bio_prose("## Links\n- [Website](https://example.com)"),
+            None
+        );
+    }
+
+    #[test]
     fn test_build_artist_md_content_none_when_profile_is_empty() {
         let profile = ArtistProfile {
             artist_key: "Empty Artist".to_string(),
@@ -2246,7 +2340,7 @@ mod tests {
     }
 
     #[test]
-    fn test_build_artist_md_content_appends_tags_then_website_and_social_links() {
+    fn test_build_artist_md_content_includes_only_bio_without_tags_or_links() {
         let profile = ArtistProfile {
             artist_key: "Shania Twain".to_string(),
             bio: Some("Canadian singer-songwriter.".to_string()),
@@ -2271,19 +2365,11 @@ mod tests {
         };
 
         let content = build_artist_md_content(&profile).unwrap();
-        assert_eq!(
-            content,
-            "Canadian singer-songwriter.\n\n## Tags\n- pop\n- country\n\n## Links\n\
-             - [Website](https://www.shaniatwain.com)\n\
-             - Instagram: @shaniatwain\n\
-             - [Youtube](https://youtube.com/@ShaniaTwain)"
-        );
+        assert_eq!(content, "Canadian singer-songwriter.");
     }
 
     #[test]
-    fn test_build_album_md_content_appends_website_and_links_but_no_tags_section() {
-        // #962: albums have no curated tag list of their own to mirror
-        // anymore -- only the embedded genre tag, already on disk per-file.
+    fn test_build_album_md_content_includes_only_description_without_links() {
         let profile = AlbumProfile {
             album_key: "Come On Over".to_string(),
             artist_key: Some("Shania Twain".to_string()),
@@ -2298,12 +2384,7 @@ mod tests {
         };
 
         let content = build_album_md_content(&profile).unwrap();
-        assert_eq!(
-            content,
-            "Iconic 1997 studio album.\n\n## Links\n\
-             - [Website](https://shaniatwain.com/music/come-on-over)\n\
-             - [Discogs](https://www.discogs.com/master/132556)"
-        );
+        assert_eq!(content, "Iconic 1997 studio album.");
     }
 
     #[test]
