@@ -12,7 +12,7 @@ Created by [Eric Soltys](https://esoltys.github.io/), a Canadian software develo
 - **Database Engine**: [SQLite](https://sqlite.org/) via `rusqlite` & `r2d2`
 - **UI Framework & Styling**: [Tailwind CSS v4](https://tailwindcss.com/)
 - **Icons**: [Phosphor Icons](https://phosphoricons.com/) and [Simple Icons](https://simpleicons.org/)
-- **Typography**: [Inter](https://rsms.me/inter/) font family by Rasmus Andersson
+- **Typography**: [Fira Sans](https://github.com/bBoxType/FiraSans) by Carrois Apostrophe and Erik Spiekermann (SIL Open Font License 1.1)
 
 ### Audio Engine & Signal Processing
 - **Audio Decoding**: [Symphonia](https://github.com/pdeljanov/Symphonia)
