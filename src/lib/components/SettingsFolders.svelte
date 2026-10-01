@@ -60,6 +60,11 @@
     showSidecarConfirmModal = false;
     await prefs.setSaveArtworkToFolders(true);
     isSweepingArtwork = true;
+    const taskId = "artwork-sweep";
+    tasksStore.startTask({
+      id: taskId,
+      label: i18n.t("tasks.exportingArtwork", {}, "Exporting artwork…"),
+    });
     try {
       const res = await invoke<{
         album_covers_exported: number;
@@ -73,12 +78,14 @@
         (res?.band_logos_exported ?? 0) +
         (res?.banners_exported ?? 0);
       if (total > 0) {
-        toastStore.show(i18n.t("settings.artworkSweepSuccess", { count: total }), "success");
+        tasksStore.completeTask(taskId, i18n.t("settings.artworkSweepSuccess", { count: total }));
       } else {
-        toastStore.show(i18n.t("settings.artworkSweepNone"), "info");
+        tasksStore.completeTask(taskId, i18n.t("settings.artworkSweepNone"));
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to sweep artwork:", e);
+      const errMsg = String(e?.message || e);
+      tasksStore.failTask(taskId, errMsg);
     } finally {
       isSweepingArtwork = false;
     }

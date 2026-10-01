@@ -1619,6 +1619,8 @@ export const en = {
     savingAlbumTags: "Saving tags for {album}…",
     savingTagsCount: "Saving tags ({current}/{total})…",
     albumTagsSaved: "Saved tags for {album}",
+    exportingArtwork: "Exporting artwork…",
+    exportingArtworkCount: "Exporting artwork ({current}/{total})…",
     libraryScan: "Refreshing library",
     libraryScanDone: "Library refreshed",
     scanPhaseDiscovering: "discovering files",

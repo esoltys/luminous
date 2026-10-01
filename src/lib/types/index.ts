@@ -377,6 +377,12 @@ export interface TagBatchProgressPayload {
   done: boolean;
 }
 
+export interface ArtworkSweepProgressPayload {
+  current: number;
+  total: number;
+  done: boolean;
+}
+
 export type ScanPhase =
   | "discovering"
   | "reading_tags"

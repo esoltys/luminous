@@ -1109,6 +1109,61 @@ pub fn run() {
                 Arc::clone(&managed_state.cover_manager),
             );
 
+            // Self-healing sidecar artwork sweep resume (#1274): if the user has
+            // opt-in folder artwork enabled, resume sweeping any un-exported cached
+            // covers or artist images in the background.
+            let is_save_artwork_enabled = managed_state
+                .db
+                .pool
+                .get()
+                .map(|conn| {
+                    crate::commands::settings::load_ui_preferences(&conn).save_artwork_to_folders
+                })
+                .unwrap_or(false);
+
+            if is_save_artwork_enabled {
+                let db_clone = Arc::clone(&managed_state.db);
+                let cover_mgr = Arc::clone(&managed_state.cover_manager);
+                let covers_dir = cover_mgr.covers_dir().to_path_buf();
+                let app_handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    let has_pending = db_clone.pool.get().map(|conn| {
+                        let has_albums = conn.query_row(
+                            "SELECT 1 FROM songs
+                             WHERE art_automatic LIKE 'album-%'
+                               AND (source IN (1, 2) OR source IS NULL)
+                               AND album IS NOT NULL AND TRIM(album) != ''
+                               AND path IS NOT NULL
+                             LIMIT 1",
+                            [],
+                            |_| Ok(true),
+                        ).unwrap_or(false);
+                        let has_artists = conn.query_row(
+                            "SELECT 1 FROM artist_profiles
+                             WHERE fetched_image_filename IS NOT NULL
+                                OR fetched_logo_filename IS NOT NULL
+                                OR fetched_background_filename IS NOT NULL
+                             LIMIT 1",
+                            [],
+                            |_| Ok(true),
+                        ).unwrap_or(false);
+                        has_albums || has_artists
+                    }).unwrap_or(false);
+
+                    if has_pending {
+                        log::info!("Resuming pending artwork sidecar sweep in background...");
+                        let _ = crate::commands::collection::sweep_artwork_to_folders_core(
+                            db_clone,
+                            cover_mgr,
+                            covers_dir,
+                            move |payload| {
+                                let _ = app_handle.emit("artwork-sweep-progress", payload);
+                            },
+                        ).await;
+                    }
+                });
+            }
+
             // Spawn position tick loop (Tokio). Spawned after app.manage()
             // above since it calls media_session::mirror_state(), which
             // reaches into app.state::<AppState>() — doing this before

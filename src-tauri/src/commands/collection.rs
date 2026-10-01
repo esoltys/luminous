@@ -1874,19 +1874,26 @@ impl ArtworkSweepResult {
     }
 }
 
-/// Sweeps existing cached artwork in `covers/` and writes them out into eligible
-/// local music folders as standard sidecar files (`cover.jpg`, `artist.jpg`,
-/// `logo.png`/`.jpg`, `banner.jpg`/`.png`), updating references and removing
-/// redundant cached files (#1274).
-#[tauri::command]
-pub async fn sweep_artwork_to_folders(
-    state: State<'_, AppState>,
-) -> Result<ArtworkSweepResult, String> {
-    let covers_dir = state.cover_manager.covers_dir().to_path_buf();
-    let db_for_closure = Arc::clone(&state.db);
-    let cover_manager = Arc::clone(&state.cover_manager);
+/// Progress payload emitted as `artwork-sweep-progress` during sidecar sweep (#1274).
+#[derive(Debug, Clone, Serialize)]
+pub struct ArtworkSweepProgressPayload {
+    pub current: usize,
+    pub total: usize,
+    pub done: bool,
+}
 
-    crate::db::run_blocking(&state.db, move |conn| {
+pub async fn sweep_artwork_to_folders_core<F>(
+    db: Arc<crate::db::Database>,
+    cover_manager: Arc<crate::covermanager::CoverManager>,
+    covers_dir: std::path::PathBuf,
+    on_progress: F,
+) -> Result<ArtworkSweepResult, String>
+where
+    F: Fn(ArtworkSweepProgressPayload) + Send + Sync + 'static,
+{
+    let on_progress = Arc::new(on_progress);
+    let db_for_closure = Arc::clone(&db);
+    crate::db::run_blocking(&db, move |conn| {
         let mut result = ArtworkSweepResult::default();
 
         // 1. Sweep album covers
@@ -1913,7 +1920,46 @@ pub async fn sweep_artwork_to_folders(
             .collect();
         drop(album_stmt);
 
+        // 2. Sweep artists (portraits, logos, banners)
+        let mut artist_stmt = conn.prepare(
+            "SELECT artist_key, fetched_image_filename, fetched_logo_filename, fetched_background_filename
+             FROM artist_profiles
+             WHERE fetched_image_filename IS NOT NULL
+                OR fetched_logo_filename IS NOT NULL
+                OR fetched_background_filename IS NOT NULL",
+        )?;
+
+        let artists: Vec<(String, Option<String>, Option<String>, Option<String>)> = artist_stmt
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, Option<String>>(1)?,
+                    row.get::<_, Option<String>>(2)?,
+                    row.get::<_, Option<String>>(3)?,
+                ))
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
+        drop(artist_stmt);
+
+        let total = albums.len() + artists.len();
+        let mut current = 0usize;
+        on_progress(ArtworkSweepProgressPayload {
+            current: 0,
+            total,
+            done: false,
+        });
+
         for (album, artist, song_path_str, cached_filename) in albums {
+            current += 1;
+            if current % 5 == 0 || current == total {
+                on_progress(ArtworkSweepProgressPayload {
+                    current,
+                    total,
+                    done: false,
+                });
+            }
+
             let cached_path = covers_dir.join(&cached_filename);
             if !cached_path.exists() {
                 continue;
@@ -1944,30 +1990,17 @@ pub async fn sweep_artwork_to_folders(
             }
         }
 
-        // 2. Sweep artists (portraits, logos, banners)
-        let mut artist_stmt = conn.prepare(
-            "SELECT artist_key, fetched_image_filename, fetched_logo_filename, fetched_background_filename
-             FROM artist_profiles
-             WHERE fetched_image_filename IS NOT NULL
-                OR fetched_logo_filename IS NOT NULL
-                OR fetched_background_filename IS NOT NULL",
-        )?;
-
-        let artists: Vec<(String, Option<String>, Option<String>, Option<String>)> = artist_stmt
-            .query_map([], |row| {
-                Ok((
-                    row.get::<_, String>(0)?,
-                    row.get::<_, Option<String>>(1)?,
-                    row.get::<_, Option<String>>(2)?,
-                    row.get::<_, Option<String>>(3)?,
-                ))
-            })?
-            .filter_map(|r| r.ok())
-            .collect();
-        drop(artist_stmt);
-
         let scanner = CollectionScanner::new(Arc::clone(&db_for_closure));
         for (artist_key, photo_fn, logo_fn, bg_fn) in artists {
+            current += 1;
+            if current % 5 == 0 || current == total {
+                on_progress(ArtworkSweepProgressPayload {
+                    current,
+                    total,
+                    done: false,
+                });
+            }
+
             let song_path_str = scanner.get_representative_song_path_for_artist(&artist_key).ok().flatten();
             let Some(song_path_str) = song_path_str else {
                 continue;
@@ -2032,10 +2065,38 @@ pub async fn sweep_artwork_to_folders(
             }
         }
 
+        on_progress(ArtworkSweepProgressPayload {
+            current: total,
+            total,
+            done: true,
+        });
+
         Ok(result)
     })
     .await
     .map_err(|e| e.to_string())
+}
+
+/// Sweeps existing cached artwork in `covers/` and writes them out into eligible
+/// local music folders as standard sidecar files (`cover.jpg`, `artist.jpg`,
+/// `logo.png`/`.jpg`, `banner.jpg`/`.png`), updating references and removing
+/// redundant cached files (#1274).
+#[tauri::command]
+pub async fn sweep_artwork_to_folders(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<ArtworkSweepResult, String> {
+    let covers_dir = state.cover_manager.covers_dir().to_path_buf();
+    let app_clone = app.clone();
+    sweep_artwork_to_folders_core(
+        Arc::clone(&state.db),
+        Arc::clone(&state.cover_manager),
+        covers_dir,
+        move |payload| {
+            let _ = app_clone.emit("artwork-sweep-progress", payload);
+        },
+    )
+    .await
 }
 
 #[cfg(test)]
@@ -2686,59 +2747,22 @@ mod tests {
             crate::covermanager::CoverManager::new(Arc::clone(&db), temp_dir.clone())
         );
 
-        let result = crate::db::run_blocking(&db, {
-            let cover_manager = Arc::clone(&cover_manager);
-            let covers_dir = covers_dir.clone();
-            move |conn| {
-                let mut result = ArtworkSweepResult::default();
-                let albums: Vec<(String, String, String, String)> = conn
-                    .prepare(
-                        "SELECT DISTINCT album, COALESCE(NULLIF(album_artist, ''), artist), MIN(path), art_automatic
-                         FROM songs
-                         WHERE art_automatic LIKE 'album-%'
-                           AND (source IN (1, 2) OR source IS NULL)
-                           AND album IS NOT NULL AND TRIM(album) != ''
-                           AND path IS NOT NULL
-                         GROUP BY album, COALESCE(NULLIF(album_artist, ''), artist), art_automatic",
-                    )?
-                    .query_map([], |row| {
-                        Ok((
-                            row.get(0)?,
-                            row.get::<_, Option<String>>(1)?.unwrap_or_default(),
-                            row.get(2)?,
-                            row.get(3)?,
-                        ))
-                    })?
-                    .filter_map(|r| r.ok())
-                    .collect();
+        let progress_events = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let progress_events_clone = Arc::clone(&progress_events);
+        let result = sweep_artwork_to_folders_core(
+            Arc::clone(&db),
+            Arc::clone(&cover_manager),
+            covers_dir,
+            move |p| {
+                progress_events_clone.lock().unwrap().push(p);
+            },
+        )
+        .await
+        .unwrap();
 
-                for (album, artist, song_path_str, cached_filename) in albums {
-                    let cached_path = covers_dir.join(&cached_filename);
-                    if cached_path.exists() {
-                        let bytes = std::fs::read(&cached_path)?;
-                        let audio_path = std::path::Path::new(&song_path_str);
-                        if let Some(sidecar_path) = cover_manager.try_save_album_cover_sidecar(
-                            audio_path,
-                            &artist,
-                            &album,
-                            &bytes,
-                        ) {
-                            let _ = std::fs::remove_file(&cached_path);
-                            let sidecar_val = sidecar_path.to_string_lossy().to_string();
-                            conn.execute(
-                                "UPDATE songs SET art_automatic = ?1
-                                 WHERE album = ?2
-                                   AND COALESCE(NULLIF(album_artist, ''), artist) = ?3
-                                   AND art_automatic = ?4",
-                                rusqlite::params![sidecar_val, album, artist, cached_filename],
-                            )?;
-                            result.album_covers_exported += 1;
-                        }
-                    }
-                }
-                Ok(result)
-            }
-        }).await.unwrap();
+        let events = progress_events.lock().unwrap().clone();
+        assert!(!events.is_empty());
+        assert!(events.last().unwrap().done);
 
         assert_eq!(result.album_covers_exported, 1);
         assert!(album_dir.join("cover.jpg").exists());

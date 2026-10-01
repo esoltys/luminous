@@ -1627,6 +1627,8 @@ export const fr: DeepStringRecord<typeof en> = {
     savingAlbumTags: "Enregistrement des balises pour {album}…",
     savingTagsCount: "Enregistrement des balises ({current}/{total})…",
     albumTagsSaved: "Balises enregistrées pour {album}",
+    exportingArtwork: "Exportation des pochettes…",
+    exportingArtworkCount: "Exportation des pochettes ({current}/{total})…",
     libraryScan: "Actualisation de la bibliothèque",
     libraryScanDone: "Bibliothèque actualisée",
     scanPhaseDiscovering: "découverte des fichiers",
