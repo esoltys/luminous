@@ -30,6 +30,16 @@ pub fn artist_dir(audio_path: &Path) -> Option<PathBuf> {
     album_dir(audio_path)?.parent().map(Path::to_path_buf)
 }
 
+/// Sidecar path for an album bio file given a song at `audio_path`.
+pub fn album_bio_path(audio_path: &Path) -> Option<PathBuf> {
+    album_dir(audio_path).map(|d| d.join(ALBUM_BIO_FILENAME))
+}
+
+/// Sidecar path for an artist bio file given a song at `audio_path`.
+pub fn artist_bio_path(audio_path: &Path) -> Option<PathBuf> {
+    artist_dir(audio_path).map(|d| d.join(ARTIST_BIO_FILENAME))
+}
+
 /// Read a bio file's contents (trimmed), or `None` if it's missing, empty, or
 /// unreadable.
 pub fn read_bio(dir: &Path, filename: &str) -> Option<String> {
@@ -72,6 +82,14 @@ mod tests {
             Some(PathBuf::from("/music/Artist Name/Album Name"))
         );
         assert_eq!(artist_dir(song), Some(PathBuf::from("/music/Artist Name")));
+        assert_eq!(
+            album_bio_path(song),
+            Some(PathBuf::from("/music/Artist Name/Album Name/album.md"))
+        );
+        assert_eq!(
+            artist_bio_path(song),
+            Some(PathBuf::from("/music/Artist Name/artist.md"))
+        );
     }
 
     #[test]

@@ -1197,7 +1197,9 @@ export const en = {
     savedError: "Failed to save artist profile",
     removeTagTooltip: "Remove tag {tag}",
     goToTagTooltip: "Browse {tag}",
-    removeLinkTooltip: "Remove link"
+    removeLinkTooltip: "Remove link",
+    editMarkdownBtn: "Edit Markdown",
+    editMarkdownTooltip: "Open roomy Markdown editor"
   },
   albumProfileEditor: {
     title: "Edit Album Details",
@@ -1218,7 +1220,26 @@ export const en = {
     cancel: "Cancel",
     savedSuccess: "Album details updated",
     savedError: "Failed to save album details",
-    removeLinkTooltip: "Remove link"
+    removeLinkTooltip: "Remove link",
+    editMarkdownBtn: "Edit Markdown",
+    editMarkdownTooltip: "Open roomy Markdown editor"
+  },
+  markdownEditor: {
+    edit: "Edit",
+    preview: "Preview",
+    openExternal: "Open in external editor",
+    openExternalTooltip: "Open this Markdown file in your default system editor",
+    conflictDetected: "This file was modified on disk by an external editor.",
+    reloadFromDisk: "Reload from disk",
+    keepLocalEdits: "Keep in-app edits",
+    emptyPreview: "No content to preview.",
+    apply: "Apply Changes",
+    cancel: "Cancel",
+    placeholder: "Write markdown bio or description here...",
+    openedToast: "Opened in external editor",
+    openErrorToast: "Failed to open external editor",
+    artistTitle: "Edit Artist Bio — {name}",
+    albumTitle: "Edit Album Description — {name}"
   },
   albumDetail: {
     backToAlbums: "Back to Albums",

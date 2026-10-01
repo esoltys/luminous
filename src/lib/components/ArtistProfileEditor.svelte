@@ -7,9 +7,11 @@
     LinkIcon,
     MicrophoneStageIcon as Mic,
     FloppyDiskIcon as Save,
-    CircleNotchIcon as LoaderCircle
+    CircleNotchIcon as LoaderCircle,
+    PencilSimpleIcon as Pencil
   } from "phosphor-svelte";
   import Button from "./Button.svelte";
+  import MarkdownEditor from "./MarkdownEditor.svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { tagsStore } from "../stores/tags.svelte";
   import { toastStore } from "../stores/toast.svelte";
@@ -46,6 +48,7 @@
   let newTagInput = $state("");
   let socialLinks = $state<ArtistSocialLink[]>([]);
   let isSaving = $state(false);
+  let isMarkdownEditorOpen = $state(false);
 
   // Sync state when opened or artistName changes
   $effect(() => {
@@ -181,9 +184,20 @@
       <div class="p-4 sm:p-6 overflow-y-auto flex-1 min-h-0 flex flex-col gap-4 sm:gap-5 text-sm">
         <!-- Bio Field -->
         <div class="flex flex-col gap-1.5">
-          <label for="artist-bio" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
-            {i18n.t("artistProfileEditor.bio", {}, "About / Biography")}
-          </label>
+          <div class="flex items-center justify-between">
+            <label for="artist-bio" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
+              {i18n.t("artistProfileEditor.bio", {}, "About / Biography")}
+            </label>
+            <button
+              type="button"
+              onclick={() => { isMarkdownEditorOpen = true; }}
+              class="inline-flex items-center gap-1 text-xs text-brand-accent hover:underline cursor-pointer"
+              title={i18n.t("artistProfileEditor.editMarkdownTooltip", {}, "Open roomy Markdown editor")}
+            >
+              <Pencil class="w-3 h-3" />
+              <span>{i18n.t("artistProfileEditor.editMarkdownBtn", {}, "Edit Markdown")}</span>
+            </button>
+          </div>
           <textarea
             id="artist-bio"
             bind:value={bio}
@@ -361,3 +375,13 @@
     </div>
   </div>
 {/if}
+
+<MarkdownEditor
+  bind:isOpen={isMarkdownEditorOpen}
+  title={i18n.t("markdownEditor.artistTitle", { name: artistName }, `Edit Artist Bio — ${artistName}`)}
+  initialValue={bio}
+  targetType="artist"
+  targetKey={artistName}
+  onApply={(updated) => { bio = updated; }}
+  onClose={() => { isMarkdownEditorOpen = false; }}
+/>

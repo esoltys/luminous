@@ -1248,7 +1248,9 @@ export const fr: DeepStringRecord<typeof en> = {
     savedError: "Échec de l'enregistrement du profil de l'artiste",
     removeTagTooltip: "Supprimer le tag {tag}",
     goToTagTooltip: "Parcourir {tag}",
-    removeLinkTooltip: "Supprimer le lien"
+    removeLinkTooltip: "Supprimer le lien",
+    editMarkdownBtn: "Modifier le Markdown",
+    editMarkdownTooltip: "Ouvrir l'éditeur Markdown agrandi"
   },
   albumProfileEditor: {
     title: "Modifier l'album",
@@ -1269,7 +1271,26 @@ export const fr: DeepStringRecord<typeof en> = {
     cancel: "Annuler",
     savedSuccess: "Détails de l'album mis à jour",
     savedError: "Échec de l'enregistrement des détails de l'album",
-    removeLinkTooltip: "Supprimer le lien"
+    removeLinkTooltip: "Supprimer le lien",
+    editMarkdownBtn: "Modifier le Markdown",
+    editMarkdownTooltip: "Ouvrir l'éditeur Markdown agrandi"
+  },
+  markdownEditor: {
+    edit: "Modifier",
+    preview: "Aperçu",
+    openExternal: "Ouvrir dans l'éditeur externe",
+    openExternalTooltip: "Ouvrir ce fichier Markdown dans votre éditeur système par défaut",
+    conflictDetected: "Ce fichier a été modifié sur le disque par un éditeur externe.",
+    reloadFromDisk: "Recharger depuis le disque",
+    keepLocalEdits: "Conserver les modifications locales",
+    emptyPreview: "Aucun contenu à prévisualiser.",
+    apply: "Appliquer les modifications",
+    cancel: "Annuler",
+    placeholder: "Écrire la biographie ou description en markdown ici...",
+    openedToast: "Ouvert dans l'éditeur externe",
+    openErrorToast: "Impossible d'ouvrir l'éditeur externe",
+    artistTitle: "Modifier la biographie de l'artiste — {name}",
+    albumTitle: "Modifier la description de l'album — {name}"
   },
   albumDetail: {
     backToAlbums: "Retour aux albums",

@@ -22,10 +22,9 @@ what makes it portable: copy, sync, or back up the library folder and another Lu
 instance picks it up automatically. If a `.md` file already exists but the database has
 no bio cached yet, Luminous adopts it the next time you view that artist/album.
 
-Each file mirrors the whole profile, not just the prose — the bio/description paragraph,
-followed by a `## Links` list for the website and social/external links. `artist.md` also
-gets a `## Tags` list (if any tags are set); `album.md` doesn't — an album has no curated
-tag list of its own, only the embedded genre tag already stored in each track's own file.
+Each file holds the Markdown bio/description text verbatim — nothing else. Tags and links
+stay in the database only, keeping the `.md` file a clean document you can freely edit in
+external Markdown tools.
 
 ## Example `artist.md`
 
@@ -33,15 +32,8 @@ tag list of its own, only the embedded genre tag already stored in each track's 
 Devin Townsend is a Canadian musician, songwriter, and record producer known for his
 work in progressive and extreme metal, as well as ambient and ballad-oriented material.
 
-## Tags
-- canadian
-- progressive metal
-- ambient
-
-## Links
-- [Website](https://hevydevy.com)
-- Instagram: @devintownsend
-- [YouTube](https://youtube.com/@devintownsend)
+## Career
+He founded Strapping Young Lad and has recorded extensively under the Devin Townsend Project and as a solo artist.
 ```
 
 ## Example `album.md`
@@ -50,19 +42,18 @@ work in progressive and extreme metal, as well as ambient and ballad-oriented ma
 Empath is Devin Townsend's tenth solo studio album, released in 2019. It draws
 together nearly every style he's worked in — ambient, extreme metal, orchestral,
 and pop — into a single, deliberately unclassifiable record.
-
-## Links
-- [Website](https://hevydevy.com/empath)
-- [Bandcamp](https://devintownsend.bandcamp.com/album/empath)
 ```
 
 ## Format notes
 
-- A link is rendered as `[Label](url)` when the value looks like a URL, or a plain
-  `Label: value` bullet otherwise (e.g. a bare social handle).
-- Clearing a profile down to nothing (no bio, no tags, no links) deletes the `.md`
-  file rather than leaving a stale one behind.
-- Hand-editing a `.md` file works too — only the text *before* the first `## `
-  heading is read back as the bio/description; anything under `## Tags` (`artist.md`
-  only) or `## Links` is Luminous's own generated section and isn't parsed back into
-  structured data.
+- The file content is the bio/description verbatim. Any Markdown formatting and headings
+  (`#`, `##`, etc.) you write are preserved and read back in full.
+- Clearing a bio down to nothing deletes the `.md` file rather than leaving an empty one behind.
+- **Editing in Luminous & External Editors**: click **Edit Markdown** next to the bio or
+  description field in the profile editor to open a roomy editing modal with live preview and
+  an **Open in external editor** shortcut that launches your default OS Markdown editor.
+  When the file is modified externally, returning to Luminous automatically detects the change,
+  prompting you to reload from disk if you have unsaved in-app edits.
+- **Backward compatibility**: on read, Luminous automatically strips trailing generated
+  `## Tags` and `## Links` blocks produced by older versions of Luminous so existing sidecars
+  don't import that boilerplate into the bio; the next save rewrites the file in the new shape.

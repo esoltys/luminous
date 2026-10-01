@@ -15,9 +15,11 @@
     LockIcon as Lock,
     ImageBrokenIcon as ImageOff,
     CloudIcon,
-    FolderOpenIcon as FolderOpen
+    FolderOpenIcon as FolderOpen,
+    PencilSimpleIcon as Pencil
   } from "phosphor-svelte";
   import Button from "./Button.svelte";
+  import MarkdownEditor from "./MarkdownEditor.svelte";
   import FormField from "./FormField.svelte";
   import Input from "./Input.svelte";
   import ChipInput from "./ChipInput.svelte";
@@ -105,6 +107,7 @@
   let genresort = $state(initialGenreSort ?? "");
 
   let isSaving = $state(false);
+  let isMarkdownEditorOpen = $state(false);
 
   // Remote songs (WebDAV #682, OpenSubsonic #916) have no local file Luminous can write lofty tags to,
   // and there's no write-back to the remote server -- edits here only ever
@@ -483,9 +486,20 @@
 
         <!-- Description / Liner Notes Field -->
         <div class="flex flex-col gap-1.5">
-          <label for="album-description" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
-            {i18n.t("albumProfileEditor.description", {}, "Description & Liner Notes")}
-          </label>
+          <div class="flex items-center justify-between">
+            <label for="album-description" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
+              {i18n.t("albumProfileEditor.description", {}, "Description & Liner Notes")}
+            </label>
+            <button
+              type="button"
+              onclick={() => { isMarkdownEditorOpen = true; }}
+              class="inline-flex items-center gap-1 text-xs text-brand-accent hover:underline cursor-pointer"
+              title={i18n.t("albumProfileEditor.editMarkdownTooltip", {}, "Open roomy Markdown editor")}
+            >
+              <Pencil class="w-3 h-3" />
+              <span>{i18n.t("albumProfileEditor.editMarkdownBtn", {}, "Edit Markdown")}</span>
+            </button>
+          </div>
           <textarea
             id="album-description"
             bind:value={description}
@@ -626,3 +640,13 @@
     onCancel={() => { showClearArtConfirm = false; }}
   />
 {/if}
+
+<MarkdownEditor
+  bind:isOpen={isMarkdownEditorOpen}
+  title={i18n.t("markdownEditor.albumTitle", { name: albumName }, `Edit Album Description — ${albumName}`)}
+  initialValue={description}
+  targetType="album"
+  targetKey={albumName}
+  onApply={(updated) => { description = updated; }}
+  onClose={() => { isMarkdownEditorOpen = false; }}
+/>
