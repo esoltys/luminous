@@ -1447,6 +1447,32 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
       );
     },
 
+    get_eq_preset_previews: (args) => {
+      const freqs = (args.frequencies as number[]) ?? [];
+      const mode = (args.mode as string) ?? "graphic10";
+      const previews: { key: string; response_db: number[] }[] = [];
+      const builtin = ["Flat", ...Object.keys(EQ_PRESETS)];
+      for (const name of builtin) {
+        const gains = EQ_PRESETS[name] ?? Array(10).fill(0);
+        previews.push({
+          key: name,
+          response_db: freqs.map((_, i) => {
+            const gainIdx = Math.min(9, Math.floor((i / Math.max(1, freqs.length - 1)) * 10));
+            return gains[gainIdx] ?? 0;
+          }),
+        });
+      }
+      if (mode === "parametric") {
+        for (const user of eqUserPresets) {
+          previews.push({
+            key: `user:${user.id}`,
+            response_db: freqs.map(() => 0),
+          });
+        }
+      }
+      return previews;
+    },
+
     get_loudness_settings: () => ({
       enabled: true,
       target_lufs: -18.0,

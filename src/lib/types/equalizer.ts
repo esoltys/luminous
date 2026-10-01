@@ -29,6 +29,11 @@ interface UserPreset {
   name: string;
 }
 
+export interface EqPresetPreview {
+  key: string;
+  response_db: number[];
+}
+
 export interface EqPresetList {
   builtin: string[];
   user: UserPreset[];

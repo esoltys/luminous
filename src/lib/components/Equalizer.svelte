@@ -13,6 +13,7 @@
   import Knob from "./Knob.svelte";
   import ParametricGraph from "./ParametricGraph.svelte";
   import ParametricBandStrip from "./ParametricBandStrip.svelte";
+  import EqPresetPicker from "./EqPresetPicker.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import { logSpacedFreqs } from "../utils/eqScale";
 
@@ -21,6 +22,7 @@
     type EqConfig,
     type EqMode,
     type EqPresetList,
+    type EqPresetPreview,
     type EqRanges,
     type ParametricBand,
     type SettingRange,
@@ -81,9 +83,31 @@
     }
   }
 
+  let presetPreviews = $state<Map<string, number[]>>(new Map());
+
+  async function loadPresetPreviews() {
+    if (!ranges?.eq) return;
+    try {
+      const freqs = logSpacedFreqs(32, ranges.eq.freq);
+      const previews = await invoke<EqPresetPreview[]>("get_eq_preset_previews", {
+        frequencies: freqs,
+        mode,
+      });
+      if (!Array.isArray(previews)) return;
+      const map = new Map<string, number[]>();
+      for (const p of previews) {
+        map.set(p.key, p.response_db);
+      }
+      presetPreviews = map;
+    } catch (e) {
+      console.error("Failed to load equalizer preset previews:", e);
+    }
+  }
+
   async function loadPresetList() {
     try {
       presetList = await invoke<EqPresetList>("list_eq_presets");
+      await loadPresetPreviews();
     } catch (e) {
       console.error("Failed to list equalizer presets:", e);
     }
@@ -132,6 +156,7 @@
     if (mode === newMode) return;
     mode = newMode;
     await applyConfig();
+    await loadPresetPreviews();
   }
 
   async function handlePreampChange() {
@@ -426,7 +451,7 @@
     loadFadeSettings();
     loudnessStore.init();
     await Promise.all([loadConfig(), loadSettingRanges(), loadPresetList()]);
-    await refreshCurves();
+    await Promise.all([refreshCurves(), loadPresetPreviews()]);
   });
 </script>
 
@@ -494,29 +519,16 @@
 
       <div class="flex items-center gap-2 bg-brand-main border border-brand-border rounded-[2rem] px-4 py-1.5">
         <label for="eq-preset-picker" class="text-xs font-semibold text-brand-text-secondary">{i18n.t('equalizer.presetLabel')}:</label>
-        <Select
+        <EqPresetPicker
           id="eq-preset-picker"
-          value={activePreset ?? ""}
-          onchange={(e) => selectPreset(e.currentTarget.value)}
-          class="bg-brand-main text-xs text-brand-text-primary border border-brand-border rounded pl-3.5 pr-6 py-1 outline-none focus:border-brand-accent font-medium"
-          chevronPosition="0.375rem"
-        >
-          {#if activePreset === null}
-            <option value="" class="bg-brand-main text-brand-text-primary" disabled>{i18n.t('equalizer.customPreset')}</option>
-          {/if}
-          <optgroup label={i18n.t('equalizer.builtinPresets')} class="bg-brand-main text-brand-text-secondary">
-            {#each presetList.builtin as preset}
-              <option value={preset} class="bg-brand-main text-brand-text-primary">{presetLabel(preset)}</option>
-            {/each}
-          </optgroup>
-          {#if mode === "parametric" && presetList.user.length > 0}
-            <optgroup label={i18n.t('equalizer.userPresets')} class="bg-brand-main text-brand-text-secondary">
-              {#each presetList.user as preset (preset.id)}
-                <option value={userPresetKey(preset.id)} class="bg-brand-main text-brand-text-primary">{preset.name}</option>
-              {/each}
-            </optgroup>
-          {/if}
-        </Select>
+          value={activePreset}
+          presets={presetList}
+          {mode}
+          previews={presetPreviews}
+          gainRange={ranges?.eq?.gain_db}
+          getLabel={presetLabel}
+          onselect={selectPreset}
+        />
       </div>
 
       <div class="flex items-center gap-3 bg-brand-main border border-brand-border rounded-[2rem] px-4 py-1.5">

@@ -59,6 +59,38 @@ pub fn list(conn: &Connection) -> Result<Vec<UserPreset>, String> {
         .map_err(|e| e.to_string())
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct StoredUserPreset {
+    pub id: i64,
+    pub name: String,
+    pub bands: Vec<ParametricBand>,
+    pub preamp: f32,
+}
+
+/// Every user preset with its stored bands, ordered by name.
+pub fn list_with_bands(conn: &Connection) -> Result<Vec<StoredUserPreset>, String> {
+    let mut stmt = conn
+        .prepare("SELECT id, name, bands, preamp FROM eq_user_presets ORDER BY name COLLATE NOCASE")
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([], |r| {
+            let id: i64 = r.get(0)?;
+            let name: String = r.get(1)?;
+            let bands_json: String = r.get(2)?;
+            let preamp: f64 = r.get(3)?;
+            let bands: Vec<ParametricBand> = serde_json::from_str(&bands_json).unwrap_or_default();
+            Ok(StoredUserPreset {
+                id,
+                name,
+                bands,
+                preamp: preamp as f32,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+    rows.collect::<rusqlite::Result<_>>()
+        .map_err(|e| e.to_string())
+}
+
 pub fn get(conn: &Connection, id: i64) -> Result<StoredPreset, String> {
     let row: Option<(String, f64)> = conn
         .query_row(
