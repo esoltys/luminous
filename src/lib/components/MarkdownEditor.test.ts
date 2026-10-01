@@ -185,4 +185,25 @@ describe("MarkdownEditor.svelte", () => {
     expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("External edit on disk");
     expect(screen.queryByText(/modified on disk by an external editor/i)).toBeNull();
   });
+
+  it("renders the markdown formatting cheatsheet", () => {
+    render(MarkdownEditor, {
+      props: {
+        isOpen: true,
+        title: "Edit Artist Bio",
+        initialValue: "Sample text",
+        targetType: "artist",
+        targetKey: "Devin Townsend",
+        onApply: vi.fn(),
+        onClose: vi.fn(),
+      },
+    });
+
+    expect(screen.getByText(/formatting:/i)).toBeInTheDocument();
+    expect(screen.getByText("**bold**")).toBeInTheDocument();
+    expect(screen.getByText("*italic*")).toBeInTheDocument();
+    expect(screen.getByText("[link](url)")).toBeInTheDocument();
+    expect(screen.getByText("https://...")).toBeInTheDocument();
+    expect(screen.getByText("## heading")).toBeInTheDocument();
+  });
 });

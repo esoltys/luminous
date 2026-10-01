@@ -1290,7 +1290,12 @@ export const fr: DeepStringRecord<typeof en> = {
     openedToast: "Ouvert dans l'éditeur externe",
     openErrorToast: "Impossible d'ouvrir l'éditeur externe",
     artistTitle: "Modifier la biographie de l'artiste — {name}",
-    albumTitle: "Modifier la description de l'album — {name}"
+    albumTitle: "Modifier la description de l'album — {name}",
+    syntaxTitle: "Formatage :",
+    bold: "gras",
+    italic: "italique",
+    linkText: "lien",
+    heading: "titre"
   },
   albumDetail: {
     backToAlbums: "Retour aux albums",

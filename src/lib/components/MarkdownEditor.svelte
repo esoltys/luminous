@@ -271,6 +271,16 @@
         {/if}
       </div>
 
+      <!-- Formatting Cheatsheet -->
+      <div class="px-4 sm:px-6 py-2 border-t border-brand-border/60 bg-brand-sidebar/40 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-text-secondary select-none shrink-0">
+        <span class="font-medium text-brand-text-secondary/70">{i18n.t("markdownEditor.syntaxTitle", {}, "Formatting:")}</span>
+        <code class="px-1.5 py-0.5 rounded bg-brand-main/60 border border-brand-border/50 text-brand-text-primary">**{i18n.t("markdownEditor.bold", {}, "bold")}**</code>
+        <code class="px-1.5 py-0.5 rounded bg-brand-main/60 border border-brand-border/50 text-brand-text-primary">*{i18n.t("markdownEditor.italic", {}, "italic")}*</code>
+        <code class="px-1.5 py-0.5 rounded bg-brand-main/60 border border-brand-border/50 text-brand-text-primary">[{i18n.t("markdownEditor.linkText", {}, "link")}](url)</code>
+        <code class="px-1.5 py-0.5 rounded bg-brand-main/60 border border-brand-border/50 text-brand-text-primary">https://...</code>
+        <code class="px-1.5 py-0.5 rounded bg-brand-main/60 border border-brand-border/50 text-brand-text-primary">## {i18n.t("markdownEditor.heading", {}, "heading")}</code>
+      </div>
+
       <!-- Footer -->
       <div class="flex items-center justify-between px-4 sm:px-6 py-3 border-t border-brand-border bg-brand-sidebar shrink-0">
         <div class="text-xs text-brand-text-secondary font-mono">

@@ -1239,7 +1239,12 @@ export const en = {
     openedToast: "Opened in external editor",
     openErrorToast: "Failed to open external editor",
     artistTitle: "Edit Artist Bio — {name}",
-    albumTitle: "Edit Album Description — {name}"
+    albumTitle: "Edit Album Description — {name}",
+    syntaxTitle: "Formatting:",
+    bold: "bold",
+    italic: "italic",
+    linkText: "link",
+    heading: "heading"
   },
   albumDetail: {
     backToAlbums: "Back to Albums",
