@@ -1243,8 +1243,7 @@ export const en = {
     syntaxTitle: "Formatting:",
     bold: "bold",
     italic: "italic",
-    linkText: "link",
-    heading: "heading"
+    linkText: "link"
   },
   albumDetail: {
     backToAlbums: "Back to Albums",

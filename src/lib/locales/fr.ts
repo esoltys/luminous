@@ -1294,8 +1294,7 @@ export const fr: DeepStringRecord<typeof en> = {
     syntaxTitle: "Formatage :",
     bold: "gras",
     italic: "italique",
-    linkText: "lien",
-    heading: "titre"
+    linkText: "lien"
   },
   albumDetail: {
     backToAlbums: "Retour aux albums",

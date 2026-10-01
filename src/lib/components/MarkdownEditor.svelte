@@ -278,7 +278,6 @@
         <code class="px-1.5 py-0.5 rounded bg-brand-main/60 border border-brand-border/50 text-brand-text-primary">*{i18n.t("markdownEditor.italic", {}, "italic")}*</code>
         <code class="px-1.5 py-0.5 rounded bg-brand-main/60 border border-brand-border/50 text-brand-text-primary">[{i18n.t("markdownEditor.linkText", {}, "link")}](url)</code>
         <code class="px-1.5 py-0.5 rounded bg-brand-main/60 border border-brand-border/50 text-brand-text-primary">https://...</code>
-        <code class="px-1.5 py-0.5 rounded bg-brand-main/60 border border-brand-border/50 text-brand-text-primary">## {i18n.t("markdownEditor.heading", {}, "heading")}</code>
       </div>
 
       <!-- Footer -->

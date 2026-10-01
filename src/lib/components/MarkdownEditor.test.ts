@@ -204,6 +204,5 @@ describe("MarkdownEditor.svelte", () => {
     expect(screen.getByText("*italic*")).toBeInTheDocument();
     expect(screen.getByText("[link](url)")).toBeInTheDocument();
     expect(screen.getByText("https://...")).toBeInTheDocument();
-    expect(screen.getByText("## heading")).toBeInTheDocument();
   });
 });

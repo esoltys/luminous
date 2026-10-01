@@ -32,7 +32,6 @@ external Markdown tools.
 Devin Townsend is a Canadian musician, songwriter, and record producer known for his
 work in progressive and extreme metal, as well as ambient and ballad-oriented material.
 
-## Career
 He founded Strapping Young Lad and has recorded extensively under the Devin Townsend Project and as a solo artist.
 ```
 
@@ -46,8 +45,8 @@ and pop — into a single, deliberately unclassifiable record.
 
 ## Format notes
 
-- The file content is the bio/description verbatim. Any Markdown formatting and headings
-  (`#`, `##`, etc.) you write are preserved and read back in full.
+- The file content is the bio/description verbatim. Any text formatting (`**bold**`, `*italic*`,
+  Markdown links, bare URLs) you write is preserved and read back in full.
 - Clearing a bio down to nothing deletes the `.md` file rather than leaving an empty one behind.
 - **Editing in Luminous & External Editors**: click **Edit Markdown** next to the bio or
   description field in the profile editor to open a roomy editing modal with live preview and
