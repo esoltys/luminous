@@ -525,6 +525,10 @@ impl Equalizer {
         &self.parametric[..self.parametric_len]
     }
 
+    pub fn sample_rate(&self) -> u32 {
+        self.sample_rate
+    }
+
     /// Re-tune the filter cascade for the output device's actual sample
     /// rate/channel count. Called by `audio.rs`'s `build_output` whenever
     /// the CPAL output stream is (re)built — lazily for the first track a
@@ -709,6 +713,24 @@ impl Equalizer {
     pub fn band_response_db(&self, idx: usize, freqs: &[f32]) -> Vec<f32> {
         let end = (idx + 1).min(self.parametric_len);
         self.cascade_response_db(idx.min(end)..end, freqs)
+    }
+
+    /// Combined magnitude response of the 10-band graphic cascade (preamp
+    /// excluded) at each of `freqs`, in dB — evaluated from the graphic filter
+    /// coefficients. Used by preset previews (#1344).
+    pub fn graphic_response_db(&self, freqs: &[f32]) -> Vec<f32> {
+        let fs = self.sample_rate as f32;
+        let nyquist = fs / 2.0;
+        let Some(filters) = self.channel_filters.first() else {
+            return vec![0.0; freqs.len()];
+        };
+        freqs
+            .iter()
+            .map(|&f| {
+                let f = f.clamp(1.0, nyquist * 0.999);
+                filters.iter().map(|flt| flt.magnitude_db(f, fs)).sum()
+            })
+            .collect()
     }
 
     fn cascade_response_db(&self, range: std::ops::Range<usize>, freqs: &[f32]) -> Vec<f32> {
@@ -1382,5 +1404,20 @@ mod tests {
             (measured - predicted).abs() < 0.2,
             "predicted {predicted} dB, measured {measured} dB at {probe} Hz"
         );
+    }
+
+    #[test]
+    fn graphic_response_evaluates_filters() {
+        let mut eq = parametric_eq_48k();
+        eq.load_preset(preset_gains("Flat"));
+        for db in eq.graphic_response_db(&log_freqs(96)) {
+            assert!(db.abs() < 1e-3, "flat graphic EQ read {db} dB");
+        }
+
+        eq.load_preset(preset_gains("Bass Boost"));
+        let sub_bass = eq.graphic_response_db(&[31.5])[0];
+        let treble = eq.graphic_response_db(&[16000.0])[0];
+        assert!(sub_bass > 3.0, "bass boost at 31.5Hz was {sub_bass} dB");
+        assert!(treble < sub_bass, "bass was not higher than treble");
     }
 }

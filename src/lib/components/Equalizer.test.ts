@@ -66,6 +66,10 @@ describe("Equalizer.svelte", () => {
       if (cmd === "load_equalizer_preset")
         return { ...defaultEqConfig, gains: [4, 3, 1, -1, -2, -1, 1, 3, 3.5, 3.5], active_preset: args.presetName };
       if (cmd === "get_parametric_response") return args.frequencies.map(() => 0);
+      if (cmd === "get_eq_preset_previews") {
+        const freqs = args?.frequencies ?? [];
+        return defaultPresets.builtin.map((key) => ({ key, response_db: freqs.map(() => 0) }));
+      }
       return null;
     });
   });
@@ -189,16 +193,23 @@ describe("Equalizer.svelte", () => {
         if (cmd === "get_fade_settings") return defaultFadeSettings;
         if (cmd === "get_audio_setting_ranges") return defaultRanges;
         if (cmd === "get_parametric_response") return args.frequencies.map(() => 0);
+        if (cmd === "get_eq_preset_previews") {
+          const freqs = args?.frequencies ?? [];
+          return [
+            ...presets.builtin.map((key) => ({ key, response_db: freqs.map(() => 0) })),
+            ...presets.user.map((u) => ({ key: `user:${u.id}`, response_db: freqs.map(() => 0) })),
+          ];
+        }
         return null;
       });
     }
 
     async function renderPicker() {
       const view = render(Equalizer);
-      let picker!: HTMLSelectElement;
+      let picker!: HTMLElement;
       await waitFor(() => {
-        picker = view.getByLabelText("Preset:") as HTMLSelectElement;
-        expect(picker.value).toBe("user:7");
+        picker = view.getByRole("combobox", { name: "Preset" });
+        expect(picker).toHaveTextContent("Studio");
       });
       return { ...view, picker };
     }
@@ -206,9 +217,12 @@ describe("Equalizer.svelte", () => {
     it("lists user presets beside the built-ins and selects the active one", async () => {
       mockPresetBackend();
       const { picker, getByRole } = await renderPicker();
-      const groups = [...picker.querySelectorAll("optgroup")].map((g) => g.label);
+      await fireEvent.click(picker);
+      const groups = [...getByRole("listbox").querySelectorAll('[role="group"]')].map((g) =>
+        g.getAttribute("aria-label")
+      );
       expect(groups).toEqual(["Built-in", "My presets"]);
-      expect(picker.selectedOptions[0].textContent).toBe("Studio");
+      expect(picker).toHaveTextContent("Studio");
       expect(getByRole("button", { name: "Rename" })).toBeInTheDocument();
       expect(getByRole("button", { name: "Delete" })).toBeInTheDocument();
     });
@@ -217,8 +231,7 @@ describe("Equalizer.svelte", () => {
       mockPresetBackend();
       const { picker, getByLabelText, queryByRole } = await renderPicker();
       await fireEvent.change(getByLabelText("Gain 1"), { target: { value: "-6" } });
-      await waitFor(() => expect(picker.value).toBe(""));
-      expect(picker.selectedOptions[0].textContent).toBe("Custom");
+      await waitFor(() => expect(picker).toHaveTextContent("Custom"));
       expect(queryByRole("button", { name: "Rename" })).toBeNull();
     });
 
@@ -234,8 +247,7 @@ describe("Equalizer.svelte", () => {
       await fireEvent.input(getByLabelText("Preset name"), { target: { value: "Late night" } });
       await fireEvent.click(getByRole("button", { name: "Save" }));
       expect(invoke).toHaveBeenCalledWith("save_eq_user_preset", { name: "Late night" });
-      await waitFor(() => expect(picker.value).toBe("user:8"));
-      expect(picker.selectedOptions[0].textContent).toBe("Late night");
+      await waitFor(() => expect(picker).toHaveTextContent("Late night"));
     });
 
     it("explains a rejected name next to the field", async () => {
@@ -268,7 +280,7 @@ describe("Equalizer.svelte", () => {
       await fireEvent.input(field, { target: { value: "Studio monitors" } });
       await fireEvent.click(getByRole("button", { name: "Save" }));
       expect(invoke).toHaveBeenCalledWith("rename_eq_user_preset", { id: 7, name: "Studio monitors" });
-      await waitFor(() => expect(picker.selectedOptions[0].textContent).toBe("Studio monitors"));
+      await waitFor(() => expect(picker).toHaveTextContent("Studio monitors"));
     });
 
     it("deletes the active preset only after confirming", async () => {
@@ -285,16 +297,18 @@ describe("Equalizer.svelte", () => {
       const deletes = getAllByRole("button", { name: "Delete" });
       await fireEvent.click(deletes[deletes.length - 1]);
       expect(invoke).toHaveBeenCalledWith("delete_eq_user_preset", { id: 7 });
-      await waitFor(() => expect(picker.value).toBe(""));
-      expect(picker.querySelectorAll("optgroup")).toHaveLength(1);
+      await waitFor(() => expect(picker).toHaveTextContent("Custom"));
+      await fireEvent.click(picker);
+      expect(getByRole("listbox").querySelectorAll('[role="group"]')).toHaveLength(1);
     });
 
     it("hides user presets in graphic mode, which they can't describe", async () => {
       mockPresetBackend();
       state = { ...state, mode: "graphic10", active_preset: "Rock" };
       const { getByRole, queryByRole } = render(Equalizer);
-      await waitFor(() => expect((getByRole("combobox") as HTMLSelectElement).value).toBe("Rock"));
-      expect(getByRole("combobox").querySelectorAll("optgroup")).toHaveLength(1);
+      await waitFor(() => expect(getByRole("combobox", { name: "Preset" })).toHaveTextContent("Rock"));
+      await fireEvent.click(getByRole("combobox", { name: "Preset" }));
+      expect(getByRole("listbox").querySelectorAll('[role="group"]')).toHaveLength(1);
       expect(queryByRole("button", { name: "Save as…" })).toBeNull();
     });
   });
@@ -384,13 +398,14 @@ describe("Equalizer.svelte", () => {
 
   it("loads a preset when selected", async () => {
     const { getByRole } = render(Equalizer);
-    let selectEl: HTMLSelectElement;
+    let selectEl: HTMLElement;
     await waitFor(() => {
-      selectEl = getByRole("combobox") as HTMLSelectElement;
+      selectEl = getByRole("combobox");
       expect(selectEl).toBeInTheDocument();
     });
 
-    await fireEvent.change(selectEl!, { target: { value: "Rock" } });
+    await fireEvent.click(selectEl!);
+    await fireEvent.click(getByRole("option", { name: /rock/i }));
     expect(invoke).toHaveBeenCalledWith("load_equalizer_preset", { presetName: "Rock" });
   });
 
@@ -399,6 +414,7 @@ describe("Equalizer.svelte", () => {
     vi.mocked(invoke).mockImplementation(async (cmd: string, args?: any) => {
       if (cmd === "get_equalizer_state") return engine;
       if (cmd === "list_eq_presets") return defaultPresets;
+      if (cmd === "get_eq_preset_previews") return defaultPresets.builtin.map((key) => ({ key, response_db: [] }));
       if (cmd === "apply_equalizer_config") return (engine = { ...args.config, active_preset: null });
       if (cmd === "load_equalizer_preset") return (engine = { ...engine, active_preset: args.presetName });
       if (cmd === "get_loudness_settings") return defaultLoudness;
@@ -407,14 +423,15 @@ describe("Equalizer.svelte", () => {
       return null;
     });
     const { getByRole } = render(Equalizer);
-    let selectEl!: HTMLSelectElement;
+    let selectEl!: HTMLElement;
     await waitFor(() => {
-      selectEl = getByRole("combobox") as HTMLSelectElement;
+      selectEl = getByRole("combobox");
       expect(selectEl).toBeInTheDocument();
     });
 
-    await fireEvent.change(selectEl, { target: { value: "Rock" } });
-    await waitFor(() => expect(selectEl.value).toBe("Rock"));
+    await fireEvent.click(selectEl);
+    await fireEvent.click(getByRole("option", { name: /rock/i }));
+    await waitFor(() => expect(selectEl).toHaveTextContent("Rock"));
     expect(engine.enabled).toBe(true);
     expect(getByRole("switch", { name: "Enable EQ" })).toBeChecked();
   });

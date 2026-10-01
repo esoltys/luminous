@@ -219,3 +219,64 @@ pub async fn get_parametric_response(
     })
     .await)
 }
+
+#[derive(Clone, Debug, Serialize)]
+pub struct EqPresetPreview {
+    pub key: String,
+    pub response_db: Vec<f32>,
+}
+
+/// Evaluated magnitude response curves for built-in and user presets across
+/// the requested frequencies, computed offline without touching the live audio
+/// engine (#1344). Previews reflect the given EQ `mode` (graphic or parametric).
+#[tauri::command]
+pub async fn get_eq_preset_previews(
+    state: State<'_, AppState>,
+    frequencies: Vec<f32>,
+    mode: Option<EqMode>,
+) -> Result<Vec<EqPresetPreview>, String> {
+    let mode = mode.unwrap_or(EqMode::Graphic10);
+    let sample_rate = crate::audio::with_audio(&state.audio, |engine| {
+        engine.with_equalizer(|eq| eq.sample_rate())
+    })
+    .await;
+
+    let mut offline_eq = Equalizer::new();
+    offline_eq.update_format(sample_rate, 2);
+
+    let mut previews = Vec::with_capacity(BUILTIN_PRESETS.len());
+
+    for &name in &BUILTIN_PRESETS {
+        let response = match mode {
+            EqMode::Graphic10 => {
+                offline_eq.load_preset(crate::equalizer::preset_gains(name));
+                offline_eq.graphic_response_db(&frequencies)
+            }
+            EqMode::Parametric => {
+                if let Some(bands) = crate::equalizer::parametric_preset(name) {
+                    offline_eq.load_parametric(&bands);
+                }
+                offline_eq.parametric_response_db(&frequencies)
+            }
+        };
+        previews.push(EqPresetPreview {
+            key: name.to_string(),
+            response_db: response,
+        });
+    }
+
+    if mode == EqMode::Parametric {
+        let conn = state.db.pool.get().map_err(|e| e.to_string())?;
+        let user_presets = eq_presets::list_with_bands(&conn)?;
+        for user_preset in user_presets {
+            offline_eq.load_parametric(&user_preset.bands);
+            let response = offline_eq.parametric_response_db(&frequencies);
+            previews.push(EqPresetPreview {
+                key: crate::equalizer::user_preset_key(user_preset.id),
+                response_db: response,
+            });
+        }
+    }
+
+    Ok(previews)
+}

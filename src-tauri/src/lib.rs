@@ -1311,6 +1311,7 @@ pub fn run() {
             commands::equalizer::get_equalizer_state,
             commands::equalizer::apply_equalizer_config,
             commands::equalizer::get_parametric_response,
+            commands::equalizer::get_eq_preset_previews,
             commands::equalizer::reset_parametric_bands,
             commands::equalizer::load_equalizer_preset,
             commands::equalizer::list_eq_presets,
