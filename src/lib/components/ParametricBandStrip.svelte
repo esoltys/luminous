@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { i18n } from "../stores/i18n.svelte";
+  import { i18n, formatNumber } from "../stores/i18n.svelte";
   import { PlusIcon as Plus, XIcon as X } from "phosphor-svelte";
   import Toggle from "./Toggle.svelte";
   import Select from "./Select.svelte";
@@ -29,8 +29,15 @@
 
   /** Decimals shown per field — the engine stores f32, so Q 1/√2 arrives as 0.70710677. */
   const DIGITS: Record<NumericField, number> = { freq: 1, gain_db: 1, q: 2 };
-  const show = (band: ParametricBand, field: NumericField) =>
-    String(Math.round(band[field] * 10 ** DIGITS[field]) / 10 ** DIGITS[field]);
+  const show = (band: ParametricBand, field: NumericField) => {
+    const val = Math.round(band[field] * 10 ** DIGITS[field]) / 10 ** DIGITS[field];
+    return formatNumber(val, { minimumFractionDigits: 0, maximumFractionDigits: DIGITS[field] });
+  };
+
+  function parseLocalized(str: string): number {
+    const normalized = str.trim().replace(/\s/g, "").replace(",", ".");
+    return parseFloat(normalized);
+  }
 
   /** Commit a typed value, then show whatever the backend echoed — the input
    * never keeps a value the engine clamped away. */
@@ -38,8 +45,8 @@
     const input = e.currentTarget;
     const band = bands[idx];
     if (!band) return;
-    const value = input.valueAsNumber;
-    if (Number.isFinite(value) && String(value) !== show(band, field)) {
+    const value = parseLocalized(input.value);
+    if (Number.isFinite(value) && value !== band[field]) {
       onselect(idx);
       await onchange(idx, { ...band, [field]: value });
     }
@@ -47,8 +54,23 @@
     if (echoed) input.value = show(echoed, field);
   }
 
-  function commitOnEnter(e: KeyboardEvent & { currentTarget: HTMLInputElement }) {
-    if (e.key === "Enter") e.currentTarget.dispatchEvent(new Event("change", { bubbles: true }));
+  function handleKeyDown(e: KeyboardEvent & { currentTarget: HTMLInputElement }, idx: number, field: NumericField, step: number) {
+    if (e.key === "Enter") {
+      e.currentTarget.dispatchEvent(new Event("change", { bubbles: true }));
+      return;
+    }
+    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+      e.preventDefault();
+      const currentVal = parseLocalized(e.currentTarget.value);
+      if (Number.isFinite(currentVal)) {
+        const delta = e.key === "ArrowUp" ? step : -step;
+        const range = ranges[field === "gain_db" ? "gain_db" : field];
+        const next = Math.round((currentVal + delta) * 100) / 100;
+        const clamped = Math.max(range.min, Math.min(range.max, next));
+        e.currentTarget.value = show({ ...bands[idx], [field]: clamped }, field);
+        e.currentTarget.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    }
   }
 
   let list: HTMLDivElement | undefined = $state();
@@ -98,36 +120,39 @@
           {/each}
         </Select>
         <input
-          type="number"
+          type="text"
+          inputmode="decimal"
           aria-label={`${i18n.t("equalizer.frequency")} ${idx + 1}`}
           min={ranges.freq.min}
           max={ranges.freq.max}
           step="any"
           value={show(band, "freq")}
           onchange={(e) => commitNumber(e, idx, "freq")}
-          onkeydown={commitOnEnter}
+          onkeydown={(e) => handleKeyDown(e, idx, "freq", 10)}
           class={inputClass}
         />
         <input
-          type="number"
+          type="text"
+          inputmode="decimal"
           aria-label={`${i18n.t("equalizer.gain")} ${idx + 1}`}
           min={ranges.gain_db.min}
           max={ranges.gain_db.max}
           step="0.1"
           value={show(band, "gain_db")}
           onchange={(e) => commitNumber(e, idx, "gain_db")}
-          onkeydown={commitOnEnter}
+          onkeydown={(e) => handleKeyDown(e, idx, "gain_db", 0.5)}
           class={inputClass}
         />
         <input
-          type="number"
+          type="text"
+          inputmode="decimal"
           aria-label={`${i18n.t("equalizer.qFactor")} ${idx + 1}`}
           min={ranges.q.min}
           max={ranges.q.max}
           step="0.01"
           value={show(band, "q")}
           onchange={(e) => commitNumber(e, idx, "q")}
-          onkeydown={commitOnEnter}
+          onkeydown={(e) => handleKeyDown(e, idx, "q", 0.05)}
           class={inputClass}
         />
         <Toggle
