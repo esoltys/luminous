@@ -946,7 +946,15 @@ export const fr: DeepStringRecord<typeof en> = {
     dragHint: "Déplacer la fenêtre",
     showLyrics: "Afficher les paroles synchronisées",
     showCoverArt: "Afficher la pochette",
-    noLiveLyrics: "Aucune parole synchronisée disponible"
+    noLiveLyrics: "Aucune parole synchronisée disponible",
+    queueComplete: "File d'attente terminée",
+    contextComplete: "{name} terminé",
+    shuffleLibrary: "Mélanger la bibliothèque",
+    replay: "Rejouer",
+    library: "Bibliothèque",
+    tracksPlayed: "{count} morceaux lus",
+    trackPlayed: "1 morceau lu",
+    dropToPlay: "ou déposez des fichiers audio pour lire"
   },
 
   chipInput: {

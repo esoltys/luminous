@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { playlistsStore } from "./playlists.svelte";
 import { toastStore } from "./toast.svelte";
+import { windowLayoutStore } from "./windowLayout.svelte";
 
 describe("PlayerStore", () => {
   let store: PlayerStore;
@@ -369,4 +370,113 @@ describe("PlayerStore", () => {
       expect(invoke).toHaveBeenCalledWith("set_auto_continue", { enabled: true });
     });
   });
+
+  describe("Session Wrap & Queue Completion (#1379)", () => {
+    async function finishPlayback(isMiniplayer: boolean, isQueue: boolean, contextName = "My Mix") {
+      const originalListenImpl = vi.mocked(listen).getMockImplementation();
+      let playbackStateCallback: ((event: { payload: any }) => Promise<void>) | undefined;
+      vi.mocked(listen).mockImplementation(async (event: string, callback: any) => {
+        if (event === "playback-state") playbackStateCallback = callback;
+        return () => {};
+      });
+      const showSpy = vi.spyOn(toastStore, "show");
+      try {
+        windowLayoutStore.isMiniplayer = isMiniplayer;
+        store = new PlayerStore();
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        playlistsStore.playlists = [
+          { id: 1, name: "Queue", dynamic_enabled: false, created: 0, updated: 0, track_count: 2, is_queue: true },
+          { id: 2, name: "My Mix", dynamic_enabled: false, created: 0, updated: 0, track_count: 5, is_queue: false },
+        ];
+        const plId = isQueue ? 1 : 2;
+        // Seed session songs
+        await store.playSongs([10, 20], 0, plId, undefined, contextName);
+        expect(store.completedSession).toBeNull();
+
+        // Simulate active playing state so wasPlaying is true
+        await playbackStateCallback?.({
+          payload: {
+            state: "playing",
+            current_song: { id: 10, title: "Track 1" },
+            playlist_id: plId,
+            playlist_item_uuid: "uuid-1",
+            remaining_playlist_items: 0,
+            position_nanosec: 1000,
+            volume: 1,
+            shuffle_mode: "off",
+            repeat_mode: "off",
+          },
+        });
+        store.activeContextName = contextName;
+
+        showSpy.mockClear();
+        // Playback stops naturally
+        await playbackStateCallback?.({
+          payload: {
+            state: "stopped",
+            current_song: null,
+            playlist_id: null,
+            playlist_item_uuid: null,
+            remaining_playlist_items: 0,
+            position_nanosec: 0,
+            volume: 1,
+            shuffle_mode: "off",
+            repeat_mode: "off",
+          },
+        });
+        return {
+          session: store.completedSession,
+          toasts: showSpy.mock.calls.filter(([, variant]) => variant === "milestone"),
+        };
+      } finally {
+        showSpy.mockRestore();
+        windowLayoutStore.isMiniplayer = false;
+        if (originalListenImpl) vi.mocked(listen).mockImplementation(originalListenImpl);
+      }
+    }
+
+    it("records completedSession with tracks and context when playback concludes naturally", async () => {
+      const result = await finishPlayback(false, true, "Queue");
+      expect(result.session).not.toBeNull();
+      expect(result.session?.isQueue).toBe(true);
+      expect(result.session?.songIds).toEqual([10, 20]);
+      expect(result.session?.trackCount).toBe(2);
+      expect(result.toasts.length).toBeGreaterThan(0);
+    });
+
+    it("suppresses floating milestone toast in miniplayer mode", async () => {
+      const result = await finishPlayback(true, true, "Queue");
+      expect(result.session).not.toBeNull();
+      expect(result.session?.isQueue).toBe(true);
+      expect(result.toasts).toHaveLength(0);
+    });
+
+    it("replays the completed session tracks on replayCompletedSession", async () => {
+      await finishPlayback(true, true, "Queue");
+      expect(store.completedSession).not.toBeNull();
+      vi.mocked(invoke).mockClear();
+
+      await store.replayCompletedSession();
+      expect(invoke).toHaveBeenCalledWith("play_songs", expect.objectContaining({
+        songIds: [10, 20],
+        startIndex: 0,
+      }));
+    });
+
+    it("shuffles library songs and plays them on shuffleLibrary", async () => {
+      const mockSongs: any[] = [{ id: 1 }, { id: 2 }, { id: 3 }];
+      vi.mocked(invoke).mockClear();
+
+      await store.shuffleLibrary(mockSongs);
+      expect(invoke).toHaveBeenCalledWith("play_songs", expect.objectContaining({
+        startIndex: 0,
+      }));
+      const call = vi.mocked(invoke).mock.calls.find(([cmd]) => cmd === "play_songs");
+      expect(call).toBeDefined();
+      const songIds = (call![1] as any).songIds;
+      expect(songIds).toHaveLength(3);
+      expect(songIds.sort()).toEqual([1, 2, 3]);
+    });
+  });
 });
+

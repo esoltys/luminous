@@ -6,8 +6,17 @@ import { applySongStats, type SongStatsPayload } from "../utils/stats";
 import { themeStore } from "./theme.svelte";
 import { toastStore } from "./toast.svelte";
 import { playlistsStore } from "./playlists.svelte";
+import { windowLayoutStore } from "./windowLayout.svelte";
 import { i18n } from "./i18n.svelte";
 import { isRemotePath } from "../utils/remoteSource";
+import { shuffleArray } from "../utils/shuffle";
+
+export interface CompletedSession {
+  contextName: string;
+  isQueue: boolean;
+  songIds: number[];
+  trackCount: number;
+}
 
 export class PlayerStore {
   state = $state<PlayState>("stopped");
@@ -31,6 +40,10 @@ export class PlayerStore {
 
   /** Celebration: queue just finished naturally (#182, Milestone tier). */
   queueJustCompleted = $state<boolean>(false);
+  /** Session wrap state for finished queue/playlist (#1379). */
+  completedSession = $state<CompletedSession | null>(null);
+  private _lastSessionSongIds: number[] = [];
+  private _playedSongIdsHistory: number[] = [];
   /** The name of the active playlist, album, or source context being played. */
   activeContextName = $state<string | undefined>(undefined);
   /** Title to display for the current song: "Nothing playing" when there is no
@@ -79,6 +92,12 @@ export class PlayerStore {
         if (this.currentSong?.id !== oldSongId || this.playlistItemUuid !== oldItemUuid) {
           themeStore.updateArtworkColors(this.currentSong);
         }
+        if (this.currentSong?.id) {
+          this.completedSession = null;
+          if (!this._playedSongIdsHistory.includes(this.currentSong.id)) {
+            this._playedSongIdsHistory.push(this.currentSong.id);
+          }
+        }
 
         // Queue completion celebration (#182, Milestone tier): fires when
         // playback stops naturally after the last track with nothing left.
@@ -91,13 +110,30 @@ export class PlayerStore {
               : undefined;
           const isQueue = playedPl ? playedPl.is_queue : (!oldContextName || oldContextName === "Queue");
 
+          const sessionTracks =
+            this._lastSessionSongIds.length > 0
+              ? [...this._lastSessionSongIds]
+              : [...this._playedSongIdsHistory];
+
+          const contextName = oldContextName || (isQueue ? i18n.t("queue.title", {}, "Queue") : "");
+          this.completedSession = {
+            contextName,
+            isQueue,
+            songIds: sessionTracks,
+            trackCount: sessionTracks.length,
+          };
+
           // With Auto Continue on the Queue has no end to celebrate — it only
           // stops here if nothing in the library could be added.
           if (!(isQueue && this.autoContinue)) {
-            const toastText = isQueue
-              ? i18n.t("celebrations.queueComplete", {}, "Your Queue is done")
-              : i18n.t("celebrations.contextComplete", { name: oldContextName }, `${oldContextName} complete`);
-            toastStore.show(toastText, "milestone");
+            // When in miniplayer mode, suppress the floating milestone toast since
+            // the miniplayer frame renders its own dedicated Session Wrap card (#1379).
+            if (!windowLayoutStore.isMiniplayer) {
+              const toastText = isQueue
+                ? i18n.t("celebrations.queueComplete", {}, "Your Queue is done")
+                : i18n.t("celebrations.contextComplete", { name: oldContextName }, `${oldContextName} complete`);
+              toastStore.show(toastText, "milestone");
+            }
           }
           setTimeout(() => { this.queueJustCompleted = false; }, 650);
 
@@ -123,6 +159,12 @@ export class PlayerStore {
         this.currentSong = event.payload.song || undefined;
         this.audioPipeline = event.payload.pipeline ?? null;
         themeStore.updateArtworkColors(this.currentSong);
+        if (this.currentSong?.id) {
+          this.completedSession = null;
+          if (!this._playedSongIdsHistory.includes(this.currentSong.id)) {
+            this._playedSongIdsHistory.push(this.currentSong.id);
+          }
+        }
       });
 
       await listen<AudioPipelineInfo | null>("audio-pipeline-changed", (event) => {
@@ -252,6 +294,9 @@ export class PlayerStore {
 
   // Playback Control Actions
   async playSong(songId: number) {
+    this._lastSessionSongIds = [songId];
+    this._playedSongIdsHistory = [songId];
+    this.completedSession = null;
     await invoke("play_song", { songId });
     await playlistsStore.refreshPlaylists();
     const queuePl = await playlistsStore.requireQueue();
@@ -260,6 +305,7 @@ export class PlayerStore {
   }
 
   async openAndPlay(paths: string[]) {
+    this.completedSession = null;
     const outcome = await invoke<{ played: number; skipped: number }>("open_and_play", { paths });
     if (outcome.played === 0) {
       toastStore.show(
@@ -285,6 +331,7 @@ export class PlayerStore {
    * Queue instead of replacing it — the "hold Shift to append" counterpart to
    * `openAndPlay`. Playback is left untouched. */
   async addPathsToQueue(paths: string[]) {
+    this.completedSession = null;
     const outcome = await invoke<{ added: number; skipped: number }>("add_paths_to_queue", { paths });
     if (outcome.added === 0) {
       toastStore.show(
@@ -362,6 +409,9 @@ export class PlayerStore {
   }
 
   async playSongs(songIds: number[], startIndex: number, playlistId?: number, context?: PlayContext, contextName?: string) {
+    this._lastSessionSongIds = [...songIds];
+    this._playedSongIdsHistory = [];
+    this.completedSession = null;
     const queuePl = await playlistsStore.requireQueue();
     const effectivePlaylistId = playlistId ?? queuePl?.id;
     if (contextName) {
@@ -384,6 +434,23 @@ export class PlayerStore {
       await playlistsStore.selectPlaylist(queuePl.id);
       await playlistsStore.refreshPlaylists();
     }
+  }
+
+  /** Replay the tracks from the just-finished queue/playlist session (#1379) */
+  async replayCompletedSession() {
+    if (!this.completedSession || this.completedSession.songIds.length === 0) return;
+    const { songIds, contextName } = this.completedSession;
+    const queuePl = await playlistsStore.requireQueue();
+    await this.playSongs(songIds, 0, queuePl?.id, undefined, contextName || "Queue");
+  }
+
+  /** 1-click continuation: shuffle library tracks into the queue and begin playback (#1379) */
+  async shuffleLibrary(librarySongs: Song[]) {
+    if (!librarySongs || librarySongs.length === 0) return;
+    const queuePl = await playlistsStore.requireQueue();
+    const shuffledIds = shuffleArray(librarySongs.map((s) => s.id));
+    await this.setShuffleMode("off");
+    await this.playSongs(shuffledIds, 0, queuePl?.id, undefined, i18n.t("queue.title", {}, "Queue"));
   }
 
   async playPlaylistItem(playlistId: number, itemIndex: number, context?: PlayContext) {
