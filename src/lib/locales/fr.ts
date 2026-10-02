@@ -270,7 +270,7 @@ export const fr: DeepStringRecord<typeof en> = {
     ratingStyleHeart: "Cœur (favori)",
     ratingStyleStars: "5 étoiles",
     ratingStyleBoth: "Les deux (cœur et 5 étoiles)",
-    ratingStyleHint: "Choisissez Cœur pour marquer les chansons comme favorites, 5 étoiles pour des notes par demi-étoile, ou Les deux pour afficher les appréciations et notes côte à côte. Les albums utilisent toujours les 5 étoiles.",
+    ratingStyleHint: "Choisissez Cœur pour marquer les chansons comme favorites, 5 étoiles pour des notes par demi-étoile, ou Les deux pour afficher les cœurs et les étoiles côte à côte. Les albums utilisent toujours les 5 étoiles.",
     weekStart: "Commencer la semaine le",
     weekStartSunday: "Dimanche",
     weekStartMonday: "Lundi",

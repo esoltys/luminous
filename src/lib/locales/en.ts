@@ -264,7 +264,7 @@ export const en = {
     ratingStyleHeart: "Heart (favourite)",
     ratingStyleStars: "5-star",
     ratingStyleBoth: "Both (heart and 5-star)",
-    ratingStyleHint: "Choose Heart to mark songs as favourites, 5-star for half-step ratings, or Both to display track feedback and star ratings side-by-side. Album ratings always use 5 stars.",
+    ratingStyleHint: "Choose Heart to mark songs as favourites, 5-star for half-step ratings, or Both to display hearts and star ratings side-by-side. Album ratings always use 5 stars.",
     weekStart: "Start the week with",
     weekStartSunday: "Sunday",
     weekStartMonday: "Monday",
