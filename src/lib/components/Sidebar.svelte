@@ -351,14 +351,9 @@
           <span class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 border border-brand-sidebar"></span>
         </div>
         {#if !layoutCollapsed}
-          <div class="min-w-0 flex-1 text-left flex items-center justify-between gap-1">
-            <span class="truncate text-xs font-semibold text-brand-text-primary">
-              {musicbrainzStore.username}
-            </span>
-            <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-[#ba478f]/15 text-[#eb743b] font-medium shrink-0 border border-[#ba478f]/20">
-              MB
-            </span>
-          </div>
+          <span class="truncate text-xs font-semibold text-brand-text-primary text-left flex-1 min-w-0">
+            {musicbrainzStore.username}
+          </span>
         {/if}
       </button>
     {:else}
