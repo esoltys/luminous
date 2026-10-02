@@ -626,7 +626,7 @@ mod tests {
             let conn = db.pool.get().unwrap();
             let id = insert_song(&conn, "/tmp/favourite.flac");
             conn.execute(
-                "UPDATE songs SET rating = 5, source = 1 WHERE id = ?1",
+                "UPDATE songs SET loved = 1, rating = 5, source = 1 WHERE id = ?1",
                 params![id],
             )
             .unwrap();

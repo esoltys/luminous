@@ -207,9 +207,49 @@ fn flush_queue(db: &Database, server: &Server) {
 /// Pushes a song's new Luminous rating to its server: `setRating`, plus
 /// `star`/`unstar` when the rating crosses the favourite threshold relative
 /// to what the server last had. On success the cache records the server's
-/// new state, so the next sync sees no server-side change and leaves the
-/// local rating alone.
+/// Pushes a song's new Luminous rating to its server: `setRating`.
+/// On success the cache records the server's new state, so the next sync
+/// sees no server-side change and leaves the local rating alone.
 pub fn push_song_rating(db: &Database, path: &str, rating: f32) {
+    let Some((server_id, track_id)) = parse_track_uri(path) else {
+        return;
+    };
+    let loaded = (|| -> Result<Option<Server>> {
+        let conn = db.pool.get()?;
+        load_server(&conn, server_id)
+    })();
+    let server = match loaded {
+        Ok(Some(v)) => v,
+        Ok(None) => return,
+        Err(e) => {
+            log::warn!("Subsonic rating: couldn't load server {server_id}: {e:#}");
+            return;
+        }
+    };
+
+    let value = rating_to_server(rating);
+    match server.client.set_rating(&track_id, value) {
+        Ok(()) => {
+            let updated = (|| -> Result<()> {
+                let server_rating: Option<i64> = (value > 0).then_some(value as i64);
+                db.pool.get()?.execute(
+                    "UPDATE subsonic_cache SET server_rating = ?1
+                     WHERE server_id = ?2 AND remote_id = ?3",
+                    params![server_rating, server_id, track_id],
+                )?;
+                Ok(())
+            })();
+            if let Err(e) = updated {
+                log::warn!("Subsonic rating: couldn't update cache: {e:#}");
+            }
+        }
+        Err(e) => log::warn!("Subsonic rating push failed for server {server_id}: {e:#}"),
+    }
+}
+
+/// Pushes a song's love/hate state to its server: invokes `star` when `loved == 1`
+/// and `unstar` when `loved <= 0`.
+pub fn push_song_loved(db: &Database, path: &str, loved: i32) {
     let Some((server_id, track_id)) = parse_track_uri(path) else {
         return;
     };
@@ -232,33 +272,29 @@ pub fn push_song_rating(db: &Database, path: &str, rating: f32) {
         Ok(Some(v)) => v,
         Ok(None) => return,
         Err(e) => {
-            log::warn!("Subsonic rating: couldn't load server {server_id}: {e:#}");
+            log::warn!("Subsonic loved: couldn't load server {server_id}: {e:#}");
             return;
         }
     };
 
-    let pushed = push_rating(
-        &server.client,
-        &track_id,
-        StarTarget::Song(&track_id),
-        rating,
-        was_starred,
-    );
-    match pushed {
-        Ok((server_rating, starred)) => {
-            let updated = (|| -> Result<()> {
-                db.pool.get()?.execute(
-                    "UPDATE subsonic_cache SET server_rating = ?1, server_starred = ?2
-                     WHERE server_id = ?3 AND remote_id = ?4",
-                    params![server_rating, starred, server_id, track_id],
-                )?;
-                Ok(())
-            })();
-            if let Err(e) = updated {
-                log::warn!("Subsonic rating: couldn't update cache: {e:#}");
+    let want_star = loved == 1;
+    if want_star != was_starred {
+        match server.client.set_starred(StarTarget::Song(&track_id), want_star) {
+            Ok(()) => {
+                let updated = (|| -> Result<()> {
+                    db.pool.get()?.execute(
+                        "UPDATE subsonic_cache SET server_starred = ?1
+                         WHERE server_id = ?2 AND remote_id = ?3",
+                        params![want_star, server_id, track_id],
+                    )?;
+                    Ok(())
+                })();
+                if let Err(e) = updated {
+                    log::warn!("Subsonic loved: couldn't update cache: {e:#}");
+                }
             }
+            Err(e) => log::warn!("Subsonic star/unstar failed for server {server_id}: {e:#}"),
         }
-        Err(e) => log::warn!("Subsonic rating push failed for server {server_id}: {e:#}"),
     }
 }
 
@@ -375,6 +411,12 @@ pub fn spawn_play(db: Arc<Database>, song: &Song, listened_at: i64) {
 pub fn spawn_song_rating(db: Arc<Database>, song: &Song, rating: f32) {
     if let Some(path) = subsonic_path(song) {
         tauri::async_runtime::spawn_blocking(move || push_song_rating(&db, &path, rating));
+    }
+}
+
+pub fn spawn_song_loved(db: Arc<Database>, song: &Song, loved: i32) {
+    if let Some(path) = subsonic_path(song) {
+        tauri::async_runtime::spawn_blocking(move || push_song_loved(&db, &path, loved));
     }
 }
 
@@ -556,17 +598,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn song_rating_stars_and_unstars_across_threshold() {
+    async fn song_rating_pushes_set_rating() {
         let server = MockServer::start().await;
         endpoint("setRating")
             .and(query_param("id", "t1"))
             .and(query_param("rating", "5"))
-            .respond_with(json(OK))
-            .expect(1)
-            .mount(&server)
-            .await;
-        endpoint("star")
-            .and(query_param("id", "t1"))
             .respond_with(json(OK))
             .expect(1)
             .mount(&server)
@@ -583,7 +619,7 @@ mod tests {
             .unwrap();
         let db2 = db.clone();
         blocking(move || push_song_rating(&db2, &track_uri(1, "t1"), 4.5)).await;
-        assert_eq!(song_cache(&db, "t1"), (Some(5), true));
+        assert_eq!(song_cache(&db, "t1"), (Some(5), false));
 
         server.verify().await;
         server.reset().await;
@@ -593,18 +629,11 @@ mod tests {
             .expect(1)
             .mount(&server)
             .await;
-        endpoint("unstar")
-            .and(query_param("id", "t1"))
-            .respond_with(json(OK))
-            .expect(1)
-            .mount(&server)
-            .await;
         let db2 = db.clone();
         blocking(move || push_song_rating(&db2, &track_uri(1, "t1"), 2.0)).await;
         assert_eq!(song_cache(&db, "t1"), (Some(2), false));
 
-        // Clearing the rating clears it on the server; the song stays
-        // unstarred, so there's no star/unstar call.
+        // Clearing the rating clears it on the server (0)
         server.verify().await;
         server.reset().await;
         endpoint("setRating")
@@ -615,6 +644,67 @@ mod tests {
             .await;
         let db2 = db.clone();
         blocking(move || push_song_rating(&db2, &track_uri(1, "t1"), -1.0)).await;
+        assert_eq!(song_cache(&db, "t1"), (None, false));
+    }
+
+    #[tokio::test]
+    async fn song_loved_stars_and_unstars() {
+        let server = MockServer::start().await;
+        endpoint("star")
+            .and(query_param("id", "t1"))
+            .respond_with(json(OK))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let (_dir, db) = temp_db("song_loved", &server.uri(), false);
+        db.pool
+            .get()
+            .unwrap()
+            .execute(
+                "INSERT INTO subsonic_cache (server_id, remote_id) VALUES (1, 't1')",
+                [],
+            )
+            .unwrap();
+        let db2 = db.clone();
+        blocking(move || push_song_loved(&db2, &track_uri(1, "t1"), 1)).await;
+        assert_eq!(song_cache(&db, "t1"), (None, true));
+
+        server.verify().await;
+        server.reset().await;
+        endpoint("unstar")
+            .and(query_param("id", "t1"))
+            .respond_with(json(OK))
+            .expect(1)
+            .mount(&server)
+            .await;
+        let db2 = db.clone();
+        blocking(move || push_song_loved(&db2, &track_uri(1, "t1"), 0)).await;
+        assert_eq!(song_cache(&db, "t1"), (None, false));
+
+        // Hate (-1) also unstars if previously starred
+        server.verify().await;
+        server.reset().await;
+        endpoint("star")
+            .and(query_param("id", "t1"))
+            .respond_with(json(OK))
+            .expect(1)
+            .mount(&server)
+            .await;
+        let db2 = db.clone();
+        blocking(move || push_song_loved(&db2, &track_uri(1, "t1"), 1)).await;
+        assert_eq!(song_cache(&db, "t1"), (None, true));
+
+        server.verify().await;
+        server.reset().await;
+        endpoint("unstar")
+            .and(query_param("id", "t1"))
+            .respond_with(json(OK))
+            .expect(1)
+            .mount(&server)
+            .await;
+        let db2 = db.clone();
+        blocking(move || push_song_loved(&db2, &track_uri(1, "t1"), -1)).await;
         assert_eq!(song_cache(&db, "t1"), (None, false));
     }
 

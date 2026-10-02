@@ -320,6 +320,7 @@ pub struct Song {
 
     // Play statistics
     pub rating: f32, // 0.0–1.0, -1.0 = unset
+    pub loved: i32,  // 1 = loved, 0 = neutral, -1 = hated
     pub playcount: i32,
     pub skipcount: i32,
     pub lastplayed: Option<i64>,
@@ -525,7 +526,7 @@ pub enum QueuePopulationMode {
     /// Full scope, uniformly randomized (not a deterministic top-N block).
     #[default]
     All,
-    /// Biased toward the user's own rating (`rating >= 4`).
+    /// Biased toward the user's loved tracks (`loved = 1`).
     Favourites,
     /// Biased toward higher playcount / more recent lastplayed.
     Familiar,

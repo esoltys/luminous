@@ -2096,7 +2096,7 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
 pub(crate) fn mode_query_fragments(mode: QueuePopulationMode) -> (&'static str, &'static str) {
     match mode {
         QueuePopulationMode::All => ("", "RANDOM()"),
-        QueuePopulationMode::Favourites => (" AND rating >= 4", "RANDOM()"),
+        QueuePopulationMode::Favourites => (" AND loved = 1", "RANDOM()"),
         QueuePopulationMode::DeepCuts => (" AND (playcount = 0 OR lastplayed IS NULL)", "RANDOM()"),
         QueuePopulationMode::Familiar => (
             " AND playcount > 0",
@@ -2123,7 +2123,7 @@ pub(crate) const SONG_SELECT_COLS: &str = "
     bpm, initial_key,
     length_nanosec, beginning_nanosec, end_nanosec,
     bitrate, samplerate, bitdepth, channels, filesize, mtime,
-    rating, playcount, skipcount, lastplayed, lastseen,
+    rating, loved, playcount, skipcount, lastplayed, lastseen,
     art_embedded, art_automatic, art_manual, art_unset,
     cue_path,
     ebur128_integrated_loudness_lufs, ebur128_loudness_range_lu,
@@ -2152,7 +2152,7 @@ pub(crate) const SONG_SELECT_COLS_QUALIFIED: &str =
     s.bpm, s.initial_key,
     s.length_nanosec, s.beginning_nanosec, s.end_nanosec,
     s.bitrate, s.samplerate, s.bitdepth, s.channels, s.filesize, s.mtime,
-    s.rating, s.playcount, s.skipcount, s.lastplayed, s.lastseen,
+    s.rating, s.loved, s.playcount, s.skipcount, s.lastplayed, s.lastseen,
     s.art_embedded, s.art_automatic, s.art_manual, s.art_unset,
     s.cue_path,
     s.ebur128_integrated_loudness_lufs, s.ebur128_loudness_range_lu,
@@ -2164,7 +2164,7 @@ pub(crate) const SONG_SELECT_COLS_QUALIFIED: &str =
     s.musicbrainz_release_type, s.musicbrainz_release_country, s.barcode, s.catalog_number,
     s.dynamic_range, s.dynamic_range_peak, s.dynamic_range_rms, s.dynamic_range_album";
 
-pub(crate) const SONG_SELECT_COL_COUNT: usize = 73;
+pub(crate) const SONG_SELECT_COL_COUNT: usize = 74;
 
 const SONG_INSERT_COLS: &str = "
     source, filetype, path, title, titlesort, artist, artistsort, album, albumsort, album_artist, album_artist_sort,
@@ -2238,39 +2238,40 @@ pub(crate) fn row_to_song_at(row: &rusqlite::Row, offset: usize) -> rusqlite::Re
         filesize: row.get(col(37))?,
         mtime: row.get(col(38))?,
         rating: row.get::<_, Option<f32>>(col(39))?.unwrap_or(-1.0),
-        playcount: row.get::<_, Option<i32>>(col(40))?.unwrap_or(0),
-        skipcount: row.get::<_, Option<i32>>(col(41))?.unwrap_or(0),
-        lastplayed: row.get(col(42))?,
-        lastseen: row.get(col(43))?,
-        art_embedded: row.get(col(44))?,
-        art_automatic: row.get(col(45))?,
-        art_manual: row.get(col(46))?,
-        art_unset: row.get(col(47))?,
-        cue_path: row.get(col(48))?,
-        ebur128_integrated_loudness_lufs: row.get(col(49))?,
-        ebur128_loudness_range_lu: row.get(col(50))?,
-        unavailable: row.get::<_, Option<bool>>(col(51))?.unwrap_or(false),
-        replaygain_track_gain: row.get(col(52))?,
-        replaygain_album_gain: row.get(col(53))?,
-        is_vbr: row.get(col(54))?,
-        is_instrumental: row.get::<_, Option<bool>>(col(55))?.unwrap_or(false),
-        not_included: row.get::<_, Option<bool>>(col(56))?.unwrap_or(false),
-        added: row.get(col(57))?,
-        musicbrainz_artist_id: row.get(col(58))?,
-        musicbrainz_album_artist_id: row.get(col(59))?,
-        musicbrainz_album_id: row.get(col(60))?,
-        musicbrainz_release_group_id: row.get(col(61))?,
-        musicbrainz_recording_id: row.get(col(62))?,
-        musicbrainz_track_id: row.get(col(63))?,
-        musicbrainz_work_id: row.get(col(64))?,
-        musicbrainz_release_type: row.get(col(65))?,
-        musicbrainz_release_country: row.get(col(66))?,
-        barcode: row.get(col(67))?,
-        catalog_number: row.get(col(68))?,
-        dynamic_range: row.get(col(69))?,
-        dynamic_range_peak: row.get(col(70))?,
-        dynamic_range_rms: row.get(col(71))?,
-        dynamic_range_album: row.get(col(72))?,
+        loved: row.get::<_, Option<i32>>(col(40))?.unwrap_or(0),
+        playcount: row.get::<_, Option<i32>>(col(41))?.unwrap_or(0),
+        skipcount: row.get::<_, Option<i32>>(col(42))?.unwrap_or(0),
+        lastplayed: row.get(col(43))?,
+        lastseen: row.get(col(44))?,
+        art_embedded: row.get(col(45))?,
+        art_automatic: row.get(col(46))?,
+        art_manual: row.get(col(47))?,
+        art_unset: row.get(col(48))?,
+        cue_path: row.get(col(49))?,
+        ebur128_integrated_loudness_lufs: row.get(col(50))?,
+        ebur128_loudness_range_lu: row.get(col(51))?,
+        unavailable: row.get::<_, Option<bool>>(col(52))?.unwrap_or(false),
+        replaygain_track_gain: row.get(col(53))?,
+        replaygain_album_gain: row.get(col(54))?,
+        is_vbr: row.get(col(55))?,
+        is_instrumental: row.get::<_, Option<bool>>(col(56))?.unwrap_or(false),
+        not_included: row.get::<_, Option<bool>>(col(57))?.unwrap_or(false),
+        added: row.get(col(58))?,
+        musicbrainz_artist_id: row.get(col(59))?,
+        musicbrainz_album_artist_id: row.get(col(60))?,
+        musicbrainz_album_id: row.get(col(61))?,
+        musicbrainz_release_group_id: row.get(col(62))?,
+        musicbrainz_recording_id: row.get(col(63))?,
+        musicbrainz_track_id: row.get(col(64))?,
+        musicbrainz_work_id: row.get(col(65))?,
+        musicbrainz_release_type: row.get(col(66))?,
+        musicbrainz_release_country: row.get(col(67))?,
+        barcode: row.get(col(68))?,
+        catalog_number: row.get(col(69))?,
+        dynamic_range: row.get(col(70))?,
+        dynamic_range_peak: row.get(col(71))?,
+        dynamic_range_rms: row.get(col(72))?,
+        dynamic_range_album: row.get(col(73))?,
         ..Default::default()
     })
 }
@@ -3159,9 +3160,14 @@ mod tests {
                 .unwrap();
             };
 
-        // Rated 5 stars, never played — should surface under Favourites, and
+        // Loved, rated 5 stars, never played — should surface under Favourites, and
         // under Deep Cuts (playcount = 0).
         seed("/music/fav.mp3", "Fav", 5.0, 0, None);
+        conn.execute(
+            "UPDATE songs SET loved = 1 WHERE path = '/music/fav.mp3'",
+            [],
+        )
+        .unwrap();
 
         // Heavily played, unrated — should surface under Discover (playcount > 0)
         // but not Favourites or Deep Cuts.

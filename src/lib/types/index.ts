@@ -91,6 +91,7 @@ export interface Song {
 
   // Play statistics
   rating: number;
+  loved?: number;
   playcount: number;
   skipcount: number;
   lastplayed?: number;

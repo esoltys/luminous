@@ -240,6 +240,38 @@ pub fn rating_to_adopt(
     }
 }
 
+/// Decides whether to adopt the server's starred status into Luminous `loved` (1 = love, 0 = neutral),
+/// given what the server said last sync (`previous`, `None` = never synced), what it says now, and the
+/// local loved state. Returns the loved value to write, or `None` to leave it alone.
+///
+/// - First import: starred tracks adopt `1` if local is neutral (`0`); never overwrites a local edit.
+/// - Later syncs: only react when server starred status changed, and only if local still matches
+///   what the server had before (local edit wins).
+pub fn loved_to_adopt(
+    previous: Option<bool>,
+    current: bool,
+    local: i32,
+) -> Option<i32> {
+    match previous {
+        None => {
+            if current && local == 0 {
+                Some(1)
+            } else {
+                None
+            }
+        }
+        Some(prev) if prev != current => {
+            let prev_loved = if prev { 1 } else { 0 };
+            if local == prev_loved || local == 0 {
+                Some(if current { 1 } else { 0 })
+            } else {
+                None
+            }
+        }
+        Some(_) => None,
+    }
+}
+
 /// Artwork already cached for this server's albums (`album_id → filename`),
 /// read up front so [`fetch_album_art`] needn't hold a pooled DB connection
 /// across its network requests.
@@ -340,6 +372,7 @@ struct ExistingSong {
     id: i64,
     unavailable: bool,
     rating: f32,
+    loved: i32,
     art_automatic: Option<String>,
 }
 
@@ -385,14 +418,15 @@ pub fn apply_library(
             .optional()?;
         let existing: Option<ExistingSong> = tx
             .query_row(
-                "SELECT id, unavailable, rating, art_automatic FROM songs WHERE path = ?1 AND beginning_nanosec = 0",
+                "SELECT id, unavailable, rating, loved, art_automatic FROM songs WHERE path = ?1 AND beginning_nanosec = 0",
                 params![uri],
                 |r| {
                     Ok(ExistingSong {
                         id: r.get(0)?,
                         unavailable: r.get(1)?,
                         rating: r.get(2)?,
-                        art_automatic: r.get(3)?,
+                        loved: r.get(3)?,
+                        art_automatic: r.get(4)?,
                     })
                 },
             )
@@ -436,18 +470,31 @@ pub fn apply_library(
 
         // Ratings / favourites.
         let starred = child.starred.is_some();
-        let current = server_rating(child.user_rating, starred);
-        // A cache row that lost its song (pruned) is a fresh import.
-        let previous = cached
+        let current_rating = child.user_rating.filter(|&r| (1..=5).contains(&r)).map(|r| r as f32);
+        let previous_rating = cached
             .as_ref()
             .filter(|c| c.song_id.is_some())
-            .map(|c| server_rating(c.server_rating, c.server_starred));
-        let local = existing
+            .and_then(|c| c.server_rating)
+            .filter(|&r| (1..=5).contains(&r))
+            .map(|r| r as f32);
+        let local_rating = existing
             .as_ref()
             .map(|e| e.rating)
             .unwrap_or(RATING_UNRATED);
-        if let Some(rating) = rating_to_adopt(previous, current, local) {
+        if let Some(rating) = rating_to_adopt(previous_rating.map(Some), current_rating, local_rating) {
             stats::set_rating(&tx, song_id, rating)?;
+        }
+
+        let previous_starred = cached
+            .as_ref()
+            .filter(|c| c.song_id.is_some())
+            .map(|c| c.server_starred);
+        let local_loved = existing
+            .as_ref()
+            .map(|e| e.loved)
+            .unwrap_or(0);
+        if let Some(loved) = loved_to_adopt(previous_starred, starred, local_loved) {
+            stats::set_loved(&tx, song_id, loved)?;
         }
 
         tx.execute(
@@ -622,6 +669,15 @@ mod tests {
         .unwrap()
     }
 
+    fn loved_of(conn: &Connection, remote_id: &str) -> i32 {
+        conn.query_row(
+            "SELECT loved FROM songs WHERE path = ?1",
+            params![track_uri(1, remote_id)],
+            |r| r.get(0),
+        )
+        .unwrap()
+    }
+
     fn unavailable(conn: &Connection, remote_id: &str) -> bool {
         conn.query_row(
             "SELECT unavailable FROM songs WHERE path = ?1",
@@ -629,6 +685,22 @@ mod tests {
             |r| r.get(0),
         )
         .unwrap()
+    }
+
+    #[test]
+    fn loved_to_adopt_rules() {
+        // First import sets loved to 1 if starred, never overwrites local edit
+        assert_eq!(loved_to_adopt(None, true, 0), Some(1));
+        assert_eq!(loved_to_adopt(None, true, -1), None);
+        assert_eq!(loved_to_adopt(None, false, 0), None);
+        // Unchanged on server -> None
+        assert_eq!(loved_to_adopt(Some(true), true, 1), None);
+        assert_eq!(loved_to_adopt(Some(false), false, 0), None);
+        // Server changed and local matches previous -> adopt
+        assert_eq!(loved_to_adopt(Some(true), false, 1), Some(0));
+        assert_eq!(loved_to_adopt(Some(false), true, 0), Some(1));
+        // Server changed but user edited locally -> local wins
+        assert_eq!(loved_to_adopt(Some(true), false, -1), None);
     }
 
     #[test]
@@ -802,23 +874,29 @@ mod tests {
         };
 
         apply_library(&conn, 1, &lib, &HashMap::new()).unwrap();
-        assert_eq!(rating_of(&conn, "fav"), 4.0);
+        assert_eq!(loved_of(&conn, "fav"), 1);
+        assert_eq!(rating_of(&conn, "fav"), RATING_UNRATED);
+        assert_eq!(loved_of(&conn, "rated"), 1);
         assert_eq!(rating_of(&conn, "rated"), 5.0);
+        assert_eq!(loved_of(&conn, "plain"), 0);
         assert_eq!(rating_of(&conn, "plain"), RATING_UNRATED);
 
-        // The user re-rates "fav" in Luminous, then the server unfavourites it;
-        // "rated" loses both its rating and its favourite on the server.
+        // The user re-rates "fav" and edits loved locally in Luminous;
+        // then the server unstars "fav" and removes rating and star on "rated".
         stats::set_rating(&conn, song_id(&conn, "fav"), 2.0).unwrap();
+        stats::set_loved(&conn, song_id(&conn, "fav"), -1).unwrap();
         lib.songs[0].starred = None;
         lib.songs[1].user_rating = None;
         lib.songs[1].starred = None;
         apply_library(&conn, 1, &lib, &HashMap::new()).unwrap();
         assert_eq!(rating_of(&conn, "fav"), 2.0, "local edit wins");
+        assert_eq!(loved_of(&conn, "fav"), -1, "local edit wins");
         assert_eq!(
             rating_of(&conn, "rated"),
             RATING_UNRATED,
             "server change adopted"
         );
+        assert_eq!(loved_of(&conn, "rated"), 0, "server change adopted");
 
         drop(conn);
     }
