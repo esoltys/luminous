@@ -1288,7 +1288,15 @@ export const en = {
     enrichmentComplete: "Album details retrieved",
   },
   immersive: {
-    emptyStateText: "Select a song from your collection to start playing."
+    emptyStateText: "Select a song from your collection to start playing.",
+    queueComplete: "Queue Complete",
+    contextComplete: "{context} Complete",
+    tracksPlayed: "{count} tracks played",
+    trackPlayed: "1 track played",
+    shuffleLibrary: "Shuffle Library",
+    replay: "Replay",
+    exitImmersive: "Exit Immersive",
+    dropToPlay: "Drop tracks anywhere to play"
   },
   shareModal: {
     menuItem: "Share Card...",

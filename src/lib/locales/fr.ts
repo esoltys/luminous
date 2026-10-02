@@ -1339,7 +1339,15 @@ export const fr: DeepStringRecord<typeof en> = {
     enrichmentComplete: "Détails de l'album récupérés"
   },
   immersive: {
-    emptyStateText: "Sélectionnez une chanson de votre collection pour commencer la lecture."
+    emptyStateText: "Sélectionnez une chanson de votre collection pour commencer la lecture.",
+    queueComplete: "File d'attente terminée",
+    contextComplete: "{context} terminée",
+    tracksPlayed: "{count} titres écoutés",
+    trackPlayed: "1 titre écouté",
+    shuffleLibrary: "Aléatoire bibliothèque",
+    replay: "Rejouer",
+    exitImmersive: "Quitter le mode immersif",
+    dropToPlay: "Glissez des titres n'importe où pour lire"
   },
   shareModal: {
     menuItem: "Partager la carte...",

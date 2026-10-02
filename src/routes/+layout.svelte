@@ -12,6 +12,7 @@
   import { playerStore } from '../lib/stores/player.svelte';
   import CoverArt from '../lib/components/CoverArt.svelte';
   import Miniplayer from '../lib/components/Miniplayer.svelte';
+  import ImmersiveSessionWrap from '../lib/components/ImmersiveSessionWrap.svelte';
   import KeyboardShortcutsModal from '../lib/components/KeyboardShortcutsModal.svelte';
   import Toast from '../lib/components/Toast.svelte';
   import WalkthroughOverlay from '../lib/components/WalkthroughOverlay.svelte';
@@ -94,7 +95,7 @@
   let immersiveAmbientSvg = $derived.by(() => {
     const art = themeStore.artworkColors;
     const colors = art ? [art.vibrant, art.darkVibrant, art.lightVibrant, art.muted].filter((c): c is string => !!c) : undefined;
-    return generateEllipseGradientSvg({ colors, seed: playerStore.currentSong?.id ?? 'immersive-empty' });
+    return generateEllipseGradientSvg({ colors, seed: playerStore.currentSong?.id ?? playerStore.completedSession?.completedAt ?? 'immersive-empty' });
   });
 
   // Dynamically synchronize the OS window title with Now Playing track status (#29).
@@ -336,8 +337,10 @@
   // current song. Force immersive mode off whenever there's nothing to show,
   // so a stale "immersive" flag from a previous session (or playback
   // stopping while immersive) never leaves the user stranded.
+  // On natural queue completion (#1380), preserve immersive mode while
+  // completedSession is active so the user sees the Session Wrap screen.
   $effect(() => {
-    if (!playerStore.currentSong) {
+    if (!playerStore.currentSong && !playerStore.completedSession) {
       windowLayoutStore.exitImmersiveMode();
     }
   });
@@ -550,8 +553,8 @@
                song id so a track change destroys the old layer and mounts a
                new one; Svelte plays both transitions concurrently, giving a
                genuine cross-dissolve rather than a hard cut. -->
-          {#if playerStore.currentSong}
-            {#key playerStore.currentSong.id}
+          {#if playerStore.currentSong || playerStore.completedSession}
+            {#key playerStore.currentSong?.id ?? playerStore.completedSession?.completedAt}
               <div class="absolute inset-0 z-0 opacity-30 pointer-events-none immersive-ambient" transition:fade={{ duration: 300 }}>
                 {@html immersiveAmbientSvg}
               </div>
@@ -593,6 +596,9 @@
                   {playerStore.currentSong.artist || i18n.t('collection.unknownArtist')}
                 </p>
               </div>
+            {:else if playerStore.completedSession}
+              <!-- Immersive Session Wrap Screen (#1380) -->
+              <ImmersiveSessionWrap session={playerStore.completedSession} />
             {:else}
               <div class="flex flex-col items-center justify-center text-center">
                 <Music class="w-16 h-16 text-brand-text-secondary/20 mb-4 animate-pulse" />

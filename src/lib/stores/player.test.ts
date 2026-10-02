@@ -372,7 +372,7 @@ describe("PlayerStore", () => {
   });
 
   describe("Session Wrap & Queue Completion (#1379)", () => {
-    async function finishPlayback(isMiniplayer: boolean, isQueue: boolean, contextName = "My Mix") {
+    async function finishPlayback(isMiniplayer: boolean, isQueue: boolean, contextName = "My Mix", isImmersive = false) {
       const originalListenImpl = vi.mocked(listen).getMockImplementation();
       let playbackStateCallback: ((event: { payload: any }) => Promise<void>) | undefined;
       vi.mocked(listen).mockImplementation(async (event: string, callback: any) => {
@@ -382,6 +382,7 @@ describe("PlayerStore", () => {
       const showSpy = vi.spyOn(toastStore, "show");
       try {
         windowLayoutStore.isMiniplayer = isMiniplayer;
+        windowLayoutStore.immersiveMode = isImmersive;
         store = new PlayerStore();
         await new Promise((resolve) => setTimeout(resolve, 50));
         playlistsStore.playlists = [
@@ -431,6 +432,7 @@ describe("PlayerStore", () => {
       } finally {
         showSpy.mockRestore();
         windowLayoutStore.isMiniplayer = false;
+        windowLayoutStore.immersiveMode = false;
         if (originalListenImpl) vi.mocked(listen).mockImplementation(originalListenImpl);
       }
     }
@@ -451,12 +453,31 @@ describe("PlayerStore", () => {
       expect(result.toasts).toHaveLength(0);
     });
 
+    it("suppresses floating milestone toast in immersive mode (#1380)", async () => {
+      const result = await finishPlayback(false, true, "Queue", true);
+      expect(result.session).not.toBeNull();
+      expect(result.session?.isQueue).toBe(true);
+      expect(result.toasts).toHaveLength(0);
+    });
+
     it("replays the completed session tracks on replayCompletedSession", async () => {
       await finishPlayback(true, true, "Queue");
       expect(store.completedSession).not.toBeNull();
       vi.mocked(invoke).mockClear();
 
       await store.replayCompletedSession();
+      expect(invoke).toHaveBeenCalledWith("play_songs", expect.objectContaining({
+        songIds: [10, 20],
+        startIndex: 0,
+      }));
+    });
+
+    it("replays completed session on togglePlayPause when stopped (#1380)", async () => {
+      await finishPlayback(false, true, "Queue", true);
+      expect(store.completedSession).not.toBeNull();
+      vi.mocked(invoke).mockClear();
+
+      await store.togglePlayPause();
       expect(invoke).toHaveBeenCalledWith("play_songs", expect.objectContaining({
         songIds: [10, 20],
         startIndex: 0,
