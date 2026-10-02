@@ -4357,7 +4357,12 @@ mod tests {
 
         // Check BPM range: only Normal Song
         let bpm_songs = scanner
-            .get_songs_by_bpm_range(110.0, Some(130.0), 10, crate::models::QueuePopulationMode::All)
+            .get_songs_by_bpm_range(
+                110.0,
+                Some(130.0),
+                10,
+                crate::models::QueuePopulationMode::All,
+            )
             .unwrap();
         assert_eq!(bpm_songs.len(), 1);
         assert_eq!(bpm_songs[0].title.as_deref(), Some("Normal Song"));
