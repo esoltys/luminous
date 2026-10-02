@@ -156,8 +156,8 @@
       </button>
     </div>
 
-    <!-- ListenBrainz Scrobbling Assistant Card -->
-    <div class="bg-white/[0.03] border border-brand-border/60 rounded-xl p-3 space-y-2">
+    <!-- ListenBrainz Scrobbling Section -->
+    <div class="space-y-2">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2">
           <img src="/listenbrainz-icon.png" alt="ListenBrainz" class="w-4 h-4 object-contain" />
