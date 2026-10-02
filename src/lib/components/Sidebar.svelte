@@ -361,14 +361,14 @@
         bind:this={profileButtonEl}
         onclick={() => { showLoginModal = true; }}
         class="flex items-center gap-3 transition-colors duration-150 text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover {layoutCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
-        title={i18n.t('sidebar.musicbrainzLogin', {}, 'MusicBrainz Login')}
+        title={i18n.t('sidebar.musicbrainzLogin', {}, 'Log In to MusicBrainz')}
       >
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 25 28" class="{layoutCollapsed ? 'w-5 h-5' : 'w-4 h-4 icon-align'} shrink-0">
           <polygon fill="#ba478f" points="12 0 0 7 0 21 12 28 12 0"/>
           <polygon fill="#eb743b" points="13 0 25 7 25 21 13 28 13 0"/>
         </svg>
         {#if !layoutCollapsed}
-          <span class="truncate whitespace-nowrap">{i18n.t('sidebar.musicbrainzLogin', {}, 'MusicBrainz Login')}</span>
+          <span class="truncate whitespace-nowrap">{i18n.t('sidebar.musicbrainzLogin', {}, 'Log In to MusicBrainz')}</span>
         {/if}
       </button>
     {/if}

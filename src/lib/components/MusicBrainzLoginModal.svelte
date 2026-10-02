@@ -66,7 +66,7 @@
         </div>
         <div>
           <h2 class="text-base font-bold text-brand-text-primary">
-            {i18n.t('auth.modalTitle', {}, 'Sign in to MusicBrainz')}
+            {i18n.t('auth.modalTitle', {}, 'Log In to MusicBrainz')}
           </h2>
           <p class="text-xs text-brand-text-secondary mt-0.5">
             {i18n.t('auth.modalSubtitle', {}, 'Connect your account to manage integrations and scrobbling')}
@@ -138,10 +138,6 @@
     {:else}
       <!-- Initial State -->
       <div class="space-y-4">
-        <p class="text-xs text-brand-text-secondary leading-relaxed">
-          {i18n.t('auth.loginDescription', {}, 'Signing in links your MusicBrainz profile with Luminous to identify your account and enable ListenBrainz scrobbling.')}
-        </p>
-
         <div class="flex items-start gap-2.5 p-3 rounded-xl bg-white/[0.03] border border-brand-border/60 text-xs text-brand-text-secondary leading-relaxed">
           <ShieldCheck class="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
           <p class="flex-1">
@@ -158,7 +154,7 @@
             <polygon points="12 0 0 7 0 21 12 28 12 0"/>
             <polygon points="13 0 25 7 25 21 13 28 13 0"/>
           </svg>
-          {i18n.t('auth.signInWithMb', {}, 'Sign in with MusicBrainz')}
+          {i18n.t('auth.loginWithMb', {}, 'Log In with MusicBrainz')}
         </Button>
 
         <div class="flex items-center justify-center gap-1.5 text-xs text-brand-text-secondary pt-1">

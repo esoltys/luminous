@@ -19,7 +19,7 @@ export const en = {
     scanning: "Scanning",
     scanningPhaseTooltip: "Scanning Phase: {phase} ({scanned}/{total})",
     scanningPhaseLabel: "Phase: {phase}",
-    musicbrainzLogin: "MusicBrainz Login",
+    musicbrainzLogin: "Log In to MusicBrainz",
     musicbrainzProfile: "MusicBrainz Profile"
   },
   topNav: {
@@ -1724,16 +1724,15 @@ export const en = {
     resampled: "Resampled",
   },
   auth: {
-    modalTitle: "Sign in to MusicBrainz",
+    modalTitle: "Log In to MusicBrainz",
     modalSubtitle: "Connect your account to manage integrations and scrobbling",
     waitingForBrowser: "Waiting for authorization in browser…",
     browserPromptDesc: "Log in to MusicBrainz and approve access. This window will automatically update.",
     enterCodeManually: "Or paste verification code:",
     codePlaceholder: "Paste code here…",
     submitCode: "Submit",
-    loginDescription: "Signing in links your MusicBrainz profile with Luminous to identify your account and enable ListenBrainz scrobbling.",
     privacyNotice: "Luminous only uses this connection to communicate with official MusicBrainz and ListenBrainz APIs. Your credentials and tokens remain strictly on your device, and your personal data is never tracked, collected, or shared.",
-    signInWithMb: "Sign in with MusicBrainz",
+    loginWithMb: "Log In with MusicBrainz",
     noAccountPrompt: "Don't have an account?",
     createAccountLink: "Create an account",
     listenbrainzScrobbling: "ListenBrainz Scrobbling",
