@@ -21,8 +21,10 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 }));
 
 describe("SettingsView.svelte", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    const { navigationStore } = await import("../stores/navigation.svelte");
+    navigationStore.settingsSubTab = "general";
   });
 
   it("defaults to the General tab and renders its content", async () => {

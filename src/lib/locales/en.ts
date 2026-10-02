@@ -18,7 +18,9 @@ export const en = {
     rescanLibrary: "Rescan Library",
     scanning: "Scanning",
     scanningPhaseTooltip: "Scanning Phase: {phase} ({scanned}/{total})",
-    scanningPhaseLabel: "Phase: {phase}"
+    scanningPhaseLabel: "Phase: {phase}",
+    musicbrainzLogin: "Log In to MusicBrainz",
+    musicbrainzProfile: "MusicBrainz Profile"
   },
   topNav: {
     goBack: "Go back",
@@ -1340,7 +1342,13 @@ export const en = {
     back: "Back",
     loading: "Loading…",
     expand: "Expand",
-    collapse: "Collapse"
+    collapse: "Collapse",
+    close: "Close",
+    cancel: "Cancel",
+    save: "Save",
+    saved: "Saved",
+    connect: "Connect",
+    active: "Active"
   },
   toast: {
     copyError: "Copy error to clipboard",
@@ -1714,5 +1722,24 @@ export const en = {
     processed: "Processed",
     directRate: "Direct rate",
     resampled: "Resampled",
+  },
+  auth: {
+    modalTitle: "Log In to MusicBrainz",
+    modalSubtitle: "Connect your account to manage integrations and scrobbling",
+    waitingForBrowser: "Waiting for authorization in browser…",
+    browserPromptDesc: "Log in to MusicBrainz and approve access. This window will automatically update.",
+    enterCodeManually: "Or paste verification code:",
+    codePlaceholder: "Paste code here…",
+    submitCode: "Submit",
+    privacyNotice: "Luminous only uses this connection to communicate with official MusicBrainz and ListenBrainz APIs. Your credentials and tokens remain strictly on your device, and your personal data is never tracked, collected, or shared.",
+    loginWithMb: "Log In with MusicBrainz",
+    noAccountPrompt: "Don't have an account?",
+    createAccountLink: "Create an account",
+    listenbrainzScrobbling: "ListenBrainz Scrobbling",
+    listenbrainzPromptDesc: "Scrobble your listening history automatically to ListenBrainz with your user token.",
+    modifyScrobblingSettings: "Modify scrobbling settings in Integrations",
+    viewProfileOnMb: "View profile on MusicBrainz",
+    aboutMusicBrainz: "About MusicBrainz",
+    logout: "Log out"
   }
 };

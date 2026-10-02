@@ -76,6 +76,9 @@ jobs:
         platform: [ubuntu-24.04, windows-latest]
 
     runs-on: ${{ matrix.platform }}
+    env:
+      MUSICBRAINZ_CLIENT_ID: ${{ secrets.MUSICBRAINZ_CLIENT_ID }}
+      MUSICBRAINZ_CLIENT_SECRET: ${{ secrets.MUSICBRAINZ_CLIENT_SECRET }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0

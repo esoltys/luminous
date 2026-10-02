@@ -24,7 +24,9 @@ export const fr: DeepStringRecord<typeof en> = {
     rescanLibrary: "Analyser la bibliothèque",
     scanning: "Analyse",
     scanningPhaseTooltip: "Phase d'analyse : {phase} ({scanned}/{total})",
-    scanningPhaseLabel: "Phase : {phase}"
+    scanningPhaseLabel: "Phase : {phase}",
+    musicbrainzLogin: "Connexion à MusicBrainz",
+    musicbrainzProfile: "Profil MusicBrainz"
   },
   topNav: {
     goBack: "Retour",
@@ -1391,7 +1393,13 @@ export const fr: DeepStringRecord<typeof en> = {
     back: "Retour",
     loading: "Chargement…",
     expand: "Développer",
-    collapse: "Réduire"
+    collapse: "Réduire",
+    close: "Fermer",
+    cancel: "Annuler",
+    save: "Enregistrer",
+    saved: "Enregistré",
+    connect: "Connecter",
+    active: "Actif"
   },
   toast: {
     copyError: "Copier l'erreur dans le presse-papiers",
@@ -1722,5 +1730,24 @@ export const fr: DeepStringRecord<typeof en> = {
     processed: "Traité",
     directRate: "Taux direct",
     resampled: "Rééchantillonné"
+  },
+  auth: {
+    modalTitle: "Connexion à MusicBrainz",
+    modalSubtitle: "Connectez votre compte pour gérer les intégrations et le scrobbling",
+    waitingForBrowser: "En attente d'autorisation dans le navigateur…",
+    browserPromptDesc: "Connectez-vous à MusicBrainz et autorisez l'accès. Cette fenêtre se mettra à jour automatiquement.",
+    enterCodeManually: "Ou collez le code de vérification :",
+    codePlaceholder: "Collez le code ici…",
+    submitCode: "Valider",
+    privacyNotice: "Luminous utilise uniquement cette connexion pour communiquer avec les API officielles de MusicBrainz et ListenBrainz. Vos identifiants et jetons restent strictement sur votre appareil, et vos données personnelles ne sont jamais suivies, collectées ou partagées.",
+    loginWithMb: "Se connecter avec MusicBrainz",
+    noAccountPrompt: "Vous n'avez pas de compte ?",
+    createAccountLink: "Créer un compte",
+    listenbrainzScrobbling: "Scrobbling ListenBrainz",
+    listenbrainzPromptDesc: "Scrobblez automatiquement votre historique d'écoute vers ListenBrainz grâce à votre jeton utilisateur.",
+    modifyScrobblingSettings: "Modifier les paramètres de scrobbling dans Intégrations",
+    viewProfileOnMb: "Voir le profil sur MusicBrainz",
+    aboutMusicBrainz: "À propos de MusicBrainz",
+    logout: "Se déconnecter"
   }
 };

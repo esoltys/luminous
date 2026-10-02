@@ -37,6 +37,7 @@ pub mod loudness;
 pub mod lyrics;
 pub mod media_session;
 pub mod models;
+pub mod musicbrainz;
 pub mod organizer;
 pub mod paths;
 pub mod picard;
@@ -100,6 +101,7 @@ pub struct AppState {
     /// the same name by `commands::settings::set_minimize_to_tray_enabled`.
     pub minimize_to_tray: Arc<std::sync::atomic::AtomicBool>,
     pub scrobbler: Arc<scrobbler::ScrobblerManager>,
+    pub musicbrainz: Arc<musicbrainz::MusicBrainzManager>,
     /// Per-server periodic auto-sync timers for remote servers (WebDAV #1082, OpenSubsonic #1162).
     pub remote_auto_sync: Arc<remote_scheduler::AutoSyncScheduler>,
     /// Portable Genres/Artist Tags hierarchy in the default library (#1312).
@@ -1072,6 +1074,7 @@ pub fn run() {
             let media_session = media_session::spawn(app.handle().clone(), media_hwnd);
 
             let watcher_paused = Arc::new(std::sync::atomic::AtomicU32::new(0));
+            let musicbrainz = Arc::new(musicbrainz::MusicBrainzManager::new(Arc::clone(&db)));
 
             let state = AppState {
                 db,
@@ -1087,6 +1090,7 @@ pub fn run() {
                 media_session,
                 minimize_to_tray,
                 scrobbler,
+                musicbrainz,
                 remote_auto_sync: Arc::new(remote_scheduler::AutoSyncScheduler::new()),
                 hierarchy_sidecar: Arc::new(hierarchy_sidecar::HierarchySidecar::new()),
             };
@@ -1468,6 +1472,15 @@ pub fn run() {
             commands::scrobbler::toggle_scrobble_pause,
             commands::scrobbler::sync_favourites_to_listenbrainz,
             commands::scrobbler::get_discord_status,
+            // MusicBrainz OAuth commands (#1388)
+            commands::musicbrainz::start_musicbrainz_login,
+            commands::musicbrainz::submit_musicbrainz_auth_code,
+            commands::musicbrainz::cancel_musicbrainz_login,
+            commands::musicbrainz::get_musicbrainz_auth_state,
+            commands::musicbrainz::get_musicbrainz_user_stats,
+            commands::musicbrainz::logout_musicbrainz,
+            commands::musicbrainz::get_musicbrainz_app_credentials,
+            commands::musicbrainz::set_musicbrainz_app_credentials,
             // Stats commands
             commands::stats::set_song_rating,
             commands::stats::set_album_rating,

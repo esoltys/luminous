@@ -5,6 +5,7 @@ pub mod diagnostics;
 pub mod equalizer;
 pub mod loudness;
 pub mod lyrics;
+pub mod musicbrainz;
 pub mod organizer;
 pub mod picard;
 pub mod pins;
