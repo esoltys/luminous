@@ -1,6 +1,4 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { invoke } from "@tauri-apps/api/core";
   import Modal from "./Modal.svelte";
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
@@ -12,8 +10,6 @@
     ArrowUpRightIcon as ArrowUpRight,
     CircleNotchIcon as LoaderCircle,
     WarningIcon as AlertTriangle,
-    GearIcon as Settings,
-    KeyIcon as Key,
     CheckIcon as Check
   } from "phosphor-svelte";
 
@@ -24,22 +20,6 @@
   let { onClose }: Props = $props();
 
   let manualCode = $state("");
-  let showAdvanced = $state(false);
-  let customClientId = $state("");
-  let customClientSecret = $state("");
-  let hasExistingSecret = $state(false);
-  let credentialsSaved = $state(false);
-  let isSavingCredentials = $state(false);
-
-  onMount(async () => {
-    try {
-      const [id, hasSec] = await invoke<[string, boolean]>("get_musicbrainz_app_credentials");
-      customClientId = id;
-      hasExistingSecret = hasSec;
-    } catch (e) {
-      console.error("Failed to load credentials:", e);
-    }
-  });
 
   async function handleStartLogin() {
     try {
@@ -57,24 +37,6 @@
       onClose();
     } catch {
       // Error handled in store
-    }
-  }
-
-  async function handleSaveCredentials() {
-    isSavingCredentials = true;
-    try {
-      await invoke("set_musicbrainz_app_credentials", {
-        clientId: customClientId.trim(),
-        clientSecret: customClientSecret.trim(),
-      });
-      credentialsSaved = true;
-      setTimeout(() => {
-        credentialsSaved = false;
-      }, 3000);
-    } catch (e) {
-      console.error("Failed to save credentials:", e);
-    } finally {
-      isSavingCredentials = false;
     }
   }
 
@@ -198,80 +160,5 @@
         </div>
       </div>
     {/if}
-
-    <!-- Advanced App Credentials Drawer -->
-    <div class="pt-3 border-t border-brand-border/60">
-      <button
-        type="button"
-        onclick={() => showAdvanced = !showAdvanced}
-        class="text-[11px] text-brand-text-secondary hover:text-brand-text-primary flex items-center gap-1.5 transition-colors"
-      >
-        <Settings class="w-3.5 h-3.5" />
-        <span>{i18n.t('auth.advancedCredentialsToggle', {}, 'Application credentials')}</span>
-      </button>
-
-      {#if showAdvanced}
-        <div class="mt-3 p-3.5 rounded-xl bg-white/[0.02] border border-brand-border space-y-3">
-          <div class="space-y-1">
-            <p class="text-xs text-brand-text-secondary">
-              {i18n.t('auth.credentialsDesc', {}, 'By default Luminous uses preconfigured credentials or environment variables. You can override them with your own registered OAuth application.')}
-            </p>
-          </div>
-
-          <div class="space-y-2">
-            <div>
-              <label for="mb-client-id" class="text-[11px] font-medium text-brand-text-secondary uppercase tracking-wider block mb-1">
-                {i18n.t('auth.clientIdLabel', {}, 'Client ID')}
-              </label>
-              <Input
-                id="mb-client-id"
-                bind:value={customClientId}
-                placeholder="MusicBrainz Client ID"
-                class="w-full text-xs font-mono"
-              />
-            </div>
-
-            <div>
-              <label for="mb-client-secret" class="text-[11px] font-medium text-brand-text-secondary uppercase tracking-wider block mb-1">
-                {i18n.t('auth.clientSecretLabel', {}, 'Client Secret (optional)')}
-              </label>
-              <Input
-                id="mb-client-secret"
-                type="password"
-                bind:value={customClientSecret}
-                placeholder={hasExistingSecret ? "••••••••••••••••" : i18n.t('auth.clientSecretPlaceholder', {}, 'Leave blank if not registered')}
-                class="w-full text-xs font-mono"
-              />
-            </div>
-
-            <div class="flex items-center justify-between pt-1">
-              <button
-                type="button"
-                onclick={() => openExternalUrl("https://musicbrainz.org/account/applications")}
-                class="text-[11px] text-brand-accent hover:underline inline-flex items-center gap-1"
-              >
-                {i18n.t('auth.registerAppHelp', {}, 'Register application on MusicBrainz')}
-                <ArrowUpRight class="w-3 h-3" />
-              </button>
-
-              <Button
-                variant="secondary"
-                size="sm"
-                onclick={handleSaveCredentials}
-                disabled={isSavingCredentials}
-              >
-                {#if credentialsSaved}
-                  <Check class="w-3 h-3 text-emerald-400" />
-                  <span class="text-emerald-400">{i18n.t('common.saved', {}, 'Saved')}</span>
-                {:else}
-                  <Key class="w-3 h-3" />
-                  {i18n.t('common.save', {}, 'Save')}
-                {/if}
-              </Button>
-            </div>
-          </div>
-        </div>
-      {/if}
-    </div>
   </div>
 </Modal>
