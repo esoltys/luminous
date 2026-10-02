@@ -102,6 +102,7 @@ impl CollectionScanner {
         let mut where_clauses = vec![
             "unavailable = 0".to_string(),
             "not_included = 0".to_string(),
+            "loved != -1".to_string(),
         ];
         if !extra_where.is_empty() {
             where_clauses.push(extra_where.trim_start_matches(" AND ").to_string());
@@ -355,6 +356,7 @@ impl CollectionScanner {
              WHERE source IN ({lib})
                AND unavailable = 0
                AND not_included = 0
+               AND loved != -1
                AND added IS NOT NULL
              ORDER BY added DESC
              LIMIT ?1",
@@ -384,7 +386,7 @@ impl CollectionScanner {
                  FROM play_history
                  GROUP BY song_id
              ) ph ON ph.song_id = s.id
-             WHERE s.source IN ({lib}) AND s.unavailable = 0 AND s.not_included = 0
+             WHERE s.source IN ({lib}) AND s.unavailable = 0 AND s.not_included = 0 AND s.loved != -1
              ORDER BY ph.play_count DESC, s.added DESC
              LIMIT ?1",
             lib = *LIBRARY_SOURCES_SQL
@@ -406,6 +408,7 @@ impl CollectionScanner {
              WHERE source IN ({lib})
                AND unavailable = 0
                AND not_included = 0
+               AND loved != -1
                AND genre IS NOT NULL
                AND genre != ''
              ORDER BY COALESCE(genresort, genre)",
@@ -429,6 +432,7 @@ impl CollectionScanner {
              WHERE source IN ({lib})
                AND unavailable = 0
                AND not_included = 0
+               AND loved != -1
                AND COALESCE(year, originalyear) IS NOT NULL
                AND COALESCE(year, originalyear) >= 1000
                AND COALESCE(year, originalyear) <= 9999
@@ -467,6 +471,7 @@ impl CollectionScanner {
                AND source IN ({lib})
                AND unavailable = 0
                AND not_included = 0
+               AND loved != -1
                {extra_where}
              ORDER BY {order_by}
              LIMIT ?3",
@@ -504,6 +509,7 @@ impl CollectionScanner {
                AND source IN ({lib})
                AND unavailable = 0
                AND not_included = 0
+               AND loved != -1
                {extra_where}
              ORDER BY {order_by}
              LIMIT ?3",
@@ -561,6 +567,7 @@ impl CollectionScanner {
                AND source IN ({lib})
                AND unavailable = 0
                AND not_included = 0
+               AND loved != -1
                {extra_where}
              ORDER BY {order_by}
              LIMIT ?{}",
@@ -603,6 +610,7 @@ impl CollectionScanner {
                AND source IN ({lib})
                AND unavailable = 0
                AND not_included = 0
+               AND loved != -1
                {extra_where}
              ORDER BY {order_by}
              LIMIT ?1",
@@ -635,6 +643,7 @@ impl CollectionScanner {
                AND source IN ({lib})
                AND unavailable = 0
                AND not_included = 0
+               AND loved != -1
                {extra_where}
              ORDER BY {order_by}
              LIMIT ?1",
@@ -663,6 +672,7 @@ impl CollectionScanner {
              WHERE source IN ({lib})
                AND unavailable = 0
                AND not_included = 0
+               AND loved != -1
              ORDER BY RANDOM()
              LIMIT ?1",
             SONG_SELECT_COLS,
@@ -4302,6 +4312,67 @@ mod tests {
             .collect();
         assert!(titles.contains(&"Loved Unrated"));
         assert!(titles.contains(&"Loved Three Star"));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_disliked_songs_are_excluded_from_auto_playlist_queries() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_disliked_exclusion_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let scanner = CollectionScanner::new(db.clone());
+        let conn = db.pool.get().unwrap();
+
+        // 1. Normal song (loved = 0)
+        conn.execute(
+            "INSERT INTO songs (title, source, unavailable, rating, loved, not_included, added, year, bpm)
+             VALUES ('Normal Song', 1, 0, 4.0, 0, 0, 1000, 1985, 120.0)",
+            [],
+        )
+        .unwrap();
+
+        // 2. Disliked song (loved = -1)
+        conn.execute(
+            "INSERT INTO songs (title, source, unavailable, rating, loved, not_included, added, year, bpm)
+             VALUES ('Disliked Song', 1, 0, 4.0, -1, 0, 2000, 1985, 120.0)",
+            [],
+        )
+        .unwrap();
+
+        // Check recently added: only Normal Song
+        let recent = scanner.get_recently_added_songs(10).unwrap();
+        assert_eq!(recent.len(), 1);
+        assert_eq!(recent[0].title.as_deref(), Some("Normal Song"));
+
+        // Check decades: only Normal Song
+        let decade_songs = scanner
+            .get_songs_by_decade("1980s", 10, crate::models::QueuePopulationMode::All)
+            .unwrap();
+        assert_eq!(decade_songs.len(), 1);
+        assert_eq!(decade_songs[0].title.as_deref(), Some("Normal Song"));
+
+        // Check BPM range: only Normal Song
+        let bpm_songs = scanner
+            .get_songs_by_bpm_range(110.0, Some(130.0), 10, crate::models::QueuePopulationMode::All)
+            .unwrap();
+        assert_eq!(bpm_songs.len(), 1);
+        assert_eq!(bpm_songs[0].title.as_deref(), Some("Normal Song"));
+
+        // Check random songs: only Normal Song
+        let random_songs = scanner.get_random_songs(10).unwrap();
+        assert_eq!(random_songs.len(), 1);
+        assert_eq!(random_songs[0].title.as_deref(), Some("Normal Song"));
+
+        // Check smart playlist search (search_songs_by_mode): only Normal Song
+        let smart_songs = scanner
+            .search_songs_by_mode("Song", 10, crate::models::QueuePopulationMode::All)
+            .unwrap();
+        assert_eq!(smart_songs.len(), 1);
+        assert_eq!(smart_songs[0].title.as_deref(), Some("Normal Song"));
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
