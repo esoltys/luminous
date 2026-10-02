@@ -4,7 +4,7 @@ import { render, fireEvent, waitFor } from "@testing-library/svelte";
 import { confirm } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { prefs } from "../stores/prefs.svelte";
-import SettingsFolders from "./SettingsFolders.svelte";
+import SettingsSources from "./SettingsSources.svelte";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockImplementation((cmd: string) => {
@@ -94,20 +94,20 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
   confirm: vi.fn(),
 }));
 
-describe("SettingsFolders.svelte - WebDAV section", () => {
+describe("SettingsSources.svelte - WebDAV section", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it("renders the WebDAV remote libraries card and configured server", async () => {
-    const { findByText } = render(SettingsFolders);
+    const { findByText } = render(SettingsSources);
 
     expect(await findByText("Remote WebDAV")).toBeInTheDocument();
     expect(await findByText("https://cloud.example.com/remote.php/webdav/Music")).toBeInTheDocument();
   });
 
   it("opens WebDavModal when clicking Add WebDAV", async () => {
-    const { findByText, getByRole } = render(SettingsFolders);
+    const { findByText, getByRole } = render(SettingsSources);
 
     const addBtn = await findByText("Add WebDAV");
     await fireEvent.click(addBtn);
@@ -117,13 +117,13 @@ describe("SettingsFolders.svelte - WebDAV section", () => {
   });
 });
 
-describe("SettingsFolders.svelte - Media servers section", () => {
+describe("SettingsSources.svelte - Media servers section", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it("lists configured OpenSubsonic servers with their type and a disconnected status", async () => {
-    const { findByText } = render(SettingsFolders);
+    const { findByText } = render(SettingsSources);
 
     expect(await findByText("Media Servers")).toBeInTheDocument();
     expect(await findByText("https://music.example.com · navidrome 0.53.3")).toBeInTheDocument();
@@ -131,7 +131,7 @@ describe("SettingsFolders.svelte - Media servers section", () => {
   });
 
   it("syncs a server and reports the stats", async () => {
-    const { findByTestId, findByText } = render(SettingsFolders);
+    const { findByTestId, findByText } = render(SettingsSources);
 
     const row = await findByTestId("subsonic-server-row");
     await fireEvent.click(row.querySelector('button[aria-label="Sync Now"]')!);
@@ -144,7 +144,7 @@ describe("SettingsFolders.svelte - Media servers section", () => {
 
   it("removes a server only after confirmation", async () => {
     vi.mocked(confirm).mockResolvedValueOnce(false).mockResolvedValueOnce(true);
-    const { findByTestId } = render(SettingsFolders);
+    const { findByTestId } = render(SettingsSources);
 
     const row = await findByTestId("subsonic-server-row");
     const removeBtn = row.querySelector('button[aria-label="Remove media server"]')!;
@@ -158,7 +158,7 @@ describe("SettingsFolders.svelte - Media servers section", () => {
   });
 
   it("opens SubsonicModal when clicking Add Server", async () => {
-    const { findByText } = render(SettingsFolders);
+    const { findByText } = render(SettingsSources);
 
     await fireEvent.click(await findByText("Add Server"));
 
@@ -166,7 +166,7 @@ describe("SettingsFolders.svelte - Media servers section", () => {
   });
 });
 
-describe("SettingsFolders.svelte - Disk Size breakdown", () => {
+describe("SettingsSources.svelte - Disk Size breakdown", () => {
   it("totals music and artwork, and breaks the total down in the card's hint", async () => {
     const { collectionStore } = await import("../stores/collection.svelte");
     collectionStore.stats = {
@@ -178,7 +178,7 @@ describe("SettingsFolders.svelte - Disk Size breakdown", () => {
       album_art_bytes: 25 * 1048576,
       artist_art_bytes: 64 * 1048576,
     };
-    const { getByRole } = render(SettingsFolders);
+    const { getByRole } = render(SettingsSources);
 
     const card = getByRole("button", { name: "Disk Size: 2.09 GB" });
     expect(card).toHaveClass("cursor-help");
@@ -188,7 +188,7 @@ describe("SettingsFolders.svelte - Disk Size breakdown", () => {
   });
 });
 
-describe("SettingsFolders.svelte - Default library", () => {
+describe("SettingsSources.svelte - Default library", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -198,7 +198,7 @@ describe("SettingsFolders.svelte - Default library", () => {
     collectionStore.directories = [
       { id: 1, path: "D:\Music", nickname: "", subdirs: true } as never,
     ];
-    const { findByLabelText, findByRole } = render(SettingsFolders);
+    const { findByLabelText, findByRole } = render(SettingsSources);
 
     const select = (await findByLabelText("Default Library")) as HTMLSelectElement;
     expect([...select.options].map((o) => o.text)).toEqual(["None", "D:\Music"]);
@@ -213,20 +213,20 @@ describe("SettingsFolders.svelte - Default library", () => {
   });
 });
 
-describe("SettingsFolders.svelte - Save artwork to folders", () => {
+describe("SettingsSources.svelte - Save artwork to folders", () => {
   beforeEach(() => {
     prefs.saveArtworkToFolders = false;
     vi.clearAllMocks();
   });
 
   it("renders the save artwork to folders toggle", async () => {
-    const { findByLabelText } = render(SettingsFolders);
+    const { findByLabelText } = render(SettingsSources);
     const toggle = await findByLabelText("Save artwork next to your music");
     expect(toggle).toBeInTheDocument();
   });
 
   it("opens confirmation dialog when toggling on and triggers sweep when confirmed", async () => {
-    const { findByLabelText, findByText, queryByText } = render(SettingsFolders);
+    const { findByLabelText, findByText, queryByText } = render(SettingsSources);
     const toggle = await findByLabelText("Save artwork next to your music");
     expect(toggle).toBeInTheDocument();
 
@@ -247,7 +247,7 @@ describe("SettingsFolders.svelte - Save artwork to folders", () => {
   });
 
   it("closes confirmation dialog without enabling when cancelled", async () => {
-    const { findByLabelText, findByText, queryByText } = render(SettingsFolders);
+    const { findByLabelText, findByText, queryByText } = render(SettingsSources);
     const toggle = await findByLabelText("Save artwork next to your music");
 
     await fireEvent.click(toggle);

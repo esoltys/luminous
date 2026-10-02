@@ -216,7 +216,7 @@ export const en = {
   settings: {
     title: "Settings",
     tabGeneral: "General",
-    tabFolders: "Folders",
+    tabSources: "Sources",
     tabIntegrations: "Integrations",
     watchedFoldersTitle: "Watched Folders",
     tabThemes: "UI Themes",
