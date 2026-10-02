@@ -62,11 +62,27 @@ pub fn set_rating(conn: &Connection, song_id: i64, rating: f32) -> Result<f32> {
     Ok(normalized)
 }
 
+/// Persist a love/hate tri-state feedback value for a song:
+/// `1` (Love), `0` (Neutral), `-1` (Hate).
+pub fn set_loved(conn: &Connection, song_id: i64, loved: i32) -> Result<i32> {
+    let normalized = normalize_loved(loved);
+    conn.execute(
+        "UPDATE songs SET loved = ?1 WHERE id = ?2",
+        params![normalized, song_id],
+    )?;
+    Ok(normalized)
+}
+
+/// Clamp loved to tri-state values -1, 0, or 1.
+pub fn normalize_loved(loved: i32) -> i32 {
+    loved.clamp(-1, 1)
+}
+
 /// Build the `song-stats-changed` event payload carrying the song's current
 /// stats so every open view can sync without refetching.
 pub fn stats_payload(conn: &Connection, song_id: i64) -> serde_json::Value {
     let row = conn.query_row(
-        "SELECT playcount, skipcount, lastplayed, rating FROM songs WHERE id = ?1",
+        "SELECT playcount, skipcount, lastplayed, rating, loved FROM songs WHERE id = ?1",
         params![song_id],
         |r| {
             Ok((
@@ -74,16 +90,18 @@ pub fn stats_payload(conn: &Connection, song_id: i64) -> serde_json::Value {
                 r.get::<_, i32>(1)?,
                 r.get::<_, Option<i64>>(2)?,
                 r.get::<_, f32>(3)?,
+                r.get::<_, i32>(4)?,
             ))
         },
     );
     match row {
-        Ok((playcount, skipcount, lastplayed, rating)) => serde_json::json!({
+        Ok((playcount, skipcount, lastplayed, rating, loved)) => serde_json::json!({
             "song_id": song_id,
             "playcount": playcount,
             "skipcount": skipcount,
             "lastplayed": lastplayed,
             "rating": rating,
+            "loved": loved,
         }),
         Err(_) => serde_json::json!({ "song_id": song_id }),
     }
@@ -342,5 +360,47 @@ mod tests {
         assert_eq!(normalize_rating(4.4), 4.5);
         assert_eq!(normalize_rating(5.0), 5.0);
         assert_eq!(normalize_rating(9.9), 5.0);
+    }
+
+    #[test]
+    fn test_set_loved_persists_normalized_value_and_updates_payload() {
+        let (_dir, db) = test_db();
+        let conn = db.pool.get().unwrap();
+        let id = insert_song(&conn, "/tmp/loved.flac");
+
+        // Initially loved defaults to 0
+        let payload = stats_payload(&conn, id);
+        assert_eq!(payload["loved"], 0);
+
+        // Set to 1 (Love)
+        let stored = set_loved(&conn, id, 1).unwrap();
+        assert_eq!(stored, 1);
+        let payload = stats_payload(&conn, id);
+        assert_eq!(payload["loved"], 1);
+
+        // Set to -1 (Hate)
+        let stored = set_loved(&conn, id, -1).unwrap();
+        assert_eq!(stored, -1);
+        let payload = stats_payload(&conn, id);
+        assert_eq!(payload["loved"], -1);
+
+        // Clear to 0 (Neutral)
+        let stored = set_loved(&conn, id, 0).unwrap();
+        assert_eq!(stored, 0);
+        let payload = stats_payload(&conn, id);
+        assert_eq!(payload["loved"], 0);
+
+        // Out-of-bounds values are clamped
+        assert_eq!(set_loved(&conn, id, 5).unwrap(), 1);
+        assert_eq!(set_loved(&conn, id, -10).unwrap(), -1);
+    }
+
+    #[test]
+    fn test_normalize_loved_clamps() {
+        assert_eq!(normalize_loved(1), 1);
+        assert_eq!(normalize_loved(0), 0);
+        assert_eq!(normalize_loved(-1), -1);
+        assert_eq!(normalize_loved(2), 1);
+        assert_eq!(normalize_loved(-5), -1);
     }
 }

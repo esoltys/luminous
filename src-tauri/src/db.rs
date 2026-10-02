@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 54;
+pub const CURRENT_SCHEMA_VERSION: i32 = 55;
 
 struct Migration {
     version: i32,
@@ -456,6 +456,19 @@ const MIGRATIONS: &[Migration] = &[
         version: 54,
         description: "user EQ presets and the persisted active preset (#1335)",
         apply: migrate_eq_presets,
+    },
+    Migration {
+        version: 55,
+        description: "independent track loved flag and favourites backfill (#1384)",
+        apply: |conn| {
+            let has_loved: bool = conn
+                .prepare("SELECT 1 FROM pragma_table_info('songs') WHERE name = 'loved'")?
+                .exists([])?;
+            if !has_loved {
+                conn.execute_batch(MIGRATION_55)?;
+            }
+            Ok(())
+        },
     },
 ];
 
@@ -1969,6 +1982,13 @@ CREATE TABLE IF NOT EXISTS song_lyrics_offsets (
 );
 ";
 
+// Migration 55: independent songs.loved column and favourites backfill (#1384)
+const MIGRATION_55: &str = "
+ALTER TABLE songs ADD COLUMN loved INTEGER NOT NULL DEFAULT 0;
+CREATE INDEX IF NOT EXISTS idx_songs_loved ON songs(loved);
+UPDATE songs SET loved = 1 WHERE rating >= 4.0;
+";
+
 fn seed_artist_tag_hierarchy(conn: &rusqlite::Connection) -> Result<()> {
     let mut stmt = conn.prepare(
         "SELECT DISTINCT json_each.value
@@ -3359,6 +3379,85 @@ mod tests {
             )
             .unwrap();
         assert_eq!(count, 0);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_migration_55_adds_songs_loved_and_backfills() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_migration55_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
+        let db = Database::new(temp_dir.clone()).unwrap();
+        assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
+
+        let conn = db.pool.get().unwrap();
+        let index_exists: bool = conn
+            .prepare(
+                "SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_songs_loved'",
+            )
+            .unwrap()
+            .exists([])
+            .unwrap();
+        assert!(index_exists);
+
+        conn.execute(
+            "INSERT INTO songs (title, artist, path, rating) VALUES ('Unrated', 'Artist', '/tmp/a.mp3', -1.0)",
+            [],
+        )
+        .unwrap();
+        let loved: i32 = conn
+            .query_row("SELECT loved FROM songs WHERE title = 'Unrated'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(loved, 0);
+
+        conn.execute(
+            "INSERT INTO songs (title, artist, path, rating) VALUES ('Five Star', 'Artist', '/tmp/b.mp3', 5.0)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO songs (title, artist, path, rating) VALUES ('Four Star', 'Artist', '/tmp/c.mp3', 4.0)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO songs (title, artist, path, rating) VALUES ('Three Star', 'Artist', '/tmp/d.mp3', 3.0)",
+            [],
+        )
+        .unwrap();
+
+        conn.execute("UPDATE songs SET loved = 1 WHERE rating >= 4.0", [])
+            .unwrap();
+
+        let loved_5: i32 = conn
+            .query_row(
+                "SELECT loved FROM songs WHERE title = 'Five Star'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        let loved_4: i32 = conn
+            .query_row(
+                "SELECT loved FROM songs WHERE title = 'Four Star'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        let loved_3: i32 = conn
+            .query_row(
+                "SELECT loved FROM songs WHERE title = 'Three Star'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(loved_5, 1);
+        assert_eq!(loved_4, 1);
+        assert_eq!(loved_3, 0);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

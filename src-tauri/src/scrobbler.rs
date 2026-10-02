@@ -777,6 +777,48 @@ impl ScrobblerManager {
         });
     }
 
+    /// Submit love/hate tri-state feedback when song loved state changes.
+    pub async fn on_song_loved(&self, song: &Song, loved: i32) {
+        let settings = self.get_settings().await;
+        if !settings.listenbrainz_enabled || settings.scrobble_paused || !settings.scrobble_ratings
+        {
+            return;
+        }
+
+        let mbid = match &song.musicbrainz_recording_id {
+            Some(id) if !id.trim().is_empty() => id.clone(),
+            _ => return, // ListenBrainz recording feedback requires recording_mbid
+        };
+
+        let token = settings.listenbrainz_token.trim().to_string();
+        if token.is_empty() {
+            return;
+        }
+
+        let client = self.client.clone();
+        tauri::async_runtime::spawn(async move {
+            let payload = FeedbackRequest {
+                recording_mbid: mbid,
+                score: loved,
+            };
+            let res = client
+                .post(format!(
+                    "{LISTENBRAINZ_API_BASE}/feedback/recording-feedback"
+                ))
+                .header("Authorization", format!("Token {token}"))
+                .json(&payload)
+                .send()
+                .await;
+
+            if let Err(e) = res {
+                log::warn!(
+                    "Failed to submit loved feedback to ListenBrainz: {}",
+                    format_error_chain(&e)
+                );
+            }
+        });
+    }
+
     /// Bulk synchronize all favourite tracks with MusicBrainz Recording IDs to ListenBrainz as loved tracks.
     pub async fn sync_favourites(&self) -> Result<SyncFavouritesResult, String> {
         let settings = self.get_settings().await;
@@ -792,7 +834,7 @@ impl ScrobblerManager {
             let conn = self.db.pool.get().map_err(|e| e.to_string())?;
             let sql = format!(
                 "SELECT {} FROM songs
-                 WHERE rating >= 4
+                 WHERE loved = 1
                    AND source IN ({lib})
                    AND unavailable = 0
                    AND not_included = 0",

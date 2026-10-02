@@ -1483,6 +1483,7 @@ pub fn run() {
             commands::musicbrainz::set_musicbrainz_app_credentials,
             // Stats commands
             commands::stats::set_song_rating,
+            commands::stats::set_song_loved,
             commands::stats::set_album_rating,
             commands::stats::get_stats_summary,
             commands::stats::get_listening_activity,

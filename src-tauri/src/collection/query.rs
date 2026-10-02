@@ -326,12 +326,12 @@ impl CollectionScanner {
         Ok(albums)
     }
 
-    /// Songs favourited via the 5-star/heart rating, for the "Favourites" auto-playlist.
+    /// Songs favourited via the love/heart flag, for the "Favourites" auto-playlist.
     pub fn get_favourite_songs(&self) -> Result<Vec<Song>> {
         let conn = self.db.pool.get()?;
         let sql = format!(
             "SELECT {} FROM songs
-             WHERE rating = 5
+             WHERE loved = 1
                AND source IN ({lib})
                AND unavailable = 0
                AND not_included = 0
@@ -4214,14 +4214,14 @@ mod tests {
         let conn = db.pool.get().unwrap();
 
         conn.execute(
-            "INSERT INTO songs (title, source, unavailable, rating, not_included)
-             VALUES ('Favourite Kept', 1, 0, 5, 0)",
+            "INSERT INTO songs (title, source, unavailable, rating, loved, not_included)
+             VALUES ('Favourite Kept', 1, 0, 5, 1, 0)",
             [],
         )
         .unwrap();
         conn.execute(
-            "INSERT INTO songs (title, source, unavailable, rating, not_included)
-             VALUES ('Favourite Excluded', 1, 0, 5, 1)",
+            "INSERT INTO songs (title, source, unavailable, rating, loved, not_included)
+             VALUES ('Favourite Excluded', 1, 0, 5, 1, 1)",
             [],
         )
         .unwrap();
@@ -4247,6 +4247,61 @@ mod tests {
             .unwrap();
         assert_eq!(decade_songs.len(), 1);
         assert_eq!(decade_songs[0].title.as_deref(), Some("Decade Kept"));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_get_favourite_songs_queries_loved_flag_decoupled_from_rating() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_fav_loved_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let scanner = CollectionScanner::new(db.clone());
+        let conn = db.pool.get().unwrap();
+
+        // 1. Loved track with unrated rating (-1.0) -> SHOULD be included
+        conn.execute(
+            "INSERT INTO songs (title, source, unavailable, rating, loved, not_included)
+             VALUES ('Loved Unrated', 1, 0, -1.0, 1, 0)",
+            [],
+        )
+        .unwrap();
+
+        // 2. Loved track with 3-star rating -> SHOULD be included
+        conn.execute(
+            "INSERT INTO songs (title, source, unavailable, rating, loved, not_included)
+             VALUES ('Loved Three Star', 1, 0, 3.0, 1, 0)",
+            [],
+        )
+        .unwrap();
+
+        // 3. Unloved track with 5-star rating -> should NOT be included
+        conn.execute(
+            "INSERT INTO songs (title, source, unavailable, rating, loved, not_included)
+             VALUES ('Five Star Unloved', 1, 0, 5.0, 0, 0)",
+            [],
+        )
+        .unwrap();
+
+        // 4. Hated track (-1) with 5-star rating -> should NOT be included
+        conn.execute(
+            "INSERT INTO songs (title, source, unavailable, rating, loved, not_included)
+             VALUES ('Five Star Hated', 1, 0, 5.0, -1, 0)",
+            [],
+        )
+        .unwrap();
+
+        let favourites = scanner.get_favourite_songs().unwrap();
+        assert_eq!(favourites.len(), 2);
+        let titles: Vec<_> = favourites
+            .iter()
+            .map(|s| s.title.as_deref().unwrap())
+            .collect();
+        assert!(titles.contains(&"Loved Unrated"));
+        assert!(titles.contains(&"Loved Three Star"));
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

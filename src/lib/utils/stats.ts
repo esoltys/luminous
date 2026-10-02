@@ -4,6 +4,7 @@ import type { AlbumItem, Song } from "../types";
 export interface SongStatsPayload {
   song_id: number;
   rating?: number;
+  loved?: number;
   playcount?: number;
   skipcount?: number;
   lastplayed?: number | null;
@@ -13,6 +14,7 @@ export interface SongStatsPayload {
 /** Apply a stats event to a song object held in any view or store. */
 export function applySongStats(song: Song, payload: SongStatsPayload) {
   if (typeof payload.rating === "number") song.rating = payload.rating;
+  if (typeof payload.loved === "number") song.loved = payload.loved;
   if (typeof payload.playcount === "number") song.playcount = payload.playcount;
   if (typeof payload.skipcount === "number") song.skipcount = payload.skipcount;
   if (payload.lastplayed !== undefined) song.lastplayed = payload.lastplayed ?? undefined;
