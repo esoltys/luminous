@@ -121,8 +121,13 @@ export default defineConfig(async () => ({
         }
       : undefined,
     watch: {
-      // 3. tell Vite to ignore watching `src-tauri` and `target` build outputs
-      ignored: ["**/src-tauri/**", "**/target/**"],
+      // 3. tell Vite to ignore watching `src-tauri` and `target` build outputs, and worktrees
+      ignored: [
+        "**/src-tauri/**",
+        "**/target/**",
+        "**/.worktrees/**",
+        "**/.claude/**",
+      ],
     },
   },
 }));
