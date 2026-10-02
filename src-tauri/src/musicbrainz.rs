@@ -494,7 +494,9 @@ impl MusicBrainzManager {
 
         // Fetch initial user stats
         if let Some(ref u) = user_info.sub {
-            let _ = self.fetch_and_cache_stats(u, &token_data.access_token).await;
+            let _ = self
+                .fetch_and_cache_stats(u, &token_data.access_token)
+                .await;
         }
 
         let auth_state = MusicBrainzAuthState {
@@ -704,7 +706,8 @@ impl MusicBrainzManager {
     }
 
     pub async fn logout(&self, app: &AppHandle) -> Result<(), String> {
-        if let Ok(Some(token)) = self.get_stored_setting("mb_refresh_token")
+        if let Ok(Some(token)) = self
+            .get_stored_setting("mb_refresh_token")
             .or_else(|_| self.get_stored_setting("mb_access_token"))
         {
             let client_id = self.resolve_client_id();
@@ -799,7 +802,8 @@ mod tests {
             cached_at: 123456789,
         };
         let json = serde_json::to_string(&stats).expect("serialize stats");
-        let deserialized: MusicBrainzUserStats = serde_json::from_str(&json).expect("deserialize stats");
+        let deserialized: MusicBrainzUserStats =
+            serde_json::from_str(&json).expect("deserialize stats");
         assert_eq!(deserialized.username, "testuser");
         assert_eq!(deserialized.collections_count, 5);
         assert_eq!(deserialized.releases_count, 42);

@@ -48,10 +48,7 @@ pub async fn get_musicbrainz_user_stats(
 }
 
 #[tauri::command]
-pub async fn logout_musicbrainz(
-    state: State<'_, AppState>,
-    app: AppHandle,
-) -> Result<(), String> {
+pub async fn logout_musicbrainz(state: State<'_, AppState>, app: AppHandle) -> Result<(), String> {
     state.musicbrainz.logout(&app).await
 }
 
