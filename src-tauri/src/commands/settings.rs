@@ -56,6 +56,9 @@ pub struct UiPreferences {
     /// (#1277); the same hiding rule as the artist types above applies.
     pub fanart_fetch_album_cover: bool,
     pub fanart_fetch_disc_art: bool,
+    /// Save album covers and artist portraits directly into music folders as
+    /// sidecar files (`cover.jpg`/`artist.jpg`, #1274). Off by default.
+    pub save_artwork_to_folders: bool,
 }
 
 impl Default for UiPreferences {
@@ -78,6 +81,7 @@ impl Default for UiPreferences {
             fanart_fetch_background: true,
             fanart_fetch_album_cover: true,
             fanart_fetch_disc_art: true,
+            save_artwork_to_folders: false,
         }
     }
 }
@@ -123,7 +127,7 @@ impl UiPreferences {
     /// Bool fields, persisted as a literal "true"/"false" string the same
     /// way the FadeSettings bools are — not part of `fields()` since they
     /// aren't domain-checked Strings.
-    fn bool_fields(&mut self) -> [(&'static str, &mut bool); 6] {
+    fn bool_fields(&mut self) -> [(&'static str, &mut bool); 7] {
         [
             ("genre_sort_asc", &mut self.genre_sort_asc),
             ("fanart_fetch_photo", &mut self.fanart_fetch_photo),
@@ -134,6 +138,7 @@ impl UiPreferences {
                 &mut self.fanart_fetch_album_cover,
             ),
             ("fanart_fetch_disc_art", &mut self.fanart_fetch_disc_art),
+            ("save_artwork_to_folders", &mut self.save_artwork_to_folders),
         ]
     }
 }
@@ -448,6 +453,7 @@ mod tests {
         assert!(prefs.fanart_fetch_background);
         assert!(prefs.fanart_fetch_album_cover);
         assert!(prefs.fanart_fetch_disc_art);
+        assert!(!prefs.save_artwork_to_folders);
     }
 
     #[test]
@@ -455,7 +461,8 @@ mod tests {
         let conn = app_state_conn();
         conn.execute_batch(
             "INSERT INTO app_state VALUES ('fanart_fetch_logo', 'false');
-             INSERT INTO app_state VALUES ('genre_sort_asc', 'false');",
+             INSERT INTO app_state VALUES ('genre_sort_asc', 'false');
+             INSERT INTO app_state VALUES ('save_artwork_to_folders', 'true');",
         )
         .unwrap();
         let prefs = load_ui_preferences(&conn);
@@ -463,5 +470,6 @@ mod tests {
         assert!(!prefs.genre_sort_asc);
         assert!(prefs.fanart_fetch_photo);
         assert!(prefs.fanart_fetch_background);
+        assert!(prefs.save_artwork_to_folders);
     }
 }

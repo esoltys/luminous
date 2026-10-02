@@ -86,7 +86,7 @@ const SELF_WRITE_TTL: std::time::Duration = std::time::Duration::from_secs(30);
 /// acquiring a `WatcherPauseGuard`, once the path is read from the DB); the
 /// watcher thread then skips any event for a tracked path regardless of how
 /// late it arrives, until the entry expires after [`SELF_WRITE_TTL`].
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct SelfWriteTracker {
     inner: parking_lot::Mutex<HashMap<PathBuf, Instant>>,
 }

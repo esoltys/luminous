@@ -7,6 +7,7 @@
   import { tasksStore } from "../stores/tasks.svelte";
   import { onMount } from "svelte";
   import { hierarchySidecarStore } from "../stores/hierarchySidecar.svelte";
+  import { prefs } from "../stores/prefs.svelte";
   import { confirm } from "@tauri-apps/plugin-dialog";
   import Toggle from "./Toggle.svelte";
   import Select from "./Select.svelte";
@@ -16,6 +17,8 @@
   import FolderEditModal from "./FolderEditModal.svelte";
   import WebDavModal from "./WebDavModal.svelte";
   import SubsonicModal from "./SubsonicModal.svelte";
+  import ConfirmDialog from "./ConfirmDialog.svelte";
+  import { toastStore } from "../stores/toast.svelte";
   import type { MusicDirectory, SubsonicServer, SubsonicSyncStats, WebDavServer } from "../types";
   import { combineWebdavPath } from "../webdavDisplay";
   import { stripEnclosingQuotes } from "../utils/filterParser";
@@ -42,6 +45,55 @@
   let editingWebdavServer = $state<WebDavServer | null>(null);
   let syncingServerId = $state<number | null>(null);
   let syncFeedback = $state<string | null>(null);
+  let showSidecarConfirmModal = $state(false);
+  let isSweepingArtwork = $state(false);
+
+  function handleToggleSaveArtwork(v: boolean) {
+    if (v) {
+      showSidecarConfirmModal = true;
+    } else {
+      prefs.setSaveArtworkToFolders(false);
+    }
+  }
+
+  async function handleConfirmSaveArtwork() {
+    showSidecarConfirmModal = false;
+    await prefs.setSaveArtworkToFolders(true);
+    isSweepingArtwork = true;
+    const taskId = "artwork-sweep";
+    tasksStore.startTask({
+      id: taskId,
+      label: i18n.t("tasks.exportingArtwork", {}, "Exporting artwork…"),
+    });
+    try {
+      const res = await invoke<{
+        album_covers_exported: number;
+        artist_portraits_exported: number;
+        band_logos_exported: number;
+        banners_exported: number;
+      }>("sweep_artwork_to_folders");
+      const total =
+        (res?.album_covers_exported ?? 0) +
+        (res?.artist_portraits_exported ?? 0) +
+        (res?.band_logos_exported ?? 0) +
+        (res?.banners_exported ?? 0);
+      if (total > 0) {
+        tasksStore.completeTask(taskId, i18n.t("settings.artworkSweepSuccess", { count: total }));
+      } else {
+        tasksStore.completeTask(taskId, i18n.t("settings.artworkSweepNone"));
+      }
+    } catch (e: any) {
+      console.error("Failed to sweep artwork:", e);
+      const errMsg = String(e?.message || e);
+      tasksStore.failTask(taskId, errMsg);
+    } finally {
+      isSweepingArtwork = false;
+    }
+  }
+
+  function handleCancelSaveArtwork() {
+    showSidecarConfirmModal = false;
+  }
   /** Live reachability per server id, refreshed whenever the list loads —
    * `undefined` while the check is still in flight. This is a network call,
    * unlike a watched folder's `is_available` (a cheap local `Path::exists()`
@@ -766,6 +818,19 @@
         label={i18n.t('settings.scanOnStartupLabel')}
       />
     </div>
+
+    <div class="flex items-center justify-between gap-4">
+      <div class="flex flex-col gap-0.5 min-w-0">
+        <span class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.saveArtworkToFoldersLabel')}</span>
+        <p class="text-xs text-brand-text-secondary text-pretty">{i18n.t('settings.saveArtworkToFoldersHint')}</p>
+      </div>
+      <Toggle
+        checked={prefs.saveArtworkToFolders}
+        onchange={handleToggleSaveArtwork}
+        disabled={isSweepingArtwork}
+        label={i18n.t('settings.saveArtworkToFoldersLabel')}
+      />
+    </div>
   </div>
 
   <div class="pt-3 border-t border-brand-border/50 space-y-3">
@@ -804,3 +869,15 @@
   </div>
 </div>
 </div>
+
+{#if showSidecarConfirmModal}
+  <ConfirmDialog
+    title={i18n.t('settings.saveArtworkToFoldersModalTitle')}
+    message={i18n.t('settings.saveArtworkToFoldersModalMessage')}
+    confirmLabel={i18n.t('settings.saveArtworkToFoldersModalConfirm')}
+    cancelLabel={i18n.t('settings.saveArtworkToFoldersModalCancel')}
+    danger={false}
+    onConfirm={handleConfirmSaveArtwork}
+    onCancel={handleCancelSaveArtwork}
+  />
+{/if}

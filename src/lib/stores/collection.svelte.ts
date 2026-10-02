@@ -27,6 +27,7 @@ import type {
   SubsonicServer,
   SubsonicSyncProgressPayload,
   TagBatchProgressPayload,
+  ArtworkSweepProgressPayload,
 } from "../types";
 import { parseSubsonicPath } from "../utils/remoteSource";
 import { applySongStats, type SongStatsPayload, applyAlbumStats, type AlbumStatsPayload } from "../utils/stats";
@@ -615,6 +616,43 @@ class CollectionStore {
             label,
             current,
             total,
+          });
+        }
+      });
+
+      // Track artwork sidecar sweep (#1274)
+      await listen<ArtworkSweepProgressPayload>("artwork-sweep-progress", (event) => {
+        const { current, total, done } = event.payload;
+        const taskId = "artwork-sweep";
+        if (done) {
+          if (tasksStore.isTaskActive(taskId)) {
+            tasksStore.completeTask(
+              taskId,
+              i18n.t(
+                "settings.artworkSweepSuccess",
+                { count: current },
+                `Exported ${current} artwork files to your music folders.`
+              )
+            );
+          }
+        } else {
+          const label = i18n.t(
+            "tasks.exportingArtworkCount",
+            { current, total },
+            `Exporting artwork (${current}/${total})…`
+          );
+          if (!tasksStore.isTaskActive(taskId)) {
+            tasksStore.startTask({
+              id: taskId,
+              label,
+              total,
+            });
+          }
+          tasksStore.updateTask(taskId, {
+            label,
+            current,
+            total,
+            progress: total > 0 ? current / total : 0,
           });
         }
       });

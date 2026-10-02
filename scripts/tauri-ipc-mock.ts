@@ -1559,6 +1559,7 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     genre_cards_view_mode: "cards",
     genre_sort_field: "name",
     genre_sort_asc: true,
+    save_artwork_to_folders: false,
   });
 
   const NOOP_COMMANDS = [
