@@ -16,6 +16,7 @@ export interface CompletedSession {
   isQueue: boolean;
   songIds: number[];
   trackCount: number;
+  completedAt?: number;
 }
 
 export class PlayerStore {
@@ -121,14 +122,15 @@ export class PlayerStore {
             isQueue,
             songIds: sessionTracks,
             trackCount: sessionTracks.length,
+            completedAt: Date.now(),
           };
 
           // With Auto Continue on the Queue has no end to celebrate — it only
           // stops here if nothing in the library could be added.
           if (!(isQueue && this.autoContinue)) {
-            // When in miniplayer mode, suppress the floating milestone toast since
-            // the miniplayer frame renders its own dedicated Session Wrap card (#1379).
-            if (!windowLayoutStore.isMiniplayer) {
+            // When in miniplayer or immersive mode, suppress the floating milestone toast since
+            // both views render their own dedicated Session Wrap card (#1379, #1380).
+            if (!windowLayoutStore.isMiniplayer && !windowLayoutStore.effectiveImmersiveMode) {
               const toastText = isQueue
                 ? i18n.t("celebrations.queueComplete", {}, "Your Queue is done")
                 : i18n.t("celebrations.contextComplete", { name: oldContextName }, `${oldContextName} complete`);
@@ -476,6 +478,8 @@ export class PlayerStore {
   async togglePlayPause() {
     if (this.state === "playing") {
       await this.pause();
+    } else if (!this.currentSong && this.completedSession) {
+      await this.replayCompletedSession();
     } else {
       await this.resume();
     }
