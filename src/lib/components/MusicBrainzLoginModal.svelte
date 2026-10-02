@@ -152,7 +152,7 @@
           <button
             type="button"
             onclick={() => openExternalUrl("https://musicbrainz.org/register")}
-            class="text-brand-accent hover:underline font-medium inline-flex items-center gap-0.5"
+            class="text-brand-text-primary hover:text-brand-accent-text-hover hover:underline underline underline-offset-2 font-semibold inline-flex items-center gap-0.5 transition-colors cursor-pointer"
           >
             {i18n.t('auth.createAccountLink', {}, 'Create an account')}
             <ArrowUpRight class="w-3 h-3" />

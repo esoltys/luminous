@@ -173,7 +173,7 @@
           class="text-brand-text-secondary hover:text-brand-text-primary p-1 rounded transition-colors"
           title={i18n.t('auth.refreshStats', {}, 'Refresh stats')}
         >
-          <RefreshCw class="w-3.5 h-3.5 {isRefreshing ? 'animate-spin text-brand-accent' : ''}" />
+          <RefreshCw class="w-3.5 h-3.5 {isRefreshing ? 'animate-spin text-brand-accent-text' : ''}" />
         </button>
       </div>
 
@@ -256,7 +256,7 @@
           <button
             type="button"
             onclick={() => openExternalUrl("https://listenbrainz.org/profile/")}
-            class="text-[11px] text-brand-accent hover:underline inline-flex items-center gap-1"
+            class="text-[11px] text-brand-text-primary hover:text-brand-accent-text-hover hover:underline underline underline-offset-2 font-medium inline-flex items-center gap-1 transition-colors cursor-pointer"
           >
             {i18n.t('listenbrainz.getTokenLink', {}, 'Get token on listenbrainz.org')}
             <ArrowUpRight class="w-3 h-3" />
