@@ -149,7 +149,7 @@
 
       <button
         onclick={onClose}
-        class="text-brand-text-secondary hover:text-brand-text-primary p-1 rounded-lg hover:bg-white/5 transition-colors"
+        class="text-brand-text-secondary hover:text-brand-text-primary p-0.5 rounded hover:bg-white/5 transition-colors"
         title={i18n.t('common.close', {}, 'Close')}
       >
         <X class="w-4 h-4" />
@@ -229,22 +229,22 @@
     </div>
 
     <!-- Quick External Links & Logout -->
-    <div class="space-y-1 pt-1 border-t border-brand-border/60">
+    <div class="space-y-1.5 pt-2 border-t border-brand-border/60">
       {#if musicbrainzStore.username}
         <button
           onclick={() => openExternalUrl(`https://musicbrainz.org/user/${encodeURIComponent(musicbrainzStore.username!)}`)}
-          class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-brand-text-secondary hover:text-brand-text-primary hover:bg-white/5 transition-colors"
+          class="w-full flex items-center justify-between py-1 text-xs text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer"
         >
-          <span>{i18n.t('auth.viewProfileOnMb', {}, 'View profile on MusicBrainz')}</span>
+          <span class="hover:underline">{i18n.t('auth.viewProfileOnMb', {}, 'View profile on MusicBrainz')}</span>
           <ArrowUpRight class="w-3.5 h-3.5" />
         </button>
       {/if}
 
       <button
         onclick={handleLogout}
-        class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors mt-1"
+        class="w-full flex items-center justify-between py-1 text-xs text-red-400 hover:text-red-300 transition-colors cursor-pointer"
       >
-        <span>{i18n.t('auth.logout', {}, 'Log out')}</span>
+        <span class="hover:underline">{i18n.t('auth.logout', {}, 'Log out')}</span>
         <LogOut class="w-3.5 h-3.5" />
       </button>
     </div>
