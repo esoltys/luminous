@@ -14,6 +14,7 @@ use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 
 pub const DEFAULT_MUSICBRAINZ_CLIENT_ID: &str = "e68tnaXh59MOsC7KyGZkAEJ_5b6A8E0JJzRcPYZYsXw";
+pub const DEFAULT_MUSICBRAINZ_CLIENT_SECRET: &str = "r66Debc7m_ZPFwNJ3tNRwmweXgw5DHTVetJJFLU-PrI";
 pub const LOOPBACK_PORT: u16 = 12083;
 pub const LOOPBACK_REDIRECT_URI: &str = "http://localhost:12083/oauth/callback";
 pub const OOB_REDIRECT_URI: &str = "urn:ietf:wg:oauth:2.0:oob";
@@ -181,6 +182,10 @@ impl MusicBrainzManager {
             if !trimmed.is_empty() {
                 return Some(trimmed.to_string());
             }
+        }
+
+        if !DEFAULT_MUSICBRAINZ_CLIENT_SECRET.trim().is_empty() {
+            return Some(DEFAULT_MUSICBRAINZ_CLIENT_SECRET.to_string());
         }
 
         None
