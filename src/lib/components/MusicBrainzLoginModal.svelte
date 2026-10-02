@@ -10,7 +10,8 @@
     ArrowUpRightIcon as ArrowUpRight,
     CircleNotchIcon as LoaderCircle,
     WarningIcon as AlertTriangle,
-    CheckIcon as Check
+    CheckIcon as Check,
+    ShieldCheckIcon as ShieldCheck
   } from "phosphor-svelte";
 
   interface Props {
@@ -68,7 +69,7 @@
             {i18n.t('auth.modalTitle', {}, 'Sign in to MusicBrainz')}
           </h2>
           <p class="text-xs text-brand-text-secondary mt-0.5">
-            {i18n.t('auth.modalSubtitle', {}, 'Connect your account to access collections and user stats')}
+            {i18n.t('auth.modalSubtitle', {}, 'Connect your account to manage integrations and scrobbling')}
           </p>
         </div>
       </div>
@@ -138,8 +139,15 @@
       <!-- Initial State -->
       <div class="space-y-4">
         <p class="text-xs text-brand-text-secondary leading-relaxed">
-          {i18n.t('auth.loginDescription', {}, 'Signing in links your MusicBrainz editor profile with Luminous, allowing you to view your collections and stats directly from the player.')}
+          {i18n.t('auth.loginDescription', {}, 'Signing in links your MusicBrainz profile with Luminous to identify your account and enable ListenBrainz scrobbling.')}
         </p>
+
+        <div class="flex items-start gap-2.5 p-3 rounded-xl bg-white/[0.03] border border-brand-border/60 text-xs text-brand-text-secondary leading-relaxed">
+          <ShieldCheck class="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+          <p class="flex-1">
+            {i18n.t('auth.privacyNotice', {}, 'Luminous only uses this connection to communicate with official MusicBrainz and ListenBrainz APIs. Your credentials and tokens remain strictly on your device, and your personal data is never tracked, collected, or shared.')}
+          </p>
+        </div>
 
         <Button
           variant="primary"
