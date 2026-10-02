@@ -3342,6 +3342,7 @@ dependencies = [
  "rustfft",
  "serde",
  "serde_json",
+ "sha2",
  "symphonia",
  "symphonia-adapter-libopus",
  "tauri",

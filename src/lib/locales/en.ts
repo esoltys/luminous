@@ -18,7 +18,9 @@ export const en = {
     rescanLibrary: "Rescan Library",
     scanning: "Scanning",
     scanningPhaseTooltip: "Scanning Phase: {phase} ({scanned}/{total})",
-    scanningPhaseLabel: "Phase: {phase}"
+    scanningPhaseLabel: "Phase: {phase}",
+    musicbrainzLogin: "MusicBrainz Login",
+    musicbrainzProfile: "MusicBrainz Profile"
   },
   topNav: {
     goBack: "Go back",
@@ -1340,7 +1342,13 @@ export const en = {
     back: "Back",
     loading: "Loading…",
     expand: "Expand",
-    collapse: "Collapse"
+    collapse: "Collapse",
+    close: "Close",
+    cancel: "Cancel",
+    save: "Save",
+    saved: "Saved",
+    connect: "Connect",
+    active: "Active"
   },
   toast: {
     copyError: "Copy error to clipboard",
@@ -1714,5 +1722,35 @@ export const en = {
     processed: "Processed",
     directRate: "Direct rate",
     resampled: "Resampled",
+  },
+  auth: {
+    modalTitle: "Sign in to MusicBrainz",
+    modalSubtitle: "Connect your account to access collections and user stats",
+    waitingForBrowser: "Waiting for authorization in browser…",
+    browserPromptDesc: "Log in to MusicBrainz and approve access. This window will automatically update.",
+    enterCodeManually: "Or paste verification code:",
+    codePlaceholder: "Paste code here…",
+    submitCode: "Submit",
+    loginDescription: "Signing in links your MusicBrainz editor profile with Luminous, allowing you to view your collections and stats directly from the player.",
+    signInWithMb: "Sign in with MusicBrainz",
+    noAccountPrompt: "Don't have an account?",
+    createAccountLink: "Create an account",
+    advancedCredentialsToggle: "Application credentials",
+    credentialsDesc: "By default Luminous uses preconfigured credentials or environment variables. You can override them with your own registered OAuth application.",
+    clientIdLabel: "Client ID",
+    clientSecretLabel: "Client Secret (optional)",
+    clientSecretPlaceholder: "Leave blank if not registered",
+    registerAppHelp: "Register application on MusicBrainz",
+    editorBadge: "Editor",
+    statsSection: "MusicBrainz Collections",
+    refreshStats: "Refresh stats",
+    collectionsCount: "Collections",
+    releasesCount: "Total Items",
+    listenbrainzScrobbling: "ListenBrainz Scrobbling",
+    listenbrainzConnectedAs: "Connected as {username}",
+    listenbrainzPromptDesc: "Scrobble your listening history automatically to ListenBrainz with your user token.",
+    viewProfileOnMb: "View profile on MusicBrainz",
+    viewCollectionsOnMb: "View your collections",
+    logout: "Log out"
   }
 };

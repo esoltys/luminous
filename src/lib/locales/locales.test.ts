@@ -36,6 +36,7 @@ const IDENTICAL_OK = new Set([
   "albumDetail.statsLine", // "{genre} · {year} · {duration}"
   "albumTagEditor.genreField", // "Genre"
   "artistDetail.albumsFilter", // "Albums ({count})"
+  "auth.collectionsCount", // "Collections"
   "artistDetail.epsFilter", // "EPs ({count})"
   "artistDetail.singlesFilter", // "Singles ({count})"
   "artistDetail.tags", // "Tags"

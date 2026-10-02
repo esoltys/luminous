@@ -8,7 +8,10 @@
   import { updaterStore } from "../stores/updater.svelte";
   import { tagsStore } from "../stores/tags.svelte";
   import { walkthroughStore } from "../stores/walkthrough.svelte";
-  import { untrack } from "svelte";
+  import { musicbrainzStore } from "../stores/musicbrainz.svelte";
+  import MusicBrainzLoginModal from "./MusicBrainzLoginModal.svelte";
+  import MusicBrainzProfilePopover from "./MusicBrainzProfilePopover.svelte";
+  import { untrack, onMount } from "svelte";
   import { fade } from "../utils/motion";
   import {
     BooksIcon as Library,
@@ -38,6 +41,13 @@
 
   let isCollapsed = $derived(width < SIDEBAR_MIN_WIDTH_PX);
   let showUpdateBadge = $derived(updaterStore.updateAvailable || updaterStore.installStatus === "ready-to-restart");
+  let showLoginModal = $state(false);
+  let showProfilePopover = $state(false);
+  let profileButtonEl = $state<HTMLButtonElement | null>(null);
+
+  onMount(() => {
+    musicbrainzStore.init();
+  });
 
   // Collapsing/expanding swaps icon sizes, padding, and text labels instantly,
   // which looks messy against the sidebar's own smooth width transition (see
@@ -323,6 +333,61 @@
   </nav>
 
   <div class="flex-1"></div>
+
+  <!-- MusicBrainz Login / Profile Section (#1388) -->
+  <div class="{layoutCollapsed ? 'p-2' : 'px-3 py-2'} border-t border-brand-border/40 w-full flex flex-col items-center">
+    {#if musicbrainzStore.isLoggedIn}
+      <button
+        bind:this={profileButtonEl}
+        onclick={() => { showProfilePopover = !showProfilePopover; }}
+        class="flex items-center gap-2.5 transition-colors duration-150 {showProfilePopover ? 'bg-brand-accent/20 text-brand-accent-text' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {layoutCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-2.5 py-1.5 rounded-lg text-sm font-medium'}"
+        title="{musicbrainzStore.username} (MusicBrainz)"
+      >
+        <div class="relative shrink-0 flex items-center justify-center">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 25 28" class="{layoutCollapsed ? 'w-5 h-5' : 'w-4 h-4'} shrink-0">
+            <polygon fill="#ba478f" points="12 0 0 7 0 21 12 28 12 0"/>
+            <polygon fill="#eb743b" points="13 0 25 7 25 21 13 28 13 0"/>
+          </svg>
+          <span class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 border border-brand-sidebar"></span>
+        </div>
+        {#if !layoutCollapsed}
+          <div class="min-w-0 flex-1 text-left flex items-center justify-between gap-1">
+            <span class="truncate text-xs font-semibold text-brand-text-primary">
+              {musicbrainzStore.username}
+            </span>
+            <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-[#ba478f]/15 text-[#eb743b] font-medium shrink-0 border border-[#ba478f]/20">
+              MB
+            </span>
+          </div>
+        {/if}
+      </button>
+    {:else}
+      <button
+        bind:this={profileButtonEl}
+        onclick={() => { showLoginModal = true; }}
+        class="flex items-center gap-3 transition-colors duration-150 text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover {layoutCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
+        title={i18n.t('sidebar.musicbrainzLogin', {}, 'MusicBrainz Login')}
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 25 28" class="{layoutCollapsed ? 'w-5 h-5' : 'w-4 h-4 icon-align'} shrink-0">
+          <polygon fill="#ba478f" points="12 0 0 7 0 21 12 28 12 0"/>
+          <polygon fill="#eb743b" points="13 0 25 7 25 21 13 28 13 0"/>
+        </svg>
+        {#if !layoutCollapsed}
+          <span class="truncate whitespace-nowrap">{i18n.t('sidebar.musicbrainzLogin', {}, 'MusicBrainz Login')}</span>
+        {/if}
+      </button>
+    {/if}
+  </div>
+
+  {#if showLoginModal}
+    <MusicBrainzLoginModal onClose={() => (showLoginModal = false)} />
+  {/if}
+
+  <MusicBrainzProfilePopover
+    isOpen={showProfilePopover}
+    anchorEl={profileButtonEl}
+    onClose={() => (showProfilePopover = false)}
+  />
 
   <!-- Bottom spacer for player bar -->
   <div class:mb-24={!!playerStore.currentSong}></div>
