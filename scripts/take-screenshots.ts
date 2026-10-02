@@ -414,8 +414,12 @@ async function main() {
       await page.getByRole("button", { name: t(language, "equalizer.modeParametric"), exact: true }).click();
       await page.waitForTimeout(400);
     },
+    "click-settings-sources": async (page, _featured, language) => {
+      await page.getByRole("tab", { name: t(language, "settings.tabSources"), exact: true }).click();
+      await page.waitForTimeout(400);
+    },
     "click-settings-folders": async (page, _featured, language) => {
-      await page.getByRole("tab", { name: t(language, "settings.tabFolders"), exact: true }).click();
+      await page.getByRole("tab", { name: t(language, "settings.tabSources"), exact: true }).click();
       await page.waitForTimeout(400);
     },
     "click-settings-integrations": async (page, _featured, language) => {

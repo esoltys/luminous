@@ -5,18 +5,18 @@
   import { invoke } from "@tauri-apps/api/core";
   import { rememberScroll } from "../utils/scrollMemory";
   import SettingsGeneral from "./SettingsGeneral.svelte";
-  import SettingsFolders from "./SettingsFolders.svelte";
+  import SettingsSources from "./SettingsSources.svelte";
   import SettingsIntegrations from "./SettingsIntegrations.svelte";
   import SettingsThemes from "./SettingsThemes.svelte";
   import SettingsAbout from "./SettingsAbout.svelte";
   import Equalizer from "./Equalizer.svelte";
 
-  let settingsTab = $state<"general" | "folders" | "integrations" | "themes" | "equalizer" | "about">("general");
+  let settingsTab = $state<"general" | "sources" | "integrations" | "themes" | "equalizer" | "about">("general");
   let isTabInitialized = $state(false);
 
   const TABS: { value: typeof settingsTab; label: () => string }[] = [
     { value: "general", label: () => i18n.t('settings.tabGeneral') },
-    { value: "folders", label: () => i18n.t('settings.tabFolders') },
+    { value: "sources", label: () => i18n.t('settings.tabSources') },
     { value: "integrations", label: () => i18n.t('settings.tabIntegrations') },
     { value: "themes", label: () => i18n.t('settings.tabThemes') },
     { value: "equalizer", label: () => i18n.t('settings.tabEqualizer') },
@@ -29,8 +29,10 @@
         const settings = await invoke<Record<string, string>>("get_all_app_settings");
         if (settings && settings.active_settings_tab) {
           const savedTab = settings.active_settings_tab;
-          if (savedTab === "general" || savedTab === "folders" || savedTab === "integrations" || savedTab === "themes" || savedTab === "equalizer" || savedTab === "about") {
+          if (savedTab === "general" || savedTab === "sources" || savedTab === "integrations" || savedTab === "themes" || savedTab === "equalizer" || savedTab === "about") {
             settingsTab = savedTab;
+          } else if (savedTab === "folders") {
+            settingsTab = "sources";
           }
         }
       } catch (e) {
@@ -66,8 +68,8 @@
     <div class="max-w-3xl mx-auto space-y-6">
       {#if settingsTab === "general"}
         <SettingsGeneral />
-      {:else if settingsTab === "folders"}
-        <SettingsFolders />
+      {:else if settingsTab === "sources"}
+        <SettingsSources />
       {:else if settingsTab === "integrations"}
         <SettingsIntegrations />
       {:else if settingsTab === "themes"}

@@ -1,6 +1,6 @@
 # Genre & Artist Tag Hierarchy Sidecar
 
-Pick a **Default Library** in Settings → Folders → Watched Folders. Luminous then keeps your
+Pick a **Default Library** in Settings → Sources → Watched Folders. Luminous then keeps your
 genre hierarchy and artist tag hierarchy in a `luminous-hierarchy.json` file in that folder.
 If you move the library or open it from a second Luminous install, such as a shared network
 library, the curation comes along with it.

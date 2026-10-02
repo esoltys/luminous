@@ -104,6 +104,7 @@ const IDENTICAL_OK = new Set([
   "settings.languageFrench", // "Français"
   "settings.simple", // "Simple"
   "settings.statsAlbums", // "Albums"
+  "settings.tabSources", // "Sources"
   "settings.updateBuildLabel", // "build {hash}"
   "settings.webdavUrlPlaceholder", // "https://cloud.example.com/remote.php/webdav"
   "shortcuts.groupNavigation", // "Navigation"

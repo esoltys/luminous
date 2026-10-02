@@ -222,7 +222,7 @@ export const fr: DeepStringRecord<typeof en> = {
   settings: {
     title: "Paramètres",
     tabGeneral: "Général",
-    tabFolders: "Dossiers",
+    tabSources: "Sources",
     tabIntegrations: "Intégrations",
     watchedFoldersTitle: "Dossiers surveillés",
     tabThemes: "Thèmes d'interface",

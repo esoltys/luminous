@@ -75,9 +75,9 @@
     navigationStore.selectedAutoPlaylist = null;
   }
 
-  function navigateToFoldersSettings() {
+  function navigateToSourcesSettings() {
     navigationStore.activeTab = "settings";
-    invoke("set_app_setting", { key: "active_settings_tab", value: "folders" });
+    invoke("set_app_setting", { key: "active_settings_tab", value: "sources" });
   }
 
   async function handleAddDirectory() {

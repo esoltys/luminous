@@ -49,4 +49,29 @@ describe("SettingsView.svelte", () => {
 
     expect(invoke).toHaveBeenCalledWith("set_app_setting", { key: "active_settings_tab", value: "integrations" });
   });
+
+  it("persists active tab as sources when clicking Sources tab", async () => {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const { findByText, getByText } = render(SettingsView);
+    await findByText(/v0\.75\.0/);
+
+    await fireEvent.click(getByText("Sources"));
+
+    expect(invoke).toHaveBeenCalledWith("set_app_setting", { key: "active_settings_tab", value: "sources" });
+  });
+
+  it("migrates legacy folders setting to sources on mount", async () => {
+    const { invoke } = await import("@tauri-apps/api/core");
+    vi.mocked(invoke).mockImplementation((cmd: string) => {
+      if (cmd === "get_all_app_settings") {
+        return Promise.resolve({ active_settings_tab: "folders" });
+      }
+      return Promise.resolve([]);
+    });
+
+    const { findByText } = render(SettingsView);
+    await findByText("Watched Folders");
+
+    expect(invoke).toHaveBeenCalledWith("set_app_setting", { key: "active_settings_tab", value: "sources" });
+  });
 });
