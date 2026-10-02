@@ -96,7 +96,7 @@
     </div>
     <div class="flex items-center justify-between gap-2">
       <p class="truncate text-xs text-brand-text-secondary font-medium min-w-0">{album.artist || i18n.t('collection.variousArtists')}</p>
-      <span class="shrink-0" onclick={(e) => e.stopPropagation()}><SongRating rating={currentRating} onRate={rateAlbum} size="sm" /></span>
+      <span class="shrink-0" onclick={(e) => e.stopPropagation()}><SongRating isAlbum rating={currentRating} onRate={rateAlbum} size="sm" /></span>
     </div>
   </div>
 

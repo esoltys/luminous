@@ -43,6 +43,7 @@ pub struct SongDetails {
     pub bpm: Option<f32>,
     pub initial_key: String,
     pub rating: f32,
+    pub loved: i32,
     pub compilation: bool,
     pub art_embedded: bool,
     /// `true` when this song was cut from a CUE sheet (#78) — its tags live in
@@ -60,7 +61,7 @@ pub async fn get_song_details(
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     conn.query_row(
         "SELECT id, path, title, titlesort, artist, artistsort, album, albumsort, album_artist, album_artist_sort, composer, composersort, genre, genresort, track, disc, year,
-                originalyear, grouping, bpm, initial_key, rating, compilation, art_embedded, cue_path
+                originalyear, grouping, bpm, initial_key, rating, loved, compilation, art_embedded, cue_path
          FROM songs WHERE id = ?1",
         rusqlite::params![song_id],
         |row| {
@@ -87,9 +88,10 @@ pub async fn get_song_details(
                 bpm: row.get(19).ok(),
                 initial_key: row.get(20).unwrap_or_default(),
                 rating: row.get(21).unwrap_or(crate::stats::RATING_UNRATED),
-                compilation: row.get(22).unwrap_or(false),
-                art_embedded: row.get(23).unwrap_or(false),
-                is_cue_track: row.get::<_, Option<String>>(24)?.is_some(),
+                loved: row.get(22).unwrap_or(0),
+                compilation: row.get(23).unwrap_or(false),
+                art_embedded: row.get(24).unwrap_or(false),
+                is_cue_track: row.get::<_, Option<String>>(25)?.is_some(),
             })
         },
     )

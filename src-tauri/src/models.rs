@@ -1183,6 +1183,8 @@ pub struct StatsTopItem {
     pub year: Option<i32>,
     #[serde(default = "default_rating")]
     pub rating: f32,
+    #[serde(default)]
+    pub loved: Option<i32>,
 }
 
 impl StatsTopItem {
@@ -1209,6 +1211,7 @@ impl StatsTopItem {
             art_manual: None,
             year: None,
             rating: crate::stats::RATING_UNRATED,
+            loved: None,
         }
     }
 }

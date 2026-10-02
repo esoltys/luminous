@@ -90,7 +90,7 @@ impl UiPreferences {
     /// Field ↔ app_state key mapping, shared by load and store so the two
     /// can't drift.
     fn fields(&mut self) -> [(&'static str, &mut String, &'static [&'static str]); 11] {
-        const RATING: &[&str] = &["heart", "stars"];
+        const RATING: &[&str] = &["heart", "stars", "both"];
         const SEEKBAR: &[&str] = &["waveform", "bands"];
         const VIEW: &[&str] = &["cards", "rows"];
         const GENRE_VIEW: &[&str] = &["genre", "tags"];

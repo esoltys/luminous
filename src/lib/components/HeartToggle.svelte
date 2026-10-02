@@ -1,16 +1,25 @@
 <script lang="ts">
-  import { HeartIcon as Heart } from "phosphor-svelte";
+  import { HeartIcon as Heart, HeartBreakIcon as HeartBreak } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
 
   interface Props {
-    favorite: boolean;
-    onToggle: () => void;
+    /** Tri-state loved: 1 = loved, 0 = neutral, -1 = hated. */
+    loved?: number;
+    /** Backwards-compatible boolean favourite flag. */
+    favorite?: boolean;
+    onToggle?: () => void;
+    onSetLoved?: (loved: number) => void;
     sizeClass?: string;
   }
 
-  let { favorite, onToggle, sizeClass = "w-4 h-4" }: Props = $props();
+  let { loved, favorite, onToggle, onSetLoved, sizeClass = "w-4 h-4" }: Props = $props();
 
   let buttonEl: HTMLButtonElement | undefined = $state();
+
+  // Tri-state: 1 = loved, 0 = neutral, -1 = hated
+  let lovedState = $derived(
+    loved !== undefined ? loved : (favorite ? 1 : 0)
+  );
 
   // Only the moment the user actually favourites a song should pulse — triggered
   // directly on user click when favouriting.
@@ -41,14 +50,37 @@
     ring.addEventListener("animationend", () => ring.remove());
   }
 
+  function emitChange(next: number) {
+    if (onSetLoved) {
+      onSetLoved(next);
+    } else if (onToggle) {
+      onToggle();
+    }
+  }
+
   function handleClick(e: MouseEvent) {
     e.stopPropagation();
-    if (!favorite) {
+    let next: number;
+    if (lovedState === 1) {
+      next = 0;
+    } else if (lovedState === -1) {
+      // clicking broken heart clears back to 0
+      next = 0;
+    } else {
+      next = 1;
       justFavorited = true;
       burstRing();
       setTimeout(() => { justFavorited = false; }, 320);
     }
-    onToggle();
+    emitChange(next);
+  }
+
+  function handleContextMenu(e: MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    // Secondary/menu action sets -1 (Hate). If already -1, clears back to 0.
+    const next = lovedState === -1 ? 0 : -1;
+    emitChange(next);
   }
 </script>
 
@@ -56,11 +88,29 @@
   bind:this={buttonEl}
   type="button"
   onclick={handleClick}
-  class="inline-flex transition-colors {favorite
+  oncontextmenu={handleContextMenu}
+  class="inline-flex items-center justify-center transition-colors {lovedState === 1
     ? 'text-brand-accent-text'
-    : 'text-brand-text-primary/60 hover:text-brand-accent-text'}"
-  title={favorite ? i18n.t('rating.unfavoriteTooltip') : i18n.t('rating.favoriteTooltip')}
-  aria-pressed={favorite}
+    : lovedState === -1
+      ? 'text-brand-accent-text/80 hover:text-brand-text-primary'
+      : 'text-brand-text-primary/60 hover:text-brand-accent-text'}"
+  title={lovedState === 1
+    ? i18n.t('rating.unfavoriteTooltip', {}, 'Remove from favourites')
+    : lovedState === -1
+      ? i18n.t('rating.clearHateTooltip', {}, 'Clear dislike')
+      : i18n.t('rating.favoriteTooltip', {}, 'Add to favourites')}
+  aria-label={lovedState === 1
+    ? i18n.t('rating.unfavoriteTooltip', {}, 'Remove from favourites')
+    : lovedState === -1
+      ? i18n.t('rating.clearHateTooltip', {}, 'Clear dislike')
+      : i18n.t('rating.favoriteTooltip', {}, 'Add to favourites')}
+  aria-pressed={lovedState === 1}
 >
-  <Heart weight={favorite ? "fill" : "duotone"} class="{sizeClass} {justFavorited ? 'anim-heart-pulse' : ''}" />
+  {#if lovedState === -1}
+    <HeartBreak weight="fill" class={sizeClass} />
+  {:else if lovedState === 1}
+    <Heart weight="fill" class="{sizeClass} {justFavorited ? 'anim-heart-pulse' : ''}" />
+  {:else}
+    <Heart weight="duotone" class={sizeClass} />
+  {/if}
 </button>

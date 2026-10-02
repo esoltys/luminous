@@ -371,4 +371,71 @@ describe("SongContextMenu.svelte", () => {
     });
     expect(onClose).toHaveBeenCalled();
   });
+
+  it("toggles favourite from context menu", async () => {
+    vi.mocked(invoke).mockResolvedValue(1);
+    const onClose = vi.fn();
+    render(SongContextMenu, {
+      x: 0,
+      y: 0,
+      song: { ...localSong, loved: 0 },
+      onPlay: () => {},
+      onClose,
+    });
+
+    const item = await screen.findByText("Add to favourites");
+    expect(item).toBeInTheDocument();
+
+    await fireEvent.click(item);
+    expect(invoke).toHaveBeenCalledWith("set_song_loved", {
+      songId: 1,
+      loved: 1,
+    });
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("toggles dislike from context menu", async () => {
+    vi.mocked(invoke).mockResolvedValue(-1);
+    const onClose = vi.fn();
+    render(SongContextMenu, {
+      x: 0,
+      y: 0,
+      song: { ...localSong, loved: 0 },
+      onPlay: () => {},
+      onClose,
+    });
+
+    const item = await screen.findByText("Dislike track");
+    expect(item).toBeInTheDocument();
+
+    await fireEvent.click(item);
+    expect(invoke).toHaveBeenCalledWith("set_song_loved", {
+      songId: 1,
+      loved: -1,
+    });
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("shows remove favourite and clear dislike when appropriate", async () => {
+    const { unmount } = render(SongContextMenu, {
+      x: 0,
+      y: 0,
+      song: { ...localSong, loved: 1 },
+      onPlay: () => {},
+      onClose: () => {},
+    });
+
+    expect(await screen.findByText("Remove from favourites")).toBeInTheDocument();
+    unmount();
+
+    render(SongContextMenu, {
+      x: 0,
+      y: 0,
+      song: { ...localSong, loved: -1 },
+      onPlay: () => {},
+      onClose: () => {},
+    });
+
+    expect(await screen.findByText("Clear dislike")).toBeInTheDocument();
+  });
 });

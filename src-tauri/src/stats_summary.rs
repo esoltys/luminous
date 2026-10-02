@@ -99,7 +99,7 @@ pub fn top_songs_with_limit(
     let sql = format!(
         "SELECT s.id, s.title, s.artist, COUNT(*) AS play_count, s.album,
                 COALESCE(SUM(COALESCE(NULLIF(ph.duration_secs, 0), s.length_nanosec / 1000000000, 0)), 0) AS total_secs,
-                s.art_embedded, s.art_automatic, s.art_manual, s.year, s.rating
+                s.art_embedded, s.art_automatic, s.art_manual, s.year, s.rating, s.loved
          FROM play_history ph
          JOIN songs s ON s.id = ph.song_id
          WHERE ph.played_at >= ?1
@@ -132,6 +132,7 @@ pub fn top_songs_with_limit(
                 rating: row
                     .get::<_, Option<f32>>(10)?
                     .unwrap_or(crate::stats::RATING_UNRATED),
+                loved: row.get(11)?,
             })
         })?
         .filter_map(|r| r.ok())
@@ -227,6 +228,7 @@ pub fn top_albums_with_limit(
                 art_manual: row.get(7)?,
                 year: row.get(8)?,
                 rating: crate::stats::RATING_UNRATED,
+                loved: None,
             })
         })?
         .filter_map(|r| r.ok())

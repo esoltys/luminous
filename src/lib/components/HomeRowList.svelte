@@ -119,6 +119,10 @@
     song.rating = await invoke<number>("set_song_rating", { songId: song.id, rating });
   }
 
+  async function setLoved(song: Song, loved: number) {
+    song.loved = await invoke<number>("set_song_loved", { songId: song.id, loved });
+  }
+
   async function rateAlbum(album: AlbumItem, rating: number) {
     if (!album.album) return;
     album.rating = await invoke<number>("set_album_rating", { album: album.album, rating });
@@ -196,9 +200,9 @@
               <p class="truncate text-xs text-brand-text-secondary font-medium min-w-0">{subtitleFor(item)}</p>
               <span class="shrink-0">
                 {#if item.type === "song"}
-                  <SongRating rating={item.song.rating} onRate={(r) => rateSong(item.song, r)} size="sm" />
+                  <SongRating rating={item.song.rating} loved={item.song.loved} onRate={(r) => rateSong(item.song, r)} onSetLoved={(l) => setLoved(item.song, l)} size="sm" />
                 {:else}
-                  <SongRating rating={item.album.rating} onRate={(r) => rateAlbum(item.album, r)} size="sm" />
+                  <SongRating isAlbum rating={item.album.rating} onRate={(r) => rateAlbum(item.album, r)} size="sm" />
                 {/if}
               </span>
             </div>

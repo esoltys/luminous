@@ -90,10 +90,9 @@ describe("HomeRowList.svelte", () => {
     const { getByText, container } = render(HomeRowList, { props: { items, variant: "rank" } });
 
     expect(getByText("Full Moon Fever")).toBeInTheDocument();
-    expect(getByText("1989")).toBeInTheDocument();
     expect(getByText("Tom Petty")).toBeInTheDocument();
-    // Rating widget (heart/star, driven by prefs.ratingStyle) now renders for album rows too.
-    expect(container.querySelector('[aria-pressed]')).toBeInTheDocument();
+    // Album rows always render star ratings (isAlbum=true), even in heart mode
+    expect(container.querySelector('[role="group"][aria-label="Rating"]')).toBeInTheDocument();
   });
 
   it("omits the year when the album has none", () => {

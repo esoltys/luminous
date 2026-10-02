@@ -52,6 +52,7 @@
   let initialKey = $state("");
   let path = $state("");
   let rating = $state(-1);
+  let loved = $state<number | undefined>(undefined);
   // Remote songs (WebDAV #682, OpenSubsonic #916) have no local file Luminous can write lofty tags to,
   // and there's no write-back to the remote server -- edits here only ever
   // reach Luminous's own DB. Derived from the path scheme rather than a
@@ -111,6 +112,7 @@
         bpm: number | null;
         initial_key: string;
         rating: number;
+        loved: number;
         compilation: boolean;
         art_embedded: boolean;
         is_cue_track: boolean;
@@ -137,6 +139,7 @@
       initialKey = details.initial_key;
       path = details.path;
       rating = details.rating;
+      loved = details.loved;
       compilation = details.compilation;
       artEmbedded = details.art_embedded;
       isCueTrack = details.is_cue_track;
@@ -199,6 +202,14 @@
       rating = await invoke<number>("set_song_rating", { songId, rating: value });
     } catch (e) {
       console.error("Failed to save rating:", e);
+    }
+  }
+
+  async function handleSetLoved(value: number) {
+    try {
+      loved = await invoke<number>("set_song_loved", { songId, loved: value });
+    } catch (e) {
+      console.error("Failed to save loved:", e);
     }
   }
 
@@ -484,7 +495,7 @@
             <!-- Rating (library-only, saves immediately) -->
             <div class="flex flex-col gap-1.5">
               <span class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">{i18n.t('rating.label')}</span>
-              <SongRating {rating} onRate={handleRate} size="md" />
+              <SongRating {rating} {loved} onRate={handleRate} onSetLoved={handleSetLoved} size="md" />
             </div>
 
             <!-- Sort Overrides ("Sort As") -->

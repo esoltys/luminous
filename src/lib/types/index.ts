@@ -491,6 +491,7 @@ export interface StatsTopItem {
   art_manual?: string | null;
   year?: number | null;
   rating?: number;
+  loved?: number;
   /** Rank movement against the prior local calendar week, set only when this row
    * came from the weekly "Top Albums" chart (`get_top_albums`, #662). */
   movement?: "new" | "reentry" | "rising" | "falling" | "steady";
