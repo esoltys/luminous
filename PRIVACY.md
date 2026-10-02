@@ -4,7 +4,6 @@
 
 ---
 
-<a id="english"></a>
 ## English
 
 ### Privacy Policy for Luminous Music Player
@@ -51,7 +50,6 @@ If you have questions about this privacy policy or Luminous, please open an issu
 
 ---
 
-<a id="français"></a>
 ## Français
 
 ### Politique de confidentialité pour Luminous Music Player

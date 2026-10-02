@@ -4,7 +4,6 @@
 
 ---
 
-<a id="english"></a>
 ## English
 
 ### Terms of Service
@@ -45,7 +44,6 @@ For questions regarding these Terms, please open an issue or discussion on the o
 
 ---
 
-<a id="français"></a>
 ## Français
 
 ### Conditions d'utilisation
