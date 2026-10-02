@@ -11,7 +11,7 @@ Luminous ("the Application") is designed as a local-first, privacy-focused audio
 Luminous does **not** collect, store, transmit, or monetize any personal data, usage analytics, tracking cookies, or telemetry.
 
 * **Local Data**: All music library indices, playlists, equalizer presets, listening history, and application preferences are stored locally on your device in an isolated database.
-* **No User Accounts**: Luminous does not require user registration or account creation.
+* **No User Accounts**: Luminous does not require user registration or account creation. If you optionally choose to connect an external account (such as MusicBrainz or ListenBrainz), authentication credentials and tokens remain strictly on your device.
 
 ---
 
@@ -22,6 +22,7 @@ Luminous operates offline by default. Optional network requests are made strictl
 1. **Cover Art & Metadata Lookup**: If enabled, the application queries public web APIs (such as iTunes Search API and MusicBrainz) to retrieve album artwork or track metadata for your local files.
 2. **Lyric Search**: When displaying song lyrics, the application fetches lyrics from public services (such as LRCLIB and Lyrics.ovh).
 3. **Application Updates**: When checking for software updates, the application queries GitHub Releases to determine if a newer version of Luminous is available.
+4. **MusicBrainz & ListenBrainz Integrations**: If you connect your MusicBrainz account or configure scrobbling, Luminous only uses this connection to communicate with official MusicBrainz and ListenBrainz APIs. Your credentials and tokens remain strictly on your device, and your personal data is never tracked, collected, or shared.
 
 No personal identifiers or library telemetry are included in these external requests.
 
