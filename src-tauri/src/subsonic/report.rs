@@ -279,7 +279,10 @@ pub fn push_song_loved(db: &Database, path: &str, loved: i32) {
 
     let want_star = loved == 1;
     if want_star != was_starred {
-        match server.client.set_starred(StarTarget::Song(&track_id), want_star) {
+        match server
+            .client
+            .set_starred(StarTarget::Song(&track_id), want_star)
+        {
             Ok(()) => {
                 let updated = (|| -> Result<()> {
                     db.pool.get()?.execute(

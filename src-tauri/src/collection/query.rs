@@ -4296,7 +4296,10 @@ mod tests {
 
         let favourites = scanner.get_favourite_songs().unwrap();
         assert_eq!(favourites.len(), 2);
-        let titles: Vec<_> = favourites.iter().map(|s| s.title.as_deref().unwrap()).collect();
+        let titles: Vec<_> = favourites
+            .iter()
+            .map(|s| s.title.as_deref().unwrap())
+            .collect();
         assert!(titles.contains(&"Loved Unrated"));
         assert!(titles.contains(&"Loved Three Star"));
 

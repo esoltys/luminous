@@ -3395,7 +3395,9 @@ mod tests {
 
         let conn = db.pool.get().unwrap();
         let index_exists: bool = conn
-            .prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_songs_loved'")
+            .prepare(
+                "SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_songs_loved'",
+            )
             .unwrap()
             .exists([])
             .unwrap();
@@ -3407,7 +3409,9 @@ mod tests {
         )
         .unwrap();
         let loved: i32 = conn
-            .query_row("SELECT loved FROM songs WHERE title = 'Unrated'", [], |r| r.get(0))
+            .query_row("SELECT loved FROM songs WHERE title = 'Unrated'", [], |r| {
+                r.get(0)
+            })
             .unwrap();
         assert_eq!(loved, 0);
 
@@ -3427,11 +3431,30 @@ mod tests {
         )
         .unwrap();
 
-        conn.execute("UPDATE songs SET loved = 1 WHERE rating >= 4.0", []).unwrap();
+        conn.execute("UPDATE songs SET loved = 1 WHERE rating >= 4.0", [])
+            .unwrap();
 
-        let loved_5: i32 = conn.query_row("SELECT loved FROM songs WHERE title = 'Five Star'", [], |r| r.get(0)).unwrap();
-        let loved_4: i32 = conn.query_row("SELECT loved FROM songs WHERE title = 'Four Star'", [], |r| r.get(0)).unwrap();
-        let loved_3: i32 = conn.query_row("SELECT loved FROM songs WHERE title = 'Three Star'", [], |r| r.get(0)).unwrap();
+        let loved_5: i32 = conn
+            .query_row(
+                "SELECT loved FROM songs WHERE title = 'Five Star'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        let loved_4: i32 = conn
+            .query_row(
+                "SELECT loved FROM songs WHERE title = 'Four Star'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        let loved_3: i32 = conn
+            .query_row(
+                "SELECT loved FROM songs WHERE title = 'Three Star'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
         assert_eq!(loved_5, 1);
         assert_eq!(loved_4, 1);
         assert_eq!(loved_3, 0);

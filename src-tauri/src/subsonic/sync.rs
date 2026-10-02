@@ -247,11 +247,7 @@ pub fn rating_to_adopt(
 /// - First import: starred tracks adopt `1` if local is neutral (`0`); never overwrites a local edit.
 /// - Later syncs: only react when server starred status changed, and only if local still matches
 ///   what the server had before (local edit wins).
-pub fn loved_to_adopt(
-    previous: Option<bool>,
-    current: bool,
-    local: i32,
-) -> Option<i32> {
+pub fn loved_to_adopt(previous: Option<bool>, current: bool, local: i32) -> Option<i32> {
     match previous {
         None => {
             if current && local == 0 {
@@ -470,7 +466,10 @@ pub fn apply_library(
 
         // Ratings / favourites.
         let starred = child.starred.is_some();
-        let current_rating = child.user_rating.filter(|&r| (1..=5).contains(&r)).map(|r| r as f32);
+        let current_rating = child
+            .user_rating
+            .filter(|&r| (1..=5).contains(&r))
+            .map(|r| r as f32);
         let previous_rating = cached
             .as_ref()
             .filter(|c| c.song_id.is_some())
@@ -481,7 +480,9 @@ pub fn apply_library(
             .as_ref()
             .map(|e| e.rating)
             .unwrap_or(RATING_UNRATED);
-        if let Some(rating) = rating_to_adopt(previous_rating.map(Some), current_rating, local_rating) {
+        if let Some(rating) =
+            rating_to_adopt(previous_rating.map(Some), current_rating, local_rating)
+        {
             stats::set_rating(&tx, song_id, rating)?;
         }
 
@@ -489,10 +490,7 @@ pub fn apply_library(
             .as_ref()
             .filter(|c| c.song_id.is_some())
             .map(|c| c.server_starred);
-        let local_loved = existing
-            .as_ref()
-            .map(|e| e.loved)
-            .unwrap_or(0);
+        let local_loved = existing.as_ref().map(|e| e.loved).unwrap_or(0);
         if let Some(loved) = loved_to_adopt(previous_starred, starred, local_loved) {
             stats::set_loved(&tx, song_id, loved)?;
         }
