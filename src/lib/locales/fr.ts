@@ -1743,16 +1743,10 @@ export const fr: DeepStringRecord<typeof en> = {
     signInWithMb: "Se connecter avec MusicBrainz",
     noAccountPrompt: "Vous n'avez pas de compte ?",
     createAccountLink: "Créer un compte",
-    editorBadge: "Éditeur",
-    statsSection: "Collections MusicBrainz",
-    refreshStats: "Actualiser les statistiques",
-    collectionsCount: "Collections",
-    releasesCount: "Éléments au total",
     listenbrainzScrobbling: "Scrobbling ListenBrainz",
-    listenbrainzConnectedAs: "Connecté en tant que {username}",
     listenbrainzPromptDesc: "Scrobblez automatiquement votre historique d'écoute vers ListenBrainz grâce à votre jeton utilisateur.",
+    modifyScrobblingSettings: "Modifier les paramètres de scrobbling dans Intégrations",
     viewProfileOnMb: "Voir le profil sur MusicBrainz",
-    viewCollectionsOnMb: "Voir vos collections",
     logout: "Se déconnecter"
   }
 };

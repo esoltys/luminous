@@ -1,5 +1,6 @@
 <script lang="ts">
   import { playerStore } from "../stores/player.svelte";
+  import { navigationStore, type SettingsTab } from "../stores/navigation.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
@@ -11,10 +12,10 @@
   import SettingsAbout from "./SettingsAbout.svelte";
   import Equalizer from "./Equalizer.svelte";
 
-  let settingsTab = $state<"general" | "sources" | "integrations" | "themes" | "equalizer" | "about">("general");
+  let settingsTab = $state<SettingsTab>(navigationStore.settingsSubTab || "general");
   let isTabInitialized = $state(false);
 
-  const TABS: { value: typeof settingsTab; label: () => string }[] = [
+  const TABS: { value: SettingsTab; label: () => string }[] = [
     { value: "general", label: () => i18n.t('settings.tabGeneral') },
     { value: "sources", label: () => i18n.t('settings.tabSources') },
     { value: "integrations", label: () => i18n.t('settings.tabIntegrations') },
@@ -26,14 +27,20 @@
   onMount(() => {
     (async () => {
       try {
-        const settings = await invoke<Record<string, string>>("get_all_app_settings");
-        if (settings && settings.active_settings_tab) {
-          const savedTab = settings.active_settings_tab;
-          if (savedTab === "general" || savedTab === "sources" || savedTab === "integrations" || savedTab === "themes" || savedTab === "equalizer" || savedTab === "about") {
-            settingsTab = savedTab;
-          } else if (savedTab === "folders") {
-            settingsTab = "sources";
+        if (!navigationStore.settingsSubTab || navigationStore.settingsSubTab === "general") {
+          const settings = await invoke<Record<string, string>>("get_all_app_settings");
+          if (settings && settings.active_settings_tab) {
+            const savedTab = settings.active_settings_tab as SettingsTab;
+            if (savedTab === "general" || savedTab === "sources" || savedTab === "integrations" || savedTab === "themes" || savedTab === "equalizer" || savedTab === "about") {
+              settingsTab = savedTab;
+              navigationStore.settingsSubTab = savedTab;
+            } else if ((savedTab as string) === "folders") {
+              settingsTab = "sources";
+              navigationStore.settingsSubTab = "sources";
+            }
           }
+        } else {
+          settingsTab = navigationStore.settingsSubTab;
         }
       } catch (e) {
         console.error("Failed to fetch settings on mount:", e);
@@ -41,6 +48,12 @@
         isTabInitialized = true;
       }
     })();
+  });
+
+  $effect(() => {
+    if (navigationStore.settingsSubTab && settingsTab !== navigationStore.settingsSubTab) {
+      settingsTab = navigationStore.settingsSubTab;
+    }
   });
 
   $effect(() => {
@@ -55,7 +68,7 @@
     <div class="pt-4 pb-4 flex items-center gap-2" role="tablist" aria-label={i18n.t('settings.title')}>
       {#each TABS as tab (tab.value)}
         <button
-          onclick={() => { settingsTab = tab.value; }}
+          onclick={() => { settingsTab = tab.value; navigationStore.settingsSubTab = tab.value; }}
           role="tab"
           aria-selected={settingsTab === tab.value}
           class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors {settingsTab === tab.value ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'}"

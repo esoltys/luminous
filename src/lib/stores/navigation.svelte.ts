@@ -3,6 +3,7 @@ import { playlistsStore } from "./playlists.svelte";
 
 export type ActiveTab = "home" | "collection" | "playlists" | "settings" | "lyrics" | "stats" | "organize" | "help";
 export type ActiveSubTab = "songs" | "albums" | "artists" | "genres";
+export type SettingsTab = "general" | "sources" | "integrations" | "themes" | "equalizer" | "about";
 
 /** Which grid is shown under the Playlists tab (mirrors `ActiveSubTab` for Collection). */
 type PlaylistsSubTab = "auto" | "custom";
@@ -81,6 +82,22 @@ class NavigationStore {
       localStorage.setItem("navigation_playlistsSubTab", val);
     }
     this.scheduleRecordHistory();
+  }
+
+  private _settingsSubTab = $state<SettingsTab>(
+    (typeof window !== "undefined" && (localStorage.getItem("navigation_settingsSubTab") as SettingsTab)) || "general"
+  );
+  get settingsSubTab() { return this._settingsSubTab; }
+  set settingsSubTab(val: SettingsTab) {
+    this._settingsSubTab = val;
+    if (typeof window !== "undefined") {
+      localStorage.setItem("navigation_settingsSubTab", val);
+    }
+  }
+
+  openSettings(tab: SettingsTab = "general") {
+    this.settingsSubTab = tab;
+    this.activeTab = "settings";
   }
 
   private _selectedArtistName = $state<string | null>(null);

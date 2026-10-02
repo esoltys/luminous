@@ -1735,16 +1735,10 @@ export const en = {
     signInWithMb: "Sign in with MusicBrainz",
     noAccountPrompt: "Don't have an account?",
     createAccountLink: "Create an account",
-    editorBadge: "Editor",
-    statsSection: "MusicBrainz Collections",
-    refreshStats: "Refresh stats",
-    collectionsCount: "Collections",
-    releasesCount: "Total Items",
     listenbrainzScrobbling: "ListenBrainz Scrobbling",
-    listenbrainzConnectedAs: "Connected as {username}",
     listenbrainzPromptDesc: "Scrobble your listening history automatically to ListenBrainz with your user token.",
+    modifyScrobblingSettings: "Modify scrobbling settings in Integrations",
     viewProfileOnMb: "View profile on MusicBrainz",
-    viewCollectionsOnMb: "View your collections",
     logout: "Log out"
   }
 };

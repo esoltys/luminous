@@ -1,24 +1,18 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { portal } from "../utils/portal";
-  import { cubicOut } from "svelte/easing";
-  import { fade } from "../utils/motion";
-  import { i18n, formatNumber } from "../stores/i18n.svelte";
+  import { i18n } from "../stores/i18n.svelte";
   import { musicbrainzStore } from "../stores/musicbrainz.svelte";
   import { scrobblerStore } from "../stores/scrobbler.svelte";
+  import { navigationStore } from "../stores/navigation.svelte";
   import { openExternalUrl } from "../utils/openExternalUrl";
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
   import {
     XIcon as X,
     ArrowUpRightIcon as ArrowUpRight,
-    ArrowsClockwiseIcon as RefreshCw,
     SignOutIcon as LogOut,
-    CheckCircleIcon as CheckCircle,
     CircleNotchIcon as LoaderCircle,
-    DiscIcon as DiscAlbum,
-    BooksIcon as Library,
-    WarningIcon as AlertTriangle,
     CheckIcon as Check
   } from "phosphor-svelte";
 
@@ -31,7 +25,6 @@
   let { isOpen, anchorEl, onClose }: Props = $props();
 
   let popoverEl = $state<HTMLDivElement | null>(null);
-  let isRefreshing = $state(false);
   let lbTokenInput = $state("");
   let isConnectingLb = $state(false);
   let lbConnectError = $state<string | null>(null);
@@ -67,10 +60,21 @@
     }
   });
 
+  onMount(() => {
+    if (isOpen) {
+      updatePosition();
+    }
+  });
+
   function handleWindowClick(e: MouseEvent) {
     if (!isOpen) return;
-    const target = e.target as Node;
-    if (popoverEl && !popoverEl.contains(target) && anchorEl && !anchorEl.contains(target)) {
+    const target = e.target as Node | null;
+    if (
+      popoverEl &&
+      !popoverEl.contains(target) &&
+      anchorEl &&
+      !anchorEl.contains(target)
+    ) {
       onClose();
     }
   }
@@ -78,15 +82,6 @@
   function handleWindowKeydown(e: KeyboardEvent) {
     if (e.key === "Escape" && isOpen) {
       onClose();
-    }
-  }
-
-  async function handleRefresh() {
-    isRefreshing = true;
-    try {
-      await musicbrainzStore.refreshStats(true);
-    } finally {
-      isRefreshing = false;
     }
   }
 
@@ -109,6 +104,11 @@
     } finally {
       isConnectingLb = false;
     }
+  }
+
+  function handleOpenScrobblerSettings() {
+    navigationStore.openSettings("integrations");
+    onClose();
   }
 
   async function handleLogout() {
@@ -136,14 +136,9 @@
           </svg>
         </div>
         <div class="min-w-0">
-          <div class="flex items-center gap-1.5">
-            <h3 class="font-bold text-sm text-brand-text-primary truncate">
-              {musicbrainzStore.username ?? "MusicBrainz User"}
-            </h3>
-            <span class="inline-flex items-center px-1.5 py-0.5 rounded-full bg-[#ba478f]/15 text-[#eb743b] text-[10px] font-semibold border border-[#ba478f]/25">
-              {i18n.t('auth.editorBadge', {}, 'Editor')}
-            </span>
-          </div>
+          <h3 class="font-bold text-sm text-brand-text-primary truncate">
+            {musicbrainzStore.username ?? "MusicBrainz User"}
+          </h3>
           {#if musicbrainzStore.email}
             <p class="text-xs text-brand-text-secondary truncate mt-0.5">
               {musicbrainzStore.email}
@@ -161,49 +156,6 @@
       </button>
     </div>
 
-    <!-- Stats Card -->
-    <div class="bg-white/[0.03] border border-brand-border/60 rounded-xl p-3 space-y-2.5">
-      <div class="flex items-center justify-between">
-        <span class="text-[11px] font-bold text-brand-text-secondary uppercase tracking-wider">
-          {i18n.t('auth.statsSection', {}, 'MusicBrainz Collections')}
-        </span>
-        <button
-          onclick={handleRefresh}
-          disabled={isRefreshing}
-          class="text-brand-text-secondary hover:text-brand-text-primary p-1 rounded transition-colors"
-          title={i18n.t('auth.refreshStats', {}, 'Refresh stats')}
-        >
-          <RefreshCw class="w-3.5 h-3.5 {isRefreshing ? 'animate-spin text-brand-accent-text' : ''}" />
-        </button>
-      </div>
-
-      <div class="grid grid-cols-2 gap-2">
-        <div class="p-2.5 rounded-lg bg-black/20 border border-brand-border/40 flex items-center gap-2.5">
-          <Library class="w-4 h-4 text-[#ba478f] shrink-0" />
-          <div class="min-w-0">
-            <span class="text-xs text-brand-text-secondary block">
-              {i18n.t('auth.collectionsCount', {}, 'Collections')}
-            </span>
-            <span class="text-sm font-bold text-brand-text-primary">
-              {formatNumber(musicbrainzStore.stats?.collections_count ?? 0)}
-            </span>
-          </div>
-        </div>
-
-        <div class="p-2.5 rounded-lg bg-black/20 border border-brand-border/40 flex items-center gap-2.5">
-          <DiscAlbum class="w-4 h-4 text-[#eb743b] shrink-0" />
-          <div class="min-w-0">
-            <span class="text-xs text-brand-text-secondary block">
-              {i18n.t('auth.releasesCount', {}, 'Total Items')}
-            </span>
-            <span class="text-sm font-bold text-brand-text-primary">
-              {formatNumber(musicbrainzStore.stats?.releases_count ?? 0)}
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- ListenBrainz Scrobbling Assistant Card -->
     <div class="bg-white/[0.03] border border-brand-border/60 rounded-xl p-3 space-y-2">
       <div class="flex items-center justify-between">
@@ -213,7 +165,7 @@
             {i18n.t('auth.listenbrainzScrobbling', {}, 'ListenBrainz Scrobbling')}
           </span>
         </div>
-        {#if scrobblerStore.enabled && scrobblerStore.username}
+        {#if scrobblerStore.enabled}
           <span class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-medium">
             <Check class="w-2.5 h-2.5" />
             {i18n.t('common.active', {}, 'Active')}
@@ -221,10 +173,17 @@
         {/if}
       </div>
 
-      {#if scrobblerStore.enabled && scrobblerStore.username}
-        <p class="text-xs text-brand-text-secondary">
-          {i18n.t('auth.listenbrainzConnectedAs', { username: scrobblerStore.username }, `Connected as ${scrobblerStore.username}`)}
-        </p>
+      {#if scrobblerStore.enabled}
+        <div class="pt-0.5">
+          <button
+            type="button"
+            onclick={handleOpenScrobblerSettings}
+            class="text-xs text-brand-text-primary hover:text-brand-accent-text-hover hover:underline underline underline-offset-2 font-medium inline-flex items-center gap-1 transition-colors cursor-pointer"
+          >
+            <span>{i18n.t('auth.modifyScrobblingSettings', {}, 'Modify scrobbling settings in Integrations')}</span>
+            <ArrowUpRight class="w-3.5 h-3.5" />
+          </button>
+        </div>
       {:else}
         <p class="text-[11px] text-brand-text-secondary leading-relaxed">
           {i18n.t('auth.listenbrainzPromptDesc', {}, 'Scrobble your listening history automatically to ListenBrainz with your user token.')}
@@ -277,14 +236,6 @@
           class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-brand-text-secondary hover:text-brand-text-primary hover:bg-white/5 transition-colors"
         >
           <span>{i18n.t('auth.viewProfileOnMb', {}, 'View profile on MusicBrainz')}</span>
-          <ArrowUpRight class="w-3.5 h-3.5" />
-        </button>
-
-        <button
-          onclick={() => openExternalUrl(`https://musicbrainz.org/user/${encodeURIComponent(musicbrainzStore.username!)}/collections`)}
-          class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-brand-text-secondary hover:text-brand-text-primary hover:bg-white/5 transition-colors"
-        >
-          <span>{i18n.t('auth.viewCollectionsOnMb', {}, 'View your collections')}</span>
           <ArrowUpRight class="w-3.5 h-3.5" />
         </button>
       {/if}
