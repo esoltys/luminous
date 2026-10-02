@@ -81,7 +81,7 @@ describe("CoverStack.svelte", () => {
       collectionStore.extendedArtworkBySong = {};
     });
 
-    it("shows a count badge when more than one artwork file was discovered", async () => {
+    it("shows a count badge positioned on the top-left when more than one artwork file was discovered", async () => {
       vi.mocked(invoke).mockImplementation(async (cmd: string) => {
         if (cmd === "get_extended_artwork_for_song") return RESPONSE_WITH_EXTRAS;
         return "";
@@ -91,7 +91,9 @@ describe("CoverStack.svelte", () => {
         props: { covers: [mockCovers[0]], extendedArtworkSongId: 1 },
       });
 
-      await waitFor(() => expect(getByText("3")).toBeInTheDocument());
+      const badge = await waitFor(() => getByText("3"));
+      expect(badge.closest("div")).toHaveClass("top-1", "left-1");
+      expect(badge.closest("div")).not.toHaveClass("right-1");
     });
 
     it("does not show a count badge when only one artwork file was discovered", async () => {
