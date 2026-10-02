@@ -940,7 +940,15 @@ export const en = {
     dragHint: "Drag window",
     showLyrics: "Show Live Lyrics",
     showCoverArt: "Show Cover Art",
-    noLiveLyrics: "No live lyrics available"
+    noLiveLyrics: "No live lyrics available",
+    queueComplete: "Queue Complete",
+    contextComplete: "{name} Complete",
+    shuffleLibrary: "Shuffle Library",
+    replay: "Replay",
+    library: "Library",
+    tracksPlayed: "{count} tracks played",
+    trackPlayed: "1 track played",
+    dropToPlay: "or drop audio files to play"
   },
 
   chipInput: {

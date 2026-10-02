@@ -255,6 +255,80 @@ describe("Miniplayer.svelte", () => {
     expect(getByText("Instrumental Song")).toBeInTheDocument();
     expect(queryByText("Some lyrics")).toBeNull();
   });
+
+  describe("Session Wrap & Queue Completion (#1379)", () => {
+    it("renders the Session Wrap completion card when a queue session concludes", () => {
+      playerStore.currentSong = undefined;
+      playerStore.completedSession = {
+        contextName: "Queue",
+        isQueue: true,
+        songIds: [101, 102],
+        trackCount: 2,
+      };
+
+      const { getByText, queryByText, getByTitle, getAllByTitle } = render(Miniplayer);
+
+      expect(getByText("Queue Complete")).toBeInTheDocument();
+      expect(getByText("2 tracks played")).toBeInTheDocument();
+      expect(getByTitle("Shuffle Library")).toBeInTheDocument();
+      expect(getByTitle("Replay")).toBeInTheDocument();
+      expect(getAllByTitle("Restore Full Window (Ctrl+M)").length).toBeGreaterThan(0);
+      expect(queryByText("Nothing playing")).toBeNull();
+    });
+
+    it("triggers replayCompletedSession when Replay is clicked", async () => {
+      playerStore.currentSong = undefined;
+      playerStore.completedSession = {
+        contextName: "Queue",
+        isQueue: true,
+        songIds: [101, 102],
+        trackCount: 2,
+      };
+      const replaySpy = vi.spyOn(playerStore, "replayCompletedSession").mockResolvedValue();
+
+      const { getByTitle } = render(Miniplayer);
+      const replayBtn = getByTitle("Replay");
+      await fireEvent.click(replayBtn);
+
+      expect(replaySpy).toHaveBeenCalled();
+    });
+
+    it("triggers shuffleLibrary when Shuffle Library is clicked", async () => {
+      playerStore.currentSong = undefined;
+      playerStore.completedSession = {
+        contextName: "Queue",
+        isQueue: true,
+        songIds: [101, 102],
+        trackCount: 2,
+      };
+      collectionStore.songs = [mockSong];
+      const shuffleSpy = vi.spyOn(playerStore, "shuffleLibrary").mockResolvedValue();
+
+      const { getByTitle } = render(Miniplayer);
+      const shuffleBtn = getByTitle("Shuffle Library");
+      await fireEvent.click(shuffleBtn);
+
+      expect(shuffleSpy).toHaveBeenCalledWith([mockSong]);
+    });
+
+    it("restores full window when Library is clicked", async () => {
+      playerStore.currentSong = undefined;
+      playerStore.completedSession = {
+        contextName: "Queue",
+        isQueue: true,
+        songIds: [101, 102],
+        trackCount: 2,
+      };
+      const exitSpy = vi.spyOn(windowLayoutStore, "exitMiniplayerMode").mockResolvedValue();
+
+      const { getByText } = render(Miniplayer);
+      const libraryBtn = getByText("Library").closest("button")!;
+      await fireEvent.click(libraryBtn);
+
+      expect(exitSpy).toHaveBeenCalled();
+    });
+  });
 });
+
 
 

@@ -23,10 +23,29 @@
     MicrophoneStageIcon as Mic2,
     PlaylistIcon as ListMusic,
     MusicNotesIcon as Music,
-    SubtitlesIcon as Lyrics
+    SubtitlesIcon as Lyrics,
+    CheckCircleIcon as CheckCircle,
+    ArrowCounterClockwiseIcon as RotateCcw
   } from "phosphor-svelte";
   import LoadingSpinner from "./LoadingSpinner.svelte";
   import { parseLrc } from "../utils/lrc";
+
+  let isSessionCompleted = $derived(!playerStore.currentSong && playerStore.completedSession !== null);
+
+  async function handleShuffleLibrary() {
+    let songs = collectionStore.songs;
+    if (songs.length === 0) {
+      await collectionStore.refreshLibrary();
+      songs = collectionStore.songs;
+    }
+    if (songs.length > 0) {
+      await playerStore.shuffleLibrary(songs);
+    }
+  }
+
+  async function handleReplay() {
+    await playerStore.replayCompletedSession();
+  }
 
   // Volume slider gradient style (mirrors PlayerBar.svelte's volume control)
   let volumePercent = $derived(playerStore.volume * 100);
@@ -361,94 +380,218 @@
     </div>
   {/if}
 
-  <!-- IDLE STATIC LAYOUT -->
-  <div class="relative z-10 w-full h-full flex flex-col items-center justify-between pointer-events-auto">
-    <div class="flex-1 w-full flex items-center justify-center min-h-0 py-2 overflow-hidden">
-      {#if showLyrics}
-        <div
-          bind:this={lyricsContainerEl}
-          class="lyrics-container w-full h-full overflow-y-auto px-3 py-6 flex flex-col items-center text-center select-none"
-        >
-          {#if isLoading}
-            <div class="flex-1 flex flex-col items-center justify-center gap-2 text-brand-text-secondary/60">
-              <LoadingSpinner label={i18n.t('lyrics.fetching', {}, 'Fetching lyrics...')} />
-            </div>
-          {:else if playerStore.currentSong?.is_instrumental}
-            <div class="flex-1 flex flex-col items-center justify-center gap-2 p-4 text-center">
-              <div class="p-3 rounded-full bg-brand-sidebar/70 border border-brand-border/40 text-brand-accent">
-                <Music class="w-6 h-6" />
-              </div>
-              <p class="text-xs font-semibold text-brand-text-primary">
-                {i18n.t('lyrics.instrumentalTitle', {}, 'Instrumental Track')}
-              </p>
-              <p class="text-[11px] text-brand-text-secondary/70 max-w-xs">
-                {i18n.t('lyrics.instrumentalDesc', {}, 'This track is marked as instrumental. Online lyrics search is bypassed.')}
-              </p>
-            </div>
-          {:else if isSynced}
-            <div class="flex flex-col gap-4 py-16 w-full">
-              {#each parsedLines as line, idx}
-                {@const isActive = idx === activeLineIndex}
-                <!-- svelte-ignore a11y_click_events_have_key_events -->
-                <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-                <p
-                  data-index={idx}
-                  dir="auto"
-                  onclick={() => playerStore.seek(line.timeMs * 1_000_000)}
-                  class="text-sm font-bold transition-all duration-300 transform px-2 text-balance leading-relaxed cursor-pointer {isActive ? 'text-brand-text-primary scale-105 filter drop-shadow-[0_0_8px_var(--color-brand-accent)] font-extrabold' : 'text-brand-text-secondary/35 hover:text-brand-text-secondary/60'}"
-                >
-                  {#if isActive && line.words && line.words.length > 0}
-                    {#each line.words as word}
-                      {@const isWordSung = currentMs >= word.timeMs}
-                      <span
-                        class="inline-block whitespace-pre-wrap transition-all duration-150 {isWordSung ? 'text-brand-text-primary opacity-100 filter drop-shadow-[0_0_6px_var(--color-brand-accent)]' : 'text-brand-text-primary/40 opacity-40'}"
-                      >{word.text}</span>
-                    {/each}
-                  {:else}
-                    {line.text || "•••"}
-                  {/if}
-                </p>
-              {/each}
-            </div>
-          {:else}
-            <div class="flex-1 flex flex-col items-center justify-center gap-2 p-4 text-center">
-              <div class="p-3 rounded-full bg-brand-sidebar/50 border border-brand-border/30 text-brand-text-secondary/50">
-                <Lyrics class="w-6 h-6 stroke-[1.5]" />
-              </div>
-              <p class="text-xs font-medium text-brand-text-secondary/70">
-                {i18n.t('miniplayer.noLiveLyrics')}
-              </p>
-            </div>
-          {/if}
+  {#if isSessionCompleted}
+    {@const session = playerStore.completedSession}
+    <!-- SESSION WRAP COMPLETION SCREEN (#1379) -->
+    <div class="relative z-10 w-full h-full flex flex-col items-center justify-between pointer-events-auto">
+      <!-- Drag handle at top -->
+      <div
+        data-tauri-drag-region
+        onpointerdown={handleStartDrag}
+        role="button"
+        tabindex="0"
+        aria-label={i18n.t('miniplayer.dragHint', {}, 'Drag window')}
+        class="drag-grabber w-full h-4 flex-shrink-0 cursor-grab active:cursor-grabbing text-brand-text-secondary/40 hover:text-brand-text-secondary/80 transition-colors"
+        title={i18n.t('miniplayer.dragHint', {}, 'Drag window')}
+      ></div>
+
+      <!-- Center: Celebration Badge & Action Pills -->
+      <div class="flex-1 w-full flex flex-col items-center justify-center my-auto px-2 min-h-0">
+        <!-- Milestone Gold Ring & Checkmark Pop -->
+        <div class="relative mb-3 flex items-center justify-center">
+          <div class="w-14 h-14 rounded-full bg-brand-gold/15 border border-brand-gold/40 flex items-center justify-center text-brand-gold shadow-[0_0_20px_rgba(245,158,11,0.2)] anim-gold-ring">
+            <CheckCircle class="w-8 h-8 anim-check-pop" weight="fill" />
+          </div>
         </div>
-      {:else}
-        <div class="relative aspect-square h-full max-h-full max-w-[90%] rounded-none overflow-hidden border border-brand-border/30 bg-brand-sidebar flex items-center justify-center {isHovered ? 'scale-[0.98]' : ''} transition-transform duration-300">
-          <CoverArt
-            songId={playerStore.currentSong?.id}
-            artEmbedded={playerStore.currentSong?.art_embedded}
-            artAutomatic={playerStore.currentSong?.art_automatic}
-            artManual={playerStore.currentSong?.art_manual}
-            sizeClass="w-full h-full object-cover"
+
+        <!-- Completion Title -->
+        <h2 class="text-sm font-bold text-brand-text-primary tracking-tight px-2 truncate w-full text-center">
+          {session?.isQueue
+            ? i18n.t('miniplayer.queueComplete')
+            : i18n.t('miniplayer.contextComplete', { name: session?.contextName })}
+        </h2>
+
+        <!-- Subtitle detail (tracks played) -->
+        <p class="text-xs text-brand-text-secondary/70 mt-0.5 text-center truncate max-w-full px-2">
+          {#if (session?.trackCount ?? 0) === 1}
+            {i18n.t('miniplayer.trackPlayed')}
+          {:else if (session?.trackCount ?? 0) > 1}
+            {i18n.t('miniplayer.tracksPlayed', { count: session?.trackCount })}
+          {:else}
+            {i18n.t('celebrations.queueComplete')}
+          {/if}
+        </p>
+
+        <!-- Continuation Action Buttons -->
+        <div class="flex flex-col gap-1.5 w-full max-w-[210px] mt-3.5">
+          <button
+            onclick={handleShuffleLibrary}
+            class="w-full py-1.5 px-3 rounded-lg bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast font-semibold text-xs flex items-center justify-center gap-2 transition-colors shadow-sm cursor-pointer"
+            title={i18n.t('miniplayer.shuffleLibrary')}
+          >
+            <Shuffle class="w-3.5 h-3.5" />
+            <span>{i18n.t('miniplayer.shuffleLibrary')}</span>
+          </button>
+
+          <div class="grid grid-cols-2 gap-1.5 w-full">
+            {#if (session?.songIds.length ?? 0) > 0}
+              <button
+                onclick={handleReplay}
+                class="py-1 px-2 rounded-lg bg-brand-sidebar hover:bg-brand-sidebar/80 text-brand-text-primary font-medium text-[11px] flex items-center justify-center gap-1.5 transition-colors border border-brand-border/40 cursor-pointer"
+                title={i18n.t('miniplayer.replay')}
+              >
+                <RotateCcw class="w-3 h-3" />
+                <span>{i18n.t('miniplayer.replay')}</span>
+              </button>
+            {/if}
+
+            <button
+              onclick={() => windowLayoutStore.exitMiniplayerMode()}
+              class="py-1 px-2 rounded-lg bg-brand-sidebar hover:bg-brand-sidebar/80 text-brand-text-primary font-medium text-[11px] flex items-center justify-center gap-1.5 transition-colors border border-brand-border/40 cursor-pointer {(session?.songIds.length ?? 0) === 0 ? 'col-span-2' : ''}"
+              title={i18n.t('miniplayer.exit')}
+            >
+              <Maximize2 class="w-3 h-3" />
+              <span>{i18n.t('miniplayer.library')}</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Drop hint -->
+        <span class="text-[10px] text-brand-text-secondary/40 mt-3 select-none">
+          {i18n.t('miniplayer.dropToPlay')}
+        </span>
+      </div>
+
+      <!-- Bottom mini window utilities -->
+      <div class="w-full flex items-center justify-between pt-1 border-t border-brand-border/20 text-brand-text-secondary/50 text-xs flex-shrink-0">
+        <div class="flex items-center gap-1.5">
+          <button
+            onclick={toggleMute}
+            class="p-1 hover:text-brand-text-primary transition-colors cursor-pointer"
+            title={i18n.t('playerBar.volume')}
+          >
+            {#if isMuted || playerStore.volume === 0}
+              <VolumeX class="w-3.5 h-3.5" />
+            {:else}
+              <Volume2 class="w-3.5 h-3.5" />
+            {/if}
+          </button>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value={playerStore.volume}
+            oninput={handleVolumeChange}
+            onchange={releaseVolumeFocus}
+            onpointerup={releaseVolumeFocus}
+            onkeyup={releaseVolumeFocus}
+            class="volume-slider w-14 h-1 rounded-lg outline-none"
+            style={volumeSliderStyle}
+            aria-label={i18n.t('playerBar.volumeSlider')}
+            title={i18n.t('playerBar.volumeWithValue', { value: Math.round(volumePercent) })}
           />
         </div>
-      {/if}
+        <button
+          onclick={() => windowLayoutStore.exitMiniplayerMode()}
+          class="p-1 hover:text-brand-text-primary transition-colors cursor-pointer"
+          title={i18n.t('miniplayer.exit')}
+        >
+          <Maximize2 class="w-3.5 h-3.5" />
+        </button>
+      </div>
     </div>
+  {:else}
+    <!-- IDLE STATIC LAYOUT -->
+    <div class="relative z-10 w-full h-full flex flex-col items-center justify-between pointer-events-auto">
+      <div class="flex-1 w-full flex items-center justify-center min-h-0 py-2 overflow-hidden">
+        {#if showLyrics}
+          <div
+            bind:this={lyricsContainerEl}
+            class="lyrics-container w-full h-full overflow-y-auto px-3 py-6 flex flex-col items-center text-center select-none"
+          >
+            {#if isLoading}
+              <div class="flex-1 flex flex-col items-center justify-center gap-2 text-brand-text-secondary/60">
+                <LoadingSpinner label={i18n.t('lyrics.fetching', {}, 'Fetching lyrics...')} />
+              </div>
+            {:else if playerStore.currentSong?.is_instrumental}
+              <div class="flex-1 flex flex-col items-center justify-center gap-2 p-4 text-center">
+                <div class="p-3 rounded-full bg-brand-sidebar/70 border border-brand-border/40 text-brand-accent">
+                  <Music class="w-6 h-6" />
+                </div>
+                <p class="text-xs font-semibold text-brand-text-primary">
+                  {i18n.t('lyrics.instrumentalTitle', {}, 'Instrumental Track')}
+                </p>
+                <p class="text-[11px] text-brand-text-secondary/70 max-w-xs">
+                  {i18n.t('lyrics.instrumentalDesc', {}, 'This track is marked as instrumental. Online lyrics search is bypassed.')}
+                </p>
+              </div>
+            {:else if isSynced}
+              <div class="flex flex-col gap-4 py-16 w-full">
+                {#each parsedLines as line, idx}
+                  {@const isActive = idx === activeLineIndex}
+                  <!-- svelte-ignore a11y_click_events_have_key_events -->
+                  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+                  <p
+                    data-index={idx}
+                    dir="auto"
+                    onclick={() => playerStore.seek(line.timeMs * 1_000_000)}
+                    class="text-sm font-bold transition-all duration-300 transform px-2 text-balance leading-relaxed cursor-pointer {isActive ? 'text-brand-text-primary scale-105 filter drop-shadow-[0_0_8px_var(--color-brand-accent)] font-extrabold' : 'text-brand-text-secondary/35 hover:text-brand-text-secondary/60'}"
+                  >
+                    {#if isActive && line.words && line.words.length > 0}
+                      {#each line.words as word}
+                        {@const isWordSung = currentMs >= word.timeMs}
+                        <span
+                          class="inline-block whitespace-pre-wrap transition-all duration-150 {isWordSung ? 'text-brand-text-primary opacity-100 filter drop-shadow-[0_0_6px_var(--color-brand-accent)]' : 'text-brand-text-primary/40 opacity-40'}"
+                        >{word.text}</span>
+                      {/each}
+                    {:else}
+                      {line.text || "•••"}
+                    {/if}
+                  </p>
+                {/each}
+              </div>
+            {:else}
+              <div class="flex-1 flex flex-col items-center justify-center gap-2 p-4 text-center">
+                <div class="p-3 rounded-full bg-brand-sidebar/50 border border-brand-border/30 text-brand-text-secondary/50">
+                  <Lyrics class="w-6 h-6 stroke-[1.5]" />
+                </div>
+                <p class="text-xs font-medium text-brand-text-secondary/70">
+                  {i18n.t('miniplayer.noLiveLyrics')}
+                </p>
+              </div>
+            {/if}
+          </div>
+        {:else}
+          <div class="relative aspect-square h-full max-h-full max-w-[90%] rounded-none overflow-hidden border border-brand-border/30 bg-brand-sidebar flex items-center justify-center {isHovered ? 'scale-[0.98]' : ''} transition-transform duration-300">
+            <CoverArt
+              songId={playerStore.currentSong?.id}
+              artEmbedded={playerStore.currentSong?.art_embedded}
+              artAutomatic={playerStore.currentSong?.art_automatic}
+              artManual={playerStore.currentSong?.art_manual}
+              sizeClass="w-full h-full object-cover"
+            />
+          </div>
+        {/if}
+      </div>
 
-    <div class="w-full text-center px-2 py-1 flex flex-col items-center justify-center flex-shrink-0">
-      <span class="text-sm font-bold text-brand-text-primary truncate w-full" title={playerStore.currentSong?.title}>
-        {playerStore.currentSongDisplayTitle}
-      </span>
-      <span class="text-xs text-brand-text-secondary/70 truncate w-full mt-0.5" title={playerStore.currentSong?.artist}>
-        {playerStore.currentSong?.artist || (playerStore.currentSong ? i18n.t('collection.unknownArtist') : '')}
-      </span>
+      <div class="w-full text-center px-2 py-1 flex flex-col items-center justify-center flex-shrink-0">
+        <span class="text-sm font-bold text-brand-text-primary truncate w-full" title={playerStore.currentSong?.title}>
+          {playerStore.currentSongDisplayTitle}
+        </span>
+        <span class="text-xs text-brand-text-secondary/70 truncate w-full mt-0.5" title={playerStore.currentSong?.artist}>
+          {playerStore.currentSong?.artist || (playerStore.currentSong ? i18n.t('collection.unknownArtist') : '')}
+        </span>
+      </div>
     </div>
-  </div>
+  {/if}
 
-  <!-- FOCUSED HOVER CONTROL MASK (Revealed on mouse hover) -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-    onpointerenter={showHover}
-    onpointermove={showHover}
+  {#if !isSessionCompleted}
+    <!-- FOCUSED HOVER CONTROL MASK (Revealed on mouse hover) -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+      onpointerenter={showHover}
+      onpointermove={showHover}
     onpointerleave={hideHover}
     class="absolute inset-0 z-30 flex flex-col justify-between p-3 transition-opacity duration-200 {isHovered ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'} {noBackdrop ? 'bg-brand-main' : 'bg-brand-main/85 backdrop-blur-md'}"
   >
@@ -600,6 +743,7 @@
       </div>
     </div>
   </div>
+  {/if}
 </div>
 
 <style>
