@@ -84,7 +84,7 @@
     <button
       type="button"
       onclick={handleShuffleLibrary}
-      class="px-5 py-2.5 sm:px-6 sm:py-3 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-text font-semibold flex items-center gap-2.5 shadow-lg shadow-brand-accent/25 hover:scale-[1.03] active:scale-[0.97] transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-accent focus:outline-none"
+      class="px-5 py-2.5 sm:px-6 sm:py-3 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast font-semibold flex items-center gap-2.5 shadow-lg shadow-brand-accent/25 hover:scale-[1.03] active:scale-[0.97] transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-accent focus:outline-none"
     >
       <Shuffle class="w-4 h-4 sm:w-5 sm:h-5" weight="bold" />
       <span>{i18n.t('immersive.shuffleLibrary', {}, 'Shuffle Library')}</span>
