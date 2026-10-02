@@ -21,6 +21,12 @@
 
   let manualCode = $state("");
 
+  $effect(() => {
+    if (musicbrainzStore.isLoggedIn) {
+      onClose();
+    }
+  });
+
   async function handleStartLogin() {
     try {
       await musicbrainzStore.startLogin(true);

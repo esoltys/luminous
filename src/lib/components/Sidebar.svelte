@@ -379,7 +379,7 @@
     {/if}
   </div>
 
-  {#if showLoginModal}
+  {#if showLoginModal && !musicbrainzStore.isLoggedIn}
     <MusicBrainzLoginModal onClose={() => (showLoginModal = false)} />
   {/if}
 
