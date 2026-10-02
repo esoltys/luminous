@@ -136,7 +136,7 @@
         />
         {#if showExtendedArtworkUi}
           {#if extraArtworkCount > 0}
-            <div class="absolute top-1 right-1 z-10 px-2 py-1 rounded-full bg-black/70 text-white text-base leading-none font-semibold flex items-center gap-1 pointer-events-none">
+            <div class="absolute top-1 left-1 z-10 px-2 py-1 rounded-full bg-black/70 text-white text-base leading-none font-semibold flex items-center gap-1 pointer-events-none">
               <ImagesIcon class="w-6 h-6" weight="fill" />
               {extraArtworkCount}
             </div>
