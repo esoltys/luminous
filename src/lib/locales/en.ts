@@ -1739,6 +1739,7 @@ export const en = {
     listenbrainzPromptDesc: "Scrobble your listening history automatically to ListenBrainz with your user token.",
     modifyScrobblingSettings: "Modify scrobbling settings in Integrations",
     viewProfileOnMb: "View profile on MusicBrainz",
+    aboutMusicBrainz: "About MusicBrainz",
     logout: "Log out"
   }
 };

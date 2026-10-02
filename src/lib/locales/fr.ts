@@ -1747,6 +1747,7 @@ export const fr: DeepStringRecord<typeof en> = {
     listenbrainzPromptDesc: "Scrobblez automatiquement votre historique d'écoute vers ListenBrainz grâce à votre jeton utilisateur.",
     modifyScrobblingSettings: "Modifier les paramètres de scrobbling dans Intégrations",
     viewProfileOnMb: "Voir le profil sur MusicBrainz",
+    aboutMusicBrainz: "À propos de MusicBrainz",
     logout: "Se déconnecter"
   }
 };

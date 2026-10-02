@@ -157,14 +157,25 @@
           {i18n.t('auth.loginWithMb', {}, 'Log In with MusicBrainz')}
         </Button>
 
-        <div class="flex items-center justify-center gap-1.5 text-xs text-brand-text-secondary pt-1">
-          <span>{i18n.t('auth.noAccountPrompt', {}, "Don't have an account?")}</span>
+        <div class="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 text-xs text-brand-text-secondary pt-1">
+          <div class="inline-flex items-center gap-1.5">
+            <span>{i18n.t('auth.noAccountPrompt', {}, "Don't have an account?")}</span>
+            <button
+              type="button"
+              onclick={() => openExternalUrl("https://musicbrainz.org/register")}
+              class="text-brand-text-primary hover:text-brand-accent-text-hover hover:underline underline underline-offset-2 font-semibold inline-flex items-center gap-0.5 transition-colors cursor-pointer"
+            >
+              {i18n.t('auth.createAccountLink', {}, 'Create an account')}
+              <ArrowUpRight class="w-3 h-3" />
+            </button>
+          </div>
+          <span class="text-brand-text-secondary/40 select-none">•</span>
           <button
             type="button"
-            onclick={() => openExternalUrl("https://musicbrainz.org/register")}
-            class="text-brand-text-primary hover:text-brand-accent-text-hover hover:underline underline underline-offset-2 font-semibold inline-flex items-center gap-0.5 transition-colors cursor-pointer"
+            onclick={() => openExternalUrl("https://musicbrainz.org/doc/About")}
+            class="text-brand-text-secondary hover:text-brand-text-primary hover:underline underline underline-offset-2 inline-flex items-center gap-0.5 transition-colors cursor-pointer"
           >
-            {i18n.t('auth.createAccountLink', {}, 'Create an account')}
+            {i18n.t('auth.aboutMusicBrainz', {}, 'About MusicBrainz')}
             <ArrowUpRight class="w-3 h-3" />
           </button>
         </div>

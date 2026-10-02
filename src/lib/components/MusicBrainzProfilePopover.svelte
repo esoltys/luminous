@@ -241,6 +241,14 @@
       {/if}
 
       <button
+        onclick={() => openExternalUrl("https://musicbrainz.org/doc/About")}
+        class="w-full flex items-center justify-between py-1 text-xs text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer"
+      >
+        <span class="hover:underline">{i18n.t('auth.aboutMusicBrainz', {}, 'About MusicBrainz')}</span>
+        <ArrowUpRight class="w-3.5 h-3.5" />
+      </button>
+
+      <button
         onclick={handleLogout}
         class="w-full flex items-center justify-between py-1 text-xs text-red-400 hover:text-red-300 transition-colors cursor-pointer"
       >
