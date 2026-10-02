@@ -1327,9 +1327,9 @@ export const en = {
     favoriteTooltip: "Add to favourites",
     unfavoriteTooltip: "Remove from favourites",
     clearTooltip: "Clear rating",
-    hateTooltip: "Disliked (hate)",
+    hateTooltip: "Disliked song",
     clearHateTooltip: "Clear dislike",
-    hateAction: "Dislike track"
+    hateAction: "Dislike song"
   },
   common: {
     aboutField: "About {field}",

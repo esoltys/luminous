@@ -1378,9 +1378,9 @@ export const fr: DeepStringRecord<typeof en> = {
     favoriteTooltip: "Ajouter aux favoris",
     unfavoriteTooltip: "Retirer des favoris",
     clearTooltip: "Effacer la note",
-    hateTooltip: "Titre non apprécié",
-    clearHateTooltip: "Ne plus marquer comme non apprécié",
-    hateAction: "Marquer comme non apprécié"
+    hateTooltip: "Chanson non appréciée",
+    clearHateTooltip: "Ne plus marquer comme non appréciée",
+    hateAction: "Marquer comme chanson non appréciée"
   },
   common: {
     aboutField: "À propos de {field}",

@@ -405,7 +405,7 @@ describe("SongContextMenu.svelte", () => {
       onClose,
     });
 
-    const item = await screen.findByText("Dislike track");
+    const item = await screen.findByText("Dislike song");
     expect(item).toBeInTheDocument();
 
     await fireEvent.click(item);
