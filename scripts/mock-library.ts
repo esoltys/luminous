@@ -368,7 +368,7 @@ function rowToArtistContext(row: Record<string, unknown>): Partial<SongContextEn
   };
 }
 
-export interface MockArtistArtwork {
+interface MockArtistArtwork {
   artist_portrait_uri: string | null;
   band_logo_uri: string | null;
   fanart_uri: string | null;
