@@ -345,24 +345,24 @@
   </div>
 
   {#if dataDirectory}
-    <div class="flex items-center justify-between gap-4 py-4 border-t border-brand-border/40">
-      <div class="flex flex-col gap-1 min-w-0 flex-1">
-        <div class="flex items-center gap-2">
-          <span class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.dataStorageLabel', {}, 'Data Storage Location')}</span>
-          <span
-            class="px-2 py-0.5 text-[10px] font-bold rounded-full {dataDirectory.is_portable ? 'bg-brand-accent/20 text-brand-accent-text border border-brand-accent/40' : 'bg-brand-border/60 text-brand-text-secondary border border-brand-border'}"
-          >
-            {dataDirectory.is_portable ? i18n.t('settings.dataStoragePortableBadge', {}, 'Portable Mode') : i18n.t('settings.dataStorageStandardBadge', {}, 'Standard Mode')}
-          </span>
-        </div>
-        <p class="text-xs text-brand-text-secondary">{i18n.t('settings.dataStorageHint', {}, 'Folder where Luminous stores your library database, cover art cache, and preferences.')}</p>
-        <p class="text-xs font-mono text-brand-text-secondary/90 truncate select-all mt-0.5 bg-brand-main/60 px-2 py-1 rounded border border-brand-border/40" title={dataDirectory.path}>
-          {dataDirectory.path}
-        </p>
+    <div class="flex flex-col gap-1 py-4 border-t border-brand-border/40">
+      <div class="flex items-center gap-2">
+        <span class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.dataStorageLabel', {}, 'Data Storage Location')}</span>
+        <span
+          class="px-2 py-0.5 text-[10px] font-bold rounded-full {dataDirectory.is_portable ? 'bg-brand-accent/20 text-brand-accent-text border border-brand-accent/40' : 'bg-brand-border/60 text-brand-text-secondary border border-brand-border'}"
+        >
+          {dataDirectory.is_portable ? i18n.t('settings.dataStoragePortableBadge', {}, 'Portable Mode') : i18n.t('settings.dataStorageStandardBadge', {}, 'Standard Mode')}
+        </span>
       </div>
-      <Button onclick={copyDataDirectory} class="shrink-0 text-xs px-3.5 py-1.5 self-end mb-1">
-        {pathCopied ? i18n.t('settings.copiedLabel', {}, 'Copied!') : i18n.t('settings.dataStorageCopyButton', {}, 'Copy Path')}
-      </Button>
+      <p class="text-xs text-brand-text-secondary">{i18n.t('settings.dataStorageHint', {}, 'Folder where Luminous stores your library database, cover art cache, and preferences.')}</p>
+      <div class="flex items-center gap-3 mt-0.5">
+        <div class="text-xs font-mono text-brand-text-secondary/90 truncate select-all bg-brand-main/60 px-2 py-1 rounded border border-brand-border/40 flex-1" title={dataDirectory.path}>
+          {dataDirectory.path}
+        </div>
+        <Button onclick={copyDataDirectory} class="shrink-0 text-xs px-3.5 py-1.5">
+          {pathCopied ? i18n.t('settings.copiedLabel', {}, 'Copied!') : i18n.t('settings.dataStorageCopyButton', {}, 'Copy Path')}
+        </Button>
+      </div>
     </div>
   {/if}
 </div>
