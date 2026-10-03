@@ -1534,7 +1534,7 @@ export const fr: DeepStringRecord<typeof en> = {
     nowPlayingLabel: "Envoyer l'état En cours de lecture",
     nowPlayingHint: "Diffusez le début des morceaux sur ListenBrainz en temps réel",
     ratingsLabel: "Synchroniser les notes des morceaux",
-    ratingsHint: "Transmettez les notes 4-5 étoiles ou cœurs comme morceaux favoris",
+    ratingsHint: "Transmettez les morceaux favoris comme mentions « J'aime »",
     pauseLabel: "Mettre en pause le scrobbling",
     pauseHint: "Mettez temporairement en pause le scrobbling sans déconnecter votre compte",
     cacheEmpty: "La file d'attente hors ligne est vide",

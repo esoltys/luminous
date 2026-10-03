@@ -1526,7 +1526,7 @@ export const en = {
     nowPlayingLabel: "Send Now Playing status",
     nowPlayingHint: "Broadcast track starts to ListenBrainz in real time",
     ratingsLabel: "Synchronize track ratings",
-    ratingsHint: "Submit 4-star and 5-star or heart ratings as loved tracks",
+    ratingsHint: "Submit favourite tracks as loved tracks",
     pauseLabel: "Pause all scrobbling",
     pauseHint: "Temporarily pause scrobbling without disconnecting your account",
     cacheEmpty: "Offline cache is empty",

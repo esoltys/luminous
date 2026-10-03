@@ -274,41 +274,41 @@
             </Button>
           </div>
         {/if}
-      </div>
 
-      <!-- Offline cache surface -->
-      <div class="pt-3 border-t border-brand-border/60 flex flex-wrap items-center justify-between gap-3">
-        <div class="flex flex-col gap-0.5 min-w-0">
-          <div class="flex items-center gap-2">
-            <span class="text-xs font-semibold text-brand-text-primary">
-              {scrobblerStore.pendingCount === 0
-                ? i18n.t('listenbrainz.cacheEmpty')
-                : i18n.t('listenbrainz.cachePending', { count: scrobblerStore.pendingCount })}
-            </span>
-            {#if scrobblerStore.flushSuccessMessage}
-              <span class="text-xs text-brand-text-primary font-medium">({scrobblerStore.flushSuccessMessage})</span>
+        <!-- Offline cache surface -->
+        <div class="ml-2 pl-3 border-l-2 border-brand-accent/30 flex flex-wrap items-center justify-between gap-3 py-1">
+          <div class="flex flex-col gap-0.5 min-w-0">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold text-brand-text-primary">
+                {scrobblerStore.pendingCount === 0
+                  ? i18n.t('listenbrainz.cacheEmpty')
+                  : i18n.t('listenbrainz.cachePending', { count: scrobblerStore.pendingCount })}
+              </span>
+              {#if scrobblerStore.flushSuccessMessage}
+                <span class="text-xs text-brand-text-primary font-medium">({scrobblerStore.flushSuccessMessage})</span>
+              {/if}
+            </div>
+            {#if scrobblerStore.lastError}
+              <span class="text-[11px] text-amber-500 wrap-anywhere">
+                {scrobblerStore.lastError}
+              </span>
+            {:else}
+              <p class="text-[11px] text-brand-text-secondary">
+                {i18n.t('listenbrainz.cacheDesc')}
+              </p>
             {/if}
           </div>
-          {#if scrobblerStore.lastError}
-            <span class="text-[11px] text-amber-500 wrap-anywhere">
-              {scrobblerStore.lastError}
-            </span>
-          {:else}
-            <span class="text-[11px] text-brand-text-secondary">
-              {i18n.t('listenbrainz.cacheDesc')}
-            </span>
-          {/if}
-        </div>
 
-        <Button
-          onclick={() => scrobblerStore.flushCache()}
-          disabled={scrobblerStore.isFlushing || scrobblerStore.pendingCount === 0 || !scrobblerStore.token.trim()}
-          variant="secondary"
-          size="sm"
-        >
-          <RefreshCw class="w-3.5 h-3.5 {scrobblerStore.isFlushing ? 'animate-spin' : ''}" />
-          {i18n.t('listenbrainz.syncNowBtn')}
-        </Button>
+          <Button
+            onclick={() => scrobblerStore.flushCache()}
+            disabled={scrobblerStore.isFlushing || scrobblerStore.pendingCount === 0 || !scrobblerStore.token.trim()}
+            variant="secondary"
+            size="sm"
+          >
+            <RefreshCw class="w-3.5 h-3.5 {scrobblerStore.isFlushing ? 'animate-spin' : ''}" />
+            {i18n.t('listenbrainz.syncNowBtn')}
+          </Button>
+        </div>
       </div>
     {/if}
   {/if}
