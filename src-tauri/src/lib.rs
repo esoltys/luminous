@@ -108,6 +108,8 @@ pub struct AppState {
     pub remote_auto_sync: Arc<remote_scheduler::AutoSyncScheduler>,
     /// Portable Genres/Artist Tags hierarchy in the default library (#1312).
     pub hierarchy_sidecar: Arc<hierarchy_sidecar::HierarchySidecar>,
+    /// Store entitlement and delivery for add-on themes (#1414).
+    pub addons: Arc<addons::entitlement::AddonManager>,
 }
 
 /// Suppresses stock webview browser chrome — reload/find/print keybindings and
@@ -1140,6 +1142,7 @@ pub fn run() {
                 musicbrainz,
                 remote_auto_sync: Arc::new(remote_scheduler::AutoSyncScheduler::new()),
                 hierarchy_sidecar: Arc::new(hierarchy_sidecar::HierarchySidecar::new()),
+                addons: commands::addons::build_manager(app.handle()),
             };
 
             crate::collection::start_watcher(app.handle().clone(), &state);
@@ -1149,6 +1152,15 @@ pub fn run() {
 
             app.manage(state);
             let managed_state = app.state::<AppState>();
+
+            // Resolve add-on ownership once the UI's listeners have had time to attach.
+            {
+                let addons = Arc::clone(&managed_state.addons);
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                    addons.refresh_all().await;
+                });
+            }
 
             // Start each enabled remote server's periodic auto-sync timer (WebDAV #1082, OpenSubsonic #1162).
             managed_state.remote_auto_sync.start_all_from_db(
@@ -1494,6 +1506,8 @@ pub fn run() {
             commands::tags::get_default_library,
             commands::tags::set_default_library,
             // Theme commands (#165)
+            commands::addons::refresh_addons,
+            commands::addons::acquire_addon,
             commands::theme::import_theme,
             commands::theme::export_theme,
             // Settings commands

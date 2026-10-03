@@ -1,3 +1,4 @@
+pub mod addons;
 pub mod collection;
 pub mod context;
 pub mod cover;

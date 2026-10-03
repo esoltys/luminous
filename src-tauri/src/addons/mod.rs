@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, LazyLock};
 
 pub mod bundle;
+pub mod entitlement;
 pub mod keyclient;
 pub mod verifier;
 
