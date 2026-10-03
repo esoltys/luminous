@@ -915,7 +915,7 @@
     />
     <ContextMenuItem
       icon={RefreshCw}
-      label={i18n.t("albumDetail.refresh", {}, "Refresh")}
+      label={i18n.t("albumDetail.refresh", {}, "Refresh Album")}
       title={i18n.t('albumDetail.refreshTooltip')}
       onclick={() => { handleRefreshAlbum(); overflowMenuPos = null; }}
       disabled={loading || collectionStore.isScanning || refreshing}

@@ -1326,7 +1326,7 @@ export const fr: DeepStringRecord<typeof en> = {
     albumInfo: "Infos album",
     editAlbumDetails: "Modifier l'album",
     editInfoTooltip: "Modifier les infos de l'album",
-    refresh: "Actualiser",
+    refresh: "Actualiser l'album",
     refreshTooltip: "Actualiser les métadonnées et la pochette de cet album",
     refreshSuccess: "Métadonnées et pochette de l'album actualisées",
     refreshError: "Échec de l'actualisation de l'album",

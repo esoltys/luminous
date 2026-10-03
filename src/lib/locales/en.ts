@@ -1275,7 +1275,7 @@ export const en = {
     albumInfo: "Album Info",
     editAlbumDetails: "Edit Album Details",
     editInfoTooltip: "Edit album info",
-    refresh: "Refresh",
+    refresh: "Refresh Album",
     refreshTooltip: "Rescan metadata and artwork for this album",
     refreshSuccess: "Album metadata and artwork refreshed",
     refreshError: "Failed to refresh album metadata",
