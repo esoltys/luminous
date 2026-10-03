@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, LazyLock};
 
 pub mod bundle;
+pub mod keyclient;
 pub mod verifier;
 
 /// Version of the host→overlay message API (see `docs/ADDONS.md`). Bumped when
