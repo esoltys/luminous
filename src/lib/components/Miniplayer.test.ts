@@ -6,6 +6,7 @@ import { playerStore } from "../stores/player.svelte";
 import { collectionStore } from "../stores/collection.svelte";
 import { windowLayoutStore } from "../stores/windowLayout.svelte";
 import { prefs } from "../stores/prefs.svelte";
+import { invoke } from "@tauri-apps/api/core";
 import type { Song } from "../types";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -267,6 +268,31 @@ describe("Miniplayer.svelte", () => {
 
     expect(getByText("Instrumental Song")).toBeInTheDocument();
     expect(queryByText("Some lyrics")).toBeNull();
+  });
+
+  it("does not enter an infinite loop when online lyrics cannot be found (#1395)", async () => {
+    localStorage.setItem("miniplayer_show_lyrics", "true");
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockImplementation((cmd) => {
+      if (cmd === "get_lyrics") {
+        return Promise.reject("no lyrics found on any online provider");
+      }
+      return Promise.resolve(0 as any);
+    });
+
+    playerStore.currentSong = {
+      ...mockSong,
+      lyrics: undefined,
+    };
+
+    const { getByText } = render(Miniplayer);
+
+    // Give microtasks and promises time to settle
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const getLyricsCalls = invokeMock.mock.calls.filter(([cmd]) => cmd === "get_lyrics");
+    expect(getLyricsCalls.length).toBe(1);
+    expect(getByText("No live lyrics available")).toBeInTheDocument();
   });
 
   describe("Session Wrap & Queue Completion (#1379)", () => {

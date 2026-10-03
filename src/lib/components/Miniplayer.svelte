@@ -269,6 +269,7 @@
       return;
     }
 
+    lyricsText = "";
     isLoading = true;
     try {
       const lyrics = await invoke<string>("get_lyrics", { songId, forceRefresh: false });
@@ -309,10 +310,10 @@
     }
   });
 
+  // Keep lyricsText in sync if currentSong.lyrics is updated externally while miniplayer is open
   $effect(() => {
-    if (showLyrics && playerStore.currentSong?.id !== undefined && !lyricsText && !isLoading) {
-      loadLyrics(playerStore.currentSong.id);
-      loadOffset(playerStore.currentSong.id);
+    if (playerStore.currentSong?.lyrics && playerStore.currentSong.lyrics !== lyricsText) {
+      lyricsText = playerStore.currentSong.lyrics;
     }
   });
 
