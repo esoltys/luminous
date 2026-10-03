@@ -172,6 +172,33 @@ pub(crate) fn reconcile_moved_songs(
     Ok(reconciled)
 }
 
+/// Folds song row `dup` into `survivor` — playlist entries and play history
+/// move over, rating/loved keep the higher value, play/skip counts add up —
+/// then deletes `dup`. Used wherever two rows turn out to be the same file
+/// (`merge_duplicate_songs`, `relocate::relocate_root`).
+pub(crate) fn merge_song_rows(conn: &rusqlite::Connection, survivor: i64, dup: i64) -> Result<()> {
+    conn.execute(
+        "UPDATE playlist_items SET song_id = ?1 WHERE song_id = ?2",
+        params![survivor, dup],
+    )?;
+    conn.execute(
+        "UPDATE play_history SET song_id = ?1 WHERE song_id = ?2",
+        params![survivor, dup],
+    )?;
+    conn.execute(
+        "UPDATE songs SET
+            rating = MAX(rating, (SELECT rating FROM songs WHERE id = ?2)),
+            loved = MAX(loved, (SELECT loved FROM songs WHERE id = ?2)),
+            playcount = playcount + (SELECT playcount FROM songs WHERE id = ?2),
+            skipcount = skipcount + (SELECT skipcount FROM songs WHERE id = ?2),
+            lastplayed = MAX(IFNULL(lastplayed, 0), IFNULL((SELECT lastplayed FROM songs WHERE id = ?2), 0))
+         WHERE id = ?1",
+        params![survivor, dup],
+    )?;
+    conn.execute("DELETE FROM songs WHERE id = ?1", params![dup])?;
+    Ok(())
+}
+
 /// Watched directory roots that can't currently be read (disconnected drive,
 /// sleeping network share, etc). Shared by the scanner's missing-file check
 /// (`CollectionScanner::find_missing_song_ids`) and the realtime watcher

@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { open } from "@tauri-apps/plugin-dialog";
+
+vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn() }));
 
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: vi.fn(() => ({
@@ -16,6 +19,8 @@ import {
   getScanPhaseLabel,
 } from "./collection.svelte";
 import { tasksStore } from "./tasks.svelte";
+import { toastStore } from "./toast.svelte";
+import { i18n } from "./i18n.svelte";
 
 describe("CollectionStore - directories, scanning, and library stats", () => {
   let eventCallbacks: Record<string, Function> = {};
@@ -300,6 +305,60 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
     const result = await collectionStore.pruneMissing();
     expect(invoke).toHaveBeenCalledWith("prune_missing_songs");
     expect(result).toEqual({ deletedSongs: 3, removedFolders: 2, mergedDuplicates: 1 });
+  });
+
+  describe("relocateDirectoryDialog (#1403)", () => {
+    beforeEach(() => {
+      i18n.currentLocale = "en";
+      for (const m of [...toastStore.messages]) toastStore.dismiss(m.id);
+    });
+
+    function failRelocateWith(error: unknown) {
+      const base = vi.mocked(invoke).getMockImplementation()!;
+      vi.mocked(invoke).mockImplementation(async (cmd: string, args?: any) => {
+        if (cmd === "relocate_directory") throw error;
+        return base(cmd, args);
+      });
+    }
+
+    it("re-links the folder to the picked location and reports how many songs moved", async () => {
+      vi.mocked(open).mockResolvedValue("F:\\Music");
+      const base = vi.mocked(invoke).getMockImplementation()!;
+      vi.mocked(invoke).mockImplementation(async (cmd: string, args?: any) =>
+        cmd === "relocate_directory" ? { songs_relocated: 1200 } : base(cmd, args),
+      );
+
+      await expect(collectionStore.relocateDirectoryDialog("E:\\Music")).resolves.toBe(true);
+
+      expect(invoke).toHaveBeenCalledWith("relocate_directory", { oldPath: "E:\\Music", newPath: "F:\\Music" });
+      expect(invoke).toHaveBeenCalledWith("get_directories");
+      expect(invoke).toHaveBeenCalledWith("scan_directories", { force: false });
+      expect(toastStore.messages.map((m) => [m.text, m.variant])).toContainEqual([
+        "Re-linked 1,200 songs to F:\\Music",
+        "success",
+      ]);
+    });
+
+    it("does nothing when the folder picker is cancelled", async () => {
+      vi.mocked(open).mockResolvedValue(null);
+
+      await expect(collectionStore.relocateDirectoryDialog("E:\\Music")).resolves.toBe(false);
+
+      expect(invoke).not.toHaveBeenCalledWith("relocate_directory", expect.anything());
+    });
+
+    it("shows the backend's refusal as an error toast", async () => {
+      vi.mocked(open).mockResolvedValue("F:\\Music");
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      failRelocateWith("E:\\Music is not a watched folder");
+
+      await expect(collectionStore.relocateDirectoryDialog("E:\\Music")).resolves.toBe(false);
+
+      expect(toastStore.messages.map((m) => [m.text, m.variant])).toContainEqual([
+        "Couldn't re-link the folder: E:\\Music is not a watched folder",
+        "error",
+      ]);
+    });
   });
 
   it("toggles and persists watchFoldersRealtime and scanOnStartup settings", async () => {

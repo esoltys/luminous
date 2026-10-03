@@ -947,6 +947,26 @@ pub fn run() {
                     .expect("failed to initialize database"),
             );
 
+            // Portable mode (#1403): watched folders on the executable's own
+            // drive follow it to a new drive letter. Runs before the player,
+            // playlists, watcher and sidecar read any library path.
+            if crate::paths::resolve_app_data_dir_info(app).is_portable {
+                if let Some(volume) = crate::paths::detect_executable_base_dir()
+                    .and_then(|dir| collection::relocate::volume_root(&dir))
+                {
+                    match db.pool.get().map_err(anyhow::Error::from).and_then(|conn| {
+                        collection::relocate::relink_portable_volume(&conn, &volume)
+                    }) {
+                        Ok(relinked) => {
+                            for (from, to) in relinked {
+                                log::info!("Portable drive moved: re-linked {from} to {to}");
+                            }
+                        }
+                        Err(e) => log::error!("Portable drive re-link failed: {e:#}"),
+                    }
+                }
+            }
+
             // `subsonic://` library paths are signed into stream URLs at open
             // time from the server's saved credentials (#1163).
             {
@@ -1289,6 +1309,7 @@ pub fn run() {
             commands::collection::prune_missing_songs,
             commands::collection::add_directory,
             commands::collection::remove_directory,
+            commands::collection::relocate_directory,
             commands::collection::get_directories,
             commands::collection::update_directory_metadata,
             commands::collection::get_library_stats,

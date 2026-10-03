@@ -1150,6 +1150,33 @@ class CollectionStore {
     }
   }
 
+  /** Asks for a watched folder's new location (drive letter changed, music
+   * moved) and re-links it there, keeping every song's id, stats and playlist
+   * membership. Returns whether it was relocated. */
+  async relocateDirectoryDialog(oldPath: string): Promise<boolean> {
+    const selected = await open({
+      directory: true,
+      multiple: false,
+      title: i18n.t("settings.folderLocateDialogTitle"),
+    });
+    if (!selected || typeof selected !== "string") return false;
+    const newPath = stripEnclosingQuotes(selected);
+    try {
+      const result = await invoke<{ songs_relocated: number }>("relocate_directory", { oldPath, newPath });
+      await this.refreshDirectories();
+      toastStore.show(
+        i18n.t("settings.folderLocateSuccess", { count: formatNumber(result.songs_relocated), path: newPath }),
+        "success",
+      );
+      this.startScan(false);
+      return true;
+    } catch (err) {
+      console.error("Failed to relocate directory:", err);
+      toastStore.show(i18n.t("settings.folderLocateFailedPrefix") + String(err), "error");
+      return false;
+    }
+  }
+
   async removeDirectory(path: string) {
     await invoke("remove_directory", { path });
     await this.refreshDirectories();
