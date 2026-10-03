@@ -1078,7 +1078,7 @@ export const en = {
     exportSuccess: "Exported \"{name}\" as a parametric EQ profile",
     exportError: "Couldn't export the profile: {error}",
     importPanelLabel: "Import a headphone profile",
-    importHint: "Load a parametric EQ profile in Equalizer APO format, such as a ParametricEQ.txt file for your headphones. It's saved under My presets and applied right away.",
+    importHint: "Load a headphone correction profile: on AutoEq, choose EqualizerAPO ParametricEq as the equalizer app and download the settings file. It's saved under My presets and applied right away.",
     importAutoEqLink: "Find your headphones on AutoEq",
     importChooseFile: "Choose file…",
     importFileFilter: "Parametric EQ profile",

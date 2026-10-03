@@ -1129,7 +1129,7 @@ export const fr: DeepStringRecord<typeof en> = {
     exportSuccess: "« {name} » exporté comme profil d'égaliseur paramétrique",
     exportError: "Impossible d'exporter le profil : {error}",
     importPanelLabel: "Importer un profil de casque",
-    importHint: "Chargez un profil d'égaliseur paramétrique au format Equalizer APO, comme le fichier ParametricEQ.txt de votre casque. Il est enregistré dans Mes préréglages et appliqué immédiatement.",
+    importHint: "Chargez un profil de correction pour votre casque : sur AutoEq, choisissez EqualizerAPO ParametricEq comme application d'égaliseur et téléchargez le fichier de réglages. Il est enregistré dans Mes préréglages et appliqué aussitôt.",
     importAutoEqLink: "Trouvez votre casque sur AutoEq",
     importChooseFile: "Choisir un fichier…",
     importFileFilter: "Profil d'égaliseur paramétrique",
