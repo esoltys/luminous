@@ -8,6 +8,7 @@ interface InstallFormatInfo {
   format: string;
   human_name: string;
   supports_self_update: boolean;
+  is_portable?: boolean;
 }
 
 type CheckStatus = "idle" | "checking" | "available" | "up-to-date" | "error";
@@ -38,6 +39,7 @@ class UpdaterStore {
     format: "unknown",
     human_name: "Desktop Application",
     supports_self_update: false,
+    is_portable: false,
   });
 
   checkStatus = $state<CheckStatus>("idle");

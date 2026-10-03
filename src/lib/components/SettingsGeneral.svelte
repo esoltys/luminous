@@ -160,6 +160,7 @@
   function getFormatName(fmt: string, fallback: string): string {
     switch (fmt) {
       case "windows_setup": return i18n.t('settings.formatWindowsSetup', {}, fallback);
+      case "windows_portable": return i18n.t('settings.formatWindowsPortable', {}, fallback);
       case "msix": return i18n.t('settings.formatMsix', {}, fallback);
       case "appimage": return i18n.t('settings.formatAppImage', {}, fallback);
       case "deb": return i18n.t('settings.formatDeb', {}, fallback);
@@ -167,6 +168,26 @@
       case "snap": return i18n.t('settings.formatSnap', {}, fallback);
       case "system_pkg": return i18n.t('settings.formatSystemPkg', {}, fallback);
       default: return fallback;
+    }
+  }
+
+  interface DataDirectoryInfo {
+    path: string;
+    is_portable: boolean;
+  }
+
+  let dataDirectory = $state<DataDirectoryInfo | null>(null);
+  let pathCopied = $state(false);
+
+  async function copyDataDirectory() {
+    if (!dataDirectory?.path) return;
+    try {
+      await navigator.clipboard.writeText(dataDirectory.path);
+      pathCopied = true;
+      setTimeout(() => { pathCopied = false; }, COPY_FEEDBACK_DURATION_MS);
+      toastStore.show(i18n.t("settings.dataStorageCopiedToast", {}, "Data directory path copied to clipboard"), "success", 2000);
+    } catch (e) {
+      console.error("Failed to copy data path:", e);
     }
   }
 
@@ -202,6 +223,12 @@
       }
     } catch (e) {
       console.error("Failed to fetch app version on mount:", e);
+    }
+
+    try {
+      dataDirectory = await invoke<DataDirectoryInfo>("get_data_directory_info");
+    } catch (e) {
+      console.error("Failed to fetch data directory info on mount:", e);
     }
   });
 </script>
@@ -316,6 +343,28 @@
       {i18n.t('settings.exportDiagnosticsLabel', {}, 'Export Diagnostics')}
     </Button>
   </div>
+
+  {#if dataDirectory}
+    <div class="flex items-center justify-between gap-4 py-4 border-t border-brand-border/40">
+      <div class="flex flex-col gap-1 min-w-0 flex-1">
+        <div class="flex items-center gap-2">
+          <span class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.dataStorageLabel', {}, 'Data Storage Location')}</span>
+          <span
+            class="px-2 py-0.5 text-[10px] font-bold rounded-full {dataDirectory.is_portable ? 'bg-brand-accent/20 text-brand-accent-text border border-brand-accent/40' : 'bg-brand-border/60 text-brand-text-secondary border border-brand-border'}"
+          >
+            {dataDirectory.is_portable ? i18n.t('settings.dataStoragePortableBadge', {}, 'Portable Mode') : i18n.t('settings.dataStorageStandardBadge', {}, 'Standard Mode')}
+          </span>
+        </div>
+        <p class="text-xs text-brand-text-secondary">{i18n.t('settings.dataStorageHint', {}, 'Folder where Luminous stores your library database, cover art cache, and preferences.')}</p>
+        <p class="text-xs font-mono text-brand-text-secondary/90 truncate select-all mt-0.5 bg-brand-main/60 px-2 py-1 rounded border border-brand-border/40" title={dataDirectory.path}>
+          {dataDirectory.path}
+        </p>
+      </div>
+      <Button onclick={copyDataDirectory} class="shrink-0 text-xs px-3.5 py-1.5 self-end mb-1">
+        {pathCopied ? i18n.t('settings.copiedLabel', {}, 'Copied!') : i18n.t('settings.dataStorageCopyButton', {}, 'Copy Path')}
+      </Button>
+    </div>
+  {/if}
 </div>
 
 {#if updaterStore.isExternallyManaged}
@@ -508,7 +557,9 @@
         ? i18n.t('settings.updateAutoSupportedFooter')
         : updaterStore.installFormat.format === 'appimage'
           ? i18n.t('settings.updateNotifyOnlyAppImageFooter', {}, 'notify only, download the new AppImage')
-          : i18n.t('settings.updateNotifyOnlyFooter')}
+          : updaterStore.installFormat.is_portable
+            ? i18n.t('settings.updateNotifyOnlyPortableFooter', {}, 'notify only, download the new portable release ZIP')
+            : i18n.t('settings.updateNotifyOnlyFooter')}
     </span>
     <button onclick={() => openExternalUrl(updaterStore.releaseUrl)} class="text-brand-accent-text hover:underline font-medium shrink-0">
       {i18n.t('settings.releaseNotesLink')}
