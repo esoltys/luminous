@@ -10,6 +10,9 @@ use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock};
 
+pub mod bundle;
+pub mod verifier;
+
 /// Version of the host→overlay message API (see `docs/ADDONS.md`). Bumped when
 /// a message shape changes incompatibly; manifests declare `minApiVersion`.
 pub const OVERLAY_API_VERSION: u32 = 1;
