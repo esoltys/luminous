@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 55;
+pub const CURRENT_SCHEMA_VERSION: i32 = 56;
 
 struct Migration {
     version: i32,
@@ -470,6 +470,11 @@ const MIGRATIONS: &[Migration] = &[
             Ok(())
         },
     },
+    Migration {
+        version: 56,
+        description: "separate preamp and preset per EQ mode (#1336)",
+        apply: migrate_eq_mode_states,
+    },
 ];
 
 /// Migration 53: the legacy parametric layout was a positional list of
@@ -550,22 +555,66 @@ fn migrate_eq_presets(conn: &rusqlite::Connection) -> Result<()> {
         if mode != "graphic10" {
             continue;
         }
-        let gains: Vec<f32> = gains_str
-            .split(',')
-            .filter_map(|g| g.trim().parse().ok())
-            .collect();
-        if gains.len() != 10 {
-            continue;
-        }
-        let matched = crate::equalizer::BUILTIN_PRESETS.iter().find(|name| {
-            crate::equalizer::preset_gains(name)
-                .iter()
-                .zip(&gains)
-                .all(|(a, b)| (a - b).abs() < 0.1)
-        });
-        if let Some(name) = matched {
+        if let Some(name) = builtin_matching_gains(&gains_str) {
             conn.execute(
                 "UPDATE equalizer_settings SET active_preset = ?1 WHERE id = ?2",
+                rusqlite::params![name, id],
+            )?;
+        }
+    }
+    Ok(())
+}
+
+/// The built-in whose 10-band gains match a stored `gains` string, if any.
+fn builtin_matching_gains(gains_str: &str) -> Option<&'static str> {
+    let gains: Vec<f32> = gains_str
+        .split(',')
+        .filter_map(|g| g.trim().parse().ok())
+        .collect();
+    if gains.len() != 10 {
+        return None;
+    }
+    crate::equalizer::BUILTIN_PRESETS.into_iter().find(|name| {
+        crate::equalizer::preset_gains(name)
+            .iter()
+            .zip(&gains)
+            .all(|(a, b)| (a - b).abs() < 0.1)
+    })
+}
+
+/// Migration 56: each EQ mode keeps its own preamp and preset. The existing
+/// `preamp` / `active_preset` columns stay the active mode's; the new
+/// `inactive_*` columns hold the other mode's. The preamp used to be shared,
+/// so the other mode starts with the same value. Its preset is the built-in
+/// its stored bands still match — graphic gains a built-in wrote, or the
+/// default parametric layout ('' in `parametric`), which is Flat — else ''.
+fn migrate_eq_mode_states(conn: &rusqlite::Connection) -> Result<()> {
+    let has_inactive: bool = conn
+        .prepare(
+            "SELECT 1 FROM pragma_table_info('equalizer_settings') WHERE name = 'inactive_preamp'",
+        )?
+        .exists([])?;
+    if has_inactive {
+        return Ok(());
+    }
+    conn.execute_batch(
+        "ALTER TABLE equalizer_settings ADD COLUMN inactive_preamp REAL NOT NULL DEFAULT 0;
+         ALTER TABLE equalizer_settings ADD COLUMN inactive_preset TEXT NOT NULL DEFAULT '';
+         UPDATE equalizer_settings SET inactive_preamp = preamp;",
+    )?;
+    let rows: Vec<(i64, String, String, String)> = conn
+        .prepare("SELECT id, mode, gains, parametric FROM equalizer_settings")?
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?
+        .collect::<rusqlite::Result<_>>()?;
+    for (id, mode, gains_str, parametric) in rows {
+        let preset = if mode == "graphic10" {
+            parametric.is_empty().then_some("Flat")
+        } else {
+            builtin_matching_gains(&gains_str)
+        };
+        if let Some(name) = preset {
+            conn.execute(
+                "UPDATE equalizer_settings SET inactive_preset = ?1 WHERE id = ?2",
                 rusqlite::params![name, id],
             )?;
         }
@@ -3271,6 +3320,51 @@ mod tests {
             .unwrap();
         assert_eq!(mode, "graphic10");
         assert_eq!(parametric, "");
+    }
+
+    fn eq_mode_states_after_56(mode: &str, gains: &str, preamp: f64) -> (f64, String) {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch(MIGRATION_2).unwrap();
+        conn.execute_batch(MIGRATION_4).unwrap();
+        migrate_eq_presets(&conn).unwrap();
+        conn.execute(
+            "UPDATE equalizer_settings SET mode = ?1, gains = ?2, preamp = ?3",
+            params![mode, gains, preamp],
+        )
+        .unwrap();
+        migrate_eq_mode_states(&conn).unwrap();
+        // Idempotent: a second run finds the columns and changes nothing.
+        migrate_eq_mode_states(&conn).unwrap();
+        conn.query_row(
+            "SELECT inactive_preamp, inactive_preset FROM equalizer_settings",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn migration_56_gives_the_inactive_mode_the_shared_preamp_and_its_matching_preset() {
+        let rock = crate::equalizer::preset_gains("Rock")
+            .iter()
+            .map(|g| g.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+        // Parametric active: the graphic gains still match Rock.
+        assert_eq!(
+            eq_mode_states_after_56("parametric", &rock, -3.0),
+            (-3.0, "Rock".to_string())
+        );
+        // Graphic gains a user edited are Custom.
+        assert_eq!(
+            eq_mode_states_after_56("parametric", "1,0,0,0,0,0,0,0,0,0", -3.0),
+            (-3.0, String::new())
+        );
+        // Graphic active, parametric never edited: the default layout is Flat.
+        assert_eq!(
+            eq_mode_states_after_56("graphic10", &rock, -1.5),
+            (-1.5, "Flat".to_string())
+        );
     }
 
     #[test]

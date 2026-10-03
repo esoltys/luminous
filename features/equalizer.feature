@@ -32,3 +32,18 @@ Feature: Graphic Equalizer
       | 8kHz   | +3.5      |
       | 16kHz  | +3.5      |
     And all biquad filter coefficients should recalculate
+
+  Scenario: Importing an AutoEq headphone profile
+    Given the equalizer is enabled
+    When I import the AutoEq profile "Anker Soundcore Life Q20 ParametricEq.txt" as "Anker Soundcore Life Q20"
+    Then a user preset named "Anker Soundcore Life Q20" should be active
+    And the parametric bands should match the profile file exactly
+    And the preamp should be -3.78dB
+
+  Scenario: Rejecting a profile the equalizer cannot reproduce
+    Given the equalizer is enabled
+    And the graphic band gains are set to "+3.0dB"
+    When I import a profile containing a "LP" filter
+    Then the import should fail with "unsupported_filter"
+    And no user preset should be saved
+    And the equalizer settings should be unchanged

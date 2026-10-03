@@ -1,11 +1,17 @@
 import "@testing-library/jest-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, fireEvent, waitFor } from "@testing-library/svelte";
+import { render, fireEvent, waitFor, screen } from "@testing-library/svelte";
 import Equalizer from "./Equalizer.svelte";
 import { invoke } from "@tauri-apps/api/core";
+import { open, save } from "@tauri-apps/plugin-dialog";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
+}));
+
+vi.mock("@tauri-apps/plugin-dialog", () => ({
+  open: vi.fn(),
+  save: vi.fn(),
 }));
 
 describe("Equalizer.svelte", () => {
@@ -214,6 +220,19 @@ describe("Equalizer.svelte", () => {
       return { ...view, picker };
     }
 
+    /** Open the preset actions menu next to the picker and choose `name`. */
+    async function choosePresetAction(name: string) {
+      await fireEvent.click(screen.getByRole("button", { name: "Preset actions" }));
+      await fireEvent.click(screen.getByRole("menuitem", { name }));
+    }
+
+    async function presetActionNames() {
+      await fireEvent.click(screen.getByRole("button", { name: "Preset actions" }));
+      const names = screen.getAllByRole("menuitem").map((item) => item.textContent?.trim());
+      await fireEvent.keyDown(window, { key: "Escape" });
+      return names;
+    }
+
     it("lists user presets beside the built-ins and selects the active one", async () => {
       mockPresetBackend();
       const { picker, getByRole } = await renderPicker();
@@ -223,16 +242,40 @@ describe("Equalizer.svelte", () => {
       );
       expect(groups).toEqual(["Built-in", "My presets"]);
       expect(picker).toHaveTextContent("Studio");
-      expect(getByRole("button", { name: "Rename" })).toBeInTheDocument();
-      expect(getByRole("button", { name: "Delete" })).toBeInTheDocument();
+      await fireEvent.keyDown(window, { key: "Escape" });
+      expect(await presetActionNames()).toEqual(["Import…", "Export…", "Save as…", "Rename", "Delete"]);
     });
 
     it("shows Custom once an edit's echo leaves the preset", async () => {
       mockPresetBackend();
-      const { picker, getByLabelText, queryByRole } = await renderPicker();
+      const { picker, getByLabelText } = await renderPicker();
       await fireEvent.change(getByLabelText("Gain 1"), { target: { value: "-6" } });
       await waitFor(() => expect(picker).toHaveTextContent("Custom"));
-      expect(queryByRole("button", { name: "Rename" })).toBeNull();
+      expect(await presetActionNames()).toEqual(["Import…", "Export…", "Save as…"]);
+    });
+
+    it("exports to the picked file, named after the active preset", async () => {
+      mockPresetBackend();
+      await renderPicker();
+      vi.mocked(save).mockResolvedValueOnce("C:/eq/Studio ParametricEQ.txt");
+      await choosePresetAction("Export…");
+      await waitFor(() =>
+        expect(invoke).toHaveBeenCalledWith("export_parametric_profile", {
+          path: "C:/eq/Studio ParametricEQ.txt",
+        })
+      );
+      expect(vi.mocked(save).mock.calls[0][0]).toMatchObject({
+        defaultPath: "Studio ParametricEQ.txt",
+      });
+    });
+
+    it("writes nothing when the export dialog is cancelled", async () => {
+      mockPresetBackend();
+      await renderPicker();
+      vi.mocked(save).mockResolvedValueOnce(null);
+      await choosePresetAction("Export…");
+      await waitFor(() => expect(save).toHaveBeenCalled());
+      expect(invoke).not.toHaveBeenCalledWith("export_parametric_profile", expect.anything());
     });
 
     it("saves the current bands under a new name and lists it", async () => {
@@ -243,7 +286,7 @@ describe("Equalizer.svelte", () => {
         },
       });
       const { picker, getByRole, getByLabelText } = await renderPicker();
-      await fireEvent.click(getByRole("button", { name: "Save as…" }));
+      await choosePresetAction("Save as…");
       await fireEvent.input(getByLabelText("Preset name"), { target: { value: "Late night" } });
       await fireEvent.click(getByRole("button", { name: "Save" }));
       expect(invoke).toHaveBeenCalledWith("save_eq_user_preset", { name: "Late night" });
@@ -257,7 +300,7 @@ describe("Equalizer.svelte", () => {
         },
       });
       const { getByRole, getByLabelText } = await renderPicker();
-      await fireEvent.click(getByRole("button", { name: "Save as…" }));
+      await choosePresetAction("Save as…");
       await fireEvent.input(getByLabelText("Preset name"), { target: { value: "studio" } });
       await fireEvent.click(getByRole("button", { name: "Save" }));
       await waitFor(() =>
@@ -274,7 +317,7 @@ describe("Equalizer.svelte", () => {
         },
       });
       const { picker, getByRole, getByLabelText } = await renderPicker();
-      await fireEvent.click(getByRole("button", { name: "Rename" }));
+      await choosePresetAction("Rename");
       const field = getByLabelText("New name") as HTMLInputElement;
       expect(field.value).toBe("Studio");
       await fireEvent.input(field, { target: { value: "Studio monitors" } });
@@ -290,16 +333,92 @@ describe("Equalizer.svelte", () => {
           return { ...state, active_preset: null };
         },
       });
-      const { picker, getByRole, getAllByRole } = await renderPicker();
-      await fireEvent.click(getByRole("button", { name: "Delete" }));
+      const { picker, getByRole } = await renderPicker();
+      await choosePresetAction("Delete");
       expect(invoke).not.toHaveBeenCalledWith("delete_eq_user_preset", expect.anything());
-      // The dialog's confirm button is the last "Delete" on the page.
-      const deletes = getAllByRole("button", { name: "Delete" });
-      await fireEvent.click(deletes[deletes.length - 1]);
+      await fireEvent.click(getByRole("button", { name: "Delete" }));
       expect(invoke).toHaveBeenCalledWith("delete_eq_user_preset", { id: 7 });
       await waitFor(() => expect(picker).toHaveTextContent("Custom"));
       await fireEvent.click(picker);
       expect(getByRole("listbox").querySelectorAll('[role="group"]')).toHaveLength(1);
+    });
+
+    describe("importing a profile (#1336)", () => {
+      const profile = "Preamp: -3.78 dB\nFilter 1: ON PK Fc 100 Hz Gain 2 dB Q 1\n";
+      const imported = {
+        ...defaultEqConfig,
+        mode: "parametric",
+        preamp: -3.78,
+        parametric: [{ kind: "peak", freq: 100, gain_db: 2, q: 1, enabled: true }],
+        active_preset: "user:8",
+      };
+
+      function mockImport(importProfile: (args: any) => unknown) {
+        mockPresetBackend({
+          read_eq_profile_file: () => profile,
+          import_parametric_profile: (args) => {
+            const config = importProfile(args);
+            presets = { ...presets, user: [...presets.user, { id: 8, name: args.name }] };
+            return config;
+          },
+        });
+      }
+
+      it("imports a chosen file under its headphone name and selects it", async () => {
+        mockImport(() => imported);
+        vi.mocked(open).mockResolvedValue("C:\\Downloads\\Anker Soundcore Life Q20 ParametricEq.txt");
+        const { picker, getByRole, getByLabelText, getByText, queryByLabelText } = await renderPicker();
+        await choosePresetAction("Import…");
+        await fireEvent.click(getByRole("button", { name: "Choose file…" }));
+        await waitFor(() => expect(getByLabelText("Profile text")).toHaveValue(profile));
+        expect(getByLabelText("Preset name")).toHaveValue("Anker Soundcore Life Q20");
+        expect(invoke).toHaveBeenCalledWith("read_eq_profile_file", {
+          path: "C:\\Downloads\\Anker Soundcore Life Q20 ParametricEq.txt",
+        });
+
+        await fireEvent.click(getByRole("button", { name: "Import" }));
+        expect(invoke).toHaveBeenCalledWith("import_parametric_profile", {
+          text: profile,
+          name: "Anker Soundcore Life Q20",
+        });
+        await waitFor(() => expect(picker).toHaveTextContent("Anker Soundcore Life Q20"));
+        expect(getByText("-3.78 dB")).toBeInTheDocument();
+        expect(queryByLabelText("Profile text")).toBeNull();
+      });
+
+      it("explains a rejected profile and leaves the panel open", async () => {
+        mockImport(() => {
+          throw JSON.stringify({ code: "unsupported_filter", line: 2, kind: "LP" });
+        });
+        const { picker, getByRole, getByLabelText } = await renderPicker();
+        await choosePresetAction("Import…");
+        await fireEvent.input(getByLabelText("Profile text"), { target: { value: "Filter: ON LP Fc 80 Hz" } });
+        await fireEvent.input(getByLabelText("Preset name"), { target: { value: "Broken" } });
+        await fireEvent.click(getByRole("button", { name: "Import" }));
+        await waitFor(() => expect(getByRole("alert")).toHaveTextContent("Line 2 uses a filter of type LP"));
+        expect(getByLabelText("Preset name")).toHaveAttribute("aria-invalid", "true");
+        expect(picker).toHaveTextContent("Studio");
+      });
+
+      it("disables Import until there's both a profile and a name", async () => {
+        mockImport(() => imported);
+        const { getByRole, getByLabelText } = await renderPicker();
+        await choosePresetAction("Import…");
+        expect(getByRole("button", { name: "Import" })).toBeDisabled();
+        await fireEvent.input(getByLabelText("Profile text"), { target: { value: profile } });
+        expect(getByRole("button", { name: "Import" })).toBeDisabled();
+        await fireEvent.input(getByLabelText("Preset name"), { target: { value: "Pasted" } });
+        expect(getByRole("button", { name: "Import" })).toBeEnabled();
+      });
+    });
+
+    it("shows an imported off-grid preamp exactly on the snapping slider", async () => {
+      mockPresetBackend();
+      state = { ...state, preamp: -3.78 };
+      const { getByLabelText, getByText } = await renderPicker();
+      expect(getByLabelText("Preamp:")).toHaveAttribute("step", "0.5");
+      expect(getByText("-3.78 dB")).toBeInTheDocument();
+      expect(invoke).not.toHaveBeenCalledWith("apply_equalizer_config", expect.anything());
     });
 
     it("hides user presets in graphic mode, which they can't describe", async () => {
@@ -309,7 +428,7 @@ describe("Equalizer.svelte", () => {
       await waitFor(() => expect(getByRole("combobox", { name: "Preset" })).toHaveTextContent("Rock"));
       await fireEvent.click(getByRole("combobox", { name: "Preset" }));
       expect(getByRole("listbox").querySelectorAll('[role="group"]')).toHaveLength(1);
-      expect(queryByRole("button", { name: "Save as…" })).toBeNull();
+      expect(queryByRole("button", { name: "Preset actions" })).toBeNull();
     });
   });
 

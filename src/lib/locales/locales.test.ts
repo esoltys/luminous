@@ -33,6 +33,7 @@ function extractPlaceholders(str: string): string[] {
  * (e.g. loanwords, shared musical terminology, technical acronyms, brand names, or symbols).
  */
 const IDENTICAL_OK = new Set([
+  "equalizer.importPlaceholder", // Equalizer APO sample lines, same syntax in every language
   "albumDetail.statsLine", // "{genre} · {year} · {duration}"
   "albumTagEditor.genreField", // "Genre"
   "artistDetail.albumsFilter", // "Albums ({count})"

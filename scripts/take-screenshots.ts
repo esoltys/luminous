@@ -413,6 +413,10 @@ async function main() {
       await page.waitForTimeout(400);
       await page.getByRole("button", { name: t(language, "equalizer.modeParametric"), exact: true }).click();
       await page.waitForTimeout(400);
+      // Open the preset actions menu so the guide shows where Import, Export
+      // and the user-preset actions live — it's easy to miss when closed.
+      await page.getByRole("button", { name: t(language, "equalizer.presetActions"), exact: true }).click();
+      await page.getByRole("menu").waitFor();
     },
     "click-settings-sources": async (page, _featured, language) => {
       await page.getByRole("tab", { name: t(language, "settings.tabSources"), exact: true }).click();

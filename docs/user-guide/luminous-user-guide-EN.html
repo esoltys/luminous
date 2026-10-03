@@ -415,16 +415,51 @@
     <section id="equalizer" data-section>
       <div class="eyebrow">Settings</div>
       <h1>Equalizer</h1>
-      <p>Everything here lives under <b>Settings → Equalizer</b>. You don't need to know anything about audio engineering to use it — the defaults sound good, and every change applies instantly, even mid-song. The panel is split into three parts: the EQ itself, loudness normalization, and playback fades — each can be tuned or left alone independently.</p>
+      <p>Find it under <b>Settings → Equalizer</b>. Every change applies instantly, even mid-song.</p>
+      <h2>10-band</h2>
       <div class="list">
-        <div class="row"><div class="mk">•</div><div>Flip <b>Enable EQ</b> on, then pick a preset from the dropdown — Pop, Rock, Bass Boost, Vocal, and more — or dial in your own curve. The <b>10-band</b> view gives you one slider per fixed frequency. Switch to <b>Parametric</b> when you need precision: the graph shows the combined response, and each band is a node you drag to set its frequency and gain — scroll on a node to widen or narrow it (Q), or double-click the graph to add a band, up to 20. The list under the graph holds the same bands as numbers, with a <b>Type</b> for each (peak, low shelf or high shelf), a switch to bypass it, and a button to remove it. With a node selected, the arrow keys nudge it and Page Up/Down change its Q. <b>Reset Bands</b> snaps everything back to flat. The <b>Preamp</b> slider at the top raises or lowers overall gain before it hits the bands, so boosting doesn't clip.</div></div>
-        <div class="row"><div class="mk">•</div><div>In Parametric, click <b>Save as…</b> to keep the current bands and preamp as your own preset — it appears under <b>My presets</b> in the dropdown, next to the built-ins. While one of your presets is selected, <b>Rename</b> and <b>Delete</b> appear beside it. Change any band and the dropdown shows <b>Custom</b>, so picking the preset again brings the saved version back. Luminous remembers the selected preset between sessions.</div></div>
-        <div class="row"><div class="mk">•</div><div><b>Loudness Normalization</b> evens out the volume jump between quiet and loud tracks, so you're not reaching for the volume knob every other song. Set a <b>Target Level</b> in LUFS, and choose whether to <b>Normalize by</b> track (each song hits the target on its own) or album (the whole album is scaled together, preserving the mix's intended dynamics between tracks). Luminous analyzes your library in the background — a progress message shows how many tracks are left — and falls back to embedded <b>ReplayGain</b> tags, then a flat <b>Fallback Gain</b>, for anything it hasn't measured yet.</div></div>
-        <div class="row"><div class="mk">•</div><div><b>Fades &amp; crossfade</b> softens the pause/stop button with a short <b>Fade Duration</b> instead of an abrupt cut, and can automatically blend the tail of one song into the start of the next over a <b>Crossfade Duration</b> you set. <b>Preserve Gapless for Same Album</b> keeps crossfade from kicking in between tracks on the same album — useful for live sets, concept albums, or anything mixed to flow without a gap.</div></div>
+        <div class="row"><div class="mk">•</div><div>Turn on <b>Enable EQ</b>, then pick a preset or shape your own curve.</div></div>
+        <div class="row"><div class="mk">•</div><div>Drag a slider to boost or cut its frequency, up to ±20&nbsp;dB.</div></div>
+        <div class="row"><div class="mk">•</div><div>Lower the <b>Preamp</b> when you boost, so loud passages don't clip.</div></div>
+        <div class="row"><div class="mk">•</div><div>10-band and Parametric keep separate bands, preamp and preset, so switching never changes the other.</div></div>
       </div>
-      <div class="grid2 mw-900">
-        <div><figure class="shot"><img src="screenshots/equalizer-EN.png" alt="10-band graphic EQ" width="1280" height="1500" loading="lazy"></figure><div class="caption">10-band graphic — one slider per fixed frequency, fastest way to shape a curve by ear.</div></div>
-        <div><figure class="shot"><img src="screenshots/equalizer-parametric-EN.png" alt="Parametric EQ" width="1280" height="1600" loading="lazy"></figure><div class="caption">Parametric — drag bands on the graph or type exact values for surgical corrections.</div></div>
+      <figure class="shot mw-640 mb-28">
+        <img src="screenshots/equalizer-EN.png" alt="10-band equalizer" width="1280" height="1500" loading="lazy">
+      </figure>
+      <h2>Parametric</h2>
+      <div class="list">
+        <div class="row"><div class="mk">•</div><div>Drag a node to set its frequency and gain. Scroll on it to make it wider or narrower (Q).</div></div>
+        <div class="row"><div class="mk">•</div><div>Double-click the graph to add a band, up to 20. The table below lists each band's type, values and on/off switch.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Reset Bands</b> returns to flat.</div></div>
+        <div class="row"><div class="mk">•</div><div>The <b>⋯</b> menu beside the preset holds the preset actions:
+          <div class="nested">
+            <div>– <b>Import…</b> loads a headphone correction profile (see below).</div>
+            <div>– <b>Export…</b> saves the bands and preamp as a <b>ParametricEQ.txt</b> file.</div>
+            <div>– <b>Save as…</b> keeps the current bands as your own preset, under <b>My presets</b>.</div>
+            <div>– <b>Rename</b> and <b>Delete</b> manage your own presets.</div>
+          </div></div></div>
+      </div>
+      <figure class="shot mw-640 mb-28">
+        <img src="screenshots/equalizer-parametric-EN.png" alt="Parametric equalizer with the preset actions menu open" width="1280" height="1600" loading="lazy">
+      </figure>
+      <h2>Correct your headphones</h2>
+      <div class="list">
+        <div class="row"><div class="mk">•</div><div>Find your headphones on <a href="https://autoeq.app" target="_blank" rel="noopener">AutoEq</a>, choose <b>EqualizerAPO ParametricEq</b> as the equalizer app, and download the settings file.</div></div>
+        <div class="row"><div class="mk">•</div><div>In Parametric, choose <b>Import…</b> from the <b>⋯</b> menu, then <b>Choose file…</b> or paste the text.</div></div>
+        <div class="row"><div class="mk">•</div><div>The profile is saved under <b>My presets</b> and applied right away. If Luminous can't reproduce it exactly, it names the problem line and changes nothing.</div></div>
+      </div>
+      <h2>Loudness Normalization</h2>
+      <div class="list">
+        <div class="row"><div class="mk">•</div><div>Turn it on to even out the volume between songs.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Target Level</b> sets how loud everything plays.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Normalize by</b> <b>Album</b> to keep the volume differences between songs on the same album.</div></div>
+        <div class="row"><div class="mk">•</div><div>Songs not analyzed yet use their ReplayGain tags, or the <b>Fallback Gain</b>.</div></div>
+      </div>
+      <h2>Playback Fades &amp; Crossfade</h2>
+      <div class="list">
+        <div class="row"><div class="mk">•</div><div><b>Fade on Pause/Stop</b> ramps the volume down instead of cutting it.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Manual Song Crossfade</b> blends songs when you skip; <b>Automatic Song Crossfade</b> blends them as a song ends.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Preserve gapless for same album</b> keeps live and concept albums seamless.</div></div>
       </div>
     </section>
 

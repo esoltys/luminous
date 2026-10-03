@@ -261,6 +261,13 @@ h1 {
   letter-spacing: -0.02em;
   margin: 0 0 18px;
 }
+h2 {
+  font-family: 'Expose', sans-serif;
+  font-weight: 700;
+  font-size: 19px;
+  letter-spacing: -0.01em;
+  margin: 36px 0 14px;
+}
 p, .p {
   font-size: 15px;
   color: var(--text-body);
