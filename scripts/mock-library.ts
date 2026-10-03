@@ -1,11 +1,11 @@
 // Loads the data the Tauri IPC mock serves: either the small bundled fixture
 // library (mock-data.ts) or, if configured, a live read from a real Luminous
 // SQLite database. See mock-config.json for the config shape.
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { AlbumItem, ArtistItem, ArtistProfile, Playlist, Song } from "../src/lib/types/index.ts";
+import type { AlbumItem, ArtistItem, ArtistProfile, Playlist, Song, SongContextEnrichment } from "../src/lib/types/index.ts";
 import { hydrateEmbeddedArt } from "./embedded-art-cache.ts";
 import { FALLBACK_ARTIST_PROFILES, FALLBACK_LYRICS, FALLBACK_PLAYLISTS, FALLBACK_SONGS } from "./mock-data.ts";
 
@@ -161,6 +161,13 @@ export interface MockLibrary {
   albums: AlbumItem[];
   artists: ArtistItem[];
   artistProfiles: ArtistProfile[];
+  /** Cached artist context (Wikipedia summary, formed date, area) from
+   * `artist_context_enrichment`, keyed by MusicBrainz artist ID. */
+  artistContexts?: Record<string, Partial<SongContextEnrichment>>;
+  /** Artist-level art found next to the music (portrait, band logo,
+   * fanart), keyed by lower-cased artist name — what
+   * get_extended_artwork_for_artist returns in the real app. */
+  artistArtwork?: Record<string, MockArtistArtwork>;
   /** Persisted Genres curation hierarchy (#545) — undefined for the bundled
    * fixture, which has no equivalent persisted tables and falls back to an
    * emergent, re-derived-from-song-genres approximation instead. */
@@ -316,6 +323,7 @@ interface DbLibrary {
   playlists: Playlist[];
   playlistTracks: Record<number, Song[]>;
   artistProfiles: ArtistProfile[];
+  artistContexts: Record<string, Partial<SongContextEnrichment>>;
   tagGroups: MockTagGroup[];
   pinnedItems: PinnedItemRow[];
   playHistory: PlayHistoryRow[];
@@ -331,7 +339,80 @@ function rowToArtistProfile(row: Record<string, unknown>): ArtistProfile {
     tags: JSON.parse((row.tags as string) || "[]"),
     social_links: JSON.parse((row.social_links as string) || "[]"),
     bio: (row.bio as string | null) ?? undefined,
+    // Newer columns: undefined on a DB from before they existed.
+    musicbrainz_artist_id: (row.musicbrainz_artist_id as string | null) ?? undefined,
+    fetched_image_filename: (row.fetched_image_filename as string | null) ?? undefined,
+    fetched_image_source: (row.fetched_image_source as string | null) ?? undefined,
+    fetched_logo_filename: (row.fetched_logo_filename as string | null) ?? undefined,
+    fetched_background_filename: (row.fetched_background_filename as string | null) ?? undefined,
   };
+}
+
+// Mirrors the artist half of get_song_context (artist_context_enrichment).
+function rowToArtistContext(row: Record<string, unknown>): Partial<SongContextEnrichment> {
+  const v = <T>(key: string) => (row[key] ?? undefined) as T | undefined;
+  return {
+    wikipedia_extract: v<string>("wikipedia_extract"),
+    wikipedia_page_url: v<string>("wikipedia_page_url"),
+    wikipedia_thumbnail_url: v<string>("wikipedia_thumbnail_url"),
+    artist_sort_name: v<string>("sort_name"),
+    artist_type: v<string>("artist_type"),
+    artist_gender: v<string>("gender"),
+    artist_begin_date: v<string>("begin_date"),
+    artist_end_date: v<string>("end_date"),
+    artist_ended: row.ended == null ? undefined : !!row.ended,
+    artist_begin_area_name: v<string>("begin_area_name"),
+    artist_begin_area_mbid: v<string>("begin_area_mbid"),
+    artist_area_name: v<string>("area_name"),
+    artist_area_mbid: v<string>("area_mbid"),
+  };
+}
+
+export interface MockArtistArtwork {
+  artist_portrait_uri: string | null;
+  band_logo_uri: string | null;
+  fanart_uri: string | null;
+}
+
+// Mirrors covermanager.rs's artist-level names (ARTIST_PORTRAIT_NAMES,
+// BAND_LOGO_NAMES, FANART_NAMES) and biomanager::artist_dir: the artist
+// folder is the album folder's parent.
+const ARTIST_ART_NAMES: Record<keyof MockArtistArtwork, string[]> = {
+  artist_portrait_uri: ["artist", "folder", "thumb", "photo"],
+  band_logo_uri: ["logo", "clearlogo"],
+  fanart_uri: ["fanart", "backdrop", "background", "banner"],
+};
+const ARTIST_ART_EXTENSIONS = ["jpg", "jpeg", "png", "webp"];
+
+function scanArtistArtwork(songs: Song[], artists: string[]): Record<string, MockArtistArtwork> {
+  const out: Record<string, MockArtistArtwork> = {};
+  for (const artist of artists) {
+    const key = artist.toLowerCase();
+    const song = songs.find(
+      (s) => s.path && (s.artist?.toLowerCase() === key || s.album_artist?.toLowerCase() === key)
+    );
+    if (!song?.path) continue;
+    const artistDir = path.dirname(path.dirname(song.path));
+    let entries: string[];
+    try {
+      entries = readdirSync(artistDir);
+    } catch {
+      continue;
+    }
+    const found: MockArtistArtwork = { artist_portrait_uri: null, band_logo_uri: null, fanart_uri: null };
+    for (const field of Object.keys(ARTIST_ART_NAMES) as (keyof MockArtistArtwork)[]) {
+      const hit = entries.find((f) => {
+        const ext = path.extname(f);
+        return (
+          ARTIST_ART_EXTENSIONS.includes(ext.slice(1).toLowerCase()) &&
+          ARTIST_ART_NAMES[field].includes(path.basename(f, ext).toLowerCase())
+        );
+      });
+      if (hit) found[field] = `luminous-art://local/${path.join(artistDir, hit)}`;
+    }
+    if (found.artist_portrait_uri || found.band_logo_uri || found.fanart_uri) out[key] = found;
+  }
+  return out;
 }
 
 async function loadFromDatabase(dbPath: string, limit: number, silentIfMissing = false): Promise<DbLibrary | null> {
@@ -377,11 +458,20 @@ async function loadFromDatabase(dbPath: string, limit: number, silentIfMissing =
       let artistProfiles: ArtistProfile[] = [];
       try {
         const profileRows = db
-          .prepare("SELECT artist_key, website, tags, social_links, bio FROM artist_profiles")
+          .prepare("SELECT * FROM artist_profiles")
           .all() as Record<string, unknown>[];
         artistProfiles = profileRows.map(rowToArtistProfile);
       } catch (err) {
         console.warn("[Mock Library] Could not read artist_profiles table:", (err as Error).message);
+      }
+
+      // Best-effort: cached artist context, for the artist page's About panel.
+      const artistContexts: Record<string, Partial<SongContextEnrichment>> = {};
+      try {
+        const contextRows = db.prepare("SELECT * FROM artist_context_enrichment").all() as Record<string, unknown>[];
+        for (const row of contextRows) artistContexts[row.artist_id as string] = rowToArtistContext(row);
+      } catch (err) {
+        console.warn("[Mock Library] Could not read artist_context_enrichment table:", (err as Error).message);
       }
 
       // Mirrors TagManager::get_tag_hierarchy() in src-tauri/src/tags.rs:
@@ -428,7 +518,7 @@ async function loadFromDatabase(dbPath: string, limit: number, silentIfMissing =
         console.warn("[Mock Library] Could not read play_history table:", (err as Error).message);
       }
 
-      return { songs, playlists, playlistTracks, artistProfiles, tagGroups, pinnedItems, playHistory };
+      return { songs, playlists, playlistTracks, artistProfiles, artistContexts, tagGroups, pinnedItems, playHistory };
     } finally {
       db.close();
     }
@@ -474,6 +564,8 @@ export async function loadMockLibrary(config: MockConfig = loadMockConfig()): Pr
     albums: deriveAlbums(songs),
     artists: deriveArtists(songs),
     artistProfiles: fromDb?.artistProfiles ?? FALLBACK_ARTIST_PROFILES,
+    artistContexts: fromDb?.artistContexts,
+    artistArtwork: fromDb ? scanArtistArtwork(songs, fromDb.artistProfiles.map((p) => p.artist_key)) : undefined,
     // undefined (not []) when there's no real DB, so the IPC mock knows to
     // fall back to its own emergent-hierarchy approximation for the fixture.
     tagGroups: fromDb?.tagGroups,
