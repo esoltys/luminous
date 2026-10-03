@@ -7,7 +7,8 @@
   import {
     SlidersIcon as Sliders,
     PulseIcon as Activity,
-    ArrowsLeftRightIcon as ArrowLeftRight
+    ArrowsLeftRightIcon as ArrowLeftRight,
+    ArrowSquareOutIcon as ExternalLink
   } from "phosphor-svelte";
   import Toggle from "./Toggle.svelte";
   import Select from "./Select.svelte";
@@ -714,10 +715,11 @@
           {i18n.t('equalizer.importHint')}
           <button
             type="button"
-            class="text-brand-accent-text hover:text-brand-accent-text-hover hover:underline"
+            class="inline-flex items-center gap-0.5 text-brand-accent-text hover:text-brand-accent-text-hover hover:underline"
             onclick={() => openExternalUrl("https://autoeq.app")}
           >
             {i18n.t('equalizer.importAutoEqLink')}
+            <ExternalLink class="w-3 h-3 shrink-0" aria-hidden="true" />
           </button>
         </p>
         <div class="flex items-center gap-2 flex-wrap">
