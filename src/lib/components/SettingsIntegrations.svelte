@@ -230,18 +230,6 @@
       <div class="space-y-3 pt-3 border-t border-brand-border/60">
         <div class="flex items-center justify-between gap-4 py-1">
           <div class="flex flex-col gap-0.5 min-w-0">
-            <span class="text-sm font-medium text-brand-text-primary">{i18n.t('listenbrainz.nowPlayingLabel')}</span>
-            <p class="text-xs text-brand-text-secondary">{i18n.t('listenbrainz.nowPlayingHint')}</p>
-          </div>
-          <Toggle
-            checked={scrobblerStore.nowPlayingEnabled}
-            onchange={(v) => scrobblerStore.setNowPlayingEnabled(v)}
-            label={i18n.t('listenbrainz.nowPlayingLabel')}
-          />
-        </div>
-
-        <div class="flex items-center justify-between gap-4 py-1">
-          <div class="flex flex-col gap-0.5 min-w-0">
             <span class="text-sm font-medium text-brand-text-primary">{i18n.t('listenbrainz.ratingsLabel')}</span>
             <p class="text-xs text-brand-text-secondary">{i18n.t('listenbrainz.ratingsHint')}</p>
           </div>
@@ -286,18 +274,6 @@
             </Button>
           </div>
         {/if}
-
-        <div class="flex items-center justify-between gap-4 py-1">
-          <div class="flex flex-col gap-0.5 min-w-0">
-            <span class="text-sm font-medium text-brand-text-primary">{i18n.t('listenbrainz.pauseLabel')}</span>
-            <p class="text-xs text-brand-text-secondary">{i18n.t('listenbrainz.pauseHint')}</p>
-          </div>
-          <Toggle
-            checked={scrobblerStore.paused}
-            onchange={(v) => scrobblerStore.setPaused(v)}
-            label={i18n.t('listenbrainz.pauseLabel')}
-          />
-        </div>
       </div>
 
       <!-- Offline cache surface -->
