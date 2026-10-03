@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 
-export type RatingStyle = "heart" | "stars";
+export type RatingStyle = "heart" | "stars" | "both";
 type SeekBarMode = "waveform" | "bands";
 export type CollectionViewMode = "cards" | "rows";
 export type GenreSortField = "name" | "count";

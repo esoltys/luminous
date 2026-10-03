@@ -80,6 +80,7 @@
       beginning_nanosec: 0,
       end_nanosec: 0,
       rating: item.rating ?? -1,
+      loved: item.loved,
       playcount: item.play_count,
       skipcount: 0,
       year: item.year ?? undefined,
@@ -88,9 +89,29 @@
     contextMenuState = { x: e.clientX, y: e.clientY, song };
   }
 
+  let localLoved = $state<Record<string, number>>({});
+  let localRatings = $state<Record<string, number>>({});
+
+  function getItemLoved(item: StatsTopItem): number | undefined {
+    return localLoved[item.key] ?? item.loved;
+  }
+
+  function getItemRating(item: StatsTopItem): number {
+    return localRatings[item.key] ?? item.rating ?? -1;
+  }
+
   async function rateSong(item: StatsTopItem, rating: number) {
     if (!item.song_id) return;
-    item.rating = await invoke<number>("set_song_rating", { songId: item.song_id, rating });
+    const normalized = await invoke<number>("set_song_rating", { songId: item.song_id, rating });
+    item.rating = normalized;
+    localRatings[item.key] = normalized;
+  }
+
+  async function setLoved(item: StatsTopItem, loved: number) {
+    if (!item.song_id) return;
+    const normalized = await invoke<number>("set_song_loved", { songId: item.song_id, loved });
+    item.loved = normalized;
+    localLoved[item.key] = normalized;
   }
 
   $effect(() => {
@@ -101,7 +122,10 @@
     if (kind === "album") {
       listen<AlbumStatsPayload>("album-stats-changed", (event) => {
         const match = items.find((it) => it.label === event.payload.album);
-        if (match && typeof event.payload.rating === "number") match.rating = event.payload.rating;
+        if (match && typeof event.payload.rating === "number") {
+          match.rating = event.payload.rating;
+          localRatings[match.key] = event.payload.rating;
+        }
       }).then((fn) => {
         if (disposed) fn();
         else unlistenAlbum = fn;
@@ -109,7 +133,16 @@
     } else if (kind === "song") {
       listen<SongStatsPayload>("song-stats-changed", (event) => {
         const match = items.find((it) => it.song_id === event.payload.song_id);
-        if (match && typeof event.payload.rating === "number") match.rating = event.payload.rating;
+        if (match) {
+          if (typeof event.payload.rating === "number") {
+            match.rating = event.payload.rating;
+            localRatings[match.key] = event.payload.rating;
+          }
+          if (typeof event.payload.loved === "number") {
+            match.loved = event.payload.loved;
+            localLoved[match.key] = event.payload.loved;
+          }
+        }
       }).then((fn) => {
         if (disposed) fn();
         else unlistenSong = fn;
@@ -281,7 +314,7 @@
                   artManual={item.art_manual}
                   sizeClass="w-11 h-11"
                 />
-                {#if item.rating === 5}
+                {#if getItemLoved(item) === 1 || (getItemLoved(item) === undefined && getItemRating(item) === 5)}
                   <FavouriteCornerFlag size="sm" />
                 {/if}
               </div>
@@ -296,7 +329,13 @@
                 <div class="flex items-center justify-between gap-2">
                   <p class="truncate text-xs text-brand-text-secondary font-medium min-w-0">{item.secondary || secondaryFallback || ""}</p>
                   <span class="shrink-0" onclick={(e) => e.stopPropagation()}>
-                    <SongRating rating={item.rating ?? -1} onRate={(r) => rateSong(item, r)} size="sm" />
+                    <SongRating
+                      rating={getItemRating(item)}
+                      loved={getItemLoved(item)}
+                      onRate={(r) => rateSong(item, r)}
+                      onSetLoved={(l) => setLoved(item, l)}
+                      size="sm"
+                    />
                   </span>
                 </div>
               </div>

@@ -19,9 +19,11 @@
 </script>
 
 <script lang="ts">
+  import { invoke } from "@tauri-apps/api/core";
   import { collectionStore } from "../stores/collection.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
   import { playerStore } from "../stores/player.svelte";
+  import { prefs } from "../stores/prefs.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { formatFileSize, formatSampleRate, formatBitDepth, formatChannels, formatDuration } from "../utils/formatters";
   import { formatDateAdded } from "../utils/date";
@@ -81,6 +83,7 @@
     onRowDoubleClick: (row: SongTableRow) => void;
     onRowContextMenu: (event: MouseEvent, row: SongTableRow) => void;
     onRate: (song: Song, rating: number) => void;
+    onSetLoved?: (song: Song, loved: number) => void;
     onAddToPlaylist?: (song: Song) => void;
     onRemoveFromPlaylist?: (row: SongTableRow) => void;
     onEditTags: (song: Song) => void;
@@ -123,6 +126,7 @@
     onRowDoubleClick,
     onRowContextMenu,
     onRate,
+    onSetLoved,
     onAddToPlaylist,
     onRemoveFromPlaylist,
     onEditTags,
@@ -321,6 +325,18 @@
     pointerDragArmed = false;
   }
 
+  async function handleSetLoved(song: Song, loved: number) {
+    if (onSetLoved) {
+      onSetLoved(song, loved);
+      return;
+    }
+    try {
+      song.loved = await invoke<number>("set_song_loved", { songId: song.id, loved });
+    } catch (e) {
+      console.error("Failed to set song loved:", e);
+    }
+  }
+
   // --- Grid column template ---
   let gridColsStyle = $derived.by(() => {
     const vc = collectionStore.visibleColumns;
@@ -330,7 +346,17 @@
       if (mode === "position" && key === "track") continue;
       if (!vc[key]) continue;
       const saved = cw[key];
-      cols.push(saved !== undefined ? `${saved}px` : (colDefaults[key] ?? "80px"));
+      let defWidth = colDefaults[key] ?? "80px";
+      if (key === "rating") {
+        if (prefs.ratingStyle === "both") {
+          defWidth = "124px";
+        } else if (prefs.ratingStyle === "heart") {
+          defWidth = "56px";
+        } else {
+          defWidth = colDefaults["rating"] ?? "96px";
+        }
+      }
+      cols.push(saved !== undefined ? `${saved}px` : defWidth);
     }
     return `grid-template-columns: ${cols.join(" ")}`;
   });
@@ -560,7 +586,12 @@
     </div>
   {:else if col.key === "rating"}
     <div class="flex justify-center">
-      <SongRating rating={song.rating} onRate={(r) => onRate(song, r)} />
+      <SongRating
+        rating={song.rating}
+        loved={song.loved}
+        onRate={(r) => onRate(song, r)}
+        onSetLoved={(l) => handleSetLoved(song, l)}
+      />
     </div>
   {:else if col.key === "playcount"}
     <div class="text-center {secondaryColor(song)} font-medium text-xs">

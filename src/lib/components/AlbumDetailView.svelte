@@ -678,7 +678,7 @@
           <span>{totalDurationLabel}</span>
           {#if albumItem}
             <span>•</span>
-            <SongRating rating={albumItem.rating} onRate={rateAlbum} size="sm" />
+            <SongRating isAlbum rating={albumItem.rating} onRate={rateAlbum} size="sm" />
           {/if}
         </div>
         {/if}

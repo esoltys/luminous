@@ -617,7 +617,9 @@
         <div class="mt-1.5">
           <SongRating
             rating={playerStore.currentSong.rating}
+            loved={playerStore.currentSong.loved}
             onRate={(r) => playerStore.rateCurrent(r)}
+            onSetLoved={(l) => playerStore.setLovedCurrent(l)}
             size="md"
           />
         </div>

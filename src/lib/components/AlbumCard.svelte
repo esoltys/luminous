@@ -115,7 +115,7 @@
     </div>
     <div class="flex items-center justify-between mt-0.5 gap-2">
       <div class="min-w-0"><GenreChips genre={album.genre} /></div>
-      <span class="shrink-0"><SongRating rating={currentRating} onRate={rateAlbum} size="sm" /></span>
+      <span class="shrink-0"><SongRating isAlbum rating={currentRating} onRate={rateAlbum} size="sm" /></span>
     </div>
   </div>
   <div class="absolute inset-0 rounded-b-xl ring-2 ring-inset ring-transparent group-hover:ring-brand-accent transition-[box-shadow] duration-200 pointer-events-none"></div>

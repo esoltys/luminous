@@ -306,6 +306,7 @@ impl TagManager {
                AND source IN ({lib})
                AND unavailable = 0
                AND not_included = 0
+               AND loved != -1
                {extra_where}
              ORDER BY {order_by}",
             SONG_SELECT_COLS,
@@ -378,6 +379,7 @@ impl TagManager {
              WHERE source IN ({lib})
                AND unavailable = 0
                AND not_included = 0
+               AND loved != -1
                AND genre IS NOT NULL
                AND genre != ''
                {extra_where}

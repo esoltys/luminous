@@ -303,7 +303,9 @@
         {#if playerStore.currentSong}
           <SongRating
             rating={playerStore.currentSong.rating}
+            loved={playerStore.currentSong.loved}
             onRate={(r) => playerStore.rateCurrent(r)}
+            onSetLoved={(l) => playerStore.setLovedCurrent(l)}
             size="sm"
           />
         {/if}

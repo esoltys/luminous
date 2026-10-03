@@ -263,6 +263,7 @@
     >
       <option value="heart">{i18n.t('settings.ratingStyleHeart')}</option>
       <option value="stars">{i18n.t('settings.ratingStyleStars')}</option>
+      <option value="both">{i18n.t('settings.ratingStyleBoth')}</option>
     </Select>
   </div>
 

@@ -539,13 +539,30 @@ export class PlayerStore {
     await invoke("set_auto_continue", { enabled });
   }
 
-  /** Rate the current track (-1 clears; hearts map to 5.0 via SongRating). */
+  /** Rate the current track (-1 clears; 0.5–5.0 sets rating). */
   async rateCurrent(rating: number) {
     if (!this.currentSong) return;
     this.currentSong.rating = await invoke<number>("set_song_rating", {
       songId: this.currentSong.id,
       rating,
     });
+  }
+
+  /** Set loved state for the current track (1 = loved, 0 = neutral, -1 = hated). */
+  async setLovedCurrent(loved: number) {
+    if (!this.currentSong) return;
+    this.currentSong.loved = await invoke<number>("set_song_loved", {
+      songId: this.currentSong.id,
+      loved,
+    });
+  }
+
+  /** Toggle loved state for the current track (0 -> 1 -> 0, or -1 -> 0). */
+  async toggleLovedCurrent() {
+    if (!this.currentSong) return;
+    const current = this.currentSong.loved ?? 0;
+    const next = current === 1 ? 0 : (current === -1 ? 0 : 1);
+    await this.setLovedCurrent(next);
   }
 }
 

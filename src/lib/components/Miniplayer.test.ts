@@ -5,6 +5,7 @@ import Miniplayer from "./Miniplayer.svelte";
 import { playerStore } from "../stores/player.svelte";
 import { collectionStore } from "../stores/collection.svelte";
 import { windowLayoutStore } from "../stores/windowLayout.svelte";
+import { prefs } from "../stores/prefs.svelte";
 import { invoke } from "@tauri-apps/api/core";
 import type { Song } from "../types";
 
@@ -51,6 +52,7 @@ describe("Miniplayer.svelte", () => {
     playerStore.volume = 0.8;
     playerStore.shuffleMode = "off";
     playerStore.repeatMode = "off";
+    prefs.ratingStyle = "heart";
     windowLayoutStore.isMiniplayer = true;
   });
 
@@ -107,15 +109,26 @@ describe("Miniplayer.svelte", () => {
     expect(getByTitle(/loop the current queue or playlist indefinitely/i)).toBeInTheDocument();
   });
 
-  it("renders the song rating widget and rates the current song", async () => {
-    playerStore.currentSong = mockSong; // rating: 5 -> favorited under the default heart style
-    const rateSpy = vi.spyOn(playerStore, "rateCurrent").mockResolvedValue(undefined as any);
+  it("renders the song rating widget and toggles favourite for the current song", async () => {
+    playerStore.currentSong = { ...mockSong, loved: 1 };
+    const lovedSpy = vi.spyOn(playerStore, "setLovedCurrent").mockResolvedValue(undefined as any);
 
     const { getByTitle } = render(Miniplayer);
     const heartBtn = getByTitle("Remove from favourites");
     await fireEvent.click(heartBtn);
 
-    expect(rateSpy).toHaveBeenCalledWith(-1);
+    expect(lovedSpy).toHaveBeenCalledWith(0);
+  });
+
+  it("rates current song in stars mode", async () => {
+    prefs.ratingStyle = "stars";
+    playerStore.currentSong = mockSong;
+    const rateSpy = vi.spyOn(playerStore, "rateCurrent").mockResolvedValue(undefined as any);
+
+    const { getByLabelText } = render(Miniplayer);
+    await fireEvent.click(getByLabelText("Rate 4 of 5"));
+
+    expect(rateSpy).toHaveBeenCalledWith(4);
   });
 
   it("exits miniplayer mode when restore button is clicked or Escape is pressed", async () => {
@@ -128,7 +141,7 @@ describe("Miniplayer.svelte", () => {
 
     expect(exitSpy).toHaveBeenCalled();
 
-    const region = getByRole("group");
+    const region = getByRole("group", { name: "Miniplayer" });
     await fireEvent.keyDown(region, { key: "Escape" });
     expect(exitSpy).toHaveBeenCalledTimes(2);
   });
@@ -155,7 +168,7 @@ describe("Miniplayer.svelte", () => {
     playerStore.currentSong = mockSong;
     const { getByRole, container } = render(Miniplayer);
 
-    const group = getByRole("group");
+    const group = getByRole("group", { name: "Miniplayer" });
     const hoverMask = container.querySelector(".absolute.inset-0.z-30") as HTMLElement;
     expect(hoverMask).toBeInTheDocument();
 

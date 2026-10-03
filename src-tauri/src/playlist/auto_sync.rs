@@ -840,7 +840,7 @@ impl PlaylistManager {
         let total_library_songs: i64 = conn
             .query_row(
                 &format!(
-                    "SELECT COUNT(*) FROM songs WHERE source IN ({lib}) AND unavailable = 0 AND not_included = 0",
+                    "SELECT COUNT(*) FROM songs WHERE source IN ({lib}) AND unavailable = 0 AND not_included = 0 AND loved != -1",
                     lib = *LIBRARY_SOURCES_SQL
                 ),
                 [],

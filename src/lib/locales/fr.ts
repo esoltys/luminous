@@ -266,10 +266,11 @@ export const fr: DeepStringRecord<typeof en> = {
     selectLanguage: "Langue / Language",
     languageEnglish: "English",
     languageFrench: "Français",
-    ratingStyle: "Style de notation",
+    ratingStyle: "Style de notation des morceaux",
     ratingStyleHeart: "Cœur (favori)",
     ratingStyleStars: "5 étoiles",
-    ratingStyleHint: "Choisissez Cœur pour marquer les chansons comme favorites, ou 5 étoiles pour des notes par demi-étoile — les deux utilisent la même note.",
+    ratingStyleBoth: "Les deux (cœur et 5 étoiles)",
+    ratingStyleHint: "Choisissez Cœur pour marquer les chansons comme favorites, 5 étoiles pour des notes par demi-étoile, ou Les deux pour afficher les cœurs et les étoiles côte à côte. Les albums utilisent toujours les 5 étoiles.",
     weekStart: "Commencer la semaine le",
     weekStartSunday: "Dimanche",
     weekStartMonday: "Lundi",
@@ -1376,7 +1377,10 @@ export const fr: DeepStringRecord<typeof en> = {
     setTooltip: "Noter {value} sur 5",
     favoriteTooltip: "Ajouter aux favoris",
     unfavoriteTooltip: "Retirer des favoris",
-    clearTooltip: "Effacer la note"
+    clearTooltip: "Effacer la note",
+    hateTooltip: "Chanson non appréciée",
+    clearHateTooltip: "Ne plus marquer comme non appréciée",
+    hateAction: "Marquer comme chanson non appréciée"
   },
   common: {
     aboutField: "À propos de {field}",

@@ -260,10 +260,11 @@ export const en = {
     selectLanguage: "Language / Langue",
     languageEnglish: "English",
     languageFrench: "Français",
-    ratingStyle: "Rating style",
+    ratingStyle: "Song rating style",
     ratingStyleHeart: "Heart (favourite)",
     ratingStyleStars: "5-star",
-    ratingStyleHint: "Choose Heart to mark songs as favourites, or 5-star for half-step ratings — both save to the same rating.",
+    ratingStyleBoth: "Both (heart and 5-star)",
+    ratingStyleHint: "Choose Heart to mark songs as favourites, 5-star for half-step ratings, or Both to display hearts and star ratings side-by-side. Album ratings always use 5 stars.",
     weekStart: "Start the week with",
     weekStartSunday: "Sunday",
     weekStartMonday: "Monday",
@@ -1325,7 +1326,10 @@ export const en = {
     setTooltip: "Rate {value} of 5",
     favoriteTooltip: "Add to favourites",
     unfavoriteTooltip: "Remove from favourites",
-    clearTooltip: "Clear rating"
+    clearTooltip: "Clear rating",
+    hateTooltip: "Disliked song",
+    clearHateTooltip: "Clear dislike",
+    hateAction: "Dislike song"
   },
   common: {
     aboutField: "About {field}",

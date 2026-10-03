@@ -283,7 +283,7 @@ const CANDIDATE_COLS: &str =
 fn load_library(conn: &Connection) -> Result<Vec<Candidate>> {
     let sql = format!(
         "SELECT {CANDIDATE_COLS} FROM songs
-         WHERE source IN ({lib}) AND unavailable = 0 AND not_included = 0",
+         WHERE source IN ({lib}) AND unavailable = 0 AND not_included = 0 AND loved != -1",
         lib = *LIBRARY_SOURCES_SQL
     );
     let mut stmt = conn.prepare(&sql)?;

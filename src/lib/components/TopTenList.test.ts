@@ -253,13 +253,59 @@ describe("TopTenList.svelte", () => {
     expect(getByText("Custom empty message")).toBeInTheDocument();
   });
 
-  it("rates an album item and updates the rating in the UI (heart toggle)", async () => {
+  it("rates a song item and updates the rating in the UI (heart toggle)", async () => {
     prefs.ratingStyle = "heart";
     vi.mocked(invoke).mockImplementation((cmd, args: any) => {
-      if (cmd === "set_album_rating") return Promise.resolve(args.rating);
+      if (cmd === "set_song_loved") return Promise.resolve(args.loved);
+      if (cmd === "set_song_rating") return Promise.resolve(args.rating);
       return Promise.resolve(null);
     });
 
+    const items: StatsTopItem[] = [
+      {
+        key: "song_1",
+        label: "Los Ojos Del Cóndor",
+        secondary: "Hermanos Gutiérrez",
+        play_count: 10,
+        minutes: 40,
+        excluded: false,
+        album: null,
+        song_id: 1,
+        rating: -1,
+      },
+    ];
+
+    const { getByTitle, queryByTestId, getByTestId } = render(TopTenList, {
+      props: { items, kind: "song" },
+    });
+
+    expect(queryByTestId("favourite-corner-flag")).toBeNull();
+
+    // Click to favorite
+    const favButton = getByTitle("Add to favourites");
+    await fireEvent.click(favButton);
+
+    expect(invoke).toHaveBeenCalledWith("set_song_loved", {
+      songId: 1,
+      loved: 1,
+    });
+    expect(items[0].loved).toBe(1);
+    expect(getByTestId("favourite-corner-flag")).toBeInTheDocument();
+
+    // Click again to unfavorite / unset
+    const unfavButton = getByTitle("Remove from favourites");
+    await fireEvent.click(unfavButton);
+
+    expect(invoke).toHaveBeenCalledWith("set_song_loved", {
+      songId: 1,
+      loved: 0,
+    });
+    expect(items[0].loved).toBe(0);
+    expect(queryByTestId("favourite-corner-flag")).toBeNull();
+  });
+
+  it("always renders stars for album items even in heart mode", () => {
+    prefs.ratingStyle = "heart";
     const items: StatsTopItem[] = [
       {
         key: "album_1",
@@ -270,37 +316,16 @@ describe("TopTenList.svelte", () => {
         excluded: false,
         album: null,
         sample_song_id: 1,
-        rating: -1,
+        rating: 4,
       },
     ];
 
-    const { getByTitle, queryByTestId, getByTestId } = render(TopTenList, {
+    const { queryByTitle, getByLabelText } = render(TopTenList, {
       props: { items, kind: "album" },
     });
 
-    expect(queryByTestId("favourite-corner-flag")).toBeNull();
-
-    // Click to favorite
-    const favButton = getByTitle("Add to favourites");
-    await fireEvent.click(favButton);
-
-    expect(invoke).toHaveBeenCalledWith("set_album_rating", {
-      album: "Los Ojos Del Cóndor",
-      rating: 5,
-    });
-    expect(items[0].rating).toBe(5);
-    expect(getByTestId("favourite-corner-flag")).toBeInTheDocument();
-
-    // Click again to unfavorite / unset
-    const unfavButton = getByTitle("Remove from favourites");
-    await fireEvent.click(unfavButton);
-
-    expect(invoke).toHaveBeenCalledWith("set_album_rating", {
-      album: "Los Ojos Del Cóndor",
-      rating: -1,
-    });
-    expect(items[0].rating).toBe(-1);
-    expect(queryByTestId("favourite-corner-flag")).toBeNull();
+    expect(queryByTitle("Add to favourites")).toBeNull();
+    expect(getByLabelText("Rate 4 of 5")).toBeInTheDocument();
   });
 
   it("rates an album item in star mode", async () => {

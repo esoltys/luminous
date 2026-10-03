@@ -19,7 +19,9 @@
     CaretRightIcon as CaretRight,
     RadioIcon as Radio,
     PlaylistIcon as PlaylistIcon,
-    XIcon as X
+    XIcon as X,
+    HeartIcon,
+    HeartBreakIcon
   } from "phosphor-svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { i18n } from "../stores/i18n.svelte";
@@ -203,6 +205,25 @@
       );
     }
   }
+
+  async function handleToggleFavourite() {
+    const isFav = song.loved === 1 || (song.loved === undefined && song.rating === 5);
+    const newLoved = isFav ? 0 : 1;
+    try {
+      song.loved = await invoke<number>("set_song_loved", { songId: song.id, loved: newLoved });
+    } catch (e) {
+      console.error("Failed to update favourite:", e);
+    }
+  }
+
+  async function handleToggleDislike() {
+    const newLoved = song.loved === -1 ? 0 : -1;
+    try {
+      song.loved = await invoke<number>("set_song_loved", { songId: song.id, loved: newLoved });
+    } catch (e) {
+      console.error("Failed to update dislike:", e);
+    }
+  }
 </script>
 
 {#if menuVisible}
@@ -347,6 +368,24 @@
   />
 
   {#if selectedCount === 1}
+    <ContextMenuItem
+      icon={HeartIcon}
+      label={(song.loved === 1 || (song.loved === undefined && song.rating === 5))
+        ? i18n.t("rating.unfavoriteTooltip")
+        : i18n.t("rating.favoriteTooltip")}
+      onmouseenter={closeSubmenuImmediately}
+      onclick={() => { handleToggleFavourite(); onClose(); }}
+    />
+
+    <ContextMenuItem
+      icon={HeartBreakIcon}
+      label={song.loved === -1
+        ? i18n.t("rating.clearHateTooltip")
+        : i18n.t("rating.hateAction")}
+      onmouseenter={closeSubmenuImmediately}
+      onclick={() => { handleToggleDislike(); onClose(); }}
+    />
+
     <ContextMenuItem
       icon={BarChart2}
       label={statsExclusionsStore.isSongExcluded(song)
