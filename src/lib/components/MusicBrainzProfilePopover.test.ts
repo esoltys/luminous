@@ -58,14 +58,14 @@ describe("MusicBrainzProfilePopover.svelte", () => {
   });
 
   it("renders user identity in header and closes on close button click", async () => {
-    const { getByText, getByTitle } = render(MusicBrainzProfilePopover, {
+    const { getByText, getByTitle, queryByText } = render(MusicBrainzProfilePopover, {
       isOpen: true,
       anchorEl,
       onClose,
     });
 
     expect(getByText("test_mb_user")).toBeInTheDocument();
-    expect(getByText("test@example.com")).toBeInTheDocument();
+    expect(queryByText("test@example.com")).not.toBeInTheDocument();
 
     const closeBtn = getByTitle("Close");
     await fireEvent.click(closeBtn);

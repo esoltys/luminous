@@ -145,11 +145,6 @@
           <h3 class="font-bold text-sm text-brand-text-primary truncate">
             {musicbrainzStore.username ?? "MusicBrainz User"}
           </h3>
-          {#if musicbrainzStore.email}
-            <p class="text-xs text-brand-text-secondary truncate mt-0.5">
-              {musicbrainzStore.email}
-            </p>
-          {/if}
         </div>
       </div>
 
@@ -255,7 +250,7 @@
       {/if}
 
       <!-- Profile Links -->
-      <div class="space-y-1 pt-1">
+      <div class="space-y-1 pt-2 border-t border-brand-border/60">
         {#if lbUsername}
           <button
             type="button"
