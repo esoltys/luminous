@@ -62,6 +62,36 @@ pub async fn remove_directory(
     Ok(())
 }
 
+/// Points watched folder `old_path` at `new_path` — the drive came back under
+/// another letter, or the music moved — keeping every song's id, stats and
+/// playlist membership (#1403). See `collection::relocate::relocate_root`.
+#[tauri::command]
+pub async fn relocate_directory(
+    app: AppHandle,
+    old_path: String,
+    new_path: String,
+    state: State<'_, AppState>,
+) -> Result<crate::collection::relocate::RelocateResult, String> {
+    let result = crate::db::run_blocking(&state.db, move |conn| {
+        crate::collection::relocate::relocate_root(conn, Path::new(&old_path), Path::new(&new_path))
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    if let Some(dir) = result.default_library.clone() {
+        // Re-attach the hierarchy sidecar at its new location.
+        let link_app = app.clone();
+        let _ = tokio::task::spawn_blocking(move || {
+            if let Err(e) = crate::hierarchy_sidecar::set_default_library(&link_app, Some(dir)) {
+                log::warn!("Couldn't re-attach the default library after relocating: {e:#}");
+            }
+        })
+        .await;
+    }
+    crate::collection::start_watcher(app.clone(), &state);
+    let _ = app.emit("library-changed", ());
+    Ok(result)
+}
+
 #[tauri::command]
 pub async fn get_directories(state: State<'_, AppState>) -> Result<Vec<MusicDirectory>, String> {
     crate::collection::with_collection_scanner(state.db.clone(), |scanner| {

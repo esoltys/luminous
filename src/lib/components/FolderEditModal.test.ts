@@ -59,4 +59,25 @@ describe("FolderEditModal.svelte", () => {
     expect(onClose).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Save Changes" })).toBeEnabled();
   });
+  it("re-links the folder from Change Location and closes once it moved (#1403)", async () => {
+    const relocate = vi.spyOn(collectionStore, "relocateDirectoryDialog").mockResolvedValue(true);
+    const onClose = vi.fn();
+    render(FolderEditModal, { directory, onClose });
+
+    await fireEvent.click(screen.getByRole("button", { name: "Change Location…" }));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(relocate).toHaveBeenCalledWith("Z:\\Music Library");
+  });
+
+  it("stays open when Change Location is cancelled", async () => {
+    vi.spyOn(collectionStore, "relocateDirectoryDialog").mockResolvedValue(false);
+    const onClose = vi.fn();
+    render(FolderEditModal, { directory, onClose });
+
+    await fireEvent.click(screen.getByRole("button", { name: "Change Location…" }));
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Change Location…" })).toBeEnabled());
+    expect(onClose).not.toHaveBeenCalled();
+  });
 });

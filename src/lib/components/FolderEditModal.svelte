@@ -5,6 +5,7 @@
   import { playerStore } from "../stores/player.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
+  import { hierarchySidecarStore } from "../stores/hierarchySidecar.svelte";
   import { PLAYER_DOCK_CLEARANCE_PX } from "../constants";
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
@@ -43,6 +44,20 @@
   function handleKeydown(e: KeyboardEvent) {
     if (e.key === "Escape") {
       onClose();
+    }
+  }
+
+  async function handleChangeLocation() {
+    if (saving) return;
+    saving = true;
+    try {
+      if (await collectionStore.relocateDirectoryDialog(directory.path)) {
+        // The default library follows its folder to the new location.
+        await hierarchySidecarStore.refresh().catch(() => {});
+        onClose();
+      }
+    } finally {
+      saving = false;
     }
   }
 
@@ -157,6 +172,20 @@
           {i18n.t("settings.folderColor")}
         </span>
         <ColorPicker choices={COLOR_CHOICES} value={selectedColor} onChange={(v) => { selectedColor = v; }} />
+      </div>
+
+      <!-- Location -->
+      <div>
+        <span class="block font-medium text-xs text-brand-text-secondary uppercase tracking-wider mb-1.5">
+          {i18n.t("settings.folderLocation")}
+        </span>
+        <div class="flex items-center justify-between gap-3">
+          <p class="text-xs text-brand-text-primary break-all min-w-0">{directory.path}</p>
+          <Button type="button" variant="secondary" size="sm" onclick={handleChangeLocation} disabled={saving}>
+            {i18n.t("settings.folderChangeLocation")}
+          </Button>
+        </div>
+        <p class="text-xs text-brand-text-secondary mt-1.5 text-pretty">{i18n.t("settings.folderLocateHint")}</p>
       </div>
 
       <!-- Footer Buttons -->

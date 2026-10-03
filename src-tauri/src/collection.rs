@@ -52,6 +52,7 @@ fn scan_thread_count() -> usize {
 
 mod query;
 mod reconcile;
+pub mod relocate;
 mod watcher;
 pub(crate) use query::get_artist_profile_conn;
 #[cfg(test)]
@@ -640,24 +641,7 @@ impl CollectionScanner {
             ids.sort_unstable();
             let survivor = ids.pop().expect("len >= 2 checked above");
             for dup_id in ids {
-                tx.execute(
-                    "UPDATE playlist_items SET song_id = ?1 WHERE song_id = ?2",
-                    params![survivor, dup_id],
-                )?;
-                tx.execute(
-                    "UPDATE play_history SET song_id = ?1 WHERE song_id = ?2",
-                    params![survivor, dup_id],
-                )?;
-                tx.execute(
-                    "UPDATE songs SET
-                        rating = MAX(rating, (SELECT rating FROM songs WHERE id = ?2)),
-                        playcount = playcount + (SELECT playcount FROM songs WHERE id = ?2),
-                        skipcount = skipcount + (SELECT skipcount FROM songs WHERE id = ?2),
-                        lastplayed = MAX(IFNULL(lastplayed, 0), IFNULL((SELECT lastplayed FROM songs WHERE id = ?2), 0))
-                     WHERE id = ?1",
-                    params![survivor, dup_id],
-                )?;
-                tx.execute("DELETE FROM songs WHERE id = ?1", params![dup_id])?;
+                reconcile::merge_song_rows(&tx, survivor, dup_id)?;
                 merged += 1;
             }
         }

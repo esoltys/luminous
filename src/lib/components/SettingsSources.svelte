@@ -281,6 +281,13 @@
     }
   }
 
+  async function handleLocateDirectory(path: string) {
+    if (await collectionStore.relocateDirectoryDialog(path)) {
+      // The default library follows its folder to the new location.
+      await hierarchySidecarStore.refresh().catch(() => {});
+    }
+  }
+
   /** A failed link says why; otherwise a linked file that can't be loaded
    * (malformed JSON) stays flagged here until it's fixed. */
   let linkError = $state<string | null>(null);
@@ -384,6 +391,13 @@
                 <span class="flex items-center gap-1">
                   <AlertTriangle class="w-3 h-3" />
                   {i18n.t('settings.folderItemUnavailable', {}, 'Unavailable (Drive disconnected?)')}
+                  <button
+                    type="button"
+                    onclick={() => handleLocateDirectory(dir.path)}
+                    class="ml-1.5 font-medium text-brand-accent-text hover:underline"
+                  >
+                    {i18n.t('settings.folderLocate')}
+                  </button>
                 </span>
               {:else}
                 {collectionStore.watchFoldersRealtime
