@@ -388,14 +388,14 @@ describe("Equalizer.svelte", () => {
 
       it("explains a rejected profile and leaves the panel open", async () => {
         mockImport(() => {
-          throw JSON.stringify({ code: "unsupported_filter", line: 2, kind: "LP" });
+          throw JSON.stringify({ code: "unsupported_filters", filters: [{ line: 2, kind: "LP" }] });
         });
         const { picker, getByRole, getByLabelText } = await renderPicker();
         await choosePresetAction("Import…");
         await fireEvent.input(getByLabelText("Profile text"), { target: { value: "Filter: ON LP Fc 80 Hz" } });
         await fireEvent.input(getByLabelText("Preset name"), { target: { value: "Broken" } });
         await fireEvent.click(getByRole("button", { name: "Import" }));
-        await waitFor(() => expect(getByRole("alert")).toHaveTextContent("Line 2 uses a filter of type LP"));
+        await waitFor(() => expect(getByRole("alert")).toHaveTextContent("Unsupported filters: LP (line 2)"));
         expect(getByLabelText("Preset name")).toHaveAttribute("aria-invalid", "true");
         expect(picker).toHaveTextContent("Studio");
       });

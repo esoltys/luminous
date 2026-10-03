@@ -31,8 +31,12 @@ export function importErrorMessage(raw: unknown): string {
       return i18n.t("equalizer.importErrorEmpty");
     case "too_many_filters":
       return i18n.t("equalizer.importErrorTooManyFilters", { count: err.count, max: err.max });
-    case "unsupported_filter":
-      return i18n.t("equalizer.importErrorUnsupportedFilter", { line: err.line, kind: err.kind });
+    case "unsupported_filters":
+      return i18n.t("equalizer.importErrorUnsupportedFilters", {
+        filters: err.filters
+          .map((f) => i18n.t("equalizer.importErrorFilterAt", { kind: f.kind, line: f.line }))
+          .join(", "),
+      });
     case "unsupported_line":
       return i18n.t("equalizer.importErrorUnsupportedLine", { line: err.line });
     case "malformed":

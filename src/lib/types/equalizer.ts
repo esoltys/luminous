@@ -62,7 +62,7 @@ export interface EqRanges {
 export type EqImportError =
   | { code: "empty" }
   | { code: "too_many_filters"; count: number; max: number }
-  | { code: "unsupported_filter"; line: number; kind: string }
+  | { code: "unsupported_filters"; filters: { line: number; kind: string }[] }
   | { code: "unsupported_line"; line: number }
   | { code: "malformed"; line: number }
   | { code: "out_of_range"; line: number; field: "freq" | "gain" | "q"; value: number; min: number; max: number }
