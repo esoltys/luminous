@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { themeStore } from "../lib/stores/theme.svelte";
+  import { addonsStore } from "../lib/stores/addons.svelte";
   import { collectionStore } from "../lib/stores/collection.svelte";
   import { navigationStore, type ActiveTab, type ActiveSubTab } from "../lib/stores/navigation.svelte";
   import { playerStore } from "../lib/stores/player.svelte";
@@ -53,6 +54,7 @@
 
     (async () => {
       // Initialize theme store first to prevent flash of default theme
+      await addonsStore.init();
       await themeStore.init();
 
       try {

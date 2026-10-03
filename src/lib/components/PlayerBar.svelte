@@ -21,6 +21,7 @@
   import { tagsStore } from "../stores/tags.svelte";
   import { openInPicard } from "../utils/picard";
   import QualityBadge from "./QualityBadge.svelte";
+  import AddonOverlay from "./AddonOverlay.svelte";
 
   // Responsive control trimming (issue #413, refined against real usage,
   // padding/seekbar fixed under #543): three named tiers as this floating
@@ -280,6 +281,9 @@
   transition:fly={{ y: 40, duration: windowLayoutStore.isPlaybarOnlyMode ? 0 : 300, easing: cubicOut }}
   class="relative bg-brand-playerbar flex items-center justify-between gap-3 px-5 min-[768px]:px-8 text-brand-text-secondary select-none {themeStore.isGlassTheme ? 'glass-surface' : ''} {themeStore.gpuCompositing === false ? 'no-backdrop' : ''} {windowLayoutStore.isPlaybarOnlyMode ? 'playbar-only-mode w-full h-full rounded-none border-none shadow-none' : 'h-20 max-w-[1200px] mx-auto border border-brand-border rounded-[2rem]'}"
 >
+  {#if themeStore.activeAddon?.overlayEntry}
+    <AddonOverlay addon={themeStore.activeAddon} />
+  {/if}
   <div data-walkthrough-target="player-bar-cover" class="flex items-center gap-3 min-w-0 flex-1 min-[768px]:w-1/3 min-[768px]:flex-none min-[768px]:min-w-[200px] max-w-sm">
     <button
       onclick={handleCoverClick}
