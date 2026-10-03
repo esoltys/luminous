@@ -44,6 +44,6 @@ Feature: Graphic Equalizer
     Given the equalizer is enabled
     And the graphic band gains are set to "+3.0dB"
     When I import a profile containing a "LP" filter
-    Then the import should fail with "unsupported_filter"
+    Then the import should fail with "unsupported_filters"
     And no user preset should be saved
     And the equalizer settings should be unchanged

@@ -42,10 +42,11 @@ pub enum ImportError {
         count: usize,
         max: usize,
     },
-    /// A filter type the engine has no equivalent for (`LP`, `HP`, `NO`, …).
-    UnsupportedFilter {
-        line: usize,
-        kind: String,
+    /// Filters the engine has no equivalent for (`LP`, `HP`, `NO`, `LS`,
+    /// `LSC 12dB`, `BW Oct`, …), every one in the profile so the user can
+    /// fix them in a single pass.
+    UnsupportedFilters {
+        filters: Vec<UnsupportedFilter>,
     },
     /// A directive other than `Preamp` / `Filter` (`Channel:`, `Include:`, …).
     UnsupportedLine {
@@ -70,6 +71,13 @@ pub enum ImportError {
         max_bytes: u64,
     },
     ReadFailed,
+}
+
+/// One unsupported filter: its 1-based line and the offending token(s).
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct UnsupportedFilter {
+    pub line: usize,
+    pub kind: String,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -135,6 +143,7 @@ pub fn parse_parametric_profile(text: &str) -> Result<ImportedProfile, ImportErr
     let text = text.strip_prefix('\u{feff}').unwrap_or(text);
     let mut preamp: Option<f32> = None;
     let mut bands = Vec::new();
+    let mut unsupported = Vec::new();
 
     for (idx, raw) in text.lines().enumerate() {
         let line_no = idx + 1;
@@ -152,12 +161,21 @@ pub fn parse_parametric_profile(text: &str) -> Result<ImportedProfile, ImportErr
             }
             preamp = Some(parse_preamp(rest).ok_or(ImportError::Malformed { line: line_no })?);
         } else if is_filter_directive(&directive) {
-            bands.push(parse_filter(rest, line_no)?);
+            match parse_filter(rest, line_no) {
+                Ok(band) => bands.push(band),
+                Err(ImportError::UnsupportedFilters { filters }) => unsupported.extend(filters),
+                Err(e) => return Err(e),
+            }
         } else {
             return Err(ImportError::UnsupportedLine { line: line_no });
         }
     }
 
+    if !unsupported.is_empty() {
+        return Err(ImportError::UnsupportedFilters {
+            filters: unsupported,
+        });
+    }
     if bands.is_empty() {
         return Err(ImportError::Empty);
     }
@@ -208,6 +226,22 @@ fn parse_preamp(rest: &str) -> Option<f32> {
     }
 }
 
+fn unsupported_filter(line: usize, kind: &str) -> ImportError {
+    ImportError::UnsupportedFilters {
+        filters: vec![UnsupportedFilter {
+            line,
+            kind: kind.to_string(),
+        }],
+    }
+}
+
+/// A shelf slope token such as `6dB` or `12dB`.
+fn is_slope(token: &str) -> bool {
+    token
+        .strip_suffix("db")
+        .is_some_and(|n| !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()))
+}
+
 fn parse_filter(rest: &str, line: usize) -> Result<ParametricBand, ImportError> {
     let malformed = ImportError::Malformed { line };
     let mut tokens = rest.split_whitespace().peekable();
@@ -223,10 +257,7 @@ fn parse_filter(rest: &str, line: usize) -> Result<ParametricBand, ImportError> 
         "LSC" => ParametricKind::LowShelf,
         "HSC" => ParametricKind::HighShelf,
         _ => {
-            return Err(ImportError::UnsupportedFilter {
-                line,
-                kind: kind_token.to_string(),
-            })
+            return Err(unsupported_filter(line, kind_token));
         }
     };
 
@@ -236,8 +267,12 @@ fn parse_filter(rest: &str, line: usize) -> Result<ParametricBand, ImportError> 
             "fc" => (&mut freq, Some("hz")),
             "gain" => (&mut gain_db, Some("db")),
             "q" => (&mut q, None),
-            // `BW Oct`, slope variants (`LSC 12dB`), … — shapes the engine
-            // can't reproduce exactly.
+            // `BW Oct`, slope variants (`LSC 12dB`) — valid APO shapes the
+            // engine can't reproduce exactly.
+            "bw" => return Err(unsupported_filter(line, "BW Oct")),
+            k if is_slope(k) => {
+                return Err(unsupported_filter(line, &format!("{kind_token} {key}")))
+            }
             _ => return Err(malformed),
         };
         if slot.is_some() {
@@ -479,11 +514,50 @@ Filter 2: ON LP Fc 15000 Hz";
             "Preamp: -1 dB\nFilter 1: ON PK Fc 100 Hz Gain 1 dB Q 1\nFilter 2: ON LP Fc 15000 Hz";
         assert_eq!(
             parse_parametric_profile(text),
-            Err(ImportError::UnsupportedFilter {
-                line: 3,
-                kind: "LP".into()
+            Err(ImportError::UnsupportedFilters {
+                filters: vec![UnsupportedFilter {
+                    line: 3,
+                    kind: "LP".into()
+                }]
             })
         );
+    }
+
+    #[test]
+    fn reports_every_unsupported_filter_at_once() {
+        let text = "Filter 1: ON LP Fc 15000 Hz\n\
+                    Filter 2: ON PK Fc 100 Hz Gain 1 dB Q 1\n\
+                    Filter 3: ON HP Fc 20 Hz\n\
+                    Filter 4: ON LS Fc 100 Hz Gain 1 dB";
+        let kinds: Vec<_> = match parse_parametric_profile(text) {
+            Err(ImportError::UnsupportedFilters { filters }) => {
+                filters.into_iter().map(|f| (f.line, f.kind)).collect()
+            }
+            other => panic!("unexpected {other:?}"),
+        };
+        assert_eq!(
+            kinds,
+            vec![(1, "LP".into()), (3, "HP".into()), (4, "LS".into())]
+        );
+    }
+
+    #[test]
+    fn valid_apo_shapes_we_cannot_reproduce_are_unsupported_not_malformed() {
+        for (text, kind) in [
+            ("Filter 1: ON LSC 12dB Fc 100 Hz Gain 1 dB Q 1", "LSC 12dB"),
+            ("Filter 1: ON PEQ Fc 100 Hz Gain 1 dB BW Oct 0.5", "BW Oct"),
+        ] {
+            assert_eq!(
+                parse_parametric_profile(text),
+                Err(ImportError::UnsupportedFilters {
+                    filters: vec![UnsupportedFilter {
+                        line: 1,
+                        kind: kind.into()
+                    }]
+                }),
+                "{text}"
+            );
+        }
     }
 
     #[test]
@@ -500,7 +574,6 @@ Filter 2: ON LP Fc 15000 Hz";
         for (text, line) in [
             ("Filter 1: ON PK Fc abc Hz Gain 1 dB Q 1", 1),
             ("Filter 1: ON PK Fc 100 Hz Gain 1 dB", 1),
-            ("Filter 1: ON PK Fc 100 Hz BW Oct 1 Gain 1 dB", 1),
             ("Filter 1: MAYBE PK Fc 100 Hz Gain 1 dB Q 1", 1),
             ("Filter 1: ON PK Fc 100 Hz Fc 200 Hz Gain 1 dB Q 1", 1),
             ("Filter 1: ON PK Fc NaN Hz Gain 1 dB Q 1", 1),

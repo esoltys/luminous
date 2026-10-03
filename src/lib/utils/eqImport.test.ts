@@ -17,9 +17,19 @@ describe("profileNameFromPath", () => {
 describe("importErrorMessage", () => {
   const err = (value: object) => JSON.stringify(value);
 
-  it("names the line and filter type the equalizer can't reproduce", () => {
-    expect(importErrorMessage(err({ code: "unsupported_filter", line: 3, kind: "LP" }))).toBe(
-      "Line 3 uses a filter of type LP. Only peak (PK), low-shelf (LSC) and high-shelf (HSC) filters can be imported."
+  it("lists every filter the equalizer can't reproduce, with a next step", () => {
+    expect(
+      importErrorMessage(
+        err({
+          code: "unsupported_filters",
+          filters: [
+            { line: 3, kind: "LP" },
+            { line: 5, kind: "LSC 12dB" },
+          ],
+        })
+      )
+    ).toBe(
+      "Unsupported filters: LP (line 3), LSC 12dB (line 5). Remove them, or export the profile from AutoEq, which only uses peak (PK), low-shelf (LSC) and high-shelf (HSC) filters."
     );
   });
 
