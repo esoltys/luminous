@@ -217,6 +217,13 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config libayatana-appind
   stale keys), placeholder token matching, and non-identical French translations (unless explicitly
   allowlisted in `IDENTICAL_OK`) are enforced in CI by `src/lib/locales/locales.test.ts`.
 
+- **French is Canadian French**: for `src/lib/locales/fr.ts` and the French user guide, check terms in
+  the OQLF's Grand dictionnaire terminologique (vitrinelinguistique.oqlf.gouv.qc.ca) first, then
+  TERMIUM Plus. Established terms: *étiquette* (tag), *diffusion en continu* (streaming), *bogue*
+  (bug), *liste de lecture* (playlist), *simple* (single), *zone de notification* (system tray),
+  *palmarès* (chart), *image dans l'image* (picture-in-picture). Typography: a space before `:` and
+  inside « », none before `?`, `!` or `;`.
+
 ## Code Conventions
 
 - **Protections run before what they protect against**: on the boot path, check order, not presence —

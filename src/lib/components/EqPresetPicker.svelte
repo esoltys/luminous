@@ -27,7 +27,7 @@
     presets,
     mode,
     previews,
-    gainRange = { min: -12, max: 12 },
+    gainRange = { min: -20, max: 20 },
     getLabel,
     onselect,
     class: className = "",
@@ -43,7 +43,6 @@
       "Bass Boost": "bassBoostPreset",
       "Vocal Boost": "vocalBoostPreset",
       "Treble Boost": "trebleBoostPreset",
-      "Headphones": "headphonesPreset",
     };
     const key = keyMap[name];
     return key ? i18n.t(`equalizer.${key}`) : name;

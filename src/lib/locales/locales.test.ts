@@ -33,12 +33,11 @@ function extractPlaceholders(str: string): string[] {
  * (e.g. loanwords, shared musical terminology, technical acronyms, brand names, or symbols).
  */
 const IDENTICAL_OK = new Set([
+  "equalizer.importPlaceholder", // Equalizer APO sample lines, same syntax in every language
   "albumDetail.statsLine", // "{genre} · {year} · {duration}"
   "albumTagEditor.genreField", // "Genre"
   "artistDetail.albumsFilter", // "Albums ({count})"
   "artistDetail.epsFilter", // "EPs ({count})"
-  "artistDetail.singlesFilter", // "Singles ({count})"
-  "artistDetail.tags", // "Tags"
   "audioPipeline.bitPerfect", // "Bit-perfect"
   "audioPipeline.codec", // "Codec"
   "audioPipeline.normalizationGain", // "{gain} dB ({source})"
@@ -91,13 +90,11 @@ const IDENTICAL_OK = new Set([
   "playlists.activeBadgeLabel", // "Active"
   "playlists.bpmAutoPlaylist", // "BPM"
   "playlists.genreAutoPlaylist", // "Genre"
-  "playlists.playlistTypeLabel", // "Playlist"
   "playlists.tableHeaderTrack", // "#"
   "settings.badgeColorCyan", // "Cyan"
   "settings.badgeColorIndigo", // "Indigo"
   "settings.badgeColorOrange", // "Orange"
   "settings.badgeIconArchive", // "Archive"
-  "settings.badgeIconCloud", // "Cloud / NAS"
   "settings.badgeIconUsb", // "USB"
   "settings.formatMsix", // "Microsoft Store"
   "settings.languageEnglish", // "English"
@@ -105,7 +102,6 @@ const IDENTICAL_OK = new Set([
   "settings.simple", // "Simple"
   "settings.statsAlbums", // "Albums"
   "settings.tabSources", // "Sources"
-  "settings.updateBuildLabel", // "build {hash}"
   "settings.webdavUrlPlaceholder", // "https://cloud.example.com/remote.php/webdav"
   "shortcuts.groupNavigation", // "Navigation"
   "sidebar.albums", // "Albums"
@@ -123,7 +119,6 @@ const IDENTICAL_OK = new Set([
   "smartPlaylistBuilder.opLte", // "<="
   "smartPlaylistBuilder.opNotEquals", // "!="
   "songTags.viewGenre", // "Genre"
-  "songTags.viewTags", // "Tags"
   "stats.heatmapStatus", // "{date} — {minutes} min"
   "stats.minuteCount", // "{count} min"
   "stats.minuteUnderOne", // "< 1 min"

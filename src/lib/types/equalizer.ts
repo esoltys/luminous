@@ -55,3 +55,18 @@ export interface EqRanges {
   max_bands: number;
   min_bands: number;
 }
+
+/** Why `import_parametric_profile` / `read_eq_profile_file` refused a profile
+ * (#1336). Crosses IPC as a JSON string; preset-store failures reuse the
+ * `eq_presets` codes. Lines are 1-based. */
+export type EqImportError =
+  | { code: "empty" }
+  | { code: "too_many_filters"; count: number; max: number }
+  | { code: "unsupported_filter"; line: number; kind: string }
+  | { code: "unsupported_line"; line: number }
+  | { code: "malformed"; line: number }
+  | { code: "out_of_range"; line: number; field: "freq" | "gain" | "q"; value: number; min: number; max: number }
+  | { code: "preamp_out_of_range"; value: number; min: number; max: number }
+  | { code: "file_too_large"; max_bytes: number }
+  | { code: "read_failed" }
+  | { code: "empty_name" | "duplicate_name" | "not_found" };

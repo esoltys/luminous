@@ -261,6 +261,13 @@ h1 {
   letter-spacing: -0.02em;
   margin: 0 0 18px;
 }
+h2 {
+  font-family: 'Expose', sans-serif;
+  font-weight: 700;
+  font-size: 19px;
+  letter-spacing: -0.01em;
+  margin: 36px 0 14px;
+}
 p, .p {
   font-size: 15px;
   color: var(--text-body);
@@ -287,6 +294,12 @@ figure { margin: 0; }
 .shot img { display: block; width: 100%; height: auto; cursor: zoom-in; }
 .caption { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+/* Low-resolution shots (the mini player): always side by side, never
+   larger than their native 340px. They shrink, rather than stretch, on a
+   narrow page (unlike .grid2, which collapses to one full-width column). */
+.pair-native { display: grid; grid-template-columns: repeat(2, minmax(0, 340px)); gap: 16px; }
+/* The app's own Phosphor icons, inline with the text that names them. */
+.ui-icon { display: inline-block; width: 1.15em; height: 1.15em; vertical-align: -0.22em; color: var(--color-text-primary); }
 
 .table { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
 .tr {

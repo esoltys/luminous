@@ -4,8 +4,24 @@
   import { CompassIcon as Compass } from "phosphor-svelte";
   import LoadingSpinner from "./LoadingSpinner.svelte";
   import Button from "./Button.svelte";
+  import { openExternalUrl } from "../utils/openExternalUrl";
 
   let isLoading = $state(true);
+
+  /**
+   * Open the guide's web links in the system browser. Inside the iframe a
+   * link would otherwise navigate the guide away, or — with target=_blank —
+   * ask for a new webview window, which the app doesn't allow, so nothing
+   * happens. In-page anchors and the guide's own files are left alone.
+   */
+  function openWebLinksExternally(doc: Document) {
+    doc.addEventListener("click", (e) => {
+      const link = (e.target as Element | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
+      if (!link || !/^https?:$/.test(link.protocol) || link.origin === doc.location.origin) return;
+      e.preventDefault();
+      openExternalUrl(link.href);
+    });
+  }
 </script>
 
 <div class="relative flex flex-col h-full overflow-hidden bg-brand-main">
@@ -26,7 +42,9 @@
     class="flex-1 w-full h-full border-0 transition-opacity duration-150 {isLoading ? 'opacity-0' : 'opacity-100'}"
     onload={(e) => {
       isLoading = false;
-      (e.currentTarget as HTMLIFrameElement).contentWindow?.scrollTo(0, 0);
+      const frame = e.currentTarget as HTMLIFrameElement;
+      frame.contentWindow?.scrollTo(0, 0);
+      if (frame.contentDocument) openWebLinksExternally(frame.contentDocument);
     }}
   ></iframe>
 </div>

@@ -6,8 +6,22 @@ import { svelteTesting } from "@testing-library/svelte/vite";
 import { tauriIpcMockPlugin } from "./scripts/vite-mock-plugin.ts";
 
 import { execSync } from "child_process";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const host = process.env.TAURI_DEV_HOST;
+const projectRoot = path.dirname(fileURLToPath(import.meta.url));
+
+// Worktrees nested in this checkout (`.claude/worktrees/`, `.worktrees/`).
+// Matched relative to this checkout, not as a `**/.claude/**` glob: the
+// watcher tests absolute paths, and every file of a worktree itself lives
+// under `.claude/`, so the glob made a worktree's dev server ignore all of
+// its own sources and HMR never fired.
+function isNestedWorktree(file) {
+  const top = path.relative(projectRoot, path.resolve(projectRoot, file)).split(path.sep)[0];
+  return top === ".claude" || top === ".worktrees";
+}
+
 let commitHash = "";
 try {
   commitHash = execSync("git rev-parse --short HEAD").toString().trim();
@@ -122,12 +136,7 @@ export default defineConfig(async () => ({
       : undefined,
     watch: {
       // 3. tell Vite to ignore watching `src-tauri` and `target` build outputs, and worktrees
-      ignored: [
-        "**/src-tauri/**",
-        "**/target/**",
-        "**/.worktrees/**",
-        "**/.claude/**",
-      ],
+      ignored: ["**/src-tauri/**", "**/target/**", isNestedWorktree],
     },
   },
 }));
