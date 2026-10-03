@@ -17,6 +17,7 @@ import {
 } from "../utils/colorUtils";
 import { LIGHTNESS_STEP } from "../constants";
 import { prefersReducedMotion } from "../utils/motion";
+import { addonsStore, type AddonsStore, type AddonTheme } from "./addons.svelte";
 
 const MAX_READABILITY_ADJUST_STEPS = 30;
 
@@ -564,10 +565,23 @@ export class ThemeStore {
    */
   colorSchemeMode = $state<"light" | "dark" | "system">("system");
 
-  constructor() {}
+  /**
+   * Add-on theme id restored from settings (or the last one active) that
+   * isn't usable right now — unregistered, unowned or still downloading.
+   * The saved `active_theme_id` is never overwritten while this is set, so
+   * the choice comes back once the add-on becomes owned again.
+   */
+  pendingAddonThemeId: string | null = null;
+  private addons: AddonsStore;
+  private unsubscribeAddons: (() => void) | null = null;
+
+  constructor(addons: AddonsStore = addonsStore) {
+    this.addons = addons;
+  }
 
   async init() {
     this.watchSystemColorScheme();
+    this.unsubscribeAddons ??= this.addons.subscribe(() => this.reconcileAddonTheme());
 
     try {
       const settings = await invoke<Record<string, string>>("get_all_app_settings");
@@ -581,8 +595,12 @@ export class ThemeStore {
         }
         if (settings.active_theme_id) {
           const themeId = settings.active_theme_id;
-          if (PREDEFINED_THEMES.some(t => t.id === themeId) || this.customThemes.some(t => t.id === themeId)) {
+          if (this.isBuiltInThemeId(themeId)) {
             this.activeThemeId = themeId;
+          } else {
+            // Not a predefined or custom theme: assume an add-on id and wait
+            // for the registry to report it owned (reconcileAddonTheme).
+            this.pendingAddonThemeId = themeId;
           }
         }
         if (settings.color_scheme_mode === "light" || settings.color_scheme_mode === "dark" || settings.color_scheme_mode === "system") {
@@ -641,7 +659,40 @@ export class ThemeStore {
     const predefined = PREDEFINED_THEMES.find(t => t.id === this.activeThemeId);
     if (predefined) return predefined;
     const custom = this.customThemes.find(t => t.id === this.activeThemeId);
-    return custom || PREDEFINED_THEMES.find(t => t.id === "system") || PREDEFINED_THEMES[0];
+    if (custom) return custom;
+    const addon = this.addons.isUsable(this.activeThemeId) ? this.addons.asTheme(this.activeThemeId) : undefined;
+    return addon || PREDEFINED_THEMES.find(t => t.id === "system") || PREDEFINED_THEMES[0];
+  }
+
+  /** The active add-on theme when one is selected and usable, else null. */
+  get activeAddon(): AddonTheme | null {
+    return this.addons.isUsable(this.activeThemeId) ? this.addons.themes[this.activeThemeId] : null;
+  }
+
+  private isBuiltInThemeId(themeId: string): boolean {
+    return PREDEFINED_THEMES.some(t => t.id === themeId) || this.customThemes.some(t => t.id === themeId);
+  }
+
+  /**
+   * Keeps the active theme honest as add-on ownership changes: re-applies a
+   * pending add-on theme once it is owned, and falls back to System (in
+   * memory only — the saved choice stays) when the active one stops being
+   * usable, e.g. a refund or a revoked key.
+   */
+  reconcileAddonTheme() {
+    const pending = this.pendingAddonThemeId;
+    if (pending && this.addons.isUsable(pending)) {
+      this.pendingAddonThemeId = null;
+      this.activeThemeId = pending;
+      this.applyActiveTheme();
+      return;
+    }
+    const active = this.activeThemeId;
+    if (!this.isBuiltInThemeId(active) && !this.addons.isUsable(active)) {
+      this.pendingAddonThemeId = active;
+      this.activeThemeId = "system";
+      this.applyActiveTheme();
+    }
   }
 
   /**
@@ -676,7 +727,8 @@ export class ThemeStore {
   }
 
   async setTheme(themeId: string) {
-    if (PREDEFINED_THEMES.some(t => t.id === themeId) || this.customThemes.some(t => t.id === themeId)) {
+    if (this.isBuiltInThemeId(themeId) || this.addons.isUsable(themeId)) {
+      this.pendingAddonThemeId = null;
       this.activeThemeId = themeId;
       this.applyActiveTheme();
       await invoke("set_app_setting", { key: "active_theme_id", value: themeId });
