@@ -9,6 +9,7 @@
 //   collection — Library scanner + file watcher
 //   playlist  — Playlist CRUD + undo/redo
 
+pub mod addons;
 pub mod analyzer;
 pub mod artist_image;
 pub mod audio;
@@ -883,6 +884,16 @@ pub fn run() {
                 let uri = request.uri().to_string();
                 tauri::async_runtime::spawn_blocking(move || {
                     responder.respond(crate::covermanager::serve_art_request(&covers_dir, &uri));
+                });
+            },
+        )
+        // Decrypted add-on overlay assets, served from memory only (#1413).
+        .register_asynchronous_uri_scheme_protocol(
+            "luminous-addon",
+            move |_ctx, request, responder| {
+                let uri = request.uri().to_string();
+                tauri::async_runtime::spawn_blocking(move || {
+                    responder.respond(crate::addons::serve_request(&uri));
                 });
             },
         )

@@ -42,6 +42,8 @@ export interface AddonTheme {
   colors: Theme["colors"];
   /** Entry point the overlay runtime loads (#1413); null for palette-only add-ons. */
   overlayEntry: string | null;
+  /** Optional manifest opt-ins; `"spectrum"` streams spectrum data to the overlay. */
+  capabilities?: string[];
 }
 
 interface AddonStatus {
