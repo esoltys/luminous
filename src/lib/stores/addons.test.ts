@@ -41,16 +41,17 @@ describe("AddonsStore", () => {
     expect(addons.errorOf(FIXTURE.id)).toBe("boom");
   });
 
-  it("changes state only from the addon-state-changed event", async () => {
-    let handler: ((e: { payload: AddonStateChange }) => void) | undefined;
-    vi.mocked(listen).mockImplementationOnce((async (name: string, cb: typeof handler) => {
-      expect(name).toBe("addon-state-changed");
-      handler = cb;
+  it("changes state and registers themes only from backend events", async () => {
+    const handlers: Record<string, (e: { payload: never }) => void> = {};
+    vi.mocked(listen).mockImplementation((async (name: string, cb: never) => {
+      handlers[name] = cb;
       return () => {};
     }) as never);
-    addons.register(FIXTURE);
     await addons.init();
-    handler!({ payload: { id: FIXTURE.id, state: "owned" } });
+    handlers["addon-theme-defined"]({ payload: FIXTURE as never });
+    expect(addons.isAddonId(FIXTURE.id)).toBe(true);
+    expect(addons.isUsable(FIXTURE.id)).toBe(false);
+    handlers["addon-state-changed"]({ payload: { id: FIXTURE.id, state: "owned" } as never });
     expect(addons.stateOf(FIXTURE.id)).toBe("owned");
   });
 });

@@ -137,6 +137,7 @@ tokio-console = ["dep:console-subscriber"]
 tauri-plugin-prevent-default = { version = "6", features = ["platform-windows"] }
 # Polls the live Shift-key state at drag-and-drop time via GetAsyncKeyState.
 windows-sys = { version = "0.61", features = ["Win32_UI_Input_KeyboardAndMouse"] }
+windows-collections = "0.3"
 # --- OS "Now Playing" integration: SMTC (#576) ---
 # Registers our window with System Media Transport Controls via
 # `ISystemMediaTransportControlsInterop::GetForWindow` (Win32_System_WinRT),
@@ -145,6 +146,9 @@ windows-sys = { version = "0.61", features = ["Win32_UI_Input_KeyboardAndMouse"]
 windows = { version = "0.62", features = [
     "Media_Control",
     "Foundation",
+    # --- Microsoft Store entitlement for add-on themes (#1414) ---
+    "Services_Store",
+    "Foundation_Collections",
     "Storage_Streams",
     "Win32_Foundation",
     "Win32_System_Com",

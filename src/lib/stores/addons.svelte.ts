@@ -60,22 +60,28 @@ export class AddonsStore {
   statuses = $state<Record<string, AddonStatus>>({});
 
   private listeners = new Set<Listener>();
-  private unlisten: UnlistenFn | null = null;
+  private unlisten: UnlistenFn[] = [];
 
   /**
-   * Subscribe to the backend's `addon-state-changed` event. State only ever
-   * changes from this event — never from the result of an `invoke()`.
+   * Subscribe to the backend's `addon-state-changed` and `addon-theme-defined`
+   * events. State only ever changes from these events — never from the result
+   * of an `invoke()`.
    */
   async init() {
-    if (this.unlisten) return;
-    this.unlisten = await listen<AddonStateChange>("addon-state-changed", (event) => {
-      this.applyEvent(event.payload);
-    });
+    if (this.unlisten.length) return;
+    this.unlisten = await Promise.all([
+      listen<AddonStateChange>("addon-state-changed", (event) => {
+        this.applyEvent(event.payload);
+      }),
+      listen<AddonTheme>("addon-theme-defined", (event) => {
+        this.register(event.payload);
+      })
+    ]);
   }
 
   destroy() {
-    this.unlisten?.();
-    this.unlisten = null;
+    for (const stop of this.unlisten) stop();
+    this.unlisten = [];
   }
 
   /** Called by the theme store so a persisted add-on theme is re-applied once it becomes owned. */
