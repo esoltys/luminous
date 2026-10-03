@@ -27,7 +27,7 @@
     presets,
     mode,
     previews,
-    gainRange = { min: -12, max: 12 },
+    gainRange = { min: -20, max: 20 },
     getLabel,
     onselect,
     class: className = "",

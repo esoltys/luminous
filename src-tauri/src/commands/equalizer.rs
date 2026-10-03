@@ -165,6 +165,54 @@ pub async fn save_eq_user_preset(
     .await
 }
 
+/// Import an Equalizer APO / AutoEq parametric profile (#1336) as a new user
+/// preset named `name`, which becomes active with the EQ switched on.
+///
+/// All-or-nothing: the text is parsed and the preset saved before the engine
+/// is touched, so a bad file or a taken name changes nothing. Errors are a
+/// JSON `{ "code": ... }` string — an `eq_import::ImportError`, or an
+/// `eq_presets::ERR_*` code.
+pub fn import_profile_into(
+    db: &crate::db::Database,
+    eq: &mut Equalizer,
+    text: &str,
+    name: &str,
+) -> Result<EqualizerConfig, String> {
+    let profile = crate::eq_import::parse_parametric_profile(text).map_err(|e| e.to_json())?;
+    let preset_err = |code: String| serde_json::json!({ "code": code }).to_string();
+    let conn = db.pool.get().map_err(|e| preset_err(e.to_string()))?;
+    let id = eq_presets::create(&conn, name, &profile.bands, profile.preamp).map_err(preset_err)?;
+    eq.load_user_preset(id, &profile.bands, profile.preamp);
+    eq.enabled = true;
+    save_eq_settings(db, eq);
+    Ok(EqualizerConfig::snapshot(eq))
+}
+
+#[tauri::command]
+pub async fn import_parametric_profile(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    text: String,
+    name: String,
+) -> Result<EqualizerConfig, String> {
+    let db = state.db.clone();
+    let canonical = crate::audio::with_audio(&state.audio, move |engine| {
+        engine.with_equalizer(|eq| import_profile_into(&db, eq, &text, &name))
+    })
+    .await?;
+    emit_pipeline_changed(&app, &state).await;
+    Ok(canonical)
+}
+
+/// Read a profile file the user picked, for the import panel to show and
+/// then pass to `import_parametric_profile`. Read here rather than by the
+/// webview because the picked file can be anywhere on disk. Errors are the
+/// same JSON `{ "code": ... }` string.
+#[tauri::command]
+pub async fn read_eq_profile_file(path: String) -> Result<String, String> {
+    crate::eq_import::read_profile_file(std::path::Path::new(&path)).map_err(|e| e.to_json())
+}
+
 #[tauri::command]
 pub async fn rename_eq_user_preset(
     state: State<'_, AppState>,
@@ -279,4 +327,83 @@ pub async fn get_eq_preset_previews(
     }
 
     Ok(previews)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::Database;
+
+    const PROFILE: &str = "Preamp: -6.3 dB
+                           Filter 1: ON LSC Fc 105 Hz Gain 6.5 dB Q 0.70
+                           Filter 2: OFF PK Fc 125 Hz Gain -2.7 dB Q 0.55
+";
+
+    fn setup() -> (tempfile::TempDir, Database, Equalizer) {
+        let dir = tempfile::Builder::new()
+            .prefix("luminous_eq_import_test_")
+            .tempdir()
+            .unwrap();
+        let db = Database::new(dir.path().to_path_buf()).unwrap();
+        let mut eq = Equalizer::new();
+        eq.update_format(48_000, 2);
+        // A non-flat graphic starting point, so any partial apply would show.
+        eq.load_preset([3.0; 10]);
+        eq.set_preamp(-1.0);
+        (dir, db, eq)
+    }
+
+    fn code(err: &str) -> String {
+        let v: serde_json::Value = serde_json::from_str(err).unwrap();
+        v["code"].as_str().unwrap().to_string()
+    }
+
+    #[test]
+    fn import_saves_exact_profile_as_the_active_user_preset() {
+        let (_dir, db, mut eq) = setup();
+        let echo = import_profile_into(&db, &mut eq, PROFILE, " HD 600 ").unwrap();
+
+        let conn = db.pool.get().unwrap();
+        let presets = eq_presets::list(&conn).unwrap();
+        assert_eq!(presets.len(), 1);
+        assert_eq!(presets[0].name, "HD 600");
+        let stored = eq_presets::get(&conn, presets[0].id).unwrap();
+        let parsed = crate::eq_import::parse_parametric_profile(PROFILE).unwrap();
+        assert_eq!(stored.bands, parsed.bands);
+        assert_eq!(stored.preamp, -6.3);
+
+        assert!(echo.enabled);
+        assert_eq!(echo.mode, EqMode::Parametric);
+        assert_eq!(echo.parametric, parsed.bands);
+        assert_eq!(echo.preamp, -6.3);
+        assert_eq!(
+            echo.active_preset,
+            Some(crate::equalizer::user_preset_key(presets[0].id))
+        );
+    }
+
+    #[test]
+    fn unparseable_profile_saves_nothing_and_leaves_eq_alone() {
+        let (_dir, db, mut eq) = setup();
+        let before = EqualizerConfig::snapshot(&eq);
+        let err = import_profile_into(&db, &mut eq, "Filter 1: ON LP Fc 100 Hz", "X").unwrap_err();
+        assert_eq!(code(&err), "unsupported_filter");
+        assert_eq!(EqualizerConfig::snapshot(&eq), before);
+        assert!(eq_presets::list(&db.pool.get().unwrap()).unwrap().is_empty());
+    }
+
+    #[test]
+    fn taken_or_empty_name_saves_nothing_and_leaves_eq_alone() {
+        let (_dir, db, mut eq) = setup();
+        eq_presets::create(&db.pool.get().unwrap(), "HD 600", &[], 0.0).unwrap();
+        let before = EqualizerConfig::snapshot(&eq);
+
+        let err = import_profile_into(&db, &mut eq, PROFILE, "hd 600").unwrap_err();
+        assert_eq!(code(&err), eq_presets::ERR_DUPLICATE_NAME);
+        let err = import_profile_into(&db, &mut eq, PROFILE, "  ").unwrap_err();
+        assert_eq!(code(&err), eq_presets::ERR_EMPTY_NAME);
+
+        assert_eq!(EqualizerConfig::snapshot(&eq), before);
+        assert_eq!(eq_presets::list(&db.pool.get().unwrap()).unwrap().len(), 1);
+    }
 }

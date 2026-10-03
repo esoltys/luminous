@@ -27,6 +27,7 @@ pub mod default_apps;
 pub mod diagnostics;
 pub mod discord;
 pub mod dr_parser;
+pub mod eq_import;
 pub mod eq_presets;
 pub mod equalizer;
 pub mod fade;
@@ -1389,6 +1390,8 @@ pub fn run() {
             commands::equalizer::load_equalizer_preset,
             commands::equalizer::list_eq_presets,
             commands::equalizer::save_eq_user_preset,
+            commands::equalizer::import_parametric_profile,
+            commands::equalizer::read_eq_profile_file,
             commands::equalizer::rename_eq_user_preset,
             commands::equalizer::delete_eq_user_preset,
             // Loudness normalization commands

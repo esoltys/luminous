@@ -26,16 +26,19 @@ pub const EQ_FREQ_RANGE: SettingRange = SettingRange {
     min: 20.0,
     max: 20000.0,
 };
+/// ±20 dB matches AutoEq, whose profiles use up to that per filter (#1336).
 pub const EQ_GAIN_RANGE: SettingRange = SettingRange {
-    min: -12.0,
-    max: 12.0,
+    min: -20.0,
+    max: 20.0,
 };
 pub const EQ_Q_RANGE: SettingRange = SettingRange {
     min: 0.1,
     max: 10.0,
 };
+/// Deeper cut than boost: an AutoEq preamp is minus the profile's largest
+/// boost, so a +16 dB bass shelf ships with −16 dB of preamp.
 pub const EQ_PREAMP_RANGE: SettingRange = SettingRange {
-    min: -12.0,
+    min: -24.0,
     max: 12.0,
 };
 
@@ -352,7 +355,7 @@ pub fn default_parametric_bands() -> Vec<ParametricBand> {
 /// Snapshot of the user-adjustable EQ state — the value type crossing the
 /// IPC boundary in both directions. The frontend edits a config and applies
 /// it whole; the echoed snapshot (post-clamping) is the canonical state.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct EqualizerConfig {
     pub enabled: bool,
     pub mode: EqMode,
@@ -972,7 +975,7 @@ mod tests {
             band(
                 ParametricKind::Peak,
                 EQ_FREQ_RANGE.min,
-                12.0,
+                EQ_GAIN_RANGE.max,
                 EQ_Q_RANGE.max
             )
         );
@@ -981,7 +984,7 @@ mod tests {
             band(
                 ParametricKind::HighShelf,
                 EQ_FREQ_RANGE.max,
-                -12.0,
+                EQ_GAIN_RANGE.min,
                 EQ_Q_RANGE.min
             )
         );
@@ -1027,7 +1030,7 @@ mod tests {
         });
         assert_eq!(echoed.parametric[0].freq, 5000.0);
         assert_eq!(echoed.parametric[1].kind, ParametricKind::LowShelf);
-        assert_eq!(echoed.parametric[1].gain_db, 12.0);
+        assert_eq!(echoed.parametric[1].gain_db, EQ_GAIN_RANGE.max);
         assert_eq!(echoed.preamp, EQ_PREAMP_RANGE.min);
     }
 
