@@ -1493,6 +1493,12 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
       format: "exe",
       human_name: "Windows Portable / Installer",
       supports_self_update: true,
+      is_portable: false,
+    }),
+
+    get_data_directory_info: () => ({
+      path: "C:\\Users\\Mock\\AppData\\Roaming\\org.luminous.music",
+      is_portable: false,
     }),
 
     get_fade_settings: () => ({

@@ -329,5 +329,17 @@ describe("UpdaterStore", () => {
       expect(updaterStore.updateCheckEnabled).toBe(true);
       expect(updaterStore.updateAutoInstall).toBe(true);
     });
+
+    it("handles portable install format without error", () => {
+      updaterStore.installFormat = {
+        format: "windows_portable",
+        human_name: "Windows Portable",
+        supports_self_update: false,
+        is_portable: true,
+      };
+      expect(updaterStore.installFormat.is_portable).toBe(true);
+      expect(updaterStore.installFormat.supports_self_update).toBe(false);
+      expect(updaterStore.isExternallyManaged).toBe(false);
+    });
   });
 });

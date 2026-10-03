@@ -922,9 +922,8 @@ pub fn run() {
             }
         }))
         .setup(move |app| {
-            if let Ok(app_data_dir) = app.path().app_data_dir() {
-                diagnostics::install_panic_hook(app_data_dir);
-            }
+            let app_data_dir = crate::paths::resolve_app_data_dir(app);
+            diagnostics::install_panic_hook(app_data_dir);
 
             let db = Arc::new(
                 Database::new(crate::paths::resolve_app_data_dir(app))
@@ -1462,6 +1461,7 @@ pub fn run() {
             commands::settings::set_autostart_enabled,
             commands::diagnostics::log_frontend_error,
             commands::diagnostics::export_diagnostics,
+            commands::diagnostics::get_data_directory_info,
             install_format::get_install_format,
             // Scrobbler commands (#83)
             commands::scrobbler::get_scrobbler_settings,

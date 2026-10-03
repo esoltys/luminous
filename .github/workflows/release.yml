@@ -145,7 +145,27 @@ jobs:
           CARGO_TARGET_DIR: ${{ github.workspace }}/target
         run: bun run tauri:windows:build
 
-      - name: Upload MSIX to Release Assets
+      - name: Package Windows Portable ZIP
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          $version = "${{ needs.create-release.outputs.tag }}".TrimStart("v")
+          $portableDir = "target/portable/Luminous.Music.Player_${version}_x64_Portable"
+          New-Item -ItemType Directory -Force -Path $portableDir
+          Copy-Item "target/release/LuminousMusicPlayer.exe" -Destination $portableDir/
+          New-Item -ItemType File -Path "$portableDir/portable"
+          Set-Content -Path "$portableDir/README-PORTABLE.txt" -Value @(
+            "Luminous Music Player - Portable Edition"
+            "========================================"
+            "This portable edition stores all application data, settings, database (luminous.db),"
+            "and cover art caches in the local `"data`" directory alongside the executable."
+            ""
+            "To keep this installation portable, keep the `"portable`" marker file in this folder."
+          )
+          $zipFile = "target/portable/Luminous.Music.Player_${version}_x64_Portable.zip"
+          Compress-Archive -Path "$portableDir/*" -DestinationPath $zipFile -Force
+
+      - name: Upload MSIX and Portable ZIP to Release Assets
         if: matrix.platform == 'windows-latest'
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
@@ -156,6 +176,7 @@ jobs:
           files: |
             target/msix/*.msix
             target/msix/*.msixbundle
+            target/portable/*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

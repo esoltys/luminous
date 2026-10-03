@@ -23,6 +23,7 @@ pub struct InstallFormatInfo {
     pub format: String,
     pub human_name: String,
     pub supports_self_update: bool,
+    pub is_portable: bool,
 }
 
 #[tauri::command]
@@ -37,6 +38,10 @@ pub fn get_install_format() -> InstallFormatInfo {
 /// branches return identical values) since NSIS/MSI is the only shipped
 /// distribution today.
 pub fn detect_install_format() -> InstallFormatInfo {
+    let is_portable = crate::paths::detect_executable_base_dir()
+        .map(|b| crate::paths::is_eligible_portable_dir(&b))
+        .unwrap_or(false);
+
     #[cfg(target_os = "linux")]
     {
         if env::var("FLATPAK_ID").is_ok() {
@@ -48,6 +53,7 @@ pub fn detect_install_format() -> InstallFormatInfo {
                 format: "flatpak".to_string(),
                 human_name: "Flatpak".to_string(),
                 supports_self_update: false,
+                is_portable: false,
             };
         }
 
@@ -56,10 +62,20 @@ pub fn detect_install_format() -> InstallFormatInfo {
             // must manually replace; there's no external package manager to
             // clash with, but there's also no way to patch the running binary
             // in place, so this behaves like the managed-package formats below.
-            return InstallFormatInfo {
-                format: "appimage".to_string(),
-                human_name: "Linux AppImage".to_string(),
-                supports_self_update: false,
+            return if is_portable {
+                InstallFormatInfo {
+                    format: "appimage".to_string(),
+                    human_name: "Linux AppImage (Portable)".to_string(),
+                    supports_self_update: false,
+                    is_portable: true,
+                }
+            } else {
+                InstallFormatInfo {
+                    format: "appimage".to_string(),
+                    human_name: "Linux AppImage".to_string(),
+                    supports_self_update: false,
+                    is_portable: false,
+                }
             };
         }
 
@@ -68,6 +84,7 @@ pub fn detect_install_format() -> InstallFormatInfo {
                 format: "snap".to_string(),
                 human_name: "Snap Package".to_string(),
                 supports_self_update: false,
+                is_portable: false,
             };
         }
 
@@ -79,6 +96,7 @@ pub fn detect_install_format() -> InstallFormatInfo {
                         format: "deb".to_string(),
                         human_name: "Debian Package (.deb)".to_string(),
                         supports_self_update: false,
+                        is_portable: false,
                     };
                 } else if std::path::Path::new("/etc/redhat-release").exists()
                     || std::path::Path::new("/etc/fedora-release").exists()
@@ -87,28 +105,40 @@ pub fn detect_install_format() -> InstallFormatInfo {
                         format: "rpm".to_string(),
                         human_name: "RPM Package (.rpm)".to_string(),
                         supports_self_update: false,
+                        is_portable: false,
                     };
                 }
                 return InstallFormatInfo {
                     format: "system_pkg".to_string(),
                     human_name: "System Package".to_string(),
                     supports_self_update: false,
+                    is_portable: false,
                 };
             }
         }
 
-        InstallFormatInfo {
-            format: "linux_generic".to_string(),
-            human_name: "Linux Executable".to_string(),
-            supports_self_update: false,
+        if is_portable {
+            InstallFormatInfo {
+                format: "linux_portable".to_string(),
+                human_name: "Linux Executable (Portable)".to_string(),
+                supports_self_update: false,
+                is_portable: true,
+            }
+        } else {
+            InstallFormatInfo {
+                format: "linux_generic".to_string(),
+                human_name: "Linux Executable".to_string(),
+                supports_self_update: false,
+                is_portable: false,
+            }
         }
     }
 
     #[cfg(target_os = "windows")]
     {
         match env::current_exe() {
-            Ok(exe_path) => classify_windows_install_path(&exe_path.to_string_lossy()),
-            Err(_) => classify_windows_install_path(""),
+            Ok(exe_path) => classify_windows_install_path(&exe_path.to_string_lossy(), is_portable),
+            Err(_) => classify_windows_install_path("", is_portable),
         }
     }
 
@@ -118,6 +148,7 @@ pub fn detect_install_format() -> InstallFormatInfo {
             format: "unknown".to_string(),
             human_name: "Desktop Application".to_string(),
             supports_self_update: false,
+            is_portable,
         }
     }
 }
@@ -136,7 +167,7 @@ pub fn detect_install_format() -> InstallFormatInfo {
 /// installer, so the app kept seeing itself as out-of-date and
 /// re-"installing" the same build on every launch.
 #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
-fn classify_windows_install_path(exe_path_lossy: &str) -> InstallFormatInfo {
+fn classify_windows_install_path(exe_path_lossy: &str, is_portable: bool) -> InstallFormatInfo {
     let path_lower = exe_path_lossy.to_lowercase();
 
     if path_lower.contains("\\windowsapps\\") {
@@ -144,6 +175,16 @@ fn classify_windows_install_path(exe_path_lossy: &str) -> InstallFormatInfo {
             format: "msix".to_string(),
             human_name: "Microsoft Store".to_string(),
             supports_self_update: false,
+            is_portable: false,
+        };
+    }
+
+    if is_portable {
+        return InstallFormatInfo {
+            format: "windows_portable".to_string(),
+            human_name: "Windows Portable".to_string(),
+            supports_self_update: false,
+            is_portable: true,
         };
     }
 
@@ -152,6 +193,7 @@ fn classify_windows_install_path(exe_path_lossy: &str) -> InstallFormatInfo {
             format: "windows_setup".to_string(),
             human_name: "Windows Installer (.exe / .msi)".to_string(),
             supports_self_update: true,
+            is_portable: false,
         };
     }
 
@@ -159,6 +201,7 @@ fn classify_windows_install_path(exe_path_lossy: &str) -> InstallFormatInfo {
         format: "windows_setup".to_string(),
         human_name: "Windows Installer (.exe / .msi)".to_string(),
         supports_self_update: true,
+        is_portable: false,
     }
 }
 
@@ -203,6 +246,7 @@ mod tests {
 
         assert_eq!(info.format, "flatpak");
         assert!(!info.supports_self_update);
+        assert!(!info.is_portable);
     }
 
     // Regression tests for #416 — these run on every host (not gated behind
@@ -212,6 +256,7 @@ mod tests {
     fn test_windowsapps_path_is_msix_and_not_self_updatable() {
         let info = classify_windows_install_path(
             r"C:\Program Files\WindowsApps\EricSoltys.LuminousMusicPlayer_1.0.0.0_x64__8wekyb3d8bbwe\Luminous.exe",
+            false,
         );
         assert_eq!(info.format, "msix");
         assert!(
@@ -219,22 +264,35 @@ mod tests {
             "Store/MSIX installs live in a read-only, Store-managed directory; the in-app \
              updater's downloaded installer can never take effect there"
         );
+        assert!(!info.is_portable);
+    }
+
+    #[test]
+    fn test_windows_portable_format() {
+        let info = classify_windows_install_path(r"D:\PortableApps\Luminous\Luminous.exe", true);
+        assert_eq!(info.format, "windows_portable");
+        assert_eq!(info.human_name, "Windows Portable");
+        assert!(!info.supports_self_update);
+        assert!(info.is_portable);
     }
 
     #[test]
     fn test_program_files_path_is_windows_setup_and_self_updatable() {
-        let info = classify_windows_install_path(r"C:\Program Files\Luminous\Luminous.exe");
+        let info = classify_windows_install_path(r"C:\Program Files\Luminous\Luminous.exe", false);
         assert_eq!(info.format, "windows_setup");
         assert!(info.supports_self_update);
+        assert!(!info.is_portable);
     }
 
     #[test]
     fn test_appdata_local_programs_path_is_windows_setup_and_self_updatable() {
         let info = classify_windows_install_path(
             r"C:\Users\alice\AppData\Local\Programs\Luminous\Luminous.exe",
+            false,
         );
         assert_eq!(info.format, "windows_setup");
         assert!(info.supports_self_update);
+        assert!(!info.is_portable);
     }
 
     #[test]
@@ -243,8 +301,10 @@ mod tests {
         // guaranteed, so the WindowsApps check must not depend on it.
         let info = classify_windows_install_path(
             r"C:\Program Files\WINDOWSAPPS\EricSoltys.LuminousMusicPlayer_1.0.0.0_x64__8wekyb3d8bbwe\Luminous.exe",
+            false,
         );
         assert_eq!(info.format, "msix");
         assert!(!info.supports_self_update);
+        assert!(!info.is_portable);
     }
 }

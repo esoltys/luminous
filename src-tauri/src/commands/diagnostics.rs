@@ -1,4 +1,4 @@
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 
 /// Fire-and-forget like `set_app_setting` — logs failures internally and
 /// never rejects, so a broken diagnostics path can't itself throw inside
@@ -9,10 +9,7 @@ pub async fn log_frontend_error(
     message: String,
     stack: Option<String>,
 ) -> Result<(), String> {
-    let Ok(app_data_dir) = app.path().app_data_dir() else {
-        log::error!("Failed to resolve app data dir for frontend error log");
-        return Ok(());
-    };
+    let app_data_dir = crate::paths::resolve_app_data_dir(&app);
     crate::diagnostics::log_frontend_error(&app_data_dir, &message, stack.as_deref());
     Ok(())
 }
@@ -22,8 +19,23 @@ pub async fn log_frontend_error(
 /// `export_playlist`).
 #[tauri::command]
 pub async fn export_diagnostics(app: AppHandle, export_path: String) -> Result<(), String> {
-    let app_data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let app_data_dir = crate::paths::resolve_app_data_dir(&app);
     let version = app.package_info().version.to_string();
     let bundle = crate::diagnostics::build_diagnostics_bundle(&app_data_dir, &version);
     std::fs::write(&export_path, bundle).map_err(|e| e.to_string())
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct DataDirectoryInfo {
+    pub path: String,
+    pub is_portable: bool,
+}
+
+#[tauri::command]
+pub fn get_data_directory_info(app: AppHandle) -> DataDirectoryInfo {
+    let info = crate::paths::resolve_app_data_dir_info(&app);
+    DataDirectoryInfo {
+        path: info.path.to_string_lossy().to_string(),
+        is_portable: info.is_portable,
+    }
 }
