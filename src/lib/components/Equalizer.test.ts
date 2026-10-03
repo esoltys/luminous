@@ -3,9 +3,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent, waitFor } from "@testing-library/svelte";
 import Equalizer from "./Equalizer.svelte";
 import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
+}));
+
+vi.mock("@tauri-apps/plugin-dialog", () => ({
+  open: vi.fn(),
 }));
 
 describe("Equalizer.svelte", () => {
@@ -300,6 +305,84 @@ describe("Equalizer.svelte", () => {
       await waitFor(() => expect(picker).toHaveTextContent("Custom"));
       await fireEvent.click(picker);
       expect(getByRole("listbox").querySelectorAll('[role="group"]')).toHaveLength(1);
+    });
+
+    describe("importing a profile (#1336)", () => {
+      const profile = "Preamp: -3.78 dB\nFilter 1: ON PK Fc 100 Hz Gain 2 dB Q 1\n";
+      const imported = {
+        ...defaultEqConfig,
+        mode: "parametric",
+        preamp: -3.78,
+        parametric: [{ kind: "peak", freq: 100, gain_db: 2, q: 1, enabled: true }],
+        active_preset: "user:8",
+      };
+
+      function mockImport(importProfile: (args: any) => unknown) {
+        mockPresetBackend({
+          read_eq_profile_file: () => profile,
+          import_parametric_profile: (args) => {
+            const config = importProfile(args);
+            presets = { ...presets, user: [...presets.user, { id: 8, name: args.name }] };
+            return config;
+          },
+        });
+      }
+
+      it("imports a chosen file under its headphone name and selects it", async () => {
+        mockImport(() => imported);
+        vi.mocked(open).mockResolvedValue("C:\\Downloads\\Anker Soundcore Life Q20 ParametricEq.txt");
+        const { picker, getByRole, getByLabelText, getByText, queryByLabelText } = await renderPicker();
+        await fireEvent.click(getByRole("button", { name: "Import…" }));
+        await fireEvent.click(getByRole("button", { name: "Choose file…" }));
+        await waitFor(() => expect(getByLabelText("Profile text")).toHaveValue(profile));
+        expect(getByLabelText("Preset name")).toHaveValue("Anker Soundcore Life Q20");
+        expect(invoke).toHaveBeenCalledWith("read_eq_profile_file", {
+          path: "C:\\Downloads\\Anker Soundcore Life Q20 ParametricEq.txt",
+        });
+
+        await fireEvent.click(getByRole("button", { name: "Import" }));
+        expect(invoke).toHaveBeenCalledWith("import_parametric_profile", {
+          text: profile,
+          name: "Anker Soundcore Life Q20",
+        });
+        await waitFor(() => expect(picker).toHaveTextContent("Anker Soundcore Life Q20"));
+        expect(getByText("-3.78 dB")).toBeInTheDocument();
+        expect(queryByLabelText("Profile text")).toBeNull();
+      });
+
+      it("explains a rejected profile and leaves the panel open", async () => {
+        mockImport(() => {
+          throw JSON.stringify({ code: "unsupported_filter", line: 2, kind: "LP" });
+        });
+        const { picker, getByRole, getByLabelText } = await renderPicker();
+        await fireEvent.click(getByRole("button", { name: "Import…" }));
+        await fireEvent.input(getByLabelText("Profile text"), { target: { value: "Filter: ON LP Fc 80 Hz" } });
+        await fireEvent.input(getByLabelText("Preset name"), { target: { value: "Broken" } });
+        await fireEvent.click(getByRole("button", { name: "Import" }));
+        await waitFor(() => expect(getByRole("alert")).toHaveTextContent("Line 2 uses a filter of type LP"));
+        expect(getByLabelText("Preset name")).toHaveAttribute("aria-invalid", "true");
+        expect(picker).toHaveTextContent("Studio");
+      });
+
+      it("disables Import until there's both a profile and a name", async () => {
+        mockImport(() => imported);
+        const { getByRole, getByLabelText } = await renderPicker();
+        await fireEvent.click(getByRole("button", { name: "Import…" }));
+        expect(getByRole("button", { name: "Import" })).toBeDisabled();
+        await fireEvent.input(getByLabelText("Profile text"), { target: { value: profile } });
+        expect(getByRole("button", { name: "Import" })).toBeDisabled();
+        await fireEvent.input(getByLabelText("Preset name"), { target: { value: "Pasted" } });
+        expect(getByRole("button", { name: "Import" })).toBeEnabled();
+      });
+    });
+
+    it("shows an imported off-grid preamp exactly on the snapping slider", async () => {
+      mockPresetBackend();
+      state = { ...state, preamp: -3.78 };
+      const { getByLabelText, getByText } = await renderPicker();
+      expect(getByLabelText("Preamp:")).toHaveAttribute("step", "0.5");
+      expect(getByText("-3.78 dB")).toBeInTheDocument();
+      expect(invoke).not.toHaveBeenCalledWith("apply_equalizer_config", expect.anything());
     });
 
     it("hides user presets in graphic mode, which they can't describe", async () => {
