@@ -330,16 +330,18 @@
     songs = Array.isArray(fetchedSongs) ? fetchedSongs : [];
   }
 
-  // Rescans the library for this artist's local portrait/band logo/fanart
+  // Rescans disk for this artist's tracks, local portrait/band logo/fanart
   // banner (#761) and re-fetches its MusicBrainz/Wikipedia context (#23),
   // bypassing both caches — mirrors AlbumDetailView's handleRefreshAlbum.
-  // Fixes #867: a portrait/logo/banner added, replaced, or removed on disk
-  // otherwise never refreshes since both lookups are cached for the session.
+  // Fixes #867 & #1399: rescans only this artist's songs via `rescan_songs`
+  // rather than triggering a whole-library scan.
   async function handleRescanArtist() {
     if (refreshing || collectionStore.isScanning) return;
     refreshing = true;
     try {
-      await collectionStore.startScan(true);
+      if (songs.length > 0) {
+        await invoke("rescan_songs", { songIds: songs.map((s) => s.id) });
+      }
       await collectionStore.refreshLibrary();
       await refetchSongs();
       const songWithMb = songs.find((s) => s.musicbrainz_artist_id || s.musicbrainz_album_artist_id);
@@ -1156,7 +1158,7 @@
     />
     <ContextMenuItem
       icon={RefreshCw}
-      label={i18n.t("artistDetail.refresh", {}, "Refresh")}
+      label={i18n.t("artistDetail.refresh", {}, "Refresh Artist")}
       title={i18n.t('artistDetail.refreshTooltip')}
       onclick={() => { handleRescanArtist(); overflowMenuPos = null; }}
       disabled={loading || collectionStore.isScanning || refreshing}
