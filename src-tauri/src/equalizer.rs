@@ -385,14 +385,7 @@ impl EqualizerConfig {
 /// The built-in preset names, in picker order. Each has a 10-band graphic
 /// version (`preset_gains`) and a parametric filter list
 /// (`parametric_preset`); these are also the canonical `active_preset` values.
-pub const BUILTIN_PRESETS: [&str; 6] = [
-    "Flat",
-    "Rock",
-    "Pop",
-    "Bass Boost",
-    "Vocal Boost",
-    "Headphones",
-];
+pub const BUILTIN_PRESETS: [&str; 5] = ["Flat", "Rock", "Pop", "Bass Boost", "Vocal Boost"];
 
 /// The canonical `BUILTIN_PRESETS` spelling of `name` (case-insensitive,
 /// spaces optional), or `None` if it isn't a built-in.
@@ -422,7 +415,6 @@ pub fn preset_gains(name: &str) -> [f32; 10] {
         "Pop" => [1.5, 2.5, 1.0, -1.0, -0.5, 1.0, 2.5, 3.0, 2.5, 2.0],
         "Bass Boost" => [9.0, 7.0, 4.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
         "Vocal Boost" => [-3.0, -2.0, -1.0, 0.0, 2.0, 4.0, 4.5, 3.5, 1.0, -1.0],
-        "Headphones" => [2.0, 1.5, 0.5, 0.0, 0.0, 0.0, -0.5, -1.0, -0.5, 1.0],
         _ => [0.0; 10], // Flat
     }
 }
@@ -455,12 +447,6 @@ pub fn parametric_preset(name: &str) -> Option<Vec<ParametricBand>> {
             (PK, 1600.0, 4.5, 0.6),
             (HS, 16000.0, -2.0, SHELF_Q),
         ],
-        "Headphones" => &[
-            (LS, 31.0, 2.0, SHELF_Q),
-            (PK, 60.0, 1.0, 0.7),
-            (PK, 8300.0, -1.0, 1.2),
-            (HS, 16000.0, 2.5, SHELF_Q),
-        ],
         _ => return None,
     };
     Some(
@@ -485,13 +471,17 @@ pub struct Equalizer {
     pub enabled: bool,
     pub mode: EqMode,
     pub gains: [f32; 10], // graphic dB gains per band (EQ_GAIN_RANGE)
-    pub preamp: f32,      // Pre-amp gain (EQ_PREAMP_RANGE), shared by both modes
+    pub preamp: f32,      // Pre-amp gain (EQ_PREAMP_RANGE) of the active mode
     /// Fixed-size so the audio thread never allocates; only the first
     /// `parametric_len` entries are live.
     parametric: [ParametricBand; PARAMETRIC_MAX_BANDS],
     parametric_len: usize,
     /// See `EqualizerConfig::active_preset`. Never touched by the audio thread.
     pub active_preset: Option<String>,
+    /// The other mode's preamp and preset. Each mode keeps its own, swapped
+    /// in by `set_mode`, so toggling never carries one mode's state over.
+    inactive_preamp: f32,
+    inactive_preset: Option<String>,
     channels: usize,
     channel_filters: Vec<Vec<BiquadFilter>>, // graphic cascade, per channel
     parametric_filters: Vec<Vec<BiquadFilter>>, // parametric cascade (MAX slots), per channel
@@ -514,6 +504,8 @@ impl Equalizer {
             parametric: [ParametricBand::flat_peak(1000.0); PARAMETRIC_MAX_BANDS],
             parametric_len: 0,
             active_preset: Some("Flat".to_string()),
+            inactive_preamp: 0.0,
+            inactive_preset: Some("Flat".to_string()),
             channels: 2,
             channel_filters: vec![vec![BiquadFilter::new(); 10]; 2],
             parametric_filters: vec![vec![BiquadFilter::new(); PARAMETRIC_MAX_BANDS]; 2],
@@ -559,9 +551,13 @@ impl Equalizer {
         }
     }
 
+    /// Switch the active cascade, swapping in that mode's own preamp and
+    /// preset. Both modes' bands are always kept; nothing is converted.
     pub fn set_mode(&mut self, mode: EqMode) {
         if self.mode != mode {
             self.mode = mode;
+            std::mem::swap(&mut self.preamp, &mut self.inactive_preamp);
+            std::mem::swap(&mut self.active_preset, &mut self.inactive_preset);
             // Recreate filters so the newly active cascade starts with clean
             // state memory instead of stale samples from a previous session.
             self.channel_filters = vec![vec![BiquadFilter::new(); 10]; self.channels];
@@ -582,45 +578,83 @@ impl Equalizer {
         self.preamp = EQ_PREAMP_RANGE.clamp(preamp_db);
     }
 
+    /// `mode`'s preamp and preset, whether or not it is the active mode.
+    pub fn mode_state(&self, mode: EqMode) -> (f32, Option<&str>) {
+        if mode == self.mode {
+            (self.preamp, self.active_preset.as_deref())
+        } else {
+            (self.inactive_preamp, self.inactive_preset.as_deref())
+        }
+    }
+
+    /// Set `mode`'s preamp (clamped) and preset, whether or not it is active.
+    pub fn set_mode_state(&mut self, mode: EqMode, preamp_db: f32, preset: Option<String>) {
+        let preamp_db = EQ_PREAMP_RANGE.clamp(preamp_db);
+        if mode == self.mode {
+            self.preamp = preamp_db;
+            self.active_preset = preset;
+        } else {
+            self.inactive_preamp = preamp_db;
+            self.inactive_preset = preset;
+        }
+    }
+
+    fn preset_mut(&mut self, mode: EqMode) -> &mut Option<String> {
+        if mode == self.mode {
+            &mut self.active_preset
+        } else {
+            &mut self.inactive_preset
+        }
+    }
+
     /// Apply a whole config in one step, clamping every field. Returns the
     /// canonical post-clamp snapshot.
     ///
-    /// Any change to the mode or the band shape (graphic gains, parametric
-    /// bands) clears `active_preset` — the result is Custom. Toggling the EQ
+    /// The config's preamp belongs to the mode it was edited in, so it is set
+    /// before any mode change, which then swaps in the new mode's own preamp
+    /// and preset. A change to a mode's band shape (graphic gains, parametric
+    /// bands) clears that mode's preset — it becomes Custom. Toggling the EQ
     /// or moving the preamp keeps it: the preamp is headroom, not shape.
     pub fn apply(&mut self, config: &EqualizerConfig) -> EqualizerConfig {
         let before = EqualizerConfig::snapshot(self);
         self.enabled = config.enabled;
-        self.set_mode(config.mode);
         for (idx, gain_db) in config.gains.iter().enumerate() {
             self.set_gain(idx, *gain_db);
         }
         self.set_preamp(config.preamp);
         self.load_parametric(&config.parametric);
-        if self.mode != before.mode
-            || self.gains != before.gains
-            || self.parametric_bands() != before.parametric.as_slice()
-        {
-            self.active_preset = None;
+        if self.gains != before.gains {
+            *self.preset_mut(EqMode::Graphic10) = None;
         }
+        if self.parametric_bands() != before.parametric.as_slice() {
+            *self.preset_mut(EqMode::Parametric) = None;
+        }
+        self.set_mode(config.mode);
         EqualizerConfig::snapshot(self)
     }
 
-    /// Load a built-in preset. The graphic gains are always replaced, so the
-    /// preset is intact if the user switches back to graphic mode; in
-    /// parametric mode the preset's own filter list is loaded too. Returns
-    /// `false` (and changes nothing) for a name that isn't a built-in.
+    /// Load a built-in preset into the active mode only: its 10-band gains in
+    /// graphic mode, its filter list in parametric mode. The other mode's
+    /// bands are left as they are. Returns `false` (and changes nothing) for
+    /// a name that isn't a built-in.
     pub fn load_builtin_preset(&mut self, name: &str) -> bool {
         let (Some(canonical), Some(bands)) = (builtin_preset_name(name), parametric_preset(name))
         else {
             return false;
         };
-        self.load_preset(preset_gains(canonical));
-        if self.mode == EqMode::Parametric {
-            self.load_parametric(&bands);
+        match self.mode {
+            EqMode::Graphic10 => self.load_preset(preset_gains(canonical)),
+            EqMode::Parametric => self.load_parametric(&bands),
         }
         self.active_preset = Some(canonical.to_string());
         true
+    }
+
+    /// Restore the default parametric layout — the parametric Flat preset —
+    /// whichever mode is active.
+    pub fn reset_parametric(&mut self) {
+        self.load_parametric(&default_parametric_bands());
+        *self.preset_mut(EqMode::Parametric) = Some("Flat".to_string());
     }
 
     /// Load a saved user preset: a parametric filter list plus its preamp.
@@ -1016,6 +1050,7 @@ mod tests {
     #[test]
     fn apply_keeps_band_order_and_echoes_clamped_layout() {
         let mut eq = Equalizer::new();
+        eq.set_mode(EqMode::Parametric);
         let bands = vec![
             band(ParametricKind::Peak, 5000.0, 3.0, 1.0),
             band(ParametricKind::LowShelf, 80.0, 50.0, 0.7),
@@ -1103,7 +1138,7 @@ mod tests {
 
     #[test]
     fn parametric_presets_are_a_few_broad_moves() {
-        for name in ["rock", "pop", "bass boost", "vocal boost", "headphones"] {
+        for name in ["rock", "pop", "bass boost", "vocal boost"] {
             let bands = parametric_preset(name).unwrap();
             let moved: Vec<_> = bands.iter().filter(|b| b.gain_db != 0.0).collect();
             assert!(
@@ -1131,7 +1166,7 @@ mod tests {
         let mut eq = parametric_eq_48k();
         assert!(eq.load_builtin_preset("bass boost"));
         assert_eq!(eq.active_preset.as_deref(), Some("Bass Boost"));
-        assert_eq!(eq.gains, preset_gains("Bass Boost"));
+        assert_eq!(eq.gains, [0.0; 10], "only the active mode's bands load");
         assert_eq!(
             eq.parametric_bands(),
             parametric_preset("Bass Boost").unwrap().as_slice()
@@ -1150,6 +1185,58 @@ mod tests {
         config.parametric[0].gain_db += 1.0;
         config.active_preset = Some("Rock".into());
         assert_eq!(eq.apply(&config).active_preset, None);
+    }
+
+    #[test]
+    fn each_mode_keeps_its_own_preamp_and_preset_across_toggles() {
+        let mut eq = Equalizer::new();
+        eq.load_builtin_preset("Rock");
+        eq.set_preamp(-4.0);
+        eq.set_mode(EqMode::Parametric);
+        assert_eq!(eq.preamp, 0.0);
+        assert_eq!(eq.active_preset.as_deref(), Some("Flat"));
+        eq.load_builtin_preset("Pop");
+        eq.set_preamp(-7.5);
+
+        eq.set_mode(EqMode::Graphic10);
+        assert_eq!(eq.preamp, -4.0);
+        assert_eq!(eq.active_preset.as_deref(), Some("Rock"));
+        assert_eq!(eq.gains, preset_gains("Rock"));
+        assert_eq!(eq.mode_state(EqMode::Parametric), (-7.5, Some("Pop")));
+
+        eq.set_mode(EqMode::Parametric);
+        assert_eq!(eq.preamp, -7.5);
+        assert_eq!(eq.active_preset.as_deref(), Some("Pop"));
+        assert_eq!(
+            eq.parametric_bands(),
+            parametric_preset("Pop").unwrap().as_slice()
+        );
+    }
+
+    #[test]
+    fn apply_sets_the_preamp_on_the_mode_it_was_edited_in() {
+        let mut eq = Equalizer::new();
+        eq.load_builtin_preset("Rock");
+        let mut config = EqualizerConfig::snapshot(&eq);
+        config.preamp = -2.0;
+        config.mode = EqMode::Parametric;
+        let echoed = eq.apply(&config);
+        assert_eq!(echoed.preamp, 0.0);
+        assert_eq!(echoed.active_preset.as_deref(), Some("Flat"));
+        assert_eq!(eq.mode_state(EqMode::Graphic10), (-2.0, Some("Rock")));
+    }
+
+    #[test]
+    fn reset_parametric_in_graphic_mode_names_only_the_parametric_preset() {
+        let mut eq = Equalizer::new();
+        eq.load_builtin_preset("Rock");
+        eq.set_mode(EqMode::Parametric);
+        eq.load_builtin_preset("Pop");
+        eq.set_mode(EqMode::Graphic10);
+        eq.reset_parametric();
+        assert_eq!(eq.active_preset.as_deref(), Some("Rock"));
+        assert_eq!(eq.mode_state(EqMode::Parametric).1, Some("Flat"));
+        assert_eq!(eq.parametric_bands(), default_parametric_bands().as_slice());
     }
 
     #[test]
@@ -1187,7 +1274,7 @@ mod tests {
 
     #[test]
     fn parametric_presets_track_their_graphic_counterparts() {
-        for name in ["rock", "pop", "bass boost", "vocal boost", "headphones"] {
+        for name in ["rock", "pop", "bass boost", "vocal boost"] {
             let mut eq = parametric_eq_48k();
             eq.load_parametric(&parametric_preset(name).unwrap());
             let response = eq.parametric_response_db(&EQ_BANDS);
@@ -1269,7 +1356,7 @@ mod tests {
         // the Q-form shelf at SHELF_Q; the two must be the same filter.
         let fs = 48000.0;
         let freqs = log_freqs(64);
-        for name in ["rock", "bass boost", "vocal boost", "headphones"] {
+        for name in ["rock", "bass boost", "vocal boost"] {
             let mut eq = Equalizer::new();
             eq.update_format(48000, 2);
             eq.load_preset(preset_gains(name));

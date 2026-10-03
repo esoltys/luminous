@@ -19,10 +19,15 @@ fn save_eq_settings(db: &crate::db::Database, eq: &Equalizer) {
             crate::equalizer::EqMode::Parametric => "parametric",
         };
         let parametric_json = serde_json::to_string(eq.parametric_bands()).unwrap_or_default();
+        let other_mode = match eq.mode {
+            EqMode::Graphic10 => EqMode::Parametric,
+            EqMode::Parametric => EqMode::Graphic10,
+        };
+        let (inactive_preamp, inactive_preset) = eq.mode_state(other_mode);
         let _ = conn.execute(
             "UPDATE equalizer_settings
              SET enabled = ?1, preamp = ?2, gains = ?3, mode = ?4, parametric = ?5,
-                 active_preset = ?6
+                 active_preset = ?6, inactive_preamp = ?7, inactive_preset = ?8
              WHERE id = 1",
             rusqlite::params![
                 if eq.enabled { 1 } else { 0 },
@@ -30,7 +35,9 @@ fn save_eq_settings(db: &crate::db::Database, eq: &Equalizer) {
                 gains_str,
                 mode_str,
                 parametric_json,
-                eq.active_preset.as_deref().unwrap_or("")
+                eq.active_preset.as_deref().unwrap_or(""),
+                inactive_preamp as f64,
+                inactive_preset.unwrap_or("")
             ],
         );
     }
@@ -82,11 +89,7 @@ pub async fn reset_parametric_bands(
     let db = state.db.clone();
     let canonical = crate::audio::with_audio(&state.audio, move |engine| {
         engine.with_equalizer(|eq| {
-            eq.load_parametric(&crate::equalizer::default_parametric_bands());
-            // The default layout is the parametric Flat preset.
-            if eq.mode == EqMode::Parametric {
-                eq.active_preset = Some("Flat".to_string());
-            }
+            eq.reset_parametric();
             save_eq_settings(&db, eq);
             EqualizerConfig::snapshot(eq)
         })
@@ -211,6 +214,26 @@ pub async fn import_parametric_profile(
 #[tauri::command]
 pub async fn read_eq_profile_file(path: String) -> Result<String, String> {
     crate::eq_import::read_profile_file(std::path::Path::new(&path)).map_err(|e| e.to_json())
+}
+
+/// Write the parametric bands and the parametric preamp to `path` as an
+/// Equalizer APO profile, whichever mode is active.
+#[tauri::command]
+pub async fn export_parametric_profile(
+    state: State<'_, AppState>,
+    path: String,
+) -> Result<(), String> {
+    let text = crate::audio::with_audio(&state.audio, |engine| {
+        engine.with_equalizer(|eq| {
+            let (preamp, _) = eq.mode_state(EqMode::Parametric);
+            Ok::<_, String>(crate::eq_import::format_parametric_profile(
+                preamp,
+                eq.parametric_bands(),
+            ))
+        })
+    })
+    .await?;
+    std::fs::write(&path, text).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

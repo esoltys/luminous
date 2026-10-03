@@ -43,7 +43,6 @@
       "Bass Boost": "bassBoostPreset",
       "Vocal Boost": "vocalBoostPreset",
       "Treble Boost": "trebleBoostPreset",
-      "Headphones": "headphonesPreset",
     };
     const key = keyMap[name];
     return key ? i18n.t(`equalizer.${key}`) : name;

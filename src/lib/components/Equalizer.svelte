@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { open } from "@tauri-apps/plugin-dialog";
+  import { open, save } from "@tauri-apps/plugin-dialog";
   import { onMount } from "svelte";
   import { i18n, formatNumber } from "../stores/i18n.svelte";
   import { loudnessStore } from "../stores/loudness.svelte";
@@ -8,7 +8,13 @@
     SlidersIcon as Sliders,
     PulseIcon as Activity,
     ArrowsLeftRightIcon as ArrowLeftRight,
-    ArrowSquareOutIcon as ExternalLink
+    ArrowSquareOutIcon as ExternalLink,
+    DotsThreeIcon as MoreHorizontal,
+    FloppyDiskIcon as Save,
+    FolderOpenIcon as FileImport,
+    ExportIcon as FileExport,
+    PencilSimpleIcon as Pencil,
+    TrashIcon as Trash2
   } from "phosphor-svelte";
   import Toggle from "./Toggle.svelte";
   import Select from "./Select.svelte";
@@ -17,9 +23,13 @@
   import ParametricBandStrip from "./ParametricBandStrip.svelte";
   import EqPresetPicker from "./EqPresetPicker.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
+  import ContextMenu from "./ContextMenu.svelte";
+  import ContextMenuItem from "./ContextMenuItem.svelte";
+  import ContextMenuDivider from "./ContextMenuDivider.svelte";
   import { logSpacedFreqs } from "../utils/eqScale";
   import { importErrorMessage, profileNameFromPath } from "../utils/eqImport";
   import { openExternalUrl } from "../utils/openExternalUrl";
+  import { toastStore } from "../stores/toast.svelte";
 
   import {
     userPresetKey,
@@ -49,6 +59,25 @@
   let activePreset = $state<string | null>(null);
   let presetList = $state<EqPresetList>({ builtin: [], user: [] });
 
+  let presetMenuPos = $state<{ x: number; y: number } | null>(null);
+  let presetMenuButtonEl = $state<HTMLButtonElement | undefined>(undefined);
+
+  function togglePresetMenu() {
+    if (presetMenuPos) {
+      presetMenuPos = null;
+      return;
+    }
+    if (!presetMenuButtonEl) return;
+    const rect = presetMenuButtonEl.getBoundingClientRect();
+    presetMenuPos = { x: rect.left, y: rect.bottom + 8 };
+  }
+
+  /** Close the preset actions menu, then run the chosen action. */
+  function fromPresetMenu(action: () => void) {
+    presetMenuPos = null;
+    action();
+  }
+
   const bandLabels = [
     "31.5 Hz", "63 Hz", "125 Hz", "250 Hz", "500 Hz",
     "1 kHz", "2 kHz", "4 kHz", "8 kHz", "16 kHz"
@@ -61,8 +90,7 @@
       "Rock": "rockPreset",
       "Bass Boost": "bassBoostPreset",
       "Vocal Boost": "vocalBoostPreset",
-      "Treble Boost": "trebleBoostPreset",
-      "Headphones": "headphonesPreset"
+      "Treble Boost": "trebleBoostPreset"
     };
     const key = keyMap[presetName];
     return key ? i18n.t(`equalizer.${key}`) : presetName;
@@ -268,10 +296,15 @@
   let importError = $state<string | null>(null);
   let importing = $state(false);
 
-  function toggleImportPanel() {
-    importPanel = importPanel ? null : { text: "", name: "" };
+  function openImportPanel() {
+    importPanel = { text: "", name: "" };
     importError = null;
     nameEditor = null;
+  }
+
+  function closeImportPanel() {
+    importPanel = null;
+    importError = null;
   }
 
   async function chooseProfileFile() {
@@ -289,6 +322,24 @@
       importError = null;
     } catch (e) {
       importError = importErrorMessage(e);
+    }
+  }
+
+  // --- Export the parametric bands as an Equalizer APO profile ---
+  async function exportProfile() {
+    const name = activeUserPreset?.name ?? (activePreset ? presetLabel(activePreset) : i18n.t("equalizer.customPreset"));
+    try {
+      const path = await save({
+        title: i18n.t("equalizer.exportProfile"),
+        defaultPath: `${name} ParametricEQ.txt`,
+        filters: [{ name: i18n.t("equalizer.importFileFilter"), extensions: ["txt"] }],
+      });
+      if (!path) return;
+      await invoke("export_parametric_profile", { path });
+      toastStore.show(i18n.t("equalizer.exportSuccess", { name }));
+    } catch (e) {
+      console.error("Failed to export profile:", e);
+      toastStore.show(i18n.t("equalizer.exportError", { error: String(e) }));
     }
   }
 
@@ -594,6 +645,20 @@
           getLabel={presetLabel}
           onselect={selectPreset}
         />
+        {#if mode === "parametric"}
+          <button
+            bind:this={presetMenuButtonEl}
+            type="button"
+            onclick={togglePresetMenu}
+            aria-label={i18n.t('equalizer.presetActions')}
+            title={i18n.t('equalizer.presetActions')}
+            aria-haspopup="menu"
+            aria-expanded={presetMenuPos !== null}
+            class="flex items-center justify-center w-6 h-6 -mr-2 rounded-full text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors shrink-0 cursor-pointer"
+          >
+            <MoreHorizontal class="w-4 h-4" />
+          </button>
+        {/if}
       </div>
 
       <div class="flex items-center gap-3 bg-brand-main border border-brand-border rounded-2xl px-4 py-1.5">
@@ -636,35 +701,48 @@
         >
           {i18n.t('equalizer.resetBands')}
         </button>
-        <button
-          class="text-xs font-semibold px-4 py-1.5 bg-brand-main border border-brand-border rounded-full text-brand-text-secondary hover:text-brand-text-primary transition-colors"
-          onclick={() => openNameEditor("save")}
-        >
-          {i18n.t('equalizer.savePresetAs')}
-        </button>
-        <button
-          class="text-xs font-semibold px-4 py-1.5 bg-brand-main border border-brand-border rounded-full text-brand-text-secondary hover:text-brand-text-primary transition-colors"
-          onclick={toggleImportPanel}
-          aria-expanded={importPanel !== null}
-        >
-          {i18n.t('equalizer.importProfile')}
-        </button>
-        {#if activeUserPreset}
-          <button
-            class="text-xs font-semibold px-4 py-1.5 bg-brand-main border border-brand-border rounded-full text-brand-text-secondary hover:text-brand-text-primary transition-colors"
-            onclick={() => openNameEditor("rename")}
-          >
-            {i18n.t('equalizer.renamePreset')}
-          </button>
-          <button
-            class="text-xs font-semibold px-4 py-1.5 bg-brand-main border border-brand-border rounded-full text-brand-text-secondary hover:text-red-400 transition-colors"
-            onclick={() => (confirmingDelete = true)}
-          >
-            {i18n.t('equalizer.deletePreset')}
-          </button>
-        {/if}
       {/if}
     </div>
+
+    {#if presetMenuPos && mode === "parametric"}
+      <ContextMenu
+        x={presetMenuPos.x}
+        y={presetMenuPos.y}
+        estimatedHeight={activeUserPreset ? 220 : 140}
+        onClose={() => (presetMenuPos = null)}
+      >
+        <ContextMenuItem
+          icon={FileImport}
+          label={i18n.t('equalizer.importProfile')}
+          onclick={() => fromPresetMenu(openImportPanel)}
+        />
+        <ContextMenuItem
+          icon={FileExport}
+          label={i18n.t('equalizer.exportProfile')}
+          onclick={() => fromPresetMenu(exportProfile)}
+        />
+        <ContextMenuDivider />
+        <ContextMenuItem
+          icon={Save}
+          label={i18n.t('equalizer.savePresetAs')}
+          onclick={() => fromPresetMenu(() => openNameEditor("save"))}
+        />
+        {#if activeUserPreset}
+          <ContextMenuItem
+            icon={Pencil}
+            label={i18n.t('equalizer.renamePreset')}
+            onclick={() => fromPresetMenu(() => openNameEditor("rename"))}
+          />
+          <ContextMenuDivider />
+          <ContextMenuItem
+            icon={Trash2}
+            label={i18n.t('equalizer.deletePreset')}
+            destructive
+            onclick={() => fromPresetMenu(() => (confirmingDelete = true))}
+          />
+        {/if}
+      </ContextMenu>
+    {/if}
 
     {#if nameEditor && mode === "parametric"}
       <form
@@ -748,7 +826,7 @@
             id="eq-import-name"
             type="text"
             bind:value={importPanel.name}
-            onkeydown={(e) => { if (e.key === "Escape") toggleImportPanel(); }}
+            onkeydown={(e) => { if (e.key === "Escape") closeImportPanel(); }}
             aria-invalid={importError !== null}
             aria-describedby={importError ? "eq-import-error" : undefined}
             class="bg-brand-main text-xs text-brand-text-primary border border-brand-border rounded px-3 py-1 outline-none focus:border-brand-accent min-w-48"
@@ -763,7 +841,7 @@
           <button
             type="button"
             class="text-xs font-semibold px-4 py-1.5 bg-brand-main border border-brand-border rounded-full text-brand-text-secondary hover:text-brand-text-primary transition-colors"
-            onclick={toggleImportPanel}
+            onclick={closeImportPanel}
           >
             {i18n.t('equalizer.cancelPreset')}
           </button>

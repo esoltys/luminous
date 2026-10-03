@@ -279,6 +279,29 @@ fn parse_filter(rest: &str, line: usize) -> Result<ParametricBand, ImportError> 
     })
 }
 
+/// Write bands and a preamp as an Equalizer APO parametric profile — the
+/// format `parse_parametric_profile` reads back, so an export re-imports
+/// exactly. Values use the shortest form that round-trips.
+pub fn format_parametric_profile(preamp: f32, bands: &[ParametricBand]) -> String {
+    let mut out = format!("Preamp: {preamp} dB\n");
+    for (i, b) in bands.iter().enumerate() {
+        let kind = match b.kind {
+            ParametricKind::Peak => "PK",
+            ParametricKind::LowShelf => "LSC",
+            ParametricKind::HighShelf => "HSC",
+        };
+        let state = if b.enabled { "ON" } else { "OFF" };
+        out.push_str(&format!(
+            "Filter {}: {state} {kind} Fc {} Hz Gain {} dB Q {}\n",
+            i + 1,
+            b.freq,
+            b.gain_db,
+            b.q
+        ));
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -582,5 +605,37 @@ Filter 2: ON LP Fc 15000 Hz";
         assert_eq!(v["line"], 4);
         assert_eq!(v["field"], "q");
         assert_eq!(ImportError::Empty.to_json(), r#"{"code":"empty"}"#);
+    }
+
+    #[test]
+    fn exported_profile_reimports_exactly() {
+        let bands = vec![
+            band(LowShelf, 105.0, 5.5, 0.7),
+            band(Peak, 180.0, -3.1, 0.53),
+            ParametricBand {
+                enabled: false,
+                ..band(HighShelf, 10000.0, -2.25, 0.7)
+            },
+        ];
+        let text = format_parametric_profile(-6.2, &bands);
+        assert_eq!(
+            text,
+            "Preamp: -6.2 dB\n\
+             Filter 1: ON LSC Fc 105 Hz Gain 5.5 dB Q 0.7\n\
+             Filter 2: ON PK Fc 180 Hz Gain -3.1 dB Q 0.53\n\
+             Filter 3: OFF HSC Fc 10000 Hz Gain -2.25 dB Q 0.7\n"
+        );
+        let profile = parse_parametric_profile(&text).unwrap();
+        assert_eq!(profile.preamp, -6.2);
+        assert_eq!(profile.bands, bands);
+    }
+
+    #[test]
+    fn fixture_survives_an_export_round_trip() {
+        let original =
+            parse_parametric_profile(&fixture("Anker Soundcore Life Q20 ParametricEq.txt"))
+                .unwrap();
+        let text = format_parametric_profile(original.preamp, &original.bands);
+        assert_eq!(parse_parametric_profile(&text).unwrap(), original);
     }
 }
