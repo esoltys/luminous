@@ -735,7 +735,9 @@ export function getCoverArtUrl(uri: string | null | undefined): string | null {
       if (cleanPath.includes(":/") || cleanPath.includes(":\\") || cleanPath.startsWith("/")) {
         return `/local-art/${encodeURIComponent(cleanPath)}`;
       }
-      if (cleanPath.startsWith("album-")) {
+      // Album covers and fetched artist images (artist-*.jpg) both live in
+      // the real app's covers/ directory.
+      if (cleanPath.startsWith("album-") || cleanPath.startsWith("artist-")) {
         // Real DB rows already include the extension (see covermanager.rs); the
         // dev server's /covers/ route falls back to trying .jpg/.png if not.
         return `/covers/${cleanPath}`;

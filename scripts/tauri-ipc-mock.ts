@@ -14,6 +14,7 @@ import type {
   AudioPipelineInfo,
   ArtistProfile,
   FileType,
+  SongContextEnrichment,
   GenreGroup,
   HomeItem,
   Playlist,
@@ -79,6 +80,10 @@ interface MockLibrary {
   albums: AlbumItem[];
   artists: ArtistItem[];
   artistProfiles?: ArtistProfile[];
+  /** Cached artist context by MusicBrainz artist ID (mock-library.ts). */
+  artistContexts?: Record<string, Partial<SongContextEnrichment>>;
+  /** Local portrait / logo / fanart by lower-cased artist name (mock-library.ts). */
+  artistArtwork?: Record<string, { artist_portrait_uri: string | null; band_logo_uri: string | null; fanart_uri: string | null }>;
   albumProfiles?: AlbumProfile[];
   /** Persisted Genres curation hierarchy (#545), read straight from the real
    * tag_groups/tag_assignments tables — undefined for the bundled fixture. */
@@ -770,13 +775,15 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     // invoke() returns without validating it, so every caller (search
     // dropdown, artist rows, album/song detail headers) then dereferences
     // `.artist_portrait_uri` etc. on that null and crashes.
-    get_extended_artwork_for_artist: () => ({
+    get_extended_artwork_for_artist: (args) => ({
       count: 0,
       primary_uri: null,
       artist_portrait_uri: null,
       band_logo_uri: null,
       fanart_uri: null,
       items: [],
+      // Portrait / logo / fanart found next to the artist's music (mock-library.ts).
+      ...(library.artistArtwork?.[String(args?.artist ?? "").toLowerCase()] ?? {}),
     }),
     get_extended_artwork_for_song: () => ({
       count: 0,
@@ -1267,10 +1274,17 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     // the result — every field degrades independently on failure, so an
     // all-empty response (as if nothing's cached yet) is a legitimate real
     // state, not a fabricated one.
-    get_song_context: () => ({
-      mb_tags: [],
-      critiquebrainz_review_links: [],
-    }),
+    // The song's artist's cached context (Wikipedia summary, formed date,
+    // area) from the real DB, keyed by MusicBrainz artist ID like the real
+    // command's artist_context_enrichment lookup.
+    get_song_context: (args) => {
+      const song = library.songs.find((s) => s.id === args?.songId);
+      const name = (song?.album_artist || song?.artist || "").toLowerCase();
+      const mbid =
+        song?.musicbrainz_artist_id ||
+        artistProfiles.find((p) => p.artist_key.toLowerCase() === name)?.musicbrainz_artist_id;
+      return { mb_tags: [], critiquebrainz_review_links: [], ...((mbid && library.artistContexts?.[mbid]) || {}) };
+    },
 
     get_playlists_by_artist: () => [],
     get_playlists: () => library.playlists,
