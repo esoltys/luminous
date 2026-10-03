@@ -291,19 +291,43 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     Pop: [1.5, 2.5, 1.0, -1.0, -0.5, 1.0, 2.5, 3.0, 2.5, 2.0],
     "Bass Boost": [9.0, 7.0, 4.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
     "Vocal Boost": [-3.0, -2.0, -1.0, 0.0, 2.0, 4.0, 4.5, 3.5, 1.0, -1.0],
-    Headphones: [2.0, 1.5, 0.5, 0.0, 0.0, 0.0, -0.5, -1.0, -0.5, 1.0],
   };
-  let eqUserPresets = [{ id: 1, name: "Studio Monitors" }];
-  // A demo headphone-style correction so the parametric screenshot shows a
-  // realistic curve; apply_equalizer_config keeps it current.
-  let eqBands: ParametricBand[] = [
-    { kind: "low_shelf", freq: 105, gain_db: 5.5, q: 0.7, enabled: true },
-    { kind: "peak", freq: 220, gain_db: -2.5, q: 1.2, enabled: true },
-    { kind: "peak", freq: 1400, gain_db: 1.5, q: 1.8, enabled: true },
-    { kind: "peak", freq: 3200, gain_db: -4.0, q: 2.5, enabled: true },
-    { kind: "peak", freq: 6000, gain_db: 3.0, q: 3.0, enabled: true },
-    { kind: "high_shelf", freq: 10000, gain_db: -2.0, q: 0.7, enabled: true },
+  let eqUserPresets = [
+    { id: 1, name: "Studio Monitors" },
+    { id: 2, name: "Anker Soundcore Life Q20" },
   ];
+  // The parametric screenshot shows an imported AutoEq profile (#1336): the
+  // bands of src-tauri/tests/fixtures/autoeq/Anker Soundcore Life Q20
+  // ParametricEq.txt. apply_equalizer_config keeps them current.
+  let eqBands: ParametricBand[] = [
+    { kind: "low_shelf", freq: 105, gain_db: -5.8, q: 0.7, enabled: true },
+    { kind: "peak", freq: 36.8, gain_db: 1.7, q: 1.35, enabled: true },
+    { kind: "peak", freq: 91.2, gain_db: -4.1, q: 0.91, enabled: true },
+    { kind: "peak", freq: 459.4, gain_db: 3.9, q: 0.83, enabled: true },
+    { kind: "peak", freq: 1087, gain_db: -2.4, q: 3.65, enabled: true },
+    { kind: "peak", freq: 1776.8, gain_db: 3.2, q: 2.66, enabled: true },
+    { kind: "peak", freq: 2926.6, gain_db: -3.3, q: 2.51, enabled: true },
+    { kind: "peak", freq: 4813.9, gain_db: 3.8, q: 3.82, enabled: true },
+    { kind: "peak", freq: 8377.4, gain_db: -3.5, q: 2.49, enabled: true },
+    { kind: "high_shelf", freq: 10000, gain_db: 0.5, q: 0.7, enabled: true },
+  ];
+  let eqGains = [10.0, 8.0, 5.0, -3.0, -6.0, -4.0, 3.0, 6.0, 8.0, 10.0];
+  let eqMode: EqualizerState["mode"] = "graphic10";
+  // Each mode keeps its own preamp and preset, like equalizer::Equalizer.
+  const eqModeState: Record<EqualizerState["mode"], { preamp: number; preset: string | null }> = {
+    graphic10: { preamp: 3.0, preset: null },
+    parametric: { preamp: -3.78, preset: "user:2" },
+  };
+  function eqSnapshot(): EqualizerState {
+    return {
+      enabled: true,
+      mode: eqMode,
+      preamp: eqModeState[eqMode].preamp,
+      gains: eqGains,
+      parametric: eqBands,
+      active_preset: eqModeState[eqMode].preset,
+    };
+  }
 
   // Rough stand-in for the backend's biquad law, good enough for a preview
   // curve — the real app plots equalizer::parametric_response_db.
@@ -1359,16 +1383,7 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
       return null;
     },
 
-    get_equalizer_state: (): EqualizerState => {
-      return {
-        enabled: true,
-        mode: "graphic10",
-        preamp: 3.0,
-        gains: [10.0, 8.0, 5.0, -3.0, -6.0, -4.0, 3.0, 6.0, 8.0, 10.0],
-        parametric: eqBands,
-        active_preset: null,
-      };
-    },
+    get_equalizer_state: (): EqualizerState => eqSnapshot(),
 
     load_equalizer_preset: (args): EqualizerState => ({
       enabled: true,
@@ -1430,9 +1445,9 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
       crossfade_auto_duration_secs: { min: 0, max: 8 },
       eq: {
         freq: { min: 20, max: 20000 },
-        gain_db: { min: -12, max: 12 },
+        gain_db: { min: -20, max: 20 },
         q: { min: 0.1, max: 10 },
-        preamp: { min: -12, max: 12 },
+        preamp: { min: -24, max: 12 },
         max_bands: 20,
         min_bands: 1,
       },
@@ -1533,10 +1548,20 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
 
   // The engine echoes the applied (clamped) config back; the component
   // assigns from the echo, so a bare noop would blank the EQ UI.
+  // Like Equalizer::apply: the preamp belongs to the mode it was edited in,
+  // a changed band shape makes that mode Custom, then the new mode's own
+  // preamp and preset are swapped in.
   commands["apply_equalizer_config"] = (args) => {
-    eqBands = (args.config as EqualizerState).parametric;
-    return { ...(args.config as EqualizerState), active_preset: null };
+    const config = args.config as EqualizerState;
+    eqModeState[eqMode].preamp = config.preamp;
+    if (JSON.stringify(config.gains) !== JSON.stringify(eqGains)) eqModeState.graphic10.preset = null;
+    if (JSON.stringify(config.parametric) !== JSON.stringify(eqBands)) eqModeState.parametric.preset = null;
+    eqGains = config.gains;
+    eqBands = config.parametric;
+    eqMode = config.mode;
+    return eqSnapshot();
   };
+  commands["export_parametric_profile"] = () => null;
   commands["validate_playlist_name"] = () => ({ valid: true, reason: null });
   // Defaults to enabled (unlike the real app's fresh-install default of
   // false) so the System Tray settings screenshot documents the feature in
