@@ -897,7 +897,7 @@ export const fr: DeepStringRecord<typeof en> = {
     composerLabel: "Compositeur",
     restoreInterface: "Restaurer l'interface complète",
     formatLabel: "Format",
-    miniplayer: "Mini-lecteur en incrustation",
+    miniplayer: "Mini-lecteur image dans l'image",
     loudnessLabel: "Volume",
     loudnessSourceAnalyzed: "Analyse R128",
     loudnessSourceReplayGain: "Étiquette ReplayGain",
@@ -952,7 +952,7 @@ export const fr: DeepStringRecord<typeof en> = {
   },
   miniplayer: {
     title: "Mini-lecteur",
-    toggleTooltip: "Mini-lecteur en incrustation (Ctrl+M)",
+    toggleTooltip: "Mini-lecteur image dans l'image (Ctrl+M)",
     exit: "Restaurer la fenêtre principale (Ctrl+M)",
     dragHint: "Déplacer la fenêtre",
     showLyrics: "Afficher les paroles synchronisées",
