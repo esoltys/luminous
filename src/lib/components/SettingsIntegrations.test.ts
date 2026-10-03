@@ -130,8 +130,9 @@ describe("SettingsIntegrations.svelte", () => {
     await fireEvent.click(toggle);
     await tick();
     expect(scrobblerStore.enabled).toBe(true);
-    expect(await findByText("Send Now Playing status")).toBeInTheDocument();
     expect(await findByText("Synchronize track ratings")).toBeInTheDocument();
+    expect(queryByLabelText("Send Now Playing status")).not.toBeInTheDocument();
+    expect(queryByLabelText("Pause all scrobbling")).not.toBeInTheDocument();
   });
 
   it("renders Picard and ListenBrainz logos", async () => {

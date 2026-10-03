@@ -1441,7 +1441,9 @@ export const fr: DeepStringRecord<typeof en> = {
     save: "Enregistrer",
     saved: "Enregistré",
     connect: "Connecter",
-    active: "Actif"
+    active: "Actif",
+    paused: "En pause",
+    inactive: "Inactif"
   },
   toast: {
     copyError: "Copier l'erreur dans le presse-papiers",
@@ -1532,7 +1534,7 @@ export const fr: DeepStringRecord<typeof en> = {
     nowPlayingLabel: "Envoyer l'état En cours de lecture",
     nowPlayingHint: "Diffusez le début des morceaux sur ListenBrainz en temps réel",
     ratingsLabel: "Synchroniser les notes des morceaux",
-    ratingsHint: "Transmettez les notes 4-5 étoiles ou cœurs comme morceaux favoris",
+    ratingsHint: "Transmettez les morceaux favoris comme mentions « J'aime »",
     pauseLabel: "Mettre en pause le scrobbling",
     pauseHint: "Mettez temporairement en pause le scrobbling sans déconnecter votre compte",
     cacheEmpty: "La file d'attente hors ligne est vide",
@@ -1785,10 +1787,11 @@ export const fr: DeepStringRecord<typeof en> = {
     loginWithMb: "Se connecter avec MusicBrainz",
     noAccountPrompt: "Vous n'avez pas de compte?",
     createAccountLink: "Créer un compte",
-    listenbrainzScrobbling: "Scrobbling ListenBrainz",
+    scrobbling: "Scrobbling",
     listenbrainzPromptDesc: "Scrobblez automatiquement votre historique d'écoute vers ListenBrainz grâce à votre jeton utilisateur.",
-    modifyScrobblingSettings: "Modifier les paramètres de scrobbling dans Intégrations",
-    viewProfileOnMb: "Voir le profil sur MusicBrainz",
+    listenbrainzProfile: "Profil d'auditeur ListenBrainz",
+    musicbrainzProfile: "Profil d'éditeur MusicBrainz",
+    integrationSettings: "Paramètres d'intégration",
     aboutMusicBrainz: "À propos de MusicBrainz",
     logout: "Se déconnecter"
   }

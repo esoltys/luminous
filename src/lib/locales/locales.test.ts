@@ -42,6 +42,7 @@ const IDENTICAL_OK = new Set([
   "audioPipeline.codec", // "Codec"
   "audioPipeline.normalizationGain", // "{gain} dB ({source})"
   "audioPipeline.outputFormat", // "Format"
+  "auth.scrobbling", // "Scrobbling"
   "collection.albums", // "Albums ({count})"
   "collection.albumsCount", // "{count} albums"
   "collection.columnActions", // "Actions"

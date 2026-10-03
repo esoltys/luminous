@@ -1390,7 +1390,9 @@ export const en = {
     save: "Save",
     saved: "Saved",
     connect: "Connect",
-    active: "Active"
+    active: "Active",
+    paused: "Paused",
+    inactive: "Inactive"
   },
   toast: {
     copyError: "Copy error to clipboard",
@@ -1524,7 +1526,7 @@ export const en = {
     nowPlayingLabel: "Send Now Playing status",
     nowPlayingHint: "Broadcast track starts to ListenBrainz in real time",
     ratingsLabel: "Synchronize track ratings",
-    ratingsHint: "Submit 4-star and 5-star or heart ratings as loved tracks",
+    ratingsHint: "Submit favourite tracks as loved tracks",
     pauseLabel: "Pause all scrobbling",
     pauseHint: "Temporarily pause scrobbling without disconnecting your account",
     cacheEmpty: "Offline cache is empty",
@@ -1777,10 +1779,11 @@ export const en = {
     loginWithMb: "Log In with MusicBrainz",
     noAccountPrompt: "Don't have an account?",
     createAccountLink: "Create an account",
-    listenbrainzScrobbling: "ListenBrainz Scrobbling",
+    scrobbling: "Scrobbling",
     listenbrainzPromptDesc: "Scrobble your listening history automatically to ListenBrainz with your user token.",
-    modifyScrobblingSettings: "Modify scrobbling settings in Integrations",
-    viewProfileOnMb: "View profile on MusicBrainz",
+    listenbrainzProfile: "ListenBrainz listener profile",
+    musicbrainzProfile: "MusicBrainz editor profile",
+    integrationSettings: "Integration settings",
     aboutMusicBrainz: "About MusicBrainz",
     logout: "Log out"
   }

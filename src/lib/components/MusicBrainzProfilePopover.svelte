@@ -8,12 +8,15 @@
   import { openExternalUrl } from "../utils/openExternalUrl";
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
+  import Toggle from "./Toggle.svelte";
   import {
     XIcon as X,
     ArrowUpRightIcon as ArrowUpRight,
+    ArrowRightIcon as ArrowRight,
     SignOutIcon as LogOut,
     CircleNotchIcon as LoaderCircle,
-    CheckIcon as Check
+    CheckIcon as Check,
+    PauseIcon as Pause
   } from "phosphor-svelte";
 
   interface Props {
@@ -28,6 +31,9 @@
   let lbTokenInput = $state("");
   let isConnectingLb = $state(false);
   let lbConnectError = $state<string | null>(null);
+
+  let lbUsername = $derived(scrobblerStore.username || musicbrainzStore.username);
+  let mbUsername = $derived(musicbrainzStore.username || scrobblerStore.username);
 
   let coords = $state<{
     left: number;
@@ -124,7 +130,7 @@
     use:portal
     bind:this={popoverEl}
     style="left: {coords.left}px; bottom: {coords.bottom}px;"
-    class="fixed z-50 w-[340px] bg-brand-sidebar border border-brand-border rounded-2xl shadow-2xl p-4 text-brand-text-primary space-y-4 select-none animate-in fade-in zoom-in-95 duration-150"
+    class="fixed z-50 w-[340px] bg-brand-sidebar border border-brand-border rounded-2xl shadow-2xl p-4 text-brand-text-primary space-y-3 select-none animate-in fade-in zoom-in-95 duration-150"
   >
     <!-- Header: User Identity -->
     <div class="flex items-start justify-between gap-3 pb-3 border-b border-brand-border/60">
@@ -139,50 +145,66 @@
           <h3 class="font-bold text-sm text-brand-text-primary truncate">
             {musicbrainzStore.username ?? "MusicBrainz User"}
           </h3>
-          {#if musicbrainzStore.email}
-            <p class="text-xs text-brand-text-secondary truncate mt-0.5">
-              {musicbrainzStore.email}
-            </p>
-          {/if}
         </div>
       </div>
 
       <button
+        type="button"
         onclick={onClose}
-        class="text-brand-text-secondary hover:text-brand-text-primary p-0.5 rounded hover:bg-white/5 transition-colors"
+        class="text-brand-text-secondary hover:text-brand-text-primary p-0.5 rounded hover:bg-white/5 transition-colors cursor-pointer"
         title={i18n.t('common.close', {}, 'Close')}
       >
         <X class="w-4 h-4" />
       </button>
     </div>
 
-    <!-- ListenBrainz Scrobbling Section -->
-    <div class="space-y-2">
+    <!-- Scrobbling Section -->
+    <div class="space-y-2.5">
       <div class="flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <img src="/listenbrainz-icon.png" alt="ListenBrainz" class="w-4 h-4 object-contain" />
-          <span class="text-xs font-semibold text-brand-text-primary">
-            {i18n.t('auth.listenbrainzScrobbling', {}, 'ListenBrainz Scrobbling')}
-          </span>
-        </div>
+        <span class="text-xs font-semibold text-brand-text-primary">
+          {i18n.t('auth.scrobbling', {}, 'Scrobbling')}
+        </span>
         {#if scrobblerStore.enabled}
-          <span class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-medium">
-            <Check class="w-2.5 h-2.5" />
-            {i18n.t('common.active', {}, 'Active')}
+          {#if scrobblerStore.paused}
+            <span class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 font-medium">
+              <Pause class="w-2.5 h-2.5" />
+              {i18n.t('common.paused', {}, 'Paused')}
+            </span>
+          {:else}
+            <span class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-medium">
+              <Check class="w-2.5 h-2.5" />
+              {i18n.t('common.active', {}, 'Active')}
+            </span>
+          {/if}
+        {:else}
+          <span class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-500/15 text-zinc-400 font-medium">
+            {i18n.t('common.inactive', {}, 'Inactive')}
           </span>
         {/if}
       </div>
 
       {#if scrobblerStore.enabled}
-        <div class="pt-0.5">
-          <button
-            type="button"
-            onclick={handleOpenScrobblerSettings}
-            class="text-xs text-brand-text-primary hover:text-brand-accent-text-hover hover:underline underline underline-offset-2 font-medium inline-flex items-center gap-1 transition-colors cursor-pointer"
-          >
-            <span>{i18n.t('auth.modifyScrobblingSettings', {}, 'Modify scrobbling settings in Integrations')}</span>
-            <ArrowUpRight class="w-3.5 h-3.5" />
-          </button>
+        <!-- Toggles moved from Settings view -->
+        <div class="space-y-1.5 py-0.5">
+          <div class="flex items-center justify-between gap-3">
+            <span class="text-xs text-brand-text-secondary leading-snug">{i18n.t('listenbrainz.pauseLabel')}</span>
+            <Toggle
+              checked={scrobblerStore.paused}
+              onchange={(v) => scrobblerStore.setPaused(v)}
+              label={i18n.t('listenbrainz.pauseLabel')}
+              showOnOffLabel={false}
+            />
+          </div>
+
+          <div class="flex items-center justify-between gap-3">
+            <span class="text-xs text-brand-text-secondary leading-snug">{i18n.t('listenbrainz.nowPlayingLabel')}</span>
+            <Toggle
+              checked={scrobblerStore.nowPlayingEnabled}
+              onchange={(v) => scrobblerStore.setNowPlayingEnabled(v)}
+              label={i18n.t('listenbrainz.nowPlayingLabel')}
+              showOnOffLabel={false}
+            />
+          </div>
         </div>
       {:else}
         <p class="text-[11px] text-brand-text-secondary leading-relaxed">
@@ -226,29 +248,49 @@
           {/if}
         </div>
       {/if}
+
+      <!-- Profile Links -->
+      <div class="space-y-1 pt-2 border-t border-brand-border/60">
+        {#if lbUsername}
+          <button
+            type="button"
+            onclick={() => openExternalUrl(`https://listenbrainz.org/user/${encodeURIComponent(lbUsername!)}/`)}
+            class="w-full flex items-center justify-between py-1 text-xs text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer"
+          >
+            <span class="hover:underline">{i18n.t('auth.listenbrainzProfile', {}, 'ListenBrainz listener profile')}</span>
+            <ArrowUpRight class="w-3.5 h-3.5" />
+          </button>
+        {/if}
+
+        {#if mbUsername}
+          <button
+            type="button"
+            onclick={() => openExternalUrl(`https://musicbrainz.org/user/${encodeURIComponent(mbUsername!)}`)}
+            class="w-full flex items-center justify-between py-1 text-xs text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer"
+          >
+            <span class="hover:underline">{i18n.t('auth.musicbrainzProfile', {}, 'MusicBrainz editor profile')}</span>
+            <ArrowUpRight class="w-3.5 h-3.5" />
+          </button>
+        {/if}
+      </div>
     </div>
 
-    <!-- Quick External Links & Logout -->
-    <div class="space-y-1.5 pt-2 border-t border-brand-border/60">
-      {#if musicbrainzStore.username}
-        <button
-          onclick={() => openExternalUrl(`https://musicbrainz.org/user/${encodeURIComponent(musicbrainzStore.username!)}`)}
-          class="w-full flex items-center justify-between py-1 text-xs text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer"
-        >
-          <span class="hover:underline">{i18n.t('auth.viewProfileOnMb', {}, 'View profile on MusicBrainz')}</span>
-          <ArrowUpRight class="w-3.5 h-3.5" />
-        </button>
-      {/if}
-
+    <!-- Integration Settings -->
+    <div class="pt-2 border-t border-brand-border/60">
       <button
-        onclick={() => openExternalUrl("https://musicbrainz.org/doc/About")}
+        type="button"
+        onclick={handleOpenScrobblerSettings}
         class="w-full flex items-center justify-between py-1 text-xs text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer"
       >
-        <span class="hover:underline">{i18n.t('auth.aboutMusicBrainz', {}, 'About MusicBrainz')}</span>
-        <ArrowUpRight class="w-3.5 h-3.5" />
+        <span class="hover:underline">{i18n.t('auth.integrationSettings', {}, 'Integration settings')}</span>
+        <ArrowRight class="w-3.5 h-3.5" />
       </button>
+    </div>
 
+    <!-- Logout -->
+    <div class="pt-2 border-t border-brand-border/60">
       <button
+        type="button"
         onclick={handleLogout}
         class="w-full flex items-center justify-between py-1 text-xs text-red-400 hover:text-red-300 transition-colors cursor-pointer"
       >
