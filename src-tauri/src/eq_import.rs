@@ -433,7 +433,10 @@ Filter 2: ON LP Fc 15000 Hz";
         assert_eq!(profile.preamp, -2.0);
         assert_eq!(
             profile.bands,
-            vec![band(Peak, 50.0, 2.0, 0.5), band(HighShelf, 8000.0, -1.5, 0.7)]
+            vec![
+                band(Peak, 50.0, 2.0, 0.5),
+                band(HighShelf, 8000.0, -1.5, 0.7)
+            ]
         );
     }
 
@@ -447,7 +450,8 @@ Filter 2: ON LP Fc 15000 Hz";
 
     #[test]
     fn rejects_unsupported_filter_type() {
-        let text = "Preamp: -1 dB\nFilter 1: ON PK Fc 100 Hz Gain 1 dB Q 1\nFilter 2: ON LP Fc 15000 Hz";
+        let text =
+            "Preamp: -1 dB\nFilter 1: ON PK Fc 100 Hz Gain 1 dB Q 1\nFilter 2: ON LP Fc 15000 Hz";
         assert_eq!(
             parse_parametric_profile(text),
             Err(ImportError::UnsupportedFilter {
@@ -475,8 +479,14 @@ Filter 2: ON LP Fc 15000 Hz";
             ("Filter 1: MAYBE PK Fc 100 Hz Gain 1 dB Q 1", 1),
             ("Filter 1: ON PK Fc 100 Hz Fc 200 Hz Gain 1 dB Q 1", 1),
             ("Filter 1: ON PK Fc NaN Hz Gain 1 dB Q 1", 1),
-            ("Preamp: -1 dB\nPreamp: -2 dB\nFilter: ON PK Fc 1 Hz Gain 1 dB Q 1", 2),
-            ("Filter 1: ON PK Fc 100 Hz Gain 1 dB Q 1\nnot a directive", 2),
+            (
+                "Preamp: -1 dB\nPreamp: -2 dB\nFilter: ON PK Fc 1 Hz Gain 1 dB Q 1",
+                2,
+            ),
+            (
+                "Filter 1: ON PK Fc 100 Hz Gain 1 dB Q 1\nnot a directive",
+                2,
+            ),
         ] {
             assert_eq!(
                 parse_parametric_profile(text),

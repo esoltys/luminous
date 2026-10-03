@@ -1,12 +1,50 @@
 use cucumber::gherkin::Step;
 use cucumber::{given, then, when, World};
-use luminous_lib::equalizer::Equalizer;
+use luminous_lib::commands::equalizer::import_profile_into;
+use luminous_lib::db::Database;
+use luminous_lib::eq_import::{parse_parametric_profile, read_profile_file};
+use luminous_lib::eq_presets;
+use luminous_lib::equalizer::{Equalizer, EqualizerConfig};
+use std::path::PathBuf;
 
 #[derive(Debug, World)]
 pub struct EqualizerWorld {
     equalizer: Equalizer,
     samples: Vec<f32>,
     processed_samples: Vec<f32>,
+    /// Preset store for import scenarios, created on first use.
+    store: Option<(tempfile::TempDir, Database)>,
+    fixture: Option<PathBuf>,
+    before_import: Option<EqualizerConfig>,
+    import_result: Option<Result<EqualizerConfig, String>>,
+}
+
+impl EqualizerWorld {
+    fn db(&mut self) -> &Database {
+        &self
+            .store
+            .get_or_insert_with(|| {
+                let dir = tempfile::Builder::new()
+                    .prefix("luminous_eq_bdd_")
+                    .tempdir()
+                    .unwrap();
+                let db = Database::new(dir.path().to_path_buf()).unwrap();
+                (dir, db)
+            })
+            .1
+    }
+
+    fn import(&mut self, text: &str, name: &str) {
+        self.before_import = Some(EqualizerConfig::snapshot(&self.equalizer));
+        self.db();
+        let db = &self.store.as_ref().unwrap().1;
+        self.import_result = Some(import_profile_into(db, &mut self.equalizer, text, name));
+    }
+
+    fn user_presets(&mut self) -> Vec<eq_presets::UserPreset> {
+        let conn = self.db().pool.get().unwrap();
+        eq_presets::list(&conn).unwrap()
+    }
 }
 
 impl Default for EqualizerWorld {
@@ -17,6 +55,10 @@ impl Default for EqualizerWorld {
             equalizer: eq,
             samples: vec![],
             processed_samples: vec![],
+            store: None,
+            fixture: None,
+            before_import: None,
+            import_result: None,
         }
     }
 }
@@ -147,6 +189,80 @@ fn all_coefficients_recalculate(w: &mut EqualizerWorld) {
     assert!(
         modified,
         "Filter coefficients were not recalculated or applied"
+    );
+}
+
+#[given(expr = "the graphic band gains are set to {string}")]
+fn graphic_gains_set(w: &mut EqualizerWorld, gain_str: String) {
+    let gain: f32 = gain_str.replace("dB", "").replace('+', "").parse().unwrap();
+    w.equalizer.load_preset([gain; 10]);
+}
+
+#[when(expr = "I import the AutoEq profile {string} as {string}")]
+fn import_fixture(w: &mut EqualizerWorld, file: String, name: String) {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/autoeq")
+        .join(file);
+    let text = read_profile_file(&path).unwrap();
+    w.fixture = Some(path);
+    w.import(&text, &name);
+}
+
+#[when(expr = "I import a profile containing a {string} filter")]
+fn import_unsupported(w: &mut EqualizerWorld, kind: String) {
+    let text = format!(
+        "Preamp: -3 dB\nFilter 1: ON PK Fc 100 Hz Gain 2 dB Q 1\nFilter 2: ON {kind} Fc 80 Hz\n"
+    );
+    w.import(&text, "Unsupported");
+}
+
+#[then(expr = "a user preset named {string} should be active")]
+fn user_preset_active(w: &mut EqualizerWorld, name: String) {
+    let config = w.import_result.clone().unwrap().unwrap();
+    let presets = w.user_presets();
+    let preset = presets
+        .iter()
+        .find(|p| p.name == name)
+        .expect("preset saved");
+    let key = format!("user:{}", preset.id);
+    assert_eq!(config.active_preset.as_deref(), Some(key.as_str()));
+    assert!(w.equalizer.enabled);
+}
+
+#[then("the parametric bands should match the profile file exactly")]
+fn bands_match_file(w: &mut EqualizerWorld) {
+    let text = read_profile_file(w.fixture.as_ref().unwrap()).unwrap();
+    let expected = parse_parametric_profile(&text).unwrap();
+    assert_eq!(w.equalizer.parametric_bands(), expected.bands.as_slice());
+}
+
+#[then(regex = r"^the preamp should be (-?[\d.]+)dB$")]
+fn preamp_is(w: &mut EqualizerWorld, db: String) {
+    let expected: f32 = db.parse().unwrap();
+    assert_eq!(w.equalizer.preamp, expected);
+}
+
+#[then(expr = "the import should fail with {string}")]
+fn import_fails(w: &mut EqualizerWorld, code: String) {
+    let err = w
+        .import_result
+        .clone()
+        .unwrap()
+        .expect_err("import should fail");
+    let json: serde_json::Value = serde_json::from_str(&err).unwrap();
+    assert_eq!(json["code"], code.as_str());
+}
+
+#[then("no user preset should be saved")]
+fn no_preset_saved(w: &mut EqualizerWorld) {
+    assert!(w.user_presets().is_empty());
+}
+
+#[then("the equalizer settings should be unchanged")]
+fn settings_unchanged(w: &mut EqualizerWorld) {
+    assert_eq!(
+        Some(EqualizerConfig::snapshot(&w.equalizer)),
+        w.before_import
     );
 }
 

@@ -389,7 +389,9 @@ mod tests {
         let err = import_profile_into(&db, &mut eq, "Filter 1: ON LP Fc 100 Hz", "X").unwrap_err();
         assert_eq!(code(&err), "unsupported_filter");
         assert_eq!(EqualizerConfig::snapshot(&eq), before);
-        assert!(eq_presets::list(&db.pool.get().unwrap()).unwrap().is_empty());
+        assert!(eq_presets::list(&db.pool.get().unwrap())
+            .unwrap()
+            .is_empty());
     }
 
     #[test]
