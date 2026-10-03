@@ -39,4 +39,3 @@ pub fn get_data_directory_info(app: AppHandle) -> DataDirectoryInfo {
         is_portable: info.is_portable,
     }
 }
-

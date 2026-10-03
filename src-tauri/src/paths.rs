@@ -21,7 +21,9 @@ pub fn detect_executable_base_dir() -> Option<PathBuf> {
         }
     }
 
-    std::env::current_exe().ok().and_then(|p| p.parent().map(|p| p.to_path_buf()))
+    std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|p| p.to_path_buf()))
 }
 
 /// Checks if a directory is eligible to operate in portable mode.
