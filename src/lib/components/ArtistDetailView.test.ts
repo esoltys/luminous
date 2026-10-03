@@ -142,6 +142,41 @@ describe("ArtistDetailView", () => {
     expect(invokeMock).toHaveBeenCalledWith("open_in_picard", { songIds: [10, 11] });
   });
 
+  it("clicking Refresh Artist in overflow menu invokes rescan_songs with artist songs, not full library scan", async () => {
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockImplementation((cmd: string, args?: any) => {
+      if (cmd === "get_songs_by_artist") {
+        return Promise.resolve([
+          { id: 10, title: "Song 1", artist: "Shania Twain", genre: "Country", length_nanosec: 180_000_000_000 } as any,
+          { id: 11, title: "Song 2", artist: "Shania Twain", genre: "Pop", length_nanosec: 200_000_000_000 } as any,
+        ]);
+      }
+      if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
+      if (cmd === "get_compilations_by_artist") return Promise.resolve([]);
+      if (cmd === "get_artist_profile") return Promise.resolve(null as any);
+      if (cmd === "rescan_songs") return Promise.resolve();
+      if (cmd === "get_extended_artwork_for_artist") return Promise.resolve({} as any);
+      return Promise.resolve();
+    });
+
+    const startScanSpy = vi.spyOn(collectionStore, "startScan");
+    const refreshLibrarySpy = vi.spyOn(collectionStore, "refreshLibrary").mockResolvedValue(undefined as any);
+
+    render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const moreBtn = screen.getByTitle("More actions");
+    await fireEvent.click(moreBtn);
+
+    const refreshBtn = screen.getByText("Refresh Artist");
+    expect(refreshBtn).toBeTruthy();
+    await fireEvent.click(refreshBtn);
+
+    expect(invokeMock).toHaveBeenCalledWith("rescan_songs", { songIds: [10, 11] });
+    expect(refreshLibrarySpy).toHaveBeenCalled();
+    expect(startScanSpy).not.toHaveBeenCalled();
+  });
+
   it("never renders embedded genre chips in the header, even with multi-value genres", async () => {
     // The header used to mirror each song's embedded genre as its own chip
     // row, but that's redundant with the Genres page and every album/song

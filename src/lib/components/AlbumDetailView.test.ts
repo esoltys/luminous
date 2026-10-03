@@ -558,4 +558,33 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
       expect(invokeMock).toHaveBeenCalledWith("retrieve_album_art", { album: "Abbey Road", onlyMissing: false });
     });
   });
+
+  it("clicking Refresh Album in overflow menu invokes rescan_songs with album songs, not full library scan", async () => {
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockImplementation((cmd: string) => {
+      if (cmd === "get_songs_by_album") {
+        return Promise.resolve([
+          { id: 1, title: "Come Together", artist: "The Beatles", album: "Abbey Road", disc: 1, track: 1 },
+          { id: 2, title: "Something", artist: "The Beatles", album: "Abbey Road", disc: 1, track: 2 },
+        ]);
+      }
+      if (cmd === "rescan_songs") return Promise.resolve();
+      return Promise.resolve();
+    });
+
+    const refreshLibrarySpy = vi.spyOn(collectionStore, "refreshLibrary").mockResolvedValue(undefined as any);
+    const startScanSpy = vi.spyOn(collectionStore, "startScan");
+
+    const view = render(AlbumDetailView, { props: { albumName: mockAlbumName } });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    await fireEvent.click(view.getByTitle("More actions"));
+    const refreshBtn = await view.findByText("Refresh Album");
+    expect(refreshBtn).toBeTruthy();
+    await fireEvent.click(refreshBtn);
+
+    expect(invokeMock).toHaveBeenCalledWith("rescan_songs", { songIds: [1, 2] });
+    expect(refreshLibrarySpy).toHaveBeenCalled();
+    expect(startScanSpy).not.toHaveBeenCalled();
+  });
 });
