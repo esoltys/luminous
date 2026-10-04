@@ -382,6 +382,7 @@ export const en = {
     dynamicThemes: "Dynamic Themes",
     predefinedThemes: "Predefined Themes",
     customThemes: "Custom Themes",
+    themesSubtitle: "Customize the visual appearance and colours of Luminous.",
     addonThemes: "Add-on Supporter Themes",
     addonBadge: "Add-on",
     addonCheckPurchases: "Check Purchases",
