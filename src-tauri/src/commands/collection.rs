@@ -195,6 +195,7 @@ pub async fn get_library_stats(state: State<'_, AppState>) -> Result<LibraryStat
         .map_err(|e| e.to_string())?;
     stats.album_art_bytes = usage.album_art_bytes as i64;
     stats.artist_art_bytes = usage.artist_art_bytes as i64;
+    stats.thumbnail_bytes = usage.thumbnail_bytes as i64;
     Ok(stats)
 }
 

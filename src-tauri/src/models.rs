@@ -1099,6 +1099,9 @@ pub struct LibraryStats {
     /// Covers-cache bytes for artist photos, logos and banners.
     #[serde(default)]
     pub artist_art_bytes: i64,
+    /// Covers-cache bytes for folder-art thumbnails (`thumbs/`).
+    #[serde(default)]
+    pub thumbnail_bytes: i64,
 }
 
 /// Represents an album summary on the Home page.

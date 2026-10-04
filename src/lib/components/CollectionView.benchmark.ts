@@ -76,6 +76,7 @@ vi.mock("@tauri-apps/api/core", () => {
           total_filesize_bytes: 500 * 1024 * 1024 * 1024,
           album_art_bytes: 0,
           artist_art_bytes: 0,
+          thumbnail_bytes: 0,
         };
       }
       if (cmd === "get_directories") return [];

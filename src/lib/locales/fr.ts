@@ -544,6 +544,7 @@ export const fr: DeepStringRecord<typeof en> = {
     statsSizeMusic: "Fichiers audio : {size}",
     statsSizeAlbumArt: "Pochettes d'album : {size}",
     statsSizeArtistArt: "Images d'artistes : {size}",
+    statsSizeThumbnails: "Miniatures des images de dossier : {size}",
     invalidThemeFile: "Format de fichier de thème invalide",
     importThemeFailed: "Échec de l'importation du thème. Veuillez vérifier le format du fichier.",
     importedThemeDefaultName: "Thème importé",

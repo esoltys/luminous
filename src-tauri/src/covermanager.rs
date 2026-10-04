@@ -446,7 +446,12 @@ fn serve_folder_art_thumbnail(covers_dir: &Path, source: &Path) -> tauri::http::
         .and_then(|m| m.duration_since(std::time::UNIX_EPOCH).ok())
         .map(|d| d.as_nanos())
         .unwrap_or(0);
-    let key = fnv1a_hex(&format!("{}|{}|{}", source.to_string_lossy(), mtime, meta.len()));
+    let key = fnv1a_hex(&format!(
+        "{}|{}|{}",
+        source.to_string_lossy(),
+        mtime,
+        meta.len()
+    ));
     let thumbs_dir = covers_dir.join("thumbs");
     for ext in ["jpg", "png"] {
         let cached = thumbs_dir.join(format!("{key}.{ext}"));
@@ -468,6 +473,19 @@ fn serve_folder_art_thumbnail(covers_dir: &Path, source: &Path) -> tauri::http::
         }
     }
     image_response(&thumb)
+}
+
+/// Total size of the regular files directly inside `dir`; zero if it's missing.
+fn dir_file_bytes(dir: &Path) -> u64 {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return 0;
+    };
+    entries
+        .flatten()
+        .filter_map(|e| e.metadata().ok())
+        .filter(|m| m.is_file())
+        .map(|m| m.len())
+        .sum()
 }
 
 fn fnv1a_hex(input: &str) -> String {
@@ -751,6 +769,8 @@ pub struct CacheSweepResult {
 pub struct CacheUsage {
     pub album_art_bytes: u64,
     pub artist_art_bytes: u64,
+    /// `thumbs/` folder-art thumbnails (see `serve_folder_art_thumbnail`).
+    pub thumbnail_bytes: u64,
 }
 
 impl CoverManager {
@@ -1592,6 +1612,7 @@ impl CoverManager {
     /// not an error.
     pub fn cache_usage(&self) -> CacheUsage {
         let mut usage = CacheUsage::default();
+        usage.thumbnail_bytes = dir_file_bytes(&self.covers_dir.join("thumbs"));
         let Ok(entries) = std::fs::read_dir(&self.covers_dir) else {
             return usage;
         };
@@ -1980,18 +2001,31 @@ mod tests {
         assert_eq!(first.status(), 200);
         let img = image::load_from_memory(first.body()).unwrap();
         assert_eq!((img.width(), img.height()), (CACHE_MAX_EDGE, 400));
-        assert_eq!(std::fs::read_dir(covers_dir.join("thumbs")).unwrap().count(), 1);
+        assert_eq!(
+            std::fs::read_dir(covers_dir.join("thumbs"))
+                .unwrap()
+                .count(),
+            1
+        );
 
         // Served from the cache even once the original is unreadable as an image.
         let again = serve_art_request(&covers_dir, &uri);
         assert_eq!(again.body(), first.body());
-        assert_eq!(std::fs::read_dir(covers_dir.join("thumbs")).unwrap().count(), 1);
+        assert_eq!(
+            std::fs::read_dir(covers_dir.join("thumbs"))
+                .unwrap()
+                .count(),
+            1
+        );
 
         // A changed file (new size) gets a fresh thumbnail.
         std::fs::write(&art, jpeg_bytes(1000, 1000)).unwrap();
         let changed = serve_art_request(&covers_dir, &uri);
         let img = image::load_from_memory(changed.body()).unwrap();
-        assert_eq!((img.width(), img.height()), (CACHE_MAX_EDGE, CACHE_MAX_EDGE));
+        assert_eq!(
+            (img.width(), img.height()),
+            (CACHE_MAX_EDGE, CACHE_MAX_EDGE)
+        );
 
         let missing = serve_art_request(&covers_dir, "luminous-art://thumb/nope.jpg");
         assert_eq!(missing.status(), 404);
@@ -2025,12 +2059,15 @@ mod tests {
         std::fs::write(covers.join("album-b.png"), [0u8; 50]).unwrap();
         std::fs::write(covers.join("artist-x.jpg"), [0u8; 30]).unwrap();
         std::fs::write(covers.join("artist-x-logo.png"), [0u8; 7]).unwrap();
+        std::fs::create_dir_all(covers.join("thumbs")).unwrap();
+        std::fs::write(covers.join("thumbs").join("0123.jpg"), [0u8; 20]).unwrap();
 
         assert_eq!(
             manager.cache_usage(),
             CacheUsage {
                 album_art_bytes: 150,
                 artist_art_bytes: 37,
+                thumbnail_bytes: 20,
             }
         );
     }
