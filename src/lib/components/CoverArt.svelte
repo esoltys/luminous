@@ -44,7 +44,7 @@
       return;
     }
     if (artAutomatic) {
-      imgSrc = resolveArtUrl(artAutomatic);
+      imgSrc = resolveArtUrl(artAutomatic, fullResolution);
       hasFailed = false;
       // The cache holds a downscaled copy; show it at once, then swap in the
       // original embedded picture for large views.

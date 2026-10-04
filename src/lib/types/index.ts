@@ -439,6 +439,7 @@ export interface LibraryStats {
   total_filesize_bytes: number;
   album_art_bytes: number;
   artist_art_bytes: number;
+  thumbnail_bytes: number;
 }
 
 /** Whether the on-disk database's schema is ahead of what this build understands —
@@ -750,6 +751,8 @@ export function getCoverArtUrl(uri: string | null | undefined): string | null {
       let cleanPath = uri.replace("luminous-art://", "");
       if (cleanPath.startsWith("local/")) {
         cleanPath = cleanPath.slice(6);
+      } else if (cleanPath.startsWith("thumb/")) {
+        cleanPath = cleanPath.slice(6);
       }
       if (cleanPath.includes(":/") || cleanPath.includes(":\\") || cleanPath.startsWith("/")) {
         return `/local-art/${encodeURIComponent(cleanPath)}`;
@@ -775,9 +778,11 @@ export function getCoverArtUrl(uri: string | null | undefined): string | null {
       // http URL, `#`/`?` in a folder name would otherwise be cut off as a
       // fragment/query and a literal `%` misdecoded. `serve_art_request`
       // percent-decodes `local/` paths.
-      const localPrefix = "luminous-art://local/";
-      if (uri.startsWith(localPrefix)) {
-        return `http://luminous-art.localhost/local/${encodeURIComponent(uri.slice(localPrefix.length))}`;
+      for (const form of ["local", "thumb"]) {
+        const prefix = `luminous-art://${form}/`;
+        if (uri.startsWith(prefix)) {
+          return `http://luminous-art.localhost/${form}/${encodeURIComponent(uri.slice(prefix.length))}`;
+        }
       }
       return uri.replace("luminous-art://", "http://luminous-art.localhost/");
     }
@@ -788,9 +793,10 @@ export function getCoverArtUrl(uri: string | null | undefined): string | null {
 /**
  * Resolves an art_manual or art_automatic string (which may be a remote HTTP URL,
  * a cached embedded art filename like "album-123.jpg", or an absolute local file path)
- * into a proper platform webview URL.
+ * into a proper platform webview URL. Folder art (an absolute path) is served
+ * as a cached thumbnail unless `original` asks for the file in place.
  */
-export function resolveArtUrl(art: string | null | undefined): string | null {
+export function resolveArtUrl(art: string | null | undefined, original = false): string | null {
   if (!art || typeof art !== "string") return null;
   if (art.startsWith("http://") || art.startsWith("https://")) {
     return art;
@@ -801,7 +807,7 @@ export function resolveArtUrl(art: string | null | undefined): string | null {
   if (art.startsWith("album-")) {
     return getCoverArtUrl(`luminous-art://${art}`);
   }
-  return getCoverArtUrl(`luminous-art://local/${art}`);
+  return getCoverArtUrl(`luminous-art://${original ? "local" : "thumb"}/${art}`);
 }
 
 /**

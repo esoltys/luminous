@@ -539,6 +539,7 @@ export const en = {
     statsSizeMusic: "Music files: {size}",
     statsSizeAlbumArt: "Album art: {size}",
     statsSizeArtistArt: "Artist images: {size}",
+    statsSizeThumbnails: "Folder art thumbnails: {size}",
     invalidThemeFile: "Invalid theme file format",
     importThemeFailed: "Failed to import theme. Please check the file format.",
     importedThemeDefaultName: "Imported Theme",

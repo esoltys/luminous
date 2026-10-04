@@ -70,7 +70,9 @@ fn build_extended_artwork_response(set: ExtendedArtworkSet) -> ExtendedArtworkRe
         let uri = local_artwork_uri(&entry.path);
         match entry.category {
             ArtworkCategory::ArtistPortrait if response.artist_portrait_uri.is_none() => {
-                response.artist_portrait_uri = Some(uri.clone());
+                // Portraits are only ever displayed, so serve the cached thumbnail.
+                response.artist_portrait_uri =
+                    Some(uri.replacen("luminous-art://local/", "luminous-art://thumb/", 1));
             }
             ArtworkCategory::BandLogo if response.band_logo_uri.is_none() => {
                 response.band_logo_uri = Some(uri.clone());
@@ -304,7 +306,7 @@ mod tests {
 
         assert_eq!(
             response.artist_portrait_uri.as_deref(),
-            Some("luminous-art://local//music/Artist/artist.jpg")
+            Some("luminous-art://thumb//music/Artist/artist.jpg")
         );
         assert_eq!(
             response.band_logo_uri.as_deref(),

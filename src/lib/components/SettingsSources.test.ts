@@ -177,13 +177,14 @@ describe("SettingsSources.svelte - Disk Size breakdown", () => {
       total_filesize_bytes: 2 * 1073741824,
       album_art_bytes: 25 * 1048576,
       artist_art_bytes: 64 * 1048576,
+      thumbnail_bytes: 11 * 1048576,
     };
     const { getByRole } = render(SettingsSources);
 
-    const card = getByRole("button", { name: "Disk Size: 2.09 GB" });
+    const card = getByRole("button", { name: "Disk Size: 2.10 GB" });
     expect(card).toHaveClass("cursor-help");
     expect(card).toHaveAccessibleDescription(
-      "Music files: 2.00 GB\nAlbum art: 25.0 MB\nArtist images: 64.0 MB"
+      "Music files: 2.00 GB\nAlbum art: 25.0 MB\nArtist images: 64.0 MB\nFolder art thumbnails: 11.0 MB"
     );
   });
 });

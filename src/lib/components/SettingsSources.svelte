@@ -174,8 +174,8 @@
   const formatDiskSize = (bytes: number) =>
     bytes >= 1073741824 ? `${formatNumber(bytes / 1073741824, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} GB` : formatFileSize(bytes);
   const diskSizeLabel = $derived.by(() => {
-    const { total_filesize_bytes, album_art_bytes, artist_art_bytes } = collectionStore.stats;
-    const total = total_filesize_bytes + (album_art_bytes ?? 0) + (artist_art_bytes ?? 0);
+    const { total_filesize_bytes, album_art_bytes, artist_art_bytes, thumbnail_bytes } = collectionStore.stats;
+    const total = total_filesize_bytes + (album_art_bytes ?? 0) + (artist_art_bytes ?? 0) + (thumbnail_bytes ?? 0);
     return `${formatNumber(total / 1073741824, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} GB`;
   });
   const diskSizeBreakdown = $derived(
@@ -183,6 +183,7 @@
       i18n.t('settings.statsSizeMusic', { size: formatDiskSize(collectionStore.stats.total_filesize_bytes) }),
       i18n.t('settings.statsSizeAlbumArt', { size: formatDiskSize(collectionStore.stats.album_art_bytes) }),
       i18n.t('settings.statsSizeArtistArt', { size: formatDiskSize(collectionStore.stats.artist_art_bytes) }),
+      i18n.t('settings.statsSizeThumbnails', { size: formatDiskSize(collectionStore.stats.thumbnail_bytes) }),
     ].join("\n"),
   );
 
