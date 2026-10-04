@@ -1021,6 +1021,11 @@ impl ScrobblerManager {
 
     /// The user's published CritiqueBrainz reviews that carry a star rating,
     /// for recordings and release groups.
+    ///
+    /// `reviewer_uuid` is the public CritiqueBrainz profile ID (it appears in
+    /// profile URLs), not a credential, and the request goes over HTTPS. CodeQL's
+    /// `rust/cleartext-transmission` flags it by its `user_id` query-key name;
+    /// that alert is dismissed as a false positive.
     async fn fetch_critiquebrainz_ratings(
         &self,
         reviewer_uuid: &str,
