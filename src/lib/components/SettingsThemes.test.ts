@@ -4,6 +4,7 @@ import { fireEvent, render, within } from "@testing-library/svelte";
 import SettingsThemes from "./SettingsThemes.svelte";
 import { themeStore, LUMINOUS_DARK_COLORS, type Theme } from "../stores/theme.svelte";
 import { open, save } from "@tauri-apps/plugin-dialog";
+import { addonsStore } from "../stores/addons.svelte";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockResolvedValue([]),
@@ -19,6 +20,15 @@ describe("SettingsThemes.svelte", () => {
     vi.clearAllMocks();
     themeStore.customThemes = [];
     themeStore.colorSchemeMode = "system";
+  });
+
+  it("lists Add-on Themes above Predefined Themes", async () => {
+    addonsStore.applyEvent({ id: "mothman", state: "unowned" });
+    const { findByText } = render(SettingsThemes);
+    const addons = await findByText("Add-on Themes");
+    const predefined = await findByText("Predefined Themes");
+    expect(addons.compareDocumentPosition(predefined) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    addonsStore.statuses = {};
   });
 
   it("renders Dynamic Themes row and footnotes for Luminous and System", async () => {

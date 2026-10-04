@@ -4,7 +4,7 @@
   import { addonsStore } from "../stores/addons.svelte";
   import { themeStore } from "../stores/theme.svelte";
   import { SWATCH_KEYS, type AddonCatalogEntry } from "../addons/catalog";
-  import { SpinnerGapIcon as Spinner } from "phosphor-svelte";
+  import { SpinnerGapIcon as Spinner, TagIcon as Tag } from "phosphor-svelte";
 
   let { entry }: { entry: AddonCatalogEntry } = $props();
 
@@ -25,6 +25,11 @@
   let busy = $derived(state === "purchasing" || state === "downloading");
   // Once owned the whole card selects the theme, like every other theme card.
   let selectable = $derived(state === "owned");
+  // A free add-on, or one whose price the Store did not report, keeps the plain "Get".
+  let price = $derived.by(() => {
+    const p = addonsStore.prices[entry.id];
+    return p && !p.isFree ? p.formatted : null;
+  });
 
   // The registered theme is the source of truth once the bundle is verified.
   let swatches = $derived.by(() => {
@@ -106,9 +111,14 @@
     {#if state === "unowned"}
       <button
         onclick={get}
-        class="w-full py-2 px-3 rounded-md text-xs font-semibold bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast transition-colors"
+        class="w-full py-2 px-3 rounded-md text-xs font-semibold bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast transition-colors flex items-center justify-center gap-1.5"
       >
-        {i18n.t("settings.addonGet")}
+        {#if price}
+          <Tag class="w-3.5 h-3.5" />
+          {i18n.t("settings.addonBuyFor", { price })}
+        {:else}
+          {i18n.t("settings.addonGet")}
+        {/if}
       </button>
     {:else if busy}
       <button

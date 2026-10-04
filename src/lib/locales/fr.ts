@@ -392,6 +392,7 @@ export const fr: DeepStringRecord<typeof en> = {
     addonBadge: "Additionnel",
     addonCheckPurchases: "Vérifier les achats",
     addonGet: "Obtenir",
+    addonBuyFor: "Acheter pour {price}",
     addonWaitingStore: "En attente du Microsoft Store…",
     addonDownloading: "Téléchargement…",
     addonOwned: "Obtenu",

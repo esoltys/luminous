@@ -76,12 +76,47 @@ pub enum PurchaseOutcome {
     Cancelled,
 }
 
+/// The Store's localised price for an add-on, as the signed-in user would pay it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProductPrice {
+    /// Display string straight from the Store, e.g. `$4.99`; never parsed for amounts.
+    pub formatted: String,
+    /// True when nothing is charged, so the card says "Get" rather than "Buy for Free".
+    pub is_free: bool,
+}
+
+impl ProductPrice {
+    /// `None` for an empty string. The Store exposes the price only as text,
+    /// so "free" is read from it: no digits at all (the localised word for
+    /// free) or digits that are all zero (`$0.00`, `0,00 $`).
+    pub fn from_formatted(formatted: &str) -> Option<Self> {
+        let formatted = formatted.trim();
+        if formatted.is_empty() {
+            return None;
+        }
+        let is_free = formatted
+            .chars()
+            .filter(char::is_ascii_digit)
+            .all(|c| c == '0');
+        Some(Self {
+            formatted: formatted.to_string(),
+            is_free,
+        })
+    }
+}
+
 /// The slice of the Store the manager needs. Blocking: the manager runs every
 /// call on a blocking thread, which is also what the WinRT `.join()` needs.
 pub trait StoreBackend: Send + Sync {
     /// False off-Windows and when the app has no package identity.
     fn is_available(&self) -> bool;
     fn is_owned(&self, store_id: &str) -> Result<bool, StoreError>;
+    /// The Store's price for the add-on, or `None` when it reports none. A
+    /// build with no Store has no price to show.
+    fn price(&self, _store_id: &str) -> Result<Option<ProductPrice>, StoreError> {
+        Ok(None)
+    }
     /// `hwnd` parents the purchase dialog to the main window.
     fn purchase(&self, store_id: &str, hwnd: isize) -> Result<PurchaseOutcome, StoreError>;
     /// The user's Store ID key for the key-release Worker.
@@ -159,6 +194,7 @@ impl From<&verifier::Manifest> for ThemeDefinition {
 pub trait Events: Send + Sync {
     fn state(&self, id: &str, state: AddonState, error: Option<&str>);
     fn theme_defined(&self, theme: &ThemeDefinition);
+    fn price_defined(&self, _id: &str, _price: &ProductPrice) {}
 }
 
 type BoxFuture<T> = Pin<Box<dyn Future<Output = T> + Send>>;
@@ -341,6 +377,7 @@ impl AddonManager {
             Ok(true) => self.activate(addon).await,
             Ok(false) => {
                 super::unregister(id);
+                self.announce_price(addon).await;
                 self.emit(id, AddonState::Unowned);
             }
             Err(e) => {
@@ -374,6 +411,21 @@ impl AddonManager {
                 log::warn!("add-on {}: purchase failed: {e:?}", addon.id);
                 self.fail(addon.id, error_code::STORE);
             }
+        }
+    }
+
+    /// Tell the UI what the add-on costs. A failed lookup only means the card
+    /// keeps its plain label, so it is logged and otherwise ignored.
+    async fn announce_price(&self, addon: &KnownAddon) {
+        let backend = Arc::clone(&self.backend);
+        let store_id = addon.store_id;
+        let looked_up = tokio::task::spawn_blocking(move || backend.price(store_id))
+            .await
+            .unwrap_or_else(|e| Err(StoreError::Failed(e.to_string())));
+        match looked_up {
+            Ok(Some(price)) => self.events.price_defined(addon.id, &price),
+            Ok(None) => {}
+            Err(e) => log::warn!("add-on {}: price lookup failed: {e:?}", addon.id),
         }
     }
 
@@ -448,7 +500,7 @@ fn publisher_user_id() -> String {
 
 #[cfg(target_os = "windows")]
 mod windows_store {
-    use super::{PurchaseOutcome, StoreBackend, StoreError};
+    use super::{ProductPrice, PurchaseOutcome, StoreBackend, StoreError};
     use windows::core::{Interface, HSTRING};
     use windows::Services::Store::{StoreContext, StorePurchaseStatus};
     use windows::Win32::Foundation::HWND;
@@ -499,6 +551,35 @@ mod windows_store {
             Ok(false)
         }
 
+        fn price(&self, store_id: &str) -> Result<Option<ProductPrice>, StoreError> {
+            let ctx = context(None)?;
+            let kinds = IIterable::<HSTRING>::from(vec![HSTRING::from("Durable")]);
+            let ids = IIterable::<HSTRING>::from(vec![HSTRING::from(store_id)]);
+            let result = ctx
+                .GetStoreProductsAsync(&kinds, &ids)
+                .map_err(failed)?
+                .join()
+                .map_err(failed)?;
+            if let Ok(err) = result.ExtendedError() {
+                if err.is_err() {
+                    return Err(StoreError::Failed(format!("{err}")));
+                }
+            }
+            for entry in result.Products().map_err(failed)? {
+                let product = entry.Value().map_err(failed)?;
+                if product.StoreId().map_err(failed)?.to_string_lossy() == store_id {
+                    let formatted = product
+                        .Price()
+                        .map_err(failed)?
+                        .FormattedPrice()
+                        .map_err(failed)?
+                        .to_string_lossy();
+                    return Ok(ProductPrice::from_formatted(&formatted));
+                }
+            }
+            Ok(None)
+        }
+
         fn purchase(&self, store_id: &str, hwnd: isize) -> Result<PurchaseOutcome, StoreError> {
             let ctx = context(Some(hwnd))?;
             let result = ctx
@@ -543,7 +624,7 @@ mod windows_store {
 /// `owned` or `unowned`; a purchase flips `unowned` to owned.
 #[cfg(debug_assertions)]
 mod fake {
-    use super::{PurchaseOutcome, StoreBackend, StoreError};
+    use super::{ProductPrice, PurchaseOutcome, StoreBackend, StoreError};
     use std::sync::atomic::{AtomicBool, Ordering};
 
     pub struct FakeStore {
@@ -575,6 +656,13 @@ mod fake {
         fn is_owned(&self, _: &str) -> Result<bool, StoreError> {
             Ok(self.owned.load(Ordering::SeqCst))
         }
+        /// `LUMINOUS_ADDON_FAKE_PRICE` (e.g. `$4.99`) stands in for the Store's price.
+        fn price(&self, _: &str) -> Result<Option<ProductPrice>, StoreError> {
+            Ok(std::env::var("LUMINOUS_ADDON_FAKE_PRICE")
+                .ok()
+                .and_then(|p| ProductPrice::from_formatted(&p)))
+        }
+
         fn purchase(&self, _: &str, _: isize) -> Result<PurchaseOutcome, StoreError> {
             self.owned.store(true, Ordering::SeqCst);
             Ok(PurchaseOutcome::Purchased)
@@ -594,6 +682,7 @@ mod tests {
     struct Recorder {
         states: Mutex<Vec<(String, AddonState, Option<String>)>>,
         themes: Mutex<Vec<ThemeDefinition>>,
+        prices: Mutex<Vec<(String, ProductPrice)>>,
     }
 
     impl Events for Recorder {
@@ -604,6 +693,9 @@ mod tests {
         }
         fn theme_defined(&self, theme: &ThemeDefinition) {
             self.themes.lock().push(theme.clone());
+        }
+        fn price_defined(&self, id: &str, price: &ProductPrice) {
+            self.prices.lock().push((id.to_string(), price.clone()));
         }
     }
 
@@ -622,6 +714,7 @@ mod tests {
         owned: Result<bool, StoreError>,
         purchase: Result<PurchaseOutcome, StoreError>,
         key: Result<String, StoreError>,
+        price: Result<Option<ProductPrice>, StoreError>,
         purchases: AtomicUsize,
     }
 
@@ -632,6 +725,7 @@ mod tests {
                 owned: Ok(true),
                 purchase: Ok(PurchaseOutcome::Purchased),
                 key: Ok("sik".into()),
+                price: Ok(None),
                 purchases: AtomicUsize::new(0),
             }
         }
@@ -647,6 +741,9 @@ mod tests {
         fn purchase(&self, _: &str, _: isize) -> Result<PurchaseOutcome, StoreError> {
             self.purchases.fetch_add(1, Ordering::SeqCst);
             self.purchase.clone()
+        }
+        fn price(&self, _: &str) -> Result<Option<ProductPrice>, StoreError> {
+            self.price.clone()
         }
         fn store_id_key(&self, _: &str, _: &str) -> Result<String, StoreError> {
             self.key.clone()
@@ -760,6 +857,78 @@ mod tests {
         );
         m.refresh("mothman").await;
         assert_eq!(rec.trail(), vec![(AddonState::Unowned, None)]);
+    }
+
+    #[test]
+    fn price_is_free_when_the_text_has_no_non_zero_digit() {
+        for free in ["Free", "Gratuit", "$0.00", "0,00 $", " 0 "] {
+            assert!(
+                ProductPrice::from_formatted(free).unwrap().is_free,
+                "{free}"
+            );
+        }
+        for paid in ["$4.99", "4,99 $", "\u{20ac}10", "CA$1.00"] {
+            assert!(
+                !ProductPrice::from_formatted(paid).unwrap().is_free,
+                "{paid}"
+            );
+        }
+        assert_eq!(ProductPrice::from_formatted("  "), None);
+        assert_eq!(
+            ProductPrice::from_formatted(" $4.99 ").unwrap().formatted,
+            "$4.99"
+        );
+    }
+
+    #[tokio::test]
+    async fn unowned_addon_announces_the_store_price_before_the_state() {
+        let (m, rec) = manager(
+            FakeBackend {
+                owned: Ok(false),
+                price: Ok(ProductPrice::from_formatted("$4.99")),
+                ..Default::default()
+            },
+            FakeNet::default(),
+        );
+        m.refresh("mothman").await;
+        assert_eq!(
+            rec.prices.lock().as_slice(),
+            &[(
+                "mothman".to_string(),
+                ProductPrice::from_formatted("$4.99").unwrap()
+            )]
+        );
+        assert_eq!(rec.trail(), vec![(AddonState::Unowned, None)]);
+    }
+
+    #[tokio::test]
+    async fn failed_or_missing_price_still_ends_unowned_without_a_price() {
+        for price in [Err(StoreError::Failed("down".into())), Ok(None)] {
+            let (m, rec) = manager(
+                FakeBackend {
+                    owned: Ok(false),
+                    price,
+                    ..Default::default()
+                },
+                FakeNet::default(),
+            );
+            m.refresh("mothman").await;
+            assert!(rec.prices.lock().is_empty());
+            assert_eq!(rec.trail(), vec![(AddonState::Unowned, None)]);
+        }
+    }
+
+    #[tokio::test]
+    async fn owned_addon_does_not_look_up_a_price() {
+        let (m, rec) = manager(
+            FakeBackend {
+                price: Ok(ProductPrice::from_formatted("$4.99")),
+                ..Default::default()
+            },
+            FakeNet::default(),
+        );
+        m.refresh("mothman").await;
+        assert!(rec.prices.lock().is_empty());
     }
 
     #[tokio::test]
