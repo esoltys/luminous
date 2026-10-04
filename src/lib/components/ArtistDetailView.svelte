@@ -928,6 +928,69 @@
       {/if}
     {/if}
 
+    {#snippet factsPanel()}
+      {#if hasArtistInfo}
+        <ArtistInformationPanel
+          sortName={contextData?.artist_sort_name}
+          gender={contextData?.artist_gender}
+          beginDate={contextData?.artist_begin_date}
+          endDate={contextData?.artist_end_date}
+          ended={contextData?.artist_ended}
+          artistType={contextData?.artist_type}
+          beginAreaName={contextData?.artist_begin_area_name}
+          beginAreaMbid={contextData?.artist_begin_area_mbid}
+          areaName={contextData?.artist_area_name}
+          areaMbid={contextData?.artist_area_mbid}
+          onOpenUrl={handleOpenUrl}
+          variant="plain"
+          class="w-full @xl:max-w-[calc(50%-0.3125rem)] @md:max-w-[calc((200%-0.625rem)/3)]"
+        />
+      {/if}
+    {/snippet}
+
+    {#snippet eventsSection()}
+      {#if hasEvents || artistMbid}
+        <ArtistEventsSection
+          events={artistEvents}
+          loading={loadingEvents}
+          artistName={artistName}
+          songkickUrl={songkickLink}
+          setlistfmUrl={setlistfmLink}
+          bandsintownUrl={bandsintownLink}
+          musicbrainzUrl={musicbrainzEventsUrl}
+          onOpenUrl={handleOpenUrl}
+        />
+      {/if}
+    {/snippet}
+
+    {#snippet linksSection(gridColsClass: string)}
+      {#if hasWebsite || hasSocials || artistMbid}
+        <div class="grid {gridColsClass} gap-2.5">
+          <!-- Website, curated social links, and derived MusicBrainz/
+               ListenBrainz/Fanart.tv links, unified and sorted
+               alphabetically with the website first (#1122, #1123) -->
+          {#each artistLinkItems as item (item.key)}
+            <button
+              type="button"
+              onclick={() => handleOpenUrl(item.url)}
+              title={item.url}
+              class="flex items-center gap-2.5 sm:gap-3 group/link text-left transition-colors cursor-pointer min-w-0"
+            >
+              <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-brand-main/60 {item.isOfficial ? 'border-[3px]' : 'border'} border-brand-border flex items-center justify-center text-brand-text-secondary group-hover/link:text-brand-accent group-hover/link:border-brand-accent/40 transition-colors shrink-0 shadow-2xs">
+                <SocialIcon platform={item.platform} size={14} />
+              </div>
+              <div class="flex items-center gap-1 min-w-0 flex-1">
+                <span class="text-xs font-medium text-brand-text-primary truncate transition-colors">
+                  {item.label}
+                </span>
+                <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover/link:opacity-100 transition-opacity shrink-0" />
+              </div>
+            </button>
+          {/each}
+        </div>
+      {/if}
+    {/snippet}
+
     <!-- Artist Profile Card (About & Links) -->
     {#if hasProfileContent && !windowLayoutStore.isDetailHeaderCollapsed && windowLayoutStore.isOverviewExpanded}
       <details
@@ -939,99 +1002,50 @@
           <span>{i18n.t('artistDetail.artistInfo', {}, 'Artist Info')}</span>
           <ArrowUpRight class="w-3.5 h-3.5 text-brand-text-secondary/70" />
         </summary>
-        <div class="p-4 sm:p-5 md:p-6 border-t border-brand-border/60 flex flex-col @2xl:flex-row gap-5 md:gap-6 justify-between items-start">
-          <!-- Left Column (Bio & Links) -->
-          {#if hasBio || hasWebsite || hasSocials || artistMbid}
+        {#if hasBio}
+          {@const bioText = effectiveBio ?? ""}
+          <div class="p-4 sm:p-5 md:p-6 border-t border-brand-border/60 flex flex-col @2xl:flex-row gap-5 md:gap-6 justify-between items-start">
+            <!-- Left Column (Bio & Links) -->
             <div class="flex-1 flex flex-col gap-5 min-w-0 w-full">
               <!-- Bio -->
-              {#if hasBio}
-                {@const bioText = effectiveBio ?? ""}
-                <div class="flex flex-col gap-3 min-w-0">
-                  <div class="text-xs text-brand-text-secondary leading-relaxed">
-                    {#if bioIsFromWikipedia}
-                      <button
-                        type="button"
-                        onclick={() => contextData?.wikipedia_page_url && handleOpenUrl(contextData.wikipedia_page_url)}
-                        class="group/wiki relative inline-flex items-center gap-1 mb-1 text-[11px] font-semibold text-brand-text-secondary/70 hover:text-brand-accent transition-colors cursor-pointer -mt-0.5"
-                      >
-                        <span class="underline decoration-brand-text-secondary/40 group-hover/wiki:decoration-brand-accent">{i18n.t('playerBar.wikipediaSectionLabel', {}, 'Wikipedia')}</span>
-                        <ExternalLink class="w-3 h-3 opacity-0 group-hover/wiki:opacity-100 transition-opacity" />
-                      </button>
-                    {/if}
-                    <MarkdownBio
-                      text={bioText}
-                      disableClamp={true}
-                    />
-                  </div>
-                </div>
-              {/if}
-
-              <!-- Links -->
-              {#if hasWebsite || hasSocials || artistMbid}
-                <div class="grid grid-cols-1 @sm:grid-cols-2 gap-2.5">
-                  <!-- Website, curated social links, and derived MusicBrainz/
-                       ListenBrainz/Fanart.tv links, unified and sorted
-                       alphabetically with the website first (#1122, #1123) -->
-                  {#each artistLinkItems as item (item.key)}
+              <div class="flex flex-col gap-3 min-w-0">
+                <div class="text-xs text-brand-text-secondary leading-relaxed">
+                  {#if bioIsFromWikipedia}
                     <button
                       type="button"
-                      onclick={() => handleOpenUrl(item.url)}
-                      title={item.url}
-                      class="flex items-center gap-2.5 sm:gap-3 group/link text-left transition-colors cursor-pointer min-w-0"
+                      onclick={() => contextData?.wikipedia_page_url && handleOpenUrl(contextData.wikipedia_page_url)}
+                      class="group/wiki relative inline-flex items-center gap-1 mb-1 text-[11px] font-semibold text-brand-text-secondary/70 hover:text-brand-accent transition-colors cursor-pointer -mt-0.5"
                     >
-                      <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-brand-main/60 {item.isOfficial ? 'border-[3px]' : 'border'} border-brand-border flex items-center justify-center text-brand-text-secondary group-hover/link:text-brand-accent group-hover/link:border-brand-accent/40 transition-colors shrink-0 shadow-2xs">
-                        <SocialIcon platform={item.platform} size={14} />
-                      </div>
-                      <div class="flex items-center gap-1 min-w-0 flex-1">
-                        <span class="text-xs font-medium text-brand-text-primary truncate transition-colors">
-                          {item.label}
-                        </span>
-                        <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover/link:opacity-100 transition-opacity shrink-0" />
-                      </div>
+                      <span class="underline decoration-brand-text-secondary/40 group-hover/wiki:decoration-brand-accent">{i18n.t('playerBar.wikipediaSectionLabel', {}, 'Wikipedia')}</span>
+                      <ExternalLink class="w-3 h-3 opacity-0 group-hover/wiki:opacity-100 transition-opacity" />
                     </button>
-                  {/each}
+                  {/if}
+                  <MarkdownBio
+                    text={bioText}
+                    disableClamp={true}
+                  />
                 </div>
-              {/if}
-            </div>
-          {/if}
+              </div>
 
-          <!-- Right Column (Facts & Events) -->
-          {#if hasArtistInfo || hasEvents || artistMbid}
-            <div class="flex-1 flex flex-col gap-5 min-w-0 w-full">
-              <!-- Facts (formed/city/country) -->
-              {#if hasArtistInfo}
-                <ArtistInformationPanel
-                  sortName={contextData?.artist_sort_name}
-                  gender={contextData?.artist_gender}
-                  beginDate={contextData?.artist_begin_date}
-                  endDate={contextData?.artist_end_date}
-                  ended={contextData?.artist_ended}
-                  artistType={contextData?.artist_type}
-                  beginAreaName={contextData?.artist_begin_area_name}
-                  beginAreaMbid={contextData?.artist_begin_area_mbid}
-                  areaName={contextData?.artist_area_name}
-                  areaMbid={contextData?.artist_area_mbid}
-                  onOpenUrl={handleOpenUrl}
-                  variant="plain"
-                />
-              {/if}
-
-              <!-- Upcoming Concerts & Events -->
-              {#if hasEvents || artistMbid}
-                <ArtistEventsSection
-                  events={artistEvents}
-                  loading={loadingEvents}
-                  artistName={artistName}
-                  songkickUrl={songkickLink}
-                  setlistfmUrl={setlistfmLink}
-                  bandsintownUrl={bandsintownLink}
-                  musicbrainzUrl={musicbrainzEventsUrl}
-                  onOpenUrl={handleOpenUrl}
-                />
-              {/if}
+              <!-- Links -->
+              {@render linksSection("grid-cols-1 @sm:grid-cols-2")}
             </div>
-          {/if}
-        </div>
+
+            <!-- Right Column (Facts & Events) -->
+            {#if hasArtistInfo || hasEvents || artistMbid}
+              <div class="flex-1 flex flex-col gap-5 min-w-0 w-full">
+                {@render factsPanel()}
+                {@render eventsSection()}
+              </div>
+            {/if}
+          </div>
+        {:else}
+          <div class="p-4 sm:p-5 md:p-6 border-t border-brand-border/60 flex flex-col gap-5 w-full">
+            {@render factsPanel()}
+            {@render eventsSection()}
+            {@render linksSection("grid-cols-1 @sm:grid-cols-2 @md:grid-cols-3 @xl:grid-cols-4")}
+          </div>
+        {/if}
       </details>
     {/if}
 
