@@ -11,6 +11,9 @@
   import type { ArtistEvent } from "../types";
   import SocialIcon from "./SocialIcon.svelte";
 
+  import { fly } from "../utils/motion";
+  import { cubicOut } from "svelte/easing";
+
   interface Props {
     events: ArtistEvent[];
     loading?: boolean;
@@ -37,13 +40,33 @@
 
   let showPast = $state(false);
   let page = $state(0);
+  let pageDirection = $state<1 | -1>(1);
   const pageSize = 5;
+
+  const isTest = typeof process !== "undefined" && process.env.NODE_ENV === "test";
+  const enterDuration = isTest ? 0 : 200;
+  const exitDuration = isTest ? 0 : 160;
+
+  function prevPage() {
+    if (page > 0) {
+      pageDirection = -1;
+      page--;
+    }
+  }
+
+  function nextPage() {
+    if (page < totalPages - 1) {
+      pageDirection = 1;
+      page++;
+    }
+  }
 
   $effect(() => {
     // Reset page if events list or artist changes
     events;
     artistName;
     page = 0;
+    pageDirection = 1;
   });
 
   // Today in UTC YYYY-MM-DD
@@ -143,8 +166,14 @@
     {:else}
       <!-- Upcoming Events List -->
       {#if upcomingEvents.length > 0}
-        <div class="space-y-2">
-          {#each pagedUpcomingEvents as event (event.id)}
+        <div class="grid grid-cols-1 grid-rows-1 overflow-hidden">
+          {#key page}
+            <div
+              in:fly={{ x: pageDirection * 40, duration: enterDuration, easing: cubicOut }}
+              out:fly={{ x: -pageDirection * 40, duration: exitDuration, easing: cubicOut }}
+              class="col-start-1 row-start-1 space-y-2 w-full"
+            >
+              {#each pagedUpcomingEvents as event (event.id)}
             {@const { month, day, year } = parseDateParts(event.begin_date)}
             {@const primaryTicketUrl = event.ticket_urls?.[0]}
             {@const primaryEventUrl = event.event_urls?.[0]}
@@ -257,6 +286,8 @@
               </div>
             </div>
           {/each}
+            </div>
+          {/key}
         </div>
 
         {#if totalPages > 1}
@@ -272,7 +303,7 @@
               <button
                 type="button"
                 disabled={page === 0}
-                onclick={() => page--}
+                onclick={prevPage}
                 class="p-1 rounded hover:bg-brand-main/60 disabled:opacity-30 disabled:hover:bg-transparent transition-colors cursor-pointer disabled:cursor-not-allowed text-brand-text-secondary hover:text-brand-text-primary"
                 aria-label={i18n.t("artistEvents.previousPage", {}, "Previous page")}
               >
@@ -282,7 +313,7 @@
               <button
                 type="button"
                 disabled={page >= totalPages - 1}
-                onclick={() => page++}
+                onclick={nextPage}
                 class="p-1 rounded hover:bg-brand-main/60 disabled:opacity-30 disabled:hover:bg-transparent transition-colors cursor-pointer disabled:cursor-not-allowed text-brand-text-secondary hover:text-brand-text-primary"
                 aria-label={i18n.t("artistEvents.nextPage", {}, "Next page")}
               >

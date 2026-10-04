@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/svelte";
+import { render, screen, fireEvent, waitFor } from "@testing-library/svelte";
 import ArtistEventsSection from "./ArtistEventsSection.svelte";
 import type { ArtistEvent } from "../types";
 
@@ -173,7 +173,7 @@ describe("ArtistEventsSection", () => {
     await fireEvent.click(nextBtn);
 
     // Page 2: shows shows 6 and 7
-    expect(screen.queryByText("Upcoming Tour Show 1")).toBeNull();
+    await waitFor(() => expect(screen.queryByText("Upcoming Tour Show 1")).toBeNull());
     expect(screen.getByText("Upcoming Tour Show 6")).toBeTruthy();
     expect(screen.getByText("Upcoming Tour Show 7")).toBeTruthy();
     expect(screen.getByText("6–7 of 7")).toBeTruthy();
