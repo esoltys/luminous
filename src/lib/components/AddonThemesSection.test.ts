@@ -19,13 +19,14 @@ describe("AddonThemesSection.svelte", () => {
     vi.clearAllMocks();
     addonsStore.statuses = {};
     addonsStore.themes = {};
+    addonsStore.prices = {};
     themeStore.activeThemeId = "system";
   });
 
   it("renders nothing while the Store is unavailable or has not reported yet", () => {
     const { container, rerender } = render(AddonThemesSection);
     expect(container.querySelector("[data-addon-card]")).toBeNull();
-    expect(container.textContent).not.toContain("Add-on Themes");
+    expect(container.textContent).not.toContain("Add-on Supporter Themes");
 
     setState("unavailable");
     rerender({});
@@ -35,7 +36,7 @@ describe("AddonThemesSection.svelte", () => {
   it("offers Get for an add-on that is not owned and starts the purchase on click", async () => {
     setState("unowned");
     const { findByRole, getByText } = render(AddonThemesSection);
-    expect(getByText("Add-on Themes")).toBeInTheDocument();
+    expect(getByText("Add-on Supporter Themes")).toBeInTheDocument();
     expect(getByText("Mothman")).toBeInTheDocument();
 
     await fireEvent.click(await findByRole("button", { name: "Get" }));
@@ -63,7 +64,7 @@ describe("AddonThemesSection.svelte", () => {
 
     const card = await findByRole("button", { name: /Mothman/ });
     expect(card).toHaveAttribute("aria-pressed", "false");
-    await fireEvent.click(getByText("A tiny moth wanders along the top of the player bar."));
+    await fireEvent.click(getByText("A tiny cryptid dances along the top of the player bar."));
     expect(setThemeSpy).toHaveBeenCalledWith("mothman");
   });
 
@@ -95,6 +96,28 @@ describe("AddonThemesSection.svelte", () => {
     setState("error", "something_new");
     const { getByRole } = render(AddonThemesSection);
     expect(getByRole("alert")).toHaveTextContent("Something went wrong. Try again.");
+  });
+
+  it("shows the Store price on the button when the add-on is not free", async () => {
+    setState("unowned");
+    addonsStore.prices["mothman"] = { id: "mothman", formatted: "$4.99", isFree: false };
+    const { findByRole, queryByRole } = render(AddonThemesSection);
+    const buy = await findByRole("button", { name: "Buy for $4.99" });
+    expect(queryByRole("button", { name: "Get" })).toBeNull();
+
+    await fireEvent.click(buy);
+    expect(invoke).toHaveBeenCalledWith("acquire_addon", { id: "mothman" });
+  });
+
+  it("says Buy for Free for a free add-on and keeps Get when the Store reported no price", async () => {
+    setState("unowned");
+    addonsStore.prices["mothman"] = { id: "mothman", formatted: "$0.00", isFree: true };
+    const { findByRole, rerender } = render(AddonThemesSection);
+    expect(await findByRole("button", { name: "Buy for Free" })).toBeInTheDocument();
+
+    addonsStore.prices = {};
+    rerender({});
+    expect(await findByRole("button", { name: "Get" })).toBeInTheDocument();
   });
 
   it("Check Purchases asks the backend to refresh every add-on", async () => {

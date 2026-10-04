@@ -1,7 +1,7 @@
 //! IPC handlers for Store-gated add-on themes (#1414). They only start flows;
 //! results arrive as `addon-state-changed` / `addon-theme-defined` events.
 
-use crate::addons::entitlement::{AddonManager, AddonState, Events, ThemeDefinition};
+use crate::addons::entitlement::{AddonManager, AddonState, Events, ProductPrice, ThemeDefinition};
 use crate::AppState;
 use serde::Serialize;
 use std::sync::Arc;
@@ -15,6 +15,14 @@ struct StateChanged<'a> {
     state: AddonState,
     #[serde(skip_serializing_if = "Option::is_none")]
     error: Option<&'a str>,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PriceDefined<'a> {
+    id: &'a str,
+    formatted: &'a str,
+    is_free: bool,
 }
 
 /// Emits the add-on events to the frontend.
@@ -33,6 +41,17 @@ impl Events for TauriEvents {
     fn theme_defined(&self, theme: &ThemeDefinition) {
         if let Err(e) = self.0.emit("addon-theme-defined", theme) {
             log::warn!("failed to emit addon-theme-defined: {e}");
+        }
+    }
+
+    fn price_defined(&self, id: &str, price: &ProductPrice) {
+        let payload = PriceDefined {
+            id,
+            formatted: &price.formatted,
+            is_free: price.is_free,
+        };
+        if let Err(e) = self.0.emit("addon-price-defined", payload) {
+            log::warn!("failed to emit addon-price-defined: {e}");
         }
     }
 }

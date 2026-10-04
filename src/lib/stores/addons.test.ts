@@ -54,6 +54,20 @@ describe("AddonsStore", () => {
     handlers["addon-state-changed"]({ payload: { id: FIXTURE.id, state: "owned" } as never });
     expect(addons.stateOf(FIXTURE.id)).toBe("owned");
   });
+
+  it("keeps the Store's price from the backend's price event", async () => {
+    const handlers: Record<string, (e: { payload: never }) => void> = {};
+    vi.mocked(listen).mockImplementation((async (name: string, cb: never) => {
+      handlers[name] = cb;
+      return () => {};
+    }) as never);
+    await addons.init();
+    expect(addons.prices[FIXTURE.id]).toBeUndefined();
+    handlers["addon-price-defined"]({
+      payload: { id: FIXTURE.id, formatted: "$4.99", isFree: false } as never
+    });
+    expect(addons.prices[FIXTURE.id]).toEqual({ id: FIXTURE.id, formatted: "$4.99", isFree: false });
+  });
 });
 
 describe("ThemeStore with add-ons", () => {

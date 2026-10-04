@@ -4,7 +4,7 @@
   import { addonsStore } from "../stores/addons.svelte";
   import { themeStore } from "../stores/theme.svelte";
   import { SWATCH_KEYS, type AddonCatalogEntry } from "../addons/catalog";
-  import { SpinnerGapIcon as Spinner } from "phosphor-svelte";
+  import { SpinnerGapIcon as Spinner, TagIcon as Tag } from "phosphor-svelte";
 
   let { entry }: { entry: AddonCatalogEntry } = $props();
 
@@ -25,6 +25,8 @@
   let busy = $derived(state === "purchasing" || state === "downloading");
   // Once owned the whole card selects the theme, like every other theme card.
   let selectable = $derived(state === "owned");
+  // The Store's price text; without one the button keeps the plain "Get".
+  let price = $derived(addonsStore.prices[entry.id]);
 
   // The registered theme is the source of truth once the bundle is verified.
   let swatches = $derived.by(() => {
@@ -78,17 +80,14 @@
         {#if state === "owned"}
           <span class="text-xs text-brand-text-secondary">{i18n.t("settings.addonOwned")}</span>
         {/if}
-        <div
-          class="absolute right-2 bottom-0 w-32 h-24 pointer-events-none"
-          style="background-image: radial-gradient(closest-side at 50% 60%, {accent}4d, {accent}00)"
-          aria-hidden="true"
-        ></div>
+        <!-- Same silhouette glow as the live overlay (overlay.css), in the add-on's accent. -->
         <img
           src={entry.art}
           alt=""
           width="104"
           height="102"
-          class="art absolute right-4 -bottom-0.5 z-10 pointer-events-none"
+          class="art absolute right-4 -bottom-[7px] z-10 pointer-events-none"
+          style="filter: drop-shadow(0 0 6px {accent}8c) drop-shadow(0 0 16px {accent}59)"
         />
       </div>
 
@@ -106,9 +105,16 @@
     {#if state === "unowned"}
       <button
         onclick={get}
-        class="w-full py-2 px-3 rounded-md text-xs font-semibold bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast transition-colors"
+        class="w-full py-2 px-3 rounded-md text-xs font-semibold bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast transition-colors flex items-center justify-center gap-1.5"
       >
-        {i18n.t("settings.addonGet")}
+        {#if price}
+          <Tag class="w-3.5 h-3.5" />
+          {price.isFree
+            ? i18n.t("settings.addonBuyForFree")
+            : i18n.t("settings.addonBuyFor", { price: price.formatted })}
+        {:else}
+          {i18n.t("settings.addonGet")}
+        {/if}
       </button>
     {:else if busy}
       <button

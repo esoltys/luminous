@@ -46,6 +46,14 @@ export interface AddonTheme {
   capabilities?: string[];
 }
 
+/** Payload of the backend's `addon-price-defined` event: the Store's own price text. */
+export interface AddonPrice {
+  id: string;
+  formatted: string;
+  /** Nothing is charged, so the card says "Get" instead of "Buy for ...". */
+  isFree: boolean;
+}
+
 interface AddonStatus {
   state: AddonState;
   error?: string;
@@ -56,6 +64,8 @@ type Listener = () => void;
 export class AddonsStore {
   /** Registered definitions, keyed by id. */
   themes = $state<Record<string, AddonTheme>>({});
+  /** Store price per add-on id, from `addon-price-defined`. Absent until the Store reports one. */
+  prices = $state<Record<string, AddonPrice>>({});
   /** Last state reported by the backend, keyed by id. Absent means `unavailable`. */
   statuses = $state<Record<string, AddonStatus>>({});
 
@@ -75,6 +85,9 @@ export class AddonsStore {
       }),
       listen<AddonTheme>("addon-theme-defined", (event) => {
         this.register(event.payload);
+      }),
+      listen<AddonPrice>("addon-price-defined", (event) => {
+        this.prices[event.payload.id] = event.payload;
       })
     ]);
   }

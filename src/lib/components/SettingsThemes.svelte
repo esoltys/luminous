@@ -236,6 +236,8 @@
     </div>
   </div>
 
+  <AddonThemesSection />
+
   <div>
     <h4 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase mb-3">{i18n.t('settings.predefinedThemes', {}, 'Predefined Themes')}</h4>
     <div class="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4">
@@ -263,8 +265,6 @@
       {/each}
     </div>
   </div>
-
-  <AddonThemesSection />
 
   {#if themeStore.customThemes.length > 0}
     <div>
