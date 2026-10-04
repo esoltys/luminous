@@ -170,7 +170,7 @@
                   </span>
                 {/if}
                 {#if day && year}
-                  <span class="text-[8px] text-brand-text-secondary/60 leading-none mb-0.5">
+                  <span class="text-[8px] font-medium text-brand-text-secondary leading-none mb-0.5">
                     {year}
                   </span>
                 {/if}
@@ -189,14 +189,14 @@
                   {/if}
                   {#if event.event_type}
                     <span
-                      class="px-1.5 py-0.2 rounded text-[9px] font-medium bg-brand-border/60 text-brand-text-secondary uppercase tracking-wider"
+                      class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-brand-sidebar border border-brand-border text-brand-text-primary uppercase tracking-wider select-none"
                     >
                       {event.event_type}
                     </span>
                   {/if}
                   {#if event.cancelled}
                     <span
-                      class="px-1.5 py-0.2 rounded text-[9px] font-medium bg-red-500/20 text-red-400 uppercase tracking-wider"
+                      class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-500/15 border border-red-500/30 text-red-600 dark:text-red-400 uppercase tracking-wider select-none"
                     >
                       {i18n.t("artistEvents.cancelled", {}, "Cancelled")}
                     </span>

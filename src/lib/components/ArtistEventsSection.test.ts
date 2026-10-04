@@ -178,4 +178,34 @@ describe("ArtistEventsSection", () => {
     expect(screen.getByText("Upcoming Tour Show 7")).toBeTruthy();
     expect(screen.getByText("6–7 of 7")).toBeTruthy();
   });
+
+  it("renders event type and cancelled badges with high-contrast accessible classes", () => {
+    const testEvents: ArtistEvent[] = [
+      {
+        id: "evt-a11y",
+        name: "Festival Headline",
+        event_type: "Festival",
+        begin_date: "2099-06-01",
+        cancelled: true,
+        ticket_urls: [],
+        event_urls: [],
+      },
+    ];
+
+    render(ArtistEventsSection, {
+      props: {
+        events: testEvents,
+        artistName: "Headliner",
+      },
+    });
+
+    const typeBadge = screen.getByText("Festival");
+    expect(typeBadge.className).toContain("text-brand-text-primary");
+    expect(typeBadge.className).toContain("bg-brand-sidebar");
+    expect(typeBadge.className).toContain("border-brand-border");
+
+    const cancelledBadge = screen.getByText("Cancelled");
+    expect(cancelledBadge.className).toContain("text-red-600");
+    expect(cancelledBadge.className).toContain("dark:text-red-400");
+  });
 });
