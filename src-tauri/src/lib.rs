@@ -1458,6 +1458,7 @@ pub fn run() {
             commands::lyrics::set_lyrics_offset,
             // Details pane context enrichment (#23)
             commands::context::get_song_context,
+            commands::context::get_artist_events,
             commands::context::is_context_enrichment_enabled,
             // Tag Editor commands
             commands::tageditor::get_song_details,

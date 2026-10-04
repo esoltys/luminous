@@ -17,7 +17,7 @@ describe("ArtistInformationPanel", () => {
     expect(container.textContent?.trim()).toBe("");
   });
 
-  it("renders person details (Born, Born in, Gender, Died) and omits Sort Name and Type", () => {
+  it("renders person details (Born, Born in, Died) and omits Sort Name, Type, and Gender", () => {
     const { container } = render(ArtistInformationPanel, {
       props: {
         sortName: "Bowie, David",
@@ -36,9 +36,9 @@ describe("ArtistInformationPanel", () => {
     expect(screen.queryByText("Sort Name")).toBeNull();
     expect(screen.queryByText("Bowie, David")).toBeNull();
 
-    // Check gender
-    expect(screen.getByText("Gender")).toBeTruthy();
-    expect(screen.getByText("Male")).toBeTruthy();
+    // Check gender is omitted
+    expect(screen.queryByText("Gender")).toBeNull();
+    expect(screen.queryByText("Male")).toBeNull();
 
     // Check born label
     expect(screen.getByText("Born")).toBeTruthy();
@@ -56,11 +56,11 @@ describe("ArtistInformationPanel", () => {
     expect(screen.getByText("Died")).toBeTruthy();
     expect(container.textContent).toContain("January 10, 2016");
 
-    // Check row order: Gender, Born, Died, City/Region, Country
+    // Check row order: Born, Died, City/Region, Country
     const labels = Array.from(
       container.querySelectorAll(".flex.items-start.justify-between > span:first-child")
     ).map((el) => el.textContent?.trim());
-    expect(labels).toEqual(["Gender", "Born", "Died", "City/Region", "Country"]);
+    expect(labels).toEqual(["Born", "Died", "City/Region", "Country"]);
 
     // CRITICAL: Type should NOT be rendered in the UI
     expect(screen.queryByText("Type")).toBeNull();
@@ -110,7 +110,7 @@ describe("ArtistInformationPanel", () => {
   it("renders card variant with collapsible details tag", () => {
     const { container } = render(ArtistInformationPanel, {
       props: {
-        gender: "female",
+        beginDate: "1990-01-01",
         artistType: "Person",
         variant: "card",
       },

@@ -1166,6 +1166,9 @@ fn platform_for_artist_rel_type(rel_type: &str, url: &str) -> Option<&'static st
         "bandcamp" => Some("bandcamp"),
         "soundcloud" => Some("soundcloud"),
         "youtube" => Some("youtube"),
+        "songkick" => Some("songkick"),
+        "setlistfm" => Some("setlistfm"),
+        "bandsintown" => Some("bandsintown"),
         "social network" => platform_for_social_network_url(url),
         _ => None,
     }

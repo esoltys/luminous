@@ -29,6 +29,7 @@
   import MarkdownBio from "./MarkdownBio.svelte";
   import SocialIcon from "./SocialIcon.svelte";
   import ArtistInformationPanel from "./ArtistInformationPanel.svelte";
+  import ArtistEventsSection from "./ArtistEventsSection.svelte";
   import SongSelectionToolbar from "./SongSelectionToolbar.svelte";
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
   import ContextMenu from "./ContextMenu.svelte";
@@ -49,13 +50,14 @@
   } from "phosphor-svelte";
   const ExternalLink = OpenInPicard;
   import ShareModal from "./ShareModal.svelte";
-  import type { Song, Playlist, AlbumItem, PlayContext, ArtistProfile, ExtendedArtworkResponse, SongContextEnrichment } from "../types";
+  import type { Song, Playlist, AlbumItem, PlayContext, ArtistProfile, ExtendedArtworkResponse, SongContextEnrichment, ArtistEvent } from "../types";
   import {
     resolveSocialUrl,
     formatDisplayLabel,
     normalizeWebsitePlatform,
     resolveArtistMbid,
     deriveMusicbrainzArtistUrl,
+    deriveMusicbrainzEventsUrl,
     deriveListenbrainzArtistUrl,
     deriveFanartTvUrlFromMbid,
     isBlacklistedLink,
@@ -172,18 +174,58 @@
     resolveArtistMbid(artistProfile?.musicbrainz_artist_id, artistProfile?.social_links)
   );
   let musicbrainzArtistUrl = $derived(deriveMusicbrainzArtistUrl(artistMbid));
+  let musicbrainzEventsUrl = $derived(deriveMusicbrainzEventsUrl(artistMbid));
   let listenbrainzArtistUrl = $derived(deriveListenbrainzArtistUrl(artistMbid));
   let fanartTvUrl = $derived(deriveFanartTvUrlFromMbid(artistMbid));
 
   let hasArtistInfo = $derived(
-    !!contextData?.artist_gender ||
-      !!contextData?.artist_begin_date ||
+    !!contextData?.artist_begin_date ||
       !!contextData?.artist_end_date ||
       !!contextData?.artist_begin_area_name ||
       !!contextData?.artist_area_name
   );
 
-  let hasProfileContent = $derived(hasWebsite || hasBio || hasSocials || !!artistMbid || hasArtistInfo);
+  let artistEvents = $state<ArtistEvent[]>([]);
+  let loadingEvents = $state(false);
+
+  $effect(() => {
+    const name = artistName;
+    const songWithMb = songs.find((s) => s.musicbrainz_artist_id || s.musicbrainz_album_artist_id);
+    const id = songWithMb?.id || songs[0]?.id;
+    let cancelled = false;
+    loadingEvents = true;
+    invoke<ArtistEvent[]>("get_artist_events", { artist: name, songId: id })
+      .then((data) => {
+        if (!cancelled) artistEvents = data || [];
+      })
+      .catch(() => {
+        if (!cancelled) artistEvents = [];
+      })
+      .finally(() => {
+        if (!cancelled) loadingEvents = false;
+      });
+    return () => {
+      cancelled = true;
+    };
+  });
+
+  let songkickLink = $derived(
+    artistProfile?.social_links?.find((l) => l.platform === "songkick")?.handle_or_url ?? null
+  );
+  let setlistfmLink = $derived(
+    artistProfile?.social_links?.find((l) => l.platform === "setlistfm")?.handle_or_url ?? null
+  );
+  let bandsintownLink = $derived(
+    artistProfile?.social_links?.find((l) => l.platform === "bandsintown")?.handle_or_url ?? null
+  );
+
+  let hasEvents = $derived(
+    artistEvents.length > 0 || !!songkickLink || !!setlistfmLink || !!bandsintownLink
+  );
+
+  let hasProfileContent = $derived(
+    hasWebsite || hasBio || hasSocials || !!artistMbid || hasArtistInfo || hasEvents
+  );
 
   // Locally-discovered artist visuals (#98/#761) — portrait/logo/fanart,
   // fetched on demand per artist since scanning every artist's folder
@@ -346,14 +388,16 @@
       await refetchSongs();
       const songWithMb = songs.find((s) => s.musicbrainz_artist_id || s.musicbrainz_album_artist_id);
       const contextSongId = songWithMb?.id ?? songs[0]?.id;
-      const [artwork, context] = await Promise.all([
+      const [artwork, context, events] = await Promise.all([
         collectionStore.getExtendedArtworkForArtist(artistName, true),
         contextSongId
           ? invoke<SongContextEnrichment>("get_song_context", { songId: contextSongId, forceRefresh: true }).catch(() => null)
-          : Promise.resolve(null)
+          : Promise.resolve(null),
+        invoke<ArtistEvent[]>("get_artist_events", { artist: artistName, songId: contextSongId, forceRefresh: true }).catch(() => null)
       ]);
       artistArtwork = artwork;
       if (context) contextData = context;
+      if (events) artistEvents = events;
       toastStore.show(i18n.t("artistDetail.refreshSuccess", {}, "Artist artwork and bio refreshed"));
     } catch (err) {
       console.error("Failed to refresh artist:", err);
@@ -895,57 +939,36 @@
           <span>{i18n.t('artistDetail.artistInfo', {}, 'Artist Info')}</span>
           <ArrowUpRight class="w-3.5 h-3.5 text-brand-text-secondary/70" />
         </summary>
-        <div class="p-4 sm:p-5 md:p-6 border-t border-brand-border/60 flex flex-col @2xl:flex-row gap-5 md:gap-6 justify-between">
-          <!-- About Column (Left) -->
-          {#if hasBio}
-            {@const bioText = effectiveBio ?? ""}
-            <div class="flex-1 flex flex-col gap-3 min-w-0">
+        <div class="p-4 sm:p-5 md:p-6 border-t border-brand-border/60 flex flex-col @2xl:flex-row gap-5 md:gap-6 justify-between items-start">
+          <!-- Left Column (Bio & Links) -->
+          {#if hasBio || hasWebsite || hasSocials || artistMbid}
+            <div class="flex-1 flex flex-col gap-5 min-w-0 w-full">
               <!-- Bio -->
-              <div class="text-xs text-brand-text-secondary leading-relaxed">
-                {#if bioIsFromWikipedia}
-                  <button
-                    type="button"
-                    onclick={() => contextData?.wikipedia_page_url && handleOpenUrl(contextData.wikipedia_page_url)}
-                    class="group/wiki relative inline-flex items-center gap-1 mb-1 text-[11px] font-semibold text-brand-text-secondary/70 hover:text-brand-accent transition-colors cursor-pointer"
-                  >
-                    <span class="underline decoration-brand-text-secondary/40 group-hover/wiki:decoration-brand-accent">{i18n.t('playerBar.wikipediaSectionLabel', {}, 'Wikipedia')}</span>
-                    <ExternalLink class="w-3 h-3 opacity-0 group-hover/wiki:opacity-100 transition-opacity" />
-                  </button>
-                {/if}
-                <MarkdownBio
-                  text={bioText}
-                  disableClamp={true}
-                />
-              </div>
-            </div>
-          {/if}
-
-          <!-- Links & Facts Column (Right or Below) -->
-          {#if hasWebsite || hasSocials || artistMbid || hasArtistInfo}
-            <div
-              class={hasBio
-                ? "@2xl:w-[22rem] @3xl:w-[28rem] shrink-0 border-t border-brand-border/40 pt-4 @2xl:border-t-0 @2xl:border-l @2xl:border-brand-border/60 @2xl:pt-0 @2xl:pl-6 flex flex-col gap-4"
-                : "w-full flex flex-col gap-4"}
-            >
-              {#if hasArtistInfo}
-                <ArtistInformationPanel
-                  sortName={contextData?.artist_sort_name}
-                  gender={contextData?.artist_gender}
-                  beginDate={contextData?.artist_begin_date}
-                  endDate={contextData?.artist_end_date}
-                  ended={contextData?.artist_ended}
-                  artistType={contextData?.artist_type}
-                  beginAreaName={contextData?.artist_begin_area_name}
-                  beginAreaMbid={contextData?.artist_begin_area_mbid}
-                  areaName={contextData?.artist_area_name}
-                  areaMbid={contextData?.artist_area_mbid}
-                  onOpenUrl={handleOpenUrl}
-                  variant="plain"
-                />
+              {#if hasBio}
+                {@const bioText = effectiveBio ?? ""}
+                <div class="flex flex-col gap-3 min-w-0">
+                  <div class="text-xs text-brand-text-secondary leading-relaxed">
+                    {#if bioIsFromWikipedia}
+                      <button
+                        type="button"
+                        onclick={() => contextData?.wikipedia_page_url && handleOpenUrl(contextData.wikipedia_page_url)}
+                        class="group/wiki relative inline-flex items-center gap-1 mb-1 text-[11px] font-semibold text-brand-text-secondary/70 hover:text-brand-accent transition-colors cursor-pointer -mt-0.5"
+                      >
+                        <span class="underline decoration-brand-text-secondary/40 group-hover/wiki:decoration-brand-accent">{i18n.t('playerBar.wikipediaSectionLabel', {}, 'Wikipedia')}</span>
+                        <ExternalLink class="w-3 h-3 opacity-0 group-hover/wiki:opacity-100 transition-opacity" />
+                      </button>
+                    {/if}
+                    <MarkdownBio
+                      text={bioText}
+                      disableClamp={true}
+                    />
+                  </div>
+                </div>
               {/if}
 
+              <!-- Links -->
               {#if hasWebsite || hasSocials || artistMbid}
-                <div class="grid grid-cols-1 @sm:grid-cols-2 {hasBio ? '@2xl:grid @2xl:grid-cols-2' : '@md:grid-cols-3 @xl:grid-cols-4'} gap-2.5">
+                <div class="grid grid-cols-1 @sm:grid-cols-2 gap-2.5">
                   <!-- Website, curated social links, and derived MusicBrainz/
                        ListenBrainz/Fanart.tv links, unified and sorted
                        alphabetically with the website first (#1122, #1123) -->
@@ -968,6 +991,43 @@
                     </button>
                   {/each}
                 </div>
+              {/if}
+            </div>
+          {/if}
+
+          <!-- Right Column (Facts & Events) -->
+          {#if hasArtistInfo || hasEvents || artistMbid}
+            <div class="flex-1 flex flex-col gap-5 min-w-0 w-full">
+              <!-- Facts (formed/city/country) -->
+              {#if hasArtistInfo}
+                <ArtistInformationPanel
+                  sortName={contextData?.artist_sort_name}
+                  gender={contextData?.artist_gender}
+                  beginDate={contextData?.artist_begin_date}
+                  endDate={contextData?.artist_end_date}
+                  ended={contextData?.artist_ended}
+                  artistType={contextData?.artist_type}
+                  beginAreaName={contextData?.artist_begin_area_name}
+                  beginAreaMbid={contextData?.artist_begin_area_mbid}
+                  areaName={contextData?.artist_area_name}
+                  areaMbid={contextData?.artist_area_mbid}
+                  onOpenUrl={handleOpenUrl}
+                  variant="plain"
+                />
+              {/if}
+
+              <!-- Upcoming Concerts & Events -->
+              {#if hasEvents || artistMbid}
+                <ArtistEventsSection
+                  events={artistEvents}
+                  loading={loadingEvents}
+                  artistName={artistName}
+                  songkickUrl={songkickLink}
+                  setlistfmUrl={setlistfmLink}
+                  bandsintownUrl={bandsintownLink}
+                  musicbrainzUrl={musicbrainzEventsUrl}
+                  onOpenUrl={handleOpenUrl}
+                />
               {/if}
             </div>
           {/if}

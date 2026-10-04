@@ -18,6 +18,8 @@
     siWikidata,
     siImdb,
     siInternetarchive,
+    siSongkick,
+    siBandsintown,
     type SimpleIcon,
   } from "simple-icons";
 
@@ -53,6 +55,8 @@
     wikidata: siWikidata,
     imdb: siImdb,
     internet_archive: siInternetarchive,
+    songkick: siSongkick,
+    bandsintown: siBandsintown,
   };
 
   const brandIcon = $derived(BRAND_ICONS[normalized]);

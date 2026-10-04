@@ -1302,6 +1302,25 @@ export const fr: DeepStringRecord<typeof en> = {
     genderOther: "Autre",
     lessThanOneYearAgo: "Il y a moins d'un an"
   },
+  artistEvents: {
+    panelTitle: "Concerts et événements à venir",
+    noEvents: "Aucun concert à venir trouvé",
+    cancelled: "Annulé",
+    viewTickets: "Billets",
+    viewDetails: "Détails",
+    concert: "Concert",
+    festival: "Festival",
+    tour: "Tournée",
+    otherPlatforms: "Trouver des billets et dates de tournée sur :",
+    loading: "Chargement des événements à venir...",
+    pastEvents: "Événements passés",
+    showPastEvents: "Afficher les événements passés ({count})",
+    hidePastEvents: "Masquer les événements passés",
+    pagination: "{start}–{end} sur {total}",
+    previousPage: "Page précédente",
+    nextPage: "Page suivante",
+    dateTba: "À dét."
+  },
   artistProfileEditor: {
     title: "Modifier l'artiste",
     website: "Site web",

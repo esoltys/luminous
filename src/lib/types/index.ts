@@ -181,6 +181,25 @@ export interface SongContextEnrichment {
   fetched_at?: number;
 }
 
+export interface ArtistEvent {
+  id: string;
+  name: string;
+  event_type?: string | null;
+  begin_date?: string | null;
+  end_date?: string | null;
+  time?: string | null;
+  cancelled: boolean;
+  venue_name?: string | null;
+  venue_address?: string | null;
+  venue_city?: string | null;
+  venue_country?: string | null;
+  venue_latitude?: number | null;
+  venue_longitude?: number | null;
+  ticket_urls: string[];
+  event_urls: string[];
+  disambiguation?: string | null;
+}
+
 export type PlaylistItemType = "song" | "stream" | "streaming_service";
 
 export interface PlaylistItem {

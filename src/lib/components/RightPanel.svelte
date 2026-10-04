@@ -81,8 +81,7 @@
   });
 
   let hasArtistInfo = $derived(
-    !!contextData?.artist_gender ||
-      !!contextData?.artist_begin_date ||
+    !!contextData?.artist_begin_date ||
       !!contextData?.artist_end_date ||
       !!contextData?.artist_begin_area_name ||
       !!contextData?.artist_area_name

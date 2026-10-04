@@ -110,6 +110,9 @@ type ReleaseGroupFlightResult = (
 pub static RELEASE_GROUP_FLIGHT: LazyLock<FlightGroup<ReleaseGroupFlightResult>> =
     LazyLock::new(FlightGroup::new);
 
+pub static ARTIST_EVENTS_FLIGHT: LazyLock<FlightGroup<Result<Vec<ArtistEvent>, String>>> =
+    LazyLock::new(FlightGroup::new);
+
 // ---------------------------------------------------------------------------
 // MusicBrainz rate limiting — MetaBrainz asks for roughly one request per
 // second per client. This is a process-global constraint (their servers
@@ -292,6 +295,164 @@ impl From<MbArtistResponse> for MusicBrainzArtistDetails {
     }
 }
 
+/// Structured live concert/event details fetched from MusicBrainz's event browse (#1431).
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
+pub struct ArtistEvent {
+    pub id: String,
+    pub name: String,
+    pub event_type: Option<String>,
+    pub begin_date: Option<String>,
+    pub end_date: Option<String>,
+    pub time: Option<String>,
+    pub cancelled: bool,
+    pub venue_name: Option<String>,
+    pub venue_address: Option<String>,
+    pub venue_city: Option<String>,
+    pub venue_country: Option<String>,
+    pub venue_latitude: Option<f64>,
+    pub venue_longitude: Option<f64>,
+    #[serde(default)]
+    pub ticket_urls: Vec<String>,
+    #[serde(default)]
+    pub event_urls: Vec<String>,
+    pub disambiguation: Option<String>,
+}
+
+#[derive(Deserialize, Debug, Default)]
+struct MbEventResponse {
+    #[serde(default)]
+    events: Vec<MbEventItem>,
+}
+
+#[derive(Deserialize, Debug, Default)]
+struct MbCoordinates {
+    latitude: Option<f64>,
+    longitude: Option<f64>,
+}
+
+#[derive(Deserialize, Debug, Default)]
+struct MbEventPlace {
+    #[allow(dead_code)]
+    id: Option<String>,
+    name: Option<String>,
+    address: Option<String>,
+    coordinates: Option<MbCoordinates>,
+    area: Option<MbArea>,
+}
+
+#[derive(Deserialize, Debug, Default)]
+struct MbEventRelation {
+    #[serde(rename = "type", default)]
+    rel_type: Option<String>,
+    #[serde(default)]
+    place: Option<MbEventPlace>,
+    #[serde(default)]
+    area: Option<MbArea>,
+    #[serde(default)]
+    url: Option<MbUrlRef>,
+}
+
+#[derive(Deserialize, Debug, Default)]
+struct MbEventItem {
+    id: String,
+    #[serde(default)]
+    name: String,
+    #[serde(rename = "type", default)]
+    event_type: Option<String>,
+    #[serde(default)]
+    disambiguation: Option<String>,
+    #[serde(default)]
+    time: Option<String>,
+    #[serde(default)]
+    cancelled: Option<bool>,
+    #[serde(rename = "life-span", default)]
+    life_span: Option<MbLifeSpan>,
+    #[serde(default)]
+    relations: Vec<MbEventRelation>,
+}
+
+impl From<MbEventItem> for ArtistEvent {
+    fn from(item: MbEventItem) -> Self {
+        let (begin_date, end_date) = match item.life_span {
+            Some(ls) => (ls.begin, ls.end),
+            None => (None, None),
+        };
+
+        let mut venue_name = None;
+        let mut venue_address = None;
+        let mut venue_city = None;
+        let mut venue_country = None;
+        let mut venue_latitude = None;
+        let mut venue_longitude = None;
+        let mut ticket_urls = Vec::new();
+        let mut event_urls = Vec::new();
+
+        for rel in item.relations {
+            if let Some(place) = rel.place {
+                if venue_name.is_none() {
+                    venue_name = place.name;
+                }
+                if venue_address.is_none() {
+                    venue_address = place.address.filter(|s| !s.trim().is_empty());
+                }
+                if let Some(coords) = place.coordinates {
+                    if venue_latitude.is_none() {
+                        venue_latitude = coords.latitude;
+                    }
+                    if venue_longitude.is_none() {
+                        venue_longitude = coords.longitude;
+                    }
+                }
+                if let Some(area) = place.area {
+                    if venue_city.is_none() {
+                        venue_city = area.name;
+                    }
+                }
+            }
+            if let Some(area) = rel.area {
+                if rel.rel_type.as_deref() == Some("held in") || venue_city.is_none() {
+                    if venue_city.is_none() {
+                        venue_city = area.name;
+                    } else if venue_country.is_none() {
+                        venue_country = area.name;
+                    }
+                }
+            }
+            if let Some(url_ref) = rel.url.and_then(|u| u.resource) {
+                if !url_ref.trim().is_empty() {
+                    let rel_type = rel.rel_type.as_deref().unwrap_or("").to_lowercase();
+                    if rel_type.contains("ticket") {
+                        if !ticket_urls.contains(&url_ref) {
+                            ticket_urls.push(url_ref);
+                        }
+                    } else if !event_urls.contains(&url_ref) {
+                        event_urls.push(url_ref);
+                    }
+                }
+            }
+        }
+
+        ArtistEvent {
+            id: item.id,
+            name: item.name,
+            event_type: item.event_type,
+            begin_date,
+            end_date,
+            time: item.time.filter(|s| !s.trim().is_empty()),
+            cancelled: item.cancelled.unwrap_or(false),
+            venue_name,
+            venue_address,
+            venue_city,
+            venue_country,
+            venue_latitude,
+            venue_longitude,
+            ticket_urls,
+            event_urls,
+            disambiguation: item.disambiguation.filter(|s| !s.trim().is_empty()),
+        }
+    }
+}
+
 #[derive(Deserialize, Debug, Default)]
 struct MbArtistCreditArtist {
     id: Option<String>,
@@ -441,6 +602,13 @@ fn merge_tags(genres: Vec<MbTagOrGenre>, tags: Vec<MbTagOrGenre>, cap: usize) ->
 pub fn is_cache_fresh(fetched_at: i64, now: i64) -> bool {
     const TTL_SECONDS: i64 = 30 * 24 * 3600;
     now.saturating_sub(fetched_at) < TTL_SECONDS
+}
+
+/// True when an artist event cache row's `fetched_at` (unix seconds) is within
+/// the 7-day TTL relative to `now` (unix seconds) (#1431).
+pub fn is_events_cache_fresh(fetched_at: i64, now: i64) -> bool {
+    const EVENTS_TTL_SECONDS: i64 = 7 * 24 * 3600;
+    now.saturating_sub(fetched_at) < EVENTS_TTL_SECONDS
 }
 
 /// Holds the shared HTTP client used for every source. Cheap to construct
@@ -808,11 +976,121 @@ impl ContextManager {
             review_links,
         })
     }
+
+    /// Looks up events, concerts, and festival appearances for an artist
+    /// using their MusicBrainz artist MBID (#1431).
+    pub async fn fetch_musicbrainz_artist_events(
+        &self,
+        artist_id: &str,
+    ) -> Result<Vec<ArtistEvent>> {
+        throttle_musicbrainz().await;
+        let url = format!(
+            "https://musicbrainz.org/ws/2/event?artist={}&inc=place-rels+area-rels+url-rels&limit=100&fmt=json",
+            percent_encoding::utf8_percent_encode(artist_id, percent_encoding::NON_ALPHANUMERIC)
+        );
+        let response = self.client.get(&url).send().await?;
+        if !response.status().is_success() {
+            return Err(anyhow!(
+                "MusicBrainz artist events lookup failed: HTTP {}",
+                response.status()
+            ));
+        }
+        let parsed: MbEventResponse = response.json().await?;
+        let mut events: Vec<ArtistEvent> =
+            parsed.events.into_iter().map(ArtistEvent::from).collect();
+        events.sort_by(|a, b| match (&a.begin_date, &b.begin_date) {
+            (Some(d1), Some(d2)) => d1.cmp(d2),
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => a.name.cmp(&b.name),
+        });
+        Ok(events)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_is_events_cache_fresh() {
+        let now = 1_700_000_000;
+        let six_days_ago = now - 6 * 24 * 3600;
+        let eight_days_ago = now - 8 * 24 * 3600;
+        assert!(is_events_cache_fresh(six_days_ago, now));
+        assert!(!is_events_cache_fresh(eight_days_ago, now));
+    }
+
+    #[test]
+    fn test_artist_event_deserialization() {
+        let json_data = r#"{
+            "events": [
+                {
+                    "id": "e1",
+                    "name": "Live at Stadium",
+                    "type": "Concert",
+                    "time": "20:00",
+                    "cancelled": false,
+                    "life-span": {
+                        "begin": "2026-11-01",
+                        "end": "2026-11-01",
+                        "ended": false
+                    },
+                    "relations": [
+                        {
+                            "type": "held at",
+                            "place": {
+                                "id": "p1",
+                                "name": "Wembley Stadium",
+                                "address": "London HA9 0WS",
+                                "coordinates": {
+                                    "latitude": 51.556,
+                                    "longitude": -0.279
+                                },
+                                "area": {
+                                    "id": "a1",
+                                    "name": "London"
+                                }
+                            }
+                        },
+                        {
+                            "type": "held in",
+                            "area": {
+                                "id": "a2",
+                                "name": "United Kingdom"
+                            }
+                        },
+                        {
+                            "type": "ticket sales",
+                            "url": {
+                                "resource": "https://tickets.example.com/e1"
+                            }
+                        }
+                    ]
+                }
+            ]
+        }"#;
+
+        let parsed: MbEventResponse = serde_json::from_str(json_data).unwrap();
+        assert_eq!(parsed.events.len(), 1);
+        let event = ArtistEvent::from(parsed.events.into_iter().next().unwrap());
+        assert_eq!(event.id, "e1");
+        assert_eq!(event.name, "Live at Stadium");
+        assert_eq!(event.event_type.as_deref(), Some("Concert"));
+        assert_eq!(event.begin_date.as_deref(), Some("2026-11-01"));
+        assert_eq!(event.time.as_deref(), Some("20:00"));
+        assert!(!event.cancelled);
+        assert_eq!(event.venue_name.as_deref(), Some("Wembley Stadium"));
+        assert_eq!(event.venue_address.as_deref(), Some("London HA9 0WS"));
+        assert_eq!(event.venue_city.as_deref(), Some("London"));
+        assert_eq!(event.venue_country.as_deref(), Some("United Kingdom"));
+        assert_eq!(event.venue_latitude, Some(51.556));
+        assert_eq!(event.venue_longitude, Some(-0.279));
+        assert_eq!(
+            event.ticket_urls,
+            vec!["https://tickets.example.com/e1".to_string()]
+        );
+    }
 
     #[test]
     fn test_extract_wikidata_qid() {

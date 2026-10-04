@@ -5,7 +5,10 @@
 //! independently on failure — see `context::ContextManager`'s doc comment.
 
 use crate::collection::get_artist_profile_conn;
-use crate::context::{is_cache_fresh, ContextManager, ARTIST_FLIGHT, RELEASE_GROUP_FLIGHT};
+use crate::context::{
+    is_cache_fresh, is_events_cache_fresh, ArtistEvent, ContextManager, ARTIST_EVENTS_FLIGHT,
+    ARTIST_FLIGHT, RELEASE_GROUP_FLIGHT,
+};
 use crate::db::Database;
 use crate::AppState;
 use rusqlite::params;
@@ -582,6 +585,172 @@ async fn write_artist_cache(
     .map_err(|e| e.to_string())
 }
 
+/// Fetches upcoming and recent concerts, tour dates, and festival appearances
+/// for an artist from MusicBrainz (#1431).
+///
+/// Looks up the artist's MBID (from `ArtistProfile`, a specific song if provided,
+/// or any song by that artist in the database), checks the local SQLite cache
+/// (`artist_events_cache`, 7-day TTL), and falls back to MusicBrainz's event browse API.
+#[tauri::command]
+pub async fn get_artist_events(
+    artist: String,
+    song_id: Option<i64>,
+    force_refresh: Option<bool>,
+    state: State<'_, AppState>,
+) -> Result<Vec<ArtistEvent>, String> {
+    let force_refresh = force_refresh.unwrap_or(false);
+
+    let (artist_mbid, cached_events): (Option<String>, Option<Vec<ArtistEvent>>) = {
+        let artist_name = artist.clone();
+        crate::db::run_blocking(&state.db, move |conn| {
+            if !context_enrichment_enabled(conn) {
+                return Ok((None, None));
+            }
+
+            // 1. Resolve MBID
+            let mut resolved_mbid: Option<String> = None;
+
+            // Check artist profile first
+            if let Ok(profile) = get_artist_profile_conn(conn, &artist_name) {
+                if let Some(mbid) = profile.musicbrainz_artist_id {
+                    if !mbid.trim().is_empty() {
+                        resolved_mbid = Some(mbid.trim().to_string());
+                    }
+                }
+            }
+
+            // If not found and a song_id was given, check that song
+            if resolved_mbid.is_none() {
+                if let Some(sid) = song_id {
+                    let row: Option<(Option<String>, Option<String>)> = conn
+                        .query_row(
+                            "SELECT musicbrainz_artist_id, musicbrainz_album_artist_id FROM songs WHERE id = ?1",
+                            params![sid],
+                            |r| Ok((r.get(0)?, r.get(1)?)),
+                        )
+                        .ok();
+                    if let Some((aid, aaid)) = row {
+                        resolved_mbid = aid
+                            .filter(|s| !s.trim().is_empty())
+                            .or_else(|| aaid.filter(|s| !s.trim().is_empty()))
+                            .map(|s| s.split(&[';', '/'][..]).next().unwrap_or(&s).trim().to_string());
+                    }
+                }
+            }
+
+            // If still not found, check any song tagged by this artist
+            if resolved_mbid.is_none() {
+                let row: Option<(Option<String>, Option<String>)> = conn
+                    .query_row(
+                        "SELECT musicbrainz_artist_id, musicbrainz_album_artist_id FROM songs \
+                         WHERE (artist = ?1 COLLATE NOCASE OR album_artist = ?1 COLLATE NOCASE) \
+                           AND (musicbrainz_artist_id IS NOT NULL OR musicbrainz_album_artist_id IS NOT NULL) \
+                         LIMIT 1",
+                        params![artist_name],
+                        |r| Ok((r.get(0)?, r.get(1)?)),
+                    )
+                    .ok();
+                if let Some((aid, aaid)) = row {
+                    resolved_mbid = aid
+                        .filter(|s| !s.trim().is_empty())
+                        .or_else(|| aaid.filter(|s| !s.trim().is_empty()))
+                        .map(|s| s.split(&[';', '/'][..]).next().unwrap_or(&s).trim().to_string());
+                }
+            }
+
+            let Some(mbid) = resolved_mbid else {
+                return Ok((None, None));
+            };
+
+            // Check cache
+            let now = now_unix();
+            let cache_row: Option<(String, i64)> = conn
+                .query_row(
+                    "SELECT events_json, fetched_at FROM artist_events_cache WHERE artist_mbid = ?1",
+                    params![mbid],
+                    |r| Ok((r.get(0)?, r.get(1)?)),
+                )
+                .ok();
+
+            if let Some((json, fetched_at)) = cache_row {
+                if !force_refresh && is_events_cache_fresh(fetched_at, now) {
+                    let parsed: Vec<ArtistEvent> = serde_json::from_str(&json).unwrap_or_default();
+                    return Ok((Some(mbid), Some(parsed)));
+                }
+            }
+
+            Ok((Some(mbid), None))
+        })
+        .await
+        .map_err(|e| e.to_string())?
+    };
+
+    if let Some(events) = cached_events {
+        return Ok(events);
+    }
+
+    let Some(artist_mbid) = artist_mbid else {
+        return Ok(Vec::new());
+    };
+
+    // SingleFlight fetch from MusicBrainz
+    let mbid_clone = artist_mbid.clone();
+    let fetch_result = ARTIST_EVENTS_FLIGHT
+        .work(&artist_mbid, move || async move {
+            ContextManager::new()
+                .fetch_musicbrainz_artist_events(&mbid_clone)
+                .await
+                .map_err(|e| e.to_string())
+        })
+        .await;
+
+    match fetch_result {
+        Ok(events) => {
+            // Write to cache
+            let mbid_for_cache = artist_mbid.clone();
+            let json_to_cache = serde_json::to_string(&events).unwrap_or_else(|_| "[]".to_string());
+            let fetched_at = now_unix();
+            let _ = crate::db::run_blocking(&state.db, move |conn| {
+                conn.execute(
+                    "INSERT INTO artist_events_cache (artist_mbid, events_json, fetched_at) \
+                     VALUES (?1, ?2, ?3) \
+                     ON CONFLICT(artist_mbid) DO UPDATE SET \
+                         events_json = excluded.events_json, \
+                         fetched_at = excluded.fetched_at",
+                    params![mbid_for_cache, json_to_cache, fetched_at],
+                )?;
+                Ok(())
+            })
+            .await;
+            Ok(events)
+        }
+        Err(err) => {
+            // If network fails, try to return stale cache as fallback rather than erroring
+            let fallback: Option<Vec<ArtistEvent>> = {
+                let mbid = artist_mbid.clone();
+                crate::db::run_blocking(&state.db, move |conn| {
+                    let json: Option<String> = conn
+                        .query_row(
+                            "SELECT events_json FROM artist_events_cache WHERE artist_mbid = ?1",
+                            params![mbid],
+                            |r| r.get(0),
+                        )
+                        .ok();
+                    Ok(json.and_then(|j| serde_json::from_str(&j).ok()))
+                })
+                .await
+                .ok()
+                .flatten()
+            };
+            if let Some(cached) = fallback {
+                Ok(cached)
+            } else {
+                Err(err)
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -743,5 +912,55 @@ mod tests {
             .unwrap();
         assert!(cached.sort_name.is_none());
         assert_eq!(cached.wikipedia_extract.as_deref(), Some("Bio only"));
+    }
+
+    #[tokio::test]
+    async fn test_artist_events_cache_read_write() {
+        let (_dir, db) = temp_db("events_cache");
+        let conn = db.pool.get().unwrap();
+        let mbid = "mbid-test-123";
+        let events = vec![ArtistEvent {
+            id: "evt-1".to_string(),
+            name: "Live at Wembley".to_string(),
+            event_type: Some("Concert".to_string()),
+            begin_date: Some("2026-12-01".to_string()),
+            end_date: Some("2026-12-01".to_string()),
+            time: Some("19:30".to_string()),
+            cancelled: false,
+            venue_name: Some("Wembley Stadium".to_string()),
+            venue_address: Some("Wembley, London".to_string()),
+            venue_city: Some("London".to_string()),
+            venue_country: Some("United Kingdom".to_string()),
+            venue_latitude: Some(51.556),
+            venue_longitude: Some(-0.279),
+            ticket_urls: vec!["https://tickets.example.com".to_string()],
+            event_urls: vec![],
+            disambiguation: None,
+        }];
+
+        let json = serde_json::to_string(&events).unwrap();
+        let fetched_at = 1_700_000_000_i64;
+        conn.execute(
+            "INSERT INTO artist_events_cache (artist_mbid, events_json, fetched_at) VALUES (?1, ?2, ?3)",
+            params![mbid, json, fetched_at],
+        )
+        .unwrap();
+
+        let (read_json, read_time): (String, i64) = conn
+            .query_row(
+                "SELECT events_json, fetched_at FROM artist_events_cache WHERE artist_mbid = ?1",
+                params![mbid],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(read_time, fetched_at);
+        let read_events: Vec<ArtistEvent> = serde_json::from_str(&read_json).unwrap();
+        assert_eq!(read_events.len(), 1);
+        assert_eq!(read_events[0].name, "Live at Wembley");
+        assert_eq!(read_events[0].venue_city.as_deref(), Some("London"));
+        assert_eq!(
+            read_events[0].ticket_urls,
+            vec!["https://tickets.example.com"]
+        );
     }
 }
