@@ -1023,7 +1023,7 @@ impl ScrobblerManager {
     /// for recordings and release groups.
     async fn fetch_critiquebrainz_ratings(
         &self,
-        user_id: &str,
+        reviewer_uuid: &str,
     ) -> Result<Vec<crate::ratings_sync::CritiqueRating>, String> {
         const PAGE: usize = 50;
         let mut ratings = Vec::new();
@@ -1032,7 +1032,7 @@ impl ScrobblerManager {
             let resp = self
                 .client
                 .get(format!(
-                    "{CRITIQUEBRAINZ_API_BASE}/review/?user_id={user_id}&limit={PAGE}&offset={offset}"
+                    "{CRITIQUEBRAINZ_API_BASE}/review/?user_id={reviewer_uuid}&limit={PAGE}&offset={offset}"
                 ))
                 .send()
                 .await
