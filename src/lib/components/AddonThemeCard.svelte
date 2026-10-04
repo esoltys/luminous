@@ -25,11 +25,8 @@
   let busy = $derived(state === "purchasing" || state === "downloading");
   // Once owned the whole card selects the theme, like every other theme card.
   let selectable = $derived(state === "owned");
-  // A free add-on, or one whose price the Store did not report, keeps the plain "Get".
-  let price = $derived.by(() => {
-    const p = addonsStore.prices[entry.id];
-    return p && !p.isFree ? p.formatted : null;
-  });
+  // The Store's price text; without one the button keeps the plain "Get".
+  let price = $derived(addonsStore.prices[entry.id]);
 
   // The registered theme is the source of truth once the bundle is verified.
   let swatches = $derived.by(() => {
@@ -115,7 +112,9 @@
       >
         {#if price}
           <Tag class="w-3.5 h-3.5" />
-          {i18n.t("settings.addonBuyFor", { price })}
+          {price.isFree
+            ? i18n.t("settings.addonBuyForFree")
+            : i18n.t("settings.addonBuyFor", { price: price.formatted })}
         {:else}
           {i18n.t("settings.addonGet")}
         {/if}

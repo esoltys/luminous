@@ -109,11 +109,11 @@ describe("AddonThemesSection.svelte", () => {
     expect(invoke).toHaveBeenCalledWith("acquire_addon", { id: "mothman" });
   });
 
-  it("keeps Get for a free add-on and when the Store reported no price", async () => {
+  it("says Buy for Free for a free add-on and keeps Get when the Store reported no price", async () => {
     setState("unowned");
-    addonsStore.prices["mothman"] = { id: "mothman", formatted: "Free", isFree: true };
+    addonsStore.prices["mothman"] = { id: "mothman", formatted: "$0.00", isFree: true };
     const { findByRole, rerender } = render(AddonThemesSection);
-    expect(await findByRole("button", { name: "Get" })).toBeInTheDocument();
+    expect(await findByRole("button", { name: "Buy for Free" })).toBeInTheDocument();
 
     addonsStore.prices = {};
     rerender({});

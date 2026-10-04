@@ -387,6 +387,7 @@ export const en = {
     addonCheckPurchases: "Check Purchases",
     addonGet: "Get",
     addonBuyFor: "Buy for {price}",
+    addonBuyForFree: "Buy for Free",
     addonWaitingStore: "Waiting for the Store…",
     addonDownloading: "Downloading…",
     addonOwned: "Owned",
