@@ -45,8 +45,8 @@
   const pageSize = 5;
 
   const isTest = typeof process !== "undefined" && process.env.NODE_ENV === "test";
-  const enterDuration = isTest ? 0 : 200;
-  const exitDuration = isTest ? 0 : 160;
+  const enterDuration = isTest ? 0 : 260;
+  const exitDuration = isTest ? 0 : 260;
 
   function prevPage() {
     if (page > 0) {
@@ -177,8 +177,18 @@
         <div class="grid grid-cols-1 grid-rows-1 overflow-hidden">
           {#key page}
             <div
-              in:fly={{ x: pageDirection * 40, duration: enterDuration, easing: cubicOut }}
-              out:fly={{ x: -pageDirection * 40, duration: exitDuration, easing: cubicOut }}
+              in:fly={{
+                x: pageDirection === 1 ? "100%" : "-100%",
+                duration: enterDuration,
+                opacity: 1,
+                easing: cubicOut,
+              }}
+              out:fly={{
+                x: pageDirection === 1 ? "-100%" : "100%",
+                duration: exitDuration,
+                opacity: 1,
+                easing: cubicOut,
+              }}
               class="col-start-1 row-start-1 space-y-2 w-full"
             >
               {#each pagedUpcomingEvents as event (event.id)}
