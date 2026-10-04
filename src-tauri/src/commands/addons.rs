@@ -39,13 +39,40 @@ impl Events for TauriEvents {
 
 /// Build the manager for this run. Cached bundles live under `<data>/addons`.
 pub fn build_manager(app: &AppHandle) -> Arc<AddonManager> {
-    use crate::addons::entitlement::{default_backend, NetworkProvisioner};
+    use crate::addons::entitlement::{default_backend, default_provisioner};
     let cache_dir = crate::paths::resolve_app_data_dir(app).join("addons");
+    #[cfg(debug_assertions)]
+    watch_dev_folder(app);
     Arc::new(AddonManager::new(
         default_backend(),
-        Arc::new(NetworkProvisioner::new(cache_dir)),
+        default_provisioner(cache_dir),
         Arc::new(TauriEvents(app.clone())),
     ))
+}
+
+/// Debug builds only (#1426): re-announce an unpacked add-on whenever its folder
+/// changes, and tell the overlay frame to reload.
+#[cfg(debug_assertions)]
+fn watch_dev_folder(app: &AppHandle) {
+    use crate::addons::devloader;
+    let Some(root) = devloader::dev_dir() else {
+        return;
+    };
+    let app = app.clone();
+    let events = TauriEvents(app.clone());
+    let watching = devloader::watch(root.clone(), move |id, loaded| match loaded {
+        Ok(manifest) => {
+            log::info!("add-on {id}: reloaded from disk");
+            events.theme_defined(&ThemeDefinition::from(&manifest));
+            events.state(id, AddonState::Owned, None);
+            let _ = app.emit("addon-dev-reloaded", id);
+        }
+        Err(e) => log::warn!("add-on {id}: reload failed, keeping the previous copy: {e}"),
+    });
+    match watching {
+        Ok(()) => log::info!("watching {} for add-on changes", root.display()),
+        Err(e) => log::warn!("could not watch {}: {e}", root.display()),
+    }
 }
 
 /// Re-check every known add-on and announce its state.

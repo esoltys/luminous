@@ -117,6 +117,11 @@ pub fn default_backend() -> Arc<dyn StoreBackend> {
     if let Some(fake) = fake::from_env() {
         return Arc::new(fake);
     }
+    // Previewing an unpacked folder (#1426) has no Store to ask, so it owns.
+    #[cfg(debug_assertions)]
+    if super::devloader::dev_dir().is_some() {
+        return Arc::new(fake::owned());
+    }
     #[cfg(target_os = "windows")]
     {
         if crate::restart_manager::current_application_user_model_id().is_some() {
@@ -172,6 +177,16 @@ pub trait Provisioner: Send + Sync {
         id: String,
         key: [u8; 32],
     ) -> BoxFuture<Result<verifier::Manifest, bundle::InstallError>>;
+}
+
+/// The provisioner for this build: the network, or in debug builds an unpacked
+/// folder named by `LUMINOUS_ADDON_DEV_DIR` (#1426).
+pub fn default_provisioner(cache_dir: PathBuf) -> Arc<dyn Provisioner> {
+    #[cfg(debug_assertions)]
+    if let Some(dir) = super::devloader::dev_dir() {
+        return Arc::new(super::devloader::DevFolderProvisioner::new(dir));
+    }
+    Arc::new(NetworkProvisioner::new(cache_dir))
 }
 
 pub struct NetworkProvisioner {
@@ -533,6 +548,12 @@ mod fake {
 
     pub struct FakeStore {
         owned: AtomicBool,
+    }
+
+    pub fn owned() -> FakeStore {
+        FakeStore {
+            owned: AtomicBool::new(true),
+        }
     }
 
     pub fn from_env() -> Option<FakeStore> {
