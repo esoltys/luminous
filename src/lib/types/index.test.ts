@@ -21,14 +21,14 @@ describe("resolveArtUrl", () => {
     expect(resolveArtUrl("album-12345.jpg")).toBe("luminous-art://album-12345.jpg");
   });
 
-  it("wraps Unix absolute local filesystem paths in luminous-art://local/", () => {
+  it("wraps Unix absolute local filesystem paths in luminous-art://thumb/", () => {
     const unixPath = "/home/user/Music/Album/folder.jpg";
-    expect(resolveArtUrl(unixPath)).toBe(`luminous-art://local/${unixPath}`);
+    expect(resolveArtUrl(unixPath)).toBe(`luminous-art://thumb/${unixPath}`);
   });
 
-  it("wraps Windows absolute local filesystem paths in luminous-art://local/", () => {
+  it("wraps Windows absolute local filesystem paths in luminous-art://thumb/", () => {
     const winPath = "C:\\Users\\User\\Music\\Album\\folder.jpg";
-    expect(resolveArtUrl(winPath)).toBe(`luminous-art://local/${winPath}`);
+    expect(resolveArtUrl(winPath)).toBe(`luminous-art://thumb/${winPath}`);
   });
 });
 

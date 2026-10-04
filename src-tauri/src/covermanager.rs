@@ -397,6 +397,13 @@ pub fn serve_art_request(covers_dir: &Path, uri: &str) -> tauri::http::Response<
         return serve_embedded_art(covers_dir, rest);
     }
 
+    if let Some(rest) = trimmed.strip_prefix("thumb/") {
+        let decoded = percent_encoding::percent_decode_str(rest)
+            .decode_utf8_lossy()
+            .into_owned();
+        return serve_folder_art_thumbnail(covers_dir, Path::new(&decoded));
+    }
+
     let file_path = if trimmed.starts_with("local/") {
         let local_path = trimmed.strip_prefix("local/").unwrap_or(trimmed);
         let decoded = percent_encoding::percent_decode_str(local_path)
@@ -418,6 +425,58 @@ pub fn serve_art_request(covers_dir: &Path, uri: &str) -> tauri::http::Response<
     );
 
     serve_image_file(&file_path)
+}
+
+/// Serve `source` (folder art used in place, often megabytes and often on a
+/// slow or network drive) as a `CACHE_MAX_EDGE` thumbnail, generated once into
+/// `covers_dir/thumbs/` and keyed on path + mtime + size so an edited file is
+/// re-thumbnailed. Lists and grids show folder art at the same size as cached
+/// embedded art; only the first view of a file pays to read it in full.
+/// Falls back to the original on any failure.
+fn serve_folder_art_thumbnail(covers_dir: &Path, source: &Path) -> tauri::http::Response<Vec<u8>> {
+    let Ok(meta) = std::fs::metadata(source) else {
+        return empty_response(404);
+    };
+    if !meta.is_file() {
+        return empty_response(404);
+    }
+    let mtime = meta
+        .modified()
+        .ok()
+        .and_then(|m| m.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let key = fnv1a_hex(&format!("{}|{}|{}", source.to_string_lossy(), mtime, meta.len()));
+    let thumbs_dir = covers_dir.join("thumbs");
+    for ext in ["jpg", "png"] {
+        let cached = thumbs_dir.join(format!("{key}.{ext}"));
+        if let Ok(data) = std::fs::read(&cached) {
+            return image_response(&data);
+        }
+    }
+
+    let Ok(data) = std::fs::read(source) else {
+        return empty_response(500);
+    };
+    let (thumb, ext) = downscale_for_cache(&data);
+    if std::fs::create_dir_all(&thumbs_dir).is_ok() {
+        let tmp = thumbs_dir.join(format!("{key}.tmp"));
+        if std::fs::write(&tmp, &thumb).is_ok()
+            && std::fs::rename(&tmp, thumbs_dir.join(format!("{key}.{ext}"))).is_err()
+        {
+            let _ = std::fs::remove_file(&tmp);
+        }
+    }
+    image_response(&thumb)
+}
+
+fn fnv1a_hex(input: &str) -> String {
+    let mut hash = 0xcbf29ce484222325u64;
+    for &byte in input.as_bytes() {
+        hash ^= byte as u64;
+        hash = hash.wrapping_mul(0x100000001b3u64);
+    }
+    format!("{hash:016x}")
 }
 
 fn serve_image_file(file_path: &Path) -> tauri::http::Response<Vec<u8>> {
@@ -1444,6 +1503,12 @@ impl CoverManager {
     /// folder-art path > unset), but returns a `luminous-art://` webview URI
     /// instead of a filesystem path — the form the frontend `<img>` tags use.
     pub fn get_cover_art_uri(&self, song_id: i64) -> Result<Option<String>> {
+        self.cover_art_uri(song_id, false)
+    }
+
+    /// `original` reads folder art in place (`local/`); otherwise it is served
+    /// as a cached thumbnail (`thumb/`).
+    fn cover_art_uri(&self, song_id: i64, original: bool) -> Result<Option<String>> {
         let conn = self.db.pool.get()?;
         let (_art_embedded, art_automatic, art_manual, art_unset) = conn.query_row(
             "SELECT art_embedded, art_automatic, art_manual, art_unset FROM songs WHERE id = ?1",
@@ -1473,8 +1538,10 @@ impl CoverManager {
             if auto.starts_with("album-") {
                 return Ok(Some(format!("luminous-art://{}", auto)));
             } else {
-                // If it's an absolute local path (folder art), serve via luminous-art://local/
-                return Ok(Some(format!("luminous-art://local/{}", auto)));
+                // An absolute local path (folder art): a cached thumbnail, or
+                // the original in place for large views.
+                let form = if original { "local" } else { "thumb" };
+                return Ok(Some(format!("luminous-art://{form}/{auto}")));
             }
         }
 
@@ -1517,7 +1584,7 @@ impl CoverManager {
                 }
             }
         }
-        self.get_cover_art_uri(song_id)
+        self.cover_art_uri(song_id, true)
     }
 
     /// Sum the on-disk size of the covers cache for the Folders settings'
@@ -1893,6 +1960,41 @@ mod tests {
             .encode_image(&img)
             .unwrap();
         out
+    }
+
+    #[test]
+    fn test_serve_art_request_thumbnails_folder_art_once_and_refreshes_on_change() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let covers_dir = temp_dir.path().join("covers");
+        std::fs::create_dir_all(&covers_dir).unwrap();
+        let art = temp_dir.path().join("cover.jpg");
+        std::fs::write(&art, jpeg_bytes(1200, 800)).unwrap();
+        let encoded = percent_encoding::utf8_percent_encode(
+            &art.to_string_lossy(),
+            percent_encoding::NON_ALPHANUMERIC,
+        )
+        .to_string();
+        let uri = format!("luminous-art://localhost/thumb/{encoded}");
+
+        let first = serve_art_request(&covers_dir, &uri);
+        assert_eq!(first.status(), 200);
+        let img = image::load_from_memory(first.body()).unwrap();
+        assert_eq!((img.width(), img.height()), (CACHE_MAX_EDGE, 400));
+        assert_eq!(std::fs::read_dir(covers_dir.join("thumbs")).unwrap().count(), 1);
+
+        // Served from the cache even once the original is unreadable as an image.
+        let again = serve_art_request(&covers_dir, &uri);
+        assert_eq!(again.body(), first.body());
+        assert_eq!(std::fs::read_dir(covers_dir.join("thumbs")).unwrap().count(), 1);
+
+        // A changed file (new size) gets a fresh thumbnail.
+        std::fs::write(&art, jpeg_bytes(1000, 1000)).unwrap();
+        let changed = serve_art_request(&covers_dir, &uri);
+        let img = image::load_from_memory(changed.body()).unwrap();
+        assert_eq!((img.width(), img.height()), (CACHE_MAX_EDGE, CACHE_MAX_EDGE));
+
+        let missing = serve_art_request(&covers_dir, "luminous-art://thumb/nope.jpg");
+        assert_eq!(missing.status(), 404);
     }
 
     #[test]
