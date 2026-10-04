@@ -221,6 +221,33 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     expect(invoke).toHaveBeenCalledWith("open_in_picard", { songIds: [1, 2] });
   });
 
+  it("opens the album's CritiqueBrainz release group page from the overflow menu (#1387)", async () => {
+    const openUrl = vi.fn().mockResolvedValue(undefined);
+    vi.doMock("@tauri-apps/plugin-opener", () => ({ openUrl }));
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_songs_by_album") {
+        return [{ ...mockSongs[0], musicbrainz_release_group_id: "rg-123" }];
+      }
+      return [];
+    });
+    const { getByTitle, getByText } = render(AlbumDetailView, { props: { albumName: mockAlbumName } });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    await fireEvent.click(getByTitle("More actions"));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    await fireEvent.click(getByText("Review on CritiqueBrainz"));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(openUrl).toHaveBeenCalledWith("https://critiquebrainz.org/release-group/rg-123");
+    vi.doUnmock("@tauri-apps/plugin-opener");
+  });
+
+  it("disables Review on CritiqueBrainz when no release group MBID is tagged (#1387)", async () => {
+    const { getByTitle, getByText } = render(AlbumDetailView, { props: { albumName: mockAlbumName } });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    await fireEvent.click(getByTitle("More actions"));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(getByText("Review on CritiqueBrainz").closest("button")).toBeDisabled();
+  });
+
   it("toggles album stats exclusion from the overflow menu (#1252)", async () => {
     let excluded: [string, string][] = [];
     vi.mocked(invoke).mockImplementation(async (cmd: string, args?: unknown) => {

@@ -1338,6 +1338,8 @@ export const en = {
     retrieveAlbumDetails: "Retrieve Album Details",
     retrieveAlbumDetailsTooltip: "Fetch Discogs, AllMusic, Wikidata and lyrics links from MusicBrainz, and the cover and disc art from fanart.tv",
     retrieveAlbumDetailsNoMbidTooltip: "No MusicBrainz release group ID found for this album",
+    reviewOnCritiqueBrainz: "Review on CritiqueBrainz",
+    reviewOnCritiqueBrainzTooltip: "Open this album on CritiqueBrainz to read or write reviews",
     retrieveDetailsSuccessOne: "Added 1 link from MusicBrainz",
     retrieveDetailsSuccessMany: "Added {count} links from MusicBrainz",
     retrieveDetailsNoResults: "No additional details found on MusicBrainz",

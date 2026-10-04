@@ -109,9 +109,10 @@
     }
   }
 
-  let hasReleaseGroupMbid = $derived(
-    songs.some((s) => (s.musicbrainz_release_group_id ?? "").trim().length > 0)
+  let releaseGroupMbid = $derived(
+    songs.map((s) => (s.musicbrainz_release_group_id ?? "").trim()).find((id) => id.length > 0) ?? ""
   );
+  let hasReleaseGroupMbid = $derived(releaseGroupMbid.length > 0);
 
   /** fanart.tv cover and disc art (#1277). New disc art re-scans the cover
    * stack so it's counted. Failures only warn: art is a bonus on top of
@@ -926,6 +927,13 @@
       title={hasReleaseGroupMbid ? i18n.t("albumDetail.retrieveAlbumDetailsTooltip", {}, "Fetch Discogs, AllMusic, Wikidata and lyrics links from MusicBrainz") : i18n.t("albumDetail.retrieveAlbumDetailsNoMbidTooltip", {}, "No MusicBrainz release group ID found for this album")}
       onclick={() => { handleRetrieveAlbumDetails(); overflowMenuPos = null; }}
       disabled={loading || retrievingDetails || !hasReleaseGroupMbid}
+    />
+    <ContextMenuItem
+      icon={ExternalLink}
+      label={i18n.t("albumDetail.reviewOnCritiqueBrainz", {}, "Review on CritiqueBrainz")}
+      title={hasReleaseGroupMbid ? i18n.t("albumDetail.reviewOnCritiqueBrainzTooltip", {}, "Open this album on CritiqueBrainz to read or write reviews") : i18n.t("albumDetail.retrieveAlbumDetailsNoMbidTooltip", {}, "No MusicBrainz release group ID found for this album")}
+      onclick={() => { handleOpenUrl(`https://critiquebrainz.org/release-group/${releaseGroupMbid}`); overflowMenuPos = null; }}
+      disabled={loading || !hasReleaseGroupMbid}
     />
     <ContextMenuItem
       icon={OpenInPicard}
