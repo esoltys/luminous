@@ -29,6 +29,8 @@
   import BlurredCover from "./BlurredCover.svelte";
   import ContextMenu from "./ContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
+  import ContextMenuDivider from "./ContextMenuDivider.svelte";
+  import StarRating from "./StarRating.svelte";
   import {
     PlusIcon as Plus,
     PencilSimpleIcon as Edit3,
@@ -48,9 +50,9 @@
   import AlbumProfileEditor from "./AlbumProfileEditor.svelte";
   import MarkdownBio from "./MarkdownBio.svelte";
   import SocialIcon from "./SocialIcon.svelte";
-  import type { Song, AlbumItem, PlayContext } from "../types";
+  import type { Song, AlbumItem, PlayContext, SongContextEnrichment } from "../types";
   import { getCoverArtUrl, resolveArtUrl } from "../types";
-  import { i18n } from "../stores/i18n.svelte";
+  import { i18n, formatNumber } from "../stores/i18n.svelte";
   import { statsExclusionsStore } from "../stores/statsExclusions.svelte";
   import { picardStore } from "../stores/picard.svelte";
   import { prefs } from "../stores/prefs.svelte";
@@ -113,6 +115,23 @@
     songs.map((s) => (s.musicbrainz_release_group_id ?? "").trim()).find((id) => id.length > 0) ?? ""
   );
   let hasReleaseGroupMbid = $derived(releaseGroupMbid.length > 0);
+
+  /** CritiqueBrainz community rating for the album's release group (cached backend-side). */
+  let communityRating = $state<{ rating: number; count: number } | null>(null);
+  $effect(() => {
+    const songId = songs.find((s) => (s.musicbrainz_release_group_id ?? "").trim() === releaseGroupMbid)?.id;
+    const mbid = releaseGroupMbid;
+    communityRating = null;
+    if (!mbid || songId == null) return;
+    let stale = false;
+    invoke<SongContextEnrichment>("get_song_context", { songId, forceRefresh: false })
+      .then((ctx) => {
+        if (stale || ctx.critiquebrainz_rating == null) return;
+        communityRating = { rating: ctx.critiquebrainz_rating, count: ctx.critiquebrainz_review_count ?? 0 };
+      })
+      .catch(() => {});
+    return () => { stale = true; };
+  });
 
   /** fanart.tv cover and disc art (#1277). New disc art re-scans the cover
    * stack so it's counted. Failures only warn: art is a bonus on top of
@@ -386,6 +405,10 @@
     } catch {
       window.open(url, "_blank");
     }
+  }
+
+  function openCritiqueBrainz() {
+    if (releaseGroupMbid) handleOpenUrl(`https://critiquebrainz.org/release-group/${releaseGroupMbid}`);
   }
 
   /** Which album `songs` currently holds — lags `albumName` until its fetch lands. */
@@ -775,7 +798,7 @@
             class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-brand-border bg-brand-sidebar text-brand-text-secondary text-xs font-medium hover:text-brand-text-primary hover:border-brand-accent/40 transition-colors cursor-pointer shrink-0 ml-auto"
           >
             <ArrowDownLeft class="w-3.5 h-3.5" />
-            <span>{i18n.t('albumDetail.albumInfo', {}, 'Album Info')}</span>
+            {@render albumInfoTitle()}
           </button>
         {/if}
       </div>
@@ -789,7 +812,7 @@
         class="group/overview border border-brand-border rounded-xl bg-brand-sidebar/95 backdrop-blur-xl overflow-hidden shadow-md transition-all @container"
       >
         <summary class="flex items-center justify-between px-4 py-2.5 sm:px-5 sm:py-3 text-xs font-semibold text-brand-text-secondary cursor-pointer select-none hover:text-brand-text-primary transition-colors">
-          <span>{i18n.t('albumDetail.albumInfo', {}, 'Album Info')}</span>
+          {@render albumInfoTitle()}
           <ArrowUpRight class="w-3.5 h-3.5 text-brand-text-secondary/70" />
         </summary>
         <div class="p-4 sm:p-5 md:p-6 border-t border-brand-border/60 flex flex-col @2xl:flex-row gap-5 md:gap-6 justify-between">
@@ -902,6 +925,26 @@
   />
 {/if}
 
+{#snippet albumInfoTitle()}
+  {#if communityRating}
+    <!-- Inside <summary>: stop the click from also toggling the card. -->
+    <span
+      role="link"
+      tabindex="0"
+      class="inline-flex items-center gap-1.5 hover:text-brand-accent hover:underline cursor-pointer"
+      title={i18n.t('albumDetail.reviewOnCritiqueBrainzTooltip', {}, 'Open this album on CritiqueBrainz to read or write reviews')}
+      onclick={(e) => { e.preventDefault(); e.stopPropagation(); openCritiqueBrainz(); }}
+      onkeydown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); openCritiqueBrainz(); } }}
+    >
+      <span>{i18n.t('albumDetail.communityRating', {}, 'Community Rating')}</span>
+      <StarRating rating={communityRating.rating} />
+      <span>({formatNumber(communityRating.count)})</span>
+    </span>
+  {:else}
+    <span>{i18n.t('albumDetail.albumInfo', {}, 'Album Info')}</span>
+  {/if}
+{/snippet}
+
 {#if overflowMenuPos}
   <ContextMenu
     x={overflowMenuPos.x}
@@ -928,11 +971,12 @@
       onclick={() => { handleRetrieveAlbumDetails(); overflowMenuPos = null; }}
       disabled={loading || retrievingDetails || !hasReleaseGroupMbid}
     />
+    <ContextMenuDivider />
     <ContextMenuItem
       icon={ExternalLink}
       label={i18n.t("albumDetail.reviewOnCritiqueBrainz", {}, "Review on CritiqueBrainz")}
       title={hasReleaseGroupMbid ? i18n.t("albumDetail.reviewOnCritiqueBrainzTooltip", {}, "Open this album on CritiqueBrainz to read or write reviews") : i18n.t("albumDetail.retrieveAlbumDetailsNoMbidTooltip", {}, "No MusicBrainz release group ID found for this album")}
-      onclick={() => { handleOpenUrl(`https://critiquebrainz.org/release-group/${releaseGroupMbid}`); overflowMenuPos = null; }}
+      onclick={() => { openCritiqueBrainz(); overflowMenuPos = null; }}
       disabled={loading || !hasReleaseGroupMbid}
     />
     <ContextMenuItem
@@ -946,6 +990,7 @@
           ? i18n.t("picard.remoteNotSupportedTooltip")
           : undefined}
     />
+    <ContextMenuDivider />
     <ContextMenuItem
       icon={BarChart2}
       label={statsExclusionsStore.isExcluded("album", albumName)

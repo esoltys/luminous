@@ -1389,6 +1389,7 @@ export const fr: DeepStringRecord<typeof en> = {
     retrieveAlbumDetails: "Récupérer les détails de l'album",
     retrieveAlbumDetailsTooltip: "Récupérer les liens Discogs, AllMusic, Wikidata et paroles depuis MusicBrainz, ainsi que la pochette et le visuel du disque depuis fanart.tv",
     retrieveAlbumDetailsNoMbidTooltip: "Aucun identifiant de groupe de parution MusicBrainz trouvé pour cet album",
+    communityRating: "Note de la communauté",
     reviewOnCritiqueBrainz: "Évaluer sur CritiqueBrainz",
     reviewOnCritiqueBrainzTooltip: "Ouvrir cet album sur CritiqueBrainz pour lire ou rédiger des critiques",
     retrieveDetailsSuccessOne: "1 lien ajouté depuis MusicBrainz",
