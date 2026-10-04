@@ -382,7 +382,7 @@ export const en = {
     dynamicThemes: "Dynamic Themes",
     predefinedThemes: "Predefined Themes",
     customThemes: "Custom Themes",
-    addonThemes: "Add-on Themes",
+    addonThemes: "Add-on Supporter Themes",
     addonBadge: "Add-on",
     addonCheckPurchases: "Check Purchases",
     addonGet: "Get",

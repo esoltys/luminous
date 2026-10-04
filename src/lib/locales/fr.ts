@@ -388,7 +388,7 @@ export const fr: DeepStringRecord<typeof en> = {
     dynamicThemes: "Thèmes dynamiques",
     predefinedThemes: "Thèmes prédéfinis",
     customThemes: "Thèmes personnalisés",
-    addonThemes: "Thèmes additionnels",
+    addonThemes: "Thèmes additionnels de soutien",
     addonBadge: "Additionnel",
     addonCheckPurchases: "Vérifier les achats",
     addonGet: "Obtenir",

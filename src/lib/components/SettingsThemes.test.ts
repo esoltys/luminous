@@ -22,10 +22,10 @@ describe("SettingsThemes.svelte", () => {
     themeStore.colorSchemeMode = "system";
   });
 
-  it("lists Add-on Themes above Predefined Themes", async () => {
+  it("lists Add-on Supporter Themes above Predefined Themes", async () => {
     addonsStore.applyEvent({ id: "mothman", state: "unowned" });
     const { findByText } = render(SettingsThemes);
-    const addons = await findByText("Add-on Themes");
+    const addons = await findByText("Add-on Supporter Themes");
     const predefined = await findByText("Predefined Themes");
     expect(addons.compareDocumentPosition(predefined) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     addonsStore.statuses = {};

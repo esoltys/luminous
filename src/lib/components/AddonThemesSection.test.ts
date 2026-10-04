@@ -26,7 +26,7 @@ describe("AddonThemesSection.svelte", () => {
   it("renders nothing while the Store is unavailable or has not reported yet", () => {
     const { container, rerender } = render(AddonThemesSection);
     expect(container.querySelector("[data-addon-card]")).toBeNull();
-    expect(container.textContent).not.toContain("Add-on Themes");
+    expect(container.textContent).not.toContain("Add-on Supporter Themes");
 
     setState("unavailable");
     rerender({});
@@ -36,7 +36,7 @@ describe("AddonThemesSection.svelte", () => {
   it("offers Get for an add-on that is not owned and starts the purchase on click", async () => {
     setState("unowned");
     const { findByRole, getByText } = render(AddonThemesSection);
-    expect(getByText("Add-on Themes")).toBeInTheDocument();
+    expect(getByText("Add-on Supporter Themes")).toBeInTheDocument();
     expect(getByText("Mothman")).toBeInTheDocument();
 
     await fireEvent.click(await findByRole("button", { name: "Get" }));
