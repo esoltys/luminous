@@ -4,7 +4,6 @@
   import {
     formatArtistLifeEvent,
     isArtistPerson,
-    resolveGenderLabel
   } from "../utils/artistInfo";
 
   interface Props {
@@ -40,7 +39,6 @@
   }: Props = $props();
 
   let isPerson = $derived(isArtistPerson(artistType, gender));
-  let genderLabel = $derived(isPerson ? resolveGenderLabel(gender) : "");
   let formattedBeginDate = $derived(formatArtistLifeEvent(beginDate, i18n.currentLocale));
   let formattedEndDate = $derived(formatArtistLifeEvent(endDate, i18n.currentLocale));
   let city = $derived(beginAreaName?.trim() || "");
@@ -63,8 +61,7 @@
   );
 
   let hasContent = $derived(
-    !!genderLabel ||
-      !!formattedBeginDate ||
+    !!formattedBeginDate ||
       !!city ||
       !!country ||
       !!formattedEndDate
@@ -72,12 +69,6 @@
 </script>
 
 {#snippet contentRows()}
-  {#if genderLabel}
-    <div class="flex items-start justify-between gap-3">
-      <span class="text-brand-text-secondary/60 shrink-0">{i18n.t("artistInfo.gender", {}, "Gender")}</span>
-      <span class="text-brand-text-primary text-right break-words min-w-0">{genderLabel}</span>
-    </div>
-  {/if}
   {#if formattedBeginDate}
     <div class="flex items-start justify-between gap-3">
       <span class="text-brand-text-secondary/60 shrink-0">{dateLabel}</span>

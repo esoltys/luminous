@@ -1,7 +1,6 @@
 <script lang="ts">
   import {
     TicketIcon as Ticket,
-    CaretDownIcon as CaretDown,
     MapPinIcon as MapPin,
     ArrowSquareOutIcon as ExternalLink,
     ClockIcon as Clock,
@@ -38,11 +37,17 @@
   const todayStr = new Date().toISOString().slice(0, 10);
 
   let upcomingEvents = $derived(
-    events.filter((e) => !e.begin_date || e.begin_date >= todayStr)
+    events
+      .filter((e) => !e.begin_date || e.begin_date >= todayStr)
+      .slice()
+      .sort((a, b) => (a.begin_date ?? "").localeCompare(b.begin_date ?? ""))
   );
 
   let pastEvents = $derived(
-    events.filter((e) => e.begin_date && e.begin_date < todayStr)
+    events
+      .filter((e) => e.begin_date && e.begin_date < todayStr)
+      .slice()
+      .sort((a, b) => (b.begin_date ?? "").localeCompare(a.begin_date ?? ""))
   );
 
   function parseDateParts(dateStr?: string | null) {
@@ -85,33 +90,19 @@
   let effectiveSetlistfmUrl = $derived(
     setlistfmUrl || `https://www.setlist.fm/search?query=${encodeURIComponent(artistName)}`
   );
-
-  let hasEvents = $derived(events.length > 0);
-  let totalCount = $derived(events.length);
 </script>
 
-<details
-  open
-  class="group border border-brand-border/60 rounded-lg bg-brand-sidebar/40 overflow-hidden {className}"
+<div
+  class="border border-brand-border/60 rounded-lg bg-brand-sidebar/40 overflow-hidden {className}"
 >
-  <summary
-    class="flex items-center justify-between px-3 py-2 text-xs font-semibold text-brand-text-secondary cursor-pointer select-none hover:text-brand-text-primary transition-colors"
+  <div
+    class="flex items-center px-3 py-2 text-xs font-semibold text-brand-text-secondary select-none"
   >
     <div class="flex items-center gap-2 min-w-0">
       <Ticket class="w-3.5 h-3.5 text-brand-accent shrink-0" />
       <span>{i18n.t("artistEvents.panelTitle", {}, "Upcoming Concerts & Events")}</span>
-      {#if upcomingEvents.length > 0}
-        <span
-          class="px-1.5 py-0.2 rounded-full text-[10px] font-medium bg-brand-accent/20 text-brand-accent"
-        >
-          {upcomingEvents.length}
-        </span>
-      {/if}
     </div>
-    <CaretDown
-      class="w-3.5 h-3.5 text-brand-text-secondary/70 group-open:rotate-180 transition-transform shrink-0"
-    />
-  </summary>
+  </div>
 
   <div class="p-3 border-t border-brand-border/40 space-y-3 text-xs">
     {#if loading}
@@ -124,8 +115,8 @@
         <div class="space-y-2">
           {#each upcomingEvents as event (event.id)}
             {@const { month, day, year } = parseDateParts(event.begin_date)}
-            {@const primaryTicketUrl = event.ticket_urls[0]}
-            {@const primaryEventUrl = event.event_urls[0]}
+            {@const primaryTicketUrl = event.ticket_urls?.[0]}
+            {@const primaryEventUrl = event.event_urls?.[0]}
             <div
               class="flex items-start justify-between gap-3 p-2.5 rounded-lg border border-brand-border/50 bg-brand-main/40 hover:bg-brand-main/70 transition-colors"
             >
@@ -261,6 +252,7 @@
             <div class="mt-2 space-y-1.5 opacity-80">
               {#each pastEvents as event (event.id)}
                 {@const { month, day, year } = parseDateParts(event.begin_date)}
+                {@const linkUrl = event.ticket_urls?.[0] || event.event_urls?.[0]}
                 <div
                   class="flex items-center justify-between gap-3 px-2 py-1.5 rounded border border-brand-border/30 bg-brand-main/20 text-[11px]"
                 >
@@ -277,12 +269,12 @@
                       </span>
                     {/if}
                   </div>
-                  {#if event.ticket_urls[0] || event.event_urls[0]}
+                  {#if linkUrl}
                     <button
                       type="button"
-                      onclick={() => onOpenUrl?.(event.ticket_urls[0] || event.event_urls[0])}
+                      onclick={() => onOpenUrl?.(linkUrl)}
                       class="text-brand-text-secondary hover:text-brand-text-primary shrink-0 cursor-pointer"
-                      title={event.ticket_urls[0] || event.event_urls[0]}
+                      title={linkUrl}
                     >
                       <ExternalLink class="w-3 h-3" />
                     </button>
@@ -333,4 +325,4 @@
       </div>
     {/if}
   </div>
-</details>
+</div>

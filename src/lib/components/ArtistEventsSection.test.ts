@@ -102,4 +102,27 @@ describe("ArtistEventsSection", () => {
     expect(screen.getByText("Past Tour 2020")).toBeTruthy();
     expect(screen.getByText(/Hide past events/i)).toBeTruthy();
   });
+
+  it("sorts past events descending with most recent on top", async () => {
+    const pastList: ArtistEvent[] = [
+      { id: "e1", name: "Old Show 2017", begin_date: "2017-05-01", cancelled: false, ticket_urls: [], event_urls: [] },
+      { id: "e2", name: "Recent Show 2023", begin_date: "2023-09-01", cancelled: false, ticket_urls: [], event_urls: [] },
+      { id: "e3", name: "Mid Show 2020", begin_date: "2020-01-15", cancelled: false, ticket_urls: [], event_urls: [] },
+    ];
+
+    const { container } = render(ArtistEventsSection, {
+      props: {
+        events: pastList,
+        artistName: "Test Artist",
+      },
+    });
+
+    const toggleBtn = screen.getByText(/Show past events/i);
+    await fireEvent.click(toggleBtn);
+
+    const eventNames = Array.from(container.querySelectorAll(".text-brand-text-primary.truncate"))
+      .map((el) => el.textContent?.trim());
+
+    expect(eventNames).toEqual(["Recent Show 2023", "Mid Show 2020", "Old Show 2017"]);
+  });
 });
