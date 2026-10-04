@@ -996,14 +996,13 @@ impl ContextManager {
             ));
         }
         let parsed: MbEventResponse = response.json().await?;
-        let mut events: Vec<ArtistEvent> = parsed.events.into_iter().map(ArtistEvent::from).collect();
-        events.sort_by(|a, b| {
-            match (&a.begin_date, &b.begin_date) {
-                (Some(d1), Some(d2)) => d1.cmp(d2),
-                (Some(_), None) => std::cmp::Ordering::Less,
-                (None, Some(_)) => std::cmp::Ordering::Greater,
-                (None, None) => a.name.cmp(&b.name),
-            }
+        let mut events: Vec<ArtistEvent> =
+            parsed.events.into_iter().map(ArtistEvent::from).collect();
+        events.sort_by(|a, b| match (&a.begin_date, &b.begin_date) {
+            (Some(d1), Some(d2)) => d1.cmp(d2),
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => a.name.cmp(&b.name),
         });
         Ok(events)
     }
@@ -1087,7 +1086,10 @@ mod tests {
         assert_eq!(event.venue_country.as_deref(), Some("United Kingdom"));
         assert_eq!(event.venue_latitude, Some(51.556));
         assert_eq!(event.venue_longitude, Some(-0.279));
-        assert_eq!(event.ticket_urls, vec!["https://tickets.example.com/e1".to_string()]);
+        assert_eq!(
+            event.ticket_urls,
+            vec!["https://tickets.example.com/e1".to_string()]
+        );
     }
 
     #[test]

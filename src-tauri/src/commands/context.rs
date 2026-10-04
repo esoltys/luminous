@@ -958,6 +958,9 @@ mod tests {
         assert_eq!(read_events.len(), 1);
         assert_eq!(read_events[0].name, "Live at Wembley");
         assert_eq!(read_events[0].venue_city.as_deref(), Some("London"));
-        assert_eq!(read_events[0].ticket_urls, vec!["https://tickets.example.com"]);
+        assert_eq!(
+            read_events[0].ticket_urls,
+            vec!["https://tickets.example.com"]
+        );
     }
 }
