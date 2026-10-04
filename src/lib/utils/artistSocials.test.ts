@@ -7,6 +7,7 @@ import {
   deriveFanartTvUrl,
   resolveArtistMbid,
   deriveMusicbrainzArtistUrl,
+  deriveMusicbrainzEventsUrl,
   deriveListenbrainzArtistUrl,
   deriveFanartTvUrlFromMbid,
   normalizeWebsitePlatform,

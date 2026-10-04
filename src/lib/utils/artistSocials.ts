@@ -421,6 +421,11 @@ export function deriveMusicbrainzArtistUrl(mbid: string | null | undefined): str
   return mbid ? `https://musicbrainz.org/artist/${mbid}` : null;
 }
 
+/** Derives a MusicBrainz artist events page URL from a resolved MBID (#1431). */
+export function deriveMusicbrainzEventsUrl(mbid: string | null | undefined): string | null {
+  return mbid ? `https://musicbrainz.org/artist/${mbid}/events` : null;
+}
+
 /** Derives a ListenBrainz artist page URL from a resolved MBID (#1123). */
 export function deriveListenbrainzArtistUrl(mbid: string | null | undefined): string | null {
   return mbid ? `https://listenbrainz.org/artist/${mbid}/` : null;

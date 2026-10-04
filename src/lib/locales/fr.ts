@@ -1313,7 +1313,10 @@ export const fr: DeepStringRecord<typeof en> = {
     loading: "Chargement des événements à venir...",
     pastEvents: "Événements passés",
     showPastEvents: "Afficher les événements passés ({count})",
-    hidePastEvents: "Masquer les événements passés"
+    hidePastEvents: "Masquer les événements passés",
+    pagination: "{start}–{end} sur {total}",
+    previousPage: "Page précédente",
+    nextPage: "Page suivante"
   },
   artistProfileEditor: {
     title: "Modifier l'artiste",

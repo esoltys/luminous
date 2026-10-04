@@ -1,6 +1,8 @@
 <script lang="ts">
   import {
     TicketIcon as Ticket,
+    CaretLeftIcon as CaretLeft,
+    CaretRightIcon as CaretRight,
     MapPinIcon as MapPin,
     ArrowSquareOutIcon as ExternalLink,
     ClockIcon as Clock,
@@ -16,6 +18,7 @@
     songkickUrl?: string | null;
     setlistfmUrl?: string | null;
     bandsintownUrl?: string | null;
+    musicbrainzUrl?: string | null;
     onOpenUrl?: (url: string) => void;
     class?: string;
   }
@@ -27,11 +30,21 @@
     songkickUrl,
     setlistfmUrl,
     bandsintownUrl,
+    musicbrainzUrl,
     onOpenUrl,
     class: className = "",
   }: Props = $props();
 
   let showPast = $state(false);
+  let page = $state(0);
+  const pageSize = 5;
+
+  $effect(() => {
+    // Reset page if events list or artist changes
+    events;
+    artistName;
+    page = 0;
+  });
 
   // Today in UTC YYYY-MM-DD
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -41,6 +54,11 @@
       .filter((e) => !e.begin_date || e.begin_date >= todayStr)
       .slice()
       .sort((a, b) => (a.begin_date ?? "").localeCompare(b.begin_date ?? ""))
+  );
+
+  let totalPages = $derived(Math.ceil(upcomingEvents.length / pageSize));
+  let pagedUpcomingEvents = $derived(
+    upcomingEvents.slice(page * pageSize, (page + 1) * pageSize)
   );
 
   let pastEvents = $derived(
@@ -98,10 +116,23 @@
   <div
     class="flex items-center px-3 py-2 text-xs font-semibold text-brand-text-secondary select-none"
   >
-    <div class="flex items-center gap-2 min-w-0">
-      <Ticket class="w-3.5 h-3.5 text-brand-accent shrink-0" />
-      <span>{i18n.t("artistEvents.panelTitle", {}, "Upcoming Concerts & Events")}</span>
-    </div>
+    {#if musicbrainzUrl}
+      <button
+        type="button"
+        onclick={() => onOpenUrl?.(musicbrainzUrl)}
+        class="group/mb flex items-center gap-2 min-w-0 hover:text-brand-accent transition-colors cursor-pointer text-left"
+        title={musicbrainzUrl}
+      >
+        <Ticket class="w-3.5 h-3.5 text-brand-accent shrink-0" />
+        <span class="underline decoration-brand-text-secondary/40 group-hover/mb:decoration-brand-accent">{i18n.t("artistEvents.panelTitle", {}, "Upcoming Concerts & Events")}</span>
+        <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover/mb:opacity-100 transition-opacity shrink-0" />
+      </button>
+    {:else}
+      <div class="flex items-center gap-2 min-w-0">
+        <Ticket class="w-3.5 h-3.5 text-brand-accent shrink-0" />
+        <span>{i18n.t("artistEvents.panelTitle", {}, "Upcoming Concerts & Events")}</span>
+      </div>
+    {/if}
   </div>
 
   <div class="p-3 border-t border-brand-border/40 space-y-3 text-xs">
@@ -113,7 +144,7 @@
       <!-- Upcoming Events List -->
       {#if upcomingEvents.length > 0}
         <div class="space-y-2">
-          {#each upcomingEvents as event (event.id)}
+          {#each pagedUpcomingEvents as event (event.id)}
             {@const { month, day, year } = parseDateParts(event.begin_date)}
             {@const primaryTicketUrl = event.ticket_urls?.[0]}
             {@const primaryEventUrl = event.event_urls?.[0]}
@@ -227,6 +258,39 @@
             </div>
           {/each}
         </div>
+
+        {#if totalPages > 1}
+          <div class="flex items-center justify-between text-[11px] text-brand-text-secondary/70 pt-1 px-0.5 select-none">
+            <span>
+              {i18n.t("artistEvents.pagination", {
+                start: page * pageSize + 1,
+                end: Math.min((page + 1) * pageSize, upcomingEvents.length),
+                total: upcomingEvents.length,
+              })}
+            </span>
+            <div class="flex items-center gap-1">
+              <button
+                type="button"
+                disabled={page === 0}
+                onclick={() => page--}
+                class="p-1 rounded hover:bg-brand-main/60 disabled:opacity-30 disabled:hover:bg-transparent transition-colors cursor-pointer disabled:cursor-not-allowed text-brand-text-secondary hover:text-brand-text-primary"
+                aria-label={i18n.t("artistEvents.previousPage", {}, "Previous page")}
+              >
+                <CaretLeft class="w-3.5 h-3.5" />
+              </button>
+              <span class="text-[10px] font-mono px-1">{page + 1} / {totalPages}</span>
+              <button
+                type="button"
+                disabled={page >= totalPages - 1}
+                onclick={() => page++}
+                class="p-1 rounded hover:bg-brand-main/60 disabled:opacity-30 disabled:hover:bg-transparent transition-colors cursor-pointer disabled:cursor-not-allowed text-brand-text-secondary hover:text-brand-text-primary"
+                aria-label={i18n.t("artistEvents.nextPage", {}, "Next page")}
+              >
+                <CaretRight class="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        {/if}
       {:else}
         <div class="py-2 text-center text-xs text-brand-text-secondary/70">
           {i18n.t("artistEvents.noEvents", {}, "No upcoming concerts found")}

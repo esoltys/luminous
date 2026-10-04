@@ -57,6 +57,7 @@
     normalizeWebsitePlatform,
     resolveArtistMbid,
     deriveMusicbrainzArtistUrl,
+    deriveMusicbrainzEventsUrl,
     deriveListenbrainzArtistUrl,
     deriveFanartTvUrlFromMbid,
     isBlacklistedLink,
@@ -173,6 +174,7 @@
     resolveArtistMbid(artistProfile?.musicbrainz_artist_id, artistProfile?.social_links)
   );
   let musicbrainzArtistUrl = $derived(deriveMusicbrainzArtistUrl(artistMbid));
+  let musicbrainzEventsUrl = $derived(deriveMusicbrainzEventsUrl(artistMbid));
   let listenbrainzArtistUrl = $derived(deriveListenbrainzArtistUrl(artistMbid));
   let fanartTvUrl = $derived(deriveFanartTvUrlFromMbid(artistMbid));
 
@@ -1023,6 +1025,7 @@
                   songkickUrl={songkickLink}
                   setlistfmUrl={setlistfmLink}
                   bandsintownUrl={bandsintownLink}
+                  musicbrainzUrl={musicbrainzEventsUrl}
                   onOpenUrl={handleOpenUrl}
                 />
               {/if}

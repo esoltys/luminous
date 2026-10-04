@@ -125,4 +125,57 @@ describe("ArtistEventsSection", () => {
 
     expect(eventNames).toEqual(["Recent Show 2023", "Mid Show 2020", "Old Show 2017"]);
   });
+
+  it("links header to MusicBrainz events page when musicbrainzUrl is provided", async () => {
+    const handleOpenUrl = vi.fn();
+    render(ArtistEventsSection, {
+      props: {
+        events: sampleEvents,
+        artistName: "Coldplay",
+        musicbrainzUrl: "https://musicbrainz.org/artist/cc197027-5f32-4d2b-add3-13eac73b1230/events",
+        onOpenUrl: handleOpenUrl,
+      },
+    });
+
+    const headerBtn = screen.getByRole("button", { name: /Upcoming Concerts & Events/i });
+    expect(headerBtn).toBeTruthy();
+    await fireEvent.click(headerBtn);
+    expect(handleOpenUrl).toHaveBeenCalledWith(
+      "https://musicbrainz.org/artist/cc197027-5f32-4d2b-add3-13eac73b1230/events"
+    );
+  });
+
+  it("limits upcoming events to 5 per page with pagination controls", async () => {
+    const manyEvents: ArtistEvent[] = Array.from({ length: 7 }, (_, i) => ({
+      id: `evt-${i + 1}`,
+      name: `Upcoming Tour Show ${i + 1}`,
+      begin_date: `2099-01-0${i + 1}`,
+      cancelled: false,
+      ticket_urls: [],
+      event_urls: [],
+    }));
+
+    render(ArtistEventsSection, {
+      props: {
+        events: manyEvents,
+        artistName: "Busy Artist",
+      },
+    });
+
+    // Page 1: shows shows 1 to 5
+    expect(screen.getByText("Upcoming Tour Show 1")).toBeTruthy();
+    expect(screen.getByText("Upcoming Tour Show 5")).toBeTruthy();
+    expect(screen.queryByText("Upcoming Tour Show 6")).toBeNull();
+    expect(screen.getByText("1–5 of 7")).toBeTruthy();
+
+    // Click Next page
+    const nextBtn = screen.getByRole("button", { name: "Next page" });
+    await fireEvent.click(nextBtn);
+
+    // Page 2: shows shows 6 and 7
+    expect(screen.queryByText("Upcoming Tour Show 1")).toBeNull();
+    expect(screen.getByText("Upcoming Tour Show 6")).toBeTruthy();
+    expect(screen.getByText("Upcoming Tour Show 7")).toBeTruthy();
+    expect(screen.getByText("6–7 of 7")).toBeTruthy();
+  });
 });
