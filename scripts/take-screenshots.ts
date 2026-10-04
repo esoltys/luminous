@@ -155,9 +155,13 @@ async function main() {
     // ones) resolves light/dark from the OS color-scheme media query —
     // Chromium defaults that to light, which is why these used to render
     // light. Force dark so System-theme captures actually show the dark
-    // System theme rather than an unintended light one.
-    if (theme !== "dynamic-artwork") {
-      await page.emulateMedia({ colorScheme: "dark" });
+    // System theme rather than an unintended light one. A `-light` suffix on
+    // the theme (e.g. "system-light" in mock-config.json) asks for the light
+    // System theme instead.
+    const light = theme.endsWith("-light");
+    const themeId = light ? theme.slice(0, -"-light".length) : theme;
+    if (themeId !== "dynamic-artwork") {
+      await page.emulateMedia({ colorScheme: light ? "light" : "dark" });
     }
     page.on("console", (msg) => {
       if (msg.type() === "error" || msg.type() === "warning") {
@@ -216,7 +220,7 @@ async function main() {
     await page.addInitScript(`
       window.mockSettings = {
         ...(window.mockSettings || {}),
-        active_theme_id: "${theme}",
+        active_theme_id: "${themeId}",
         custom_themes: "[]",
         active_tab: "${tab}",
         active_sub_tab: "${subTab}",

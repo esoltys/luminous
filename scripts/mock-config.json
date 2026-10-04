@@ -282,7 +282,7 @@
       "filename": "themes.png",
       "tab": "settings",
       "action": "click-themes",
-      "theme": "dynamic-artwork",
+      "theme": "system-light",
       "featuredSong": "Got Your Number",
       "featuredArtist": "Serena Ryder"
     }
