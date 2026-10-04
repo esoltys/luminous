@@ -39,9 +39,6 @@
       : null
   );
 
-  // The walk loop only runs while the window is visible.
-  let windowVisible = $state(true);
-
   let cardClass = $derived(
     `bg-brand-main/50 border-2 rounded-xl flex flex-col overflow-hidden text-left w-full transition-colors duration-200 ${
       isActive ? "border-brand-accent shadow-md shadow-brand-accent/5" : "border-brand-border/60"
@@ -62,41 +59,44 @@
   }
 </script>
 
-<svelte:document onvisibilitychange={() => (windowVisible = !document.hidden)} />
-
 {#snippet content()}
-  <div
-    class="hero h-[132px] flex items-center justify-center"
-    style="background-color: {swatches[0]}; background-image: radial-gradient(closest-side at 50% 55%, {accent}4d, {accent}00)"
-    aria-hidden="true"
-  >
-    <div
-      class="walk"
-      style="background-image: url({entry.heroFrames}); animation-play-state: {windowVisible ? 'running' : 'paused'}"
-    ></div>
-    <img class="still" src={entry.heroImage} alt="" width="104" height="102" />
-  </div>
-
   <div class="p-4 flex flex-col gap-3">
-    <div class="flex items-center gap-2">
-      <span
-        class="font-semibold text-sm text-brand-text-primary"
-        style="text-shadow: 0 0 12px {accent}a6, 0 0 3px {accent}b3"
-      >
-        {entry.name}
-      </span>
-      <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-brand-accent/15 text-brand-accent-text">
-        {i18n.t("settings.addonBadge")}
-      </span>
-      {#if state === "owned"}
-        <span class="text-xs text-brand-text-secondary ml-auto">{i18n.t("settings.addonOwned")}</span>
-      {/if}
-    </div>
+    <!-- The moth stands on top of the palette strip; the title sits beside it. -->
+    <div>
+      <div class="relative h-24 flex flex-col items-start justify-end gap-1 pb-2">
+        <div class="flex items-center gap-2">
+          <span
+            class="font-semibold text-sm text-brand-text-primary"
+            style="text-shadow: 0 0 12px {accent}a6, 0 0 3px {accent}b3"
+          >
+            {entry.name}
+          </span>
+          <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-brand-accent/15 text-brand-accent-text">
+            {i18n.t("settings.addonBadge")}
+          </span>
+        </div>
+        {#if state === "owned"}
+          <span class="text-xs text-brand-text-secondary">{i18n.t("settings.addonOwned")}</span>
+        {/if}
+        <div
+          class="absolute right-2 bottom-0 w-32 h-24 pointer-events-none"
+          style="background-image: radial-gradient(closest-side at 50% 60%, {accent}4d, {accent}00)"
+          aria-hidden="true"
+        ></div>
+        <img
+          src={entry.art}
+          alt=""
+          width="104"
+          height="102"
+          class="art absolute right-4 -bottom-0.5 z-10 pointer-events-none"
+        />
+      </div>
 
-    <div class="flex gap-0.5 w-full h-8 rounded-lg overflow-hidden border border-brand-border/40 bg-black/10">
-      {#each swatches as color}
-        <div class="flex-1" style="background-color: {color}"></div>
-      {/each}
+      <div class="flex gap-0.5 w-full h-8 rounded-lg overflow-hidden border border-brand-border/40 bg-black/10">
+        {#each swatches as color}
+          <div class="flex-1" style="background-color: {color}"></div>
+        {/each}
+      </div>
     </div>
 
     <div class="text-xs leading-relaxed min-h-9 {errorMessage ? 'text-brand-gold' : 'text-brand-text-secondary'}" role={errorMessage ? "alert" : undefined}>
@@ -141,38 +141,13 @@
 {/if}
 
 <style>
-  .walk,
-  .still {
+  .art {
     width: 104px;
+    height: 102px;
     image-rendering: pixelated;
-  }
-  .walk {
-    height: 100px;
-    background-repeat: no-repeat;
-    background-size: 312px 100px;
-    animation: moth-walk 880ms steps(1, end) infinite;
-  }
-  .still {
-    display: none;
-    height: auto;
   }
   :global(.spin) {
     animation: moth-spin 1s linear infinite;
-  }
-  /* Walk cycle of the live overlay: frames 0, 1, 2, 1 at 220 ms each. */
-  @keyframes moth-walk {
-    0% {
-      background-position: 0 0;
-    }
-    25% {
-      background-position: -104px 0;
-    }
-    50% {
-      background-position: -208px 0;
-    }
-    75% {
-      background-position: -104px 0;
-    }
   }
   @keyframes moth-spin {
     to {
@@ -180,12 +155,6 @@
     }
   }
   @media (prefers-reduced-motion: reduce) {
-    .walk {
-      display: none;
-    }
-    .still {
-      display: block;
-    }
     :global(.spin) {
       animation: none;
     }

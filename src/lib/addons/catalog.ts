@@ -15,10 +15,8 @@ export interface AddonCatalogEntry {
   descriptionKey: string;
   /** Six swatches in the order of every other theme card: main, sidebar, player bar, accent, accent hover, border. */
   swatches: [string, string, string, string, string, string];
-  /** Static Store image, shown when motion is reduced. Pre-scaled to 2x the 104px display width. */
-  heroImage: string;
-  /** Horizontal strip of walk frames, each 104x100 CSS px (stored at 2x). */
-  heroFrames: string;
+  /** Public Store image that perches on the palette strip. Pre-scaled to 2x its 104x102 CSS px display size. */
+  art: string;
 }
 
 export const ADDON_CATALOG: readonly AddonCatalogEntry[] = [
@@ -27,8 +25,7 @@ export const ADDON_CATALOG: readonly AddonCatalogEntry[] = [
     name: "Mothman",
     descriptionKey: "settings.addonDescriptionMothman",
     swatches: ["#2a535e", "#000308", "#2a535e", "#c6133d", "#e2bd86", "#904d46"],
-    heroImage: "/addons/mothman-store.png",
-    heroFrames: "/addons/mothman-walk.png"
+    art: "/addons/mothman-store.png"
   }
 ];
 
