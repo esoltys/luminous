@@ -5,7 +5,7 @@
 //! ensuring listens survive offline sessions and application restarts.
 
 use crate::db::Database;
-use crate::models::{Song, SongSource, LIBRARY_SOURCES_SQL};
+use crate::models::{Song, SongSource};
 use crate::tageditor::format_error_chain;
 use anyhow::Result;
 use reqwest::Client;
@@ -16,6 +16,7 @@ use std::time::Duration;
 use tokio::sync::Mutex;
 
 const LISTENBRAINZ_API_BASE: &str = "https://api.listenbrainz.org/1";
+const CRITIQUEBRAINZ_API_BASE: &str = "https://critiquebrainz.org/ws/1";
 const SUBMISSION_CLIENT_NAME: &str = "Luminous";
 
 /// User configuration for scrobbling services.
@@ -24,6 +25,9 @@ pub struct ScrobblerSettings {
     pub listenbrainz_enabled: bool,
     pub listenbrainz_token: String,
     pub listenbrainz_username: Option<String>,
+    /// CritiqueBrainz profile URL or user UUID, pasted by the user: CritiqueBrainz
+    /// can't resolve a username to the UUID its review API filters on (#1386).
+    pub critiquebrainz_user_id: String,
     pub scrobble_now_playing: bool,
     pub scrobble_ratings: bool,
     pub scrobble_paused: bool,
@@ -41,6 +45,7 @@ impl Default for ScrobblerSettings {
             listenbrainz_enabled: false,
             listenbrainz_token: String::new(),
             listenbrainz_username: None,
+            critiquebrainz_user_id: String::new(),
             scrobble_now_playing: true,
             scrobble_ratings: true,
             scrobble_paused: false,
@@ -83,13 +88,52 @@ pub struct ScrobbleCacheStatus {
     pub last_attempt: Option<i64>,
 }
 
-/// Statistics from bulk synchronizing favourite tracks to ListenBrainz.
+/// Outcome of a two-way ratings sync (#1386). `pulled_*` counts are local
+/// changes made from remote data; `pushed` counts loves/hates sent to
+/// ListenBrainz. `critiquebrainz_checked` is false when no CritiqueBrainz
+/// account is configured, so the UI can say stars weren't looked at.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SyncFavouritesResult {
-    pub total_favourites: u32,
-    pub synced: u32,
-    pub skipped_no_mbid: u32,
+pub struct SyncRatingsResult {
+    pub pulled_loved: u32,
+    pub pulled_hated: u32,
+    pub pulled_song_ratings: u32,
+    pub pulled_album_ratings: u32,
+    pub pushed: u32,
     pub failed: u32,
+    pub critiquebrainz_checked: bool,
+    /// Songs whose love/stars changed locally; the command layer emits
+    /// `song-stats-changed` for each so views and dynamic playlists catch up.
+    #[serde(skip)]
+    pub changed_song_ids: Vec<i64>,
+}
+
+#[derive(Deserialize)]
+struct FeedbackPage {
+    feedback: Vec<FeedbackItem>,
+    total_count: usize,
+}
+
+#[derive(Deserialize)]
+struct FeedbackItem {
+    recording_mbid: Option<String>,
+    score: i32,
+}
+
+#[derive(Deserialize)]
+struct CritiquePage {
+    count: usize,
+    reviews: Vec<CritiqueReview>,
+}
+
+#[derive(Deserialize)]
+struct CritiqueReview {
+    entity_id: String,
+    entity_type: String,
+    rating: Option<u8>,
+    #[serde(default)]
+    is_draft: bool,
+    #[serde(default)]
+    is_hidden: bool,
 }
 
 #[derive(Deserialize)]
@@ -215,6 +259,9 @@ impl ScrobblerManager {
                                 settings.listenbrainz_username =
                                     if v.is_empty() { None } else { Some(v) }
                             }
+                            "listenbrainz_critiquebrainz_user_id" => {
+                                settings.critiquebrainz_user_id = v
+                            }
                             "scrobbler_now_playing" => {
                                 settings.scrobble_now_playing = v != "false" && v != "0"
                             }
@@ -268,6 +315,10 @@ impl ScrobblerManager {
                         .listenbrainz_username
                         .clone()
                         .unwrap_or_default(),
+                ),
+                (
+                    "listenbrainz_critiquebrainz_user_id",
+                    new_settings.critiquebrainz_user_id.clone(),
                 ),
                 (
                     "scrobbler_now_playing",
@@ -819,8 +870,10 @@ impl ScrobblerManager {
         });
     }
 
-    /// Bulk synchronize all favourite tracks with MusicBrainz Recording IDs to ListenBrainz as loved tracks.
-    pub async fn sync_favourites(&self) -> Result<SyncFavouritesResult, String> {
+    /// Two-way ratings sync (#1386). Pulls ListenBrainz love/hate feedback and
+    /// the user's CritiqueBrainz star ratings into the library (remote wins),
+    /// then pushes local loves/hates ListenBrainz doesn't have yet.
+    pub async fn sync_ratings(&self) -> Result<SyncRatingsResult, String> {
         let settings = self.get_settings().await;
         if !settings.listenbrainz_enabled {
             return Err("ListenBrainz scrobbling is not enabled".into());
@@ -829,65 +882,61 @@ impl ScrobblerManager {
         if token.is_empty() {
             return Err("ListenBrainz user token is not configured".into());
         }
-
-        let songs: Vec<Song> = {
-            let conn = self.db.pool.get().map_err(|e| e.to_string())?;
-            let sql = format!(
-                "SELECT {} FROM songs
-                 WHERE loved = 1
-                   AND source IN ({lib})
-                   AND unavailable = 0
-                   AND not_included = 0",
-                crate::collection::SONG_SELECT_COLS,
-                lib = *LIBRARY_SOURCES_SQL
-            );
-            let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
-            let rows = stmt
-                .query_map([], crate::collection::row_to_song)
-                .map_err(|e| e.to_string())?;
-            rows.filter_map(|r| r.ok()).collect()
+        let username = settings
+            .listenbrainz_username
+            .as_deref()
+            .filter(|u| !u.trim().is_empty())
+            .ok_or("ListenBrainz username is unknown: validate your token first")?
+            .to_string();
+        let cb_input = settings.critiquebrainz_user_id.trim();
+        let cb_user = if cb_input.is_empty() {
+            None
+        } else {
+            Some(
+                crate::ratings_sync::parse_critiquebrainz_user_id(cb_input)
+                    .ok_or("CritiqueBrainz user ID must be a profile URL or UUID")?,
+            )
         };
 
-        let total_favourites = songs.len() as u32;
-        let mut synced = 0u32;
-        let mut skipped_no_mbid = 0u32;
-        let mut failed = 0u32;
-        let mut seen_mbids = std::collections::HashSet::new();
+        let remote = self.fetch_listenbrainz_feedback(&username, &token).await?;
+        let critique = match &cb_user {
+            Some(id) => Some(self.fetch_critiquebrainz_ratings(id).await?),
+            None => None,
+        };
 
-        for song in songs {
-            let mbid = match &song.musicbrainz_recording_id {
-                Some(id) if !id.trim().is_empty() => id.trim().to_string(),
-                _ => {
-                    skipped_no_mbid += 1;
-                    continue;
-                }
-            };
-
-            if !seen_mbids.insert(mbid.clone()) {
-                // Already synced this recording_mbid in this batch
-                synced += 1;
-                continue;
+        let (mut outcome, pushes) = {
+            let mut conn = self.db.pool.get().map_err(|e| e.to_string())?;
+            let mut outcome = crate::ratings_sync::apply_feedback(&mut conn, &remote)
+                .map_err(|e| e.to_string())?;
+            if let Some(ratings) = &critique {
+                let stars = crate::ratings_sync::apply_critique_ratings(&mut conn, ratings)
+                    .map_err(|e| e.to_string())?;
+                outcome.song_ratings = stars.song_ratings;
+                outcome.album_ratings = stars.album_ratings;
+                outcome.song_ids.extend(stars.song_ids);
             }
+            let pushes =
+                crate::ratings_sync::pending_pushes(&conn, &remote).map_err(|e| e.to_string())?;
+            (outcome, pushes)
+        };
 
-            let payload = FeedbackRequest {
-                recording_mbid: mbid,
-                score: 1,
-            };
-
+        let mut pushed = 0u32;
+        let mut failed = 0u32;
+        for (mbid, score) in pushes {
             let res = self
                 .client
                 .post(format!(
                     "{LISTENBRAINZ_API_BASE}/feedback/recording-feedback"
                 ))
                 .header("Authorization", format!("Token {token}"))
-                .json(&payload)
+                .json(&FeedbackRequest {
+                    recording_mbid: mbid,
+                    score,
+                })
                 .send()
                 .await;
-
             match res {
-                Ok(resp) if resp.status().is_success() => {
-                    synced += 1;
-                }
+                Ok(resp) if resp.status().is_success() => pushed += 1,
                 Ok(resp) => {
                     log::warn!("ListenBrainz feedback returned HTTP {}", resp.status());
                     failed += 1;
@@ -900,16 +949,120 @@ impl ScrobblerManager {
                     failed += 1;
                 }
             }
-
             tokio::time::sleep(Duration::from_millis(50)).await;
         }
 
-        Ok(SyncFavouritesResult {
-            total_favourites,
-            synced,
-            skipped_no_mbid,
+        outcome.song_ids.sort_unstable();
+        outcome.song_ids.dedup();
+        Ok(SyncRatingsResult {
+            pulled_loved: outcome.loved,
+            pulled_hated: outcome.hated,
+            pulled_song_ratings: outcome.song_ratings,
+            pulled_album_ratings: outcome.album_ratings,
+            pushed,
             failed,
+            critiquebrainz_checked: critique.is_some(),
+            changed_song_ids: outcome.song_ids,
         })
+    }
+
+    /// Every love (1) and hate (-1) the user has recorded on ListenBrainz,
+    /// keyed by recording MBID.
+    async fn fetch_listenbrainz_feedback(
+        &self,
+        username: &str,
+        token: &str,
+    ) -> Result<std::collections::HashMap<String, i32>, String> {
+        const PAGE: usize = 100;
+        let mut feedback = std::collections::HashMap::new();
+        let mut offset = 0usize;
+        loop {
+            let resp = self
+                .client
+                .get(format!(
+                    "{LISTENBRAINZ_API_BASE}/feedback/user/{}/get-feedback?count={PAGE}&offset={offset}",
+                    percent_encoding::utf8_percent_encode(
+                        username,
+                        percent_encoding::NON_ALPHANUMERIC
+                    )
+                ))
+                .header("Authorization", format!("Token {token}"))
+                .send()
+                .await
+                .map_err(|e| {
+                    format!(
+                        "ListenBrainz feedback request failed: {}",
+                        format_error_chain(&e)
+                    )
+                })?;
+            if !resp.status().is_success() {
+                return Err(format!(
+                    "ListenBrainz feedback returned HTTP {}",
+                    resp.status()
+                ));
+            }
+            let page: FeedbackPage = resp
+                .json()
+                .await
+                .map_err(|e| format!("Unreadable ListenBrainz feedback: {e}"))?;
+            let received = page.feedback.len();
+            for item in page.feedback {
+                if let Some(mbid) = item.recording_mbid.filter(|m| !m.trim().is_empty()) {
+                    feedback.insert(mbid.trim().to_string(), item.score);
+                }
+            }
+            offset += received;
+            if received == 0 || offset >= page.total_count {
+                return Ok(feedback);
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+    }
+
+    /// The user's published CritiqueBrainz reviews that carry a star rating,
+    /// for recordings and release groups.
+    async fn fetch_critiquebrainz_ratings(
+        &self,
+        user_id: &str,
+    ) -> Result<Vec<crate::ratings_sync::CritiqueRating>, String> {
+        const PAGE: usize = 50;
+        let mut ratings = Vec::new();
+        let mut offset = 0usize;
+        loop {
+            let resp = self
+                .client
+                .get(format!(
+                    "{CRITIQUEBRAINZ_API_BASE}/review/?user_id={user_id}&limit={PAGE}&offset={offset}"
+                ))
+                .send()
+                .await
+                .map_err(|e| format!("CritiqueBrainz request failed: {}", format_error_chain(&e)))?;
+            if !resp.status().is_success() {
+                return Err(format!("CritiqueBrainz returned HTTP {}", resp.status()));
+            }
+            let page: CritiquePage = resp
+                .json()
+                .await
+                .map_err(|e| format!("Unreadable CritiqueBrainz reviews: {e}"))?;
+            let received = page.reviews.len();
+            for review in page.reviews {
+                if review.is_draft || review.is_hidden {
+                    continue;
+                }
+                if let Some(stars) = review.rating {
+                    ratings.push(crate::ratings_sync::CritiqueRating {
+                        entity_type: review.entity_type,
+                        entity_mbid: review.entity_id,
+                        stars: stars as f32,
+                    });
+                }
+            }
+            offset += received;
+            if received == 0 || offset >= page.count {
+                return Ok(ratings);
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
     }
 
     /// Retrieve live scrobble cache statistics.

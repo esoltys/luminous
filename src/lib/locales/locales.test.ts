@@ -34,6 +34,7 @@ function extractPlaceholders(str: string): string[] {
  */
 const IDENTICAL_OK = new Set([
   "equalizer.importPlaceholder", // Equalizer APO sample lines, same syntax in every language
+  "listenbrainz.critiquebrainzUserPlaceholder", // a URL
   "albumDetail.statsLine", // "{genre} · {year} · {duration}"
   "albumTagEditor.genreField", // "Genre"
   "artistDetail.albumsFilter", // "Albums ({count})"

@@ -87,25 +87,34 @@ describe("scrobblerStore", () => {
     expect(scrobblerStore.pendingCount).toBe(0);
   });
 
-  it("syncs favourites to listenbrainz and updates state", async () => {
+  it("syncs ratings with listenbrainz and updates state", async () => {
     vi.mocked(invoke).mockImplementation((cmd: string) => {
-      if (cmd === "sync_favourites_to_listenbrainz") {
+      if (cmd === "sync_ratings_to_listenbrainz") {
         return Promise.resolve({
-          total_favourites: 10,
-          synced: 8,
-          skipped_no_mbid: 2,
+          pulled_loved: 4,
+          pulled_hated: 1,
+          pulled_song_ratings: 2,
+          pulled_album_ratings: 3,
+          pushed: 5,
           failed: 0,
+          critiquebrainz_checked: true,
         });
       }
       return Promise.resolve(null);
     });
 
-    const res = await scrobblerStore.syncFavourites();
+    const res = await scrobblerStore.syncRatings();
     expect(res).not.toBeNull();
-    expect(scrobblerStore.syncFavouritesResult?.synced).toBe(8);
-    expect(scrobblerStore.syncFavouritesResult?.total_favourites).toBe(10);
-    expect(scrobblerStore.syncFavouritesResult?.skipped_no_mbid).toBe(2);
-    expect(scrobblerStore.syncFavouritesError).toBeNull();
+    expect(scrobblerStore.syncRatingsResult?.pulled_loved).toBe(4);
+    expect(scrobblerStore.syncRatingsResult?.pushed).toBe(5);
+    expect(scrobblerStore.syncRatingsError).toBeNull();
+  });
+
+  it("surfaces a ratings sync error", async () => {
+    vi.mocked(invoke).mockRejectedValue("ListenBrainz username is unknown");
+    expect(await scrobblerStore.syncRatings()).toBeNull();
+    expect(scrobblerStore.syncRatingsError).toBe("ListenBrainz username is unknown");
+    expect(scrobblerStore.syncRatingsResult).toBeNull();
   });
 
   it("updates discord settings and checks status", async () => {

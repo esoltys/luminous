@@ -47,6 +47,7 @@ pub mod pins;
 pub mod player;
 pub mod playlist;
 pub mod playlist_parsers;
+pub mod ratings_sync;
 pub mod remote_scheduler;
 pub mod restart_manager;
 pub mod scrobbler;
@@ -1527,7 +1528,7 @@ pub fn run() {
             commands::scrobbler::get_scrobble_cache_status,
             commands::scrobbler::flush_scrobble_cache,
             commands::scrobbler::toggle_scrobble_pause,
-            commands::scrobbler::sync_favourites_to_listenbrainz,
+            commands::scrobbler::sync_ratings_to_listenbrainz,
             commands::scrobbler::get_discord_status,
             // MusicBrainz OAuth commands (#1388)
             commands::musicbrainz::start_musicbrainz_login,
