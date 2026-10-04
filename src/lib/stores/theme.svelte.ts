@@ -18,6 +18,7 @@ import {
 import { LIGHTNESS_STEP } from "../constants";
 import { prefersReducedMotion } from "../utils/motion";
 import { addonsStore, type AddonsStore, type AddonTheme } from "./addons.svelte";
+import { ADDON_CATALOG } from "../addons/catalog";
 
 const MAX_READABILITY_ADJUST_STEPS = 30;
 
@@ -572,6 +573,8 @@ export class ThemeStore {
    * the choice comes back once the add-on becomes owned again.
    */
   pendingAddonThemeId: string | null = null;
+  /** True while the painted theme is a pending add-on's provisional palette (#1438). */
+  private paintedProvisional = false;
   private addons: AddonsStore;
   private unsubscribeAddons: (() => void) | null = null;
 
@@ -655,7 +658,26 @@ export class ThemeStore {
     return true;
   }
 
+  /**
+   * A saved add-on theme the backend hasn't ruled on yet. Its public palette
+   * (no overlay) stands in so the app isn't painted as System for a moment on
+   * every launch (#1438). Never overrides a theme picked since launch, and
+   * ends as soon as the backend reports the add-on unowned, unavailable or
+   * failed.
+   */
+  private get provisionalAddonTheme(): Theme | null {
+    const id = this.pendingAddonThemeId;
+    if (!id || this.activeThemeId !== "system") return null;
+    const entry = ADDON_CATALOG.find((e) => e.id === id);
+    if (!entry) return null;
+    const state = this.addons.statuses[id]?.state;
+    const undecided = state === undefined || state === "purchasing" || state === "downloading" || state === "owned";
+    return undecided ? { id: entry.id, name: entry.name, colors: entry.colors } : null;
+  }
+
   get currentTheme(): Theme {
+    const provisional = this.provisionalAddonTheme;
+    if (provisional) return provisional;
     const predefined = PREDEFINED_THEMES.find(t => t.id === this.activeThemeId);
     if (predefined) return predefined;
     const custom = this.customThemes.find(t => t.id === this.activeThemeId);
@@ -692,7 +714,11 @@ export class ThemeStore {
       this.pendingAddonThemeId = active;
       this.activeThemeId = "system";
       this.applyActiveTheme();
+      return;
     }
+    // The provisional palette ends when the backend rules the add-on unowned,
+    // unavailable or failed; repaint only then, as each repaint crossfades.
+    if (this.paintedProvisional && this.provisionalAddonTheme === null) this.applyActiveTheme();
   }
 
   /**
@@ -742,6 +768,7 @@ export class ThemeStore {
     } else {
       this.customThemes.push(theme);
     }
+    this.pendingAddonThemeId = null;
     this.activeThemeId = theme.id;
     this.applyActiveTheme();
 
@@ -1013,6 +1040,7 @@ export class ThemeStore {
 
   private writeActiveTheme(skipApplyArtworkColors: boolean) {
     const theme = this.currentTheme;
+    this.paintedProvisional = this.provisionalAddonTheme !== null;
 
     // updateArtworkColors() only re-extracts/applies colors on a song
     // change (see player.svelte.ts), so switching *to* Dynamic Artwork

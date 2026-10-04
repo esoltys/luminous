@@ -31,7 +31,7 @@
   // The registered theme is the source of truth once the bundle is verified.
   let swatches = $derived.by(() => {
     const colors = addonsStore.themes[entry.id]?.colors;
-    return colors ? SWATCH_KEYS.map((k) => colors[k] ?? "transparent") : entry.swatches;
+    return SWATCH_KEYS.map((k) => (colors ?? entry.colors)[k] ?? "transparent");
   });
   let accent = $derived(swatches[3]);
 

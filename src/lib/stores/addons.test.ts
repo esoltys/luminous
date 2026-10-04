@@ -122,4 +122,72 @@ describe("ThemeStore with add-ons", () => {
       expect.objectContaining({ key: "active_theme_id" })
     );
   });
+
+  describe("provisional palette while a saved add-on waits for ownership (#1438)", () => {
+    async function launchWithSaved(id: string) {
+      vi.mocked(invoke).mockResolvedValueOnce({ active_theme_id: id } as never);
+      await theme.init();
+    }
+
+    it("paints the add-on's public palette, without its overlay, before the backend reports", async () => {
+      await launchWithSaved("mothman");
+      expect(theme.currentTheme.id).toBe("mothman");
+      expect(theme.resolvedColors["color-accent"]).toBe("#c6133d");
+      expect(theme.activeAddon).toBeNull();
+      expect(theme.pendingAddonThemeId).toBe("mothman");
+    });
+
+    it("keeps the palette while the add-on is on its way to owned", async () => {
+      await launchWithSaved("mothman");
+      for (const state of ["purchasing", "downloading", "owned"] as const) {
+        addons.applyEvent({ id: "mothman", state });
+        expect(theme.currentTheme.id).toBe("mothman");
+      }
+    });
+
+    it("falls back to System and repaints once the backend rules the add-on out", async () => {
+      await launchWithSaved("mothman");
+      for (const state of ["unowned", "unavailable", "error"] as const) {
+        addons.applyEvent({ id: "mothman", state });
+        expect(theme.currentTheme.id).toBe("system");
+      }
+      const repaint = vi.spyOn(theme, "applyActiveTheme");
+      addons.applyEvent({ id: "mothman", state: "unowned" });
+      // Already painted as System after the first ruling, so nothing more to repaint.
+      expect(repaint).not.toHaveBeenCalled();
+    });
+
+    it("repaints exactly once when a painted provisional palette is ruled out", async () => {
+      await launchWithSaved("mothman");
+      const repaint = vi.spyOn(theme, "applyActiveTheme");
+      addons.applyEvent({ id: "mothman", state: "downloading" });
+      expect(repaint).not.toHaveBeenCalled();
+      theme.applyActiveTheme();
+      repaint.mockClear();
+      addons.applyEvent({ id: "mothman", state: "unowned" });
+      expect(repaint).toHaveBeenCalledTimes(1);
+    });
+
+    it("never overrides a theme chosen since launch", async () => {
+      await launchWithSaved("mothman");
+      await theme.setTheme("nordic-blue");
+      expect(theme.currentTheme.id).toBe("nordic-blue");
+      expect(theme.pendingAddonThemeId).toBeNull();
+
+      await launchWithSaved("mothman");
+      await theme.addCustomTheme({
+        id: "mine",
+        name: "Mine",
+        colors: { ...LUMINOUS_DARK_COLORS },
+        isCustom: true
+      });
+      expect(theme.currentTheme.id).toBe("mine");
+      expect(theme.pendingAddonThemeId).toBeNull();
+    });
+
+    it("ignores a saved id the catalog does not know", async () => {
+      await launchWithSaved("not-in-catalog");
+      expect(theme.currentTheme.id).toBe("system");
+    });
+  });
 });
