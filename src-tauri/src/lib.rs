@@ -1153,15 +1153,6 @@ pub fn run() {
             app.manage(state);
             let managed_state = app.state::<AppState>();
 
-            // Resolve add-on ownership once the UI's listeners have had time to attach.
-            {
-                let addons = Arc::clone(&managed_state.addons);
-                tauri::async_runtime::spawn(async move {
-                    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-                    addons.refresh_all().await;
-                });
-            }
-
             // Start each enabled remote server's periodic auto-sync timer (WebDAV #1082, OpenSubsonic #1162).
             managed_state.remote_auto_sync.start_all_from_db(
                 app.handle().clone(),
