@@ -1611,8 +1611,10 @@ impl CoverManager {
     /// Disk Size breakdown. A missing cache dir (nothing cached yet) is zero,
     /// not an error.
     pub fn cache_usage(&self) -> CacheUsage {
-        let mut usage = CacheUsage::default();
-        usage.thumbnail_bytes = dir_file_bytes(&self.covers_dir.join("thumbs"));
+        let mut usage = CacheUsage {
+            thumbnail_bytes: dir_file_bytes(&self.covers_dir.join("thumbs")),
+            ..Default::default()
+        };
         let Ok(entries) = std::fs::read_dir(&self.covers_dir) else {
             return usage;
         };
