@@ -56,6 +56,9 @@
       // Initialize theme store first to prevent flash of default theme
       await addonsStore.init();
       await themeStore.init();
+      // The backend answers with `addon-state-changed` events; asking only after the
+      // listeners are attached means none can be missed, even after a webview reload.
+      invoke("refresh_addons").catch((err) => console.error("Failed to refresh add-ons:", err));
 
       try {
         const settings = await invoke<Record<string, string>>("get_all_app_settings");

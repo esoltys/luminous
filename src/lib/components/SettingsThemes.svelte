@@ -5,6 +5,7 @@
   import { onDestroy } from "svelte";
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
+  import AddonThemesSection from "./AddonThemesSection.svelte";
   import { open, save } from "@tauri-apps/plugin-dialog";
   import {
     PaletteIcon as Palette,
@@ -262,6 +263,8 @@
       {/each}
     </div>
   </div>
+
+  <AddonThemesSection />
 
   {#if themeStore.customThemes.length > 0}
     <div>
