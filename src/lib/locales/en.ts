@@ -392,7 +392,7 @@ export const en = {
     addonDownloading: "Downloading…",
     addonOwned: "Owned",
     addonTryAgain: "Try Again",
-    addonDescriptionMothman: "A tiny moth wanders along the top of the player bar.",
+    addonDescriptionMothman: "A tiny cryptid dances along the top of the player bar.",
     addonError_offline: "Can't reach the add-on server. Check your connection and try again.",
     addonError_not_entitled: "The Store couldn't confirm you own this add-on. Check purchases, then try again.",
     addonError_store: "The Microsoft Store didn't respond. Try again in a moment.",

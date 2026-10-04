@@ -80,17 +80,14 @@
         {#if state === "owned"}
           <span class="text-xs text-brand-text-secondary">{i18n.t("settings.addonOwned")}</span>
         {/if}
-        <div
-          class="absolute right-2 bottom-0 w-32 h-24 pointer-events-none"
-          style="background-image: radial-gradient(closest-side at 50% 60%, {accent}4d, {accent}00)"
-          aria-hidden="true"
-        ></div>
+        <!-- Same silhouette glow as the live overlay (overlay.css), in the add-on's accent. -->
         <img
           src={entry.art}
           alt=""
           width="104"
           height="102"
-          class="art absolute right-4 -bottom-0.5 z-10 pointer-events-none"
+          class="art absolute right-4 -bottom-[7px] z-10 pointer-events-none"
+          style="filter: drop-shadow(0 0 6px {accent}8c) drop-shadow(0 0 16px {accent}59)"
         />
       </div>
 

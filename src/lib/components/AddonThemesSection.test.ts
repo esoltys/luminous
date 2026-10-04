@@ -64,7 +64,7 @@ describe("AddonThemesSection.svelte", () => {
 
     const card = await findByRole("button", { name: /Mothman/ });
     expect(card).toHaveAttribute("aria-pressed", "false");
-    await fireEvent.click(getByText("A tiny moth wanders along the top of the player bar."));
+    await fireEvent.click(getByText("A tiny cryptid dances along the top of the player bar."));
     expect(setThemeSpy).toHaveBeenCalledWith("mothman");
   });
 
