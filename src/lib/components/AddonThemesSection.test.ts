@@ -54,22 +54,32 @@ describe("AddonThemesSection.svelte", () => {
     expect(await findByRole("button", { name: "Downloading…" })).toBeDisabled();
   });
 
-  it("offers Apply when owned and applies the theme through the theme store", async () => {
+  it("makes the whole card select the theme once owned, with no separate Apply button", async () => {
     const setThemeSpy = vi.spyOn(themeStore, "setTheme").mockResolvedValue(undefined as never);
     setState("owned");
-    const { findByRole, getByText } = render(AddonThemesSection);
+    const { findByRole, getByText, queryByRole } = render(AddonThemesSection);
     expect(getByText("Owned")).toBeInTheDocument();
+    expect(queryByRole("button", { name: "Apply" })).toBeNull();
 
-    await fireEvent.click(await findByRole("button", { name: "Apply" }));
+    const card = await findByRole("button", { name: /Mothman/ });
+    expect(card).toHaveAttribute("aria-pressed", "false");
+    await fireEvent.click(getByText("A tiny moth wanders along the top of the player bar."));
     expect(setThemeSpy).toHaveBeenCalledWith("mothman");
   });
 
-  it("marks the active add-on as Applied with nothing left to click", async () => {
+  it("marks the card pressed when it is the active theme", async () => {
     setState("owned");
     themeStore.activeThemeId = "mothman";
-    const { findByRole, queryByRole } = render(AddonThemesSection);
-    expect(await findByRole("button", { name: "Applied" })).toBeDisabled();
-    expect(queryByRole("button", { name: "Apply" })).toBeNull();
+    const { findByRole } = render(AddonThemesSection);
+    expect(await findByRole("button", { name: /Mothman/ })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("is not a clickable card before the add-on is owned", () => {
+    setState("unowned");
+    const { container } = render(AddonThemesSection);
+    const card = container.querySelector("[data-addon-card]") as HTMLElement;
+    expect(card.tagName).toBe("DIV");
+    expect(card).not.toHaveAttribute("aria-pressed");
   });
 
   it("shows the message for the error code and re-checks ownership on Try Again", async () => {

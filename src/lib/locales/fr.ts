@@ -394,8 +394,6 @@ export const fr: DeepStringRecord<typeof en> = {
     addonGet: "Obtenir",
     addonWaitingStore: "En attente du Microsoft Store…",
     addonDownloading: "Téléchargement…",
-    addonApply: "Appliquer",
-    addonApplied: "Appliqué",
     addonOwned: "Obtenu",
     addonTryAgain: "Réessayer",
     addonDescriptionMothman: "Un minuscule papillon de nuit se promène en haut de la barre de lecture.",

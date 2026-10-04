@@ -4,7 +4,7 @@
   import { addonsStore } from "../stores/addons.svelte";
   import { themeStore } from "../stores/theme.svelte";
   import { SWATCH_KEYS, type AddonCatalogEntry } from "../addons/catalog";
-  import { CheckIcon as Check, SpinnerGapIcon as Spinner } from "phosphor-svelte";
+  import { SpinnerGapIcon as Spinner } from "phosphor-svelte";
 
   let { entry }: { entry: AddonCatalogEntry } = $props();
 
@@ -23,6 +23,8 @@
   let errorCode = $derived(addonsStore.errorOf(entry.id));
   let isActive = $derived(themeStore.activeThemeId === entry.id);
   let busy = $derived(state === "purchasing" || state === "downloading");
+  // Once owned the whole card selects the theme, like every other theme card.
+  let selectable = $derived(state === "owned");
 
   // The registered theme is the source of truth once the bundle is verified.
   let swatches = $derived.by(() => {
@@ -40,6 +42,12 @@
   // The walk loop only runs while the window is visible.
   let windowVisible = $state(true);
 
+  let cardClass = $derived(
+    `bg-brand-main/50 border-2 rounded-xl flex flex-col overflow-hidden text-left w-full transition-colors duration-200 ${
+      isActive ? "border-brand-accent shadow-md shadow-brand-accent/5" : "border-brand-border/60"
+    } ${selectable ? "hover:border-brand-accent/40" : ""}`
+  );
+
   function get() {
     void invoke("acquire_addon", { id: entry.id });
   }
@@ -56,12 +64,7 @@
 
 <svelte:document onvisibilitychange={() => (windowVisible = !document.hidden)} />
 
-<div
-  class="bg-brand-main/50 border-2 rounded-xl flex flex-col overflow-hidden text-left {isActive
-    ? 'border-brand-accent shadow-md shadow-brand-accent/5'
-    : 'border-brand-border/60'}"
-  data-addon-card={entry.id}
->
+{#snippet content()}
   <div
     class="hero h-[132px] flex items-center justify-center"
     style="background-color: {swatches[0]}; background-image: radial-gradient(closest-side at 50% 55%, {accent}4d, {accent}00)"
@@ -96,9 +99,9 @@
       {/each}
     </div>
 
-    <p class="text-xs leading-relaxed min-h-9 {errorMessage ? 'text-brand-gold' : 'text-brand-text-secondary'}" role={errorMessage ? "alert" : undefined}>
+    <div class="text-xs leading-relaxed min-h-9 {errorMessage ? 'text-brand-gold' : 'text-brand-text-secondary'}" role={errorMessage ? "alert" : undefined}>
       {errorMessage ?? i18n.t(entry.descriptionKey)}
-    </p>
+    </div>
 
     {#if state === "unowned"}
       <button
@@ -116,21 +119,6 @@
         <Spinner class="w-3.5 h-3.5 spin" />
         {state === "purchasing" ? i18n.t("settings.addonWaitingStore") : i18n.t("settings.addonDownloading")}
       </button>
-    {:else if state === "owned" && isActive}
-      <button
-        disabled
-        class="w-full py-2 px-3 rounded-md text-xs font-semibold border border-brand-border text-brand-text-primary flex items-center justify-center gap-1.5"
-      >
-        <Check class="w-3.5 h-3.5" />
-        {i18n.t("settings.addonApplied")}
-      </button>
-    {:else if state === "owned"}
-      <button
-        onclick={apply}
-        class="w-full py-2 px-3 rounded-md text-xs font-semibold bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast transition-colors"
-      >
-        {i18n.t("settings.addonApply")}
-      </button>
     {:else if state === "error"}
       <button
         onclick={retry}
@@ -140,7 +128,17 @@
       </button>
     {/if}
   </div>
-</div>
+{/snippet}
+
+{#if selectable}
+  <button onclick={apply} aria-pressed={isActive} class={cardClass} data-addon-card={entry.id}>
+    {@render content()}
+  </button>
+{:else}
+  <div class={cardClass} data-addon-card={entry.id}>
+    {@render content()}
+  </div>
+{/if}
 
 <style>
   .walk,

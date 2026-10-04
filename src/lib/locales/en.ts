@@ -388,8 +388,6 @@ export const en = {
     addonGet: "Get",
     addonWaitingStore: "Waiting for the Store…",
     addonDownloading: "Downloading…",
-    addonApply: "Apply",
-    addonApplied: "Applied",
     addonOwned: "Owned",
     addonTryAgain: "Try Again",
     addonDescriptionMothman: "A tiny moth wanders along the top of the player bar.",
