@@ -9,6 +9,7 @@ interface ScrobblerSettings {
   listenbrainz_enabled: boolean;
   listenbrainz_token: string;
   listenbrainz_username: string | null;
+  critiquebrainz_user_id: string;
   scrobble_now_playing: boolean;
   scrobble_ratings: boolean;
   scrobble_paused: boolean;
@@ -25,17 +26,21 @@ interface ScrobbleCacheStatus {
   last_attempt: number | null;
 }
 
-interface SyncFavouritesResult {
-  total_favourites: number;
-  synced: number;
-  skipped_no_mbid: number;
+interface SyncRatingsResult {
+  pulled_loved: number;
+  pulled_hated: number;
+  pulled_song_ratings: number;
+  pulled_album_ratings: number;
+  pushed: number;
   failed: number;
+  critiquebrainz_checked: boolean;
 }
 
 class ScrobblerStore {
   enabled = $state(false);
   token = $state("");
   username = $state<string | null>(null);
+  critiquebrainzUserId = $state("");
   nowPlayingEnabled = $state(true);
   ratingsEnabled = $state(true);
   paused = $state(false);
@@ -55,11 +60,11 @@ class ScrobblerStore {
 
   isValidating = $state(false);
   isFlushing = $state(false);
-  isSyncingFavourites = $state(false);
+  isSyncingRatings = $state(false);
   validationError = $state<string | null>(null);
   flushSuccessMessage = $state<string | null>(null);
-  syncFavouritesResult = $state<SyncFavouritesResult | null>(null);
-  syncFavouritesError = $state<string | null>(null);
+  syncRatingsResult = $state<SyncRatingsResult | null>(null);
+  syncRatingsError = $state<string | null>(null);
 
   private initialized = false;
 
@@ -72,6 +77,7 @@ class ScrobblerStore {
       this.enabled = settings.listenbrainz_enabled;
       this.token = settings.listenbrainz_token;
       this.username = settings.listenbrainz_username;
+      this.critiquebrainzUserId = settings.critiquebrainz_user_id;
       this.nowPlayingEnabled = settings.scrobble_now_playing;
       this.ratingsEnabled = settings.scrobble_ratings;
       this.paused = settings.scrobble_paused;
@@ -90,6 +96,7 @@ class ScrobblerStore {
         this.enabled = s.listenbrainz_enabled;
         this.token = s.listenbrainz_token;
         this.username = s.listenbrainz_username;
+        this.critiquebrainzUserId = s.critiquebrainz_user_id;
         this.nowPlayingEnabled = s.scrobble_now_playing;
         this.ratingsEnabled = s.scrobble_ratings;
         this.paused = s.scrobble_paused;
@@ -114,6 +121,7 @@ class ScrobblerStore {
       listenbrainz_enabled: this.enabled,
       listenbrainz_token: this.token,
       listenbrainz_username: this.username,
+      critiquebrainz_user_id: this.critiquebrainzUserId,
       scrobble_now_playing: this.nowPlayingEnabled,
       scrobble_ratings: this.ratingsEnabled,
       scrobble_paused: this.paused,
@@ -184,19 +192,26 @@ class ScrobblerStore {
     }
   }
 
-  async syncFavourites() {
-    this.isSyncingFavourites = true;
-    this.syncFavouritesResult = null;
-    this.syncFavouritesError = null;
+  async syncRatings() {
+    this.isSyncingRatings = true;
+    this.syncRatingsResult = null;
+    this.syncRatingsError = null;
     try {
-      const res = await invoke<SyncFavouritesResult>("sync_favourites_to_listenbrainz");
-      this.syncFavouritesResult = res;
+      const res = await invoke<SyncRatingsResult>("sync_ratings_to_listenbrainz");
+      this.syncRatingsResult = res;
       return res;
     } catch (err: any) {
-      this.syncFavouritesError = typeof err === "string" ? err : err?.message ?? "Failed to sync favourites";
+      this.syncRatingsError = typeof err === "string" ? err : err?.message ?? "Failed to sync ratings";
       return null;
     } finally {
-      this.isSyncingFavourites = false;
+      this.isSyncingRatings = false;
+    }
+  }
+
+  setCritiquebrainzUserId(val: string) {
+    if (this.critiquebrainzUserId !== val) {
+      this.critiquebrainzUserId = val;
+      this.saveSettings();
     }
   }
 

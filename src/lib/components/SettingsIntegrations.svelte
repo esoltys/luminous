@@ -276,37 +276,57 @@
         </div>
 
         {#if scrobblerStore.ratingsEnabled}
-          <div class="ml-2 pl-3 border-l-2 border-brand-accent/30 flex flex-wrap items-center justify-between gap-3 py-1">
-            <div class="flex flex-col gap-0.5 min-w-0">
-              <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('listenbrainz.syncFavouritesLabel')}</span>
-              <p class="text-[11px] text-brand-text-secondary">{i18n.t('listenbrainz.syncFavouritesHint')}</p>
-              {#if scrobblerStore.syncFavouritesResult}
-                <p class="text-[11px] text-brand-text-primary font-medium">
-                  {i18n.t('listenbrainz.syncFavouritesSuccess', {
-                    synced: scrobblerStore.syncFavouritesResult.synced,
-                    total: scrobblerStore.syncFavouritesResult.total_favourites,
-                    skipped: scrobblerStore.syncFavouritesResult.skipped_no_mbid
-                  })}
-                </p>
-              {:else if scrobblerStore.syncFavouritesError}
-                <p class="text-[11px] text-brand-text-primary font-medium">{scrobblerStore.syncFavouritesError}</p>
-              {/if}
+          <div class="ml-2 pl-3 border-l-2 border-brand-accent/30 flex flex-col gap-3 py-1">
+            <div class="flex flex-col gap-1">
+              <label for="critiquebrainz-user-input" class="text-xs font-semibold text-brand-text-primary">{i18n.t('listenbrainz.critiquebrainzUserLabel')}</label>
+              <p class="text-[11px] text-brand-text-secondary">{i18n.t('listenbrainz.critiquebrainzUserHint')}</p>
+              <Input
+                id="critiquebrainz-user-input"
+                value={scrobblerStore.critiquebrainzUserId}
+                oninput={(e) => scrobblerStore.setCritiquebrainzUserId((e.target as HTMLInputElement).value)}
+                placeholder={i18n.t('listenbrainz.critiquebrainzUserPlaceholder')}
+                class="w-full max-w-md"
+              />
             </div>
-            <Button
-              variant="secondary"
-              size="sm"
-              onclick={() => scrobblerStore.syncFavourites()}
-              disabled={scrobblerStore.isSyncingFavourites}
-              class="gap-1.5 shrink-0"
-            >
-              {#if scrobblerStore.isSyncingFavourites}
-                <LoaderCircle class="w-3.5 h-3.5 animate-spin" />
-                <span>{i18n.t('listenbrainz.syncingFavouritesBtn')}</span>
-              {:else}
-                <Heart weight="fill" class="w-3.5 h-3.5 text-rose-400" />
-                <span>{i18n.t('listenbrainz.syncFavouritesBtn')}</span>
-              {/if}
-            </Button>
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div class="flex flex-col gap-0.5 min-w-0">
+                <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('listenbrainz.syncRatingsLabel')}</span>
+                <p class="text-[11px] text-brand-text-secondary">{i18n.t('listenbrainz.syncRatingsHint')}</p>
+                {#if scrobblerStore.syncRatingsResult}
+                  {@const r = scrobblerStore.syncRatingsResult}
+                  <p class="text-[11px] text-brand-text-primary font-medium">
+                    {i18n.t('listenbrainz.syncRatingsSuccess', {
+                      loved: r.pulled_loved,
+                      hated: r.pulled_hated,
+                      songRatings: r.pulled_song_ratings,
+                      albumRatings: r.pulled_album_ratings,
+                      pushed: r.pushed
+                    })}
+                    {#if r.failed > 0}{i18n.t('listenbrainz.syncRatingsFailed', { failed: r.failed })}{/if}
+                  </p>
+                  {#if !r.critiquebrainz_checked}
+                    <p class="text-[11px] text-brand-text-secondary">{i18n.t('listenbrainz.syncRatingsNoCritiquebrainz')}</p>
+                  {/if}
+                {:else if scrobblerStore.syncRatingsError}
+                  <p class="text-[11px] text-brand-text-primary font-medium">{scrobblerStore.syncRatingsError}</p>
+                {/if}
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onclick={() => scrobblerStore.syncRatings()}
+                disabled={scrobblerStore.isSyncingRatings}
+                class="gap-1.5 shrink-0"
+              >
+                {#if scrobblerStore.isSyncingRatings}
+                  <LoaderCircle class="w-3.5 h-3.5 animate-spin" />
+                  <span>{i18n.t('listenbrainz.syncingRatingsBtn')}</span>
+                {:else}
+                  <Heart weight="fill" class="w-3.5 h-3.5 text-rose-400" />
+                  <span>{i18n.t('listenbrainz.syncRatingsBtn')}</span>
+                {/if}
+              </Button>
+            </div>
           </div>
         {/if}
       </div>

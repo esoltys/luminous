@@ -58,10 +58,35 @@ pub async fn flush_scrobble_cache(state: State<'_, AppState>) -> Result<u32, Str
 }
 
 #[tauri::command]
-pub async fn sync_favourites_to_listenbrainz(
+pub async fn sync_ratings_to_listenbrainz(
+    app: tauri::AppHandle,
     state: State<'_, AppState>,
-) -> Result<crate::scrobbler::SyncFavouritesResult, String> {
-    state.scrobbler.sync_favourites().await
+) -> Result<crate::scrobbler::SyncRatingsResult, String> {
+    let result = state.scrobbler.sync_ratings().await?;
+
+    // Patch the in-memory current song, then announce each change; the
+    // `song-stats-changed` listener coalesces the burst into one dynamic
+    // playlist reconcile, so Favourites reflects the pull immediately.
+    for &song_id in &result.changed_song_ids {
+        let payload = crate::db::run_blocking(&state.db, move |conn| {
+            Ok(crate::stats::stats_payload(conn, song_id))
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+        {
+            let mut player = state.player.lock().await;
+            if let Some(song) = player.current_song.as_mut().filter(|s| s.id == song_id) {
+                if let Some(loved) = payload["loved"].as_i64() {
+                    song.loved = loved as i32;
+                }
+                if let Some(rating) = payload["rating"].as_f64() {
+                    song.rating = rating as f32;
+                }
+            }
+        }
+        let _ = app.emit("song-stats-changed", payload);
+    }
+    Ok(result)
 }
 
 #[tauri::command]

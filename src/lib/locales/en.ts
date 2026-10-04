@@ -1575,11 +1575,16 @@ export const en = {
     cachePending: "{count} listen(s) pending in offline cache",
     cacheDesc: "Listens recorded without internet connectivity are queued and sent automatically.",
     syncNowBtn: "Sync Now",
-    syncFavouritesLabel: "Sync existing Favourites",
-    syncFavouritesHint: "Submit all currently favourited songs with MusicBrainz IDs as loved tracks",
-    syncFavouritesBtn: "Sync Favourites",
-    syncingFavouritesBtn: "Syncing...",
-    syncFavouritesSuccess: "Synced {synced} of {total} favourite(s) ({skipped} skipped without MusicBrainz ID)"
+    critiquebrainzUserLabel: "CritiqueBrainz profile",
+    critiquebrainzUserHint: "Paste your critiquebrainz.org profile URL or user ID to pull your star ratings",
+    critiquebrainzUserPlaceholder: "https://critiquebrainz.org/user/...",
+    syncRatingsLabel: "Sync ratings",
+    syncRatingsHint: "Pull your loves, hates and star ratings from ListenBrainz and CritiqueBrainz, and push local loves",
+    syncRatingsBtn: "Sync Ratings",
+    syncingRatingsBtn: "Syncing...",
+    syncRatingsSuccess: "Pulled {loved} love(s), {hated} hate(s), {songRatings} track rating(s) and {albumRatings} album rating(s); pushed {pushed} to ListenBrainz",
+    syncRatingsFailed: "({failed} failed to send)",
+    syncRatingsNoCritiquebrainz: "Star ratings were not pulled: add your CritiqueBrainz profile above."
   },
   discord: {
     integrationTitle: "Discord Rich Presence",

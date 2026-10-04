@@ -1583,11 +1583,16 @@ export const fr: DeepStringRecord<typeof en> = {
     cachePending: "{count} écoute(s) en attente dans la file hors ligne",
     cacheDesc: "Les écoutes enregistrées hors ligne sont mises en file d'attente et envoyées automatiquement.",
     syncNowBtn: "Synchroniser",
-    syncFavouritesLabel: "Synchroniser les favoris existants",
-    syncFavouritesHint: "Transmettre tous les morceaux favoris actuels ayant un identifiant MusicBrainz",
-    syncFavouritesBtn: "Synchroniser les favoris",
-    syncingFavouritesBtn: "Synchronisation...",
-    syncFavouritesSuccess: "{synced} sur {total} favori(s) synchronisé(s) ({skipped} ignoré(s) sans identifiant MusicBrainz)"
+    critiquebrainzUserLabel: "Profil CritiqueBrainz",
+    critiquebrainzUserHint: "Collez l’URL de votre profil critiquebrainz.org ou votre identifiant d’utilisateur pour récupérer vos notes en étoiles",
+    critiquebrainzUserPlaceholder: "https://critiquebrainz.org/user/...",
+    syncRatingsLabel: "Synchroniser les notes",
+    syncRatingsHint: "Récupérez vos coups de cœur, rejets et notes en étoiles depuis ListenBrainz et CritiqueBrainz, et transmettez vos coups de cœur locaux",
+    syncRatingsBtn: "Synchroniser les notes",
+    syncingRatingsBtn: "Synchronisation...",
+    syncRatingsSuccess: "{loved} coup(s) de cœur, {hated} rejet(s), {songRatings} note(s) de morceau et {albumRatings} note(s) d’album récupéré(s) ; {pushed} transmis à ListenBrainz",
+    syncRatingsFailed: "({failed} échec(s) de transmission)",
+    syncRatingsNoCritiquebrainz: "Les notes en étoiles n’ont pas été récupérées : ajoutez votre profil CritiqueBrainz ci-dessus."
   },
   discord: {
     integrationTitle: "Discord Rich Presence",
