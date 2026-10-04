@@ -950,7 +950,7 @@
                       <button
                         type="button"
                         onclick={() => contextData?.wikipedia_page_url && handleOpenUrl(contextData.wikipedia_page_url)}
-                        class="group/wiki relative inline-flex items-center gap-1 mb-1 text-[11px] font-semibold text-brand-text-secondary/70 hover:text-brand-accent transition-colors cursor-pointer"
+                        class="group/wiki relative inline-flex items-center gap-1 mb-1 text-[11px] font-semibold text-brand-text-secondary/70 hover:text-brand-accent transition-colors cursor-pointer -mt-0.5"
                       >
                         <span class="underline decoration-brand-text-secondary/40 group-hover/wiki:decoration-brand-accent">{i18n.t('playerBar.wikipediaSectionLabel', {}, 'Wikipedia')}</span>
                         <ExternalLink class="w-3 h-3 opacity-0 group-hover/wiki:opacity-100 transition-opacity" />
