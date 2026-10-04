@@ -956,7 +956,6 @@ export const fr: DeepStringRecord<typeof en> = {
     mbRatingVotes: "({count} votes)",
     critiquebrainzSectionLabel: "CritiqueBrainz",
     critiquebrainzRatingLabel: "Note de la communauté",
-    critiquebrainzReviewsLabel: "Critique",
     listenbrainzSectionLabel: "ListenBrainz",
     listenbrainzArtistLabel: "Artiste",
     listenbrainzAlbumArtistLabel: "Artiste de l'album",

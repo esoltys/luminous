@@ -950,7 +950,6 @@ export const en = {
     mbRatingVotes: "({count} votes)",
     critiquebrainzSectionLabel: "CritiqueBrainz",
     critiquebrainzRatingLabel: "Community Rating",
-    critiquebrainzReviewsLabel: "Review",
     listenbrainzSectionLabel: "ListenBrainz",
     listenbrainzArtistLabel: "Artist",
     listenbrainzAlbumArtistLabel: "Album Artist",

@@ -13,6 +13,7 @@
   import { lyricsStatus } from "../utils/lyrics";
   import { openExternalUrl } from "../utils/openExternalUrl";
   import GenreChips from "./GenreChips.svelte";
+  import CommunityRating from "./CommunityRating.svelte";
   import AudioPipelineStages from "./AudioPipelineStages.svelte";
   import ArtistInformationPanel from "./ArtistInformationPanel.svelte";
   import type { SongContextEnrichment } from "../types";
@@ -93,7 +94,6 @@
     return !!(
       contextData.wikipedia_extract ||
       contextData.critiquebrainz_rating != null ||
-      (contextData.critiquebrainz_review_links?.length ?? 0) > 0 ||
       hasArtistInfo
     );
   });
@@ -358,7 +358,7 @@
             </div>
           {/if}
 
-          {#if contextData?.critiquebrainz_rating != null || (contextData?.critiquebrainz_review_links?.length ?? 0) > 0}
+          {#if contextData?.critiquebrainz_rating != null}
             <div class="space-y-1.5 text-xs">
               {#if currentSong.musicbrainz_release_group_id}
                 <button
@@ -373,20 +373,14 @@
                 <img src="/critiquebrainz-logo.svg" alt={i18n.t('playerBar.critiquebrainzSectionLabel', {}, 'CritiqueBrainz')} class="h-5 w-auto opacity-80" />
               {/if}
               {#if contextData?.critiquebrainz_rating != null}
-                <div class="flex items-start justify-between gap-3">
-                  <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.critiquebrainzRatingLabel', {}, 'Community Rating')}</span>
-                  <span class="text-brand-text-primary text-right">{formatNumber(contextData.critiquebrainz_rating, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} / 5</span>
+                <div class="text-brand-text-secondary">
+                  <CommunityRating
+                    rating={contextData.critiquebrainz_rating}
+                    count={contextData.critiquebrainz_review_count}
+                    releaseGroupMbid={currentSong.musicbrainz_release_group_id}
+                  />
                 </div>
               {/if}
-              {#each contextData?.critiquebrainz_review_links ?? [] as link, i (link)}
-                <button
-                  type="button"
-                  onclick={() => openExternalUrl(link)}
-                  class="group relative text-brand-accent hover:underline transition-colors cursor-pointer block"
-                >
-                  {i18n.t('playerBar.critiquebrainzReviewsLabel', {}, 'Review')} {i + 1}
-                </button>
-              {/each}
             </div>
           {/if}
 

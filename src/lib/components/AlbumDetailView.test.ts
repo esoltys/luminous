@@ -261,6 +261,17 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     expect(await findByText("(7)")).toBeInTheDocument();
   });
 
+  it("shows the community rating on its own when the album has no Album Info content (#1387)", async () => {
+    collectionStore.albumProfiles = {};
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_songs_by_album") return [{ ...mockSongs[0], musicbrainz_release_group_id: "rg-123" }];
+      if (cmd === "get_song_context") return { critiquebrainz_rating: 3.5, critiquebrainz_review_count: 2, critiquebrainz_review_links: [] };
+      return [];
+    });
+    const { findByText } = render(AlbumDetailView, { props: { albumName: mockAlbumName } });
+    expect(await findByText("(2)")).toBeInTheDocument();
+  });
+
   it("toggles album stats exclusion from the overflow menu (#1252)", async () => {
     let excluded: [string, string][] = [];
     vi.mocked(invoke).mockImplementation(async (cmd: string, args?: unknown) => {

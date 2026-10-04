@@ -30,7 +30,7 @@
   import ContextMenu from "./ContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
-  import StarRating from "./StarRating.svelte";
+  import CommunityRating from "./CommunityRating.svelte";
   import {
     PlusIcon as Plus,
     PencilSimpleIcon as Edit3,
@@ -791,6 +791,11 @@
             <span>{genreLabel}</span>
           </div>
         {/if}
+        {#if !hasProfileContent && communityRating}
+          <div class="inline-flex items-center px-3 py-1 text-xs font-medium text-brand-text-secondary shrink-0 ml-auto">
+            <CommunityRating rating={communityRating.rating} count={communityRating.count} {releaseGroupMbid} />
+          </div>
+        {/if}
         {#if hasProfileContent && !windowLayoutStore.isOverviewExpanded}
           <button
             type="button"
@@ -927,19 +932,7 @@
 
 {#snippet albumInfoTitle()}
   {#if communityRating}
-    <!-- Inside <summary>: stop the click from also toggling the card. -->
-    <span
-      role="link"
-      tabindex="0"
-      class="inline-flex items-center gap-1.5 hover:text-brand-accent hover:underline cursor-pointer"
-      title={i18n.t('albumDetail.reviewOnCritiqueBrainzTooltip', {}, 'Open this album on CritiqueBrainz to read or write reviews')}
-      onclick={(e) => { e.preventDefault(); e.stopPropagation(); openCritiqueBrainz(); }}
-      onkeydown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); openCritiqueBrainz(); } }}
-    >
-      <span>{i18n.t('albumDetail.communityRating', {}, 'Community Rating')}</span>
-      <StarRating rating={communityRating.rating} />
-      <span>({formatNumber(communityRating.count)})</span>
-    </span>
+    <CommunityRating rating={communityRating.rating} count={communityRating.count} {releaseGroupMbid} />
   {:else}
     <span>{i18n.t('albumDetail.albumInfo', {}, 'Album Info')}</span>
   {/if}
