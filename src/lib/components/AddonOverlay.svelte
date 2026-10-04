@@ -81,6 +81,27 @@
     return () => observer.disconnect();
   });
 
+  // Debug builds only (#1426): the backend re-reads an unpacked add-on folder
+  // when a file changes. The query string is ignored by the scheme handler and
+  // forces a fresh load of the frame.
+  onMount(() => {
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+    void listen<string>("addon-dev-reloaded", (event) => {
+      if (event.payload === addon.id && src && frame) {
+        loaded = false;
+        frame.src = `${src}?r=${Date.now()}`;
+      }
+    }).then((fn) => {
+      if (cancelled) fn();
+      else unlisten = fn;
+    });
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  });
+
   function onLoad() {
     loaded = true;
     postSize();

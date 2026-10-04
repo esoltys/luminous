@@ -11,6 +11,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, LazyLock};
 
 pub mod bundle;
+#[cfg(debug_assertions)]
+pub mod devloader;
 pub mod entitlement;
 pub mod keyclient;
 pub mod verifier;
@@ -44,6 +46,12 @@ static REGISTRY: LazyLock<RwLock<Registry>> = LazyLock::new(|| RwLock::new(HashM
 /// Make an add-on's assets servable, replacing any earlier registration.
 pub fn register(id: &str, assets: AddonAssets) {
     REGISTRY.write().insert(id.to_string(), Arc::new(assets));
+}
+
+/// Whether an add-on currently has assets registered.
+#[cfg(debug_assertions)]
+pub fn is_registered(id: &str) -> bool {
+    REGISTRY.read().contains_key(id)
 }
 
 /// Drop an add-on's assets (e.g. entitlement lost); further requests 404.
