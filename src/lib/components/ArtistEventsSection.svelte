@@ -1,6 +1,7 @@
 <script lang="ts">
   import {
     TicketIcon as Ticket,
+    CalendarIcon as Calendar,
     CaretLeftIcon as CaretLeft,
     CaretRightIcon as CaretRight,
     MapPinIcon as MapPin,
@@ -76,7 +77,14 @@
     events
       .filter((e) => !e.begin_date || e.begin_date >= todayStr)
       .slice()
-      .sort((a, b) => (a.begin_date ?? "").localeCompare(b.begin_date ?? ""))
+      .sort((a, b) => {
+        if (a.begin_date && b.begin_date) {
+          return a.begin_date.localeCompare(b.begin_date);
+        }
+        if (a.begin_date) return -1;
+        if (b.begin_date) return 1;
+        return a.name.localeCompare(b.name);
+      })
   );
 
   let totalPages = $derived(Math.ceil(upcomingEvents.length / pageSize));
@@ -184,24 +192,36 @@
               <div
                 class="flex flex-col items-center justify-center shrink-0 w-11 h-12 rounded bg-brand-sidebar border border-brand-border text-center select-none"
               >
-                {#if month}
-                  <span class="text-[9px] font-bold tracking-wider text-brand-accent uppercase leading-none mt-1">
-                    {month}
+                {#if !month && !day && !year}
+                  <Calendar class="w-4 h-4 text-brand-accent mb-0.5" />
+                  <span class="text-[9px] font-bold text-brand-text-secondary uppercase tracking-wider leading-none">
+                    {i18n.t("artistEvents.dateTba", {}, "TBA")}
                   </span>
-                {/if}
-                {#if day}
-                  <span class="text-sm font-extrabold text-brand-text-primary leading-tight">
-                    {day}
-                  </span>
-                {:else if year}
-                  <span class="text-[10px] font-semibold text-brand-text-secondary leading-tight">
+                {:else if !month && !day && year}
+                  <Calendar class="w-3.5 h-3.5 text-brand-accent mb-0.5" />
+                  <span class="text-[10px] font-bold text-brand-text-primary leading-none">
                     {year}
                   </span>
-                {/if}
-                {#if day && year}
-                  <span class="text-[8px] font-medium text-brand-text-secondary leading-none mb-0.5">
-                    {year}
-                  </span>
+                {:else}
+                  {#if month}
+                    <span class="text-[9px] font-bold tracking-wider text-brand-accent uppercase leading-none mt-1">
+                      {month}
+                    </span>
+                  {/if}
+                  {#if day}
+                    <span class="text-sm font-extrabold text-brand-text-primary leading-tight">
+                      {day}
+                    </span>
+                  {:else if year}
+                    <span class="text-[10px] font-semibold text-brand-text-secondary leading-tight">
+                      {year}
+                    </span>
+                  {/if}
+                  {#if day && year}
+                    <span class="text-[8px] font-medium text-brand-text-secondary leading-none mb-0.5">
+                      {year}
+                    </span>
+                  {/if}
                 {/if}
               </div>
 
@@ -353,7 +373,7 @@
                 >
                   <div class="flex items-center gap-2 min-w-0">
                     <span class="text-brand-text-secondary/60 shrink-0 font-mono text-[10px] w-20">
-                      {event.begin_date || ""}
+                      {event.begin_date || i18n.t("artistEvents.dateTba", {}, "TBA")}
                     </span>
                     <span class="text-brand-text-primary truncate">
                       {event.name}

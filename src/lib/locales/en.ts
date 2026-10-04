@@ -1265,7 +1265,8 @@ export const en = {
     hidePastEvents: "Hide past events",
     pagination: "{start}–{end} of {total}",
     previousPage: "Previous page",
-    nextPage: "Next page"
+    nextPage: "Next page",
+    dateTba: "TBA"
   },
   artistProfileEditor: {
     title: "Edit Artist Details",

@@ -1316,7 +1316,8 @@ export const fr: DeepStringRecord<typeof en> = {
     hidePastEvents: "Masquer les événements passés",
     pagination: "{start}–{end} sur {total}",
     previousPage: "Page précédente",
-    nextPage: "Page suivante"
+    nextPage: "Page suivante",
+    dateTba: "À dét."
   },
   artistProfileEditor: {
     title: "Modifier l'artiste",

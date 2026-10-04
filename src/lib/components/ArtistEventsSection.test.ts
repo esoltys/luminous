@@ -208,4 +208,79 @@ describe("ArtistEventsSection", () => {
     expect(cancelledBadge.className).toContain("text-red-600");
     expect(cancelledBadge.className).toContain("dark:text-red-400");
   });
+
+  it("renders TBA calendar badge for undated events and sorts them after dated concerts", () => {
+    const testEvents: ArtistEvent[] = [
+      {
+        id: "evt-undated",
+        name: "The Age of Pleasure: Seattle",
+        event_type: "Concert",
+        begin_date: null,
+        end_date: null,
+        cancelled: false,
+        venue_name: "Paramount Theatre",
+        venue_city: "Seattle",
+        venue_country: "United States",
+        ticket_urls: [],
+        event_urls: [],
+      },
+      {
+        id: "evt-dated",
+        name: "The Age of Pleasure: Portland",
+        event_type: "Concert",
+        begin_date: "2099-09-20",
+        end_date: "2099-09-20",
+        cancelled: false,
+        venue_name: "Keller Auditorium",
+        venue_city: "Portland",
+        venue_country: "United States",
+        ticket_urls: [],
+        event_urls: [],
+      },
+    ];
+
+    const { container } = render(ArtistEventsSection, {
+      props: {
+        events: testEvents,
+        artistName: "Janelle Monáe",
+      },
+    });
+
+    expect(screen.getByText("The Age of Pleasure: Seattle")).toBeTruthy();
+    expect(screen.getByText("TBA")).toBeTruthy();
+
+    // Dated event should appear before undated event in the DOM
+    const eventTitles = Array.from(
+      container.querySelectorAll(".font-medium.text-brand-text-primary.text-xs")
+    ).map((el) => el.textContent?.trim());
+
+    expect(eventTitles).toEqual([
+      "The Age of Pleasure: Portland",
+      "The Age of Pleasure: Seattle",
+    ]);
+  });
+
+  it("renders year-only date badge when event date only has a year", () => {
+    const testEvents: ArtistEvent[] = [
+      {
+        id: "evt-year-only",
+        name: "World Tour 2099",
+        begin_date: "2099",
+        cancelled: false,
+        ticket_urls: [],
+        event_urls: [],
+      },
+    ];
+
+    render(ArtistEventsSection, {
+      props: {
+        events: testEvents,
+        artistName: "Touring Band",
+      },
+    });
+
+    expect(screen.getByText("World Tour 2099")).toBeTruthy();
+    expect(screen.getByText("2099")).toBeTruthy();
+  });
 });
+
