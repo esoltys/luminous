@@ -127,6 +127,24 @@ export const SOCIAL_PLATFORMS: SocialPlatformInfo[] = [
     example: "https://www.imdb.com/name/nm0876013",
   },
   {
+    id: "songkick",
+    label: "Songkick",
+    placeholder: "https://www.songkick.com/artists/...",
+    example: "https://www.songkick.com/artists/253846",
+  },
+  {
+    id: "setlistfm",
+    label: "Setlist.fm",
+    placeholder: "https://www.setlist.fm/setlists/...",
+    example: "https://www.setlist.fm/setlists/radiohead-bd6bd12.html",
+  },
+  {
+    id: "bandsintown",
+    label: "Bandsintown",
+    placeholder: "https://www.bandsintown.com/a/...",
+    example: "https://www.bandsintown.com/a/438314",
+  },
+  {
     id: "custom",
     label: "Custom Link",
     placeholder: "https://...",
@@ -174,6 +192,9 @@ export function resolveSocialUrl(platformId: string, input: string): string {
     case "musicbrainz":
     case "discogs":
     case "wikipedia":
+    case "songkick":
+    case "setlistfm":
+    case "bandsintown":
       return trimmed.startsWith("http") ? trimmed : `https://${trimmed}`;
 
     case "bandcamp":
@@ -282,6 +303,9 @@ const KNOWN_FIXED_PLATFORMS = new Set([
   "wikidata",
   "imdb",
   "listenbrainz",
+  "songkick",
+  "setlistfm",
+  "bandsintown",
 ]);
 
 /**

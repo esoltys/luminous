@@ -29,6 +29,7 @@
   import MarkdownBio from "./MarkdownBio.svelte";
   import SocialIcon from "./SocialIcon.svelte";
   import ArtistInformationPanel from "./ArtistInformationPanel.svelte";
+  import ArtistEventsSection from "./ArtistEventsSection.svelte";
   import SongSelectionToolbar from "./SongSelectionToolbar.svelte";
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
   import ContextMenu from "./ContextMenu.svelte";
@@ -49,7 +50,7 @@
   } from "phosphor-svelte";
   const ExternalLink = OpenInPicard;
   import ShareModal from "./ShareModal.svelte";
-  import type { Song, Playlist, AlbumItem, PlayContext, ArtistProfile, ExtendedArtworkResponse, SongContextEnrichment } from "../types";
+  import type { Song, Playlist, AlbumItem, PlayContext, ArtistProfile, ExtendedArtworkResponse, SongContextEnrichment, ArtistEvent } from "../types";
   import {
     resolveSocialUrl,
     formatDisplayLabel,
@@ -183,7 +184,47 @@
       !!contextData?.artist_area_name
   );
 
-  let hasProfileContent = $derived(hasWebsite || hasBio || hasSocials || !!artistMbid || hasArtistInfo);
+  let artistEvents = $state<ArtistEvent[]>([]);
+  let loadingEvents = $state(false);
+
+  $effect(() => {
+    const name = artistName;
+    const songWithMb = songs.find((s) => s.musicbrainz_artist_id || s.musicbrainz_album_artist_id);
+    const id = songWithMb?.id || songs[0]?.id;
+    let cancelled = false;
+    loadingEvents = true;
+    invoke<ArtistEvent[]>("get_artist_events", { artist: name, songId: id })
+      .then((data) => {
+        if (!cancelled) artistEvents = data || [];
+      })
+      .catch(() => {
+        if (!cancelled) artistEvents = [];
+      })
+      .finally(() => {
+        if (!cancelled) loadingEvents = false;
+      });
+    return () => {
+      cancelled = true;
+    };
+  });
+
+  let songkickLink = $derived(
+    artistProfile?.social_links?.find((l) => l.platform === "songkick")?.handle_or_url ?? null
+  );
+  let setlistfmLink = $derived(
+    artistProfile?.social_links?.find((l) => l.platform === "setlistfm")?.handle_or_url ?? null
+  );
+  let bandsintownLink = $derived(
+    artistProfile?.social_links?.find((l) => l.platform === "bandsintown")?.handle_or_url ?? null
+  );
+
+  let hasEvents = $derived(
+    artistEvents.length > 0 || !!songkickLink || !!setlistfmLink || !!bandsintownLink
+  );
+
+  let hasProfileContent = $derived(
+    hasWebsite || hasBio || hasSocials || !!artistMbid || hasArtistInfo || hasEvents
+  );
 
   // Locally-discovered artist visuals (#98/#761) — portrait/logo/fanart,
   // fetched on demand per artist since scanning every artist's folder
@@ -346,14 +387,16 @@
       await refetchSongs();
       const songWithMb = songs.find((s) => s.musicbrainz_artist_id || s.musicbrainz_album_artist_id);
       const contextSongId = songWithMb?.id ?? songs[0]?.id;
-      const [artwork, context] = await Promise.all([
+      const [artwork, context, events] = await Promise.all([
         collectionStore.getExtendedArtworkForArtist(artistName, true),
         contextSongId
           ? invoke<SongContextEnrichment>("get_song_context", { songId: contextSongId, forceRefresh: true }).catch(() => null)
-          : Promise.resolve(null)
+          : Promise.resolve(null),
+        invoke<ArtistEvent[]>("get_artist_events", { artist: artistName, songId: contextSongId, forceRefresh: true }).catch(() => null)
       ]);
       artistArtwork = artwork;
       if (context) contextData = context;
+      if (events) artistEvents = events;
       toastStore.show(i18n.t("artistDetail.refreshSuccess", {}, "Artist artwork and bio refreshed"));
     } catch (err) {
       console.error("Failed to refresh artist:", err);
@@ -921,7 +964,7 @@
           {/if}
 
           <!-- Links & Facts Column (Right or Below) -->
-          {#if hasWebsite || hasSocials || artistMbid || hasArtistInfo}
+          {#if hasWebsite || hasSocials || artistMbid || hasArtistInfo || hasEvents}
             <div
               class={hasBio
                 ? "@2xl:w-[22rem] @3xl:w-[28rem] shrink-0 border-t border-brand-border/40 pt-4 @2xl:border-t-0 @2xl:border-l @2xl:border-brand-border/60 @2xl:pt-0 @2xl:pl-6 flex flex-col gap-4"
@@ -968,6 +1011,18 @@
                     </button>
                   {/each}
                 </div>
+              {/if}
+
+              {#if hasEvents || artistMbid}
+                <ArtistEventsSection
+                  events={artistEvents}
+                  loading={loadingEvents}
+                  artistName={artistName}
+                  songkickUrl={songkickLink}
+                  setlistfmUrl={setlistfmLink}
+                  bandsintownUrl={bandsintownLink}
+                  onOpenUrl={handleOpenUrl}
+                />
               {/if}
             </div>
           {/if}

@@ -1249,6 +1249,21 @@ export const en = {
     genderOther: "Other",
     lessThanOneYearAgo: "<1 year ago"
   },
+  artistEvents: {
+    panelTitle: "Upcoming Concerts & Events",
+    noEvents: "No upcoming concerts found",
+    cancelled: "Cancelled",
+    viewTickets: "Tickets",
+    viewDetails: "Details",
+    concert: "Concert",
+    festival: "Festival",
+    tour: "Tour",
+    otherPlatforms: "Find tickets and tour dates on:",
+    loading: "Loading upcoming events...",
+    pastEvents: "Past events",
+    showPastEvents: "Show past events ({count})",
+    hidePastEvents: "Hide past events"
+  },
   artistProfileEditor: {
     title: "Edit Artist Details",
     website: "Website",

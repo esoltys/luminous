@@ -38,6 +38,8 @@ const IDENTICAL_OK = new Set([
   "albumTagEditor.genreField", // "Genre"
   "artistDetail.albumsFilter", // "Albums ({count})"
   "artistDetail.epsFilter", // "EPs ({count})"
+  "artistEvents.concert", // "Concert"
+  "artistEvents.festival", // "Festival"
   "audioPipeline.bitPerfect", // "Bit-perfect"
   "audioPipeline.codec", // "Codec"
   "audioPipeline.normalizationGain", // "{gain} dB ({source})"

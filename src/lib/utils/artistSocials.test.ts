@@ -57,6 +57,9 @@ describe("artistSocials", () => {
     expect(formatDisplayLabel("discogs", "https://discogs.com/release/12345")).toBe("Discogs");
     expect(formatDisplayLabel("allmusic", "https://allmusic.com/album/mw0001")).toBe("AllMusic");
     expect(formatDisplayLabel("wikidata", "https://wikidata.org/wiki/Q11649")).toBe("Wikidata");
+    expect(formatDisplayLabel("songkick", "https://www.songkick.com/artists/123")).toBe("Songkick");
+    expect(formatDisplayLabel("setlistfm", "https://www.setlist.fm/setlists/123")).toBe("Setlist.fm");
+    expect(formatDisplayLabel("bandsintown", "https://www.bandsintown.com/a/123")).toBe("Bandsintown");
   });
 
   it("shows only the domain for URLs from unrecognized or generic platforms (#1133)", () => {

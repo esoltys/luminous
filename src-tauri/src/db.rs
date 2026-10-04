@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 56;
+pub const CURRENT_SCHEMA_VERSION: i32 = 57;
 
 struct Migration {
     version: i32,
@@ -474,6 +474,11 @@ const MIGRATIONS: &[Migration] = &[
         version: 56,
         description: "separate preamp and preset per EQ mode (#1336)",
         apply: migrate_eq_mode_states,
+    },
+    Migration {
+        version: 57,
+        description: "artist_events_cache table for artist tour dates and concerts (#1431)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_57)?),
     },
 ];
 
@@ -2038,6 +2043,15 @@ CREATE INDEX IF NOT EXISTS idx_songs_loved ON songs(loved);
 UPDATE songs SET loved = 1 WHERE rating >= 4.0;
 ";
 
+// Migration 57: artist_events_cache table for artist tour dates and concerts (#1431)
+const MIGRATION_57: &str = "
+CREATE TABLE IF NOT EXISTS artist_events_cache (
+    artist_mbid TEXT PRIMARY KEY,
+    events_json TEXT NOT NULL DEFAULT '[]',
+    fetched_at INTEGER NOT NULL
+);
+";
+
 fn seed_artist_tag_hierarchy(conn: &rusqlite::Connection) -> Result<()> {
     let mut stmt = conn.prepare(
         "SELECT DISTINCT json_each.value
@@ -3552,6 +3566,36 @@ mod tests {
         assert_eq!(loved_5, 1);
         assert_eq!(loved_4, 1);
         assert_eq!(loved_3, 0);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_migration_57_artist_events_cache_round_trip() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_migration57_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
+        let db = Database::new(temp_dir.clone()).unwrap();
+        assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
+
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO artist_events_cache (artist_mbid, events_json, fetched_at) VALUES (?1, ?2, ?3)",
+            params!["mbid-123", r#"[{"id":"evt-1","name":"Summer Fest","cancelled":false,"ticket_urls":[],"event_urls":[]}]"#, 1_700_000_000_i64],
+        )
+        .unwrap();
+
+        let (events_json, fetched_at): (String, i64) = conn
+            .query_row(
+                "SELECT events_json, fetched_at FROM artist_events_cache WHERE artist_mbid = 'mbid-123'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert!(events_json.contains("Summer Fest"));
+        assert_eq!(fetched_at, 1_700_000_000);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
