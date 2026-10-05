@@ -384,3 +384,22 @@ describe("Manual language", () => {
     expect(manualLanguageForLocale("en-GB")).toBe("EN");
   });
 });
+
+describe("Inline-fallback keys", () => {
+  it("every i18n.t call with an inline English fallback names a key that exists in en.ts", () => {
+    // A key that is only in the call site's fallback can never be translated.
+    const sources = import.meta.glob(["/src/**/*.svelte", "/src/**/*.ts", "!/src/**/*.test.ts", "!/src/lib/locales/**"], {
+      query: "?raw",
+      import: "default",
+      eager: true,
+    }) as Record<string, string>;
+    const flatEn = flatten(en);
+    const missing: string[] = [];
+    for (const [file, text] of Object.entries(sources)) {
+      for (const m of text.matchAll(/i18n\.t\(\s*["'`]([\w.-]+)["'`]\s*,\s*\{[^}]*\}\s*,\s*["'`]/g)) {
+        if (!(m[1] in flatEn)) missing.push(`${file}: ${m[1]}`);
+      }
+    }
+    expect(missing, `Keys used with an inline fallback but missing from en.ts:\n${missing.join("\n")}`).toEqual([]);
+  });
+});

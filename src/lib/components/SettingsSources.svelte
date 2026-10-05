@@ -364,7 +364,7 @@
       </div>
       <div class="space-y-1 min-w-0">
         <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('settings.watchedFoldersTitle')}</h3>
-        <p class="text-xs text-brand-text-secondary leading-relaxed text-pretty">{i18n.t('settings.watchedFoldersSubtitle', {}, 'Manage directories to scan for music files.')}</p>
+        <p class="text-xs text-brand-text-secondary leading-relaxed text-pretty">{i18n.t('settings.watchedFoldersSubtitle')}</p>
       </div>
     </div>
     <Button onclick={() => collectionStore.addDirectoryDialog()} variant="primary" size="sm">

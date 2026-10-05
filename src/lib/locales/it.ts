@@ -620,7 +620,9 @@ export const it = {
     subsonicNoServersTitle: "Nessun server multimediale connesso",
     subsonicNoServersText: "Aggiungi un server Navidrome o un altro server OpenSubsonic qui sopra per riprodurne la libreria in streaming.",
     confirmRemoveSubsonicServer: "Rimuovere il server multimediale «{name}»? I suoi brani restano nella libreria, contrassegnati come non disponibili.",
-    removeSubsonicServer: "Rimuovi server multimediale"
+    removeSubsonicServer: "Rimuovi server multimediale",
+    saving: "Salvataggio in corso...",
+    watchedFoldersSubtitle: "Gestisci le cartelle da analizzare per trovare file musicali."
   },
   playlists: {
     title: "Playlist",
@@ -794,7 +796,10 @@ export const it = {
     smartRulePlaylistLabel: "Playlist con regole intelligenti",
     smartRuleBasedTooltip: "Playlist basata su regole intelligenti",
     smartBadgeLabel: "Intelligente",
-    saveRenameTooltip: "Salva"
+    saveRenameTooltip: "Salva",
+    historyCleared: "Cronologia di riproduzione cancellata",
+    saveQueueNameLabel: "Nome della playlist",
+    saveQueueNamePlaceholder: "La mia playlist"
   },
   lyrics: {
     title: "Testi",
@@ -981,7 +986,9 @@ export const it = {
     tracksSkippedToast: "{count} brani non disponibili saltati.",
     trackSkippedRemoteToast: "Impossibile riprodurre «{title}»: {message}. Brano saltato.",
     openNothingPlayable: "Nessun file audio supportato da riprodurre.",
-    playSongFailed: "Impossibile riprodurre questo brano."
+    playSongFailed: "Impossibile riprodurre questo brano.",
+    noSongPlaying: "Nessun brano in riproduzione",
+    menuTooltip: "Menu del brano"
   },
   miniplayer: {
     title: "Miniplayer",
@@ -1441,7 +1448,8 @@ export const it = {
     connect: "Connetti",
     active: "Attivo",
     paused: "In pausa",
-    inactive: "Inattivo"
+    inactive: "Inattivo",
+    create: "Crea"
   },
   toast: {
     copyError: "Copia l'errore negli appunti",
@@ -1547,7 +1555,8 @@ export const it = {
     noPathRecorded: "(Nessun percorso registrato)",
     unknownError: "Errore sconosciuto",
     applying: "Applicazione in corso...",
-    close: "Chiudi"
+    close: "Chiudi",
+    toastErrors: "File che non è stato possibile organizzare: {count}"
   },
   picard: {
     openInPicard: "Apri in Picard",

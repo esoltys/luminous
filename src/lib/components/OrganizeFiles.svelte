@@ -537,15 +537,15 @@
       if (result.errors && result.errors.length > 0) {
         errorMessage = result.errors.join("; ");
         toastStore.show(
-          i18n.t("organizer.toastErrors", { count: result.errors.length }, `${result.errors.length} file(s) couldn't be organized`),
+          i18n.t("organizer.toastErrors", { count: result.errors.length }),
           "warning"
         );
       } else {
         successMessage = result.moved_count === 1 ? i18n.t("organizer.applySuccessOne") : i18n.t("organizer.applySuccessMany", { count: result.moved_count });
         toastStore.show(
           result.moved_count === 1
-            ? i18n.t("organizer.toastSuccessOne", {}, "1 file organized successfully")
-            : i18n.t("organizer.toastSuccessMany", { count: result.moved_count }, `${result.moved_count} files organized successfully`),
+            ? i18n.t("organizer.applySuccessOne")
+            : i18n.t("organizer.applySuccessMany", { count: result.moved_count }),
           "success",
           TOAST_DURATION_MS
         );

@@ -1080,13 +1080,13 @@
     <form onsubmit={(e) => { e.preventDefault(); confirmSaveQueueAsCustomPlaylist(); }} class="flex flex-col gap-4 p-6 bg-brand-sidebar">
       <div class="flex flex-col gap-1.5">
         <label for="save-queue-name-input" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
-          {i18n.t("playlists.saveQueueNameLabel", {}, "Playlist Name")}
+          {i18n.t("playlists.saveQueueNameLabel")}
         </label>
         <Input
           id="save-queue-name-input"
           type="text"
           bind:value={saveQueueName}
-          placeholder={i18n.t("playlists.saveQueueNamePlaceholder", {}, "My Queue Playlist")}
+          placeholder={i18n.t("playlists.saveQueueNamePlaceholder")}
           class="w-full"
           required
           autofocus
@@ -1098,7 +1098,7 @@
           {i18n.t("playlists.cancel", {}, "Cancel")}
         </Button>
         <Button type="submit" variant="primary" size="sm">
-          {i18n.t("playlists.saveQueueConfirm", {}, "Save")}
+          {i18n.t("common.save")}
         </Button>
       </div>
     </form>

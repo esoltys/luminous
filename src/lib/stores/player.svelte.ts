@@ -116,7 +116,7 @@ export class PlayerStore {
               ? [...this._lastSessionSongIds]
               : [...this._playedSongIdsHistory];
 
-          const contextName = oldContextName || (isQueue ? i18n.t("queue.title", {}, "Queue") : "");
+          const contextName = oldContextName || (isQueue ? i18n.t("playerBar.queueTitle") : "");
           this.completedSession = {
             contextName,
             isQueue,
@@ -452,7 +452,7 @@ export class PlayerStore {
     const queuePl = await playlistsStore.requireQueue();
     const shuffledIds = shuffleArray(librarySongs.map((s) => s.id));
     await this.setShuffleMode("off");
-    await this.playSongs(shuffledIds, 0, queuePl?.id, undefined, i18n.t("queue.title", {}, "Queue"));
+    await this.playSongs(shuffledIds, 0, queuePl?.id, undefined, i18n.t("playerBar.queueTitle"));
   }
 
   async playPlaylistItem(playlistId: number, itemIndex: number, context?: PlayContext) {

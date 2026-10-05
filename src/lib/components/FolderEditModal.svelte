@@ -194,7 +194,7 @@
           {i18n.t("settings.cancel")}
         </Button>
         <Button type="submit" variant="primary" disabled={saving}>
-          {saving ? i18n.t("settings.saving", {}, "Saving...") : i18n.t("settings.saveChanges")}
+          {saving ? i18n.t("settings.saving") : i18n.t("settings.saveChanges")}
         </Button>
       </div>
     </form>

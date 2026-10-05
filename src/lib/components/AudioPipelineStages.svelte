@@ -54,7 +54,7 @@
 <div class={`space-y-4 select-text ${className}`}>
   {#if !pipeline}
     <div class="text-xs text-brand-text-primary py-4 text-center">
-      {i18n.t('playerBar.noSongPlaying', {}, 'No song currently playing')}
+      {i18n.t('playerBar.noSongPlaying')}
     </div>
   {:else}
     <!-- Stage 1: Input -->

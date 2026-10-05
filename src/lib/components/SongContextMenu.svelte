@@ -518,7 +518,7 @@
           {i18n.t("common.cancel", {}, "Cancel")}
         </Button>
         <Button variant="primary" onclick={handleConfirmCreatePlaylist}>
-          {i18n.t("common.create", {}, "Create")}
+          {i18n.t("common.create")}
         </Button>
       </div>
     </div>
