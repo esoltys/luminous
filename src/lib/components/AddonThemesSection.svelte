@@ -23,7 +23,7 @@
         {i18n.t("settings.addonCheckPurchases")}
       </button>
     </div>
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div class="grid grid-cols-1 @xl:grid-cols-2 gap-4">
       {#each visible as entry (entry.id)}
         <AddonThemeCard {entry} />
       {/each}

@@ -512,7 +512,7 @@
             {/if}
 
             <!-- Central Content Area -->
-            <main class="flex-1 bg-brand-main overflow-hidden flex flex-col">
+            <main class="@container flex-1 bg-brand-main overflow-hidden flex flex-col">
               {@render children()}
             </main>
 

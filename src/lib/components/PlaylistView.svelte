@@ -680,7 +680,7 @@
             <div class="flex items-center gap-3 group/title">
               <h1
                 ondblclick={isQueue ? undefined : startRename}
-                class="text-3xl sm:text-4xl font-heading font-bold text-brand-text-primary transition-colors truncate py-0.5 leading-snug {isQueue ? '' : 'hover:text-brand-accent-text'}"
+                class="text-3xl @xl:text-4xl font-heading font-bold text-brand-text-primary transition-colors truncate py-0.5 leading-snug {isQueue ? '' : 'hover:text-brand-accent-text'}"
                 title={isQueue ? undefined : i18n.t("playlists.renamePlaylistTooltip")}
               >
                 {activePlaylist.name}
@@ -817,7 +817,7 @@
 
         {#if !windowLayoutStore.isDetailHeaderCollapsed}
         {#if isQueue}
-          <div class="w-40 h-40 hidden sm:flex shrink-0 bg-brand-main bg-gradient-to-br from-brand-accent/25 to-brand-accent/15 items-center justify-center overflow-hidden border border-brand-accent/30 shadow-[0_0_28px_3px] shadow-brand-accent/40">
+          <div class="w-40 h-40 hidden @xl:flex shrink-0 bg-brand-main bg-gradient-to-br from-brand-accent/25 to-brand-accent/15 items-center justify-center overflow-hidden border border-brand-accent/30 shadow-[0_0_28px_3px] shadow-brand-accent/40">
             {#key playerStore.currentSong?.id}
               <div class="w-full h-full" in:fade={{ duration: 200 }}>
                 {#if playerStore.currentSong}
@@ -837,15 +837,15 @@
             {/key}
           </div>
         {:else if isSmartPlaylist && topAlbums.length > 0}
-          <div class="w-40 h-40 hidden sm:flex shrink-0 bg-brand-main bg-gradient-to-br from-[#C2410C]/25 to-[#F59E0B]/15 items-center justify-center overflow-hidden border border-[#F59E0B]/30 shadow-[0_0_28px_3px_rgba(245,158,11,0.4)]">
+          <div class="w-40 h-40 hidden @xl:flex shrink-0 bg-brand-main bg-gradient-to-br from-[#C2410C]/25 to-[#F59E0B]/15 items-center justify-center overflow-hidden border border-[#F59E0B]/30 shadow-[0_0_28px_3px_rgba(245,158,11,0.4)]">
             <CoverStack covers={topAlbums} sizeClass="w-[82%] h-[82%]" />
           </div>
         {:else if isSmartPlaylist}
-          <div class="w-40 h-40 hidden sm:flex shrink-0 bg-brand-main bg-gradient-to-br from-[#C2410C]/25 to-[#F59E0B]/15 items-center justify-center overflow-hidden border border-[#F59E0B]/30 shadow-[0_0_28px_3px_rgba(245,158,11,0.4)]">
+          <div class="w-40 h-40 hidden @xl:flex shrink-0 bg-brand-main bg-gradient-to-br from-[#C2410C]/25 to-[#F59E0B]/15 items-center justify-center overflow-hidden border border-[#F59E0B]/30 shadow-[0_0_28px_3px_rgba(245,158,11,0.4)]">
             <Sparkles class="w-16 h-16 text-[#F59E0B]" />
           </div>
         {:else if topAlbums.length > 0}
-          <div class="hidden sm:flex items-start shrink-0 shadow-xl">
+          <div class="hidden @xl:flex items-start shrink-0 shadow-xl">
             <CoverMosaic covers={topAlbums} sizeClass="h-36" />
           </div>
         {/if}

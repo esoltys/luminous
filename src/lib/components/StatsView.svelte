@@ -136,7 +136,7 @@
         {/if}
       </div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4 items-start">
+      <div class="grid grid-cols-1 @5xl:grid-cols-2 gap-6 mt-4 items-start">
         <ListeningHeatmap {range} />
         <div class="bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col">
           <h2 class="text-xl font-semibold text-brand-text-primary mb-3 shrink-0">

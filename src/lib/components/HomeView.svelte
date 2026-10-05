@@ -143,7 +143,7 @@
 <div class="flex flex-col h-full w-full bg-brand-main overflow-hidden">
   <div class="flex-1 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}" use:rememberScroll={"home"}>
     <div class="px-6 pt-6">
-      <h1 class="text-3xl sm:text-4xl font-heading font-bold text-brand-text-primary leading-snug py-0.5">
+      <h1 class="text-3xl @xl:text-4xl font-heading font-bold text-brand-text-primary leading-snug py-0.5">
         {timeOfDayGreeting}
       </h1>
     </div>
@@ -157,7 +157,7 @@
       <PinnedRow />
 
       {#if topAlbums.length > 0 || featuredAlbums.length > 0 || recentlyAdded.length > 0}
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div class="grid grid-cols-1 @5xl:grid-cols-2 gap-8">
           {#if topAlbums.length > 0}
             <TopTenList
               title={topAlbumsTitle}

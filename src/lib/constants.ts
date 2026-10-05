@@ -82,3 +82,12 @@ export const LIGHTNESS_STEP = 0.02;
 
 /** How long a toast notification stays visible before auto-dismissing. */
 export const TOAST_DURATION_MS = 4000;
+
+/**
+ * CoverStack container-query thresholds (px of the card's own width) at which the 4th, 5th and
+ * 6th fanned covers appear. Mirrored by the `@container (min-width: …)` rules in CoverStack.svelte
+ * (CSS can't import them); breakpoints.test.ts keeps them equal.
+ */
+export const COVER_STACK_FOURTH_COVER_PX = 150;
+export const COVER_STACK_FIFTH_COVER_PX = 180;
+export const COVER_STACK_SIXTH_COVER_PX = 210;

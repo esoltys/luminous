@@ -217,7 +217,7 @@
 
 <svelte:window onpointermove={handlePointerMove} onpointerup={handlePointerUp} onmousedown={handleWindowMouseDown} />
 
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+<div class="grid grid-cols-1 @xl:grid-cols-2 @5xl:grid-cols-3 gap-3">
   {#each sortedHierarchy as group (group.name)}
     {@const cardHighlighted = (dropTarget?.kind === 'card' || dropTarget?.kind === 'header') && dropTarget.group === group.name && (draggedChip || draggedCard)}
     <!-- svelte-ignore a11y_click_events_have_key_events -->

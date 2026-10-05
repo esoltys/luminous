@@ -11,10 +11,10 @@
 </script>
 
 <div class="space-y-6 max-w-4xl">
-  <div class="bg-brand-sidebar border border-brand-border rounded-2xl p-6 flex flex-col md:flex-row items-center gap-6 shadow-md">
+  <div class="bg-brand-sidebar border border-brand-border rounded-2xl p-6 flex flex-col @3xl:flex-row items-center gap-6 shadow-md">
     <img src="/app-icon.svg" alt="Luminous Logo" class="w-20 h-20 shrink-0 drop-shadow-md" />
-    <div class="space-y-2 text-center md:text-left flex-1 min-w-0">
-      <div class="flex flex-wrap items-center justify-center md:justify-start gap-2.5">
+    <div class="space-y-2 text-center @3xl:text-left flex-1 min-w-0">
+      <div class="flex flex-wrap items-center justify-center @3xl:justify-start gap-2.5">
         <h3 class="text-2xl font-bold text-brand-text-primary">{i18n.t('settings.aboutAppName', {}, 'Luminous Music Player')}</h3>
       </div>
       <p class="text-sm text-brand-text-secondary">{i18n.t('settings.aboutTagline')}</p>
@@ -32,7 +32,7 @@
     </div>
   </div>
 
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+  <div class="grid grid-cols-1 @3xl:grid-cols-3 gap-4">
     <button
       onclick={() => openExternalUrl("https://esoltys.dev/luminous")}
       class="bg-brand-sidebar/60 border border-brand-border hover:border-brand-accent/50 rounded-xl p-4 flex items-center gap-3 text-left transition-all group"
@@ -119,7 +119,7 @@
       {i18n.t('settings.aboutCoreTech')}
     </h4>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+    <div class="grid grid-cols-1 @3xl:grid-cols-2 gap-4 text-xs">
       <div class="bg-brand-main/40 border border-brand-border/60 rounded-xl p-3.5 space-y-1">
         <p class="font-bold text-brand-text-primary">Rust & Tauri v2</p>
         <p class="text-brand-text-secondary leading-relaxed">{i18n.t('settings.aboutTechRust')}</p>
@@ -135,7 +135,7 @@
       {i18n.t('settings.aboutAudioEngine')}
     </h4>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+    <div class="grid grid-cols-1 @3xl:grid-cols-3 gap-3 text-xs">
       <div class="bg-brand-main/40 border border-brand-border/60 rounded-xl p-3">
         <p class="font-bold text-brand-text-primary">Symphonia & CPAL</p>
         <p class="text-xs text-brand-text-secondary mt-0.5">{i18n.t('settings.aboutTechSymphonia')}</p>
@@ -154,7 +154,7 @@
       {i18n.t('settings.aboutMetadataServices')}
     </h4>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+    <div class="grid grid-cols-1 @3xl:grid-cols-2 gap-4 text-xs">
       <div class="bg-brand-main/40 border border-brand-border/60 rounded-xl p-3.5 space-y-1">
         <p class="font-bold text-brand-text-primary">LRCLIB</p>
         <p class="text-brand-text-secondary leading-relaxed">{i18n.t('settings.aboutTechLrcLib')}</p>

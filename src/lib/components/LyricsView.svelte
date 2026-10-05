@@ -250,10 +250,10 @@
     <div class="flex items-center gap-3 min-w-0 flex-1">
       <Lyrics class="w-6 h-6 text-brand-accent-text shrink-0" />
       <div class="min-w-0">
-        <h2 class="text-sm font-bold truncate max-w-xs md:max-w-md text-brand-text-primary py-0.5 leading-snug">
+        <h2 class="text-sm font-bold truncate max-w-xs @3xl:max-w-md text-brand-text-primary py-0.5 leading-snug">
           {playerStore.currentSongDisplayTitle}
         </h2>
-        <p class="text-[10px] text-brand-text-secondary/70 truncate max-w-xs md:max-w-md">
+        <p class="text-[10px] text-brand-text-secondary/70 truncate max-w-xs @3xl:max-w-md">
           {playerStore.currentSong ? `${playerStore.currentSong.artist || i18n.t('collection.unknownArtist')} — ${playerStore.currentSong.album || i18n.t('collection.unknownAlbum')}` : i18n.t('lyrics.lyricsHelpText')}
         </p>
       </div>
@@ -344,7 +344,7 @@
     {:else if lyricsText}
       <div class="max-w-3xl mx-auto text-center">
         {#if isSynced}
-          <div class="flex flex-col gap-6 md:gap-8 pb-32">
+          <div class="flex flex-col gap-6 @3xl:gap-8 pb-32">
             {#each parsedLines as line, idx}
               {@const isActive = idx === activeLineIndex}
               <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -353,7 +353,7 @@
                 data-index={idx}
                 dir="auto"
                 onclick={() => playerStore.seek(line.timeMs * 1_000_000)}
-                class="text-xl md:text-2xl font-bold transition-all duration-300 transform text-balance {isActive ? 'text-brand-text-primary scale-105 filter drop-shadow-[0_0_8px_var(--color-brand-accent)] font-extrabold' : 'text-brand-text-secondary/30 hover:text-brand-text-secondary/60'}"
+                class="text-xl @3xl:text-2xl font-bold transition-all duration-300 transform text-balance {isActive ? 'text-brand-text-primary scale-105 filter drop-shadow-[0_0_8px_var(--color-brand-accent)] font-extrabold' : 'text-brand-text-secondary/30 hover:text-brand-text-secondary/60'}"
               >
                 {#if isActive && line.words && line.words.length > 0}
                   {#each line.words as word}

@@ -612,7 +612,7 @@
 
 {#snippet templateSection()}
   <div class="space-y-4">
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+    <div class="grid grid-cols-1 @xl:grid-cols-3 gap-3">
       {#each TEMPLATE_PRESETS as preset (preset.id)}
         <button
           type="button"

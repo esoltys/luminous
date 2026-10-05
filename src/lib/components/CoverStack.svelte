@@ -196,16 +196,19 @@
   .cover-item:nth-child(n + 4) {
     display: none;
   }
+  /* COVER_STACK_FOURTH_COVER_PX (constants.ts) */
   @container (min-width: 150px) {
     .cover-item:nth-child(4) {
       display: block;
     }
   }
+  /* COVER_STACK_FIFTH_COVER_PX */
   @container (min-width: 180px) {
     .cover-item:nth-child(5) {
       display: block;
     }
   }
+  /* COVER_STACK_SIXTH_COVER_PX */
   @container (min-width: 210px) {
     .cover-item:nth-child(6) {
       display: block;
