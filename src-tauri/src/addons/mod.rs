@@ -18,8 +18,9 @@ pub mod keycache;
 pub mod keyclient;
 pub mod verifier;
 
-/// Version of the host→overlay message API (see `docs/ADDONS.md`). Bumped when
-/// a message shape changes incompatibly; manifests declare `minApiVersion`.
+/// Version of the host→overlay message API (see `docs/ADDONS.md` in the private
+/// esoltys/luminous-store repo). Bumped when a message shape changes
+/// incompatibly; manifests declare `minApiVersion`.
 pub const OVERLAY_API_VERSION: u32 = 1;
 
 /// Served with every add-on response. The overlay runs in an iframe with

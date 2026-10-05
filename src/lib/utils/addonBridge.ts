@@ -4,7 +4,7 @@ import { isWindows } from "../platform";
  * Host→overlay message API for add-on overlays (#1413). One-way: the overlay
  * runs in a sandboxed iframe (`sandbox="allow-scripts"`, opaque origin, no
  * Tauri IPC) and receives these via `window.postMessage`. Documented in
- * docs/ADDONS.md. The version is `OVERLAY_API_VERSION` in
+ * docs/ADDONS.md of the private esoltys/luminous-store repo. The version is `OVERLAY_API_VERSION` in
  * src-tauri/src/addons/mod.rs; bump it when a shape changes incompatibly.
  */
 
