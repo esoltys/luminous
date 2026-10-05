@@ -230,22 +230,34 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
       }
       return [];
     });
-    const { getByTitle, getByText } = render(AlbumDetailView, { props: { albumName: mockAlbumName } });
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    await fireEvent.click(getByTitle("More actions"));
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    await fireEvent.click(getByText("Review on CritiqueBrainz"));
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(openUrl).toHaveBeenCalledWith("https://critiquebrainz.org/release-group/rg-123");
-    vi.doUnmock("@tauri-apps/plugin-opener");
+    // The component loads the opener with a dynamic import on click, so every
+    // step waits on its condition rather than on a fixed delay: a loaded
+    // machine can take far longer than a few milliseconds to resolve it.
+    try {
+      const { findByTitle, findByText } = render(AlbumDetailView, { props: { albumName: mockAlbumName } });
+      await fireEvent.click(await findByTitle("More actions"));
+      const item = await findByText("Review on CritiqueBrainz");
+      // The item stays disabled until the album's songs (and their MBID) have loaded.
+      await vi.waitFor(() => expect(item.closest("button")).not.toBeDisabled());
+      await fireEvent.click(item);
+      await vi.waitFor(() =>
+        expect(openUrl).toHaveBeenCalledWith("https://critiquebrainz.org/release-group/rg-123")
+      );
+    } finally {
+      // Always undo the mock, or a failure here would leak it into later tests.
+      vi.doUnmock("@tauri-apps/plugin-opener");
+    }
   });
 
   it("disables Review on CritiqueBrainz when no release group MBID is tagged (#1387)", async () => {
-    const { getByTitle, getByText } = render(AlbumDetailView, { props: { albumName: mockAlbumName } });
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    await fireEvent.click(getByTitle("More actions"));
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(getByText("Review on CritiqueBrainz").closest("button")).toBeDisabled();
+    const { findByTitle, findByText } = render(AlbumDetailView, { props: { albumName: mockAlbumName } });
+    // Wait for the album's songs to be requested, so "disabled" is the answer to a loaded album.
+    await vi.waitFor(() =>
+      expect(vi.mocked(invoke).mock.calls.map((call) => call[0])).toContain("get_songs_by_album")
+    );
+    await fireEvent.click(await findByTitle("More actions"));
+    const item = await findByText("Review on CritiqueBrainz");
+    expect(item.closest("button")).toBeDisabled();
   });
 
   it("shows the CritiqueBrainz community rating in place of the Album Info title (#1387)", async () => {
