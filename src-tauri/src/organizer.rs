@@ -2260,9 +2260,11 @@ mod tests {
         assert!(file2.exists());
 
         // B. Enable auto_organize
-        let mut cfg = OrganizeConfig::default();
-        cfg.auto_organize = true;
-        cfg.template = "%artist/%album/%title".to_string();
+        let cfg = OrganizeConfig {
+            auto_organize: true,
+            template: "%artist/%album/%title".to_string(),
+            ..OrganizeConfig::default()
+        };
         set_organize_config(&db, &cfg).unwrap();
 
         // C. Run auto_organize_song_ids: song1 moves, song2 is protected and stays
