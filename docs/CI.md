@@ -147,3 +147,19 @@ One thing worth calling out explicitly since it's easy to miss:
 - Microsoft Store submission lives entirely in `esoltys/luminous-store`, not this repo. It's
   triggered by hand after a release is published, decoupled from `release.yml`, and can be
   re-run independently without touching this repo at all.
+
+## Add-on themes
+
+Optional add-on themes (epic #1036) are mostly outside this repo's pipeline:
+
+- Building, signing, encrypting and publishing add-on bundles happens in the private
+  `esoltys/luminous-store` repo, through its own manual `publish-addin.yml` workflow, and the
+  key-release Worker is deployed from there too. Nothing in `luminous` triggers or waits on
+  any of it, and `release.yml` never touches add-on bundles.
+- The app's own add-on code (overlay runtime, Store entitlement, key cache, Settings section)
+  is ordinary app code, so the normal `ci.yml` jobs above cover it: Vitest, `cargo test`,
+  clippy and `cargo fmt --check`.
+- CI cannot exercise the real purchase and key-release path. Dev builds have no package
+  identity, so the Store is unavailable to them, and the path only runs in a packaged build
+  installed from the Store. That is tested by hand on a package flight (see
+  [`docs/PERMISSIONS.md`](./PERMISSIONS.md)).
