@@ -18,6 +18,45 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::AtomicU32;
 use std::sync::Arc;
 
+pub const DEFAULT_ORGANIZE_TEMPLATE: &str =
+    "%albumartist/{%year - }{%album/}{%disc-}{%track }%title";
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct OrganizeConfig {
+    pub auto_organize: bool,
+    pub template: String,
+    pub preset: String,
+    pub destination_mode: String,
+    pub custom_destination_dir: String,
+    pub replace_spaces: bool,
+    pub ascii_only: bool,
+    pub clean_empty_dirs: bool,
+    pub move_extra_files: bool,
+}
+
+impl Default for OrganizeConfig {
+    fn default() -> Self {
+        Self {
+            auto_organize: false,
+            template: DEFAULT_ORGANIZE_TEMPLATE.to_string(),
+            preset: "default".to_string(),
+            destination_mode: "original".to_string(),
+            custom_destination_dir: String::new(),
+            replace_spaces: false,
+            ascii_only: false,
+            clean_empty_dirs: true,
+            move_extra_files: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct AutoOrganizeResult {
+    pub moved_count: usize,
+    pub duplicates_count: usize,
+    pub errors: Vec<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrganizeOptions {
     pub destination_dir: Option<String>,
@@ -1247,6 +1286,117 @@ pub(crate) fn remove_empty_dirs_under_root(root: &Path) -> usize {
     removed
 }
 
+/// Load the persisted organizer configuration from the `app_state` KV table.
+pub fn get_organize_config(db: &Database) -> Result<OrganizeConfig> {
+    let conn = db.pool.get()?;
+    let mut stmt = conn.prepare("SELECT value FROM app_state WHERE key = 'organize_config'")?;
+    let mut rows = stmt.query([])?;
+    if let Some(row) = rows.next()? {
+        let val: String = row.get(0)?;
+        if let Ok(cfg) = serde_json::from_str(&val) {
+            return Ok(cfg);
+        }
+    }
+    Ok(OrganizeConfig::default())
+}
+
+/// Persist the organizer configuration into the `app_state` KV table.
+pub fn set_organize_config(db: &Database, config: &OrganizeConfig) -> Result<()> {
+    let conn = db.pool.get()?;
+    let val = serde_json::to_string(config)?;
+    conn.execute(
+        "INSERT OR REPLACE INTO app_state (key, value) VALUES ('organize_config', ?1)",
+        params![val],
+    )?;
+    Ok(())
+}
+
+/// Automatically organize specific songs in the background if auto-organization is enabled.
+///
+/// Safety guardrails:
+/// - Only applies moves when preview status is `Ok` and source differs from destination.
+/// - Songs with `MissingTag` (missing title or artist) are never moved into generic Unknown folders.
+/// - Collisions / duplicates are counted and skipped from moving, reported in `AutoOrganizeResult`.
+pub fn auto_organize_song_ids(
+    db: &Database,
+    watcher_paused: &Arc<AtomicU32>,
+    self_writes: &Arc<crate::collection::SelfWriteTracker>,
+    cover_manager: Option<&CoverManager>,
+    song_ids: &[i64],
+) -> Result<AutoOrganizeResult> {
+    if song_ids.is_empty() {
+        return Ok(AutoOrganizeResult::default());
+    }
+    let config = get_organize_config(db)?;
+    if !config.auto_organize {
+        return Ok(AutoOrganizeResult::default());
+    }
+
+    let destination_dir = if config.destination_mode == "custom"
+        && !config.custom_destination_dir.trim().is_empty()
+    {
+        Some(config.custom_destination_dir.clone())
+    } else {
+        None
+    };
+
+    let options = OrganizeOptions {
+        destination_dir,
+        replace_spaces_with_underscores: config.replace_spaces,
+        ascii_only: config.ascii_only,
+        clean_empty_dirs: config.clean_empty_dirs,
+        move_extra_files: config.move_extra_files,
+    };
+
+    let preview = compute_preview(db, song_ids, &config.template, &options)?;
+
+    let mut duplicates_count = 0;
+    let mut items_to_apply = Vec::new();
+
+    for item in preview {
+        if item.status == OrganizePreviewStatus::Collision
+            || item
+                .error_message
+                .as_deref()
+                .is_some_and(|msg| msg.contains("Routed to Duplicates"))
+        {
+            duplicates_count += 1;
+        }
+
+        if item.status == OrganizePreviewStatus::Ok && item.from_path != item.to_path {
+            items_to_apply.push(OrganizeApplyItem {
+                song_id: item.song_id,
+                from_path: item.from_path,
+                to_path: item.to_path,
+            });
+        }
+    }
+
+    if items_to_apply.is_empty() {
+        return Ok(AutoOrganizeResult {
+            moved_count: 0,
+            duplicates_count,
+            errors: vec![],
+        });
+    }
+
+    let apply_res = execute_apply(
+        db,
+        watcher_paused,
+        self_writes,
+        &items_to_apply,
+        config.clean_empty_dirs,
+        config.move_extra_files,
+        cover_manager,
+    )?;
+
+    Ok(AutoOrganizeResult {
+        moved_count: apply_res.moved_count,
+        duplicates_count,
+        errors: apply_res.errors,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2006,5 +2156,136 @@ mod tests {
         }
 
         let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn test_organize_config_persistence() {
+        let temp_dir = tempfile::Builder::new()
+            .prefix("luminous_organize_cfg_test_")
+            .tempdir()
+            .unwrap();
+        let db = Database::new(temp_dir.path().to_path_buf()).unwrap();
+
+        // 1. Initially returns default config
+        let initial_cfg = get_organize_config(&db).unwrap();
+        assert_eq!(initial_cfg, OrganizeConfig::default());
+        assert!(!initial_cfg.auto_organize);
+
+        // 2. Persist modified config
+        let mut custom_cfg = initial_cfg.clone();
+        custom_cfg.auto_organize = true;
+        custom_cfg.preset = "custom".to_string();
+        custom_cfg.template = "%artist/%title".to_string();
+        custom_cfg.replace_spaces = true;
+        set_organize_config(&db, &custom_cfg).unwrap();
+
+        // 3. Reload and verify persistence
+        let loaded_cfg = get_organize_config(&db).unwrap();
+        assert_eq!(loaded_cfg, custom_cfg);
+        assert!(loaded_cfg.auto_organize);
+        assert_eq!(loaded_cfg.template, "%artist/%title");
+    }
+
+    #[test]
+    fn test_auto_organize_song_ids_moves_eligible_and_protects_missing_tags() {
+        use crate::collection::upsert_song;
+        use crate::models::{FileType, SongSource};
+
+        let temp_dir = tempfile::Builder::new()
+            .prefix("luminous_auto_org_test_")
+            .tempdir()
+            .unwrap();
+        let base = temp_dir.path().to_path_buf();
+        let src_dir = base.join("music");
+        fs::create_dir_all(&src_dir).unwrap();
+
+        let db = Database::new(base.join("appdata")).unwrap();
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO directories (path) VALUES (?1)",
+            params![src_dir.to_string_lossy().to_string()],
+        )
+        .unwrap();
+
+        // Song 1: Complete tags (eligible to move)
+        let file1 = src_dir.join("track1.mp3");
+        fs::write(&file1, b"audio 1").unwrap();
+        let song1 = Song {
+            path: Some(file1.to_string_lossy().to_string()),
+            title: Some("Song One".to_string()),
+            artist: Some("Artist Alpha".to_string()),
+            album: Some("Album One".to_string()),
+            source: SongSource::LocalFile,
+            filetype: FileType::Mp3,
+            ..Default::default()
+        };
+        upsert_song(&conn, &song1).unwrap();
+        let id1: i64 = conn
+            .query_row(
+                "SELECT id FROM songs WHERE path = ?1",
+                params![song1.path],
+                |row| row.get(0),
+            )
+            .unwrap();
+
+        // Song 2: Missing title tag (MissingTag guardrail must protect it)
+        let file2 = src_dir.join("track2.mp3");
+        fs::write(&file2, b"audio 2").unwrap();
+        let song2 = Song {
+            path: Some(file2.to_string_lossy().to_string()),
+            title: None,
+            artist: Some("Artist Alpha".to_string()),
+            album: Some("Album One".to_string()),
+            source: SongSource::LocalFile,
+            filetype: FileType::Mp3,
+            ..Default::default()
+        };
+        upsert_song(&conn, &song2).unwrap();
+        let id2: i64 = conn
+            .query_row(
+                "SELECT id FROM songs WHERE path = ?1",
+                params![song2.path],
+                |row| row.get(0),
+            )
+            .unwrap();
+
+        let watcher_paused = Arc::new(AtomicU32::new(0));
+        let self_writes = Arc::new(crate::collection::SelfWriteTracker::new());
+
+        // A. When auto_organize is false, auto_organize_song_ids does nothing
+        let res_off =
+            auto_organize_song_ids(&db, &watcher_paused, &self_writes, None, &[id1, id2]).unwrap();
+        assert_eq!(res_off.moved_count, 0);
+        assert!(file1.exists());
+        assert!(file2.exists());
+
+        // B. Enable auto_organize
+        let cfg = OrganizeConfig {
+            auto_organize: true,
+            template: "%artist/%album/%title".to_string(),
+            ..OrganizeConfig::default()
+        };
+        set_organize_config(&db, &cfg).unwrap();
+
+        // C. Run auto_organize_song_ids: song1 moves, song2 is protected and stays
+        let res_on =
+            auto_organize_song_ids(&db, &watcher_paused, &self_writes, None, &[id1, id2]).unwrap();
+        assert_eq!(res_on.moved_count, 1);
+        assert_eq!(res_on.duplicates_count, 0);
+        assert!(res_on.errors.is_empty());
+
+        let expected_dst = src_dir
+            .join("Artist Alpha")
+            .join("Album One")
+            .join("Song One.mp3");
+        assert!(
+            expected_dst.exists(),
+            "song 1 should be moved to {:?}",
+            expected_dst
+        );
+        assert!(
+            file2.exists(),
+            "song 2 (missing tag) must remain in original place"
+        );
     }
 }

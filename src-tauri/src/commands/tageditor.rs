@@ -101,6 +101,7 @@ pub async fn get_song_details(
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
 pub async fn save_song_tags(
+    app: AppHandle,
     state: State<'_, AppState>,
     song_id: i64,
     title: String,
@@ -267,6 +268,23 @@ pub async fn save_song_tags(
         ],
     )
     .map_err(|e| e.to_string())?;
+
+    // Continuous auto-organization hook (#1468)
+    if let Ok(auto_res) = crate::organizer::auto_organize_song_ids(
+        &state.db,
+        &state.watcher_paused,
+        &state.self_writes,
+        Some(&state.cover_manager),
+        &[song_id],
+    ) {
+        if auto_res.moved_count > 0 || auto_res.duplicates_count > 0 || !auto_res.errors.is_empty()
+        {
+            let _ = app.emit("auto-organize-result", &auto_res);
+        }
+        if auto_res.moved_count > 0 {
+            let _ = app.emit("library-changed", ());
+        }
+    }
 
     Ok(())
 }
@@ -463,6 +481,23 @@ pub async fn save_album_tags(
             done: true,
         },
     );
+
+    // Continuous auto-organization hook (#1468)
+    if let Ok(auto_res) = crate::organizer::auto_organize_song_ids(
+        &state.db,
+        &state.watcher_paused,
+        &state.self_writes,
+        Some(&state.cover_manager),
+        &song_ids,
+    ) {
+        if auto_res.moved_count > 0 || auto_res.duplicates_count > 0 || !auto_res.errors.is_empty()
+        {
+            let _ = app.emit("auto-organize-result", &auto_res);
+        }
+        if auto_res.moved_count > 0 {
+            let _ = app.emit("library-changed", ());
+        }
+    }
 
     Ok(updated_count)
 }

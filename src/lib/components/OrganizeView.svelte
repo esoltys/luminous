@@ -3,8 +3,10 @@
   import { i18n } from "../stores/i18n.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { rememberScroll } from "../utils/scrollMemory";
+  import { organizeStore } from "../stores/organizer.svelte";
   import OrganizeFiles from "./OrganizeFiles.svelte";
   import Button from "./Button.svelte";
+  import Toggle from "./Toggle.svelte";
   import { EraserIcon as Eraser, ArrowsClockwiseIcon as RefreshCw, BroomIcon as Broom, StarIcon as Star } from "phosphor-svelte";
 
   const PRUNE_MESSAGE_DURATION_MS = 8000;
@@ -50,18 +52,35 @@
         </span>
       {/if}
 
-      <Button
-        variant="primary"
-        onclick={() => { organizeApplyRequestKey++; }}
-        disabled={!organizeCanApply || organizeIsApplying}
-      >
-        {#if organizeIsApplying}
-          <RefreshCw class="w-4 h-4 animate-spin" />
-          <span>{i18n.t("organizer.applying")}</span>
-        {:else}
-          <span>{i18n.t("organizer.applyButton")}</span>
-        {/if}
-      </Button>
+      <div class="flex items-center gap-4">
+        <div class="flex items-center gap-2">
+          <Toggle
+            checked={organizeStore.autoOrganize}
+            onchange={(v) => organizeStore.setAutoOrganize(v)}
+            label={i18n.t("organizer.autoOrganizeToggle")}
+            showOnOffLabel={false}
+          />
+          <span
+            class="text-xs font-semibold text-brand-text-secondary select-none"
+            title={i18n.t("organizer.autoOrganizeToggleTooltip")}
+          >
+            {i18n.t("organizer.autoOrganizeToggle")}
+          </span>
+        </div>
+
+        <Button
+          variant="primary"
+          onclick={() => { organizeApplyRequestKey++; }}
+          disabled={!organizeCanApply || organizeIsApplying}
+        >
+          {#if organizeIsApplying}
+            <RefreshCw class="w-4 h-4 animate-spin" />
+            <span>{i18n.t("organizer.applying")}</span>
+          {:else}
+            <span>{i18n.t("organizer.applyButton")}</span>
+          {/if}
+        </Button>
+      </div>
     </div>
 
     <div class="space-y-4">

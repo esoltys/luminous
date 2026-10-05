@@ -4,6 +4,8 @@
   import { open } from "@tauri-apps/plugin-dialog";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
+  import { organizeStore } from "../stores/organizer.svelte";
+  import { TOAST_DURATION_MS } from "../constants";
   import { portal } from "../utils/portal";
   import {
     XIcon as X,
@@ -237,6 +239,39 @@
   let destinationMode = $state<"original" | "custom">("original");
   let customDestinationDir = $state<string>("");
   let destinationDir = $derived(destinationMode === "custom" ? customDestinationDir : "");
+
+  let initializedFromStore = false;
+  $effect(() => {
+    if (organizeStore.isLoaded && !initializedFromStore) {
+      initializedFromStore = true;
+      templatePreset = (organizeStore.preset as TemplatePresetId) || "default";
+      if (organizeStore.preset === "custom") {
+        customTemplate = organizeStore.template || DEFAULT_TEMPLATE;
+      }
+      replaceSpaces = organizeStore.replaceSpaces;
+      asciiOnly = organizeStore.asciiOnly;
+      cleanEmptyDirs = organizeStore.cleanEmptyDirs;
+      moveExtraFiles = organizeStore.moveExtraFiles;
+      destinationMode = organizeStore.destinationMode;
+      customDestinationDir = organizeStore.customDestinationDir;
+    }
+  });
+
+  $effect(() => {
+    const cfg = {
+      template,
+      preset: templatePreset,
+      destination_mode: destinationMode,
+      custom_destination_dir: customDestinationDir,
+      replace_spaces: replaceSpaces,
+      ascii_only: asciiOnly,
+      clean_empty_dirs: cleanEmptyDirs,
+      move_extra_files: moveExtraFiles,
+    };
+    if (initializedFromStore && organizeStore.isLoaded) {
+      organizeStore.updateConfig(cfg);
+    }
+  });
 
   $effect(() => {
     if (effectiveOpen) {
@@ -511,7 +546,8 @@
           result.moved_count === 1
             ? i18n.t("organizer.toastSuccessOne", {}, "1 file organized successfully")
             : i18n.t("organizer.toastSuccessMany", { count: result.moved_count }, `${result.moved_count} files organized successfully`),
-          "success"
+          "success",
+          TOAST_DURATION_MS
         );
         onSuccess?.();
         // Leave the modal open so the user can see the result — refresh the
