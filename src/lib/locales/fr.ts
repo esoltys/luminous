@@ -224,6 +224,7 @@ export const fr: DeepStringRecord<typeof en> = {
   settings: {
     title: "Paramètres",
     tabGeneral: "Général",
+    tabSystem: "Système",
     tabSources: "Sources",
     tabIntegrations: "Intégrations",
     watchedFoldersTitle: "Dossiers surveillés",
@@ -264,6 +265,8 @@ export const fr: DeepStringRecord<typeof en> = {
     generalTitle: "Paramètres généraux",
     generalSubtitle: "Configurer la langue de l'application et les préférences de format.",
     selectLanguage: "Langue / Language",
+    systemTitle: "Système",
+    systemSubtitle: "Gérer le démarrage et la réduction de Luminous, et l'emplacement de ses données.",
     uiLanguageHint: "Choisissez la langue des menus, des boutons et des messages.",
     manualLanguage: "Langue du guide de l'utilisateur",
     manualLanguageHint: "Choisissez la langue du guide d'aide. Le guide n'est offert qu'en anglais et en français.",

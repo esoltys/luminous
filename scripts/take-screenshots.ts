@@ -422,6 +422,10 @@ async function main() {
       await page.getByRole("button", { name: t(language, "equalizer.presetActions"), exact: true }).click();
       await page.getByRole("menu").waitFor();
     },
+    "click-settings-system": async (page, _featured, language) => {
+      await page.getByRole("tab", { name: t(language, "settings.tabSystem"), exact: true }).click();
+      await page.waitForTimeout(400);
+    },
     "click-settings-sources": async (page, _featured, language) => {
       await page.getByRole("tab", { name: t(language, "settings.tabSources"), exact: true }).click();
       await page.waitForTimeout(400);

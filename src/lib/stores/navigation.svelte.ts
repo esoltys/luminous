@@ -3,7 +3,7 @@ import { playlistsStore } from "./playlists.svelte";
 
 export type ActiveTab = "home" | "collection" | "playlists" | "settings" | "lyrics" | "stats" | "organize" | "help";
 export type ActiveSubTab = "songs" | "albums" | "artists" | "genres";
-export type SettingsTab = "general" | "sources" | "integrations" | "themes" | "equalizer" | "about";
+export type SettingsTab = "general" | "system" | "sources" | "integrations" | "themes" | "equalizer" | "about";
 
 /** Which grid is shown under the Playlists tab (mirrors `ActiveSubTab` for Collection). */
 type PlaylistsSubTab = "auto" | "custom";
