@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { en } from "./en";
 import { fr } from "./fr";
+import { BASE_LOCALE, LOCALES, catalogChain, isLocale, legacyLanguageToLocale, localeLabel } from "./index";
 
 /**
  * Recursively flattens a nested object into dotted key paths.
@@ -101,8 +102,6 @@ const IDENTICAL_OK = new Set([
   "settings.badgeIconArchive", // "Archive"
   "settings.badgeIconUsb", // "USB"
   "settings.formatMsix", // "Microsoft Store"
-  "settings.languageEnglish", // "English"
-  "settings.languageFrench", // "Français"
   "settings.simple", // "Simple"
   "settings.statsAlbums", // "Albums"
   "settings.tabSources", // "Sources"
@@ -225,5 +224,46 @@ describe("Locale validation helper functions", () => {
       "{name}"
     ]);
     expect(extractPlaceholders("Plain string without variables")).toEqual([]);
+  });
+});
+
+describe("Locale registry", () => {
+  it("lists the base locale and has unique BCP 47 tags", () => {
+    const tags = LOCALES.map((l) => l.tag);
+    expect(tags).toContain(BASE_LOCALE);
+    expect(new Set(tags).size).toBe(tags.length);
+    for (const tag of tags) {
+      expect(() => new Intl.Locale(tag)).not.toThrow();
+    }
+  });
+
+  it("every declared fallback names a registered locale", () => {
+    const tags = new Set<string>(LOCALES.map((l) => l.tag));
+    for (const def of LOCALES as readonly { tag: string; fallback?: string }[]) {
+      if (def.fallback) expect(tags.has(def.fallback), `${def.tag} -> ${def.fallback}`).toBe(true);
+    }
+  });
+
+  it("isLocale accepts only registered tags", () => {
+    expect(isLocale("fr-CA")).toBe(true);
+    expect(isLocale("fr")).toBe(false);
+    expect(isLocale(undefined)).toBe(false);
+  });
+
+  it("maps pre-registry values to tags", () => {
+    expect(legacyLanguageToLocale("en")).toBe("en-CA");
+    expect(legacyLanguageToLocale("fr")).toBe("fr-CA");
+    expect(legacyLanguageToLocale("de")).toBeNull();
+  });
+
+  it("catalogChain ends at the base catalog and tolerates unknown tags", () => {
+    expect(catalogChain("fr-CA")).toEqual([fr, en]);
+    expect(catalogChain("en-CA")).toEqual([en]);
+    expect(catalogChain("zz")).toEqual([en]);
+  });
+
+  it("labels locales in their own language", () => {
+    expect(localeLabel("en-CA")).toBe("English (Canada)");
+    expect(localeLabel("fr-CA")).toBe("Français (Canada)");
   });
 });

@@ -37,7 +37,7 @@
     </Button>
   </div>
   <iframe
-    src="/luminous-user-guide-{i18n.currentLocale.toUpperCase()}.html"
+    src="/luminous-user-guide-{i18n.currentLocale.startsWith("fr") ? "FR" : "EN"}.html"
     title={i18n.t('sidebar.help')}
     class="flex-1 w-full h-full border-0 transition-opacity duration-150 {isLoading ? 'opacity-0' : 'opacity-100'}"
     onload={(e) => {

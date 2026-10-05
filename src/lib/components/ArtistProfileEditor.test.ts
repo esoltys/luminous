@@ -179,7 +179,7 @@ describe("ArtistProfileEditor", () => {
   });
 
   it("renders localized text when locale is French", () => {
-    i18n.currentLocale = "fr";
+    i18n.currentLocale = "fr-CA";
 
     render(ArtistProfileEditor, {
       props: {

@@ -15,7 +15,7 @@ describe("Toast.svelte", () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
-    i18n.currentLocale = "en";
+    i18n.currentLocale = "en-CA";
     writeTextMock = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, {
       clipboard: {
@@ -80,7 +80,7 @@ describe("Toast.svelte", () => {
   });
 
   it("renders localized labels in French", async () => {
-    i18n.currentLocale = "fr";
+    i18n.currentLocale = "fr-CA";
     toastStore.show("Échec de l'enregistrement", "error");
 
     render(Toast);

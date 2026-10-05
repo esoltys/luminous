@@ -1,5 +1,6 @@
 <script lang="ts">
   import { i18n, type Locale } from "../stores/i18n.svelte";
+  import { LOCALES, localeLabel } from "../locales";
   import { prefs, type RatingStyle, type WeekStart } from "../stores/prefs.svelte";
   import { updaterStore, MICROSOFT_STORE_URL } from "../stores/updater.svelte";
   import { onMount } from "svelte";
@@ -260,8 +261,9 @@
       onchange={(e) => i18n.setLocale(e.currentTarget.value as Locale)}
       class="shrink-0 bg-brand-main border border-brand-border hover:border-brand-accent/60 text-brand-text-primary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
     >
-      <option value="en">{i18n.t('settings.languageEnglish')}</option>
-      <option value="fr">{i18n.t('settings.languageFrench')}</option>
+      {#each LOCALES as def (def.tag)}
+        <option value={def.tag}>{localeLabel(def.tag)}</option>
+      {/each}
     </Select>
   </div>
 

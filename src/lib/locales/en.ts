@@ -258,8 +258,6 @@ export const en = {
     generalTitle: "General Settings",
     generalSubtitle: "Configure application language and formatting preferences.",
     selectLanguage: "Language / Langue",
-    languageEnglish: "English",
-    languageFrench: "Français",
     ratingStyle: "Song rating style",
     ratingStyleHeart: "Heart (favourite)",
     ratingStyleStars: "5-star",
