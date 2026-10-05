@@ -1425,6 +1425,9 @@ mod tests {
             id: 1,
             title: Some("Single Track".to_string()),
             artist: Some("Artist".to_string()),
+            album: Some("Album".to_string()),
+            year: Some(1997),
+            disc: Some(1),
             track: Some(3),
             ..Default::default()
         };
@@ -1433,18 +1436,65 @@ mod tests {
             id: 2,
             title: Some("Single Track".to_string()),
             artist: Some("Artist".to_string()),
+            album: Some("Album".to_string()),
+            year: Some(1997),
+            disc: Some(1),
             track: None,
             ..Default::default()
         };
 
-        let template = "%albumartist/{%album/}{%disc-}{%track }%title";
+        // Default preset pattern: {%track }
+        let template_default = "%albumartist/{%album/}{%disc-}{%track }%title";
         assert_eq!(
-            expand_template(template, &song_with_track, "flac"),
-            "Artist/03 Single Track"
+            expand_template(template_default, &song_with_track, "flac"),
+            "Artist/Album/1-03 Single Track"
         );
         assert_eq!(
-            expand_template(template, &song_no_track, "flac"),
-            "Artist/Single Track"
+            expand_template(template_default, &song_no_track, "flac"),
+            "Artist/Album/1-Single Track"
+        );
+
+        // Alternative preset pattern: {%track-}
+        let template_alt = "%artist/%album (%year)/{CD %disc/}{%track-}%artist-%title";
+        assert_eq!(
+            expand_template(template_alt, &song_with_track, "flac"),
+            "Artist/Album (1997)/CD 1/03-Artist-Single Track"
+        );
+        assert_eq!(
+            expand_template(template_alt, &song_no_track, "flac"),
+            "Artist/Album (1997)/CD 1/Artist-Single Track"
+        );
+
+        // Dot-separated track pattern: {%track. }
+        let template_dot = "%albumartist/%album/{%track. }%title";
+        assert_eq!(
+            expand_template(template_dot, &song_with_track, "flac"),
+            "Artist/Album/03. Single Track"
+        );
+        assert_eq!(
+            expand_template(template_dot, &song_no_track, "flac"),
+            "Artist/Album/Single Track"
+        );
+
+        // 3-digit and raw unpadded alternatives with hyphens
+        let template_track3 = "{%track3-}%title";
+        assert_eq!(
+            expand_template(template_track3, &song_with_track, "flac"),
+            "003-Single Track"
+        );
+        assert_eq!(
+            expand_template(template_track3, &song_no_track, "flac"),
+            "Single Track"
+        );
+
+        let template_raw = "{%rawtrack-}%title";
+        assert_eq!(
+            expand_template(template_raw, &song_with_track, "flac"),
+            "3-Single Track"
+        );
+        assert_eq!(
+            expand_template(template_raw, &song_no_track, "flac"),
+            "Single Track"
         );
     }
 
