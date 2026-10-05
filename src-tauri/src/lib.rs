@@ -1551,6 +1551,8 @@ pub fn run() {
             // Organizer commands
             commands::organizer::preview_organize,
             commands::organizer::apply_organize,
+            commands::organizer::get_organize_config,
+            commands::organizer::set_organize_config,
             // WebDAV commands (#682)
             commands::subsonic::list_subsonic_servers,
             commands::subsonic::save_subsonic_server,

@@ -26,6 +26,7 @@
   import { updaterStore } from '../lib/stores/updater.svelte';
   import { picardStore } from '../lib/stores/picard.svelte';
   import { scrobblerStore } from '../lib/stores/scrobbler.svelte';
+  import { organizeStore } from '../lib/stores/organizer.svelte';
   import { toastStore } from '../lib/stores/toast.svelte';
   import { walkthroughStore } from '../lib/stores/walkthrough.svelte';
   import { welcomeStore } from '../lib/stores/welcome.svelte';
@@ -157,6 +158,7 @@
     updaterStore.init();
     picardStore.init();
     scrobblerStore.init();
+    organizeStore.init();
     void getCurrentWindow().show().catch(() => {});
     invoke<boolean>('is_remote_devtools_enabled')
       .then((enabled) => {

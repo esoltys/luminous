@@ -44,3 +44,18 @@ pub async fn apply_organize(
 
     Ok(res)
 }
+
+#[tauri::command]
+pub async fn get_organize_config(
+    state: State<'_, AppState>,
+) -> Result<organizer::OrganizeConfig, String> {
+    organizer::get_organize_config(&state.db).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn set_organize_config(
+    state: State<'_, AppState>,
+    config: organizer::OrganizeConfig,
+) -> Result<(), String> {
+    organizer::set_organize_config(&state.db, &config).map_err(|e| e.to_string())
+}

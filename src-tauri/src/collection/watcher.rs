@@ -657,6 +657,7 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                         );
                     }
 
+                    let mut newly_added_song_ids = Vec::new();
                     for path in &still_added {
                         log::info!(
                             "Watcher detected file addition/change: {}",
@@ -667,6 +668,14 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                             None => super::read_tags(path).and_then(|song| super::upsert_song(&conn, &song)),
                         };
                         if result.is_ok() {
+                            let path_str = path.to_string_lossy().to_string();
+                            if let Ok(id) = conn.query_row(
+                                "SELECT id FROM songs WHERE path = ?1",
+                                rusqlite::params![path_str],
+                                |row| row.get::<_, i64>(0),
+                            ) {
+                                newly_added_song_ids.push(id);
+                            }
                             let _ = app_clone.emit("library-changed", ());
                         }
                         processed_count += 1;
@@ -691,6 +700,24 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                                 phase: BatchPhase::Done,
                             },
                         );
+                    }
+
+                    // Continuous auto-organization hook for newly detected files (#1468)
+                    if !newly_added_song_ids.is_empty() {
+                        if let Ok(auto_res) = crate::organizer::auto_organize_song_ids(
+                            &db_for_thread,
+                            &watcher_paused,
+                            &self_writes,
+                            cover_manager.as_ref(),
+                            &newly_added_song_ids,
+                        ) {
+                            if auto_res.moved_count > 0 || auto_res.duplicates_count > 0 || !auto_res.errors.is_empty() {
+                                let _ = app_clone.emit("auto-organize-result", &auto_res);
+                            }
+                            if auto_res.moved_count > 0 {
+                                let _ = app_clone.emit("library-changed", ());
+                            }
+                        }
                     }
                 }
 
