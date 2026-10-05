@@ -31,8 +31,8 @@ Luminous doesn't accept PRs as this is a hobby project that I enjoy working on i
 
 | Platform    | Download |
 | ----------- | -------- |
-| **Windows** | [Microsoft Store](https://apps.microsoft.com/detail/9PNQ2NFSQ7XW) (recommended — installs and updates automatically) &#124; [.exe / .msix](https://github.com/esoltys/luminous/releases/latest) (manual/sideloaded install) |
-| **Linux**   | [.deb / .rpm / AppImage](https://github.com/esoltys/luminous/releases/latest) for your distro |
+| **Windows** | [Microsoft Store](https://apps.microsoft.com/detail/9PNQ2NFSQ7XW) (recommended — installs and updates automatically)<br>[.exe / .msix](https://github.com/esoltys/luminous/releases/latest) (manual/sideloaded install) |
+| **Linux**   | [.deb / .rpm / Flatpak](https://github.com/esoltys/luminous/releases/latest) for your distro |
 
 ## Architecture
 
