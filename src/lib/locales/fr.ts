@@ -407,6 +407,7 @@ export const fr: DeepStringRecord<typeof en> = {
     addonError_rate_limited: "Trop de tentatives. Attendez une minute, puis réessayez.",
     addonError_bundle: "La vérification du téléchargement a échoué. Réessayez, ou communiquez avec l'assistance si le problème persiste.",
     addonError_unsupported_api: "Ce thème nécessite une version plus récente de Luminous. Mettez à jour pour l'utiliser.",
+    addonError_reconfirm: "Connectez-vous à Internet une fois pour reconfirmer votre achat.",
     addonError_internal: "Une erreur s'est produite. Réessayez.",
     luminousFootnote: "Les couleurs s'adaptent à la pochette d'album en cours d'écoute",
     systemFootnote: "Bascule entre mode clair et sombre selon votre système",

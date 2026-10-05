@@ -401,6 +401,7 @@ export const en = {
     addonError_rate_limited: "Too many attempts. Wait a minute, then try again.",
     addonError_bundle: "The download failed verification. Try again, or contact support if it keeps failing.",
     addonError_unsupported_api: "This add-on needs a newer Luminous. Update to use it.",
+    addonError_reconfirm: "Go online once to re-confirm your purchase.",
     addonError_internal: "Something went wrong. Try again.",
     luminousFootnote: "Colors shift to match whatever album art is playing now",
     systemFootnote: "Switches between light and dark to match your OS",

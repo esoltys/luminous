@@ -62,11 +62,15 @@ pub fn build_manager(app: &AppHandle) -> Arc<AddonManager> {
     let cache_dir = crate::paths::resolve_app_data_dir(app).join("addons");
     #[cfg(debug_assertions)]
     watch_dev_folder(app);
-    Arc::new(AddonManager::new(
-        default_backend(),
-        default_provisioner(cache_dir),
-        Arc::new(TauriEvents(app.clone())),
-    ))
+    let keys = crate::addons::keycache::default_vault(cache_dir.clone());
+    Arc::new(
+        AddonManager::new(
+            default_backend(),
+            default_provisioner(cache_dir),
+            Arc::new(TauriEvents(app.clone())),
+        )
+        .with_key_vault(keys),
+    )
 }
 
 /// Debug builds only (#1426): re-announce an unpacked add-on whenever its folder

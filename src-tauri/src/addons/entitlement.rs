@@ -12,6 +12,7 @@
 //! can localise it. Neither the service ticket, the Store ID key nor the
 //! add-on key is ever logged.
 
+use super::keycache::{CachedKey, KeyVault, NoVault};
 use super::keyclient::{self, KeyError};
 use super::{bundle, verifier};
 use parking_lot::Mutex;
@@ -21,6 +22,7 @@ use std::future::Future;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::Arc;
+use std::time::SystemTime;
 
 /// An add-on this build knows how to sell. Ids are fixed at build time so a
 /// compromised server can never ask the Store to purchase an arbitrary product.
@@ -61,6 +63,8 @@ pub mod error_code {
     pub const BUNDLE: &str = "bundle";
     pub const UNSUPPORTED_API: &str = "unsupported_api";
     pub const INTERNAL: &str = "internal";
+    /// The remembered key has run out and nothing could be reached to renew it.
+    pub const RECONFIRM: &str = "reconfirm";
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -300,11 +304,17 @@ fn install_error_code(e: &bundle::InstallError) -> &'static str {
     }
 }
 
+/// Where the manager reads the time, so the key's 30 days can be tested.
+pub type Clock = Arc<dyn Fn() -> SystemTime + Send + Sync>;
+
 /// Drives refresh and acquire for every known add-on.
 pub struct AddonManager {
     backend: Arc<dyn StoreBackend>,
     provisioner: Arc<dyn Provisioner>,
     events: Arc<dyn Events>,
+    /// Released keys remembered for [`super::keycache::GRACE`] (#1429).
+    keys: Arc<dyn KeyVault>,
+    clock: Clock,
     /// Ids with a flow in flight, so a double click can't start two purchases.
     busy: Mutex<HashSet<String>>,
 }
@@ -330,8 +340,27 @@ impl AddonManager {
             backend,
             provisioner,
             events,
+            keys: Arc::new(NoVault),
+            clock: Arc::new(SystemTime::now),
             busy: Mutex::new(HashSet::new()),
         }
+    }
+
+    /// Remember released keys in `keys`; without one every launch asks the Worker.
+    pub fn with_key_vault(mut self, keys: Arc<dyn KeyVault>) -> Self {
+        self.keys = keys;
+        self
+    }
+
+    #[cfg(test)]
+    fn with_clock(mut self, clock: Clock) -> Self {
+        self.clock = clock;
+        self
+    }
+
+    /// A remembered key that is still inside its 30 days.
+    fn fresh_key(&self, id: &str) -> Option<CachedKey> {
+        self.keys.load(id).filter(|c| c.is_fresh((self.clock)()))
     }
 
     pub fn is_available(&self) -> bool {
@@ -377,12 +406,19 @@ impl AddonManager {
             Ok(true) => self.activate(addon).await,
             Ok(false) => {
                 super::unregister(id);
+                self.keys.forget(id);
                 self.announce_price(addon).await;
                 self.emit(id, AddonState::Unowned);
             }
             Err(e) => {
                 log::warn!("add-on {id}: ownership check failed: {e:?}");
-                self.fail(id, error_code::STORE);
+                // Could not ask the Store (offline, say): a key remembered
+                // within its 30 days stands in for the answer.
+                if self.fresh_key(id).is_some() {
+                    self.activate(addon).await;
+                } else {
+                    self.fail(id, error_code::STORE);
+                }
             }
         }
     }
@@ -456,7 +492,61 @@ impl AddonManager {
         }
     }
 
+    /// Remembered key → bundle, or ticket → Store ID key → add-on key → bundle.
     async fn provision(&self, id: &str) -> Result<verifier::Manifest, &'static str> {
+        let now = (self.clock)();
+        let remembered = self.keys.load(id);
+        let ran_out = remembered.as_ref().is_some_and(|c| !c.is_fresh(now));
+
+        if let Some(cached) = remembered.filter(|c| c.is_fresh(now)) {
+            match self.provisioner.install(id.to_string(), cached.key).await {
+                Ok(manifest) => return Ok(manifest),
+                // The key no longer fits the bundle (it was replaced on the
+                // Worker): forget it and ask again.
+                Err(bundle::InstallError::Verify(e)) => {
+                    log::warn!("add-on {id}: remembered key rejected ({e}), asking the Worker");
+                    self.keys.forget(id);
+                }
+                Err(e) => {
+                    log::warn!("add-on {id}: install failed: {e}");
+                    return Err(install_error_code(&e));
+                }
+            }
+        }
+
+        let key = match self.release_key(id).await {
+            Ok(key) => key,
+            Err(code) => {
+                if code == error_code::NOT_ENTITLED {
+                    self.keys.forget(id);
+                }
+                let unreachable = code == error_code::UPSTREAM || code == error_code::STORE;
+                return Err(if ran_out && unreachable {
+                    error_code::RECONFIRM
+                } else {
+                    code
+                });
+            }
+        };
+        self.keys.save(
+            id,
+            &CachedKey {
+                key,
+                checked_at: now,
+            },
+        );
+
+        self.provisioner
+            .install(id.to_string(), key)
+            .await
+            .map_err(|e| {
+                log::warn!("add-on {id}: install failed: {e}");
+                install_error_code(&e)
+            })
+    }
+
+    /// Ticket → Store ID key → add-on key, each step on its own error code.
+    async fn release_key(&self, id: &str) -> Result<[u8; 32], &'static str> {
         let ticket = self.provisioner.service_ticket().await.map_err(|e| {
             log::warn!("add-on {id}: service ticket failed: {e}");
             key_error_code(&e)
@@ -473,21 +563,12 @@ impl AddonManager {
                     error_code::STORE
                 })?;
 
-        let key = self
-            .provisioner
+        self.provisioner
             .release_key(store_id_key, id.to_string())
             .await
             .map_err(|e| {
                 log::warn!("add-on {id}: key release failed: {e}");
                 key_error_code(&e)
-            })?;
-
-        self.provisioner
-            .install(id.to_string(), key)
-            .await
-            .map_err(|e| {
-                log::warn!("add-on {id}: install failed: {e}");
-                install_error_code(&e)
             })
     }
 }
@@ -675,8 +756,11 @@ mod fake {
 
 #[cfg(test)]
 mod tests {
+    use super::super::keycache::GRACE;
     use super::*;
+    use std::collections::HashMap;
     use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::time::Duration;
 
     #[derive(Default)]
     struct Recorder {
@@ -754,6 +838,12 @@ mod tests {
         ticket: Result<String, fn() -> KeyError>,
         key: Result<[u8; 32], fn() -> KeyError>,
         install: Result<(), fn() -> bundle::InstallError>,
+        /// A key the bundle no longer decrypts with, as after a key change on the Worker.
+        rejects: Option<[u8; 32]>,
+        /// Shared so a test can still read them once the net is inside the manager.
+        tickets: Arc<AtomicUsize>,
+        releases: Arc<AtomicUsize>,
+        installed_with: Arc<Mutex<Vec<[u8; 32]>>>,
     }
 
     impl Default for FakeNet {
@@ -762,6 +852,10 @@ mod tests {
                 ticket: Ok("t".into()),
                 key: Ok([7; 32]),
                 install: Ok(()),
+                rejects: None,
+                tickets: Arc::default(),
+                releases: Arc::default(),
+                installed_with: Arc::default(),
             }
         }
     }
@@ -778,19 +872,26 @@ mod tests {
 
     impl Provisioner for FakeNet {
         fn service_ticket(&self) -> BoxFuture<Result<String, KeyError>> {
+            self.tickets.fetch_add(1, Ordering::SeqCst);
             let r = self.ticket.clone().map_err(|f| f());
             Box::pin(async move { r })
         }
         fn release_key(&self, _: String, _: String) -> BoxFuture<Result<[u8; 32], KeyError>> {
+            self.releases.fetch_add(1, Ordering::SeqCst);
             let r = self.key.map_err(|f| f());
             Box::pin(async move { r })
         }
         fn install(
             &self,
             id: String,
-            _: [u8; 32],
+            key: [u8; 32],
         ) -> BoxFuture<Result<verifier::Manifest, bundle::InstallError>> {
-            let r = self.install.map(|_| manifest(&id)).map_err(|f| f());
+            self.installed_with.lock().push(key);
+            let r = if self.rejects == Some(key) {
+                Err(bundle::InstallError::Verify(verifier::Error::DecryptFailed))
+            } else {
+                self.install.map(|_| manifest(&id)).map_err(|f| f())
+            };
             Box::pin(async move { r })
         }
     }
@@ -802,6 +903,60 @@ mod tests {
             Arc::new(n),
             rec.clone() as Arc<dyn Events>,
         ));
+        (m, rec)
+    }
+
+    /// A key vault in memory; the real one is covered in keycache.rs.
+    #[derive(Default)]
+    struct MemVault(Mutex<HashMap<String, CachedKey>>);
+
+    impl KeyVault for MemVault {
+        fn load(&self, id: &str) -> Option<CachedKey> {
+            self.0.lock().get(id).cloned()
+        }
+        fn save(&self, id: &str, key: &CachedKey) {
+            self.0.lock().insert(id.to_string(), key.clone());
+        }
+        fn forget(&self, id: &str) {
+            self.0.lock().remove(id);
+        }
+    }
+
+    /// A clock the test moves by hand; every date in these tests comes from it.
+    struct Clock0(Arc<Mutex<SystemTime>>);
+
+    impl Clock0 {
+        fn new() -> Self {
+            Self(Arc::new(Mutex::new(
+                SystemTime::UNIX_EPOCH + Duration::from_secs(1_700_000_000),
+            )))
+        }
+        fn now(&self) -> SystemTime {
+            *self.0.lock()
+        }
+        fn advance(&self, by: Duration) {
+            *self.0.lock() += by;
+        }
+        fn clock(&self) -> Clock {
+            let shared = Arc::clone(&self.0);
+            Arc::new(move || *shared.lock())
+        }
+    }
+
+    const DAY: Duration = Duration::from_secs(24 * 60 * 60);
+
+    fn remembering_manager(
+        b: FakeBackend,
+        n: FakeNet,
+        vault: &Arc<MemVault>,
+        clock: &Clock0,
+    ) -> (Arc<AddonManager>, Arc<Recorder>) {
+        let rec = Arc::new(Recorder::default());
+        let m = Arc::new(
+            AddonManager::new(Arc::new(b), Arc::new(n), rec.clone() as Arc<dyn Events>)
+                .with_key_vault(vault.clone() as Arc<dyn KeyVault>)
+                .with_clock(clock.clock()),
+        );
         (m, rec)
     }
 
@@ -1037,6 +1192,245 @@ mod tests {
             rec.trail().last(),
             Some(&(AddonState::Error, Some(error_code::OFFLINE.into())))
         );
+    }
+
+    #[tokio::test]
+    async fn a_remembered_key_spares_the_worker_for_the_grace_period() {
+        let vault = Arc::new(MemVault::default());
+        let clock = Clock0::new();
+        let net = FakeNet::default();
+        let (tickets, releases) = (net.tickets.clone(), net.releases.clone());
+        let (m, rec) = remembering_manager(FakeBackend::default(), net, &vault, &clock);
+
+        m.refresh("mothman").await;
+        assert_eq!(releases.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            vault.load("mothman"),
+            Some(CachedKey {
+                key: [7; 32],
+                checked_at: clock.now()
+            })
+        );
+
+        clock.advance(GRACE);
+        m.refresh("mothman").await;
+        // Still owned, without asking the Worker again.
+        assert_eq!(tickets.load(Ordering::SeqCst), 1);
+        assert_eq!(releases.load(Ordering::SeqCst), 1);
+        assert_eq!(rec.trail().last(), Some(&(AddonState::Owned, None)));
+    }
+
+    #[tokio::test]
+    async fn after_the_grace_period_a_fresh_key_is_fetched_and_the_clock_resets() {
+        let vault = Arc::new(MemVault::default());
+        let clock = Clock0::new();
+        let net = FakeNet::default();
+        let releases = net.releases.clone();
+        let (m, _) = remembering_manager(FakeBackend::default(), net, &vault, &clock);
+
+        m.refresh("mothman").await;
+        clock.advance(GRACE + Duration::from_secs(1));
+        m.refresh("mothman").await;
+        assert_eq!(releases.load(Ordering::SeqCst), 2);
+        assert_eq!(vault.load("mothman").unwrap().checked_at, clock.now());
+    }
+
+    #[tokio::test]
+    async fn without_a_remembered_key_every_launch_asks_the_worker() {
+        let clock = Clock0::new();
+        let net = FakeNet::default();
+        let releases = net.releases.clone();
+        let rec = Arc::new(Recorder::default());
+        let m = Arc::new(
+            AddonManager::new(
+                Arc::new(FakeBackend::default()),
+                Arc::new(net),
+                rec.clone() as Arc<dyn Events>,
+            )
+            .with_clock(clock.clock()),
+        );
+        m.refresh("mothman").await;
+        m.refresh("mothman").await;
+        assert_eq!(releases.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn a_store_that_cannot_be_asked_still_serves_a_fresh_remembered_key() {
+        let vault = Arc::new(MemVault::default());
+        let clock = Clock0::new();
+        let (online, _) =
+            remembering_manager(FakeBackend::default(), FakeNet::default(), &vault, &clock);
+        online.refresh("mothman").await;
+
+        clock.advance(10 * DAY);
+        let net = FakeNet::default();
+        let releases = net.releases.clone();
+        let (offline, rec) = remembering_manager(
+            FakeBackend {
+                owned: Err(StoreError::Failed("offline".into())),
+                ..Default::default()
+            },
+            net,
+            &vault,
+            &clock,
+        );
+        offline.refresh("mothman").await;
+        assert_eq!(rec.trail().last(), Some(&(AddonState::Owned, None)));
+        assert_eq!(releases.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn a_store_that_cannot_be_asked_with_no_remembered_key_is_a_store_error() {
+        let vault = Arc::new(MemVault::default());
+        let clock = Clock0::new();
+        let (m, rec) = remembering_manager(
+            FakeBackend {
+                owned: Err(StoreError::Failed("offline".into())),
+                ..Default::default()
+            },
+            FakeNet::default(),
+            &vault,
+            &clock,
+        );
+        m.refresh("mothman").await;
+        assert_eq!(
+            rec.trail().last(),
+            Some(&(AddonState::Error, Some(error_code::STORE.into())))
+        );
+    }
+
+    #[tokio::test]
+    async fn a_run_out_key_with_nothing_reachable_asks_the_user_to_reconfirm() {
+        let vault = Arc::new(MemVault::default());
+        let clock = Clock0::new();
+        let (online, _) =
+            remembering_manager(FakeBackend::default(), FakeNet::default(), &vault, &clock);
+        online.refresh("mothman").await;
+
+        clock.advance(GRACE + DAY);
+        for ticket_error in [|| KeyError::Upstream] {
+            let (m, rec) = remembering_manager(
+                FakeBackend::default(),
+                FakeNet {
+                    ticket: Err(ticket_error),
+                    ..Default::default()
+                },
+                &vault,
+                &clock,
+            );
+            m.refresh("mothman").await;
+            assert_eq!(
+                rec.trail().last(),
+                Some(&(AddonState::Error, Some(error_code::RECONFIRM.into())))
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn an_unreachable_worker_with_no_remembered_key_keeps_its_plain_error() {
+        let vault = Arc::new(MemVault::default());
+        let clock = Clock0::new();
+        let (m, rec) = remembering_manager(
+            FakeBackend::default(),
+            FakeNet {
+                ticket: Err(|| KeyError::Upstream),
+                ..Default::default()
+            },
+            &vault,
+            &clock,
+        );
+        m.refresh("mothman").await;
+        assert_eq!(
+            rec.trail().last(),
+            Some(&(AddonState::Error, Some(error_code::UPSTREAM.into())))
+        );
+    }
+
+    #[tokio::test]
+    async fn learning_the_add_on_is_not_owned_forgets_the_key() {
+        let vault = Arc::new(MemVault::default());
+        let clock = Clock0::new();
+        let (online, _) =
+            remembering_manager(FakeBackend::default(), FakeNet::default(), &vault, &clock);
+        online.refresh("mothman").await;
+        assert!(vault.load("mothman").is_some());
+
+        let (refunded, _) = remembering_manager(
+            FakeBackend {
+                owned: Ok(false),
+                ..Default::default()
+            },
+            FakeNet::default(),
+            &vault,
+            &clock,
+        );
+        refunded.refresh("mothman").await;
+        assert_eq!(vault.load("mothman"), None);
+    }
+
+    #[tokio::test]
+    async fn a_worker_that_refuses_the_account_forgets_the_key() {
+        let vault = Arc::new(MemVault::default());
+        let clock = Clock0::new();
+        let (online, _) =
+            remembering_manager(FakeBackend::default(), FakeNet::default(), &vault, &clock);
+        online.refresh("mothman").await;
+
+        clock.advance(GRACE + DAY);
+        let (m, _) = remembering_manager(
+            FakeBackend::default(),
+            FakeNet {
+                key: Err(|| KeyError::NotEntitled),
+                ..Default::default()
+            },
+            &vault,
+            &clock,
+        );
+        m.refresh("mothman").await;
+        assert_eq!(vault.load("mothman"), None);
+    }
+
+    #[tokio::test]
+    async fn a_remembered_key_the_bundle_rejects_is_replaced_by_a_fresh_one() {
+        let vault = Arc::new(MemVault::default());
+        let clock = Clock0::new();
+        vault.save(
+            "mothman",
+            &CachedKey {
+                key: [9; 32],
+                checked_at: clock.now(),
+            },
+        );
+        let net = FakeNet {
+            rejects: Some([9; 32]),
+            ..Default::default()
+        };
+        let (releases, installed_with) = (net.releases.clone(), net.installed_with.clone());
+        let (m, rec) = remembering_manager(FakeBackend::default(), net, &vault, &clock);
+        m.refresh("mothman").await;
+        assert_eq!(rec.trail().last(), Some(&(AddonState::Owned, None)));
+        assert_eq!(releases.load(Ordering::SeqCst), 1);
+        assert_eq!(installed_with.lock().as_slice(), &[[9; 32], [7; 32]]);
+        assert_eq!(vault.load("mothman").unwrap().key, [7; 32]);
+    }
+
+    #[tokio::test]
+    async fn a_clock_set_back_does_not_stretch_the_grace_period() {
+        let vault = Arc::new(MemVault::default());
+        let clock = Clock0::new();
+        let stamped = clock.now() + 10 * DAY;
+        vault.save(
+            "mothman",
+            &CachedKey {
+                key: [9; 32],
+                checked_at: stamped,
+            },
+        );
+        let net = FakeNet::default();
+        let releases = net.releases.clone();
+        let (m, _) = remembering_manager(FakeBackend::default(), net, &vault, &clock);
+        m.refresh("mothman").await;
+        assert_eq!(releases.load(Ordering::SeqCst), 1);
     }
 
     #[tokio::test]

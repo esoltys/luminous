@@ -14,6 +14,7 @@ pub mod bundle;
 #[cfg(debug_assertions)]
 pub mod devloader;
 pub mod entitlement;
+pub mod keycache;
 pub mod keyclient;
 pub mod verifier;
 

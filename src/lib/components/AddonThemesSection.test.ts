@@ -92,6 +92,12 @@ describe("AddonThemesSection.svelte", () => {
     expect(invoke).toHaveBeenCalledWith("refresh_addons");
   });
 
+  it("asks the user to go online once when the remembered key has run out", async () => {
+    setState("error", "reconfirm");
+    const { getByRole } = render(AddonThemesSection);
+    expect(getByRole("alert")).toHaveTextContent("Go online once to re-confirm your purchase.");
+  });
+
   it("falls back to the generic message for an unknown error code", async () => {
     setState("error", "something_new");
     const { getByRole } = render(AddonThemesSection);

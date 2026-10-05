@@ -16,6 +16,7 @@
     "rate_limited",
     "bundle",
     "unsupported_api",
+    "reconfirm",
     "internal"
   ];
 

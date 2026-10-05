@@ -2,7 +2,7 @@
 
 Advanced cosmetic themes (animated overlays above the player bar) are optional add-ons gated by Microsoft Store entitlement (epic #1036). All Luminous functionality stays open source and free; add-ons only change how it looks.
 
-Status: the overlay runtime (#1413) is implemented. The bundle verifier (#1415), key-release client (#1416) and Store entitlement (#1414) are not, and the Partner Center behaviours they depend on are unverified.
+Status: the overlay runtime (#1413), bundle verifier (#1415), key-release client (#1416), Store entitlement (#1414) and the Settings section (#1417) are implemented, and the purchase and key release were verified end to end against the real Store on 2026-10-04. The key cache (#1429) is described below.
 
 ## Overlay runtime
 
@@ -31,3 +31,11 @@ An overlay must honour `reducedMotion` by showing a static frame. The host acqui
 - `overlayEntry` is a bundle path to an HTML file, normally `overlay.html`. Relative URLs inside it resolve within the bundle and must be declared in `manifest.assets`.
 - `colors` has exactly the eight theme keys, each `#rrggbb`.
 - The decrypted archive is capped at 25 MB (enforced by the packer, and by the verifier in #1415).
+
+## Key cache (#1429)
+
+The add-on key is the same for every owner. After the key Worker releases it, the app remembers it for 30 days (`GRACE` in `src-tauri/src/addons/keycache.rs`). Inside that window it is used without calling the Worker, so the Worker is asked about once a month instead of on every launch, and an owner keeps the add-on offline.
+
+The Store is still asked about ownership on every launch, and a remembered key never overrides it: if the Store says the add-on is not owned, or the Worker refuses the account, the key is forgotten. If the Store cannot be asked at all (for example offline), a remembered key within its 30 days stands in for the answer. If the key has run out and nothing can be reached to renew it, the card asks the user to go online once (`reconfirm`). A key the bundle no longer decrypts with is discarded and fetched again. A key stamped in the future is treated as run out, so setting the clock back does not extend the 30 days.
+
+The key is stored in `<app data>/addons/<id>.key`, sealed with Windows DPAPI for the signed-in user, together with the time of the last Worker release. Where no such protection exists, nothing is written and the key stays in memory, as before. The trade-off: the key moves from memory-only to protected on disk. Because it is the same for every owner, this exposes no more than reading it from the running app's memory.
