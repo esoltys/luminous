@@ -11,21 +11,31 @@ A freshly created issue isn't a Project item yet, so it has no Priority/Status t
 until it's added:
 
 ```bash
-gh project item-add 3 --owner esoltys --url <issue-url>
+gh project item-add 3 --owner esoltys --url <issue-url> --format json --jq .id
 ```
+
+This prints the new item's `id` (also for an issue already on the board), which is exactly what
+`item-edit` below needs — capture it rather than listing the board to find it again.
 
 ## Reading current values
 
 ```bash
-gh project item-list 3 --owner esoltys --format json
+gh project item-list 3 --owner esoltys --format json --query "<filter>"
 ```
 
 Each item in the result includes `priority` and `status` directly, plus `content.number` so you
 can match it to a specific issue.
 
+`item-list` has no sort order and returns only 30 items unless you pass `--limit`; the board holds hundreds of
+items, so an unfiltered list silently drops issues. Filter on GitHub's side with
+`--query` instead of fetching everything — plain text matches titles, and it takes the Projects
+filter syntax, e.g. `--query "Cyrillic"`, `--query "milestone:3.0 status:Todo"`. If you really need
+the whole board, pass `--limit 1000` and check `totalCount` against the number of items returned.
+
 ## Setting a value
 
-Find the item's `id` from the `item-list` output above (matching on `content.number`), then:
+Use the item's `id` from `item-add` above (or from an `item-list --query` result, matching on
+`content.number`), then:
 
 ```bash
 gh project item-edit --project-id PVT_kwHOAAE3ZM4BgXrH --id <item-id> \
