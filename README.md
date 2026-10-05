@@ -5,7 +5,7 @@
 <h1 align="center">Luminous</h1>
 <p align="center">A high-performance home for the music you already own.</p>
 <p align="center">
-  <a href="https://esoltys.dev/luminous/"><strong>Luminous Homepage ↗</strong></a>
+  <a href="https://esoltys.dev/luminous/"><strong>Luminous Homepage</strong></a>
 </p>
 
 <p align="center">
@@ -19,9 +19,9 @@
 
 Luminous is a fast, local-first player for your own audio library. Built for anyone who wants the convenience of a modern streaming app without giving up ownership of their music. Turn a folder of files into a library you'll enjoy browsing and listening to.
 
-⭐ **[Issues](https://github.com/esoltys/luminous/issues)** - file a bug report or a feature request
+**[Issues](https://github.com/esoltys/luminous/issues)** - file a bug report or a feature request
 
-💬 **[Luminous Discussions](https://github.com/esoltys/luminous/discussions)** - announcements, general discussion, Q&A, Show and Tell
+**[Luminous Discussion](https://www.reddit.com/r/LuminousMusicPlayer/)** - announcements, general discussion, Q&A, Show and Tell
 
 Luminous doesn't accept PRs as this is a hobby project that I enjoy working on in my spare time.
 
