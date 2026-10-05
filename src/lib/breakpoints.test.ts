@@ -6,6 +6,9 @@ import {
   BREAKPOINT_MEDIUM_PX,
   BREAKPOINT_RIGHT_PANEL_PX,
   BREAKPOINT_EXPANDED_PX,
+  COVER_STACK_FOURTH_COVER_PX,
+  COVER_STACK_FIFTH_COVER_PX,
+  COVER_STACK_SIXTH_COVER_PX,
 } from "./constants";
 
 // Reads the real stylesheet so a drift between the Tailwind tokens and the JS
@@ -25,5 +28,17 @@ describe("breakpoint tokens", () => {
     expect(token("sm")).toBe(BREAKPOINT_MEDIUM_PX);
     expect(token("md")).toBe(BREAKPOINT_RIGHT_PANEL_PX);
     expect(token("lg")).toBe(BREAKPOINT_EXPANDED_PX);
+  });
+});
+
+describe("CoverStack container thresholds", () => {
+  it("keeps the @container rules in CoverStack.svelte equal to the JS constants", () => {
+    const src = readFileSync(resolve(__dirname, "components/CoverStack.svelte"), "utf-8");
+    const widths = [...src.matchAll(/@container \(min-width: (\d+)px\)/g)].map((m) => Number(m[1]));
+    expect(widths).toEqual([
+      COVER_STACK_FOURTH_COVER_PX,
+      COVER_STACK_FIFTH_COVER_PX,
+      COVER_STACK_SIXTH_COVER_PX,
+    ]);
   });
 });

@@ -628,7 +628,7 @@
   <div class="relative z-30 w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md table-surface-blur px-6 pt-6 pb-6 shrink-0">
     <div class="flex items-stretch justify-between gap-6 relative z-10">
       <div class="flex flex-col justify-end gap-1.5 min-w-0 flex-1">
-        <h1 class="text-3xl sm:text-4xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5" title={displayName}>
+        <h1 class="text-3xl @xl:text-4xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5" title={displayName}>
           {displayName}
         </h1>
 
@@ -693,7 +693,7 @@
         {/if}
       </div>
 
-      <div class="hidden sm:flex h-40 shrink-0 {hasCoverMosaic ? '' : 'w-40'}">
+      <div class="hidden @xl:flex h-40 shrink-0 {hasCoverMosaic ? '' : 'w-40'}">
         {#if kind === "genre" && topCovers.length > 0}
           <div
             class="h-full p-3.5 bg-brand-main flex items-center justify-center overflow-hidden border relative"

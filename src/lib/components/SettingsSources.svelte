@@ -871,7 +871,7 @@
       </div>
     {/if}
 
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+    <div class="grid grid-cols-2 @3xl:grid-cols-4 gap-4 text-xs">
     <div class="bg-brand-main/40 border border-brand-border rounded-lg p-3">
       <span class="text-xs text-brand-text-secondary uppercase font-semibold">{i18n.t('settings.statsSongs')}</span>
       <p class="text-base font-bold text-brand-text-primary mt-0.5">{formatNumber(collectionStore.stats.total_songs)}</p>

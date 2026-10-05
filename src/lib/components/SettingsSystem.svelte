@@ -476,7 +476,7 @@
 
   <div>
     <h4 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase mb-3">{i18n.t('settings.updatePolicyTitle')}</h4>
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+    <div class="grid grid-cols-1 @xl:grid-cols-3 gap-3">
       {#each UPDATE_POLICIES as policy}
         {@const isSelected = updaterStore.updatePolicy === policy.id}
         {@const isDisabled = policy.id === 'auto' && !updaterStore.installFormat.supports_self_update}

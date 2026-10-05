@@ -855,14 +855,14 @@
 
     <!-- Slider bounds are the backend's clamp range (#1249), so wait for them. -->
     {#if ranges && mode === "graphic10"}
-      <div class="grid grid-cols-5 md:grid-cols-10 gap-3 md:gap-5 min-h-64 h-auto md:h-72 items-center bg-brand-main/50 border border-brand-border/50 rounded-xl p-4 md:p-6">
+      <div class="grid grid-cols-5 @3xl:grid-cols-10 gap-3 @3xl:gap-5 min-h-64 h-auto @3xl:h-72 items-center bg-brand-main/50 border border-brand-border/50 rounded-xl p-4 @3xl:p-6">
         {#each gains as gain, idx}
           <div class="flex flex-col items-center justify-between h-full group">
             <span class="text-[10px] font-bold w-full text-center transition-colors {gain > 0 ? 'text-green-400/80' : gain < 0 ? 'text-red-400/80' : 'text-brand-text-secondary/70'}">
               {gain > 0 ? "+" : ""}{formatNumber(gain, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
             </span>
 
-            <div class="h-40 md:h-48 flex items-center justify-center relative">
+            <div class="h-40 @3xl:h-48 flex items-center justify-center relative">
               <input
                 type="range"
                 min={ranges.eq.gain_db.min}
@@ -876,7 +876,7 @@
               />
             </div>
 
-            <span class="text-[10px] md:text-[11px] font-medium text-brand-text-secondary text-center truncate w-full">
+            <span class="text-[10px] @3xl:text-[11px] font-medium text-brand-text-secondary text-center truncate w-full">
               {bandLabels[idx]}
             </span>
           </div>
@@ -931,7 +931,7 @@
         </div>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-12">
+      <div class="grid grid-cols-1 @3xl:grid-cols-3 gap-12">
         <div class="flex flex-col items-center justify-center gap-1.5 h-full">
           {#if ranges}
             <Knob
@@ -1089,7 +1089,7 @@
               {/each}
             </div>
           </div>
-          <div class="flex items-center justify-between gap-2 pt-4 md:w-1/2 text-xs text-brand-text-secondary">
+          <div class="flex items-center justify-between gap-2 pt-4 @3xl:w-1/2 text-xs text-brand-text-secondary">
             <span>{i18n.t('fades.suppressSameAlbum')}</span>
             <Toggle
               checked={crossfadeSuppressSameAlbum}
