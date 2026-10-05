@@ -562,7 +562,7 @@ describe("ArtistDetailView", () => {
     it("hides tags and bio/profile section while keeping action buttons visible when detail header is collapsed", async () => {
       const originalHeight = windowLayoutStore.viewportHeight;
       try {
-        // Set viewportHeight to less than DETAIL_HEADER_COLLAPSE_HEIGHT_PX (600)
+        // Set viewportHeight to less than HEIGHT_BREAKPOINT_SHORT_PX (600)
         windowLayoutStore.viewportHeight = 500;
         expect(windowLayoutStore.isDetailHeaderCollapsed).toBe(true);
 

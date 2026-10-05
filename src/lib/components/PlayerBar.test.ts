@@ -287,7 +287,7 @@ describe("PlayerBar.svelte", () => {
     playerStore.currentSong = mockSong;
     playerStore.state = "playing";
     windowLayoutStore.immersiveMode = false;
-    windowLayoutStore.viewportWidth = 500; // below SMALL_BREAKPOINT_WIDTH_PX (640)
+    windowLayoutStore.viewportWidth = 500; // below BREAKPOINT_MEDIUM_PX (640)
 
     const toggleImmersiveModeSpy = vi.spyOn(windowLayoutStore, "toggleImmersiveMode");
     const exitImmersiveModeSpy = vi.spyOn(windowLayoutStore, "exitImmersiveMode");
@@ -325,7 +325,7 @@ describe("PlayerBar.svelte", () => {
     expect(getAllByTitle(/picture-in-picture/i).length).toBe(1);
 
     // Minimal-breakpoint class on previous:
-    expect(getByTitle(/previous song/i)).toHaveClass("hidden", "min-[400px]:block");
+    expect(getByTitle(/previous song/i)).toHaveClass("hidden", "xs:block");
 
     // Core controls: cover art, play/pause, skip-next
     expect(getByTitle("Immersive Mode")).toBeInTheDocument();
