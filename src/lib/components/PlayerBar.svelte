@@ -279,12 +279,12 @@
 
 <footer
   transition:fly={{ y: 40, duration: windowLayoutStore.isPlaybarOnlyMode ? 0 : 300, easing: cubicOut }}
-  class="relative bg-brand-playerbar flex items-center justify-between gap-3 px-5 min-[768px]:px-8 text-brand-text-secondary select-none {themeStore.isGlassTheme ? 'glass-surface' : ''} {themeStore.gpuCompositing === false ? 'no-backdrop' : ''} {windowLayoutStore.isPlaybarOnlyMode ? 'playbar-only-mode w-full h-full rounded-none border-none shadow-none' : 'h-20 max-w-[1200px] mx-auto border border-brand-border rounded-[2rem]'}"
+  class="relative bg-brand-playerbar flex items-center justify-between gap-3 px-5 md:px-8 text-brand-text-secondary select-none {themeStore.isGlassTheme ? 'glass-surface' : ''} {themeStore.gpuCompositing === false ? 'no-backdrop' : ''} {windowLayoutStore.isPlaybarOnlyMode ? 'playbar-only-mode w-full h-full rounded-none border-none shadow-none' : 'h-20 max-w-[1200px] mx-auto border border-brand-border rounded-[2rem]'}"
 >
   {#if themeStore.activeAddon?.overlayEntry}
     <AddonOverlay addon={themeStore.activeAddon} />
   {/if}
-  <div data-walkthrough-target="player-bar-cover" class="flex items-center gap-3 min-w-0 flex-1 min-[768px]:w-1/3 min-[768px]:flex-none min-[768px]:min-w-[200px] max-w-sm">
+  <div data-walkthrough-target="player-bar-cover" class="flex items-center gap-3 min-w-0 flex-1 md:w-1/3 md:flex-none md:min-w-[200px] max-w-sm">
     <button
       onclick={handleCoverClick}
       disabled={!playerStore.currentSong}
@@ -347,8 +347,8 @@
     </div>
   </div>
 
-  <div data-walkthrough-target="player-bar-controls" class="flex flex-col items-center gap-1.5 min-w-0 flex-1 min-[400px]:ml-auto min-[640px]:ml-0 min-[768px]:w-1/3 min-[768px]:flex-none max-w-[600px]">
-    <div class="flex items-center gap-3 min-[768px]:gap-5">
+  <div data-walkthrough-target="player-bar-controls" class="flex flex-col items-center gap-1.5 min-w-0 flex-1 xs:ml-auto sm:ml-0 md:w-1/3 md:flex-none max-w-[600px]">
+    <div class="flex items-center gap-3 md:gap-5">
       {#if !windowLayoutStore.isRightPanelAutoHidden}
         <div transition:collapseFade={{ duration: 250 }} class="relative inline-flex items-center flex-shrink-0">
           {#if playerStore.shuffleMode !== 'off'}
@@ -374,7 +374,7 @@
         </div>
       {/if}
 
-      <button onclick={() => playerStore.previous()} class="hidden min-[400px]:block text-brand-text-secondary hover:text-brand-text-primary transition-colors" title={i18n.t('playerBar.previous')}>
+      <button onclick={() => playerStore.previous()} class="hidden xs:block text-brand-text-secondary hover:text-brand-text-primary transition-colors" title={i18n.t('playerBar.previous')}>
         <SkipBack class="w-5 h-5 fill-current" />
       </button>
 
@@ -468,9 +468,9 @@
   {#if !windowLayoutStore.isPlayerBarCompact}
     <div
       data-walkthrough-target="player-bar-toolbar"
-      class="flex flex-col items-center gap-1.5 flex-shrink-0 min-[768px]:w-1/3 min-[768px]:min-w-[200px] max-w-xs"
+      class="flex flex-col items-center gap-1.5 flex-shrink-0 md:w-1/3 md:min-w-[200px] max-w-xs"
     >
-      <div class="h-5 flex items-center gap-3 min-[768px]:gap-5">
+      <div class="h-5 flex items-center gap-3 md:gap-5">
         <button
           onclick={openCurrentSongMenu}
           disabled={!playerStore.currentSong}

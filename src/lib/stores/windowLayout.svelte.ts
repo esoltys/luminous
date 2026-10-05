@@ -3,11 +3,11 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   SIDEBAR_MIN_WIDTH_PX,
   SIDEBAR_COLLAPSED_WIDTH_PX,
-  MEDIUM_BREAKPOINT_WIDTH_PX,
-  RIGHT_PANEL_AUTO_HIDE_WIDTH_PX,
-  SMALL_BREAKPOINT_WIDTH_PX,
-  PLAYBAR_ONLY_HEIGHT_BREAKPOINT_PX,
-  DETAIL_HEADER_COLLAPSE_HEIGHT_PX,
+  BREAKPOINT_EXPANDED_PX,
+  BREAKPOINT_RIGHT_PANEL_PX,
+  BREAKPOINT_MEDIUM_PX,
+  HEIGHT_BREAKPOINT_MINIMAL_PX,
+  HEIGHT_BREAKPOINT_SHORT_PX,
 } from "../constants";
 
 class WindowLayoutStore {
@@ -335,19 +335,19 @@ class WindowLayoutStore {
   // overrides so widening/heightening the window back out always restores
   // exactly whatever the user had set manually.
   get isSidebarAutoCollapsed(): boolean {
-    return this.viewportWidth < MEDIUM_BREAKPOINT_WIDTH_PX;
+    return this.viewportWidth < BREAKPOINT_EXPANDED_PX;
   }
 
   get isRightPanelAutoHidden(): boolean {
-    return this.viewportWidth < RIGHT_PANEL_AUTO_HIDE_WIDTH_PX;
+    return this.viewportWidth < BREAKPOINT_RIGHT_PANEL_PX;
   }
 
   get isPlayerBarCompact(): boolean {
-    return this.viewportWidth < SMALL_BREAKPOINT_WIDTH_PX;
+    return this.viewportWidth < BREAKPOINT_MEDIUM_PX;
   }
 
   get isImmersiveForced(): boolean {
-    return this.viewportWidth < SMALL_BREAKPOINT_WIDTH_PX;
+    return this.viewportWidth < BREAKPOINT_MEDIUM_PX;
   }
 
   get effectiveImmersiveMode(): boolean {
@@ -355,11 +355,11 @@ class WindowLayoutStore {
   }
 
   get isPlaybarOnlyMode(): boolean {
-    return this.viewportHeight < PLAYBAR_ONLY_HEIGHT_BREAKPOINT_PX;
+    return this.viewportHeight < HEIGHT_BREAKPOINT_MINIMAL_PX;
   }
 
   get isDetailHeaderCollapsed(): boolean {
-    return this.viewportHeight < DETAIL_HEADER_COLLAPSE_HEIGHT_PX;
+    return this.viewportHeight < HEIGHT_BREAKPOINT_SHORT_PX;
   }
 
   setSidebarWidth(width: number) {

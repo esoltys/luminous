@@ -4,6 +4,13 @@
 @import "./lib/fonts/fira-sans/fira-sans.css";
 
 @theme {
+  /* Window-size tiers (issue #1154). Pinned in px so they equal window.innerWidth exactly;
+     mirrored by BREAKPOINT_*_PX in src/lib/constants.ts (breakpoints.test.ts keeps them equal).
+     xs = narrowest phone-width step (previously 400/420 literals), sm = medium tier, md = right panel, lg = expanded tier. */
+  --breakpoint-xs: 420px;
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
   --font-heading: 'Expose', 'Fira Sans', system-ui, -apple-system, sans-serif;
   --color-brand-main: var(--bg-main);
   --color-brand-sidebar: var(--bg-sidebar);

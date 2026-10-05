@@ -138,6 +138,15 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config libayatana-appind
 
 ## UI/UX Design Conventions
 
+- **Responsive breakpoints: viewport for the shell, container for what lives inside it.** Window-size
+  tiers are declared once as `--breakpoint-*` in `src/app.css` and mirrored by `BREAKPOINT_*_PX` in
+  `src/lib/constants.ts` (`breakpoints.test.ts` fails if they drift): `xs` 420, `sm` 640 (compact to medium),
+  `md` 768 (right panel), `lg` 1024 (sidebar). Height tiers are `HEIGHT_BREAKPOINT_*_PX` (JS-only, 160/600).
+  Use them for app-shell decisions only. Anything that depends on the space a component actually gets (it
+  moves with the sidebar and right panel) uses a container query with Tailwind's named sizes (`@sm`, `@3xl`),
+  never a viewport prefix or an arbitrary `min-[Npx]` / `@min-[Npx]` value. Structural show/hide goes through
+  `windowLayoutStore`; pure styling goes through CSS. Never both for one decision.
+
 - **Toast persistence**: Toasts must never auto-dismiss unless an explicit `durationMs` is passed by the
   caller. By default, toasts stay visible until the user clicks the `X` button.
 

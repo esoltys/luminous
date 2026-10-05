@@ -178,7 +178,7 @@
       </div>
     {:else}
       <div class="@container">
-        <div class="grid grid-cols-1 @min-[784px]:grid-cols-2 @min-[1188px]:grid-cols-3 @min-[1392px]:grid-cols-4 gap-6">
+        <div class="grid grid-cols-1 @3xl:grid-cols-2 @6xl:grid-cols-3 @7xl:grid-cols-4 gap-6">
           {#each SECTIONS as section (section.key)}
             <div class="bg-brand-sidebar border border-brand-border/60 rounded-xl p-4">
               <TopTenList
