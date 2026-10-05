@@ -80,6 +80,7 @@
     { label: "{%disc-}", desc: "Conditional Disc Prefix" },
     { label: "%track", desc: "Track # (2-digit padding: 01, 09, 11). Alternatives: %track3 (3-digit: 001), %rawtrack (unpadded: 1)" },
     { label: "{%track }", desc: "Optional Track # (2-digit padding). Alternatives: {%track3 }, {%rawtrack }" },
+    { label: "{%track. }", desc: "Optional Track # with Dot (2-digit padding). Alternatives: {%track3. }, {%rawtrack. }" },
     { label: "%title", desc: "Title" },
     { label: "%year", desc: "Year" },
     { label: "%genre", desc: "Genre" },
@@ -101,7 +102,7 @@
   // extending TEMPLATE_PRESETS.
   const TEMPLATE_PRESETS = [
     { id: "default", labelKey: "organizer.presetDefault", template: DEFAULT_TEMPLATE },
-    { id: "alternative", labelKey: "organizer.presetAlternative", template: "%artist/%album (%year)/{CD %disc/}%track-%artist-%title" },
+    { id: "alternative", labelKey: "organizer.presetAlternative", template: "%artist/%album (%year)/{CD %disc/}{%track-}%artist-%title" },
   ] as const;
   type TemplatePresetId = (typeof TEMPLATE_PRESETS)[number]["id"] | "custom";
 
@@ -135,13 +136,16 @@
     year: number;
     genre: string;
     disc?: number;
-    track: number;
+    track?: number;
     title: string;
   }
   const PREVIEW_SAMPLES: PreviewSample[] = [
     { albumArtist: "Radiohead", artist: "Radiohead", album: "OK Computer", year: 1997, genre: "Alternative Rock", track: 1, title: "Airbag" },
     { albumArtist: "Radiohead", artist: "Radiohead", album: "OK Computer", year: 1997, genre: "Alternative Rock", track: 2, title: "Paranoid Android" },
     { albumArtist: "Daft Punk", artist: "Daft Punk", album: "Discovery", year: 2001, genre: "Electronic", track: 1, title: "One More Time" },
+    // A track with no track number to demonstrate conditional track wrapping
+    // ({%track }, {%track-}) omitting leading spaces or hyphens.
+    { albumArtist: "Daft Punk", artist: "Daft Punk", album: "Aerodynamic", year: 2001, genre: "Electronic", title: "Aerodynamic (Remix)" },
     // A multi-disc album so the preview demonstrates the conditional
     // {CD %disc/} / {%disc-} blocks splitting into per-disc folders/prefixes.
     { albumArtist: "Pink Floyd", artist: "Pink Floyd", album: "The Wall", year: 1979, genre: "Rock", disc: 1, track: 1, title: "In The Flesh?" },
@@ -172,15 +176,16 @@
       expanded = expanded.slice(0, start) + (shouldRender ? block : "") + expanded.slice(end + 1);
     }
 
-    const track2 = String(s.track).padStart(2, "0");
-    const track3 = String(s.track).padStart(3, "0");
+    const track2 = s.track ? String(s.track).padStart(2, "0") : "00";
+    const track3 = s.track ? String(s.track).padStart(3, "0") : "000";
+    const rawtrack = s.track ? String(s.track) : "0";
     expanded = expanded
       .split("%albumartist").join(s.albumArtist)
       .split("%artist").join(s.artist)
       .split("%album").join(s.album)
       .split("%disc").join(String(s.disc ?? 1))
       .split("%track3").join(track3)
-      .split("%rawtrack").join(String(s.track))
+      .split("%rawtrack").join(rawtrack)
       .split("%track").join(track2)
       .split("%title").join(s.title)
       .split("%year").join(String(s.year))
