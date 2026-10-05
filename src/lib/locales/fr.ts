@@ -739,6 +739,7 @@ export const fr: DeepStringRecord<typeof en> = {
     bpmExtreme: "Extrême BPM",
     smartAutoPlaylist: "Intelligente",
     playlistTypeLabel: "Liste de lecture",
+    autoPlaylistLabel: "Liste auto",
     favouritesAutoPlaylist: "Liste auto",
     recentlyAddedAutoPlaylist: "Liste auto",
     mostPlayedAutoPlaylist: "Liste auto",

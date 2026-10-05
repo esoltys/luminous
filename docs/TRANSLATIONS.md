@@ -24,6 +24,15 @@ This covers the in-app UI strings only. The user guide ships in English and Fren
 - Counts: `{count}` is substituted verbatim. Where English has a singular/plural pair, it is two keys, `fooOne` ("1 song added") and `fooMany` ("{count} songs added"), and the caller picks `One` only when the count is exactly 1. There is no CLDR plural-category support, so a language with more than two forms (Russian, Ukrainian, Czech, Polish) cannot inflect a noun after a number correctly. Until plural support lands, phrase those strings so the noun does not agree with the number ("Songs: {count}"), and flag any string where that is impossible.
 - Keep numbers, dates and durations out of the string when the UI already formats them with `formatNumber` or `Intl`; the token receives the locale-formatted value.
 
+## Strings the backend stores in English
+
+The backend stores some auto-playlist names in English, and the UI shows a localized label derived from the playlist's `dynamic_spec`, so a missing translation shows up as English on a card, not as a missing key. Translate all of them in every language:
+
+- **Moment Mix time of day:** `playlists.daypartMorning`, `daypartAfternoon`, `daypartEvening` and `daypartLateNight` (a full name such as "Afternoon Mix", not just the time word). The row's own `name` stays English; `getDaypartMixLabel` in `src/lib/utils/playlist.ts` picks the label. Keep the wording aligned with `stats.clock*` and `home.greeting*`, since the buckets are the same.
+- **BPM buckets:** `playlists.bpmDownTempo` through `bpmExtreme`, via `getBpmBucketLabel`.
+
+When checking a new locale in the running app, open Home and Playlists on an auto-playlist card and the global search results: these labels are the ones the completeness test cannot catch if a component falls back to an English default instead of a key.
+
 ## Terminology authorities
 
 Each source is where a term gets checked, in the order listed. "Microsoft Terminology Collection" applies to every language, because most users meet these terms in Windows: <https://learn.microsoft.com/en-us/globalization/reference/microsoft-terminology>.

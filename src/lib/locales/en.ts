@@ -733,6 +733,7 @@ export const en = {
     bpmExtreme: "Extreme BPM",
     smartAutoPlaylist: "Smart",
     playlistTypeLabel: "Playlist",
+    autoPlaylistLabel: "Auto-Playlist",
     favouritesAutoPlaylist: "Auto-Playlist",
     recentlyAddedAutoPlaylist: "Auto-Playlist",
     mostPlayedAutoPlaylist: "Auto-Playlist",
