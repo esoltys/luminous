@@ -55,7 +55,7 @@
   import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
-  import { getPopulationModeSuffix, getBpmBucketLabel } from "../utils/playlist";
+  import { getPopulationModeSuffix, getBpmBucketLabel, getDaypartMixLabel } from "../utils/playlist";
   import { genreColorHsl, resolveGenreColorIndex } from "../utils/genrePalette";
   import { rememberScroll } from "../utils/scrollMemory";
   import { openInPicard } from "../utils/picard";
@@ -184,11 +184,11 @@
             })()
           : kind === "daypart"
             ? (() => {
-                // The row's own `name` IS the current bucket's mix name
-                // (e.g. "Afternoon Mix") — updated in place by the backend
-                // every time the daypart boundary crosses (#223).
+                // The row's own `name` IS the current bucket's English mix name
+                // — updated in place by the backend every time the daypart
+                // boundary crosses (#223); the label is localized from its spec.
                 const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
-                return pl?.name || i18n.t("playlists.daypartAutoPlaylist");
+                return pl?.name ? getDaypartMixLabel(pl.dynamic_spec, pl.name) : i18n.t("playlists.daypartAutoPlaylist");
               })()
             : kind === "no_genre"
             ? i18n.t("songTags.noGenre", {}, "No Genre")
