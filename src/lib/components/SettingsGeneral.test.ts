@@ -21,6 +21,8 @@ describe("SettingsGeneral.svelte", () => {
     expect([...select.options].map((o) => [o.value, o.textContent?.trim()])).toEqual([
       ["en-CA", "English (Canada)"],
       ["fr-CA", "Français (Canada)"],
+      ["──────────", "──────────"],
+      ["it", "Italiano"],
     ]);
 
     await fireEvent.change(select, { target: { value: "fr-CA" } });

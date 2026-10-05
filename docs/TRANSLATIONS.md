@@ -24,6 +24,15 @@ This covers the in-app UI strings only. The user guide ships in English and Fren
 - Counts: `{count}` is substituted verbatim. Where English has a singular/plural pair, it is two keys, `fooOne` ("1 song added") and `fooMany` ("{count} songs added"), and the caller picks `One` only when the count is exactly 1. There is no CLDR plural-category support, so a language with more than two forms (Russian, Ukrainian, Czech, Polish) cannot inflect a noun after a number correctly. Until plural support lands, phrase those strings so the noun does not agree with the number ("Songs: {count}"), and flag any string where that is impossible.
 - Keep numbers, dates and durations out of the string when the UI already formats them with `formatNumber` or `Intl`; the token receives the locale-formatted value.
 
+## Strings the backend stores in English
+
+The backend stores some auto-playlist names in English, and the UI shows a localized label derived from the playlist's `dynamic_spec`, so a missing translation shows up as English on a card, not as a missing key. Translate all of them in every language:
+
+- **Moment Mix time of day:** `playlists.daypartMorning`, `daypartAfternoon`, `daypartEvening` and `daypartLateNight` (a full name such as "Afternoon Mix", not just the time word). The row's own `name` stays English; `getDaypartMixLabel` in `src/lib/utils/playlist.ts` picks the label. Keep the wording aligned with `stats.clock*` and `home.greeting*`, since the buckets are the same.
+- **BPM buckets:** `playlists.bpmDownTempo` through `bpmExtreme`, via `getBpmBucketLabel`.
+
+When checking a new locale in the running app, open Home and Playlists on an auto-playlist card and the global search results: these labels are the ones the completeness test cannot catch if a component falls back to an English default instead of a key.
+
 ## Terminology authorities
 
 Each source is where a term gets checked, in the order listed. "Microsoft Terminology Collection" applies to every language, because most users meet these terms in Windows: <https://learn.microsoft.com/en-us/globalization/reference/microsoft-terminology>.
@@ -54,5 +63,10 @@ French is Canadian French, for `fr.ts` and the French user guide.
 
 Established terms and register are recorded here as each language is drafted, so the lessons are written down before the next language starts. Each entry is a term, its English source, and one line on why it was chosen over the obvious alternative.
 
-- **it:** pending the draft-versus-contribution diff from #1421 (Claude drafts blind, then diffs against the contributed file). Seed this list from that diff: terminology differences, register, over-literal calques, key coverage.
+- **it** (locale tag `it`; drafted blind, then diffed against the contributed file in #1421). **Register:** informal "tu" imperative everywhere ("Scegli", "Aggiungi", "Fai clic"); both drafts agreed. Established terms:
+  - *brano* (song/track; *traccia* only where English says "Track #" or MusicBrainz track), *libreria* (library), *raccolta* (Collection view), *playlist* (kept; *playlist intelligente*, not "Smart Playlist"), *coda* (Queue), *preferiti* (favourites), *testi* (lyrics), *cartella* (folder, never "directory"), *unità* (drive, not "disco"), *intestazione* (header), *area di notifica* (system tray), *dissolvenza incrociata* (crossfade), *tag* (kept, as Windows does).
+  - Failure: "non riuscito/a" ("Salvataggio non riuscito"), not the harsher "fallito" (24 uses in the contribution). Success: "correttamente", not the calque "con successo".
+  - Verbs: "Fai clic", not the colloquial "Clicca". "Rilascia" for drop, not "Trascina" (which is drag).
+  - Quotes: «guillemets» around substituted names.
+  - Lessons from the diff, for every language: (1) don't drop articles and prepositions to mimic English headline style ("Fase scansione", "Conteggio riproduzioni"); write the natural phrase ("Fase della scansione", "Numero di riproduzioni"). (2) Don't leave English UI jargon that has an everyday word (*Smart Playlist*, *Builder*, *header*, *fallback*, *provider*, *tray*, *Top*): the contribution kept about 30. Keep a loanword only when Windows does. (3) No "(s)" slash plurals ("brano/i", "cartella/e"): rephrase around the count ("brani mancanti: {count}") so they read in both singular and plural. (4) Keep Title Case out of labels; Italian uses sentence case (the contribution had ~60% more title-cased labels). (5) Watch noun gender when a word is carried over ("Una player" for "Un lettore"). (6) Check the source snapshot: the contribution was built from an older `en.ts` (68 current keys missing, 10 stale ones such as `settings.languageItalie`), and its claim of passing `locales.test.ts` did not hold (a `;` for `,` at line 263 made the file unparseable). Always re-run the gate on a contributed catalog.
 - **es, de, uk, ru, en-US, en-GB, fr (France):** empty until drafted.

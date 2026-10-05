@@ -626,7 +626,9 @@ export const fr: DeepStringRecord<typeof en> = {
     subsonicNoServersTitle: "Aucun serveur multimédia connecté",
     subsonicNoServersText: "Ajoutez un serveur Navidrome ou OpenSubsonic ci-dessus pour diffuser sa bibliothèque.",
     confirmRemoveSubsonicServer: "Retirer le serveur multimédia « {name} »? Ses morceaux restent dans votre bibliothèque, marqués comme indisponibles.",
-    removeSubsonicServer: "Retirer le serveur multimédia"
+    removeSubsonicServer: "Retirer le serveur multimédia",
+    saving: "Enregistrement en cours...",
+    watchedFoldersSubtitle: "Gérez les dossiers à analyser pour trouver des fichiers de musique."
   },
   playlists: {
     title: "Listes de lecture",
@@ -728,6 +730,10 @@ export const fr: DeepStringRecord<typeof en> = {
     missingMetadataAutoPlaylist: "Métadonnées manquantes",
     missingMusicBrainzAutoPlaylist: "Liste auto",
     daypartAutoPlaylist: "Mix du moment",
+    daypartMorning: "Mix du matin",
+    daypartAfternoon: "Mix de l'après-midi",
+    daypartEvening: "Mix du soir",
+    daypartLateNight: "Mix de fin de nuit",
     bpmDownTempo: "Tempo lent BPM",
     bpmMidTempo: "Tempo moyen BPM",
     bpmUptempo: "Tempo enlevé BPM",
@@ -735,6 +741,7 @@ export const fr: DeepStringRecord<typeof en> = {
     bpmExtreme: "Extrême BPM",
     smartAutoPlaylist: "Intelligente",
     playlistTypeLabel: "Liste de lecture",
+    autoPlaylistLabel: "Liste auto",
     favouritesAutoPlaylist: "Liste auto",
     recentlyAddedAutoPlaylist: "Liste auto",
     mostPlayedAutoPlaylist: "Liste auto",
@@ -795,7 +802,10 @@ export const fr: DeepStringRecord<typeof en> = {
     smartRulePlaylistLabel: "Liste intelligente",
     smartRuleBasedTooltip: "Liste intelligente basée sur des règles",
     smartBadgeLabel: "Intelligente",
-    saveRenameTooltip: "Enregistrer"
+    saveRenameTooltip: "Enregistrer",
+    historyCleared: "Historique de lecture effacé",
+    saveQueueNameLabel: "Nom de la liste de lecture",
+    saveQueueNamePlaceholder: "Ma liste de lecture"
   },
   lyrics: {
     title: "Paroles",
@@ -982,7 +992,9 @@ export const fr: DeepStringRecord<typeof en> = {
     tracksSkippedToast: "{count} morceaux indisponibles ignorés.",
     trackSkippedRemoteToast: 'Impossible de lire « {title} » — {message}. Morceau ignoré.',
     openNothingPlayable: "Aucun fichier audio pris en charge à lire.",
-    playSongFailed: "Impossible de lire ce morceau."
+    playSongFailed: "Impossible de lire ce morceau.",
+    noSongPlaying: "Aucune chanson en cours de lecture",
+    menuTooltip: "Menu de la chanson"
   },
   miniplayer: {
     title: "Mini-lecteur",
@@ -1297,18 +1309,12 @@ export const fr: DeepStringRecord<typeof en> = {
   },
   artistInfo: {
     panelTitle: "Informations sur l'artiste",
-    sortName: "Nom de tri",
-    gender: "Genre",
     born: "Date de naissance",
     formed: "Date de formation",
     cityRegion: "Ville/Région",
     country: "Pays",
     died: "Date de décès",
     disbanded: "Dissous",
-    genderMale: "Masculin",
-    genderFemale: "Féminin",
-    genderNonBinary: "Non binaire",
-    genderOther: "Autre",
     lessThanOneYearAgo: "Il y a moins d'un an"
   },
   artistEvents: {
@@ -1493,7 +1499,8 @@ export const fr: DeepStringRecord<typeof en> = {
     connect: "Connecter",
     active: "Actif",
     paused: "En pause",
-    inactive: "Inactif"
+    inactive: "Inactif",
+    create: "Créer"
   },
   toast: {
     copyError: "Copier l'erreur dans le presse-papiers",
@@ -1556,7 +1563,8 @@ export const fr: DeepStringRecord<typeof en> = {
     noPathRecorded: "(Aucun chemin enregistré)",
     unknownError: "Erreur inconnue",
     applying: "Application en cours...",
-    close: "Fermer"
+    close: "Fermer",
+    toastErrors: "Fichiers qui n'ont pas pu être organisés : {count}"
   },
   picard: {
     openInPicard: "Ouvrir dans Picard",

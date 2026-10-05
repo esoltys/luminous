@@ -620,7 +620,9 @@ export const en = {
     subsonicNoServersTitle: "No Media Servers Connected",
     subsonicNoServersText: "Add a Navidrome or other OpenSubsonic server above to stream its library.",
     confirmRemoveSubsonicServer: "Remove media server \"{name}\"? Its songs stay in your library, marked unavailable.",
-    removeSubsonicServer: "Remove media server"
+    removeSubsonicServer: "Remove media server",
+    saving: "Saving...",
+    watchedFoldersSubtitle: "Manage folders to scan for music files."
   },
   playlists: {
     title: "Playlists",
@@ -722,6 +724,10 @@ export const en = {
     missingMetadataAutoPlaylist: "Missing Metadata",
     missingMusicBrainzAutoPlaylist: "Auto-Playlist",
     daypartAutoPlaylist: "Moment Mix",
+    daypartMorning: "Morning Mix",
+    daypartAfternoon: "Afternoon Mix",
+    daypartEvening: "Evening Mix",
+    daypartLateNight: "Late Night Mix",
     bpmDownTempo: "Down-Tempo BPM",
     bpmMidTempo: "Mid-Tempo BPM",
     bpmUptempo: "Uptempo BPM",
@@ -729,6 +735,7 @@ export const en = {
     bpmExtreme: "Extreme BPM",
     smartAutoPlaylist: "Smart",
     playlistTypeLabel: "Playlist",
+    autoPlaylistLabel: "Auto-Playlist",
     favouritesAutoPlaylist: "Auto-Playlist",
     recentlyAddedAutoPlaylist: "Auto-Playlist",
     mostPlayedAutoPlaylist: "Auto-Playlist",
@@ -789,7 +796,10 @@ export const en = {
     smartRulePlaylistLabel: "Smart Rule Playlist",
     smartRuleBasedTooltip: "Smart Rule-Based Playlist",
     smartBadgeLabel: "Smart",
-    saveRenameTooltip: "Save"
+    saveRenameTooltip: "Save",
+    historyCleared: "Play history cleared",
+    saveQueueNameLabel: "Playlist Name",
+    saveQueueNamePlaceholder: "My Playlist"
   },
   lyrics: {
     title: "Lyrics",
@@ -976,7 +986,9 @@ export const en = {
     tracksSkippedToast: "Skipped {count} unavailable tracks.",
     trackSkippedRemoteToast: 'Couldn\'t play "{title}" — {message}. Skipped.',
     openNothingPlayable: "No supported audio files found to play.",
-    playSongFailed: "Couldn't play this track."
+    playSongFailed: "Couldn't play this track.",
+    noSongPlaying: "No song currently playing",
+    menuTooltip: "Song menu"
   },
   miniplayer: {
     title: "Miniplayer",
@@ -1246,18 +1258,12 @@ export const en = {
   },
   artistInfo: {
     panelTitle: "Artist Information",
-    sortName: "Sort Name",
-    gender: "Gender",
     born: "Born",
     formed: "Formed",
     cityRegion: "City/Region",
     country: "Country",
     died: "Died",
     disbanded: "Disbanded",
-    genderMale: "Male",
-    genderFemale: "Female",
-    genderNonBinary: "Non-binary",
-    genderOther: "Other",
     lessThanOneYearAgo: "<1 year ago"
   },
   artistEvents: {
@@ -1442,7 +1448,8 @@ export const en = {
     connect: "Connect",
     active: "Active",
     paused: "Paused",
-    inactive: "Inactive"
+    inactive: "Inactive",
+    create: "Create"
   },
   toast: {
     copyError: "Copy error to clipboard",
@@ -1548,7 +1555,8 @@ export const en = {
     noPathRecorded: "(No path recorded)",
     unknownError: "Unknown error",
     applying: "Applying...",
-    close: "Close"
+    close: "Close",
+    toastErrors: "Files that couldn't be organized: {count}"
   },
   picard: {
     openInPicard: "Open in Picard",

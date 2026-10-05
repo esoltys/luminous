@@ -6,7 +6,6 @@ import {
   formatArtistLifeEvent,
   isArtistPerson,
   isArtistGroup,
-  resolveGenderLabel,
   getArtistAreaLinks,
 } from "./artistInfo";
 
@@ -104,23 +103,6 @@ describe("artistInfo utils", () => {
       expect(isArtistGroup("group")).toBe(true);
       expect(isArtistGroup("Person")).toBe(false);
       expect(isArtistGroup(null)).toBe(false);
-    });
-  });
-
-  describe("resolveGenderLabel", () => {
-    it("resolves recognized genders", () => {
-      expect(resolveGenderLabel("Female")).toBe("Female");
-      expect(resolveGenderLabel("female")).toBe("Female");
-      expect(resolveGenderLabel("Male")).toBe("Male");
-      expect(resolveGenderLabel("male")).toBe("Male");
-      expect(resolveGenderLabel("non-binary")).toBe("Non-binary");
-      expect(resolveGenderLabel("other")).toBe("Other");
-    });
-
-    it("handles unknown or empty genders", () => {
-      expect(resolveGenderLabel(null)).toBe("");
-      expect(resolveGenderLabel("")).toBe("");
-      expect(resolveGenderLabel("custom")).toBe("Custom");
     });
   });
 

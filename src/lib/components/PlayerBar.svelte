@@ -475,7 +475,7 @@
           onclick={openCurrentSongMenu}
           disabled={!playerStore.currentSong}
           class="inline-flex items-center justify-center flex-shrink-0 text-brand-text-secondary hover:text-brand-text-primary transition-colors disabled:opacity-40 disabled:pointer-events-none"
-          title={i18n.t('playerBar.menuTooltip', {}, 'Song menu')}
+          title={i18n.t('playerBar.menuTooltip')}
         >
           <Menu class="w-5 h-5" />
         </button>

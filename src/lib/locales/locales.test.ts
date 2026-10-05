@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { en } from "./en";
 import { fr } from "./fr";
+import { it as itMessages } from "./it";
 import { BASE_LOCALE, LOCALES, catalogChain, isLocale, legacyLanguageToLocale, localeLabel, localePickerGroups, manualLanguageForLocale } from "./index";
 
 /**
@@ -33,7 +34,7 @@ function extractPlaceholders(str: string): string[] {
  * Allowlist of keys whose French translation is legitimately identical to English
  * (e.g. loanwords, shared musical terminology, technical acronyms, brand names, or symbols).
  */
-const IDENTICAL_OK = new Set([
+const IDENTICAL_OK_FR = new Set([
   "equalizer.importPlaceholder", // Equalizer APO sample lines, same syntax in every language
   "listenbrainz.critiquebrainzUserPlaceholder", // a URL
   "albumDetail.statsLine", // "{genre} · {year} · {duration}"
@@ -133,69 +134,164 @@ const IDENTICAL_OK = new Set([
   "topNav.searchSuggestions", // "Suggestions"
 ]);
 
-describe("Locale translation completeness and integrity", () => {
+const IDENTICAL_OK_IT = new Set<string>([
+  "sidebar.home", // "Home"
+  "collection.tableHeaderTrack", // "#"
+  "collection.tableHeaderAlbum", // "Album"
+  "collection.oneAlbum", // "1 album"
+  "collection.albumPlaylistName", // "Album: {name}"
+  "collection.columnBitrate", // "Bitrate"
+  "collection.columnBpm", // "BPM"
+  "collection.booleanNo", // "No"
+  "collection.columnAlbum", // "Album"
+  "collection.tableHeaderBitrate", // "Bitrate"
+  "collection.tableHeaderBpm", // "BPM"
+  "collection.tableHeaderMusicBrainzId", // "MBID"
+  "settings.aboutAppName", // "Luminous Music Player"
+  "settings.formatMsix", // "Microsoft Store"
+  "settings.updateBuildLabel", // "build {hash}"
+  "settings.badgeIconCloud", // "Cloud / NAS"
+  "settings.badgeIconComputer", // "Computer"
+  "settings.badgeIconUsb", // "USB"
+  "settings.webdavUrlPlaceholder", // "https://cloud.example.com/remote.php/webdav"
+  "settings.subsonicUrlPlaceholder", // "https://music.example.com"
+  "settings.subsonicPassword", // "Password"
+  "settings.subsonicPasswordPlaceholder", // "Password"
+  "settings.subsonicAuthPassword", // "Password (legacy)"
+  "playlists.tableHeaderTrack", // "#"
+  "playlists.populationModeTitleFormat", // "{base} {suffix}"
+  "playlists.bpmAutoPlaylist", // "BPM"
+  "playlists.playlistTypeLabel", // "Playlist"
+  "stats.minuteCount", // "{count} min"
+  "stats.minuteUnderOne", // "< 1 min"
+  "stats.heatmapStatus", // "{date} — {minutes} min"
+  "playerBar.repeatAlbum", // "Album"
+  "playerBar.repeatPlaylist", // "Playlist"
+  "playerBar.volume", // "Volume"
+  "playerBar.volumeWithValue", // "Volume: {value}%"
+  "playerBar.albumLabel", // "Album"
+  "playerBar.bitrateLabel", // "Bitrate"
+  "playerBar.channelsMono", // "Mono"
+  "playerBar.channelsStereo", // "Stereo"
+  "playerBar.dynamicRangeRms", // "RMS {value} dB"
+  "playerBar.musicbrainzSectionLabel", // "MusicBrainz"
+  "playerBar.wikipediaSectionLabel", // "Wikipedia"
+  "playerBar.critiquebrainzSectionLabel", // "CritiqueBrainz"
+  "playerBar.listenbrainzSectionLabel", // "ListenBrainz"
+  "playerBar.listenbrainzAlbumLabel", // "Album"
+  "miniplayer.title", // "Miniplayer"
+  "tagEditor.albumField", // "Album"
+  "tagEditor.bpmField", // "BPM"
+  "equalizer.presetLabel", // "Preset"
+  "equalizer.popPreset", // "Pop"
+  "equalizer.rockPreset", // "Rock"
+  "equalizer.jazzPreset", // "Jazz"
+  "equalizer.importPlaceholder", // "Preamp: -6.2 dB\nFilter 1: ON LSC Fc 105 Hz Gain 5.5 dB Q 0
+  "equalizer.qFactor", // "Q"
+  "equalizer.kindPeak", // "Peak"
+  "equalizer.kindLowShelf", // "Low shelf"
+  "equalizer.kindHighShelf", // "High shelf"
+  "equalizer.isoStandard", // "ISO 266:1997"
+  "loudness.modeAlbum", // "Album"
+  "themes.dynamic-artwork", // "✨ Luminous"
+  "themes.sabrina", // "Sabrina"
+  "artistEvents.festival", // "Festival"
+  "artistEvents.tour", // "Tour"
+  "markdownEditor.linkText", // "link"
+  "albumDetail.statsLine", // "{genre} · {year} · {duration}"
+  "picard.integrationTitle", // "MusicBrainz Picard"
+  "picard.customPathPlaceholder", // "C:\\Program Files\\MusicBrainz Picard\\picard.exe"
+  "picard.customPathPlaceholderLinux", // "/var/lib/flatpak/exports/bin/org.musicbrainz.Picard"
+  "listenbrainz.critiquebrainzUserPlaceholder", // "https://critiquebrainz.org/user/..."
+  "discord.integrationTitle", // "Discord Rich Presence"
+  "smartPlaylistBuilder.mixWord", // "Mix"
+  "smartPlaylistBuilder.playlistWord", // "Playlist"
+  "smartPlaylistBuilder.fieldAlbum", // "Album"
+  "smartPlaylistBuilder.fieldBitrate", // "Bitrate"
+  "smartPlaylistBuilder.fieldBpm", // "BPM"
+  "smartPlaylistBuilder.fieldCompilation", // "Compilation"
+  "smartPlaylistBuilder.opEquals", // "="
+  "smartPlaylistBuilder.opNotEquals", // "!="
+  "smartPlaylistBuilder.opGte", // ">="
+  "smartPlaylistBuilder.opLte", // "<="
+  "smartPlaylistBuilder.opGt", // ">"
+  "smartPlaylistBuilder.opLt", // "<"
+  "audioPipeline.codec", // "Codec"
+  "audioPipeline.bitrate", // "Bitrate"
+  "audioPipeline.normalizationGain", // "{gain} dB ({source})"
+  "audioPipeline.outputBackend", // "Backend"
+  "audioPipeline.bitPerfect", // "Bit-perfect"
+  "auth.scrobbling", // "Scrobbling"
+]);
+
+const CATALOGS = [
+  { name: "French", file: "fr.ts", messages: fr, identicalOk: IDENTICAL_OK_FR },
+  { name: "Italian", file: "it.ts", messages: itMessages, identicalOk: IDENTICAL_OK_IT },
+];
+
+describe.each(CATALOGS)("Locale translation completeness and integrity: $name", ({ name, file, messages, identicalOk }) => {
   const flatEn = flatten(en);
-  const flatFr = flatten(fr);
+  const flatLoc = flatten(messages);
 
-  it("every key in en.ts has a corresponding translation in fr.ts", () => {
-    const missingInFr = Object.keys(flatEn).filter((key) => !(key in flatFr));
+  it(`every key in en.ts has a corresponding translation in ${file}`, () => {
+    const missing = Object.keys(flatEn).filter((key) => !(key in flatLoc));
     expect(
-      missingInFr,
-      `Missing French translations in src/lib/locales/fr.ts for the following keys:\n${missingInFr.map((k) => `  - ${k}`).join("\n")}`
+      missing,
+      `Missing ${name} translations in src/lib/locales/${file} for the following keys:\n${missing.map((k) => `  - ${k}`).join("\n")}`
     ).toEqual([]);
   });
 
-  it("fr.ts contains no stale keys that do not exist in en.ts", () => {
-    const staleInFr = Object.keys(flatFr).filter((key) => !(key in flatEn));
+  it(`${file} contains no stale keys that do not exist in en.ts`, () => {
+    const stale = Object.keys(flatLoc).filter((key) => !(key in flatEn));
     expect(
-      staleInFr,
-      `Stale keys found in src/lib/locales/fr.ts that no longer exist in en.ts:\n${staleInFr.map((k) => `  - ${k}`).join("\n")}`
+      stale,
+      `Stale keys found in src/lib/locales/${file} that no longer exist in en.ts:\n${stale.map((k) => `  - ${k}`).join("\n")}`
     ).toEqual([]);
   });
 
-  it("fr.ts values differ from en.ts unless explicitly allowlisted in IDENTICAL_OK", () => {
+  it(`${file} values differ from en.ts unless explicitly allowlisted`, () => {
     const untranslated = Object.keys(flatEn).filter((key) => {
-      return key in flatFr && flatEn[key] === flatFr[key] && !IDENTICAL_OK.has(key);
+      return key in flatLoc && flatEn[key] === flatLoc[key] && !identicalOk.has(key);
     });
 
     expect(
       untranslated,
-      `The following French translations are identical to English. If this is legitimately the same word in French (or a symbol/brand name), add the key to IDENTICAL_OK in src/lib/locales/locales.test.ts:\n${untranslated
+      `The following ${name} translations are identical to English. If this is legitimately the same word in ${name} (or a symbol/brand name), add the key to that locale's identical-text allowlist in src/lib/locales/locales.test.ts:\n${untranslated
         .map((k) => `  - ${k}: "${flatEn[k]}"`)
         .join("\n")}`
     ).toEqual([]);
   });
 
-  it("every key in IDENTICAL_OK is still identical and exists in en.ts", () => {
-    const unneededInAllowlist = [...IDENTICAL_OK].filter((key) => {
-      return !(key in flatEn) || !(key in flatFr) || flatEn[key] !== flatFr[key];
+  it("every allowlisted key is still identical and exists in en.ts", () => {
+    const unneeded = [...identicalOk].filter((key) => {
+      return !(key in flatEn) || !(key in flatLoc) || flatEn[key] !== flatLoc[key];
     });
 
     expect(
-      unneededInAllowlist,
-      `The following keys in IDENTICAL_OK no longer match or no longer exist; remove them from IDENTICAL_OK in src/lib/locales/locales.test.ts:\n${unneededInAllowlist
+      unneeded,
+      `The following ${name} allowlist keys no longer match or no longer exist; remove them from the allowlist in src/lib/locales/locales.test.ts:\n${unneeded
         .map((k) => `  - ${k}`)
         .join("\n")}`
     ).toEqual([]);
   });
 
-  it("interpolation placeholder tokens match between en.ts and fr.ts", () => {
-    const mismatches: { key: string; enTokens: string[]; frTokens: string[] }[] = [];
+  it(`interpolation placeholder tokens match between en.ts and ${file}`, () => {
+    const mismatches: { key: string; enTokens: string[]; locTokens: string[] }[] = [];
 
     for (const key of Object.keys(flatEn)) {
-      if (key in flatFr) {
+      if (key in flatLoc) {
         const enTokens = extractPlaceholders(flatEn[key]);
-        const frTokens = extractPlaceholders(flatFr[key]);
-        if (enTokens.join(",") !== frTokens.join(",")) {
-          mismatches.push({ key, enTokens, frTokens });
+        const locTokens = extractPlaceholders(flatLoc[key]);
+        if (enTokens.join(",") !== locTokens.join(",")) {
+          mismatches.push({ key, enTokens, locTokens });
         }
       }
     }
 
     expect(
       mismatches,
-      `Interpolation placeholders mismatch between en.ts and fr.ts:\n${mismatches
-        .map((m) => `  - ${m.key}: en has [${m.enTokens.join(", ")}], fr has [${m.frTokens.join(", ")}]`)
+      `Interpolation placeholders mismatch between en.ts and ${file}:\n${mismatches
+        .map((m) => `  - ${m.key}: en has [${m.enTokens.join(", ")}], ${name} has [${m.locTokens.join(", ")}]`)
         .join("\n")}`
     ).toEqual([]);
   });
@@ -286,5 +382,24 @@ describe("Manual language", () => {
     expect(manualLanguageForLocale("fr-FR")).toBe("FR");
     expect(manualLanguageForLocale("de")).toBe("EN");
     expect(manualLanguageForLocale("en-GB")).toBe("EN");
+  });
+});
+
+describe("Inline-fallback keys", () => {
+  it("every i18n.t call with an inline English fallback names a key that exists in en.ts", () => {
+    // A key that is only in the call site's fallback can never be translated.
+    const sources = import.meta.glob(["/src/**/*.svelte", "/src/**/*.ts", "!/src/**/*.test.ts", "!/src/lib/locales/**"], {
+      query: "?raw",
+      import: "default",
+      eager: true,
+    }) as Record<string, string>;
+    const flatEn = flatten(en);
+    const missing: string[] = [];
+    for (const [file, text] of Object.entries(sources)) {
+      for (const m of text.matchAll(/i18n\.t\(\s*["'`]([\w.-]+)["'`]\s*,\s*\{[^}]*\}\s*,\s*["'`]/g)) {
+        if (!(m[1] in flatEn)) missing.push(`${file}: ${m[1]}`);
+      }
+    }
+    expect(missing, `Keys used with an inline fallback but missing from en.ts:\n${missing.join("\n")}`).toEqual([]);
   });
 });

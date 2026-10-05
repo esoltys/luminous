@@ -46,6 +46,24 @@ export function getBpmBucketLabel(dynamicSpec: string | undefined | null, fallba
   return bpmKey ? i18n.t(`playlists.${bpmKey}`) : fallbackName;
 }
 
+// The Moment Mix row's `name` is the English bucket name the backend stores
+// (src-tauri/src/playlist/auto_sync.rs's `daypart_bucket_for_hour`), so its label
+// comes from i18n, keyed by the bucket id in `dynamic_spec`
+// ("daypart:<bucket>:<local-date>:<resolved-name>").
+const DAYPART_BUCKET_TO_I18N_KEY: Record<string, string> = {
+  morning: "daypartMorning",
+  afternoon: "daypartAfternoon",
+  evening: "daypartEvening",
+  latenight: "daypartLateNight",
+};
+
+/** Localizes a Moment Mix playlist's name from its `dynamic_spec`, falling back to `fallbackName`. */
+export function getDaypartMixLabel(dynamicSpec: string | undefined | null, fallbackName: string): string {
+  const bucket = dynamicSpec?.startsWith("daypart:") ? dynamicSpec.split(":")[1] : undefined;
+  const key = bucket !== undefined ? DAYPART_BUCKET_TO_I18N_KEY[bucket] : undefined;
+  return key ? i18n.t(`playlists.${key}`) : fallbackName;
+}
+
 export function getPlaylistDisplayName(
   playlist: Playlist | { name: string; population_mode?: QueuePopulationMode; dynamic_enabled?: boolean; dynamic_spec?: string } | undefined | null
 ): string {
@@ -55,7 +73,7 @@ export function getPlaylistDisplayName(
   // derivation needed here the way the old bare-genre-string convention
   // required (a chip's own card already exists separately, so there's
   // nothing to strip a parent's name out of).
-  const baseName = getBpmBucketLabel(playlist.dynamic_spec, playlist.name);
+  const baseName = getDaypartMixLabel(playlist.dynamic_spec, getBpmBucketLabel(playlist.dynamic_spec, playlist.name));
   // Missing Metadata (#367) is a diagnostic singleton, not a library-data
   // category — a population-mode suffix ("Missing Metadata (Favourites)")
   // wouldn't mean anything useful, so it's excluded the same way Smart

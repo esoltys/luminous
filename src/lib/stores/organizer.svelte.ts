@@ -147,11 +147,7 @@ class OrganizerStore {
 
     // 3. File errors: sticky error (remains until manually dismissed)
     if (errors && errors.length > 0) {
-      const text = i18n.t(
-        "organizer.toastErrors",
-        { count: errors.length },
-        `${errors.length} file(s) couldn't be organized`
-      );
+      const text = i18n.t("organizer.toastErrors", { count: errors.length });
       toastStore.show(text, "error");
     }
   }

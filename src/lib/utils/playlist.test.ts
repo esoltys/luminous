@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { autoContinueRunStarts, getPlaylistDisplayName, getPopulationModeSuffix, isAutoContinueItem } from "./playlist";
+import { autoContinueRunStarts, getDaypartMixLabel, getPlaylistDisplayName, getPopulationModeSuffix, isAutoContinueItem } from "./playlist";
 import type { Playlist, PlaylistItem } from "../types";
+import { i18n } from "../stores/i18n.svelte";
 
 describe("playlist utils", () => {
   it("returns base name for non-dynamic playlists", () => {
@@ -189,5 +190,23 @@ describe("Auto Continue rows (#1235)", () => {
   it("marks the first row of each run of Auto Continue songs", () => {
     const rows = [item("u1"), item("a1", AUTO), item("a2", AUTO), item("u2"), item("a3", AUTO)];
     expect([...autoContinueRunStarts(rows)]).toEqual(["a1", "a3"]);
+  });
+});
+
+describe("Moment Mix label", () => {
+  it("localizes the bucket name from dynamic_spec, not the stored English name", () => {
+    i18n.currentLocale = "it";
+    try {
+      expect(getDaypartMixLabel("daypart:afternoon:2026-10-05:Deep Cuts", "Afternoon Mix")).toBe("Mix del pomeriggio");
+      expect(getDaypartMixLabel("daypart:latenight:2026-10-05:", "Late Night Mix")).toBe("Mix della notte");
+    } finally {
+      i18n.currentLocale = "en-CA";
+    }
+  });
+
+  it("falls back to the stored name for an unknown bucket or a non-daypart spec", () => {
+    expect(getDaypartMixLabel("daypart:brunch:2026-10-05:", "Brunch Mix")).toBe("Brunch Mix");
+    expect(getDaypartMixLabel("tag:Jazz", "Jazz")).toBe("Jazz");
+    expect(getDaypartMixLabel(null, "X")).toBe("X");
   });
 });

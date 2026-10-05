@@ -55,7 +55,7 @@
   import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
-  import { getPopulationModeSuffix, getBpmBucketLabel } from "../utils/playlist";
+  import { getPopulationModeSuffix, getBpmBucketLabel, getDaypartMixLabel } from "../utils/playlist";
   import { genreColorHsl, resolveGenreColorIndex } from "../utils/genrePalette";
   import { rememberScroll } from "../utils/scrollMemory";
   import { openInPicard } from "../utils/picard";
@@ -184,11 +184,11 @@
             })()
           : kind === "daypart"
             ? (() => {
-                // The row's own `name` IS the current bucket's mix name
-                // (e.g. "Afternoon Mix") — updated in place by the backend
-                // every time the daypart boundary crosses (#223).
+                // The row's own `name` IS the current bucket's English mix name
+                // — updated in place by the backend every time the daypart
+                // boundary crosses (#223); the label is localized from its spec.
                 const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
-                return pl?.name || i18n.t("playlists.daypartAutoPlaylist");
+                return pl?.name ? getDaypartMixLabel(pl.dynamic_spec, pl.name) : i18n.t("playlists.daypartAutoPlaylist");
               })()
             : kind === "no_genre"
             ? i18n.t("songTags.noGenre", {}, "No Genre")
@@ -572,7 +572,7 @@
     try {
       await invoke("clear_play_history");
       songs = [];
-      toastStore.show(i18n.t("playlists.historyCleared", {}, "Play history cleared"));
+      toastStore.show(i18n.t("playlists.historyCleared"));
     } catch (err) {
       console.error("Failed to clear play history:", err);
     }
@@ -954,7 +954,7 @@
       <ContextMenuItem
         icon={Eraser}
         destructive
-        label={i18n.t("playlists.clearHistoryBtn", {}, "Clear History")}
+        label={i18n.t("playerBar.clearHistory")}
         onclick={handleClearHistory}
         disabled={loading || songs.length === 0}
       />
@@ -971,7 +971,7 @@
     <div class="h-14 flex items-center justify-between px-6 border-b border-brand-border shrink-0 bg-brand-main">
       <div class="flex items-center gap-2">
         <FolderPlus class="w-4 h-4 text-brand-accent-text" />
-        <h3 class="text-sm font-bold text-brand-text-primary">{i18n.t("playlists.saveAsCustomTitle", {}, "Save as Custom Playlist")}</h3>
+        <h3 class="text-sm font-bold text-brand-text-primary">{i18n.t("playlists.saveQueueAsPlaylist")}</h3>
       </div>
       <button onclick={() => showSaveModal = false} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors">
         <X class="w-4 h-4" />
@@ -981,13 +981,13 @@
     <form onsubmit={(e) => { e.preventDefault(); confirmSaveAsCustomPlaylist(); }} class="flex flex-col gap-4 p-6 bg-brand-sidebar">
       <div class="flex flex-col gap-1.5">
         <label for="save-playlist-name-input" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
-          {i18n.t("playlists.saveQueueNameLabel", {}, "Playlist Name")}
+          {i18n.t("playlists.saveQueueNameLabel")}
         </label>
         <Input
           id="save-playlist-name-input"
           type="text"
           bind:value={savePlaylistName}
-          placeholder={i18n.t("playlists.saveQueueNamePlaceholder", {}, "My Playlist")}
+          placeholder={i18n.t("playlists.saveQueueNamePlaceholder")}
           class="w-full"
           required
           autofocus
@@ -999,7 +999,7 @@
           {i18n.t("playlists.cancel", {}, "Cancel")}
         </Button>
         <Button type="submit" variant="primary" size="sm">
-          {i18n.t("playlists.saveQueueConfirm", {}, "Save")}
+          {i18n.t("common.save")}
         </Button>
       </div>
     </form>
