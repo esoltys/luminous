@@ -8,12 +8,12 @@
 
 ### Terms of Service
 
-**Last updated:** October 2, 2026
+**Last updated:** October 5, 2026
 
 Welcome to **Luminous Music Player** ("Luminous", "we", "us", or "our"). By downloading, installing, or using Luminous Music Player or connecting any integrations (including the Luminous Discord Application), you agree to be bound by these Terms of Service.
 
 #### 1. Description of Software
-Luminous is a local-first, open-source desktop audio player designed for playing, managing, and organizing your personal audio library. The core software is licensed under the MIT License.
+Luminous is a local-first, open-source desktop audio player designed for playing, managing, and organizing your personal audio library. The core software is licensed under the MIT License. Optional add-on themes, such as Mothman, are separate from the core software: they are distributed through the Microsoft Store, are not covered by the MIT License, and all rights in them are reserved.
 
 #### 2. Personal & Lawful Use
 Luminous is provided for your personal use to manage and play audio files that you own or have the lawful right to access. You agree not to use Luminous or its integrations in violation of any applicable local, national, or international laws, or in violation of any third-party intellectual property rights.
@@ -27,8 +27,8 @@ Luminous offers optional integrations with third-party platforms, including:
 
 These third-party services are operated by independent providers and are governed by their respective terms of service and privacy policies. We are not responsible for the availability, policies, or practices of third-party platforms.
 
-#### 4. No Telemetry or Central Hosting
-Luminous does not maintain a central user database or cloud server infrastructure. All playback, library indices, and user preferences remain stored locally on your device.
+#### 4. No Telemetry; Limited Hosting
+Luminous does not run a user database or collect telemetry. All playback, library indices, and user preferences remain stored locally on your device. The only infrastructure Luminous operates is a small key service and a file host used to deliver optional add-on themes (see the Privacy Policy). Purchases are processed by Microsoft under its own terms.
 
 #### 5. Disclaimer of Warranties
 LUMINOUS IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -48,12 +48,12 @@ For questions regarding these Terms, please open an issue or discussion on the o
 
 ### Conditions d'utilisation
 
-**Dernière mise à jour :** 2 octobre 2026
+**Dernière mise à jour :** 5 octobre 2026
 
 Bienvenue sur **Luminous Music Player** (« Luminous », « nous », « notre » ou « nos »). En téléchargeant, installant ou utilisant Luminous Music Player ou en connectant des intégrations (y compris l'application Discord Luminous), vous acceptez d'être lié par ces Conditions d'utilisation.
 
 #### 1. Description du logiciel
-Luminous est un lecteur audio de bureau open source, axé sur le stockage local, conçu pour écouter, gérer et organiser votre bibliothèque audio personnelle. Le logiciel principal est sous licence MIT.
+Luminous est un lecteur audio de bureau open source, axé sur le stockage local, conçu pour écouter, gérer et organiser votre bibliothèque audio personnelle. Le logiciel principal est sous licence MIT. Les thèmes additionnels facultatifs, comme Mothman, sont distincts du logiciel principal : ils sont distribués par le Microsoft Store, ne sont pas visés par la licence MIT et tous les droits qui s'y rattachent sont réservés.
 
 #### 2. Utilisation personnelle et légale
 Luminous est fourni pour votre usage personnel afin de gérer et d'écouter les fichiers audio que vous possédez ou auxquels vous avez légalement le droit d'accéder. Vous acceptez de ne pas utiliser Luminous ou ses intégrations en violation des lois locales, nationales ou internationales applicables, ni en violation des droits de propriété intellectuelle de tiers.
@@ -67,8 +67,8 @@ Luminous propose des intégrations facultatives avec des plateformes tierces, no
 
 Ces services tiers sont gérés par des fournisseurs indépendants et sont régis par leurs propres conditions d'utilisation et politiques de confidentialité. Nous ne sommes pas responsables de la disponibilité, des politiques ou des pratiques de ces plateformes tierces.
 
-#### 4. Aucune télémétrie ni hébergement centralisé
-Luminous ne maintient aucune base de données centrale d'utilisateurs ni infrastructure de serveurs cloud. Toutes les lectures, index de bibliothèque et préférences utilisateur restent stockés localement sur votre appareil.
+#### 4. Aucune télémétrie; hébergement limité
+Luminous ne maintient aucune base de données d'utilisateurs et ne recueille aucune télémétrie. Toutes les lectures, tous les index de bibliothèque et toutes les préférences utilisateur restent stockés localement sur votre appareil. La seule infrastructure exploitée par Luminous est un petit service de clés et un hébergeur de fichiers servant à livrer les thèmes additionnels facultatifs (voir la politique de confidentialité). Les achats sont traités par Microsoft selon ses propres conditions.
 
 #### 5. Exclusion de garanties
 LUMINOUS EST FOURNI « EN L'ÉTAT », SANS GARANTIE D'AUCUNE SORTE, EXPRESSE OU IMPLICITE, Y COMPRIS MAIS SANS S'Y LIMITER, LES GARANTIES DE QUALITÉ MARCHANDE, D'ADÉQUATION À UN USAGE PARTICULIER ET D'ABSENCE DE CONTREFAÇON. EN AUCUN CAS LES AUTEURS OU TITULAIRES DU DROIT D'AUTEUR NE POURRONT ÊTRE TENUS RESPONSABLES DE TOUTE RÉCLAMATION, DOMMAGE OU AUTRE RESPONSABILITÉ RÉSULTANT DE, OU EN RELATION AVEC LE LOGICIEL OU SON UTILISATION.
