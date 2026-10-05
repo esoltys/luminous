@@ -242,6 +242,13 @@
       "tab": "settings"
     },
     {
+      "name": "settings-system",
+      "filename": "settings-system.png",
+      "tab": "settings",
+      "action": "click-settings-system",
+      "viewportHeight": 1100
+    },
+    {
       "name": "settings-integrations",
       "filename": "settings-integrations.png",
       "tab": "settings",

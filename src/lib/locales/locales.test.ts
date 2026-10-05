@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { en } from "./en";
 import { fr } from "./fr";
-import { BASE_LOCALE, LOCALES, catalogChain, isLocale, legacyLanguageToLocale, localeLabel } from "./index";
+import { BASE_LOCALE, LOCALES, catalogChain, isLocale, legacyLanguageToLocale, localeLabel, localePickerGroups, manualLanguageForLocale } from "./index";
 
 /**
  * Recursively flattens a nested object into dotted key paths.
@@ -265,5 +265,26 @@ describe("Locale registry", () => {
   it("labels locales in their own language", () => {
     expect(localeLabel("en-CA")).toBe("English (Canada)");
     expect(localeLabel("fr-CA")).toBe("Français (Canada)");
+  });
+});
+
+describe("Locale picker groups", () => {
+  it("pins English (Canada) and Français (Canada) first", () => {
+    const { pinned } = localePickerGroups();
+    expect(pinned).toEqual(["en-CA", "fr-CA"]);
+  });
+
+  it("lists every registered locale exactly once", () => {
+    const { pinned, rest } = localePickerGroups();
+    expect([...pinned, ...rest].sort()).toEqual(LOCALES.map((l) => l.tag).sort());
+  });
+});
+
+describe("Manual language", () => {
+  it("maps any fr* UI locale to French and everything else to English", () => {
+    expect(manualLanguageForLocale("fr-CA")).toBe("FR");
+    expect(manualLanguageForLocale("fr-FR")).toBe("FR");
+    expect(manualLanguageForLocale("de")).toBe("EN");
+    expect(manualLanguageForLocale("en-GB")).toBe("EN");
   });
 });

@@ -29,13 +29,13 @@ describe("SettingsView.svelte", () => {
 
   it("defaults to the General tab and renders its content", async () => {
     const { findByText } = render(SettingsView);
-    expect(await findByText(/v0\.75\.0/)).toBeInTheDocument();
+    expect(await findByText("General Settings")).toBeInTheDocument();
   });
 
   it("persists the active tab via set_app_setting when switching tabs", async () => {
     const { invoke } = await import("@tauri-apps/api/core");
     const { findByText, getByText } = render(SettingsView);
-    await findByText(/v0\.75\.0/);
+    await findByText("General Settings");
 
     await fireEvent.click(getByText("UI Themes"));
 
@@ -45,17 +45,27 @@ describe("SettingsView.svelte", () => {
   it("persists active tab as integrations when clicking Integrations tab", async () => {
     const { invoke } = await import("@tauri-apps/api/core");
     const { findByText, getByText } = render(SettingsView);
-    await findByText(/v0\.75\.0/);
+    await findByText("General Settings");
 
     await fireEvent.click(getByText("Integrations"));
 
     expect(invoke).toHaveBeenCalledWith("set_app_setting", { key: "active_settings_tab", value: "integrations" });
   });
 
+  it("persists active tab as system when clicking System tab", async () => {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const { findByText, getByText } = render(SettingsView);
+    await findByText("General Settings");
+
+    await fireEvent.click(getByText("System"));
+
+    expect(invoke).toHaveBeenCalledWith("set_app_setting", { key: "active_settings_tab", value: "system" });
+  });
+
   it("persists active tab as sources when clicking Sources tab", async () => {
     const { invoke } = await import("@tauri-apps/api/core");
     const { findByText, getByText } = render(SettingsView);
-    await findByText(/v0\.75\.0/);
+    await findByText("General Settings");
 
     await fireEvent.click(getByText("Sources"));
 
