@@ -1297,18 +1297,12 @@ export const fr: DeepStringRecord<typeof en> = {
   },
   artistInfo: {
     panelTitle: "Informations sur l'artiste",
-    sortName: "Nom de tri",
-    gender: "Genre",
     born: "Date de naissance",
     formed: "Date de formation",
     cityRegion: "Ville/Région",
     country: "Pays",
     died: "Date de décès",
     disbanded: "Dissous",
-    genderMale: "Masculin",
-    genderFemale: "Féminin",
-    genderNonBinary: "Non binaire",
-    genderOther: "Autre",
     lessThanOneYearAgo: "Il y a moins d'un an"
   },
   artistEvents: {

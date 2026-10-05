@@ -1246,18 +1246,12 @@ export const it = {
   },
   artistInfo: {
     panelTitle: "Informazioni sull'artista",
-    sortName: "Nome per l'ordinamento",
-    gender: "Sesso",
     born: "Nascita",
     formed: "Formazione",
     cityRegion: "Città/Regione",
     country: "Paese",
     died: "Morte",
     disbanded: "Scioglimento",
-    genderMale: "Maschile",
-    genderFemale: "Femminile",
-    genderNonBinary: "Non binario",
-    genderOther: "Altro",
     lessThanOneYearAgo: "<1 anno fa"
   },
   artistEvents: {

@@ -121,26 +121,6 @@ export function isArtistGroup(artistType?: string | null): boolean {
   return artistType?.trim().toLowerCase() === "group";
 }
 
-/**
- * Localizes common MusicBrainz gender strings.
- */
-export function resolveGenderLabel(gender?: string | null): string {
-  if (!gender || !gender.trim()) return "";
-  const normalized = gender.trim().toLowerCase();
-  switch (normalized) {
-    case "female":
-      return i18n.t("artistInfo.genderFemale", {}, "Female");
-    case "male":
-      return i18n.t("artistInfo.genderMale", {}, "Male");
-    case "non-binary":
-      return i18n.t("artistInfo.genderNonBinary", {}, "Non-binary");
-    case "other":
-      return i18n.t("artistInfo.genderOther", {}, "Other");
-    default:
-      return gender.charAt(0).toUpperCase() + gender.slice(1);
-  }
-}
-
 export interface AreaLinkItem {
   name: string;
   url?: string;
