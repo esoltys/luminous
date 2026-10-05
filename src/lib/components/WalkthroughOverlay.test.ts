@@ -20,7 +20,7 @@ function mountAllTargets() {
 
 describe("WalkthroughOverlay.svelte", () => {
   beforeEach(() => {
-    i18n.currentLocale = "en";
+    i18n.currentLocale = "en-CA";
     walkthroughStore.isActive = false;
     walkthroughStore.currentStepIndex = 0;
     walkthroughStore.seenStepIds = new Set();

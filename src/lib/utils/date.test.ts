@@ -4,7 +4,7 @@ import { i18n } from "../stores/i18n.svelte";
 
 describe("formatDateAdded", () => {
   beforeEach(() => {
-    i18n.currentLocale = "en";
+    i18n.currentLocale = "en-CA";
     vi.useFakeTimers();
     // Fixed reference time: 2026-09-13T12:00:00Z (midday)
     vi.setSystemTime(new Date("2026-09-13T12:00:00Z"));

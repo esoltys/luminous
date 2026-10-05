@@ -4,6 +4,7 @@ import { render, fireEvent } from "@testing-library/svelte";
 import SettingsGeneral from "./SettingsGeneral.svelte";
 import { invoke } from "@tauri-apps/api/core";
 import { prefs } from "../stores/prefs.svelte";
+import { i18n } from "../stores/i18n.svelte";
 import { updaterStore } from "../stores/updater.svelte";
 import { flushSync } from "svelte";
 
@@ -37,6 +38,7 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 describe("SettingsGeneral.svelte", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    i18n.currentLocale = "en-CA";
   });
 
   it("renders the version number and build commit hash", async () => {
@@ -55,6 +57,19 @@ describe("SettingsGeneral.svelte", () => {
 
     expect(prefs.autostartEnabled).toBe(true);
     expect(invoke).toHaveBeenCalledWith("set_autostart_enabled", { enabled: true });
+  });
+
+  it("lists every registered UI language by its own name and switches on pick", async () => {
+    const { findByLabelText } = render(SettingsGeneral);
+    const select = (await findByLabelText(/Language/)) as HTMLSelectElement;
+    expect([...select.options].map((o) => [o.value, o.textContent?.trim()])).toEqual([
+      ["en-CA", "English (Canada)"],
+      ["fr-CA", "Français (Canada)"],
+    ]);
+
+    await fireEvent.change(select, { target: { value: "fr-CA" } });
+
+    expect(invoke).toHaveBeenCalledWith("set_app_setting", { key: "language", value: "fr-CA" });
   });
 
   it("opens Windows Default Apps from the default player row", async () => {

@@ -309,7 +309,7 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
 
   describe("relocateDirectoryDialog (#1403)", () => {
     beforeEach(() => {
-      i18n.currentLocale = "en";
+      i18n.currentLocale = "en-CA";
       for (const m of [...toastStore.messages]) toastStore.dismiss(m.id);
     });
 

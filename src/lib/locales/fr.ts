@@ -264,8 +264,6 @@ export const fr: DeepStringRecord<typeof en> = {
     generalTitle: "Paramètres généraux",
     generalSubtitle: "Configurer la langue de l'application et les préférences de format.",
     selectLanguage: "Langue / Language",
-    languageEnglish: "English",
-    languageFrench: "Français",
     ratingStyle: "Style de notation des morceaux",
     ratingStyleHeart: "Cœur (favori)",
     ratingStyleStars: "5 étoiles",

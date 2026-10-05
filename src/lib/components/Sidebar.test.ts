@@ -18,7 +18,7 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 describe("Sidebar.svelte", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    i18n.currentLocale = "en";
+    i18n.currentLocale = "en-CA";
     navigationStore.activeTab = "collection";
     navigationStore.activeSubTab = "songs";
     collectionStore.stats = {
@@ -93,7 +93,7 @@ describe("Sidebar.svelte", () => {
   });
 
   it("formats collection numbers according to the active locale", () => {
-    i18n.currentLocale = "fr";
+    i18n.currentLocale = "fr-CA";
     collectionStore.stats = {
       ...collectionStore.stats,
       total_songs: 3095,

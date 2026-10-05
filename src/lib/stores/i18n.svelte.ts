@@ -1,21 +1,28 @@
-import { en } from '../locales/en';
-import { fr } from '../locales/fr';
+import { BASE_LOCALE, catalogChain, isLocale, legacyLanguageToLocale, type Locale } from '../locales';
 import { invoke } from '@tauri-apps/api/core';
 
-export type Locale = 'en' | 'fr';
+export type { Locale };
 
-const translations = { en, fr };
+/**
+ * Marks that `language` holds a BCP 47 tag. Builds before the locale registry saved bare
+ * "en"/"fr"; without this marker a saved "fr" could not be told apart from a future
+ * France-French tag of the same name, so legacy values are only aliased while it is absent.
+ */
+const LANGUAGE_TAGS_KEY = "language_tags";
 
 class I18nStore {
-  currentLocale = $state<Locale>('en');
+  currentLocale = $state<Locale>(BASE_LOCALE);
 
   async init() {
     try {
       const settings = await invoke<Record<string, string>>("get_all_app_settings");
-      if (settings && settings.language) {
-        if (settings.language === "en" || settings.language === "fr") {
-          this.currentLocale = settings.language as Locale;
-        }
+      const saved = settings?.language;
+      const migrating = settings?.[LANGUAGE_TAGS_KEY] !== "1";
+      const locale = saved ? (migrating ? legacyLanguageToLocale(saved) : null) ?? (isLocale(saved) ? saved : null) : null;
+      if (locale) this.currentLocale = locale;
+      if (migrating) {
+        if (locale) void invoke("set_app_setting", { key: "language", value: locale }).catch(() => {});
+        void invoke("set_app_setting", { key: LANGUAGE_TAGS_KEY, value: "1" }).catch(() => {});
       }
     } catch (e) {
       console.error("Failed to load language settings:", e);
@@ -44,27 +51,13 @@ class I18nStore {
 
   t(key: string, vars: Record<string, any> = {}, fallback?: string): string {
     const keys = key.split('.');
-    let value: any = translations[this.currentLocale];
-    for (const k of keys) {
-      if (value && typeof value === 'object') {
-        value = value[k];
-      } else {
-        value = undefined;
-        break;
-      }
-    }
-
-    if (value === undefined) {
-      // Fallback to English
-      value = translations['en'];
+    let value: any;
+    for (const catalog of catalogChain(this.currentLocale)) {
+      value = catalog;
       for (const k of keys) {
-        if (value && typeof value === 'object') {
-          value = value[k];
-        } else {
-          value = undefined;
-          break;
-        }
+        value = value && typeof value === 'object' ? value[k] : undefined;
       }
+      if (typeof value === 'string') break;
     }
 
     if (typeof value !== 'string') {

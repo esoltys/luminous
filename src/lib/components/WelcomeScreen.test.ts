@@ -10,7 +10,7 @@ vi.mock("../utils/openExternalUrl", () => ({
 
 describe("WelcomeScreen.svelte", () => {
   it("renders the welcome copy and Get Started button", () => {
-    i18n.currentLocale = "en";
+    i18n.currentLocale = "en-CA";
     render(WelcomeScreen, { onGetStarted: vi.fn() });
 
     expect(screen.getByText(i18n.t("welcome.title"))).toBeInTheDocument();
@@ -19,7 +19,7 @@ describe("WelcomeScreen.svelte", () => {
   });
 
   it("calls onGetStarted when the button is clicked", async () => {
-    i18n.currentLocale = "en";
+    i18n.currentLocale = "en-CA";
     const onGetStarted = vi.fn();
     render(WelcomeScreen, { onGetStarted });
 
@@ -29,7 +29,7 @@ describe("WelcomeScreen.svelte", () => {
   });
 
   it("opens the Terms of Service and Privacy Policy links externally", async () => {
-    i18n.currentLocale = "en";
+    i18n.currentLocale = "en-CA";
     const { openExternalUrl } = await import("../utils/openExternalUrl");
     render(WelcomeScreen, { onGetStarted: vi.fn() });
 

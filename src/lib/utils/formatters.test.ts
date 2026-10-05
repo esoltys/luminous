@@ -42,21 +42,21 @@ describe("formatters", () => {
   });
 
   it("formats file size according to active locale", () => {
-    i18n.currentLocale = "en";
+    i18n.currentLocale = "en-CA";
     expect(formatFileSize(1_342_177_280)).toBe("1.3 GB"); // 1.25 GB rounds to 1.3 with 1 fraction digit
     expect(formatFileSize(52_428_800)).toBe("50.0 MB");
 
-    i18n.currentLocale = "fr";
+    i18n.currentLocale = "fr-CA";
     expect(formatFileSize(1_342_177_280)).toBe("1,3 GB");
     expect(formatFileSize(52_428_800)).toBe("50,0 MB");
   });
 
   it("formats sample rate according to active locale", () => {
-    i18n.currentLocale = "en";
+    i18n.currentLocale = "en-CA";
     expect(formatSampleRate(44100)).toBe("44.1 kHz");
     expect(formatSampleRate(96000)).toBe("96.0 kHz");
 
-    i18n.currentLocale = "fr";
+    i18n.currentLocale = "fr-CA";
     expect(formatSampleRate(44100)).toBe("44,1 kHz");
     expect(formatSampleRate(96000)).toBe("96,0 kHz");
   });
@@ -64,7 +64,7 @@ describe("formatters", () => {
 
 describe("formatWindowTitle", () => {
   beforeEach(() => {
-    i18n.currentLocale = "en";
+    i18n.currentLocale = "en-CA";
   });
 
   it("returns 'Luminous' when stopped or paused, even with a song", () => {
@@ -95,7 +95,7 @@ describe("formatWindowTitle", () => {
   });
 
   it("respects French locale for fallback title", () => {
-    i18n.currentLocale = "fr";
+    i18n.currentLocale = "fr-CA";
     expect(formatWindowTitle({ title: "", artist: "Daft Punk" }, "playing")).toBe("Chanson inconnue - Daft Punk - Luminous");
     expect(formatWindowTitle({ title: "", artist: "" }, "playing")).toBe("Chanson inconnue - Luminous");
   });

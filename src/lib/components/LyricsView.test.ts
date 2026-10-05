@@ -191,7 +191,7 @@ describe("LyricsView.svelte", () => {
   });
 
   it("formats the offset controls for the French locale", async () => {
-    i18n.currentLocale = "fr";
+    i18n.currentLocale = "fr-CA";
     try {
       getOffsetResult = 1500;
       playerStore.currentSong = mockSong;
@@ -203,7 +203,7 @@ describe("LyricsView.svelte", () => {
       expect(getByRole("button", { name: "Afficher les paroles 0,5 s plus tôt" })).toHaveTextContent("+0,5 s");
       expect(getByRole("button", { name: "Afficher les paroles 0,5 s plus tard" })).toHaveTextContent(/^[-−]0,5 s$/);
     } finally {
-      i18n.currentLocale = "en";
+      i18n.currentLocale = "en-CA";
       getOffsetResult = 0;
     }
   });
