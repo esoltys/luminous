@@ -1,6 +1,6 @@
 <script lang="ts">
   import { i18n, type Locale } from "../stores/i18n.svelte";
-  import { LOCALES, localeLabel } from "../locales";
+  import { MANUAL_LANGUAGES, localeLabel, localePickerGroups, isManualLanguage } from "../locales";
   import { prefs, type RatingStyle, type WeekStart } from "../stores/prefs.svelte";
   import { updaterStore, MICROSOFT_STORE_URL } from "../stores/updater.svelte";
   import { onMount } from "svelte";
@@ -232,6 +232,8 @@
       console.error("Failed to fetch data directory info on mount:", e);
     }
   });
+
+  const languageGroups = localePickerGroups();
 </script>
 
 <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6">
@@ -250,10 +252,7 @@
   <div class="flex items-center justify-between gap-4 py-4">
     <div class="flex flex-col gap-0.5 min-w-0">
       <label for="language-select" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.selectLanguage')}</label>
-      <!-- Invisible placeholder matching the description line's height
-           in the rows below, so this row's control centers at the same
-           relative position as the ones with an actual description. -->
-      <p class="text-xs invisible" aria-hidden="true">&nbsp;</p>
+      <p class="text-xs text-brand-text-secondary">{i18n.t('settings.uiLanguageHint')}</p>
     </div>
     <Select
       id="language-select"
@@ -261,8 +260,35 @@
       onchange={(e) => i18n.setLocale(e.currentTarget.value as Locale)}
       class="shrink-0 bg-brand-main border border-brand-border hover:border-brand-accent/60 text-brand-text-primary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
     >
-      {#each LOCALES as def (def.tag)}
-        <option value={def.tag}>{localeLabel(def.tag)}</option>
+      {#each languageGroups.pinned as tag (tag)}
+        <option value={tag} lang={tag}>{localeLabel(tag)}</option>
+      {/each}
+      {#if languageGroups.rest.length > 0}
+        <!-- Non-focusable separator: a disabled option is skipped by keyboard navigation. -->
+        <option disabled>──────────</option>
+        {#each languageGroups.rest as tag (tag)}
+          <option value={tag} lang={tag}>{localeLabel(tag)}</option>
+        {/each}
+      {/if}
+    </Select>
+  </div>
+
+  <div class="flex items-center justify-between gap-4 py-4">
+    <div class="flex flex-col gap-0.5 min-w-0">
+      <label for="manual-language-select" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.manualLanguage')}</label>
+      <p class="text-xs text-brand-text-secondary">{i18n.t('settings.manualLanguageHint')}</p>
+    </div>
+    <Select
+      id="manual-language-select"
+      value={i18n.manualLanguage}
+      onchange={(e) => {
+        const code = e.currentTarget.value;
+        if (isManualLanguage(code)) void i18n.setManualLanguage(code);
+      }}
+      class="shrink-0 bg-brand-main border border-brand-border hover:border-brand-accent/60 text-brand-text-primary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+    >
+      {#each MANUAL_LANGUAGES as m (m.code)}
+        <option value={m.code} lang={m.code.toLowerCase()}>{m.label}</option>
       {/each}
     </Select>
   </div>

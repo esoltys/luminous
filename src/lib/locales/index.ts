@@ -65,3 +65,36 @@ export function localeLabel(tag: string): string {
   }
   return tag;
 }
+
+/** Locales listed first in the language picker, in this order. */
+const PINNED_LOCALES: readonly Locale[] = ["en-CA", "fr-CA"];
+
+/**
+ * The language picker's options: the pinned locales, then everything else sorted by its
+ * own-language label. The picker draws a separator between the groups when `rest` is non-empty.
+ */
+export function localePickerGroups(): { pinned: Locale[]; rest: Locale[] } {
+  const tags = LOCALES.map((def) => def.tag);
+  const pinned = PINNED_LOCALES.filter((tag) => tags.includes(tag));
+  const rest = tags
+    .filter((tag) => !pinned.includes(tag))
+    .sort((a, b) => localeLabel(a).localeCompare(localeLabel(b), a));
+  return { pinned, rest };
+}
+
+/** User guide languages shipped in `docs/user-guide/`; independent of the UI languages. */
+export const MANUAL_LANGUAGES = [
+  { code: "EN", label: "English" },
+  { code: "FR", label: "Français" },
+] as const;
+
+export type ManualLanguage = (typeof MANUAL_LANGUAGES)[number]["code"];
+
+export function isManualLanguage(code: unknown): code is ManualLanguage {
+  return MANUAL_LANGUAGES.some((m) => m.code === code);
+}
+
+/** The manual language implied by a UI locale: any `fr*` gives French, everything else English. */
+export function manualLanguageForLocale(tag: string): ManualLanguage {
+  return tag.toLowerCase().startsWith("fr") ? "FR" : "EN";
+}

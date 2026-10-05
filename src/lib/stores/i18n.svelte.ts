@@ -1,4 +1,13 @@
-import { BASE_LOCALE, catalogChain, isLocale, legacyLanguageToLocale, type Locale } from '../locales';
+import {
+  BASE_LOCALE,
+  catalogChain,
+  isLocale,
+  isManualLanguage,
+  legacyLanguageToLocale,
+  manualLanguageForLocale,
+  type Locale,
+  type ManualLanguage,
+} from '../locales';
 import { invoke } from '@tauri-apps/api/core';
 
 export type { Locale };
@@ -10,8 +19,17 @@ export type { Locale };
  */
 const LANGUAGE_TAGS_KEY = "language_tags";
 
+/** Explicit user-manual language; absent until the user picks one, so it follows the UI language. */
+const MANUAL_LANGUAGE_KEY = "manual_language";
+
 class I18nStore {
   currentLocale = $state<Locale>(BASE_LOCALE);
+  private explicitManualLanguage = $state<ManualLanguage | null>(null);
+
+  /** Language of the user guide the Help view loads. */
+  get manualLanguage(): ManualLanguage {
+    return this.explicitManualLanguage ?? manualLanguageForLocale(this.currentLocale);
+  }
 
   async init() {
     try {
@@ -20,6 +38,8 @@ class I18nStore {
       const migrating = settings?.[LANGUAGE_TAGS_KEY] !== "1";
       const locale = saved ? (migrating ? legacyLanguageToLocale(saved) : null) ?? (isLocale(saved) ? saved : null) : null;
       if (locale) this.currentLocale = locale;
+      const manual = settings?.[MANUAL_LANGUAGE_KEY];
+      if (isManualLanguage(manual)) this.explicitManualLanguage = manual;
       if (migrating) {
         if (locale) void invoke("set_app_setting", { key: "language", value: locale }).catch(() => {});
         void invoke("set_app_setting", { key: LANGUAGE_TAGS_KEY, value: "1" }).catch(() => {});
@@ -42,6 +62,15 @@ class I18nStore {
       await invoke("set_app_setting", { key: "language", value: locale });
     } catch (e) {
       console.error("Failed to save language settings:", e);
+    }
+  }
+
+  async setManualLanguage(language: ManualLanguage) {
+    this.explicitManualLanguage = language;
+    try {
+      await invoke("set_app_setting", { key: MANUAL_LANGUAGE_KEY, value: language });
+    } catch (e) {
+      console.error("Failed to save manual language setting:", e);
     }
   }
 
