@@ -277,7 +277,8 @@ pub async fn save_song_tags(
         Some(&state.cover_manager),
         &[song_id],
     ) {
-        if auto_res.moved_count > 0 || auto_res.duplicates_count > 0 || !auto_res.errors.is_empty() {
+        if auto_res.moved_count > 0 || auto_res.duplicates_count > 0 || !auto_res.errors.is_empty()
+        {
             let _ = app.emit("auto-organize-result", &auto_res);
         }
         if auto_res.moved_count > 0 {
@@ -489,7 +490,8 @@ pub async fn save_album_tags(
         Some(&state.cover_manager),
         &song_ids,
     ) {
-        if auto_res.moved_count > 0 || auto_res.duplicates_count > 0 || !auto_res.errors.is_empty() {
+        if auto_res.moved_count > 0 || auto_res.duplicates_count > 0 || !auto_res.errors.is_empty()
+        {
             let _ = app.emit("auto-organize-result", &auto_res);
         }
         if auto_res.moved_count > 0 {

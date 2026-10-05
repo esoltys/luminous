@@ -18,7 +18,8 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::AtomicU32;
 use std::sync::Arc;
 
-pub const DEFAULT_ORGANIZE_TEMPLATE: &str = "%albumartist/{%year - }{%album/}{%disc-}{%track }%title";
+pub const DEFAULT_ORGANIZE_TEMPLATE: &str =
+    "%albumartist/{%year - }{%album/}{%disc-}{%track }%title";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct OrganizeConfig {
@@ -2220,7 +2221,11 @@ mod tests {
         };
         upsert_song(&conn, &song1).unwrap();
         let id1: i64 = conn
-            .query_row("SELECT id FROM songs WHERE path = ?1", params![song1.path], |row| row.get(0))
+            .query_row(
+                "SELECT id FROM songs WHERE path = ?1",
+                params![song1.path],
+                |row| row.get(0),
+            )
             .unwrap();
 
         // Song 2: Missing title tag (MissingTag guardrail must protect it)
@@ -2237,21 +2242,19 @@ mod tests {
         };
         upsert_song(&conn, &song2).unwrap();
         let id2: i64 = conn
-            .query_row("SELECT id FROM songs WHERE path = ?1", params![song2.path], |row| row.get(0))
+            .query_row(
+                "SELECT id FROM songs WHERE path = ?1",
+                params![song2.path],
+                |row| row.get(0),
+            )
             .unwrap();
 
         let watcher_paused = Arc::new(AtomicU32::new(0));
         let self_writes = Arc::new(crate::collection::SelfWriteTracker::new());
 
         // A. When auto_organize is false, auto_organize_song_ids does nothing
-        let res_off = auto_organize_song_ids(
-            &db,
-            &watcher_paused,
-            &self_writes,
-            None,
-            &[id1, id2],
-        )
-        .unwrap();
+        let res_off =
+            auto_organize_song_ids(&db, &watcher_paused, &self_writes, None, &[id1, id2]).unwrap();
         assert_eq!(res_off.moved_count, 0);
         assert!(file1.exists());
         assert!(file2.exists());
@@ -2263,14 +2266,8 @@ mod tests {
         set_organize_config(&db, &cfg).unwrap();
 
         // C. Run auto_organize_song_ids: song1 moves, song2 is protected and stays
-        let res_on = auto_organize_song_ids(
-            &db,
-            &watcher_paused,
-            &self_writes,
-            None,
-            &[id1, id2],
-        )
-        .unwrap();
+        let res_on =
+            auto_organize_song_ids(&db, &watcher_paused, &self_writes, None, &[id1, id2]).unwrap();
         assert_eq!(res_on.moved_count, 1);
         assert_eq!(res_on.duplicates_count, 0);
         assert!(res_on.errors.is_empty());
@@ -2279,7 +2276,14 @@ mod tests {
             .join("Artist Alpha")
             .join("Album One")
             .join("Song One.mp3");
-        assert!(expected_dst.exists(), "song 1 should be moved to {:?}", expected_dst);
-        assert!(file2.exists(), "song 2 (missing tag) must remain in original place");
+        assert!(
+            expected_dst.exists(),
+            "song 1 should be moved to {:?}",
+            expected_dst
+        );
+        assert!(
+            file2.exists(),
+            "song 2 (missing tag) must remain in original place"
+        );
     }
 }
