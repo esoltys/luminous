@@ -25,6 +25,7 @@ describe("SettingsGeneral.svelte", () => {
       ["de", "Deutsch"],
       ["es", "Español"],
       ["it", "Italiano"],
+      ["uk", "Українська"],
     ]);
 
     await fireEvent.change(select, { target: { value: "fr-CA" } });

@@ -4,6 +4,7 @@ import { en } from "./en";
 import { es } from "./es";
 import { fr } from "./fr";
 import { it as itMessages } from "./it";
+import { uk } from "./uk";
 import { BASE_LOCALE, LOCALES, catalogChain, isLocale, legacyLanguageToLocale, localeLabel, localePickerGroups, manualLanguageForLocale } from "./index";
 
 const PLURAL_CATEGORIES = new Set(["zero", "one", "two", "few", "many", "other"]);
@@ -435,11 +436,51 @@ const IDENTICAL_OK_DE = new Set<string>([
   "auth.scrobbling",
 ]);
 
+// Brands, acronyms, units, symbols and example URLs or paths that Ukrainian leaves as they are.
+const IDENTICAL_OK_UK = new Set<string>([
+  "collection.columnBpm", // BPM
+  "collection.tableHeaderBpm", // BPM
+  "collection.tableHeaderMusicBrainzId", // MBID
+  "settings.aboutAppName", // the app name
+  "settings.formatMsix", // Microsoft Store
+  "settings.formatAppImage", // Linux AppImage
+  "settings.badgeIconUsb", // USB
+  "settings.webdavUrlPlaceholder", // an example URL
+  "settings.subsonicUrlPlaceholder", // an example URL
+  "playlists.populationModeTitleFormat", // "{base} {suffix}"
+  "playlists.bpmAutoPlaylist", // BPM
+  "playerBar.musicbrainzSectionLabel", // MusicBrainz
+  "playerBar.critiquebrainzSectionLabel", // CritiqueBrainz
+  "playerBar.listenbrainzSectionLabel", // ListenBrainz
+  "tagEditor.bpmField", // BPM
+  "equalizer.importPlaceholder", // Equalizer APO sample lines, same syntax in every language
+  "equalizer.qFactor", // Q
+  "equalizer.isoStandard", // ISO 266:1997
+  "themes.dynamic-artwork", // "✨ Luminous"
+  "themes.sabrina", // a theme name
+  "albumDetail.statsLine", // "{genre} · {year} · {duration}"
+  "picard.integrationTitle", // MusicBrainz Picard
+  "picard.customPathPlaceholder", // a Windows path
+  "picard.customPathPlaceholderLinux", // a Linux path
+  "listenbrainz.critiquebrainzUserPlaceholder", // a URL
+  "discord.integrationTitle", // Discord Rich Presence
+  "smartPlaylistBuilder.fieldBpm", // BPM
+  "smartPlaylistBuilder.opEquals", // "="
+  "smartPlaylistBuilder.opNotEquals", // "!="
+  "smartPlaylistBuilder.opGte", // ">="
+  "smartPlaylistBuilder.opLte", // "<="
+  "smartPlaylistBuilder.opGt", // ">"
+  "smartPlaylistBuilder.opLt", // "<"
+  "audioPipeline.tierHiRes", // Hi-Res Audio
+  "audioPipeline.bitPerfect", // Bit-perfect
+]);
+
 const CATALOGS = [
   { name: "German", tag: "de", file: "de.ts", messages: de, identicalOk: IDENTICAL_OK_DE },
   { name: "Spanish", tag: "es", file: "es.ts", messages: es, identicalOk: IDENTICAL_OK_ES },
   { name: "French", tag: "fr-CA", file: "fr.ts", messages: fr, identicalOk: IDENTICAL_OK_FR },
   { name: "Italian", tag: "it", file: "it.ts", messages: itMessages, identicalOk: IDENTICAL_OK_IT },
+  { name: "Ukrainian", tag: "uk", file: "uk.ts", messages: uk, identicalOk: IDENTICAL_OK_UK },
 ];
 
 describe.each(CATALOGS)("Locale translation completeness and integrity: $name", ({ name, tag, file, messages, identicalOk }) => {

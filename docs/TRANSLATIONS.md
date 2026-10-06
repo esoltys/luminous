@@ -50,7 +50,7 @@ Each source is where a term gets checked, in the order listed. "Microsoft Termin
 | en-US | Merriam-Webster | |
 | en-GB | Oxford English Dictionary or Collins | |
 
-Link status when this was written: the hosts above that have a URL answered, except the RAE, Gramota.ru and Merriam-Webster sites, which refuse automated requests and need a manual check in a browser. No stable FranceTerme or Ukrainian Orthography URL has been confirmed yet; find and add them when the fr (France) and uk locales are drafted. Treat every authority as "proposed" until the person drafting that language has used it once and confirmed it gives usable answers for UI terms.
+Link status when this was written: the hosts above that have a URL answered, except the RAE, Gramota.ru and Merriam-Webster sites, which refuse automated requests and need a manual check in a browser. No stable FranceTerme or Ukrainian Orthography URL has been confirmed yet; find and add them when the fr (France) locale is drafted and when the uk draft gets a native review. Treat every authority as "proposed" until the person drafting that language has used it once and confirmed it gives usable answers for UI terms.
 
 ## French (Canada)
 
@@ -81,4 +81,10 @@ Established terms and register are recorded here as each language is drafted, so
   - Failure: "… konnte nicht gespeichert werden" or "Fehler beim …", not "fehlgeschlagen" for every case. No "(s)" slash plurals; rephrase around the count.
   - Kept English where Windows or the field does: *Scrobbling*, *Bit-perfect*, *Resampling*, *Codec*, *Decoder*, *Pop/Rock/Jazz*, *Add-on*, brands and symbols (see `IDENTICAL_OK_DE`).
   - Time-of-day wording matches across `home.greeting*`, `stats.clock*` and `playlists.daypart*` (*Morgen*, *Nachmittag*, *Abend*, *Nacht*).
-- **uk, ru, en-US, en-GB, fr (France):** empty until drafted.
+- **uk** (locale tag `uk`; drafted from `en.ts` by Claude, not yet reviewed by a native speaker). **Register:** no direct address in labels, buttons and hints (infinitive: "Додати папку", "Вибрати мову меню, кнопок і повідомлень."); where a sentence must address the user, the polite plural imperative as Windows does ("Виберіть", "Натисніть", "Установіть"); never "ти". Established terms:
+  - *пісня* (song; *композиція* for a track, *№ композиції* for "Track #"), *виконавець* (artist), *бібліотека* (library), *колекція* (Collection view), *список відтворення* (playlist; *розумний список відтворення* for Smart Playlist, *автосписок* for Auto-Playlist), *черга* (Queue), *улюблені* (favourites), *текст пісні* (lyrics), *обкладинка* (artwork), *тег* (tag), *папка* (folder; Windows says *папка*, so not the native-but-unfamiliar *тека*), *диск* (drive), *область сповіщень* (system tray), *перехресне згасання* (crossfade), *попереднє підсилення* (preamp), *Налаштування* (Settings), *Статистика* (Stats), *скроблінг* (scrobbling), *мікс* (mix), *доповнення* (add-on).
+  - Plurals: every counted string has `one` / `few` / `many` / `other` (1 пісня, 2 пісні, 5 пісень); `other`, used for fractions, is the genitive singular. Where a verb or participle agrees with the number, the form is written out per category ("Відтворюється 1 пісня", "Відтворюються 2 пісні").
+  - Typography: «лапки» around substituted names, the typographic apostrophe ’ (U+2019) in words like *пов’язано*, a space before `%` and units (`{percent} %`, `дБ`, `кБ`), decimal comma, `хв` for minutes and `с` for seconds, "А–Я" sort ranges. Sentence case in labels.
+  - Time-of-day wording matches across `home.greeting*`, `stats.clock*` and `playlists.daypart*` (*ранок*, *день*, *вечір*, *ніч*). Short names matter in cards and tabs: auto-playlist and theme names were shortened after a width check (*Часто відтворювані*, *Морська деревина*, *Повільний BPM*).
+  - Kept English where Windows or the field does: *BPM*, *Bit-perfect*, *Hi-Res Audio*, brands, symbols and example URLs (see `IDENTICAL_OK_UK`).
+- **ru, en-US, en-GB, fr (France):** empty until drafted.

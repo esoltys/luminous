@@ -3,6 +3,7 @@ import { en } from "./en";
 import { es } from "./es";
 import { fr } from "./fr";
 import { it } from "./it";
+import { uk } from "./uk";
 
 export type Messages = { [key: string]: string | Messages };
 
@@ -27,6 +28,7 @@ export const LOCALES = [
   { tag: "es", messages: es },
   { tag: "fr-CA", messages: fr },
   { tag: "it", messages: it },
+  { tag: "uk", messages: uk },
 ] as const satisfies readonly LocaleDef[];
 
 export type Locale = (typeof LOCALES)[number]["tag"];
@@ -77,14 +79,14 @@ const PINNED_LOCALES: readonly Locale[] = ["en-CA", "fr-CA"];
 
 /**
  * The language picker's options: the pinned locales, then everything else sorted by its
- * own-language label. The picker draws a separator between the groups when `rest` is non-empty.
+ * own-language label, collated with one fixed locale so a non-Latin script does not reorder the list. The picker draws a separator between the groups when `rest` is non-empty.
  */
 export function localePickerGroups(): { pinned: Locale[]; rest: Locale[] } {
   const tags = LOCALES.map((def) => def.tag);
   const pinned = PINNED_LOCALES.filter((tag) => tags.includes(tag));
   const rest = tags
     .filter((tag) => !pinned.includes(tag))
-    .sort((a, b) => localeLabel(a).localeCompare(localeLabel(b), a));
+    .sort((a, b) => localeLabel(a).localeCompare(localeLabel(b), BASE_LOCALE));
   return { pinned, rest };
 }
 
