@@ -237,6 +237,7 @@ pub struct NetworkProvisioner {
 
 impl NetworkProvisioner {
     pub fn new(cache_dir: PathBuf) -> Self {
+        #[cfg_attr(not(debug_assertions), allow(unused_mut))]
         let mut p = Self {
             key_base_url: keyclient::DEFAULT_KEY_BASE_URL.to_string(),
             bundle_base_url: bundle::DEFAULT_BASE_URL.to_string(),
