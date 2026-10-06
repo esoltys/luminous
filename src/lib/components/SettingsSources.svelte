@@ -159,6 +159,7 @@
         updated: stats.updated,
         errors: stats.errors,
       });
+      if (stats.errors > 0) syncFeedback += ` ${i18n.t("settings.webdavSyncErrorsHint")}`;
       tasksStore.completeTask(taskId, `${server.name}: ${syncFeedback}`);
       await loadWebdavServers();
     } catch (e: any) {

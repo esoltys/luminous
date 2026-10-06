@@ -476,6 +476,8 @@ pub async fn sync_webdav_server_inner(
         let mut probe_time = std::time::Duration::ZERO;
         let mut dirs_listed = 0usize;
         let mut files_probed = 0usize;
+        // Files that failed to probe or store, for the diagnostics export (#1495).
+        let mut failures: Vec<(String, String)> = Vec::new();
 
         // Walk the tree one depth level at a time so each level's directories
         // are listed concurrently (bounded) instead of one PROPFIND at a time.
@@ -672,6 +674,7 @@ pub async fn sync_webdav_server_inner(
 
                             if let Err(e) = crate::collection::upsert_song(&tx, &song) {
                                 log::warn!("Failed to upsert WebDAV song {}: {e}", item.href);
+                                failures.push((item.href.clone(), format!("could not store song: {e}")));
                                 stats.errors += 1;
                                 continue;
                             }
@@ -704,6 +707,7 @@ pub async fn sync_webdav_server_inner(
                         }
                         Err(err) => {
                             log::warn!("Failed to probe WebDAV file {}: {err}", item.href);
+                            failures.push((item.href.clone(), format!("tag probe failed: {err}")));
                             stats.errors += 1;
                         }
                     }
@@ -786,7 +790,7 @@ pub async fn sync_webdav_server_inner(
             },
         );
 
-        let summary = format!(
+        let mut summary = format!(
             concat!(
                 "webdav sync ({}): total {} ms | {} file(s) seen, ",
                 "{} probed, {} added, {} updated, {} removed, {} error(s) | ",
@@ -805,6 +809,7 @@ pub async fn sync_webdav_server_inner(
             skipped_dirs.len(),
             probe_time.as_millis(),
         );
+        summary.push_str(&failure_report(&failures));
         log::info!("{summary}");
         crate::diagnostics::record_operation(&summary);
 
@@ -813,6 +818,29 @@ pub async fn sync_webdav_server_inner(
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+/// Failed files listed per sync in the diagnostics export; the rest are only counted (#1495).
+const MAX_REPORTED_FAILURES: usize = 20;
+
+/// Lines naming the files that failed during a sync and why (English: the diagnostics
+/// log is for bug reports, not the UI). Empty when nothing failed.
+fn failure_report(failures: &[(String, String)]) -> String {
+    let mut out = String::new();
+    for (href, reason) in failures.iter().take(MAX_REPORTED_FAILURES) {
+        out.push_str(&format!(
+            "
+    failed: {href} ({reason})"
+        ));
+    }
+    if failures.len() > MAX_REPORTED_FAILURES {
+        out.push_str(&format!(
+            "
+    ... and {} more failed file(s)",
+            failures.len() - MAX_REPORTED_FAILURES
+        ));
+    }
+    out
 }
 
 /// Longest an auto-sync may go without listing every folder (#1483).
@@ -1036,6 +1064,25 @@ mod tests {
     use super::*;
     use crate::models::{Song, SongSource};
     use crate::webdav::WebDavItem;
+
+    #[test]
+    fn failure_report_lists_files_and_caps_the_rest() {
+        assert_eq!(failure_report(&[]), "");
+
+        let one = vec![("/a.mp3".to_string(), "tag probe failed: 404".to_string())];
+        assert_eq!(
+            failure_report(&one),
+            "
+    failed: /a.mp3 (tag probe failed: 404)"
+        );
+
+        let many: Vec<_> = (0..MAX_REPORTED_FAILURES + 3)
+            .map(|i| (format!("/{i}.mp3"), "boom".to_string()))
+            .collect();
+        let report = failure_report(&many);
+        assert_eq!(report.matches("failed: /").count(), MAX_REPORTED_FAILURES);
+        assert!(report.ends_with("... and 3 more failed file(s)"));
+    }
 
     fn item(etag: Option<&str>, len: u64) -> WebDavItem {
         WebDavItem {

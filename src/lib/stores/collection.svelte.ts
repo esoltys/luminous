@@ -546,7 +546,8 @@ class CollectionStore {
             added,
             updated,
             errors,
-          }, `Sync complete: ${added} added, ${updated} updated, ${errors} errors`);
+          }, `Sync complete: ${added} added, ${updated} updated, ${errors} errors`)
+            + (errors > 0 ? ` ${i18n.t("settings.webdavSyncErrorsHint")}` : "");
           tasksStore.completeTask(taskId, `${server_name}: ${summary}`);
           this.refreshWebDavServers();
         } else {
