@@ -19,6 +19,7 @@
   import { playerStore } from "../stores/player.svelte";
   import { getCoverArtUrl, resolveArtUrl, type Song, type StatsSummary, type StatsRange, type StatsTopItem } from "../types";
   import { getArtistAlbums, classifyRelease } from "../utils/artist";
+  import { statsBarPercents } from "../utils/statsBars";
   import { songsToCoverStack, getArtistCoverStack, resolveArtistPortraitUrl, type CoverStackItem } from "../utils/covers";
   import { bucketListeningClock } from "../utils/listeningClock";
   import type { DaypartBucket } from "../utils/daypart";
@@ -209,9 +210,15 @@
     });
   });
 
+  /** Pairs each ranked item with its proportional-bar percent (#1475), shared with the Stats lists. */
+  function withBarPercents(items: StatsTopItem[]) {
+    const percents = statsBarPercents(items);
+    return items.map((it, i) => ({ ...it, percent: percents[i] }));
+  }
+
   let trackCards = $derived<ShareCardTrack[]>(
     entity.kind === "stats-section"
-      ? entity.items.slice(0, 10).map((it, i) => ({ number: i + 1, title: it.label, secondary: it.secondary }))
+      ? withBarPercents(entity.items.slice(0, 10)).map((it, i) => ({ number: i + 1, title: it.label, secondary: it.secondary, percent: it.percent }))
       : entity.kind === "playlist"
         // A playlist spans multiple artists, unlike an album, so each row
         // needs its own artist to be legible on its own.
@@ -528,7 +535,7 @@
     if (entity.kind !== "stats") return [];
     const s = entity.summary;
     const toItems = (items: StatsTopItem[]) =>
-      items.slice(0, 5).map((it) => ({ label: it.label, secondary: it.secondary }));
+      withBarPercents(items.slice(0, 5)).map((it) => ({ label: it.label, secondary: it.secondary, percent: it.percent }));
     return [
       { title: i18n.t("stats.topArtists", {}, "Top Artists"), items: toItems(s.top_artists), coverStackDataUris: statsArtistsCoverStack },
       { title: i18n.t("stats.topAlbums", {}, "Top Albums"), items: toItems(s.top_albums), coverStackDataUris: statsAlbumsCoverStack },

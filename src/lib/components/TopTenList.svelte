@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { StatsTopItem, Song, AlbumItem } from "../types";
+  import { statsBarPercents } from "../utils/statsBars";
   import { playerStore } from "../stores/player.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
   import { collectionStore } from "../stores/collection.svelte";
@@ -56,29 +57,11 @@
     onShareClick,
   }: Props = $props();
 
-  // Relative scaling calculation for proportional accent bars (#1475)
-  const maxMetric = $derived.by(() => {
-    if (!items || items.length === 0) return 0;
-    const topItem = items[0];
-    if (topItem.minutes > 0) return topItem.minutes;
-    if (topItem.play_count > 0) return topItem.play_count;
-    const maxMinutes = Math.max(0, ...items.map((it) => it.minutes || 0));
-    if (maxMinutes > 0) return maxMinutes;
-    return Math.max(0, ...items.map((it) => it.play_count || 0));
-  });
-
-  const useMinutesMetric = $derived.by(() => {
-    if (!items || items.length === 0) return true;
-    const topItem = items[0];
-    if (topItem.minutes > 0) return true;
-    if (topItem.play_count > 0) return false;
-    return Math.max(0, ...items.map((it) => it.minutes || 0)) > 0;
-  });
+  // Relative scaling for proportional accent bars (#1475)
+  const barPercents = $derived(statsBarPercents(items));
 
   function getItemPercent(item: StatsTopItem): number {
-    if (!showAccentBars || maxMetric <= 0) return 0;
-    const val = useMinutesMetric ? item.minutes : item.play_count;
-    return Math.min(100, Math.max(0, (val / maxMetric) * 100));
+    return showAccentBars ? (barPercents[items.indexOf(item)] ?? 0) : 0;
   }
 
   let contextMenuState = $state<{ x: number; y: number; song: Song } | null>(null);

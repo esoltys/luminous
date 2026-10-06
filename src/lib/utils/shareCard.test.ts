@@ -401,6 +401,27 @@ describe("buildStatsShareCardSvg", () => {
   });
 });
 
+describe("share card proportional bars (#1475)", () => {
+  it("draws a bar behind track rows that carry a percent, and none otherwise", () => {
+    const withBars = buildShareCardSvg({
+      ...baseOptions,
+      aspectRatio: "4:3",
+      includeTrackList: true,
+      coverDataUri: null,
+      tracks: [{ number: 1, title: "Pop", percent: 100 }, { number: 2, title: "Rock", percent: 40 }],
+    });
+    expect(withBars.svg).toContain("linear-gradient(90deg,rgba(255,255,255,0.16) 40%,transparent 40%)");
+    const without = buildShareCardSvg({
+      ...baseOptions,
+      aspectRatio: "4:3",
+      includeTrackList: true,
+      coverDataUri: null,
+      tracks: [{ number: 1, title: "Pop" }],
+    });
+    expect(without.svg).not.toContain("linear-gradient(90deg,rgba");
+  });
+});
+
 describe("buildMosaicCoverHtml", () => {
   it("returns empty string when no covers are provided", () => {
     expect(buildMosaicCoverHtml(null, [], 100)).toBe("");

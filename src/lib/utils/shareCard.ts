@@ -42,6 +42,9 @@ export interface ShareCardTrack {
    * Secondary" convention already used by the stats card's own rows. Album
    * cards omit it since every track already shares the card's one artist. */
   secondary?: string | null;
+  /** 0-100 share of the list's leader; draws the proportional bar behind the
+   * row (#1475). Omit for lists with no ranking metric (albums, playlists). */
+  percent?: number | null;
 }
 
 export interface ShareCardOptions {
@@ -76,6 +79,14 @@ function escapeHtml(value: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+/** Row background drawing a proportional bar (a hard-stop gradient, so it needs no layering). */
+function rowBarStyle(percent: number | null | undefined, isDark: boolean): string {
+  if (percent == null) return "";
+  const color = isDark ? "rgba(255,255,255,0.16)" : "rgba(0,0,0,0.12)";
+  const p = Math.round(Math.min(100, Math.max(0, percent)) * 10) / 10;
+  return `background:linear-gradient(90deg,${color} ${p}%,transparent ${p}%);border-radius:6px;padding-left:10px;padding-right:10px;`;
 }
 
 /**
@@ -246,7 +257,15 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
   // to fill the space on its own (e.g. a 9:16 artist card with just a name).
   // Portrait/square frames have plenty of room below the cover, so the text
   // reads bigger there than the cover-sizing scale alone would make it.
-  const textScale = isPortrait ? Math.min(1.9, contentScale * 1.4) : contentScale;
+  // A card with no cover (e.g. Top Genres) is just text, so it scales up to fill the frame.
+  const noCover = !options.coverDataUri && !(options.coverStackDataUris ?? []).some(Boolean);
+  const textScale = noCover
+    ? isPortrait
+      ? Math.min(2.8, contentScale * 2)
+      : 1.6 * Math.min(1, 1440 / width)
+    : isPortrait
+      ? Math.min(1.9, contentScale * 1.4)
+      : contentScale;
   const coverContentScale = textLineCount >= 3 ? contentScale : textLineCount === 2 ? Math.min(contentScale, 1.15) : Math.min(contentScale, 1);
   // A long track list needs more of the frame for itself, so a cover sized
   // for a typical ~10-track album (no shrink) is too big once a list is
@@ -276,7 +295,7 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
 
     const rows = visible.map(
       (track) =>
-        `<div style="display:flex;gap:10px;align-items:baseline;padding:4px 0;font-size:${rowFontSize}px;color:${textSecondary};break-inside:avoid;">` +
+        `<div style="display:flex;gap:10px;align-items:baseline;padding:4px 0;font-size:${rowFontSize}px;color:${textSecondary};break-inside:avoid;${rowBarStyle(track.percent, isDark)}">` +
           (track.number != null
             ? `<span style="min-width:1.8em;text-align:right;opacity:0.7;">${track.number}</span>`
             : "") +
@@ -295,7 +314,7 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
     // trackListLayout already sizes for the expected case, cap the block's
     // own height and clip it so it can never grow past the LUMINOUS mark
     // pinned near the bottom of the frame, rather than overlapping it.
-    const trackListMaxHeight = Math.round(height * (isPortrait ? 0.36 : 0.4));
+    const trackListMaxHeight = Math.round(height * (noCover ? (isPortrait ? 0.5 : 0.62) : isPortrait ? 0.36 : 0.4));
 
     trackListHtml =
       `<div style="margin-top:${Math.round(width * 0.025 * textScale)}px;text-align:left;width:100%;column-count:${columns};column-gap:${Math.round(width * 0.03)}px;max-height:${trackListMaxHeight}px;overflow:hidden;">` +
@@ -307,6 +326,8 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
   const textAlign = isPortrait ? "center" : "left";
   const groupDirection = isPortrait ? "column" : "row";
   const textBlockMaxWidth = isPortrait ? Math.round(width * 0.82) : undefined;
+  // With no cover the list is the whole card: let it span the content width so the bars read as a chart.
+  const noCoverWidth = Math.round(width * (isPortrait ? 0.82 : 0.8));
   const contentGap = Math.round(width * 0.035 * contentScale);
 
   // In landscape frames, the mosaic fills a box: coverSize tall and a safe
@@ -339,7 +360,7 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
     (listRows > 0 ? width * 0.025 * textScale + listRows * (rowFont * 1.35 + 8) : 0);
   // The LUMINOUS mark is pinned bottom-left, so tall frames reserve a strip for
   // it under the centered content rather than letting a long list run into it.
-  const footerReserve = isPortrait ? Math.round(width * 0.075) : 0;
+  const footerReserve = isPortrait ? Math.round(width * 0.075) : noCover ? Math.round(width * 0.05) : 0;
   const portraitMosaicHeight = Math.round(
     Math.max(coverSize * 0.8, Math.min(height - 2 * cardPad - footerReserve - estTextHeight * 1.06 - contentGap, coverSize * 2))
   );
@@ -347,13 +368,13 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
 
   const contentHtml = `
     <div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;width:100%;height:100%;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:${cardPad}px ${cardPad}px ${cardPad + footerReserve}px;box-sizing:border-box;font-family:'Fira Sans','Inter','Segoe UI',system-ui,sans-serif;">
-      <div style="display:flex;flex-direction:${groupDirection};align-items:center;gap:${contentGap}px;max-width:100%;">
+      <div style="display:flex;flex-direction:${groupDirection};align-items:center;gap:${contentGap}px;max-width:100%;${noCover ? `width:${noCoverWidth}px;` : ""}">
         ${!isPortrait
           ? buildMosaicCoverHtml(options.coverDataUri, options.coverStackDataUris, coverSize, coverSize, { width: maxMosaicWidth, height: coverSize })
           : hasMosaic
           ? buildMosaicCoverHtml(options.coverDataUri, options.coverStackDataUris, coverSize, coverSize, { width: portraitMosaicWidth, height: portraitMosaicHeight })
           : buildCoverHtml(options.coverDataUri, options.coverStackDataUris, coverSize, false)}
-        <div style="min-width:0;${isPortrait ? "" : "flex:1;"}display:flex;flex-direction:column;gap:2px;align-items:${isPortrait ? "center" : "flex-start"};text-align:${textAlign};${textBlockMaxWidth ? `max-width:${textBlockMaxWidth}px;` : ""}">
+        <div style="min-width:0;${isPortrait ? "" : "flex:1;"}display:flex;flex-direction:column;gap:2px;align-items:${isPortrait ? "center" : "flex-start"};text-align:${textAlign};${noCover ? "width:100%;" : textBlockMaxWidth ? `max-width:${textBlockMaxWidth}px;` : ""}">
           <div style="font-size:${Math.round(width * 0.046 * textScale)}px;font-weight:800;color:${textPrimary};line-height:1.3;padding-bottom:0.08em;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${escapeHtml(options.title)}</div>
           <div style="font-size:${Math.round(width * 0.026 * textScale)}px;font-weight:600;color:${textSecondary};margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">${escapeHtml(options.subtitle)}</div>
           <div style="font-size:${Math.round(width * 0.019 * textScale)}px;color:${textSecondary};margin-top:6px;">${escapeHtml(options.metadataLine)}</div>
@@ -389,6 +410,8 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
 interface StatsShareCardItem {
   label: string;
   secondary?: string | null;
+  /** 0-100 share of the list's leader, for the proportional bar behind the row. */
+  percent?: number | null;
 }
 
 export interface StatsShareCardSection {
@@ -474,7 +497,7 @@ export function buildStatsShareCardSvg(options: StatsShareCardOptions): { svg: s
       const rows = section.items
         .map(
           (item, i) =>
-            `<div style="display:flex;gap:${rowGap}px;align-items:baseline;padding:${rowPad}px 0;font-size:${rowSize}px;color:${textSecondary};">` +
+            `<div style="display:flex;gap:${rowGap}px;align-items:baseline;padding:${rowPad}px 0;font-size:${rowSize}px;color:${textSecondary};${rowBarStyle(item.percent, isDark)}">` +
               `<span style="min-width:1.6em;opacity:0.6;">${i + 1}</span>` +
               `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">${escapeHtml(item.label)}${
                 item.secondary ? ` <span style="opacity:0.65;">— ${escapeHtml(item.secondary)}</span>` : ""
