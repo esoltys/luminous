@@ -1301,15 +1301,15 @@ impl CollectionScanner {
 
     /// Weekly "Top Albums" chart (#662): albums ranked by minutes played
     /// (then play count), matching the Stats view's Top Albums (including
-    /// its "Don't include in stats" album exclusions), within
-    /// the current local calendar week (starting local midnight on the
+    /// its "Don't include in stats" album exclusions), within the most
+    /// recent *completed* local calendar week (starting local midnight on the
     /// user's chosen Sunday or Monday), with movement (new/rising/falling/steady) against the
-    /// prior week, peak rank, and weeks-on-chart. Backed by a snapshot table
+    /// week before it, peak rank, and weeks-on-chart. The running week is not
+    /// charted until it ends. Backed by a snapshot table
     /// (`album_chart_history`, migration 22) written lazily on each call —
-    /// there's no scheduler in this codebase, so the current week's rows are
-    /// replaced here every time, keeping the snapshot current as new plays
-    /// land during the week. Past weeks are rebuilt from play_history
-    /// whenever they weren't built under the current `week_start` setting.
+    /// there's no scheduler in this codebase. Past weeks are rebuilt from
+    /// play_history whenever they weren't built under the current
+    /// `week_start` setting.
     pub fn get_top_albums(&self, limit: i64) -> Result<Vec<TopAlbumItem>> {
         self.get_top_albums_at(limit, chrono::Utc::now().timestamp(), &chrono::Local)
     }
@@ -1331,95 +1331,32 @@ impl CollectionScanner {
             )
             .map(|v| v == "sunday")
             .unwrap_or(true);
+        // The chart is last week's listening: the in-progress week only
+        // appears once it has ended, so a new week starts out showing the
+        // week that just finished, not an empty or half-built chart.
+        let current = chart_week(now, start_sunday, tz);
+        rebuild_chart_history_if_stale(&conn, start_sunday, current.starts_at, limit, tz)?;
         let ChartWeek {
             period_start,
             starts_at,
-        } = chart_week(now, start_sunday, tz);
-        rebuild_chart_history_if_stale(&conn, start_sunday, starts_at, limit, tz)?;
+        } = chart_week(current.starts_at - 1, start_sunday, tz);
+        let ranked = rank_week_items(
+            &conn,
+            starts_at,
+            current.starts_at,
+            limit,
+            &mut std::collections::HashSet::new(),
+        )?;
 
-        // Rank this week's albums by listening time, as Stats does. Every result must be an
-        // Album card regardless of track count (unlike
-        // group_songs_into_home_items, which falls back to a Song card for
-        // single-track "albums"), so this dedups by album name directly
-        // instead of reusing that helper.
-        let query_limit = limit * 20;
-        let home_item_select_cols = home_item_select_cols();
-        let sql = format!(
-            "SELECT {home_item_select_cols}, wc.week_plays
-             FROM songs s
-             JOIN (
-                 SELECT s2.album AS album, COUNT(*) AS week_plays,
-                        COALESCE(SUM(COALESCE(NULLIF(ph.duration_secs, 0), s2.length_nanosec / 1000000000, 0)), 0) AS week_secs
-                 FROM play_history ph
-                 JOIN songs s2 ON s2.id = ph.song_id
-                 WHERE ph.played_at >= ?1
-                   AND s2.source IN ({lib}) AND s2.unavailable = 0
-                   AND s2.album IS NOT NULL AND s2.album != ''
-                   AND NOT EXISTS ({excluded})
-                 GROUP BY s2.album
-             ) wc ON wc.album = s.album
-             WHERE s.source IN ({lib}) AND s.unavailable = 0
-             ORDER BY wc.week_secs DESC, wc.week_plays DESC, s.added DESC
-             LIMIT ?2",
-            lib = *LIBRARY_SOURCES_SQL,
-            excluded = excluded_album_sql("s2.album"),
-        );
-        let mut stmt = conn.prepare(&sql)?;
-        let rows: Vec<(Song, i64, i64, i64)> = stmt
-            .query_map(params![starts_at, query_limit], |row| {
-                let song = row_to_song(row)?;
-                let album_track_count: i64 = row.get(SONG_SELECT_COL_COUNT)?;
-                let album_disc_count: i64 = row.get(SONG_SELECT_COL_COUNT + 1)?;
-                let week_plays: i64 = row.get(SONG_SELECT_COL_COUNT + 2)?;
-                Ok((song, album_track_count, album_disc_count, week_plays))
-            })?
-            .filter_map(|r| r.ok())
-            .collect();
-
-        let mut seen_albums = std::collections::HashSet::new();
-        let mut ranked: Vec<(AlbumItem, i64)> = Vec::new();
-        for (song, album_track_count, album_disc_count, week_plays) in rows {
-            if ranked.len() >= limit as usize {
-                break;
-            }
-            let Some(album_name) = song.album.clone() else {
-                continue;
-            };
-            if album_name.trim().is_empty() || !seen_albums.insert(album_name.clone()) {
-                continue;
-            }
-            let artist_name = song
-                .album_artist
-                .clone()
-                .or_else(|| song.artist.clone())
-                .unwrap_or_default();
-            ranked.push((
-                AlbumItem {
-                    artist: Some(artist_name),
-                    album: Some(album_name),
-                    year: song.year,
-                    track_count: album_track_count as i32,
-                    disc_count: album_disc_count as i32,
-                    art_embedded: song.art_embedded,
-                    art_automatic: song.art_automatic.clone(),
-                    art_manual: song.art_manual.clone(),
-                    genre: song.genre.clone(),
-                    sample_song_id: Some(song.id),
-                    rating: crate::stats::RATING_UNRATED,
-                    total_duration_nanosec: 0,
-                },
-                week_plays,
-            ));
-        }
-
-        // Replace this week's snapshot before reading history, so a "new"
-        // entry's own row already counts toward its weeks-on-chart/peak-rank
-        // below. Replace rather than upsert: an album that has since dropped
-        // out of the top `limit` must not keep its earlier rank this week.
+        // Replace the shown week's snapshot (plus any row an earlier version
+        // filed for the still-running week) before reading history, so a
+        // "new" entry's own row already counts toward its weeks-on-chart and
+        // peak rank below. Replace rather than upsert: an album that has
+        // since dropped out of the top `limit` must not keep its old rank.
         {
             let tx = conn.unchecked_transaction()?;
             tx.execute(
-                "DELETE FROM album_chart_history WHERE period_start = ?1",
+                "DELETE FROM album_chart_history WHERE period_start >= ?1",
                 params![period_start],
             )?;
             for (i, (album, week_plays)) in ranked.iter().enumerate() {
@@ -1435,11 +1372,10 @@ impl CollectionScanner {
             tx.commit()?;
         }
 
-        // Rank the previous week live from play_history rather than reading
-        // its snapshot: a snapshot is only as fresh as the last time Home was
-        // opened that week, and one written under the other week-start
-        // setting (or in UTC, before this was local) sits under a different
-        // key than the week before `period_start`.
+        // Rank the week before the shown one live from play_history rather
+        // than reading its snapshot: a snapshot written under the other
+        // week-start setting (or in UTC, before this was local) sits under a
+        // different key than the week before `period_start`.
         let previous_starts_at = chart_week(starts_at - 1, start_sunday, tz).starts_at;
         let previous_ranks: std::collections::HashMap<String, i32> =
             rank_albums_between(&conn, previous_starts_at, starts_at, limit)?
@@ -1491,6 +1427,90 @@ impl CollectionScanner {
         }
         Ok(result)
     }
+}
+
+/// Top `limit` albums by minutes played (then play count) among plays in
+/// `[from, to)`, as Album cards with their play count, skipping (and
+/// recording) albums already in `seen`. Every result is an Album card
+/// regardless of track count (unlike group_songs_into_home_items, which falls
+/// back to a Song card for single-track "albums"), so this dedups by album
+/// name directly.
+fn rank_week_items(
+    conn: &rusqlite::Connection,
+    from: i64,
+    to: i64,
+    limit: i64,
+    seen: &mut std::collections::HashSet<String>,
+) -> Result<Vec<(AlbumItem, i64)>> {
+    let query_limit = (limit + seen.len() as i64) * 20;
+    let home_item_select_cols = home_item_select_cols();
+    let sql = format!(
+        "SELECT {home_item_select_cols}, wc.week_plays
+         FROM songs s
+         JOIN (
+             SELECT s2.album AS album, COUNT(*) AS week_plays,
+                    COALESCE(SUM(COALESCE(NULLIF(ph.duration_secs, 0), s2.length_nanosec / 1000000000, 0)), 0) AS week_secs
+             FROM play_history ph
+             JOIN songs s2 ON s2.id = ph.song_id
+             WHERE ph.played_at >= ?1 AND ph.played_at < ?2
+               AND s2.source IN ({lib}) AND s2.unavailable = 0
+               AND s2.album IS NOT NULL AND s2.album != ''
+               AND NOT EXISTS ({excluded})
+             GROUP BY s2.album
+         ) wc ON wc.album = s.album
+         WHERE s.source IN ({lib}) AND s.unavailable = 0
+         ORDER BY wc.week_secs DESC, wc.week_plays DESC, s.added DESC
+         LIMIT ?3",
+        lib = *LIBRARY_SOURCES_SQL,
+        excluded = excluded_album_sql("s2.album"),
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let rows: Vec<(Song, i64, i64, i64)> = stmt
+        .query_map(params![from, to, query_limit], |row| {
+            let song = row_to_song(row)?;
+            let album_track_count: i64 = row.get(SONG_SELECT_COL_COUNT)?;
+            let album_disc_count: i64 = row.get(SONG_SELECT_COL_COUNT + 1)?;
+            let week_plays: i64 = row.get(SONG_SELECT_COL_COUNT + 2)?;
+            Ok((song, album_track_count, album_disc_count, week_plays))
+        })?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    let mut ranked: Vec<(AlbumItem, i64)> = Vec::new();
+    for (song, album_track_count, album_disc_count, week_plays) in rows {
+        if ranked.len() >= limit as usize {
+            break;
+        }
+        let Some(album_name) = song.album.clone() else {
+            continue;
+        };
+        if album_name.trim().is_empty() || !seen.insert(album_name.clone()) {
+            continue;
+        }
+        let artist_name = song
+            .album_artist
+            .clone()
+            .or_else(|| song.artist.clone())
+            .unwrap_or_default();
+        ranked.push((
+            AlbumItem {
+                artist: Some(artist_name),
+                album: Some(album_name),
+                year: song.year,
+                track_count: album_track_count as i32,
+                disc_count: album_disc_count as i32,
+                art_embedded: song.art_embedded,
+                art_automatic: song.art_automatic.clone(),
+                art_manual: song.art_manual.clone(),
+                genre: song.genre.clone(),
+                sample_song_id: Some(song.id),
+                rating: crate::stats::RATING_UNRATED,
+                total_duration_nanosec: 0,
+            },
+            week_plays,
+        ));
+    }
+    Ok(ranked)
 }
 
 /// `app_state` key recording what the past weeks in `album_chart_history`
@@ -3861,8 +3881,10 @@ mod tests {
 
         let scanner = CollectionScanner::new(db.clone());
 
+        // The chart shows the last completed week, so "now" sits a bit into
+        // the week after the one being charted.
         // Week 1 (Monday 2024-01-01 00:00:00 UTC): everything is "new".
-        let week1_now = 1_704_153_600 + 3600; // a bit into week 1
+        let week1_now = 1_704_672_000 + 3600; // a bit into week 2
         for _ in 0..1 {
             record_play(rising_id, 1_704_153_600 + 10);
         }
@@ -3890,7 +3912,7 @@ mod tests {
         // Week 2 (Monday 2024-01-08): rising overtakes falling, steady stays
         // put, and a brand-new album enters the chart.
         let week2_base = 1_704_672_000;
-        let week2_now = week2_base + 3600;
+        let week2_now = week2_base + 7 * 86_400 + 3600; // a bit into week 3
         for _ in 0..10 {
             record_play(rising_id, week2_base + 10);
         }
@@ -3934,7 +3956,7 @@ mod tests {
     }
 
     /// Like Stats' Top Albums, the chart ranks by minutes played: one long
-    /// listen outranks several short ones, in both this week and last.
+    /// listen outranks several short ones, in both the charted week and the one before.
     #[test]
     fn test_get_top_albums_ranks_by_minutes_played() {
         let temp_dir_guard = tempfile::Builder::new()
@@ -3978,7 +4000,7 @@ mod tests {
 
         let last_week = 1_789_257_600; // Sun 2026-09-13 00:00 UTC
         let this_week = 1_789_862_400; // Sun 2026-09-20 00:00 UTC
-        let now = this_week + 86_400;
+        let now = this_week + 8 * 86_400; // the week after the charted one
         record_plays(short, last_week + 60, 60, 5); // 5 min
         record_plays(long, last_week + 60, 600, 1); // 10 min
         record_plays(short, this_week + 60, 60, 5); // 5 min
@@ -4074,7 +4096,7 @@ mod tests {
         }
 
         let chart = CollectionScanner::new(db.clone())
-            .get_top_albums_at(10, sep20 + 6 * 86_400, &chrono::Utc)
+            .get_top_albums_at(10, sep27 + 86_400, &chrono::Utc)
             .unwrap();
         assert_eq!(chart.len(), 1);
         assert_eq!(chart[0].movement, "new");
@@ -4153,11 +4175,11 @@ mod tests {
         // Local Sundays 2026-09-13 and 2026-09-20, 00:00 at UTC-7.
         let last_week = 1_789_282_800;
         let this_week = 1_789_887_600;
-        let now = 1_790_487_240; // Sat 2026-09-26 22:34 local
+        let now = 1_790_487_240 + 7 * 86_400; // Sat 2026-10-03 22:34 local
 
         record_plays(a, last_week + 3600, 5); // last week: A #1, B #2
         record_plays(b, last_week + 3600, 2);
-        record_plays(b, this_week + 3600, 6); // this week: B #1, A #2
+        record_plays(b, this_week + 3600, 6); // charted week: B #1, A #2
         record_plays(a, this_week + 3600, 1);
 
         let scanner = CollectionScanner::new(db.clone());
