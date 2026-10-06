@@ -30,7 +30,7 @@ export function importErrorMessage(raw: unknown): string {
     case "empty":
       return i18n.t("equalizer.importErrorEmpty");
     case "too_many_filters":
-      return i18n.t("equalizer.importErrorTooManyFilters", { count: err.count, max: err.max });
+      return i18n.plural("equalizer.importErrorTooManyFilters", err.count, { max: err.max });
     case "unsupported_filters":
       return i18n.t("equalizer.importErrorUnsupportedFilters", {
         filters: err.filters

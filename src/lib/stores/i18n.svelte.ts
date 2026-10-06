@@ -93,10 +93,46 @@ class I18nStore {
       return fallback !== undefined ? fallback : key;
     }
 
-    return value.replace(/{(\w+)}/g, (_, name) => {
-      return name in vars ? String(vars[name]) : `{${name}}`;
-    });
+    return interpolate(value, vars);
   }
+
+  /**
+   * Counted string: the catalog entry is an object keyed by CLDR plural category
+   * (`one`, `few`, `many`, `other`...) and the category comes from `Intl.PluralRules` for the
+   * current locale, so callers never decide the form. A locale missing the category falls back
+   * to its `other`, then to the next catalog in the chain. `{count}` is the locale-formatted
+   * `count` unless `vars` supplies its own.
+   */
+  plural(key: string, count: number, vars: Record<string, any> = {}, fallback?: string): string {
+    const category = pluralCategory(this.currentLocale, count);
+    const keys = key.split('.');
+    for (const catalog of catalogChain(this.currentLocale)) {
+      let value: any = catalog;
+      for (const k of keys) {
+        value = value && typeof value === 'object' ? value[k] : undefined;
+      }
+      const form = value && typeof value === 'object' ? (value[category] ?? value.other) : undefined;
+      if (typeof form === 'string') return interpolate(form, { count: formatNumber(count), ...vars });
+    }
+    return fallback !== undefined ? fallback : key;
+  }
+}
+
+function interpolate(template: string, vars: Record<string, any>): string {
+  return template.replace(/{(\w+)}/g, (_, name) => {
+    return name in vars ? String(vars[name]) : `{${name}}`;
+  });
+}
+
+const pluralRulesCache = new Map<string, Intl.PluralRules>();
+
+function pluralCategory(locale: string, count: number): Intl.LDMLPluralRule {
+  let rules = pluralRulesCache.get(locale);
+  if (!rules) {
+    rules = new Intl.PluralRules(locale);
+    pluralRulesCache.set(locale, rules);
+  }
+  return rules.select(count);
 }
 
 export const i18n = new I18nStore();

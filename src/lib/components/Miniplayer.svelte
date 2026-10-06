@@ -414,10 +414,8 @@
 
         <!-- Subtitle detail (tracks played) -->
         <p class="text-xs text-brand-text-secondary/70 mt-0.5 text-center truncate max-w-full px-2">
-          {#if (session?.trackCount ?? 0) === 1}
-            {i18n.t('miniplayer.trackPlayed')}
-          {:else if (session?.trackCount ?? 0) > 1}
-            {i18n.t('miniplayer.tracksPlayed', { count: session?.trackCount })}
+          {#if (session?.trackCount ?? 0) >= 1}
+            {i18n.plural("miniplayer.tracksPlayed", session?.trackCount ?? 0)}
           {:else}
             {i18n.t('celebrations.queueComplete')}
           {/if}

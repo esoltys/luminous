@@ -709,9 +709,7 @@
 
           <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-primary font-medium">
             <span>
-              {playlistsStore.activePlaylistTracks.length === 1
-                ? i18n.t("playlists.oneSong")
-                : i18n.t("playlists.songsCount", { count: playlistsStore.activePlaylistTracks.length })}
+              {i18n.plural("playlists.songsCount", playlistsStore.activePlaylistTracks.length)}
             </span>
             <span>•</span>
             <span>{totalRuntimeLabel}</span>
@@ -972,7 +970,7 @@
       {#if duplicateCount > 0}
         <ContextMenuItem
           icon={CopyPlus}
-          label={i18n.t("playlists.removeDuplicatesBtn", { count: duplicateCount })}
+          label={i18n.plural("playlists.removeDuplicatesBtn", duplicateCount)}
           onclick={() => { removeDuplicates(); showOverflowMenu = false; }}
         />
       {/if}

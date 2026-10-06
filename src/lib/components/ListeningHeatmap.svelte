@@ -222,7 +222,7 @@
   }
 
   function streakLabel(days: number): string {
-    return days === 1 ? i18n.t("stats.heatmapStreakOneDay") : i18n.t("stats.heatmapStreakDays", { count: days });
+    return i18n.plural("stats.heatmapStreakDays", days);
   }
 
   // Zero-minute days still render a thin sliver so every bar stays visible

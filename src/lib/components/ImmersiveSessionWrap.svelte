@@ -21,9 +21,7 @@
   );
 
   let subtitle = $derived(
-    session.trackCount === 1
-      ? i18n.t("immersive.trackPlayed", {}, "1 track played")
-      : i18n.t("immersive.tracksPlayed", { count: session.trackCount }, `${session.trackCount} tracks played`)
+    i18n.plural("immersive.tracksPlayed", session.trackCount)
   );
 
   async function handleShuffleLibrary() {

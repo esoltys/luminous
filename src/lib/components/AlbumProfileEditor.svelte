@@ -197,7 +197,7 @@
       await collectionStore.refreshStats();
       await collectionStore.refreshLibrary();
 
-      toastStore.show(i18n.t("albumTagEditor.clearArtSuccess", { count }), "success");
+      toastStore.show(i18n.plural("albumTagEditor.clearArtSuccess", count), "success");
     } catch (e: any) {
       console.error("Failed to clear album artwork:", e);
       toastStore.show(i18n.t("albumTagEditor.clearArtFailedPrefix") + e.toString(), "error");
@@ -596,7 +596,7 @@
         {#if songIds.length > 0}
           <div class="flex items-center gap-2 text-xs font-medium text-brand-text-secondary">
             <Layers class="w-3.5 h-3.5 text-brand-accent shrink-0" />
-            <span>{i18n.t('albumTagEditor.tracksAffected', { count: songIds.length })}</span>
+            <span>{i18n.plural("albumTagEditor.tracksAffected", songIds.length)}</span>
           </div>
         {:else}
           <span></span>

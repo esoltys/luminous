@@ -48,7 +48,7 @@
       {:else}
         <span class="flex items-center gap-2 text-xl font-bold text-brand-accent-text whitespace-nowrap">
           <Broom class="w-5 h-5 shrink-0" />
-          {i18n.t("organizer.summaryReady", { count: organizeReadyCount })}
+          {i18n.plural("organizer.summaryReady", organizeReadyCount)}
         </span>
       {/if}
 

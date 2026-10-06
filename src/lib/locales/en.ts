@@ -30,7 +30,10 @@ export const en = {
     openFilesTooltip: "Open Audio Files or Playlists (*.m3u)",
     openFilesTitle: "Open Audio Files or Playlists",
     searching: "Searching...",
-    tracksCount: "{count} songs",
+    tracksCount: {
+      one: "{count} song",
+      other: "{count} songs"
+    },
     clearSearch: "Clear Search",
     recentSearches: "Recent searches",
     clearRecentSearches: "Clear recent searches",
@@ -66,8 +69,10 @@ export const en = {
     chartFalling: "Falling",
     chartSteady: "Steady",
     chartPeak: "Peak #{peak}",
-    chartWeek: "1 week",
-    chartWeeksCount: "{weeks} weeks",
+    chartWeeksCount: {
+      one: "{count} week",
+      other: "{count} weeks"
+    },
     recentlyAdded: "Recently Added",
     pinned: "Pinned",
     exploreLibrary: "Explore Your Library",
@@ -99,12 +104,18 @@ export const en = {
     artists: "Artists ({count})",
     albums: "Albums ({count})",
     songs: "Songs ({count})",
-    showingSongs: "Showing {count} songs",
-    showingOneSong: "Showing 1 song",
-    showingAlbums: "Showing {count} albums",
-    showingOneAlbum: "Showing 1 album",
-    showingArtists: "Showing {count} artists",
-    showingOneArtist: "Showing 1 artist",
+    showingSongs: {
+      one: "Showing {count} song",
+      other: "Showing {count} songs"
+    },
+    showingAlbums: {
+      one: "Showing {count} album",
+      other: "Showing {count} albums"
+    },
+    showingArtists: {
+      one: "Showing {count} artist",
+      other: "Showing {count} artists"
+    },
     noSongsTitle: "No songs found",
     noSongsSearchEmpty: "We couldn't find any songs matching \"{query}\". Try adjusting your keywords.",
     clearSearchFilter: "Clear Search Filter",
@@ -153,8 +164,10 @@ export const en = {
     sortAlbumsAsc: "Sort: Albums (Least)",
     sortGenreAsc: "Sort: Genre (A-Z)",
     sortGenreDesc: "Sort: Genre (Z-A)",
-    albumsCount: "{count} albums",
-    oneAlbum: "1 album",
+    albumsCount: {
+      one: "{count} album",
+      other: "{count} albums"
+    },
     selectPlaylistFirstAlert: "Please select or create a playlist first from the Playlists tab.",
     albumPlaylistName: "Album: {name}",
     columnsMenuTooltip: "Custom Visible Columns",
@@ -350,7 +363,10 @@ export const en = {
     folderChangeLocation: "Change Location…",
     folderLocateHint: "Point this folder at its new location if its drive letter changed or you moved the music. Songs keep their play counts, ratings and playlists.",
     folderLocateDialogTitle: "Select the folder's new location",
-    folderLocateSuccess: "Re-linked {count} songs to {path}",
+    folderLocateSuccess: {
+      one: "Re-linked {count} song to {path}",
+      other: "Re-linked {count} songs to {path}"
+    },
     folderLocateFailedPrefix: "Couldn't re-link the folder: ",
     editFolderTitle: "Edit Folder Details",
     folderSaveFailedPrefix: "Failed to save folder details: ",
@@ -380,7 +396,10 @@ export const en = {
     badgeColorEmerald: "Emerald",
     badgeColorCyan: "Cyan",
     badgeColorIndigo: "Indigo",
-    loudnessAnalysisActive: "Loudness Normalization is analyzing {remaining} song(s) in the background — this can look like scanning even when folder watching is off. Disable it in the Equalizer tab to stop.",
+    loudnessAnalysisActive: {
+      one: "Loudness Normalization is analyzing {count} song in the background — this can look like scanning even when folder watching is off. Disable it in the Equalizer tab to stop.",
+      other: "Loudness Normalization is analyzing {count} songs in the background — this can look like scanning even when folder watching is off. Disable it in the Equalizer tab to stop."
+    },
     noFoldersTitle: "No Watched Folders",
     noFoldersText: "Click \"Add Folder\" above to add your music directory.",
     dynamicThemes: "Dynamic Themes",
@@ -473,11 +492,15 @@ export const en = {
     rescanTitle: "Library Scanning & Maintenance",
     rescanSubtitle: "Perform incremental or full rescans and configure automatic background scanning.",
     lastScanned: "Last scan: {time}",
-    importFinishedToastOne: "1 song added",
-    importFinishedToastMany: "{count} songs added",
+    importFinishedToast: {
+      one: "{count} song added",
+      other: "{count} songs added"
+    },
     batchProcessingToast: "Processing songs ({current}/{total})...",
-    batchProcessingDoneToastOne: "1 song updated",
-    batchProcessingDoneToastMany: "{count} songs updated",
+    batchProcessingDoneToast: {
+      one: "{count} song updated",
+      other: "{count} songs updated"
+    },
     scanningPhase: "Phase: {phase}",
     phaseDiscovering: "Discovering Files",
     phaseReadingTags: "Reading Tags",
@@ -515,10 +538,10 @@ export const en = {
     fanartFetchAlbumCoverHint: "Fetch a cover for albums that have none of their own",
     fanartFetchDiscArt: "Disc art",
     fanartFetchDiscArtHint: "Fetch disc art to add to the album's artwork",
-    pruneCompleteMsg: "Cleaned up {count} missing song(s)",
-    pruneCompleteMsgWithFolders: "Cleaned up {count} missing song(s) and removed {folders} empty folder(s)",
-    pruneCompleteMsgWithDuplicates: "Cleaned up {count} missing song(s) and merged {duplicates} duplicate(s)",
-    pruneCompleteMsgWithFoldersAndDuplicates: "Cleaned up {count} missing song(s), removed {folders} empty folder(s), and merged {duplicates} duplicate(s)",
+    pruneCompleteMsg: "Cleaned up missing songs: {count}",
+    pruneCompleteMsgWithFolders: "Cleaned up missing songs: {count}; removed empty folders: {folders}",
+    pruneCompleteMsgWithDuplicates: "Cleaned up missing songs: {count}; merged duplicates: {duplicates}",
+    pruneCompleteMsgWithFoldersAndDuplicates: "Cleaned up missing songs: {count}; removed empty folders: {folders}; merged duplicates: {duplicates}",
     watchRealtimeLabel: "Real-Time Folder Watching",
     watchRealtimeHint: "Watch monitored music directories automatically for file additions, modifications, or deletions.",
     defaultLibraryLabel: "Default Library",
@@ -537,7 +560,10 @@ export const en = {
     saveArtworkToFoldersModalMessage: "Enabling this will export existing cached album covers (cover.jpg), artist photos (artist.jpg), band logos (logo.png), and banners (banner.jpg) directly into your local music folders. Shared folders and existing artwork will not be overwritten. Do you want to proceed?",
     saveArtworkToFoldersModalConfirm: "Export Artwork",
     saveArtworkToFoldersModalCancel: "Cancel",
-    artworkSweepSuccess: "Exported {count} artwork files to your music folders.",
+    artworkSweepSuccess: {
+      one: "Exported {count} artwork file to your music folders.",
+      other: "Exported {count} artwork files to your music folders."
+    },
     artworkSweepNone: "No cached artwork needed exporting to folders.",
     statsSongs: "Songs",
     statsAlbums: "Albums",
@@ -632,8 +658,10 @@ export const en = {
     reservedPlaylistName: "\"{name}\" is reserved for the built-in Queue playlist. Please choose a different name.",
     noPlaylistsTitle: "No playlists",
     noPlaylistsText: "Click \"New Playlist\" above to create your first one.",
-    showingOnePlaylist: "Showing 1 playlist",
-    showingPlaylists: "Showing {count} playlists",
+    showingPlaylists: {
+      one: "Showing {count} playlist",
+      other: "Showing {count} playlists"
+    },
     newPlaylistBtn: "New Playlist",
     newSmartPlaylistBtn: "New Smart Playlist",
     sortNameAsc: "Sort: Name (A-Z)",
@@ -671,8 +699,10 @@ export const en = {
     cancel: "Cancel",
     playTrack: "Play song",
     removeFromPlaylist: "Remove from playlist",
-    songsCount: "{count} songs",
-    oneSong: "1 song",
+    songsCount: {
+      one: "{count} song",
+      other: "{count} songs"
+    },
     unknownGenre: "Unknown genre",
     mixedGenre: "Mixed",
     statsLine: "{genre} · {songs} • {duration} total",
@@ -682,7 +712,10 @@ export const en = {
     redoTooltip: "Redo last playlist operation",
     redoBtn: "Redo",
     moreActionsTooltip: "More actions",
-    removeUnavailableTooltip: "Remove all {count} unavailable songs from playlist",
+    removeUnavailableTooltip: {
+      one: "Remove {count} unavailable song from playlist",
+      other: "Remove all {count} unavailable songs from playlist"
+    },
     removeUnavailableBtn: "Remove {count} unavailable",
     fileNotFoundTooltip: "File not found on disk",
     fileNotFoundText: "File not found",
@@ -698,8 +731,14 @@ export const en = {
     cancelBtn: "Cancel",
     filterPlaceholder: "Filter songs...",
     clearFilter: "Clear filter",
-    removeDuplicatesTooltip: "Remove all {count} duplicate files from playlist",
-    removeDuplicatesBtn: "Remove {count} duplicate files",
+    removeDuplicatesTooltip: {
+      one: "Remove {count} duplicate file from playlist",
+      other: "Remove all {count} duplicate files from playlist"
+    },
+    removeDuplicatesBtn: {
+      one: "Remove {count} duplicate file",
+      other: "Remove {count} duplicate files"
+    },
     duplicateTrackFlag: "Duplicate file",
     selectedCount: "{count} selected",
     populationModeLabel: "Playing from",
@@ -743,19 +782,32 @@ export const en = {
     mostPlayedAutoPlaylist: "Auto-Playlist",
     historyAutoPlaylist: "Auto-Playlist",
     relativeJustNow: "Just now",
-    relativeOneMinuteAgo: "1 minute ago",
-    relativeMinutesAgo: "{count} minutes ago",
-    relativeOneHourAgo: "1 hour ago",
-    relativeHoursAgo: "{count} hours ago",
+    relativeMinutesAgo: {
+      one: "{count} minute ago",
+      other: "{count} minutes ago"
+    },
+    relativeHoursAgo: {
+      one: "{count} hour ago",
+      other: "{count} hours ago"
+    },
     relativeToday: "Today",
     relativeYesterday: "Yesterday",
-    relativeDaysAgo: "{count} days ago",
-    relativeOneWeekAgo: "1 week ago",
-    relativeWeeksAgo: "{count} weeks ago",
-    relativeOneMonthAgo: "1 month ago",
-    relativeMonthsAgo: "{count} months ago",
-    relativeOneYearAgo: "1 year ago",
-    relativeYearsAgo: "{count} years ago",
+    relativeDaysAgo: {
+      one: "{count} day ago",
+      other: "{count} days ago"
+    },
+    relativeWeeksAgo: {
+      one: "{count} week ago",
+      other: "{count} weeks ago"
+    },
+    relativeMonthsAgo: {
+      one: "{count} month ago",
+      other: "{count} months ago"
+    },
+    relativeYearsAgo: {
+      one: "{count} year ago",
+      other: "{count} years ago"
+    },
     makeActiveBtn: "Make Active",
     activeBadgeLabel: "Active",
     refreshPlaylistBtn: "Refresh Playlist",
@@ -855,12 +907,16 @@ export const en = {
     loading: "Loading stats...",
     empty: "No listening history for this range yet.",
     noData: "No data for this range.",
-    totalMinutesOne: "1 minute listened",
-    totalMinutes: "{count} minutes listened",
+    totalMinutes: {
+      one: "{count} minute listened",
+      other: "{count} minutes listened"
+    },
     minuteCount: "{count} min",
     minuteUnderOne: "< 1 min",
-    playsCount: "{count} plays",
-    playsCountOne: "1 play",
+    playsCount: {
+      one: "{count} play",
+      other: "{count} plays"
+    },
     excludeFromStats: "Don't Include in Stats",
     includeInStats: "Include in Stats",
     excludedToast: "Excluded {name} from Stats",
@@ -868,8 +924,10 @@ export const en = {
     heatmapTitle: "Listening Streak",
     heatmapCurrentStreak: "Current streak",
     heatmapLongestStreak: "Longest streak",
-    heatmapStreakOneDay: "1 day",
-    heatmapStreakDays: "{count} days",
+    heatmapStreakDays: {
+      one: "{count} day",
+      other: "{count} days"
+    },
     heatmapStatus: "{date} — {minutes} min",
     heatmapLegendLess: "Less",
     heatmapLegendMore: "More"
@@ -932,7 +990,10 @@ export const en = {
     channelsStereo: "Stereo",
     channels51: "5.1 Surround",
     channels71: "7.1 Surround",
-    channelsCount: "{count} channels",
+    channelsCount: {
+      one: "{count} channel",
+      other: "{count} channels"
+    },
     releasedLabel: "Released",
     genreLabel: "Genre",
     composerLabel: "Composer",
@@ -970,7 +1031,10 @@ export const en = {
     wikipediaSectionLabel: "Wikipedia",
     mbTagsSectionLabel: "Community Tags",
     mbRatingLabel: "Community Rating",
-    mbRatingVotes: "({count} votes)",
+    mbRatingVotes: {
+      one: "({count} vote)",
+      other: "({count} votes)"
+    },
     critiquebrainzSectionLabel: "CritiqueBrainz",
     critiquebrainzRatingLabel: "Community Rating",
     listenbrainzSectionLabel: "ListenBrainz",
@@ -985,7 +1049,10 @@ export const en = {
     contextLoading: "Fetching context…",
     contextFetchError: "Couldn't fetch context data. Check your connection and retry.",
     trackSkippedToast: 'Couldn\'t play "{title}" — file not found. Skipped.',
-    tracksSkippedToast: "Skipped {count} unavailable tracks.",
+    tracksSkippedToast: {
+      one: "Skipped {count} unavailable track.",
+      other: "Skipped {count} unavailable tracks."
+    },
     trackSkippedRemoteToast: 'Couldn\'t play "{title}" — {message}. Skipped.',
     openNothingPlayable: "No supported audio files found to play.",
     playSongFailed: "Couldn't play this track.",
@@ -1005,8 +1072,10 @@ export const en = {
     shuffleLibrary: "Shuffle Library",
     replay: "Replay",
     library: "Library",
-    tracksPlayed: "{count} tracks played",
-    trackPlayed: "1 track played",
+    tracksPlayed: {
+      one: "{count} track played",
+      other: "{count} tracks played"
+    },
     dropToPlay: "or drop audio files to play"
   },
 
@@ -1076,11 +1145,17 @@ export const en = {
     compilationField: "Compilation (mark as Various Artists)",
     yearField: "Release Year",
     discField: "Disc #",
-    tracksAffected: "Applies to {count} songs",
+    tracksAffected: {
+      one: "Applies to {count} song",
+      other: "Applies to {count} songs"
+    },
     cancelBtn: "Cancel",
     saveBtn: "Save Tags",
     saving: "Saving album tags...",
-    saveSuccess: "Updated album tags for {count} songs",
+    saveSuccess: {
+      one: "Updated album tags for {count} song",
+      other: "Updated album tags for {count} songs"
+    },
     saveFailedPrefix: "Failed to save album tags: ",
     artworkField: "Artwork",
     artworkEmbedded: "Embedded cover art",
@@ -1089,7 +1164,10 @@ export const en = {
     clearArtConfirmTitle: "Clear Embedded Artwork?",
     clearArtConfirmMessage: "This removes the embedded cover art from every track's file in this album. Tracks will fall back to folder art or a placeholder.",
     clearingArt: "Clearing artwork...",
-    clearArtSuccess: "Cleared embedded artwork for {count} songs",
+    clearArtSuccess: {
+      one: "Cleared embedded artwork for {count} song",
+      other: "Cleared embedded artwork for {count} songs"
+    },
     clearArtFailedPrefix: "Failed to clear album artwork: "
   },
   equalizer: {
@@ -1135,7 +1213,10 @@ export const en = {
     importPlaceholder: "Preamp: -6.2 dB\nFilter 1: ON LSC Fc 105 Hz Gain 5.5 dB Q 0.70\nFilter 2: ON PK Fc 180 Hz Gain -3.1 dB Q 0.53",
     importSubmit: "Import",
     importErrorEmpty: "This profile has no filters. Paste or choose a parametric EQ profile.",
-    importErrorTooManyFilters: "This profile has {count} filters, but the equalizer supports up to {max}.",
+    importErrorTooManyFilters: {
+      one: "This profile has {count} filter, but the equalizer supports up to {max}.",
+      other: "This profile has {count} filters, but the equalizer supports up to {max}."
+    },
     importErrorUnsupportedFilters: "Unsupported filters: {filters}. Remove them, or export the profile from AutoEq, which only uses peak (PK), low-shelf (LSC) and high-shelf (HSC) filters.",
     importErrorFilterAt: "{kind} (line {line})",
     importErrorUnsupportedLine: "Line {line} isn't a Preamp or Filter line, so the profile can't be reproduced exactly.",
@@ -1178,9 +1259,15 @@ export const en = {
     modeAlbum: "Album",
     fallbackGain: "Fallback Gain",
     fallbackGainHint: "Applied when a song has neither R128 analysis nor a ReplayGain tag",
-    analyzing: "Analyzing library: {remaining} song(s) remaining",
+    analyzing: {
+      one: "Analyzing library: {count} song remaining",
+      other: "Analyzing library: {count} songs remaining"
+    },
     analyzed: "All songs analyzed",
-    analysisPaused: "{remaining} song(s) not yet analyzed — enable to analyze in the background"
+    analysisPaused: {
+      one: "{count} song not yet analyzed — enable to analyze in the background",
+      other: "{count} songs not yet analyzed — enable to analyze in the background"
+    }
   },
   fades: {
     title: "Playback Fades & Crossfade",
@@ -1224,8 +1311,10 @@ export const en = {
     retrieveArtistDetails: "Retrieve Artist Details",
     retrieveArtistDetailsTooltip: "Fetch Discogs, AllMusic, Wikidata, IMDb and social links from MusicBrainz",
     retrieveArtistDetailsNoMbidTooltip: "No MusicBrainz artist ID found for this artist",
-    retrieveDetailsSuccessOne: "Added 1 link from MusicBrainz",
-    retrieveDetailsSuccessMany: "Added {count} links from MusicBrainz",
+    retrieveDetailsSuccess: {
+      one: "Added {count} link from MusicBrainz",
+      other: "Added {count} links from MusicBrainz"
+    },
     retrieveDetailsNoResults: "No additional details found on MusicBrainz",
     retrieveArtistImage: "Retrieve Artist Image",
     retrieveArtistImageTooltip: "Retrieve the artist photo, logo and background from fanart.tv, or a photo from Wikidata",
@@ -1378,8 +1467,10 @@ export const en = {
     communityRating: "Community Rating",
     reviewOnCritiqueBrainz: "Review on CritiqueBrainz",
     reviewOnCritiqueBrainzTooltip: "Open this album on CritiqueBrainz to read or write reviews",
-    retrieveDetailsSuccessOne: "Added 1 link from MusicBrainz",
-    retrieveDetailsSuccessMany: "Added {count} links from MusicBrainz",
+    retrieveDetailsSuccess: {
+      one: "Added {count} link from MusicBrainz",
+      other: "Added {count} links from MusicBrainz"
+    },
     retrieveDetailsNoResults: "No additional details found on MusicBrainz",
     retrieveDetailsError: "Failed to retrieve album details",
     retrievingDetails: "Retrieving album details...",
@@ -1390,8 +1481,10 @@ export const en = {
     emptyStateText: "Select a song from your collection to start playing.",
     queueComplete: "Queue Complete",
     contextComplete: "{context} Complete",
-    tracksPlayed: "{count} tracks played",
-    trackPlayed: "1 track played",
+    tracksPlayed: {
+      one: "{count} track played",
+      other: "{count} tracks played"
+    },
     shuffleLibrary: "Shuffle Library",
     replay: "Replay",
     exitImmersive: "Exit Immersive",
@@ -1434,7 +1527,10 @@ export const en = {
     scrollRight: "Scroll right",
     albumArtAlt: "Album Art",
     openImages: "Open images",
-    openImagesCount: "Open {count} images",
+    openImagesCount: {
+      one: "Open {count} image",
+      other: "Open {count} images"
+    },
     enableLogoPulse: "Click to enable logo pulsing",
     disableLogoPulse: "Click to disable logo pulsing",
     toggleLogoPulsing: "Toggle Luminous logo pulsing",
@@ -1460,17 +1556,29 @@ export const en = {
     dismiss: "Dismiss notification"
   },
   songTags: {
-    genresTabDescription: "Showing {count} genres",
+    genresTabDescription: {
+      one: "Showing {count} genre",
+      other: "Showing {count} genres"
+    },
     viewGenre: "Genre",
     viewTags: "Tags",
     emptyTitle: "No tags yet",
     emptySubtitle: "Right-click a song and choose Edit Tags to give it a genre — the first value is its main category, the rest are subgenres.",
-    songCount: "{count} songs",
-    playAll: "Play all {count} songs",
+    songCount: {
+      one: "{count} song",
+      other: "{count} songs"
+    },
+    playAll: {
+      one: "Play {count} song",
+      other: "Play all {count} songs"
+    },
     editSongTooltip: "Edit Song",
     editAlbumTooltip: "Edit Album",
     goToGenreTooltip: "Browse {genre}",
-    artistCount: "{count} artists",
+    artistCount: {
+      one: "{count} artist",
+      other: "{count} artists"
+    },
     artistTagsHeading: "Artist Tags",
     songTagsHeading: "Song Tags",
     goToArtistTagTooltip: "Browse {tag}",
@@ -1490,15 +1598,27 @@ export const en = {
     createGroupBtn: "Create",
     groupSelectedTitle: "Group Selected Tags",
     groupToast: "Grouped {count} tags under \"{name}\"",
-    deleteToast: "Deleted ({count} songs updated)",
-    artistDeleteToast: "Deleted ({count} artists updated)",
+    deleteToast: {
+      one: "Deleted ({count} song updated)",
+      other: "Deleted ({count} songs updated)"
+    },
+    artistDeleteToast: {
+      one: "Deleted ({count} artist updated)",
+      other: "Deleted ({count} artists updated)"
+    },
     renameTag: "Rename",
     promoteTag: "Promote to top-level genre",
     promoteArtistTag: "Promote to top-level tag",
     renameToast: "Renamed to \"{name}\" ({count} songs updated)",
     artistRenameToast: "Renamed to \"{name}\" ({count} artists updated)",
-    deleteConfirmMessage: "Remove {count} tag(s) from every song that carries them? This can't be undone.",
-    artistDeleteConfirmMessage: "Remove {count} tag(s) from every artist that carries them? This can't be undone.",
+    deleteConfirmMessage: {
+      one: "Remove {count} tag from every song that carries it? This can't be undone.",
+      other: "Remove {count} tags from every song that carries them? This can't be undone."
+    },
+    artistDeleteConfirmMessage: {
+      one: "Remove {count} tag from every artist that carries it? This can't be undone.",
+      other: "Remove {count} tags from every artist that carries them? This can't be undone."
+    },
     deleteBtn: "Delete",
     cancelBtn: "Cancel"
   },
@@ -1535,18 +1655,27 @@ export const en = {
     statusCollision: "Duplicate file",
     statusMissingTag: "Missing Tag",
     statusError: "Error",
-    summaryReady: "{count} unorganized songs",
+    summaryReady: {
+      one: "{count} unorganized song",
+      other: "{count} unorganized songs"
+    },
     nothingToOrganize: "Nothing to Organize!",
     autoOrganizeToggle: "Auto-organize",
     autoOrganizeToggleTooltip: "Organize files automatically in the background when new tracks arrive or tags are edited",
-    autoOrganizeSuccessOne: "Auto-organized 1 file",
-    autoOrganizeSuccessMany: "Auto-organized {count} files",
-    toastDuplicateDetectedOne: "1 duplicate file detected during auto-organize",
-    toastDuplicatesDetectedMany: "{count} duplicate files detected during auto-organize",
+    autoOrganizeSuccess: {
+      one: "Auto-organized {count} file",
+      other: "Auto-organized {count} files"
+    },
+    toastDuplicatesDetected: {
+      one: "{count} duplicate file detected during auto-organize",
+      other: "{count} duplicate files detected during auto-organize"
+    },
     cancel: "Cancel",
     applyButton: "Organize Music",
-    applySuccessOne: "Successfully reorganized 1 file",
-    applySuccessMany: "Successfully reorganized {count} files",
+    applySuccess: {
+      one: "Successfully reorganized {count} file",
+      other: "Successfully reorganized {count} files"
+    },
     organizeFilesTooltip: "Organize files by tag template",
     organizeEntireLibrary: "Organize",
     refreshPreviewTooltip: "Refresh Preview",
@@ -1597,7 +1726,10 @@ export const en = {
     pauseLabel: "Pause all scrobbling",
     pauseHint: "Temporarily pause scrobbling without disconnecting your account",
     cacheEmpty: "Offline cache is empty",
-    cachePending: "{count} listen(s) pending in offline cache",
+    cachePending: {
+      one: "{count} listen pending in offline cache",
+      other: "{count} listens pending in offline cache"
+    },
     cacheDesc: "Listens recorded without internet connectivity are queued and sent automatically.",
     syncNowBtn: "Sync Now",
     critiquebrainzUserLabel: "CritiqueBrainz profile",
@@ -1607,7 +1739,7 @@ export const en = {
     syncRatingsHint: "Pull your loves, hates and star ratings from ListenBrainz and CritiqueBrainz, and push local loves",
     syncRatingsBtn: "Sync Ratings",
     syncingRatingsBtn: "Syncing...",
-    syncRatingsSuccess: "Pulled {loved} love(s), {hated} hate(s), {songRatings} track rating(s) and {albumRatings} album rating(s); pushed {pushed} to ListenBrainz",
+    syncRatingsSuccess: "Pulled loves: {loved}; hates: {hated}; track ratings: {songRatings}; album ratings: {albumRatings}; pushed to ListenBrainz: {pushed}",
     syncRatingsFailed: "({failed} failed to send)",
     syncRatingsNoCritiquebrainz: "Star ratings were not pulled: add your CritiqueBrainz profile above."
   },
@@ -1713,7 +1845,10 @@ export const en = {
   celebrations: {
     firstLaunch: "Welcome to Luminous v{version}!",
     newVersion: "Updated to Luminous v{version}",
-    milestone: "{count} songs in your library!",
+    milestone: {
+      one: "{count} song in your library!",
+      other: "{count} songs in your library!"
+    },
     firstFolder: "First music folder added!",
     contextComplete: "{name} complete",
     queueComplete: "Your Queue is done",
@@ -1724,10 +1859,14 @@ export const en = {
     overlayReplaceHint: "Hold Shift to append instead",
     overlayAppendTitle: "Drop to append to queue",
     overlayAppendHint: "Playback won't be interrupted",
-    playingSong: "Playing 1 song",
-    playingSongs: "Playing {count} songs",
-    addedSong: "Added 1 song to queue",
-    addedSongs: "Added {count} songs to queue",
+    playingSongs: {
+      one: "Playing {count} song",
+      other: "Playing {count} songs"
+    },
+    addedSongs: {
+      one: "Added {count} song to queue",
+      other: "Added {count} songs to queue"
+    },
     nothingToAdd: "No supported audio files found to add."
   },
   walkthrough: {

@@ -234,7 +234,7 @@
             <span class="text-xs font-semibold text-brand-text-primary">
               {scrobblerStore.pendingCount === 0
                 ? i18n.t('listenbrainz.cacheEmpty')
-                : i18n.t('listenbrainz.cachePending', { count: scrobblerStore.pendingCount })}
+                : i18n.plural("listenbrainz.cachePending", scrobblerStore.pendingCount)}
             </span>
             {#if scrobblerStore.flushSuccessMessage}
               <span class="text-xs text-brand-text-primary font-medium">({scrobblerStore.flushSuccessMessage})</span>

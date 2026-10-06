@@ -430,7 +430,7 @@
                   <span class="text-brand-text-primary text-right">
                     {formatNumber(contextData.mb_rating, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / 5
                     {#if contextData.mb_rating_votes}
-                      <span class="text-brand-text-secondary/60">{i18n.t('playerBar.mbRatingVotes', { count: contextData.mb_rating_votes }, `(${contextData.mb_rating_votes} votes)`)}</span>
+                      <span class="text-brand-text-secondary/60">{i18n.plural("playerBar.mbRatingVotes", contextData.mb_rating_votes)}</span>
                     {/if}
                   </span>
                 </div>

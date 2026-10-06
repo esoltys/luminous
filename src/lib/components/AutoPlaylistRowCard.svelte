@@ -131,7 +131,7 @@
 
   <div class="shrink-0 max-w-40 text-right">
     <p class="text-xs text-brand-text-secondary font-medium tabular-nums truncate">
-      {trackCount === 1 ? i18n.t("playlists.oneSong") : i18n.t("playlists.songsCount", { count: trackCount })}
+      {i18n.plural("playlists.songsCount", trackCount)}
     </p>
     {#if updatedLabel}
       <p class="text-xs text-brand-text-secondary truncate">{updatedLabel}</p>

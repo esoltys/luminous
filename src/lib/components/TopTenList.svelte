@@ -187,9 +187,7 @@
       steady: i18n.t("home.chartSteady", {}, "Steady"),
     };
     const weeks = item.weeks_on_chart ?? 1;
-    const weeksLabel = weeks === 1
-      ? i18n.t("home.chartWeek", {}, "1 week")
-      : i18n.t("home.chartWeeksCount", { weeks }, `${weeks} weeks`);
+    const weeksLabel = i18n.plural("home.chartWeeksCount", weeks);
     return `${movementLabels[item.movement ?? "steady"]} · ${weeksLabel}`;
   }
 </script>
@@ -227,9 +225,7 @@
   <div class="shrink-0 flex flex-col items-end justify-center text-right">
     <span
       class="text-xs font-medium text-brand-text-secondary tabular-nums"
-      title={item.play_count === 1
-        ? i18n.t("stats.playsCountOne", {}, "1 play")
-        : i18n.t("stats.playsCount", { count: item.play_count }, `${item.play_count} plays`)}
+      title={i18n.plural("stats.playsCount", item.play_count)}
     >
       {item.minutes === 0 && item.play_count > 0
         ? i18n.t("stats.minuteUnderOne", {}, "< 1 min")

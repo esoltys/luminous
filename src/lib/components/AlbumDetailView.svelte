@@ -161,10 +161,8 @@
     });
     try {
       const result = await collectionStore.retrieveAlbumDetails(albumName);
-      const label = result.added_count === 1
-        ? i18n.t("albumDetail.retrieveDetailsSuccessOne", {}, "Added 1 link from MusicBrainz")
-        : result.added_count > 1
-          ? i18n.t("albumDetail.retrieveDetailsSuccessMany", { count: result.added_count }, `Added ${result.added_count} links from MusicBrainz`)
+      const label = result.added_count > 1
+          ? i18n.plural("albumDetail.retrieveDetailsSuccess", result.added_count)
           : i18n.t("albumDetail.retrieveDetailsNoResults", {}, "No additional details found on MusicBrainz");
       await retrieveAlbumArt(auto);
       tasksStore.completeTask(taskId, label);
@@ -697,7 +695,7 @@
             <span>{yearLabel}</span>
             <span>•</span>
           {/if}
-          <span>{songs.length === 1 ? i18n.t('playlists.oneSong') : i18n.t('playlists.songsCount', { count: songs.length })}</span>
+          <span>{i18n.plural("playlists.songsCount", songs.length)}</span>
           <span>•</span>
           <span>{totalDurationLabel}</span>
           {#if albumItem}

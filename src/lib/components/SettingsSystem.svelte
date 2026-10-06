@@ -51,14 +51,10 @@
     if (diffMinutes < 1) {
       relative = i18n.t("playlists.relativeJustNow");
     } else if (diffMinutes < 60) {
-      relative = diffMinutes === 1
-        ? i18n.t("playlists.relativeOneMinuteAgo")
-        : i18n.t("playlists.relativeMinutesAgo", { count: diffMinutes });
+      relative = i18n.plural("playlists.relativeMinutesAgo", diffMinutes);
     } else {
       const diffHours = Math.floor(diffMinutes / 60);
-      relative = diffHours === 1
-        ? i18n.t("playlists.relativeOneHourAgo")
-        : i18n.t("playlists.relativeHoursAgo", { count: diffHours });
+      relative = i18n.plural("playlists.relativeHoursAgo", diffHours);
     }
     // The playlists.* relative-time strings are capitalized for standalone use (e.g. a
     // Date Added column); lowercase the leading letter here since we're splicing it mid-sentence.

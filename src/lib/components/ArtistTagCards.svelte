@@ -92,7 +92,7 @@
     if (!name) return;
     const count = await tagsStore.deleteArtistTags([name]);
     toastStore.show(
-      i18n.t("songTags.artistDeleteToast", { count }, `Deleted (${count} artists updated)`),
+      i18n.plural("songTags.artistDeleteToast", count),
       "success"
     );
   }
@@ -272,7 +272,7 @@
           >
             <span class="text-sm font-semibold text-brand-text-primary truncate">{group.name}</span>
             <span class="text-xs text-brand-text-secondary tabular-nums shrink-0">
-              {i18n.t("songTags.artistCount", { count: group.song_count }, group.song_count === 1 ? "1 artist" : `${group.song_count} artists`)}
+              {i18n.plural("songTags.artistCount", group.song_count)}
             </span>
           </button>
         {/if}
@@ -363,11 +363,7 @@
 {#if deleteConfirmName}
   <ConfirmDialog
     title={i18n.t("songTags.deleteBtn", {}, "Delete")}
-    message={i18n.t(
-      "songTags.artistDeleteConfirmMessage",
-      { count: 1 },
-      `Remove "${deleteConfirmName}" from every artist that carries it? This can't be undone.`
-    )}
+    message={i18n.plural("songTags.artistDeleteConfirmMessage", 1)}
     confirmLabel={i18n.t("songTags.deleteBtn", {}, "Delete")}
     cancelLabel={i18n.t("songTags.cancelBtn", {}, "Cancel")}
     onConfirm={confirmDeleteTag}

@@ -6,21 +6,57 @@ import { fr } from "./fr";
 import { it as itMessages } from "./it";
 import { BASE_LOCALE, LOCALES, catalogChain, isLocale, legacyLanguageToLocale, localeLabel, localePickerGroups, manualLanguageForLocale } from "./index";
 
+const PLURAL_CATEGORIES = new Set(["zero", "one", "two", "few", "many", "other"]);
+
+/** A counted string: an object keyed by CLDR plural category that always has `other`. */
+function isPluralObject(value: unknown): value is Record<string, string> {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const keys = Object.keys(value);
+  return keys.includes("other") && keys.every((k) => PLURAL_CATEGORIES.has(k));
+}
+
 /**
  * Recursively flattens a nested object into dotted key paths.
  * E.g. { sidebar: { home: "Home" } } -> { "sidebar.home": "Home" }
+ * A plural object is a single leaf whose value is its `other` form; its other forms are checked
+ * separately by `collectPlurals`.
  */
 function flatten(obj: Record<string, any>, prefix = ""): Record<string, string> {
   const result: Record<string, string> = {};
   for (const [key, value] of Object.entries(obj)) {
     const fullKey = prefix ? `${prefix}.${key}` : key;
-    if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+    if (isPluralObject(value)) {
+      result[fullKey] = value.other;
+    } else if (value !== null && typeof value === "object" && !Array.isArray(value)) {
       Object.assign(result, flatten(value, fullKey));
     } else {
       result[fullKey] = String(value);
     }
   }
   return result;
+}
+
+/** Dotted path -> category -> text for every plural object in a catalog. */
+function collectPlurals(obj: Record<string, any>, prefix = ""): Record<string, Record<string, string>> {
+  const result: Record<string, Record<string, string>> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    const fullKey = prefix ? `${prefix}.${key}` : key;
+    if (isPluralObject(value)) result[fullKey] = value;
+    else if (value !== null && typeof value === "object" && !Array.isArray(value)) Object.assign(result, collectPlurals(value, fullKey));
+  }
+  return result;
+}
+
+/**
+ * Categories a translator must supply for `tag`: those whose selected for some integer 0-1000, plus
+ * `other`. Excludes CLDR's `many` for French/Spanish/Italian, which only covers multiples of a
+ * million; a missing category falls back to `other` at runtime.
+ */
+function requiredCategories(tag: string): Set<string> {
+  const rules = new Intl.PluralRules(tag);
+  const required = new Set<string>(["other"]);
+  for (let n = 0; n <= 1000; n++) required.add(rules.select(n));
+  return required;
 }
 
 /**
@@ -57,7 +93,6 @@ const IDENTICAL_OK_FR = new Set([
   "collection.columnBpm", // "BPM"
   "collection.columnFormat", // "Format"
   "collection.columnGenre", // "Genre"
-  "collection.oneAlbum", // "1 album"
   "collection.tableHeaderActions", // "Actions"
   "collection.tableHeaderAlbum", // "Album"
   "collection.tableHeaderBpm", // "BPM"
@@ -141,7 +176,6 @@ const IDENTICAL_OK_IT = new Set<string>([
   "sidebar.home", // "Home"
   "collection.tableHeaderTrack", // "#"
   "collection.tableHeaderAlbum", // "Album"
-  "collection.oneAlbum", // "1 album"
   "collection.albumPlaylistName", // "Album: {name}"
   "collection.columnBitrate", // "Bitrate"
   "collection.columnBpm", // "BPM"
@@ -402,13 +436,13 @@ const IDENTICAL_OK_DE = new Set<string>([
 ]);
 
 const CATALOGS = [
-  { name: "German", file: "de.ts", messages: de, identicalOk: IDENTICAL_OK_DE },
-  { name: "Spanish", file: "es.ts", messages: es, identicalOk: IDENTICAL_OK_ES },
-  { name: "French", file: "fr.ts", messages: fr, identicalOk: IDENTICAL_OK_FR },
-  { name: "Italian", file: "it.ts", messages: itMessages, identicalOk: IDENTICAL_OK_IT },
+  { name: "German", tag: "de", file: "de.ts", messages: de, identicalOk: IDENTICAL_OK_DE },
+  { name: "Spanish", tag: "es", file: "es.ts", messages: es, identicalOk: IDENTICAL_OK_ES },
+  { name: "French", tag: "fr-CA", file: "fr.ts", messages: fr, identicalOk: IDENTICAL_OK_FR },
+  { name: "Italian", tag: "it", file: "it.ts", messages: itMessages, identicalOk: IDENTICAL_OK_IT },
 ];
 
-describe.each(CATALOGS)("Locale translation completeness and integrity: $name", ({ name, file, messages, identicalOk }) => {
+describe.each(CATALOGS)("Locale translation completeness and integrity: $name", ({ name, tag, file, messages, identicalOk }) => {
   const flatEn = flatten(en);
   const flatLoc = flatten(messages);
 
@@ -473,6 +507,38 @@ describe.each(CATALOGS)("Locale translation completeness and integrity: $name", 
         .map((m) => `  - ${m.key}: en has [${m.enTokens.join(", ")}], ${name} has [${m.locTokens.join(", ")}]`)
         .join("\n")}`
     ).toEqual([]);
+  });
+});
+
+describe.each([{ name: "English", tag: "en-CA", file: "en.ts", messages: en }, ...CATALOGS])("Plural forms: $name", ({ tag, file, messages }) => {
+  const enPlurals = collectPlurals(en);
+  const locPlurals = collectPlurals(messages);
+
+  it(`${file} counts exactly the same keys as en.ts, as plural objects`, () => {
+    expect(Object.keys(locPlurals).sort()).toEqual(Object.keys(enPlurals).sort());
+  });
+
+  it(`${file} supplies every plural category ${tag} uses, and no unknown ones`, () => {
+    const required = requiredCategories(tag);
+    const allowed = new Set(new Intl.PluralRules(tag).resolvedOptions().pluralCategories);
+    const problems: string[] = [];
+    for (const [key, forms] of Object.entries(locPlurals)) {
+      const have = new Set(Object.keys(forms));
+      for (const c of required) if (!have.has(c)) problems.push(`${key}: missing "${c}"`);
+      for (const c of have) if (!allowed.has(c as Intl.LDMLPluralRule) && c !== "other") problems.push(`${key}: "${c}" is not a ${tag} plural category`);
+    }
+    expect(problems).toEqual([]);
+  });
+
+  it(`every ${file} plural form carries the same {placeholder} tokens as the English other form`, () => {
+    const mismatches: string[] = [];
+    for (const [key, forms] of Object.entries(locPlurals)) {
+      const expected = extractPlaceholders(enPlurals[key]?.other ?? "").join(",");
+      for (const [category, text] of Object.entries(forms)) {
+        if (extractPlaceholders(text).join(",") !== expected) mismatches.push(`${key}.${category}`);
+      }
+    }
+    expect(mismatches).toEqual([]);
   });
 });
 

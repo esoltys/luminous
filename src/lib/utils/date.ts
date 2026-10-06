@@ -29,17 +29,13 @@ export function formatDateAdded(timestampSec: number | undefined | null): string
   if (diffDays <= 0 || diffMinutes < ELAPSED_TIME_WINDOW_MINUTES) {
     if (diffMinutes < 1) return i18n.t("playlists.relativeJustNow");
     if (diffMinutes < 60) {
-      return diffMinutes === 1
-        ? i18n.t("playlists.relativeOneMinuteAgo")
-        : i18n.t("playlists.relativeMinutesAgo", { count: diffMinutes });
+      return i18n.plural("playlists.relativeMinutesAgo", diffMinutes);
     }
     const diffHours = Math.floor(diffMinutes / 60);
-    return diffHours === 1
-      ? i18n.t("playlists.relativeOneHourAgo")
-      : i18n.t("playlists.relativeHoursAgo", { count: diffHours });
+    return i18n.plural("playlists.relativeHoursAgo", diffHours);
   }
   if (diffDays === 1) return i18n.t("playlists.relativeYesterday");
-  if (diffDays <= 6) return i18n.t("playlists.relativeDaysAgo", { count: diffDays });
+  if (diffDays <= 6) return i18n.plural("playlists.relativeDaysAgo", diffDays);
   return formatDate(timestampSec);
 }
 
@@ -49,23 +45,17 @@ export function formatRelativeDate(timestampSec: number | undefined | null): str
 
   if (diffDays <= 0) return i18n.t("playlists.relativeToday");
   if (diffDays === 1) return i18n.t("playlists.relativeYesterday");
-  if (diffDays < 7) return i18n.t("playlists.relativeDaysAgo", { count: diffDays });
+  if (diffDays < 7) return i18n.plural("playlists.relativeDaysAgo", diffDays);
   if (diffDays < 30) {
     const weeks = Math.floor(diffDays / 7);
-    return weeks === 1
-      ? i18n.t("playlists.relativeOneWeekAgo")
-      : i18n.t("playlists.relativeWeeksAgo", { count: weeks });
+    return i18n.plural("playlists.relativeWeeksAgo", weeks);
   }
   if (diffDays < 365) {
     const months = Math.floor(diffDays / 30);
-    return months === 1
-      ? i18n.t("playlists.relativeOneMonthAgo")
-      : i18n.t("playlists.relativeMonthsAgo", { count: months });
+    return i18n.plural("playlists.relativeMonthsAgo", months);
   }
   const years = Math.floor(diffDays / 365);
-  return years === 1
-    ? i18n.t("playlists.relativeOneYearAgo")
-    : i18n.t("playlists.relativeYearsAgo", { count: years });
+  return i18n.plural("playlists.relativeYearsAgo", years);
 }
 
 /** Formats a chart week (as computed by the backend's `chart_week`, #662) as a
