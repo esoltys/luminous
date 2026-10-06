@@ -237,17 +237,13 @@
       if (append) {
         const outcome = await playerStore.addPathsToQueue(paths);
         if (outcome.added > 0) {
-          const text = outcome.added === 1
-            ? i18n.t('dragDrop.addedSong', {}, 'Added 1 song to queue')
-            : i18n.t('dragDrop.addedSongs', { count: outcome.added }, `Added ${outcome.added} songs to queue`);
+          const text = i18n.plural("dragDrop.addedSongs", outcome.added);
           toastStore.show(text, 'success');
         }
       } else {
         const outcome = await playerStore.openAndPlay(paths);
         if (outcome.played > 0) {
-          const text = outcome.played === 1
-            ? i18n.t('dragDrop.playingSong', {}, 'Playing 1 song')
-            : i18n.t('dragDrop.playingSongs', { count: outcome.played }, `Playing ${outcome.played} songs`);
+          const text = i18n.plural("dragDrop.playingSongs", outcome.played);
           toastStore.show(text, 'success');
         }
       }

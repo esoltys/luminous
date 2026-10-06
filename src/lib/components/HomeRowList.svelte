@@ -69,9 +69,7 @@
 
   function trackCountFor(item: HomeItem): string {
     if (item.type === "playlist") {
-      return item.playlist.track_count === 1
-        ? i18n.t("playlists.oneSong")
-        : i18n.t("playlists.songsCount", { count: item.playlist.track_count });
+      return i18n.plural("playlists.songsCount", item.playlist.track_count);
     }
     return "";
   }

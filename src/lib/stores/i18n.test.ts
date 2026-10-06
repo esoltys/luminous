@@ -115,15 +115,49 @@ describe("I18nStore", () => {
 
   it("should interpolate variables correctly", () => {
     i18n.currentLocale = "en-CA";
-    expect(i18n.t("playlists.songsCount", { count: 42 })).toBe("42 songs");
+    expect(i18n.t("collection.songs", { count: 42 })).toBe("Songs (42)");
 
     i18n.currentLocale = "fr-CA";
-    expect(i18n.t("playlists.songsCount", { count: 42 })).toBe("42 chansons");
+    expect(i18n.t("collection.songs", { count: 42 })).toBe("Chansons (42)");
   });
 
   it("should handle missing variables by leaving placeholders", () => {
     i18n.currentLocale = "en-CA";
-    expect(i18n.t("playlists.songsCount", {})).toBe("{count} songs");
+    expect(i18n.t("collection.songs", {})).toBe("Songs ({count})");
+  });
+
+  describe("plural", () => {
+    it("picks the one and other forms for English", () => {
+      i18n.currentLocale = "en-CA";
+      expect(i18n.plural("playlists.songsCount", 1)).toBe("1 song");
+      expect(i18n.plural("playlists.songsCount", 0)).toBe("0 songs");
+      expect(i18n.plural("playlists.songsCount", 2)).toBe("2 songs");
+    });
+
+    it("follows the locale's own rules: French treats 0 as singular", () => {
+      i18n.currentLocale = "fr-CA";
+      expect(i18n.plural("playlists.songsCount", 0)).toBe("0 chanson");
+      expect(i18n.plural("playlists.songsCount", 1)).toBe("1 chanson");
+      expect(i18n.plural("playlists.songsCount", 2)).toBe("2 chansons");
+    });
+
+    it("formats {count} for the locale and lets vars override it", () => {
+      i18n.currentLocale = "en-CA";
+      expect(i18n.plural("playlists.songsCount", 12345)).toBe("12,345 songs");
+      expect(i18n.plural("playlists.songsCount", 2, { count: "two" })).toBe("two songs");
+    });
+
+    it("passes extra variables through", () => {
+      i18n.currentLocale = "en-CA";
+      expect(i18n.plural("settings.folderLocateSuccess", 1, { path: "D:\Music" })).toBe("Re-linked 1 song to D:\Music");
+    });
+
+    it("returns the key or the explicit fallback when the key is missing or not counted", () => {
+      i18n.currentLocale = "en-CA";
+      expect(i18n.plural("nonexistent.key", 3)).toBe("nonexistent.key");
+      expect(i18n.plural("nonexistent.key", 3, {}, "Fallback")).toBe("Fallback");
+      expect(i18n.plural("sidebar.home", 3)).toBe("sidebar.home");
+    });
   });
 
   it("should format numbers with locale decimal separator", () => {

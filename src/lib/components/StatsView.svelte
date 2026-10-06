@@ -121,9 +121,7 @@
         {#if summary}
           <div class="flex items-center gap-2 shrink-0">
             <span class="text-sm font-medium text-brand-text-secondary">
-              {summary.total_minutes === 1
-                ? i18n.t("stats.totalMinutesOne", {}, "1 minute listened")
-                : i18n.t("stats.totalMinutes", { count: summary.total_minutes }, `${summary.total_minutes} minutes listened`)}
+              {i18n.plural("stats.totalMinutes", summary.total_minutes)}
             </span>
             <button
               onclick={() => { showShareModal = true; }}

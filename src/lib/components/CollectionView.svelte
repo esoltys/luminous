@@ -398,7 +398,7 @@
     <div class="px-6 pt-4 pb-2 flex-shrink-0">
       <div class="h-9 flex items-center justify-between">
         <div class="text-xs text-brand-text-secondary font-medium">
-          {filteredSongs.length === 1 ? i18n.t('collection.showingOneSong') : i18n.t('collection.showingSongs', { count: filteredSongs.length })}
+          {i18n.plural("collection.showingSongs", filteredSongs.length)}
         </div>
 
         <div class="flex items-center gap-2">
@@ -453,9 +453,9 @@
         <div class="h-12 flex items-center justify-between">
           <div class="text-xs text-brand-text-secondary font-medium">
             {#if navigationStore.activeSubTab === "albums"}
-              {sortedAlbums.length === 1 ? i18n.t('collection.showingOneAlbum') : i18n.t('collection.showingAlbums', { count: sortedAlbums.length })}
+              {i18n.plural("collection.showingAlbums", sortedAlbums.length)}
             {:else}
-              {sortedArtists.length === 1 ? i18n.t('collection.showingOneArtist') : i18n.t('collection.showingArtists', { count: sortedArtists.length })}
+              {i18n.plural("collection.showingArtists", sortedArtists.length)}
             {/if}
           </div>
 

@@ -52,7 +52,7 @@
   {/if}
   <div class="flex items-center justify-between mt-1.5 text-xs leading-[22px] text-brand-text-secondary">
     <span class="truncate">{updatedLabel}</span>
-    <span class="shrink-0">{trackCount === 1 ? i18n.t('playlists.oneSong') : i18n.t("playlists.songsCount", { count: trackCount })}</span>
+    <span class="shrink-0">{i18n.plural("playlists.songsCount", trackCount)}</span>
   </div>
 
   {#if footer}

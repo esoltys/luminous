@@ -114,7 +114,7 @@
     </div>
   </div>
 
-  <p class="relative z-10 text-xs text-brand-text-secondary font-medium tabular-nums truncate shrink-0 text-right">{i18n.t('playlists.songsCount', { count: artist.song_count })}</p>
+  <p class="relative z-10 text-xs text-brand-text-secondary font-medium tabular-nums truncate shrink-0 text-right">{i18n.plural("playlists.songsCount", artist.song_count)}</p>
 
   {#if suffix}
     <div class="relative z-10">

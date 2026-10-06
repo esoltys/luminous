@@ -541,11 +541,9 @@
           "warning"
         );
       } else {
-        successMessage = result.moved_count === 1 ? i18n.t("organizer.applySuccessOne") : i18n.t("organizer.applySuccessMany", { count: result.moved_count });
+        successMessage = i18n.plural("organizer.applySuccess", result.moved_count);
         toastStore.show(
-          result.moved_count === 1
-            ? i18n.t("organizer.applySuccessOne")
-            : i18n.t("organizer.applySuccessMany", { count: result.moved_count }),
+          i18n.plural("organizer.applySuccess", result.moved_count),
           "success",
           TOAST_DURATION_MS
         );

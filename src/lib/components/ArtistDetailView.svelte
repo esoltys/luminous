@@ -519,10 +519,8 @@
     });
     try {
       const result = await collectionStore.retrieveArtistDetails(artistName);
-      const label = result.added_count === 1
-        ? i18n.t("artistDetail.retrieveDetailsSuccessOne", {}, "Added 1 link from MusicBrainz")
-        : result.added_count > 1
-          ? i18n.t("artistDetail.retrieveDetailsSuccessMany", { count: result.added_count }, `Added ${result.added_count} links from MusicBrainz`)
+      const label = result.added_count > 1
+          ? i18n.plural("artistDetail.retrieveDetailsSuccess", result.added_count)
           : i18n.t("artistDetail.retrieveDetailsNoResults", {}, "No additional details found on MusicBrainz");
       tasksStore.completeTask(taskId, label);
     } catch (err) {
@@ -717,7 +715,7 @@
   let singles = $derived(albums.filter((a) => classifyRelease(a.track_count, a.disc_count, a.total_duration_nanosec) === "single"));
 
   let songsText = $derived(
-    songs.length === 1 ? i18n.t("playlists.oneSong") : i18n.t("playlists.songsCount", { count: songs.length })
+    i18n.plural("playlists.songsCount", songs.length)
   );
 
   // Songs with no album tag at all are excluded from get_albums() entirely

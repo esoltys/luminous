@@ -129,7 +129,7 @@
       await collectionStore.refreshStats();
       await collectionStore.refreshLibrary();
 
-      toastStore.show(i18n.t("albumTagEditor.clearArtSuccess", { count }), "success");
+      toastStore.show(i18n.plural("albumTagEditor.clearArtSuccess", count), "success");
       if (onSave) onSave();
       onClose();
     } catch (e: any) {
@@ -345,7 +345,7 @@
     <div class="h-16 flex items-center justify-between px-6 border-t border-brand-border bg-brand-main shrink-0">
       <div class="flex items-center gap-2 text-xs font-medium text-brand-text-secondary">
         <Layers class="w-3.5 h-3.5 text-brand-accent-text shrink-0" />
-        <span>{i18n.t('albumTagEditor.tracksAffected', { count: songIds.length })}</span>
+        <span>{i18n.plural("albumTagEditor.tracksAffected", songIds.length)}</span>
       </div>
 
       <div class="flex items-center gap-3">

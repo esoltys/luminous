@@ -30,7 +30,10 @@ export const de = {
     openFilesTooltip: "Audiodateien oder Wiedergabelisten öffnen (*.m3u)",
     openFilesTitle: "Audiodateien oder Wiedergabelisten öffnen",
     searching: "Suche läuft ...",
-    tracksCount: "{count} Titel",
+    tracksCount: {
+      one: "{count} Titel",
+      other: "{count} Titel"
+    },
     clearSearch: "Suche löschen",
     recentSearches: "Letzte Suchen",
     clearRecentSearches: "Letzte Suchen löschen",
@@ -66,8 +69,10 @@ export const de = {
     chartFalling: "Fallend",
     chartSteady: "Unverändert",
     chartPeak: "Peak #{peak}",
-    chartWeek: "1 Woche",
-    chartWeeksCount: "{weeks} Wochen",
+    chartWeeksCount: {
+      one: "{count} Woche",
+      other: "{count} Wochen"
+    },
     recentlyAdded: "Zuletzt hinzugefügt",
     pinned: "Angeheftet",
     exploreLibrary: "Mediathek entdecken",
@@ -99,12 +104,18 @@ export const de = {
     artists: "Interpreten ({count})",
     albums: "Alben ({count})",
     songs: "Titel ({count})",
-    showingSongs: "{count} Titel werden angezeigt",
-    showingOneSong: "1 Titel wird angezeigt",
-    showingAlbums: "{count} Alben werden angezeigt",
-    showingOneAlbum: "1 Album wird angezeigt",
-    showingArtists: "{count} Interpreten werden angezeigt",
-    showingOneArtist: "1 Interpret wird angezeigt",
+    showingSongs: {
+      one: "{count} Titel wird angezeigt",
+      other: "{count} Titel werden angezeigt"
+    },
+    showingAlbums: {
+      one: "{count} Album wird angezeigt",
+      other: "{count} Alben werden angezeigt"
+    },
+    showingArtists: {
+      one: "{count} Interpret wird angezeigt",
+      other: "{count} Interpreten werden angezeigt"
+    },
     noSongsTitle: "Keine Titel gefunden",
     noSongsSearchEmpty: "Zu „{query}“ wurden keine Titel gefunden. Versuche es mit anderen Suchbegriffen.",
     clearSearchFilter: "Suchfilter löschen",
@@ -153,8 +164,10 @@ export const de = {
     sortAlbumsAsc: "Sortierung: Alben (wenigste zuerst)",
     sortGenreAsc: "Sortierung: Genre (A–Z)",
     sortGenreDesc: "Sortierung: Genre (Z–A)",
-    albumsCount: "{count} Alben",
-    oneAlbum: "1 Album",
+    albumsCount: {
+      one: "{count} Album",
+      other: "{count} Alben"
+    },
     selectPlaylistFirstAlert: "Wähle zuerst auf der Registerkarte „Wiedergabelisten“ eine Wiedergabeliste aus oder erstelle eine.",
     albumPlaylistName: "Album: {name}",
     columnsMenuTooltip: "Sichtbare Spalten anpassen",
@@ -350,7 +363,10 @@ export const de = {
     folderChangeLocation: "Speicherort ändern …",
     folderLocateHint: "Den Ordner auf seinen neuen Speicherort verweisen, wenn sich der Laufwerksbuchstabe geändert hat oder die Musik verschoben wurde. Wiedergabezähler, Bewertungen und Wiedergabelisten der Titel bleiben erhalten.",
     folderLocateDialogTitle: "Neuen Speicherort des Ordners auswählen",
-    folderLocateSuccess: "{count} Titel mit {path} neu verknüpft",
+    folderLocateSuccess: {
+      one: "{count} Titel mit {path} neu verknüpft",
+      other: "{count} Titel mit {path} neu verknüpft"
+    },
     folderLocateFailedPrefix: "Der Ordner konnte nicht neu verknüpft werden: ",
     editFolderTitle: "Ordnerdetails bearbeiten",
     folderSaveFailedPrefix: "Ordnerdetails konnten nicht gespeichert werden: ",
@@ -380,7 +396,10 @@ export const de = {
     badgeColorEmerald: "Smaragdgrün",
     badgeColorCyan: "Cyan",
     badgeColorIndigo: "Indigo",
-    loudnessAnalysisActive: "Die Lautheitsnormalisierung analysiert im Hintergrund noch {remaining} Titel. Das kann wie eine Suche aussehen, auch wenn die Ordnerüberwachung aus ist. Zum Beenden auf der Registerkarte „Equalizer“ deaktivieren.",
+    loudnessAnalysisActive: {
+      one: "Die Lautheitsnormalisierung analysiert im Hintergrund noch {count} Titel. Das kann wie eine Suche aussehen, auch wenn die Ordnerüberwachung aus ist. Zum Beenden auf der Registerkarte „Equalizer“ deaktivieren.",
+      other: "Die Lautheitsnormalisierung analysiert im Hintergrund noch {count} Titel. Das kann wie eine Suche aussehen, auch wenn die Ordnerüberwachung aus ist. Zum Beenden auf der Registerkarte „Equalizer“ deaktivieren."
+    },
     noFoldersTitle: "Keine überwachten Ordner",
     noFoldersText: "Oben auf „Ordner hinzufügen“ klicken, um dein Musikverzeichnis hinzuzufügen.",
     dynamicThemes: "Dynamische Designs",
@@ -473,11 +492,15 @@ export const de = {
     rescanTitle: "Durchsuchen und Pflege der Mediathek",
     rescanSubtitle: "Inkrementelle oder vollständige erneute Suchen ausführen und die automatische Hintergrundsuche konfigurieren.",
     lastScanned: "Letzte Suche: {time}",
-    importFinishedToastOne: "1 Titel hinzugefügt",
-    importFinishedToastMany: "{count} Titel hinzugefügt",
+    importFinishedToast: {
+      one: "{count} Titel hinzugefügt",
+      other: "{count} Titel hinzugefügt"
+    },
     batchProcessingToast: "Titel werden verarbeitet ({current}/{total}) ...",
-    batchProcessingDoneToastOne: "1 Titel aktualisiert",
-    batchProcessingDoneToastMany: "{count} Titel aktualisiert",
+    batchProcessingDoneToast: {
+      one: "{count} Titel aktualisiert",
+      other: "{count} Titel aktualisiert"
+    },
     scanningPhase: "Phase: {phase}",
     phaseDiscovering: "Dateien werden gesucht",
     phaseReadingTags: "Tags werden gelesen",
@@ -537,7 +560,10 @@ export const de = {
     saveArtworkToFoldersModalMessage: "Wenn du dies aktivierst, werden vorhandene zwischengespeicherte Albumcover (cover.jpg), Interpretenfotos (artist.jpg), Bandlogos (logo.png) und Banner (banner.jpg) direkt in deine lokalen Musikordner exportiert. Freigegebene Ordner und vorhandene Cover werden nicht überschrieben. Fortfahren?",
     saveArtworkToFoldersModalConfirm: "Cover exportieren",
     saveArtworkToFoldersModalCancel: "Abbrechen",
-    artworkSweepSuccess: "{count} Coverdateien in deine Musikordner exportiert.",
+    artworkSweepSuccess: {
+      one: "{count} Coverdatei in deine Musikordner exportiert.",
+      other: "{count} Coverdateien in deine Musikordner exportiert."
+    },
     artworkSweepNone: "Es mussten keine zwischengespeicherten Cover in Ordner exportiert werden.",
     statsSongs: "Titel",
     statsAlbums: "Alben",
@@ -631,8 +657,10 @@ export const de = {
     reservedPlaylistName: "„{name}“ ist für die integrierte Warteschlange reserviert. Wähle einen anderen Namen.",
     noPlaylistsTitle: "Keine Wiedergabelisten",
     noPlaylistsText: "Oben auf „Neue Wiedergabeliste“ klicken, um die erste zu erstellen.",
-    showingOnePlaylist: "1 Wiedergabeliste wird angezeigt",
-    showingPlaylists: "{count} Wiedergabelisten werden angezeigt",
+    showingPlaylists: {
+      one: "{count} Wiedergabeliste wird angezeigt",
+      other: "{count} Wiedergabelisten werden angezeigt"
+    },
     newPlaylistBtn: "Neue Wiedergabeliste",
     newSmartPlaylistBtn: "Neue intelligente Wiedergabeliste",
     sortNameAsc: "Sortierung: Name (A–Z)",
@@ -670,8 +698,10 @@ export const de = {
     cancel: "Abbrechen",
     playTrack: "Titel abspielen",
     removeFromPlaylist: "Aus Wiedergabeliste entfernen",
-    songsCount: "{count} Titel",
-    oneSong: "1 Titel",
+    songsCount: {
+      one: "{count} Titel",
+      other: "{count} Titel"
+    },
     unknownGenre: "Unbekanntes Genre",
     mixedGenre: "Gemischt",
     statsLine: "{genre} · {songs} • {duration} insgesamt",
@@ -681,7 +711,10 @@ export const de = {
     redoTooltip: "Letzten Vorgang der Wiedergabeliste wiederholen",
     redoBtn: "Wiederholen",
     moreActionsTooltip: "Weitere Aktionen",
-    removeUnavailableTooltip: "Alle {count} nicht verfügbaren Titel aus der Wiedergabeliste entfernen",
+    removeUnavailableTooltip: {
+      one: "Den {count} nicht verfügbaren Titel aus der Wiedergabeliste entfernen",
+      other: "Alle {count} nicht verfügbaren Titel aus der Wiedergabeliste entfernen"
+    },
     removeUnavailableBtn: "{count} nicht verfügbare entfernen",
     fileNotFoundTooltip: "Datei auf dem Datenträger nicht gefunden",
     fileNotFoundText: "Datei nicht gefunden",
@@ -697,8 +730,14 @@ export const de = {
     cancelBtn: "Abbrechen",
     filterPlaceholder: "Titel filtern ...",
     clearFilter: "Filter löschen",
-    removeDuplicatesTooltip: "Alle {count} doppelten Dateien aus der Wiedergabeliste entfernen",
-    removeDuplicatesBtn: "{count} doppelte Dateien entfernen",
+    removeDuplicatesTooltip: {
+      one: "Die {count} doppelte Datei aus der Wiedergabeliste entfernen",
+      other: "Alle {count} doppelten Dateien aus der Wiedergabeliste entfernen"
+    },
+    removeDuplicatesBtn: {
+      one: "{count} doppelte Datei entfernen",
+      other: "{count} doppelte Dateien entfernen"
+    },
     duplicateTrackFlag: "Doppelte Datei",
     selectedCount: "{count} ausgewählt",
     populationModeLabel: "Wiedergabe aus",
@@ -742,19 +781,32 @@ export const de = {
     mostPlayedAutoPlaylist: "Auto-Wiedergabeliste",
     historyAutoPlaylist: "Auto-Wiedergabeliste",
     relativeJustNow: "Gerade eben",
-    relativeOneMinuteAgo: "vor 1 Minute",
-    relativeMinutesAgo: "vor {count} Minuten",
-    relativeOneHourAgo: "vor 1 Stunde",
-    relativeHoursAgo: "vor {count} Stunden",
+    relativeMinutesAgo: {
+      one: "vor {count} Minute",
+      other: "vor {count} Minuten"
+    },
+    relativeHoursAgo: {
+      one: "vor {count} Stunde",
+      other: "vor {count} Stunden"
+    },
     relativeToday: "Heute",
     relativeYesterday: "Gestern",
-    relativeDaysAgo: "vor {count} Tagen",
-    relativeOneWeekAgo: "vor 1 Woche",
-    relativeWeeksAgo: "vor {count} Wochen",
-    relativeOneMonthAgo: "vor 1 Monat",
-    relativeMonthsAgo: "vor {count} Monaten",
-    relativeOneYearAgo: "vor 1 Jahr",
-    relativeYearsAgo: "vor {count} Jahren",
+    relativeDaysAgo: {
+      one: "vor {count} Tag",
+      other: "vor {count} Tagen"
+    },
+    relativeWeeksAgo: {
+      one: "vor {count} Woche",
+      other: "vor {count} Wochen"
+    },
+    relativeMonthsAgo: {
+      one: "vor {count} Monat",
+      other: "vor {count} Monaten"
+    },
+    relativeYearsAgo: {
+      one: "vor {count} Jahr",
+      other: "vor {count} Jahren"
+    },
     makeActiveBtn: "Aktivieren",
     activeBadgeLabel: "Aktiv",
     refreshPlaylistBtn: "Wiedergabeliste aktualisieren",
@@ -854,12 +906,16 @@ export const de = {
     loading: "Statistik wird geladen ...",
     empty: "Für diesen Zeitraum gibt es noch keinen Wiedergabeverlauf.",
     noData: "Keine Daten für diesen Zeitraum.",
-    totalMinutesOne: "1 Minute gehört",
-    totalMinutes: "{count} Minuten gehört",
+    totalMinutes: {
+      one: "{count} Minute gehört",
+      other: "{count} Minuten gehört"
+    },
     minuteCount: "{count} Min.",
     minuteUnderOne: "< 1 Min.",
-    playsCount: "{count} Wiedergaben",
-    playsCountOne: "1 Wiedergabe",
+    playsCount: {
+      one: "{count} Wiedergabe",
+      other: "{count} Wiedergaben"
+    },
     excludeFromStats: "Nicht in Statistik einbeziehen",
     includeInStats: "In Statistik einbeziehen",
     excludedToast: "{name} aus der Statistik ausgeschlossen",
@@ -867,8 +923,10 @@ export const de = {
     heatmapTitle: "Hörserie",
     heatmapCurrentStreak: "Aktuelle Serie",
     heatmapLongestStreak: "Längste Serie",
-    heatmapStreakOneDay: "1 Tag",
-    heatmapStreakDays: "{count} Tage",
+    heatmapStreakDays: {
+      one: "{count} Tag",
+      other: "{count} Tage"
+    },
     heatmapStatus: "{date} — {minutes} Min.",
     heatmapLegendLess: "Weniger",
     heatmapLegendMore: "Mehr"
@@ -931,7 +989,10 @@ export const de = {
     channelsStereo: "Stereo",
     channels51: "5.1-Surround",
     channels71: "7.1-Surround",
-    channelsCount: "{count} Kanäle",
+    channelsCount: {
+      one: "{count} Kanal",
+      other: "{count} Kanäle"
+    },
     releasedLabel: "Veröffentlicht",
     genreLabel: "Genre",
     composerLabel: "Komponist",
@@ -969,7 +1030,10 @@ export const de = {
     wikipediaSectionLabel: "Wikipedia",
     mbTagsSectionLabel: "Community-Tags",
     mbRatingLabel: "Community-Bewertung",
-    mbRatingVotes: "({count} Stimmen)",
+    mbRatingVotes: {
+      one: "({count} Stimme)",
+      other: "({count} Stimmen)"
+    },
     critiquebrainzSectionLabel: "CritiqueBrainz",
     critiquebrainzRatingLabel: "Community-Bewertung",
     listenbrainzSectionLabel: "ListenBrainz",
@@ -984,7 +1048,10 @@ export const de = {
     contextLoading: "Kontext wird abgerufen …",
     contextFetchError: "Die Kontextdaten konnten nicht abgerufen werden. Verbindung prüfen und erneut versuchen.",
     trackSkippedToast: '„{title}“ konnte nicht abgespielt werden – Datei nicht gefunden. Übersprungen.',
-    tracksSkippedToast: "{count} nicht verfügbare Titel übersprungen.",
+    tracksSkippedToast: {
+      one: "{count} nicht verfügbarer Titel übersprungen.",
+      other: "{count} nicht verfügbare Titel übersprungen."
+    },
     trackSkippedRemoteToast: '„{title}“ konnte nicht abgespielt werden – {message}. Übersprungen.',
     openNothingPlayable: "Es wurden keine unterstützten Audiodateien zum Abspielen gefunden.",
     playSongFailed: "Dieser Titel konnte nicht abgespielt werden.",
@@ -1004,8 +1071,10 @@ export const de = {
     shuffleLibrary: "Mediathek mischen",
     replay: "Erneut abspielen",
     library: "Mediathek",
-    tracksPlayed: "{count} Titel gespielt",
-    trackPlayed: "1 Titel gespielt",
+    tracksPlayed: {
+      one: "{count} Titel gespielt",
+      other: "{count} Titel gespielt"
+    },
     dropToPlay: "oder Audiodateien zum Abspielen hierher ziehen"
   },
 
@@ -1075,11 +1144,17 @@ export const de = {
     compilationField: "Sampler (als „Verschiedene Interpreten“ markieren)",
     yearField: "Erscheinungsjahr",
     discField: "Disc-Nr.",
-    tracksAffected: "Gilt für {count} Titel",
+    tracksAffected: {
+      one: "Gilt für {count} Titel",
+      other: "Gilt für {count} Titel"
+    },
     cancelBtn: "Abbrechen",
     saveBtn: "Tags speichern",
     saving: "Album-Tags werden gespeichert ...",
-    saveSuccess: "Album-Tags für {count} Titel aktualisiert",
+    saveSuccess: {
+      one: "Album-Tags für {count} Titel aktualisiert",
+      other: "Album-Tags für {count} Titel aktualisiert"
+    },
     saveFailedPrefix: "Die Album-Tags konnten nicht gespeichert werden: ",
     artworkField: "Cover",
     artworkEmbedded: "Eingebettetes Cover",
@@ -1088,7 +1163,10 @@ export const de = {
     clearArtConfirmTitle: "Eingebettetes Cover entfernen?",
     clearArtConfirmMessage: "Dadurch wird das eingebettete Cover aus der Datei jedes Titels dieses Albums entfernt. Für die Titel wird dann das Ordnercover oder ein Platzhalter verwendet.",
     clearingArt: "Cover werden entfernt ...",
-    clearArtSuccess: "Eingebettetes Cover für {count} Titel entfernt",
+    clearArtSuccess: {
+      one: "Eingebettetes Cover für {count} Titel entfernt",
+      other: "Eingebettetes Cover für {count} Titel entfernt"
+    },
     clearArtFailedPrefix: "Das Albumcover konnte nicht entfernt werden: "
   },
   equalizer: {
@@ -1134,7 +1212,10 @@ export const de = {
     importPlaceholder: "Preamp: -6.2 dB\nFilter 1: ON LSC Fc 105 Hz Gain 5.5 dB Q 0.70\nFilter 2: ON PK Fc 180 Hz Gain -3.1 dB Q 0.53",
     importSubmit: "Importieren",
     importErrorEmpty: "Dieses Profil enthält keine Filter. Füge ein parametrisches EQ-Profil ein oder wähle eines aus.",
-    importErrorTooManyFilters: "Dieses Profil enthält {count} Filter, der Equalizer unterstützt aber höchstens {max}.",
+    importErrorTooManyFilters: {
+      one: "Dieses Profil enthält {count} Filter, der Equalizer unterstützt aber höchstens {max}.",
+      other: "Dieses Profil enthält {count} Filter, der Equalizer unterstützt aber höchstens {max}."
+    },
     importErrorUnsupportedFilters: "Nicht unterstützte Filter: {filters}. Entferne sie oder exportiere das Profil aus AutoEq, das nur Peak-Filter (PK), Low-Shelf-Filter (LSC) und High-Shelf-Filter (HSC) verwendet.",
     importErrorFilterAt: "{kind} (Zeile {line})",
     importErrorUnsupportedLine: "Zeile {line} ist keine Preamp- oder Filter-Zeile, daher lässt sich das Profil nicht exakt wiedergeben.",
@@ -1177,9 +1258,15 @@ export const de = {
     modeAlbum: "Album",
     fallbackGain: "Ersatzverstärkung",
     fallbackGainHint: "Wird angewendet, wenn ein Titel weder eine R128-Analyse noch einen ReplayGain-Tag hat",
-    analyzing: "Mediathek wird analysiert: noch {remaining} Titel",
+    analyzing: {
+      one: "Mediathek wird analysiert: noch {count} Titel",
+      other: "Mediathek wird analysiert: noch {count} Titel"
+    },
     analyzed: "Alle Titel analysiert",
-    analysisPaused: "{remaining} Titel noch nicht analysiert – aktivieren, um sie im Hintergrund zu analysieren"
+    analysisPaused: {
+      one: "{count} Titel noch nicht analysiert – aktivieren, um sie im Hintergrund zu analysieren",
+      other: "{count} Titel noch nicht analysiert – aktivieren, um sie im Hintergrund zu analysieren"
+    }
   },
   fades: {
     title: "Ein-/Ausblenden und Überblenden",
@@ -1223,8 +1310,10 @@ export const de = {
     retrieveArtistDetails: "Interpretendetails abrufen",
     retrieveArtistDetailsTooltip: "Links zu Discogs, AllMusic, Wikidata, IMDb und sozialen Netzwerken von MusicBrainz abrufen",
     retrieveArtistDetailsNoMbidTooltip: "Für diesen Interpreten wurde keine MusicBrainz-Interpreten-ID gefunden",
-    retrieveDetailsSuccessOne: "1 Link von MusicBrainz hinzugefügt",
-    retrieveDetailsSuccessMany: "{count} Links von MusicBrainz hinzugefügt",
+    retrieveDetailsSuccess: {
+      one: "{count} Link von MusicBrainz hinzugefügt",
+      other: "{count} Links von MusicBrainz hinzugefügt"
+    },
     retrieveDetailsNoResults: "Auf MusicBrainz wurden keine weiteren Details gefunden",
     retrieveArtistImage: "Interpretenbild abrufen",
     retrieveArtistImageTooltip: "Interpretenfoto, Logo und Hintergrund von fanart.tv oder ein Foto von Wikidata abrufen",
@@ -1377,8 +1466,10 @@ export const de = {
     communityRating: "Community-Bewertung",
     reviewOnCritiqueBrainz: "Rezension auf CritiqueBrainz",
     reviewOnCritiqueBrainzTooltip: "Dieses Album auf CritiqueBrainz öffnen, um Rezensionen zu lesen oder zu schreiben",
-    retrieveDetailsSuccessOne: "1 Link von MusicBrainz hinzugefügt",
-    retrieveDetailsSuccessMany: "{count} Links von MusicBrainz hinzugefügt",
+    retrieveDetailsSuccess: {
+      one: "{count} Link von MusicBrainz hinzugefügt",
+      other: "{count} Links von MusicBrainz hinzugefügt"
+    },
     retrieveDetailsNoResults: "Auf MusicBrainz wurden keine weiteren Details gefunden",
     retrieveDetailsError: "Die Albumdetails konnten nicht abgerufen werden",
     retrievingDetails: "Albumdetails werden abgerufen ...",
@@ -1389,8 +1480,10 @@ export const de = {
     emptyStateText: "Wähle einen Titel aus deiner Sammlung, um die Wiedergabe zu starten.",
     queueComplete: "Warteschlange beendet",
     contextComplete: "{context} beendet",
-    tracksPlayed: "{count} Titel gespielt",
-    trackPlayed: "1 Titel gespielt",
+    tracksPlayed: {
+      one: "{count} Titel gespielt",
+      other: "{count} Titel gespielt"
+    },
     shuffleLibrary: "Mediathek mischen",
     replay: "Erneut abspielen",
     exitImmersive: "Immersiven Modus beenden",
@@ -1433,7 +1526,10 @@ export const de = {
     scrollRight: "Nach rechts scrollen",
     albumArtAlt: "Albumcover",
     openImages: "Bilder öffnen",
-    openImagesCount: "{count} Bilder öffnen",
+    openImagesCount: {
+      one: "{count} Bild öffnen",
+      other: "{count} Bilder öffnen"
+    },
     enableLogoPulse: "Klicken, um das Pulsieren des Logos zu aktivieren",
     disableLogoPulse: "Klicken, um das Pulsieren des Logos zu deaktivieren",
     toggleLogoPulsing: "Pulsieren des Luminous-Logos umschalten",
@@ -1459,17 +1555,29 @@ export const de = {
     dismiss: "Benachrichtigung schließen"
   },
   songTags: {
-    genresTabDescription: "{count} Genres werden angezeigt",
+    genresTabDescription: {
+      one: "{count} Genre wird angezeigt",
+      other: "{count} Genres werden angezeigt"
+    },
     viewGenre: "Genre",
     viewTags: "Tags",
     emptyTitle: "Noch keine Tags",
     emptySubtitle: "Mit der rechten Maustaste auf einen Titel klicken und „Tags bearbeiten“ wählen, um ihm ein Genre zu geben – der erste Wert ist die Hauptkategorie, die übrigen sind Untergenres.",
-    songCount: "{count} Titel",
-    playAll: "Alle {count} Titel abspielen",
+    songCount: {
+      one: "{count} Titel",
+      other: "{count} Titel"
+    },
+    playAll: {
+      one: "{count} Titel abspielen",
+      other: "Alle {count} Titel abspielen"
+    },
     editSongTooltip: "Titel bearbeiten",
     editAlbumTooltip: "Album bearbeiten",
     goToGenreTooltip: "{genre} durchsuchen",
-    artistCount: "{count} Interpreten",
+    artistCount: {
+      one: "{count} Interpret",
+      other: "{count} Interpreten"
+    },
     artistTagsHeading: "Interpreten-Tags",
     songTagsHeading: "Titel-Tags",
     goToArtistTagTooltip: "{tag} durchsuchen",
@@ -1489,15 +1597,27 @@ export const de = {
     createGroupBtn: "Erstellen",
     groupSelectedTitle: "Ausgewählte Tags gruppieren",
     groupToast: "{count} Tags unter „{name}“ gruppiert",
-    deleteToast: "Gelöscht ({count} Titel aktualisiert)",
-    artistDeleteToast: "Gelöscht ({count} Interpreten aktualisiert)",
+    deleteToast: {
+      one: "Gelöscht ({count} Titel aktualisiert)",
+      other: "Gelöscht ({count} Titel aktualisiert)"
+    },
+    artistDeleteToast: {
+      one: "Gelöscht ({count} Interpret aktualisiert)",
+      other: "Gelöscht ({count} Interpreten aktualisiert)"
+    },
     renameTag: "Umbenennen",
     promoteTag: "Zum Genre der obersten Ebene machen",
     promoteArtistTag: "Zum Tag der obersten Ebene machen",
     renameToast: "In „{name}“ umbenannt ({count} Titel aktualisiert)",
     artistRenameToast: "In „{name}“ umbenannt ({count} Interpreten aktualisiert)",
-    deleteConfirmMessage: "{count} Tags von jedem Titel entfernen, der sie trägt? Dies kann nicht rückgängig gemacht werden.",
-    artistDeleteConfirmMessage: "{count} Tags von jedem Interpreten entfernen, der sie trägt? Dies kann nicht rückgängig gemacht werden.",
+    deleteConfirmMessage: {
+      one: "{count} Tag von jedem Titel entfernen, der es trägt? Dies kann nicht rückgängig gemacht werden.",
+      other: "{count} Tags von jedem Titel entfernen, der sie trägt? Dies kann nicht rückgängig gemacht werden."
+    },
+    artistDeleteConfirmMessage: {
+      one: "{count} Tag von jedem Interpreten entfernen, der es trägt? Dies kann nicht rückgängig gemacht werden.",
+      other: "{count} Tags von jedem Interpreten entfernen, der sie trägt? Dies kann nicht rückgängig gemacht werden."
+    },
     deleteBtn: "Löschen",
     cancelBtn: "Abbrechen"
   },
@@ -1534,18 +1654,27 @@ export const de = {
     statusCollision: "Doppelte Datei",
     statusMissingTag: "Fehlender Tag",
     statusError: "Fehler",
-    summaryReady: "{count} nicht organisierte Titel",
+    summaryReady: {
+      one: "{count} nicht organisierte Titel",
+      other: "{count} nicht organisierte Titel"
+    },
     nothingToOrganize: "Nichts zu organisieren!",
     autoOrganizeToggle: "Automatisch organisieren",
     autoOrganizeToggleTooltip: "Dateien im Hintergrund automatisch organisieren, wenn neue Titel hinzukommen oder Tags bearbeitet werden",
-    autoOrganizeSuccessOne: "1 Datei automatisch organisiert",
-    autoOrganizeSuccessMany: "{count} Dateien automatisch organisiert",
-    toastDuplicateDetectedOne: "Beim automatischen Organisieren wurde 1 doppelte Datei erkannt",
-    toastDuplicatesDetectedMany: "Beim automatischen Organisieren wurden {count} doppelte Dateien erkannt",
+    autoOrganizeSuccess: {
+      one: "{count} Datei automatisch organisiert",
+      other: "{count} Dateien automatisch organisiert"
+    },
+    toastDuplicatesDetected: {
+      one: "Beim automatischen Organisieren wurde {count} doppelte Datei erkannt",
+      other: "Beim automatischen Organisieren wurden {count} doppelte Dateien erkannt"
+    },
     cancel: "Abbrechen",
     applyButton: "Musik organisieren",
-    applySuccessOne: "1 Datei wurde neu organisiert",
-    applySuccessMany: "{count} Dateien wurden neu organisiert",
+    applySuccess: {
+      one: "{count} Datei wurde neu organisiert",
+      other: "{count} Dateien wurden neu organisiert"
+    },
     organizeFilesTooltip: "Dateien nach Tag-Vorlage organisieren",
     organizeEntireLibrary: "Organisieren",
     refreshPreviewTooltip: "Vorschau aktualisieren",
@@ -1596,7 +1725,10 @@ export const de = {
     pauseLabel: "Gesamtes Scrobbling pausieren",
     pauseHint: "Das Scrobbling vorübergehend pausieren, ohne das Konto zu trennen",
     cacheEmpty: "Offline-Cache ist leer",
-    cachePending: "{count} Wiedergaben im Offline-Cache ausstehend",
+    cachePending: {
+      one: "{count} Wiedergabe im Offline-Cache ausstehend",
+      other: "{count} Wiedergaben im Offline-Cache ausstehend"
+    },
     cacheDesc: "Ohne Internetverbindung aufgezeichnete Wiedergaben werden in eine Warteschlange gestellt und automatisch gesendet.",
     syncNowBtn: "Jetzt synchronisieren",
     critiquebrainzUserLabel: "CritiqueBrainz-Profil",
@@ -1712,7 +1844,10 @@ export const de = {
   celebrations: {
     firstLaunch: "Willkommen bei Luminous v{version}!",
     newVersion: "Auf Luminous v{version} aktualisiert",
-    milestone: "{count} Titel in deiner Mediathek!",
+    milestone: {
+      one: "{count} Titel in deiner Mediathek!",
+      other: "{count} Titel in deiner Mediathek!"
+    },
     firstFolder: "Erster Musikordner hinzugefügt!",
     contextComplete: "{name} beendet",
     queueComplete: "Deine Warteschlange ist abgespielt",
@@ -1723,10 +1858,14 @@ export const de = {
     overlayReplaceHint: "Umschalttaste gedrückt halten, um stattdessen anzuhängen",
     overlayAppendTitle: "Ablegen, um an die Warteschlange anzuhängen",
     overlayAppendHint: "Die Wiedergabe wird nicht unterbrochen",
-    playingSong: "1 Titel wird abgespielt",
-    playingSongs: "{count} Titel werden abgespielt",
-    addedSong: "1 Titel zur Warteschlange hinzugefügt",
-    addedSongs: "{count} Titel zur Warteschlange hinzugefügt",
+    playingSongs: {
+      one: "{count} Titel wird abgespielt",
+      other: "{count} Titel werden abgespielt"
+    },
+    addedSongs: {
+      one: "{count} Titel zur Warteschlange hinzugefügt",
+      other: "{count} Titel zur Warteschlange hinzugefügt"
+    },
     nothingToAdd: "Es wurden keine unterstützten Audiodateien zum Hinzufügen gefunden."
   },
   walkthrough: {

@@ -79,7 +79,7 @@
         (res?.band_logos_exported ?? 0) +
         (res?.banners_exported ?? 0);
       if (total > 0) {
-        tasksStore.completeTask(taskId, i18n.t("settings.artworkSweepSuccess", { count: total }));
+        tasksStore.completeTask(taskId, i18n.plural("settings.artworkSweepSuccess", total));
       } else {
         tasksStore.completeTask(taskId, i18n.t("settings.artworkSweepNone"));
       }
@@ -391,7 +391,7 @@
   {#if loudnessStore.enabled && loudnessStore.analysisRemaining > 0}
     <div class="flex items-center gap-2.5 bg-brand-accent/10 border border-brand-accent/30 rounded-xl px-4 py-2.5 text-xs text-brand-text-secondary">
       <Activity class="w-4 h-4 text-brand-accent-text shrink-0" />
-      <span>{i18n.t('settings.loudnessAnalysisActive', { remaining: loudnessStore.analysisRemaining })}</span>
+      <span>{i18n.plural('settings.loudnessAnalysisActive', loudnessStore.analysisRemaining)}</span>
     </div>
   {/if}
 

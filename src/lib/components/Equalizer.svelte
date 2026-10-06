@@ -997,9 +997,9 @@
         {#if loudnessStore.analysisRemaining === 0}
           {i18n.t('loudness.analyzed')}
         {:else if loudnessStore.enabled}
-          {i18n.t('loudness.analyzing', { remaining: loudnessStore.analysisRemaining })}
+          {i18n.plural('loudness.analyzing', loudnessStore.analysisRemaining)}
         {:else}
-          {i18n.t('loudness.analysisPaused', { remaining: loudnessStore.analysisRemaining })}
+          {i18n.plural('loudness.analysisPaused', loudnessStore.analysisRemaining)}
         {/if}
       </p>
     </div>

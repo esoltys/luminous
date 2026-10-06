@@ -87,7 +87,7 @@
     {artist.name || i18n.t('collection.unknownArtist')}
   </span>
   <span class="text-xs text-brand-text-secondary font-medium truncate w-full mt-0.5 text-left">
-    {i18n.t('playlists.songsCount', { count: artist.song_count })}
+    {i18n.plural("playlists.songsCount", artist.song_count)}
   </span>
   <div class="w-full mt-1.5 flex justify-start">
     {#if hasGenre}

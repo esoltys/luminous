@@ -147,7 +147,7 @@
             class="absolute inset-0 z-10 flex items-center justify-center bg-black/50 opacity-0 group-hover/artwork:opacity-100 transition-opacity duration-200 cursor-pointer"
             onclick={handleOpenImages}
             title={extraArtworkCount > 0
-              ? i18n.t("common.openImagesCount", { count: extraArtworkCount })
+              ? i18n.plural("common.openImagesCount", extraArtworkCount)
               : i18n.t("common.openImages")}
           >
             <span class="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-black/60 text-white text-sm font-medium">

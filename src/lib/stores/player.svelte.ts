@@ -252,7 +252,7 @@ export class PlayerStore {
       }
     } else {
       toastStore.show(
-        i18n.t("playerBar.tracksSkippedToast", { count: failures.length }, `Skipped ${failures.length} unavailable tracks.`),
+        i18n.plural("playerBar.tracksSkippedToast", failures.length),
         "error"
       );
     }
@@ -318,7 +318,7 @@ export class PlayerStore {
     }
     if (outcome.skipped > 0) {
       toastStore.show(
-        i18n.t("playerBar.tracksSkippedToast", { count: outcome.skipped }, `Skipped ${outcome.skipped} unavailable tracks.`),
+        i18n.plural("playerBar.tracksSkippedToast", outcome.skipped),
         "error"
       );
     }
@@ -344,7 +344,7 @@ export class PlayerStore {
     }
     if (outcome.skipped > 0) {
       toastStore.show(
-        i18n.t("playerBar.tracksSkippedToast", { count: outcome.skipped }, `Skipped ${outcome.skipped} unavailable tracks.`),
+        i18n.plural("playerBar.tracksSkippedToast", outcome.skipped),
         "error"
       );
     }

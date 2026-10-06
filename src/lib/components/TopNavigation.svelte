@@ -351,7 +351,7 @@
         <div class="animate-spin rounded-full h-4 w-4 border-2 border-brand-accent border-t-transparent flex-shrink-0" title={i18n.t('topNav.searching')}></div>
       {:else if collectionStore.searchQuery}
         <span class="text-[10px] bg-brand-border/60 px-1.5 py-0.5 rounded text-brand-text-secondary font-mono flex-shrink-0 select-none">
-          {i18n.t('topNav.tracksCount', { count: collectionStore.searchResults.length })}
+          {i18n.plural("topNav.tracksCount", collectionStore.searchResults.length)}
         </span>
         <button
           type="button"

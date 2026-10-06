@@ -129,9 +129,7 @@ class OrganizerStore {
         this.pendingMovedCount = 0;
         this.debounceTimer = null;
         if (count > 0) {
-          const text = count === 1
-            ? i18n.t("organizer.autoOrganizeSuccessOne", {}, "Auto-organized 1 file")
-            : i18n.t("organizer.autoOrganizeSuccessMany", { count }, `Auto-organized ${count} files`);
+          const text = i18n.plural("organizer.autoOrganizeSuccess", count);
           toastStore.show(text, "success", TOAST_DURATION_MS);
         }
       }, 1200);
@@ -139,9 +137,7 @@ class OrganizerStore {
 
     // 2. Duplicates detected: sticky warning (remains until manually dismissed)
     if (duplicates_count > 0) {
-      const text = duplicates_count === 1
-        ? i18n.t("organizer.toastDuplicateDetectedOne", {}, "1 duplicate file detected during auto-organize")
-        : i18n.t("organizer.toastDuplicatesDetectedMany", { count: duplicates_count }, `${duplicates_count} duplicate files detected during auto-organize`);
+      const text = i18n.plural("organizer.toastDuplicatesDetected", duplicates_count);
       toastStore.show(text, "warning");
     }
 

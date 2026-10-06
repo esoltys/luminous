@@ -277,13 +277,11 @@
     if (entity.kind === "album" && albumItem?.year) parts.push(String(albumItem.year));
     if (entity.kind === "artist") {
       parts.push(
-        artistFullAlbumCount === 1
-          ? i18n.t("collection.oneAlbum")
-          : i18n.t("collection.albumsCount", { count: artistFullAlbumCount })
+        i18n.plural("collection.albumsCount", artistFullAlbumCount)
       );
     }
     parts.push(
-      songs.length === 1 ? i18n.t("playlists.oneSong") : i18n.t("playlists.songsCount", { count: songs.length })
+      i18n.plural("playlists.songsCount", songs.length)
     );
     if (totalDurationLabel) parts.push(totalDurationLabel);
     return parts.join(" • ");
@@ -490,9 +488,7 @@
   let statsTotalMinutesLabel = $derived.by(() => {
     if (entity.kind !== "stats") return "";
     const n = entity.summary.total_minutes;
-    return n === 1
-      ? i18n.t("stats.totalMinutesOne", {}, "1 minute listened")
-      : i18n.t("stats.totalMinutes", { count: n }, `${n} minutes listened`);
+    return i18n.plural("stats.totalMinutes", n);
   });
 
   // Cover stacks for the summary card's Top Artists/Albums/Songs cells

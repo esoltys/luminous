@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { stripEnclosingQuotes } from "../utils/filterParser";
-import { i18n, formatNumber } from "./i18n.svelte";
+import { i18n } from "./i18n.svelte";
 import type {
   AlbumArtRetrievalResult,
   Song,
@@ -446,9 +446,7 @@ class CollectionStore {
             // covers this same filesystem activity, so skip this toast to
             // avoid a second, less-accurate "songs added" notification (#233).
             if (added > 0 && !event.payload.silent) {
-              const text = added === 1
-                ? i18n.t("settings.importFinishedToastOne")
-                : i18n.t("settings.importFinishedToastMany", { count: added });
+              const text = i18n.plural("settings.importFinishedToast", added);
               toastStore.show(text, "success");
             }
 
@@ -459,9 +457,8 @@ class CollectionStore {
             for (const threshold of MILESTONE_THRESHOLDS) {
               if (songCountBeforeRefresh < threshold && newTotal >= threshold) {
                 this.milestoneReached = threshold;
-                const thresholdFormatted = formatNumber(threshold);
                 toastStore.show(
-                  i18n.t("celebrations.milestone", { count: thresholdFormatted }, `${thresholdFormatted} songs in your library!`),
+                  i18n.plural("celebrations.milestone", threshold),
                   "milestone"
                 );
                 setTimeout(() => { this.milestoneReached = null; }, 700);
@@ -531,9 +528,7 @@ class CollectionStore {
       await listen<BatchProgress>("batch-processing-completed", (event) => {
         const { batch_id, total_count } = event.payload;
         const taskId = `watcher-batch-${batch_id}`;
-        const text = total_count === 1
-          ? i18n.t("settings.batchProcessingDoneToastOne")
-          : i18n.t("settings.batchProcessingDoneToastMany", { count: total_count });
+        const text = i18n.plural("settings.batchProcessingDoneToast", total_count);
         tasksStore.completeTask(taskId, text);
       });
 
@@ -632,11 +627,7 @@ class CollectionStore {
           if (tasksStore.isTaskActive(taskId)) {
             tasksStore.completeTask(
               taskId,
-              i18n.t(
-                "settings.artworkSweepSuccess",
-                { count: current },
-                `Exported ${current} artwork files to your music folders.`
-              )
+              i18n.plural("settings.artworkSweepSuccess", current)
             );
           }
         } else {
@@ -1169,7 +1160,7 @@ class CollectionStore {
       const result = await invoke<{ songs_relocated: number }>("relocate_directory", { oldPath, newPath });
       await this.refreshDirectories();
       toastStore.show(
-        i18n.t("settings.folderLocateSuccess", { count: formatNumber(result.songs_relocated), path: newPath }),
+        i18n.plural("settings.folderLocateSuccess", result.songs_relocated, { path: newPath }),
         "success",
       );
       this.startScan(false, "folder_relocated");
