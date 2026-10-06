@@ -557,17 +557,15 @@ pub async fn sync_webdav_server_inner(
                     seen.insert(item.href.clone());
 
                     let file_size = item.content_length.unwrap_or(0);
-                    // Used for the stored path/stream_url: the audio engine has no separate
-                    // credential lookup at playback time, so credentials travel embedded in
-                    // the URL itself (see `WebDavClient::build_authenticated_url`).
-                    let playback_url = client.build_authenticated_url(&item.href);
+                    // Stored as path/url/stream_url. Credential-free: playback looks the
+                    // server's credentials up when it opens the track (#1492).
+                    let playback_url = client.playback_url(&item.href);
 
                     match cache.get(&item.href) {
                         Some(cached) if !remote_file_changed(cached, &item) => {
                             // The remote file itself is unchanged, so skip re-probing tags —
-                            // but the stored playback URL may still be stale (e.g. it predates
-                            // #682's fix to embed credentials for playback, or the server's
-                            // credentials changed since) and the song may have been flagged
+                            // but the stored playback URL may still be stale (e.g. the
+                            // server's URL changed since) and the song may have been flagged
                             // unavailable while the file was missing. Repair both, so a rescan
                             // fixes previously-synced songs, not just new ones.
                             let path_stale = cached.song_path.as_deref() != Some(playback_url.as_str());

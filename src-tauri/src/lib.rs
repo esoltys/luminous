@@ -991,6 +991,16 @@ pub fn run() {
                 });
             }
 
+            // WebDAV song URLs are stored credential-free; the Basic auth
+            // header comes from the saved server at open time (#1492).
+            {
+                let db = db.clone();
+                audio::register_webdav_auth_resolver(move |url| {
+                    let conn = db.pool.get().ok()?;
+                    webdav::resolve_auth_header(&conn, url)
+                });
+            }
+
             // Graceful Store (MSIX) update handling (#744): register for
             // Restart Manager-driven relaunch, and fire a one-time "app
             // updated" OS notification if the previous launch's persisted
