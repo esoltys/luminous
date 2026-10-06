@@ -177,12 +177,12 @@
         <button
           type="button"
           onclick={() => openExternalUrl(toast.url!)}
-          class="flex-1 text-left underline decoration-dotted underline-offset-2 hover:decoration-solid text-pretty"
+          class="flex-1 min-w-0 wrap-anywhere text-left underline decoration-dotted underline-offset-2 hover:decoration-solid text-pretty"
         >
           {toast.text}
         </button>
       {:else}
-        <span class="flex-1 text-pretty">{toast.text}</span>
+        <span class="flex-1 min-w-0 wrap-anywhere text-pretty">{toast.text}</span>
       {/if}
       <div class="flex items-center gap-1 shrink-0 self-center">
         {#if toast.action}

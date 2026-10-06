@@ -35,3 +35,27 @@ export function parseSubsonicPath(
   if (!m) return null;
   return { serverId: Number(m[1]), trackId: m[2] };
 }
+
+const MAX_FILENAME_CHARS = 24;
+const QUOTED_URL = /'(https?:\/\/[^'\s]+)'/gi;
+
+/**
+ * Shortens each single-quoted `http(s)://` URL in an error message to
+ * `origin/…filename`, with a long filename ellipsized in the middle so its
+ * extension stays visible. A full playback URL is one unbreakable token that
+ * overflows a toast.
+ */
+export function shortenQuotedUrls(text: string): string {
+  return text.replace(QUOTED_URL, (_match, url: string) => {
+    const withoutQuery = url.split(/[?#]/)[0];
+    const originEnd = withoutQuery.indexOf("/", withoutQuery.indexOf("//") + 2);
+    if (originEnd === -1) return `'${withoutQuery}'`;
+    const origin = withoutQuery.slice(0, originEnd);
+    const segments = withoutQuery.slice(originEnd + 1).split("/").filter(Boolean);
+    let name = segments.pop() ?? "";
+    if (name.length > MAX_FILENAME_CHARS) {
+      name = `${name.slice(0, MAX_FILENAME_CHARS - 12)}…${name.slice(-11)}`;
+    }
+    return `'${origin}/${segments.length > 0 ? "…" : ""}${name}'`;
+  });
+}

@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 58;
+pub const CURRENT_SCHEMA_VERSION: i32 = 59;
 
 struct Migration {
     version: i32,
@@ -498,7 +498,38 @@ const MIGRATIONS: &[Migration] = &[
             Ok(())
         },
     },
+    Migration {
+        version: 59,
+        description: "strip embedded credentials from WebDAV song URLs (#1492)",
+        apply: migrate_strip_webdav_song_credentials,
+    },
 ];
+
+/// Migration 59: WebDAV songs used to store `user:pass@host/...` as their
+/// path/url/stream_url. Playback now looks credentials up from the saved
+/// server, so drop the userinfo from existing rows. A row whose credential-free
+/// path is already taken is left for the next sync to reconcile.
+fn migrate_strip_webdav_song_credentials(conn: &rusqlite::Connection) -> Result<()> {
+    let rows: Vec<(i64, String)> = conn
+        .prepare(
+            "SELECT id, path FROM songs
+             WHERE source = ?1 AND (path LIKE 'http://%@%' OR path LIKE 'https://%@%')",
+        )?
+        .query_map([crate::models::SongSource::WEBDAV_ID], |r| {
+            Ok((r.get(0)?, r.get(1)?))
+        })?
+        .collect::<rusqlite::Result<_>>()?;
+    for (id, path) in rows {
+        let clean = crate::webdav::strip_url_credentials(&path);
+        if clean != path {
+            conn.execute(
+                "UPDATE OR IGNORE songs SET path = ?1, url = ?1, stream_url = ?1 WHERE id = ?2",
+                rusqlite::params![clean, id],
+            )?;
+        }
+    }
+    Ok(())
+}
 
 /// Migration 53: the legacy parametric layout was a positional list of
 /// `{freq, gain_db, q}` whose first band was implicitly a low shelf and last a
@@ -3674,5 +3705,39 @@ mod tests {
         assert_eq!(fetched_at, 1_700_000_000);
 
         let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn migration_59_strips_credentials_from_webdav_song_urls_only() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_migration59_test_")
+            .tempdir()
+            .unwrap();
+        let db = Database::new(temp_dir_guard.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+        let webdav = crate::models::SongSource::WEBDAV_ID;
+        let embedded = "http://u:p@nas/dav/a.mp3";
+        for (path, source) in [(embedded, webdav), ("http://u:p@radio/stream", 0)] {
+            conn.execute(
+                "INSERT INTO songs (path, url, stream_url, source) VALUES (?1, ?1, ?1, ?2)",
+                params![path, source],
+            )
+            .unwrap();
+        }
+
+        migrate_strip_webdav_song_credentials(&conn).unwrap();
+
+        let row = |path: &str| -> Option<(String, String)> {
+            conn.query_row(
+                "SELECT url, stream_url FROM songs WHERE path = ?1",
+                params![path],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .ok()
+        };
+        let plain = "http://nas/dav/a.mp3".to_string();
+        assert_eq!(row(&plain), Some((plain.clone(), plain)));
+        assert!(row(embedded).is_none());
+        assert!(row("http://u:p@radio/stream").is_some());
     }
 }

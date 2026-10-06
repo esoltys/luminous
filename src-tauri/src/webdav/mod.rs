@@ -22,6 +22,48 @@ pub struct WebDavItem {
     pub etag: Option<String>,
 }
 
+/// Removes any `user:pass@` userinfo from a URL, re-serialised in normal form.
+/// Unparseable input is returned unchanged.
+pub fn strip_url_credentials(url: &str) -> String {
+    match reqwest::Url::parse(url) {
+        Ok(mut parsed) => {
+            let _ = parsed.set_username("");
+            let _ = parsed.set_password(None);
+            parsed.to_string()
+        }
+        Err(_) => url.to_string(),
+    }
+}
+
+/// The `Authorization: Basic ...` value for a credential-free song URL, from the
+/// saved server it belongs to (#1492). Prefers the most specific server when
+/// several share a host. `None` when no saved server matches or it has no
+/// credentials, so plain HTTP streams are untouched.
+pub fn resolve_auth_header(conn: &rusqlite::Connection, song_url: &str) -> Option<String> {
+    let mut stmt = conn
+        .prepare("SELECT url, username, password FROM webdav_servers")
+        .ok()?;
+    let servers = stmt
+        .query_map([], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, Option<String>>(1)?,
+                r.get::<_, Option<String>>(2)?,
+            ))
+        })
+        .ok()?;
+    let (_, user, pass) = servers
+        .flatten()
+        .filter(|(url, ..)| crate::collection::song_matches_webdav_server(song_url, url))
+        .max_by_key(|(url, ..)| {
+            reqwest::Url::parse(url).map_or(0, |u| u.path().trim_end_matches('/').len())
+        })?;
+    let (user, pass) = (user?, pass?);
+    use base64::Engine;
+    let encoded = base64::engine::general_purpose::STANDARD.encode(format!("{user}:{pass}"));
+    Some(format!("Basic {encoded}"))
+}
+
 /// WebDAV HTTP client.
 #[derive(Clone)]
 pub struct WebDavClient {
@@ -75,23 +117,11 @@ impl WebDavClient {
         format!("{}{clean_path}", self.base_url)
     }
 
-    /// Resolve a path to a full URL with credentials embedded as URL userinfo
-    /// (`scheme://user:pass@host/path`). The audio engine only ever has the
-    /// bare URL string stored on the `Song` to work with — no separate
-    /// credential lookup is available at playback time — so this is how
-    /// Basic Auth reaches WebDAV streaming requests (see `audio.rs`'s
-    /// `HttpRangeReader`, which extracts and strips the userinfo again
-    /// before sending the request).
-    pub fn build_authenticated_url(&self, path: &str) -> String {
-        let base = self.build_url(path);
-        if let (Some(u), Some(p)) = (&self.username, &self.password) {
-            if let Ok(mut parsed) = reqwest::Url::parse(&base) {
-                if parsed.set_username(u).is_ok() && parsed.set_password(Some(p)).is_ok() {
-                    return parsed.to_string();
-                }
-            }
-        }
-        base
+    /// The URL stored as a song's `path`/`url`/`stream_url`: normalised the way
+    /// `strip_url_credentials` leaves it, and never carrying credentials. Playback
+    /// looks the server's credentials up when it opens the track (#1492).
+    pub fn playback_url(&self, path: &str) -> String {
+        strip_url_credentials(&self.build_url(path))
     }
 
     /// Test server connectivity and authentication using PROPFIND with Depth: 0.
@@ -526,7 +556,7 @@ mod tests {
     }
 
     #[test]
-    fn test_build_authenticated_url_embeds_credentials() {
+    fn test_playback_url_never_embeds_credentials() {
         let client = WebDavClient::new(
             "http://127.0.0.1:8080".to_string(),
             Some("test".to_string()),
@@ -535,19 +565,45 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            client.build_authenticated_url("/Music/song.mp3"),
-            "http://test:test@127.0.0.1:8080/Music/song.mp3"
+            client.playback_url("/Music/song.mp3"),
+            "http://127.0.0.1:8080/Music/song.mp3"
         );
     }
 
     #[test]
-    fn test_build_authenticated_url_without_credentials_is_unchanged() {
-        let client = WebDavClient::new("http://127.0.0.1:8080".to_string(), None, None).unwrap();
-
+    fn test_strip_url_credentials() {
         assert_eq!(
-            client.build_authenticated_url("/Music/song.mp3"),
-            "http://127.0.0.1:8080/Music/song.mp3"
+            strip_url_credentials("http://u:p%40ss@host:8080/a b/c.mp3"),
+            "http://host:8080/a%20b/c.mp3"
         );
+        assert_eq!(
+            strip_url_credentials("https://host/Music/c.mp3"),
+            "https://host/Music/c.mp3"
+        );
+        assert_eq!(strip_url_credentials("not a url"), "not a url");
+    }
+
+    #[test]
+    fn test_resolve_auth_header_uses_the_matching_servers_credentials() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE webdav_servers (url TEXT, username TEXT, password TEXT);
+             INSERT INTO webdav_servers VALUES ('http://nas/dav', 'a', 'b');
+             INSERT INTO webdav_servers VALUES ('http://nas/dav/kids', 'c', 'd');
+             INSERT INTO webdav_servers VALUES ('http://open/dav', NULL, NULL);",
+        )
+        .unwrap();
+        // base64("a:b") / base64("c:d")
+        assert_eq!(
+            resolve_auth_header(&conn, "http://nas/dav/x.mp3").as_deref(),
+            Some("Basic YTpi")
+        );
+        assert_eq!(
+            resolve_auth_header(&conn, "http://nas/dav/kids/x.mp3").as_deref(),
+            Some("Basic Yzpk")
+        );
+        assert_eq!(resolve_auth_header(&conn, "http://open/dav/x.mp3"), None);
+        assert_eq!(resolve_auth_header(&conn, "http://other/x.mp3"), None);
     }
 
     #[test]

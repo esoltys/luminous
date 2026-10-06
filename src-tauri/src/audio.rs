@@ -659,9 +659,9 @@ impl Default for AudioEngine {
 
 /// Splits a `user:pass@` prefix out of a URL's authority, if present, returning
 /// the credential-free URL and a ready-to-use `Authorization: Basic ...` header
-/// value. WebDAV playback URLs carry credentials embedded as userinfo (see
-/// `WebDavClient::build_authenticated_url`) since there's no separate credential
-/// lookup available here — just the bare URL string stored on the `Song`.
+/// value. WebDAV songs synced before #1492 may still carry credentials embedded
+/// as userinfo until the migration scrubs them; current rows are credential-free
+/// and get their header from the registered WebDAV resolver instead.
 fn extract_basic_auth(url: &str) -> (String, Option<String>) {
     let Ok(mut parsed) = reqwest::Url::parse(url) else {
         return (url.to_string(), None);
@@ -736,6 +736,11 @@ impl HttpRangeReader {
         let (url, auth_header) = extract_basic_auth(url);
         let label = url.clone();
         Self::open(url, label, auth_header)
+    }
+
+    /// Like `new`, but sends `auth_header` as the `Authorization` value.
+    pub fn new_with_auth(url: &str, auth_header: Option<String>) -> Result<Self, String> {
+        Self::open(url.to_string(), url.to_string(), auth_header)
     }
 
     /// Like `new`, but error messages name the source as `label` rather than
@@ -957,6 +962,21 @@ pub fn register_subsonic_resolver(
     let _ = SUBSONIC_RESOLVER.set(Box::new(resolver));
 }
 
+/// Looks up the `Authorization` header for a credential-free WebDAV song URL
+/// from the saved server it belongs to (#1492). Registered at startup (it needs
+/// the database, which this module doesn't own).
+type WebDavAuthResolver = dyn Fn(&str) -> Option<String> + Send + Sync;
+
+static WEBDAV_AUTH_RESOLVER: OnceLock<Box<WebDavAuthResolver>> = OnceLock::new();
+
+/// Installs the WebDAV credential resolver used by `open_media_source`.
+/// Only the first registration takes effect.
+pub fn register_webdav_auth_resolver(
+    resolver: impl Fn(&str) -> Option<String> + Send + Sync + 'static,
+) {
+    let _ = WEBDAV_AUTH_RESOLVER.set(Box::new(resolver));
+}
+
 /// Open a playable media source. Local files or remote HTTP/WebDAV endpoints (#682).
 /// Shared with the offline analyzers (`analyzer::decode_all_samples`,
 /// `loudness::decode_channels`) so waveform/band-waveform generation and R128
@@ -972,7 +992,9 @@ pub(crate) fn open_media_source(path: &str) -> Result<Box<dyn MediaSource>, Stri
         let reader = HttpRangeReader::new_with_label(&url, path)?;
         Ok(Box::new(reader))
     } else if path.starts_with("http://") || path.starts_with("https://") {
-        let reader = HttpRangeReader::new(path)?;
+        let (url, embedded) = extract_basic_auth(path);
+        let auth = embedded.or_else(|| WEBDAV_AUTH_RESOLVER.get().and_then(|r| r(&url)));
+        let reader = HttpRangeReader::new_with_auth(&url, auth)?;
         Ok(Box::new(reader))
     } else {
         let file =
