@@ -124,7 +124,12 @@ pub async fn scan_directories(
 ) -> Result<(), String> {
     let scanner = CollectionScanner::new(state.db.clone());
     scanner
-        .scan_all(app, force.unwrap_or(false), false)
+        .scan_all(
+            app,
+            force.unwrap_or(false),
+            false,
+            crate::collection::ScanTrigger::Requested,
+        )
         .await
         .map_err(|e| e.to_string())
 }

@@ -491,7 +491,14 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                     let scanner = super::CollectionScanner::new(Arc::clone(&db_for_thread));
                     let app_handle_scan = app_clone.clone();
                     tauri::async_runtime::block_on(async move {
-                        let _ = scanner.scan_all(app_handle_scan.clone(), false, true).await;
+                        let _ = scanner
+                            .scan_all(
+                                app_handle_scan.clone(),
+                                false,
+                                true,
+                                super::ScanTrigger::WatcherOverflow,
+                            )
+                            .await;
                         let _ = app_handle_scan.emit("library-changed", ());
                     });
                     continue;
@@ -741,7 +748,14 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                     let scanner = super::CollectionScanner::new(Arc::clone(&db_for_thread));
                     let app_handle_scan = app_clone.clone();
                     tauri::async_runtime::block_on(async move {
-                        let _ = scanner.scan_all(app_handle_scan.clone(), false, true).await;
+                        let _ = scanner
+                            .scan_all(
+                                app_handle_scan.clone(),
+                                false,
+                                true,
+                                super::ScanTrigger::WatcherDirectoryChange,
+                            )
+                            .await;
                         let _ = app_handle_scan.emit("library-changed", ());
                     });
                 }
