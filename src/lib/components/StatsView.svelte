@@ -168,11 +168,11 @@
       </div>
     </div>
 
-    {#if loading}
+    {#if loading && !summary}
       <div class="flex items-center justify-center h-64">
         <LoadingSpinner label={i18n.t("stats.loading", {}, "Loading stats...")} />
       </div>
-    {:else if !summary || summary.play_timestamps.length === 0}
+    {:else if (!loading && (!summary || summary.play_timestamps.length === 0))}
       <div class="flex items-center justify-center h-64 text-brand-text-secondary text-sm">
         {i18n.t("stats.empty", {}, "No listening history for this range yet.")}
       </div>

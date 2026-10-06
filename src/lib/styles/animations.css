@@ -196,6 +196,13 @@
   }
 }
 
+/* Stats view ranked items proportional bar entrance animation (#1475) */
+@starting-style {
+  .accent-bar {
+    width: 0% !important;
+  }
+}
+
 /* Reduced motion for everything else that moves via CSS transitions —
    Tailwind's transition-transform/transition-all utilities and component
    <style> blocks. Colour, opacity and shadow transitions keep playing
