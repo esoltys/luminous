@@ -14,6 +14,8 @@
     oncontextmenu?: (e: MouseEvent) => void;
     prefix?: import("svelte").Snippet;
     suffix?: import("svelte").Snippet;
+    /** Proportional listening weight percentage [0, 100] for ranked charts (#1475). */
+    progressPercent?: number;
   }
 
   let {
@@ -24,6 +26,7 @@
     oncontextmenu: customContextMenu,
     prefix,
     suffix,
+    progressPercent,
   }: Props = $props();
 
   // Same front-cover selection ArtistCard uses for its CoverStack (index 0 is
@@ -62,13 +65,23 @@
   onclick={(e) => customClick?.(e)}
   oncontextmenu={(e) => customContextMenu?.(e)}
   onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); customClick?.(e as unknown as MouseEvent); } }}
-  class="group flex items-center gap-3 px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 select-none cursor-pointer w-full"
+  class="group flex items-center gap-3 px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 select-none cursor-pointer w-full relative overflow-hidden"
 >
-  {#if prefix}
-    {@render prefix()}
+  {#if typeof progressPercent === "number" && progressPercent > 0}
+    <div
+      class="accent-bar absolute inset-y-0 left-0 rounded-lg bg-brand-accent/15 pointer-events-none transition-[width] duration-300 ease-out motion-reduce:transition-none"
+      style="width: {Math.min(100, Math.max(0, progressPercent))}%;"
+      data-testid="stats-accent-bar"
+    ></div>
   {/if}
 
-  <div class="relative shrink-0 overflow-hidden">
+  {#if prefix}
+    <div class="relative z-10">
+      {@render prefix()}
+    </div>
+  {/if}
+
+  <div class="relative z-10 shrink-0 overflow-hidden">
     {#if artistPortraitUrl}
       <div class="w-11 h-11 relative overflow-hidden bg-brand-sidebar border border-brand-border shrink-0">
         <img
@@ -88,7 +101,7 @@
     {/if}
   </div>
 
-  <div class="min-w-0 flex-1 flex flex-col gap-0.5">
+  <div class="relative z-10 min-w-0 flex-1 flex flex-col gap-0.5">
     <div class="flex items-center justify-between gap-2">
       <p class="truncate text-sm font-semibold text-brand-text-primary min-w-0">{artist.name || i18n.t('collection.unknownArtist')}</p>
     </div>
@@ -101,9 +114,11 @@
     </div>
   </div>
 
-  <p class="text-xs text-brand-text-secondary font-medium tabular-nums truncate shrink-0 text-right">{i18n.t('playlists.songsCount', { count: artist.song_count })}</p>
+  <p class="relative z-10 text-xs text-brand-text-secondary font-medium tabular-nums truncate shrink-0 text-right">{i18n.t('playlists.songsCount', { count: artist.song_count })}</p>
 
   {#if suffix}
-    {@render suffix()}
+    <div class="relative z-10">
+      {@render suffix()}
+    </div>
   {/if}
 </div>
