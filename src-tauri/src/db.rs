@@ -483,7 +483,20 @@ const MIGRATIONS: &[Migration] = &[
     Migration {
         version: 58,
         description: "webdav_dir_cache table so WebDAV sync can skip unchanged folders (#1483)",
-        apply: |conn| Ok(conn.execute_batch(MIGRATION_58)?),
+        apply: |conn| {
+            conn.execute_batch(MIGRATION_58)?;
+            let has_last_full_listing_at: bool = conn
+                .prepare(
+                    "SELECT 1 FROM pragma_table_info('webdav_servers') WHERE name = 'last_full_listing_at'",
+                )?
+                .exists([])?;
+            if !has_last_full_listing_at {
+                conn.execute_batch(
+                    "ALTER TABLE webdav_servers ADD COLUMN last_full_listing_at INTEGER;",
+                )?;
+            }
+            Ok(())
+        },
     },
 ];
 
@@ -2065,7 +2078,6 @@ CREATE TABLE IF NOT EXISTS webdav_dir_cache (
     etag        TEXT NOT NULL,
     PRIMARY KEY (server_id, remote_path)
 );
-ALTER TABLE webdav_servers ADD COLUMN last_full_listing_at INTEGER;
 ";
 
 fn seed_artist_tag_hierarchy(conn: &rusqlite::Connection) -> Result<()> {
