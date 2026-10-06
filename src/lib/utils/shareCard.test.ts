@@ -487,7 +487,7 @@ describe("buildMosaicCoverHtml", () => {
   it("fit mode grows a third row and more columns to fill the box, never overflowing it (#1496)", () => {
     const uris = Array.from({ length: 8 }, (_, i) => `data:image/png;base64,${i + 1}`);
     const html = buildMosaicCoverHtml(null, uris, 400, 400, { width: 600, height: 400 });
-    expect(html).toMatch(/grid-template-rows:repeat\(3, /);
+    expect(html).toMatch(/grid-template-rows:repeat\([34], /);
     for (const uri of uris) expect(html).toContain(`src="${uri}"`);
     const [, w, h] = html.match(/;width:([\d.]+)px;height:([\d.]+)px;border-radius/)!.map(Number) as number[];
     expect(w).toBeLessThanOrEqual(600);

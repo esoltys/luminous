@@ -58,9 +58,9 @@ export function computeMosaicLayout(opts: MosaicLayoutOptions): MosaicLayout | n
 
   let best: MosaicLayout | null = null;
   let bestEmpty = 0;
-  // Effective size: each empty cell discounts a grid by 20%, so an exact fill
+  // Effective size: each empty cell discounts a grid by 35%, so an exact fill
   // wins unless a gapped grid has much bigger tiles.
-  const effective = (unit: number, empty: number) => unit / (1 + 0.2 * empty);
+  const effective = (unit: number, empty: number) => unit / (1 + 0.35 * empty);
   for (let heroSpan = 2; heroSpan <= 3; heroSpan++) {
     for (let rows = heroSpan; rows <= maxRows; rows++) {
       for (let cols = heroSpan + 1; cols <= maxCols; cols++) {

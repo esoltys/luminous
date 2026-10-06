@@ -196,8 +196,9 @@
           </div>
         {/each}
       </div>
-    {:else if quarterCovers.length === 0 && fitSoloEdge > 0}
-      <div class="shrink-0" style="width: {fitSoloEdge}px; height: {fitSoloEdge}px;">
+    {:else}
+      <!-- Not measured yet, no covers to grid, or nothing fits `minTile`: the big tile alone, as a square. -->
+      <div class="shrink-0 {fitSoloEdge > 0 ? '' : 'h-full aspect-square'}" style={fitSoloEdge > 0 ? `width: ${fitSoloEdge}px; height: ${fitSoloEdge}px;` : ""}>
         {@render bigTile()}
       </div>
     {/if}
