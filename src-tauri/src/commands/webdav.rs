@@ -403,9 +403,19 @@ pub async fn sync_webdav_server_inner(
 
         let mut stats = WebDavSyncStats::default();
         let mut current_count = 0usize;
+        // Timing for the diagnostics export (#1482): where a slow sync spends its time.
+        let sync_started = std::time::Instant::now();
+        let mut list_time = std::time::Duration::ZERO;
+        let mut probe_time = std::time::Duration::ZERO;
+        let mut dirs_listed = 0usize;
+        let mut files_probed = 0usize;
 
         while let Some(current_path) = queue.pop_front() {
-            let items = match client.list_directory(&current_path) {
+            let list_started = std::time::Instant::now();
+            let listing = client.list_directory(&current_path);
+            list_time += list_started.elapsed();
+            dirs_listed += 1;
+            let items = match listing {
                 Ok(it) => it,
                 Err(err) => {
                     log::warn!("Failed to list WebDAV directory {current_path}: {err}");
@@ -443,9 +453,7 @@ pub async fn sync_webdav_server_inner(
 
             for item in items {
                 // Avoid infinite loops matching the directory itself
-                let norm_item_href = item.href.trim_end_matches('/');
-                let norm_cur = current_path.trim_end_matches('/');
-                if norm_item_href == norm_cur || norm_item_href.ends_with(norm_cur) && norm_item_href.len() == norm_cur.len() {
+                if crate::webdav::is_listed_collection(&item.href, &current_path) {
                     continue;
                 }
 
@@ -525,7 +533,11 @@ pub async fn sync_webdav_server_inner(
                     }
 
                     // Probe remote tags using byte ranges
-                    match client.probe_song_tags(&probe_url, file_size) {
+                    files_probed += 1;
+                    let probe_started = std::time::Instant::now();
+                    let probed = client.probe_song_tags(&probe_url, file_size);
+                    probe_time += probe_started.elapsed();
+                    match probed {
                         Ok(mut song) => {
                             song.path = Some(playback_url.clone());
                             song.url = Some(playback_url.clone());
@@ -653,6 +665,26 @@ pub async fn sync_webdav_server_inner(
                 done: true,
             },
         );
+
+        let summary = format!(
+            concat!(
+                "webdav sync ({}): total {} ms | {} file(s) seen, ",
+                "{} probed, {} added, {} updated, {} error(s) | ",
+                "{} dir listing(s) {} ms, tag probes {} ms"
+            ),
+            server_name,
+            sync_started.elapsed().as_millis(),
+            current_count,
+            files_probed,
+            stats.added,
+            stats.updated,
+            stats.errors,
+            dirs_listed,
+            list_time.as_millis(),
+            probe_time.as_millis(),
+        );
+        log::info!("{summary}");
+        crate::diagnostics::record_operation(&summary);
 
         let _ = app_clone.emit("library-changed", ());
         Ok(stats)

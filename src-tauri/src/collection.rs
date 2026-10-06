@@ -23,7 +23,7 @@ use std::{
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
     sync::Arc,
-    time::UNIX_EPOCH,
+    time::{Instant, UNIX_EPOCH},
 };
 use tauri::{AppHandle, Emitter, Manager};
 use walkdir::WalkDir;
@@ -59,6 +59,109 @@ pub(crate) use query::get_artist_profile_conn;
 pub(crate) use query::set_artist_profile_conn;
 pub(crate) use reconcile::resolve_case_insensitive_path;
 pub use watcher::{start_watcher, SelfWriteTracker, WatcherPauseGuard};
+
+/// What started a library scan — recorded with its timings so repeated
+/// whole-library rescans (e.g. one per watcher event on a network share) are
+/// visible in the diagnostics export.
+#[derive(Debug, Clone, Copy)]
+pub enum ScanTrigger {
+    /// The frontend asked without saying why (older callers, or an unrecognised reason).
+    Requested,
+    /// Scan-on-startup.
+    Startup,
+    /// A rescan the user clicked in Settings (including force rescans).
+    Manual,
+    /// A watched folder was added.
+    FolderAdded,
+    /// A watched folder was removed.
+    FolderRemoved,
+    /// A watched folder was re-linked to a new location.
+    FolderRelocated,
+    /// The file watcher lost events (buffer overflow) and can't know what changed.
+    WatcherOverflow,
+    /// The file watcher saw a directory added or changed.
+    WatcherDirectoryChange,
+}
+
+impl ScanTrigger {
+    /// Maps the reason string the frontend sends with `scan_directories`.
+    pub fn from_reason(reason: Option<&str>) -> Self {
+        match reason {
+            Some("startup") => Self::Startup,
+            Some("manual") => Self::Manual,
+            Some("folder_added") => Self::FolderAdded,
+            Some("folder_removed") => Self::FolderRemoved,
+            Some("folder_relocated") => Self::FolderRelocated,
+            _ => Self::Requested,
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::Requested => "requested",
+            Self::Startup => "startup",
+            Self::Manual => "manual",
+            Self::FolderAdded => "folder added",
+            Self::FolderRemoved => "folder removed",
+            Self::FolderRelocated => "folder relocated",
+            Self::WatcherOverflow => "watcher overflow",
+            Self::WatcherDirectoryChange => "watcher directory change",
+        }
+    }
+}
+
+/// Wall-clock cost and file counts of one `scan_all_core` run. `tag_read_ms`
+/// covers reading tags and writing rows, which are interleaved per batch.
+#[derive(Debug, Default, Clone)]
+pub struct ScanReport {
+    pub force: bool,
+    pub directories: usize,
+    pub files_found: usize,
+    pub cue_sheets: usize,
+    pub unchanged: usize,
+    pub reread: usize,
+    pub failed: usize,
+    pub marked_unavailable: usize,
+    pub artwork_albums: usize,
+    pub remote_art_fetches: usize,
+    pub discovery_ms: u128,
+    pub partition_ms: u128,
+    pub tag_read_ms: u128,
+    pub missing_check_ms: u128,
+    pub dr_logs_ms: u128,
+    pub artwork_ms: u128,
+    pub total_ms: u128,
+}
+
+impl ScanReport {
+    /// One line for the log and the diagnostics export.
+    pub fn summary(&self, trigger: ScanTrigger) -> String {
+        format!(
+            "scan ({}{}): total {} ms | {} dir(s), {} file(s) found, {} CUE sheet(s), \
+             {} unchanged, {} re-read, {} failed, {} marked unavailable | \
+             discovery {} ms, moved-file reconcile + mtime check {} ms, tag read+write {} ms, missing check {} ms, \
+             DR logs {} ms, artwork {} ms ({} album(s), {} remote fetch(es))",
+            trigger.label(),
+            if self.force { ", force" } else { "" },
+            self.total_ms,
+            self.directories,
+            self.files_found,
+            self.cue_sheets,
+            self.unchanged,
+            self.reread,
+            self.failed,
+            self.marked_unavailable,
+            self.discovery_ms,
+            self.partition_ms,
+            self.tag_read_ms,
+            self.missing_check_ms,
+            self.dr_logs_ms,
+            self.artwork_ms,
+            self.artwork_albums,
+            self.remote_art_fetches,
+        )
+    }
+}
 
 #[derive(Debug)]
 pub struct CollectionScanner {
@@ -747,17 +850,28 @@ impl CollectionScanner {
     /// explicit user action — see `ScanProgress::silent` (#233). Thin
     /// Tauri-facing wrapper around `scan_all_core` — see that method for the
     /// actual scan logic.
-    pub async fn scan_all(&self, app: AppHandle, force: bool, silent: bool) -> Result<()> {
+    pub async fn scan_all(
+        &self,
+        app: AppHandle,
+        force: bool,
+        silent: bool,
+        trigger: ScanTrigger,
+    ) -> Result<()> {
         let _watcher_pause_guard = app
             .try_state::<crate::AppState>()
             .map(|state| WatcherPauseGuard::new(Arc::clone(&state.watcher_paused)));
 
         let app_data_dir = crate::paths::resolve_app_data_dir(&app);
         let app_for_progress = app.clone();
-        self.scan_all_core(app_data_dir, force, silent, true, move |progress| {
-            let _ = app_for_progress.emit("scan-progress", progress);
-        })
-        .await
+        let report = self
+            .scan_all_core(app_data_dir, force, silent, true, move |progress| {
+                let _ = app_for_progress.emit("scan-progress", progress);
+            })
+            .await?;
+        let summary = report.summary(trigger);
+        log::info!("{summary}");
+        crate::diagnostics::record_operation(&summary);
+        Ok(())
     }
 
     /// Force re-reads embedded tags for exactly these files, bypassing the
@@ -840,8 +954,14 @@ impl CollectionScanner {
         silent: bool,
         resolve_remote_art: bool,
         mut on_progress: impl FnMut(ScanProgress),
-    ) -> Result<()> {
+    ) -> Result<ScanReport> {
+        let scan_started = Instant::now();
         let dirs = self.get_directories()?;
+        let mut report = ScanReport {
+            force,
+            directories: dirs.len(),
+            ..ScanReport::default()
+        };
         if dirs.is_empty() {
             // Still tell the frontend we're done — otherwise the isScanning
             // flag it optimistically set before calling this command is
@@ -855,7 +975,7 @@ impl CollectionScanner {
                 directory_name: None,
                 directory_id: None,
             });
-            return Ok(());
+            return Ok(report);
         }
 
         let default_dir_context = if dirs.len() == 1 {
@@ -875,6 +995,7 @@ impl CollectionScanner {
             directory_id: default_dir_context.0,
         });
 
+        let discovery_started = Instant::now();
         let mut all_paths: Vec<PathBuf> = Vec::new();
         let mut cue_paths: Vec<PathBuf> = Vec::new();
         for dir in &dirs {
@@ -917,6 +1038,9 @@ impl CollectionScanner {
         }
 
         let total = (all_paths.len() + cue_jobs.len()) as u64;
+        report.discovery_ms = discovery_started.elapsed().as_millis();
+        report.files_found = all_paths.len();
+        report.cue_sheets = cue_jobs.len();
         log::info!(
             "Scan found {total} audio track source(s) ({} plain file(s), {} CUE sheet(s)) (force={force})",
             all_paths.len(),
@@ -938,8 +1062,10 @@ impl CollectionScanner {
         let cover_manager =
             CoverManager::new(Arc::clone(&self.db), app_data_dir).with_per_scan_album_dedup();
 
+        let tag_phase_started = Instant::now();
         {
             let conn = self.db.pool.get()?;
+            let partition_started = Instant::now();
 
             // Repoint DB rows for files that moved to a different watched folder
             // (e.g. a library split/reorganization) before doing anything else,
@@ -995,6 +1121,10 @@ impl CollectionScanner {
                 needs_update.push(path);
             }
 
+            report.partition_ms = partition_started.elapsed().as_millis();
+            report.unchanged = scanned as usize;
+            report.reread = needs_update.len();
+
             // Read tags + resolve local art in parallel across a bounded thread
             // pool — this is disk-I/O/CPU-bound per file and independent of the
             // DB, so it's the part worth parallelizing. We deliberately cap the
@@ -1035,6 +1165,7 @@ impl CollectionScanner {
                         match result {
                             Ok(song) => songs.push((path.clone(), song)),
                             Err(e) => {
+                                report.failed += 1;
                                 log::warn!("Failed to read tags for {}: {e}", path.display())
                             }
                         }
@@ -1083,12 +1214,14 @@ impl CollectionScanner {
 
                     if !force && known_mtimes.get(&path_str) == Some(&combined_mtime) {
                         scanned += 1;
+                        report.unchanged += 1;
                         continue;
                     }
 
                     match build_cue_songs(&cover_manager, job, combined_mtime) {
                         Ok(songs) => built.push((job, songs)),
                         Err(e) => {
+                            report.failed += 1;
                             log::warn!("Failed to parse CUE sheet {}: {e}", job.cue_path.display())
                         }
                     }
@@ -1122,6 +1255,11 @@ impl CollectionScanner {
             }
         }
 
+        report.tag_read_ms = tag_phase_started
+            .elapsed()
+            .as_millis()
+            .saturating_sub(report.partition_ms);
+
         // Tag reading is finished — switch to the CheckingMissing phase before the
         // maintenance passes below (missing-file check, DR logs, artwork
         // query), which can take a while on a large library and would
@@ -1141,18 +1279,24 @@ impl CollectionScanner {
         // directory that's merely unreachable (asleep drive, disconnected network share)
         // at scan time can't cause data loss. Hard-deleting is reserved for the explicit
         // "Clean Up Missing Songs" action (`prune_missing_songs`).
-        if let Err(e) = self.mark_missing_unavailable() {
-            log::error!("Failed to mark missing songs during scan: {e}");
+        let missing_check_started = Instant::now();
+        match self.mark_missing_unavailable() {
+            Ok(marked) => report.marked_unavailable = marked,
+            Err(e) => log::error!("Failed to mark missing songs during scan: {e}"),
         }
+        report.missing_check_ms = missing_check_started.elapsed().as_millis();
 
         // Parse foo_dr.txt DR Meter logs (#57) and backfill dynamic range
         // fields for tracks in folders whose log is new or has changed.
+        let dr_logs_started = Instant::now();
         if let Err(e) = self.resolve_dynamic_range_logs() {
             log::error!("Failed to resolve foo_dr.txt logs during scan: {e}");
         }
+        report.dr_logs_ms = dr_logs_started.elapsed().as_millis();
 
         // Phase 3: Resolve missing album artwork (local & remote) and backfill visualizers
         log::info!("Starting artwork resolution for missing albums...");
+        let artwork_started = Instant::now();
         let mut albums_to_resolve = Vec::new();
         if let Ok(conn) = self.db.pool.get() {
             let sql = format!(
@@ -1284,6 +1428,10 @@ impl CollectionScanner {
             }
         }
 
+        report.artwork_albums = total_updating_items as usize;
+        report.remote_art_fetches = remote_fetch_count;
+        report.artwork_ms = artwork_started.elapsed().as_millis();
+
         // Prune orphaned covers-cache files and shrink ones cached at full
         // resolution before #1272. The grace period spares files a concurrent
         // WebDAV/Subsonic sync has written but not yet recorded on its row.
@@ -1314,7 +1462,8 @@ impl CollectionScanner {
             directory_id: default_dir_context.0,
         });
 
-        Ok(())
+        report.total_ms = scan_started.elapsed().as_millis();
+        Ok(report)
     }
 }
 
@@ -2563,6 +2712,50 @@ mod tests {
                 .iter()
                 .any(|p| p.directory_name.as_deref() == Some("music")));
         }
+    }
+
+    #[tokio::test]
+    async fn test_scan_report_counts_reread_and_unchanged_files() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let music_dir = temp_dir.path().join("music");
+        std::fs::create_dir_all(&music_dir).unwrap();
+        for i in 0..5 {
+            write_test_wav(&music_dir.join(format!("song{i}.wav")));
+        }
+
+        let db = Arc::new(Database::new(temp_dir.path().to_path_buf()).unwrap());
+        let scanner = CollectionScanner::new(Arc::clone(&db));
+        scanner.add_directory(&music_dir.to_string_lossy()).unwrap();
+
+        let first = scanner
+            .scan_all_core(temp_dir.path().to_path_buf(), false, false, false, |_| {})
+            .await
+            .unwrap();
+        assert_eq!(first.files_found, 5);
+        assert_eq!((first.unchanged, first.reread, first.failed), (0, 5, 0));
+
+        let second = scanner
+            .scan_all_core(temp_dir.path().to_path_buf(), false, false, false, |_| {})
+            .await
+            .unwrap();
+        assert_eq!((second.unchanged, second.reread, second.failed), (5, 0, 0));
+
+        let summary = second.summary(ScanTrigger::WatcherDirectoryChange);
+        assert!(summary.starts_with("scan (watcher directory change): total "));
+        assert!(summary.contains("5 file(s) found"));
+        assert!(summary.contains("5 unchanged, 0 re-read"));
+    }
+
+    #[test]
+    fn test_scan_trigger_from_reason_maps_known_reasons_and_falls_back() {
+        assert_eq!(ScanTrigger::from_reason(Some("startup")).label(), "startup");
+        assert_eq!(ScanTrigger::from_reason(Some("manual")).label(), "manual");
+        assert_eq!(
+            ScanTrigger::from_reason(Some("folder_relocated")).label(),
+            "folder relocated"
+        );
+        assert_eq!(ScanTrigger::from_reason(Some("bogus")).label(), "requested");
+        assert_eq!(ScanTrigger::from_reason(None).label(), "requested");
     }
 
     #[test]

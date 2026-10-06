@@ -323,6 +323,20 @@ pub fn detect_filetype_from_url(url: &str) -> FileType {
     }
 }
 
+/// Whether a PROPFIND entry's `href` names the collection that was listed. A
+/// `Depth: 1` listing includes the collection itself, which must not be walked
+/// again as a child. Servers percent-encode hrefs (`/Alice%20in%20Chains/`) while a
+/// saved remote path is typed as-is (`/Alice in Chains`), so compare decoded paths.
+pub fn is_listed_collection(item_href: &str, listed_path: &str) -> bool {
+    use percent_encoding::percent_decode_str;
+    let decode = |p: &str| {
+        percent_decode_str(p.trim_end_matches('/'))
+            .decode_utf8_lossy()
+            .into_owned()
+    };
+    decode(item_href) == decode(listed_path)
+}
+
 /// Parse WebDAV XML PROPFIND multistatus response.
 pub fn parse_propfind_response(xml: &str) -> Result<Vec<WebDavItem>> {
     use quick_xml::events::Event;
@@ -449,6 +463,24 @@ pub fn parse_propfind_response(xml: &str) -> Result<Vec<WebDavItem>> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn listed_collection_matches_across_percent_encoding_and_trailing_slash() {
+        use super::is_listed_collection;
+        assert!(is_listed_collection(
+            "/Alice%20in%20Chains/",
+            "/Alice in Chains"
+        ));
+        assert!(is_listed_collection(
+            "/Alice%20in%20Chains/",
+            "/Alice%20in%20Chains"
+        ));
+        assert!(is_listed_collection("/music/", "/music"));
+        assert!(!is_listed_collection(
+            "/Alice%20in%20Chains/Jar%20of%20Flies/",
+            "/Alice in Chains"
+        ));
+    }
+
     use super::*;
 
     #[test]

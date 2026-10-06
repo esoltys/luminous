@@ -6,7 +6,7 @@
 // than "it crashed."
 
 use parking_lot::Mutex;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
@@ -22,6 +22,46 @@ struct RepeatTracker {
 }
 
 use std::sync::LazyLock;
+
+/// Library scans and remote syncs kept for the diagnostics export. A slow-library
+/// report (#1439) needs to show where the time went, and by the time a user exports
+/// the log the interesting scan was usually the one at startup.
+const MAX_OPERATION_ENTRIES: usize = 30;
+
+/// Bounded, in-memory log of the most recent scan/sync summaries (one line each).
+/// Not persisted: it describes this session only, which is what a "slow since launch"
+/// report is about, and it keeps timing noise out of `crash.log`.
+struct OperationLog {
+    entries: Mutex<VecDeque<String>>,
+}
+
+impl OperationLog {
+    const fn new() -> Self {
+        Self {
+            entries: Mutex::new(VecDeque::new()),
+        }
+    }
+
+    fn record(&self, summary: &str) {
+        let mut entries = self.entries.lock();
+        if entries.len() == MAX_OPERATION_ENTRIES {
+            entries.pop_front();
+        }
+        entries.push_back(format!("[{}] {summary}", chrono::Local::now().to_rfc3339()));
+    }
+
+    fn snapshot(&self) -> Vec<String> {
+        self.entries.lock().iter().cloned().collect()
+    }
+}
+
+static OPERATIONS: OperationLog = OperationLog::new();
+
+/// Records a one-line summary of a finished library scan or remote sync so it appears
+/// in the next diagnostics export.
+pub fn record_operation(summary: &str) {
+    OPERATIONS.record(summary);
+}
 
 static TRACKERS: LazyLock<Mutex<HashMap<PathBuf, RepeatTracker>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
@@ -169,6 +209,15 @@ pub fn build_diagnostics_bundle(app_data_dir: &Path, app_version: &str) -> Strin
         std::env::consts::ARCH
     ));
 
+    let operations = OPERATIONS.snapshot();
+    if !operations.is_empty() {
+        out.push_str("\n--- recent scans and syncs (this session) ---\n");
+        for line in operations {
+            out.push_str(&line);
+            out.push('\n');
+        }
+    }
+
     let log_dir = app_data_dir.join("logs");
     let mut wrote_any = false;
     for name in ["crash.log.old", "crash.log"] {
@@ -199,6 +248,30 @@ mod tests {
         let bundle = build_diagnostics_bundle(dir.path(), "1.9.0");
         assert!(bundle.contains("FRONTEND ERROR: boom"));
         assert!(bundle.contains("at foo.js:1"));
+    }
+
+    #[test]
+    fn recorded_operation_appears_in_bundle() {
+        let dir = tempdir().unwrap();
+        record_operation("scan (requested): total 1.2s, 3140 files");
+        let bundle = build_diagnostics_bundle(dir.path(), "1.9.0");
+        assert!(bundle.contains("recent scans and syncs"));
+        assert!(bundle.contains("scan (requested): total 1.2s, 3140 files"));
+    }
+
+    #[test]
+    fn operation_log_drops_oldest_entries_beyond_its_cap() {
+        let log = OperationLog::new();
+        for i in 0..MAX_OPERATION_ENTRIES + 5 {
+            log.record(&format!("op {i}"));
+        }
+        let entries = log.snapshot();
+        assert_eq!(entries.len(), MAX_OPERATION_ENTRIES);
+        assert!(entries.first().unwrap().ends_with("op 5"));
+        assert!(entries
+            .last()
+            .unwrap()
+            .ends_with(&format!("op {}", MAX_OPERATION_ENTRIES + 4)));
     }
 
     #[test]
