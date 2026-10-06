@@ -132,6 +132,9 @@
     }
   }
 
+  // Fixed code from `remote_scheduler::SYNC_IN_PROGRESS`.
+  const isSyncInProgressError = (e: unknown) => String((e as any)?.message ?? e) === "sync-in-progress";
+
   function isServerSyncing(serverId: number): boolean {
     return syncingServerId === serverId || tasksStore.isTaskActive(`webdav-sync-${serverId}`);
   }
@@ -159,6 +162,14 @@
       tasksStore.completeTask(taskId, `${server.name}: ${syncFeedback}`);
       await loadWebdavServers();
     } catch (e: any) {
+      if (isSyncInProgressError(e)) {
+        // Another sync of this server is running and owns the task row; its
+        // progress events re-create it if this clear removed it.
+        tasksStore.clearTask(taskId);
+        syncFeedback = i18n.t("settings.syncAlreadyRunning", { name: server.name });
+        toastStore.show(syncFeedback, "info");
+        return;
+      }
       console.error("Failed to sync WebDAV server:", e);
       const errMsg = String(e?.message || e);
       syncFeedback = errMsg;
@@ -225,6 +236,11 @@
       const stats = await invoke<SubsonicSyncStats>("sync_subsonic_server", { id: server.id });
       subsonicSyncFeedback = `${server.name}: ${i18n.t("settings.subsonicSyncComplete", { ...stats })}`;
     } catch (e: any) {
+      if (isSyncInProgressError(e)) {
+        subsonicSyncFeedback = i18n.t("settings.syncAlreadyRunning", { name: server.name });
+        toastStore.show(subsonicSyncFeedback, "info");
+        return;
+      }
       console.error("Failed to sync media server:", e);
       subsonicSyncFeedback = i18n.t("settings.subsonicSyncFailed", {
         name: server.name,

@@ -588,6 +588,7 @@ export const fr: DeepStringRecord<typeof en> = {
     webdavSyncBtn: "Synchroniser",
     webdavSyncing: "Synchronisation...",
     webdavSyncComplete: "Synchronisation terminée : {added} ajoutés, {updated} mis à jour, {errors} erreurs.",
+    syncAlreadyRunning: "{name} est déjà en cours de synchronisation. Attendez la fin.",
     webdavNoServersTitle: "Aucun serveur WebDAV configuré",
     webdavNoServersText: "Ajoutez un serveur WebDAV ci-dessus pour lire de la musique à distance sans monter de disque.",
     confirmRemoveWebdavServer: "Supprimer le serveur WebDAV « {name} » et tous les éléments associés en cache?",

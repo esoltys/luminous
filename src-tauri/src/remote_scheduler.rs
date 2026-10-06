@@ -78,6 +78,10 @@ type ScheduleKey = (RemoteKind, i64);
 /// handful of entries at most, and `Mutex::new` is `const` for it.
 static ACTIVE_SYNCS: parking_lot::Mutex<Vec<ScheduleKey>> = parking_lot::Mutex::new(Vec::new());
 
+/// Error a refused sync returns. A fixed code rather than prose so the UI can
+/// show its own localized message for it.
+pub const SYNC_IN_PROGRESS: &str = "sync-in-progress";
+
 /// Held for the duration of one server's sync; releases the server on drop,
 /// including when the sync fails or its task is aborted.
 #[derive(Debug)]
@@ -89,10 +93,7 @@ impl SyncGuard {
         let mut active = ACTIVE_SYNCS.lock();
         let key = (kind, server_id);
         if active.contains(&key) {
-            return Err(format!(
-                "A sync of this {} server is already in progress",
-                kind.label()
-            ));
+            return Err(SYNC_IN_PROGRESS.to_string());
         }
         active.push(key);
         Ok(Self(key))
