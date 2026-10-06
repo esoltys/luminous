@@ -337,13 +337,16 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
     (options.subtitle ? width * 0.026 * textScale * 1.3 + 6 : 0) +
     (options.metadataLine ? width * 0.019 * textScale * 1.3 + 6 : 0) +
     (listRows > 0 ? width * 0.025 * textScale + listRows * (rowFont * 1.35 + 8) : 0);
+  // The LUMINOUS mark is pinned bottom-left, so tall frames reserve a strip for
+  // it under the centered content rather than letting a long list run into it.
+  const footerReserve = isPortrait ? Math.round(width * 0.075) : 0;
   const portraitMosaicHeight = Math.round(
-    Math.max(coverSize * 0.8, Math.min(height - 2 * cardPad - width * 0.04 - estTextHeight - contentGap, coverSize * 2))
+    Math.max(coverSize * 0.8, Math.min(height - 2 * cardPad - footerReserve - estTextHeight * 1.06 - contentGap, coverSize * 2))
   );
   const hasMosaic = (options.coverStackDataUris ?? []).filter(Boolean).length >= 2;
 
   const contentHtml = `
-    <div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;width:100%;height:100%;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:${cardPad}px;box-sizing:border-box;font-family:'Fira Sans','Inter','Segoe UI',system-ui,sans-serif;">
+    <div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;width:100%;height:100%;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:${cardPad}px ${cardPad}px ${cardPad + footerReserve}px;box-sizing:border-box;font-family:'Fira Sans','Inter','Segoe UI',system-ui,sans-serif;">
       <div style="display:flex;flex-direction:${groupDirection};align-items:center;gap:${contentGap}px;max-width:100%;">
         ${!isPortrait
           ? buildMosaicCoverHtml(options.coverDataUri, options.coverStackDataUris, coverSize, coverSize, { width: maxMosaicWidth, height: coverSize })
