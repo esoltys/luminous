@@ -6,7 +6,7 @@
 use crate::covermanager::CoverManager;
 use crate::db::Database;
 use crate::models::{SongSource, SubsonicServer, SubsonicSyncStats};
-use crate::remote_scheduler::RemoteKind;
+use crate::remote_scheduler::{RemoteKind, SyncGuard};
 use crate::subsonic::sync;
 use crate::subsonic::{
     load_auth, Auth, AuthMode, ServerProbe, SubsonicApiError, SubsonicClient, URI_SCHEME,
@@ -513,7 +513,10 @@ pub async fn sync_subsonic_server_inner(
     db: Arc<Database>,
     cover_manager: Arc<CoverManager>,
 ) -> Result<SubsonicSyncStats, String> {
+    let guard = SyncGuard::acquire(RemoteKind::Subsonic, id)?;
+
     tokio::task::spawn_blocking(move || {
+        let _guard = guard;
         let emit = |name: &str, phase: &'static str, count: usize, stats: &SubsonicSyncStats, done: bool, error: Option<String>| {
             let _ = app.emit(
                 "subsonic-sync-progress",
