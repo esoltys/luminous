@@ -1,0 +1,179 @@
+$ bun scripts/tauri.ts dev
+     Running BeforeDevCommand (`bun run dev`)
+$ bun run sync-docs && svelte-kit sync && vite dev
+$ bun run scripts/sync-docs.ts
+[sync-docs] Synced user guides and assets into static/
+[2m10:59:42 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m Forced re-optimization of dependencies
+
+  [32m[1mVITE[22m v8.3.2[39m  [2mready in [0m[1m1847[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m1420[22m/[39m
+     Running DevCommand (`cargo  run --no-default-features --color always --`)
+        Info Watching C:\Users\ericj\source\luminous\.claude\worktrees\webdav-work-cc8d0e\src-tauri for changes...
+[2m10:59:45 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [optimizer] bundling dependencies...
+[1m[92m   Compiling[0m memchr v2.8.3
+[1m[92m   Compiling[0m derive_more-impl v2.1.1
+[1m[92m   Compiling[0m serde_with v3.22.0
+[1m[92m   Compiling[0m either v1.18.0
+[1m[96m    Building[0m [=========>               ] 271/677: memchr,…                                                            [1m[92m   Compiling[0m aho-corasick v1.1.5
+[1m[96m    Building[0m [=========>               ] 272/677: aho-cor…                                                            [1m[92m   Compiling[0m quick-xml v0.41.0
+[1m[96m    Building[0m [=========>               ] 273/677: aho-cor…                                                            [1m[92m   Compiling[0m regex-automata v0.4.18
+[1m[96m    Building[0m [=========>               ] 274/677: regex-a…                                                            [1m[92m   Compiling[0m serde_json v1.0.151
+[1m[96m    Building[0m [=========>               ] 275/677: regex-a…                                                            [1m[92m   Compiling[0m regex v1.13.1
+[1m[96m    Building[0m [=========>               ] 276/677: derive_…                                                            [1m[92m   Compiling[0m urlpattern v0.6.0
+[1m[96m    Building[0m [=========>               ] 277/677: derive_…                                                            [1m[92m   Compiling[0m jsonptr v0.7.1
+[1m[96m    Building[0m [=========>               ] 278/677: derive_…                                                            [1m[92m   Compiling[0m cargo_metadata v0.19.2
+[1m[96m    Building[0m [=========>               ] 279/677: derive_…                                                            [1m[92m   Compiling[0m derive_more v2.1.1
+[1m[96m    Building[0m [=========>               ] 280/677: urlpatt…                                                            [1m[92m   Compiling[0m schemars v0.8.22
+[1m[96m    Building[0m [=========>               ] 281/677: schemar…                                                            [1m[92m   Compiling[0m selectors v0.38.0
+[1m[96m    Building[0m [=========>               ] 282/677: schemar…                                                            [1m[92m   Compiling[0m json-patch v4.2.0
+[1m[96m    Building[0m [=========>               ] 283/677: json-pa…                                                            [1m[92m   Compiling[0m plist v1.10.0
+[1m[96m    Building[0m [=========>               ] 284/677: plist, …                                                            [1m[92m   Compiling[0m dom_query v0.28.0
+[1m[96m    Building[0m [=========>               ] 285/677: plist, …[1m[96m    Building[0m [=========>               ] 288/677: plist, …                                                            [1m[92m   Compiling[0m rayon v1.12.0
+[1m[96m    Building[0m [==========>              ] 320/677: serde_j…                                                            [1m[92m   Compiling[0m no_std_io2 v0.9.4
+[1m[96m    Building[0m [===========>             ] 344/677: no_std_…                                                            [1m[92m   Compiling[0m nom v8.0.0
+[1m[96m    Building[0m [===========>             ] 345/677: serde_j…[1m[96m    Building[0m [===========>             ] 346/677: jsonptr…                                                            [1m[92m   Compiling[0m av-scenechange v0.14.1
+[1m[96m    Building[0m [============>            ] 364/677: jsonptr…                                                            [1m[92m   Compiling[0m av1-grain v0.2.5
+[1m[96m    Building[0m [============>            ] 365/677: jsonptr…                                                            [1m[92m   Compiling[0m tauri-utils v2.10.1
+[1m[96m    Building[0m [============>            ] 366/677: tauri-u…                                                            [1m[92m   Compiling[0m bitstream-io v4.10.0
+[1m[96m    Building[0m [============>            ] 373/677: tauri-u…[1m[96m    Building[0m [=============>           ] 380/677: tauri-u…[1m[96m    Building[0m [=============>           ] 381/677: tauri-u…                                                            [1m[92m   Compiling[0m maybe-rayon v0.1.1
+[1m[96m    Building[0m [=============>           ] 382/677: tauri-u…[1m[96m    Building[0m [=============>           ] 383/677: tauri-u…                                                            [1m[92m   Compiling[0m itertools v0.14.0
+[1m[96m    Building[0m [=============>           ] 384/677: tauri-u…[1m[96m    Building[0m [=============>           ] 385/677: tauri-u…                                                            [1m[92m   Compiling[0m rav1e v0.8.1
+[1m[96m    Building[0m [=============>           ] 402/677: tauri-u…                                                            [1m[92m   Compiling[0m getrandom v0.3.4
+[1m[96m    Building[0m [==============>          ] 412/677: tauri-u…[1m[96m    Building[0m [==============>          ] 429/677: tauri-u…                                                            [1m[92m   Compiling[0m serialize-to-javascript v0.1.2
+[1m[96m    Building[0m [===============>         ] 439/677: tauri-u…[1m[96m    Building[0m [===============>         ] 442/677: tauri-u…                                                            [1m[92m   Compiling[0m slab v0.4.12
+[1m[96m    Building[0m [================>        ] 476/677: tauri-u…[1m[96m    Building[0m [================>        ] 477/677: tauri-u…                                                            [1m[92m   Compiling[0m futures-util v0.3.34
+[1m[96m    Building[0m [================>        ] 480/677: tauri-u…                                                            [1m[92m   Compiling[0m hyper v1.11.0
+[1m[96m    Building[0m [=================>       ] 498/677: tauri-u…                                                            [1m[92m   Compiling[0m ravif v0.13.0
+[1m[96m    Building[0m [=================>       ] 499/677: tauri-u…                                                            [1m[92m   Compiling[0m tower v0.5.3
+[1m[96m    Building[0m [=================>       ] 510/677: tauri-u…                                                            [1m[92m   Compiling[0m hyper-util v0.1.20
+[1m[96m    Building[0m [=================>       ] 511/677: tauri-u…                                                            [1m[92m   Compiling[0m hyper-rustls v0.27.9
+[1m[96m    Building[0m [==================>      ] 537/677: tauri-u…                                                            [1m[92m   Compiling[0m tower-http v0.6.11
+[1m[96m    Building[0m [==================>      ] 540/677: tauri-u…                                                            [1m[92m   Compiling[0m tokio-util v0.7.19
+[1m[96m    Building[0m [===================>     ] 547/677: tauri-u…                                                            [1m[92m   Compiling[0m anstream v1.0.0
+[1m[96m    Building[0m [====================>    ] 571/677: tauri-u…                                                            [1m[92m   Compiling[0m reqwest v0.13.4
+[1m[96m    Building[0m [====================>    ] 581/677: tauri-u…                                                            [1m[92m   Compiling[0m image v0.25.10
+[1m[96m    Building[0m [====================>    ] 582/677: tauri-u…                                                            [1m[92m   Compiling[0m zip v4.6.1
+[1m[96m    Building[0m [=====================>   ] 603/677: tauri-u…                                                            [1m[92m   Compiling[0m tauri-plugin v2.7.1
+[1m[96m    Building[0m [=====================>   ] 604/677: zip, ta…                                                            [1m[92m   Compiling[0m tauri-build v2.7.1
+[1m[96m    Building[0m [=====================>   ] 605/677: tauri-b…                                                            [1m[92m   Compiling[0m tauri-runtime v2.12.1
+[1m[96m    Building[0m [=====================>   ] 606/677: tauri-b…                                                            [1m[92m   Compiling[0m tauri-codegen v2.7.1
+[1m[96m    Building[0m [=====================>   ] 607/677: tauri-b…                                                            [1m[92m   Compiling[0m tauri-runtime-wry v2.12.1
+[1m[96m    Building[0m [=====================>   ] 608/677: tauri-b…                                                            [1m[92m   Compiling[0m tauri-plugin-fs v2.6.0
+[1m[96m    Building[0m [=====================>   ] 609/677: tauri-b…                                                            [1m[92m   Compiling[0m tauri v2.12.1
+[1m[96m    Building[0m [=====================>   ] 610/677: tauri-p…                                                            [1m[92m   Compiling[0m tauri-plugin-window-state v2.4.1
+[1m[96m    Building[0m [=====================>   ] 611/677: tauri(b…[1m[96m    Building[0m [=====================>   ] 612/677: tauri-c…                                                            [1m[92m   Compiling[0m tauri-plugin-global-shortcut v2.3.2
+[1m[96m    Building[0m [=====================>   ] 613/677: tauri-c…[1m[96m    Building[0m [=====================>   ] 614/677: tauri-c…                                                            [1m[92m   Compiling[0m tauri-plugin-positioner v2.3.3
+[1m[96m    Building[0m [=====================>   ] 615/677: tauri-c…                                                            [1m[92m   Compiling[0m tauri-plugin-process v2.4.0
+[1m[96m    Building[0m [=====================>   ] 616/677: tauri-p…                                                            [1m[92m   Compiling[0m tauri-plugin-updater v2.13.1
+[1m[96m    Building[0m [=====================>   ] 617/677: tauri-p…                                                            [1m[92m   Compiling[0m tauri-macros v2.7.1
+[1m[96m    Building[0m [=====================>   ] 618/677: tauri-p…                                                            [1m[92m   Compiling[0m tauri-plugin-opener v2.6.0
+[1m[96m    Building[0m [=====================>   ] 619/677: tauri-p…                                                            [1m[92m   Compiling[0m tauri-plugin-shell v2.3.5
+[1m[96m    Building[0m [=====================>   ] 620/677: tauri-m…                                                            [1m[92m   Compiling[0m tauri-plugin-autostart v2.5.1
+[1m[96m    Building[0m [=====================>   ] 621/677: tauri-m…                                                            [1m[92m   Compiling[0m tauri-plugin-dialog v2.8.1
+[1m[96m    Building[0m [=====================>   ] 622/677: tauri-m…[1m[96m    Building[0m [======================>  ] 623/677: tauri-m…[1m[96m    Building[0m [======================>  ] 624/677: tauri-p…[1m[96m    Building[0m [======================>  ] 625/677: tauri-p…[1m[96m    Building[0m [======================>  ] 626/677: tauri-p…[1m[96m    Building[0m [======================>  ] 627/677: tauri-m…[1m[96m    Building[0m [======================>  ] 628/677: tauri-m…[1m[96m    Building[0m [======================>  ] 629/677: tauri-m…                                                            [1m[92m   Compiling[0m luminous v2.6.0 (C:\Users\ericj\source\luminous\.claude\worktrees\webdav-work-cc8d0e\src-tauri)
+[1m[96m    Building[0m [======================>  ] 630/677: luminou…[1m[96m    Building[0m [======================>  ] 631/677: luminou…                                                            [1m[92m   Compiling[0m env_filter v2.0.0
+[1m[96m    Building[0m [======================>  ] 632/677: luminou…                                                            [1m[92m   Compiling[0m itertools v0.15.0
+[1m[96m    Building[0m [======================>  ] 633/677: luminou…[1m[96m    Building[0m [======================>  ] 634/677: luminou…                                                            [1m[92m   Compiling[0m env_logger v0.11.11
+[1m[96m    Building[0m [======================>  ] 645/677: luminou…                                                            [1m[92m   Compiling[0m quick-xml v0.42.0
+[1m[96m    Building[0m [=======================> ] 653/677: luminou…[1m[96m    Building[0m [=======================> ] 658/677: luminou…[1m[96m    Building[0m [=======================> ] 659/677: quick-x…[1m[96m    Building[0m [=======================> ] 660/677: quick-x…[1m[96m    Building[0m [=======================> ] 661/677: quick-x…[1m[96m    Building[0m [=======================> ] 662/677: tauri   [1m[96m    Building[0m [=======================> ] 662/677: tauri-p…[1m[96m    Building[0m [=======================> ] 663/677: tauri-p…[1m[96m    Building[0m [=======================> ] 664/677: tauri-p…[1m[96m    Building[0m [=======================> ] 665/677: tauri-p…[1m[96m    Building[0m [=======================> ] 666/677: tauri-p…[1m[96m    Building[0m [=======================> ] 667/677: tauri-p…                                                            [1m[92m   Compiling[0m tauri-plugin-single-instance v2.4.3
+[1m[96m    Building[0m [=======================> ] 668/677: tauri-p…[1m[96m    Building[0m [=======================> ] 669/677: tauri-p…[1m[96m    Building[0m [=======================> ] 670/677: tauri-p…                                                            [1m[92m   Compiling[0m tauri-plugin-prevent-default v6.0.0
+[1m[96m    Building[0m [=======================> ] 671/677: tauri-p…[1m[96m    Building[0m [=======================> ] 672/677: tauri-p…[1m[96m    Building[0m [=======================> ] 673/677: tauri-p…[1m[96m    Building[0m [=======================> ] 674/677: tauri-p…[1m[96m    Building[0m [=======================> ] 675/677: luminous[1m[96m    Building[0m [=======================> ] 676/677: Luminou…                                                            [1m[92m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 2m 28s
+[1m[92m     Running[0m `C:\Users\ericj\source\luminous\.claude\worktrees\webdav-work-cc8d0e\target\debug\LuminousMusicPlayer.exe`
+[2026-10-06T19:02:13Z INFO  luminous_lib::db] Opening database: C:\Users\ericj\AppData\Roaming\39231EricJamesSoltys.LuminousMusicPlayer\luminous.db
+[2026-10-06T19:02:13Z INFO  luminous_lib::db] Database schema version: 58 (current: 59)
+[2026-10-06T19:02:13Z INFO  luminous_lib::db] Running migration 59: strip embedded credentials from WebDAV song URLs (#1492)
+[2026-10-06T19:02:14Z INFO  luminous_lib::stall_monitor] Stall monitor started: warns on Tokio stalls over 40ms and synchronous IPC commands over 32ms
+[2026-10-06T19:02:14Z INFO  luminous_lib] Resuming pending artwork sidecar sweep in background...
+[2026-10-06T19:02:14Z INFO  luminous_lib::bridge] Luminous desktop bridge server listening on http://127.0.0.1:21849
+[2m11:02:36 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAbortError[22m: Transition was skipped. New ViewTransition started
+[39m
+[2026-10-06T19:02:37Z WARN  luminous_lib::stall_monitor] Tokio stall: 20ms probe woke 40ms late. Cause: a Tokio worker was blocked (OS-thread probe was on time) with no IPC nearby — likely a background task (scan, file watcher, cover/metadata fetch, analysis) doing blocking work outside `spawn_blocking`. IPC around the stall: none. Runtime: 6 alive tasks, 0 queued globally, 20 workers.
+[2m11:02:51 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAbortError[22m: Transition was skipped. New ViewTransition started
+[39m
+[2026-10-06T19:03:03Z ERROR luminous_lib] Audio engine error: HTTP error 401 Unauthorized when accessing 'http://127.0.0.1:8765/Test%20Artist/Test%20Album/song_beta.wav'
+[2m11:03:03 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAbortError[22m: Transition was skipped. New ViewTransition started
+[39m
+[2m11:05:07 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/app.css, /src/routes/+layout.svelte, /src/lib/components/PlayerBar.svelte, /src/lib/components/Sidebar.svelte, /src/lib/components/WalkthroughOverlay.svelte, /src/lib/components/LibraryWelcome.svelte, /src/lib/components/TopNavigation.svelte, /src/routes/+page.svelte, /src/lib/components/GenreChips.svelte, /src/lib/components/MusicBrainzProfilePopover.svelte, /src/lib/components/SmartPlaylistBuilderModal.svelte, /src/lib/components/StatsView.svelte, /src/lib/components/TopTenList.svelte and 32 more[22m
+[2m11:05:07 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/+layout.svelte, /src/lib/components/RightPanel.svelte, /src/lib/components/PlayerBar.svelte, /src/lib/components/Sidebar.svelte, /src/lib/components/Miniplayer.svelte, /src/lib/components/ImmersiveSessionWrap.svelte, /src/lib/components/WalkthroughOverlay.svelte, /src/lib/components/LibraryWelcome.svelte, /src/lib/components/TopNavigation.svelte, /src/routes/+page.svelte, /src/lib/components/TagEditor.svelte, /src/lib/components/SongContextMenu.svelte and 23 more[22m
+[2m11:05:07 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/app.css[22m
+[2m11:05:09 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/lib/components/Toast.svelte, /src/app.css[22m
+[2026-10-06T19:05:10Z WARN  luminous_lib::stall_monitor] Tokio stall: 20ms probe woke 181ms late. Cause: a Tokio worker was blocked (OS-thread probe was on time) with no IPC nearby — likely a background task (scan, file watcher, cover/metadata fetch, analysis) doing blocking work outside `spawn_blocking`. IPC around the stall: none. Runtime: 5 alive tasks, 0 queued globally, 20 workers.
+[2m11:05:10 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/nodes/0.js[22m
+[2m11:05:10 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/app.js[22m
+[2m11:05:10 AM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/shared/error-template.js[22m
+[2m11:05:10 AM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/server/internal.js[22m
+[2m11:05:10 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/nodes/1.js[22m
+[2m11:05:10 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/nodes/2.js[22m
+[2m11:05:10 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/matchers.js[22m
+[2m11:05:10 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/root.js[22m
+[2m11:05:10 AM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/root.js[22m
+[2m11:05:10 AM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/root.svelte[22m
+[2m11:05:11 AM[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mIPC custom protocol failed, Tauri will now use the postMessage interface instead TypeError: Failed to fetch
+    at window.fetch (http://localhost:1420/node_modules/@sveltejs/kit/src/runtime/client/fetcher.js?v=2bb66455:67:10)
+    at Object.sendIpcMessage (<anonymous>:83:7)
+    at Object.<anonymous> (<anonymous>:177:38)
+    at action (<anonymous>:336:38)
+    at <anonymous>:345:11
+    at new Promise (<anonymous>)
+    at Object.value (<anonymous>:325:14)
+    at invoke (http://localhost:1420/node_modules/.vite/deps/core-2mDn0ICy.js?v=2bb66455:334:36)
+    at listen (http://localhost:1420/node_modules/.vite/deps/@tauri-apps_api_event.js?v=156663c8:137:9)
+    at CollectionStore.init (http://localhost:1420/src/lib/stores/collection.svelte.ts?t=1791313507839:861:35)
+[2m11:06:01 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/app.css, /src/routes/+layout.svelte, /src/lib/components/PlayerBar.svelte, /src/lib/components/Sidebar.svelte, /src/lib/components/WalkthroughOverlay.svelte, /src/lib/components/LibraryWelcome.svelte, /src/lib/components/TopNavigation.svelte, /src/routes/+page.svelte, /src/lib/components/GenreChips.svelte, /src/lib/components/MusicBrainzProfilePopover.svelte, /src/lib/components/SmartPlaylistBuilderModal.svelte, /src/lib/components/StatsView.svelte, /src/lib/components/TopTenList.svelte and 32 more[22m
+[2m11:06:01 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/app.css[22m
+[2m11:06:02 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/nodes/0.js[22m
+[2m11:06:02 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/nodes/1.js[22m
+[2m11:06:02 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/nodes/2.js[22m
+[2m11:06:02 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/app.js[22m
+[2m11:06:02 AM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/shared/error-template.js[22m
+[2m11:06:02 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/matchers.js[22m
+[2m11:06:02 AM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/server/internal.js[22m
+[2m11:06:02 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/root.js[22m
+[2m11:06:02 AM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/root.js[22m
+[2m11:06:02 AM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/root.svelte[22m
+[2m11:06:02 AM[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mIPC custom protocol failed, Tauri will now use the postMessage interface instead TypeError: Failed to fetch
+    at window.fetch (http://localhost:1420/node_modules/@sveltejs/kit/src/runtime/client/fetcher.js?v=2bb66455:67:10)
+    at Object.sendIpcMessage (<anonymous>:83:7)
+    at Object.<anonymous> (<anonymous>:177:38)
+    at action (<anonymous>:336:38)
+    at <anonymous>:345:11
+    at new Promise (<anonymous>)
+    at Object.value (<anonymous>:325:14)
+    at invoke (http://localhost:1420/node_modules/.vite/deps/core-2mDn0ICy.js?v=2bb66455:334:36)
+    at CollectionStore.refreshLibrary (http://localhost:1420/src/lib/stores/collection.svelte.ts?t=1791313561071:1104:51)
+    at CollectionStore.init (http://localhost:1420/src/lib/stores/collection.svelte.ts?t=1791313561071:551:40)
+[2m11:06:03 AM[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22m[TAURI] Couldn't find callback id 2743364517. This might happen when the app is reloaded while Rust is running an asynchronous operation.
+[2m11:06:45 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/nodes/0.js[22m
+[2m11:06:45 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/nodes/1.js[22m
+[2m11:06:45 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/nodes/2.js[22m
+[2m11:06:45 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/app.js[22m
+[2m11:06:45 AM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/shared/error-template.js[22m
+[2m11:06:45 AM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/server/internal.js[22m
+[2m11:06:45 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/matchers.js[22m
+[2m11:06:45 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/root.js[22m
+[2m11:06:45 AM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/root.js[22m
+[2m11:06:45 AM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/root.svelte[22m
+[2m11:07:25 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/app.css[22m
+[2m11:07:26 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/nodes/0.js[22m
+[2m11:07:26 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/nodes/1.js[22m
+[2m11:07:26 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/nodes/2.js[22m
+[2m11:07:26 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/app.js[22m
+[2m11:07:26 AM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/shared/error-template.js[22m
+[2m11:07:26 AM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/server/internal.js[22m
+[2m11:07:26 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/matchers.js[22m
+[2m11:07:27 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/root.js[22m
+[2m11:07:27 AM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/root.js[22m
+[2m11:07:27 AM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/root.svelte[22m
+[2026-10-06T19:08:44Z WARN  luminous_lib::stall_monitor] Tokio stall: 20ms probe woke 102ms late. Cause: a Tokio worker was blocked (OS-thread probe was on time) with no IPC nearby — likely a background task (scan, file watcher, cover/metadata fetch, analysis) doing blocking work outside `spawn_blocking`. IPC around the stall: none. Runtime: 5 alive tasks, 0 queued globally, 20 workers.
+[2026-10-06T19:08:50Z WARN  luminous_lib::stall_monitor] Tokio stall: 20ms probe woke 53ms late. Cause: a Tokio worker was blocked (OS-thread probe was on time) with no IPC nearby — likely a background task (scan, file watcher, cover/metadata fetch, analysis) doing blocking work outside `spawn_blocking`. IPC around the stall: none. Runtime: 5 alive tasks, 0 queued globally, 20 workers.
+[2m11:09:18 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/nodes/0.js[22m
+[2m11:09:18 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/nodes/1.js[22m
+[2m11:09:18 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/nodes/2.js[22m
+[2m11:09:18 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/app.js[22m
+[2m11:09:18 AM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/shared/error-template.js[22m
+[2m11:09:18 AM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/server/internal.js[22m
+[2m11:09:18 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/matchers.js[22m
+[2m11:09:18 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/root.js[22m
+[2m11:09:18 AM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/root.js[22m
+[2m11:09:18 AM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/root.svelte[22m

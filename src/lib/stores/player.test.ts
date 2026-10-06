@@ -193,6 +193,20 @@ describe("PlayerStore", () => {
       );
 
       errorCallback?.({
+        payload: {
+          songId: 11,
+          title: "Long",
+          path: "http://nas/dav/Artist/Album/a_really_long_track_filename_here.flac",
+          message: "HTTP error 401 Unauthorized when accessing 'http://nas/dav/Artist/Album/a_really_long_track_filename_here.flac'.",
+        },
+      });
+      await vi.advanceTimersByTimeAsync(500);
+      expect(showSpy).toHaveBeenLastCalledWith(
+        `Couldn't play "Long" — HTTP error 401 Unauthorized when accessing 'http://nas/…a_really_lon…e_here.flac'. Skipped.`,
+        "error"
+      );
+
+      errorCallback?.({
         payload: { songId: 10, title: "Local Song", path: "/music/a.flac", message: "No such file" },
       });
       await vi.advanceTimersByTimeAsync(500);

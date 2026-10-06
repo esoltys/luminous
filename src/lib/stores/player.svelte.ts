@@ -8,7 +8,7 @@ import { toastStore } from "./toast.svelte";
 import { playlistsStore } from "./playlists.svelte";
 import { windowLayoutStore } from "./windowLayout.svelte";
 import { i18n } from "./i18n.svelte";
-import { isRemotePath } from "../utils/remoteSource";
+import { isRemotePath, shortenQuotedUrls } from "../utils/remoteSource";
 import { shuffleArray } from "../utils/shuffle";
 
 export interface CompletedSession {
@@ -238,7 +238,7 @@ export class PlayerStore {
       // A remote song (WebDAV/OpenSubsonic, #916) fails for reasons other than
       // a missing file — bad credentials, server down — so surface the
       // backend's reason instead of "file not found".
-      const reason = message?.trim().replace(/[.\s]+$/, "");
+      const reason = message && shortenQuotedUrls(message.trim().replace(/[.\s]+$/, ""));
       if (isRemotePath(path) && reason) {
         toastStore.show(
           i18n.t("playerBar.trackSkippedRemoteToast", { title, message: reason }, `Couldn't play "${title}" — ${reason}. Skipped.`),
