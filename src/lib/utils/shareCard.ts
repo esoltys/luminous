@@ -312,15 +312,21 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
   // extra columns/rows inside that box when there are covers to fill them.
   const availWidth = width - 2 * cardPad - contentGap;
   const maxMosaicWidthFraction = willShowTrackList
-    ? (width / height > 1.5 ? 0.45 : 0.42)
+    ? (width / height > 1.5 ? 0.48 : 0.45)
     : 0.54;
   const maxMosaicWidth = Math.round(availWidth * maxMosaicWidthFraction);
+  // Portrait/square frames stack the cover above the text, so the mosaic gets
+  // the full content width instead of a fanned stack of four.
+  const portraitMosaicWidth = width - 2 * cardPad;
+  const hasMosaic = (options.coverStackDataUris ?? []).filter(Boolean).length >= 2;
 
   const contentHtml = `
     <div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;width:100%;height:100%;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:${cardPad}px;box-sizing:border-box;font-family:'Fira Sans','Inter','Segoe UI',system-ui,sans-serif;">
       <div style="display:flex;flex-direction:${groupDirection};align-items:center;gap:${contentGap}px;max-width:100%;">
         ${!isPortrait
           ? buildMosaicCoverHtml(options.coverDataUri, options.coverStackDataUris, coverSize, coverSize, { width: maxMosaicWidth, height: coverSize })
+          : hasMosaic
+          ? buildMosaicCoverHtml(options.coverDataUri, options.coverStackDataUris, coverSize, coverSize, { width: portraitMosaicWidth, height: coverSize })
           : buildCoverHtml(options.coverDataUri, options.coverStackDataUris, coverSize, false)}
         <div style="min-width:0;${isPortrait ? "" : "flex:1;"}display:flex;flex-direction:column;gap:2px;align-items:${isPortrait ? "center" : "flex-start"};text-align:${textAlign};${textBlockMaxWidth ? `max-width:${textBlockMaxWidth}px;` : ""}">
           <div style="font-size:${Math.round(width * 0.046 * contentScale)}px;font-weight:800;color:${textPrimary};line-height:1.3;padding-bottom:0.08em;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${escapeHtml(options.title)}</div>

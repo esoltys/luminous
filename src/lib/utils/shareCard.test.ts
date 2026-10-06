@@ -79,7 +79,7 @@ describe("buildShareCardSvg", () => {
     expect(a.svg).toBe(b.svg);
   });
 
-  it("renders a fanned cover stack when 2+ stack covers are given", () => {
+  it("renders a cover mosaic (not a fanned stack) when 2+ stack covers are given on a square card", () => {
     const { svg } = buildShareCardSvg({
       ...baseOptions,
       aspectRatio: "1:1",
@@ -88,7 +88,8 @@ describe("buildShareCardSvg", () => {
     expect(svg).toContain("data:image/png;base64,AAA");
     expect(svg).toContain("data:image/png;base64,BBB");
     expect(svg).toContain("data:image/png;base64,CCC");
-    expect(svg).toContain("rotate(5deg)");
+    expect(svg).toContain("grid-template-columns:repeat(");
+    expect(svg).not.toContain("rotate(5deg)");
   });
 
   it("falls back to a single cover when the stack has fewer than 2 entries", () => {
@@ -137,14 +138,15 @@ describe("buildShareCardSvg", () => {
     expect(svg).toMatch(/grid-template-columns:repeat\(\d, /);
   });
 
-  it("keeps the fanned stack on portrait aspect ratios (9:16, 3:4)", () => {
+  it("renders the mosaic across the full card width on portrait aspect ratios (9:16, 3:4)", () => {
     for (const ratio of ["9:16", "3:4"] as const) {
       const { svg } = buildShareCardSvg({
         ...baseOptions,
         aspectRatio: ratio,
         coverStackDataUris: ["data:image/png;base64,AAA", "data:image/png;base64,BBB"],
       });
-      expect(svg).toContain("rotate(5deg)");
+      expect(svg).toContain("grid-template-columns:repeat(");
+      expect(svg).not.toContain("rotate(5deg)");
     }
   });
 
