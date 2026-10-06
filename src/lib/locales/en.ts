@@ -1408,6 +1408,7 @@ export const en = {
     themeDark: "Dark",
     trackListToggle: "Track Info",
     libraryToggle: "Library Info",
+    barsToggle: "Bars",
     copyButton: "Copy Image",
     saveButton: "Save Image",
     copySuccess: "Share card copied to clipboard",

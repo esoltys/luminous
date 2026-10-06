@@ -3,6 +3,7 @@
   import { getArtistGradient } from "../utils/artist";
   import { i18n } from "../stores/i18n.svelte";
   import type { CoverStackItem } from "../utils/covers";
+  import { computeMosaicLayout, MOSAIC_GAP } from "../utils/mosaicLayout";
 
   interface Props {
     covers?: CoverStackItem[];
@@ -36,6 +37,18 @@
     sizeClass?: string;
     fallbackName?: string | null;
     hoverEffect?: boolean;
+    /**
+     * Fill the box this component is given (width from the parent, height
+     * from `sizeClass`) instead of the fixed 1-big + up-to-4-quarters layout
+     * (#1496): the grid gains columns (extra width) and rows (extra height)
+     * while there are covers to put in them and tiles stay at least `minTile`
+     * px, and never overflows the box. The grid is aligned to `align` inside it.
+     * Needs a parent that gives this a definite width (e.g. a `flex-1 min-w-0`
+     * cell), since the box is measured, not derived from the tile count.
+     */
+    fit?: boolean;
+    align?: "start" | "end";
+    minTile?: number;
   }
 
   let {
@@ -46,6 +59,9 @@
     sizeClass = "h-24",
     fallbackName = null,
     hoverEffect = false,
+    fit = false,
+    align = "start",
+    minTile = 40,
   }: Props = $props();
 
   let hasHero = $derived(!!heroImageUrl);
@@ -55,6 +71,7 @@
   // candidate; otherwise covers[0] was already used as the big tile above.
   let quarterCovers = $derived.by(() => {
     const list = covers ?? [];
+    if (fit) return hasHero ? list.slice(0, maxCovers) : list.slice(1, maxCovers + 1);
     return hasHero ? list.slice(0, Math.min(maxCovers, 4)) : list.slice(1, Math.min(maxCovers, 5));
   });
   // 1 or 2 columns of H/2-wide quarter tiles, just enough to hold them
@@ -79,21 +96,27 @@
    * you're testing against. */
   let rootEl = $state<HTMLDivElement | undefined>();
   let measuredHeight = $state(0);
+  // Only `fit` reads the width: the box it fills comes from the parent.
+  let measuredBoxWidth = $state(0);
 
   $effect(() => {
     if (!rootEl) return;
     const el = rootEl;
     let rafId: number | undefined;
-    const initialH = el.getBoundingClientRect().height;
-    if (initialH > 0) {
-      measuredHeight = initialH;
+    const initial = el.getBoundingClientRect();
+    if (initial.height > 0) {
+      measuredHeight = initial.height;
+    }
+    if (initial.width > 0) {
+      measuredBoxWidth = initial.width;
     }
     const update = () => {
-      const h = el.getBoundingClientRect().height;
-      if (Math.abs(h - measuredHeight) >= 0.5) {
+      const { height: h, width: w } = el.getBoundingClientRect();
+      if (Math.abs(h - measuredHeight) >= 0.5 || (fit && Math.abs(w - measuredBoxWidth) >= 0.5)) {
         if (rafId) cancelAnimationFrame(rafId);
         rafId = requestAnimationFrame(() => {
           measuredHeight = h;
+          measuredBoxWidth = w;
         });
       }
     };
@@ -106,6 +129,21 @@
   });
 
   let measuredWidth = $derived(measuredHeight > 0 ? measuredHeight * ratio : 0);
+
+  let fitLayout = $derived(
+    fit && measuredHeight > 0 && measuredBoxWidth > 0
+      ? computeMosaicLayout({
+          width: measuredBoxWidth,
+          height: measuredHeight,
+          quarterCount: quarterCovers.length,
+          minTile,
+          maxRows: 4,
+          maxCols: 8,
+        })
+      : null
+  );
+  // With no quarter covers (or nothing fitting) the big tile stands alone, as a square.
+  let fitSoloEdge = $derived(Math.max(0, Math.min(measuredHeight, measuredBoxWidth)));
 </script>
 
 {#snippet bigTile()}
@@ -134,10 +172,37 @@
 -->
 <div
   bind:this={rootEl}
-  class="{sizeClass} shrink-0 select-none"
-  style={measuredWidth > 0 ? `width: ${measuredWidth}px;` : `aspect-ratio: ${ratio};`}
+  class="{sizeClass} select-none {fit ? `w-full min-w-0 flex items-center ${align === 'end' ? 'justify-end' : 'justify-start'}` : 'shrink-0'}"
+  style={fit ? "" : measuredWidth > 0 ? `width: ${measuredWidth}px;` : `aspect-ratio: ${ratio};`}
 >
-  {#if !hasBigTile}
+  {#if fit && hasBigTile}
+    {#if fitLayout}
+      <div
+        class="grid shrink-0 shadow-xl"
+        style="grid-template-columns: repeat({fitLayout.cols}, {fitLayout.unit}px); grid-template-rows: repeat({fitLayout.rows}, {fitLayout.unit}px); gap: {MOSAIC_GAP}px; width: {fitLayout.width}px; height: {fitLayout.height}px;"
+      >
+        <div class="min-w-0 min-h-0" style="grid-area: 1 / 1 / span {fitLayout.heroSpan} / span {fitLayout.heroSpan};">
+          {@render bigTile()}
+        </div>
+        {#each quarterCovers.slice(0, fitLayout.shown) as cover, i (i)}
+          <div class="min-w-0 min-h-0">
+            <CoverArt
+              songId={cover.songId}
+              artEmbedded={cover.artEmbedded}
+              artAutomatic={cover.artAutomatic}
+              artManual={cover.artManual}
+              sizeClass={tileClass}
+            />
+          </div>
+        {/each}
+      </div>
+    {:else}
+      <!-- Not measured yet, no covers to grid, or nothing fits `minTile`: the big tile alone, as a square. -->
+      <div class="shrink-0 {fitSoloEdge > 0 ? '' : 'h-full aspect-square'}" style={fitSoloEdge > 0 ? `width: ${fitSoloEdge}px; height: ${fitSoloEdge}px;` : ""}>
+        {@render bigTile()}
+      </div>
+    {/if}
+  {:else if !hasBigTile}
     {#if fallbackName}
       <div class="w-full h-full bg-gradient-to-br {getArtistGradient(fallbackName)} rounded-full flex items-center justify-center text-white border border-brand-border/40 font-bold text-2xl shadow-md">
         {fallbackName.charAt(0).toUpperCase()}

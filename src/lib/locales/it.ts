@@ -1408,6 +1408,7 @@ export const it = {
     themeDark: "Scuro",
     trackListToggle: "Info sul brano",
     libraryToggle: "Info sulla libreria",
+    barsToggle: "Barre",
     copyButton: "Copia immagine",
     saveButton: "Salva immagine",
     copySuccess: "Scheda da condividere copiata negli appunti",

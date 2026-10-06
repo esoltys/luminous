@@ -1459,6 +1459,7 @@ export const fr: DeepStringRecord<typeof en> = {
     themeDark: "Sombre",
     trackListToggle: "Infos pistes",
     libraryToggle: "Infos bibliothèque",
+    barsToggle: "Barres",
     copyButton: "Copier l'image",
     saveButton: "Enregistrer l'image",
     copySuccess: "Carte de partage copiée dans le presse-papiers",

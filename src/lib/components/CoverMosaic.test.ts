@@ -116,3 +116,30 @@ describe("CoverMosaic.svelte", () => {
     });
   });
 });
+
+describe("CoverMosaic.svelte fit mode (#1496)", () => {
+  function renderFit(count: number, box: { width: number; height: number }) {
+    const spy = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+      ...box, x: 0, y: 0, top: 0, left: 0, right: box.width, bottom: box.height, toJSON: () => ({}),
+    } as DOMRect);
+    const result = render(CoverMosaic, {
+      props: { covers: Array.from({ length: count }, (_, i) => cover(i + 1)), fit: true, maxCovers: 16 },
+    });
+    spy.mockRestore();
+    return result;
+  }
+
+  it("adds a third row of covers when the box has the room", async () => {
+    const { container } = renderFit(8, { width: 420, height: 400 });
+    await Promise.resolve();
+    expect(tiles(container).length).toBe(8);
+    const grid = container.querySelector(".grid") as HTMLElement;
+    expect(grid.style.gridTemplateRows).toMatch(/repeat\([34],/);
+  });
+
+  it("never draws more tiles than covers", async () => {
+    const { container } = renderFit(3, { width: 800, height: 144 });
+    await Promise.resolve();
+    expect(tiles(container).length).toBe(3);
+  });
+});
