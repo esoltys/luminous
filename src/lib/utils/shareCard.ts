@@ -8,6 +8,7 @@
 // snapshot.
 
 import { generateEllipseGradientSvg } from "./ellipseGradient";
+import { computeMosaicLayout } from "./mosaicLayout";
 import exposeFontUrl from "../fonts/expose/expose-700.woff2?url";
 
 // The mark's colors are fixed brand values (matching static/luminous-mark.svg
@@ -143,25 +144,27 @@ function buildCoverHtml(
 
 /**
  * Renders a mosaic layout for horizontal share cards (mirroring
- * CoverMosaic.svelte): one full-square "big" tile (covers[0]) and up to 4
- * quarter tiles (H/2 × H/2) laid out in a grid.
+ * CoverMosaic.svelte): one big tile (covers[0]) spanning the top-left 2x2
+ * (or 3x3, when that fills the grid exactly) unit cells, and every other cover a unit cell laid out row-major around it.
+ * The grid math lives in `computeMosaicLayout` (shared with CoverMosaic).
  *
- * Sizing rules mirror CoverMosaic.svelte:
- * - Height H = `size`.
- * - 0 quarter covers (1 cover total): single square tile (H × H), ratio 1.
- * - 1–2 quarter covers (2–3 covers total): 1 quarter column, ratio ~1.5.
- * - 3–4 quarter covers (4–5 covers total): 2 quarter columns, ratio ~2.0.
- * - Quarter edge Q = (H - gap) / 2, so two stacked quarters exactly span H;
- *   width = H + cols * (Q + gap).
- * - Capped at 5 covers total (1 big + 4 quarters).
+ * - Default (`fit` omitted): fixed height H = `size`, the original layout —
+ *   1 big + up to 4 quarters (2 rows, up to 4 columns), capped at 5 covers.
+ * - `fit` = `{ width, height }`: fills that box instead, growing extra columns
+ *   and a third/fourth row while there are covers to put in them (up to
+ *   `MOSAIC_FIT_MAX_COVERS`), without exceeding the box (#1496).
+ * - Fewer than 2 covers: a single square tile (`fallbackSingleSize`).
  */
+export const MOSAIC_FIT_MAX_COVERS = 16;
+
 export function buildMosaicCoverHtml(
   coverDataUri: string | null,
   stackUris: (string | null)[] | null | undefined,
   size: number,
-  fallbackSingleSize = size
+  fallbackSingleSize = size,
+  fit?: { width: number; height: number }
 ): string {
-  const stack = (stackUris ?? []).filter((u): u is string => !!u).slice(0, 5);
+  const stack = (stackUris ?? []).filter((u): u is string => !!u).slice(0, fit ? MOSAIC_FIT_MAX_COVERS : 5);
   if (stack.length < 2) {
     const single = coverDataUri ?? stack[0] ?? null;
     return single
@@ -171,25 +174,31 @@ export function buildMosaicCoverHtml(
 
   const bigCover = stack[0];
   const quarterCovers = stack.slice(1);
-  const quarterCols = quarterCovers.length <= 2 ? 1 : 2;
-  const radius = Math.round(size * 0.06);
-  const gap = 2;
+  const layout = computeMosaicLayout(
+    fit
+      ? { width: fit.width, height: fit.height, quarterCount: quarterCovers.length, minTile: Math.round(fit.height * 0.1), maxRows: 4, maxCols: 8 }
+      : { width: Infinity, height: size, quarterCount: quarterCovers.length }
+  );
+  if (!layout) return "";
+  const radius = Math.round(Math.min(layout.width, layout.height) * 0.06);
+  const px = (v: number) => Math.round(v * 100) / 100;
   // Every track and tile gets an explicit pixel size. `fr` tracks (i.e.
   // `minmax(auto, 1fr)`) around bare `<img>`s let each image's intrinsic
   // size inflate its track, so non-square quarter covers came out as
   // unequal, non-square rows.
-  const quarter = (size - gap) / 2;
-  const width = size + quarterCols * (quarter + gap);
+  const unit = px(layout.unit);
+  const big = px(layout.heroSpan * layout.unit + (layout.heroSpan - 1) * layout.gap);
   const tile = (edge: number) => `width:${edge}px;height:${edge}px;object-fit:cover;display:block;`;
 
   const quarterImages = quarterCovers
-    .map((uri) => `<img decoding="sync" src="${uri}" style="${tile(quarter)}" />`)
+    .slice(0, layout.shown)
+    .map((uri) => `<img decoding="sync" src="${uri}" style="${tile(unit)}" />`)
     .join("");
 
   return (
     `<div style="${COVER_SHADOW};flex-shrink:0;">` +
-    `<div style="display:grid;grid-template-columns:${size}px repeat(${quarterCols}, ${quarter}px);grid-template-rows:${quarter}px ${quarter}px;gap:${gap}px;width:${width}px;height:${size}px;border-radius:${radius}px;overflow:hidden;background:rgba(0,0,0,0.2);">` +
-      `<img decoding="sync" src="${bigCover}" style="${tile(size)}grid-column:1;grid-row:1 / span 2;" />` +
+    `<div style="display:grid;grid-template-columns:repeat(${layout.cols}, ${unit}px);grid-template-rows:repeat(${layout.rows}, ${unit}px);gap:${layout.gap}px;width:${px(layout.width)}px;height:${px(layout.height)}px;border-radius:${radius}px;overflow:hidden;background:rgba(0,0,0,0.2);">` +
+      `<img decoding="sync" src="${bigCover}" style="${tile(big)}grid-column:1 / span ${layout.heroSpan};grid-row:1 / span ${layout.heroSpan};" />` +
       quarterImages +
     `</div>` +
     `</div>`
@@ -297,25 +306,21 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
   const textBlockMaxWidth = isPortrait ? Math.round(width * 0.82) : undefined;
   const contentGap = Math.round(width * 0.035 * contentScale);
 
-  // In landscape frames, a multi-cover mosaic is wider than a single square
-  // cover (aspect ratio 1.5–2.0 vs 1.0). Cap the mosaic's width to a safe
-  // fraction of the available horizontal space so the adjacent text column
-  // (and track list) isn't squeezed or pushed offscreen.
+  // In landscape frames, the mosaic fills a box: coverSize tall and a safe
+  // fraction of the available horizontal space wide, so the adjacent text
+  // column (and track list) isn't squeezed or pushed offscreen. It grows
+  // extra columns/rows inside that box when there are covers to fill them.
   const availWidth = width - 2 * cardPad - contentGap;
-  const stackCount = (options.coverStackDataUris ?? []).filter(Boolean).length;
-  const quarterCols = Math.min(Math.max(0, stackCount - 1), 4) <= 2 ? 1 : 2;
-  const mosaicRatio = (2 + quarterCols) / 2;
   const maxMosaicWidthFraction = willShowTrackList
     ? (width / height > 1.5 ? 0.45 : 0.42)
     : 0.54;
   const maxMosaicWidth = Math.round(availWidth * maxMosaicWidthFraction);
-  const mosaicHeight = Math.min(coverSize, Math.round(maxMosaicWidth / mosaicRatio));
 
   const contentHtml = `
     <div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;width:100%;height:100%;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:${cardPad}px;box-sizing:border-box;font-family:'Fira Sans','Inter','Segoe UI',system-ui,sans-serif;">
       <div style="display:flex;flex-direction:${groupDirection};align-items:center;gap:${contentGap}px;max-width:100%;">
         ${!isPortrait
-          ? buildMosaicCoverHtml(options.coverDataUri, options.coverStackDataUris, mosaicHeight, coverSize)
+          ? buildMosaicCoverHtml(options.coverDataUri, options.coverStackDataUris, coverSize, coverSize, { width: maxMosaicWidth, height: coverSize })
           : buildCoverHtml(options.coverDataUri, options.coverStackDataUris, coverSize, false)}
         <div style="min-width:0;${isPortrait ? "" : "flex:1;"}display:flex;flex-direction:column;gap:2px;align-items:${isPortrait ? "center" : "flex-start"};text-align:${textAlign};${textBlockMaxWidth ? `max-width:${textBlockMaxWidth}px;` : ""}">
           <div style="font-size:${Math.round(width * 0.046 * contentScale)}px;font-weight:800;color:${textPrimary};line-height:1.3;padding-bottom:0.08em;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${escapeHtml(options.title)}</div>
@@ -453,10 +458,16 @@ export function buildStatsShareCardSvg(options: StatsShareCardOptions): { svg: s
       // they keep the fanned stack, fanned toward the text (fanLeft) so it
       // stays inside the section's own padding.
       const statsCoverSize = Math.round(scaleBasis * 0.15);
-      const statsMosaicHeight = Math.round(scaleBasis * 0.10);
+      // The mosaic fills a box beside the list: as tall as the rows (so a
+      // Top 10 gets all ten covers) and ~42% of the section card's inner width.
+      const sectionInnerWidth = (Math.min(width * 0.86, width - 2 * pad) - Math.round(scaleBasis * 0.022)) / 2 - 2 * Math.round(scaleBasis * 0.024);
+      const statsMosaicBox = {
+        width: Math.round(sectionInnerWidth * 0.42),
+        height: Math.round(Math.max(1, section.items.length) * (rowSize * 1.2 + 2 * rowPad)),
+      };
       const coverHtml = hasCover
         ? isHorizontal
-          ? buildMosaicCoverHtml(null, section.coverStackDataUris, statsMosaicHeight, statsCoverSize)
+          ? buildMosaicCoverHtml(null, section.coverStackDataUris, statsMosaicBox.height, statsCoverSize, statsMosaicBox)
           : buildCoverHtml(null, section.coverStackDataUris, statsCoverSize, true)
         : "";
       return (

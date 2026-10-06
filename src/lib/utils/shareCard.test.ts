@@ -113,7 +113,7 @@ describe("buildShareCardSvg", () => {
       expect(svg).not.toContain("rotate(5deg)");
       expect(svg).toContain("data:image/png;base64,AAA");
       expect(svg).toContain("data:image/png;base64,BBB");
-      expect(svg).toMatch(/grid-template-columns:[\d.]+px repeat\(1, /);
+      expect(svg).toMatch(/grid-template-columns:repeat\(3, /);
     }
   });
 
@@ -134,7 +134,7 @@ describe("buildShareCardSvg", () => {
     expect(svg).toContain("data:image/png;base64,3");
     expect(svg).toContain("data:image/png;base64,4");
     expect(svg).toContain("data:image/png;base64,5");
-    expect(svg).toMatch(/grid-template-columns:[\d.]+px repeat\(2, /);
+    expect(svg).toMatch(/grid-template-columns:repeat\(\d, /);
   });
 
   it("keeps the fanned stack on portrait aspect ratios (9:16, 3:4)", () => {
@@ -334,7 +334,7 @@ describe("buildStatsShareCardSvg", () => {
       expect(svg).not.toContain("rotate(5deg)");
       expect(svg).toContain("data:image/png;base64,AAA");
       expect(svg).toContain("data:image/png;base64,BBB");
-      expect(svg).toMatch(/grid-template-columns:[\d.]+px repeat\(1, /);
+      expect(svg).toMatch(/grid-template-columns:repeat\(3, /);
     }
   });
 
@@ -375,7 +375,7 @@ describe("buildStatsShareCardSvg", () => {
     });
     expect(svg).toContain("data:image/png;base64,1");
     expect(svg).toContain("data:image/png;base64,5");
-    expect(svg).toMatch(/grid-template-columns:[\d.]+px repeat\(2, /);
+    expect(svg).toMatch(/grid-template-columns:repeat\(\d, /);
   });
 
   it("renders an ambient layered-ellipse gradient at 30% opacity over a base surface on stats cards", () => {
@@ -405,7 +405,7 @@ describe("buildMosaicCoverHtml", () => {
 
   it("renders 1 full tile + 1 quarter tile for 2 covers (1 quarter column)", () => {
     const html = buildMosaicCoverHtml(null, ["data:image/png;base64,1", "data:image/png;base64,2"], 100);
-    expect(html).toContain("grid-template-columns:100px repeat(1, 49px)");
+    expect(html).toContain("grid-template-columns:repeat(3, 49px)");
     expect(html).toContain("width:151px;height:100px");
     expect(html).toContain('src="data:image/png;base64,1"');
     expect(html).toContain('src="data:image/png;base64,2"');
@@ -417,7 +417,7 @@ describe("buildMosaicCoverHtml", () => {
       ["data:image/png;base64,1", "data:image/png;base64,2", "data:image/png;base64,3"],
       100
     );
-    expect(html).toContain("grid-template-columns:100px repeat(1, 49px)");
+    expect(html).toContain("grid-template-columns:repeat(3, 49px)");
     expect(html).toContain("width:151px;height:100px");
     expect(html).toContain('src="data:image/png;base64,1"');
     expect(html).toContain('src="data:image/png;base64,2"');
@@ -435,7 +435,7 @@ describe("buildMosaicCoverHtml", () => {
       ],
       100
     );
-    expect(html).toContain("grid-template-columns:100px repeat(2, 49px)");
+    expect(html).toContain("grid-template-columns:repeat(4, 49px)");
     expect(html).toContain("width:202px;height:100px");
   });
 
@@ -451,7 +451,7 @@ describe("buildMosaicCoverHtml", () => {
       ],
       100
     );
-    expect(html).toContain("grid-template-columns:100px repeat(2, 49px)");
+    expect(html).toContain("grid-template-columns:repeat(4, 49px)");
     expect(html).toContain("width:202px;height:100px");
     expect(html).toContain('src="data:image/png;base64,5"');
   });
@@ -482,6 +482,22 @@ describe("buildMosaicCoverHtml", () => {
     );
     expect(html).toContain('src="data:image/png;base64,5"');
     expect(html).not.toContain('src="data:image/png;base64,6"');
+  });
+
+  it("fit mode grows a third row and more columns to fill the box, never overflowing it (#1496)", () => {
+    const uris = Array.from({ length: 8 }, (_, i) => `data:image/png;base64,${i + 1}`);
+    const html = buildMosaicCoverHtml(null, uris, 400, 400, { width: 600, height: 400 });
+    expect(html).toMatch(/grid-template-rows:repeat\(3, /);
+    for (const uri of uris) expect(html).toContain(`src="${uri}"`);
+    const [, w, h] = html.match(/;width:([\d.]+)px;height:([\d.]+)px;border-radius/)!.map(Number) as number[];
+    expect(w).toBeLessThanOrEqual(600);
+    expect(h).toBeLessThanOrEqual(400);
+  });
+
+  it("fit mode shows no more than the available covers", () => {
+    const uris = ["data:image/png;base64,1", "data:image/png;base64,2", "data:image/png;base64,3"];
+    const html = buildMosaicCoverHtml(null, uris, 400, 400, { width: 900, height: 400 });
+    expect(html.match(/<img /g)?.length).toBe(3);
   });
 
   it("uses drop-shadow and synchronously-decoded images so WebKitGTK renders covers correctly", () => {

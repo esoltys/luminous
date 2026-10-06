@@ -884,17 +884,18 @@
 
       {#if !windowLayoutStore.isDetailHeaderCollapsed && (bandLogoUrl || artistPortraitUrl || headerCovers.length > 0)}
         <!-- The logo sits beside the photo rather than replacing the name: logos are often hard to read. -->
-        <div class="hidden @xl:flex items-center gap-6 min-w-0">
+        <div class="hidden @xl:flex items-center justify-end gap-6 min-w-0 flex-1">
           {#if bandLogoUrl}
             <img
               src={bandLogoUrl}
               alt=""
-              class="h-16 w-auto max-w-64 min-w-0 object-contain object-right"
+              class="h-16 w-auto max-w-64 min-w-0 shrink object-contain object-right"
             />
           {/if}
           {#if artistPortraitUrl || headerCovers.length > 0}
-            <div class="flex items-start shrink-0 shadow-xl">
-              <CoverMosaic covers={headerCovers} heroImageUrl={artistPortraitUrl} heroImageAlt={artistName} sizeClass="h-36" />
+            <!-- Fills the header's spare width: more albums = more columns/rows, never overflowing (#1496). -->
+            <div class="flex-1 min-w-0">
+              <CoverMosaic covers={headerCovers} heroImageUrl={artistPortraitUrl} heroImageAlt={artistName} sizeClass="h-36" fit align="end" maxCovers={16} />
             </div>
           {/if}
         </div>

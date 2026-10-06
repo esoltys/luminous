@@ -27,6 +27,7 @@
     rasterizeShareCard,
     rasterizeStatsShareCard,
     toDataUri,
+    MOSAIC_FIT_MAX_COVERS,
     blobToBase64,
     type ShareAspectRatio,
     type ShareCardTheme,
@@ -323,7 +324,7 @@
   async function resolveTopItemsCoverUrls(
     items: StatsTopItem[],
     kind: "artist" | "album" | "song" | "genre",
-    maxCovers = 5
+    maxCovers = MOSAIC_FIT_MAX_COVERS
   ): Promise<string[]> {
     if (kind === "genre") return [];
     const candidates = items.slice(0, 10);
@@ -368,7 +369,7 @@
         // exists, it serves as the big tile and the artist's album covers fill
         // the mosaic quarter tiles (or the fanned stack behind it). When no
         // portrait exists, the album covers themselves form the stack/mosaic.
-        const stackItems = getArtistCoverStack(artistAlbums, artistSongs, 5);
+        const stackItems = getArtistCoverStack(artistAlbums, artistSongs, MOSAIC_FIT_MAX_COVERS);
         const urls = (await Promise.all(stackItems.map(resolveCoverUrl))).filter((u): u is string => !!u);
         if (!cancelled) {
           if (artistPortraitUrl) {
@@ -380,7 +381,7 @@
           }
         }
       } else if (entity.kind === "playlist") {
-        const stackItems = songsToCoverStack(entity.songs, 5);
+        const stackItems = songsToCoverStack(entity.songs, MOSAIC_FIT_MAX_COVERS);
         const urls = (await Promise.all(stackItems.map(resolveCoverUrl))).filter((u): u is string => !!u);
         if (!cancelled) {
           coverUrl = urls[0] ?? null;
