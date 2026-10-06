@@ -44,6 +44,12 @@ The following 3rd-party services are planned for implementation in the **v2.0 We
 
 ---
 
+## Translations
+
+- **Italian**: original translation by [giallorosso84](https://github.com/giallorosso84)
+
+---
+
 ## Influences & Recommended Music Players
 
 Inspired by open-source and indie media players:
