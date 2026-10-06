@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 57;
+pub const CURRENT_SCHEMA_VERSION: i32 = 58;
 
 struct Migration {
     version: i32,
@@ -479,6 +479,24 @@ const MIGRATIONS: &[Migration] = &[
         version: 57,
         description: "artist_events_cache table for artist tour dates and concerts (#1431)",
         apply: |conn| Ok(conn.execute_batch(MIGRATION_57)?),
+    },
+    Migration {
+        version: 58,
+        description: "webdav_dir_cache table so WebDAV sync can skip unchanged folders (#1483)",
+        apply: |conn| {
+            conn.execute_batch(MIGRATION_58)?;
+            let has_last_full_listing_at: bool = conn
+                .prepare(
+                    "SELECT 1 FROM pragma_table_info('webdav_servers') WHERE name = 'last_full_listing_at'",
+                )?
+                .exists([])?;
+            if !has_last_full_listing_at {
+                conn.execute_batch(
+                    "ALTER TABLE webdav_servers ADD COLUMN last_full_listing_at INTEGER;",
+                )?;
+            }
+            Ok(())
+        },
     },
 ];
 
@@ -2049,6 +2067,16 @@ CREATE TABLE IF NOT EXISTS artist_events_cache (
     artist_mbid TEXT PRIMARY KEY,
     events_json TEXT NOT NULL DEFAULT '[]',
     fetched_at INTEGER NOT NULL
+);
+";
+
+// Migration 58: folder etags from the last complete WebDAV sync (#1483).
+const MIGRATION_58: &str = "
+CREATE TABLE IF NOT EXISTS webdav_dir_cache (
+    server_id   INTEGER NOT NULL REFERENCES webdav_servers(id) ON DELETE CASCADE,
+    remote_path TEXT NOT NULL,
+    etag        TEXT NOT NULL,
+    PRIMARY KEY (server_id, remote_path)
 );
 ";
 

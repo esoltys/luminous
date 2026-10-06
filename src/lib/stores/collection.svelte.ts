@@ -539,7 +539,7 @@ class CollectionStore {
 
       // Track WebDAV synchronization (#682, #1083, #1087)
       await listen<WebDavSyncProgressPayload>("webdav-sync-progress", (event) => {
-        const { server_id, server_name, current_count, added, updated, errors, done } = event.payload;
+        const { server_id, server_name, current_count, added, updated, errors, done, daily_check } = event.payload;
         const taskId = `webdav-sync-${server_id}`;
         if (done) {
           const summary = i18n.t("settings.webdavSyncComplete", {
@@ -550,9 +550,11 @@ class CollectionStore {
           tasksStore.completeTask(taskId, `${server_name}: ${summary}`);
           this.refreshWebDavServers();
         } else {
-          const label = current_count > 0
-            ? i18n.t("tasks.syncingWebdavCount", { name: server_name, count: current_count }, `Syncing ${server_name} (${current_count} items)...`)
-            : i18n.t("tasks.syncingWebdav", { name: server_name }, `Syncing ${server_name}...`);
+          const label = daily_check
+            ? i18n.t("tasks.syncingWebdavDaily", { name: server_name, count: current_count }, `Daily full check of ${server_name} (${current_count} items)...`)
+            : current_count > 0
+              ? i18n.t("tasks.syncingWebdavCount", { name: server_name, count: current_count }, `Syncing ${server_name} (${current_count} items)...`)
+              : i18n.t("tasks.syncingWebdav", { name: server_name }, `Syncing ${server_name}...`);
 
           if (!tasksStore.isTaskActive(taskId)) {
             tasksStore.startTask({
