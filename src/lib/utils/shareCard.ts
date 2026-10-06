@@ -429,7 +429,11 @@ export interface StatsShareCardOptions {
 export function buildStatsShareCardSvg(options: StatsShareCardOptions): { svg: string; width: number; height: number } {
   const dims = SHARE_ASPECT_RATIOS.find((r) => r.id === options.aspectRatio) ?? SHARE_ASPECT_RATIOS[0];
   const { width, height } = dims;
-  const isHorizontal = width > height;
+  // A very tall frame (9:16) stacks the four sections in one column, scaled up,
+  // instead of leaving a 2x2 grid floating in empty space.
+  const isTall = height / width >= 1.5;
+  const sectionColumns = isTall ? 1 : 2;
+  const textBoost = isTall ? 1.3 : 1;
   const isDark = options.theme === "dark";
   const textPrimary = isDark ? "#f5f6f8" : "#0b0c0f";
   const textSecondary = isDark ? "rgba(245,246,248,0.78)" : "rgba(11,12,15,0.72)";
@@ -454,10 +458,10 @@ export function buildStatsShareCardSvg(options: StatsShareCardOptions): { svg: s
   const background = generateEllipseGradientSvg({ colors: options.backgroundColors, seed: options.seed });
   const backgroundInner = background.replace(/^<svg[^>]*>/, "").replace(/<\/svg>$/, "");
 
-  const titleSize = Math.round(scaleBasis * 0.05);
+  const titleSize = Math.round(scaleBasis * 0.05 * textBoost);
   const subtitleSize = Math.round(scaleBasis * 0.026);
-  const sectionTitleSize = Math.round(scaleBasis * 0.026);
-  const rowSize = Math.round(scaleBasis * 0.021);
+  const sectionTitleSize = Math.round(scaleBasis * 0.026 * textBoost);
+  const rowSize = Math.round(scaleBasis * 0.021 * textBoost);
   const clockLabelSize = Math.round(scaleBasis * 0.018);
 
   const sectionsHtml = options.sections
@@ -481,22 +485,17 @@ export function buildStatsShareCardSvg(options: StatsShareCardOptions): { svg: s
           rows +
         `</div>`;
       const hasCover = !!(section.coverStackDataUris && section.coverStackDataUris.length > 0);
-      // On horizontal aspect ratios (16:9, 4:3), multi-cover sections render
-      // as a CoverMosaic grid. On portrait/square ratios (1:1, 9:16, 3:4),
-      // they keep the fanned stack, fanned toward the text (fanLeft) so it
-      // stays inside the section's own padding.
+      // Sections with covers render a mosaic beside the list on every ratio.
       const statsCoverSize = Math.round(scaleBasis * 0.15);
       // The mosaic fills a box beside the list: as tall as the rows (so a
       // Top 10 gets all ten covers) and ~42% of the section card's inner width.
-      const sectionInnerWidth = (Math.min(width * 0.86, width - 2 * pad) - Math.round(scaleBasis * 0.022)) / 2 - 2 * Math.round(scaleBasis * 0.024);
+      const sectionInnerWidth = (Math.min(width * 0.86, width - 2 * pad) - (sectionColumns - 1) * Math.round(scaleBasis * 0.022)) / sectionColumns - 2 * Math.round(scaleBasis * 0.024);
       const statsMosaicBox = {
         width: Math.round(sectionInnerWidth * 0.42),
         height: Math.round(Math.max(1, section.items.length) * (rowSize * 1.2 + 2 * rowPad)),
       };
       const coverHtml = hasCover
-        ? isHorizontal
-          ? buildMosaicCoverHtml(null, section.coverStackDataUris, statsMosaicBox.height, statsCoverSize, statsMosaicBox)
-          : buildCoverHtml(null, section.coverStackDataUris, statsCoverSize, true)
+        ? buildMosaicCoverHtml(null, section.coverStackDataUris, statsMosaicBox.height, statsCoverSize, statsMosaicBox)
         : "";
       return (
         `<div style="background:${cardBg};border-radius:${Math.round(scaleBasis * 0.016)}px;padding:${Math.round(scaleBasis * 0.024)}px;min-width:0;display:flex;align-items:center;gap:${Math.round(scaleBasis * 0.02)}px;">` +
@@ -531,7 +530,7 @@ export function buildStatsShareCardSvg(options: StatsShareCardOptions): { svg: s
     <div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;width:100%;height:100%;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:${pad}px;box-sizing:border-box;font-family:'Fira Sans','Inter','Segoe UI',system-ui,sans-serif;">
       <div style="font-size:${titleSize}px;font-weight:800;color:${textPrimary};text-align:center;">${escapeHtml(options.rangeLabel)}</div>
       <div style="font-size:${subtitleSize}px;font-weight:600;color:${textSecondary};margin-top:${Math.round(scaleBasis * 0.006)}px;margin-bottom:${Math.round(scaleBasis * 0.038)}px;text-align:center;">${escapeHtml(options.totalMinutesLabel)}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:${Math.round(scaleBasis * 0.022)}px;width:100%;max-width:${Math.round(width * 0.86)}px;">
+      <div style="display:grid;grid-template-columns:repeat(${sectionColumns}, 1fr);gap:${Math.round(scaleBasis * 0.022)}px;width:100%;max-width:${Math.round(width * 0.86)}px;">
         ${sectionsHtml}
       </div>
       ${clockHtml}

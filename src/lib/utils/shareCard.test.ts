@@ -301,7 +301,7 @@ describe("buildStatsShareCardSvg", () => {
     expect(a.svg).toBe(b.svg);
   });
 
-  it("renders a section's cover stack when given one, and omits it otherwise", () => {
+  it("renders a section's cover mosaic when given covers, and omits it otherwise", () => {
     const { svg } = buildStatsShareCardSvg({
       ...baseStatsOptions,
       aspectRatio: "1:1",
@@ -316,7 +316,7 @@ describe("buildStatsShareCardSvg", () => {
     });
     expect(svg).toContain("data:image/png;base64,AAA");
     expect(svg).toContain("data:image/png;base64,BBB");
-    expect(svg).toContain("rotate(-5deg)");
+    expect(svg).toContain("grid-template-columns:repeat(");
   });
 
   it("renders a mosaic cover for sections on horizontal aspect ratios (16:9 and 4:3)", () => {
@@ -340,7 +340,7 @@ describe("buildStatsShareCardSvg", () => {
     }
   });
 
-  it("renders a fanned cover stack for sections on portrait/square aspect ratios (1:1, 9:16, 3:4)", () => {
+  it("renders a section mosaic (not a fanned stack) on portrait/square aspect ratios (1:1, 9:16, 3:4)", () => {
     for (const ratio of ["1:1", "9:16", "3:4"] as const) {
       const { svg } = buildStatsShareCardSvg({
         ...baseStatsOptions,
@@ -353,8 +353,16 @@ describe("buildStatsShareCardSvg", () => {
           },
         ],
       });
-      expect(svg).toContain("rotate(-5deg)");
+      expect(svg).toContain("grid-template-columns:repeat(");
+      expect(svg).not.toContain("rotate(-5deg)");
     }
+  });
+
+  it("stacks the sections in one column on a 9:16 stats card", () => {
+    const { svg } = buildStatsShareCardSvg({ ...baseStatsOptions, aspectRatio: "9:16" });
+    expect(svg).toContain("grid-template-columns:repeat(1, 1fr)");
+    const square = buildStatsShareCardSvg({ ...baseStatsOptions, aspectRatio: "1:1" });
+    expect(square.svg).toContain("grid-template-columns:repeat(2, 1fr)");
   });
 
   it("renders 5 covers in a section mosaic on horizontal aspect ratios", () => {
