@@ -453,9 +453,7 @@ pub async fn sync_webdav_server_inner(
 
             for item in items {
                 // Avoid infinite loops matching the directory itself
-                let norm_item_href = item.href.trim_end_matches('/');
-                let norm_cur = current_path.trim_end_matches('/');
-                if norm_item_href == norm_cur || norm_item_href.ends_with(norm_cur) && norm_item_href.len() == norm_cur.len() {
+                if crate::webdav::is_listed_collection(&item.href, &current_path) {
                     continue;
                 }
 
