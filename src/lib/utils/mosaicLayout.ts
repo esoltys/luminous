@@ -3,10 +3,10 @@
  * buildMosaicCoverHtml, so the two can't drift (#1496).
  *
  * The mosaic is a grid of square unit cells: the big tile (hero image or
- * covers[0]) spans the top-left NxN cells (N = 2, or 3 when that fills a grid
- * exactly, e.g. a Top 10 as 1 big + 3x3) and every other cover is one unit
- * cell, auto-placed row-major in the cells that are left (to the right of the
- * big tile first, then under it once there are more rows than the big tile).
+ * covers[0]) spans the top-left NxN cells (N = 2-4, whichever fills the box
+ * best, e.g. a Top 10 as 1 big + 3x3 beside it, or stacked above it in a tall
+ * box) and every other cover is one unit cell, auto-placed row-major in the
+ * cells that are left (to the right of the big tile first, then under it).
  */
 
 export interface MosaicLayoutOptions {
@@ -25,7 +25,7 @@ export interface MosaicLayoutOptions {
 export interface MosaicLayout {
   cols: number;
   rows: number;
-  /** Big tile edge in unit cells (2 or 3); it is `heroSpan * unit + (heroSpan - 1) * gap` px. */
+  /** Big tile edge in unit cells (2-4); it is `heroSpan * unit + (heroSpan - 1) * gap` px. */
   heroSpan: number;
   /** Unit-cell edge in px. */
   unit: number;
@@ -61,9 +61,11 @@ export function computeMosaicLayout(opts: MosaicLayoutOptions): MosaicLayout | n
   // Effective size: each empty cell discounts a grid by 35%, so an exact fill
   // wins unless a gapped grid has much bigger tiles.
   const effective = (unit: number, empty: number) => unit / (1 + 0.35 * empty);
-  for (let heroSpan = 2; heroSpan <= 3; heroSpan++) {
+  // `cols === heroSpan` stacks the big tile on top of the grid of singles
+  // (a tall box's best fit, e.g. a Top 10 on a 9:16 card).
+  for (let heroSpan = 2; heroSpan <= 4; heroSpan++) {
     for (let rows = heroSpan; rows <= maxRows; rows++) {
-      for (let cols = heroSpan + 1; cols <= maxCols; cols++) {
+      for (let cols = heroSpan; cols <= maxCols; cols++) {
         const slots = cols * rows - heroSpan * heroSpan;
         const unit = Math.min((width - (cols - 1) * gap) / cols, (height - (rows - 1) * gap) / rows);
         if (!(unit > 0) || unit < minTile) continue;

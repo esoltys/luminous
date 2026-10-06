@@ -176,7 +176,7 @@ export function buildMosaicCoverHtml(
   const quarterCovers = stack.slice(1);
   const layout = computeMosaicLayout(
     fit
-      ? { width: fit.width, height: fit.height, quarterCount: quarterCovers.length, minTile: Math.round(fit.height * 0.1), maxRows: 4, maxCols: 8 }
+      ? { width: fit.width, height: fit.height, quarterCount: quarterCovers.length, minTile: Math.round(Math.min(fit.width, fit.height) * 0.1), maxRows: 8, maxCols: 8 }
       : { width: Infinity, height: size, quarterCount: quarterCovers.length }
   );
   if (!layout) return "";
@@ -244,6 +244,9 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
   // text to begin with, that empty room isn't going to be filled either way,
   // so cap how much of the boost the cover absorbs instead of ballooning it
   // to fill the space on its own (e.g. a 9:16 artist card with just a name).
+  // Portrait/square frames have plenty of room below the cover, so the text
+  // reads bigger there than the cover-sizing scale alone would make it.
+  const textScale = isPortrait ? Math.min(1.9, contentScale * 1.4) : contentScale;
   const coverContentScale = textLineCount >= 3 ? contentScale : textLineCount === 2 ? Math.min(contentScale, 1.15) : Math.min(contentScale, 1);
   // A long track list needs more of the frame for itself, so a cover sized
   // for a typical ~10-track album (no shrink) is too big once a list is
@@ -269,7 +272,7 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
     const { columns, maxVisible } = trackListLayout(dims, options.tracks.length);
     const visible = options.tracks.slice(0, maxVisible);
     const overflow = options.tracks.length - visible.length;
-    const rowFontSize = Math.round(width * 0.017 * contentScale);
+    const rowFontSize = Math.round(width * 0.017 * textScale);
 
     const rows = visible.map(
       (track) =>
@@ -292,10 +295,10 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
     // trackListLayout already sizes for the expected case, cap the block's
     // own height and clip it so it can never grow past the LUMINOUS mark
     // pinned near the bottom of the frame, rather than overlapping it.
-    const trackListMaxHeight = Math.round(height * (isPortrait ? 0.3 : 0.4));
+    const trackListMaxHeight = Math.round(height * (isPortrait ? 0.36 : 0.4));
 
     trackListHtml =
-      `<div style="margin-top:${Math.round(width * 0.025 * contentScale)}px;text-align:left;width:100%;column-count:${columns};column-gap:${Math.round(width * 0.03)}px;max-height:${trackListMaxHeight}px;overflow:hidden;">` +
+      `<div style="margin-top:${Math.round(width * 0.025 * textScale)}px;text-align:left;width:100%;column-count:${columns};column-gap:${Math.round(width * 0.03)}px;max-height:${trackListMaxHeight}px;overflow:hidden;">` +
         rows.join("") + overflowRow +
       `</div>`;
   }
@@ -318,6 +321,25 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
   // Portrait/square frames stack the cover above the text, so the mosaic gets
   // the full content width instead of a fanned stack of four.
   const portraitMosaicWidth = width - 2 * cardPad;
+  // ...and the height left once the text block (estimated from its own font
+  // sizes) and the footer mark are accounted for, so a tall frame can stack the
+  // big tile above the grid instead of leaving the space empty.
+  const listRows = willShowTrackList
+    ? (() => {
+        const { columns, maxVisible } = trackListLayout(dims, trackCount);
+        const visible = Math.min(trackCount, maxVisible);
+        return Math.ceil(visible / columns) + (trackCount > visible ? 1 : 0);
+      })()
+    : 0;
+  const rowFont = width * 0.017 * textScale;
+  const estTextHeight =
+    width * 0.046 * textScale * 1.3 +
+    (options.subtitle ? width * 0.026 * textScale * 1.3 + 6 : 0) +
+    (options.metadataLine ? width * 0.019 * textScale * 1.3 + 6 : 0) +
+    (listRows > 0 ? width * 0.025 * textScale + listRows * (rowFont * 1.35 + 8) : 0);
+  const portraitMosaicHeight = Math.round(
+    Math.max(coverSize * 0.8, Math.min(height - 2 * cardPad - width * 0.04 - estTextHeight - contentGap, coverSize * 2))
+  );
   const hasMosaic = (options.coverStackDataUris ?? []).filter(Boolean).length >= 2;
 
   const contentHtml = `
@@ -326,12 +348,12 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
         ${!isPortrait
           ? buildMosaicCoverHtml(options.coverDataUri, options.coverStackDataUris, coverSize, coverSize, { width: maxMosaicWidth, height: coverSize })
           : hasMosaic
-          ? buildMosaicCoverHtml(options.coverDataUri, options.coverStackDataUris, coverSize, coverSize, { width: portraitMosaicWidth, height: coverSize })
+          ? buildMosaicCoverHtml(options.coverDataUri, options.coverStackDataUris, coverSize, coverSize, { width: portraitMosaicWidth, height: portraitMosaicHeight })
           : buildCoverHtml(options.coverDataUri, options.coverStackDataUris, coverSize, false)}
         <div style="min-width:0;${isPortrait ? "" : "flex:1;"}display:flex;flex-direction:column;gap:2px;align-items:${isPortrait ? "center" : "flex-start"};text-align:${textAlign};${textBlockMaxWidth ? `max-width:${textBlockMaxWidth}px;` : ""}">
-          <div style="font-size:${Math.round(width * 0.046 * contentScale)}px;font-weight:800;color:${textPrimary};line-height:1.3;padding-bottom:0.08em;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${escapeHtml(options.title)}</div>
-          <div style="font-size:${Math.round(width * 0.026 * contentScale)}px;font-weight:600;color:${textSecondary};margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">${escapeHtml(options.subtitle)}</div>
-          <div style="font-size:${Math.round(width * 0.019 * contentScale)}px;color:${textSecondary};margin-top:6px;">${escapeHtml(options.metadataLine)}</div>
+          <div style="font-size:${Math.round(width * 0.046 * textScale)}px;font-weight:800;color:${textPrimary};line-height:1.3;padding-bottom:0.08em;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${escapeHtml(options.title)}</div>
+          <div style="font-size:${Math.round(width * 0.026 * textScale)}px;font-weight:600;color:${textSecondary};margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">${escapeHtml(options.subtitle)}</div>
+          <div style="font-size:${Math.round(width * 0.019 * textScale)}px;color:${textSecondary};margin-top:6px;">${escapeHtml(options.metadataLine)}</div>
           ${showTrackList ? trackListHtml : ""}
         </div>
       </div>
