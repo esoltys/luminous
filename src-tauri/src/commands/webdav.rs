@@ -23,6 +23,8 @@ pub struct WebDavSyncProgressPayload {
     pub updated: usize,
     pub errors: usize,
     pub done: bool,
+    /// True while an auto-sync is doing its once-a-day full listing (#1483).
+    pub daily_check: bool,
 }
 
 /// List all configured WebDAV servers.
@@ -172,6 +174,13 @@ pub async fn save_webdav_server(
             )
             .map_err(|e| e.to_string())?;
         }
+
+        // A changed URL, credentials or remote path invalidates what the
+        // folder etags were recorded against: the next sync lists everything.
+        let _ = conn.execute(
+            "DELETE FROM webdav_dir_cache WHERE server_id = ?1",
+            params![server_id],
+        );
 
         conn.query_row(
             &format!("SELECT {WEBDAV_SERVER_COLUMNS} FROM webdav_servers WHERE id = ?1"),
@@ -340,18 +349,25 @@ pub async fn sync_webdav_server(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<WebDavSyncStats, String> {
-    sync_webdav_server_inner(id, app, state.db.clone(), state.cover_manager.clone()).await
+    // "Sync Now" is the user asking for a thorough check: list every folder.
+    sync_webdav_server_inner(id, app, state.db.clone(), state.cover_manager.clone(), true).await
 }
 
 /// Core sync routine shared by the [`sync_webdav_server`] command (manual
 /// "Sync Now" clicks) and `remote_scheduler::AutoSyncScheduler` (periodic
 /// auto-sync, #1082) — the scheduler runs as a background task with only an
 /// `AppHandle` and `Arc<Database>`/`Arc<CoverManager>`, not a `State<AppState>`.
+///
+/// `thorough` lists every folder. Otherwise (auto-sync) a folder whose etag is
+/// unchanged is skipped, but a full listing is still forced once a day: that
+/// bounds how long a server whose folder etags don't reflect changes deeper in
+/// the tree (not every WebDAV server does) can hide them.
 pub async fn sync_webdav_server_inner(
     id: i64,
     app: AppHandle,
     db: Arc<Database>,
     cover_manager: Arc<CoverManager>,
+    thorough: bool,
 ) -> Result<WebDavSyncStats, String> {
     let app_clone = app.clone();
 
@@ -366,6 +382,33 @@ pub async fn sync_webdav_server_inner(
                 |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
             )
             .map_err(|e| e.to_string())?;
+
+        let now_secs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+        let last_full_listing: Option<i64> = conn
+            .query_row(
+                "SELECT last_full_listing_at FROM webdav_servers WHERE id = ?1",
+                params![id],
+                |r| r.get(0),
+            )
+            .ok()
+            .flatten();
+        let may_skip_folders = !thorough
+            && last_full_listing.is_some_and(|t| now_secs - t < FULL_LISTING_INTERVAL_SECS);
+        // Saved either way; only consulted for skipping when allowed.
+        let saved_dir_etags = load_dir_cache(&conn, id).unwrap_or_default();
+        let dir_cache = if may_skip_folders {
+            saved_dir_etags.clone()
+        } else {
+            HashMap::new()
+        };
+        // An auto-sync that lists everything only because the daily interval
+        // lapsed, on a server that has folder etags to skip with: say so in the
+        // progress label so a slow run isn't mistaken for the new normal.
+        let daily_check =
+            !thorough && !may_skip_folders && last_full_listing.is_some() && !saved_dir_etags.is_empty();
 
         // Update status to 'syncing'
         let _ = conn.execute(
@@ -384,6 +427,7 @@ pub async fn sync_webdav_server_inner(
                 updated: 0,
                 errors: 0,
                 done: false,
+                daily_check,
             },
         );
 
@@ -411,9 +455,14 @@ pub async fn sync_webdav_server_inner(
             }
         };
 
+        // Folders whose etag matched the last complete sync: not listed again.
+        let mut skipped_dirs: HashSet<String> = HashSet::new();
+        // Etags seen this sync, saved if the sync completes.
+        let mut new_dir_etags: HashMap<String, String> = HashMap::new();
+
         let mut stats = WebDavSyncStats::default();
         let mut current_count = 0usize;
-        let mut progress = ProgressThrottle::new();
+        let mut progress = ProgressThrottle::new(daily_check);
         // Audio files the server listed this sync, for remote-deletion detection.
         let mut seen: HashSet<String> = HashSet::new();
         // Set false by any failed listing or write: a partial view of the
@@ -485,6 +534,18 @@ pub async fn sync_webdav_server_inner(
                         continue;
                     }
                     if item.is_directory {
+                        // A server that reports a folder etag changing whenever
+                        // anything beneath it changes lets an unchanged folder
+                        // be skipped without listing it. No etag, no skip.
+                        if let Some(etag) = &item.etag {
+                            let key = item.href.trim_end_matches('/').to_string();
+                            let unchanged = dir_cache.get(&key) == Some(etag);
+                            new_dir_etags.insert(key.clone(), etag.clone());
+                            if unchanged {
+                                skipped_dirs.insert(key);
+                                continue;
+                            }
+                        }
                         next_level.push(item.href);
                         continue;
                     }
@@ -661,6 +722,30 @@ pub async fn sync_webdav_server_inner(
             level = next_level;
         }
 
+        // Files inside skipped folders weren't listed but are known from the
+        // last sync: count them as seen so they aren't mistaken for deletions.
+        if !skipped_dirs.is_empty() {
+            for href in cache.keys() {
+                if is_under_any(href, &skipped_dirs) {
+                    seen.insert(href.clone());
+                    current_count += 1;
+                }
+            }
+        }
+        if sync_complete {
+            if let Err(e) =
+                save_dir_cache(&conn, id, &saved_dir_etags, &new_dir_etags, &skipped_dirs)
+            {
+                log::warn!("Failed to save WebDAV folder etags: {e}");
+            }
+            if skipped_dirs.is_empty() {
+                let _ = conn.execute(
+                    "UPDATE webdav_servers SET last_full_listing_at = ?1 WHERE id = ?2",
+                    params![now_secs, id],
+                );
+            }
+        }
+
         // Files the server no longer lists: flag their songs unavailable (like a
         // local scan does for missing files) so they stop showing as playable.
         // Only after a sync that listed every directory and every write landed;
@@ -697,6 +782,7 @@ pub async fn sync_webdav_server_inner(
                 updated: stats.updated,
                 errors: stats.errors,
                 done: true,
+                daily_check,
             },
         );
 
@@ -704,7 +790,7 @@ pub async fn sync_webdav_server_inner(
             concat!(
                 "webdav sync ({}): total {} ms | {} file(s) seen, ",
                 "{} probed, {} added, {} updated, {} removed, {} error(s) | ",
-                "{} dir listing(s) {} ms, tag probes {} ms"
+                "{} dir listing(s) {} ms ({} unchanged folder(s) skipped), tag probes {} ms"
             ),
             server_name,
             sync_started.elapsed().as_millis(),
@@ -716,6 +802,7 @@ pub async fn sync_webdav_server_inner(
             stats.errors,
             dirs_listed,
             list_time.as_millis(),
+            skipped_dirs.len(),
             probe_time.as_millis(),
         );
         log::info!("{summary}");
@@ -728,6 +815,8 @@ pub async fn sync_webdav_server_inner(
     .map_err(|e| e.to_string())?
 }
 
+/// Longest an auto-sync may go without listing every folder (#1483).
+const FULL_LISTING_INTERVAL_SECS: i64 = 24 * 60 * 60;
 /// Directory listings in flight at once during a sync (#1483).
 const LIST_CONCURRENCY: usize = 8;
 /// Tag probes in flight at once during a sync (#1483).
@@ -775,6 +864,61 @@ fn load_remote_cache(
         ))
     })?;
     rows.collect()
+}
+
+/// Folder etags recorded by the last complete sync, keyed by href without a trailing slash.
+fn load_dir_cache(
+    conn: &rusqlite::Connection,
+    server_id: i64,
+) -> rusqlite::Result<HashMap<String, String>> {
+    let mut stmt =
+        conn.prepare("SELECT remote_path, etag FROM webdav_dir_cache WHERE server_id = ?1")?;
+    let rows = stmt.query_map(params![server_id], |r| Ok((r.get(0)?, r.get(1)?)))?;
+    rows.collect()
+}
+
+/// Whether `path` is one of `dirs` or lies beneath one (hrefs compared without trailing slashes).
+fn is_under_any(path: &str, dirs: &HashSet<String>) -> bool {
+    let mut current = path.trim_end_matches('/');
+    loop {
+        if dirs.contains(current) {
+            return true;
+        }
+        match current.rfind('/') {
+            Some(index) => current = &current[..index],
+            None => return false,
+        }
+    }
+}
+
+/// Replaces the saved folder etags with this sync's, keeping the rows beneath
+/// skipped folders (their contents weren't visited, so their old etags stand).
+fn save_dir_cache(
+    conn: &rusqlite::Connection,
+    server_id: i64,
+    old: &HashMap<String, String>,
+    new: &HashMap<String, String>,
+    skipped: &HashSet<String>,
+) -> rusqlite::Result<()> {
+    let tx = conn.unchecked_transaction()?;
+    for path in old.keys() {
+        if !new.contains_key(path) && !is_under_any(path, skipped) {
+            tx.execute(
+                "DELETE FROM webdav_dir_cache WHERE server_id = ?1 AND remote_path = ?2",
+                params![server_id, path],
+            )?;
+        }
+    }
+    for (path, etag) in new {
+        if old.get(path) != Some(etag) {
+            tx.execute(
+                "INSERT INTO webdav_dir_cache (server_id, remote_path, etag) VALUES (?1, ?2, ?3)
+                 ON CONFLICT(server_id, remote_path) DO UPDATE SET etag = excluded.etag",
+                params![server_id, path, etag],
+            )?;
+        }
+    }
+    tx.commit()
 }
 
 /// Whether a listed file differs from what the last sync recorded: by etag when
@@ -843,11 +987,15 @@ fn run_bounded<T: Send, R: Send>(
 /// one per file, each a cross-process message the UI re-rendered on.
 struct ProgressThrottle {
     last_emit: Option<std::time::Instant>,
+    daily_check: bool,
 }
 
 impl ProgressThrottle {
-    fn new() -> Self {
-        Self { last_emit: None }
+    fn new(daily_check: bool) -> Self {
+        Self {
+            last_emit: None,
+            daily_check,
+        }
     }
 
     fn maybe_emit(
@@ -877,6 +1025,7 @@ impl ProgressThrottle {
                 updated: stats.updated,
                 errors: stats.errors,
                 done: false,
+                daily_check: self.daily_check,
             },
         );
     }
@@ -923,6 +1072,52 @@ mod tests {
             &item(Some("b"), 10)
         ));
         assert!(remote_file_changed(&cached(Some("a"), 10), &item(None, 11)));
+    }
+
+    #[test]
+    fn is_under_any_matches_the_folder_itself_and_its_descendants_only() {
+        let dirs: HashSet<String> = ["/music/a".to_string()].into();
+        assert!(is_under_any("/music/a", &dirs));
+        assert!(is_under_any("/music/a/", &dirs));
+        assert!(is_under_any("/music/a/b/c.mp3", &dirs));
+        assert!(!is_under_any("/music/ab/c.mp3", &dirs));
+        assert!(!is_under_any("/music", &dirs));
+        assert!(!is_under_any("/other/a/c.mp3", &dirs));
+    }
+
+    #[test]
+    fn dir_cache_round_trips_and_keeps_rows_beneath_skipped_folders() {
+        let dir = tempfile::Builder::new()
+            .prefix("luminous_webdav_dir_")
+            .tempdir()
+            .unwrap();
+        let db = Database::new(dir.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO webdav_servers (id, name, url, remote_path) VALUES (1, 'NAS', 'http://nas/dav', '/')",
+            [],
+        )
+        .unwrap();
+        let map = |pairs: &[(&str, &str)]| -> HashMap<String, String> {
+            pairs
+                .iter()
+                .map(|(p, e)| (p.to_string(), e.to_string()))
+                .collect()
+        };
+
+        let first = map(&[("/a", "e1"), ("/a/x", "e2"), ("/b", "e3"), ("/gone", "e9")]);
+        save_dir_cache(&conn, 1, &HashMap::new(), &first, &HashSet::new()).unwrap();
+        assert_eq!(load_dir_cache(&conn, 1).unwrap(), first);
+
+        // Second sync: /a unchanged (skipped, so /a/x wasn't visited), /b changed,
+        // /c new, and /gone no longer exists.
+        let new = map(&[("/a", "e1"), ("/b", "e4"), ("/c", "e5")]);
+        let skipped: HashSet<String> = ["/a".to_string()].into();
+        save_dir_cache(&conn, 1, &first, &new, &skipped).unwrap();
+        assert_eq!(
+            load_dir_cache(&conn, 1).unwrap(),
+            map(&[("/a", "e1"), ("/a/x", "e2"), ("/b", "e4"), ("/c", "e5")])
+        );
     }
 
     #[test]

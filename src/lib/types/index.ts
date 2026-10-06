@@ -334,6 +334,8 @@ export interface WebDavSyncProgressPayload {
   updated: number;
   errors: number;
   done: boolean;
+  /** True while an auto-sync does its once-a-day full listing (#1483). */
+  daily_check: boolean;
 }
 
 /** How Luminous signs in to a Subsonic server (#1167): salted token

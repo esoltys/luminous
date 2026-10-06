@@ -1778,6 +1778,7 @@ export const it = {
     allDone: "Attività completate",
     syncingWebdav: "Sincronizzazione di {name}…",
     syncingWebdavCount: "Sincronizzazione di {name} ({count} elementi)…",
+    syncingWebdavDaily: "Controllo completo giornaliero di {name} ({count} elementi), una volta al giorno, quindi questa esecuzione è più lenta…",
     savingAlbumTags: "Salvataggio dei tag di {album}…",
     savingTagsCount: "Salvataggio dei tag ({current}/{total})…",
     albumTagsSaved: "Tag di {album} salvati",

@@ -49,11 +49,15 @@ impl RemoteKind {
         cover_manager: Arc<CoverManager>,
     ) -> Result<(), String> {
         match self {
-            RemoteKind::WebDav => {
-                crate::commands::webdav::sync_webdav_server_inner(server_id, app, db, cover_manager)
-                    .await
-                    .map(|_| ())
-            }
+            RemoteKind::WebDav => crate::commands::webdav::sync_webdav_server_inner(
+                server_id,
+                app,
+                db,
+                cover_manager,
+                false,
+            )
+            .await
+            .map(|_| ()),
             RemoteKind::Subsonic => crate::commands::subsonic::sync_subsonic_server_inner(
                 server_id,
                 app,

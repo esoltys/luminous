@@ -1778,6 +1778,7 @@ export const en = {
     allDone: "Tasks done",
     syncingWebdav: "Syncing {name}…",
     syncingWebdavCount: "Syncing {name} ({count} items)…",
+    syncingWebdavDaily: "Daily full check of {name} ({count} items), once a day so this run takes longer…",
     savingAlbumTags: "Saving tags for {album}…",
     savingTagsCount: "Saving tags ({current}/{total})…",
     albumTagsSaved: "Saved tags for {album}",
