@@ -83,6 +83,46 @@ This causes Luminous to initialize a brand new `luminous.db`, `covers/`, and `lo
 > [!NOTE]
 > On Windows, WebView2 persists `localStorage` (such as last-viewed tabs or navigation state) across sessions in its User Data Directory (`%LOCALAPPDATA%\com.luminous.app\EBWebView`). When testing a genuinely pristine first launch, you can clear `localStorage` via the DevTools console (`Ctrl+Shift+I` -> `localStorage.clear(); location.reload()`) in addition to setting `LUMINOUS_DATA_DIR`.
 
+## Testing against a local WebDAV server
+
+To exercise WebDAV sync and playback without a real NAS, serve a folder of the repo's short audio
+clips from [wsgidav](https://wsgidav.readthedocs.io) on loopback, with Basic auth so the credential
+path is actually used. Copy a few files from `src-tauri/tests/fixtures/audio/` into a scratch
+folder (outside the repo), then write a `wsgidav.yaml` beside it. `test-only-password` is a
+throwaway value for this loopback server, not a real credential:
+
+```yaml
+host: 127.0.0.1
+port: 8765
+provider_mapping:
+  "/": "<absolute path to the scratch folder>"
+http_authenticator:
+  accept_basic: true
+  accept_digest: false
+  default_to_digest: false
+simple_dc:
+  user_mapping:
+    "*":
+      "tester":
+        password: "test-only-password"
+        roles: []
+```
+
+```bash
+uv run --with wsgidav --with cheroot wsgidav --config wsgidav.yaml
+```
+
+- **Use an isolated profile** (`LUMINOUS_DATA_DIR`, above) so the test server never lands in your
+  real library. Add it under Settings, Sources, or call `save_webdav_server` over devtools; its
+  input keys are camelCase (`remotePath`, not `remote_path`).
+- **Drive the app** with `bun run monitor-cdp --eval "<js>"`, e.g.
+  `window.__TAURI_INTERNALS__.invoke('play_song', { songId })`. Don't overlap sync invocations.
+- **Credentials:** song rows must hold the plain URL. Saving a wrong password should make playback
+  fail with a 401 toast that names no credentials, and restoring it should play again with no
+  re-sync (#1492).
+- **Folder-etag skipping (#1483):** stock wsgidav sends no folder etags, so testing that needs a
+  custom provider that adds propagating etags.
+
 ## Windows UI automation
 
 - **Windows e2e smoke test (`bun run test:e2e:windows`, `e2e/run-smoke.ts`)**: drives the real
