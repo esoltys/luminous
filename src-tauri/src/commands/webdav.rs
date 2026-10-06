@@ -669,11 +669,19 @@ pub async fn sync_webdav_server_inner(
         );
 
         let summary = format!(
-            "webdav sync ({server_name}): total {} ms | {current_count} file(s) seen,              {files_probed} probed, {} added, {} updated, {} error(s) |              {dirs_listed} dir listing(s) {} ms, tag probes {} ms",
+            concat!(
+                "webdav sync ({}): total {} ms | {} file(s) seen, ",
+                "{} probed, {} added, {} updated, {} error(s) | ",
+                "{} dir listing(s) {} ms, tag probes {} ms"
+            ),
+            server_name,
             sync_started.elapsed().as_millis(),
+            current_count,
+            files_probed,
             stats.added,
             stats.updated,
             stats.errors,
+            dirs_listed,
             list_time.as_millis(),
             probe_time.as_millis(),
         );
