@@ -185,6 +185,7 @@
                 title={section.title()}
                 items={itemsFor(section.key)}
                 kind={section.kind}
+                showAccentBars={true}
                 onShareClick={() => { shareSection = { title: section.title(), kind: section.kind, items: itemsFor(section.key) }; }}
               />
             </div>

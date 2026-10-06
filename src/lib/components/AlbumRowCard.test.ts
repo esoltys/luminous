@@ -96,4 +96,23 @@ describe("AlbumRowCard.svelte", () => {
     const { queryByTestId } = render(AlbumRowCard, { props: { album: unratedAlbum } });
     expect(queryByTestId("favourite-corner-flag")).toBeNull();
   });
+
+  it("renders proportional accent bar when progressPercent is provided", () => {
+    const { getByTestId } = render(AlbumRowCard, {
+      props: { album: mockAlbum, progressPercent: 75 },
+    });
+    const bar = getByTestId("stats-accent-bar");
+    expect(bar).toBeInTheDocument();
+    expect(bar).toHaveStyle({ width: "75%" });
+  });
+
+  it("does not render proportional accent bar when progressPercent is undefined or 0", () => {
+    const { queryByTestId, rerender } = render(AlbumRowCard, {
+      props: { album: mockAlbum },
+    });
+    expect(queryByTestId("stats-accent-bar")).toBeNull();
+
+    rerender({ album: mockAlbum, progressPercent: 0 });
+    expect(queryByTestId("stats-accent-bar")).toBeNull();
+  });
 });
