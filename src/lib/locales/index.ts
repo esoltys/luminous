@@ -1,3 +1,4 @@
+import { de } from "./de";
 import { en } from "./en";
 import { es } from "./es";
 import { fr } from "./fr";
@@ -21,6 +22,7 @@ export const BASE_LOCALE = "en-CA";
  * `Locale`, the Settings list, and the saved-setting check all derive from it.
  */
 export const LOCALES = [
+  { tag: "de", messages: de },
   { tag: "en-CA", messages: en },
   { tag: "es", messages: es },
   { tag: "fr-CA", messages: fr },
