@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { en } from "./en";
+import { es } from "./es";
 import { fr } from "./fr";
 import { it as itMessages } from "./it";
 import { BASE_LOCALE, LOCALES, catalogChain, isLocale, legacyLanguageToLocale, localeLabel, localePickerGroups, manualLanguageForLocale } from "./index";
@@ -116,6 +117,7 @@ const IDENTICAL_OK_FR = new Set([
   "smartPlaylistBuilder.fieldCompilation", // "Compilation"
   "smartPlaylistBuilder.fieldGenre", // "Genre"
   "smartPlaylistBuilder.mixWord", // "Mix"
+  "smartPlaylistBuilder.fieldBpm", // "BPM"
   "smartPlaylistBuilder.opEquals", // "="
   "smartPlaylistBuilder.opGt", // ">"
   "smartPlaylistBuilder.opGte", // ">="
@@ -210,6 +212,7 @@ const IDENTICAL_OK_IT = new Set<string>([
   "smartPlaylistBuilder.fieldBitrate", // "Bitrate"
   "smartPlaylistBuilder.fieldBpm", // "BPM"
   "smartPlaylistBuilder.fieldCompilation", // "Compilation"
+  "smartPlaylistBuilder.fieldBpm", // "BPM"
   "smartPlaylistBuilder.opEquals", // "="
   "smartPlaylistBuilder.opNotEquals", // "!="
   "smartPlaylistBuilder.opGte", // ">="
@@ -224,7 +227,64 @@ const IDENTICAL_OK_IT = new Set<string>([
   "auth.scrobbling", // "Scrobbling"
 ]);
 
+const IDENTICAL_OK_ES = new Set<string>([
+  "collection.tableHeaderTrack", // "#"
+  "collection.columnBpm", // "BPM"
+  "collection.booleanNo", // "No"
+  "collection.tableHeaderBpm", // "BPM"
+  "collection.tableHeaderMusicBrainzId", // "MBID"
+  "settings.tabGeneral", // "General"
+  "settings.aboutAppName", // "Luminous Music Player"
+  "settings.formatMsix", // "Microsoft Store"
+  "settings.badgeIconUsb", // "USB"
+  "settings.webdavUrlPlaceholder", // a URL
+  "settings.subsonicUrlPlaceholder", // a URL
+  "playlists.tableHeaderTrack", // "#"
+  "playlists.populationModeTitleFormat", // "{base} {suffix}"
+  "playlists.bpmAutoPlaylist", // "BPM"
+  "lyrics.instrumentalBadge", // "Instrumental"
+  "stats.minuteCount", // "{count} min"
+  "stats.minuteUnderOne", // "< 1 min"
+  "stats.heatmapStatus", // "{date} — {minutes} min"
+  "playerBar.channelsMono", // "Mono"
+  "playerBar.dynamicRangeRms", // "RMS {value} dB"
+  "playerBar.musicbrainzSectionLabel", // "MusicBrainz"
+  "playerBar.wikipediaSectionLabel", // "Wikipedia"
+  "playerBar.critiquebrainzSectionLabel", // "CritiqueBrainz"
+  "playerBar.listenbrainzSectionLabel", // "ListenBrainz"
+  "tagEditor.bpmField", // "BPM"
+  "equalizer.popPreset", // "Pop"
+  "equalizer.rockPreset", // "Rock"
+  "equalizer.jazzPreset", // "Jazz"
+  "equalizer.importPlaceholder", // Equalizer APO sample lines, same syntax in every language
+  "equalizer.qFactor", // "Q"
+  "equalizer.isoStandard", // "ISO 266:1997"
+  "themes.dynamic-artwork", // "✨ Luminous"
+  "themes.sabrina", // "Sabrina"
+  "artistEvents.festival", // "Festival"
+  "albumDetail.statsLine", // "{genre} · {year} · {duration}"
+  "organizer.placeholders", // "Variables"
+  "organizer.statusError", // "Error"
+  "picard.integrationTitle", // "MusicBrainz Picard"
+  "picard.customPathPlaceholder", // a Windows path
+  "picard.customPathPlaceholderLinux", // a Linux path
+  "listenbrainz.integrationTitle", // "ListenBrainz Scrobbler"
+  "listenbrainz.critiquebrainzUserPlaceholder", // a URL
+  "discord.integrationTitle", // "Discord Rich Presence"
+  "smartPlaylistBuilder.fieldBpm", // "BPM"
+  "smartPlaylistBuilder.opEquals", // "="
+  "smartPlaylistBuilder.opNotEquals", // "!="
+  "smartPlaylistBuilder.opGte", // ">="
+  "smartPlaylistBuilder.opLte", // "<="
+  "smartPlaylistBuilder.opGt", // ">"
+  "smartPlaylistBuilder.opLt", // "<"
+  "audioPipeline.normalizationGain", // "{gain} dB ({source})"
+  "audioPipeline.bitPerfect", // "Bit-perfect, a term of art"
+  "auth.scrobbling", // "Scrobbling"
+]);
+
 const CATALOGS = [
+  { name: "Spanish", file: "es.ts", messages: es, identicalOk: IDENTICAL_OK_ES },
   { name: "French", file: "fr.ts", messages: fr, identicalOk: IDENTICAL_OK_FR },
   { name: "Italian", file: "it.ts", messages: itMessages, identicalOk: IDENTICAL_OK_IT },
 ];

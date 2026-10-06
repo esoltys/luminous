@@ -1833,6 +1833,7 @@ export const fr: DeepStringRecord<typeof en> = {
     equalizer: "Égaliseur et DSP",
     equalizerDisabled: "Désactivé",
     equalizerActive: "{mode} ({bands} active(s))",
+    eqModeGraphic: "Graphique à 10 bandes",
     limiter: "Limiteur",
     outputFormat: "Format",
     outputDevice: "Périphérique",
