@@ -1,4 +1,5 @@
 import { en } from "./en";
+import { es } from "./es";
 import { fr } from "./fr";
 import { it } from "./it";
 
@@ -21,6 +22,7 @@ export const BASE_LOCALE = "en-CA";
  */
 export const LOCALES = [
   { tag: "en-CA", messages: en },
+  { tag: "es", messages: es },
   { tag: "fr-CA", messages: fr },
   { tag: "it", messages: it },
 ] as const satisfies readonly LocaleDef[];
