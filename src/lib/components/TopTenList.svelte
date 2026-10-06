@@ -33,6 +33,8 @@
     secondaryFallback?: string;
     /** Hides the plays/minutes trailing column, for compact contexts (e.g. Home). */
     showDuration?: boolean;
+    /** Whether to show proportional accent colour bars behind ranked items (#1475). */
+    showAccentBars?: boolean;
     /** When provided, the title becomes a clickable button that navigates to
      * the full expanded view. */
     onHeaderClick?: () => void;
@@ -42,7 +44,42 @@
     onShareClick?: () => void;
   }
 
-  let { title, items, kind, emptyText, secondaryFallback, showDuration = true, onHeaderClick, onShareClick }: Props = $props();
+  let {
+    title,
+    items,
+    kind,
+    emptyText,
+    secondaryFallback,
+    showDuration = true,
+    showAccentBars = false,
+    onHeaderClick,
+    onShareClick,
+  }: Props = $props();
+
+  // Relative scaling calculation for proportional accent bars (#1475)
+  const maxMetric = $derived.by(() => {
+    if (!items || items.length === 0) return 0;
+    const topItem = items[0];
+    if (topItem.minutes > 0) return topItem.minutes;
+    if (topItem.play_count > 0) return topItem.play_count;
+    const maxMinutes = Math.max(0, ...items.map((it) => it.minutes || 0));
+    if (maxMinutes > 0) return maxMinutes;
+    return Math.max(0, ...items.map((it) => it.play_count || 0));
+  });
+
+  const useMinutesMetric = $derived.by(() => {
+    if (!items || items.length === 0) return true;
+    const topItem = items[0];
+    if (topItem.minutes > 0) return true;
+    if (topItem.play_count > 0) return false;
+    return Math.max(0, ...items.map((it) => it.minutes || 0)) > 0;
+  });
+
+  function getItemPercent(item: StatsTopItem): number {
+    if (!showAccentBars || maxMetric <= 0) return 0;
+    const val = useMinutesMetric ? item.minutes : item.play_count;
+    return Math.min(100, Math.max(0, (val / maxMetric) * 100));
+  }
 
   let contextMenuState = $state<{ x: number; y: number; song: Song } | null>(null);
 
@@ -248,6 +285,7 @@
 
   <div class="flex-1 flex flex-col gap-2">
     {#each items as item, i (item.key)}
+      {@const itemPercent = getItemPercent(item)}
       <div class="flex items-center gap-3">
         {#if item.movement}
           {@render movementSnippet(item)}
@@ -271,6 +309,7 @@
             }}
             <AlbumRowCard
               album={albumItem}
+              progressPercent={showAccentBars ? itemPercent : undefined}
               onclick={() => openItem(item)}
               onRate={(r) => { item.rating = r; }}
             />
@@ -287,6 +326,7 @@
               {artist}
               {artistAlbums}
               {artistSongs}
+              progressPercent={showAccentBars ? itemPercent : undefined}
               onclick={() => openItem(item)}
             />
           {:else if kind === "song"}
@@ -304,9 +344,17 @@
                   openItem(item);
                 }
               }}
-              class="group flex items-center gap-3 px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 select-none cursor-pointer w-full"
+              class="group flex items-center gap-3 px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 select-none cursor-pointer w-full relative overflow-hidden"
             >
-              <div class="relative shrink-0 overflow-hidden">
+              {#if showAccentBars && itemPercent > 0}
+                <div
+                  class="accent-bar absolute inset-y-0 left-0 rounded-lg bg-brand-accent/15 pointer-events-none transition-[width] duration-300 ease-out motion-reduce:transition-none"
+                  style="width: {itemPercent}%;"
+                  data-testid="stats-accent-bar"
+                ></div>
+              {/if}
+
+              <div class="relative z-10 shrink-0 overflow-hidden">
                 <CoverArt
                   songId={item.song_id ?? undefined}
                   artEmbedded={item.art_embedded}
@@ -319,7 +367,7 @@
                 {/if}
               </div>
 
-              <div class="min-w-0 flex-1 flex flex-col gap-0.5">
+              <div class="relative z-10 min-w-0 flex-1 flex flex-col gap-0.5">
                 <div class="flex items-center justify-between gap-2">
                   <p class="truncate text-sm font-semibold text-brand-text-primary min-w-0">{item.label}</p>
                   {#if item.year}
@@ -355,9 +403,17 @@
                   openItem(item);
                 }
               }}
-              class="group flex items-center min-h-[66px] px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 select-none cursor-pointer w-full"
+              class="group flex items-center min-h-[66px] px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 select-none cursor-pointer w-full relative overflow-hidden"
             >
-              <div class="min-w-0 flex-1 flex flex-col gap-0.5">
+              {#if showAccentBars && itemPercent > 0}
+                <div
+                  class="accent-bar absolute inset-y-0 left-0 rounded-lg bg-brand-accent/15 pointer-events-none transition-[width] duration-300 ease-out motion-reduce:transition-none"
+                  style="width: {itemPercent}%;"
+                  data-testid="stats-accent-bar"
+                ></div>
+              {/if}
+
+              <div class="relative z-10 min-w-0 flex-1 flex flex-col gap-0.5">
                 <p class="truncate text-sm font-semibold text-brand-text-primary min-w-0">{item.label}</p>
                 {#if item.secondary || secondaryFallback}
                   <p class="truncate text-xs text-brand-text-secondary font-medium min-w-0">{item.secondary || secondaryFallback}</p>

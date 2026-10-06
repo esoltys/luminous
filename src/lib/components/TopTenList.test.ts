@@ -361,4 +361,161 @@ describe("TopTenList.svelte", () => {
     });
     expect(items[0].rating).toBe(4);
   });
+
+  it("does not render accent bars by default when showAccentBars is false", () => {
+    const items: StatsTopItem[] = [
+      {
+        key: "1",
+        label: "Song One",
+        secondary: "Artist One",
+        play_count: 10,
+        minutes: 60,
+        excluded: false,
+        album: "Album One",
+        song_id: 101,
+      },
+    ];
+
+    const { queryByTestId } = render(TopTenList, {
+      props: { items, kind: "song" },
+    });
+
+    expect(queryByTestId("stats-accent-bar")).toBeNull();
+  });
+
+  it("renders proportional accent bars scaled relative to #1 item when showAccentBars is true", () => {
+    const items: StatsTopItem[] = [
+      {
+        key: "1",
+        label: "Song One",
+        secondary: "Artist One",
+        play_count: 10,
+        minutes: 100,
+        excluded: false,
+        album: "Album One",
+        song_id: 101,
+      },
+      {
+        key: "2",
+        label: "Song Two",
+        secondary: "Artist Two",
+        play_count: 5,
+        minutes: 50,
+        excluded: false,
+        album: "Album Two",
+        song_id: 102,
+      },
+      {
+        key: "3",
+        label: "Song Three",
+        secondary: "Artist Three",
+        play_count: 1,
+        minutes: 0,
+        excluded: false,
+        album: "Album Three",
+        song_id: 103,
+      },
+    ];
+
+    const { getAllByTestId, queryAllByTestId } = render(TopTenList, {
+      props: { items, kind: "song", showAccentBars: true },
+    });
+
+    const bars = getAllByTestId("stats-accent-bar");
+    // #1 (100 min) -> 100%, #2 (50 min) -> 50%, #3 (0 min) -> no bar rendered
+    expect(bars).toHaveLength(2);
+    expect(bars[0]).toHaveStyle({ width: "100%" });
+    expect(bars[1]).toHaveStyle({ width: "50%" });
+  });
+
+  it("falls back to play_count for proportional scaling when minutes are zero", () => {
+    const items: StatsTopItem[] = [
+      {
+        key: "1",
+        label: "Song One",
+        secondary: "Artist One",
+        play_count: 20,
+        minutes: 0,
+        excluded: false,
+        album: "Album One",
+        song_id: 101,
+      },
+      {
+        key: "2",
+        label: "Song Two",
+        secondary: "Artist Two",
+        play_count: 5,
+        minutes: 0,
+        excluded: false,
+        album: "Album Two",
+        song_id: 102,
+      },
+    ];
+
+    const { getAllByTestId } = render(TopTenList, {
+      props: { items, kind: "song", showAccentBars: true },
+    });
+
+    const bars = getAllByTestId("stats-accent-bar");
+    expect(bars).toHaveLength(2);
+    expect(bars[0]).toHaveStyle({ width: "100%" });
+    expect(bars[1]).toHaveStyle({ width: "25%" });
+  });
+
+  it("renders proportional accent bars for genre kind when showAccentBars is true", () => {
+    const genreItems: StatsTopItem[] = [
+      {
+        key: "Rock",
+        label: "Rock",
+        secondary: "30 tracks",
+        play_count: 10,
+        minutes: 80,
+        excluded: false,
+        album: null,
+      },
+    ];
+
+    const { getByTestId } = render(TopTenList, {
+      props: { items: genreItems, kind: "genre", showAccentBars: true },
+    });
+    expect(getByTestId("stats-accent-bar")).toHaveStyle({ width: "100%" });
+  });
+
+  it("renders proportional accent bars for album kind when showAccentBars is true", () => {
+    const albumItems: StatsTopItem[] = [
+      {
+        key: "album_1",
+        label: "Album One",
+        secondary: "Artist One",
+        play_count: 10,
+        minutes: 120,
+        excluded: false,
+        album: null,
+      },
+    ];
+
+    const { getByTestId } = render(TopTenList, {
+      props: { items: albumItems, kind: "album", showAccentBars: true },
+    });
+    expect(getByTestId("stats-accent-bar")).toHaveStyle({ width: "100%" });
+  });
+
+  it("renders proportional accent bars for artist kind when showAccentBars is true", () => {
+    const artistItems: StatsTopItem[] = [
+      {
+        key: "Queen",
+        label: "Queen",
+        secondary: "Rock",
+        play_count: 10,
+        minutes: 90,
+        excluded: false,
+        album: null,
+      },
+    ];
+
+    const { getByTestId } = render(TopTenList, {
+      props: { items: artistItems, kind: "artist", showAccentBars: true },
+    });
+    expect(getByTestId("stats-accent-bar")).toHaveStyle({ width: "100%" });
+  });
 });

@@ -117,4 +117,23 @@ describe("ArtistRowCard.svelte", () => {
     expect(oncontextmenu).toHaveBeenCalledTimes(1);
     expect(onclick).not.toHaveBeenCalled();
   });
+
+  it("renders proportional accent bar when progressPercent is provided", () => {
+    const { getByTestId } = render(ArtistRowCard, {
+      props: { artist: mockArtist, artistAlbums: [mockAlbum], progressPercent: 60 },
+    });
+    const bar = getByTestId("stats-accent-bar");
+    expect(bar).toBeInTheDocument();
+    expect(bar).toHaveStyle({ width: "60%" });
+  });
+
+  it("does not render proportional accent bar when progressPercent is undefined or 0", () => {
+    const { queryByTestId, rerender } = render(ArtistRowCard, {
+      props: { artist: mockArtist, artistAlbums: [mockAlbum] },
+    });
+    expect(queryByTestId("stats-accent-bar")).toBeNull();
+
+    rerender({ artist: mockArtist, artistAlbums: [mockAlbum], progressPercent: 0 });
+    expect(queryByTestId("stats-accent-bar")).toBeNull();
+  });
 });
