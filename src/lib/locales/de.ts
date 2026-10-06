@@ -582,6 +582,7 @@ export const de = {
     webdavSyncBtn: "Jetzt synchronisieren",
     webdavSyncing: "Wird synchronisiert ...",
     webdavSyncComplete: "Synchronisierung abgeschlossen: {added} hinzugefügt, {updated} aktualisiert, {errors} Fehler.",
+    webdavSyncErrorsHint: "Die fehlgeschlagenen Dateien findest du über „Diagnosedaten exportieren“ in den Einstellungen.",
     syncAlreadyRunning: "{name} wird bereits synchronisiert. Warte, bis der Vorgang abgeschlossen ist.",
     webdavNoServersTitle: "Keine WebDAV-Server konfiguriert",
     webdavNoServersText: "Oben einen WebDAV-Server hinzufügen, um Remote-Audio ohne eingebundene Laufwerke zu streamen.",
