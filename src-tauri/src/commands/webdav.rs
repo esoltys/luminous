@@ -8,7 +8,7 @@ use crate::webdav::{detect_filetype_from_url, WebDavClient};
 use crate::AppState;
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
-use std::collections::VecDeque;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State};
 
@@ -398,11 +398,27 @@ pub async fn sync_webdav_server_inner(
             }
         };
 
-        let mut queue = VecDeque::new();
-        queue.push_back(remote_path);
+        // Everything the previous syncs recorded for this server, loaded once
+        // rather than queried per file (#1483).
+        let cache = match load_remote_cache(&conn, id) {
+            Ok(c) => c,
+            Err(e) => {
+                let _ = conn.execute(
+                    "UPDATE webdav_servers SET sync_status = 'idle' WHERE id = ?1",
+                    params![id],
+                );
+                return Err(e.to_string());
+            }
+        };
 
         let mut stats = WebDavSyncStats::default();
         let mut current_count = 0usize;
+        let mut progress = ProgressThrottle::new();
+        // Audio files the server listed this sync, for remote-deletion detection.
+        let mut seen: HashSet<String> = HashSet::new();
+        // Set false by any failed listing or write: a partial view of the
+        // server must never be read as "these files were deleted".
+        let mut sync_complete = true;
         // Timing for the diagnostics export (#1482): where a slow sync spends its time.
         let sync_started = std::time::Instant::now();
         let mut list_time = std::time::Duration::ZERO;
@@ -410,188 +426,196 @@ pub async fn sync_webdav_server_inner(
         let mut dirs_listed = 0usize;
         let mut files_probed = 0usize;
 
-        while let Some(current_path) = queue.pop_front() {
+        // Walk the tree one depth level at a time so each level's directories
+        // are listed concurrently (bounded) instead of one PROPFIND at a time.
+        let mut level = vec![remote_path];
+        while !level.is_empty() {
             let list_started = std::time::Instant::now();
-            let listing = client.list_directory(&current_path);
+            let listings = run_bounded(level, LIST_CONCURRENCY, |path| {
+                let listing = client.list_directory(&path);
+                (path, listing)
+            });
             list_time += list_started.elapsed();
-            dirs_listed += 1;
-            let items = match listing {
-                Ok(it) => it,
-                Err(err) => {
-                    log::warn!("Failed to list WebDAV directory {current_path}: {err}");
-                    stats.errors += 1;
-                    continue;
-                }
-            };
+            let mut next_level = Vec::new();
 
-            // Standalone folder-art image (`album.png`, `cover.jpg`, etc.)
-            // for this directory, if any — the WebDAV counterpart to
-            // `CoverManager::scan_folder_art`'s local-filesystem `read_dir`
-            // scan, resolved from this directory's own PROPFIND listing
-            // instead since there's no filesystem to scan (#1082 follow-up).
-            // Downloaded lazily (only if some song in the directory actually
-            // needs it) and at most once per directory, since every song
-            // here shares the same folder image.
-            let folder_art_item = items
-                .iter()
-                .find(|it| {
-                    !it.is_directory
-                        && std::path::Path::new(&it.href)
-                            .file_stem()
-                            .zip(std::path::Path::new(&it.href).extension())
-                            .map(|(stem, ext)| {
-                                CoverManager::is_folder_art_filename(
-                                    &stem.to_string_lossy(),
-                                    &ext.to_string_lossy(),
-                                )
-                            })
-                            .unwrap_or(false)
-                })
-                .cloned();
-            let mut folder_art_bytes: Option<Vec<u8>> = None;
-            let mut folder_art_fetch_attempted = false;
-
-            for item in items {
-                // Avoid infinite loops matching the directory itself
-                if crate::webdav::is_listed_collection(&item.href, &current_path) {
-                    continue;
-                }
-
-                if item.is_directory {
-                    queue.push_back(item.href);
-                } else {
-                    let filetype = detect_filetype_from_url(&item.href);
-                    if filetype == crate::models::FileType::Unknown {
+            for (current_path, listing) in listings {
+                dirs_listed += 1;
+                let items = match listing {
+                    Ok(it) => it,
+                    Err(err) => {
+                        log::warn!("Failed to list WebDAV directory {current_path}: {err}");
+                        stats.errors += 1;
+                        sync_complete = false;
                         continue;
                     }
+                };
+
+                // Standalone folder-art image (`album.png`, `cover.jpg`, etc.)
+                // for this directory, if any — the WebDAV counterpart to
+                // `CoverManager::scan_folder_art`'s local-filesystem `read_dir`
+                // scan, resolved from this directory's own PROPFIND listing
+                // instead since there's no filesystem to scan (#1082 follow-up).
+                // Downloaded lazily (only if some song in the directory actually
+                // needs it) and at most once per directory, since every song
+                // here shares the same folder image.
+                let folder_art_item = items
+                    .iter()
+                    .find(|it| {
+                        !it.is_directory
+                            && std::path::Path::new(&it.href)
+                                .file_stem()
+                                .zip(std::path::Path::new(&it.href).extension())
+                                .map(|(stem, ext)| {
+                                    CoverManager::is_folder_art_filename(
+                                        &stem.to_string_lossy(),
+                                        &ext.to_string_lossy(),
+                                    )
+                                })
+                                .unwrap_or(false)
+                    })
+                    .cloned();
+
+                // Classify the directory's files. Unchanged ones only need a
+                // (rare) row fix-up; new or changed ones go to the probe list.
+                let mut to_probe: Vec<ProbeTask> = Vec::new();
+                let mut fixups: Vec<(i64, String)> = Vec::new();
+                for item in items {
+                    // Avoid infinite loops matching the directory itself
+                    if crate::webdav::is_listed_collection(&item.href, &current_path) {
+                        continue;
+                    }
+                    if item.is_directory {
+                        next_level.push(item.href);
+                        continue;
+                    }
+                    if detect_filetype_from_url(&item.href) == crate::models::FileType::Unknown {
+                        continue;
+                    }
+                    seen.insert(item.href.clone());
 
                     let file_size = item.content_length.unwrap_or(0);
-                    // Used for internal probing (Authorization header set explicitly by the client).
-                    let probe_url = client.build_url(&item.href);
                     // Used for the stored path/stream_url: the audio engine has no separate
                     // credential lookup at playback time, so credentials travel embedded in
                     // the URL itself (see `WebDavClient::build_authenticated_url`).
                     let playback_url = client.build_authenticated_url(&item.href);
 
-                    // Check cache for existing etag/size match
-                    let cached_info: Option<(i64, Option<String>, i64, i64)> = conn
-                        .query_row(
-                            "SELECT id, etag, size, song_id FROM webdav_cache WHERE server_id = ?1 AND remote_path = ?2",
-                            params![id, item.href],
-                            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
-                        )
-                        .ok();
-
-                    let needs_rescan = match cached_info {
-                        Some((_, ref cached_etag, cached_size, _)) => {
-                            if let (Some(c_etag), Some(ref i_etag)) = (cached_etag, &item.etag) {
-                                c_etag != i_etag
-                            } else {
-                                cached_size != file_size as i64
+                    match cache.get(&item.href) {
+                        Some(cached) if !remote_file_changed(cached, &item) => {
+                            // The remote file itself is unchanged, so skip re-probing tags —
+                            // but the stored playback URL may still be stale (e.g. it predates
+                            // #682's fix to embed credentials for playback, or the server's
+                            // credentials changed since) and the song may have been flagged
+                            // unavailable while the file was missing. Repair both, so a rescan
+                            // fixes previously-synced songs, not just new ones.
+                            let path_stale = cached.song_path.as_deref() != Some(playback_url.as_str());
+                            if path_stale || cached.unavailable {
+                                if path_stale {
+                                    stats.updated += 1;
+                                }
+                                fixups.push((cached.song_id, playback_url));
                             }
+                            current_count += 1;
+                            progress.maybe_emit(&app_clone, id, &server_name, &item.href, current_count, &stats);
                         }
-                        None => true,
-                    };
+                        _ => to_probe.push(ProbeTask {
+                            // Used for internal probing (Authorization header set explicitly by the client).
+                            probe_url: client.build_url(&item.href),
+                            item,
+                            file_size,
+                            playback_url,
+                        }),
+                    }
+                }
 
-                    if !needs_rescan {
-                        // The remote file itself is unchanged, so skip re-probing tags —
-                        // but the stored playback URL may still be stale (e.g. it predates
-                        // #682's fix to embed credentials for playback, or the server's
-                        // credentials changed since). Refresh it unconditionally so a
-                        // rescan actually repairs previously-synced songs, not just new ones.
-                        if let Some((_, _, _, cached_song_id)) = cached_info {
-                            let current_path: Option<String> = conn
-                                .query_row(
-                                    "SELECT path FROM songs WHERE id = ?1",
-                                    params![cached_song_id],
-                                    |r| r.get(0),
-                                )
-                                .ok();
-                            if current_path.as_deref() != Some(playback_url.as_str()) {
-                                let _ = conn.execute(
-                                    "UPDATE songs SET path = ?1, url = ?1, stream_url = ?1 WHERE id = ?2",
-                                    params![playback_url, cached_song_id],
-                                );
-                                stats.updated += 1;
-                            }
+                // Probe remote tags using byte ranges, concurrently.
+                let probe_started = std::time::Instant::now();
+                files_probed += to_probe.len();
+                let probed = run_bounded(to_probe, PROBE_CONCURRENCY, |task| {
+                    let result = client.probe_song_tags(&task.probe_url, task.file_size);
+                    (task, result)
+                });
+                probe_time += probe_started.elapsed();
+
+                // No embedded-picture extraction over WebDAV yet, so
+                // `art_automatic` is always still unset: fall back to this
+                // directory's folder-art image, same as a local scan's
+                // `scan_folder_art` fallback (#1082 follow-up). Fetched before
+                // the write transaction opens so the network never holds the
+                // database's write lock.
+                let mut folder_art_bytes: Option<Vec<u8>> = None;
+                if let Some(art_item) = &folder_art_item {
+                    let needs_art = probed
+                        .iter()
+                        .any(|(_, r)| matches!(r, Ok(song) if song.art_automatic.is_none()));
+                    if needs_art {
+                        let art_url = client.build_url(&art_item.href);
+                        match client.fetch_full(&art_url) {
+                            Ok(bytes) => folder_art_bytes = Some(bytes),
+                            Err(e) => log::warn!(
+                                "Failed to download WebDAV folder art {}: {e}",
+                                art_item.href
+                            ),
                         }
-                        current_count += 1;
-                        let _ = app_clone.emit(
-                            "webdav-sync-progress",
-                            WebDavSyncProgressPayload {
-                                server_id: id,
-                                server_name: server_name.clone(),
-                                current_path: item.href.clone(),
-                                current_count,
-                                added: stats.added,
-                                updated: stats.updated,
-                                errors: stats.errors,
-                                done: false,
-                            },
-                        );
+                    }
+                }
+
+                // One transaction per directory instead of an autocommit per row.
+                let tx = match conn.unchecked_transaction() {
+                    Ok(tx) => tx,
+                    Err(e) => {
+                        log::warn!("Failed to open a WebDAV sync transaction for {current_path}: {e}");
+                        stats.errors += 1;
+                        sync_complete = false;
                         continue;
                     }
+                };
 
-                    // Probe remote tags using byte ranges
-                    files_probed += 1;
-                    let probe_started = std::time::Instant::now();
-                    let probed = client.probe_song_tags(&probe_url, file_size);
-                    probe_time += probe_started.elapsed();
-                    match probed {
+                for (song_id, playback_url) in &fixups {
+                    let _ = tx.execute(
+                        "UPDATE songs SET path = ?1, url = ?1, stream_url = ?1, unavailable = 0 WHERE id = ?2",
+                        params![playback_url, song_id],
+                    );
+                }
+
+                for (task, result) in probed {
+                    let ProbeTask { item, file_size, playback_url, .. } = task;
+                    match result {
                         Ok(mut song) => {
                             song.path = Some(playback_url.clone());
                             song.url = Some(playback_url.clone());
                             song.stream_url = Some(playback_url.clone());
 
-                            // No embedded-picture extraction over WebDAV yet, so
-                            // `art_automatic` is always still unset here — fall
-                            // back to this directory's folder-art image, same as
-                            // a local scan's `scan_folder_art` fallback (#1082
-                            // follow-up).
                             if song.art_automatic.is_none() {
-                                if let Some(art_item) = &folder_art_item {
-                                    if !folder_art_fetch_attempted {
-                                        folder_art_fetch_attempted = true;
-                                        let art_url = client.build_url(&art_item.href);
-                                        match client.fetch_full(&art_url) {
-                                            Ok(bytes) => folder_art_bytes = Some(bytes),
-                                            Err(e) => log::warn!(
-                                                "Failed to download WebDAV folder art {}: {e}",
-                                                art_item.href
-                                            ),
-                                        }
-                                    }
-                                    if let Some(bytes) = &folder_art_bytes {
-                                        let artist = song
-                                            .album_artist
-                                            .clone()
-                                            .filter(|a| !a.trim().is_empty())
-                                            .or_else(|| song.artist.clone())
-                                            .unwrap_or_default();
-                                        let album = song
-                                            .album
-                                            .clone()
-                                            .filter(|a| !a.trim().is_empty())
-                                            .or_else(|| song.title.clone())
-                                            .unwrap_or_default();
-                                        match cover_manager.cache_art_bytes(&artist, &album, bytes) {
-                                            Ok(filename) => song.art_automatic = Some(filename),
-                                            Err(e) => log::warn!(
-                                                "Failed to cache WebDAV folder art for {}: {e}",
-                                                item.href
-                                            ),
-                                        }
+                                if let Some(bytes) = &folder_art_bytes {
+                                    let artist = song
+                                        .album_artist
+                                        .clone()
+                                        .filter(|a| !a.trim().is_empty())
+                                        .or_else(|| song.artist.clone())
+                                        .unwrap_or_default();
+                                    let album = song
+                                        .album
+                                        .clone()
+                                        .filter(|a| !a.trim().is_empty())
+                                        .or_else(|| song.title.clone())
+                                        .unwrap_or_default();
+                                    match cover_manager.cache_art_bytes(&artist, &album, bytes) {
+                                        Ok(filename) => song.art_automatic = Some(filename),
+                                        Err(e) => log::warn!(
+                                            "Failed to cache WebDAV folder art for {}: {e}",
+                                            item.href
+                                        ),
                                     }
                                 }
                             }
 
-                            if let Err(e) = crate::collection::upsert_song(&conn, &song) {
+                            if let Err(e) = crate::collection::upsert_song(&tx, &song) {
                                 log::warn!("Failed to upsert WebDAV song {}: {e}", item.href);
                                 stats.errors += 1;
                                 continue;
                             }
 
-                            let song_id: i64 = conn
+                            let song_id: i64 = tx
                                 .query_row(
                                     "SELECT id FROM songs WHERE path = ?1",
                                     params![playback_url],
@@ -599,7 +623,7 @@ pub async fn sync_webdav_server_inner(
                                 )
                                 .unwrap_or(0);
 
-                            let _ = conn.execute(
+                            let _ = tx.execute(
                                 "INSERT INTO webdav_cache (server_id, remote_path, etag, size, last_modified, song_id)
                                  VALUES (?1, ?2, ?3, ?4, ?5, ?6)
                                  ON CONFLICT(server_id, remote_path) DO UPDATE SET
@@ -611,7 +635,7 @@ pub async fn sync_webdav_server_inner(
                                 params![id, item.href, item.etag, file_size as i64, item.last_modified, song_id],
                             );
 
-                            if cached_info.is_some() {
+                            if cache.contains_key(&item.href) {
                                 stats.updated += 1;
                             } else {
                                 stats.added += 1;
@@ -624,21 +648,31 @@ pub async fn sync_webdav_server_inner(
                     }
 
                     current_count += 1;
-                    let _ = app_clone.emit(
-                        "webdav-sync-progress",
-                        WebDavSyncProgressPayload {
-                            server_id: id,
-                            server_name: server_name.clone(),
-                            current_path: item.href.clone(),
-                            current_count,
-                            added: stats.added,
-                            updated: stats.updated,
-                            errors: stats.errors,
-                            done: false,
-                        },
-                    );
+                    progress.maybe_emit(&app_clone, id, &server_name, &item.href, current_count, &stats);
+                }
+
+                if let Err(e) = tx.commit() {
+                    log::warn!("Failed to commit WebDAV sync of {current_path}: {e}");
+                    stats.errors += 1;
+                    sync_complete = false;
                 }
             }
+
+            level = next_level;
+        }
+
+        // Files the server no longer lists: flag their songs unavailable (like a
+        // local scan does for missing files) so they stop showing as playable.
+        // Only after a sync that listed every directory and every write landed;
+        // a server that answered with no audio at all is treated as a failed
+        // listing rather than as "everything was deleted".
+        if sync_complete && !seen.is_empty() {
+            match mark_remote_deletions(&conn, &cache, &seen) {
+                Ok(removed) => stats.removed = removed,
+                Err(e) => log::warn!("Failed to flag deleted WebDAV songs: {e}"),
+            }
+        } else if !sync_complete {
+            log::warn!("WebDAV sync of '{server_name}' was incomplete; not checking for remote deletions");
         }
 
         // Update server status to idle and update last_synced_at timestamp
@@ -669,7 +703,7 @@ pub async fn sync_webdav_server_inner(
         let summary = format!(
             concat!(
                 "webdav sync ({}): total {} ms | {} file(s) seen, ",
-                "{} probed, {} added, {} updated, {} error(s) | ",
+                "{} probed, {} added, {} updated, {} removed, {} error(s) | ",
                 "{} dir listing(s) {} ms, tag probes {} ms"
             ),
             server_name,
@@ -678,6 +712,7 @@ pub async fn sync_webdav_server_inner(
             files_probed,
             stats.added,
             stats.updated,
+            stats.removed,
             stats.errors,
             dirs_listed,
             list_time.as_millis(),
@@ -691,4 +726,286 @@ pub async fn sync_webdav_server_inner(
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+/// Directory listings in flight at once during a sync (#1483).
+const LIST_CONCURRENCY: usize = 8;
+/// Tag probes in flight at once during a sync (#1483).
+const PROBE_CONCURRENCY: usize = 6;
+/// Minimum gap between `webdav-sync-progress` events while a sync runs.
+const PROGRESS_EMIT_INTERVAL: std::time::Duration = std::time::Duration::from_millis(250);
+
+/// What a previous sync recorded for one remote file, joined with its song.
+struct CachedRemoteFile {
+    etag: Option<String>,
+    size: i64,
+    song_id: i64,
+    song_path: Option<String>,
+    unavailable: bool,
+}
+
+/// A new or changed remote file waiting for its tags to be read.
+struct ProbeTask {
+    item: crate::webdav::WebDavItem,
+    probe_url: String,
+    file_size: u64,
+    playback_url: String,
+}
+
+/// Loads every cached remote file of `server_id` (that still has a song) in one query.
+fn load_remote_cache(
+    conn: &rusqlite::Connection,
+    server_id: i64,
+) -> rusqlite::Result<HashMap<String, CachedRemoteFile>> {
+    let mut stmt = conn.prepare(
+        "SELECT c.remote_path, c.etag, c.size, c.song_id, s.path, COALESCE(s.unavailable, 0)
+         FROM webdav_cache c LEFT JOIN songs s ON s.id = c.song_id
+         WHERE c.server_id = ?1 AND c.song_id IS NOT NULL",
+    )?;
+    let rows = stmt.query_map(params![server_id], |r| {
+        Ok((
+            r.get::<_, String>(0)?,
+            CachedRemoteFile {
+                etag: r.get(1)?,
+                size: r.get(2)?,
+                song_id: r.get(3)?,
+                song_path: r.get(4)?,
+                unavailable: r.get::<_, i64>(5)? != 0,
+            },
+        ))
+    })?;
+    rows.collect()
+}
+
+/// Whether a listed file differs from what the last sync recorded: by etag when
+/// both sides have one, otherwise by size.
+fn remote_file_changed(cached: &CachedRemoteFile, item: &crate::webdav::WebDavItem) -> bool {
+    match (&cached.etag, &item.etag) {
+        (Some(c), Some(i)) => c != i,
+        _ => cached.size != item.content_length.unwrap_or(0) as i64,
+    }
+}
+
+/// Flags the songs of cached files missing from `seen` as unavailable; returns
+/// how many were newly flagged.
+fn mark_remote_deletions(
+    conn: &rusqlite::Connection,
+    cache: &HashMap<String, CachedRemoteFile>,
+    seen: &HashSet<String>,
+) -> rusqlite::Result<usize> {
+    let tx = conn.unchecked_transaction()?;
+    let mut removed = 0;
+    for (href, cached) in cache {
+        if cached.unavailable || seen.contains(href) {
+            continue;
+        }
+        removed += tx.execute(
+            "UPDATE songs SET unavailable = 1 WHERE id = ?1 AND unavailable = 0",
+            params![cached.song_id],
+        )?;
+    }
+    tx.commit()?;
+    Ok(removed)
+}
+
+/// Runs `f` over `items` on at most `workers` threads and returns the results
+/// in input order. The caller's thread blocks until all are done.
+fn run_bounded<T: Send, R: Send>(
+    items: Vec<T>,
+    workers: usize,
+    f: impl Fn(T) -> R + Sync,
+) -> Vec<R> {
+    let total = items.len();
+    let workers = workers.clamp(1, total.max(1));
+    if workers == 1 {
+        return items.into_iter().map(f).collect();
+    }
+    let queue = parking_lot::Mutex::new(items.into_iter().enumerate());
+    let results = parking_lot::Mutex::new((0..total).map(|_| None).collect::<Vec<Option<R>>>());
+    std::thread::scope(|scope| {
+        for _ in 0..workers {
+            scope.spawn(|| loop {
+                let next = queue.lock().next();
+                let Some((index, item)) = next else { break };
+                let result = f(item);
+                results.lock()[index] = Some(result);
+            });
+        }
+    });
+    results
+        .into_inner()
+        .into_iter()
+        .map(|r| r.expect("every queued item is processed before the scope ends"))
+        .collect()
+}
+
+/// Rate-limits `webdav-sync-progress` events: a 3,000-file sync used to send
+/// one per file, each a cross-process message the UI re-rendered on.
+struct ProgressThrottle {
+    last_emit: Option<std::time::Instant>,
+}
+
+impl ProgressThrottle {
+    fn new() -> Self {
+        Self { last_emit: None }
+    }
+
+    fn maybe_emit(
+        &mut self,
+        app: &AppHandle,
+        server_id: i64,
+        server_name: &str,
+        current_path: &str,
+        current_count: usize,
+        stats: &WebDavSyncStats,
+    ) {
+        let due = self
+            .last_emit
+            .is_none_or(|t| t.elapsed() >= PROGRESS_EMIT_INTERVAL);
+        if !due {
+            return;
+        }
+        self.last_emit = Some(std::time::Instant::now());
+        let _ = app.emit(
+            "webdav-sync-progress",
+            WebDavSyncProgressPayload {
+                server_id,
+                server_name: server_name.to_string(),
+                current_path: current_path.to_string(),
+                current_count,
+                added: stats.added,
+                updated: stats.updated,
+                errors: stats.errors,
+                done: false,
+            },
+        );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{Song, SongSource};
+    use crate::webdav::WebDavItem;
+
+    fn item(etag: Option<&str>, len: u64) -> WebDavItem {
+        WebDavItem {
+            href: "/a.mp3".to_string(),
+            is_directory: false,
+            content_length: Some(len),
+            last_modified: None,
+            etag: etag.map(str::to_string),
+        }
+    }
+
+    fn cached(etag: Option<&str>, size: i64) -> CachedRemoteFile {
+        CachedRemoteFile {
+            etag: etag.map(str::to_string),
+            size,
+            song_id: 1,
+            song_path: None,
+            unavailable: false,
+        }
+    }
+
+    #[test]
+    fn remote_file_changed_prefers_etag_and_falls_back_to_size() {
+        assert!(!remote_file_changed(
+            &cached(Some("a"), 10),
+            &item(Some("a"), 99)
+        ));
+        assert!(remote_file_changed(
+            &cached(Some("a"), 10),
+            &item(Some("b"), 10)
+        ));
+        assert!(!remote_file_changed(
+            &cached(None, 10),
+            &item(Some("b"), 10)
+        ));
+        assert!(remote_file_changed(&cached(Some("a"), 10), &item(None, 11)));
+    }
+
+    #[test]
+    fn run_bounded_keeps_input_order_and_never_exceeds_the_worker_cap() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let running = AtomicUsize::new(0);
+        let peak = AtomicUsize::new(0);
+        let out = run_bounded((0..40).collect::<Vec<_>>(), 4, |n| {
+            let now = running.fetch_add(1, Ordering::SeqCst) + 1;
+            peak.fetch_max(now, Ordering::SeqCst);
+            std::thread::sleep(std::time::Duration::from_millis(2));
+            running.fetch_sub(1, Ordering::SeqCst);
+            n * 2
+        });
+        assert_eq!(out, (0..40).map(|n| n * 2).collect::<Vec<_>>());
+        assert!(peak.load(Ordering::SeqCst) <= 4);
+        assert!(run_bounded(Vec::<i32>::new(), 4, |n| n).is_empty());
+    }
+
+    #[test]
+    fn mark_remote_deletions_flags_only_files_missing_from_the_listing() {
+        let dir = tempfile::Builder::new()
+            .prefix("luminous_webdav_del_")
+            .tempdir()
+            .unwrap();
+        let db = Database::new(dir.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO webdav_servers (id, name, url, remote_path) VALUES (1, 'NAS', 'http://nas/dav', '/')",
+            [],
+        )
+        .unwrap();
+
+        let mut cache = HashMap::new();
+        for name in ["kept", "gone"] {
+            let path = format!("http://nas/dav/{name}.mp3");
+            crate::collection::upsert_song(
+                &conn,
+                &Song {
+                    path: Some(path.clone()),
+                    source: SongSource::WebDav,
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+            let song_id: i64 = conn
+                .query_row("SELECT id FROM songs WHERE path = ?1", params![path], |r| {
+                    r.get(0)
+                })
+                .unwrap();
+            cache.insert(
+                format!("/{name}.mp3"),
+                CachedRemoteFile {
+                    song_id,
+                    song_path: Some(path),
+                    ..cached(None, 1)
+                },
+            );
+        }
+
+        let seen: HashSet<String> = ["/kept.mp3".to_string()].into();
+        assert_eq!(mark_remote_deletions(&conn, &cache, &seen).unwrap(), 1);
+        // A second pass finds nothing new to flag.
+        assert_eq!(mark_remote_deletions(&conn, &cache, &seen).unwrap(), 0);
+
+        let flag = |name: &str| -> bool {
+            conn.query_row(
+                "SELECT unavailable FROM songs WHERE path = ?1",
+                params![format!("http://nas/dav/{name}.mp3")],
+                |r| r.get(0),
+            )
+            .unwrap()
+        };
+        assert!(!flag("kept"));
+        assert!(flag("gone"));
+
+        // load_remote_cache reports the flag so a returning file can be repaired.
+        conn.execute(
+            "INSERT INTO webdav_cache (server_id, remote_path, size, song_id) SELECT 1, '/gone.mp3', 1, id FROM songs WHERE path LIKE '%gone%'",
+            [],
+        )
+        .unwrap();
+        let loaded = load_remote_cache(&conn, 1).unwrap();
+        assert!(loaded["/gone.mp3"].unavailable);
+    }
 }
