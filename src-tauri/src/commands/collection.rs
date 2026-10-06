@@ -120,6 +120,7 @@ pub async fn update_directory_metadata(
 pub async fn scan_directories(
     app: AppHandle,
     force: Option<bool>,
+    reason: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let scanner = CollectionScanner::new(state.db.clone());
@@ -128,7 +129,7 @@ pub async fn scan_directories(
             app,
             force.unwrap_or(false),
             false,
-            crate::collection::ScanTrigger::Requested,
+            crate::collection::ScanTrigger::from_reason(reason.as_deref()),
         )
         .await
         .map_err(|e| e.to_string())

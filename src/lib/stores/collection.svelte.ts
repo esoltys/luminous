@@ -10,6 +10,7 @@ import type {
   LibraryStats,
   DbSchemaStatus,
   ScanProgress,
+  ScanReason,
   ScanPhase,
   BatchProgress,
   AlbumItem,
@@ -675,7 +676,7 @@ class CollectionStore {
       });
 
       if (this.scanOnStartup) {
-        this.startScan(false);
+        this.startScan(false, "startup");
       }
     } catch (err) {
       console.error("Failed to initialize CollectionStore:", err);
@@ -1133,7 +1134,7 @@ class CollectionStore {
       setTimeout(() => { this.justAddedFirstFolder = false; }, 400);
     }
 
-    this.startScan(false);
+    this.startScan(false, "folder_added");
   }
 
   async addDirectoryDialog() {
@@ -1169,7 +1170,7 @@ class CollectionStore {
         i18n.t("settings.folderLocateSuccess", { count: formatNumber(result.songs_relocated), path: newPath }),
         "success",
       );
-      this.startScan(false);
+      this.startScan(false, "folder_relocated");
       return true;
     } catch (err) {
       console.error("Failed to relocate directory:", err);
@@ -1181,12 +1182,13 @@ class CollectionStore {
   async removeDirectory(path: string) {
     await invoke("remove_directory", { path });
     await this.refreshDirectories();
-    this.startScan(false);
+    this.startScan(false, "folder_removed");
   }
 
-  async startScan(force: boolean = false) {
+  /** `reason` only labels the scan in the diagnostics export's timing log. */
+  async startScan(force: boolean = false, reason: ScanReason = "manual") {
     this.isScanning = true;
-    invoke("scan_directories", { force }).catch((err) => {
+    invoke("scan_directories", { force, reason }).catch((err) => {
       console.error("Failed to scan directories:", err);
       this.isScanning = false;
     });

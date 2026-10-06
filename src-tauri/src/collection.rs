@@ -65,8 +65,18 @@ pub use watcher::{start_watcher, SelfWriteTracker, WatcherPauseGuard};
 /// visible in the diagnostics export.
 #[derive(Debug, Clone, Copy)]
 pub enum ScanTrigger {
-    /// The frontend asked: scan-on-startup, a manual rescan, or a force rescan.
+    /// The frontend asked without saying why (older callers, or an unrecognised reason).
     Requested,
+    /// Scan-on-startup.
+    Startup,
+    /// A rescan the user clicked in Settings (including force rescans).
+    Manual,
+    /// A watched folder was added.
+    FolderAdded,
+    /// A watched folder was removed.
+    FolderRemoved,
+    /// A watched folder was re-linked to a new location.
+    FolderRelocated,
     /// The file watcher lost events (buffer overflow) and can't know what changed.
     WatcherOverflow,
     /// The file watcher saw a directory added or changed.
@@ -74,9 +84,26 @@ pub enum ScanTrigger {
 }
 
 impl ScanTrigger {
+    /// Maps the reason string the frontend sends with `scan_directories`.
+    pub fn from_reason(reason: Option<&str>) -> Self {
+        match reason {
+            Some("startup") => Self::Startup,
+            Some("manual") => Self::Manual,
+            Some("folder_added") => Self::FolderAdded,
+            Some("folder_removed") => Self::FolderRemoved,
+            Some("folder_relocated") => Self::FolderRelocated,
+            _ => Self::Requested,
+        }
+    }
+
     fn label(self) -> &'static str {
         match self {
             Self::Requested => "requested",
+            Self::Startup => "startup",
+            Self::Manual => "manual",
+            Self::FolderAdded => "folder added",
+            Self::FolderRemoved => "folder removed",
+            Self::FolderRelocated => "folder relocated",
             Self::WatcherOverflow => "watcher overflow",
             Self::WatcherDirectoryChange => "watcher directory change",
         }
@@ -2717,6 +2744,18 @@ mod tests {
         assert!(summary.starts_with("scan (watcher directory change): total "));
         assert!(summary.contains("5 file(s) found"));
         assert!(summary.contains("5 unchanged, 0 re-read"));
+    }
+
+    #[test]
+    fn test_scan_trigger_from_reason_maps_known_reasons_and_falls_back() {
+        assert_eq!(ScanTrigger::from_reason(Some("startup")).label(), "startup");
+        assert_eq!(ScanTrigger::from_reason(Some("manual")).label(), "manual");
+        assert_eq!(
+            ScanTrigger::from_reason(Some("folder_relocated")).label(),
+            "folder relocated"
+        );
+        assert_eq!(ScanTrigger::from_reason(Some("bogus")).label(), "requested");
+        assert_eq!(ScanTrigger::from_reason(None).label(), "requested");
     }
 
     #[test]

@@ -403,6 +403,14 @@ export interface ArtworkSweepProgressPayload {
   done: boolean;
 }
 
+/** Why a scan was started; only labels it in the diagnostics export's timing log. */
+export type ScanReason =
+  | "startup"
+  | "manual"
+  | "folder_added"
+  | "folder_removed"
+  | "folder_relocated";
+
 export type ScanPhase =
   | "discovering"
   | "reading_tags"

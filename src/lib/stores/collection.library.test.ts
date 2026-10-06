@@ -177,7 +177,7 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
     vi.mocked(invoke).mockResolvedValueOnce(undefined as any);
     await collectionStore.startScan(true);
     expect(collectionStore.isScanning).toBe(true);
-    expect(invoke).toHaveBeenCalledWith("scan_directories", { force: true });
+    expect(invoke).toHaveBeenCalledWith("scan_directories", { force: true, reason: "manual" });
 
     eventCallbacks["scan-progress"]({
       payload: {
@@ -332,7 +332,7 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
 
       expect(invoke).toHaveBeenCalledWith("relocate_directory", { oldPath: "E:\\Music", newPath: "F:\\Music" });
       expect(invoke).toHaveBeenCalledWith("get_directories");
-      expect(invoke).toHaveBeenCalledWith("scan_directories", { force: false });
+      expect(invoke).toHaveBeenCalledWith("scan_directories", { force: false, reason: "folder_relocated" });
       expect(toastStore.messages.map((m) => [m.text, m.variant])).toContainEqual([
         "Re-linked 1,200 songs to F:\\Music",
         "success",
