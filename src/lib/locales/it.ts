@@ -712,7 +712,7 @@ export const it = {
     redoBtn: "Ripeti",
     moreActionsTooltip: "Altre azioni",
     removeUnavailableTooltip: {
-      one: "Rimuovi dalla playlist il {count} brano non disponibile",
+      one: "Rimuovi dalla playlist {count} brano non disponibile",
       other: "Rimuovi dalla playlist tutti i {count} brani non disponibili"
     },
     removeUnavailableBtn: "Rimuovi {count} non disponibili",
@@ -731,7 +731,7 @@ export const it = {
     filterPlaceholder: "Filtra brani...",
     clearFilter: "Cancella filtro",
     removeDuplicatesTooltip: {
-      one: "Rimuovi dalla playlist il {count} file duplicato",
+      one: "Rimuovi dalla playlist {count} file duplicato",
       other: "Rimuovi dalla playlist tutti i {count} file duplicati"
     },
     removeDuplicatesBtn: {

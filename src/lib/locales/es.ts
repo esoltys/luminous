@@ -712,8 +712,8 @@ export const es = {
     redoBtn: "Rehacer",
     moreActionsTooltip: "Más acciones",
     removeUnavailableTooltip: {
-      one: "Quitar de la lista de reproducción la {count} canción no disponible",
-      other: "Quitar de la lista de reproducción las {count} canciones no disponibles"
+      one: "Quitar {count} canción no disponible de la lista de reproducción",
+      other: "Quitar las {count} canciones no disponibles de la lista de reproducción"
     },
     removeUnavailableBtn: "Quitar {count} no disponibles",
     fileNotFoundTooltip: "Archivo no encontrado en el disco",
@@ -731,8 +731,8 @@ export const es = {
     filterPlaceholder: "Filtrar canciones...",
     clearFilter: "Borrar filtro",
     removeDuplicatesTooltip: {
-      one: "Quitar de la lista de reproducción el {count} archivo duplicado",
-      other: "Quitar de la lista de reproducción los {count} archivos duplicados"
+      one: "Quitar {count} archivo duplicado de la lista de reproducción",
+      other: "Quitar los {count} archivos duplicados de la lista de reproducción"
     },
     removeDuplicatesBtn: {
       one: "Quitar {count} archivo duplicado",
@@ -1568,7 +1568,7 @@ export const es = {
       other: "{count} canciones"
     },
     playAll: {
-      one: "Reproducir la {count} canción",
+      one: "Reproducir {count} canción",
       other: "Reproducir las {count} canciones"
     },
     editSongTooltip: "Editar canción",

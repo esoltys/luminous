@@ -712,7 +712,7 @@ export const de = {
     redoBtn: "Wiederholen",
     moreActionsTooltip: "Weitere Aktionen",
     removeUnavailableTooltip: {
-      one: "Den {count} nicht verfügbaren Titel aus der Wiedergabeliste entfernen",
+      one: "{count} nicht verfügbaren Titel aus der Wiedergabeliste entfernen",
       other: "Alle {count} nicht verfügbaren Titel aus der Wiedergabeliste entfernen"
     },
     removeUnavailableBtn: "{count} nicht verfügbare entfernen",
@@ -731,7 +731,7 @@ export const de = {
     filterPlaceholder: "Titel filtern ...",
     clearFilter: "Filter löschen",
     removeDuplicatesTooltip: {
-      one: "Die {count} doppelte Datei aus der Wiedergabeliste entfernen",
+      one: "{count} doppelte Datei aus der Wiedergabeliste entfernen",
       other: "Alle {count} doppelten Dateien aus der Wiedergabeliste entfernen"
     },
     removeDuplicatesBtn: {
