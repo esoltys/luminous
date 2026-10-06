@@ -1407,6 +1407,7 @@ export const es = {
     themeDark: "Oscuro",
     trackListToggle: "Información de la pista",
     libraryToggle: "Información de la biblioteca",
+    barsToggle: "Barras",
     copyButton: "Copiar imagen",
     saveButton: "Guardar imagen",
     copySuccess: "Tarjeta para compartir copiada al portapapeles",

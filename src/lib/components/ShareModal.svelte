@@ -62,11 +62,13 @@
   const SETTING_THEME = "share_card_theme";
   const SETTING_INCLUDE_TRACK_LIST = "share_card_include_track_list";
   const SETTING_INCLUDE_LIBRARY_INFO = "share_card_include_library_info";
+  const SETTING_INCLUDE_BARS = "share_card_include_bars";
 
   let aspectRatio = $state<ShareAspectRatio>("1:1");
   let theme = $state<ShareCardTheme>("dark");
   let includeTrackList = $state(true);
   let includeLibraryInfo = $state(true);
+  let includeBars = $state(true);
   let settingsLoaded = $state(false);
   let previewUrl = $state<string | null>(null);
   let rendering = $state(false);
@@ -91,6 +93,10 @@
       const savedLibraryInfo = settings[SETTING_INCLUDE_LIBRARY_INFO];
       if (savedLibraryInfo === "true" || savedLibraryInfo === "false") {
         includeLibraryInfo = savedLibraryInfo === "true";
+      }
+      const savedBars = settings[SETTING_INCLUDE_BARS];
+      if (savedBars === "true" || savedBars === "false") {
+        includeBars = savedBars === "true";
       }
     } catch (err) {
       console.error("Failed to load share card settings:", err);
@@ -119,6 +125,11 @@
     void invoke("set_app_setting", { key: SETTING_INCLUDE_LIBRARY_INFO, value: String(includeLibraryInfo) });
   });
 
+  $effect(() => {
+    if (!settingsLoaded) return;
+    void invoke("set_app_setting", { key: SETTING_INCLUDE_BARS, value: String(includeBars) });
+  });
+
   // Only the album/playlist entity cards have a track list to toggle —
   // artist and stats cards never show one, and a stats-section card's list
   // *is* the whole card, so it's always shown with no toggle to hide it.
@@ -129,6 +140,8 @@
   // clean name-and-image card — independent of the playlist card's own
   // track-list toggle.
   let showLibraryToggle = $derived(entity.kind === "artist" || entity.kind === "playlist");
+  // Only the ranked stats cards have proportional bars to hide (#1475).
+  let showBarsToggle = $derived(entity.kind === "stats" || entity.kind === "stats-section");
 
   let albumItem = $derived(
     entity.kind === "album" ? collectionStore.albums.find((a) => a.album === entity.albumName) || null : null
@@ -218,7 +231,7 @@
 
   let trackCards = $derived<ShareCardTrack[]>(
     entity.kind === "stats-section"
-      ? withBarPercents(entity.items.slice(0, 10)).map((it, i) => ({ number: i + 1, title: it.label, secondary: it.secondary, percent: it.percent }))
+      ? withBarPercents(entity.items.slice(0, 10)).map((it, i) => ({ number: i + 1, title: it.label, secondary: it.secondary, percent: includeBars ? it.percent : null }))
       : entity.kind === "playlist"
         // A playlist spans multiple artists, unlike an album, so each row
         // needs its own artist to be legible on its own.
@@ -535,7 +548,7 @@
     if (entity.kind !== "stats") return [];
     const s = entity.summary;
     const toItems = (items: StatsTopItem[]) =>
-      withBarPercents(items.slice(0, 5)).map((it) => ({ label: it.label, secondary: it.secondary, percent: it.percent }));
+      withBarPercents(items.slice(0, 5)).map((it) => ({ label: it.label, secondary: it.secondary, percent: includeBars ? it.percent : null }));
     return [
       { title: i18n.t("stats.topArtists", {}, "Top Artists"), items: toItems(s.top_artists), coverStackDataUris: statsArtistsCoverStack },
       { title: i18n.t("stats.topAlbums", {}, "Top Albums"), items: toItems(s.top_albums), coverStackDataUris: statsAlbumsCoverStack },
@@ -769,6 +782,17 @@
               checked={includeTrackList}
               onchange={(v) => (includeTrackList = v)}
               label={i18n.t("shareModal.trackListToggle")}
+              showOnOffLabel={false}
+            />
+          </div>
+        {/if}
+        {#if showBarsToggle}
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-medium text-brand-text-secondary text-right whitespace-nowrap">{i18n.t("shareModal.barsToggle")}</span>
+            <Toggle
+              checked={includeBars}
+              onchange={(v) => (includeBars = v)}
+              label={i18n.t("shareModal.barsToggle")}
               showOnOffLabel={false}
             />
           </div>
