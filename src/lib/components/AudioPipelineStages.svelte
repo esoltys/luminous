@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { AudioPipelineInfo } from '$lib/types';
+  import type { AudioPipelineInfo, LoudnessGainSource } from '$lib/types';
   import { i18n, formatNumber } from '$lib/stores/i18n.svelte';
   import {
     CpuIcon as Cpu,
@@ -14,6 +14,25 @@
   }
 
   let { pipeline, class: className = '' }: Props = $props();
+
+  /** The backend reports the EQ mode as an English string; show the localized name. */
+  function eqModeLabel(mode?: string): string {
+    if (mode === 'Parametric') return i18n.t('equalizer.modeParametric', {}, 'Parametric');
+    if (mode === '10-band Graphic') return i18n.t('audioPipeline.eqModeGraphic', {}, '10-band Graphic');
+    return mode || i18n.t('common.active', {}, 'Active');
+  }
+
+  const LOUDNESS_SOURCE_KEYS: Record<LoudnessGainSource, string> = {
+    disabled: 'audioPipeline.normalizationDisabled',
+    analyzed: 'playerBar.loudnessSourceAnalyzed',
+    replay_gain: 'playerBar.loudnessSourceReplayGain',
+    dynamic_range_log: 'playerBar.loudnessSourceDynamicRangeLog',
+    fallback: 'playerBar.loudnessSourceFallback',
+  };
+
+  function loudnessSourceLabel(source: LoudnessGainSource): string {
+    return i18n.t(LOUDNESS_SOURCE_KEYS[source], {}, source);
+  }
 
   function formatChannels(channels?: number): string {
     if (!channels) return 'Stereo (2 ch)';
@@ -129,7 +148,8 @@
           <span class="text-brand-text-secondary font-medium">{i18n.t('audioPipeline.equalizer', {}, 'Equalizer & DSP')}</span>
           <span class="font-semibold text-right text-brand-text-primary">
             {#if pipeline.eq_enabled}
-              {i18n.t('audioPipeline.equalizerActive', { mode: pipeline.eq_mode || 'Active', bands: pipeline.eq_active_bands_count }, `${pipeline.eq_mode || 'Active'} (${pipeline.eq_active_bands_count} active)`)}
+              {@const eqMode = eqModeLabel(pipeline.eq_mode)}
+              {i18n.t('audioPipeline.equalizerActive', { mode: eqMode, bands: pipeline.eq_active_bands_count }, `${eqMode} (${pipeline.eq_active_bands_count} active)`)}
             {:else}
               {i18n.t('audioPipeline.equalizerDisabled', {}, 'Bypass / Disabled')}
             {/if}
@@ -143,7 +163,8 @@
             {#if pipeline.loudness_source !== 'disabled'}
               {@const gain = pipeline.loudness_gain_db ?? 0}
               {@const formattedGain = `${gain >= 0 ? '+' : ''}${formatNumber(gain, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}`}
-              {i18n.t('audioPipeline.normalizationGain', { gain: formattedGain, source: pipeline.loudness_source }, `${formattedGain} dB (${pipeline.loudness_source})`)}
+              {@const source = loudnessSourceLabel(pipeline.loudness_source)}
+              {i18n.t('audioPipeline.normalizationGain', { gain: formattedGain, source }, `${formattedGain} dB (${source})`)}
             {:else}
               {i18n.t('audioPipeline.normalizationDisabled', {}, 'Disabled')}
             {/if}

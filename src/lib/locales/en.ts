@@ -1826,6 +1826,7 @@ export const en = {
     equalizer: "Equalizer & DSP",
     equalizerDisabled: "Disabled",
     equalizerActive: "{mode} ({bands} active)",
+    eqModeGraphic: "10-band Graphic",
     limiter: "Limiter",
     outputFormat: "Format",
     outputDevice: "Device",
