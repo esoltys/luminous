@@ -357,7 +357,7 @@
 </script>
 
 <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
-  <div class="pb-3 flex justify-between items-center">
+  <div class="pb-3 flex justify-between items-center gap-4">
     <div class="flex items-center gap-3">
       <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
         <Folder class="w-5 h-5" />
@@ -478,7 +478,7 @@
     {/if}
 
     {#if collectionStore.directories.length === 0}
-      <div class="border border-dashed border-brand-border rounded-xl py-12 text-center text-brand-text-secondary">
+      <div class="border border-dashed border-brand-border rounded-xl px-6 py-12 text-center text-brand-text-secondary">
         <Folder class="w-12 h-12 mx-auto mb-2 text-brand-text-secondary/50" />
         <h4 class="font-semibold text-brand-text-primary mb-1">{i18n.t('settings.noFoldersTitle')}</h4>
         <p class="text-xs text-brand-text-secondary mb-4 text-pretty">{i18n.t('settings.noFoldersText')}</p>
@@ -489,7 +489,7 @@
 
 <!-- WebDAV Remote Libraries (#682) -->
 <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
-  <div class="pb-3 flex justify-between items-center">
+  <div class="pb-3 flex justify-between items-center gap-4">
     <div class="flex items-center gap-3">
       <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
         <Cloud class="w-5 h-5" />
@@ -599,7 +599,7 @@
     {/each}
 
     {#if collectionStore.webdavServers.length === 0}
-      <div class="border border-dashed border-brand-border rounded-xl py-8 text-center text-brand-text-secondary">
+      <div class="border border-dashed border-brand-border rounded-xl px-6 py-8 text-center text-brand-text-secondary">
         <Cloud class="w-10 h-10 mx-auto mb-2 text-brand-text-secondary/50" />
         <h4 class="font-semibold text-brand-text-primary mb-1 text-xs">{i18n.t('settings.webdavNoServersTitle')}</h4>
         <p class="text-xs text-brand-text-secondary text-pretty">{i18n.t('settings.webdavNoServersText')}</p>
@@ -621,7 +621,7 @@
 
 <!-- OpenSubsonic media servers (#916) -->
 <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
-  <div class="pb-3 flex justify-between items-center">
+  <div class="pb-3 flex justify-between items-center gap-4">
     <div class="flex items-center gap-3">
       <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
         <Cloud class="w-5 h-5" />
@@ -734,7 +734,7 @@
     {/each}
 
     {#if collectionStore.subsonicServers.length === 0}
-      <div class="border border-dashed border-brand-border rounded-xl py-8 text-center text-brand-text-secondary">
+      <div class="border border-dashed border-brand-border rounded-xl px-6 py-8 text-center text-brand-text-secondary">
         <Cloud class="w-10 h-10 mx-auto mb-2 text-brand-text-secondary/50" />
         <h4 class="font-semibold text-brand-text-primary mb-1 text-xs">{i18n.t('settings.subsonicNoServersTitle')}</h4>
         <p class="text-xs text-brand-text-secondary text-pretty">{i18n.t('settings.subsonicNoServersText')}</p>
@@ -755,7 +755,7 @@
 {/if}
 
 <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
-  <div class="pb-3 flex items-center justify-between">
+  <div class="pb-3 flex items-center justify-between gap-4">
     <div class="flex items-center gap-3">
       <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
         <RefreshCw class="w-5 h-5" />
