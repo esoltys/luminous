@@ -582,6 +582,7 @@ export const en = {
     webdavSyncBtn: "Sync Now",
     webdavSyncing: "Syncing...",
     webdavSyncComplete: "Sync finished: {added} added, {updated} updated, {errors} errors.",
+    syncAlreadyRunning: "{name} is already syncing. Wait for it to finish.",
     webdavNoServersTitle: "No WebDAV Servers Configured",
     webdavNoServersText: "Add a WebDAV server above to stream remote audio without mounting drives.",
     confirmRemoveWebdavServer: "Remove WebDAV server \"{name}\" and all associated cached items?",

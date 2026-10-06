@@ -72,6 +72,44 @@ impl RemoteKind {
 
 type ScheduleKey = (RemoteKind, i64);
 
+/// Servers with a sync running right now (#1491). In memory rather than the
+/// `sync_status` column: a crash can't leave it stuck, and a manual "Sync Now"
+/// and an auto-sync can't both pass a check-then-set race. A `Vec` because a
+/// handful of entries at most, and `Mutex::new` is `const` for it.
+static ACTIVE_SYNCS: parking_lot::Mutex<Vec<ScheduleKey>> = parking_lot::Mutex::new(Vec::new());
+
+/// Error a refused sync returns. A fixed code rather than prose so the UI can
+/// show its own localized message for it.
+pub const SYNC_IN_PROGRESS: &str = "sync-in-progress";
+
+/// Held for the duration of one server's sync; releases the server on drop,
+/// including when the sync fails or its task is aborted.
+#[derive(Debug)]
+pub struct SyncGuard(ScheduleKey);
+
+impl SyncGuard {
+    /// Claims `server_id`, or says the server is already syncing.
+    pub fn acquire(kind: RemoteKind, server_id: i64) -> Result<Self, String> {
+        let mut active = ACTIVE_SYNCS.lock();
+        let key = (kind, server_id);
+        if active.contains(&key) {
+            return Err(SYNC_IN_PROGRESS.to_string());
+        }
+        active.push(key);
+        Ok(Self(key))
+    }
+
+    fn is_active(kind: RemoteKind, server_id: i64) -> bool {
+        ACTIVE_SYNCS.lock().contains(&(kind, server_id))
+    }
+}
+
+impl Drop for SyncGuard {
+    fn drop(&mut self) {
+        ACTIVE_SYNCS.lock().retain(|k| *k != self.0);
+    }
+}
+
 #[derive(Default)]
 pub struct AutoSyncScheduler {
     tasks: parking_lot::Mutex<HashMap<ScheduleKey, JoinHandle<()>>>,
@@ -134,7 +172,7 @@ impl AutoSyncScheduler {
                     .lock()
                     .insert(key, now_unix() + interval_secs as i64);
 
-                if Self::is_syncing(&db, kind, server_id) {
+                if SyncGuard::is_active(kind, server_id) {
                     log::debug!(
                         "Skipping scheduled {} auto-sync for server {server_id}: a sync is already in flight",
                         kind.label()
@@ -174,22 +212,6 @@ impl AutoSyncScheduler {
     /// `None` if it has no timer running.
     pub fn next_run_at(&self, kind: RemoteKind, server_id: i64) -> Option<i64> {
         self.next_run.lock().get(&(kind, server_id)).copied()
-    }
-
-    fn is_syncing(db: &Arc<Database>, kind: RemoteKind, server_id: i64) -> bool {
-        db.pool
-            .get()
-            .ok()
-            .and_then(|conn| {
-                conn.query_row(
-                    &format!("SELECT sync_status FROM {} WHERE id = ?1", kind.table()),
-                    rusqlite::params![server_id],
-                    |row| row.get::<_, String>(0),
-                )
-                .ok()
-            })
-            .map(|status| status == "syncing")
-            .unwrap_or(false)
     }
 
     /// Starts a schedule for every server (of every kind) that currently has
@@ -236,5 +258,28 @@ impl AutoSyncScheduler {
                 interval_minutes,
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn second_sync_of_same_server_is_refused_until_the_first_ends() {
+        // Ids unlikely to collide with other tests sharing the static.
+        let first = SyncGuard::acquire(RemoteKind::WebDav, 9_001).unwrap();
+        assert!(SyncGuard::acquire(RemoteKind::WebDav, 9_001).is_err());
+        assert!(SyncGuard::is_active(RemoteKind::WebDav, 9_001));
+        drop(first);
+        assert!(!SyncGuard::is_active(RemoteKind::WebDav, 9_001));
+        assert!(SyncGuard::acquire(RemoteKind::WebDav, 9_001).is_ok());
+    }
+
+    #[test]
+    fn guard_is_per_kind_and_per_server() {
+        let _a = SyncGuard::acquire(RemoteKind::WebDav, 9_002).unwrap();
+        assert!(SyncGuard::acquire(RemoteKind::Subsonic, 9_002).is_ok());
+        assert!(SyncGuard::acquire(RemoteKind::WebDav, 9_003).is_ok());
     }
 }

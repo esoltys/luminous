@@ -3,7 +3,7 @@
 use crate::covermanager::CoverManager;
 use crate::db::Database;
 use crate::models::{SongSource, WebDavServer, WebDavSyncStats};
-use crate::remote_scheduler::RemoteKind;
+use crate::remote_scheduler::{RemoteKind, SyncGuard};
 use crate::webdav::{detect_filetype_from_url, WebDavClient};
 use crate::AppState;
 use rusqlite::params;
@@ -370,8 +370,10 @@ pub async fn sync_webdav_server_inner(
     thorough: bool,
 ) -> Result<WebDavSyncStats, String> {
     let app_clone = app.clone();
+    let guard = SyncGuard::acquire(RemoteKind::WebDav, id)?;
 
     tokio::task::spawn_blocking(move || {
+        let _guard = guard;
         let conn = db.pool.get().map_err(|e| e.to_string())?;
 
         // Retrieve server credentials & config

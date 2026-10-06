@@ -716,11 +716,26 @@ impl Database {
             schema_version: 0,
         };
         let schema_version = db.run_migrations()?;
+        db.reset_stale_sync_status();
 
         Ok(Self {
             schema_version,
             ..db
         })
+    }
+
+    /// Nothing can be syncing when the app has only just started, so a
+    /// `syncing` flag left by a crash or forced close is stale (#1491).
+    fn reset_stale_sync_status(&self) {
+        let Ok(conn) = self.pool.get() else { return };
+        for table in ["webdav_servers", "subsonic_servers"] {
+            if let Err(e) = conn.execute(
+                &format!("UPDATE {table} SET sync_status = 'idle' WHERE sync_status = 'syncing'"),
+                [],
+            ) {
+                log::warn!("Failed to reset stale sync status in {table}: {e}");
+            }
+        }
     }
 
     /// Runs any migrations this build knows about and returns the resulting schema
@@ -2626,6 +2641,39 @@ mod tests {
         assert_eq!(sync_interval_minutes, 15);
 
         let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn startup_resets_stale_syncing_status() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_stale_sync_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
+        {
+            let db = Database::new(temp_dir.clone()).unwrap();
+            let conn = db.pool.get().unwrap();
+            conn.execute(
+                "INSERT INTO subsonic_servers (name, url, username, password, sync_status) VALUES ('s', 'https://x', 'u', 'p', 'syncing')",
+                [],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO webdav_servers (name, url, sync_status) VALUES ('w', 'https://x', 'syncing')",
+                [],
+            )
+            .unwrap();
+        }
+        let db = Database::new(temp_dir).unwrap();
+        let conn = db.pool.get().unwrap();
+        for table in ["subsonic_servers", "webdav_servers"] {
+            let status: String = conn
+                .query_row(&format!("SELECT sync_status FROM {table}"), [], |r| {
+                    r.get(0)
+                })
+                .unwrap();
+            assert_eq!(status, "idle", "{table}");
+        }
     }
 
     #[test]
