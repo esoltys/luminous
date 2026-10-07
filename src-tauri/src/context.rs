@@ -565,6 +565,25 @@ struct CritiqueBrainzResponse {
     reviews: Vec<CritiqueBrainzReview>,
 }
 
+const CRITIQUEBRAINZ_REVIEW_LIMIT: usize = 5;
+
+/// Review links with `preferred` (same-language) reviews first, then the
+/// remaining `others`, de-duplicated and capped at the review limit.
+fn merge_review_links(
+    preferred: &[CritiqueBrainzReview],
+    others: &[CritiqueBrainzReview],
+) -> Vec<String> {
+    let mut seen = std::collections::HashSet::new();
+    preferred
+        .iter()
+        .chain(others)
+        .filter_map(|r| r.id.as_ref())
+        .filter(|id| seen.insert(id.as_str()))
+        .take(CRITIQUEBRAINZ_REVIEW_LIMIT)
+        .map(|id| format!("https://critiquebrainz.org/review/{id}"))
+        .collect()
+}
+
 /// Extracts a Wikidata QID (e.g. `"Q11649"`) from a `wikidata` relation's
 /// resource URL (`https://www.wikidata.org/wiki/Q11649`).
 fn extract_wikidata_qid(resource_url: &str) -> Option<String> {
@@ -985,17 +1004,54 @@ impl ContextManager {
     /// Aggregate rating + a handful of review links for a release-group.
     /// CritiqueBrainz has no MusicBrainz-style rate limit; a single lookup
     /// per song view doesn't need throttling.
+    ///
+    /// For a non-English `lang`, reviews written in that language are listed
+    /// first, followed by the rest; the rating and count always cover all
+    /// languages (#1480).
     pub async fn fetch_critiquebrainz_reviews(
         &self,
         release_group_id: &str,
+        lang: &str,
     ) -> Result<CritiqueBrainzData> {
-        let url = format!(
-            "https://critiquebrainz.org/ws/1/review/?entity_id={}&entity_type=release_group&limit=5",
+        let parsed = self
+            .fetch_critiquebrainz_page(release_group_id, None)
+            .await?;
+        // The localized lookup only reorders links, so its failure is not an error.
+        let preferred = if lang == "en" {
+            None
+        } else {
+            self.fetch_critiquebrainz_page(release_group_id, Some(lang))
+                .await
+                .ok()
+        };
+        let review_links = merge_review_links(
+            preferred.as_ref().map_or(&[][..], |p| &p.reviews[..]),
+            &parsed.reviews,
+        );
+        Ok(CritiqueBrainzData {
+            average_rating: parsed.average_rating.and_then(|a| a.rating),
+            review_count: parsed.count,
+            review_links,
+        })
+    }
+
+    async fn fetch_critiquebrainz_page(
+        &self,
+        release_group_id: &str,
+        lang: Option<&str>,
+    ) -> Result<CritiqueBrainzResponse> {
+        let mut url = format!(
+            "https://critiquebrainz.org/ws/1/review/?entity_id={}&entity_type=release_group&limit={}",
             percent_encoding::utf8_percent_encode(
                 release_group_id,
                 percent_encoding::NON_ALPHANUMERIC
-            )
+            ),
+            CRITIQUEBRAINZ_REVIEW_LIMIT
         );
+        if let Some(lang) = lang {
+            url.push_str("&language=");
+            url.push_str(lang);
+        }
         let response = self.client.get(&url).send().await?;
         if !response.status().is_success() {
             return Err(anyhow!(
@@ -1003,18 +1059,7 @@ impl ContextManager {
                 response.status()
             ));
         }
-        let parsed: CritiqueBrainzResponse = response.json().await?;
-        let review_links = parsed
-            .reviews
-            .iter()
-            .filter_map(|r| r.id.as_ref())
-            .map(|id| format!("https://critiquebrainz.org/review/{id}"))
-            .collect();
-        Ok(CritiqueBrainzData {
-            average_rating: parsed.average_rating.and_then(|a| a.rating),
-            review_count: parsed.count,
-            review_links,
-        })
+        Ok(response.json().await?)
     }
 
     /// Looks up events, concerts, and festival appearances for an artist
@@ -1463,6 +1508,22 @@ mod tests {
             parsed.thumbnail.unwrap().source,
             Some("https://upload.wikimedia.org/thumb.jpg".to_string())
         );
+    }
+
+    #[test]
+    fn test_merge_review_links_puts_preferred_first_and_dedupes() {
+        let review = |id: &str| CritiqueBrainzReview {
+            id: Some(id.to_string()),
+        };
+        let preferred = [review("fr1"), review("shared")];
+        let others = [review("en1"), review("shared"), review("en2")];
+        let links = merge_review_links(&preferred, &others);
+        let ids: Vec<&str> = links
+            .iter()
+            .map(|l| l.rsplit('/').next().unwrap())
+            .collect();
+        assert_eq!(ids, ["fr1", "shared", "en1", "en2"]);
+        assert_eq!(merge_review_links(&[], &others).len(), 3);
     }
 
     #[test]

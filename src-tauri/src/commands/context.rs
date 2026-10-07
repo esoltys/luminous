@@ -172,9 +172,14 @@ pub async fn get_song_context(
 
     if let Some(ref rg_id) = release_group_id {
         let cached = read_release_group_cache(&db, rg_id).await?;
+        // Review links are ordered by language, so a row cached for another
+        // language is stale (#1480); pre-migration-61 rows were English.
         let fresh = cached
             .as_ref()
-            .map(|c| is_cache_fresh(c.fetched_at, now))
+            .map(|c| {
+                is_cache_fresh(c.fetched_at, now)
+                    && c.critiquebrainz_lang.as_deref().unwrap_or("en") == wiki_lang
+            })
             .unwrap_or(false);
 
         if fresh && !force_refresh {
@@ -183,14 +188,16 @@ pub async fn get_song_context(
             let db_clone = db.clone();
             let rg_id_clone = rg_id.clone();
             let cm = context_manager.clone();
+            let lang = wiki_lang.clone();
+            let flight_key = format!("{rg_id}:{wiki_lang}");
             let (mb_res, cb_res) = RELEASE_GROUP_FLIGHT
-                .work(rg_id, move || async move {
+                .work(&flight_key, move || async move {
                     let mb = cm
                         .fetch_musicbrainz_release_group(&rg_id_clone)
                         .await
                         .map_err(|e| e.to_string());
                     let cb = cm
-                        .fetch_critiquebrainz_reviews(&rg_id_clone)
+                        .fetch_critiquebrainz_reviews(&rg_id_clone, &lang)
                         .await
                         .map_err(|e| e.to_string());
 
@@ -198,9 +205,15 @@ pub async fn get_song_context(
                     let cb_ok = cb.as_ref().ok().cloned();
 
                     if mb.is_ok() || cb.is_ok() {
-                        let _ =
-                            write_release_group_cache(&db_clone, &rg_id_clone, &mb_ok, &cb_ok, now)
-                                .await;
+                        let _ = write_release_group_cache(
+                            &db_clone,
+                            &rg_id_clone,
+                            &mb_ok,
+                            &cb_ok,
+                            cb.is_ok().then_some(lang.as_str()),
+                            now,
+                        )
+                        .await;
                     }
                     (mb, cb)
                 })
@@ -367,6 +380,8 @@ struct ReleaseGroupCacheRow {
     critiquebrainz_rating: Option<f32>,
     critiquebrainz_review_count: Option<u32>,
     critiquebrainz_review_links: Option<String>,
+    /// Language the review links were ordered for; `None` for pre-migration-61 rows.
+    critiquebrainz_lang: Option<String>,
     fetched_at: i64,
 }
 
@@ -377,7 +392,7 @@ async fn read_release_group_cache(
     let release_group_id = release_group_id.to_string();
     crate::db::run_blocking(db, move |conn| {
         conn.query_row(
-            "SELECT mb_rating, mb_rating_votes, mb_tags, critiquebrainz_rating, critiquebrainz_review_count, critiquebrainz_review_links, fetched_at
+            "SELECT mb_rating, mb_rating_votes, mb_tags, critiquebrainz_rating, critiquebrainz_review_count, critiquebrainz_review_links, fetched_at, critiquebrainz_lang
              FROM context_enrichment WHERE release_group_id = ?1",
             params![release_group_id],
             |row| {
@@ -389,6 +404,7 @@ async fn read_release_group_cache(
                     critiquebrainz_review_count: row.get(4)?,
                     critiquebrainz_review_links: row.get(5)?,
                     fetched_at: row.get(6)?,
+                    critiquebrainz_lang: row.get(7)?,
                 })
             },
         )
@@ -423,9 +439,11 @@ async fn write_release_group_cache(
     release_group_id: &str,
     mb: &Option<crate::context::MusicBrainzReleaseGroupData>,
     cb: &Option<crate::context::CritiqueBrainzData>,
+    critiquebrainz_lang: Option<&str>,
     fetched_at: i64,
 ) -> Result<(), String> {
     let release_group_id = release_group_id.to_string();
+    let critiquebrainz_lang = critiquebrainz_lang.map(str::to_string);
     let mb = mb.clone();
     let cb = cb.clone();
     crate::db::run_blocking(db, move |conn| {
@@ -438,8 +456,8 @@ async fn write_release_group_cache(
         .unwrap_or_else(|_| "[]".to_string());
         conn.execute(
             "INSERT INTO context_enrichment
-                (release_group_id, mb_rating, mb_rating_votes, mb_tags, critiquebrainz_rating, critiquebrainz_review_count, critiquebrainz_review_links, fetched_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+                (release_group_id, mb_rating, mb_rating_votes, mb_tags, critiquebrainz_rating, critiquebrainz_review_count, critiquebrainz_review_links, fetched_at, critiquebrainz_lang)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
              ON CONFLICT(release_group_id) DO UPDATE SET
                 mb_rating = excluded.mb_rating,
                 mb_rating_votes = excluded.mb_rating_votes,
@@ -447,6 +465,7 @@ async fn write_release_group_cache(
                 critiquebrainz_rating = excluded.critiquebrainz_rating,
                 critiquebrainz_review_count = excluded.critiquebrainz_review_count,
                 critiquebrainz_review_links = excluded.critiquebrainz_review_links,
+                critiquebrainz_lang = CASE WHEN excluded.critiquebrainz_lang IS NOT NULL THEN excluded.critiquebrainz_lang ELSE context_enrichment.critiquebrainz_lang END,
                 fetched_at = excluded.fetched_at",
             params![
                 release_group_id,
@@ -457,6 +476,7 @@ async fn write_release_group_cache(
                 cb.as_ref().map(|c| c.review_count),
                 cb_links_json,
                 fetched_at,
+                critiquebrainz_lang,
             ],
         )?;
         Ok(())
@@ -966,6 +986,31 @@ mod tests {
             .unwrap();
         assert_eq!(cached.wikipedia_lang.as_deref(), Some("en"));
         assert_eq!(cached.wikipedia_extract.as_deref(), Some("Bio"));
+    }
+
+    #[tokio::test]
+    async fn test_release_group_cache_records_review_language() {
+        let (_temp_dir, db) = temp_db("rg_cache_lang");
+        let db = Arc::new(db);
+        let cb = crate::context::CritiqueBrainzData {
+            average_rating: Some(4.0),
+            review_count: 1,
+            review_links: vec!["https://critiquebrainz.org/review/a".to_string()],
+        };
+
+        write_release_group_cache(&db, "rg-1", &None, &Some(cb), Some("fr"), 1000)
+            .await
+            .unwrap();
+        // A refresh whose CritiqueBrainz lookup failed must not relabel the row.
+        write_release_group_cache(&db, "rg-1", &None, &None, None, 2000)
+            .await
+            .unwrap();
+
+        let cached = read_release_group_cache(&db, "rg-1")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(cached.critiquebrainz_lang.as_deref(), Some("fr"));
     }
 
     #[tokio::test]

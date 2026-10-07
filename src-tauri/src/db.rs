@@ -522,17 +522,20 @@ const MIGRATIONS: &[Migration] = &[
     },
     Migration {
         version: 61,
-        description: "artist_context_enrichment.wikipedia_lang so a cached bio is re-fetched when the UI language changes (#1480)",
+        description: "wikipedia_lang on artist_context_enrichment and critiquebrainz_lang on context_enrichment so cached context is re-fetched when the UI language changes (#1480)",
         apply: |conn| {
-            let has_lang: bool = conn
-                .prepare(
-                    "SELECT 1 FROM pragma_table_info('artist_context_enrichment') WHERE name = 'wikipedia_lang'",
-                )?
-                .exists([])?;
-            if !has_lang {
-                conn.execute_batch(
-                    "ALTER TABLE artist_context_enrichment ADD COLUMN wikipedia_lang TEXT;",
-                )?;
+            for (table, column) in [
+                ("artist_context_enrichment", "wikipedia_lang"),
+                ("context_enrichment", "critiquebrainz_lang"),
+            ] {
+                let has_column: bool = conn
+                    .prepare(&format!(
+                        "SELECT 1 FROM pragma_table_info('{table}') WHERE name = '{column}'"
+                    ))?
+                    .exists([])?;
+                if !has_column {
+                    conn.execute_batch(&format!("ALTER TABLE {table} ADD COLUMN {column} TEXT;"))?;
+                }
             }
             Ok(())
         },
