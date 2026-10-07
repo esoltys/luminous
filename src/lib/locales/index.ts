@@ -2,6 +2,7 @@ import { de } from "./de";
 import { en } from "./en";
 import { es } from "./es";
 import { fr } from "./fr";
+import { frFR } from "./fr-FR";
 import { it } from "./it";
 import { ru } from "./ru";
 import { uk } from "./uk";
@@ -28,6 +29,7 @@ export const LOCALES = [
   { tag: "en-CA", messages: en },
   { tag: "es", messages: es },
   { tag: "fr-CA", messages: fr },
+  { tag: "fr", messages: frFR },
   { tag: "it", messages: it },
   { tag: "ru", messages: ru },
   { tag: "uk", messages: uk },
