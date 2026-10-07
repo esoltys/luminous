@@ -56,9 +56,15 @@ describe("I18nStore", () => {
     });
 
     it("does not alias a bare legacy value once the marker is set", async () => {
-      mockSettings({ language: "fr", language_tags: "1" });
+      mockSettings({ language: "en", language_tags: "1" });
       await i18n.init();
       expect(i18n.currentLocale).toBe("en-CA");
+    });
+
+    it("treats a bare fr as France French once the marker is set", async () => {
+      mockSettings({ language: "fr", language_tags: "1" });
+      await i18n.init();
+      expect(i18n.currentLocale).toBe("fr");
     });
 
     it("ignores an unknown saved language", async () => {

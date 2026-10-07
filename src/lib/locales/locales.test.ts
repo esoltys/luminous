@@ -3,6 +3,7 @@ import { de } from "./de";
 import { en } from "./en";
 import { es } from "./es";
 import { fr } from "./fr";
+import { frFR } from "./fr-FR";
 import { it as itMessages } from "./it";
 import { ru } from "./ru";
 import { uk } from "./uk";
@@ -531,6 +532,7 @@ const CATALOGS = [
   { name: "German", tag: "de", file: "de.ts", messages: de, identicalOk: IDENTICAL_OK_DE },
   { name: "Spanish", tag: "es", file: "es.ts", messages: es, identicalOk: IDENTICAL_OK_ES },
   { name: "French", tag: "fr-CA", file: "fr.ts", messages: fr, identicalOk: IDENTICAL_OK_FR },
+  { name: "French (France)", tag: "fr", file: "fr-FR.ts", messages: frFR, identicalOk: IDENTICAL_OK_FR },
   { name: "Italian", tag: "it", file: "it.ts", messages: itMessages, identicalOk: IDENTICAL_OK_IT },
   { name: "Ukrainian", tag: "uk", file: "uk.ts", messages: uk, identicalOk: IDENTICAL_OK_UK },
   { name: "Russian", tag: "ru", file: "ru.ts", messages: ru, identicalOk: IDENTICAL_OK_RU },
@@ -681,7 +683,8 @@ describe("Locale registry", () => {
 
   it("isLocale accepts only registered tags", () => {
     expect(isLocale("fr-CA")).toBe(true);
-    expect(isLocale("fr")).toBe(false);
+    expect(isLocale("fr")).toBe(true);
+    expect(isLocale("fr-FR")).toBe(false);
     expect(isLocale(undefined)).toBe(false);
   });
 
@@ -700,6 +703,7 @@ describe("Locale registry", () => {
   it("labels locales in their own language", () => {
     expect(localeLabel("en-CA")).toBe("English (Canada)");
     expect(localeLabel("fr-CA")).toBe("Français (Canada)");
+    expect(localeLabel("fr")).toBe("Français");
   });
 });
 
