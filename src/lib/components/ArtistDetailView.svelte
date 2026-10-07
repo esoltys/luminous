@@ -143,7 +143,7 @@
   $effect(() => {
     const songWithMb = songs.find((s) => s.musicbrainz_artist_id || s.musicbrainz_album_artist_id);
     const id = songWithMb?.id || songs[0]?.id;
-    if (!id) {
+    if (!id || !prefs.onlineEnabled) {
       contextData = null;
       return;
     }
@@ -192,6 +192,11 @@
     const name = artistName;
     const songWithMb = songs.find((s) => s.musicbrainz_artist_id || s.musicbrainz_album_artist_id);
     const id = songWithMb?.id || songs[0]?.id;
+    if (!prefs.onlineEnabled) {
+      artistEvents = [];
+      loadingEvents = false;
+      return;
+    }
     let cancelled = false;
     loadingEvents = true;
     invoke<ArtistEvent[]>("get_artist_events", { artist: name, songId: id })
@@ -388,12 +393,15 @@
       await refetchSongs();
       const songWithMb = songs.find((s) => s.musicbrainz_artist_id || s.musicbrainz_album_artist_id);
       const contextSongId = songWithMb?.id ?? songs[0]?.id;
+      const online = prefs.onlineEnabled;
       const [artwork, context, events] = await Promise.all([
         collectionStore.getExtendedArtworkForArtist(artistName, true),
-        contextSongId
+        online && contextSongId
           ? invoke<SongContextEnrichment>("get_song_context", { songId: contextSongId, forceRefresh: true, locale: i18n.currentLocale }).catch(() => null)
           : Promise.resolve(null),
-        invoke<ArtistEvent[]>("get_artist_events", { artist: artistName, songId: contextSongId, forceRefresh: true }).catch(() => null)
+        online
+          ? invoke<ArtistEvent[]>("get_artist_events", { artist: artistName, songId: contextSongId, forceRefresh: true }).catch(() => null)
+          : Promise.resolve(null)
       ]);
       artistArtwork = artwork;
       if (context) contextData = context;
@@ -474,7 +482,7 @@
   let lastAutoFetchedArtist = $state<string | null>(null);
   $effect(() => {
     const currentArtist = artistName;
-    if (!currentArtist || songs.length === 0) return;
+    if (!currentArtist || songs.length === 0 || !prefs.onlineEnabled) return;
     if (lastAutoFetchedArtist === currentArtist) return;
 
     const profile = artistProfile;
@@ -509,7 +517,7 @@
   // The artist detail overflow menu's "Retrieve Artist Details" (#1123) —
   // the artist-level equivalent of AlbumDetailView's handleRetrieveAlbumDetails.
   async function handleRetrieveArtistDetails() {
-    if (retrievingDetails || !hasMusicbrainzArtistId) return;
+    if (retrievingDetails || !hasMusicbrainzArtistId || !prefs.onlineEnabled) return;
     retrievingDetails = true;
     const taskId = `artist-details-${artistName.toLowerCase()}`;
     tasksStore.startTask({
@@ -536,7 +544,7 @@
   // photo, logo and background from fanart.tv (if a key is configured), whatever
   // the Settings toggles say, with Wikidata as the photo fallback.
   async function handleRetrieveArtistImage() {
-    if (retrievingImage || !hasMusicbrainzArtistId) return;
+    if (retrievingImage || !hasMusicbrainzArtistId || !prefs.onlineEnabled) return;
     retrievingImage = true;
     const taskId = `artist-image-${artistName.toLowerCase()}`;
     tasksStore.startTask({
@@ -946,7 +954,7 @@
     {/snippet}
 
     {#snippet eventsSection()}
-      {#if hasEvents || artistMbid}
+      {#if prefs.onlineEnabled && (hasEvents || artistMbid)}
         <ArtistEventsSection
           events={artistEvents}
           loading={loadingEvents}
@@ -1245,6 +1253,7 @@
           ? i18n.t("picard.remoteNotSupportedTooltip")
           : undefined}
     />
+    {#if prefs.onlineEnabled}
     <ContextMenuItem
       icon={RetrieveDetails}
       label={i18n.t("artistDetail.retrieveArtistDetails", {}, "Retrieve Artist Details")}
@@ -1259,6 +1268,7 @@
       onclick={() => { handleRetrieveArtistImage(); overflowMenuPos = null; }}
       disabled={loading || retrievingImage || !hasMusicbrainzArtistId}
     />
+    {/if}
     <ContextMenuItem
       icon={BarChart2}
       label={statsExclusionsStore.isExcluded("artist", artistName)

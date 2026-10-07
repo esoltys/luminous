@@ -364,6 +364,7 @@ export const ru = {
     formatSnap: "Пакет Snap",
     formatSystemPkg: "Системный пакет",
     updateChecksDisabledTitle: "Автоматическая проверка обновлений отключена",
+    updateChecksOfflineTitle: "Проверка обновлений приостановлена, пока вы не в сети",
     updateCheckingTitle: "Проверка обновлений…",
     updateBuildLabel: "сборка {hash}",
     updateLastChecked: "проверено {time}",
@@ -555,10 +556,10 @@ export const ru = {
     forceFullScanHint: "Заново прочитать метаданные и обложки всех аудиофайлов, игнорируя время изменения файлов",
     pruneMissingBtn: "Очистить",
     pruneMissingHint: "Удалить отсутствующие песни, пустые папки и дубликаты записей",
-    contextEnrichmentIntegrationTitle: "Онлайн-источники данных",
-    contextEnrichmentDesc: "Используются для информационной панели и сведений об исполнителе.",
-    contextEnrichmentLabel: "Загружать контекст и биографии",
-    contextEnrichmentHint: "Искать оценки, теги, рецензии и биографии исполнителей в MusicBrainz, CritiqueBrainz и Википедии. Отключите, чтобы Luminous не обращался к сети за этими данными.",
+    contextEnrichmentIntegrationTitle: "Онлайн-сервисы",
+    contextEnrichmentDesc: "Выключите, чтобы Luminous работал полностью офлайн: никаких запросов к внешним сервисам за обложками, текстами песен, биографиями, скробблингом или обновлениями. Библиотеки Subsonic и WebDAV продолжают работать.",
+    onlineLabel: "В сети",
+    offlineLabel: "Не в сети",
     fanartIntegration: "Интеграция с fanart.tv",
     fanartDesc1: "Luminous использует ",
     fanartDesc2: ", чтобы загружать фотографии исполнителей, логотипы групп, фоны заголовков, обложки альбомов и изображения дисков, если на компьютере их нет. Без ключа API Luminous берёт фотографию исполнителя из Викиданных, если она там есть.",
@@ -953,6 +954,7 @@ export const ru = {
     editorPlaceholder: "Вставьте сюда текст в формате LRC или простой текст…",
     saveFailedPrefix: "Не удалось сохранить текст: ",
     noOnlineResults: "Ни один сетевой источник не нашёл текст.",
+    offlineNoLyrics: "Для этого трека нет сохранённого текста. Включите «В сети» в Настройки › Интеграции, чтобы найти его.",
     insufficientMetadata: "Недостаточно сведений о песне (исполнитель и название) для поиска текста в сети."
   },
   stats: {
@@ -1124,6 +1126,7 @@ export const ru = {
     contextRetry: "Повторить",
     contextLoading: "Загрузка контекста…",
     contextFetchError: "Не удалось загрузить контекст. Проверьте подключение и повторите попытку.",
+    contextOffline: "Не в сети. Включите «В сети» в Настройки › Интеграции, чтобы загрузить биографии и контекст.",
     trackSkippedToast: "Не удалось воспроизвести «{title}» — файл не найден. Пропущено.",
     tracksSkippedToast: {
       one: "Пропущена {count} недоступная композиция.",

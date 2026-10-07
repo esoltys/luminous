@@ -74,6 +74,7 @@
   });
 
   let updateHeaderTitle = $derived.by(() => {
+    if (!prefs.onlineEnabled) return i18n.t("settings.updateChecksOfflineTitle");
     if (!updaterStore.updateCheckEnabled) return i18n.t("settings.updateChecksDisabledTitle");
     switch (updaterStore.checkStatus) {
       case "checking": return i18n.t("settings.updateCheckingTitle");
@@ -398,7 +399,7 @@
         </p>
       </button>
     </div>
-    <Button onclick={checkNow} disabled={updaterStore.checkStatus === 'checking'} variant="secondary" size="sm" class="shrink-0">
+    <Button onclick={checkNow} disabled={updaterStore.checkStatus === 'checking' || !prefs.onlineEnabled} variant="secondary" size="sm" class="shrink-0">
       <RefreshCw class="w-3.5 h-3.5 {updaterStore.checkStatus === 'checking' ? 'animate-spin text-brand-accent-text' : ''}" />
       {updaterStore.checkStatus === 'checking' ? i18n.t('settings.updateChecking') : i18n.t('settings.updateCheckNowBtn')}
     </Button>

@@ -690,6 +690,7 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
   }
 
   let minimizeToTrayEnabled = true;
+  let mockOnline = true;
 
   const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
     get_all_app_settings: () => window.mockSettings,
@@ -756,7 +757,13 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     }),
     webview_gpu_compositing: () => true,
     has_fanart_env_key: () => false,
-    is_context_enrichment_enabled: () => false,
+    // Online/Offline master toggle (#1398). Online by default so the Integrations
+    // cards and online-only actions render; `set_online_enabled` flips it for the session.
+    is_context_enrichment_enabled: () => mockOnline,
+    set_online_enabled: (args) => {
+      mockOnline = !!args.enabled;
+      return null;
+    },
     get_artist_tag_hierarchy: () => [],
 
     get_scrobbler_settings: () => ({
@@ -1247,6 +1254,12 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
         ?? { album_key: album, artist_key: null, description: null, website: null, links: [] };
       return { profile, added_count: 0, artist_profile: null };
     },
+
+    // Online by default (see `is_context_enrichment_enabled`), so the quiet auto-enrichment
+    // may fire: these no-ops return nothing instead of fabricating fetched art or links.
+    retrieve_artist_details: () => null,
+    retrieve_artist_image: () => null,
+    retrieve_album_art: () => null,
 
     get_song_details: (args) => {
       const songId = args.songId as number;

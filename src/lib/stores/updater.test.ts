@@ -47,6 +47,15 @@ describe("UpdaterStore", () => {
     expect(updaterStore.checkStatus).toBe("up-to-date");
   });
 
+  it("checkForUpdates() makes no request while Offline (#1398)", async () => {
+    const core = await import("@tauri-apps/api/core");
+    vi.mocked(core.invoke).mockResolvedValueOnce(false);
+
+    await updaterStore.checkForUpdates();
+
+    expect(check).not.toHaveBeenCalled();
+  });
+
   it("init() is idempotent on subsequent calls", async () => {
     vi.mocked(check).mockResolvedValueOnce(null);
     await updaterStore.init();
@@ -103,13 +112,14 @@ describe("UpdaterStore", () => {
     const update = fakeUpdate({ version: "2.0.0" });
     vi.mocked(check).mockResolvedValueOnce(update);
     updaterStore.updateAutoInstall = true;
+    const install = vi.spyOn(updaterStore, "downloadAndInstall");
 
     await updaterStore.checkForUpdates();
-    // downloadAndInstall runs async without being awaited by checkForUpdates; flush microtasks.
-    await Promise.resolve();
-    await Promise.resolve();
+    // checkForUpdates fires downloadAndInstall without awaiting it; await the real promise.
+    await install.mock.results[0].value;
 
     expect(update.download).toHaveBeenCalled();
+    install.mockRestore();
   });
 
   it("does not auto-install when the format does not support self-update", async () => {

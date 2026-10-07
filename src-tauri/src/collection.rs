@@ -866,10 +866,23 @@ impl CollectionScanner {
 
         let app_data_dir = crate::paths::resolve_app_data_dir(&app);
         let app_for_progress = app.clone();
+        // Offline master toggle (#1398): don't resolve missing art online.
+        let resolve_remote_art = self
+            .db
+            .pool
+            .get()
+            .map(|conn| crate::commands::context::is_online_enabled(&conn))
+            .unwrap_or(true);
         let report = self
-            .scan_all_core(app_data_dir, force, silent, true, move |progress| {
-                let _ = app_for_progress.emit("scan-progress", progress);
-            })
+            .scan_all_core(
+                app_data_dir,
+                force,
+                silent,
+                resolve_remote_art,
+                move |progress| {
+                    let _ = app_for_progress.emit("scan-progress", progress);
+                },
+            )
             .await?;
         let summary = report.summary(trigger);
         log::info!("{summary}");

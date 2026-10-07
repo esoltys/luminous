@@ -731,6 +731,9 @@ pub fn subtitles_to_lrc(content: &str) -> String {
 /// `AppHandle`/`State` — BDD tests exercise this directly (see
 /// `tests/lyrics_bdd.rs`) to verify the cache-hit path never reaches
 /// `lyrics_manager.fetch_lyrics`.
+/// Returned instead of querying online providers while the master toggle is Offline.
+pub const OFFLINE_LYRICS_ERROR: &str = "offline: online lyrics lookup is disabled";
+
 pub async fn get_lyrics_for_song(
     db: &crate::db::Database,
     lyrics_manager: &LyricsManager,
@@ -810,6 +813,16 @@ pub async fn get_lyrics_for_song(
     }
 
     let duration_sec = (len_ns / 1_000_000_000) as u32;
+
+    // Offline master toggle (#1398): sidecar files and cached lyrics were
+    // already tried above; never fall through to the online providers, and
+    // leave the cache untouched so lookup resumes when back online.
+    if !crate::commands::context::is_online_enabled(&conn) {
+        return match cached_lyrics {
+            Some(lyrics) if !lyrics.trim().is_empty() => Ok(lyrics),
+            _ => Err(OFFLINE_LYRICS_ERROR.to_string()),
+        };
+    }
 
     // 3. Query online APIs (LRCLIB -> NetEase -> Lyrics.ovh)
     match lyrics_manager
@@ -1156,6 +1169,39 @@ mod tests {
             .query_row("SELECT lyrics FROM songs WHERE id = 1", [], |r| r.get(0))
             .unwrap();
         assert_eq!(cached, Some("[00:10.00] Sidecar lyrics line".to_string()));
+    }
+
+    /// Offline master toggle (#1398): sidecar/cached lyrics still resolve; with
+    /// neither, the lookup stops before any online provider is queried.
+    #[tokio::test]
+    async fn test_get_lyrics_for_song_offline_never_queries_online() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db = crate::db::Database::new(temp_dir.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "INSERT OR REPLACE INTO app_state (key, value) VALUES ('context_enrichment_enabled', 'false')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO songs (id, title, artist, path, source, filetype, unavailable)
+             VALUES (1, 'Track', 'Artist', ?1, 1, 1, 0)",
+            rusqlite::params![temp_dir.path().join("missing.flac").to_str().unwrap()],
+        )
+        .unwrap();
+
+        let result = get_lyrics_for_song(&db, &LyricsManager::new(), 1, false).await;
+        assert_eq!(result, Err(OFFLINE_LYRICS_ERROR.to_string()));
+
+        // Cached lyrics are still served, and the cache is left unmarked.
+        conn.execute("UPDATE songs SET lyrics = 'Cached line' WHERE id = 1", [])
+            .unwrap();
+        let result = get_lyrics_for_song(&db, &LyricsManager::new(), 1, true).await;
+        assert_eq!(result, Ok("Cached line".to_string()));
+        let cached: Option<String> = conn
+            .query_row("SELECT lyrics FROM songs WHERE id = 1", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(cached, Some("Cached line".to_string()));
     }
 
     fn netease_song(id: i64, dt: Option<i64>) -> NetEaseSong {

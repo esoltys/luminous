@@ -1,6 +1,7 @@
 import "@testing-library/jest-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent } from "@testing-library/svelte";
+import { prefs } from "../stores/prefs.svelte";
 import RightPanel from "./RightPanel.svelte";
 import { playerStore } from "../stores/player.svelte";
 import type { Song, AudioPipelineInfo } from "../types";
@@ -47,6 +48,7 @@ describe("RightPanel.svelte", () => {
     vi.clearAllMocks();
     playerStore.state = "stopped";
     playerStore.currentSong = undefined;
+    prefs.onlineEnabled = true;
   });
 
   it("renders 'Not Playing' when no current song", () => {
@@ -285,5 +287,15 @@ describe("RightPanel.svelte", () => {
     const detailsEl = bioText.closest("details");
     expect(detailsEl).toBeTruthy();
     expect(detailsEl?.hasAttribute("open")).toBe(true);
+  });
+
+  it("shows an offline notice on the Information tab and makes no online call (#1398)", async () => {
+    prefs.onlineEnabled = false;
+    playerStore.currentSong = mockSong;
+    const { getByText, findByText } = render(RightPanel);
+    await fireEvent.click(getByText("Information"));
+
+    expect(await findByText(/Offline\. Turn Online on/)).toBeInTheDocument();
+    expect(vi.mocked(invoke).mock.calls.some(([cmd]) => cmd === "get_song_context")).toBe(false);
   });
 });

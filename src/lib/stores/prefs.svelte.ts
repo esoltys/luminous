@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 
 export type RatingStyle = "heart" | "stars" | "both";
 type SeekBarMode = "waveform" | "bands";
@@ -61,6 +62,12 @@ class PrefsStore {
   minimizeToTray = $state<boolean>(false);
   /** Off by default; mirrors the OS's actual registration, queried fresh on init. */
   autostartEnabled = $state<boolean>(false);
+  /** Online/Offline master toggle (#1398). Off means Luminous makes no requests
+   * to third-party internet services. The backend owns the value and enforces
+   * it; this mirrors it (loaded in `init()`, kept current by `online-mode-changed`)
+   * so the UI can hide online-only actions. */
+  onlineEnabled = $state<boolean>(true);
+  private onlineUnlisten: (() => void) | null = null;
 
   async init() {
     const prefs = await invoke<UiPreferences>("get_ui_preferences");
@@ -81,6 +88,15 @@ class PrefsStore {
     this.genreSortField = prefs.genre_sort_field;
     this.genreSortAsc = prefs.genre_sort_asc;
     this.weekStart = prefs.week_start;
+    try {
+      this.onlineEnabled = await invoke<boolean>("is_context_enrichment_enabled");
+      this.onlineUnlisten?.();
+      this.onlineUnlisten = await listen<boolean>("online-mode-changed", (event) => {
+        this.onlineEnabled = event.payload;
+      });
+    } catch (e) {
+      console.error("Failed to read online mode:", e);
+    }
     this.minimizeToTray = await invoke<boolean>("get_minimize_to_tray_enabled");
     try {
       this.autostartEnabled = await invoke<boolean>("get_autostart_enabled");
@@ -203,6 +219,19 @@ class PrefsStore {
   setMinimizeToTray(enabled: boolean) {
     this.minimizeToTray = enabled;
     invoke("set_minimize_to_tray_enabled", { enabled });
+  }
+
+  /** Persisted and enforced by the backend, which also suspends Discord and
+   * ListenBrainz and emits `online-mode-changed`. Reverts if the write fails. */
+  async setOnlineEnabled(enabled: boolean) {
+    const previous = this.onlineEnabled;
+    this.onlineEnabled = enabled;
+    try {
+      await invoke("set_online_enabled", { enabled });
+    } catch (e) {
+      console.error("Failed to set online mode:", e);
+      this.onlineEnabled = previous;
+    }
   }
 
   /** Proxies straight to the OS via the plugin, which can fail (permissions,

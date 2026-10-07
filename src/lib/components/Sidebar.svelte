@@ -9,6 +9,7 @@
   import { tagsStore } from "../stores/tags.svelte";
   import { walkthroughStore } from "../stores/walkthrough.svelte";
   import { musicbrainzStore } from "../stores/musicbrainz.svelte";
+  import { prefs } from "../stores/prefs.svelte";
   import MusicBrainzLoginModal from "./MusicBrainzLoginModal.svelte";
   import MusicBrainzProfilePopover from "./MusicBrainzProfilePopover.svelte";
   import { untrack, onMount } from "svelte";
@@ -334,7 +335,8 @@
 
   <div class="flex-1"></div>
 
-  <!-- MusicBrainz Login / Profile Section (#1388) -->
+  <!-- MusicBrainz Login / Profile Section (#1388); hidden while Offline (#1398) -->
+  {#if prefs.onlineEnabled}
   <div class="{layoutCollapsed ? 'p-2' : 'px-3 py-2'} border-t border-brand-border/40 w-full flex flex-col items-center">
     {#if musicbrainzStore.isLoggedIn}
       <button
@@ -383,6 +385,7 @@
     anchorEl={profileButtonEl}
     onClose={() => (showProfilePopover = false)}
   />
+  {/if}
 
   <!-- Bottom spacer for player bar -->
   <div class:mb-24={!!playerStore.currentSong}></div>

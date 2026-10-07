@@ -58,10 +58,18 @@ fn now_unix() -> i64 {
         .unwrap_or(0)
 }
 
-/// Reads `context_enrichment_enabled` from the generic `app_state` KV table
-/// (same mechanism as `set_app_setting`/other toggles). Defaults to enabled
-/// — absent means "never explicitly turned off".
-pub fn context_enrichment_enabled(conn: &rusqlite::Connection) -> bool {
+/// Key of the Online/Offline master toggle (#1398) in the `app_state` KV table.
+/// The name predates the toggle: it began as the context-enrichment switch.
+pub const ONLINE_ENABLED_KEY: &str = "context_enrichment_enabled";
+
+/// Error returned by network entry points while the master toggle is Offline.
+pub const OFFLINE_ERROR: &str = "Luminous is offline: turn Online on in Settings › Integrations";
+
+/// Master Online/Offline toggle. When `false`, Luminous must make no requests
+/// to third-party internet services (art, lyrics, bios, ListenBrainz,
+/// MusicBrainz, update checks). Subsonic/WebDAV libraries are the user's own
+/// servers and are exempt. Defaults to enabled: absent means "never turned off".
+pub fn is_online_enabled(conn: &rusqlite::Connection) -> bool {
     let stored: Option<String> = conn
         .query_row(
             "SELECT value FROM app_state WHERE key = 'context_enrichment_enabled'",
@@ -72,9 +80,31 @@ pub fn context_enrichment_enabled(conn: &rusqlite::Connection) -> bool {
     stored.map(|v| v != "false").unwrap_or(true)
 }
 
+/// Persist the master toggle, apply its side effects (Discord, ListenBrainz)
+/// and tell every window via `online-mode-changed`.
+#[tauri::command]
+pub async fn set_online_enabled(
+    enabled: bool,
+    state: State<'_, AppState>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    crate::db::run_blocking(&state.db, move |conn| {
+        conn.execute(
+            "INSERT OR REPLACE INTO app_state (key, value) VALUES (?1, ?2)",
+            rusqlite::params![ONLINE_ENABLED_KEY, if enabled { "true" } else { "false" }],
+        )?;
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    state.scrobbler.set_online(enabled).await;
+    let _ = tauri::Emitter::emit(&app, "online-mode-changed", enabled);
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn is_context_enrichment_enabled(state: State<'_, AppState>) -> Result<bool, String> {
-    crate::db::run_blocking(&state.db, |conn| Ok(context_enrichment_enabled(conn)))
+    crate::db::run_blocking(&state.db, |conn| Ok(is_online_enabled(conn)))
         .await
         .map_err(|e| e.to_string())
 }
@@ -133,7 +163,7 @@ pub async fn get_song_context(
     let wiki_lang = crate::context::wikipedia_language(locale.as_deref());
 
     let context_result = crate::db::run_blocking(&state.db, move |conn| {
-        if !context_enrichment_enabled(conn) {
+        if !is_online_enabled(conn) {
             return Ok(None);
         }
         let row: SongIdentifiersRow = conn
@@ -643,7 +673,7 @@ pub async fn get_artist_events(
     let (artist_mbid, cached_events): (Option<String>, Option<Vec<ArtistEvent>>) = {
         let artist_name = artist.clone();
         crate::db::run_blocking(&state.db, move |conn| {
-            if !context_enrichment_enabled(conn) {
+            if !is_online_enabled(conn) {
                 return Ok((None, None));
             }
 
@@ -805,6 +835,25 @@ mod tests {
             .unwrap();
         let db = Database::new(temp_dir.path().to_path_buf()).unwrap();
         (temp_dir, db)
+    }
+
+    #[test]
+    fn test_is_online_enabled_defaults_on_and_follows_stored_value() {
+        let (_temp_dir, db) = temp_db("online_toggle");
+        let conn = db.pool.get().unwrap();
+        assert!(is_online_enabled(&conn), "absent row means online");
+        conn.execute(
+            "INSERT OR REPLACE INTO app_state (key, value) VALUES (?1, 'false')",
+            params![ONLINE_ENABLED_KEY],
+        )
+        .unwrap();
+        assert!(!is_online_enabled(&conn));
+        conn.execute(
+            "INSERT OR REPLACE INTO app_state (key, value) VALUES (?1, 'true')",
+            params![ONLINE_ENABLED_KEY],
+        )
+        .unwrap();
+        assert!(is_online_enabled(&conn));
     }
 
     #[test]

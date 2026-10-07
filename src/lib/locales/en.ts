@@ -352,6 +352,7 @@ export const en = {
     formatSnap: "Snap Package",
     formatSystemPkg: "System Package",
     updateChecksDisabledTitle: "Automatic update checks are off",
+    updateChecksOfflineTitle: "Update checks are paused while Offline",
     updateCheckingTitle: "Checking for updates…",
     updateBuildLabel: "build {hash}",
     updateLastChecked: "checked {time}",
@@ -535,10 +536,10 @@ export const en = {
     forceFullScanHint: "Re-read metadata and artwork for all audio files, ignoring file modification times",
     pruneMissingBtn: "Clean Up",
     pruneMissingHint: "Remove missing songs, empty folders, and duplicate entries",
-    contextEnrichmentIntegrationTitle: "Online Data Sources",
-    contextEnrichmentDesc: "Used for the Info Panel and Artist Details.",
-    contextEnrichmentLabel: "Fetch context & bio data",
-    contextEnrichmentHint: "Look up ratings, tags, reviews, and artist bios from MusicBrainz, CritiqueBrainz, and Wikipedia. Turn this off to keep Luminous fully offline for this data.",
+    contextEnrichmentIntegrationTitle: "Online Services",
+    contextEnrichmentDesc: "Turn off to take Luminous completely offline: no requests to external services for cover art, lyrics, bios, scrobbling or updates. Subsonic and WebDAV libraries keep working.",
+    onlineLabel: "Online",
+    offlineLabel: "Offline",
     fanartIntegration: "fanart.tv Integration",
     fanartDesc1: "Luminous uses ",
     fanartDesc2: " to fetch artist photos, band logos, header backgrounds, album covers and disc art when none are found locally. Without an API key, Luminous falls back to Wikidata's image for the artist photo, if any.",
@@ -909,6 +910,7 @@ export const en = {
     editorPlaceholder: "Paste synced LRC or plain text lyrics here...",
     saveFailedPrefix: "Failed to save lyrics: ",
     noOnlineResults: "No lyrics found from any online provider.",
+    offlineNoLyrics: "No saved lyrics for this track. Turn Online on in Settings › Integrations to search for them.",
     insufficientMetadata: "Not enough song info (artist/title) to search for lyrics online."
   },
   stats: {
@@ -1070,6 +1072,7 @@ export const en = {
     contextRetry: "Retry",
     contextLoading: "Fetching context…",
     contextFetchError: "Couldn't fetch context data. Check your connection and retry.",
+    contextOffline: "Offline. Turn Online on in Settings › Integrations to fetch bios and context.",
     trackSkippedToast: 'Couldn\'t play "{title}" — file not found. Skipped.',
     tracksSkippedToast: {
       one: "Skipped {count} unavailable track.",

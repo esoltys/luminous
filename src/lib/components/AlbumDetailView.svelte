@@ -124,7 +124,7 @@
     const songId = songs.find((s) => (s.musicbrainz_release_group_id ?? "").trim() === releaseGroupMbid)?.id;
     const mbid = releaseGroupMbid;
     communityRating = null;
-    if (!mbid || songId == null) return;
+    if (!mbid || songId == null || !prefs.onlineEnabled) return;
     let stale = false;
     invoke<SongContextEnrichment>("get_song_context", { songId, forceRefresh: false, locale: i18n.currentLocale })
       .then((ctx) => {
@@ -139,6 +139,7 @@
    * stack so it's counted. Failures only warn: art is a bonus on top of
    * the details. */
   async function retrieveAlbumArt(onlyMissing: boolean) {
+    if (!prefs.onlineEnabled) return;
     try {
       const result = await collectionStore.retrieveAlbumArt(albumName, { onlyMissing });
       if (result.disc_uri) artworkRefreshToken++;
@@ -152,7 +153,7 @@
   // the user didn't ask for it, so a network error isn't worth a toast;
   // `details_fetched` stays unset and the next visit retries.
   async function handleRetrieveAlbumDetails(auto = false) {
-    if (retrievingDetails || !hasReleaseGroupMbid) return;
+    if (retrievingDetails || !hasReleaseGroupMbid || !prefs.onlineEnabled) return;
     retrievingDetails = true;
     const taskId = `album-enrichment-${albumName.toLowerCase()}`;
     tasksStore.startTask({
@@ -309,7 +310,7 @@
   let lastAutoFetchedAlbum = $state<string | null>(null);
   $effect(() => {
     const currentAlbum = albumName;
-    if (!currentAlbum || songs.length === 0) return;
+    if (!currentAlbum || songs.length === 0 || !prefs.onlineEnabled) return;
     if (lastAutoFetchedAlbum === currentAlbum) return;
 
     const profile = albumProfile;
@@ -948,6 +949,7 @@
       onclick={() => { handleRefreshAlbum(); overflowMenuPos = null; }}
       disabled={loading || collectionStore.isScanning || refreshing}
     />
+    {#if prefs.onlineEnabled}
     <ContextMenuItem
       icon={RetrieveDetails}
       label={i18n.t("albumDetail.retrieveAlbumDetails", {}, "Retrieve Album Details")}
@@ -963,6 +965,7 @@
       onclick={() => { openCritiqueBrainz(); overflowMenuPos = null; }}
       disabled={loading || !hasReleaseGroupMbid}
     />
+    {/if}
     <ContextMenuItem
       icon={OpenInPicard}
       label={i18n.t("picard.openInPicard")}

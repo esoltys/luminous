@@ -109,7 +109,7 @@
   }
 
   async function triggerRemoteFetch() {
-    if (songId === undefined) return;
+    if (songId === undefined || !prefs.onlineEnabled) return;
     try {
       const uri = await invoke<string | null>("fetch_remote_cover", { songId });
       if (uri) {
@@ -138,6 +138,8 @@
     const _full = fullResolution;
     // A fanart.tv cover arriving or its toggle changing re-resolves (#1277).
     const _fanart = prefs.fanartFetchAlbumCover;
+    // Going Offline hides fanart.tv covers; going Online retries missing art (#1398).
+    const _online = prefs.onlineEnabled;
     const _version = collectionStore.coverArtVersion;
     loadCoverArt();
   });

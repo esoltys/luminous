@@ -352,6 +352,7 @@ export const it = {
     formatSnap: "Pacchetto Snap",
     formatSystemPkg: "Pacchetto di sistema",
     updateChecksDisabledTitle: "La verifica automatica degli aggiornamenti è disattivata",
+    updateChecksOfflineTitle: "I controlli degli aggiornamenti sono sospesi offline",
     updateCheckingTitle: "Verifica degli aggiornamenti in corso…",
     updateBuildLabel: "build {hash}",
     updateLastChecked: "verificato {time}",
@@ -535,10 +536,10 @@ export const it = {
     forceFullScanHint: "Rileggi metadati e copertine di tutti i file audio, ignorando le date di modifica dei file",
     pruneMissingBtn: "Pulisci",
     pruneMissingHint: "Rimuovi brani mancanti, cartelle vuote e voci duplicate",
-    contextEnrichmentIntegrationTitle: "Fonti di dati online",
-    contextEnrichmentDesc: "Usate per il pannello informazioni e i dettagli dell'artista.",
-    contextEnrichmentLabel: "Recupera dati di contesto e biografie",
-    contextEnrichmentHint: "Cerca valutazioni, tag, recensioni e biografie degli artisti su MusicBrainz, CritiqueBrainz e Wikipedia. Disattiva per mantenere Luminous completamente offline per questi dati.",
+    contextEnrichmentIntegrationTitle: "Servizi online",
+    contextEnrichmentDesc: "Disattiva per usare Luminous completamente offline: nessuna richiesta a servizi esterni per copertine, testi, biografie, scrobbling o aggiornamenti. Le librerie Subsonic e WebDAV continuano a funzionare.",
+    onlineLabel: "Online",
+    offlineLabel: "Offline",
     fanartIntegration: "Integrazione con fanart.tv",
     fanartDesc1: "Luminous usa ",
     fanartDesc2: " per recuperare foto degli artisti, loghi delle band, sfondi di intestazione, copertine degli album e immagini dei dischi quando non ne trova in locale. Senza una chiave API, Luminous ripiega sull'immagine di Wikidata per la foto dell'artista, se disponibile.",
@@ -909,6 +910,7 @@ export const it = {
     editorPlaceholder: "Incolla qui il testo LRC sincronizzato o semplice...",
     saveFailedPrefix: "Salvataggio del testo non riuscito: ",
     noOnlineResults: "Nessun testo trovato presso alcun fornitore online.",
+    offlineNoLyrics: "Nessun testo salvato per questo brano. Attiva «Online» in Impostazioni › Integrazioni per cercarlo.",
     insufficientMetadata: "Informazioni sul brano (artista/titolo) insufficienti per cercare il testo online."
   },
   stats: {
@@ -1070,6 +1072,7 @@ export const it = {
     contextRetry: "Riprova",
     contextLoading: "Recupero del contesto in corso…",
     contextFetchError: "Impossibile recuperare i dati di contesto. Controlla la connessione e riprova.",
+    contextOffline: "Offline. Attiva «Online» in Impostazioni › Integrazioni per recuperare biografie e contesto.",
     trackSkippedToast: "Impossibile riprodurre «{title}»: file non trovato. Brano saltato.",
     tracksSkippedToast: {
       one: "{count} brano non disponibile saltato.",

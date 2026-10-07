@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { check as checkForUpdate, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { toastStore } from "./toast.svelte";
@@ -117,10 +118,15 @@ class UpdaterStore {
         this.updateAutoInstall = true;
       }
 
+      // Back online: catch up on the check that was skipped while offline.
+      void listen<boolean>("online-mode-changed", (event) => {
+        if (event.payload && this.updateCheckEnabled) void this.checkForUpdates();
+      }).catch(() => {});
+
       // 3. Perform check & setup interval if enabled
       if (this.updateCheckEnabled) {
-        this.checkForUpdates();
         this.startPeriodicCheck();
+        await this.checkForUpdates();
       }
     } catch (e) {
       console.error("Failed to initialize updater store:", e);
@@ -182,8 +188,20 @@ class UpdaterStore {
     }
   }
 
+  /** Offline master toggle (#1398). Asks the backend rather than `prefs` so a
+   * check fired during boot can't beat the prefs store loading the value. */
+  private async isOnline(): Promise<boolean> {
+    try {
+      return (await invoke<boolean>("is_context_enrichment_enabled")) !== false;
+    } catch {
+      return true;
+    }
+  }
+
   async checkForUpdates() {
     if (this.isExternallyManaged) return;
+
+    if (!(await this.isOnline())) return;
 
     // Never clobber an in-flight download or one already sitting ready to
     // restart — re-checking (the periodic timer, or another manual click)
@@ -233,6 +251,7 @@ class UpdaterStore {
     if (!this.pendingUpdate || !this.installFormat.supports_self_update || this.installStatus === "downloading") {
       return;
     }
+    if (!(await this.isOnline())) return;
 
     this.installStatus = "downloading";
     this.downloadProgress = { downloaded: 0, total: null };

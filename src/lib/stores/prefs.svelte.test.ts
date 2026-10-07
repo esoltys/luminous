@@ -29,3 +29,27 @@ describe("prefs.setAutostart", () => {
     expect(prefs.autostartEnabled).toBe(false);
   });
 });
+
+describe("prefs.setOnlineEnabled", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    prefs.onlineEnabled = true;
+  });
+
+  it("persists through the dedicated command, not the generic setting writer", async () => {
+    vi.mocked(invoke).mockResolvedValueOnce(undefined);
+
+    await prefs.setOnlineEnabled(false);
+
+    expect(prefs.onlineEnabled).toBe(false);
+    expect(invoke).toHaveBeenCalledWith("set_online_enabled", { enabled: false });
+  });
+
+  it("reverts when the backend rejects the change", async () => {
+    vi.mocked(invoke).mockRejectedValueOnce(new Error("db locked"));
+
+    await prefs.setOnlineEnabled(false);
+
+    expect(prefs.onlineEnabled).toBe(true);
+  });
+});

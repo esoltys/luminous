@@ -8,15 +8,18 @@
     id?: string;
     disabled?: boolean;
     showOnOffLabel?: boolean;
+    /** Replace the default "On"/"Off" state text (e.g. "Online"/"Offline"). */
+    onText?: string;
+    offText?: string;
   }
 
-  let { checked, onchange, label, id, disabled = false, showOnOffLabel = true }: Props = $props();
+  let { checked, onchange, label, id, disabled = false, showOnOffLabel = true, onText, offText }: Props = $props();
 </script>
 
 <div class="flex items-center gap-2 shrink-0">
   {#if showOnOffLabel}
     <span class="text-xs font-medium text-brand-text-secondary text-right whitespace-nowrap min-w-[4.5rem]">
-      {checked ? i18n.t('common.on') : i18n.t('common.off')}
+      {checked ? (onText ?? i18n.t('common.on')) : (offText ?? i18n.t('common.off'))}
     </span>
   {/if}
   <button

@@ -21,7 +21,8 @@
     CircleNotchIcon as LoaderCircle,
     ArrowUpRightIcon as ArrowUpRight,
     HeartIcon as Heart,
-    BookOpenIcon as Globe,
+    WifiHighIcon as WifiHigh,
+    WifiSlashIcon as WifiSlash,
     DiscordLogoIcon as DiscordLogo
   } from "phosphor-svelte";
 
@@ -33,7 +34,6 @@
   let fanartValidationError = $state<string | null>(null);
   let picardCustomPath = $state("");
   let isRecheckingPicard = $state(false);
-  let contextEnrichmentEnabled = $state(true);
 
   async function handleValidateFanartKey() {
     const key = fanartKeyInput.trim();
@@ -48,11 +48,6 @@
     } finally {
       isValidatingFanartKey = false;
     }
-  }
-
-  async function handleContextEnrichmentToggle(v: boolean) {
-    contextEnrichmentEnabled = v;
-    await invoke("set_app_setting", { key: "context_enrichment_enabled", value: v ? "true" : "false" });
   }
 
   async function handlePicardCustomPathChange() {
@@ -86,7 +81,6 @@
     try {
       const settings = await invoke<Record<string, string>>("get_all_app_settings");
       picardCustomPath = settings?.picard_path ?? "";
-      contextEnrichmentEnabled = settings?.context_enrichment_enabled !== "false";
     } catch (e) {
       console.error("Failed to load Picard custom path on mount:", e);
     }
@@ -99,33 +93,33 @@
   });
 </script>
 
-<!-- Online Data Sources (Context & Bio Enrichment) Integration Card -->
-<div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
-  <div class="pb-3 flex justify-between items-center">
-    <div class="flex items-center gap-3">
+<!-- Online / Offline master toggle (#1398) -->
+<div class="bg-brand-sidebar border border-brand-border rounded-xl p-6">
+  <div class="flex justify-between items-start gap-4">
+    <div class="flex items-center gap-3 min-w-0">
       <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
-        <Globe class="w-5 h-5" />
+        {#if prefs.onlineEnabled}
+          <WifiHigh class="w-5 h-5" />
+        {:else}
+          <WifiSlash class="w-5 h-5" />
+        {/if}
       </div>
       <div class="space-y-1 min-w-0">
         <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('settings.contextEnrichmentIntegrationTitle')}</h3>
         <p class="text-xs text-brand-text-secondary leading-relaxed">{i18n.t('settings.contextEnrichmentDesc')}</p>
       </div>
     </div>
-  </div>
-
-  <div class="flex items-center justify-between gap-4 py-1">
-    <div class="flex flex-col gap-0.5 min-w-0">
-      <span class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.contextEnrichmentLabel')}</span>
-      <p class="text-xs text-brand-text-secondary">{i18n.t('settings.contextEnrichmentHint')}</p>
-    </div>
     <Toggle
-      checked={contextEnrichmentEnabled}
-      onchange={(v) => handleContextEnrichmentToggle(v)}
-      label={i18n.t('settings.contextEnrichmentLabel')}
+      checked={prefs.onlineEnabled}
+      onchange={(v) => prefs.setOnlineEnabled(v)}
+      label={i18n.t('settings.contextEnrichmentIntegrationTitle')}
+      onText={i18n.t('settings.onlineLabel')}
+      offText={i18n.t('settings.offlineLabel')}
     />
   </div>
 </div>
 
+{#if prefs.onlineEnabled}
 <!-- ListenBrainz Scrobbler Integration Card -->
 <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
   <div class="pb-3 flex justify-between items-start gap-4">
@@ -334,6 +328,8 @@
   {/if}
 </div>
 
+{/if}
+
 <!-- MusicBrainz Picard Card -->
 <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
   <div class="pb-3 flex justify-between items-center">
@@ -404,6 +400,7 @@
   </div>
 </div>
 
+{#if prefs.onlineEnabled}
 <!-- Discord Rich Presence Card -->
 <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
   <div class="pb-3 flex justify-between items-center border-b border-brand-border/60">
@@ -606,3 +603,4 @@
     {/each}
   </div>
 </div>
+{/if}

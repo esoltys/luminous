@@ -10,6 +10,7 @@
     CaretDownIcon as CaretDown
   } from "phosphor-svelte";
   import { i18n, formatNumber } from "../stores/i18n.svelte";
+  import { prefs } from "../stores/prefs.svelte";
   import { lyricsStatus } from "../utils/lyrics";
   import { openExternalUrl } from "../utils/openExternalUrl";
   import GenreChips from "./GenreChips.svelte";
@@ -57,7 +58,7 @@
 
   async function loadContext(songId: number | undefined, forceRefresh = false) {
     const requestId = ++contextRequestId;
-    if (!songId) {
+    if (!songId || !prefs.onlineEnabled) {
       contextData = null;
       contextErrorMsg = "";
       return;
@@ -267,7 +268,9 @@
       </div>
 
       {#if activeTab === "context"}
-        {#if isLoadingContext}
+        {#if !prefs.onlineEnabled}
+          <p class="text-xs text-brand-text-secondary/60 py-2">{i18n.t('playerBar.contextOffline')}</p>
+        {:else if isLoadingContext}
           <div class="flex items-center gap-2 text-xs text-brand-text-secondary/60 py-2">
             <RefreshCw class="w-3.5 h-3.5 animate-spin" />
             <span>{i18n.t('playerBar.contextLoading', {}, 'Fetching context…')}</span>
