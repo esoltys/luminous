@@ -319,7 +319,9 @@ impl WebDavClient {
     }
 
     /// Probes remote file metadata using byte ranges.
-    /// Fetches initial 256KB for ID3v2/FLAC/Vorbis headers and trailing 128KB for ID3v1/APEv2.
+    /// Fetches the first 256KB for ID3v2/FLAC/Vorbis headers, then the trailing 128KB
+    /// (ID3v1/APEv2, an MP4 `moov` atom, an Ogg last page) only if the head left the
+    /// duration or a core tag unresolved: most files cost one request, not two.
     pub fn probe_song_tags(&self, url: &str, content_length: u64) -> Result<Song> {
         let initial_probe_size = 256 * 1024;
         let head_size = initial_probe_size.min(content_length);
@@ -330,108 +332,134 @@ impl WebDavClient {
         let (head_bytes, metadata_complete) =
             self.extend_probe_head(url, head_bytes, content_length);
 
-        let tail_bytes = if metadata_complete {
-            // Everything the tags need is already in hand (FLAC/ID3v2 lead with them).
-            Vec::new()
-        } else if content_length > head_size {
+        let mut song = parse_probe_buffer(&head_bytes, url, content_length);
+        let head_len = head_bytes.len() as u64;
+        if !metadata_complete
+            && content_length > head_len
+            && !head_resolves_song(&song, &head_bytes)
+        {
             let tail_probe_size = 128 * 1024;
-            let tail_start = content_length
-                .saturating_sub(tail_probe_size)
-                .max(head_size);
-            self.fetch_range(url, tail_start, content_length.saturating_sub(1))
-                .unwrap_or_default()
-        } else {
-            Vec::new()
-        };
-
-        let mut probe_buffer = Vec::with_capacity(head_bytes.len() + tail_bytes.len());
-        probe_buffer.extend_from_slice(&head_bytes);
-        if !tail_bytes.is_empty() {
-            probe_buffer.extend_from_slice(&tail_bytes);
-        }
-
-        let mut cursor = Cursor::new(probe_buffer);
-        let filetype = detect_filetype_from_url(url);
-
-        let mut song = Song {
-            source: SongSource::WebDav,
-            filetype,
-            url: Some(url.to_string()),
-            stream_url: Some(url.to_string()),
-            filesize: Some(content_length as i64),
-            ..Default::default()
-        };
-
-        let parsed = Probe::new(&mut cursor)
-            .guess_file_type()
-            .map_err(|e| anyhow::anyhow!(e))
-            .and_then(|p| p.read().map_err(|e| anyhow::anyhow!(e)));
-        if let Err(e) = &parsed {
-            log::warn!("Could not read tags from {url}: {e}");
-        }
-        if let Ok(tagged_file) = parsed {
-            let properties = tagged_file.properties();
-            let duration_ns = (properties.duration().as_secs_f64() * 1_000_000_000.0) as i64;
-            song.length_nanosec = Some(duration_ns);
-            song.bitrate = properties.audio_bitrate().map(|b| b as i32);
-            song.samplerate = properties.sample_rate().map(|r| r as i32);
-            song.channels = properties.channels().map(|c| c as i32);
-            song.bitdepth = properties.bit_depth().map(|b| b as i32);
-
-            let mut candidate_tags = Vec::new();
-            if let Some(primary) = tagged_file.primary_tag() {
-                candidate_tags.push(primary);
-            }
-            for t in tagged_file.tags() {
-                if !candidate_tags
-                    .iter()
-                    .any(|existing| std::ptr::eq(*existing, t))
-                {
-                    candidate_tags.push(t);
-                }
-            }
-
-            for tag in candidate_tags {
-                use lofty::tag::{Accessor, ItemKey};
-                if song.title.is_none() {
-                    song.title = tag.title().map(|t| t.to_string());
-                }
-                if song.artist.is_none() {
-                    song.artist = tag.artist().map(|a| a.to_string());
-                }
-                if song.album.is_none() {
-                    song.album = tag.album().map(|a| a.to_string());
-                }
-                if song.genre.is_none() {
-                    song.genre = tag.genre().map(|g| g.to_string());
-                }
-                if song.track.is_none() {
-                    song.track = tag.track().map(|t| t as i32);
-                }
-                if song.disc.is_none() {
-                    song.disc = tag.disk().map(|d| d as i32);
-                }
-                if song.year.is_none() {
-                    song.year = tag.date().map(|d| d.year as i32).or_else(|| {
-                        tag.get_string(ItemKey::Year)
-                            .and_then(|s| s.trim().parse::<i32>().ok())
-                    });
-                }
+            let tail_start = content_length.saturating_sub(tail_probe_size).max(head_len);
+            if let Ok(tail_bytes) =
+                self.fetch_range(url, tail_start, content_length.saturating_sub(1))
+            {
+                let mut probe_buffer = head_bytes;
+                probe_buffer.extend_from_slice(&tail_bytes);
+                song = parse_probe_buffer(&probe_buffer, url, content_length);
             }
         }
-
-        // Fallback: if title is missing, infer from filename
-        if song.title.is_none() {
-            if let Some(filename) = url.split('/').next_back() {
-                let name = filename.split('?').next().unwrap_or(filename);
-                // URLs are percent-encoded; the title should read as the file name does.
-                let name = percent_encoding::percent_decode_str(name).decode_utf8_lossy();
-                let stem = name.rfind('.').map_or(&*name, |idx| &name[..idx]);
-                song.title = Some(stem.to_string());
-            }
-        }
-
+        title_from_filename_if_missing(&mut song, url);
         Ok(song)
+    }
+}
+
+/// Whether the head alone settled everything the tail could still change.
+///
+/// FLAC keeps its duration (STREAMINFO) and every tag in the header, so any head that
+/// yields a duration is final. MP3 carries its tags in an ID3v2 header, but without
+/// one (or with core tags missing) ID3v1/APEv2 in the last bytes may still supply
+/// them. Every other format falls back to the tail: an MP4 `moov` atom or an Ogg last
+/// page decides the duration, and a head-only parse of those fails outright.
+fn head_resolves_song(song: &Song, head: &[u8]) -> bool {
+    let has_duration = song.length_nanosec.is_some_and(|d| d > 0);
+    match song.filetype {
+        FileType::Flac => has_duration,
+        FileType::Mp3 => {
+            head.starts_with(b"ID3")
+                && has_duration
+                && song.title.is_some()
+                && song.artist.is_some()
+                && song.album.is_some()
+        }
+        _ => false,
+    }
+}
+
+/// Parses tags and stream properties out of a probe buffer (the head, or head + tail).
+fn parse_probe_buffer(buffer: &[u8], url: &str, content_length: u64) -> Song {
+    let mut cursor = Cursor::new(buffer);
+    let filetype = detect_filetype_from_url(url);
+
+    let mut song = Song {
+        source: SongSource::WebDav,
+        filetype,
+        url: Some(url.to_string()),
+        stream_url: Some(url.to_string()),
+        filesize: Some(content_length as i64),
+        ..Default::default()
+    };
+
+    let parsed = Probe::new(&mut cursor)
+        .guess_file_type()
+        .map_err(|e| anyhow::anyhow!(e))
+        .and_then(|p| p.read().map_err(|e| anyhow::anyhow!(e)));
+    if let Err(e) = &parsed {
+        log::warn!("Could not read tags from {url}: {e}");
+    }
+    if let Ok(tagged_file) = parsed {
+        let properties = tagged_file.properties();
+        let duration_ns = (properties.duration().as_secs_f64() * 1_000_000_000.0) as i64;
+        song.length_nanosec = Some(duration_ns);
+        song.bitrate = properties.audio_bitrate().map(|b| b as i32);
+        song.samplerate = properties.sample_rate().map(|r| r as i32);
+        song.channels = properties.channels().map(|c| c as i32);
+        song.bitdepth = properties.bit_depth().map(|b| b as i32);
+
+        let mut candidate_tags = Vec::new();
+        if let Some(primary) = tagged_file.primary_tag() {
+            candidate_tags.push(primary);
+        }
+        for t in tagged_file.tags() {
+            if !candidate_tags
+                .iter()
+                .any(|existing| std::ptr::eq(*existing, t))
+            {
+                candidate_tags.push(t);
+            }
+        }
+
+        for tag in candidate_tags {
+            use lofty::tag::{Accessor, ItemKey};
+            if song.title.is_none() {
+                song.title = tag.title().map(|t| t.to_string());
+            }
+            if song.artist.is_none() {
+                song.artist = tag.artist().map(|a| a.to_string());
+            }
+            if song.album.is_none() {
+                song.album = tag.album().map(|a| a.to_string());
+            }
+            if song.genre.is_none() {
+                song.genre = tag.genre().map(|g| g.to_string());
+            }
+            if song.track.is_none() {
+                song.track = tag.track().map(|t| t as i32);
+            }
+            if song.disc.is_none() {
+                song.disc = tag.disk().map(|d| d as i32);
+            }
+            if song.year.is_none() {
+                song.year = tag.date().map(|d| d.year as i32).or_else(|| {
+                    tag.get_string(ItemKey::Year)
+                        .and_then(|s| s.trim().parse::<i32>().ok())
+                });
+            }
+        }
+    }
+
+    song
+}
+
+/// Falls back to the file name for a title when the tags hold none.
+fn title_from_filename_if_missing(song: &mut Song, url: &str) {
+    if song.title.is_none() {
+        if let Some(filename) = url.split('/').next_back() {
+            let name = filename.split('?').next().unwrap_or(filename);
+            // URLs are percent-encoded; the title should read as the file name does.
+            let name = percent_encoding::percent_decode_str(name).decode_utf8_lossy();
+            let stem = name.rfind('.').map_or(&*name, |idx| &name[..idx]);
+            song.title = Some(stem.to_string());
+        }
     }
 }
 
@@ -840,5 +868,77 @@ mod tests {
         );
         assert!(!items[1].is_directory);
         assert_eq!(items[1].content_length, Some(1234567));
+    }
+
+    const AUDIO_FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/audio/");
+
+    fn fixture(name: &str) -> Vec<u8> {
+        std::fs::read(format!("{AUDIO_FIXTURES}{name}")).unwrap()
+    }
+
+    /// Parses the first `head_len` bytes the way `probe_song_tags` does, before any tail.
+    fn probe_head(name: &str, head_len: usize) -> (super::Song, bool) {
+        let bytes = fixture(name);
+        let url = format!("https://example.com/{name}");
+        let head = &bytes[..head_len.min(bytes.len())];
+        let song = super::parse_probe_buffer(head, &url, bytes.len() as u64);
+        let resolved = super::head_resolves_song(&song, head);
+        (song, resolved)
+    }
+
+    #[test]
+    fn flac_head_alone_skips_the_tail_even_without_an_album_tag() {
+        let (song, resolved) = probe_head("song_gamma.flac", 50 * 1024);
+        assert!(resolved);
+        assert_eq!(song.length_nanosec, Some(800_000_000));
+        assert_eq!(song.title.as_deref(), Some("Song Gamma"));
+    }
+
+    #[test]
+    fn mp3_with_complete_id3v2_tags_skips_the_tail() {
+        let (song, resolved) = probe_head("song_alpha.mp3", 2718);
+        assert!(resolved);
+        assert_eq!(song.album.as_deref(), Some("Album Gold"));
+    }
+
+    #[test]
+    fn untagged_mp3_keeps_the_tail_for_id3v1() {
+        let (_, resolved) = probe_head("song_short.mp3", 881);
+        assert!(!resolved);
+    }
+
+    #[test]
+    fn formats_that_need_the_file_end_keep_the_tail() {
+        for name in ["song_beta.wav", "song_delta.ogg", "song_epsilon.m4a"] {
+            let (song, resolved) = probe_head(name, 1024);
+            assert!(!resolved, "{name} must fetch the tail");
+            assert!(
+                song.length_nanosec.is_none(),
+                "{name} head parse is partial"
+            );
+        }
+    }
+
+    #[test]
+    fn head_plus_tail_recovers_what_a_head_alone_cannot() {
+        for (name, head_len, duration) in [
+            ("song_delta.ogg", 1024, 500_000_000),
+            ("song_epsilon.m4a", 1024, 2_023_000_000),
+        ] {
+            let bytes = fixture(name);
+            let url = format!("https://example.com/{name}");
+            let mut probe = bytes[..head_len].to_vec();
+            probe.extend_from_slice(&bytes[head_len..]);
+            let song = super::parse_probe_buffer(&probe, &url, bytes.len() as u64);
+            assert_eq!(song.length_nanosec, Some(duration), "{name}");
+            assert!(song.title.is_some(), "{name}");
+        }
+    }
+
+    #[test]
+    fn title_falls_back_to_the_decoded_file_name() {
+        let mut song = super::Song::default();
+        super::title_from_filename_if_missing(&mut song, "https://h/a%20b/Track%20One.mp3?x=1");
+        assert_eq!(song.title.as_deref(), Some("Track One"));
     }
 }
