@@ -3,6 +3,7 @@ import { en } from "./en";
 import { es } from "./es";
 import { fr } from "./fr";
 import { it } from "./it";
+import { ru } from "./ru";
 import { uk } from "./uk";
 
 export type Messages = { [key: string]: string | Messages };
@@ -28,6 +29,7 @@ export const LOCALES = [
   { tag: "es", messages: es },
   { tag: "fr-CA", messages: fr },
   { tag: "it", messages: it },
+  { tag: "ru", messages: ru },
   { tag: "uk", messages: uk },
 ] as const satisfies readonly LocaleDef[];
 
