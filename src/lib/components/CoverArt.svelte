@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
+  import { untrack } from "svelte";
   import {
     MusicNotesIcon as Music,
     DiscIcon as Disc,
@@ -9,7 +10,7 @@
   import { i18n } from "../stores/i18n.svelte";
   import { prefs } from "../stores/prefs.svelte";
   import { collectionStore } from "../stores/collection.svelte";
-  import { sizedCoverSrcset } from "../utils/covers";
+  import { sizedCoverUrl } from "../utils/covers";
 
   interface Props {
     songId: number | undefined;
@@ -36,8 +37,28 @@
   let isLoading = $state(false);
   let hasFailed = $state(false);
   let loadToken = 0;
-  // Card-sized copies for small views (#1528); a full-resolution view wants the original.
-  let srcset = $derived(fullResolution ? null : sizedCoverSrcset(imgSrc));
+  // The box's widest measured width in device pixels, so a card loads a
+  // cover copy near its drawn size (#1528). Never shrinks, so a narrowing
+  // window doesn't refetch; null until measured, and the <img> waits for it
+  // so it never starts loading a copy of the wrong size.
+  let box = $state<HTMLDivElement>();
+  let boxPixels = $state<number | null>(null);
+  let displaySrc = $derived(
+    imgSrc && boxPixels !== null && !fullResolution ? sizedCoverUrl(imgSrc, boxPixels) : imgSrc
+  );
+
+  $effect(() => {
+    const node = box;
+    if (!node) return;
+    const measure = () => {
+      const pixels = node.clientWidth * window.devicePixelRatio;
+      if (boxPixels === null || pixels > boxPixels) boxPixels = pixels;
+    };
+    untrack(measure);
+    const ro = new ResizeObserver(measure);
+    ro.observe(node);
+    return () => ro.disconnect();
+  });
 
   async function loadCoverArt() {
     const token = ++loadToken;
@@ -122,12 +143,10 @@
   });
 </script>
 
-<div class="{sizeClass} relative overflow-hidden bg-brand-sidebar border border-brand-border flex items-center justify-center text-brand-text-secondary group shrink-0">
-  {#if imgSrc && !hasFailed}
+<div bind:this={box} class="{sizeClass} relative overflow-hidden bg-brand-sidebar border border-brand-border flex items-center justify-center text-brand-text-secondary group shrink-0">
+  {#if displaySrc && boxPixels !== null && !hasFailed}
     <img
-      src={imgSrc}
-      srcset={srcset ?? undefined}
-      sizes={srcset ? "auto" : undefined}
+      src={displaySrc}
       alt={i18n.t('common.albumArtAlt')}
       loading="lazy"
       class="w-full h-full object-cover transition-opacity duration-300 {isLoading ? 'opacity-0' : 'opacity-100'} {animateSpin ? 'animate-spin' : ''}"

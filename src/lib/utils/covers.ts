@@ -49,25 +49,28 @@ export function resolveArtistBackgroundUrl(
 }
 
 /** Smaller copies `luminous-art://` serves on request (`?w=<px>`, #1528), so a
- * card decodes a cover near the size it's drawn. Bounded by the backend's
- * `MIN_SIZED_EDGE` and `CACHE_MAX_EDGE` (covermanager.rs). */
+ * card decodes a cover near the size it's drawn rather than the 600 px cache
+ * copy. Bounded by the backend's `MIN_SIZED_EDGE` and `CACHE_MAX_EDGE`
+ * (covermanager.rs); a box bigger than the largest gets the unsized copy. */
 const SIZED_COVER_EDGES = [256, 384];
-/** `CACHE_MAX_EDGE` in covermanager.rs: the longest edge of an unsized cached cover. */
-const CACHED_COVER_EDGE = 600;
 
 /**
- * A `srcset` offering card-sized copies of a cached cover or folder-art
- * thumbnail URL, for an `<img sizes="auto" loading="lazy">` to pick from by
- * its drawn width and the display scale. Null for anything else: an original
- * (`local/`, `embedded/`), a remote URL, or a mock-library path.
+ * The URL of a cached cover or folder-art thumbnail sized for a box
+ * `devicePixels` wide: the smallest card-sized copy that covers it, else
+ * `url` itself. Anything else is returned as-is: an original (`local/`,
+ * `embedded/`), a remote URL, a mock-library path, or an unmeasured box.
+ *
+ * Picked here rather than by `srcset`/`sizes="auto"`, which WebKitGTK lacks
+ * and which Chromium re-evaluates as `100vw` when an image is unmounted —
+ * fetching the largest candidate for every card a virtualized grid drops.
  */
-export function sizedCoverSrcset(url: string | null): string | null {
-  if (!url) return null;
+export function sizedCoverUrl(url: string, devicePixels: number): string {
   const prefix = ["http://luminous-art.localhost/", "luminous-art://"].find((p) => url.startsWith(p));
-  if (!prefix) return null;
+  if (!prefix || devicePixels <= 0) return url;
   const rest = url.slice(prefix.length).replace(/^localhost\//, "");
-  if (rest.startsWith("local/") || rest.startsWith("embedded/") || rest.includes("?")) return null;
-  return [...SIZED_COVER_EDGES.map((w) => `${url}?w=${w} ${w}w`), `${url} ${CACHED_COVER_EDGE}w`].join(", ");
+  if (rest.startsWith("local/") || rest.startsWith("embedded/") || rest.includes("?")) return url;
+  const edge = SIZED_COVER_EDGES.find((e) => e >= devicePixels);
+  return edge ? `${url}?w=${edge}` : url;
 }
 
 export interface CoverSource {

@@ -42,7 +42,9 @@
 
   let root = $state<HTMLDivElement>();
   let rowsEl = $state<HTMLDivElement>();
-  let width = $state(0);
+  // Null until first measured: nothing mounts before then, or the first
+  // cards would lay out in one full-width column and size their covers for it.
+  let width = $state<number | null>(null);
   // A row's height, and the column width it was measured at: cards are
   // square-ish, so a different width makes the measurement stale.
   let measured = $state<{ columnWidth: number; height: number } | null>(null);
@@ -51,11 +53,11 @@
   let viewHeight = $state(0);
 
   let columns = $derived.by(() => {
-    if (width <= 0) return 1;
+    if (!width) return 1;
     const tracks = Math.max(1, Math.floor((width + gap) / (minColumnWidth + gap)));
     return fit ? Math.max(1, Math.min(tracks, items.length)) : tracks;
   });
-  let columnWidth = $derived((width - gap * (columns - 1)) / columns);
+  let columnWidth = $derived(((width ?? 0) - gap * (columns - 1)) / columns);
   let rowHeight = $derived(
     measured && Math.abs(measured.columnWidth - columnWidth) < 0.5
       ? measured.height
@@ -69,7 +71,7 @@
   let lastRow = $derived(
     Math.min(rowCount, Math.ceil((viewTop + viewHeight) / rowStride) + overscanRows)
   );
-  let visible = $derived(items.slice(firstRow * columns, lastRow * columns));
+  let visible = $derived(width === null ? [] : items.slice(firstRow * columns, lastRow * columns));
 
   function findScroller(node: HTMLElement): HTMLElement | null {
     for (let el = node.parentElement; el; el = el.parentElement) {
