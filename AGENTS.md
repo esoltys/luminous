@@ -134,7 +134,6 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config libayatana-appind
 ## Design Principles
 
 - **State Preservation**: Luminous must always save and restore the state the user left/closed the application in. When reopened, the user should be returned exactly to where they were (e.g., same sidebar view/tab, same song selection, same player track/position/volume, same equalizer presets/enabled state).
-- See [DESIGN.md](DESIGN.md)
 
 ## UI/UX Design Conventions
 
