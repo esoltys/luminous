@@ -16,7 +16,7 @@ The imported `AGENTS.md` above is the canonical instructions file for this repo 
   below hold; Store certification is tracked and verified separately in `luminous-store`.
 
 ### Definition of Done (releases)
-A release is only complete when **all three** of the following hold. Never report a release as done based on CI status alone.
+A release is only complete when **all four** of the following hold. Never report a release as done based on CI status alone.
 1. The release GitHub Actions workflow is green.
 2. The pushed tag matches the version in `package.json`/`Cargo.toml`.
 3. The GitHub release has the expected artifacts attached (including a `.msix`/`.msixbundle` for

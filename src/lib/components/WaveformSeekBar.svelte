@@ -9,8 +9,8 @@
   const NARROW_WIDTH_BREAKPOINT_PX = 450;
 
   // Fixed layer colors for the low/mid/high band waveform (bands mode). These
-  // are a deliberate exception to DESIGN.md's "accent is the only
-  // interactive-emphasis hue" rule — like the mood colors they replace, they
+  // are a deliberate exception to the "accent is the only interactive-emphasis
+  // hue" convention — like the mood colors they replace, they
   // encode frequency-band data rather than interactive state, so they're kept
   // visually distinct from accentColor (the progress cap below still uses
   // accentColor so "this is progress" stays legible against these bands).

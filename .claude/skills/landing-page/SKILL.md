@@ -49,7 +49,7 @@ done
   `<img>` tags (EN and FR), and fix the attributes if a capture size changed:
 
 ```bash
-cd $SITE && python3 - <<'E'
+cd $SITE && uv run python - <<'E'
 import re, struct
 html = open('luminous/index.html').read()
 for m in re.finditer(r'src="\./landing-assets/([^"]+\.png)"[^>]*?width="(\d+)" height="(\d+)"', html):
@@ -104,13 +104,13 @@ English lives only in the markup; `fr.js` holds French for every `data-i18n` /
 - Confirm there are no missing or orphaned keys, and that the file still parses:
 
 ```bash
-cd $SITE && python3 - <<'E'
+cd $SITE && uv run python - <<'E'
 import re
 keys = set(re.findall(r'data-i18n(?:-html)?="([^"]+)"', open('luminous/index.html').read()))
 fr = set(re.findall(r'^\s*"([^"]+)":', open('luminous/i18n/fr.js').read(), re.M))
 print('missing in fr:', sorted(keys - fr)); print('orphaned in fr:', sorted(fr - keys))
 E
-node -e "import('./luminous/i18n/fr.js').then(m => console.log('fr.js ok,', Object.keys(m.default).length, 'keys'))"
+bun -e "import('./luminous/i18n/fr.js').then(m => console.log('fr.js ok,', Object.keys(m.default).length, 'keys'))"
 ```
 
 ## 6. `luminous/llms.txt`
@@ -120,14 +120,13 @@ node -e "import('./luminous/i18n/fr.js').then(m => console.log('fr.js ok,', Obje
   here — it's for LLMs, so more detail than the page). Drop a What's New section only when its
   card leaves the page.
 - Update "Core Features" for anything that's now core (e.g. a new format or source).
-- Check "Tech Stack & Architecture" still matches AGENTS.md's Tech Stack (it once said React —
-  it's SvelteKit + Svelte 5).
+- Check "Tech Stack & Architecture" still matches AGENTS.md's Tech Stack.
 
 ## 7. Verify
 
 - `bunx html-validate luminous/index.html` (from the site repo root).
 - Serve the site over HTTP (`main.js` is an ES module, so `file://` won't run it):
-  `python3 -m http.server 8765` from the site root, then with Playwright (Chromium) load
+  `uv run python -m http.server 8765` from the site root, then with Playwright (Chromium) load
   `http://localhost:8765/luminous/` at 1280px and 390px wide, in EN and after clicking
   `button[data-lang=fr]`. Screenshot the hero and `section[aria-labelledby=whats-new-title]`
   and **read the images**: badge text, both cards, no overflowing French strings.

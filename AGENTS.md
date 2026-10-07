@@ -134,7 +134,6 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config libayatana-appind
 ## Design Principles
 
 - **State Preservation**: Luminous must always save and restore the state the user left/closed the application in. When reopened, the user should be returned exactly to where they were (e.g., same sidebar view/tab, same song selection, same player track/position/volume, same equalizer presets/enabled state).
-- See [DESIGN.md](../DESIGN.md)
 
 ## UI/UX Design Conventions
 
@@ -321,8 +320,8 @@ punt either to the user.
 - Proactively search and view GitHub issues using the `gh` command tool (e.g., `gh issue list` and `gh issue view <id>`) when asked to "fix a bug" or "work on a feature".
 - When working on a bug or feature, always work in a dedicated git worktree. Note that Claude uses its own worktree flow in `.claude/worktrees/`, while all other AI assistants and agents must place their dedicated worktree in the `.worktrees/` directory (e.g., `.worktrees/<feature-or-bug-name>`). Do not delete the worktree until the changes have been reviewed, merged, and approved for cleanup by the user.
 - As soon as you start working a tracked issue, set its Status to "In Progress" on the Project board (see [docs/ISSUE_PRIORITY.md](docs/ISSUE_PRIORITY.md) for the `gh project item-edit` command) — don't leave it sitting at "Todo" while work is underway.
-- Present the Walkthrough (`walkthrough.md`) to the user and wait for their explicit feedback and approval before opening or finalizing a PR. Running `bun run tauri dev` directly is fine, but check first that another instance isn't already running (`ps aux | grep LuminousMusicPlayer`) — this repo uses `tauri-plugin-single-instance`, and launching a second one while the user has their own session up can tear down their running instance instead of just being rejected.
-- **Merge once every check has actually finished, not before.** This replaced an earlier blanket "never merge" rule after PRs were repeatedly merged while checks were still running — the CI gate is what matters, not withholding the merge action itself. After creating a PR, watch it with `gh pr checks <pr> --watch` (this blocks until every check concludes, pass or fail) rather than sampling `mergeable`/the GitHub UI banner, which both go green on required-checks-only and can be reported alongside still-`in_progress` non-required checks. Once everything has genuinely concluded and passed, run `gh pr merge <pr>` and tell the user it merged. If any check fails, stop and report it — do not merge, and do not retry the merge command hoping it clears. For a stack of dependent PRs, merge them in order (base before dependent) so each retargets cleanly as its predecessor's branch is deleted.
+- Present the Walkthrough (`walkthrough.md`) to the user and wait for their explicit feedback and approval before opening or finalizing a PR.
+- **Merge once every check has actually finished, not before.** The CI gate is what matters: PRs have been merged while non-required checks were still running. After creating a PR, watch it with `gh pr checks <pr> --watch` (this blocks until every check concludes, pass or fail) rather than sampling `mergeable`/the GitHub UI banner, which both go green on required-checks-only and can be reported alongside still-`in_progress` non-required checks. Once everything has genuinely concluded and passed, run `gh pr merge <pr>` and tell the user it merged. If any check fails, stop and report it — do not merge, and do not retry the merge command hoping it clears. For a stack of dependent PRs, merge them in order (base before dependent) so each retargets cleanly as its predecessor's branch is deleted.
 - Once a PR has merged, confirm the corresponding issues closed and their Status set to "Done" on the Project board. On Windows, `git worktree remove` fails with "Permission denied" on the worktree the current session is running from (open file handles keep it locked) — hand the `git worktree remove`/`git branch -d` commands to the user to run themselves in that case instead of retrying.
 - **Creating Issues & Pull Requests**:
   1. Inspect the relevant templates under `.github/ISSUE_TEMPLATE/` (e.g., `bug_report.md`, `feature_request.md`, `epic.md`) when creating issues.
@@ -331,8 +330,7 @@ punt either to the user.
   4. Write the issue or PR body to a temporary scratch file in the workspace or the artifacts scratch directory.
   5. Pick the milestone: never file a new issue against a Closed milestone. Unless the user
      specifies one, default to the open milestone with the highest version number (`gh api
-     repos/esoltys/luminous/milestones -q '.[] | select(.state=="open") | .title'` — at the time
-     of writing that's `3.0`) rather than asking which milestone to use each time. **Never attach a
+     repos/esoltys/luminous/milestones -q '.[] | select(.state=="open") | .title'`) rather than asking which milestone to use each time. **Never attach a
      milestone to a Pull Request** — milestones track issues only, and tagging or assigning a
      milestone to a PR can trigger release workflows.
   6. Create the issue using the GitHub CLI:
