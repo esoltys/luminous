@@ -9,6 +9,7 @@
   import { i18n } from "../stores/i18n.svelte";
   import { prefs } from "../stores/prefs.svelte";
   import { collectionStore } from "../stores/collection.svelte";
+  import { sizedCoverSrcset } from "../utils/covers";
 
   interface Props {
     songId: number | undefined;
@@ -35,6 +36,8 @@
   let isLoading = $state(false);
   let hasFailed = $state(false);
   let loadToken = 0;
+  // Card-sized copies for small views (#1528); a full-resolution view wants the original.
+  let srcset = $derived(fullResolution ? null : sizedCoverSrcset(imgSrc));
 
   async function loadCoverArt() {
     const token = ++loadToken;
@@ -123,6 +126,8 @@
   {#if imgSrc && !hasFailed}
     <img
       src={imgSrc}
+      srcset={srcset ?? undefined}
+      sizes={srcset ? "auto" : undefined}
       alt={i18n.t('common.albumArtAlt')}
       loading="lazy"
       class="w-full h-full object-cover transition-opacity duration-300 {isLoading ? 'opacity-0' : 'opacity-100'} {animateSpin ? 'animate-spin' : ''}"

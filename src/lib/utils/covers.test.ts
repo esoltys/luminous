@@ -5,6 +5,7 @@ import {
   resolveArtistPortraitUrl,
   resolveArtistLogoUrl,
   resolveArtistBackgroundUrl,
+  sizedCoverSrcset,
 } from "./covers";
 import { prefs } from "../stores/prefs.svelte";
 
@@ -73,4 +74,30 @@ describe("artist image resolvers (#1276)", () => {
       expect(resolve("C:/Music/Artist/local.jpg", "abc.jpg")).toContain("local.jpg");
     });
   }
+});
+
+describe("sizedCoverSrcset (#1528)", () => {
+  it("offers card-sized copies of a cached cover, on both URL forms", () => {
+    expect(sizedCoverSrcset("http://luminous-art.localhost/album-1.jpg")).toBe(
+      "http://luminous-art.localhost/album-1.jpg?w=256 256w, " +
+        "http://luminous-art.localhost/album-1.jpg?w=384 384w, " +
+        "http://luminous-art.localhost/album-1.jpg 600w"
+    );
+    expect(sizedCoverSrcset("luminous-art://album-1.jpg")).toBe(
+      "luminous-art://album-1.jpg?w=256 256w, luminous-art://album-1.jpg?w=384 384w, luminous-art://album-1.jpg 600w"
+    );
+  });
+
+  it("offers them for a folder-art thumbnail", () => {
+    const url = "http://luminous-art.localhost/thumb/D%3A%2FMusic%2Fcover.jpg";
+    expect(sizedCoverSrcset(url)).toContain(`${url}?w=256 256w`);
+  });
+
+  it("leaves originals, remote and mock URLs alone", () => {
+    expect(sizedCoverSrcset("http://luminous-art.localhost/local/D%3A%2Fcover.jpg")).toBeNull();
+    expect(sizedCoverSrcset("luminous-art://embedded/album-1.jpg/D%3A%2Fsong.flac")).toBeNull();
+    expect(sizedCoverSrcset("https://is1-ssl.mzstatic.com/image/600x600.jpg")).toBeNull();
+    expect(sizedCoverSrcset("/covers/album-1.jpg")).toBeNull();
+    expect(sizedCoverSrcset(null)).toBeNull();
+  });
 });

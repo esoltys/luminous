@@ -48,6 +48,28 @@ export function resolveArtistBackgroundUrl(
   return resolveLocalOrFetched(localFanartUri, fetchedBackgroundFilename, prefs.fanartFetchBackground);
 }
 
+/** Smaller copies `luminous-art://` serves on request (`?w=<px>`, #1528), so a
+ * card decodes a cover near the size it's drawn. Bounded by the backend's
+ * `MIN_SIZED_EDGE` and `CACHE_MAX_EDGE` (covermanager.rs). */
+const SIZED_COVER_EDGES = [256, 384];
+/** `CACHE_MAX_EDGE` in covermanager.rs: the longest edge of an unsized cached cover. */
+const CACHED_COVER_EDGE = 600;
+
+/**
+ * A `srcset` offering card-sized copies of a cached cover or folder-art
+ * thumbnail URL, for an `<img sizes="auto" loading="lazy">` to pick from by
+ * its drawn width and the display scale. Null for anything else: an original
+ * (`local/`, `embedded/`), a remote URL, or a mock-library path.
+ */
+export function sizedCoverSrcset(url: string | null): string | null {
+  if (!url) return null;
+  const prefix = ["http://luminous-art.localhost/", "luminous-art://"].find((p) => url.startsWith(p));
+  if (!prefix) return null;
+  const rest = url.slice(prefix.length).replace(/^localhost\//, "");
+  if (rest.startsWith("local/") || rest.startsWith("embedded/") || rest.includes("?")) return null;
+  return [...SIZED_COVER_EDGES.map((w) => `${url}?w=${w} ${w}w`), `${url} ${CACHED_COVER_EDGE}w`].join(", ");
+}
+
 export interface CoverSource {
   id: number;
   art_manual?: string | null;
