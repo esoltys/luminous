@@ -301,7 +301,7 @@ export const frFR: DeepStringRecord<typeof en> = {
     defaultPlayerButton: "Ouvrir les applications par défaut",
     defaultPlayerError: "Impossible d'ouvrir les applications par défaut de Windows",
     exportDiagnosticsLabel: "Exporter les diagnostics",
-    exportDiagnosticsHint: "Enregistrer un journal des erreurs et incidents récents à joindre à un rapport de bug.",
+    exportDiagnosticsHint: "Enregistrer un journal des erreurs et incidents récents à joindre à un rapport de bogue.",
     exportDiagnosticsSuccess: "Diagnostics exportés",
     exportDiagnosticsError: "Échec de l'exportation des diagnostics",
     dataStorageLabel: "Emplacement des données",
