@@ -397,7 +397,7 @@ class CollectionStore {
             const releaseUrl = isFirstEver
               ? undefined
               : "https://github.com/esoltys/luminous/releases";
-            toastStore.show(msg, "milestone", undefined, releaseUrl);
+            toastStore.celebrate(msg, isFirstEver ? "star" : "sparkle", releaseUrl);
             setTimeout(() => { this.isFirstLaunch = false; }, 700);
           }, 1200);
         }
@@ -451,19 +451,19 @@ class CollectionStore {
             }
 
             // Milestone detection (#182): check if total_songs just crossed a
-            // threshold. Only fire the first one crossed (don't stack multiple
+            // threshold. Only fire the highest one crossed (don't stack multiple
             // milestone toasts if an import jumps past several at once).
             const newTotal = this.stats.total_songs;
-            for (const threshold of MILESTONE_THRESHOLDS) {
-              if (songCountBeforeRefresh < threshold && newTotal >= threshold) {
-                this.milestoneReached = threshold;
-                toastStore.show(
-                  i18n.plural("celebrations.milestone", threshold),
-                  "milestone"
-                );
-                setTimeout(() => { this.milestoneReached = null; }, 700);
-                break;
-              }
+            const threshold = MILESTONE_THRESHOLDS.findLast(
+              (t) => songCountBeforeRefresh < t && newTotal >= t
+            );
+            if (threshold !== undefined) {
+              this.milestoneReached = threshold;
+              toastStore.celebrate(
+                i18n.plural("celebrations.milestone", threshold),
+                "flag"
+              );
+              setTimeout(() => { this.milestoneReached = null; }, 700);
             }
           });
           this.refreshLibrary();

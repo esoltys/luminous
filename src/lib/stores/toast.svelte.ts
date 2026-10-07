@@ -2,6 +2,9 @@ import { TOAST_DURATION_MS } from "../constants";
 
 type ToastVariant = "info" | "error" | "success" | "milestone" | "warning" | "task";
 
+/** Icon shown on a milestone toast; `checks` is the default. */
+type MilestoneIcon = "checks" | "flag" | "star" | "sparkle";
+
 interface ToastAction {
   label: string;
   onClick: () => void;
@@ -25,6 +28,7 @@ interface ToastMessage {
   url?: string;
   action?: ToastAction;
   task?: ToastTaskData;
+  milestoneIcon?: MilestoneIcon;
 }
 
 class ToastStore {
@@ -180,6 +184,14 @@ class ToastStore {
     const id = this.nextId++;
     this.messages.push({ id, text, variant, url, action });
     this.scheduleDismiss(id, durationMs);
+    return id;
+  }
+
+  /** Show a milestone-tier celebration toast with the icon that suits the moment. */
+  celebrate(text: string, icon: MilestoneIcon, url?: string) {
+    const id = this.show(text, "milestone", undefined, url);
+    const msg = this.messages.find((m) => m.id === id);
+    if (msg) msg.milestoneIcon = icon;
     return id;
   }
 
