@@ -16,36 +16,53 @@ before/after a change, instead of relying on "it feels heavier." See #706.
   that don't change with Luminous's own code.
 - **Build measured**: a release build (`bun run tauri build --no-bundle`), not the dev server — the
   dev server's Vite/HMR overhead isn't representative of what ships to users.
+- **Where it runs**: each source is measured in a throwaway profile (`LUMINOUS_DATA_DIR` and
+  `WEBVIEW2_USER_DATA_FOLDER` in a temp folder) over the real music library, read in place. The
+  build under test creates its own database, so any past release can be measured, and nothing it
+  plays or changes reaches the real profile. Rows from these runs have `profile` = `scratch`; rows
+  from before #1197 were taken in the developer's own profile and have `real`. Only compare rows of
+  the same kind.
 - **Held constant between runs**: the window is on screen at a fixed size, the app launches fresh
   into Collection → Songs with nothing selected, each scenario settles before sampling, and the
   recorded figure is the median of 5 readings. Each of these moves the numbers on its own: a
   minimized WebView2 reads ~100MB lower than a visible one, and the restored view alone shifted idle
-  private bytes by ~26MB between otherwise identical runs.
+  private bytes by ~26MB between otherwise identical runs. The library still grows over time, so
+  compare versions measured back to back on the same day.
+- **Peak**: each row also records the highest working set and private bytes polled during the
+  scenario (the work, the settle and the samples). Polls are a second or two apart, so a shorter
+  spike can slip between them.
 
 ## Running it
 
-**Windows**: one command runs all three scenarios the same way every time and appends one row per
+**Windows**: one command runs every scenario the same way every time and appends one row per
 scenario to `docs/performance-history.csv`:
 
 ```bash
 bun run tauri build --no-bundle
 bun run perf:memory -- --app-version 2.6.0 --track "<path to the baseline track>"
+bun run perf:memory -- --track "<path>" --sources local,webdav,subsonic
 ```
 
 `scripts/perf-memory-scenarios.ts` launches the release exe with WebView2's DevTools port open and
-triggers each scenario through the same IPC calls the UI's buttons make (Force Full Scan, Play). It
-runs against your real library and settings, and restores the view, window placement, EQ state and
-playback position it changed before closing the app. Playback is audible for about a minute.
+triggers each scenario through the same IPC calls the UI makes (Add Folder, Force Full Scan, Sync
+Now, Play). The local source uses your profile's watched folders unless you pass `--library`.
+Remote servers come from `LUMINOUS_PERF_WEBDAV_*` and `LUMINOUS_PERF_SUBSONIC_*` environment
+variables (see the script header), so credentials stay out of the command line and the CSV.
+Playback is audible for about a minute per source.
 
 `--track` names the baseline track, which must already be in the library. The decoder's cost
 depends on the format, so every version is measured playing the same file: since 2.6 that's
 "Nevidal" by Arkona, a 274s FLAC at 44.1kHz/16-bit. The script cues it at 0:00 and stops before
 its halfway mark, so it never records a play or scrobble. Pass `--app-version` when measuring
 before the version bump, since `package.json` still has the previous version then. It refuses to
-run if Luminous is already open or the exe is older than the last app-source commit.
+run if Luminous is already open or the exe is older than the last app-source commit. A remote
+source's copy of the baseline track is matched by title, album and length, so the server must serve
+the same file.
 
 To measure an older release, build it in its own worktree and pass that exe with `--exe`. The
 staleness check and the CSV's commit column then use that worktree's checkout, not this one.
+Builds before #1197 save window placement in the real profile even in a scratch run; the script
+restores that file afterwards.
 
 **Linux**: the scenario script needs WebView2's DevTools protocol, so drive the app by hand and
 take each reading with `measure-memory`, keeping the window on screen at a consistent size:
@@ -57,7 +74,8 @@ bun run measure-memory -- --label idle --samples 5 --app-version 2.5.0 --tracks 
 **Comparing versions**: `scripts/perf-chart.py` (needs `pip install matplotlib`) draws the chart
 below and prints the Markdown delta table from the CSV. For each version and scenario it uses the
 newest row, so a re-run supersedes an earlier one without deleting history. `--runs N` averages
-the newest N runs per version instead, for when a single run is too noisy to judge:
+the newest N runs per version instead, for when a single run is too noisy to judge. It compares
+scratch-profile rows by default; pass `--profile real` for the history before #1197:
 
 ```bash
 bun run perf:chart -- --baseline 2.5.0 --candidate 2.6.0 --runs 2
@@ -65,10 +83,15 @@ bun run perf:chart -- --baseline 2.5.0 --candidate 2.6.0 --runs 2
 
 ## Scenarios
 
-1. **Idle** — app freshly launched, library already scanned from a prior run, no playback.
-2. **After a full library scan** — freshly launched, then a forced full rescan triggered and run to
-   completion.
-3. **During playback** — a track playing, with the equalizer and spectrum analyzer enabled.
+| Source | Label | What happens |
+| --- | --- | --- |
+| Local | `initial-scan` | Watched folders added to an empty profile and scanned, including embedded/folder art extraction |
+| Local | `idle` | Fresh launch over the scanned library, no playback |
+| Local | `after-full-scan` | Forced full rescan run to completion |
+| Local | `playback-eq-analyzer` | Baseline track playing with the equalizer and spectrum analyzer on |
+| Local | `album-grid` | Fresh launch into Collection → Albums, scrolled end to end, which generates every cover thumbnail |
+| WebDAV | `webdav-sync`, `webdav-idle`, `webdav-playback` | First sync, idle after relaunch, streamed playback |
+| Subsonic | `subsonic-sync`, `subsonic-idle`, `subsonic-playback` | The same against an OpenSubsonic server (e.g. Navidrome) |
 
 ## Baseline results
 
@@ -140,9 +163,8 @@ Private bytes still don't climb across scenarios, and the forced full scan of 2,
 
 The 2.5 rows are the first taken with every condition held constant, so they're the baseline to
 compare future releases against. Two back-to-back scripted runs differed by 2-13MB of private bytes
-per scenario, so a change under ~3% is within run-to-run noise. Measuring against a fixed test
-library instead of the real one would remove library drift and allow a controlled re-run of 2.0.0
-(#1197).
+per scenario, so a change under ~3% is within run-to-run noise. Scratch-profile runs (#1197) allow
+a controlled re-run of 2.0.0.
 
 ### 2.6 vs. 2.5 (Windows)
 
