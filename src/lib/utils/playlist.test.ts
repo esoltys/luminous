@@ -210,3 +210,12 @@ describe("Moment Mix label", () => {
     expect(getDaypartMixLabel(null, "X")).toBe("X");
   });
 });
+
+describe("getPlaylistDisplayName for the built-in Queue", () => {
+  it("localizes the Queue and leaves user playlists as named", () => {
+    i18n.currentLocale = "ru";
+    expect(getPlaylistDisplayName({ name: "Queue", is_queue: true })).toBe("Очередь");
+    expect(getPlaylistDisplayName({ name: "Queue", is_queue: false })).toBe("Queue");
+    i18n.currentLocale = "en-CA";
+  });
+});

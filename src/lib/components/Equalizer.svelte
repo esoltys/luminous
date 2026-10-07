@@ -78,10 +78,10 @@
     action();
   }
 
-  const bandLabels = [
-    "31.5 Hz", "63 Hz", "125 Hz", "250 Hz", "500 Hz",
-    "1 kHz", "2 kHz", "4 kHz", "8 kHz", "16 kHz"
-  ];
+  const bandLabels = $derived([
+    ...[31.5, 63, 125, 250, 500].map((f) => `${formatNumber(f)} ${i18n.t("units.hz")}`),
+    ...[1, 2, 4, 8, 16].map((f) => `${formatNumber(f)} ${i18n.t("units.khz")}`)
+  ]);
 
   function presetLabel(presetName: string): string {
     const keyMap: Record<string, string> = {
@@ -611,21 +611,22 @@
     </div>
     <div class="flex items-center gap-4 flex-wrap">
 
-      <div class="relative flex items-center bg-brand-main border border-brand-border rounded-[2rem] p-0.5" role="group" aria-label={i18n.t('equalizer.modeLabel')}>
+      <!-- Equal grid columns, not flex-1: unequal label widths would drift the 50%-wide pill off its button. -->
+      <div class="relative grid grid-cols-2 items-center bg-brand-main border border-brand-border rounded-[2rem] p-0.5" role="group" aria-label={i18n.t('equalizer.modeLabel')}>
         <!-- Sliding background pill -->
         <span
           class="absolute top-0.5 bottom-0.5 left-0.5 w-[calc(50%-2px)] rounded-full bg-brand-accent shadow-sm pointer-events-none transition-transform duration-200 ease-out {mode === 'parametric' ? 'translate-x-full' : 'translate-x-0'}"
           aria-hidden="true"
         ></span>
         <button
-          class="relative z-10 flex-1 whitespace-nowrap text-xs font-semibold px-4 py-1.5 rounded-full transition-colors duration-200 {mode === 'graphic10' ? 'text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+          class="relative z-10 whitespace-nowrap text-xs font-semibold px-4 py-1.5 rounded-full transition-colors duration-200 {mode === 'graphic10' ? 'text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
           onclick={() => handleModeChange("graphic10")}
           aria-pressed={mode === "graphic10"}
         >
           {i18n.t('equalizer.modeGraphic')}
         </button>
         <button
-          class="relative z-10 flex-1 whitespace-nowrap text-xs font-semibold px-4 py-1.5 rounded-full transition-colors duration-200 {mode === 'parametric' ? 'text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+          class="relative z-10 whitespace-nowrap text-xs font-semibold px-4 py-1.5 rounded-full transition-colors duration-200 {mode === 'parametric' ? 'text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
           onclick={() => handleModeChange("parametric")}
           aria-pressed={mode === "parametric"}
         >
@@ -690,7 +691,7 @@
           </div>
         {/if}
         <span class="text-xs font-mono font-medium w-16 text-right {preamp > 0 ? 'text-green-400' : preamp < 0 ? 'text-red-400' : 'text-brand-text-primary'}">
-          {preamp > 0 ? "+" : ""}{formatNumber(preamp, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} dB
+          {preamp > 0 ? "+" : ""}{formatNumber(preamp, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} {i18n.t("units.db")}
         </span>
       </div>
 
@@ -985,7 +986,7 @@
               oninput={handleFallbackGainChange}
               disabled={!loudnessStore.enabled}
               label={i18n.t('loudness.fallbackGain')}
-              suffix="dB"
+              suffix={i18n.t("units.db")}
               size={80}
             />
           {/if}

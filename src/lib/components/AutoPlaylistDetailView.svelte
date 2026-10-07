@@ -61,7 +61,7 @@
   import { openInPicard } from "../utils/picard";
   import { picardStore } from "../stores/picard.svelte";
   import { compareSongs } from "../utils/songSort";
-  import { toTitleCase } from "../utils/formatters";
+  import { toTitleCase, formatHoursMinutes } from "../utils/formatters";
   import Modal from "./Modal.svelte";
   import Button from "./Button.svelte";
   import AlbumTagEditor from "./AlbumTagEditor.svelte";
@@ -243,10 +243,7 @@
 
   let totalDurationLabel = $derived.by(() => {
     const totalNs = songs.reduce((sum, s) => sum + (s.length_nanosec ?? 0), 0);
-    const totalMinutes = Math.round(totalNs / 1_000_000_000 / 60);
-    const h = Math.floor(totalMinutes / 60);
-    const m = totalMinutes % 60;
-    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+    return formatHoursMinutes(Math.round(totalNs / 1_000_000_000 / 60));
   });
 
   async function fetchSongs(k: typeof kind, g: typeof genre, at: typeof artistTag, d: typeof decade, b: typeof bpm, pid: typeof playlistId): Promise<Song[]> {

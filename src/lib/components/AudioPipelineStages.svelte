@@ -44,7 +44,7 @@
   function formatSampleRate(rate?: number): string {
     if (!rate) return '—';
     const digits = rate % 1000 === 0 ? 0 : 1;
-    return `${formatNumber(rate / 1000, { minimumFractionDigits: digits, maximumFractionDigits: digits })} kHz`;
+    return `${formatNumber(rate / 1000, { minimumFractionDigits: digits, maximumFractionDigits: digits })} ${i18n.t("units.khz")}`;
   }
 
   function getQualityTierLabel(tier: string): string {

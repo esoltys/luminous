@@ -1550,6 +1550,11 @@ export const de = {
     inactive: "Inaktiv",
     create: "Erstellen"
   },
+  units: {
+    hz: "Hz",
+    khz: "kHz",
+    db: "dB"
+  },
   toast: {
     copyError: "Fehler in die Zwischenablage kopieren",
     copied: "In die Zwischenablage kopiert",

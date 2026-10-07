@@ -1625,6 +1625,11 @@ export const fr: DeepStringRecord<typeof en> = {
     inactive: "Inactif",
     create: "Créer"
   },
+  units: {
+    hz: "Hz",
+    khz: "kHz",
+    db: "dB"
+  },
   toast: {
     copyError: "Copier l'erreur dans le presse-papiers",
     copied: "Copié dans le presse-papiers",

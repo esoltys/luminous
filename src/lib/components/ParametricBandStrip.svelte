@@ -89,8 +89,8 @@
   <div class="grid grid-cols-[1.5rem_minmax(6rem,1.4fr)_repeat(3,minmax(4rem,1fr))_auto_auto] gap-2 px-2 text-[10px] font-bold uppercase tracking-wider text-brand-text-secondary" aria-hidden="true">
     <span>#</span>
     <span>{i18n.t("equalizer.bandType")}</span>
-    <span>{i18n.t("equalizer.frequency")} (Hz)</span>
-    <span>{i18n.t("equalizer.gain")} (dB)</span>
+    <span>{i18n.t("equalizer.frequency")} ({i18n.t("units.hz")})</span>
+    <span>{i18n.t("equalizer.gain")} ({i18n.t("units.db")})</span>
     <span>{i18n.t("equalizer.qFactor")}</span>
     <span class="w-9"></span>
     <span class="w-7"></span>

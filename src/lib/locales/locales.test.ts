@@ -4,6 +4,7 @@ import { en } from "./en";
 import { es } from "./es";
 import { fr } from "./fr";
 import { it as itMessages } from "./it";
+import { ru } from "./ru";
 import { uk } from "./uk";
 import { BASE_LOCALE, LOCALES, catalogChain, isLocale, legacyLanguageToLocale, localeLabel, localePickerGroups, manualLanguageForLocale } from "./index";
 
@@ -74,6 +75,9 @@ function extractPlaceholders(str: string): string[] {
  * (e.g. loanwords, shared musical terminology, technical acronyms, brand names, or symbols).
  */
 const IDENTICAL_OK_FR = new Set([
+  "units.hz", // SI unit symbols are the same in this language
+  "units.khz",
+  "units.db",
   "equalizer.importPlaceholder", // Equalizer APO sample lines, same syntax in every language
   "listenbrainz.critiquebrainzUserPlaceholder", // a URL
   "albumDetail.statsLine", // "{genre} · {year} · {duration}"
@@ -174,6 +178,9 @@ const IDENTICAL_OK_FR = new Set([
 ]);
 
 const IDENTICAL_OK_IT = new Set<string>([
+  "units.hz", // SI unit symbols are the same in this language
+  "units.khz",
+  "units.db",
   "sidebar.home", // "Home"
   "collection.tableHeaderTrack", // "#"
   "collection.tableHeaderAlbum", // "Album"
@@ -264,6 +271,9 @@ const IDENTICAL_OK_IT = new Set<string>([
 ]);
 
 const IDENTICAL_OK_ES = new Set<string>([
+  "units.hz", // SI unit symbols are the same in this language
+  "units.khz",
+  "units.db",
   "collection.tableHeaderTrack", // "#"
   "collection.columnBpm", // "BPM"
   "collection.booleanNo", // "No"
@@ -321,6 +331,9 @@ const IDENTICAL_OK_ES = new Set<string>([
 
 // Cognates, loanwords and technical terms Windows and the field also leave in English, plus brands, acronyms and symbols.
 const IDENTICAL_OK_DE = new Set<string>([
+  "units.hz", // SI unit symbols are the same in this language
+  "units.khz",
+  "units.db",
   "home.chartPeak", // "Peak #{peak}", left untranslated as chart UIs commonly do
   "sidebar.genres",
   "sidebar.scanningPhaseLabel",
@@ -475,12 +488,52 @@ const IDENTICAL_OK_UK = new Set<string>([
   "audioPipeline.bitPerfect", // Bit-perfect
 ]);
 
+// Brands, acronyms, units, symbols and example URLs or paths that Russian leaves as they are.
+const IDENTICAL_OK_RU = new Set<string>([
+  "collection.columnBpm", // BPM
+  "collection.tableHeaderBpm", // BPM
+  "collection.tableHeaderMusicBrainzId", // MBID
+  "settings.aboutAppName", // the app name
+  "settings.formatMsix", // Microsoft Store
+  "settings.formatAppImage", // Linux AppImage
+  "settings.badgeIconUsb", // USB
+  "settings.webdavUrlPlaceholder", // an example URL
+  "settings.subsonicUrlPlaceholder", // an example URL
+  "playlists.populationModeTitleFormat", // "{base} {suffix}"
+  "playlists.bpmAutoPlaylist", // BPM
+  "playerBar.musicbrainzSectionLabel", // MusicBrainz
+  "playerBar.critiquebrainzSectionLabel", // CritiqueBrainz
+  "playerBar.listenbrainzSectionLabel", // ListenBrainz
+  "tagEditor.bpmField", // BPM
+  "equalizer.importPlaceholder", // Equalizer APO sample lines, same syntax in every language
+  "equalizer.qFactor", // Q
+  "equalizer.isoStandard", // ISO 266:1997
+  "themes.dynamic-artwork", // "✨ Luminous"
+  "themes.sabrina", // a theme name
+  "albumDetail.statsLine", // "{genre} · {year} · {duration}"
+  "picard.integrationTitle", // MusicBrainz Picard
+  "picard.customPathPlaceholder", // a Windows path
+  "picard.customPathPlaceholderLinux", // a Linux path
+  "listenbrainz.critiquebrainzUserPlaceholder", // a URL
+  "discord.integrationTitle", // Discord Rich Presence
+  "smartPlaylistBuilder.fieldBpm", // BPM
+  "smartPlaylistBuilder.opEquals", // "="
+  "smartPlaylistBuilder.opNotEquals", // "!="
+  "smartPlaylistBuilder.opGte", // ">="
+  "smartPlaylistBuilder.opLte", // "<="
+  "smartPlaylistBuilder.opGt", // ">"
+  "smartPlaylistBuilder.opLt", // "<"
+  "audioPipeline.tierHiRes", // Hi-Res Audio
+  "audioPipeline.bitPerfect", // Bit-perfect
+]);
+
 const CATALOGS = [
   { name: "German", tag: "de", file: "de.ts", messages: de, identicalOk: IDENTICAL_OK_DE },
   { name: "Spanish", tag: "es", file: "es.ts", messages: es, identicalOk: IDENTICAL_OK_ES },
   { name: "French", tag: "fr-CA", file: "fr.ts", messages: fr, identicalOk: IDENTICAL_OK_FR },
   { name: "Italian", tag: "it", file: "it.ts", messages: itMessages, identicalOk: IDENTICAL_OK_IT },
   { name: "Ukrainian", tag: "uk", file: "uk.ts", messages: uk, identicalOk: IDENTICAL_OK_UK },
+  { name: "Russian", tag: "ru", file: "ru.ts", messages: ru, identicalOk: IDENTICAL_OK_RU },
 ];
 
 describe.each(CATALOGS)("Locale translation completeness and integrity: $name", ({ name, tag, file, messages, identicalOk }) => {

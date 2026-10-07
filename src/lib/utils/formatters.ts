@@ -11,6 +11,18 @@ export function formatDuration(ns: number | undefined): string {
   return `${m}:${s < 10 ? "0" : ""}${s}`;
 }
 
+/**
+ * "1h 5m" in English. Intl supplies the unit words, so they follow the locale and need no keys.
+ * Callers pick their own rounding and pass whole minutes.
+ */
+export function formatHoursMinutes(totalMinutes: number): string {
+  const part = (value: number, unit: "hour" | "minute") =>
+    formatNumber(value, { style: "unit", unit, unitDisplay: "narrow" });
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return hours > 0 ? `${part(hours, "hour")} ${part(minutes, "minute")}` : part(minutes, "minute");
+}
+
 export function formatDate(timestamp?: number): string {
   if (!timestamp) return "—";
   return new Date(timestamp * 1000).toLocaleDateString();
@@ -26,7 +38,7 @@ export function formatFileSize(bytes?: number): string {
 
 export function formatSampleRate(hz?: number): string {
   if (!hz) return "—";
-  return `${formatNumber(hz / 1000, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kHz`;
+  return `${formatNumber(hz / 1000, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} ${i18n.t("units.khz", {}, "kHz")}`;
 }
 
 export function formatBitDepth(bits?: number): string {

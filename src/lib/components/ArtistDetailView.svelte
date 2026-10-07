@@ -9,7 +9,7 @@
   import { pinnedStore } from "../stores/pinned.svelte";
   import { statsExclusionsStore } from "../stores/statsExclusions.svelte";
   import { shuffleArray } from "../utils/shuffle";
-  import { formatDuration } from "../utils/formatters";
+  import { formatDuration, formatHoursMinutes } from "../utils/formatters";
   import CoverArt from "./CoverArt.svelte";
   import CoverMosaic from "./CoverMosaic.svelte";
   import GenreChips from "./GenreChips.svelte";
@@ -699,10 +699,7 @@
 
   let totalDurationLabel = $derived.by(() => {
     const totalNs = songs.reduce((sum, s) => sum + (s.length_nanosec ?? 0), 0);
-    const totalMinutes = Math.round(totalNs / 1_000_000_000 / 60);
-    const h = Math.floor(totalMinutes / 60);
-    const m = totalMinutes % 60;
-    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+    return formatHoursMinutes(Math.round(totalNs / 1_000_000_000 / 60));
   });
 
   // Shares classifyRelease() with the per-card badge everywhere else in the
