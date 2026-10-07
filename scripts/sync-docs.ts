@@ -24,20 +24,8 @@ function copyDir(src: string, dest: string) {
   }
 }
 
-const FIRA_FONT_FILES = [
-  "fira-sans-latin-400-normal.woff2",
-  "fira-sans-latin-ext-400-normal.woff2",
-  "fira-sans-latin-400-italic.woff2",
-  "fira-sans-latin-ext-400-italic.woff2",
-  "fira-sans-latin-500-normal.woff2",
-  "fira-sans-latin-ext-500-normal.woff2",
-  "fira-sans-latin-600-normal.woff2",
-  "fira-sans-latin-ext-600-normal.woff2",
-  "fira-sans-latin-700-normal.woff2",
-  "fira-sans-latin-ext-700-normal.woff2",
-  "fira-sans-latin-700-italic.woff2",
-  "fira-sans-latin-ext-700-italic.woff2",
-];
+// The guide reuses the app's own fonts rather than keeping a copy in docs/user-guide/.
+const FONT_DIRS = ["expose", "fira-sans"];
 
 const FILE_COPIES = [
   "luminous-user-guide-EN.html",
@@ -45,12 +33,19 @@ const FILE_COPIES = [
   "guide.css",
   "guide.js",
   "luminous-mark.svg",
-  "expose-700.woff2",
-  ...FIRA_FONT_FILES,
 ];
 
 for (const file of FILE_COPIES) {
   fs.copyFileSync(path.join(userGuideDir, file), path.join(staticDir, file));
+}
+
+const fontsOut = path.join(staticDir, "fonts");
+fs.mkdirSync(fontsOut, { recursive: true });
+for (const dir of FONT_DIRS) {
+  const fontsSrc = path.join(rootDir, "src", "lib", "fonts", dir);
+  for (const file of fs.readdirSync(fontsSrc).filter((f) => f.endsWith(".woff2"))) {
+    fs.copyFileSync(path.join(fontsSrc, file), path.join(fontsOut, file));
+  }
 }
 
 copyDir(path.join(userGuideDir, "screenshots"), path.join(staticDir, "screenshots"));
