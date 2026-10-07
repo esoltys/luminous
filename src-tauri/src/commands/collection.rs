@@ -132,6 +132,7 @@ pub async fn scan_directories(
             crate::collection::ScanTrigger::from_reason(reason.as_deref()),
         )
         .await
+        .map(|_| ())
         .map_err(|e| e.to_string())
 }
 
