@@ -731,6 +731,9 @@ pub fn subtitles_to_lrc(content: &str) -> String {
 /// `AppHandle`/`State` — BDD tests exercise this directly (see
 /// `tests/lyrics_bdd.rs`) to verify the cache-hit path never reaches
 /// `lyrics_manager.fetch_lyrics`.
+/// Returned instead of querying online providers while the master toggle is Offline.
+pub const OFFLINE_LYRICS_ERROR: &str = "offline: online lyrics lookup is disabled";
+
 pub async fn get_lyrics_for_song(
     db: &crate::db::Database,
     lyrics_manager: &LyricsManager,
@@ -810,6 +813,16 @@ pub async fn get_lyrics_for_song(
     }
 
     let duration_sec = (len_ns / 1_000_000_000) as u32;
+
+    // Offline master toggle (#1398): sidecar files and cached lyrics were
+    // already tried above; never fall through to the online providers, and
+    // leave the cache untouched so lookup resumes when back online.
+    if !crate::commands::context::is_online_enabled(&conn) {
+        return match cached_lyrics {
+            Some(lyrics) if !lyrics.trim().is_empty() => Ok(lyrics),
+            _ => Err(OFFLINE_LYRICS_ERROR.to_string()),
+        };
+    }
 
     // 3. Query online APIs (LRCLIB -> NetEase -> Lyrics.ovh)
     match lyrics_manager

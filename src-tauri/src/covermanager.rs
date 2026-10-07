@@ -1358,6 +1358,11 @@ impl CoverManager {
     pub async fn fetch_remote_cover(&self, song_id: i64) -> Result<Option<String>> {
         let (artist, album, album_artist, art_unset) = {
             let conn = self.db.pool.get()?;
+            // Offline master toggle (#1398). Returns before touching `art_unset`
+            // so the lookup is retried once the user is back online.
+            if !crate::commands::context::is_online_enabled(&conn) {
+                return Ok(None);
+            }
             conn.query_row(
                 "SELECT artist, album, album_artist, art_unset FROM songs WHERE id = ?1",
                 params![song_id],
@@ -1714,6 +1719,9 @@ impl CoverManager {
     /// missed), so it never displaces a cover found any other way.
     pub fn fanart_album_art(&self, song_id: i64) -> Result<(Option<String>, Option<String>)> {
         let conn = self.db.pool.get()?;
+        if !crate::commands::context::is_online_enabled(&conn) {
+            return Ok((None, None));
+        }
         let prefs = crate::commands::settings::load_ui_preferences(&conn);
         if !prefs.fanart_fetch_album_cover && !prefs.fanart_fetch_disc_art {
             return Ok((None, None));
@@ -1769,6 +1777,61 @@ mod tests {
         );
 
         let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    /// Offline master toggle (#1398): no lookup, and `art_unset` stays clear so
+    /// the song is retried once the user is back online.
+    #[tokio::test]
+    async fn test_fetch_remote_cover_offline_skips_lookup_and_keeps_art_retryable() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_covermanager_offline_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let song_id = {
+            let conn = db.pool.get().unwrap();
+            crate::collection::upsert_song(
+                &conn,
+                &crate::models::Song {
+                    artist: Some("Artist".to_string()),
+                    album: Some("Album".to_string()),
+                    title: Some("Title".to_string()),
+                    source: crate::models::SongSource::LocalFile,
+                    path: Some(r"C:\Music	agged.ogg".to_string()),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT OR REPLACE INTO app_state (key, value) VALUES ('context_enrichment_enabled', 'false')",
+                [],
+            )
+            .unwrap();
+            conn.query_row(
+                "SELECT id FROM songs WHERE path = ?1",
+                params![r"C:\Music	agged.ogg"],
+                |r| r.get::<_, i64>(0),
+            )
+            .unwrap()
+        };
+
+        // Unreachable base URL: any request would error rather than return Ok(None).
+        let manager = CoverManager::new(db.clone(), temp_dir.clone())
+            .with_itunes_base_url("http://127.0.0.1:1");
+        assert_eq!(manager.fetch_remote_cover(song_id).await.unwrap(), None);
+
+        let art_unset: bool = db
+            .pool
+            .get()
+            .unwrap()
+            .query_row(
+                "SELECT art_unset FROM songs WHERE id = ?1",
+                params![song_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert!(!art_unset);
     }
 
     /// Regression test for the #362 follow-up: a song with no artist/album

@@ -225,11 +225,23 @@ impl MusicBrainzManager {
         Ok(())
     }
 
+    /// Master Online/Offline toggle (#1398); account traffic is suspended while Offline.
+    fn is_online(&self) -> bool {
+        self.db
+            .pool
+            .get()
+            .map(|conn| crate::commands::context::is_online_enabled(&conn))
+            .unwrap_or(true)
+    }
+
     pub async fn start_login(
         &self,
         app: AppHandle,
         prefer_loopback: bool,
     ) -> Result<String, String> {
+        if !self.is_online() {
+            return Err(crate::commands::context::OFFLINE_ERROR.to_string());
+        }
         let client_id = self.resolve_client_id();
         let code_verifier = generate_pkce_verifier();
         let code_challenge = generate_pkce_challenge(&code_verifier);
@@ -416,6 +428,9 @@ impl MusicBrainzManager {
         code: &str,
         app: &AppHandle,
     ) -> Result<MusicBrainzAuthState, String> {
+        if !self.is_online() {
+            return Err(crate::commands::context::OFFLINE_ERROR.to_string());
+        }
         let clean_code = code.trim();
         if clean_code.is_empty() {
             return Err("Authorization code cannot be empty".to_string());
@@ -644,6 +659,9 @@ impl MusicBrainzManager {
             }
         }
 
+        if !self.is_online() {
+            return Err(crate::commands::context::OFFLINE_ERROR.to_string());
+        }
         let token = self.ensure_valid_token().await?;
         self.fetch_and_cache_stats(&username, &token).await
     }
@@ -706,10 +724,15 @@ impl MusicBrainzManager {
     }
 
     pub async fn logout(&self, app: &AppHandle) -> Result<(), String> {
-        if let Ok(Some(token)) = self
-            .get_stored_setting("mb_refresh_token")
-            .or_else(|_| self.get_stored_setting("mb_access_token"))
-        {
+        // Token revocation is best-effort and skipped offline; local credentials
+        // are cleared either way.
+        let stored_token = if self.is_online() {
+            self.get_stored_setting("mb_refresh_token")
+                .or_else(|_| self.get_stored_setting("mb_access_token"))
+        } else {
+            Ok(None)
+        };
+        if let Ok(Some(token)) = stored_token {
             let client_id = self.resolve_client_id();
             let client_secret = self.resolve_client_secret();
             let mut form = vec![("token", token), ("client_id", client_id)];

@@ -210,6 +210,10 @@ pub struct ScrobblerManager {
     settings: Arc<Mutex<ScrobblerSettings>>,
     paused: Arc<std::sync::atomic::AtomicBool>,
     discord: Arc<Mutex<crate::discord::DiscordManager>>,
+    /// Mirrors the Online/Offline master toggle (#1398). While `false`,
+    /// ListenBrainz traffic and Discord presence are suspended; the persisted
+    /// per-service settings are left untouched so they resume on re-enable.
+    online: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl ScrobblerManager {
@@ -225,6 +229,11 @@ impl ScrobblerManager {
             initial_settings.scrobble_paused,
         ));
         let discord = Arc::new(Mutex::new(crate::discord::DiscordManager::new()));
+        let online = db
+            .pool
+            .get()
+            .map(|conn| crate::commands::context::is_online_enabled(&conn))
+            .unwrap_or(true);
 
         Self {
             db,
@@ -232,6 +241,36 @@ impl ScrobblerManager {
             settings: Arc::new(Mutex::new(initial_settings)),
             paused,
             discord,
+            online: Arc::new(std::sync::atomic::AtomicBool::new(online)),
+        }
+    }
+
+    pub fn is_online(&self) -> bool {
+        self.online.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Apply the Online/Offline master toggle: going offline drops the Discord
+    /// connection; going online reconnects it when the user has it enabled.
+    pub async fn set_online(&self, online: bool) {
+        self.online
+            .store(online, std::sync::atomic::Ordering::Relaxed);
+        let settings = self.get_settings().await;
+        let discord = Arc::clone(&self.discord);
+        let client_id = settings.discord_client_id.clone();
+        if online {
+            if settings.discord_enabled && !settings.scrobble_paused {
+                tauri::async_runtime::spawn(async move {
+                    let mut d = discord.lock().await;
+                    let _ = d.connect(&client_id).await;
+                });
+            }
+            self.trigger_flush();
+        } else {
+            tauri::async_runtime::spawn(async move {
+                let mut d = discord.lock().await;
+                let _ = d.clear_activity(&client_id).await;
+                d.disconnect();
+            });
         }
     }
 
@@ -358,7 +397,7 @@ impl ScrobblerManager {
         let mut s = self.settings.lock().await;
         *s = new_settings.clone();
 
-        if new_settings.discord_enabled && !new_settings.scrobble_paused {
+        if new_settings.discord_enabled && !new_settings.scrobble_paused && self.is_online() {
             let discord = Arc::clone(&self.discord);
             let client_id = new_settings.discord_client_id.clone();
             tauri::async_runtime::spawn(async move {
@@ -397,8 +436,22 @@ impl ScrobblerManager {
         self.settings.lock().await.clone()
     }
 
+    /// Settings as the network/presence paths must see them: ListenBrainz and
+    /// Discord read as disabled while the master toggle is Offline.
+    async fn effective_settings(&self) -> ScrobblerSettings {
+        let mut s = self.get_settings().await;
+        if !self.is_online() {
+            s.listenbrainz_enabled = false;
+            s.discord_enabled = false;
+        }
+        s
+    }
+
     /// Validate a ListenBrainz user token by hitting `/1/validate-token`.
     pub async fn validate_token(&self, token: &str) -> Result<String, String> {
+        if !self.is_online() {
+            return Err(crate::commands::context::OFFLINE_ERROR.into());
+        }
         let trimmed = token.trim();
         if trimmed.is_empty() {
             return Err("Token cannot be empty".into());
@@ -455,7 +508,7 @@ impl ScrobblerManager {
         is_playing: bool,
         position_nanosec: i64,
     ) {
-        let settings = self.get_settings().await;
+        let settings = self.effective_settings().await;
         if !settings.discord_enabled || settings.scrobble_paused {
             let discord = Arc::clone(&self.discord);
             let client_id = settings.discord_client_id.clone();
@@ -586,7 +639,7 @@ impl ScrobblerManager {
     /// Query the current Discord connection status.
     pub async fn get_discord_status(&self) -> crate::discord::DiscordStatus {
         let mut d = self.discord.lock().await;
-        let settings = self.get_settings().await;
+        let settings = self.effective_settings().await;
         if settings.discord_enabled
             && !settings.scrobble_paused
             && d.status() != crate::discord::DiscordStatus::Connected
@@ -598,7 +651,7 @@ impl ScrobblerManager {
 
     /// Submit a "Playing Now" listen to ListenBrainz when track playback starts.
     pub async fn on_now_playing(&self, song: &Song) {
-        let settings = self.get_settings().await;
+        let settings = self.effective_settings().await;
         if !settings.scrobble_paused {
             crate::subsonic::report::spawn_now_playing(self.db.clone(), song);
         }
@@ -787,7 +840,7 @@ impl ScrobblerManager {
 
     /// Submit love/feedback when song rating changes.
     pub async fn on_song_rating(&self, song: &Song, rating: f32) {
-        let settings = self.get_settings().await;
+        let settings = self.effective_settings().await;
         if !settings.listenbrainz_enabled || settings.scrobble_paused || !settings.scrobble_ratings
         {
             return;
@@ -830,7 +883,7 @@ impl ScrobblerManager {
 
     /// Submit love/hate tri-state feedback when song loved state changes.
     pub async fn on_song_loved(&self, song: &Song, loved: i32) {
-        let settings = self.get_settings().await;
+        let settings = self.effective_settings().await;
         if !settings.listenbrainz_enabled || settings.scrobble_paused || !settings.scrobble_ratings
         {
             return;
@@ -874,7 +927,7 @@ impl ScrobblerManager {
     /// the user's CritiqueBrainz star ratings into the library (remote wins),
     /// then pushes local loves/hates ListenBrainz doesn't have yet.
     pub async fn sync_ratings(&self) -> Result<SyncRatingsResult, String> {
-        let settings = self.get_settings().await;
+        let settings = self.effective_settings().await;
         if !settings.listenbrainz_enabled {
             return Err("ListenBrainz scrobbling is not enabled".into());
         }
@@ -1107,10 +1160,12 @@ impl ScrobblerManager {
         let client = self.client.clone();
         let db = self.db.clone();
         let settings_arc = self.settings.clone();
+        let online = self.online.clone();
 
         tauri::async_runtime::spawn(async move {
             let settings = settings_arc.lock().await.clone();
-            if !settings.listenbrainz_enabled
+            if !online.load(std::sync::atomic::Ordering::Relaxed)
+                || !settings.listenbrainz_enabled
                 || settings.scrobble_paused
                 || settings.listenbrainz_token.trim().is_empty()
             {
@@ -1126,7 +1181,10 @@ impl ScrobblerManager {
 
     /// Drain pending scrobbles from the database cache and submit them to ListenBrainz.
     pub async fn flush_cache_now(&self) -> Result<u32, String> {
-        let settings = self.get_settings().await;
+        let settings = self.effective_settings().await;
+        if !self.is_online() {
+            return Err(crate::commands::context::OFFLINE_ERROR.into());
+        }
         if settings.listenbrainz_token.trim().is_empty() {
             return Err("ListenBrainz user token is not configured".into());
         }
