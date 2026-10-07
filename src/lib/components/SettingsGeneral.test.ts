@@ -24,6 +24,7 @@ describe("SettingsGeneral.svelte", () => {
       ["──────────", "──────────"],
       ["de", "Deutsch"],
       ["es", "Español"],
+      ["fr", "Français"],
       ["it", "Italiano"],
       ["ru", "Русский"],
       ["uk", "Українська"],
