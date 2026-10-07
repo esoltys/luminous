@@ -70,6 +70,11 @@ export default defineConfig(async () => ({
     devSourcemap: false,
   },
   build: {
+    // The bundle is loaded from disk by Tauri, not over a network, so the
+    // default 500 kB "large chunk" advice (about download time) doesn't apply.
+    // The SSR prerender output (`.svelte-kit/output/server`, never shipped) has a
+    // ~1.5 MB shared chunk, so the limit sits above that.
+    chunkSizeWarningLimit: 2000,
     // Silence Rolldown's `[PLUGIN_TIMINGS]` warnings (Vite 8 defaults to
     // warning when a plugin's transform takes a while during build).
     rolldownOptions: {
