@@ -56,8 +56,7 @@ scripts/mock-config.local.json
 /static/guide.css
 /static/guide.js
 /static/luminous-mark.svg
-/static/expose-700.woff2
-/static/fira-sans-*.woff2
+/static/fonts/
 /static/screenshots/
 /static/assets/
 
