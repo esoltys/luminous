@@ -97,6 +97,20 @@ pub fn resolve_app_data_dir_info<R: Runtime>(app: &impl Manager<R>) -> AppDataDi
     }
 }
 
+/// Where tauri-plugin-window-state keeps window placement during a
+/// `LUMINOUS_DATA_DIR` run: inside that folder, so a test run doesn't
+/// overwrite the real profile's placement in the app config dir. The plugin
+/// joins its filename onto the config dir, and joining an absolute path
+/// replaces the base. `None` (a normal launch) keeps the plugin's default.
+pub fn isolated_window_state_file() -> Option<String> {
+    window_state_file_in(std::env::var_os("LUMINOUS_DATA_DIR").map(PathBuf::from))
+}
+
+fn window_state_file_in(data_dir: Option<PathBuf>) -> Option<String> {
+    let path = data_dir?.join(tauri_plugin_window_state::DEFAULT_FILENAME);
+    Some(path.to_string_lossy().into_owned())
+}
+
 /// Resolves the app data directory. Convenience wrapper around [`resolve_app_data_dir_info`].
 pub fn resolve_app_data_dir<R: Runtime>(app: &impl Manager<R>) -> PathBuf {
     resolve_app_data_dir_info(app).path
@@ -105,6 +119,21 @@ pub fn resolve_app_data_dir<R: Runtime>(app: &impl Manager<R>) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn window_state_file_stays_inside_an_isolated_data_dir() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file = window_state_file_in(Some(temp_dir.path().to_path_buf())).unwrap();
+        assert_eq!(
+            Path::new(&file),
+            temp_dir
+                .path()
+                .join(tauri_plugin_window_state::DEFAULT_FILENAME)
+        );
+        // The plugin joins this onto the app config dir; an absolute path must win.
+        assert_eq!(Path::new("C:/config").join(&file), Path::new(&file));
+        assert_eq!(window_state_file_in(None), None);
+    }
 
     #[test]
     fn test_is_eligible_portable_dir_with_marker_files() {

@@ -24,7 +24,7 @@
  *                         default this refuses, since a hidden WebView2 reads ~100MB lower
  */
 
-import { execFileSync } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -45,6 +45,9 @@ export const CSV_COLUMNS = [
   "private_bytes_mb",
   "samples",
   "scan_seconds",
+  "profile",
+  "peak_working_set_mb",
+  "peak_private_bytes_mb",
 ] as const;
 
 export type CsvRow = Record<(typeof CSV_COLUMNS)[number], string | number>;
@@ -78,13 +81,16 @@ function parseArgs() {
 }
 
 function snapshotWindows(): Snapshot {
-  // Sum WorkingSet64/PrivateMemorySize64 across the main exe and every
-  // descendant process (WebView2 renderer/GPU/crashpad, etc.) so the total
-  // matches what a user perceives as "Luminous's memory usage", not just
-  // the thin main process. Also reports whether the main window is visible:
-  // a minimized/hidden WebView2 holds far less memory, so a reading taken
-  // that way isn't comparable to one taken with the window on screen.
-  const script = `
+  return parseWindowsSnapshot(execFileSync("powershell", ["-NoProfile", "-Command", WINDOWS_SNAPSHOT_SCRIPT], { encoding: "utf8" }));
+}
+
+// Sum WorkingSet64/PrivateMemorySize64 across the main exe and every
+// descendant process (WebView2 renderer/GPU/crashpad, etc.) so the total
+// matches what a user perceives as "Luminous's memory usage", not just
+// the thin main process. Also reports whether the main window is visible:
+// a minimized/hidden WebView2 holds far less memory, so a reading taken
+// that way isn't comparable to one taken with the window on screen.
+const WINDOWS_SNAPSHOT_SCRIPT = `
 $ErrorActionPreference = 'Stop'
 $main = Get-Process -Name '${BINARY_NAME}' -ErrorAction SilentlyContinue | Select-Object -First 1
 if (-not $main) { Write-Output 'NOTFOUND'; exit 0 }
@@ -118,10 +124,9 @@ foreach ($procId in $pids) {
 }
 Write-Output "$count,$ws,$priv,$winState"
 `;
-  const out = execFileSync("powershell", ["-NoProfile", "-Command", script], {
-    encoding: "utf8",
-  }).trim();
 
+function parseWindowsSnapshot(raw: string): Snapshot {
+  const out = raw.trim();
   if (out === "NOTFOUND" || out === "") {
     throw new Error(
       `Process '${BINARY_NAME}' not found. Is Luminous running? (Task Manager shows the exe as "${BINARY_NAME}.exe")`,
@@ -211,6 +216,69 @@ export function snapshot(): Snapshot {
   if (process.platform === "win32") return snapshotWindows();
   if (process.platform === "linux") return snapshotLinux();
   throw new Error(`Unsupported platform: ${process.platform} (this script covers Windows and Linux)`);
+}
+
+/** Like `snapshot()`, but doesn't block the event loop while PowerShell runs (Windows; elsewhere it's the sync read). */
+export function snapshotAsync(): Promise<Snapshot> {
+  if (process.platform !== "win32") return Promise.resolve().then(snapshot);
+  return new Promise((resolve, reject) => {
+    execFile("powershell", ["-NoProfile", "-Command", WINDOWS_SNAPSHOT_SCRIPT], { encoding: "utf8" }, (err, out) => {
+      if (err) reject(err);
+      else {
+        try {
+          resolve(parseWindowsSnapshot(out));
+        } catch (e) {
+          reject(e);
+        }
+      }
+    });
+  });
+}
+
+/**
+ * Polls memory in the background from `start()` until `stop()`, which
+ * returns the highest working set and private bytes seen (each metric's own
+ * maximum, so the two may come from different readings). Catches transient
+ * spikes, like a scan's or thumbnail pass's, that a settled median hides.
+ * Each reading takes a second or two, so a spike shorter than that can slip
+ * between polls.
+ */
+export class PeakTracker {
+  private peak: Snapshot | null = null;
+  private running = false;
+  private loop: Promise<void> = Promise.resolve();
+
+  start(pollIntervalSec = 1) {
+    this.peak = null;
+    this.running = true;
+    this.loop = (async () => {
+      while (this.running) {
+        try {
+          this.record(await snapshotAsync());
+        } catch {
+          // The app can be mid-exit or between launches; a missed poll isn't a peak.
+        }
+        if (this.running) await new Promise((r) => setTimeout(r, pollIntervalSec * 1000));
+      }
+    })();
+  }
+
+  /** Folds in a reading taken elsewhere (e.g. a median sample), so the peak never reads below it. */
+  record(s: Snapshot) {
+    this.peak = this.peak
+      ? {
+          ...s,
+          workingSetMb: Math.max(this.peak.workingSetMb, s.workingSetMb),
+          privateBytesMb: Math.max(this.peak.privateBytesMb, s.privateBytesMb),
+        }
+      : s;
+  }
+
+  async stop(): Promise<Snapshot | null> {
+    this.running = false;
+    await this.loop;
+    return this.peak;
+  }
 }
 
 function median(values: number[]): number {
@@ -334,6 +402,10 @@ async function report(opts: ReturnType<typeof parseArgs>) {
       private_bytes_mb: s.privateBytesMb.toFixed(1),
       samples: Math.max(1, opts.samples),
       scan_seconds: "",
+      // This CLI reads whatever instance is running, normally the real profile.
+      profile: "real",
+      peak_working_set_mb: "",
+      peak_private_bytes_mb: "",
     });
   }
 }

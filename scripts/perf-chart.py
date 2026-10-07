@@ -17,6 +17,12 @@ scenario name (legacy runs' "-recheck" rows count as the same scenario), so a
 re-run supersedes an earlier one without deleting history. With --runs N it
 averages the newest N rows instead, for scenarios too noisy to judge from one
 run (idle private bytes can differ by ~100MB between runs of the same build).
+
+Only rows from one kind of profile are compared (--profile): "scratch" rows
+come from the throwaway profiles perf-memory-scenarios.ts runs in, "real" rows
+from runs against the developer's own profile (everything before #1197). The
+first three scenarios must exist for both versions; the others are drawn when
+both versions have them (a build that predates WebDAV has no webdav rows).
 """
 
 import argparse
@@ -26,12 +32,24 @@ import textwrap
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-SCENARIOS = [
-    ("idle", "Idle"),
-    ("after-full-scan", "After full scan"),
-    ("playback-eq-analyzer", "During playback (EQ + analyzer on)"),
+# (CSV label, table name, chart label)
+REQUIRED_SCENARIOS = [
+    ("idle", "Idle", "Idle"),
+    ("after-full-scan", "After full scan", "After full scan"),
+    ("playback-eq-analyzer", "During playback (EQ + analyzer on)", "Playback\n(EQ + analyzer)"),
+]
+OPTIONAL_SCENARIOS = [
+    ("initial-scan", "First scan (with artwork)", "First scan"),
+    ("album-grid", "Albums grid scrolled (thumbnails)", "Albums grid"),
+    ("webdav-sync", "WebDAV first sync", "WebDAV sync"),
+    ("webdav-idle", "WebDAV idle", "WebDAV idle"),
+    ("webdav-playback", "WebDAV playback (EQ + analyzer on)", "WebDAV\nplayback"),
+    ("subsonic-sync", "Subsonic first sync", "Subsonic sync"),
+    ("subsonic-idle", "Subsonic idle", "Subsonic idle"),
+    ("subsonic-playback", "Subsonic playback (EQ + analyzer on)", "Subsonic\nplayback"),
 ]
 METRICS = [("private_bytes_mb", "Private bytes"), ("working_set_mb", "Working set")]
+PEAK_METRICS = [("peak_private_bytes_mb", "Peak private bytes"), ("peak_working_set_mb", "Peak working set")]
 
 SURFACE = "#fcfcfb"
 INK = "#1a1a19"
@@ -41,24 +59,36 @@ BASE_COLOR = "#b4b2a9"  # recessive neutral for the reference version
 NEW_COLOR = "#2a78d6"
 
 
-def latest_rows(rows, version, os_name, runs=1):
+def latest_rows(rows, version, os_name, profile, runs=1):
+    known = {key for key, *_ in REQUIRED_SCENARIOS + OPTIONAL_SCENARIOS}
     picked = {}
     for r in rows:  # file order is chronological, so the newest rows come last
-        if r["app_version"] != version or r["os"] != os_name:
+        if r["app_version"] != version or r["os"] != os_name or (r.get("profile") or "real") != profile:
             continue
         label = r["label"].removesuffix("-recheck")
-        if label in dict(SCENARIOS):
+        if label in known:
             picked.setdefault(label, []).append(r)
-    short = [s for s, _ in SCENARIOS if len(picked.get(s, [])) < runs]
+    short = [key for key, *_ in REQUIRED_SCENARIOS if len(picked.get(key, [])) < runs]
     if short:
-        raise SystemExit(f"Fewer than {runs} {os_name} row(s) for {version} scenario(s): {', '.join(short)}")
+        raise SystemExit(
+            f"Fewer than {runs} {profile}-profile {os_name} row(s) for {version} scenario(s): {', '.join(short)}"
+        )
     averaged = {}
     for label, found in picked.items():
+        if len(found) < runs:
+            continue
         newest = found[-runs:]
         averaged[label] = dict(newest[-1])
-        for metric, _ in METRICS:
-            averaged[label][metric] = sum(float(r[metric]) for r in newest) / runs
+        for metric, _ in METRICS + PEAK_METRICS:
+            values = [float(r[metric]) for r in newest if r.get(metric)]
+            # Peaks are blank in rows older than #1197; average only a complete set.
+            averaged[label][metric] = sum(values) / runs if len(values) == runs else None
     return averaged
+
+
+def shared_scenarios(base, cand):
+    """The required scenarios, then each optional one both versions have."""
+    return REQUIRED_SCENARIOS + [s for s in OPTIONAL_SCENARIOS if s[0] in base and s[0] in cand]
 
 
 def describe(rows):
@@ -67,15 +97,20 @@ def describe(rows):
     return f"{r['timestamp'][:10]}, {tracks}"
 
 
+def delta(b, c):
+    if b is None or c is None:
+        return "not recorded"
+    d = c - b
+    return f"{d:+.1f} MB ({d / b * 100:+.1f}%)".replace("-", "−")
+
+
 def markdown(base, cand):
-    lines = ["| Scenario | Private bytes Δ | Working set Δ |", "| --- | --- | --- |"]
-    for key, name in SCENARIOS:
-        cells = []
-        for metric, _ in METRICS:
-            b, c = float(base[key][metric]), float(cand[key][metric])
-            d = c - b
-            cells.append(f"{d:+.1f} MB ({d / b * 100:+.1f}%)".replace("-", "−"))
-        lines.append(f"| {name} | {cells[0]} | {cells[1]} |")
+    metrics = METRICS + PEAK_METRICS
+    lines = ["| Scenario | " + " | ".join(f"{name} Δ" for _, name in metrics) + " |",
+             "| --- |" + " --- |" * len(metrics)]
+    for key, name, _ in shared_scenarios(base, cand):
+        cells = [delta(base[key][metric], cand[key][metric]) for metric, _ in metrics]
+        lines.append(f"| {name} | " + " | ".join(cells) + " |")
     return "\n".join(lines)
 
 
@@ -87,13 +122,14 @@ def chart(base, cand, args, out):
 
     plt.rcParams.update({"font.size": 10, "text.color": INK, "axes.labelcolor": INK_2,
                          "xtick.color": INK_2, "ytick.color": INK_2})
-    fig, axes = plt.subplots(1, 2, figsize=(11, 4.8), sharey=True, facecolor=SURFACE)
-    labels = ["Idle", "After full scan", "Playback\n(EQ + analyzer)"]
-    top = max(float(rows[k][m]) for rows in (base, cand) for k, _ in SCENARIOS for m, _ in METRICS)
+    scenarios = shared_scenarios(base, cand)
+    fig, axes = plt.subplots(1, 2, figsize=(max(11, 3.2 * len(scenarios)), 4.8), sharey=True, facecolor=SURFACE)
+    labels = [chart_label for *_, chart_label in scenarios]
+    top = max(float(rows[k][m]) for rows in (base, cand) for k, *_ in scenarios for m, _ in METRICS)
     w, gap = 0.36, 0.02
     for ax, (metric, title) in zip(axes, METRICS):
         ax.set_facecolor(SURFACE)
-        for x, (key, _) in enumerate(SCENARIOS):
+        for x, (key, *_) in enumerate(scenarios):
             b, c = float(base[key][metric]), float(cand[key][metric])
             for off, v, color in ((-w / 2 - gap / 2, b, BASE_COLOR), (w / 2 + gap / 2, c, NEW_COLOR)):
                 ax.bar(x + off, v, w, color=color, linewidth=0)
@@ -102,9 +138,9 @@ def chart(base, cand, args, out):
             d = c - b
             ax.text(x + w / 2 + gap / 2, c + top * 0.017, f"{d:+.0f} MB\n({d / b * 100:+.1f}%)",
                     ha="center", va="bottom", fontsize=9, color=INK)
-        ax.set_xlim(-0.6, len(SCENARIOS) - 0.4)
+        ax.set_xlim(-0.6, len(scenarios) - 0.4)
         ax.set_ylim(0, top * 1.2)
-        ax.set_xticks(range(len(SCENARIOS)), labels)
+        ax.set_xticks(range(len(scenarios)), labels)
         ax.set_title(f"{title} (MB)", loc="left", fontsize=11.5, color=INK, pad=10, fontweight="bold")
         ax.yaxis.grid(True, color=GRID, linewidth=0.8)
         ax.set_axisbelow(True)
@@ -141,21 +177,26 @@ def main():
     p.add_argument("--csv", default=REPO_ROOT / "docs" / "performance-history.csv", type=Path)
     p.add_argument("--out", type=Path, help="default: docs/performance-<baseline>-vs-<candidate>.png")
     p.add_argument("--runs", type=int, default=1, help="average the newest N runs per version (default 1)")
+    p.add_argument("--profile", default="scratch", choices=["scratch", "real"],
+                   help="compare rows from throwaway profiles (default) or the real profile (history before #1197)")
     args = p.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")  # the delta table uses Δ/−, which cp1252 consoles can't encode
 
     rows = list(csv.DictReader(args.csv.open(encoding="utf8")))
-    base = latest_rows(rows, args.baseline, args.os, args.runs)
-    cand = latest_rows(rows, args.candidate, args.os, args.runs)
+    base = latest_rows(rows, args.baseline, args.os, args.profile, args.runs)
+    cand = latest_rows(rows, args.candidate, args.os, args.profile, args.runs)
 
     out = args.out or REPO_ROOT / "docs" / f"performance-{args.baseline}-vs-{args.candidate}.png"
     chart(base, cand, args, out)
     print(f"Wrote {out}\n")
     print(markdown(base, cand))
     for name, rows_ in ((args.baseline, base), (args.candidate, cand)):
-        secs = rows_["after-full-scan"]["scan_seconds"]
-        if secs:
-            print(f"\n{name}: forced full scan of {int(rows_['idle']['library_tracks']):,} tracks took {secs}s")
+        for key, what in (("initial-scan", "first scan"), ("after-full-scan", "forced full scan"),
+                          ("webdav-sync", "WebDAV sync"), ("subsonic-sync", "Subsonic sync")):
+            row = rows_.get(key)
+            if row and row["scan_seconds"]:
+                tracks = int(row["library_tracks"] or rows_["idle"]["library_tracks"])
+                print(f"\n{name}: {what} of {tracks:,} tracks took {row['scan_seconds']}s")
 
 
 if __name__ == "__main__":
