@@ -15,6 +15,7 @@
   import HelpTip from "./HelpTip.svelte";
   import { i18n, formatNumber } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
+  import { prefs } from "../stores/prefs.svelte";
   import { rememberScroll } from "../utils/scrollMemory";
   import { parseLrc } from "../utils/lrc";
 
@@ -108,6 +109,9 @@
           playerStore.currentSong.is_instrumental = true;
         }
         errorMsg = "";
+      } else if (errStrLower.startsWith("offline:")) {
+        // Online lookup is switched off (#1398); only saved lyrics are available.
+        errorMsg = i18n.t('lyrics.offlineNoLyrics');
       } else if (errStrLower.includes("no lyrics found on any online provider")) {
         // Known backend error (src-tauri/src/lyrics.rs) — surface the translated
         // message instead of the raw Rust error string.
@@ -208,6 +212,8 @@
 
   $effect(() => {
     const id = playerStore.currentSong?.id;
+    // Re-resolve when Online/Offline flips so a missing lyric can now be searched (#1398).
+    const _online = prefs.onlineEnabled;
     console.log("[LyricsView] Song changed. Reloading lyrics for song ID:", id);
     loadLyrics(id);
     loadOffset(id);
@@ -294,9 +300,11 @@
               <HelpTip text={i18n.t('lyrics.offsetHelp')} label={i18n.t('lyrics.syncOffsetLabel', {}, 'Sync Offset')} describes="lyrics-offset-value" />
             </div>
           {/if}
-          <Button onclick={() => loadLyrics(playerStore.currentSong?.id, true)} variant="secondary" size="sm" title={i18n.t('lyrics.refetchTooltip', {}, "Refetch lyrics online")}>
-            <RefreshCw class="w-3.5 h-3.5" /> {i18n.t('lyrics.refetchBtn', {}, "Refetch")}
-          </Button>
+          {#if prefs.onlineEnabled}
+            <Button onclick={() => loadLyrics(playerStore.currentSong?.id, true)} variant="secondary" size="sm" title={i18n.t('lyrics.refetchTooltip', {}, "Refetch lyrics online")}>
+              <RefreshCw class="w-3.5 h-3.5" /> {i18n.t('lyrics.refetchBtn', {}, "Refetch")}
+            </Button>
+          {/if}
           <Button onclick={startEditing} variant="primary" size="sm">
             <Edit3 class="w-3.5 h-3.5" /> {i18n.t('settings.editThemeShort')}
           </Button>
@@ -385,9 +393,11 @@
         <p class="text-sm font-semibold text-rose-400">{i18n.t('lyrics.lyricsNotFound')}</p>
         <p class="text-xs text-brand-text-secondary/50 max-w-sm">{errorMsg}</p>
         <div class="flex items-center gap-2 mt-2">
-          <Button onclick={() => loadLyrics(playerStore.currentSong?.id)} variant="secondary" size="sm">
-            {i18n.t('lyrics.retrySearch', {}, "Retry Search")}
-          </Button>
+          {#if prefs.onlineEnabled}
+            <Button onclick={() => loadLyrics(playerStore.currentSong?.id)} variant="secondary" size="sm">
+              {i18n.t('lyrics.retrySearch', {}, "Retry Search")}
+            </Button>
+          {/if}
           {#if playerStore.currentSong}
             <Button onclick={() => toggleInstrumental(true)} variant="accent-soft" size="sm">
               {i18n.t('lyrics.markInstrumental', {}, "Mark as Instrumental")}

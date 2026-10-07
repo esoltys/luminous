@@ -690,6 +690,7 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
   }
 
   let minimizeToTrayEnabled = true;
+  let mockOnline = true;
 
   const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
     get_all_app_settings: () => window.mockSettings,
@@ -756,7 +757,13 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     }),
     webview_gpu_compositing: () => true,
     has_fanart_env_key: () => false,
-    is_context_enrichment_enabled: () => false,
+    // Online/Offline master toggle (#1398). Online by default so the Integrations
+    // cards and online-only actions render; `set_online_enabled` flips it for the session.
+    is_context_enrichment_enabled: () => mockOnline,
+    set_online_enabled: (args) => {
+      mockOnline = !!args.enabled;
+      return null;
+    },
     get_artist_tag_hierarchy: () => [],
 
     get_scrobbler_settings: () => ({

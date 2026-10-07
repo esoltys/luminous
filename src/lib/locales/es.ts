@@ -535,10 +535,10 @@ export const es = {
     forceFullScanHint: "Vuelve a leer los metadatos y las carátulas de todos los archivos de audio, ignorando las fechas de modificación",
     pruneMissingBtn: "Limpiar",
     pruneMissingHint: "Quita canciones faltantes, carpetas vacías y entradas duplicadas",
-    contextEnrichmentIntegrationTitle: "Fuentes de datos en línea",
-    contextEnrichmentDesc: "Se usan en el panel de información y en los detalles del artista.",
-    contextEnrichmentLabel: "Obtener datos de contexto y biografías",
-    contextEnrichmentHint: "Busca valoraciones, etiquetas, reseñas y biografías de artistas en MusicBrainz, CritiqueBrainz y Wikipedia. Desactívalo para mantener estos datos totalmente sin conexión.",
+    contextEnrichmentIntegrationTitle: "Servicios en línea",
+    contextEnrichmentDesc: "Desactiva para que Luminous funcione totalmente sin conexión: sin solicitudes a servicios externos para carátulas, letras, biografías, scrobbling o actualizaciones. Las bibliotecas Subsonic y WebDAV siguen funcionando.",
+    onlineLabel: "En línea",
+    offlineLabel: "Sin conexión",
     fanartIntegration: "Integración con fanart.tv",
     fanartDesc1: "Luminous usa ",
     fanartDesc2: " para obtener fotos de artistas, logotipos de bandas, fondos de encabezado, carátulas de álbumes e imágenes de discos cuando no hay ninguna en local. Sin clave de API, Luminous recurre a la imagen de Wikidata para la foto del artista, si existe.",
@@ -909,6 +909,7 @@ export const es = {
     editorPlaceholder: "Pega aquí la letra sincronizada en LRC o en texto sin formato...",
     saveFailedPrefix: "No se pudo guardar la letra: ",
     noOnlineResults: "No se encontró la letra en ningún proveedor en línea.",
+    offlineNoLyrics: "No hay letra guardada para esta pista. Activa «En línea» en Ajustes › Integraciones para buscarla.",
     insufficientMetadata: "No hay suficiente información de la canción (artista y título) para buscar la letra en línea."
   },
   stats: {
@@ -1070,6 +1071,7 @@ export const es = {
     contextRetry: "Reintentar",
     contextLoading: "Obteniendo contexto…",
     contextFetchError: "No se pudieron obtener los datos de contexto. Revisa tu conexión e inténtalo de nuevo.",
+    contextOffline: "Sin conexión. Activa «En línea» en Ajustes › Integraciones para obtener biografías y contexto.",
     trackSkippedToast: "No se pudo reproducir «{title}»: archivo no encontrado. Se omitió.",
     tracksSkippedToast: {
       one: "Se omitió {count} pista no disponible.",

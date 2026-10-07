@@ -47,6 +47,15 @@ describe("UpdaterStore", () => {
     expect(updaterStore.checkStatus).toBe("up-to-date");
   });
 
+  it("checkForUpdates() makes no request while Offline (#1398)", async () => {
+    const core = await import("@tauri-apps/api/core");
+    vi.mocked(core.invoke).mockResolvedValueOnce(false);
+
+    await updaterStore.checkForUpdates();
+
+    expect(check).not.toHaveBeenCalled();
+  });
+
   it("init() is idempotent on subsequent calls", async () => {
     vi.mocked(check).mockResolvedValueOnce(null);
     await updaterStore.init();

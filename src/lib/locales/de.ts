@@ -535,10 +535,10 @@ export const de = {
     forceFullScanHint: "Metadaten und Cover aller Audiodateien neu einlesen und Änderungsdaten der Dateien ignorieren",
     pruneMissingBtn: "Bereinigen",
     pruneMissingHint: "Fehlende Titel, leere Ordner und doppelte Einträge entfernen",
-    contextEnrichmentIntegrationTitle: "Online-Datenquellen",
-    contextEnrichmentDesc: "Wird für den Infobereich und die Interpretendetails verwendet.",
-    contextEnrichmentLabel: "Kontext- und Biografiedaten abrufen",
-    contextEnrichmentHint: "Bewertungen, Tags, Rezensionen und Interpretenbiografien von MusicBrainz, CritiqueBrainz und Wikipedia abrufen. Deaktivieren, damit Luminous für diese Daten vollständig offline bleibt.",
+    contextEnrichmentIntegrationTitle: "Online-Dienste",
+    contextEnrichmentDesc: "Ausschalten, um Luminous vollständig offline zu betreiben: keine Anfragen an externe Dienste für Cover, Songtexte, Biografien, Scrobbling oder Updates. Subsonic- und WebDAV-Bibliotheken funktionieren weiterhin.",
+    onlineLabel: "Online",
+    offlineLabel: "Offline",
     fanartIntegration: "fanart.tv-Integration",
     fanartDesc1: "Luminous verwendet ",
     fanartDesc2: ", um Interpretenfotos, Bandlogos, Kopfzeilenhintergründe, Albumcover und Disc-Grafiken abzurufen, wenn lokal keine vorhanden sind. Ohne API-Schlüssel greift Luminous für das Interpretenfoto auf das Wikidata-Bild zurück, falls vorhanden.",
@@ -909,6 +909,7 @@ export const de = {
     editorPlaceholder: "Synchronisierten LRC-Songtext oder reinen Text hier einfügen ...",
     saveFailedPrefix: "Der Songtext konnte nicht gespeichert werden: ",
     noOnlineResults: "Bei keinem Online-Anbieter wurde ein Songtext gefunden.",
+    offlineNoLyrics: "Für diesen Titel sind keine Songtexte gespeichert. „Online“ unter Einstellungen › Integrationen einschalten, um danach zu suchen.",
     insufficientMetadata: "Nicht genügend Angaben zum Titel (Interpret/Titel), um online nach Songtexten zu suchen."
   },
   stats: {
@@ -1070,6 +1071,7 @@ export const de = {
     contextRetry: "Erneut versuchen",
     contextLoading: "Kontext wird abgerufen …",
     contextFetchError: "Die Kontextdaten konnten nicht abgerufen werden. Verbindung prüfen und erneut versuchen.",
+    contextOffline: "Offline. „Online“ unter Einstellungen › Integrationen einschalten, um Biografien und Kontext abzurufen.",
     trackSkippedToast: '„{title}“ konnte nicht abgespielt werden – Datei nicht gefunden. Übersprungen.',
     tracksSkippedToast: {
       one: "{count} nicht verfügbarer Titel übersprungen.",

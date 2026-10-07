@@ -541,10 +541,10 @@ export const fr: DeepStringRecord<typeof en> = {
     forceFullScanHint: "Relisez les métadonnées et pochette de tous les fichiers audio sans tenir compte des dates de modification",
     pruneMissingBtn: "Nettoyer",
     pruneMissingHint: "Supprimez les chansons manquantes, les dossiers vides et les doublons",
-    contextEnrichmentIntegrationTitle: "Sources de données en ligne",
-    contextEnrichmentDesc: "Utilisé pour le panneau d'informations et les détails d'artiste.",
-    contextEnrichmentLabel: "Récupérer les données de contexte et de biographie",
-    contextEnrichmentHint: "Recherche les notes, étiquettes, critiques et biographies d'artistes sur MusicBrainz, CritiqueBrainz et Wikipédia. Désactivez cette option pour garder Luminous entièrement hors ligne pour ces données.",
+    contextEnrichmentIntegrationTitle: "Services en ligne",
+    contextEnrichmentDesc: "Désactivez pour mettre Luminous entièrement hors ligne : aucune requête vers des services externes pour les pochettes, les paroles, les biographies, les scrobbles ou les mises à jour. Les bibliothèques Subsonic et WebDAV continuent de fonctionner.",
+    onlineLabel: "En ligne",
+    offlineLabel: "Hors ligne",
     fanartIntegration: "Intégration fanart.tv",
     fanartDesc1: "Luminous utilise ",
     fanartDesc2: " pour récupérer des photos d'artistes, des logos de groupes, des fonds d'en-tête, des pochettes d'album et des visuels de disque lorsqu'aucun n'est trouvé localement. Sans clé API, Luminous se rabat sur l'image Wikidata de l'artiste pour la photo, si elle existe.",
@@ -915,6 +915,7 @@ export const fr: DeepStringRecord<typeof en> = {
     editorPlaceholder: "Coller les paroles au format LRC synchronisé ou texte brut ici...",
     saveFailedPrefix: "Échec de l'enregistrement des paroles : ",
     noOnlineResults: "Aucune parole trouvée auprès des fournisseurs en ligne.",
+    offlineNoLyrics: "Aucune parole enregistrée pour cette piste. Activez « En ligne » dans Paramètres › Intégrations pour les rechercher.",
     insufficientMetadata: "Informations insuffisantes (artiste/titre) pour rechercher des paroles en ligne."
   },
   stats: {
@@ -1076,6 +1077,7 @@ export const fr: DeepStringRecord<typeof en> = {
     contextRetry: "Réessayer",
     contextLoading: "Récupération du contexte…",
     contextFetchError: "Impossible de récupérer les données de contexte. Vérifiez votre connexion et réessayez.",
+    contextOffline: "Hors ligne. Activez « En ligne » dans Paramètres › Intégrations pour récupérer les biographies et le contexte.",
     trackSkippedToast: 'Impossible de lire « {title} » — fichier introuvable. Morceau ignoré.',
     tracksSkippedToast: {
       one: "{count} morceau indisponible ignoré.",

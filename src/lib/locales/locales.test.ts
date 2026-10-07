@@ -184,6 +184,8 @@ const IDENTICAL_OK_FR = new Set([
 ]);
 
 const IDENTICAL_OK_IT = new Set<string>([
+  "settings.onlineLabel", // "Online" is the usual word in this language
+  "settings.offlineLabel", // "Offline" is the usual word in this language
   "organizer.chipAlbum", // Same word in this language
   "units.hz", // SI unit symbols are the same in this language
   "units.khz",
@@ -340,6 +342,8 @@ const IDENTICAL_OK_ES = new Set<string>([
 
 // Cognates, loanwords and technical terms Windows and the field also leave in English, plus brands, acronyms and symbols.
 const IDENTICAL_OK_DE = new Set<string>([
+  "settings.onlineLabel", // "Online" is the usual word in this language
+  "settings.offlineLabel", // "Offline" is the usual word in this language
   "settings.textFilesFilter", // Same word in this language
   "collection.columnSelectorMetatags", // Same word in this language
   "organizer.chipAlbum", // Same word in this language

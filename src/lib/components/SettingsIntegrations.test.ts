@@ -4,6 +4,7 @@ import { render, fireEvent } from "@testing-library/svelte";
 import { tick } from "svelte";
 import SettingsIntegrations from "./SettingsIntegrations.svelte";
 import { scrobblerStore } from "../stores/scrobbler.svelte";
+import { prefs } from "../stores/prefs.svelte";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockImplementation((cmd: string) => {
@@ -52,16 +53,38 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 describe("SettingsIntegrations.svelte", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    prefs.onlineEnabled = true;
   });
 
-  it("renders all integration cards: Online Data Sources, ListenBrainz, Discord, Picard, and fanart.tv", async () => {
+  it("renders all integration cards: Online Services, ListenBrainz, Discord, Picard, and fanart.tv", async () => {
     const { findByText, findByRole } = render(SettingsIntegrations);
 
-    expect(await findByText("Online Data Sources")).toBeInTheDocument();
+    expect(await findByText("Online Services")).toBeInTheDocument();
     expect(await findByText("ListenBrainz Scrobbler")).toBeInTheDocument();
     expect(await findByRole("heading", { name: "Discord Rich Presence" })).toBeInTheDocument();
     expect(await findByRole("heading", { name: "MusicBrainz Picard" })).toBeInTheDocument();
     expect(await findByRole("heading", { name: "fanart.tv Integration" })).toBeInTheDocument();
+  });
+
+  it("hides every online integration but keeps Picard when Offline (#1398)", async () => {
+    prefs.onlineEnabled = false;
+    const { findByRole, findByText, queryByRole, queryByText } = render(SettingsIntegrations);
+
+    expect(await findByText("Online Services")).toBeInTheDocument();
+    expect(await findByText("Offline")).toBeInTheDocument();
+    expect(await findByRole("heading", { name: "MusicBrainz Picard" })).toBeInTheDocument();
+    expect(queryByText("ListenBrainz Scrobbler")).not.toBeInTheDocument();
+    expect(queryByRole("heading", { name: "Discord Rich Presence" })).not.toBeInTheDocument();
+    expect(queryByRole("heading", { name: "fanart.tv Integration" })).not.toBeInTheDocument();
+  });
+
+  it("persists the master toggle through set_online_enabled", async () => {
+    const core = await import("@tauri-apps/api/core");
+    const { findByRole } = render(SettingsIntegrations);
+
+    await fireEvent.click(await findByRole("switch", { name: "Online Services" }));
+
+    expect(core.invoke).toHaveBeenCalledWith("set_online_enabled", { enabled: false });
   });
 
   it("shows the fanart.tv env key badge only when has_fanart_env_key is true", async () => {
