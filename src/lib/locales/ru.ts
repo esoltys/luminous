@@ -1631,7 +1631,8 @@ export const ru = {
   units: {
     hz: "Гц",
     khz: "кГц",
-    db: "дБ"
+    db: "дБ",
+    lufs: "LUFS"
   },
   toast: {
     copyError: "Копировать ошибку в буфер обмена",

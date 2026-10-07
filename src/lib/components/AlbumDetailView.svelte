@@ -125,7 +125,7 @@
     communityRating = null;
     if (!mbid || songId == null) return;
     let stale = false;
-    invoke<SongContextEnrichment>("get_song_context", { songId, forceRefresh: false })
+    invoke<SongContextEnrichment>("get_song_context", { songId, forceRefresh: false, locale: i18n.currentLocale })
       .then((ctx) => {
         if (stale || ctx.critiquebrainz_rating == null) return;
         communityRating = { rating: ctx.critiquebrainz_rating, count: ctx.critiquebrainz_review_count ?? 0 };

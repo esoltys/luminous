@@ -565,6 +565,25 @@ struct CritiqueBrainzResponse {
     reviews: Vec<CritiqueBrainzReview>,
 }
 
+const CRITIQUEBRAINZ_REVIEW_LIMIT: usize = 5;
+
+/// Review links with `preferred` (same-language) reviews first, then the
+/// remaining `others`, de-duplicated and capped at the review limit.
+fn merge_review_links(
+    preferred: &[CritiqueBrainzReview],
+    others: &[CritiqueBrainzReview],
+) -> Vec<String> {
+    let mut seen = std::collections::HashSet::new();
+    preferred
+        .iter()
+        .chain(others)
+        .filter_map(|r| r.id.as_ref())
+        .filter(|id| seen.insert(id.as_str()))
+        .take(CRITIQUEBRAINZ_REVIEW_LIMIT)
+        .map(|id| format!("https://critiquebrainz.org/review/{id}"))
+        .collect()
+}
+
 /// Extracts a Wikidata QID (e.g. `"Q11649"`) from a `wikidata` relation's
 /// resource URL (`https://www.wikidata.org/wiki/Q11649`).
 fn extract_wikidata_qid(resource_url: &str) -> Option<String> {
@@ -599,6 +618,26 @@ fn merge_tags(genres: Vec<MbTagOrGenre>, tags: Vec<MbTagOrGenre>, cap: usize) ->
 /// True when a cached row's `fetched_at` (unix seconds) is still within the
 /// 30-day TTL relative to `now` (unix seconds). Pure so it's testable
 /// without touching the database or wall-clock time.
+/// Wikipedia language edition for a BCP 47 locale tag (`fr-CA` -> `fr`,
+/// `uk` -> `uk`), used as the `{lang}.wikipedia.org` subdomain and the
+/// `{lang}wiki` Wikidata sitelink key. Anything that isn't a plain 2-3 letter
+/// code falls back to `en`, which also keeps the value safe to interpolate
+/// into a URL host (#1480).
+pub fn wikipedia_language(locale: Option<&str>) -> String {
+    let primary = locale
+        .and_then(|l| l.split(['-', '_']).next())
+        .map(|p| p.trim().to_ascii_lowercase())
+        .unwrap_or_default();
+    match primary.as_str() {
+        // Wikipedia has no nbwiki/nnwiki; Bokmål and Nynorsk are `no`/`nn`.
+        "nb" => "no".to_string(),
+        p if (2..=3).contains(&p.len()) && p.bytes().all(|b| b.is_ascii_lowercase()) => {
+            p.to_string()
+        }
+        _ => "en".to_string(),
+    }
+}
+
 pub fn is_cache_fresh(fetched_at: i64, now: i64) -> bool {
     const TTL_SECONDS: i64 = 30 * 24 * 3600;
     now.saturating_sub(fetched_at) < TTL_SECONDS
@@ -826,27 +865,46 @@ impl ContextManager {
         Ok((parsed.into(), qid))
     }
 
-    /// Resolves a Wikidata QID to a Wikipedia summary (#1128).
+    /// Resolves a Wikidata QID to a Wikipedia summary (#1128), preferring the
+    /// article in `lang` (see [`wikipedia_language`]) and falling back to
+    /// English (#1480).
     pub async fn fetch_wikipedia_bio_from_wikidata_id(
         &self,
         wikidata_id: &str,
+        lang: &str,
     ) -> Result<Option<WikipediaSummary>> {
-        let Some(title) = self
-            .resolve_wikidata_to_wikipedia_title(wikidata_id)
-            .await?
-        else {
-            return Ok(None);
-        };
-        self.fetch_wikipedia_summary(&title).await.map(Some)
+        let sitelinks = self.fetch_wikipedia_sitelinks(wikidata_id).await?;
+        self.fetch_localized_wikipedia_summary(&sitelinks, lang)
+            .await
     }
 
-    /// Resolves a Wikidata QID to its English Wikipedia article title via
-    /// `sitelinks.enwiki.title`. Returns `None` when the entity has no
-    /// English Wikipedia article.
-    async fn resolve_wikidata_to_wikipedia_title(
+    /// Tries `lang`'s article first, then English. A localized article that
+    /// is missing, errors out, or has an empty extract falls through to
+    /// English; the English attempt's own error is what propagates.
+    async fn fetch_localized_wikipedia_summary(
+        &self,
+        sitelinks: &HashMap<String, String>,
+        lang: &str,
+    ) -> Result<Option<WikipediaSummary>> {
+        if lang != "en" {
+            if let Some(title) = sitelinks.get(&format!("{lang}wiki")) {
+                if let Ok(summary) = self.fetch_wikipedia_summary(lang, title).await {
+                    return Ok(Some(summary));
+                }
+            }
+        }
+        let Some(title) = sitelinks.get("enwiki") else {
+            return Ok(None);
+        };
+        self.fetch_wikipedia_summary("en", title).await.map(Some)
+    }
+
+    /// Returns the entity's Wikipedia sitelinks as `{site -> article title}`
+    /// (e.g. `enwiki`, `frwiki`). Empty when the entity has none.
+    async fn fetch_wikipedia_sitelinks(
         &self,
         wikidata_id: &str,
-    ) -> Result<Option<String>> {
+    ) -> Result<HashMap<String, String>> {
         let url = format!(
             "https://www.wikidata.org/wiki/Special:EntityData/{}.json",
             percent_encoding::utf8_percent_encode(wikidata_id, percent_encoding::NON_ALPHANUMERIC)
@@ -862,8 +920,13 @@ impl ContextManager {
         Ok(parsed
             .entities
             .get(wikidata_id)
-            .and_then(|e| e.sitelinks.get("enwiki"))
-            .map(|s| s.title.clone()))
+            .map(|e| {
+                e.sitelinks
+                    .iter()
+                    .map(|(site, s)| (site.clone(), s.title.clone()))
+                    .collect()
+            })
+            .unwrap_or_default())
     }
 
     /// Resolves a Wikidata QID's `P18` (image) claim to the raw Wikimedia
@@ -902,22 +965,18 @@ impl ContextManager {
     pub async fn fetch_wikipedia_bio_for_artist(
         &self,
         artist_id: &str,
+        lang: &str,
     ) -> Result<Option<WikipediaSummary>> {
         let Some(wikidata_id) = self.fetch_musicbrainz_artist_wikidata_id(artist_id).await? else {
             return Ok(None);
         };
-        let Some(title) = self
-            .resolve_wikidata_to_wikipedia_title(&wikidata_id)
-            .await?
-        else {
-            return Ok(None);
-        };
-        self.fetch_wikipedia_summary(&title).await.map(Some)
+        self.fetch_wikipedia_bio_from_wikidata_id(&wikidata_id, lang)
+            .await
     }
 
-    async fn fetch_wikipedia_summary(&self, title: &str) -> Result<WikipediaSummary> {
+    async fn fetch_wikipedia_summary(&self, lang: &str, title: &str) -> Result<WikipediaSummary> {
         let url = format!(
-            "https://en.wikipedia.org/api/rest_v1/page/summary/{}",
+            "https://{lang}.wikipedia.org/api/rest_v1/page/summary/{}",
             percent_encoding::utf8_percent_encode(title, percent_encoding::NON_ALPHANUMERIC)
         );
         let response = self.client.get(&url).send().await?;
@@ -945,17 +1004,54 @@ impl ContextManager {
     /// Aggregate rating + a handful of review links for a release-group.
     /// CritiqueBrainz has no MusicBrainz-style rate limit; a single lookup
     /// per song view doesn't need throttling.
+    ///
+    /// For a non-English `lang`, reviews written in that language are listed
+    /// first, followed by the rest; the rating and count always cover all
+    /// languages (#1480).
     pub async fn fetch_critiquebrainz_reviews(
         &self,
         release_group_id: &str,
+        lang: &str,
     ) -> Result<CritiqueBrainzData> {
-        let url = format!(
-            "https://critiquebrainz.org/ws/1/review/?entity_id={}&entity_type=release_group&limit=5",
+        let parsed = self
+            .fetch_critiquebrainz_page(release_group_id, None)
+            .await?;
+        // The localized lookup only reorders links, so its failure is not an error.
+        let preferred = if lang == "en" {
+            None
+        } else {
+            self.fetch_critiquebrainz_page(release_group_id, Some(lang))
+                .await
+                .ok()
+        };
+        let review_links = merge_review_links(
+            preferred.as_ref().map_or(&[][..], |p| &p.reviews[..]),
+            &parsed.reviews,
+        );
+        Ok(CritiqueBrainzData {
+            average_rating: parsed.average_rating.and_then(|a| a.rating),
+            review_count: parsed.count,
+            review_links,
+        })
+    }
+
+    async fn fetch_critiquebrainz_page(
+        &self,
+        release_group_id: &str,
+        lang: Option<&str>,
+    ) -> Result<CritiqueBrainzResponse> {
+        let mut url = format!(
+            "https://critiquebrainz.org/ws/1/review/?entity_id={}&entity_type=release_group&limit={}",
             percent_encoding::utf8_percent_encode(
                 release_group_id,
                 percent_encoding::NON_ALPHANUMERIC
-            )
+            ),
+            CRITIQUEBRAINZ_REVIEW_LIMIT
         );
+        if let Some(lang) = lang {
+            url.push_str("&language=");
+            url.push_str(lang);
+        }
         let response = self.client.get(&url).send().await?;
         if !response.status().is_success() {
             return Err(anyhow!(
@@ -963,18 +1059,7 @@ impl ContextManager {
                 response.status()
             ));
         }
-        let parsed: CritiqueBrainzResponse = response.json().await?;
-        let review_links = parsed
-            .reviews
-            .iter()
-            .filter_map(|r| r.id.as_ref())
-            .map(|id| format!("https://critiquebrainz.org/review/{id}"))
-            .collect();
-        Ok(CritiqueBrainzData {
-            average_rating: parsed.average_rating.and_then(|a| a.rating),
-            review_count: parsed.count,
-            review_links,
-        })
+        Ok(response.json().await?)
     }
 
     /// Looks up events, concerts, and festival appearances for an artist
@@ -1090,6 +1175,19 @@ mod tests {
             event.ticket_urls,
             vec!["https://tickets.example.com/e1".to_string()]
         );
+    }
+
+    #[test]
+    fn test_wikipedia_language_from_locale_tag() {
+        assert_eq!(wikipedia_language(Some("fr-CA")), "fr");
+        assert_eq!(wikipedia_language(Some("de_DE")), "de");
+        assert_eq!(wikipedia_language(Some("uk")), "uk");
+        assert_eq!(wikipedia_language(Some("nb-NO")), "no");
+        assert_eq!(wikipedia_language(Some("EN-ca")), "en");
+        assert_eq!(wikipedia_language(None), "en");
+        assert_eq!(wikipedia_language(Some("")), "en");
+        assert_eq!(wikipedia_language(Some("../evil")), "en");
+        assert_eq!(wikipedia_language(Some("x1")), "en");
     }
 
     #[test]
@@ -1410,6 +1508,22 @@ mod tests {
             parsed.thumbnail.unwrap().source,
             Some("https://upload.wikimedia.org/thumb.jpg".to_string())
         );
+    }
+
+    #[test]
+    fn test_merge_review_links_puts_preferred_first_and_dedupes() {
+        let review = |id: &str| CritiqueBrainzReview {
+            id: Some(id.to_string()),
+        };
+        let preferred = [review("fr1"), review("shared")];
+        let others = [review("en1"), review("shared"), review("en2")];
+        let links = merge_review_links(&preferred, &others);
+        let ids: Vec<&str> = links
+            .iter()
+            .map(|l| l.rsplit('/').next().unwrap())
+            .collect();
+        assert_eq!(ids, ["fr1", "shared", "en1", "en2"]);
+        assert_eq!(merge_review_links(&[], &others).len(), 3);
     }
 
     #[test]

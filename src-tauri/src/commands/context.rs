@@ -127,8 +127,10 @@ pub async fn get_song_context(
     state: State<'_, AppState>,
     song_id: i64,
     force_refresh: Option<bool>,
+    locale: Option<String>,
 ) -> Result<SongContextEnrichment, String> {
     let force_refresh = force_refresh.unwrap_or(false);
+    let wiki_lang = crate::context::wikipedia_language(locale.as_deref());
 
     let context_result = crate::db::run_blocking(&state.db, move |conn| {
         if !context_enrichment_enabled(conn) {
@@ -170,9 +172,14 @@ pub async fn get_song_context(
 
     if let Some(ref rg_id) = release_group_id {
         let cached = read_release_group_cache(&db, rg_id).await?;
+        // Review links are ordered by language, so a row cached for another
+        // language is stale (#1480); pre-migration-61 rows were English.
         let fresh = cached
             .as_ref()
-            .map(|c| is_cache_fresh(c.fetched_at, now))
+            .map(|c| {
+                is_cache_fresh(c.fetched_at, now)
+                    && c.critiquebrainz_lang.as_deref().unwrap_or("en") == wiki_lang
+            })
             .unwrap_or(false);
 
         if fresh && !force_refresh {
@@ -181,14 +188,16 @@ pub async fn get_song_context(
             let db_clone = db.clone();
             let rg_id_clone = rg_id.clone();
             let cm = context_manager.clone();
+            let lang = wiki_lang.clone();
+            let flight_key = format!("{rg_id}:{wiki_lang}");
             let (mb_res, cb_res) = RELEASE_GROUP_FLIGHT
-                .work(rg_id, move || async move {
+                .work(&flight_key, move || async move {
                     let mb = cm
                         .fetch_musicbrainz_release_group(&rg_id_clone)
                         .await
                         .map_err(|e| e.to_string());
                     let cb = cm
-                        .fetch_critiquebrainz_reviews(&rg_id_clone)
+                        .fetch_critiquebrainz_reviews(&rg_id_clone, &lang)
                         .await
                         .map_err(|e| e.to_string());
 
@@ -196,9 +205,15 @@ pub async fn get_song_context(
                     let cb_ok = cb.as_ref().ok().cloned();
 
                     if mb.is_ok() || cb.is_ok() {
-                        let _ =
-                            write_release_group_cache(&db_clone, &rg_id_clone, &mb_ok, &cb_ok, now)
-                                .await;
+                        let _ = write_release_group_cache(
+                            &db_clone,
+                            &rg_id_clone,
+                            &mb_ok,
+                            &cb_ok,
+                            cb.is_ok().then_some(lang.as_str()),
+                            now,
+                        )
+                        .await;
                     }
                     (mb, cb)
                 })
@@ -245,9 +260,15 @@ pub async fn get_song_context(
         // If sort_name is missing, the row was cached before migration 42
         // introduced structured MusicBrainz artist details (#1128, #1146);
         // treat it as stale so details are fetched.
+        // A bio cached for another language is stale too (#1480); rows from
+        // before migration 61 have no language and were fetched in English.
         let fresh = cached
             .as_ref()
-            .map(|c| is_cache_fresh(c.fetched_at, now) && c.sort_name.is_some())
+            .map(|c| {
+                is_cache_fresh(c.fetched_at, now)
+                    && c.sort_name.is_some()
+                    && c.wikipedia_lang.as_deref().unwrap_or("en") == wiki_lang
+            })
             .unwrap_or(false);
 
         if fresh && !force_refresh {
@@ -258,8 +279,10 @@ pub async fn get_song_context(
             let db_clone = db.clone();
             let artist_id_clone = artist_id.clone();
             let cm = context_manager.clone();
+            let lang = wiki_lang.clone();
+            let flight_key = format!("{artist_id}:{wiki_lang}");
             let (details_res, bio_res) = ARTIST_FLIGHT
-                .work(artist_id, move || async move {
+                .work(&flight_key, move || async move {
                     // Fetch MusicBrainz details + wikidata_id in one request (#1128)
                     let mb_res = cm
                         .fetch_musicbrainz_artist_details_and_wikidata_id(&artist_id_clone)
@@ -271,11 +294,11 @@ pub async fn get_song_context(
                     };
 
                     let bio = if let Some(ref qid) = wikidata_id {
-                        cm.fetch_wikipedia_bio_from_wikidata_id(qid)
+                        cm.fetch_wikipedia_bio_from_wikidata_id(qid, &lang)
                             .await
                             .map_err(|e| e.to_string())
                     } else {
-                        cm.fetch_wikipedia_bio_for_artist(&artist_id_clone)
+                        cm.fetch_wikipedia_bio_for_artist(&artist_id_clone, &lang)
                             .await
                             .map_err(|e| e.to_string())
                     };
@@ -289,6 +312,9 @@ pub async fn get_song_context(
                             &artist_id_clone,
                             &bio_ok,
                             &details_ok,
+                            // Stamp the language only when the bio lookup
+                            // actually answered, so a failed fetch stays stale.
+                            bio.is_ok().then_some(lang.as_str()),
                             now,
                         )
                         .await;
@@ -354,6 +380,8 @@ struct ReleaseGroupCacheRow {
     critiquebrainz_rating: Option<f32>,
     critiquebrainz_review_count: Option<u32>,
     critiquebrainz_review_links: Option<String>,
+    /// Language the review links were ordered for; `None` for pre-migration-61 rows.
+    critiquebrainz_lang: Option<String>,
     fetched_at: i64,
 }
 
@@ -364,7 +392,7 @@ async fn read_release_group_cache(
     let release_group_id = release_group_id.to_string();
     crate::db::run_blocking(db, move |conn| {
         conn.query_row(
-            "SELECT mb_rating, mb_rating_votes, mb_tags, critiquebrainz_rating, critiquebrainz_review_count, critiquebrainz_review_links, fetched_at
+            "SELECT mb_rating, mb_rating_votes, mb_tags, critiquebrainz_rating, critiquebrainz_review_count, critiquebrainz_review_links, fetched_at, critiquebrainz_lang
              FROM context_enrichment WHERE release_group_id = ?1",
             params![release_group_id],
             |row| {
@@ -376,6 +404,7 @@ async fn read_release_group_cache(
                     critiquebrainz_review_count: row.get(4)?,
                     critiquebrainz_review_links: row.get(5)?,
                     fetched_at: row.get(6)?,
+                    critiquebrainz_lang: row.get(7)?,
                 })
             },
         )
@@ -410,9 +439,11 @@ async fn write_release_group_cache(
     release_group_id: &str,
     mb: &Option<crate::context::MusicBrainzReleaseGroupData>,
     cb: &Option<crate::context::CritiqueBrainzData>,
+    critiquebrainz_lang: Option<&str>,
     fetched_at: i64,
 ) -> Result<(), String> {
     let release_group_id = release_group_id.to_string();
+    let critiquebrainz_lang = critiquebrainz_lang.map(str::to_string);
     let mb = mb.clone();
     let cb = cb.clone();
     crate::db::run_blocking(db, move |conn| {
@@ -425,8 +456,8 @@ async fn write_release_group_cache(
         .unwrap_or_else(|_| "[]".to_string());
         conn.execute(
             "INSERT INTO context_enrichment
-                (release_group_id, mb_rating, mb_rating_votes, mb_tags, critiquebrainz_rating, critiquebrainz_review_count, critiquebrainz_review_links, fetched_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+                (release_group_id, mb_rating, mb_rating_votes, mb_tags, critiquebrainz_rating, critiquebrainz_review_count, critiquebrainz_review_links, fetched_at, critiquebrainz_lang)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
              ON CONFLICT(release_group_id) DO UPDATE SET
                 mb_rating = excluded.mb_rating,
                 mb_rating_votes = excluded.mb_rating_votes,
@@ -434,6 +465,7 @@ async fn write_release_group_cache(
                 critiquebrainz_rating = excluded.critiquebrainz_rating,
                 critiquebrainz_review_count = excluded.critiquebrainz_review_count,
                 critiquebrainz_review_links = excluded.critiquebrainz_review_links,
+                critiquebrainz_lang = CASE WHEN excluded.critiquebrainz_lang IS NOT NULL THEN excluded.critiquebrainz_lang ELSE context_enrichment.critiquebrainz_lang END,
                 fetched_at = excluded.fetched_at",
             params![
                 release_group_id,
@@ -444,6 +476,7 @@ async fn write_release_group_cache(
                 cb.as_ref().map(|c| c.review_count),
                 cb_links_json,
                 fetched_at,
+                critiquebrainz_lang,
             ],
         )?;
         Ok(())
@@ -467,6 +500,8 @@ struct ArtistCacheRow {
     begin_area_mbid: Option<String>,
     area_name: Option<String>,
     area_mbid: Option<String>,
+    /// Language the bio was requested in; `None` for rows from before migration 61.
+    wikipedia_lang: Option<String>,
     fetched_at: i64,
 }
 
@@ -496,7 +531,7 @@ async fn read_artist_cache(
         conn.query_row(
             "SELECT wikipedia_extract, wikipedia_page_url, wikipedia_thumbnail_url,
                     sort_name, artist_type, gender, begin_date, end_date, ended,
-                    begin_area_name, begin_area_mbid, area_name, area_mbid, fetched_at
+                    begin_area_name, begin_area_mbid, area_name, area_mbid, fetched_at, wikipedia_lang
              FROM artist_context_enrichment WHERE artist_id = ?1",
             params![artist_id],
             |row| {
@@ -516,6 +551,7 @@ async fn read_artist_cache(
                     area_name: row.get(11)?,
                     area_mbid: row.get(12)?,
                     fetched_at: row.get(13)?,
+                    wikipedia_lang: row.get(14)?,
                 })
             },
         )
@@ -534,18 +570,20 @@ async fn write_artist_cache(
     artist_id: &str,
     bio: &Option<crate::context::WikipediaSummary>,
     details: &Option<crate::context::MusicBrainzArtistDetails>,
+    wikipedia_lang: Option<&str>,
     fetched_at: i64,
 ) -> Result<(), String> {
     let artist_id = artist_id.to_string();
     let bio = bio.clone();
     let details = details.clone();
+    let wikipedia_lang = wikipedia_lang.map(str::to_string);
     crate::db::run_blocking(db, move |conn| {
         conn.execute(
             "INSERT INTO artist_context_enrichment
                 (artist_id, wikidata_id, wikipedia_extract, wikipedia_page_url, wikipedia_thumbnail_url,
                  sort_name, artist_type, gender, begin_date, end_date, ended,
-                 begin_area_name, begin_area_mbid, area_name, area_mbid, fetched_at)
-             VALUES (?1, NULL, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
+                 begin_area_name, begin_area_mbid, area_name, area_mbid, fetched_at, wikipedia_lang)
+             VALUES (?1, NULL, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
              ON CONFLICT(artist_id) DO UPDATE SET
                 wikipedia_extract = CASE WHEN excluded.wikipedia_extract IS NOT NULL THEN excluded.wikipedia_extract ELSE artist_context_enrichment.wikipedia_extract END,
                 wikipedia_page_url = CASE WHEN excluded.wikipedia_page_url IS NOT NULL THEN excluded.wikipedia_page_url ELSE artist_context_enrichment.wikipedia_page_url END,
@@ -560,6 +598,7 @@ async fn write_artist_cache(
                 begin_area_mbid = CASE WHEN excluded.begin_area_mbid IS NOT NULL THEN excluded.begin_area_mbid ELSE artist_context_enrichment.begin_area_mbid END,
                 area_name = CASE WHEN excluded.area_name IS NOT NULL THEN excluded.area_name ELSE artist_context_enrichment.area_name END,
                 area_mbid = CASE WHEN excluded.area_mbid IS NOT NULL THEN excluded.area_mbid ELSE artist_context_enrichment.area_mbid END,
+                wikipedia_lang = CASE WHEN excluded.wikipedia_lang IS NOT NULL THEN excluded.wikipedia_lang ELSE artist_context_enrichment.wikipedia_lang END,
                 fetched_at = excluded.fetched_at",
             params![
                 artist_id,
@@ -577,6 +616,7 @@ async fn write_artist_cache(
                 details.as_ref().and_then(|d| d.area_name.clone()),
                 details.as_ref().and_then(|d| d.area_mbid.clone()),
                 fetched_at,
+                wikipedia_lang,
             ],
         )?;
         Ok(())
@@ -855,9 +895,16 @@ mod tests {
             thumbnail_url: None,
         };
 
-        write_artist_cache(&db, "artist-123", &Some(bio), &Some(details), 1000)
-            .await
-            .unwrap();
+        write_artist_cache(
+            &db,
+            "artist-123",
+            &Some(bio),
+            &Some(details),
+            Some("fr"),
+            1000,
+        )
+        .await
+        .unwrap();
 
         let cached = read_artist_cache(&db, "artist-123").await.unwrap().unwrap();
         assert_eq!(cached.sort_name.as_deref(), Some("Twain, Shania"));
@@ -880,6 +927,7 @@ mod tests {
             Some("Shania Twain is a Canadian singer-songwriter.")
         );
         assert_eq!(cached.fetched_at, 1000);
+        assert_eq!(cached.wikipedia_lang.as_deref(), Some("fr"));
 
         let mut enrichment = SongContextEnrichment::default();
         apply_artist_cache(&mut enrichment, &cached);
@@ -902,7 +950,7 @@ mod tests {
         };
 
         // Write row with bio but no MB details (legacy pre-migration 42 shape)
-        write_artist_cache(&db, "artist-legacy", &Some(bio), &None, 1000)
+        write_artist_cache(&db, "artist-legacy", &Some(bio), &None, None, 1000)
             .await
             .unwrap();
 
@@ -912,6 +960,57 @@ mod tests {
             .unwrap();
         assert!(cached.sort_name.is_none());
         assert_eq!(cached.wikipedia_extract.as_deref(), Some("Bio only"));
+    }
+
+    #[tokio::test]
+    async fn test_artist_cache_keeps_language_when_bio_fetch_failed() {
+        let (_temp_dir, db) = temp_db("artist_cache_lang_kept");
+        let db = Arc::new(db);
+        let bio = crate::context::WikipediaSummary {
+            extract: "Bio".to_string(),
+            page_url: None,
+            thumbnail_url: None,
+        };
+
+        write_artist_cache(&db, "artist-lang", &Some(bio), &None, Some("en"), 1000)
+            .await
+            .unwrap();
+        // A later refresh whose bio lookup errored passes no language.
+        write_artist_cache(&db, "artist-lang", &None, &None, None, 2000)
+            .await
+            .unwrap();
+
+        let cached = read_artist_cache(&db, "artist-lang")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(cached.wikipedia_lang.as_deref(), Some("en"));
+        assert_eq!(cached.wikipedia_extract.as_deref(), Some("Bio"));
+    }
+
+    #[tokio::test]
+    async fn test_release_group_cache_records_review_language() {
+        let (_temp_dir, db) = temp_db("rg_cache_lang");
+        let db = Arc::new(db);
+        let cb = crate::context::CritiqueBrainzData {
+            average_rating: Some(4.0),
+            review_count: 1,
+            review_links: vec!["https://critiquebrainz.org/review/a".to_string()],
+        };
+
+        write_release_group_cache(&db, "rg-1", &None, &Some(cb), Some("fr"), 1000)
+            .await
+            .unwrap();
+        // A refresh whose CritiqueBrainz lookup failed must not relabel the row.
+        write_release_group_cache(&db, "rg-1", &None, &None, None, 2000)
+            .await
+            .unwrap();
+
+        let cached = read_release_group_cache(&db, "rg-1")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(cached.critiquebrainz_lang.as_deref(), Some("fr"));
     }
 
     #[tokio::test]

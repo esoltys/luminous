@@ -148,7 +148,7 @@
       return;
     }
     let cancelled = false;
-    invoke<SongContextEnrichment>("get_song_context", { songId: id })
+    invoke<SongContextEnrichment>("get_song_context", { songId: id, locale: i18n.currentLocale })
       .then((data) => {
         if (!cancelled) contextData = data;
       })
@@ -391,7 +391,7 @@
       const [artwork, context, events] = await Promise.all([
         collectionStore.getExtendedArtworkForArtist(artistName, true),
         contextSongId
-          ? invoke<SongContextEnrichment>("get_song_context", { songId: contextSongId, forceRefresh: true }).catch(() => null)
+          ? invoke<SongContextEnrichment>("get_song_context", { songId: contextSongId, forceRefresh: true, locale: i18n.currentLocale }).catch(() => null)
           : Promise.resolve(null),
         invoke<ArtistEvent[]>("get_artist_events", { artist: artistName, songId: contextSongId, forceRefresh: true }).catch(() => null)
       ]);
@@ -442,6 +442,7 @@
           const context = await invoke<SongContextEnrichment>("get_song_context", {
             songId: contextSongId,
             forceRefresh: true,
+            locale: i18n.currentLocale,
           });
           if (context) contextData = context;
         } catch (e) {

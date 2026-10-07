@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 60;
+pub const CURRENT_SCHEMA_VERSION: i32 = 61;
 
 struct Migration {
     version: i32,
@@ -516,6 +516,26 @@ const MIGRATIONS: &[Migration] = &[
                 conn.execute_batch(
                     "ALTER TABLE webdav_cache ADD COLUMN missed_syncs INTEGER NOT NULL DEFAULT 0;",
                 )?;
+            }
+            Ok(())
+        },
+    },
+    Migration {
+        version: 61,
+        description: "wikipedia_lang on artist_context_enrichment and critiquebrainz_lang on context_enrichment so cached context is re-fetched when the UI language changes (#1480)",
+        apply: |conn| {
+            for (table, column) in [
+                ("artist_context_enrichment", "wikipedia_lang"),
+                ("context_enrichment", "critiquebrainz_lang"),
+            ] {
+                let has_column: bool = conn
+                    .prepare(&format!(
+                        "SELECT 1 FROM pragma_table_info('{table}') WHERE name = '{column}'"
+                    ))?
+                    .exists([])?;
+                if !has_column {
+                    conn.execute_batch(&format!("ALTER TABLE {table} ADD COLUMN {column} TEXT;"))?;
+                }
             }
             Ok(())
         },

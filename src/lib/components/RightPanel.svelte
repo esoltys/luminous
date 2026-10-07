@@ -65,7 +65,7 @@
     isLoadingContext = true;
     contextErrorMsg = "";
     try {
-      const data = await invoke<SongContextEnrichment>("get_song_context", { songId, forceRefresh });
+      const data = await invoke<SongContextEnrichment>("get_song_context", { songId, forceRefresh, locale: i18n.currentLocale });
       if (requestId !== contextRequestId) return;
       contextData = data;
     } catch (e) {
