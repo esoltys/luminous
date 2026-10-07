@@ -799,8 +799,16 @@ pub async fn sync_webdav_server_inner(
         // a server that answered with no audio at all is treated as a failed
         // listing rather than as "everything was deleted".
         if sync_complete && !seen.is_empty() {
-            match mark_remote_deletions(&conn, &cache, &seen) {
-                Ok(removed) => stats.removed = removed,
+            match mark_remote_deletions(&conn, id, &cache, &seen) {
+                Ok(deleted) => {
+                    stats.removed = deleted.flagged + deleted.pruned;
+                    if deleted.pruned > 0 {
+                        log::info!(
+                            "Removed {} song(s) missing from '{server_name}' for {STALE_SYNC_LIMIT} syncs",
+                            deleted.pruned
+                        );
+                    }
+                }
                 Err(e) => log::warn!("Failed to flag deleted WebDAV songs: {e}"),
             }
         } else if !sync_complete {
@@ -908,6 +916,8 @@ struct CachedRemoteFile {
     /// The song has no duration: its tags never parsed (e.g. cut off by a short
     /// probe, #1493), so it is probed again even though the file is unchanged.
     tags_unread: bool,
+    /// Consecutive complete syncs that did not list this file.
+    missed_syncs: i64,
 }
 
 /// One listed directory's classified files, waiting for its level to be probed.
@@ -932,7 +942,7 @@ fn load_remote_cache(
     server_id: i64,
 ) -> rusqlite::Result<HashMap<String, CachedRemoteFile>> {
     let mut stmt = conn.prepare(
-        "SELECT c.remote_path, c.etag, c.size, c.song_id, s.path, COALESCE(s.unavailable, 0), COALESCE(s.length_nanosec, 0) = 0
+        "SELECT c.remote_path, c.etag, c.size, c.song_id, s.path, COALESCE(s.unavailable, 0), COALESCE(s.length_nanosec, 0) = 0, c.missed_syncs
          FROM webdav_cache c LEFT JOIN songs s ON s.id = c.song_id
          WHERE c.server_id = ?1 AND c.song_id IS NOT NULL",
     )?;
@@ -946,6 +956,7 @@ fn load_remote_cache(
                 song_path: r.get(4)?,
                 unavailable: r.get::<_, i64>(5)? != 0,
                 tags_unread: r.get::<_, i64>(6)? != 0,
+                missed_syncs: r.get(7)?,
             },
         ))
     })?;
@@ -1016,26 +1027,71 @@ fn remote_file_changed(cached: &CachedRemoteFile, item: &crate::webdav::WebDavIt
     }
 }
 
-/// Flags the songs of cached files missing from `seen` as unavailable; returns
-/// how many were newly flagged.
+/// Complete syncs a file may be missing from before its song and cache row are
+/// hard-deleted (#1494). Until then the song is only flagged unavailable, so a
+/// file that returns (a remounted share, a restored backup) is repaired by the
+/// unchanged-file path instead of being re-probed.
+const STALE_SYNC_LIMIT: i64 = 5;
+
+/// What one pass of `mark_remote_deletions` changed.
+#[derive(Debug, Default, PartialEq, Eq)]
+struct RemoteDeletions {
+    /// Songs newly flagged unavailable.
+    flagged: usize,
+    /// Songs (and their cache rows) hard-deleted after `STALE_SYNC_LIMIT` misses.
+    pruned: usize,
+}
+
+/// Handles cached files of `server_id` that `seen` doesn't list: flags their
+/// songs unavailable, and hard-deletes song and cache row once the file has been
+/// missing for `STALE_SYNC_LIMIT` consecutive syncs. A file that is listed again
+/// has its miss count reset.
 fn mark_remote_deletions(
     conn: &rusqlite::Connection,
+    server_id: i64,
     cache: &HashMap<String, CachedRemoteFile>,
     seen: &HashSet<String>,
-) -> rusqlite::Result<usize> {
+) -> rusqlite::Result<RemoteDeletions> {
     let tx = conn.unchecked_transaction()?;
-    let mut removed = 0;
+    let mut result = RemoteDeletions::default();
     for (href, cached) in cache {
-        if cached.unavailable || seen.contains(href) {
+        if seen.contains(href) {
+            if cached.missed_syncs > 0 {
+                tx.execute(
+                    "UPDATE webdav_cache SET missed_syncs = 0 WHERE server_id = ?1 AND remote_path = ?2",
+                    params![server_id, href],
+                )?;
+            }
             continue;
         }
-        removed += tx.execute(
-            "UPDATE songs SET unavailable = 1 WHERE id = ?1 AND unavailable = 0",
-            params![cached.song_id],
-        )?;
+        let missed: i64 = tx
+            .query_row(
+                "UPDATE webdav_cache SET missed_syncs = missed_syncs + 1
+                 WHERE server_id = ?1 AND remote_path = ?2 RETURNING missed_syncs",
+                params![server_id, href],
+                |r| r.get(0),
+            )
+            .unwrap_or(cached.missed_syncs + 1);
+        if missed >= STALE_SYNC_LIMIT {
+            tx.execute("DELETE FROM songs WHERE id = ?1", params![cached.song_id])?;
+            tx.execute(
+                "DELETE FROM webdav_cache WHERE server_id = ?1 AND remote_path = ?2",
+                params![server_id, href],
+            )?;
+            result.pruned += 1;
+        } else if !cached.unavailable {
+            result.flagged += tx.execute(
+                "UPDATE songs SET unavailable = 1 WHERE id = ?1 AND unavailable = 0",
+                params![cached.song_id],
+            )?;
+        }
+    }
+    if result.pruned > 0 {
+        // The queue and playlists reference songs with ON DELETE SET NULL.
+        tx.execute_batch("DELETE FROM playlist_items WHERE song_id IS NULL;")?;
     }
     tx.commit()?;
-    Ok(removed)
+    Ok(result)
 }
 
 /// Runs `f` over `items` on at most `workers` threads and returns the results
@@ -1160,6 +1216,7 @@ mod tests {
             song_path: None,
             unavailable: false,
             tags_unread: false,
+            missed_syncs: 0,
         }
     }
 
@@ -1285,9 +1342,16 @@ mod tests {
         }
 
         let seen: HashSet<String> = ["/kept.mp3".to_string()].into();
-        assert_eq!(mark_remote_deletions(&conn, &cache, &seen).unwrap(), 1);
+        let flagged = |r: RemoteDeletions| r.flagged;
+        assert_eq!(
+            flagged(mark_remote_deletions(&conn, 1, &cache, &seen).unwrap()),
+            1
+        );
         // A second pass finds nothing new to flag.
-        assert_eq!(mark_remote_deletions(&conn, &cache, &seen).unwrap(), 0);
+        assert_eq!(
+            flagged(mark_remote_deletions(&conn, 1, &cache, &seen).unwrap()),
+            0
+        );
 
         let flag = |name: &str| -> bool {
             conn.query_row(
@@ -1308,5 +1372,65 @@ mod tests {
         .unwrap();
         let loaded = load_remote_cache(&conn, 1).unwrap();
         assert!(loaded["/gone.mp3"].unavailable);
+    }
+
+    #[test]
+    fn mark_remote_deletions_prunes_after_the_stale_limit_and_resets_on_return() {
+        let dir = tempfile::Builder::new()
+            .prefix("luminous_webdav_stale_")
+            .tempdir()
+            .unwrap();
+        let db = Database::new(dir.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO webdav_servers (id, name, url, remote_path) VALUES (1, 'NAS', 'http://nas/dav', '/')",
+            [],
+        )
+        .unwrap();
+        for name in ["gone", "back"] {
+            let path = format!("http://nas/dav/{name}.mp3");
+            crate::collection::upsert_song(
+                &conn,
+                &Song {
+                    path: Some(path.clone()),
+                    source: SongSource::WebDav,
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO webdav_cache (server_id, remote_path, size, song_id)
+                 SELECT 1, ?1, 1, id FROM songs WHERE path = ?2",
+                params![format!("/{name}.mp3"), path],
+            )
+            .unwrap();
+        }
+        let songs = || -> i64 {
+            conn.query_row("SELECT COUNT(*) FROM songs", [], |r| r.get(0))
+                .unwrap()
+        };
+
+        let none: HashSet<String> = HashSet::new();
+        // `back` is missing for all but the last allowed sync, then listed again.
+        for sync in 1..=STALE_SYNC_LIMIT {
+            let cache = load_remote_cache(&conn, 1).unwrap();
+            let seen: HashSet<String> = if sync == STALE_SYNC_LIMIT {
+                ["/back.mp3".to_string()].into()
+            } else {
+                none.clone()
+            };
+            let r = mark_remote_deletions(&conn, 1, &cache, &seen).unwrap();
+            if sync < STALE_SYNC_LIMIT {
+                assert_eq!(r.pruned, 0);
+                assert_eq!(songs(), 2);
+            } else {
+                // `gone` hits the limit; `back` resets instead of being pruned.
+                assert_eq!(r.pruned, 1);
+            }
+        }
+        assert_eq!(songs(), 1);
+        let loaded = load_remote_cache(&conn, 1).unwrap();
+        assert!(!loaded.contains_key("/gone.mp3"));
+        assert_eq!(loaded["/back.mp3"].missed_syncs, 0);
     }
 }

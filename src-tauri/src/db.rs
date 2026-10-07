@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 59;
+pub const CURRENT_SCHEMA_VERSION: i32 = 60;
 
 struct Migration {
     version: i32,
@@ -502,6 +502,23 @@ const MIGRATIONS: &[Migration] = &[
         version: 59,
         description: "strip embedded credentials from WebDAV song URLs (#1492)",
         apply: migrate_strip_webdav_song_credentials,
+    },
+    Migration {
+        version: 60,
+        description: "webdav_cache.missed_syncs so rows for files gone from the server can be pruned (#1494)",
+        apply: |conn| {
+            let has_missed_syncs: bool = conn
+                .prepare(
+                    "SELECT 1 FROM pragma_table_info('webdav_cache') WHERE name = 'missed_syncs'",
+                )?
+                .exists([])?;
+            if !has_missed_syncs {
+                conn.execute_batch(
+                    "ALTER TABLE webdav_cache ADD COLUMN missed_syncs INTEGER NOT NULL DEFAULT 0;",
+                )?;
+            }
+            Ok(())
+        },
     },
 ];
 
