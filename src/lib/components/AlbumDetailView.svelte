@@ -61,6 +61,7 @@
   import { compareSongs } from "../utils/songSort";
   import { rememberScroll } from "../utils/scrollMemory";
   import { openInPicard } from "../utils/picard";
+  import { openExternalUrl } from "../utils/openExternalUrl";
   import {
     resolveSocialUrl,
     formatDisplayLabel,
@@ -393,14 +394,8 @@
     });
   });
 
-  async function handleOpenUrl(url: string) {
-    if (!url) return;
-    try {
-      const { openUrl } = await import("@tauri-apps/plugin-opener");
-      await openUrl(url);
-    } catch {
-      window.open(url, "_blank");
-    }
+  function handleOpenUrl(url: string) {
+    if (url) openExternalUrl(url);
   }
 
   function openCritiqueBrainz() {
