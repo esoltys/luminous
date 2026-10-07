@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { de } from "./de";
 import { en } from "./en";
+import { enGB } from "./en-GB";
+import { enUS } from "./en-US";
 import { es } from "./es";
 import { fr } from "./fr";
 import { frFR } from "./fr-FR";
@@ -606,6 +608,34 @@ describe.each(CATALOGS)("Locale translation completeness and integrity: $name", 
   });
 });
 
+describe.each([
+  { name: "English (US)", tag: "en-US", file: "en-US.ts", messages: enUS },
+  { name: "English (UK)", tag: "en-GB", file: "en-GB.ts", messages: enGB },
+])("Overlay locale: $name", ({ tag, file, messages }) => {
+  const flatEn = flatten(en);
+  const flatLoc = flatten(messages);
+
+  it(`${file} only overrides keys that exist in en.ts`, () => {
+    expect(Object.keys(flatLoc).filter((key) => !(key in flatEn))).toEqual([]);
+  });
+
+  it(`${file} only carries strings that differ from en.ts`, () => {
+    expect(Object.keys(flatLoc).filter((key) => flatLoc[key] === flatEn[key])).toEqual([]);
+  });
+
+  it(`${file} keeps the same {placeholder} tokens as en.ts`, () => {
+    const mismatches = Object.keys(flatLoc).filter(
+      (key) => extractPlaceholders(flatLoc[key]).join(",") !== extractPlaceholders(flatEn[key] ?? "").join(","),
+    );
+    expect(mismatches).toEqual([]);
+  });
+
+  it("falls back to the Canadian English base", () => {
+    const def = (LOCALES as readonly { tag: string; fallback?: string }[]).find((l) => l.tag === tag);
+    expect(def?.fallback).toBe(BASE_LOCALE);
+  });
+});
+
 describe.each([{ name: "English", tag: "en-CA", file: "en.ts", messages: en }, ...CATALOGS])("Plural forms: $name", ({ tag, file, messages }) => {
   const enPlurals = collectPlurals(en);
   const locPlurals = collectPlurals(messages);
@@ -697,6 +727,8 @@ describe("Locale registry", () => {
   it("catalogChain ends at the base catalog and tolerates unknown tags", () => {
     expect(catalogChain("fr-CA")).toEqual([fr, en]);
     expect(catalogChain("en-CA")).toEqual([en]);
+    expect(catalogChain("en-US")).toEqual([enUS, en]);
+    expect(catalogChain("en-GB")).toEqual([enGB, en]);
     expect(catalogChain("zz")).toEqual([en]);
   });
 
@@ -704,6 +736,8 @@ describe("Locale registry", () => {
     expect(localeLabel("en-CA")).toBe("English (Canada)");
     expect(localeLabel("fr-CA")).toBe("Français (Canada)");
     expect(localeLabel("fr")).toBe("Français");
+    expect(localeLabel("en-US")).toBe("English (United States)");
+    expect(localeLabel("en-GB")).toBe("English (United Kingdom)");
   });
 });
 
