@@ -393,6 +393,58 @@ fn head_resolves_song(song: &Song, head: &[u8]) -> bool {
     }
 }
 
+/// Byte length of a leading ID3v2 tag (header and footer included), or 0 if there is none.
+fn id3v2_len(buffer: &[u8]) -> usize {
+    if buffer.len() < 10 || !buffer.starts_with(b"ID3") {
+        return 0;
+    }
+    let size = buffer[6..10]
+        .iter()
+        .fold(0usize, |acc, b| (acc << 7) | (*b & 0x7f) as usize);
+    let footer = if buffer[5] & 0x10 != 0 { 10 } else { 0 };
+    10 + size + footer
+}
+
+/// Replaces the duration and bitrate lofty derived from a truncated probe buffer.
+///
+/// Lofty can only see the bytes we fetched, so anything computed from the stream length
+/// is wrong: an MP3 without a Xing/Info/VBRI header gets a duration estimated from the
+/// buffer, and a FLAC gets an average bitrate over the buffer. `content_length` is the
+/// real size, so recompute those two values from it.
+fn correct_size_dependent_properties(song: &mut Song, buffer: &[u8], content_length: u64) {
+    match song.filetype {
+        FileType::Flac => {
+            // STREAMINFO makes the duration exact; only the bitrate depends on size.
+            let secs = song.length_nanosec.unwrap_or(0) as f64 / 1e9;
+            if secs > 0.0 {
+                song.bitrate = Some((content_length as f64 * 8.0 / secs / 1000.0).round() as i32);
+            }
+        }
+        FileType::Mp3 => {
+            let audio_start = id3v2_len(buffer);
+            let Some(kbps) = song.bitrate.filter(|b| *b > 0) else {
+                return;
+            };
+            let frame_header_end = (audio_start + 4096).min(buffer.len());
+            let has_vbr_header = buffer
+                .get(audio_start..frame_header_end)
+                .is_some_and(|frame| {
+                    [&b"Xing"[..], b"Info", b"VBRI"]
+                        .iter()
+                        .any(|tag| frame.windows(tag.len()).any(|w| w == *tag))
+                });
+            // Only a head that reaches the first frame can prove the header is absent.
+            if has_vbr_header || audio_start >= buffer.len() {
+                return;
+            }
+            let audio_bytes = (content_length as usize).saturating_sub(audio_start) as f64;
+            let secs = audio_bytes * 8.0 / (kbps as f64 * 1000.0);
+            song.length_nanosec = Some((secs * 1e9) as i64);
+        }
+        _ => {}
+    }
+}
+
 /// Parses tags and stream properties out of a probe buffer (the head, or head + tail).
 fn parse_probe_buffer(buffer: &[u8], url: &str, content_length: u64) -> Song {
     let mut cursor = Cursor::new(buffer);
@@ -419,6 +471,9 @@ fn parse_probe_buffer(buffer: &[u8], url: &str, content_length: u64) -> Song {
         let duration_ns = (properties.duration().as_secs_f64() * 1_000_000_000.0) as i64;
         song.length_nanosec = Some(duration_ns);
         song.bitrate = properties.audio_bitrate().map(|b| b as i32);
+        if (buffer.len() as u64) < content_length {
+            correct_size_dependent_properties(&mut song, buffer, content_length);
+        }
         song.samplerate = properties.sample_rate().map(|r| r as i32);
         song.channels = properties.channels().map(|c| c as i32);
         song.bitdepth = properties.bit_depth().map(|b| b as i32);
@@ -1020,6 +1075,24 @@ mod tests {
             assert_eq!(song.length_nanosec, Some(duration), "{name}");
             assert!(song.title.is_some(), "{name}");
         }
+    }
+
+    #[test]
+    fn flac_bitrate_comes_from_the_real_file_size() {
+        let bytes = fixture("song_gamma.flac");
+        let (song, _) = probe_head("song_gamma.flac", 50 * 1024);
+        let expected = (bytes.len() as f64 * 8.0 / 0.8 / 1000.0).round() as i32;
+        assert_eq!(song.bitrate, Some(expected));
+    }
+
+    #[test]
+    fn headerless_mp3_duration_uses_the_real_file_size() {
+        let bytes = fixture("song_alpha.mp3");
+        let (full, _) = probe_head("song_alpha.mp3", bytes.len());
+        let (head, _) = probe_head("song_alpha.mp3", 2718);
+        let (full, head) = (full.length_nanosec.unwrap(), head.length_nanosec.unwrap());
+        // Tolerate lofty's frame-boundary rounding; the truncated head used to be far off.
+        assert!((full - head).abs() < 50_000_000, "full={full} head={head}");
     }
 
     #[test]
