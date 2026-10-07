@@ -476,6 +476,8 @@ pub async fn sync_webdav_server_inner(
         let mut probe_time = std::time::Duration::ZERO;
         let mut dirs_listed = 0usize;
         let mut files_probed = 0usize;
+        let mut art_time = std::time::Duration::ZERO;
+        let mut write_time = std::time::Duration::ZERO;
         // Files that failed to probe or store, for the diagnostics export (#1495).
         let mut failures: Vec<(String, String)> = Vec::new();
 
@@ -490,6 +492,9 @@ pub async fn sync_webdav_server_inner(
             });
             list_time += list_started.elapsed();
             let mut next_level = Vec::new();
+            // Each listed directory's pending work. Probing is done for the whole
+            // level at once below, so a small album doesn't leave workers idle.
+            let mut works: Vec<DirWork> = Vec::new();
 
             for (current_path, listing) in listings {
                 dirs_listed += 1;
@@ -564,7 +569,7 @@ pub async fn sync_webdav_server_inner(
                     let playback_url = client.playback_url(&item.href);
 
                     match cache.get(&item.href) {
-                        Some(cached) if !remote_file_changed(cached, &item) => {
+                        Some(cached) if !cached.tags_unread && !remote_file_changed(cached, &item) => {
                             // The remote file itself is unchanged, so skip re-probing tags —
                             // but the stored playback URL may still be stale (e.g. the
                             // server's URL changed since) and the song may have been flagged
@@ -590,14 +595,30 @@ pub async fn sync_webdav_server_inner(
                     }
                 }
 
-                // Probe remote tags using byte ranges, concurrently.
-                let probe_started = std::time::Instant::now();
-                files_probed += to_probe.len();
-                let probed = run_bounded(to_probe, PROBE_CONCURRENCY, |task| {
-                    let result = client.probe_song_tags(&task.probe_url, task.file_size);
-                    (task, result)
-                });
-                probe_time += probe_started.elapsed();
+                works.push(DirWork { path: current_path, folder_art_item, fixups, to_probe });
+            }
+
+            // Probe remote tags using byte ranges, concurrently across every
+            // directory of this level (not just within one folder).
+            let probe_started = std::time::Instant::now();
+            let mut tasks: Vec<(usize, ProbeTask)> = Vec::new();
+            for (dir_index, work) in works.iter_mut().enumerate() {
+                tasks.extend(work.to_probe.drain(..).map(|task| (dir_index, task)));
+            }
+            files_probed += tasks.len();
+            let probed_all = run_bounded(tasks, PROBE_CONCURRENCY, |(dir_index, task)| {
+                let result = client.probe_song_tags(&task.probe_url, task.file_size);
+                (dir_index, task, result)
+            });
+            probe_time += probe_started.elapsed();
+            let mut probed_by_dir: Vec<Vec<(ProbeTask, anyhow::Result<crate::models::Song>)>> =
+                works.iter().map(|_| Vec::new()).collect();
+            for (dir_index, task, result) in probed_all {
+                probed_by_dir[dir_index].push((task, result));
+            }
+
+            for (work, probed) in works.into_iter().zip(probed_by_dir) {
+                let DirWork { path: current_path, folder_art_item, fixups, .. } = work;
 
                 // No embedded-picture extraction over WebDAV yet, so
                 // `art_automatic` is always still unset: fall back to this
@@ -611,6 +632,7 @@ pub async fn sync_webdav_server_inner(
                         .iter()
                         .any(|(_, r)| matches!(r, Ok(song) if song.art_automatic.is_none()));
                     if needs_art {
+                        let art_started = std::time::Instant::now();
                         let art_url = client.build_url(&art_item.href);
                         match client.fetch_full(&art_url) {
                             Ok(bytes) => folder_art_bytes = Some(bytes),
@@ -619,10 +641,16 @@ pub async fn sync_webdav_server_inner(
                                 art_item.href
                             ),
                         }
+                        art_time += art_started.elapsed();
                     }
                 }
+                // The folder image is shared by the directory's songs, so decode and
+                // cache it once per album rather than once per song.
+                let mut cached_art: HashMap<(String, String), String> = HashMap::new();
 
                 // One transaction per directory instead of an autocommit per row.
+                let write_started = std::time::Instant::now();
+                let art_before_write = art_time;
                 let tx = match conn.unchecked_transaction() {
                     Ok(tx) => tx,
                     Err(e) => {
@@ -662,12 +690,23 @@ pub async fn sync_webdav_server_inner(
                                         .filter(|a| !a.trim().is_empty())
                                         .or_else(|| song.title.clone())
                                         .unwrap_or_default();
-                                    match cover_manager.cache_art_bytes(&artist, &album, bytes) {
-                                        Ok(filename) => song.art_automatic = Some(filename),
-                                        Err(e) => log::warn!(
-                                            "Failed to cache WebDAV folder art for {}: {e}",
-                                            item.href
-                                        ),
+                                    let key = (artist, album);
+                                    if let Some(filename) = cached_art.get(&key) {
+                                        song.art_automatic = Some(filename.clone());
+                                    } else {
+                                        let art_started = std::time::Instant::now();
+                                        let cached = cover_manager.cache_art_bytes(&key.0, &key.1, bytes);
+                                        art_time += art_started.elapsed();
+                                        match cached {
+                                            Ok(filename) => {
+                                                cached_art.insert(key, filename.clone());
+                                                song.art_automatic = Some(filename);
+                                            }
+                                            Err(e) => log::warn!(
+                                                "Failed to cache WebDAV folder art for {}: {e}",
+                                                item.href
+                                            ),
+                                        }
                                     }
                                 }
                             }
@@ -721,6 +760,10 @@ pub async fn sync_webdav_server_inner(
                     stats.errors += 1;
                     sync_complete = false;
                 }
+                // Database time only: the art caching inside the loop is counted apart.
+                write_time += write_started
+                    .elapsed()
+                    .saturating_sub(art_time.saturating_sub(art_before_write));
             }
 
             level = next_level;
@@ -794,7 +837,8 @@ pub async fn sync_webdav_server_inner(
             concat!(
                 "webdav sync ({}): total {} ms | {} file(s) seen, ",
                 "{} probed, {} added, {} updated, {} removed, {} error(s) | ",
-                "{} dir listing(s) {} ms ({} unchanged folder(s) skipped), tag probes {} ms"
+                "{} dir listing(s) {} ms ({} unchanged folder(s) skipped), tag probes {} ms, ",
+                "folder art {} ms, database writes {} ms"
             ),
             server_name,
             sync_started.elapsed().as_millis(),
@@ -808,6 +852,8 @@ pub async fn sync_webdav_server_inner(
             list_time.as_millis(),
             skipped_dirs.len(),
             probe_time.as_millis(),
+            art_time.as_millis(),
+            write_time.as_millis(),
         );
         summary.push_str(&failure_report(&failures));
         log::info!("{summary}");
@@ -848,7 +894,7 @@ const FULL_LISTING_INTERVAL_SECS: i64 = 24 * 60 * 60;
 /// Directory listings in flight at once during a sync (#1483).
 const LIST_CONCURRENCY: usize = 8;
 /// Tag probes in flight at once during a sync (#1483).
-const PROBE_CONCURRENCY: usize = 6;
+const PROBE_CONCURRENCY: usize = 12;
 /// Minimum gap between `webdav-sync-progress` events while a sync runs.
 const PROGRESS_EMIT_INTERVAL: std::time::Duration = std::time::Duration::from_millis(250);
 
@@ -859,6 +905,17 @@ struct CachedRemoteFile {
     song_id: i64,
     song_path: Option<String>,
     unavailable: bool,
+    /// The song has no duration: its tags never parsed (e.g. cut off by a short
+    /// probe, #1493), so it is probed again even though the file is unchanged.
+    tags_unread: bool,
+}
+
+/// One listed directory's classified files, waiting for its level to be probed.
+struct DirWork {
+    path: String,
+    folder_art_item: Option<crate::webdav::WebDavItem>,
+    fixups: Vec<(i64, String)>,
+    to_probe: Vec<ProbeTask>,
 }
 
 /// A new or changed remote file waiting for its tags to be read.
@@ -875,7 +932,7 @@ fn load_remote_cache(
     server_id: i64,
 ) -> rusqlite::Result<HashMap<String, CachedRemoteFile>> {
     let mut stmt = conn.prepare(
-        "SELECT c.remote_path, c.etag, c.size, c.song_id, s.path, COALESCE(s.unavailable, 0)
+        "SELECT c.remote_path, c.etag, c.size, c.song_id, s.path, COALESCE(s.unavailable, 0), COALESCE(s.length_nanosec, 0) = 0
          FROM webdav_cache c LEFT JOIN songs s ON s.id = c.song_id
          WHERE c.server_id = ?1 AND c.song_id IS NOT NULL",
     )?;
@@ -888,6 +945,7 @@ fn load_remote_cache(
                 song_id: r.get(3)?,
                 song_path: r.get(4)?,
                 unavailable: r.get::<_, i64>(5)? != 0,
+                tags_unread: r.get::<_, i64>(6)? != 0,
             },
         ))
     })?;
@@ -1101,6 +1159,7 @@ mod tests {
             song_id: 1,
             song_path: None,
             unavailable: false,
+            tags_unread: false,
         }
     }
 

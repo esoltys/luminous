@@ -221,6 +221,103 @@ impl WebDavClient {
         Ok(bytes.to_vec())
     }
 
+    /// Fetches `[start, end)` of the file into `buf` at the same offsets (zero-extending
+    /// it), skipping whatever the head probe already holds. False if it came up short.
+    fn fill_probe_range(
+        &self,
+        url: &str,
+        buf: &mut Vec<u8>,
+        head_len: usize,
+        start: usize,
+        end: usize,
+    ) -> bool {
+        let from = start.max(head_len);
+        if end <= from {
+            return true;
+        }
+        match self.fetch_range(url, from as u64, (end - 1) as u64) {
+            Ok(bytes) => {
+                if buf.len() < from + bytes.len() {
+                    buf.resize(from + bytes.len(), 0);
+                }
+                buf[from..from + bytes.len()].copy_from_slice(&bytes);
+                bytes.len() == end - from
+            }
+            Err(_) => false,
+        }
+    }
+
+    /// Reads past the head probe when the tags don't fit in it: a FLAC with a large
+    /// padding or picture block, or an MP3 with a large ID3v2 tag (embedded art). The
+    /// head is cut mid-tag otherwise and the file's tags are lost. FLAC padding is
+    /// skipped, not downloaded. Returns the (possibly longer) buffer, plus whether it
+    /// already holds every tag so the tail probe can be skipped.
+    fn extend_probe_head(
+        &self,
+        url: &str,
+        mut buf: Vec<u8>,
+        content_length: u64,
+    ) -> (Vec<u8>, bool) {
+        const MAX_METADATA_BYTES: usize = 16 * 1024 * 1024;
+        let head_len = buf.len();
+        if content_length as usize <= head_len {
+            return (buf, false);
+        }
+
+        if buf.starts_with(b"ID3") && buf.len() >= 10 {
+            let size = ((buf[6] as usize & 0x7f) << 21)
+                | ((buf[7] as usize & 0x7f) << 14)
+                | ((buf[8] as usize & 0x7f) << 7)
+                | (buf[9] as usize & 0x7f);
+            // The tag plus a little audio: the MPEG reader insists on finding a frame.
+            let end = (size + 10 + 128 * 1024).min(content_length as usize);
+            if end > head_len && size <= MAX_METADATA_BYTES {
+                self.fill_probe_range(url, &mut buf, head_len, head_len, end);
+            }
+            return (buf, false);
+        }
+
+        if buf.starts_with(b"fLaC") {
+            let mut pos = 4usize;
+            let mut extended = false;
+            let mut fetched = 0usize;
+            loop {
+                if !self.fill_probe_range(url, &mut buf, head_len, pos, pos + 4) {
+                    return (buf, extended);
+                }
+                let header = buf[pos];
+                let is_last = header & 0x80 != 0;
+                let block_type = header & 0x7f;
+                let len = ((buf[pos + 1] as usize) << 16)
+                    | ((buf[pos + 2] as usize) << 8)
+                    | buf[pos + 3] as usize;
+                let end = pos + 4 + len;
+                if end > head_len {
+                    extended = true;
+                    if block_type == 1 {
+                        // Padding is all zeros: stand in for it instead of downloading it.
+                        if buf.len() < end {
+                            buf.resize(end, 0);
+                        }
+                    } else {
+                        fetched += len;
+                        if fetched > MAX_METADATA_BYTES
+                            || !self.fill_probe_range(url, &mut buf, head_len, pos + 4, end)
+                        {
+                            return (buf, false);
+                        }
+                    }
+                }
+                pos = end;
+                if is_last {
+                    return (buf, extended);
+                }
+            }
+        }
+
+        (buf, false)
+    }
+
     /// Probes remote file metadata using byte ranges.
     /// Fetches initial 256KB for ID3v2/FLAC/Vorbis headers and trailing 128KB for ID3v1/APEv2.
     pub fn probe_song_tags(&self, url: &str, content_length: u64) -> Result<Song> {
@@ -228,7 +325,15 @@ impl WebDavClient {
         let head_size = initial_probe_size.min(content_length);
         let head_bytes = self.fetch_range(url, 0, head_size.saturating_sub(1))?;
 
-        let tail_bytes = if content_length > head_size {
+        // A tag block bigger than the head probe (FLAC padding or embedded art,
+        // a large ID3v2 tag) would be cut off and the tags lost: read the rest.
+        let (head_bytes, metadata_complete) =
+            self.extend_probe_head(url, head_bytes, content_length);
+
+        let tail_bytes = if metadata_complete {
+            // Everything the tags need is already in hand (FLAC/ID3v2 lead with them).
+            Vec::new()
+        } else if content_length > head_size {
             let tail_probe_size = 128 * 1024;
             let tail_start = content_length
                 .saturating_sub(tail_probe_size)
@@ -257,11 +362,14 @@ impl WebDavClient {
             ..Default::default()
         };
 
-        if let Ok(tagged_file) = Probe::new(&mut cursor)
+        let parsed = Probe::new(&mut cursor)
             .guess_file_type()
             .map_err(|e| anyhow::anyhow!(e))
-            .and_then(|p| p.read().map_err(|e| anyhow::anyhow!(e)))
-        {
+            .and_then(|p| p.read().map_err(|e| anyhow::anyhow!(e)));
+        if let Err(e) = &parsed {
+            log::warn!("Could not read tags from {url}: {e}");
+        }
+        if let Ok(tagged_file) = parsed {
             let properties = tagged_file.properties();
             let duration_ns = (properties.duration().as_secs_f64() * 1_000_000_000.0) as i64;
             song.length_nanosec = Some(duration_ns);
@@ -316,11 +424,10 @@ impl WebDavClient {
         if song.title.is_none() {
             if let Some(filename) = url.split('/').next_back() {
                 let name = filename.split('?').next().unwrap_or(filename);
-                if let Some(idx) = name.rfind('.') {
-                    song.title = Some(name[..idx].to_string());
-                } else {
-                    song.title = Some(name.to_string());
-                }
+                // URLs are percent-encoded; the title should read as the file name does.
+                let name = percent_encoding::percent_decode_str(name).decode_utf8_lossy();
+                let stem = name.rfind('.').map_or(&*name, |idx| &name[..idx]);
+                song.title = Some(stem.to_string());
             }
         }
 
@@ -553,6 +660,72 @@ mod tests {
             Some("Wed, 21 Oct 2025 07:28:00 GMT")
         );
         assert_eq!(items[1].etag.as_deref(), Some("\"abcd1234efgh\""));
+    }
+
+    /// A FLAC whose tags sit behind more than the head probe's worth of data used
+    /// to lose them entirely (#1493): the probe reads on past a big picture block
+    /// and stands in for the padding that follows it instead of downloading it.
+    #[tokio::test]
+    async fn extend_probe_head_reads_past_the_head_and_skips_padding() {
+        use wiremock::matchers::method;
+        use wiremock::{Mock, MockServer};
+
+        fn block(kind: u8, last: bool, body: Vec<u8>) -> Vec<u8> {
+            let mut out = vec![kind | if last { 0x80 } else { 0 }];
+            out.extend_from_slice(&(body.len() as u32).to_be_bytes()[1..]);
+            out.extend(body);
+            out
+        }
+        let picture = vec![7u8; 300_000];
+        let mut file = b"fLaC".to_vec();
+        file.extend(block(0, false, vec![1; 34]));
+        file.extend(block(6, false, picture.clone()));
+        file.extend(block(1, true, vec![0; 400_000]));
+        let metadata_len = file.len();
+        file.extend(vec![9u8; 1_000]); // audio frames
+        let served = file.clone();
+
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .respond_with(move |req: &wiremock::Request| {
+                let (start, end) = req
+                    .headers
+                    .get(wiremock::http::HeaderName::from_static("range"))
+                    .and_then(|r| r.to_str().ok())
+                    .and_then(|r| r.strip_prefix("bytes="))
+                    .and_then(|r| r.split_once('-'))
+                    .map(|(s, e)| (s.parse::<usize>().unwrap(), e.parse::<usize>().unwrap()))
+                    .unwrap();
+                let end = end.min(served.len() - 1);
+                wiremock::ResponseTemplate::new(206).set_body_bytes(served[start..=end].to_vec())
+            })
+            .mount(&server)
+            .await;
+
+        let base = server.uri();
+        let url = format!("{base}/song.flac");
+        let total = file.len() as u64;
+        let head = file[..256 * 1024].to_vec();
+        let (buf, complete) = tokio::task::spawn_blocking(move || {
+            let client = WebDavClient::new(base, None, None).unwrap();
+            client.extend_probe_head(&url, head, total)
+        })
+        .await
+        .unwrap();
+
+        assert!(
+            complete,
+            "every tag block was read, so the tail probe is skipped"
+        );
+        assert_eq!(buf.len(), metadata_len);
+        assert_eq!(
+            &buf[..],
+            &file[..metadata_len - 400_000]
+                .iter()
+                .copied()
+                .chain(std::iter::repeat_n(0, 400_000))
+                .collect::<Vec<u8>>()[..]
+        );
     }
 
     #[test]
