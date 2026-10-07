@@ -369,11 +369,35 @@ pub fn local_artwork_uri(path: &Path) -> String {
     format!("luminous-art://local/{}", path.to_string_lossy())
 }
 
+/// Narrowest `?w=` a `luminous-art://` request may ask for (#1528): smaller
+/// isn't worth a cache entry. At `CACHE_MAX_EDGE` and above, the regular
+/// cached copy already is the answer.
+const MIN_SIZED_EDGE: u32 = 64;
+
+/// Splits a `?w=<px>` suffix off a `luminous-art://` URI (#1528) — the
+/// `srcset` candidates cover images list so a card loads a cover no larger
+/// than it's drawn. Anything else after a `?` stays part of the path (a
+/// Linux folder-art path isn't percent-encoded, so it may hold a `?`).
+fn split_size_query(uri: &str) -> (&str, Option<u32>) {
+    if let Some((base, query)) = uri.rsplit_once('?') {
+        if let Some(width) = query.strip_prefix("w=").and_then(|w| w.parse::<u32>().ok()) {
+            let width = (MIN_SIZED_EDGE..CACHE_MAX_EDGE)
+                .contains(&width)
+                .then_some(width);
+            return (base, width);
+        }
+    }
+    (uri, None)
+}
+
 /// Serves a `luminous-art://` request: `local/<percent-encoded absolute path>`
 /// for folder art used in place, anything else a filename in `covers_dir`.
+/// A `?w=<px>` suffix on a cached cover or a folder-art thumbnail asks for a
+/// copy downscaled to fit that edge (see `serve_sized_copy`).
 /// Blocking file I/O — the protocol handler in `lib.rs` runs it on the
 /// blocking pool, never on the UI thread.
 pub fn serve_art_request(covers_dir: &Path, uri: &str) -> tauri::http::Response<Vec<u8>> {
+    let (uri, width) = split_size_query(uri);
     let mut trimmed = uri;
     // On Windows WebView2, requests are made to `http://luminous-art.localhost/`
     // via the frontend rewrite in `getCoverArtUrl()`. wry intercepts the HTTP request
@@ -401,6 +425,9 @@ pub fn serve_art_request(covers_dir: &Path, uri: &str) -> tauri::http::Response<
         let decoded = percent_encoding::percent_decode_str(rest)
             .decode_utf8_lossy()
             .into_owned();
+        if let Some(width) = width {
+            return serve_sized_copy(covers_dir, Path::new(&decoded), width);
+        }
         return serve_folder_art_thumbnail(covers_dir, Path::new(&decoded));
     }
 
@@ -414,6 +441,9 @@ pub fn serve_art_request(covers_dir: &Path, uri: &str) -> tauri::http::Response<
         let decoded = percent_encoding::percent_decode_str(trimmed)
             .decode_utf8_lossy()
             .into_owned();
+        if let Some(width) = width {
+            return serve_sized_copy(covers_dir, &covers_dir.join(&decoded), width);
+        }
         covers_dir.join(decoded)
     };
 
@@ -434,6 +464,31 @@ pub fn serve_art_request(covers_dir: &Path, uri: &str) -> tauri::http::Response<
 /// embedded art; only the first view of a file pays to read it in full.
 /// Falls back to the original on any failure.
 fn serve_folder_art_thumbnail(covers_dir: &Path, source: &Path) -> tauri::http::Response<Vec<u8>> {
+    serve_cached_downscale(covers_dir, source, "", CACHE_MAX_EDGE)
+}
+
+/// Serve `source` — a covers-cache file or folder art — downscaled to fit
+/// `max_edge` (#1528), so a grid card decodes a cover the size it's drawn
+/// rather than the `CACHE_MAX_EDGE` copy, which is 2–3x the pixels a 240 px
+/// card needs. Made from `source` on first request and cached in `thumbs/`
+/// beside the folder-art thumbnails, so scanning never pays for it.
+fn serve_sized_copy(
+    covers_dir: &Path,
+    source: &Path,
+    max_edge: u32,
+) -> tauri::http::Response<Vec<u8>> {
+    serve_cached_downscale(covers_dir, source, &format!("w{max_edge}|"), max_edge)
+}
+
+/// Serve `source` downscaled to fit `max_edge`, from `covers_dir/thumbs/`
+/// when it was made before. Keyed on `tag` + path + mtime + size, so an
+/// edited file is redone; folder-art thumbnails use an empty `tag`.
+fn serve_cached_downscale(
+    covers_dir: &Path,
+    source: &Path,
+    tag: &str,
+    max_edge: u32,
+) -> tauri::http::Response<Vec<u8>> {
     let Ok(meta) = std::fs::metadata(source) else {
         return empty_response(404);
     };
@@ -447,7 +502,7 @@ fn serve_folder_art_thumbnail(covers_dir: &Path, source: &Path) -> tauri::http::
         .map(|d| d.as_nanos())
         .unwrap_or(0);
     let key = fnv1a_hex(&format!(
-        "{}|{}|{}",
+        "{tag}{}|{}|{}",
         source.to_string_lossy(),
         mtime,
         meta.len()
@@ -463,7 +518,7 @@ fn serve_folder_art_thumbnail(covers_dir: &Path, source: &Path) -> tauri::http::
     let Ok(data) = std::fs::read(source) else {
         return empty_response(500);
     };
-    let (thumb, ext) = downscale_for_cache(&data);
+    let (thumb, ext) = downscale_to_fit(&data, max_edge);
     if std::fs::create_dir_all(&thumbs_dir).is_ok() {
         let tmp = thumbs_dir.join(format!("{key}.tmp"));
         if std::fs::write(&tmp, &thumb).is_ok()
@@ -639,11 +694,16 @@ const CACHE_JPEG_QUALITY: u8 = 85;
 /// decode is cached as-is too — a cache entry the webview may still manage
 /// to render beats none at all.
 pub fn downscale_for_cache(data: &[u8]) -> (Vec<u8>, &'static str) {
+    downscale_to_fit(data, CACHE_MAX_EDGE)
+}
+
+/// `downscale_for_cache` to any bound, for card-sized copies (#1528).
+fn downscale_to_fit(data: &[u8], max_edge: u32) -> (Vec<u8>, &'static str) {
     let (cleaned, _mime, ext) = detect_image_format_and_clean(data);
     let Ok(img) = image::load_from_memory(cleaned) else {
         return (cleaned.to_vec(), ext);
     };
-    if img.width() <= CACHE_MAX_EDGE && img.height() <= CACHE_MAX_EDGE {
+    if img.width() <= max_edge && img.height() <= max_edge {
         return (cleaned.to_vec(), ext);
     }
     let format = if img.color().has_alpha() {
@@ -651,7 +711,7 @@ pub fn downscale_for_cache(data: &[u8]) -> (Vec<u8>, &'static str) {
     } else {
         image::ImageFormat::Jpeg
     };
-    match encode_downscaled(&img, format) {
+    match encode_downscaled(&img, format, max_edge) {
         Some(encoded) if encoded.len() < cleaned.len() => (encoded, cache_ext_for(format)),
         _ => (cleaned.to_vec(), ext),
     }
@@ -665,14 +725,14 @@ fn cache_ext_for(format: image::ImageFormat) -> &'static str {
     }
 }
 
-/// Resize `img` to fit `CACHE_MAX_EDGE` (keeping its aspect ratio) and encode
-/// it as `format` — JPEG at `CACHE_JPEG_QUALITY`, or PNG.
-fn encode_downscaled(img: &image::DynamicImage, format: image::ImageFormat) -> Option<Vec<u8>> {
-    let resized = img.resize(
-        CACHE_MAX_EDGE,
-        CACHE_MAX_EDGE,
-        image::imageops::FilterType::CatmullRom,
-    );
+/// Resize `img` to fit `max_edge` (keeping its aspect ratio) and encode it
+/// as `format` — JPEG at `CACHE_JPEG_QUALITY`, or PNG.
+fn encode_downscaled(
+    img: &image::DynamicImage,
+    format: image::ImageFormat,
+    max_edge: u32,
+) -> Option<Vec<u8>> {
+    let resized = img.resize(max_edge, max_edge, image::imageops::FilterType::CatmullRom);
     let mut out = Vec::new();
     if format == image::ImageFormat::Png {
         resized
@@ -739,7 +799,7 @@ fn recompress_cache_file(path: &Path) -> Option<u64> {
     }
     let data = std::fs::read(path).ok()?;
     let img = image::load_from_memory(&data).ok()?;
-    let encoded = encode_downscaled(&img, format)?;
+    let encoded = encode_downscaled(&img, format, CACHE_MAX_EDGE)?;
     if encoded.len() >= data.len() {
         return None;
     }
@@ -2031,6 +2091,79 @@ mod tests {
 
         let missing = serve_art_request(&covers_dir, "luminous-art://thumb/nope.jpg");
         assert_eq!(missing.status(), 404);
+    }
+
+    fn served_size(covers_dir: &Path, uri: &str) -> (u32, u32) {
+        let response = serve_art_request(covers_dir, uri);
+        assert_eq!(response.status(), 200, "{uri}");
+        let img = image::load_from_memory(response.body()).unwrap();
+        (img.width(), img.height())
+    }
+
+    #[test]
+    fn test_serve_art_request_serves_card_sized_copies() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let covers_dir = temp_dir.path().join("covers");
+        std::fs::create_dir_all(&covers_dir).unwrap();
+        std::fs::write(covers_dir.join("album-1.jpg"), jpeg_bytes(600, 600)).unwrap();
+        let art = temp_dir.path().join("folder.jpg");
+        std::fs::write(&art, jpeg_bytes(1200, 800)).unwrap();
+        let encoded = percent_encoding::utf8_percent_encode(
+            &art.to_string_lossy(),
+            percent_encoding::NON_ALPHANUMERIC,
+        )
+        .to_string();
+
+        // A cached cover, both URI forms the webviews send.
+        assert_eq!(
+            served_size(&covers_dir, "luminous-art://album-1.jpg?w=256"),
+            (256, 256)
+        );
+        assert_eq!(
+            served_size(
+                &covers_dir,
+                "http://luminous-art.localhost/album-1.jpg?w=384"
+            ),
+            (384, 384)
+        );
+        // Folder art, sized from the original.
+        assert_eq!(
+            served_size(
+                &covers_dir,
+                &format!("luminous-art://localhost/thumb/{encoded}?w=384")
+            ),
+            (384, 256)
+        );
+        let thumbs = || {
+            std::fs::read_dir(covers_dir.join("thumbs"))
+                .unwrap()
+                .count()
+        };
+        assert_eq!(thumbs(), 3);
+        // Served from the cache the second time.
+        served_size(&covers_dir, "luminous-art://album-1.jpg?w=256");
+        assert_eq!(thumbs(), 3);
+
+        // Out-of-range widths fall back to the regular copy.
+        assert_eq!(
+            served_size(&covers_dir, "luminous-art://album-1.jpg?w=16"),
+            (600, 600)
+        );
+        assert_eq!(
+            served_size(&covers_dir, "luminous-art://album-1.jpg?w=600"),
+            (600, 600)
+        );
+        assert_eq!(thumbs(), 3);
+    }
+
+    #[test]
+    fn test_split_size_query_keeps_other_question_marks_in_the_path() {
+        assert_eq!(split_size_query("thumb/a?b.jpg"), ("thumb/a?b.jpg", None));
+        assert_eq!(
+            split_size_query("thumb/a?b.jpg?w=256"),
+            ("thumb/a?b.jpg", Some(256))
+        );
+        assert_eq!(split_size_query("album-1.jpg"), ("album-1.jpg", None));
     }
 
     #[test]

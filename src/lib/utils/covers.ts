@@ -48,6 +48,31 @@ export function resolveArtistBackgroundUrl(
   return resolveLocalOrFetched(localFanartUri, fetchedBackgroundFilename, prefs.fanartFetchBackground);
 }
 
+/** Smaller copies `luminous-art://` serves on request (`?w=<px>`, #1528), so a
+ * card decodes a cover near the size it's drawn rather than the 600 px cache
+ * copy. Bounded by the backend's `MIN_SIZED_EDGE` and `CACHE_MAX_EDGE`
+ * (covermanager.rs); a box bigger than the largest gets the unsized copy. */
+const SIZED_COVER_EDGES = [256, 384];
+
+/**
+ * The URL of a cached cover or folder-art thumbnail sized for a box
+ * `devicePixels` wide: the smallest card-sized copy that covers it, else
+ * `url` itself. Anything else is returned as-is: an original (`local/`,
+ * `embedded/`), a remote URL, a mock-library path, or an unmeasured box.
+ *
+ * Picked here rather than by `srcset`/`sizes="auto"`, which WebKitGTK lacks
+ * and which Chromium re-evaluates as `100vw` when an image is unmounted —
+ * fetching the largest candidate for every card a virtualized grid drops.
+ */
+export function sizedCoverUrl(url: string, devicePixels: number): string {
+  const prefix = ["http://luminous-art.localhost/", "luminous-art://"].find((p) => url.startsWith(p));
+  if (!prefix || devicePixels <= 0) return url;
+  const rest = url.slice(prefix.length).replace(/^localhost\//, "");
+  if (rest.startsWith("local/") || rest.startsWith("embedded/") || rest.includes("?")) return url;
+  const edge = SIZED_COVER_EDGES.find((e) => e >= devicePixels);
+  return edge ? `${url}?w=${edge}` : url;
+}
+
 export interface CoverSource {
   id: number;
   art_manual?: string | null;

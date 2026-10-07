@@ -15,6 +15,12 @@
 // Vite CSS-minify pipeline (the same one `bun run build` uses), scoped to
 // just the CSS entry so it stays fast (~1s) without needing a full
 // SvelteKit build.
+//
+// The build's root is an empty temp folder, so Tailwind's class-name scan
+// (which starts at Vite's root) finds nothing. The `.glass*` rules under test
+// are plain CSS in app.css and are emitted either way. Scanning the whole
+// project took this test 10-30s+ while the rest of the suite loaded every CPU,
+// and it timed out (#1528).
 import { describe, it, expect, afterAll } from "vitest";
 import { build } from "vite";
 import tailwindcss from "@tailwindcss/vite";
@@ -42,7 +48,7 @@ async function buildProdCss(): Promise<string> {
   // minifier, which is what actually determines whether this bug
   // reproduces.
   await build({
-    root: projectRoot,
+    root: tmpDir,
     configFile: false,
     logLevel: "warn",
     plugins: [tailwindcss()],

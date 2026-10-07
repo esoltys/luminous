@@ -5,6 +5,7 @@ import {
   resolveArtistPortraitUrl,
   resolveArtistLogoUrl,
   resolveArtistBackgroundUrl,
+  sizedCoverUrl,
 } from "./covers";
 import { prefs } from "../stores/prefs.svelte";
 
@@ -73,4 +74,36 @@ describe("artist image resolvers (#1276)", () => {
       expect(resolve("C:/Music/Artist/local.jpg", "abc.jpg")).toContain("local.jpg");
     });
   }
+});
+
+describe("sizedCoverUrl (#1528)", () => {
+  it("picks the smallest card-sized copy that covers the box, on both URL forms", () => {
+    const url = "http://luminous-art.localhost/album-1.jpg";
+    expect(sizedCoverUrl(url, 72)).toBe(`${url}?w=256`);
+    expect(sizedCoverUrl(url, 256)).toBe(`${url}?w=256`);
+    expect(sizedCoverUrl(url, 360)).toBe(`${url}?w=384`);
+    expect(sizedCoverUrl("luminous-art://album-1.jpg", 300)).toBe("luminous-art://album-1.jpg?w=384");
+  });
+
+  it("uses the unsized copy for a box bigger than the largest, or one not measured", () => {
+    const url = "http://luminous-art.localhost/album-1.jpg";
+    expect(sizedCoverUrl(url, 385)).toBe(url);
+    expect(sizedCoverUrl(url, 0)).toBe(url);
+  });
+
+  it("sizes a folder-art thumbnail", () => {
+    const url = "http://luminous-art.localhost/thumb/D%3A%2FMusic%2Fcover.jpg";
+    expect(sizedCoverUrl(url, 200)).toBe(`${url}?w=256`);
+  });
+
+  it("leaves originals, remote and mock URLs alone", () => {
+    for (const url of [
+      "http://luminous-art.localhost/local/D%3A%2Fcover.jpg",
+      "luminous-art://embedded/album-1.jpg/D%3A%2Fsong.flac",
+      "https://is1-ssl.mzstatic.com/image/600x600.jpg",
+      "/covers/album-1.jpg",
+    ]) {
+      expect(sizedCoverUrl(url, 200)).toBe(url);
+    }
+  });
 });

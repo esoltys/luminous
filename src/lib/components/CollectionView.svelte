@@ -31,6 +31,7 @@
   import AlbumCard from "./AlbumCard.svelte";
   import ArtistCard from "./ArtistCard.svelte";
   import AlbumRowCard from "./AlbumRowCard.svelte";
+  import VirtualCardGrid from "./VirtualCardGrid.svelte";
   import ArtistRowCard from "./ArtistRowCard.svelte";
   import Select from "./Select.svelte";
   import LibraryWelcome from "./LibraryWelcome.svelte";
@@ -255,6 +256,8 @@
       localStorage.setItem("sort_artist_asc", artistSortAsc.toString());
     }
   });
+
+  const albumKey = (album: AlbumItem) => album.artist + "|" + album.album;
 
   let sortedAlbums = $derived.by(() => {
     const list = [...collectionStore.filteredAlbums];
@@ -574,26 +577,45 @@
       <div class="pt-2">
         {#if navigationStore.activeSubTab === "albums"}
         {#if activeViewMode === "rows"}
-          <div class="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-2">
-            {#each sortedAlbums as album (album.artist + "|" + album.album)}
-              <AlbumRowCard
-                {album}
-                oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
-              />
-            {/each}
-            {@render albumEmptyState()}
-          </div>
+          {#if sortedAlbums.length === 0}
+            <div class="grid">{@render albumEmptyState()}</div>
+          {:else}
+            <VirtualCardGrid
+              items={sortedAlbums}
+              key={albumKey}
+              minColumnWidth={280}
+              gap={8}
+              fit
+              estimateRowHeight={() => 72}
+            >
+              {#snippet item(album)}
+                <AlbumRowCard
+                  {album}
+                  oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
+                />
+              {/snippet}
+            </VirtualCardGrid>
+          {/if}
         {:else}
-          <div class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-6">
-            {#each sortedAlbums as album (album.artist + "|" + album.album)}
-              <AlbumCard
-                {album}
-                widthClass="w-full"
-                oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
-              />
-            {/each}
-            {@render albumEmptyState()}
-          </div>
+          {#if sortedAlbums.length === 0}
+            <div class="grid">{@render albumEmptyState()}</div>
+          {:else}
+            <VirtualCardGrid
+              items={sortedAlbums}
+              key={albumKey}
+              minColumnWidth={180}
+              gap={24}
+              estimateRowHeight={(w) => w + 90}
+            >
+              {#snippet item(album)}
+                <AlbumCard
+                  {album}
+                  widthClass="w-full"
+                  oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
+                />
+              {/snippet}
+            </VirtualCardGrid>
+          {/if}
         {/if}
         {:else if navigationStore.activeSubTab === "artists"}
         {#if activeViewMode === "rows"}

@@ -12,9 +12,15 @@ import { tasksStore } from "../stores/tasks.svelte";
 import { toastStore } from "../stores/toast.svelte";
 import { statsExclusionsStore } from "../stores/statsExclusions.svelte";
 import { invoke } from "@tauri-apps/api/core";
+import { openUrl } from "@tauri-apps/plugin-opener";
+import { tick } from "svelte";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockResolvedValue([]),
+}));
+
+vi.mock("@tauri-apps/plugin-opener", () => ({
+  openUrl: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("@tauri-apps/api/window", () => ({
@@ -222,31 +228,21 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
   });
 
   it("opens the album's CritiqueBrainz release group page from the overflow menu (#1387)", async () => {
-    const openUrl = vi.fn().mockResolvedValue(undefined);
-    vi.doMock("@tauri-apps/plugin-opener", () => ({ openUrl }));
-    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
-      if (cmd === "get_songs_by_album") {
-        return [{ ...mockSongs[0], musicbrainz_release_group_id: "rg-123" }];
-      }
-      return [];
-    });
-    // The component loads the opener with a dynamic import on click, so every
-    // step waits on its condition rather than on a fixed delay: a loaded
-    // machine can take far longer than a few milliseconds to resolve it.
-    try {
-      const { findByTitle, findByText } = render(AlbumDetailView, { props: { albumName: mockAlbumName } });
-      await fireEvent.click(await findByTitle("More actions"));
-      const item = await findByText("Review on CritiqueBrainz");
-      // The item stays disabled until the album's songs (and their MBID) have loaded.
-      await vi.waitFor(() => expect(item.closest("button")).not.toBeDisabled());
-      await fireEvent.click(item);
-      await vi.waitFor(() =>
-        expect(openUrl).toHaveBeenCalledWith("https://critiquebrainz.org/release-group/rg-123")
-      );
-    } finally {
-      // Always undo the mock, or a failure here would leak it into later tests.
-      vi.doUnmock("@tauri-apps/plugin-opener");
-    }
+    // The test hands the component its songs and awaits the same promise: the
+    // component's own `.then` was registered first, so it has run by the time
+    // this await returns, and tick() renders the result. No polling.
+    const songs = Promise.resolve([{ ...mockSongs[0], musicbrainz_release_group_id: "rg-123" }]);
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => (cmd === "get_songs_by_album" ? songs : []));
+    const { getByTitle, getByText } = render(AlbumDetailView, { props: { albumName: mockAlbumName } });
+    await songs;
+    await tick();
+
+    await fireEvent.click(getByTitle("More actions"));
+    const item = getByText("Review on CritiqueBrainz");
+    // Enabled only once the album's songs (and their MBID) have loaded.
+    expect(item.closest("button")).not.toBeDisabled();
+    await fireEvent.click(item);
+    expect(openUrl).toHaveBeenCalledWith("https://critiquebrainz.org/release-group/rg-123");
   });
 
   it("disables Review on CritiqueBrainz when no release group MBID is tagged (#1387)", async () => {
