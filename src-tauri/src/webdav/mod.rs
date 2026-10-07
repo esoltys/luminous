@@ -249,8 +249,8 @@ impl WebDavClient {
 
     /// Reads past the head probe when the tags don't fit in it: a FLAC with a large
     /// padding or picture block, or an MP3 with a large ID3v2 tag (embedded art). The
-    /// head is cut mid-tag otherwise and the file's tags are lost. FLAC padding is
-    /// skipped, not downloaded. Returns the (possibly longer) buffer, plus whether it
+    /// head is cut mid-tag otherwise and the file's tags are lost. FLAC padding and
+    /// embedded pictures are skipped, not downloaded. Returns the (possibly longer) buffer, plus whether it
     /// already holds every tag so the tail probe can be skipped.
     fn extend_probe_head(
         &self,
@@ -259,6 +259,9 @@ impl WebDavClient {
         content_length: u64,
     ) -> (Vec<u8>, bool) {
         const MAX_METADATA_BYTES: usize = 16 * 1024 * 1024;
+        const FLAC_BLOCK_PADDING: u8 = 1;
+        const FLAC_BLOCK_PICTURE: u8 = 6;
+        const FLAC_BLOCK_WINDOW: usize = 16 * 1024;
         let head_len = buf.len();
         if content_length as usize <= head_len {
             return (buf, false);
@@ -278,12 +281,19 @@ impl WebDavClient {
         }
 
         if buf.starts_with(b"fLaC") {
+            // `buf[..have]` is real data or a stand-in; the loop only reads past it.
+            let mut have = head_len;
             let mut pos = 4usize;
-            let mut extended = false;
             let mut fetched = 0usize;
             loop {
-                if !self.fill_probe_range(url, &mut buf, head_len, pos, pos + 4) {
-                    return (buf, extended);
+                if pos + 4 > have {
+                    // Read a window, not 4 bytes: it usually holds the block too, and
+                    // the next header, so a small block costs one request instead of two.
+                    let to = (pos + FLAC_BLOCK_WINDOW).min(content_length as usize);
+                    if to < pos + 4 || !self.fill_probe_range(url, &mut buf, have, pos, to) {
+                        return (buf, false);
+                    }
+                    have = have.max(to);
                 }
                 let header = buf[pos];
                 let is_last = header & 0x80 != 0;
@@ -292,25 +302,33 @@ impl WebDavClient {
                     | ((buf[pos + 2] as usize) << 8)
                     | buf[pos + 3] as usize;
                 let end = pos + 4 + len;
-                if end > head_len {
-                    extended = true;
-                    if block_type == 1 {
-                        // Padding is all zeros: stand in for it instead of downloading it.
+                if end > have {
+                    if block_type == FLAC_BLOCK_PADDING || block_type == FLAC_BLOCK_PICTURE {
+                        // Padding is all zeros: stand in for it instead of downloading
+                        // it. An embedded picture is skipped the same way, relabelled as
+                        // padding so lofty steps over it: WebDAV sync keeps no embedded
+                        // art (cover art comes from the folder image), so its bytes
+                        // would only be downloaded to be thrown away.
+                        if block_type == FLAC_BLOCK_PICTURE {
+                            buf[pos] = (header & 0x80) | FLAC_BLOCK_PADDING;
+                        }
                         if buf.len() < end {
                             buf.resize(end, 0);
                         }
+                        have = end;
                     } else {
                         fetched += len;
                         if fetched > MAX_METADATA_BYTES
-                            || !self.fill_probe_range(url, &mut buf, head_len, pos + 4, end)
+                            || !self.fill_probe_range(url, &mut buf, have, pos + 4, end)
                         {
                             return (buf, false);
                         }
+                        have = end;
                     }
                 }
                 pos = end;
                 if is_last {
-                    return (buf, extended);
+                    return (buf, true);
                 }
             }
         }
@@ -746,14 +764,83 @@ mod tests {
             "every tag block was read, so the tail probe is skipped"
         );
         assert_eq!(buf.len(), metadata_len);
+        // The picture is relabelled as padding (header byte only), the rest of its
+        // body and all of the real padding are zero stand-ins.
+        let picture_header = 4 + 4 + 34;
+        assert_eq!(buf[picture_header], 1);
         assert_eq!(
-            &buf[..],
-            &file[..metadata_len - 400_000]
-                .iter()
-                .copied()
-                .chain(std::iter::repeat_n(0, 400_000))
-                .collect::<Vec<u8>>()[..]
+            &buf[..picture_header],
+            &file[..picture_header],
+            "bytes before the picture are untouched"
         );
+        let picture_end = picture_header + 4 + 300_000;
+        assert!(buf[256 * 1024..picture_end].iter().all(|&b| b == 0));
+        assert_eq!(
+            server.received_requests().await.unwrap().len(),
+            1,
+            "one window read finds the block after the picture; nothing else is fetched"
+        );
+    }
+
+    /// A small block past the head costs one request (a window holding its header,
+    /// body and the next header), not a header read plus a body read per block.
+    #[tokio::test]
+    async fn extend_probe_head_reads_small_blocks_past_the_head_in_one_request() {
+        use wiremock::matchers::method;
+        use wiremock::{Mock, MockServer};
+
+        fn block(kind: u8, last: bool, body: Vec<u8>) -> Vec<u8> {
+            let mut out = vec![kind | if last { 0x80 } else { 0 }];
+            out.extend_from_slice(&(body.len() as u32).to_be_bytes()[1..]);
+            out.extend(body);
+            out
+        }
+        let mut file = b"fLaC".to_vec();
+        file.extend(block(0, false, vec![1; 34]));
+        file.extend(block(6, false, vec![7; 270_000]));
+        file.extend(block(3, false, vec![2; 2_000]));
+        file.extend(block(4, true, vec![3; 3_000]));
+        let metadata_len = file.len();
+        file.extend(vec![9u8; 50_000]);
+        let served = file.clone();
+
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .respond_with(move |req: &wiremock::Request| {
+                let (start, end) = req
+                    .headers
+                    .get(wiremock::http::HeaderName::from_static("range"))
+                    .and_then(|r| r.to_str().ok())
+                    .and_then(|r| r.strip_prefix("bytes="))
+                    .and_then(|r| r.split_once('-'))
+                    .map(|(s, e)| (s.parse::<usize>().unwrap(), e.parse::<usize>().unwrap()))
+                    .unwrap();
+                let end = end.min(served.len() - 1);
+                wiremock::ResponseTemplate::new(206).set_body_bytes(served[start..=end].to_vec())
+            })
+            .mount(&server)
+            .await;
+
+        let base = server.uri();
+        let url = format!("{base}/song.flac");
+        let total = file.len() as u64;
+        let head = file[..256 * 1024].to_vec();
+        let expected = file[256 * 1024..metadata_len].to_vec();
+        let (buf, complete) = tokio::task::spawn_blocking(move || {
+            let client = WebDavClient::new(base, None, None).unwrap();
+            client.extend_probe_head(&url, head, total)
+        })
+        .await
+        .unwrap();
+
+        assert!(complete);
+        assert!(buf.len() >= metadata_len);
+        let picture_end = 4 + 4 + 34 + 4 + 270_000;
+        assert_eq!(
+            &buf[picture_end..metadata_len],
+            &expected[picture_end - 256 * 1024..]
+        );
+        assert_eq!(server.received_requests().await.unwrap().len(), 1);
     }
 
     #[test]
