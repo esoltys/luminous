@@ -120,8 +120,7 @@ bun -e "import('./luminous/i18n/fr.js').then(m => console.log('fr.js ok,', Objec
   here — it's for LLMs, so more detail than the page). Drop a What's New section only when its
   card leaves the page.
 - Update "Core Features" for anything that's now core (e.g. a new format or source).
-- Check "Tech Stack & Architecture" still matches AGENTS.md's Tech Stack (it once said React —
-  it's SvelteKit + Svelte 5).
+- Check "Tech Stack & Architecture" still matches AGENTS.md's Tech Stack.
 
 ## 7. Verify
 

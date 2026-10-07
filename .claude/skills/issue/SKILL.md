@@ -1,20 +1,15 @@
 ---
 name: issue
-description: Look up a GitHub issue, confirm its milestone-derived base branch, and prep the session's worktree to start work on it
+description: Look up a GitHub issue, confirm the base branch (always `main`), and prep the session's worktree to start work on it
 ---
 
 Start work on issue $ARGUMENTS.
 
 1. **Fetch the issue**: `gh issue view $ARGUMENTS --json number,title,body,milestone,labels,url`.
    If it doesn't exist, stop and say so.
-2. **Determine the base branch** per AGENTS.md's Branching Model: there is currently no long-lived
-   integration branch, so the base is `main` regardless of milestone — unless a future milestone
-   integration branch exists (see AGENTS.md) and the issue's milestone points at it. If the issue
-   has no milestone set, tell the user and ask them to confirm which base to use rather than
-   guessing.
-3. **Confirm before doing anything**: show the user the issue title, milestone, and the base
-   branch you determined, and get an explicit go-ahead. Don't skip this even when the milestone
-   makes the base obvious — this confirmation is the whole point of the skill.
+2. **Base branch**: `main`, per AGENTS.md's Branching Model — a milestone tracks scope, never a branch.
+3. **Confirm before doing anything**: show the user the issue title, milestone, and base branch
+   (`main`), and get an explicit go-ahead — this confirmation is the whole point of the skill.
 4. **Set up the worktree**: `git fetch origin`.
    - **This session's shell is sandboxed to the worktree it started in**: `cd` into any other
      worktree only holds for the rest of that same command — the next tool call's `cwd` silently
