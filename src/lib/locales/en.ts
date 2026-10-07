@@ -352,6 +352,7 @@ export const en = {
     formatSnap: "Snap Package",
     formatSystemPkg: "System Package",
     updateChecksDisabledTitle: "Automatic update checks are off",
+    updateChecksOfflineTitle: "Update checks are paused while Offline",
     updateCheckingTitle: "Checking for updates…",
     updateBuildLabel: "build {hash}",
     updateLastChecked: "checked {time}",

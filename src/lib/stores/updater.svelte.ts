@@ -188,16 +188,20 @@ class UpdaterStore {
     }
   }
 
+  /** Offline master toggle (#1398). Asks the backend rather than `prefs` so a
+   * check fired during boot can't beat the prefs store loading the value. */
+  private async isOnline(): Promise<boolean> {
+    try {
+      return (await invoke<boolean>("is_context_enrichment_enabled")) !== false;
+    } catch {
+      return true;
+    }
+  }
+
   async checkForUpdates() {
     if (this.isExternallyManaged) return;
 
-    // Offline master toggle (#1398). Asks the backend rather than `prefs` so a
-    // check fired during boot can't beat the prefs store loading the value.
-    try {
-      if ((await invoke<boolean>("is_context_enrichment_enabled")) === false) return;
-    } catch {
-      // Unreadable flag: fall through to the normal check.
-    }
+    if (!(await this.isOnline())) return;
 
     // Never clobber an in-flight download or one already sitting ready to
     // restart — re-checking (the periodic timer, or another manual click)
@@ -247,6 +251,7 @@ class UpdaterStore {
     if (!this.pendingUpdate || !this.installFormat.supports_self_update || this.installStatus === "downloading") {
       return;
     }
+    if (!(await this.isOnline())) return;
 
     this.installStatus = "downloading";
     this.downloadProgress = { downloaded: 0, total: null };

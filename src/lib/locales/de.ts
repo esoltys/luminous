@@ -352,6 +352,7 @@ export const de = {
     formatSnap: "Snap-Paket",
     formatSystemPkg: "Systempaket",
     updateChecksDisabledTitle: "Update-Suche ist deaktiviert",
+    updateChecksOfflineTitle: "Update-Prüfungen sind offline pausiert",
     updateCheckingTitle: "Suche nach Updates …",
     updateBuildLabel: "Build {hash}",
     updateLastChecked: "geprüft {time}",

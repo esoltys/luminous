@@ -352,6 +352,7 @@ export const it = {
     formatSnap: "Pacchetto Snap",
     formatSystemPkg: "Pacchetto di sistema",
     updateChecksDisabledTitle: "La verifica automatica degli aggiornamenti è disattivata",
+    updateChecksOfflineTitle: "I controlli degli aggiornamenti sono sospesi offline",
     updateCheckingTitle: "Verifica degli aggiornamenti in corso…",
     updateBuildLabel: "build {hash}",
     updateLastChecked: "verificato {time}",

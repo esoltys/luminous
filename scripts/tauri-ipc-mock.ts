@@ -1255,6 +1255,12 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
       return { profile, added_count: 0, artist_profile: null };
     },
 
+    // Online by default (see `is_context_enrichment_enabled`), so the quiet auto-enrichment
+    // may fire: these no-ops return nothing instead of fabricating fetched art or links.
+    retrieve_artist_details: () => null,
+    retrieve_artist_image: () => null,
+    retrieve_album_art: () => null,
+
     get_song_details: (args) => {
       const songId = args.songId as number;
       const song = library.songs.find((s) => s.id === songId) ?? featuredSong;

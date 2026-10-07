@@ -364,6 +364,7 @@ export const uk = {
     formatSnap: "Пакет Snap",
     formatSystemPkg: "Системний пакет",
     updateChecksDisabledTitle: "Автоперевірку оновлень вимкнено",
+    updateChecksOfflineTitle: "Перевірку оновлень призупинено, поки ви не в мережі",
     updateCheckingTitle: "Перевірка оновлень…",
     updateBuildLabel: "збірка {hash}",
     updateLastChecked: "перевірено {time}",

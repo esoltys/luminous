@@ -358,6 +358,7 @@ export const frFR: DeepStringRecord<typeof en> = {
     formatSnap: "Paquet Snap",
     formatSystemPkg: "Paquet système",
     updateChecksDisabledTitle: "Les vérifications automatiques sont désactivées",
+    updateChecksOfflineTitle: "Les vérifications de mise à jour sont suspendues hors ligne",
     updateCheckingTitle: "Vérification des mises à jour…",
     updateBuildLabel: "compilation {hash}",
     updateLastChecked: "vérifié {time}",

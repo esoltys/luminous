@@ -1351,6 +1351,43 @@ fn describe_error_response(status: reqwest::StatusCode, body: &str) -> String {
 mod tests {
     use super::*;
 
+    /// Offline master toggle (#1398): ListenBrainz entry points refuse before
+    /// any request, and the effective settings read ListenBrainz/Discord as off
+    /// without touching what the user saved.
+    #[tokio::test]
+    async fn offline_suspends_listenbrainz_and_discord_without_changing_saved_settings() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db = Arc::new(Database::new(temp_dir.path().to_path_buf()).unwrap());
+        let manager = ScrobblerManager::new(Arc::clone(&db));
+        let saved = ScrobblerSettings {
+            listenbrainz_enabled: true,
+            listenbrainz_token: "token".into(),
+            discord_enabled: true,
+            ..ScrobblerSettings::default()
+        };
+        manager.save_settings(saved).await.unwrap();
+
+        manager.set_online(false).await;
+
+        assert!(!manager.is_online());
+        let effective = manager.effective_settings().await;
+        assert!(!effective.listenbrainz_enabled && !effective.discord_enabled);
+        let persisted = manager.get_settings().await;
+        assert!(persisted.listenbrainz_enabled && persisted.discord_enabled);
+        assert_eq!(
+            manager.validate_token("token").await,
+            Err(crate::commands::context::OFFLINE_ERROR.to_string())
+        );
+        assert_eq!(
+            manager.flush_cache_now().await,
+            Err(crate::commands::context::OFFLINE_ERROR.to_string())
+        );
+        assert_eq!(
+            manager.sync_ratings().await.map(|_| ()),
+            Err("ListenBrainz scrobbling is not enabled".to_string())
+        );
+    }
+
     #[test]
     fn error_response_keeps_api_message_but_drops_html_pages() {
         assert_eq!(

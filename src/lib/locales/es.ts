@@ -352,6 +352,7 @@ export const es = {
     formatSnap: "Paquete Snap",
     formatSystemPkg: "Paquete del sistema",
     updateChecksDisabledTitle: "La búsqueda automática de actualizaciones está desactivada",
+    updateChecksOfflineTitle: "Las comprobaciones de actualizaciones están en pausa sin conexión",
     updateCheckingTitle: "Buscando actualizaciones…",
     updateBuildLabel: "compilación {hash}",
     updateLastChecked: "comprobado {time}",

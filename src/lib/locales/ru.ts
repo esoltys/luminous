@@ -364,6 +364,7 @@ export const ru = {
     formatSnap: "Пакет Snap",
     formatSystemPkg: "Системный пакет",
     updateChecksDisabledTitle: "Автоматическая проверка обновлений отключена",
+    updateChecksOfflineTitle: "Проверка обновлений приостановлена, пока вы не в сети",
     updateCheckingTitle: "Проверка обновлений…",
     updateBuildLabel: "сборка {hash}",
     updateLastChecked: "проверено {time}",
