@@ -1,5 +1,7 @@
 import { de } from "./de";
 import { en } from "./en";
+import { enGB } from "./en-GB";
+import { enUS } from "./en-US";
 import { es } from "./es";
 import { fr } from "./fr";
 import { frFR } from "./fr-FR";
@@ -27,6 +29,8 @@ export const BASE_LOCALE = "en-CA";
 export const LOCALES = [
   { tag: "de", messages: de },
   { tag: "en-CA", messages: en },
+  { tag: "en-GB", messages: enGB, fallback: "en-CA" },
+  { tag: "en-US", messages: enUS, fallback: "en-CA" },
   { tag: "es", messages: es },
   { tag: "fr-CA", messages: fr },
   { tag: "fr", messages: frFR },
