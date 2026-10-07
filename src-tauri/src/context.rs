@@ -599,6 +599,26 @@ fn merge_tags(genres: Vec<MbTagOrGenre>, tags: Vec<MbTagOrGenre>, cap: usize) ->
 /// True when a cached row's `fetched_at` (unix seconds) is still within the
 /// 30-day TTL relative to `now` (unix seconds). Pure so it's testable
 /// without touching the database or wall-clock time.
+/// Wikipedia language edition for a BCP 47 locale tag (`fr-CA` -> `fr`,
+/// `uk` -> `uk`), used as the `{lang}.wikipedia.org` subdomain and the
+/// `{lang}wiki` Wikidata sitelink key. Anything that isn't a plain 2-3 letter
+/// code falls back to `en`, which also keeps the value safe to interpolate
+/// into a URL host (#1480).
+pub fn wikipedia_language(locale: Option<&str>) -> String {
+    let primary = locale
+        .and_then(|l| l.split(['-', '_']).next())
+        .map(|p| p.trim().to_ascii_lowercase())
+        .unwrap_or_default();
+    match primary.as_str() {
+        // Wikipedia has no nbwiki/nnwiki; Bokmål and Nynorsk are `no`/`nn`.
+        "nb" => "no".to_string(),
+        p if (2..=3).contains(&p.len()) && p.bytes().all(|b| b.is_ascii_lowercase()) => {
+            p.to_string()
+        }
+        _ => "en".to_string(),
+    }
+}
+
 pub fn is_cache_fresh(fetched_at: i64, now: i64) -> bool {
     const TTL_SECONDS: i64 = 30 * 24 * 3600;
     now.saturating_sub(fetched_at) < TTL_SECONDS
@@ -826,27 +846,46 @@ impl ContextManager {
         Ok((parsed.into(), qid))
     }
 
-    /// Resolves a Wikidata QID to a Wikipedia summary (#1128).
+    /// Resolves a Wikidata QID to a Wikipedia summary (#1128), preferring the
+    /// article in `lang` (see [`wikipedia_language`]) and falling back to
+    /// English (#1480).
     pub async fn fetch_wikipedia_bio_from_wikidata_id(
         &self,
         wikidata_id: &str,
+        lang: &str,
     ) -> Result<Option<WikipediaSummary>> {
-        let Some(title) = self
-            .resolve_wikidata_to_wikipedia_title(wikidata_id)
-            .await?
-        else {
-            return Ok(None);
-        };
-        self.fetch_wikipedia_summary(&title).await.map(Some)
+        let sitelinks = self.fetch_wikipedia_sitelinks(wikidata_id).await?;
+        self.fetch_localized_wikipedia_summary(&sitelinks, lang)
+            .await
     }
 
-    /// Resolves a Wikidata QID to its English Wikipedia article title via
-    /// `sitelinks.enwiki.title`. Returns `None` when the entity has no
-    /// English Wikipedia article.
-    async fn resolve_wikidata_to_wikipedia_title(
+    /// Tries `lang`'s article first, then English. A localized article that
+    /// is missing, errors out, or has an empty extract falls through to
+    /// English; the English attempt's own error is what propagates.
+    async fn fetch_localized_wikipedia_summary(
+        &self,
+        sitelinks: &HashMap<String, String>,
+        lang: &str,
+    ) -> Result<Option<WikipediaSummary>> {
+        if lang != "en" {
+            if let Some(title) = sitelinks.get(&format!("{lang}wiki")) {
+                if let Ok(summary) = self.fetch_wikipedia_summary(lang, title).await {
+                    return Ok(Some(summary));
+                }
+            }
+        }
+        let Some(title) = sitelinks.get("enwiki") else {
+            return Ok(None);
+        };
+        self.fetch_wikipedia_summary("en", title).await.map(Some)
+    }
+
+    /// Returns the entity's Wikipedia sitelinks as `{site -> article title}`
+    /// (e.g. `enwiki`, `frwiki`). Empty when the entity has none.
+    async fn fetch_wikipedia_sitelinks(
         &self,
         wikidata_id: &str,
-    ) -> Result<Option<String>> {
+    ) -> Result<HashMap<String, String>> {
         let url = format!(
             "https://www.wikidata.org/wiki/Special:EntityData/{}.json",
             percent_encoding::utf8_percent_encode(wikidata_id, percent_encoding::NON_ALPHANUMERIC)
@@ -862,8 +901,13 @@ impl ContextManager {
         Ok(parsed
             .entities
             .get(wikidata_id)
-            .and_then(|e| e.sitelinks.get("enwiki"))
-            .map(|s| s.title.clone()))
+            .map(|e| {
+                e.sitelinks
+                    .iter()
+                    .map(|(site, s)| (site.clone(), s.title.clone()))
+                    .collect()
+            })
+            .unwrap_or_default())
     }
 
     /// Resolves a Wikidata QID's `P18` (image) claim to the raw Wikimedia
@@ -902,22 +946,18 @@ impl ContextManager {
     pub async fn fetch_wikipedia_bio_for_artist(
         &self,
         artist_id: &str,
+        lang: &str,
     ) -> Result<Option<WikipediaSummary>> {
         let Some(wikidata_id) = self.fetch_musicbrainz_artist_wikidata_id(artist_id).await? else {
             return Ok(None);
         };
-        let Some(title) = self
-            .resolve_wikidata_to_wikipedia_title(&wikidata_id)
-            .await?
-        else {
-            return Ok(None);
-        };
-        self.fetch_wikipedia_summary(&title).await.map(Some)
+        self.fetch_wikipedia_bio_from_wikidata_id(&wikidata_id, lang)
+            .await
     }
 
-    async fn fetch_wikipedia_summary(&self, title: &str) -> Result<WikipediaSummary> {
+    async fn fetch_wikipedia_summary(&self, lang: &str, title: &str) -> Result<WikipediaSummary> {
         let url = format!(
-            "https://en.wikipedia.org/api/rest_v1/page/summary/{}",
+            "https://{lang}.wikipedia.org/api/rest_v1/page/summary/{}",
             percent_encoding::utf8_percent_encode(title, percent_encoding::NON_ALPHANUMERIC)
         );
         let response = self.client.get(&url).send().await?;
@@ -1090,6 +1130,19 @@ mod tests {
             event.ticket_urls,
             vec!["https://tickets.example.com/e1".to_string()]
         );
+    }
+
+    #[test]
+    fn test_wikipedia_language_from_locale_tag() {
+        assert_eq!(wikipedia_language(Some("fr-CA")), "fr");
+        assert_eq!(wikipedia_language(Some("de_DE")), "de");
+        assert_eq!(wikipedia_language(Some("uk")), "uk");
+        assert_eq!(wikipedia_language(Some("nb-NO")), "no");
+        assert_eq!(wikipedia_language(Some("EN-ca")), "en");
+        assert_eq!(wikipedia_language(None), "en");
+        assert_eq!(wikipedia_language(Some("")), "en");
+        assert_eq!(wikipedia_language(Some("../evil")), "en");
+        assert_eq!(wikipedia_language(Some("x1")), "en");
     }
 
     #[test]
