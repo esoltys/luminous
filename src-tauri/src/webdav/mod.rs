@@ -405,6 +405,20 @@ fn id3v2_len(buffer: &[u8]) -> usize {
     10 + size + footer
 }
 
+/// Offset of the first FLAC audio frame, found by walking the metadata block headers;
+/// 0 if the walk runs off the buffer.
+fn flac_audio_start(buffer: &[u8]) -> usize {
+    let mut pos = 4;
+    while let Some(h) = buffer.get(pos..pos + 4) {
+        let end = pos + 4 + ((h[1] as usize) << 16 | (h[2] as usize) << 8 | h[3] as usize);
+        if h[0] & 0x80 != 0 {
+            return end;
+        }
+        pos = end;
+    }
+    0
+}
+
 /// Replaces the duration and bitrate lofty derived from a truncated probe buffer.
 ///
 /// Lofty can only see the bytes we fetched, so anything computed from the stream length
@@ -417,7 +431,9 @@ fn correct_size_dependent_properties(song: &mut Song, buffer: &[u8], content_len
             // STREAMINFO makes the duration exact; only the bitrate depends on size.
             let secs = song.length_nanosec.unwrap_or(0) as f64 / 1e9;
             if secs > 0.0 {
-                song.bitrate = Some((content_length as f64 * 8.0 / secs / 1000.0).round() as i32);
+                // Lofty's own figure counts audio only, not the tags or embedded art.
+                let audio_bytes = content_length.saturating_sub(flac_audio_start(buffer) as u64);
+                song.bitrate = Some((audio_bytes as f64 * 8.0 / secs / 1000.0).round() as i32);
             }
         }
         FileType::Mp3 => {
@@ -1081,8 +1097,25 @@ mod tests {
     fn flac_bitrate_comes_from_the_real_file_size() {
         let bytes = fixture("song_gamma.flac");
         let (song, _) = probe_head("song_gamma.flac", 50 * 1024);
-        let expected = (bytes.len() as f64 * 8.0 / 0.8 / 1000.0).round() as i32;
+        let audio = bytes.len() - super::flac_audio_start(&bytes);
+        let expected = (audio as f64 * 8.0 / 0.8 / 1000.0).round() as i32;
         assert_eq!(song.bitrate, Some(expected));
+    }
+
+    #[test]
+    fn flac_bitrate_ignores_embedded_art_bytes() {
+        let bytes = fixture("song_gamma.flac");
+        let (plain, _) = probe_head("song_gamma.flac", 50 * 1024);
+        // The same audio claimed to sit in a file 300 KB larger (art stood in as padding).
+        let url = "https://example.com/song_gamma.flac";
+        let head = &bytes[..50 * 1024];
+        let song = super::parse_probe_buffer(head, url, bytes.len() as u64 + 300_000);
+        let audio_start = super::flac_audio_start(&bytes);
+        assert!(audio_start > 0);
+        let expected = ((bytes.len() - audio_start) as f64 * 8.0 / 0.8 / 1000.0).round() as i32;
+        assert_eq!(plain.bitrate, Some(expected));
+        // With 300 KB extra the figure must rise by exactly those bytes' worth.
+        assert!(song.bitrate.unwrap() > plain.bitrate.unwrap());
     }
 
     #[test]
