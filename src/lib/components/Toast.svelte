@@ -6,6 +6,8 @@
     InfoIcon as Info,
     ChecksIcon as CheckCheck,
     SparkleIcon as Sparkles,
+    StarIcon as Star,
+    FlagBannerFoldIcon as FlagBannerFold,
     XIcon as X,
     ClipboardIcon as Clipboard,
     CheckIcon as Check,
@@ -15,6 +17,13 @@
   import { i18n } from "../stores/i18n.svelte";
   import { portal } from "../utils/portal";
   import Button from "./Button.svelte";
+
+  const MILESTONE_ICONS = {
+    checks: CheckCheck,
+    flag: FlagBannerFold,
+    star: Star,
+    sparkle: Sparkles,
+  } as const;
 
   const COPY_FEEDBACK_DURATION_MS = 1500;
   let copiedToastId = $state<number | null>(null);
@@ -141,9 +150,13 @@
           <CheckCircle2 class="w-4 h-4 text-brand-accent-text anim-check-pop" />
         </span>
       {:else if toast.variant === "milestone"}
+        {@const MilestoneIcon = MILESTONE_ICONS[toast.milestoneIcon ?? "checks"]}
         <span class="relative inline-flex w-5 h-5 shrink-0 items-center justify-center translate-y-[calc((1lh-1.25rem)/2)]">
           <span class="absolute inset-0 rounded-full anim-gold-ring"></span>
-          <CheckCheck class="w-5 h-5 text-brand-gold anim-milestone-bounce" />
+          <MilestoneIcon
+            class="w-5 h-5 text-brand-gold anim-milestone-bounce"
+            data-milestone-icon={toast.milestoneIcon ?? "checks"}
+          />
         </span>
       {:else}
         <Info class="w-4 h-4 shrink-0 text-brand-accent-text translate-y-[calc((1lh-1rem)/2)]" />

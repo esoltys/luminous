@@ -66,6 +66,19 @@ describe("Toast.svelte", () => {
     expect(screen.queryByLabelText(/copy/i)).not.toBeInTheDocument();
   });
 
+  it("shows the icon each celebration asks for, defaulting to the double check", () => {
+    toastStore.celebrate("2,500 songs in your library!", "flag");
+    toastStore.celebrate("Welcome to Luminous!", "star");
+    toastStore.show("Your Queue is done", "milestone");
+
+    render(Toast);
+
+    const icons = [...document.querySelectorAll("[data-milestone-icon]")].map(
+      (el) => el.getAttribute("data-milestone-icon")
+    );
+    expect(icons).toEqual(["flag", "star", "checks"]);
+  });
+
   it("dismisses the toast when clicking the dismiss button", async () => {
     const id = toastStore.show("Temporary error", "error");
 
