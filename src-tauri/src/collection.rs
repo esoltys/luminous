@@ -122,6 +122,9 @@ pub struct ScanReport {
     pub reread: usize,
     pub failed: usize,
     pub marked_unavailable: usize,
+    /// Paths whose rows this scan wrote (new or re-read files), so a caller can
+    /// act on exactly what the scan picked up — e.g. auto-organize.
+    pub upserted_paths: Vec<String>,
     pub artwork_albums: usize,
     pub remote_art_fetches: usize,
     pub discovery_ms: u128,
@@ -856,7 +859,7 @@ impl CollectionScanner {
         force: bool,
         silent: bool,
         trigger: ScanTrigger,
-    ) -> Result<()> {
+    ) -> Result<ScanReport> {
         let _watcher_pause_guard = app
             .try_state::<crate::AppState>()
             .map(|state| WatcherPauseGuard::new(Arc::clone(&state.watcher_paused)));
@@ -871,7 +874,7 @@ impl CollectionScanner {
         let summary = report.summary(trigger);
         log::info!("{summary}");
         crate::diagnostics::record_operation(&summary);
-        Ok(())
+        Ok(report)
     }
 
     /// Force re-reads embedded tags for exactly these files, bypassing the
@@ -1191,8 +1194,11 @@ impl CollectionScanner {
 
                 let tx = conn.unchecked_transaction()?;
                 for (path, song) in &songs {
-                    if let Err(e) = upsert_song(&tx, song) {
-                        log::warn!("Failed to save tags for {}: {e}", path.display());
+                    match upsert_song(&tx, song) {
+                        Ok(()) => report
+                            .upserted_paths
+                            .push(path.to_string_lossy().to_string()),
+                        Err(e) => log::warn!("Failed to save tags for {}: {e}", path.display()),
                     }
                 }
                 tx.commit()?;
@@ -2733,12 +2739,29 @@ mod tests {
             .unwrap();
         assert_eq!(first.files_found, 5);
         assert_eq!((first.unchanged, first.reread, first.failed), (0, 5, 0));
+        // The watcher auto-organizes exactly the songs a catch-up scan wrote.
+        let mut upserted = first.upserted_paths.clone();
+        upserted.sort();
+        let expected: Vec<String> = (0..5)
+            .map(|i| {
+                music_dir
+                    .join(format!("song{i}.wav"))
+                    .to_string_lossy()
+                    .to_string()
+            })
+            .collect();
+        assert_eq!(upserted, expected);
+        assert_eq!(
+            super::watcher::song_ids_for_paths(&db, &first.upserted_paths).len(),
+            5
+        );
 
         let second = scanner
             .scan_all_core(temp_dir.path().to_path_buf(), false, false, false, |_| {})
             .await
             .unwrap();
         assert_eq!((second.unchanged, second.reread, second.failed), (5, 0, 0));
+        assert!(second.upserted_paths.is_empty());
 
         let summary = second.summary(ScanTrigger::WatcherDirectoryChange);
         assert!(summary.starts_with("scan (watcher directory change): total "));
