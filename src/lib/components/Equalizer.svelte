@@ -78,10 +78,10 @@
     action();
   }
 
-  const bandLabels = [
-    "31.5 Hz", "63 Hz", "125 Hz", "250 Hz", "500 Hz",
-    "1 kHz", "2 kHz", "4 kHz", "8 kHz", "16 kHz"
-  ];
+  const bandLabels = $derived([
+    ...[31.5, 63, 125, 250, 500].map((f) => `${formatNumber(f)} ${i18n.t("units.hz")}`),
+    ...[1, 2, 4, 8, 16].map((f) => `${formatNumber(f)} ${i18n.t("units.khz")}`)
+  ]);
 
   function presetLabel(presetName: string): string {
     const keyMap: Record<string, string> = {
@@ -691,7 +691,7 @@
           </div>
         {/if}
         <span class="text-xs font-mono font-medium w-16 text-right {preamp > 0 ? 'text-green-400' : preamp < 0 ? 'text-red-400' : 'text-brand-text-primary'}">
-          {preamp > 0 ? "+" : ""}{formatNumber(preamp, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} dB
+          {preamp > 0 ? "+" : ""}{formatNumber(preamp, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} {i18n.t("units.db")}
         </span>
       </div>
 
@@ -986,7 +986,7 @@
               oninput={handleFallbackGainChange}
               disabled={!loudnessStore.enabled}
               label={i18n.t('loudness.fallbackGain')}
-              suffix="dB"
+              suffix={i18n.t("units.db")}
               size={80}
             />
           {/if}

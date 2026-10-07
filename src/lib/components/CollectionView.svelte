@@ -39,6 +39,7 @@
   import { SONG_TABLE_COLUMNS } from "../utils/songColumns";
   import { rememberScroll } from "../utils/scrollMemory";
   import { openInPicard } from "../utils/picard";
+  import { getPlaylistDisplayName } from "../utils/playlist";
 
   // activeSubTab and activeTab are managed globally via collectionStore
 
@@ -725,7 +726,7 @@
       <Plus class="w-3.5 h-3.5 text-brand-accent-text" />
       <span>
         {playlistsStore.activeCustomPlaylist
-          ? i18n.t('playlists.contextMenuAddToPlaylist', { name: playlistsStore.activeCustomPlaylist.name })
+          ? i18n.t('playlists.contextMenuAddToPlaylist', { name: getPlaylistDisplayName(playlistsStore.activeCustomPlaylist) })
           : i18n.t('playlists.contextMenuAddToPlaylistDefault')}
       </span>
     </button>

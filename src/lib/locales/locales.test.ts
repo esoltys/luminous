@@ -75,6 +75,9 @@ function extractPlaceholders(str: string): string[] {
  * (e.g. loanwords, shared musical terminology, technical acronyms, brand names, or symbols).
  */
 const IDENTICAL_OK_FR = new Set([
+  "units.hz", // SI unit symbols are the same in this language
+  "units.khz",
+  "units.db",
   "equalizer.importPlaceholder", // Equalizer APO sample lines, same syntax in every language
   "listenbrainz.critiquebrainzUserPlaceholder", // a URL
   "albumDetail.statsLine", // "{genre} · {year} · {duration}"
@@ -175,6 +178,9 @@ const IDENTICAL_OK_FR = new Set([
 ]);
 
 const IDENTICAL_OK_IT = new Set<string>([
+  "units.hz", // SI unit symbols are the same in this language
+  "units.khz",
+  "units.db",
   "sidebar.home", // "Home"
   "collection.tableHeaderTrack", // "#"
   "collection.tableHeaderAlbum", // "Album"
@@ -265,6 +271,9 @@ const IDENTICAL_OK_IT = new Set<string>([
 ]);
 
 const IDENTICAL_OK_ES = new Set<string>([
+  "units.hz", // SI unit symbols are the same in this language
+  "units.khz",
+  "units.db",
   "collection.tableHeaderTrack", // "#"
   "collection.columnBpm", // "BPM"
   "collection.booleanNo", // "No"
@@ -322,6 +331,9 @@ const IDENTICAL_OK_ES = new Set<string>([
 
 // Cognates, loanwords and technical terms Windows and the field also leave in English, plus brands, acronyms and symbols.
 const IDENTICAL_OK_DE = new Set<string>([
+  "units.hz", // SI unit symbols are the same in this language
+  "units.khz",
+  "units.db",
   "home.chartPeak", // "Peak #{peak}", left untranslated as chart UIs commonly do
   "sidebar.genres",
   "sidebar.scanningPhaseLabel",

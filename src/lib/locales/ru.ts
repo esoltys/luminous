@@ -1628,6 +1628,11 @@ export const ru = {
     inactive: "Неактивно",
     create: "Создать"
   },
+  units: {
+    hz: "Гц",
+    khz: "кГц",
+    db: "дБ"
+  },
   toast: {
     copyError: "Копировать ошибку в буфер обмена",
     copied: "Скопировано в буфер обмена",

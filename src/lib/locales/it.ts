@@ -1550,6 +1550,11 @@ export const it = {
     inactive: "Inattivo",
     create: "Crea"
   },
+  units: {
+    hz: "Hz",
+    khz: "kHz",
+    db: "dB"
+  },
   toast: {
     copyError: "Copia l'errore negli appunti",
     copied: "Copiato negli appunti",

@@ -65,7 +65,7 @@
   import SearchEmptyState from "./SearchEmptyState.svelte";
   import { matchesSongSearch } from "../utils/songSearch";
   import { portal } from "../utils/portal";
-  import { formatSampleRate, formatBitDepth, formatChannels, formatFileSize, formatDuration } from "../utils/formatters";
+  import { formatSampleRate, formatBitDepth, formatChannels, formatFileSize, formatDuration, formatHoursMinutes } from "../utils/formatters";
   import { formatDateAdded } from "../utils/date";
   import { CONTEXT_MENU_WIDTH_PX } from "../constants";
   import { compareSongs } from "../utils/songSort";
@@ -309,12 +309,7 @@
       (sum, item) => sum + (item.song?.length_nanosec ?? 0),
       0
     );
-    if (!totalNs) return "0m";
-    const totalSec = Math.floor(totalNs / 1_000_000_000);
-    const m = Math.floor(totalSec / 60);
-    const h = Math.floor(m / 60);
-    const remM = m % 60;
-    return h > 0 ? `${h}h ${remM}m` : `${m}m`;
+    return formatHoursMinutes(Math.floor(totalNs / 1_000_000_000 / 60));
   });
 
   let rawGenre = $derived.by(() => {
@@ -683,7 +678,7 @@
                 class="text-3xl @xl:text-4xl font-heading font-bold text-brand-text-primary transition-colors truncate py-0.5 leading-snug {isQueue ? '' : 'hover:text-brand-accent-text'}"
                 title={isQueue ? undefined : i18n.t("playlists.renamePlaylistTooltip")}
               >
-                {activePlaylist.name}
+                {isQueue ? getPlaylistDisplayName(activePlaylist) : activePlaylist.name}
               </h1>
               {#if !isQueue}
                 <button

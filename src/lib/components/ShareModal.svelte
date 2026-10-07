@@ -13,6 +13,7 @@
   import Button from "./Button.svelte";
   import Toggle from "./Toggle.svelte";
   import { i18n } from "../stores/i18n.svelte";
+  import { formatHoursMinutes } from "../utils/formatters";
   import { toastStore } from "../stores/toast.svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { extractColorsFromImage, themeStore } from "../stores/theme.svelte";
@@ -241,10 +242,7 @@
 
   let totalDurationLabel = $derived.by(() => {
     const totalNs = songs.reduce((sum, s) => sum + (s.length_nanosec ?? 0), 0);
-    const totalMinutes = Math.round(totalNs / 1_000_000_000 / 60);
-    const h = Math.floor(totalMinutes / 60);
-    const m = totalMinutes % 60;
-    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+    return formatHoursMinutes(Math.round(totalNs / 1_000_000_000 / 60));
   });
 
   let cardTitle = $derived.by(() => {

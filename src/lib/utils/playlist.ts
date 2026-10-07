@@ -65,9 +65,11 @@ export function getDaypartMixLabel(dynamicSpec: string | undefined | null, fallb
 }
 
 export function getPlaylistDisplayName(
-  playlist: Playlist | { name: string; population_mode?: QueuePopulationMode; dynamic_enabled?: boolean; dynamic_spec?: string } | undefined | null
+  playlist: Playlist | { name: string; is_queue?: boolean; population_mode?: QueuePopulationMode; dynamic_enabled?: boolean; dynamic_spec?: string } | undefined | null
 ): string {
   if (!playlist || !playlist.name) return "";
+  // The built-in Queue is stored under the English name "Queue"; its label comes from i18n.
+  if (playlist.is_queue) return i18n.t("playerBar.queueTitle", {}, "Queue");
   // Genre auto-playlists (#548) are keyed one row per curated tag, so
   // `name` is already the plain display name — no per-spec label
   // derivation needed here the way the old bare-genre-string convention

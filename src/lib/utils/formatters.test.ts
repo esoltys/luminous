@@ -7,6 +7,7 @@ import {
   formatBitDepth,
   formatChannels,
   formatWindowTitle,
+  formatHoursMinutes,
 } from "./formatters";
 import { i18n } from "../stores/i18n.svelte";
 
@@ -101,3 +102,27 @@ describe("formatWindowTitle", () => {
   });
 });
 
+
+describe("formatHoursMinutes", () => {
+  beforeEach(() => {
+    i18n.currentLocale = "en-CA";
+  });
+
+  it("shows hours and minutes, or minutes alone under an hour", () => {
+    expect(formatHoursMinutes(65)).toBe("1h 5min");
+    expect(formatHoursMinutes(59)).toBe("59min");
+    expect(formatHoursMinutes(0)).toBe("0min");
+  });
+
+  it("takes the unit words from the locale instead of English letters", () => {
+    i18n.currentLocale = "ru";
+    expect(formatHoursMinutes(65)).not.toMatch(/\dh|\dmin/);
+    expect(formatHoursMinutes(65)).toMatch(/[ч]/);
+  });
+
+  it("localizes the kHz unit in sample rates", () => {
+    expect(formatSampleRate(44100)).toBe("44.1 kHz");
+    i18n.currentLocale = "ru";
+    expect(formatSampleRate(44100)).toBe("44,1 кГц");
+  });
+});

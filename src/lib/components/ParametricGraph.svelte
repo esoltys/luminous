@@ -198,7 +198,7 @@
     return i18n.t("equalizer.nodeAriaLabel", {
       n: idx + 1,
       type: i18n.t(KIND_LABEL_KEYS[band.kind]),
-      freq: `${roundFreq(band.freq)} Hz`,
+      freq: `${formatNumber(roundFreq(band.freq), { useGrouping: false })} ${i18n.t("units.hz")}`,
       gain: formatGain(band.gain_db),
       q: formatNumber(band.q, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
     });

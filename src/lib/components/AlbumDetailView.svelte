@@ -53,6 +53,7 @@
   import type { Song, AlbumItem, PlayContext, SongContextEnrichment } from "../types";
   import { getCoverArtUrl, resolveArtUrl } from "../types";
   import { i18n, formatNumber } from "../stores/i18n.svelte";
+  import { formatHoursMinutes } from "../utils/formatters";
   import { statsExclusionsStore } from "../stores/statsExclusions.svelte";
   import { picardStore } from "../stores/picard.svelte";
   import { prefs } from "../stores/prefs.svelte";
@@ -276,10 +277,7 @@
 
   let totalDurationLabel = $derived.by(() => {
     const totalNs = songs.reduce((sum, s) => sum + (s.length_nanosec ?? 0), 0);
-    const totalMinutes = Math.round(totalNs / 1_000_000_000 / 60);
-    const h = Math.floor(totalMinutes / 60);
-    const m = totalMinutes % 60;
-    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+    return formatHoursMinutes(Math.round(totalNs / 1_000_000_000 / 60));
   });
 
   let isEditorOpen = $state(false);
