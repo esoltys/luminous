@@ -81,6 +81,7 @@ const IDENTICAL_OK_FR = new Set([
   "units.hz", // SI unit symbols are the same in this language
   "units.khz",
   "units.db",
+  "units.lufs",
   "equalizer.importPlaceholder", // Equalizer APO sample lines, same syntax in every language
   "listenbrainz.critiquebrainzUserPlaceholder", // a URL
   "albumDetail.statsLine", // "{genre} · {year} · {duration}"
@@ -184,6 +185,7 @@ const IDENTICAL_OK_IT = new Set<string>([
   "units.hz", // SI unit symbols are the same in this language
   "units.khz",
   "units.db",
+  "units.lufs",
   "sidebar.home", // "Home"
   "collection.tableHeaderTrack", // "#"
   "collection.tableHeaderAlbum", // "Album"
@@ -277,6 +279,7 @@ const IDENTICAL_OK_ES = new Set<string>([
   "units.hz", // SI unit symbols are the same in this language
   "units.khz",
   "units.db",
+  "units.lufs",
   "collection.tableHeaderTrack", // "#"
   "collection.columnBpm", // "BPM"
   "collection.booleanNo", // "No"
@@ -337,6 +340,7 @@ const IDENTICAL_OK_DE = new Set<string>([
   "units.hz", // SI unit symbols are the same in this language
   "units.khz",
   "units.db",
+  "units.lufs",
   "home.chartPeak", // "Peak #{peak}", left untranslated as chart UIs commonly do
   "sidebar.genres",
   "sidebar.scanningPhaseLabel",
@@ -454,6 +458,7 @@ const IDENTICAL_OK_DE = new Set<string>([
 
 // Brands, acronyms, units, symbols and example URLs or paths that Ukrainian leaves as they are.
 const IDENTICAL_OK_UK = new Set<string>([
+  "units.lufs", // Loudness unit, written in Latin letters
   "collection.columnBpm", // BPM
   "collection.tableHeaderBpm", // BPM
   "collection.tableHeaderMusicBrainzId", // MBID
@@ -493,6 +498,7 @@ const IDENTICAL_OK_UK = new Set<string>([
 
 // Brands, acronyms, units, symbols and example URLs or paths that Russian leaves as they are.
 const IDENTICAL_OK_RU = new Set<string>([
+  "units.lufs", // Loudness unit, written in Latin letters
   "collection.columnBpm", // BPM
   "collection.tableHeaderBpm", // BPM
   "collection.tableHeaderMusicBrainzId", // MBID

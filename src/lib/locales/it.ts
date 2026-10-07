@@ -1553,7 +1553,8 @@ export const it = {
   units: {
     hz: "Hz",
     khz: "kHz",
-    db: "dB"
+    db: "dB",
+    lufs: "LUFS"
   },
   toast: {
     copyError: "Copia l'errore negli appunti",

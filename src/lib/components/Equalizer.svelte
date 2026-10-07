@@ -943,7 +943,7 @@
               oninput={handleTargetLufsChange}
               disabled={!loudnessStore.enabled}
               label={i18n.t('loudness.targetLevel')}
-              suffix="LUFS"
+              suffix={i18n.t("units.lufs")}
               size={80}
             />
           {/if}
