@@ -74,18 +74,18 @@
 
   const DEFAULT_TEMPLATE = "%albumartist/{%year - }{%album/}{%disc-}{%track }%title";
   const VARIABLE_CHIPS = [
-    { label: "%albumartist", desc: "Album Artist" },
-    { label: "%artist", desc: "Artist" },
-    { label: "%album", desc: "Album" },
-    { label: "{%album/}", desc: "Optional Album Folder" },
-    { label: "/", desc: "Folder Separator" },
-    { label: "{%disc-}", desc: "Conditional Disc Prefix" },
-    { label: "%track", desc: "Track # (2-digit padding: 01, 09, 11). Alternatives: %track3 (3-digit: 001), %rawtrack (unpadded: 1)" },
-    { label: "{%track }", desc: "Optional Track # (2-digit padding). Alternatives: {%track3 }, {%rawtrack }" },
-    { label: "{%track. }", desc: "Optional Track # with Dot (2-digit padding). Alternatives: {%track3. }, {%rawtrack. }" },
-    { label: "%title", desc: "Title" },
-    { label: "%year", desc: "Year" },
-    { label: "%genre", desc: "Genre" },
+    { label: "%albumartist", descKey: "organizer.chipAlbumArtist" },
+    { label: "%artist", descKey: "organizer.chipArtist" },
+    { label: "%album", descKey: "organizer.chipAlbum" },
+    { label: "{%album/}", descKey: "organizer.chipOptionalAlbumFolder" },
+    { label: "/", descKey: "organizer.chipFolderSeparator" },
+    { label: "{%disc-}", descKey: "organizer.chipConditionalDisc" },
+    { label: "%track", descKey: "organizer.chipTrack" },
+    { label: "{%track }", descKey: "organizer.chipOptionalTrack" },
+    { label: "{%track. }", descKey: "organizer.chipOptionalTrackDot" },
+    { label: "%title", descKey: "organizer.chipTitle" },
+    { label: "%year", descKey: "organizer.chipYear" },
+    { label: "%genre", descKey: "organizer.chipGenre" },
   ];
 
   function highlightPathHtml(path: string): string {
@@ -480,7 +480,7 @@
       items = res;
     } catch (err: any) {
       console.error("Preview failed:", err);
-      errorMessage = typeof err === "string" ? err : err.message || "Failed to generate preview";
+      errorMessage = typeof err === "string" ? err : err.message || i18n.t("organizer.previewFailed");
       items = [];
     } finally {
       isLoading = false;
@@ -554,7 +554,7 @@
       }
     } catch (err: any) {
       console.error("Failed to apply organize:", err);
-      errorMessage = typeof err === "string" ? err : err.message || "Failed to organize files";
+      errorMessage = typeof err === "string" ? err : err.message || i18n.t("organizer.organizeFailed");
     } finally {
       isApplying = false;
     }
@@ -655,9 +655,9 @@
               type="button"
               onclick={() => insertChip(chip.label)}
               class="px-2 py-0.5 rounded-lg text-[11px] font-mono transition-colors border bg-brand-sidebar hover:bg-brand-accent/15 border-brand-border/80 text-brand-text-primary hover:text-brand-accent-text font-medium"
-              title={chip.desc}
+              title={i18n.t(chip.descKey)}
             >
-              {chip.label === '/' ? '/ (Folder)' : chip.label}
+              {chip.label === '/' ? i18n.t('organizer.chipFolderLabel') : chip.label}
             </button>
           {/each}
         </div>

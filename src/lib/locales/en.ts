@@ -23,6 +23,10 @@ export const en = {
     musicbrainzProfile: "MusicBrainz Profile"
   },
   topNav: {
+    filterExample: "e.g. rating:>=4 year:<2000 genre:jazz \"miles davis\"",
+    fileFilterSupported: "Supported Files",
+    fileFilterAudio: "Audio Files",
+    fileFilterPlaylists: "Playlists",
     goBack: "Go back",
     goForward: "Go forward",
     searchPlaceholder: "Search and filter... (Ctrl+L)",
@@ -101,6 +105,9 @@ export const en = {
     text: "This library was last opened by a newer version of Luminous (database v{dbVersion}, this app supports v{appVersion}). Your folders and songs are still there — update Luminous to see them again."
   },
   collection: {
+    columnSelectorVisible: "Visible",
+    columnSelectorNoneVisible: "No columns visible",
+    columnSelectorMetatags: "Metatags",
     artists: "Artists ({count})",
     albums: "Albums ({count})",
     songs: "Songs ({count})",
@@ -229,6 +236,20 @@ export const en = {
     resetSearchFilters: "Reset Search & Filters"
   },
   settings: {
+    textFilesFilter: "Text",
+    showToken: "Show token",
+    hideToken: "Hide token",
+    showKey: "Show key",
+    hideKey: "Hide key",
+    aboutLogoAlt: "Luminous logo",
+    picardExecutableFilter: "Picard executable",
+    fanartValidateFailed: "Failed to validate API key",
+    updateServerNoResponse: "No response from the update server",
+    updateDownloadFailed: "Download failed",
+    updateRestartFailed: "Failed to restart for update",
+    musicbrainzLoginFailed: "Failed to start MusicBrainz login",
+    musicbrainzVerifyFailed: "Failed to verify authorization code",
+    musicbrainzStatsFailed: "Failed to load MusicBrainz stats",
     title: "Settings",
     tabGeneral: "General",
     tabSystem: "System",
@@ -653,6 +674,7 @@ export const en = {
     watchedFoldersSubtitle: "Manage folders to scan for music files."
   },
   playlists: {
+    queuePlaylistDefaultName: "Queue Playlist",
     title: "Playlists",
     untitledPlaylistName: "Untitled Playlist",
     reservedPlaylistName: "\"{name}\" is reserved for the built-in Queue playlist. Please choose a different name.",
@@ -1522,6 +1544,7 @@ export const en = {
     hateAction: "Dislike song"
   },
   common: {
+    closeDialog: "Close dialog",
     aboutField: "About {field}",
     scrollLeft: "Scroll left",
     scrollRight: "Scroll right",
@@ -1550,6 +1573,23 @@ export const en = {
     inactive: "Inactive",
     create: "Create"
   },
+  sortOverrides: {
+    heading: "Sort Overrides (\"Sort As\")",
+    title: "Title Sort As",
+    artist: "Artist Sort As",
+    album: "Album Sort As",
+    albumArtist: "Album Artist Sort As",
+    composer: "Composer Sort As",
+    genre: "Genre Sort As",
+    example: "e.g. Beatles, The",
+  },
+  socialPlatforms: {
+    lyrics: "Lyrics",
+    otherDatabases: "Other Databases",
+    lyricsPlaceholder: "https://... (e.g. Genius, Musixmatch)",
+    otherDatabasesPlaceholder: "https://... (e.g. VGMdb)",
+    customPlaceholder: "https://... (e.g. Pitchfork review, liner notes, blog)",
+  },
   units: {
     hz: "Hz",
     khz: "kHz",
@@ -1562,6 +1602,7 @@ export const en = {
     dismiss: "Dismiss notification"
   },
   songTags: {
+    groupNamePlaceholder: "e.g. Award-Winning",
     genresTabDescription: {
       one: "Showing {count} genre",
       other: "Showing {count} genres"
@@ -1629,6 +1670,21 @@ export const en = {
     cancelBtn: "Cancel"
   },
   organizer: {
+    chipAlbumArtist: "Album Artist",
+    chipArtist: "Artist",
+    chipAlbum: "Album",
+    chipOptionalAlbumFolder: "Optional Album Folder",
+    chipFolderSeparator: "Folder Separator",
+    chipConditionalDisc: "Conditional Disc Prefix",
+    chipTrack: "Track # (2-digit padding: 01, 09, 11). Alternatives: %track3 (3-digit: 001), %rawtrack (unpadded: 1)",
+    chipOptionalTrack: "Optional Track # (2-digit padding). Alternatives: {%track3 }, {%rawtrack }",
+    chipOptionalTrackDot: "Optional Track # with Dot (2-digit padding). Alternatives: {%track3. }, {%rawtrack. }",
+    chipTitle: "Title",
+    chipYear: "Year",
+    chipGenre: "Genre",
+    chipFolderLabel: "/ (Folder)",
+    previewFailed: "Failed to generate preview",
+    organizeFailed: "Failed to organize files",
     title: "Organize Files",
     subtitle: "Rename and reorganize library files using tag templates",
     sectionTemplatePattern: "Template Pattern",
@@ -1715,6 +1771,16 @@ export const en = {
     missingPlaylistHint: "Show an auto-playlist of library tracks missing MusicBrainz IDs to easily tag them in Picard"
   },
   listenbrainz: {
+    tokenRequired: "Please enter a user token",
+    validateFailed: "Failed to validate token",
+    submittedPending: {
+      one: "Submitted {count} pending listen",
+      other: "Submitted {count} pending listens"
+    },
+    queueEmpty: "Queue is empty",
+    flushFailed: "Flush failed",
+    syncRatingsError: "Failed to sync ratings",
+    connectFailed: "Failed to connect ListenBrainz",
     integrationTitle: "ListenBrainz Scrobbler",
     integrationDesc: "is an open-source, non-profit music diary that keeps track of every song you listen to across different apps (\"scrobbling\") and lets you explore your listening habits without selling your personal data.",
     enableLabel: "Enable ListenBrainz scrobbling",
@@ -1919,6 +1985,7 @@ export const en = {
     }
   },
   tasks: {
+    taskFailed: "Task failed",
     title: "Background Tasks",
     clear: "Clear",
     clearCompleted: "Clear completed tasks",
@@ -1941,6 +2008,10 @@ export const en = {
     scanPhaseUpdating: "updating library"
   },
   audioPipeline: {
+    channelsStereo: "Stereo (2 ch)",
+    channelsMono: "Mono (1 ch)",
+    channelsCount: "{count} ch",
+    defaultOutputDevice: "Default Output Device",
     title: "Audio Pipeline",
     badgeTooltip: "Audio quality: {tier} — click to view audio pipeline",
     qualityTier: "Quality",

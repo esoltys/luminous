@@ -1,4 +1,5 @@
 import type { ArtistSocialLink } from "../types";
+import { i18n } from "../stores/i18n.svelte";
 
 export interface SocialPlatformInfo {
   id: string;
@@ -152,11 +153,31 @@ export const SOCIAL_PLATFORMS: SocialPlatformInfo[] = [
   },
 ];
 
+/**
+ * Localizes the few platform labels and placeholders that are descriptions
+ * rather than site names ("Lyrics", "Other Databases"); site names such as
+ * Bandcamp or Discogs stay as they are.
+ */
+export function localizePlatform(info: SocialPlatformInfo): SocialPlatformInfo {
+  switch (info.id) {
+    case "lyrics":
+      return { ...info, label: i18n.t("socialPlatforms.lyrics"), placeholder: i18n.t("socialPlatforms.lyricsPlaceholder") };
+    case "other_databases":
+      return { ...info, label: i18n.t("socialPlatforms.otherDatabases"), placeholder: i18n.t("socialPlatforms.otherDatabasesPlaceholder") };
+    case "custom":
+      return info.placeholder.includes("e.g.")
+        ? { ...info, placeholder: i18n.t("socialPlatforms.customPlaceholder") }
+        : info;
+    default:
+      return info;
+  }
+}
+
 export function getPlatformInfo(platformId: string): SocialPlatformInfo {
   const found =
     SOCIAL_PLATFORMS.find((p) => p.id === platformId) ??
     ALBUM_LINK_PLATFORMS.find((p) => p.id === platformId);
-  if (found) return found;
+  if (found) return localizePlatform(found);
   return {
     id: platformId,
     label: platformId.charAt(0).toUpperCase() + platformId.slice(1),

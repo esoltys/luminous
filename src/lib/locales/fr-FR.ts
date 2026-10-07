@@ -29,6 +29,10 @@ export const frFR: DeepStringRecord<typeof en> = {
     musicbrainzProfile: "Profil MusicBrainz"
   },
   topNav: {
+    filterExample: "p. ex. rating:>=4 year:<2000 genre:jazz \"miles davis\"",
+    fileFilterSupported: "Fichiers pris en charge",
+    fileFilterAudio: "Fichiers audio",
+    fileFilterPlaylists: "Listes de lecture",
     goBack: "Retour",
     goForward: "Avancer",
     searchPlaceholder: "Rechercher et filtrer... (Ctrl+L)",
@@ -107,6 +111,9 @@ export const frFR: DeepStringRecord<typeof en> = {
     text: "Cette bibliothèque a été ouverte pour la dernière fois par une version plus récente de Luminous (base de données v{dbVersion}, cette application prend en charge la v{appVersion}). Vos dossiers et vos morceaux sont toujours là — mettez à jour Luminous pour les retrouver."
   },
   collection: {
+    columnSelectorVisible: "Visibles",
+    columnSelectorNoneVisible: "Aucune colonne visible",
+    columnSelectorMetatags: "Métabalises",
     artists: "Artistes ({count})",
     albums: "Albums ({count})",
     songs: "Chansons ({count})",
@@ -235,6 +242,20 @@ export const frFR: DeepStringRecord<typeof en> = {
     resetSearchFilters: "Réinitialiser la recherche et les filtres"
   },
   settings: {
+    textFilesFilter: "Texte",
+    showToken: "Afficher le jeton",
+    hideToken: "Masquer le jeton",
+    showKey: "Afficher la clé",
+    hideKey: "Masquer la clé",
+    aboutLogoAlt: "Logo de Luminous",
+    picardExecutableFilter: "Exécutable Picard",
+    fanartValidateFailed: "Échec de la validation de la clé d'API",
+    updateServerNoResponse: "Aucune réponse du serveur de mise à jour",
+    updateDownloadFailed: "Échec du téléchargement",
+    updateRestartFailed: "Échec du redémarrage pour la mise à jour",
+    musicbrainzLoginFailed: "Échec du démarrage de la connexion à MusicBrainz",
+    musicbrainzVerifyFailed: "Échec de la vérification du code d'autorisation",
+    musicbrainzStatsFailed: "Échec du chargement des statistiques MusicBrainz",
     title: "Paramètres",
     tabGeneral: "Général",
     tabSystem: "Système",
@@ -659,6 +680,7 @@ export const frFR: DeepStringRecord<typeof en> = {
     watchedFoldersSubtitle: "Gérez les dossiers à analyser pour trouver des fichiers de musique."
   },
   playlists: {
+    queuePlaylistDefaultName: "Liste de lecture de la file",
     title: "Listes de lecture",
     untitledPlaylistName: "Liste sans titre",
     reservedPlaylistName: "« {name} » est réservé à la file d'attente intégrée. Veuillez choisir un autre nom.",
@@ -1092,6 +1114,7 @@ export const frFR: DeepStringRecord<typeof en> = {
   },
 
   songTags: {
+    groupNamePlaceholder: "p. ex. Primé",
     genresTabDescription: {
       one: "Affichage de {count} genre",
       other: "Affichage de {count} genres"
@@ -1597,6 +1620,7 @@ export const frFR: DeepStringRecord<typeof en> = {
     hateAction: "Marquer comme chanson non appréciée"
   },
   common: {
+    closeDialog: "Fermer la boîte de dialogue",
     aboutField: "À propos de {field}",
     scrollLeft: "Défiler vers la gauche",
     scrollRight: "Défiler vers la droite",
@@ -1625,6 +1649,23 @@ export const frFR: DeepStringRecord<typeof en> = {
     inactive: "Inactif",
     create: "Créer"
   },
+  sortOverrides: {
+    heading: "Remplacements de tri (« Trier comme »)",
+    title: "Trier le titre comme",
+    artist: "Trier l'artiste comme",
+    album: "Trier l'album comme",
+    albumArtist: "Trier l'artiste de l'album comme",
+    composer: "Trier le compositeur comme",
+    genre: "Trier le genre comme",
+    example: "p. ex. Beatles, The",
+  },
+  socialPlatforms: {
+    lyrics: "Paroles",
+    otherDatabases: "Autres bases de données",
+    lyricsPlaceholder: "https://... (p. ex. Genius, Musixmatch)",
+    otherDatabasesPlaceholder: "https://... (p. ex. VGMdb)",
+    customPlaceholder: "https://... (p. ex. critique Pitchfork, notes de pochette, blogue)",
+  },
   units: {
     hz: "Hz",
     khz: "kHz",
@@ -1637,6 +1678,21 @@ export const frFR: DeepStringRecord<typeof en> = {
     dismiss: "Fermer la notification"
   },
   organizer: {
+    chipAlbumArtist: "Artiste de l'album",
+    chipArtist: "Artiste",
+    chipAlbum: "Album",
+    chipOptionalAlbumFolder: "Dossier d'album facultatif",
+    chipFolderSeparator: "Séparateur de dossiers",
+    chipConditionalDisc: "Préfixe de disque conditionnel",
+    chipTrack: "N° de piste (2 chiffres : 01, 09, 11). Variantes : %track3 (3 chiffres : 001), %rawtrack (sans zéros : 1)",
+    chipOptionalTrack: "N° de piste facultatif (2 chiffres). Variantes : {%track3 }, {%rawtrack }",
+    chipOptionalTrackDot: "N° de piste facultatif avec point (2 chiffres). Variantes : {%track3. }, {%rawtrack. }",
+    chipTitle: "Titre",
+    chipYear: "Année",
+    chipGenre: "Genre",
+    chipFolderLabel: "/ (dossier)",
+    previewFailed: "Échec de la génération de l'aperçu",
+    organizeFailed: "Échec de l'organisation des fichiers",
     title: "Organiser les fichiers",
     subtitle: "Renommer et réorganiser les fichiers selon un modèle d'balises",
     sectionTemplatePattern: "Modèle de nom",
@@ -1723,6 +1779,16 @@ export const frFR: DeepStringRecord<typeof en> = {
     missingPlaylistHint: "Afficher une liste de lecture automatique des morceaux sans identifiant MusicBrainz pour les taguer facilement dans Picard"
   },
   listenbrainz: {
+    tokenRequired: "Veuillez saisir un jeton d'utilisateur",
+    validateFailed: "Échec de la validation du jeton",
+    submittedPending: {
+      one: "{count} écoute en attente soumise",
+      other: "{count} écoutes en attente soumises"
+    },
+    queueEmpty: "La file d'attente est vide",
+    flushFailed: "Échec de l'envoi",
+    syncRatingsError: "Échec de la synchronisation des cotes",
+    connectFailed: "Échec de la connexion à ListenBrainz",
     integrationTitle: "Scrobbler ListenBrainz",
     integrationDesc: "est un carnet d'écoute musical à code source ouvert et sans but lucratif qui garde une trace de chaque morceau écouté sur différentes applications (« scrobbling ») et vous permet d'explorer vos habitudes d'écoute sans vendre vos données personnelles.",
     enableLabel: "Activer le scrobbling ListenBrainz",
@@ -1927,6 +1993,7 @@ export const frFR: DeepStringRecord<typeof en> = {
     }
   },
   tasks: {
+    taskFailed: "Échec de la tâche",
     title: "Tâches en arrière-plan",
     clear: "Effacer",
     clearCompleted: "Effacer les tâches terminées",
@@ -1949,6 +2016,10 @@ export const frFR: DeepStringRecord<typeof en> = {
     scanPhaseUpdating: "mise à jour de la bibliothèque"
   },
   audioPipeline: {
+    channelsStereo: "Stéréo (2 can.)",
+    channelsMono: "Mono (1 can.)",
+    channelsCount: "{count} can.",
+    defaultOutputDevice: "Périphérique de sortie par défaut",
     title: "Chaîne audio",
     badgeTooltip: "Qualité audio : {tier} — cliquer pour afficher la chaîne audio",
     qualityTier: "Qualité",

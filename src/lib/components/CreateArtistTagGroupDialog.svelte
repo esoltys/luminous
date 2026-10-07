@@ -73,7 +73,7 @@
         use:focusInput
         bind:value={groupName}
         onkeydown={handleKeyDown}
-        placeholder="e.g. Award-Winning"
+        placeholder={i18n.t("songTags.groupNamePlaceholder")}
         class="w-full bg-brand-sidebar border border-brand-border focus:border-brand-accent rounded-lg px-3 py-2 text-sm text-brand-text-primary focus:outline-none transition-colors"
       />
     </div>

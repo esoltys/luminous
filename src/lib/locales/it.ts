@@ -23,6 +23,10 @@ export const it = {
     musicbrainzProfile: "Profilo MusicBrainz"
   },
   topNav: {
+    filterExample: "ad es. rating:>=4 year:<2000 genre:jazz \"miles davis\"",
+    fileFilterSupported: "File supportati",
+    fileFilterAudio: "File audio",
+    fileFilterPlaylists: "Playlist",
     goBack: "Indietro",
     goForward: "Avanti",
     searchPlaceholder: "Cerca e filtra... (Ctrl+L)",
@@ -101,6 +105,9 @@ export const it = {
     text: "Questa libreria è stata aperta l'ultima volta da una versione più recente di Luminous (database v{dbVersion}, questa app supporta la v{appVersion}). Le tue cartelle e i tuoi brani sono ancora al loro posto: aggiorna Luminous per rivederli."
   },
   collection: {
+    columnSelectorVisible: "Visibili",
+    columnSelectorNoneVisible: "Nessuna colonna visibile",
+    columnSelectorMetatags: "Metatag",
     artists: "Artisti ({count})",
     albums: "Album ({count})",
     songs: "Brani ({count})",
@@ -229,6 +236,20 @@ export const it = {
     resetSearchFilters: "Reimposta ricerca e filtri"
   },
   settings: {
+    textFilesFilter: "Testo",
+    showToken: "Mostra token",
+    hideToken: "Nascondi token",
+    showKey: "Mostra chiave",
+    hideKey: "Nascondi chiave",
+    aboutLogoAlt: "Logo di Luminous",
+    picardExecutableFilter: "Eseguibile di Picard",
+    fanartValidateFailed: "Impossibile convalidare la chiave API",
+    updateServerNoResponse: "Nessuna risposta dal server degli aggiornamenti",
+    updateDownloadFailed: "Download non riuscito",
+    updateRestartFailed: "Riavvio per l'aggiornamento non riuscito",
+    musicbrainzLoginFailed: "Impossibile avviare l'accesso a MusicBrainz",
+    musicbrainzVerifyFailed: "Impossibile verificare il codice di autorizzazione",
+    musicbrainzStatsFailed: "Impossibile caricare le statistiche di MusicBrainz",
     title: "Impostazioni",
     tabGeneral: "Generale",
     tabSystem: "Sistema",
@@ -653,6 +674,7 @@ export const it = {
     watchedFoldersSubtitle: "Gestisci le cartelle da analizzare per trovare file musicali."
   },
   playlists: {
+    queuePlaylistDefaultName: "Playlist della coda",
     title: "Playlist",
     untitledPlaylistName: "Playlist senza titolo",
     reservedPlaylistName: "«{name}» è riservato alla playlist integrata Coda. Scegli un nome diverso.",
@@ -1522,6 +1544,7 @@ export const it = {
     hateAction: "Non mi piace"
   },
   common: {
+    closeDialog: "Chiudi la finestra di dialogo",
     aboutField: "Informazioni su {field}",
     scrollLeft: "Scorri a sinistra",
     scrollRight: "Scorri a destra",
@@ -1550,6 +1573,23 @@ export const it = {
     inactive: "Inattivo",
     create: "Crea"
   },
+  sortOverrides: {
+    heading: "Sostituzioni di ordinamento («Ordina come»)",
+    title: "Ordina titolo come",
+    artist: "Ordina artista come",
+    album: "Ordina album come",
+    albumArtist: "Ordina artista dell'album come",
+    composer: "Ordina compositore come",
+    genre: "Ordina genere come",
+    example: "ad es. Beatles, The",
+  },
+  socialPlatforms: {
+    lyrics: "Testi",
+    otherDatabases: "Altri database",
+    lyricsPlaceholder: "https://... (ad es. Genius, Musixmatch)",
+    otherDatabasesPlaceholder: "https://... (ad es. VGMdb)",
+    customPlaceholder: "https://... (ad es. recensione di Pitchfork, note di copertina, blog)",
+  },
   units: {
     hz: "Hz",
     khz: "kHz",
@@ -1562,6 +1602,7 @@ export const it = {
     dismiss: "Chiudi notifica"
   },
   songTags: {
+    groupNamePlaceholder: "ad es. Premiati",
     genresTabDescription: {
       one: "{count} genere visualizzato",
       other: "{count} generi visualizzati"
@@ -1629,6 +1670,21 @@ export const it = {
     cancelBtn: "Annulla"
   },
   organizer: {
+    chipAlbumArtist: "Artista dell'album",
+    chipArtist: "Artista",
+    chipAlbum: "Album",
+    chipOptionalAlbumFolder: "Cartella dell'album facoltativa",
+    chipFolderSeparator: "Separatore di cartelle",
+    chipConditionalDisc: "Prefisso del disco condizionale",
+    chipTrack: "N. traccia (2 cifre: 01, 09, 11). Alternative: %track3 (3 cifre: 001), %rawtrack (senza zeri: 1)",
+    chipOptionalTrack: "N. traccia facoltativo (2 cifre). Alternative: {%track3 }, {%rawtrack }",
+    chipOptionalTrackDot: "N. traccia facoltativo con punto (2 cifre). Alternative: {%track3. }, {%rawtrack. }",
+    chipTitle: "Titolo",
+    chipYear: "Anno",
+    chipGenre: "Genere",
+    chipFolderLabel: "/ (cartella)",
+    previewFailed: "Impossibile generare l'anteprima",
+    organizeFailed: "Impossibile organizzare i file",
     title: "Organizza file",
     subtitle: "Rinomina e riorganizza i file della libreria usando modelli basati sui tag",
     sectionTemplatePattern: "Schema del modello",
@@ -1715,6 +1771,16 @@ export const it = {
     missingPlaylistHint: "Mostra una playlist automatica dei brani della libreria senza ID MusicBrainz, per taggarli facilmente in Picard"
   },
   listenbrainz: {
+    tokenRequired: "Inserisci un token utente",
+    validateFailed: "Impossibile convalidare il token",
+    submittedPending: {
+      one: "{count} ascolto in sospeso inviato",
+      other: "{count} ascolti in sospeso inviati"
+    },
+    queueEmpty: "La coda è vuota",
+    flushFailed: "Invio non riuscito",
+    syncRatingsError: "Impossibile sincronizzare le valutazioni",
+    connectFailed: "Impossibile connettersi a ListenBrainz",
     integrationTitle: "Scrobbler ListenBrainz",
     integrationDesc: "è un diario musicale open source e senza scopo di lucro che tiene traccia di ogni brano che ascolti nelle varie app («scrobbling») e ti permette di esplorare le tue abitudini di ascolto senza vendere i tuoi dati personali.",
     enableLabel: "Attiva lo scrobbling su ListenBrainz",
@@ -1919,6 +1985,7 @@ export const it = {
     }
   },
   tasks: {
+    taskFailed: "Attività non riuscita",
     title: "Attività in background",
     clear: "Cancella",
     clearCompleted: "Cancella le attività completate",
@@ -1941,6 +2008,10 @@ export const it = {
     scanPhaseUpdating: "aggiornamento della libreria"
   },
   audioPipeline: {
+    channelsStereo: "Stereo (2 can.)",
+    channelsMono: "Mono (1 can.)",
+    channelsCount: "{count} can.",
+    defaultOutputDevice: "Dispositivo di uscita predefinito",
     title: "Pipeline audio",
     badgeTooltip: "Qualità audio: {tier}: fai clic per vedere la pipeline audio",
     qualityTier: "Qualità",

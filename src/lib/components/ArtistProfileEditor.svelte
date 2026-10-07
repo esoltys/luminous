@@ -18,7 +18,7 @@
   import { i18n } from "../stores/i18n.svelte";
   import { portal } from "../utils/portal";
   import SocialIcon from "./SocialIcon.svelte";
-  import { SOCIAL_PLATFORMS, getPlatformInfo, type SocialPlatformInfo } from "../utils/artistSocials";
+  import { SOCIAL_PLATFORMS, getPlatformInfo, localizePlatform, type SocialPlatformInfo } from "../utils/artistSocials";
   import type { ArtistProfile, ArtistSocialLink } from "../types";
 
   let {
@@ -174,7 +174,7 @@
         <button
           onclick={onClose}
           class="p-1.5 text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10 rounded-md transition-colors shrink-0"
-          aria-label="Close dialog"
+          aria-label={i18n.t("common.closeDialog")}
         >
           <X class="w-4 h-4" />
         </button>
@@ -314,7 +314,7 @@
                     >
                       {#each SOCIAL_PLATFORMS as p (p.id)}
                         <option value={p.id}>
-                          {p.id === "website" ? i18n.t("artistProfileEditor.website", {}, "Website") : p.id === "custom" ? i18n.t("artistProfileEditor.customLink", {}, "Custom Link") : p.label}
+                          {p.id === "website" ? i18n.t("artistProfileEditor.website", {}, "Website") : p.id === "custom" ? i18n.t("artistProfileEditor.customLink", {}, "Custom Link") : localizePlatform(p).label}
                         </option>
                       {/each}
                     </select>

@@ -23,6 +23,10 @@ export const ru = {
     musicbrainzProfile: "Профиль MusicBrainz"
   },
   topNav: {
+    filterExample: "напр. rating:>=4 year:<2000 genre:jazz \"miles davis\"",
+    fileFilterSupported: "Поддерживаемые файлы",
+    fileFilterAudio: "Аудиофайлы",
+    fileFilterPlaylists: "Плейлисты",
     goBack: "Назад",
     goForward: "Вперёд",
     searchPlaceholder: "Поиск и фильтр… (Ctrl+L)",
@@ -105,6 +109,9 @@ export const ru = {
     text: "Эта библиотека последний раз открывалась в более новой версии Luminous (база данных v{dbVersion}, это приложение поддерживает v{appVersion}). Ваши папки и песни на месте — обновите Luminous, чтобы снова их увидеть."
   },
   collection: {
+    columnSelectorVisible: "Видимые",
+    columnSelectorNoneVisible: "Нет видимых столбцов",
+    columnSelectorMetatags: "Метатеги",
     artists: "Исполнители ({count})",
     albums: "Альбомы ({count})",
     songs: "Песни ({count})",
@@ -241,6 +248,20 @@ export const ru = {
     resetSearchFilters: "Сбросить поиск и фильтры"
   },
   settings: {
+    textFilesFilter: "Текст",
+    showToken: "Показать токен",
+    hideToken: "Скрыть токен",
+    showKey: "Показать ключ",
+    hideKey: "Скрыть ключ",
+    aboutLogoAlt: "Логотип Luminous",
+    picardExecutableFilter: "Исполняемый файл Picard",
+    fanartValidateFailed: "Не удалось проверить ключ API",
+    updateServerNoResponse: "Нет ответа от сервера обновлений",
+    updateDownloadFailed: "Не удалось скачать",
+    updateRestartFailed: "Не удалось перезапустить для обновления",
+    musicbrainzLoginFailed: "Не удалось начать вход в MusicBrainz",
+    musicbrainzVerifyFailed: "Не удалось проверить код авторизации",
+    musicbrainzStatsFailed: "Не удалось загрузить статистику MusicBrainz",
     title: "Параметры",
     tabGeneral: "Общие",
     tabSystem: "Система",
@@ -675,6 +696,7 @@ export const ru = {
     watchedFoldersSubtitle: "Управляйте папками, которые сканируются на наличие музыкальных файлов."
   },
   playlists: {
+    queuePlaylistDefaultName: "Плейлист из очереди",
     title: "Плейлисты",
     untitledPlaylistName: "Список без названия",
     reservedPlaylistName: "Название «{name}» зарезервировано для встроенного списка «Очередь». Выберите другое название.",
@@ -1598,6 +1620,7 @@ export const ru = {
     hateAction: "Отметить «не нравится»"
   },
   common: {
+    closeDialog: "Закрыть диалог",
     aboutField: "Подробнее: {field}",
     scrollLeft: "Прокрутить влево",
     scrollRight: "Прокрутить вправо",
@@ -1628,6 +1651,23 @@ export const ru = {
     inactive: "Неактивно",
     create: "Создать"
   },
+  sortOverrides: {
+    heading: "Переопределение сортировки («Сортировать как»)",
+    title: "Сортировать название как",
+    artist: "Сортировать исполнителя как",
+    album: "Сортировать альбом как",
+    albumArtist: "Сортировать исполнителя альбома как",
+    composer: "Сортировать композитора как",
+    genre: "Сортировать жанр как",
+    example: "напр. Beatles, The",
+  },
+  socialPlatforms: {
+    lyrics: "Тексты песен",
+    otherDatabases: "Другие базы данных",
+    lyricsPlaceholder: "https://... (напр. Genius, Musixmatch)",
+    otherDatabasesPlaceholder: "https://... (напр. VGMdb)",
+    customPlaceholder: "https://... (напр. рецензия Pitchfork, буклет, блог)",
+  },
   units: {
     hz: "Гц",
     khz: "кГц",
@@ -1640,6 +1680,7 @@ export const ru = {
     dismiss: "Закрыть уведомление"
   },
   songTags: {
+    groupNamePlaceholder: "напр. Награждённые",
     genresTabDescription: {
       one: "Показан {count} жанр",
       few: "Показано {count} жанра",
@@ -1723,6 +1764,21 @@ export const ru = {
     cancelBtn: "Отмена"
   },
   organizer: {
+    chipAlbumArtist: "Исполнитель альбома",
+    chipArtist: "Исполнитель",
+    chipAlbum: "Альбом",
+    chipOptionalAlbumFolder: "Необязательная папка альбома",
+    chipFolderSeparator: "Разделитель папок",
+    chipConditionalDisc: "Условный префикс диска",
+    chipTrack: "№ трека (2 цифры: 01, 09, 11). Варианты: %track3 (3 цифры: 001), %rawtrack (без нулей: 1)",
+    chipOptionalTrack: "Необязательный № трека (2 цифры). Варианты: {%track3 }, {%rawtrack }",
+    chipOptionalTrackDot: "Необязательный № трека с точкой (2 цифры). Варианты: {%track3. }, {%rawtrack. }",
+    chipTitle: "Название",
+    chipYear: "Год",
+    chipGenre: "Жанр",
+    chipFolderLabel: "/ (папка)",
+    previewFailed: "Не удалось создать предпросмотр",
+    organizeFailed: "Не удалось упорядочить файлы",
     title: "Упорядочение файлов",
     subtitle: "Переименовывайте и перемещайте файлы библиотеки по шаблонам на основе тегов",
     sectionTemplatePattern: "Шаблон",
@@ -1817,6 +1873,18 @@ export const ru = {
     missingPlaylistHint: "Показывать автосписок композиций библиотеки без идентификаторов MusicBrainz, чтобы удобно проставить их в Picard"
   },
   listenbrainz: {
+    tokenRequired: "Введите токен пользователя",
+    validateFailed: "Не удалось проверить токен",
+    submittedPending: {
+      one: "Отправлено {count} ожидающее прослушивание",
+      few: "Отправлено {count} ожидающих прослушивания",
+      many: "Отправлено {count} ожидающих прослушиваний",
+      other: "Отправлено {count} ожидающего прослушивания"
+    },
+    queueEmpty: "Очередь пуста",
+    flushFailed: "Не удалось отправить",
+    syncRatingsError: "Не удалось синхронизировать оценки",
+    connectFailed: "Не удалось подключиться к ListenBrainz",
     integrationTitle: "Скробблер ListenBrainz",
     integrationDesc: "— некоммерческий дневник прослушивания с открытым исходным кодом: он запоминает каждую песню, которую вы слушаете в разных приложениях («скробблинг»), и позволяет изучать ваши музыкальные привычки без продажи личных данных.",
     enableLabel: "Включить скробблинг в ListenBrainz",
@@ -2029,6 +2097,7 @@ export const ru = {
     }
   },
   tasks: {
+    taskFailed: "Не удалось выполнить задачу",
     title: "Фоновые задачи",
     clear: "Очистить",
     clearCompleted: "Очистить завершённые задачи",
@@ -2051,6 +2120,10 @@ export const ru = {
     scanPhaseUpdating: "обновление библиотеки"
   },
   audioPipeline: {
+    channelsStereo: "Стерео (2 кан.)",
+    channelsMono: "Моно (1 кан.)",
+    channelsCount: "{count} кан.",
+    defaultOutputDevice: "Устройство вывода по умолчанию",
     title: "Аудиоконвейер",
     badgeTooltip: "Качество звука: {tier} — нажмите, чтобы открыть аудиоконвейер",
     qualityTier: "Качество",

@@ -120,7 +120,7 @@
       const exportPath = await save({
         title: i18n.t("settings.exportDiagnosticsLabel", {}, "Export Diagnostics"),
         defaultPath: `luminous-diagnostics-${timestamp}.txt`,
-        filters: [{ name: "Text", extensions: ["txt"] }],
+        filters: [{ name: i18n.t("settings.textFilesFilter"), extensions: ["txt"] }],
       });
       if (exportPath && typeof exportPath === "string") {
         await invoke("export_diagnostics", { exportPath });

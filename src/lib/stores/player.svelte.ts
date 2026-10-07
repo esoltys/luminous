@@ -364,15 +364,15 @@ export class PlayerStore {
         title: i18n.t('topNav.openFilesTitle', {}, "Open Audio Files or Playlists"),
         filters: [
           {
-            name: "Supported Files",
+            name: i18n.t("topNav.fileFilterSupported"),
             extensions: ["mp3", "flac", "ogg", "opus", "m4a", "aac", "alac", "wav", "aiff", "aif", "wv", "mpc", "ape", "tta", "dsf", "dff", "asf", "wma", "m4b", "m3u", "m3u8", "pls", "xspf"]
           },
           {
-            name: "Audio Files",
+            name: i18n.t("topNav.fileFilterAudio"),
             extensions: ["mp3", "flac", "ogg", "opus", "m4a", "aac", "alac", "wav", "aiff", "aif", "wv", "mpc", "ape", "tta", "dsf", "dff", "asf", "wma", "m4b"]
           },
           {
-            name: "Playlists",
+            name: i18n.t("topNav.fileFilterPlaylists"),
             extensions: ["m3u", "m3u8", "pls", "xspf"]
           }
         ]

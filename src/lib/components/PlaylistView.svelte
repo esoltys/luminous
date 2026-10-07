@@ -98,7 +98,7 @@
   let overflowButtonEl = $state<HTMLButtonElement | undefined>(undefined);
 
   let showSaveQueueModal = $state(false);
-  let saveQueueName = $state("Queue Playlist");
+  let saveQueueName = $state(i18n.t("playlists.queuePlaylistDefaultName"));
 
   function toggleOverflowMenu() {
     if (showOverflowMenu) {
@@ -555,7 +555,7 @@
     const songIds = playlistsStore.activePlaylistTracks.filter((t) => t.song).map((t) => t.song!.id);
     if (songIds.length === 0) return;
 
-    saveQueueName = `Queue Playlist`;
+    saveQueueName = i18n.t("playlists.queuePlaylistDefaultName");
     showSaveQueueModal = true;
   }
 

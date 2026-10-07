@@ -12,7 +12,7 @@
 
 <div class="space-y-6 max-w-4xl">
   <div class="bg-brand-sidebar border border-brand-border rounded-2xl p-6 flex flex-col @3xl:flex-row items-center gap-6 shadow-md">
-    <img src="/app-icon.svg" alt="Luminous Logo" class="w-20 h-20 shrink-0 drop-shadow-md" />
+    <img src="/app-icon.svg" alt={i18n.t("settings.aboutLogoAlt")} class="w-20 h-20 shrink-0 drop-shadow-md" />
     <div class="space-y-2 text-center @3xl:text-left flex-1 min-w-0">
       <div class="flex flex-wrap items-center justify-center @3xl:justify-start gap-2.5">
         <h3 class="text-2xl font-bold text-brand-text-primary">{i18n.t('settings.aboutAppName', {}, 'Luminous Music Player')}</h3>

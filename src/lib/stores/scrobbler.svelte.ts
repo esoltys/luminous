@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { i18n } from "./i18n.svelte";
 import { listen } from "@tauri-apps/api/event";
 
 type DiscordStatus = "connected" | "disconnected" | "not_running";
@@ -142,7 +143,7 @@ class ScrobblerStore {
   async validateToken(tokenToTest?: string) {
     const targetToken = (tokenToTest ?? this.token).trim();
     if (!targetToken) {
-      this.validationError = "Please enter a user token";
+      this.validationError = i18n.t("listenbrainz.tokenRequired");
       return false;
     }
 
@@ -156,7 +157,7 @@ class ScrobblerStore {
       await this.saveSettings();
       return true;
     } catch (err: any) {
-      this.validationError = typeof err === "string" ? err : err?.message ?? "Failed to validate token";
+      this.validationError = typeof err === "string" ? err : err?.message ?? i18n.t("listenbrainz.validateFailed");
       return false;
     } finally {
       this.isValidating = false;
@@ -168,13 +169,13 @@ class ScrobblerStore {
     this.flushSuccessMessage = null;
     try {
       const count = await invoke<number>("flush_scrobble_cache");
-      this.flushSuccessMessage = count > 0 ? `Submitted ${count} pending listen${count === 1 ? "" : "s"}` : "Queue is empty";
+      this.flushSuccessMessage = count > 0 ? i18n.plural("listenbrainz.submittedPending", count) : i18n.t("listenbrainz.queueEmpty");
       await this.refreshCacheStatus();
       setTimeout(() => {
         this.flushSuccessMessage = null;
       }, 4000);
     } catch (err: any) {
-      this.lastError = typeof err === "string" ? err : err?.message ?? "Flush failed";
+      this.lastError = typeof err === "string" ? err : err?.message ?? i18n.t("listenbrainz.flushFailed");
       await this.refreshCacheStatus();
     } finally {
       this.isFlushing = false;
@@ -201,7 +202,7 @@ class ScrobblerStore {
       this.syncRatingsResult = res;
       return res;
     } catch (err: any) {
-      this.syncRatingsError = typeof err === "string" ? err : err?.message ?? "Failed to sync ratings";
+      this.syncRatingsError = typeof err === "string" ? err : err?.message ?? i18n.t("listenbrainz.syncRatingsError");
       return null;
     } finally {
       this.isSyncingRatings = false;
