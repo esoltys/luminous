@@ -143,10 +143,10 @@
       style="top: {menuTop}px; left: {menuLeft}px; max-height: {menuMaxHeight}px"
     >
       <div class="text-[10px] font-extrabold text-brand-accent-text uppercase tracking-wider px-2 pt-1 pb-0.5">
-        Visible
+        {i18n.t("collection.columnSelectorVisible")}
       </div>
       {#if visibleInOrder.length === 0}
-        <div class="px-2 py-2 text-[11px] text-brand-text-secondary/60 italic">No columns visible</div>
+        <div class="px-2 py-2 text-[11px] text-brand-text-secondary/60 italic">{i18n.t("collection.columnSelectorNoneVisible")}</div>
       {:else}
         {#each visibleInOrder as col (col.key)}
           <label class="flex items-center gap-2 px-2 py-1 hover:bg-brand-main/60 rounded-lg text-xs text-brand-text-primary">
@@ -157,7 +157,7 @@
       {/if}
 
       <div class="text-[10px] font-extrabold text-brand-accent-text uppercase tracking-wider px-2 pt-2 pb-0.5 mt-1 border-t border-brand-border/30">
-        Metatags
+        {i18n.t("collection.columnSelectorMetatags")}
       </div>
       {#each METATAG_COLS as col (col.key)}
         <label class="flex items-center gap-2 px-2 py-1 hover:bg-brand-main/60 rounded-lg text-xs {collectionStore.visibleColumns[col.key] ? 'text-brand-text-primary' : 'text-brand-text-secondary/70'}">

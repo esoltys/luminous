@@ -35,10 +35,10 @@
   }
 
   function formatChannels(channels?: number): string {
-    if (!channels) return 'Stereo (2 ch)';
-    if (channels === 1) return 'Mono (1 ch)';
-    if (channels === 2) return 'Stereo (2 ch)';
-    return `${channels} ch`;
+    if (!channels) return i18n.t('audioPipeline.channelsStereo');
+    if (channels === 1) return i18n.t('audioPipeline.channelsMono');
+    if (channels === 2) return i18n.t('audioPipeline.channelsStereo');
+    return i18n.t('audioPipeline.channelsCount', { count: channels });
   }
 
   function formatSampleRate(rate?: number): string {
@@ -203,7 +203,7 @@
         <div class="col-span-2 flex flex-col">
           <span class="text-[10px] uppercase font-semibold text-brand-text-secondary">{i18n.t('audioPipeline.outputDevice', {}, 'Device')}</span>
           <span class="text-brand-text-primary font-semibold wrap-anywhere">
-            {pipeline.output_device_name || 'Default Output Device'}
+            {pipeline.output_device_name || i18n.t('audioPipeline.defaultOutputDevice')}
           </span>
         </div>
 

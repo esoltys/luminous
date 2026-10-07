@@ -501,31 +501,31 @@
             <!-- Sort Overrides ("Sort As") -->
             <details class="col-span-2 group border border-brand-border rounded-lg bg-brand-sidebar/40 overflow-hidden mt-1">
               <summary class="flex items-center justify-between px-3 py-2 text-xs font-semibold text-brand-text-secondary cursor-pointer select-none hover:text-brand-text-primary transition-colors">
-                <span>Sort Overrides ("Sort As")</span>
+                <span>{i18n.t("sortOverrides.heading")}</span>
                 <span class="text-[10px] text-brand-text-secondary/70 group-open:rotate-180 transition-transform">▼</span>
               </summary>
               <div class="p-3 pt-2 grid grid-cols-2 gap-3 border-t border-brand-border/60">
-                <FormField label="Title Sort As" for="tag-titlesort">
-                  <Input id="tag-titlesort" bind:value={titlesort} disabled={isSaving} size="sm" placeholder="e.g. Beatles, The" class="w-full" />
+                <FormField label={i18n.t("sortOverrides.title")} for="tag-titlesort">
+                  <Input id="tag-titlesort" bind:value={titlesort} disabled={isSaving} size="sm" placeholder={i18n.t("sortOverrides.example")} class="w-full" />
                 </FormField>
 
-                <FormField label="Artist Sort As" for="tag-artistsort">
-                  <Input id="tag-artistsort" bind:value={artistsort} disabled={isSaving} size="sm" placeholder="e.g. Beatles, The" class="w-full" />
+                <FormField label={i18n.t("sortOverrides.artist")} for="tag-artistsort">
+                  <Input id="tag-artistsort" bind:value={artistsort} disabled={isSaving} size="sm" placeholder={i18n.t("sortOverrides.example")} class="w-full" />
                 </FormField>
 
-                <FormField label="Album Sort As" for="tag-albumsort">
+                <FormField label={i18n.t("sortOverrides.album")} for="tag-albumsort">
                   <Input id="tag-albumsort" bind:value={albumsort} disabled={isSaving} size="sm" class="w-full" />
                 </FormField>
 
-                <FormField label="Album Artist Sort As" for="tag-albumartistsort">
+                <FormField label={i18n.t("sortOverrides.albumArtist")} for="tag-albumartistsort">
                   <Input id="tag-albumartistsort" bind:value={albumArtistSort} disabled={isSaving} size="sm" class="w-full" />
                 </FormField>
 
-                <FormField label="Composer Sort As" for="tag-composersort">
+                <FormField label={i18n.t("sortOverrides.composer")} for="tag-composersort">
                   <Input id="tag-composersort" bind:value={composersort} disabled={isSaving} size="sm" class="w-full" />
                 </FormField>
 
-                <FormField label="Genre Sort As" for="tag-genresort">
+                <FormField label={i18n.t("sortOverrides.genre")} for="tag-genresort">
                   <Input id="tag-genresort" bind:value={genresort} disabled={isSaving} size="sm" class="w-full" />
                 </FormField>
               </div>

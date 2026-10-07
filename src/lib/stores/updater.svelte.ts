@@ -225,7 +225,7 @@ class UpdaterStore {
     } catch (err: unknown) {
       console.warn("Update check failed:", err);
       this.checkStatus = "error";
-      this.errorMessage = extractErrorMessage(err, "No response from the update server");
+      this.errorMessage = extractErrorMessage(err, i18n.t("settings.updateServerNoResponse"));
     }
   }
 
@@ -277,7 +277,7 @@ class UpdaterStore {
     } catch (err: unknown) {
       console.error("Failed to download and install update:", err);
       this.installStatus = "error";
-      this.errorMessage = extractErrorMessage(err, "Download failed");
+      this.errorMessage = extractErrorMessage(err, i18n.t("settings.updateDownloadFailed"));
     }
   }
 
@@ -294,7 +294,7 @@ class UpdaterStore {
     } catch (err) {
       console.error("Failed to restart for update:", err);
       this.installStatus = "error";
-      this.errorMessage = extractErrorMessage(err, "Failed to restart for update");
+      this.errorMessage = extractErrorMessage(err, i18n.t("settings.updateRestartFailed"));
       toastStore.show(
         i18n.t("settings.updateInstallError", {}, "Update failed."),
         "error"

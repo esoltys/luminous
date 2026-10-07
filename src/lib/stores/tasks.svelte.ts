@@ -1,4 +1,5 @@
 import { toastStore } from "./toast.svelte";
+import { i18n } from "./i18n.svelte";
 
 type TaskStatus = "pending" | "running" | "done" | "failed" | "cancelled";
 
@@ -141,7 +142,7 @@ class TasksStore {
     task.status = "failed";
     if (error) task.error = error;
     task.finishedAt = Date.now();
-    toastStore.failTask(id, error || "Task failed");
+    toastStore.failTask(id, error || i18n.t("tasks.taskFailed"));
     this.scheduleAgeOut(id);
   }
 

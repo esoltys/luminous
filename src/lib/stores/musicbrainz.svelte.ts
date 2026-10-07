@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { openExternalUrl } from "../utils/openExternalUrl";
+import { i18n } from "./i18n.svelte";
 
 interface MusicBrainzAuthState {
   is_logged_in: boolean;
@@ -89,7 +90,7 @@ class MusicBrainzStore {
       return authUrl;
     } catch (err) {
       this.isAuthorizing = false;
-      this.authError = typeof err === "string" ? err : "Failed to start MusicBrainz login";
+      this.authError = typeof err === "string" ? err : i18n.t("settings.musicbrainzLoginFailed");
       throw err;
     }
   }
@@ -112,7 +113,7 @@ class MusicBrainzStore {
       return state;
     } catch (err) {
       this.isLoading = false;
-      this.authError = typeof err === "string" ? err : "Failed to verify authorization code";
+      this.authError = typeof err === "string" ? err : i18n.t("settings.musicbrainzVerifyFailed");
       throw err;
     }
   }
@@ -137,7 +138,7 @@ class MusicBrainzStore {
       });
       this.stats = stats;
     } catch (err) {
-      this.statsError = typeof err === "string" ? err : "Failed to load MusicBrainz stats";
+      this.statsError = typeof err === "string" ? err : i18n.t("settings.musicbrainzStatsFailed");
       console.error("Failed to load MusicBrainz stats:", err);
     }
   }

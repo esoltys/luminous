@@ -44,7 +44,7 @@
       await invoke("validate_fanart_api_key", { apiKey: key });
       prefs.setFanartApiKey(key);
     } catch (err) {
-      fanartValidationError = typeof err === "string" ? err : "Failed to validate API key";
+      fanartValidationError = typeof err === "string" ? err : i18n.t("settings.fanartValidateFailed");
     } finally {
       isValidatingFanartKey = false;
     }
@@ -64,7 +64,7 @@
     const selected = await open({
       multiple: false,
       title: i18n.t("picard.browseBtn"),
-      filters: isWindows ? [{ name: "Picard executable", extensions: ["exe"] }] : undefined,
+      filters: isWindows ? [{ name: i18n.t("settings.picardExecutableFilter"), extensions: ["exe"] }] : undefined,
     });
     if (selected && typeof selected === "string") {
       picardCustomPath = selected;
@@ -180,7 +180,7 @@
           type="button"
           onclick={() => showListenBrainzToken = !showListenBrainzToken}
           class="absolute right-3 top-1/2 -translate-y-1/2 text-brand-text-secondary hover:text-brand-text-primary transition-colors"
-          title={showListenBrainzToken ? "Hide token" : "Show token"}
+          title={showListenBrainzToken ? i18n.t("settings.hideToken") : i18n.t("settings.showToken")}
         >
           {#if showListenBrainzToken}
             <EyeOff class="w-4 h-4" />
@@ -549,7 +549,7 @@
           type="button"
           onclick={() => showFanartKey = !showFanartKey}
           class="absolute right-3 top-1/2 -translate-y-1/2 text-brand-text-secondary hover:text-brand-text-primary transition-colors"
-          title={showFanartKey ? "Hide key" : "Show key"}
+          title={showFanartKey ? i18n.t("settings.hideKey") : i18n.t("settings.showKey")}
         >
           {#if showFanartKey}
             <EyeOff class="w-4 h-4" />

@@ -216,7 +216,7 @@
             type="button"
             onclick={handleClose}
             class="p-1.5 text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10 rounded-md transition-colors shrink-0 cursor-pointer"
-            aria-label="Close dialog"
+            aria-label={i18n.t("common.closeDialog")}
           >
             <X class="w-4 h-4" />
           </button>

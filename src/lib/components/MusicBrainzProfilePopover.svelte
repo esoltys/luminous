@@ -106,7 +106,7 @@
         lbTokenInput = "";
       }
     } catch (err) {
-      lbConnectError = typeof err === "string" ? err : "Failed to connect ListenBrainz";
+      lbConnectError = typeof err === "string" ? err : i18n.t("listenbrainz.connectFailed");
     } finally {
       isConnectingLb = false;
     }

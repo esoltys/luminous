@@ -23,6 +23,10 @@ export const uk = {
     musicbrainzProfile: "Профіль MusicBrainz"
   },
   topNav: {
+    filterExample: "напр. rating:>=4 year:<2000 genre:jazz \"miles davis\"",
+    fileFilterSupported: "Підтримувані файли",
+    fileFilterAudio: "Аудіофайли",
+    fileFilterPlaylists: "Плейлисти",
     goBack: "Назад",
     goForward: "Уперед",
     searchPlaceholder: "Пошук і фільтр… (Ctrl+L)",
@@ -105,6 +109,9 @@ export const uk = {
     text: "Цю бібліотеку востаннє відкривала новіша версія Luminous (база даних v{dbVersion}, цей застосунок підтримує v{appVersion}). Ваші папки й пісні нікуди не зникли — оновіть Luminous, щоб знову їх побачити."
   },
   collection: {
+    columnSelectorVisible: "Видимі",
+    columnSelectorNoneVisible: "Немає видимих стовпців",
+    columnSelectorMetatags: "Метатеги",
     artists: "Виконавці ({count})",
     albums: "Альбоми ({count})",
     songs: "Пісні ({count})",
@@ -241,6 +248,20 @@ export const uk = {
     resetSearchFilters: "Скинути пошук і фільтри"
   },
   settings: {
+    textFilesFilter: "Текст",
+    showToken: "Показати токен",
+    hideToken: "Сховати токен",
+    showKey: "Показати ключ",
+    hideKey: "Сховати ключ",
+    aboutLogoAlt: "Логотип Luminous",
+    picardExecutableFilter: "Виконуваний файл Picard",
+    fanartValidateFailed: "Не вдалося перевірити ключ API",
+    updateServerNoResponse: "Немає відповіді від сервера оновлень",
+    updateDownloadFailed: "Не вдалося завантажити",
+    updateRestartFailed: "Не вдалося перезапустити для оновлення",
+    musicbrainzLoginFailed: "Не вдалося почати вхід у MusicBrainz",
+    musicbrainzVerifyFailed: "Не вдалося перевірити код авторизації",
+    musicbrainzStatsFailed: "Не вдалося завантажити статистику MusicBrainz",
     title: "Налаштування",
     tabGeneral: "Загальні",
     tabSystem: "Система",
@@ -675,6 +696,7 @@ export const uk = {
     watchedFoldersSubtitle: "Керуйте папками, які скануються на наявність музичних файлів."
   },
   playlists: {
+    queuePlaylistDefaultName: "Плейлист із черги",
     title: "Списки відтворення",
     untitledPlaylistName: "Список відтворення без назви",
     reservedPlaylistName: "Назва «{name}» зарезервована для вбудованого списку «Черга». Виберіть іншу назву.",
@@ -1598,6 +1620,7 @@ export const uk = {
     hateAction: "Не подобається"
   },
   common: {
+    closeDialog: "Закрити діалог",
     aboutField: "Про {field}",
     scrollLeft: "Прокрутити ліворуч",
     scrollRight: "Прокрутити праворуч",
@@ -1628,6 +1651,23 @@ export const uk = {
     inactive: "Неактивно",
     create: "Створити"
   },
+  sortOverrides: {
+    heading: "Перевизначення сортування («Сортувати як»)",
+    title: "Сортувати назву як",
+    artist: "Сортувати виконавця як",
+    album: "Сортувати альбом як",
+    albumArtist: "Сортувати виконавця альбому як",
+    composer: "Сортувати композитора як",
+    genre: "Сортувати жанр як",
+    example: "напр. Beatles, The",
+  },
+  socialPlatforms: {
+    lyrics: "Тексти пісень",
+    otherDatabases: "Інші бази даних",
+    lyricsPlaceholder: "https://... (напр. Genius, Musixmatch)",
+    otherDatabasesPlaceholder: "https://... (напр. VGMdb)",
+    customPlaceholder: "https://... (напр. рецензія Pitchfork, буклет, блог)",
+  },
   units: {
     hz: "Гц",
     khz: "кГц",
@@ -1640,6 +1680,7 @@ export const uk = {
     dismiss: "Закрити сповіщення"
   },
   songTags: {
+    groupNamePlaceholder: "напр. Відзначені нагородами",
     genresTabDescription: {
       one: "Показано {count} жанр",
       few: "Показано {count} жанри",
@@ -1723,6 +1764,21 @@ export const uk = {
     cancelBtn: "Скасувати"
   },
   organizer: {
+    chipAlbumArtist: "Виконавець альбому",
+    chipArtist: "Виконавець",
+    chipAlbum: "Альбом",
+    chipOptionalAlbumFolder: "Необов'язкова папка альбому",
+    chipFolderSeparator: "Роздільник папок",
+    chipConditionalDisc: "Умовний префікс диска",
+    chipTrack: "№ треку (2 цифри: 01, 09, 11). Варіанти: %track3 (3 цифри: 001), %rawtrack (без нулів: 1)",
+    chipOptionalTrack: "Необов'язковий № треку (2 цифри). Варіанти: {%track3 }, {%rawtrack }",
+    chipOptionalTrackDot: "Необов'язковий № треку з крапкою (2 цифри). Варіанти: {%track3. }, {%rawtrack. }",
+    chipTitle: "Назва",
+    chipYear: "Рік",
+    chipGenre: "Жанр",
+    chipFolderLabel: "/ (папка)",
+    previewFailed: "Не вдалося створити попередній перегляд",
+    organizeFailed: "Не вдалося впорядкувати файли",
     title: "Упорядкування файлів",
     subtitle: "Перейменовуйте й переорганізовуйте файли бібліотеки за шаблонами тегів",
     sectionTemplatePattern: "Шаблон",
@@ -1817,6 +1873,18 @@ export const uk = {
     missingPlaylistHint: "Показувати автосписок композицій бібліотеки без ідентифікаторів MusicBrainz, щоб легко позначити їх у Picard"
   },
   listenbrainz: {
+    tokenRequired: "Введіть токен користувача",
+    validateFailed: "Не вдалося перевірити токен",
+    submittedPending: {
+      one: "Надіслано {count} очікуване прослуховування",
+      few: "Надіслано {count} очікувані прослуховування",
+      many: "Надіслано {count} очікуваних прослуховувань",
+      other: "Надіслано {count} очікуваного прослуховування"
+    },
+    queueEmpty: "Черга порожня",
+    flushFailed: "Не вдалося надіслати",
+    syncRatingsError: "Не вдалося синхронізувати оцінки",
+    connectFailed: "Не вдалося підключитися до ListenBrainz",
     integrationTitle: "Скроблер ListenBrainz",
     integrationDesc: "— це неприбутковий щоденник прослуховування з відкритим кодом, що веде облік кожної пісні, яку ви слухаєте в різних застосунках («скроблінг»), і дає змогу досліджувати свої звички без продажу ваших особистих даних.",
     enableLabel: "Увімкнути скроблінг у ListenBrainz",
@@ -2029,6 +2097,7 @@ export const uk = {
     }
   },
   tasks: {
+    taskFailed: "Не вдалося виконати завдання",
     title: "Фонові завдання",
     clear: "Очистити",
     clearCompleted: "Очистити завершені завдання",
@@ -2051,6 +2120,10 @@ export const uk = {
     scanPhaseUpdating: "оновлення бібліотеки"
   },
   audioPipeline: {
+    channelsStereo: "Стерео (2 кан.)",
+    channelsMono: "Моно (1 кан.)",
+    channelsCount: "{count} кан.",
+    defaultOutputDevice: "Пристрій виведення за замовчуванням",
     title: "Аудіоконвеєр",
     badgeTooltip: "Якість звуку: {tier} — натисніть, щоб переглянути аудіоконвеєр",
     qualityTier: "Якість",
