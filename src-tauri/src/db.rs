@@ -503,6 +503,23 @@ const MIGRATIONS: &[Migration] = &[
         description: "strip embedded credentials from WebDAV song URLs (#1492)",
         apply: migrate_strip_webdav_song_credentials,
     },
+    Migration {
+        version: 60,
+        description: "webdav_cache.missed_syncs so rows for files gone from the server can be pruned (#1494)",
+        apply: |conn| {
+            let has_missed_syncs: bool = conn
+                .prepare(
+                    "SELECT 1 FROM pragma_table_info('webdav_cache') WHERE name = 'missed_syncs'",
+                )?
+                .exists([])?;
+            if !has_missed_syncs {
+                conn.execute_batch(
+                    "ALTER TABLE webdav_cache ADD COLUMN missed_syncs INTEGER NOT NULL DEFAULT 0;",
+                )?;
+            }
+            Ok(())
+        },
+    },
 ];
 
 /// Migration 59: WebDAV songs used to store `user:pass@host/...` as their
