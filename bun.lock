@@ -27,7 +27,7 @@
         "@testing-library/svelte": "^5.4.2",
         "@types/node": "^26.6.3",
         "@typescript/native-preview": "^7.0.0-dev.20260707.2",
-        "image-js": "^1.7.0",
+        "image-js": "^1.7.1",
         "jsdom": "^30.1.0",
         "knip": "^6.37.0",
         "music-metadata": "^11.16.1",
@@ -468,7 +468,7 @@
 
     "ieee754": ["ieee754@1.2.1", "", {}, "sha512-dcyqhDvX1C46lXZcVqCpK+FtMRQVdIMN6/Df5js2zouUsqG7I6sFxitIC+7KYK29KdXOLHdu9zL4sFnoVQnqaA=="],
 
-    "image-js": ["image-js@1.7.0", "", { "dependencies": { "bresenham-zingl": "^0.2.5", "colord": "^2.9.3", "fast-bmp": "^4.0.1", "fast-jpeg": "^3.0.1", "fast-png": "^8.0.0", "image-type": "^4.1.0", "jpeg-js": "^0.4.4", "js-priority-queue": "^0.1.5", "median-quickselect": "^1.0.1", "ml-affine-transform": "^1.0.3", "ml-convolution": "^2.0.0", "ml-matrix": "^6.12.1", "ml-ransac": "^1.0.0", "ml-regression-multivariate-linear": "^2.0.4", "ml-regression-polynomial-2d": "^1.0.0", "ml-spectra-processing": "^14.18.2", "robust-point-in-polygon": "^1.0.3", "ssim.js": "^3.5.0", "tiff": "^7.1.3", "ts-pattern": "^5.9.0", "uint8-base64": "^1.0.0" }, "optionalDependencies": { "skia-canvas": "^3.0.8" } }, "sha512-/i72uwbYaSetVaLYPi3lHqr71/4O5RqWkEq4h/p5DM3FR0SSe5Jj57u6xk6sMVOurDBmTrvbm+FeinKnqLwIMA=="],
+    "image-js": ["image-js@1.7.1", "", { "dependencies": { "bresenham-zingl": "^0.2.5", "colord": "^2.10.0", "fast-bmp": "^4.0.1", "fast-jpeg": "^3.0.1", "fast-png": "^8.0.0", "image-type": "^4.1.0", "jpeg-js": "^0.4.4", "js-priority-queue": "^0.1.5", "median-quickselect": "^1.0.1", "ml-affine-transform": "^1.0.3", "ml-convolution": "^2.0.0", "ml-matrix": "^6.15.0", "ml-ransac": "^1.0.0", "ml-regression-multivariate-linear": "^2.0.4", "ml-regression-polynomial-2d": "^1.0.0", "ml-spectra-processing": "^14.34.0", "robust-point-in-polygon": "^1.0.3", "ssim.js": "^3.5.0", "tiff": "^7.1.3", "ts-pattern": "^5.9.0", "uint8-base64": "^1.0.0" }, "optionalDependencies": { "skia-canvas": "^3.0.8" } }, "sha512-n8/psrUfO7v7wBjTY2OMhj2OND24T6COvBoXNFCYI5HWq4QTToZWP34yFU2Dy5ESajp8BbmjdHjxMqEoj8cBPg=="],
 
     "image-type": ["image-type@4.1.0", "", { "dependencies": { "file-type": "^10.10.0" } }, "sha512-CFJMJ8QK8lJvRlTCEgarL4ro6hfDQKif2HjSvYCdQZESaIPV4v9imrf7BQHK+sQeTeNeMpWciR9hyC/g8ybXEg=="],
 
