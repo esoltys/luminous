@@ -1492,6 +1492,7 @@ export const en = {
     communityRating: "Community Rating",
     reviewOnCritiqueBrainz: "Review on CritiqueBrainz",
     reviewOnCritiqueBrainzTooltip: "Open this album on CritiqueBrainz to read or write reviews",
+    viewOnMusicBrainzTooltip: "Open this album on MusicBrainz",
     retrieveDetailsSuccess: {
       one: "Added {count} link from MusicBrainz",
       other: "Added {count} links from MusicBrainz"

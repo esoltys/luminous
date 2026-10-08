@@ -280,6 +280,23 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     expect(await findByText("(2)")).toBeInTheDocument();
   });
 
+  it("falls back to the MusicBrainz community rating when CritiqueBrainz has no rating (#1571)", async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_songs_by_album") return [{ ...mockSongs[0], musicbrainz_release_group_id: "rg-123" }];
+      if (cmd === "get_song_context") return { mb_rating: 3.75, mb_rating_votes: 4, critiquebrainz_rating: null, critiquebrainz_review_links: [] };
+      return [];
+    });
+    collectionStore.albumProfiles = {
+      "abbey road": { album_key: "abbey road", artist_key: "the beatles", description: "Classic album", links: [] },
+    };
+    const { findByText, findByTitle } = render(AlbumDetailView, { props: { albumName: mockAlbumName } });
+    expect(await findByText("(4)")).toBeInTheDocument();
+    const btn = await findByTitle("Open this album on MusicBrainz");
+    expect(btn).toBeInTheDocument();
+    await fireEvent.click(btn);
+    expect(openUrl).toHaveBeenCalledWith("https://musicbrainz.org/release-group/rg-123");
+  });
+
   it("toggles album stats exclusion from the overflow menu (#1252)", async () => {
     let excluded: [string, string][] = [];
     vi.mocked(invoke).mockImplementation(async (cmd: string, args?: unknown) => {

@@ -1564,6 +1564,7 @@ export const uk = {
     communityRating: "Оцінка спільноти",
     reviewOnCritiqueBrainz: "Рецензія на CritiqueBrainz",
     reviewOnCritiqueBrainzTooltip: "Відкрити цей альбом на CritiqueBrainz, щоб прочитати або написати рецензії",
+    viewOnMusicBrainzTooltip: "Відкрити цей альбом на MusicBrainz",
     retrieveDetailsSuccess: {
       one: "Додано {count} посилання з MusicBrainz",
       few: "Додано {count} посилання з MusicBrainz",
