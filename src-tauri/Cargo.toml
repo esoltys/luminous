@@ -120,7 +120,7 @@ percent-encoding = "2"
 rayon = "1"
 md-5 = "0.11"
 sha2 = "0.10"
-ed25519-dalek = "2"
+ed25519-dalek = "3"
 chacha20poly1305 = "0.10"
 
 [features]
