@@ -177,9 +177,10 @@ pub fn open(
         return Err(Error::TooLarge);
     }
     let cipher = ChaCha20Poly1305::new(addin_key.into());
+    let nonce = Nonce::try_from(p.nonce).map_err(|_| Error::Malformed("bad nonce length"))?;
     let plain = cipher
         .decrypt(
-            Nonce::from_slice(p.nonce),
+            &nonce,
             Payload {
                 msg: p.ciphertext,
                 aad: p.header,
