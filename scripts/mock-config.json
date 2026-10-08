@@ -302,16 +302,7 @@
       "featuredAlbum": "My Mess, My Heart, My Life.",
       "sidebarWidth": 220,
       "positionSeconds": 73,
-      "viewportWidth": 1200,
-      "viewportHeight": 890,
-      "locales": [
-        "en-CA"
-      ],
-      "schemes": [
-        "dynamic"
-      ],
-      "openAlbum": true,
-      "online": false
+      "liveApp": true
     },
     {
       "name": "theme-dynamic-cannons",
@@ -324,16 +315,7 @@
       "featuredAlbum": "Everything Glows",
       "sidebarWidth": 220,
       "positionSeconds": 137,
-      "viewportWidth": 1200,
-      "viewportHeight": 890,
-      "locales": [
-        "en-CA"
-      ],
-      "schemes": [
-        "dynamic"
-      ],
-      "openAlbum": true,
-      "online": false
+      "liveApp": true
     },
     {
       "name": "theme-dynamic-the-warning",
@@ -346,16 +328,7 @@
       "featuredAlbum": "Everything’s Falling",
       "sidebarWidth": 220,
       "positionSeconds": 65,
-      "viewportWidth": 1200,
-      "viewportHeight": 890,
-      "locales": [
-        "en-CA"
-      ],
-      "schemes": [
-        "dynamic"
-      ],
-      "openAlbum": true,
-      "online": false
+      "liveApp": true
     },
     {
       "name": "theme-dynamic-lorna-shore",
@@ -368,16 +341,7 @@
       "featuredAlbum": "I Feel the Everblack Festering Within Me",
       "sidebarWidth": 220,
       "positionSeconds": 97,
-      "viewportWidth": 1200,
-      "viewportHeight": 890,
-      "locales": [
-        "en-CA"
-      ],
-      "schemes": [
-        "dynamic"
-      ],
-      "openAlbum": true,
-      "online": false
+      "liveApp": true
     },
     {
       "name": "theme-dynamic-shania-twain",
@@ -390,16 +354,7 @@
       "featuredAlbum": "Little Miss Twain",
       "sidebarWidth": 220,
       "positionSeconds": 55,
-      "viewportWidth": 1200,
-      "viewportHeight": 890,
-      "locales": [
-        "en-CA"
-      ],
-      "schemes": [
-        "dynamic"
-      ],
-      "openAlbum": true,
-      "online": false
+      "liveApp": true
     },
     {
       "name": "theme-dynamic-phoebe-bridgers",
@@ -412,16 +367,7 @@
       "featuredAlbum": "Lost Weekend",
       "sidebarWidth": 220,
       "positionSeconds": 86,
-      "viewportWidth": 1200,
-      "viewportHeight": 890,
-      "locales": [
-        "en-CA"
-      ],
-      "schemes": [
-        "dynamic"
-      ],
-      "openAlbum": true,
-      "online": false
+      "liveApp": true
     },
     {
       "name": "theme-dynamic-wet-leg",
@@ -434,16 +380,7 @@
       "featuredAlbum": "moisturizer",
       "sidebarWidth": 220,
       "positionSeconds": 49,
-      "viewportWidth": 1200,
-      "viewportHeight": 890,
-      "locales": [
-        "en-CA"
-      ],
-      "schemes": [
-        "dynamic"
-      ],
-      "openAlbum": true,
-      "online": false
+      "liveApp": true
     }
   ]
 }

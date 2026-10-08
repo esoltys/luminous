@@ -1603,6 +1603,9 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     clean_empty_dirs: true,
     move_extra_files: true,
   });
+  commands["set_organize_config"] = () => null;
+  commands["get_lyrics_offset"] = () => 0;
+  commands["get_artist_events"] = () => [];
   commands["get_musicbrainz_auth_state"] = () => ({ is_logged_in: false, username: null, email: null });
   commands["get_default_library"] = () => ({ path: null, error: null });
   commands["validate_playlist_name"] = () => ({ valid: true, reason: null });

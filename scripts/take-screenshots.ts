@@ -9,7 +9,7 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import { compileMockScript } from "./compile-mock-script";
 import { DEV_SERVER_URL, startViteDevServer } from "./vite-dev-server";
-import { loadMockConfig, loadMockLibrary, resolveFeatured, resolveScreenshotSettings } from "./mock-library";
+import { DEFAULT_VIEWPORT, loadMockConfig, loadMockLibrary, resolveFeatured, resolveScreenshotSettings } from "./mock-library";
 import type { FeaturedSelection } from "./mock-library";
 import { BASE_LOCALE, LOCALES, catalogChain } from "../src/lib/locales";
 
@@ -162,8 +162,8 @@ async function main() {
     rightPanelOpen = false,
     sidebarWidth = 64,
     positionSeconds = 122,
-    viewportWidth = 1280,
-    viewportHeight = 800,
+    viewportWidth = DEFAULT_VIEWPORT.width,
+    viewportHeight = DEFAULT_VIEWPORT.height,
     emptyLibrary = false,
     selector,
     walkthroughCompleted = true,
@@ -587,9 +587,8 @@ async function main() {
 
   try {
     if (mockConfig.screenshots && mockConfig.screenshots.length > 0) {
-      const screenshotsToRun = nameFilter
-        ? mockConfig.screenshots.filter((s) => s.name === nameFilter)
-        : mockConfig.screenshots;
+      const headless = mockConfig.screenshots.filter((s) => !s.liveApp);
+      const screenshotsToRun = nameFilter ? headless.filter((s) => s.name === nameFilter) : headless;
       if (nameFilter && screenshotsToRun.length === 0) {
         logWarn(`No screenshot named "${nameFilter}" found in mock-config.json. Available: ${mockConfig.screenshots.map((s) => s.name).join(", ")}`);
       }
