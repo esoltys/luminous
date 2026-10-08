@@ -919,6 +919,7 @@ pub fn run() {
         .plugin(tauri_plugin_positioner::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         // `MacosLauncher::LaunchAgent` is required by the plugin's cross-platform
         // API but inert on the platforms Luminous actually ships (Windows/Linux) —
         // it only takes effect on a macOS build, which this project doesn't target.
@@ -1408,6 +1409,7 @@ pub fn run() {
             commands::pins::reorder_pinned_items,
             // Social share card export (#97)
             commands::share::save_share_card_image,
+            commands::share::copy_share_card_image,
             // Playlist commands
             commands::playlist::validate_playlist_name,
             commands::playlist::create_playlist,
