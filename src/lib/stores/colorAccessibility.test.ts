@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { PREDEFINED_THEMES, LUMINOUS_DARK_COLORS, LUMINOUS_LIGHT_COLORS } from "./theme.svelte";
+import { PREDEFINED_THEMES, LUMINOUS_DARK_COLORS, LUMINOUS_LIGHT_COLORS, withReadableText } from "./theme.svelte";
 import { checkWcagCompliance, pickAccessibleOnColor } from "../utils/colorUtils";
 
 describe("PREDEFINED_THEMES", () => {
@@ -50,9 +50,9 @@ describe.each([
 });
 
 describe("accent color contrast against bg-main (used for accent icons/badges/active-state text)", () => {
-  it("dark scheme accent meets the strict 4.5:1 text threshold", () => {
+  it("dark scheme accent meets WCAG 1.4.11's 3:1 non-text/UI-component threshold (accent text is lifted to 4.5:1 by clampForContrast)", () => {
     const result = checkWcagCompliance(LUMINOUS_DARK_COLORS["color-accent"], LUMINOUS_DARK_COLORS["bg-main"]);
-    expect(result.wcagAA).toBe(true);
+    expect(result.ratio).toBeGreaterThanOrEqual(3);
   });
 
   it("light scheme accent meets WCAG 1.4.11's 3:1 non-text/UI-component threshold", () => {
@@ -95,5 +95,33 @@ describe("on-accent text contrast (heuristically derived, not hand-picked)", () 
 
   it("picks white (perceived-brightness) rather than black (marginal WCAG-ratio winner) for the shared Luminous accent", () => {
     expect(pickAccessibleOnColor(LUMINOUS_LIGHT_COLORS["color-accent"])).toBe("#ffffff");
+  });
+});
+
+describe("withReadableText (theme builder)", () => {
+  it("swaps light text for dark when the user picks light backgrounds", () => {
+    const out = withReadableText({
+      ...LUMINOUS_DARK_COLORS,
+      "bg-main": "#eee9df",
+      "bg-sidebar": "#e5e0d4",
+      "bg-playerbar": "#e5e0d4"
+    });
+    expect(out["color-text-primary"]).toBe(LUMINOUS_LIGHT_COLORS["color-text-primary"]);
+    expect(out["color-text-secondary"]).toBe(LUMINOUS_LIGHT_COLORS["color-text-secondary"]);
+  });
+
+  it("swaps dark text for light when the user picks dark backgrounds", () => {
+    const out = withReadableText({ ...LUMINOUS_LIGHT_COLORS, "bg-main": "#101010", "bg-sidebar": "#181818", "bg-playerbar": "#181818" });
+    expect(out["color-text-primary"]).toBe(LUMINOUS_DARK_COLORS["color-text-primary"]);
+  });
+
+  it("leaves already-readable text colours untouched", () => {
+    const colors = { ...LUMINOUS_DARK_COLORS, "color-text-primary": "#ffffff" };
+    expect(withReadableText(colors)).toBe(colors);
+  });
+
+  it("ignores half-typed hex values", () => {
+    const colors = { ...LUMINOUS_DARK_COLORS, "bg-main": "#ee" };
+    expect(withReadableText(colors)).toBe(colors);
   });
 });

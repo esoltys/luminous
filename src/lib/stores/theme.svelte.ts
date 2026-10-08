@@ -57,15 +57,15 @@ export interface ExtractedColors {
 }
 
 /**
- * Dusty slate blue, the dark theme's UI accent (badges, buttons, sliders,
- * active states) — clears the strict 4.5:1 WCAG text-contrast threshold
- * against the near-black canvas (~4.96:1). Per the Luminous Logo System
- * (docs/Luminous Logo System.dc.html), the in-app reactive logo's glow/ring
- * re-target to this same active-theme accent/accent-hover pair — the fixed
- * Indigo/Gold brand colors in app-icon.svg are reserved for the static
- * "at rest" mark (app icon, marketing) only.
+ * Indigo, the Luminous UI accent (badges, buttons, sliders, active states).
+ * Per the Luminous Logo System (docs/Luminous Logo System.dc.html), the
+ * in-app reactive logo's glow/ring re-target to this same active-theme
+ * accent/accent-hover pair — the fixed Indigo/Gold brand colors in
+ * app-icon.svg are reserved for the static "at rest" mark only. Against the
+ * dark canvas it clears WCAG 1.4.11's 3:1 non-text threshold; accent-colored
+ * *text* is lifted to 4.5:1 separately via clampForContrast().
  */
-const LUMINOUS_DARK_ACCENT = "#6f7ea9";
+const LUMINOUS_ACCENT = "#4f5bd5";
 
 /**
  * "System" auto-theme: adapts to the OS light/dark preference. Panels
@@ -77,38 +77,55 @@ const LUMINOUS_DARK_ACCENT = "#6f7ea9";
  * silently break editing.
  */
 export const LUMINOUS_DARK_COLORS: ThemeColors = {
-  "bg-main": "#08090c",
-  "bg-sidebar": "#1c1f29",
-  "bg-playerbar": "#191b23",
-  "color-accent": LUMINOUS_DARK_ACCENT,
-  "color-accent-hover": blendToward(LUMINOUS_DARK_ACCENT, 255, 0.2),
+  "bg-main": "#191918",
+  "bg-sidebar": "#222220",
+  "bg-playerbar": "#2a2a27",
+  "color-accent": LUMINOUS_ACCENT,
+  "color-accent-hover": "#626fe8",
   "color-text-primary": "#f1f3f8",
   "color-text-secondary": "#a6adc4",
-  "color-border": "#3d4255"
+  "color-border": "#38382f"
 };
-
-/**
- * Same hex as LUMINOUS_DARK_ACCENT — unlike the old orange accent (which
- * had to darken into brown/rust to read against a light canvas), this slate
- * blue already clears WCAG 1.4.11's 3:1 non-text threshold as-is (~3.34:1
- * against this light canvas), so both schemes can share one literal color.
- */
-const LUMINOUS_LIGHT_ACCENT = LUMINOUS_DARK_ACCENT;
 
 export const LUMINOUS_LIGHT_COLORS: ThemeColors = {
-  "bg-main": "#e9eaf0",
-  "bg-sidebar": "#ffffff",
-  "bg-playerbar": "#ffffff",
-  "color-accent": LUMINOUS_LIGHT_ACCENT,
-  "color-accent-hover": blendToward(LUMINOUS_LIGHT_ACCENT, 255, 0.2),
+  "bg-main": "#eee9df",
+  "bg-sidebar": "#e5e0d4",
+  "bg-playerbar": "#e5e0d4",
+  "color-accent": LUMINOUS_ACCENT,
+  "color-accent-hover": "#3a45b0",
   "color-text-primary": "#16181d",
   "color-text-secondary": "#5a6072",
-  // #dcdce4 measured ~1.8:1 against the white sidebar/card surfaces here —
-  // well under WCAG 1.4.11's 3:1 non-text contrast floor, so borders (e.g.
-  // the playlist toolbar's icon buttons) were nearly invisible. This slate,
-  // hue-matched to LUMINOUS_LIGHT_ACCENT, clears ~3.7:1.
-  "color-border": "#7f84a0"
+  "color-border": "#cdc7b8"
 };
+
+const HEX6 = /^#[0-9a-f]{6}$/i;
+
+/**
+ * Returns `colors` with its text colours swapped for a readable Luminous
+ * pair when they fail WCAG AA against any of the three surfaces. The theme
+ * builder has no text-colour pickers, so a theme started from a dark theme
+ * (light text) would otherwise stay light-on-light after the user picks light
+ * backgrounds. Text colours that already pass (e.g. an imported theme's) are
+ * left alone.
+ */
+export function withReadableText(colors: ThemeColors): ThemeColors {
+  const surfaces = [colors["bg-main"], colors["bg-sidebar"], colors["bg-playerbar"]];
+  if (!surfaces.every((c) => HEX6.test(c))) return colors;
+  const passes = (text: string) => HEX6.test(text) && surfaces.every((bg) => checkWcagCompliance(text, bg).wcagAA);
+  if (passes(colors["color-text-primary"]) && passes(colors["color-text-secondary"])) return colors;
+
+  const light = LUMINOUS_LIGHT_COLORS;
+  const dark = LUMINOUS_DARK_COLORS;
+  const [first, second] = isLightColor(colors["bg-main"]) ? [light, dark] : [dark, light];
+  const pair = [first, second].find(
+    (p) => passes(p["color-text-primary"]) && passes(p["color-text-secondary"])
+  ) ?? first;
+  return {
+    ...colors,
+    "color-text-primary": pair["color-text-primary"],
+    "color-text-secondary": pair["color-text-secondary"]
+  };
+}
 
 /** Blends a hex color toward white (factor > 0) or black (factor < 0). */
 export function blendToward(hex: string, target: 0 | 255, amount: number): string {
@@ -749,7 +766,7 @@ export class ThemeStore {
         ...getArtworkTextColors(artColors)
       };
     }
-    return theme.colors;
+    return theme.isCustom ? withReadableText(theme.colors) : theme.colors;
   }
 
   async setTheme(themeId: string) {
@@ -1058,7 +1075,7 @@ export class ThemeStore {
     // the static preview colors on the theme entry.
     const colors = isLuminous
       ? (this.effectiveColorScheme === "dark" ? LUMINOUS_DARK_COLORS : LUMINOUS_LIGHT_COLORS)
-      : theme.colors;
+      : theme.isCustom ? withReadableText(theme.colors) : theme.colors;
 
     // Heuristically derived, not hand-picked: text rendered directly on
     // the accent color (active nav items, filled buttons) needs contrast
