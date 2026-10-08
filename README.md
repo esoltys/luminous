@@ -34,6 +34,15 @@ Luminous doesn't accept PRs as this is a hobby project that I enjoy working on i
 | **Windows** | [Microsoft Store](https://apps.microsoft.com/detail/9PNQ2NFSQ7XW) (recommended — installs and updates automatically)<br>[.exe / .msix](https://github.com/esoltys/luminous/releases/latest) (manual/sideloaded install) |
 | **Linux**   | [.deb / .rpm / Flatpak](https://github.com/esoltys/luminous/releases/latest) for your distro |
 
+## Upcoming 3.0 Release
+
+- **Nine UI locales**: English (CA/US/UK), French (CA/FR), Spanish, German, Italian, Russian and Ukrainian, with the UI language and user-manual language set separately
+- **Cosmetic add-on themes**, including the free Mothman theme on the Microsoft Store
+- **Large-library performance**: faster scanning and WebDAV sync on network drives, with remote-deletion detection
+- **Parametric EQ editor**: free-frequency bands, drag-to-edit response graph, user presets and AutoEq headphone profile import
+- **Auto Continue**, richer lyrics (word-by-word sync, `.srt`/`.vtt` sidecars, timing offset) and Love plus 5-star ratings with ListenBrainz/MusicBrainz sync
+- **Portable mode** and a portable ZIP release for Windows
+
 ## Architecture
 
 "Isn't this just a web wrapper?" Not in the Electron sense. Tauri renders the UI in the OS's own webview (WebView2 on Windows, WebKit on Linux/macOS) instead of bundling a full Chromium, so there's no shipped browser engine inflating the binary or idling in RAM. And the UI is the only part that's web tech — audio decoding/output, DSP, the library scanner, and the SQLite index all run as native Rust off the UI thread, driving the frontend through events rather than the other way around. See below for how the two sides split.
@@ -50,13 +59,14 @@ luminous/
 ├── src/                      # Svelte 5 + TypeScript Frontend
 │   ├── lib/
 │   │   ├── components/       # PlayerBar, Visualizers, Equalizer, LyricsView, TagEditor, etc.
-│   │   ├── locales/          # English & French translation strings
+│   │   ├── locales/          # UI translations (English CA/US/UK, French CA/FR, Spanish, German, Italian, Russian, Ukrainian)
 │   │   ├── stores/           # Global stores (player, collection, navigation, windowLayout, playlists, theme, i18n, prefs)
 │   │   ├── types/            # Frontend interfaces
 │   │   └── utils/            # Shared utilities (color parsing, filter parsing, lyrics, stats, etc.)
 │   └── routes/               # Layouts and navigation views
 └── src-tauri/                # Tauri + Rust Backend Core
     ├── src/
+    │   ├── addons/           # Cosmetic add-on themes: signed bundles, Store entitlement, key cache
     │   ├── analyzer.rs       # Real-time FFT spectrum processing
     │   ├── audio.rs          # Symphonia decoding thread & CPAL playback loop with gapless double-buffering
     │   ├── band_waveform.rs  # Layered low/mid/high frequency-band waveform analysis scanner
@@ -72,15 +82,19 @@ luminous/
     │   ├── main.rs           # Binary entry point invoking luminous_lib::run()
     │   ├── media_session.rs  # OS media transport integration (SMTC, MPRIS2, Now Playing)
     │   ├── models.rs         # Shared structs and types
+    │   ├── musicbrainz.rs    # MusicBrainz lookups, OAuth2 login, artist events
     │   ├── organizer.rs      # Tag-based file/folder reorganizer
     │   ├── player.rs         # Playback controller (Shuffle, Repeat, Next/Prev)
     │   ├── playlist.rs       # Playlist manager & Queue abstraction (auto-sync/dynamic/import-export/undo split into playlist/)
     │   ├── playlist_parsers.rs # M3U, M3U8, PLS, and XSPF import/export
+    │   ├── ratings_sync.rs   # Two-way rating/Love sync with ListenBrainz & CritiqueBrainz
     │   ├── stats.rs          # Play counts, ratings, and history tracking
+    │   ├── subsonic/         # Subsonic/Navidrome media-server sync
     │   ├── tageditor.rs      # lofty tag reader & writer
     │   ├── tags.rs           # Genre/tag browsing over the existing songs.genre column
     │   ├── tray.rs           # System tray icon, menu, and minimize-to-tray behavior
     │   ├── waveform.rs       # Background audio peak analyzer
+    │   ├── webdav/           # WebDAV library sync and tag probing
     │   └── commands/         # Tauri IPC command handlers
     └── Cargo.toml            # Rust dependencies (cpal, symphonia, rusqlite, lofty, rustfft)
 ```
