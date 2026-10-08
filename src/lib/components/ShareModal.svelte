@@ -662,15 +662,11 @@
   async function handleCopy() {
     exporting = true;
     try {
-      // Hand ClipboardItem a Promise and call write() synchronously in the click
-      // handler. Awaiting the render first lets the user-activation window expire
-      // (WebKitGTK rejects the write), which made the first Copy after opening the
-      // modal fail whenever the preview hadn't finished rendering yet.
-      const blobPromise = getExportBlob().then((blob) => {
-        if (!blob) throw new Error("render failed");
-        return blob;
-      });
-      await navigator.clipboard.write([new ClipboardItem({ "image/png": blobPromise })]);
+      // Native clipboard: WebKitGTK's navigator.clipboard.write() rejects images
+      // outside a fresh user gesture, so the first Copy on Linux failed.
+      const blob = await getExportBlob();
+      if (!blob) throw new Error("render failed");
+      await invoke("copy_share_card_image", { dataBase64: await blobToBase64(blob) });
       toastStore.show(i18n.t("shareModal.copySuccess"));
     } catch (err) {
       console.error("Failed to copy share card:", err);

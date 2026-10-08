@@ -12,3 +12,21 @@ pub async fn save_share_card_image(path: String, data_base64: String) -> Result<
     let bytes = STANDARD.decode(&data_base64).map_err(|e| e.to_string())?;
     std::fs::write(&path, bytes).map_err(|e| e.to_string())
 }
+
+/// Put the rendered card on the system clipboard natively. WebKitGTK rejects
+/// `navigator.clipboard.write()` for images unless it lands inside a fresh user
+/// gesture, which made the first Copy on Linux fail; the native clipboard has no
+/// such restriction.
+#[tauri::command]
+pub async fn copy_share_card_image(
+    app: tauri::AppHandle,
+    data_base64: String,
+) -> Result<(), String> {
+    use tauri_plugin_clipboard_manager::ClipboardExt;
+
+    let bytes = STANDARD.decode(&data_base64).map_err(|e| e.to_string())?;
+    let image = tauri::image::Image::from_bytes(&bytes).map_err(|e| e.to_string())?;
+    app.clipboard()
+        .write_image(&image)
+        .map_err(|e| e.to_string())
+}
