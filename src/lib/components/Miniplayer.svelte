@@ -757,7 +757,7 @@
      its GPU rendering disabled by env var), leaving the panel see-through instead of frosted — same
      fallback as PlayerBar's footer.no-backdrop. */
   :global(.glass-surface.no-backdrop) {
-    background-color: var(--bg-main, #08090c) !important;
+    background-color: var(--bg-main, #191918) !important;
     -webkit-backdrop-filter: none !important;
     backdrop-filter: none !important;
   }
