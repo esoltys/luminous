@@ -66,47 +66,47 @@
 @property --bg-main {
   syntax: '<color>';
   inherits: true;
-  initial-value: #08090c;
+  initial-value: #191918;
 }
 @property --bg-sidebar {
   syntax: '<color>';
   inherits: true;
-  initial-value: #1c1f29;
+  initial-value: #222220;
 }
 @property --bg-playerbar {
   syntax: '<color>';
   inherits: true;
-  initial-value: #191b23;
+  initial-value: #2a2a27;
 }
 @property --color-accent {
   syntax: '<color>';
   inherits: true;
-  initial-value: #6f7ea9;
+  initial-value: #4f5bd5;
 }
 @property --color-accent-hover {
   syntax: '<color>';
   inherits: true;
-  initial-value: #8c98ba;
+  initial-value: #626fe8;
 }
 @property --color-border {
   syntax: '<color>';
   inherits: true;
-  initial-value: #3d4255;
+  initial-value: #38382f;
 }
 @property --glass-bg-sidebar {
   syntax: '<color>';
   inherits: true;
-  initial-value: rgba(28, 31, 41, 0.5);
+  initial-value: rgba(34, 34, 32, 0.5);
 }
 @property --glass-bg-playerbar {
   syntax: '<color>';
   inherits: true;
-  initial-value: rgba(25, 27, 35, 0.5);
+  initial-value: rgba(42, 42, 39, 0.5);
 }
 @property --glass-solid-sidebar {
   syntax: '<color>';
   inherits: true;
-  initial-value: #12141c;
+  initial-value: #1e1e1c;
 }
 
 @property --color-text-primary {
@@ -127,12 +127,12 @@
 @property --color-accent-text {
   syntax: '<color>';
   inherits: true;
-  initial-value: #6f7ea9;
+  initial-value: #707add;
 }
 @property --color-accent-text-hover {
   syntax: '<color>';
   inherits: true;
-  initial-value: #8c98ba;
+  initial-value: #6b77e9;
 }
 
 @layer base {
@@ -164,19 +164,19 @@
     /* Default theme colors (Luminous, dark variant) — overwritten by
        ThemeStore.applyActiveTheme() on load; this is only the first-paint
        fallback before JS runs. */
-    --bg-main: #08090c;
-    --bg-sidebar: #1c1f29;
-    --bg-playerbar: #191b23;
-    --color-accent: #6f7ea9;
-    --color-accent-hover: #8c98ba;
+    --bg-main: #191918;
+    --bg-sidebar: #222220;
+    --bg-playerbar: #2a2a27;
+    --color-accent: #4f5bd5;
+    --color-accent-hover: #626fe8;
     --color-text-primary: #f1f3f8;
     --color-text-secondary: #a6adc4;
-    --color-border: #3d4255;
+    --color-border: #38382f;
     --color-accent-contrast: #000000;
-    /* #6f7ea9 already clears WCAG AA 4.5:1 against bg-main (~4.96:1), so no
-       further clamping needed for this fallback — see clampForContrast(). */
-    --color-accent-text: #6f7ea9;
-    --color-accent-text-hover: #8c98ba;
+    /* The raw accent is only ~3.2:1 against bg-main; these are its
+       clampForContrast() lifts to 4.5:1 for accent-colored text. */
+    --color-accent-text: #707add;
+    --color-accent-text-hover: #6b77e9;
     /* Fixed brand gold, never overridden per-theme (see @theme block above) */
     --color-accent-gold: #ffb648;
 

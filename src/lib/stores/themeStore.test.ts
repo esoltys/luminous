@@ -390,7 +390,7 @@ describe("flatGlassColor (solid stand-in for glass over the flat canvas)", () =>
   });
 
   it("matches the default dark theme's first-paint value in app.css", () => {
-    expect(flatGlassColor(LUMINOUS_DARK_COLORS["bg-sidebar"], 0.5, LUMINOUS_DARK_COLORS["bg-main"])).toBe("#12141c");
+    expect(flatGlassColor(LUMINOUS_DARK_COLORS["bg-sidebar"], 0.5, LUMINOUS_DARK_COLORS["bg-main"])).toBe("#1e1e1c");
   });
 });
 
@@ -539,5 +539,19 @@ describe("Image Extraction Fallbacks", () => {
     await themeStore.updateArtworkColors(undefined);
     expect(themeStore.artworkColors).toBeNull();
     expect(themeStore.resolvedColors["bg-main"]).toBe("#2e3440");
+  });
+});
+
+describe("custom themes saved with unreadable text", () => {
+  it("resolves readable text for a custom theme whose stored text fails contrast", async () => {
+    const store = new ThemeStore();
+    store.customThemes = [{
+      id: "custom-cream",
+      name: "Cream",
+      isCustom: true,
+      colors: { ...LUMINOUS_DARK_COLORS, "bg-main": "#eee9df", "bg-sidebar": "#e5e0d4", "bg-playerbar": "#e5e0d4" }
+    }];
+    store.activeThemeId = "custom-cream";
+    expect(store.resolvedColors["color-text-primary"]).toBe(LUMINOUS_LIGHT_COLORS["color-text-primary"]);
   });
 });
