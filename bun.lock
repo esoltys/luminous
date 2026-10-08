@@ -12,7 +12,7 @@
         "@tauri-apps/plugin-process": "^2",
         "@tauri-apps/plugin-updater": "^2",
         "phosphor-svelte": "^3.1.0",
-        "simple-icons": "^16.33.0",
+        "simple-icons": "^16.34.0",
         "svelte-virtual-list-ts": "^0.0.3",
         "tailwindcss": "^4.3.3",
       },
@@ -642,7 +642,7 @@
 
     "siginfo": ["siginfo@2.0.0", "", {}, "sha512-ybx0WO1/8bSBLEWXZvEd7gMW3Sn3JFlW3TvX1nREbDLRNQNaeNN8WK0meBwPdAaOI7TtRRRJn/Es1zhrrCHu7g=="],
 
-    "simple-icons": ["simple-icons@16.33.0", "", {}, "sha512-z14u6A8ngAg9mgERRsNO8YkjIMefehIpBk7A8Dz3Gd91945qFP19MLPSHgV4z8P5u/MRYd5e07OTzaDoB4d6qA=="],
+    "simple-icons": ["simple-icons@16.34.0", "", {}, "sha512-UTxKn0PVspk84B2hHF3Dqiqht1yDjJmDc/t4cO7PyCQxCMk6OjEu95pnpGjhLaGeQ4qBrGASbefTIe/+czrX7g=="],
 
     "sirv": ["sirv@3.0.2", "", { "dependencies": { "@polka/url": "^1.0.0-next.24", "mrmime": "^2.0.0", "totalist": "^3.0.0" } }, "sha512-2wcC/oGxHis/BoHkkPwldgiPSYcpZK3JU28WoMVv55yHJgcZ8rlXvuG9iZggz+sU1d4bRgIGASwyWqjxu3FM0g=="],
 
