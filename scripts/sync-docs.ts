@@ -48,7 +48,6 @@ for (const dir of FONT_DIRS) {
   }
 }
 
-copyDir(path.join(userGuideDir, "screenshots"), path.join(staticDir, "screenshots"));
 copyDir(path.join(userGuideDir, "assets"), path.join(staticDir, "assets"));
 
 console.log("[sync-docs] Synced user guides and assets into static/");

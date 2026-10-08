@@ -98,13 +98,20 @@ export interface ScreenshotConfig extends MockConfigDefaults {
   filename: string;
   action?: string;
   selector?: string;
-  outDir?: string;
   walkthroughCompleted?: boolean;
   isImmersive?: boolean;
   viewportWidth?: number;
   viewportHeight?: number;
   /** Serves a zeroed-out library (no songs/albums/artists/directories) instead of the real mock data — for the no-folders-added empty-state capture. */
   emptyLibrary?: boolean;
+  /** Locale tags to capture in. Defaults to every shipped locale. */
+  locales?: string[];
+  /** Boot straight into the featured album's detail view (restored from saved navigation state, so it works for albums scrolled out of the virtualized grid). */
+  openAlbum?: boolean;
+  /** false boots with online services off, so no enrichment toasts or fetched panels appear. */
+  online?: boolean;
+  /** Folders to capture into under assets/{locale}/screenshots/. Defaults to light + dark; "dynamic" skips color-scheme emulation for dynamic-artwork themes. */
+  schemes?: Array<"light" | "dark" | "dynamic">;
 }
 
 export interface MockConfig {

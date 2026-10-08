@@ -46,7 +46,25 @@
     const bg = cs.getPropertyValue("--bg-main").trim();
     const lum = bg ? luminance(bg) : null;
     if (lum !== null) root.style.colorScheme = lum < 0.5 ? "dark" : "light";
+    syncScreenshots();
   }
+
+  // ── Screenshots: show the light or dark capture matching the guide's scheme ──
+  // The markup points at the dark capture (assets/{locale}/screenshots/dark/x.png); swap the
+  // folder to follow the app theme when embedded, else the OS preference.
+  const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+  function syncScreenshots() {
+    const scheme = root.style.colorScheme || (darkQuery.matches ? "dark" : "light");
+    for (const img of document.querySelectorAll("img[src*='/dark/'], img[src*='/light/']")) {
+      const next = img.getAttribute("src").replace(/\/(?:light|dark)\//, `/${scheme}/`);
+      if (next !== img.getAttribute("src")) {
+        // Until a light capture exists, fall back to the dark one.
+        img.onerror = () => { img.onerror = null; img.setAttribute("src", next.replace("/light/", "/dark/")); };
+        img.setAttribute("src", next);
+      }
+    }
+  }
+  darkQuery.addEventListener("change", syncScreenshots);
 
   function watchParentTheme() {
     let parentDoc;
@@ -214,5 +232,6 @@
     initSections();
     initLightbox();
     watchParentTheme();
+    syncScreenshots();
   });
 })();

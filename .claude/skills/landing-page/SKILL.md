@@ -10,7 +10,7 @@ The page lives in a **different repo**: `esoltys/esoltys.github.io`, under `lumi
 `.agents/AGENTS.md` ("Luminous landing page" section) is the source of truth for the page's
 structure and i18n rules — re-read it before starting; if it disagrees with this file, it wins
 and you should tell the user this skill needs updating. Inputs all come from this repo:
-`docs/release-notes/vX.Y.Z.md` and `docs/user-guide/screenshots/`.
+`docs/release-notes/vX.Y.Z.md` and `docs/user-guide/assets/`.
 
 Run this after the release PR has merged, so the screenshots and notes on `origin/main` are the
 released ones. It can run from a cloud session (unlike `release`).
@@ -27,14 +27,15 @@ released ones. It can run from a cloud session (unlike `release`).
 
 ## 2. Screenshots
 
-The user guide's `docs/user-guide/screenshots/<name>-EN.png` / `<name>-FR.png` map one-to-one
-onto the site's `luminous/landing-assets/` (same filenames). Don't assume they were already
-copied — compare by hash:
+The user guide's `docs/user-guide/assets/en-CA/screenshots/dark/<name>.png` / `assets/fr-CA/screenshots/dark/<name>.png`
+map one-to-one onto the site's `luminous/landing-assets/<name>-EN.png` / `<name>-FR.png` (the site
+keeps the locale in the filename). Don't assume they were already copied — compare by hash:
 
 ```bash
 SITE=<path to esoltys.github.io>
-for f in $(git ls-tree --name-only origin/main docs/user-guide/screenshots/); do
-  b=$(basename "$f")
+for f in $(git ls-tree --name-only origin/main docs/user-guide/assets/en-CA/screenshots/dark/ docs/user-guide/assets/fr-CA/screenshots/dark/); do
+  loc=$(echo "$f" | cut -d/ -f4 | cut -c1-2 | tr a-z A-Z)   # en-CA -> EN
+  b=$(basename "$f" .png)-$loc.png
   a=$(git show "origin/main:$f" | sha1sum | cut -c1-8)
   l=$([ -f "$SITE/luminous/landing-assets/$b" ] && sha1sum < "$SITE/luminous/landing-assets/$b" | cut -c1-8 || echo NEW)
   [ "$a" = "$l" ] || echo "$b $l"
@@ -42,9 +43,9 @@ done
 ```
 
 - Copy every differing file over its same-named counterpart
-  (`git show origin/main:<path> > $SITE/luminous/landing-assets/<name>`). `NEW` files only
+  (`git show origin/main:<path> > $SITE/luminous/landing-assets/<name>-<EN|FR>.png`). `NEW` files only
   need copying if the page will reference them.
-- `theme-dynamic-*.png` (the theme slideshow) aren't in the user guide — leave them alone.
+- `theme-dynamic-*.png` (the theme slideshow) come from `docs/user-guide/assets/en-CA/screenshots/dynamic/theme-dynamic-<artist>.png`; copy them like the others, keeping the `theme-dynamic-` names the page references.
 - Check the copied images' pixel sizes still match the `width`/`height` attributes on their
   `<img>` tags (EN and FR), and fix the attributes if a capture size changed:
 
@@ -60,7 +61,7 @@ print('dimension check done')
 E
 ```
 
-- Read `home-EN.png` (the hero) and one screenshot that shows a headline feature to confirm
+- Read `assets/en-CA/screenshots/dark/home.png` (the hero) and one screenshot that shows a headline feature to confirm
   they're the new captures.
 
 ## 3. Version
