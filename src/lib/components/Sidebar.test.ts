@@ -5,6 +5,7 @@ import Sidebar from "./Sidebar.svelte";
 import { collectionStore } from "../stores/collection.svelte";
 import { navigationStore } from "../stores/navigation.svelte";
 import { playlistsStore } from "../stores/playlists.svelte";
+import { pinnedStore } from "../stores/pinned.svelte";
 import { i18n } from "../stores/i18n.svelte";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -102,4 +103,31 @@ describe("Sidebar.svelte", () => {
     const songsBtn = getByRole("button", { name: /chansons|songs/i });
     expect(songsBtn.textContent).toMatch(/3[\s\u202f]095/);
   });
+
+  it("renders pinned navigation items in expanded and collapsed sidebar modes", async () => {
+    pinnedStore.items = [
+      {
+        type: "album",
+        album: {
+          album: "OK Computer",
+          artist: "Radiohead",
+          rating: 5,
+        } as any,
+      },
+    ];
+
+    // Expanded sidebar
+    const { getByText, queryByText, getAllByTitle, rerender } = render(Sidebar, { props: { width: 256 } });
+    expect(getByText("OK Computer")).toBeInTheDocument();
+    expect(getByText("Radiohead")).toBeInTheDocument();
+
+    // Collapsed sidebar
+    rerender({ width: 64 });
+    await vi.waitFor(() => {
+      expect(queryByText("Radiohead")).not.toBeInTheDocument();
+    });
+    const pinnedBtn = getAllByTitle("OK Computer • Radiohead");
+    expect(pinnedBtn.length).toBeGreaterThan(0);
+  });
 });
+
