@@ -1,17 +1,17 @@
 // Docs-screenshot harness: boots its own Vite dev server, injects the mocked
 // Tauri IPC bridge (see tauri-ipc-mock.ts), captures each view listed in
-// mock-config.json via Playwright, then kills the dev server. See
+// mock-config.json via Playwright (once per color scheme, into
+// docs/user-guide/assets/{locale}/screenshots/{light,dark}/), then kills the dev server. See
 // .claude/CLAUDE.md for the mock-config.json setup trap in a fresh worktree.
-// Usage: bun run take-screenshots [--name=<entry>]
+// Usage: bun run take-screenshots [--name=<entry>] [--locale=<tag>]
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { compileMockScript } from "./compile-mock-script";
 import { DEV_SERVER_URL, startViteDevServer } from "./vite-dev-server";
-import { loadMockConfig, loadMockLibrary, resolveFeatured, resolveScreenshotSettings } from "./mock-library";
+import { DEFAULT_VIEWPORT, loadMockConfig, loadMockLibrary, resolveFeatured, resolveScreenshotSettings } from "./mock-library";
 import type { FeaturedSelection } from "./mock-library";
-import { en } from "../src/lib/locales/en";
-import { fr } from "../src/lib/locales/fr";
+import { BASE_LOCALE, LOCALES, catalogChain } from "../src/lib/locales";
 
 // Minimal ANSI coloring (no chalk dependency) so warnings/errors stand out
 // against the routine progress logs when scanning a long run's output.
@@ -32,20 +32,30 @@ function logError(...args: unknown[]) {
 // The app renders all button/tooltip text in the active locale, so any UI
 // text used to find elements to click must be looked up per-language rather
 // than hardcoded in English.
-const locales: Record<string, Record<string, unknown>> = { en, fr };
 function t(language: string, keyPath: string): string {
-  const dict = locales[language] ?? en;
-  const value = keyPath.split(".").reduce<unknown>((obj, key) => (obj as Record<string, unknown> | undefined)?.[key], dict);
-  return typeof value === "string" ? value : keyPath;
+  for (const catalog of catalogChain(language)) {
+    const value = keyPath.split(".").reduce<unknown>((obj, key) => (obj as Record<string, unknown> | undefined)?.[key], catalog);
+    if (typeof value === "string") return value;
+  }
+  return keyPath;
+}
+
+// Every screenshot is captured in every shipped locale (regional variants
+// included) so each can feed its own Store listing; an entry may narrow that
+// with `"locales": [...]`, and `--locale=<tag>` narrows a whole run.
+const ALL_LOCALES = LOCALES.map((l) => l.tag);
+function localesFor(spec: string[] | undefined, localeFilter: string | undefined): string[] {
+  const tags = spec ?? ALL_LOCALES;
+  return localeFilter ? tags.filter((t) => t === localeFilter) : tags;
 }
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-function parseNameFilter(argv: string[]): string | undefined {
-  const eqArg = argv.find((a) => a.startsWith("--name="));
-  if (eqArg) return eqArg.slice("--name=".length);
-  const flagIndex = argv.indexOf("--name");
+function parseFlag(argv: string[], flag: string): string | undefined {
+  const eqArg = argv.find((a) => a.startsWith(`--${flag}=`));
+  if (eqArg) return eqArg.slice(`--${flag}=`.length);
+  const flagIndex = argv.indexOf(`--${flag}`);
   if (flagIndex !== -1) return argv[flagIndex + 1];
   return undefined;
 }
@@ -56,7 +66,8 @@ async function main() {
     process.exit(0);
   }
 
-  const nameFilter = parseNameFilter(process.argv.slice(2));
+  const nameFilter = parseFlag(process.argv.slice(2), "name");
+  const localeFilter = parseFlag(process.argv.slice(2), "locale");
   if (nameFilter) {
     console.log(`--name "${nameFilter}" given; only that screenshot will be captured.`);
   }
@@ -104,6 +115,11 @@ async function main() {
   const libraryJson = JSON.stringify(mockLibrary);
   const mockCode = compileMockScript();
 
+  // "dynamic" is for dynamic-artwork captures: the theme comes from the album
+  // art rather than the OS color scheme, so no scheme is emulated.
+  const colorSchemes = ["light", "dark"] as const;
+  type ColorScheme = (typeof colorSchemes)[number] | "dynamic";
+
   interface CaptureOptions {
     tab: string;
     subTab?: string;
@@ -111,6 +127,10 @@ async function main() {
     filename: string;
     featured: FeaturedSelection;
     language?: string;
+    /** Color scheme to render and the output subfolder to write into. */
+    scheme?: ColorScheme;
+    openAlbum?: boolean;
+    online?: boolean;
     afterLoad?: (page: import("playwright").Page, featured: FeaturedSelection, language: string) => Promise<void>;
     isImmersive?: boolean;
     sidebarOpen?: boolean;
@@ -121,7 +141,6 @@ async function main() {
     viewportHeight?: number;
     emptyLibrary?: boolean;
     selector?: string;
-    outDir?: string;
     walkthroughCompleted?: boolean;
     /** e.g. "[3/20]" — shown when running the full batch (no --name filter); omitted otherwise. */
     progressLabel?: string;
@@ -133,36 +152,31 @@ async function main() {
     theme,
     filename,
     featured,
-    language = "en",
+    language = BASE_LOCALE,
+    scheme = "dark",
+    openAlbum = false,
+    online = true,
     afterLoad,
     isImmersive = false,
     sidebarOpen = true,
     rightPanelOpen = false,
     sidebarWidth = 64,
     positionSeconds = 122,
-    viewportWidth = 1280,
-    viewportHeight = 800,
+    viewportWidth = DEFAULT_VIEWPORT.width,
+    viewportHeight = DEFAULT_VIEWPORT.height,
     emptyLibrary = false,
     selector,
-    outDir,
     walkthroughCompleted = true,
     progressLabel,
   }: CaptureOptions) {
-    console.log(`${progressLabel ? progressLabel + " " : ""}Capturing ${filename}...`);
+    console.log(`${progressLabel ? progressLabel + " " : ""}Capturing ${scheme}/${filename}...`);
     const page = await browser.newPage();
     await page.setViewportSize({ width: viewportWidth, height: viewportHeight });
-    // The System theme (used by every screenshot except the dynamic-artwork
-    // ones) resolves light/dark from the OS color-scheme media query —
-    // Chromium defaults that to light, which is why these used to render
-    // light. Force dark so System-theme captures actually show the dark
-    // System theme rather than an unintended light one. A `-light` suffix on
-    // the theme (e.g. "system-light" in mock-config.json) asks for the light
-    // System theme instead.
-    const light = theme.endsWith("-light");
-    const themeId = light ? theme.slice(0, -"-light".length) : theme;
-    if (themeId !== "dynamic-artwork") {
-      await page.emulateMedia({ colorScheme: light ? "light" : "dark" });
-    }
+    // The System theme resolves light/dark from the OS color-scheme media
+    // query (Chromium defaults to light), so emulate the requested scheme.
+    // A legacy `-light` theme suffix is ignored: both schemes are always captured.
+    const themeId = theme.endsWith("-light") ? theme.slice(0, -"-light".length) : theme;
+    if (scheme !== "dynamic") await page.emulateMedia({ colorScheme: scheme });
     page.on("console", (msg) => {
       if (msg.type() === "error" || msg.type() === "warning") {
         const text = msg.text();
@@ -209,6 +223,7 @@ async function main() {
     await page.addInitScript(`
       window.__LUMINOUS_MOCK_LIBRARY__ = ${emptyLibrary ? emptyLibraryJson : libraryJson};
       window.__LUMINOUS_MOCK_FEATURED__ = ${emptyLibrary ? "{}" : JSON.stringify(featured)};
+      window.__LUMINOUS_MOCK_ONLINE__ = ${online};
     `);
     await page.addInitScript(mockCode);
 
@@ -225,6 +240,8 @@ async function main() {
         active_tab: "${tab}",
         active_sub_tab: "${subTab}",
         language: "${language}",
+        // Marks \`language\` as a BCP 47 tag so it isn't treated as a legacy "en"/"fr".
+        language_tags: "1",
         // Otherwise +layout.svelte auto-starts the first-launch Walkthrough
         // tour, whose popover would cover every capture (see #897).
         walkthrough_completed: "${walkthroughCompleted ? 'true' : 'false'}",
@@ -243,6 +260,9 @@ async function main() {
       } else if ("${subTab}" === "albums") {
         window.localStorage.setItem("sort_album_field", "year");
         window.localStorage.setItem("sort_album_asc", "false");
+      }
+      if (${openAlbum}) {
+        window.localStorage.setItem("navigation_selectedAlbumName", ${JSON.stringify(featured.album ?? featured.song?.album ?? "")});
       }
       if ("${subTab}" === "auto" || "${subTab}" === "custom") {
         window.localStorage.setItem("navigation_playlistsSubTab", "${subTab}");
@@ -304,9 +324,8 @@ async function main() {
     // Settle transitions
     await page.waitForTimeout(400);
 
-    const dir = outDir
-      ? path.resolve(__dirname, "..", outDir)
-      : path.join(__dirname, "../docs/user-guide/screenshots");
+    // Matches the Microsoft Store listing layout: assets/{locale}/screenshots/{theme}.
+    const dir = path.join(__dirname, "../docs/user-guide/assets", language, "screenshots", scheme);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
@@ -562,43 +581,38 @@ async function main() {
     },
   };
 
-  const withLanguageSuffix = (filename: string, language: string) => {
-    const suffix = language.toUpperCase();
-    const dotIndex = filename.lastIndexOf(".");
-    return dotIndex === -1 ? `${filename}-${suffix}` : `${filename.slice(0, dotIndex)}-${suffix}${filename.slice(dotIndex)}`;
-  };
-
   const cleanThemeId = (theme: string) => {
     return theme.trim().toLowerCase().replace(/\s+/g, "-");
   };
 
   try {
     if (mockConfig.screenshots && mockConfig.screenshots.length > 0) {
-      const screenshotsToRun = nameFilter
-        ? mockConfig.screenshots.filter((s) => s.name === nameFilter)
-        : mockConfig.screenshots;
+      const headless = mockConfig.screenshots.filter((s) => !s.liveApp);
+      const screenshotsToRun = nameFilter ? headless.filter((s) => s.name === nameFilter) : headless;
       if (nameFilter && screenshotsToRun.length === 0) {
         logWarn(`No screenshot named "${nameFilter}" found in mock-config.json. Available: ${mockConfig.screenshots.map((s) => s.name).join(", ")}`);
       }
-      const totalCaptures = screenshotsToRun.length * Object.keys(locales).length;
+      const schemesFor = (s: { schemes?: ColorScheme[] }) => s.schemes ?? colorSchemes;
+      const totalCaptures = screenshotsToRun.reduce((n, s) => n + localesFor(s.locales, localeFilter).length * schemesFor(s).length, 0);
       let captureIndex = 0;
       for (const s of screenshotsToRun) {
         const settings = resolveScreenshotSettings(mockConfig, s);
         const featured = resolveFeatured(mockLibrary, settings);
         const afterLoad = s.action ? actionRegistry[s.action] : undefined;
 
-        // Every screenshot is captured once per supported locale (see the
-        // `locales` map above), so adding a language only requires adding its
-        // locale file there — no changes needed here or in mock-config.json.
-        for (const language of Object.keys(locales)) {
+        for (const language of localesFor(s.locales, localeFilter)) {
+        for (const scheme of schemesFor(s)) {
           captureIndex++;
           await capture({
             tab: s.tab,
             subTab: s.subTab,
             theme: cleanThemeId(settings.theme),
-            filename: withLanguageSuffix(s.filename, language),
+            filename: s.filename,
             featured,
             language,
+            scheme,
+            openAlbum: s.openAlbum,
+            online: s.online,
             afterLoad,
             isImmersive: s.isImmersive ?? false,
             sidebarOpen: settings.sidebarOpen,
@@ -609,10 +623,10 @@ async function main() {
             viewportHeight: s.viewportHeight,
             emptyLibrary: s.emptyLibrary,
             selector: s.selector,
-            outDir: s.outDir,
             walkthroughCompleted: s.walkthroughCompleted ?? true,
             progressLabel: nameFilter ? undefined : `[${captureIndex}/${totalCaptures}]`,
           });
+         }
         }
       }
     } else {
@@ -633,10 +647,11 @@ async function main() {
       if (nameFilter && toRun.length === 0) {
         logWarn(`No screenshot named "${nameFilter}". Available: ${fallbackCaptures.map((c) => c.name).join(", ")}`);
       }
-      for (const [i, c] of toRun.entries()) {
+      const runs = toRun.flatMap((c) => colorSchemes.map((scheme) => ({ ...c.opts, scheme })));
+      for (const [i, opts] of runs.entries()) {
         await capture({
-          ...c.opts,
-          progressLabel: nameFilter ? undefined : `[${i + 1}/${toRun.length}]`,
+          ...opts,
+          progressLabel: nameFilter ? undefined : `[${i + 1}/${runs.length}]`,
         });
       }
     }

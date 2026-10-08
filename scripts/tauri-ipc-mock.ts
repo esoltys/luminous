@@ -690,7 +690,8 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
   }
 
   let minimizeToTrayEnabled = true;
-  let mockOnline = true;
+  // Captures that must not trigger online enrichment (toasts, fetched panels) preset this false.
+  let mockOnline = (window as unknown as { __LUMINOUS_MOCK_ONLINE__?: boolean }).__LUMINOUS_MOCK_ONLINE__ !== false;
 
   const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
     get_all_app_settings: () => window.mockSettings,
@@ -1259,7 +1260,7 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     // may fire: these no-ops return nothing instead of fabricating fetched art or links.
     retrieve_artist_details: () => null,
     retrieve_artist_image: () => null,
-    retrieve_album_art: () => null,
+    retrieve_album_art: () => ({ cover_uri: null, disc_uri: null, profile: null }),
 
     get_song_details: (args) => {
       const songId = args.songId as number;
@@ -1589,6 +1590,24 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     return eqSnapshot();
   };
   commands["export_parametric_profile"] = () => null;
+  // Mirrors OrganizeConfig::default() in organizer.rs; a null reply would make
+  // OrganizerStore.applyConfig throw during init.
+  commands["get_organize_config"] = () => ({
+    auto_organize: false,
+    template: "%albumartist/{%year - }{%album/}{%disc-}{%track }%title",
+    preset: "default",
+    destination_mode: "original",
+    custom_destination_dir: "",
+    replace_spaces: false,
+    ascii_only: false,
+    clean_empty_dirs: true,
+    move_extra_files: true,
+  });
+  commands["set_organize_config"] = () => null;
+  commands["get_lyrics_offset"] = () => 0;
+  commands["get_artist_events"] = () => [];
+  commands["get_musicbrainz_auth_state"] = () => ({ is_logged_in: false, username: null, email: null });
+  commands["get_default_library"] = () => ({ path: null, error: null });
   commands["validate_playlist_name"] = () => ({ valid: true, reason: null });
   // Defaults to enabled (unlike the real app's fresh-install default of
   // false) so the System Tray settings screenshot documents the feature in
@@ -1626,7 +1645,7 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     "set_fade_settings", "set_ui_preferences", "add_songs_to_queue",
     "play_song", "play_songs", "play_playlist_item", "pause", "resume", "stop",
     "next_track", "previous_track", "seek_to", "set_volume", "set_shuffle_mode", "set_repeat_mode",
-    "get_startup_file",
+    "get_startup_file", "refresh_addons",
     "enter_miniplayer_mode", "exit_miniplayer_mode", "start_window_drag", "start_window_resize",
     "move_window_to_preset", "get_window_geometry", "plugin:window|show", "plugin:window|set_title",
     "save_song_tags", "save_album_tags",
