@@ -297,8 +297,6 @@ export const de = {
     systemTitle: "System",
     systemSubtitle: "Festlegen, wie Luminous startet, minimiert wird und seine Daten speichert.",
     uiLanguageHint: "Sprache der Menüs, Schaltflächen und Meldungen wählen.",
-    manualLanguage: "Sprache des Benutzerhandbuchs",
-    manualLanguageHint: "Sprache der Hilfe wählen. Das Handbuch gibt es nur auf Englisch und Französisch.",
     ratingStyle: "Art der Titelbewertung",
     ratingStyleHeart: "Herz (Favorit)",
     ratingStyleStars: "5 Sterne",

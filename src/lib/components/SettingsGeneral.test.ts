@@ -37,18 +37,8 @@ describe("SettingsGeneral.svelte", () => {
     expect(invoke).toHaveBeenCalledWith("set_app_setting", { key: "language", value: "fr-CA" });
   });
 
-
-  it("saves the manual language separately from the UI language", async () => {
-    const { findByLabelText } = render(SettingsGeneral);
-    const select = (await findByLabelText("User manual language")) as HTMLSelectElement;
-    expect([...select.options].map((o) => [o.value, o.textContent?.trim()])).toEqual([
-      ["EN", "English"],
-      ["FR", "Français"],
-    ]);
-
-    await fireEvent.change(select, { target: { value: "FR" } });
-
-    expect(invoke).toHaveBeenCalledWith("set_app_setting", { key: "manual_language", value: "FR" });
-    expect(invoke).not.toHaveBeenCalledWith("set_app_setting", expect.objectContaining({ key: "language" }));
+  it("has no separate manual language picker", async () => {
+    const { queryByLabelText } = render(SettingsGeneral);
+    expect(queryByLabelText("User manual language")).toBeNull();
   });
 });

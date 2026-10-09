@@ -15,7 +15,7 @@ manual.
 
 ## Content
 
-- [ ] Update the user manual (`docs/user-guide/luminous-user-guide-{EN,FR}.html`) for any
+- [ ] Update the user manual (`docs/user-guide/luminous-user-guide-{EN,FR,DE,ES,IT,RU,UK}.html`) for any
       user-facing changes, editing both languages together.
 - [ ] Regenerate screenshots for any changed views:
   ```bash

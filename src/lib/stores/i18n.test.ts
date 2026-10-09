@@ -207,38 +207,24 @@ describe("I18nStore", () => {
 });
 
 describe("manual language", () => {
-  const mockSettings = (settings: Record<string, string>) =>
-    vi.mocked(invoke).mockImplementation(async (cmd: string) =>
-      cmd === "get_all_app_settings" ? settings : null
-    );
-
   beforeEach(() => {
     vi.clearAllMocks();
     i18n.currentLocale = "en-CA";
-    (i18n as unknown as { explicitManualLanguage: null }).explicitManualLanguage = null;
   });
 
-  it("follows the UI language until the user picks one", () => {
+  it("follows the UI language", () => {
     expect(i18n.manualLanguage).toBe("EN");
     i18n.currentLocale = "fr-CA";
     expect(i18n.manualLanguage).toBe("FR");
+    i18n.currentLocale = "es";
+    expect(i18n.manualLanguage).toBe("ES");
   });
 
-  it("keeps an explicit choice when the UI language changes, and saves it", async () => {
-    await i18n.setManualLanguage("EN");
-    i18n.currentLocale = "fr-CA";
-    expect(i18n.manualLanguage).toBe("EN");
-    expect(invoke).toHaveBeenCalledWith("set_app_setting", { key: "manual_language", value: "EN" });
-  });
-
-  it("restores the saved choice on launch and ignores an invalid one", async () => {
-    mockSettings({ language: "en-CA", language_tags: "1", manual_language: "FR" });
+  it("ignores a manual_language value saved by an earlier version", async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) =>
+      cmd === "get_all_app_settings" ? { language: "es", language_tags: "1", manual_language: "FR" } : null
+    );
     await i18n.init();
-    expect(i18n.manualLanguage).toBe("FR");
-
-    (i18n as unknown as { explicitManualLanguage: null }).explicitManualLanguage = null;
-    mockSettings({ language: "en-CA", language_tags: "1", manual_language: "DE" });
-    await i18n.init();
-    expect(i18n.manualLanguage).toBe("EN");
+    expect(i18n.manualLanguage).toBe("ES");
   });
 });
