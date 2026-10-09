@@ -22,6 +22,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defaultDbPath } from "./mock-library";
 import { CdpClient } from "./monitor-cdp";
+import { DevtoolsDriver } from "./devtools-driver";
+
+export { DevtoolsDriver } from "./devtools-driver";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const CDP_PORT = 9222;
@@ -293,6 +296,14 @@ export class AppProfile {
     if (!this.hasLaunched || !this.isRunning()) return;
     await closeGracefully(timeoutSec);
     this.hasLaunched = false;
+  }
+
+  /**
+   * Connects a DevtoolsDriver to this profile's running app instance.
+   */
+  async connectDriver(timeoutMs = 30_000): Promise<DevtoolsDriver> {
+    if (!this.isRunning()) throw new Error("Cannot connect driver while Luminous is stopped.");
+    return await DevtoolsDriver.connect({ port: this.port, timeoutMs });
   }
 
   /**
