@@ -53,6 +53,9 @@ jobs:
       - name: Run Vitest
         run: bun run test:run
 
+      - name: Run script tests
+        run: bun test scripts/throwaway-profile.test.ts
+
   backend_test:
     name: Backend Tests
     runs-on: ubuntu-latest
