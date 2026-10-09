@@ -138,7 +138,7 @@
 </script>
 
 {#if pinnedStore.navigableItems.length > 0}
-  <div data-pinned-nav-list="true" class="w-full flex flex-col {collapsed ? 'items-center py-1' : 'px-1 py-1'}">
+  <div data-pinned-nav-list="true" class="w-full flex flex-col {collapsed ? 'items-center py-1' : 'py-0.5'}">
     <div class="w-full space-y-0.5 flex flex-col {collapsed ? 'items-center' : ''}">
       {#each pinnedStore.navigableItems as pin, index (pin.id)}
         <PinnedNavItem

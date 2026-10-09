@@ -79,7 +79,7 @@
   title={tooltipText}
   class="relative group transition-colors select-none text-left cursor-grab active:cursor-grabbing {isDragged ? 'opacity-40' : ''} {collapsed
     ? 'w-10 h-10 flex items-center justify-center rounded-xl mx-auto'
-    : 'w-full flex items-center gap-2.5 px-2 py-1 rounded-md'} {pin.isActive
+    : 'w-full flex items-center gap-3 px-3 py-1 rounded-lg'} {pin.isActive
     ? 'bg-brand-accent/20 text-brand-accent-text font-semibold'
     : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
 >
@@ -93,11 +93,11 @@
     {/if}
   {/if}
 
-  <!-- Artwork / Thumbnail Container -->
+  <!-- Artwork / Thumbnail Container (square with no rounded corners) -->
   <div
     class="shrink-0 relative overflow-hidden bg-brand-main/60 flex items-center justify-center {collapsed
-      ? 'w-8 h-8 rounded-lg shadow-sm'
-      : 'w-7 h-7 rounded-md'}"
+      ? 'w-8 h-8'
+      : 'w-7 h-7'}"
   >
     {#if pin.type === "song" || pin.type === "album"}
       <CoverArt
