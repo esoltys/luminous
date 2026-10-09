@@ -2,8 +2,8 @@
   import { pinnedStore } from "../stores/pinned.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
-  import { i18n } from "../stores/i18n.svelte";
   import type { PinnedItem } from "../types";
+  import type { NavigablePin } from "../utils/pinnedNav";
   import PinnedNavItem from "./PinnedNavItem.svelte";
   import AlbumContextMenu from "./AlbumContextMenu.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
@@ -31,30 +31,27 @@
   let pointerDragArmed = false;
   let pointerDragStartX = 0;
   let pointerDragStartY = 0;
-  let pointerDragPointerId: number | null = null;
-  let pointerDragEl: HTMLElement | null = null;
+  let wasDragged = false;
 
   let contextMenuState = $state<{ x: number; y: number; item: PinnedItem } | null>(null);
-
-  function suppressOneClick(e: MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-  }
 
   function handlePointerDown(e: PointerEvent, index: number) {
     if (e.button !== 0) return;
     const target = e.target as HTMLElement;
-    if (target.closest("button:not([data-pinned-nav-item]), input, select, textarea")) return;
+    if (target.closest("button, a, input, select, textarea, [data-interactive]")) return;
 
     pointerDragArmed = false;
+    wasDragged = false;
     pointerDragStartX = e.clientX;
     pointerDragStartY = e.clientY;
-    pointerDragPointerId = e.pointerId;
-    pointerDragEl = e.currentTarget as HTMLElement;
     draggedIndex = index;
+
+    // Immediately capture pointer so WebView2 doesn't hijack into a native OS drag gesture
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
 
     window.addEventListener("pointermove", handlePointerMove);
     window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerCancel);
   }
 
   function handlePointerMove(e: PointerEvent) {
@@ -64,38 +61,56 @@
       const dx = e.clientX - pointerDragStartX;
       const dy = e.clientY - pointerDragStartY;
       if (Math.hypot(dx, dy) < POINTER_DRAG_THRESHOLD_PX) return;
-
       pointerDragArmed = true;
-      if (pointerDragEl && pointerDragPointerId !== null) {
-        pointerDragEl.setPointerCapture?.(pointerDragPointerId);
-      }
     }
 
-    const el = document
+    const listEl = document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-pinned-nav-list]");
+    if (!listEl) {
+      dragOverIndex = null;
+      return;
+    }
+
+    const rowEl = document
       .elementFromPoint(e.clientX, e.clientY)
       ?.closest("[data-pinned-nav-index]") as HTMLElement | null;
-    const idx = el?.dataset.pinnedNavIndex;
-    dragOverIndex = idx !== undefined ? Number(idx) : null;
+    const idx = rowEl?.dataset.pinnedNavIndex;
+    if (idx !== undefined) {
+      dragOverIndex = Number(idx);
+    }
   }
 
   async function handlePointerUp() {
     window.removeEventListener("pointermove", handlePointerMove);
     window.removeEventListener("pointerup", handlePointerUp);
+    window.removeEventListener("pointercancel", handlePointerCancel);
 
-    if (pointerDragArmed && dragOverIndex !== null && draggedIndex !== null) {
-      const fromIdx = draggedIndex;
-      const toIdx = dragOverIndex;
-      window.addEventListener("click", suppressOneClick, { capture: true, once: true });
-      if (fromIdx !== toIdx) {
-        await pinnedStore.reorderVisible(fromIdx, toIdx);
+    if (pointerDragArmed) {
+      wasDragged = true;
+      if (dragOverIndex !== null && draggedIndex !== null && dragOverIndex !== draggedIndex) {
+        await pinnedStore.reorderVisible(draggedIndex, dragOverIndex);
       }
     }
 
     draggedIndex = null;
     dragOverIndex = null;
     pointerDragArmed = false;
-    pointerDragPointerId = null;
-    pointerDragEl = null;
+  }
+
+  function handlePointerCancel() {
+    window.removeEventListener("pointermove", handlePointerMove);
+    window.removeEventListener("pointerup", handlePointerUp);
+    window.removeEventListener("pointercancel", handlePointerCancel);
+    draggedIndex = null;
+    dragOverIndex = null;
+    pointerDragArmed = false;
+  }
+
+  function handleRowClick(pin: NavigablePin) {
+    if (wasDragged) {
+      wasDragged = false;
+      return;
+    }
+    pin.open();
   }
 
   function handleContextMenu(e: MouseEvent, item: PinnedItem) {
@@ -104,7 +119,7 @@
     contextMenuState = { x: e.clientX, y: e.clientY, item };
   }
 
-  function handleKeyDown(e: KeyboardEvent, index: number) {
+  function handleKeyDown(e: KeyboardEvent, index: number, pin: NavigablePin) {
     if (e.altKey && e.key === "ArrowUp" && index > 0) {
       e.preventDefault();
       pinnedStore.reorderVisible(index, index - 1);
@@ -115,45 +130,29 @@
     ) {
       e.preventDefault();
       pinnedStore.reorderVisible(index, index + 1);
+    } else if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      pin.open();
     }
   }
 </script>
 
 {#if pinnedStore.navigableItems.length > 0}
-  <div class="w-full flex flex-col {collapsed ? 'items-center py-1' : 'px-1 pt-1.5 pb-1'}">
-    {#if !collapsed}
-      <div class="px-2 pt-1 pb-1 text-[10px] font-semibold tracking-wider uppercase text-brand-text-secondary/60 select-none">
-        {i18n.t('sidebar.pinned')}
-      </div>
-    {/if}
-
+  <div data-pinned-nav-list="true" class="w-full flex flex-col {collapsed ? 'items-center py-1' : 'py-0.5'}">
     <div class="w-full space-y-0.5 flex flex-col {collapsed ? 'items-center' : ''}">
       {#each pinnedStore.navigableItems as pin, index (pin.id)}
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <div
-          data-pinned-nav-index={index}
+        <PinnedNavItem
+          {pin}
+          {collapsed}
+          {index}
+          isDragged={draggedIndex === index}
+          isDragOver={dragOverIndex === index && draggedIndex !== null && draggedIndex !== index}
+          dropIndicatorPosition={draggedIndex !== null && draggedIndex < index ? "bottom" : "top"}
+          onclick={() => handleRowClick(pin)}
+          oncontextmenu={(e) => handleContextMenu(e, pin.rawItem)}
           onpointerdown={(e) => handlePointerDown(e, index)}
-          onkeydown={(e) => handleKeyDown(e, index)}
-          class="relative w-full transition-opacity rounded-md {draggedIndex === index ? 'opacity-40 cursor-grabbing' : 'cursor-grab'}"
-        >
-          <!-- Drop target indicator line / ring -->
-          {#if dragOverIndex === index && draggedIndex !== null && draggedIndex !== index}
-            {#if collapsed}
-              <div class="absolute inset-0 rounded-xl ring-2 ring-brand-accent pointer-events-none z-10"></div>
-            {:else}
-              <div
-                class="absolute left-1 right-1 h-0.5 bg-brand-accent rounded-full pointer-events-none z-10 {draggedIndex < index ? '-bottom-0.5' : '-top-0.5'}"
-              ></div>
-            {/if}
-          {/if}
-
-          <PinnedNavItem
-            {pin}
-            {collapsed}
-            onclick={() => pin.open()}
-            oncontextmenu={(e) => handleContextMenu(e, pin.rawItem)}
-          />
-        </div>
+          onkeydown={(e) => handleKeyDown(e, index, pin)}
+        />
       {/each}
     </div>
   </div>

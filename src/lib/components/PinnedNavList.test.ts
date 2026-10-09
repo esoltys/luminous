@@ -37,17 +37,17 @@ describe("PinnedNavList.svelte", () => {
     pinnedStore.items = [mockAlbumItem, mockSongItem];
   });
 
-  it("renders pinned items in expanded mode with section header", () => {
-    const { getByText } = render(PinnedNavList, {
+  it("renders pinned items in expanded mode without extra section header", () => {
+    const { getByText, queryByText } = render(PinnedNavList, {
       props: { collapsed: false },
     });
 
-    expect(getByText("Pinned")).toBeInTheDocument();
+    expect(queryByText("Pinned")).not.toBeInTheDocument();
     expect(getByText("OK Computer")).toBeInTheDocument();
     expect(getByText("Paranoid Android")).toBeInTheDocument();
   });
 
-  it("renders pinned items in collapsed mode without section header text", () => {
+  it("renders pinned items in collapsed mode without text", () => {
     const { queryByText, getAllByRole } = render(PinnedNavList, {
       props: { collapsed: true },
     });
@@ -68,6 +68,37 @@ describe("PinnedNavList.svelte", () => {
 
     expect(queryByText("Pinned")).not.toBeInTheDocument();
     expect(container.querySelector("[data-pinned-nav-index]")).toBeNull();
+  });
+
+  it("reorders items via pointer drag gestures", async () => {
+    const reorderSpy = vi.spyOn(pinnedStore, "reorderVisible").mockResolvedValue();
+    const { container } = render(PinnedNavList, {
+      props: { collapsed: false },
+    });
+
+    const rows = container.querySelectorAll<HTMLElement>("[data-pinned-nav-index]");
+    expect(rows).toHaveLength(2);
+
+    rows[0].setPointerCapture = vi.fn();
+
+    // Start drag on row 0
+    await fireEvent.pointerDown(rows[0], { clientX: 10, clientY: 10, button: 0, pointerId: 1 });
+    expect(rows[0].setPointerCapture).toHaveBeenCalledWith(1);
+
+    // Mock elementFromPoint to hit row 1
+    const originalElementFromPoint = document.elementFromPoint;
+    document.elementFromPoint = vi.fn().mockImplementation(() => rows[1]);
+
+    try {
+      // Move past 4px threshold
+      await fireEvent.pointerMove(window, { clientX: 10, clientY: 50 });
+
+      // Drop on row 1
+      await fireEvent.pointerUp(window);
+      expect(reorderSpy).toHaveBeenCalledWith(0, 1);
+    } finally {
+      document.elementFromPoint = originalElementFromPoint;
+    }
   });
 
   it("allows reordering via Alt+ArrowUp and Alt+ArrowDown keyboard shortcuts", async () => {

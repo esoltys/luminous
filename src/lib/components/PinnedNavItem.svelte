@@ -9,11 +9,28 @@
   interface Props {
     pin: NavigablePin;
     collapsed?: boolean;
+    index?: number;
+    isDragged?: boolean;
+    isDragOver?: boolean;
+    dropIndicatorPosition?: "top" | "bottom";
     onclick?: () => void;
     oncontextmenu?: (e: MouseEvent) => void;
+    onpointerdown?: (e: PointerEvent) => void;
+    onkeydown?: (e: KeyboardEvent) => void;
   }
 
-  let { pin, collapsed = false, onclick, oncontextmenu }: Props = $props();
+  let {
+    pin,
+    collapsed = false,
+    index,
+    isDragged = false,
+    isDragOver = false,
+    dropIndicatorPosition = "top",
+    onclick,
+    oncontextmenu,
+    onpointerdown,
+    onkeydown,
+  }: Props = $props();
 
   let artistArtwork = $state<ExtendedArtworkResponse | null>(null);
 
@@ -49,22 +66,38 @@
   const tooltipText = $derived(pin.subtitle ? `${pin.title} • ${pin.subtitle}` : pin.title);
 </script>
 
-<button
-  type="button"
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div
+  role="button"
+  tabindex="0"
+  data-pinned-nav-index={index}
   {onclick}
   {oncontextmenu}
+  {onpointerdown}
+  {onkeydown}
+  ondragstart={(e) => e.preventDefault()}
   title={tooltipText}
-  class="group transition-colors select-none text-left {collapsed
+  class="relative group transition-colors select-none text-left cursor-grab active:cursor-grabbing {isDragged ? 'opacity-40' : ''} {collapsed
     ? 'w-10 h-10 flex items-center justify-center rounded-xl mx-auto'
-    : 'w-full flex items-center gap-2.5 px-2 py-1 rounded-md'} {pin.isActive
+    : 'w-full flex items-center gap-3 px-3 py-1 rounded-lg'} {pin.isActive
     ? 'bg-brand-accent/20 text-brand-accent-text font-semibold'
     : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
 >
-  <!-- Artwork / Thumbnail Container -->
+  {#if isDragOver}
+    {#if collapsed}
+      <div class="absolute inset-0 rounded-xl ring-2 ring-brand-accent pointer-events-none z-10"></div>
+    {:else}
+      <div
+        class="absolute left-1 right-1 h-0.5 bg-brand-accent rounded-full pointer-events-none z-10 {dropIndicatorPosition === 'bottom' ? '-bottom-0.5' : '-top-0.5'}"
+      ></div>
+    {/if}
+  {/if}
+
+  <!-- Artwork / Thumbnail Container (square with no rounded corners) -->
   <div
     class="shrink-0 relative overflow-hidden bg-brand-main/60 flex items-center justify-center {collapsed
-      ? 'w-8 h-8 rounded-lg shadow-sm'
-      : 'w-7 h-7 rounded-md'}"
+      ? 'w-8 h-8'
+      : 'w-7 h-7'}"
   >
     {#if pin.type === "song" || pin.type === "album"}
       <CoverArt
@@ -110,4 +143,4 @@
       {/if}
     </div>
   {/if}
-</button>
+</div>
