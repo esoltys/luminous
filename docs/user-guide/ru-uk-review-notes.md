@@ -52,7 +52,7 @@ Comment on the pull request, or edit the HTML directly (the text is plain, one e
 Applied:
 - UK: «чип» → «мітка»; «рейтинг» → «чарт» (three places); lyrics **Edit** → «Змінити» (the app's `settings.editThemeShort`); «збігається 25 пісень» → «щойно набереться 25 відповідних пісень»; «додати її» → «додати їх»; add-on themes heading restructured; "Take the tour" heading → «Швидкий огляд» (the catalog's wording); Portable Mode sentence («використовує»).
 - RU: tray sentence now quotes the tray menu labels; Portable Mode sentence («использует»); «Кнопка» added before the waveform/frequency sentence; «показатели» added in the heatmap sentence; «Включите параметр …» for the equalizer switch; auto-organize sentence («новые файлы и файлы с изменёнными тегами»); GitHub/credits sentence simplified; "Take the tour" heading → «Краткий обзор».
-- ES, IT, UK: the search syntax example keeps the English `field:value`, because the search only accepts English field names. (The French guide still says `champ:valeur`; that text predates this work and is left for a separate fix.)
+- ES, IT, UK: the search syntax example keeps the English `field:value`, because the search only accepts English field names. (The French guide is fixed too, in #1590.)
 
 Kept as they were, on purpose:
 - Tray labels «Відтворення/Пауза» / «Воспроизведение/Пауза» keep no spaces around the slash. The shortcut list in the app writes «Відтворення / пауза» with spaces, so the two places differ slightly; unify them in the catalog if you want them identical.
