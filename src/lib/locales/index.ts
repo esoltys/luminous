@@ -99,7 +99,7 @@ export function localePickerGroups(): { pinned: Locale[]; rest: Locale[] } {
 }
 
 /** User guide languages shipped in `docs/user-guide/luminous-user-guide-{code}.html`: one per UI language. */
-export const MANUAL_LANGUAGES = ["EN", "FR", "ES"] as const;
+export const MANUAL_LANGUAGES = ["EN", "FR", "DE", "ES", "IT", "RU", "UK"] as const;
 
 export type ManualLanguage = (typeof MANUAL_LANGUAGES)[number];
 

@@ -779,7 +779,8 @@ describe("Manual language", () => {
     expect(manualLanguageForLocale("fr-CA")).toBe("FR");
     expect(manualLanguageForLocale("fr-FR")).toBe("FR");
     expect(manualLanguageForLocale("es")).toBe("ES");
-    expect(manualLanguageForLocale("de")).toBe("EN");
+    expect(manualLanguageForLocale("de")).toBe("DE");
+    expect(manualLanguageForLocale("uk")).toBe("UK");
     expect(manualLanguageForLocale("en-GB")).toBe("EN");
     expect(manualLanguageForLocale("ja")).toBe("EN");
   });
@@ -793,9 +794,7 @@ describe("Manual language", () => {
     for (const code of MANUAL_LANGUAGES) {
       expect(guideScript.includes(`${code.toLowerCase()}: { fit:`), `guide.js has no labels for ${code}`).toBe(true);
     }
-    // Locales whose guide is still being translated (issue #1521); each moves out of this list with its guide.
-    const PENDING_GUIDES = ["de", "it", "ru", "uk"];
-    for (const { tag } of LOCALES.filter((l) => !PENDING_GUIDES.includes(l.tag))) {
+    for (const { tag } of LOCALES) {
       const code = manualLanguageForLocale(tag);
       expect(guides[`/docs/user-guide/luminous-user-guide-${code}.html`], `${tag} -> ${code}`).toBeDefined();
       if (tag.split("-")[0] !== "en") expect(code, `${tag} has no guide of its own`).not.toBe("EN");
