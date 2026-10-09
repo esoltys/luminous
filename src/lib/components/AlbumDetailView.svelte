@@ -118,8 +118,12 @@
   );
   let hasReleaseGroupMbid = $derived(releaseGroupMbid.length > 0);
 
-  /** CritiqueBrainz community rating for the album's release group (cached backend-side). */
-  let communityRating = $state<{ rating: number; count: number } | null>(null);
+  /** CritiqueBrainz or MusicBrainz community rating for the album's release group (cached backend-side). */
+  let communityRating = $state<{
+    rating: number;
+    count: number | null;
+    source: "critiquebrainz" | "musicbrainz";
+  } | null>(null);
   $effect(() => {
     const songId = songs.find((s) => (s.musicbrainz_release_group_id ?? "").trim() === releaseGroupMbid)?.id;
     const mbid = releaseGroupMbid;
@@ -128,8 +132,20 @@
     let stale = false;
     invoke<SongContextEnrichment>("get_song_context", { songId, forceRefresh: false, locale: i18n.currentLocale })
       .then((ctx) => {
-        if (stale || ctx.critiquebrainz_rating == null) return;
-        communityRating = { rating: ctx.critiquebrainz_rating, count: ctx.critiquebrainz_review_count ?? 0 };
+        if (stale) return;
+        if (ctx.critiquebrainz_rating != null) {
+          communityRating = {
+            rating: ctx.critiquebrainz_rating,
+            count: ctx.critiquebrainz_review_count || null,
+            source: "critiquebrainz",
+          };
+        } else if (ctx.mb_rating != null) {
+          communityRating = {
+            rating: ctx.mb_rating,
+            count: ctx.mb_rating_votes || null,
+            source: "musicbrainz",
+          };
+        }
       })
       .catch(() => {});
     return () => { stale = true; };
@@ -785,7 +801,7 @@
         {/if}
         {#if !hasProfileContent && communityRating}
           <div class="inline-flex items-center px-3 py-1 text-xs font-medium text-brand-text-secondary shrink-0 ml-auto">
-            <CommunityRating rating={communityRating.rating} count={communityRating.count} {releaseGroupMbid} />
+            <CommunityRating rating={communityRating.rating} count={communityRating.count} {releaseGroupMbid} source={communityRating.source} />
           </div>
         {/if}
         {#if hasProfileContent && !windowLayoutStore.isOverviewExpanded}
@@ -924,7 +940,7 @@
 
 {#snippet albumInfoTitle()}
   {#if communityRating}
-    <CommunityRating rating={communityRating.rating} count={communityRating.count} {releaseGroupMbid} />
+    <CommunityRating rating={communityRating.rating} count={communityRating.count} {releaseGroupMbid} source={communityRating.source} />
   {:else}
     <span>{i18n.t('albumDetail.albumInfo', {}, 'Album Info')}</span>
   {/if}

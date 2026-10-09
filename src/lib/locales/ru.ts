@@ -1565,6 +1565,7 @@ export const ru = {
     communityRating: "Оценка сообщества",
     reviewOnCritiqueBrainz: "Рецензия на CritiqueBrainz",
     reviewOnCritiqueBrainzTooltip: "Открыть этот альбом на CritiqueBrainz, чтобы прочитать или написать рецензии",
+    viewOnMusicBrainzTooltip: "Открыть этот альбом на MusicBrainz",
     retrieveDetailsSuccess: {
       one: "Добавлена {count} ссылка из MusicBrainz",
       few: "Добавлено {count} ссылки из MusicBrainz",

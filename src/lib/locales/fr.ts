@@ -1569,6 +1569,7 @@ export const fr: DeepStringRecord<typeof en> = {
     communityRating: "Note de la communauté",
     reviewOnCritiqueBrainz: "Évaluer sur CritiqueBrainz",
     reviewOnCritiqueBrainzTooltip: "Ouvrir cet album sur CritiqueBrainz pour lire ou rédiger des critiques",
+    viewOnMusicBrainzTooltip: "Ouvrir cet album sur MusicBrainz",
     retrieveDetailsSuccess: {
       one: "{count} lien ajouté depuis MusicBrainz",
       other: "{count} liens ajoutés depuis MusicBrainz"
