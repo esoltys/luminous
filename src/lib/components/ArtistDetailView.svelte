@@ -1059,7 +1059,6 @@
         {#each sets as album (album.album)}
           <AlbumCard
             {album}
-            widthClass="w-48 shrink-0"
             onclick={() => openAlbum(album)}
             oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
           />
@@ -1072,7 +1071,6 @@
         {#each fullAlbums as album (album.album)}
           <AlbumCard
             {album}
-            widthClass="w-48 shrink-0"
             onclick={() => openAlbum(album)}
             oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
           />
@@ -1085,7 +1083,6 @@
         {#each eps as album (album.album)}
           <AlbumCard
             {album}
-            widthClass="w-48 shrink-0"
             onclick={() => openAlbum(album)}
             oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
           />
@@ -1128,7 +1125,6 @@
         {#each compilations as album (album.album)}
           <AlbumCard
             {album}
-            widthClass="w-48 shrink-0"
             onclick={() => openAlbum(album)}
             oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
           />
@@ -1143,7 +1139,6 @@
         {#each playlists as playlist (playlist.id)}
           <PlaylistCard
             {playlist}
-            widthClass="w-48 shrink-0"
             onClick={() => openPlaylist(playlist)}
             oncontextmenu={(e) => handlePlaylistContextMenu(e, playlist)}
           />

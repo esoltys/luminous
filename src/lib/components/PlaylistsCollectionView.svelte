@@ -570,6 +570,7 @@
                 {:else}
                   <PlaylistCard
                     playlist={pl}
+                    widthClass="w-full"
                     onClick={() => openPlaylist(pl)}
                     oncontextmenu={(e) => handlePlaylistContextMenu(e, pl)}
                   />

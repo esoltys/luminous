@@ -25,7 +25,7 @@
   let {
     album,
     covers,
-    widthClass = "w-full",
+    widthClass = "w-56 shrink-0",
     showArtist = true,
     onclick: customClick,
     ondblclick: customDblClick,

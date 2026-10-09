@@ -746,4 +746,39 @@ describe("ArtistDetailView", () => {
         prefs.fanartFetchBackground = true;
       }
     });
+
+    it("renders album cards with w-56 width to match Album collection view size", async () => {
+      collectionStore.albums = [
+        {
+          album: "Come On Over",
+          artist: "Shania Twain",
+          year: 1997,
+          track_count: 16,
+          disc_count: 1,
+          art_embedded: false,
+          art_automatic: null,
+          art_manual: null,
+          rating: -1,
+          total_duration_nanosec: 3_600_000_000_000,
+        },
+      ];
+
+      const invokeMock = vi.mocked(invoke);
+      invokeMock.mockImplementation((cmd: string) => {
+        if (cmd === "get_songs_by_artist") {
+          return Promise.resolve([
+            { id: 1, title: "Man! I Feel Like a Woman!", album: "Come On Over", artist: "Shania Twain", length_nanosec: 240_000_000_000 } as any,
+          ]);
+        }
+        if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
+        if (cmd === "get_compilations_by_artist") return Promise.resolve([]);
+        if (cmd === "get_artist_profile") return Promise.resolve(collectionStore.artistProfiles["shania twain"]);
+        return Promise.resolve();
+      });
+
+      const { findByText } = render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
+      const albumTitle = await findByText("Come On Over");
+      const card = albumTitle.closest(".w-56.shrink-0");
+      expect(card).toBeTruthy();
+    });
 });
