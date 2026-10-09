@@ -5,6 +5,9 @@
   "author": "Eric James Soltys <ericjamessoltys@outlook.com>",
   "license": "MIT",
   "type": "module",
+  "imports": {
+    "#lib/*": "./src/lib/*"
+  },
   "scripts": {
     "dev": "bun run sync-docs && svelte-kit sync && vite dev",
     "build": "bun run sync-docs && svelte-kit sync && vite build",
@@ -51,8 +54,8 @@
   "devDependencies": {
     "@ast-grep/cli": "^0.45.3",
     "@choochmeque/tauri-windows-bundle": "^0.2.0",
-    "@sveltejs/adapter-static": "^3.0.6",
-    "@sveltejs/kit": "^2.70.3",
+    "@sveltejs/adapter-static": "^4.0.0",
+    "@sveltejs/kit": "^3.0.1",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@tauri-apps/cli": "^2.12.0",
     "@testing-library/jest-dom": "^7.0.1",
@@ -72,12 +75,10 @@
   },
   "overrides": {
     "postcss": "^8.5.18",
-    "cookie": "^0.7.0",
     "nanoid": "^3.3.18"
   },
   "resolutions": {
     "postcss": "^8.5.18",
-    "cookie": "^0.7.0",
     "nanoid": "^3.3.18"
   }
 }
