@@ -501,7 +501,7 @@
                     onkeydown={handleSidebarKeyDown}
                   >
                     <!-- Expanded hover/touch area wrapper -->
-                    <div class="absolute -inset-x-2 top-0 bottom-0 cursor-col-resize"></div>
+                    <div class="absolute left-0 -right-2 top-0 bottom-0 cursor-col-resize"></div>
                   </div>
                 {/if}
               </div>
@@ -530,7 +530,7 @@
                   onkeydown={handleRightPanelKeyDown}
                 >
                   <!-- Expanded hover/touch area wrapper -->
-                  <div class="absolute -inset-x-2 top-0 bottom-0 cursor-col-resize"></div>
+                  <div class="absolute left-0 -right-2 top-0 bottom-0 cursor-col-resize"></div>
                 </div>
 
                 <RightPanel isOpen={windowLayoutStore.rightPanelOpen} width={windowLayoutStore.rightPanelWidth} onClose={() => windowLayoutStore.toggleRightPanel()} />
