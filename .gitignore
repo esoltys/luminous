@@ -51,8 +51,7 @@ scripts/mock-config.local.json
 /walkthrough.md
 
 # Synced from docs/user-guide/ by `bun run sync-docs` (see scripts/sync-docs.ts)
-/static/luminous-user-guide-EN.html
-/static/luminous-user-guide-FR.html
+/static/luminous-user-guide-*.html
 /static/guide.css
 /static/guide.js
 /static/luminous-mark.svg

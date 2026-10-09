@@ -1,6 +1,6 @@
 # Translating the Luminous UI
 
-This covers the in-app UI strings only. The user guide ships in English and French, and Store listings are not localized per language. All UI languages are produced and maintained in this repo; outside translation contributions are not accepted as a workflow.
+This covers the in-app UI strings and the user guide, which has one translation per UI language (the Help view follows the UI language). Store listings are not localized per language. All UI languages are produced and maintained in this repo; outside translation contributions are not accepted as a workflow.
 
 ## Adding a locale
 
@@ -8,7 +8,8 @@ This covers the in-app UI strings only. The user guide ships in English and Fren
 2. Add one entry to `LOCALES` in `src/lib/locales/index.ts`: a BCP 47 `tag`, the `messages`, and an optional `fallback` tag. The picker label is derived from the tag via `Intl.DisplayNames`, so don't hand-write it. `Locale`, the Settings list and the saved-setting check all derive from `LOCALES`.
 3. Regional variants (en-US, en-GB, fr-FR) set `fallback` to the language they share a base with, so a variant file only has to contain the keys that differ. A variant is only worth shipping if it has real differences to carry.
 4. Run `bun run test:run src/lib/locales/locales.test.ts`. That gate enforces key completeness, matching `{placeholder}` tokens, and non-identical text versus English. A string that is legitimately the same as English (a loanword, an acronym, a brand, a symbol) goes in `IDENTICAL_OK` with a comment.
-5. Consult the terminology authority for the language (below) before choosing a term for anything that isn't obvious, and add any term you had to look up to that language's established-terms list.
+5. Add the guide: `docs/user-guide/luminous-user-guide-<CODE>.html` (translated from the English guide with identical markup, ids and classes), the code added to `MANUAL_LANGUAGES` in `src/lib/locales/index.ts`, its three lightbox labels to `guide.js`, and its screenshots under `docs/user-guide/assets/<tag>/`. The guide quotes button and menu names exactly as that locale's catalog shows them. `locales.test.ts` fails if a registered locale has no guide.
+6. Consult the terminology authority for the language (below) before choosing a term for anything that isn't obvious, and add any term you had to look up to that language's established-terms list.
 
 ## Voice and register
 
@@ -63,6 +64,8 @@ French is Canadian French, for `fr.ts` and the French user guide.
 ## Other languages
 
 Established terms and register are recorded here as each language is drafted, so the lessons are written down before the next language starts. Each entry is a term, its English source, and one line on why it was chosen over the obvious alternative.
+
+**User guides.** Each guide is produced from the English guide by substituting translated text onto identical markup, so ids, classes and image sets match; UI names in bold are copied from that locale's catalog, and the `<kbd>` keycaps use the labels printed on that language's keyboard (*Strg*, *Umschalt*, *Leertaste*, *Bild ↑/↓* in de; *Maiusc*, *Spazio*, *Pag ↑/↓* in it; *Espacio*, *Re Pág*, *Av Pág* in es; *Пробел* in ru; *Пробіл* in uk). The ru and uk guides have not had a native review; names that exist only in prose (for example "heatmap", "chart") are the translator's choice, not catalog strings.
 
 - **it** (locale tag `it`; drafted blind, then diffed against the contributed file in #1421). **Register:** informal "tu" imperative everywhere ("Scegli", "Aggiungi", "Fai clic"); both drafts agreed. Established terms:
   - *brano* (song/track; *traccia* only where English says "Track #" or MusicBrainz track), *libreria* (library), *raccolta* (Collection view), *playlist* (kept; *playlist intelligente*, not "Smart Playlist"), *coda* (Queue), *preferiti* (favourites), *testi* (lyrics), *cartella* (folder, never "directory"), *unità* (drive, not "disco"), *intestazione* (header), *area di notifica* (system tray), *dissolvenza incrociata* (crossfade), *tag* (kept, as Windows does).
