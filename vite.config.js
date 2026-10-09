@@ -146,6 +146,7 @@ export default defineConfig(async () => ({
   test: {
     globals: true,
     include: ["src/**/*.{test,spec}.{js,ts}", "scripts/**/*.{test,spec}.{js,ts}"],
+    exclude: ["scripts/throwaway-profile.test.ts"],
     environment: "jsdom",
     setupFiles: ["./vitest.setup.ts"],
     testTimeout: 15000,
