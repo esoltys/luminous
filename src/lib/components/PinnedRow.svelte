@@ -205,6 +205,7 @@
         {#if item.type === "album"}
           <AlbumCard
             album={item.album}
+            widthClass="w-full"
             onclick={() => openItem(item)}
             oncontextmenu={(e) => handleContextMenu(e, item)}
           />
@@ -219,6 +220,7 @@
         {:else if item.type === "playlist"}
           <PlaylistCard
             playlist={item.playlist}
+            widthClass="w-full"
             onClick={() => openItem(item)}
             oncontextmenu={(e) => handleContextMenu(e, item)}
           />
