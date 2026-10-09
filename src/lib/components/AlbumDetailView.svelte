@@ -136,13 +136,13 @@
         if (ctx.critiquebrainz_rating != null) {
           communityRating = {
             rating: ctx.critiquebrainz_rating,
-            count: ctx.critiquebrainz_review_count ?? 0,
+            count: ctx.critiquebrainz_review_count || null,
             source: "critiquebrainz",
           };
         } else if (ctx.mb_rating != null) {
           communityRating = {
             rating: ctx.mb_rating,
-            count: ctx.mb_rating_votes ?? null,
+            count: ctx.mb_rating_votes || null,
             source: "musicbrainz",
           };
         }

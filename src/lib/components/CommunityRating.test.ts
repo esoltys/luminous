@@ -60,10 +60,11 @@ describe("CommunityRating.svelte", () => {
     expect(getByText("Community Rating").closest("button")).toBeNull();
   });
 
-  it("omits count when count is null or undefined", () => {
+  it("omits count when count is null, undefined, or 0", () => {
     const { getByText, queryByText } = render(CommunityRating, {
       props: {
         rating: 3.0,
+        count: 0,
       },
     });
 

@@ -41,7 +41,7 @@
 {#snippet content()}
   <span>{i18n.t("albumDetail.communityRating", {}, "Community Rating")}</span>
   <StarRating {rating} />
-  {#if count != null}<span>({formatNumber(count)})</span>{/if}
+  {#if count != null && count > 0}<span>({formatNumber(count)})</span>{/if}
 {/snippet}
 
 {#if releaseGroupMbid}
