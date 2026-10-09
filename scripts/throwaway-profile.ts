@@ -47,6 +47,18 @@ export const canonicalView = (subTab: "songs" | "albums") => ({
   active_sub_tab: subTab,
 });
 
+/**
+ * Sensible baseline app_state for throwaway profiles:
+ * - Suppresses first-run welcome and walkthrough tour.
+ * - Disables default library auto-linking (prevents hierarchy sidecars in music folders).
+ * - Opens to Collection → Songs view with nothing selected.
+ */
+export const DEFAULT_APP_STATE: Record<string, string> = {
+  ...FIRST_RUN_DONE,
+  ...NO_DEFAULT_LIBRARY,
+  ...canonicalView("songs"),
+};
+
 export interface SongRecord {
   id: number;
   title: string;
@@ -72,19 +84,15 @@ export interface ProfileOptions {
   window?: WindowDimensions;
   /** Library folders to add and scan upon start. */
   libraryFolders?: string[];
-  /** App state keys to pre-seed into SQLite before the first launch. */
+  /** App state keys to pre-seed into SQLite before the first launch. Overrides DEFAULT_APP_STATE. */
   appState?: Record<string, string | null>;
   /** If true, keeps temporary profile folders on disk after disposal. */
   keepProfiles?: boolean;
 }
 
 export interface LaunchOptions {
-  /** Window dimensions override for this launch. */
+  /** Window dimensions override for this launch. Defaults to ProfileOptions.window. */
   window?: WindowDimensions;
-  /** Width in physical pixels. */
-  width?: number;
-  /** Height in physical pixels. */
-  height?: number;
   /** Maximum seconds to wait for CDP readiness. Defaults to 60. */
   timeoutSec?: number;
 }
@@ -207,6 +215,7 @@ export class AppProfile {
   readonly port: number;
   private readonly defaultWindow?: WindowDimensions;
   private isDisposed = false;
+  private hasLaunched = false;
 
   constructor(options?: ProfileOptions) {
     this.root = mkdtempSync(path.join(tmpdir(), "luminous-profile-"));
@@ -221,9 +230,11 @@ export class AppProfile {
     this.port = options?.port ?? CDP_PORT;
     this.defaultWindow = options?.window;
 
-    if (options?.appState) {
-      this.writeAppState(options.appState);
-    }
+    // Pull defaults downward: suppress first-run popups, set canonical songs view, and apply caller overrides
+    this.writeAppState({
+      ...DEFAULT_APP_STATE,
+      ...(options?.appState ?? {}),
+    });
   }
 
   /** Whether Luminous is currently running. */
@@ -238,6 +249,7 @@ export class AppProfile {
   async launch(options?: LaunchOptions): Promise<void> {
     if (this.isDisposed) throw new Error("Cannot launch a disposed AppProfile.");
     checkPreconditions(this.exe);
+    this.hasLaunched = true;
 
     const existing = process.env.WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS ?? "";
     spawn(this.exe, [], {
@@ -252,10 +264,7 @@ export class AppProfile {
     }).unref();
 
     const timeoutSec = options?.timeoutSec ?? 60;
-    const win =
-      options?.window ??
-      (options?.width && options?.height ? { width: options.width, height: options.height } : undefined) ??
-      this.defaultWindow;
+    const win = options?.window ?? this.defaultWindow;
 
     for (let i = 0; i < timeoutSec; i++) {
       await sleep(1);
@@ -281,8 +290,9 @@ export class AppProfile {
    * If the app is already stopped, this is a safe no-op.
    */
   async close(timeoutSec = 30): Promise<void> {
-    if (!this.isRunning()) return;
+    if (!this.hasLaunched || !this.isRunning()) return;
     await closeGracefully(timeoutSec);
+    this.hasLaunched = false;
   }
 
   /**
@@ -305,20 +315,20 @@ export class AppProfile {
 
   /** Writes (or deletes, if value is null) app_state keys in the profile DB. */
   writeAppState(keys: Record<string, string | null>): void {
-    if (this.isRunning()) throw new Error("Refusing to write app_state while Luminous is running.");
+    if (this.hasLaunched && this.isRunning()) throw new Error("Refusing to write app_state while Luminous is running.");
 
     const db = new Database(this.dbPath);
     try {
       db.exec("PRAGMA busy_timeout = 5000");
       db.exec("CREATE TABLE IF NOT EXISTS app_state (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
-      const del = db.query("DELETE FROM app_state WHERE key = ?1");
-      const set = db.query(
+      const stmtDelete = db.query("DELETE FROM app_state WHERE key = ?1");
+      const stmtUpsert = db.query(
         "INSERT INTO app_state (key, value) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
       );
       db.transaction(() => {
         for (const [k, v] of Object.entries(keys)) {
-          if (v === null) del.run(k);
-          else set.run(k, v);
+          if (v === null) stmtDelete.run(k);
+          else stmtUpsert.run(k, v);
         }
       })();
     } finally {
@@ -326,8 +336,8 @@ export class AppProfile {
     }
   }
 
-  /** Finds a single song in the profile DB matching the SQL WHERE clause. */
-  findSong(where: string, ...params: (string | number)[]): SongRecord | null {
+  /** Finds a single playable song in the profile DB matching the SQL WHERE clause. */
+  findPlayableSong(where: string, ...params: (string | number)[]): SongRecord | null {
     if (!existsSync(this.dbPath)) return null;
     const db = new Database(this.dbPath, { readonly: true });
     try {
@@ -337,6 +347,14 @@ export class AppProfile {
     } finally {
       db.close();
     }
+  }
+
+  /**
+   * Finds a single playable song in the profile DB matching the SQL WHERE clause.
+   * Alias for findPlayableSong.
+   */
+  findSong(where: string, ...params: (string | number)[]): SongRecord | null {
+    return this.findPlayableSong(where, ...params);
   }
 
   /** Cues `song` at 0:00 for the next launch as a one-item queue. */
@@ -358,7 +376,7 @@ export class AppProfile {
     if (this.isDisposed) return;
     this.isDisposed = true;
 
-    if (this.isRunning()) {
+    if (this.hasLaunched && this.isRunning()) {
       try {
         await this.close(10);
       } catch {
@@ -383,15 +401,6 @@ export class AppProfile {
 export async function startProfile(options?: ProfileOptions): Promise<AppProfile> {
   const profile = new AppProfile(options);
   try {
-    // If folders are provided, setup first-run flags unless overridden
-    if (options?.libraryFolders && options.libraryFolders.length > 0) {
-      profile.writeAppState({
-        ...FIRST_RUN_DONE,
-        ...NO_DEFAULT_LIBRARY,
-        ...canonicalView("songs"),
-      });
-    }
-
     await profile.launch({ window: options?.window });
 
     if (options?.libraryFolders && options.libraryFolders.length > 0) {
