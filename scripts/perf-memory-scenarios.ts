@@ -78,9 +78,8 @@
  */
 
 import { Database } from "bun:sqlite";
-import { execFileSync, spawn } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { execFileSync } from "node:child_process";
+import { existsSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -98,9 +97,19 @@ import {
 } from "./measure-memory";
 import { defaultDbPath } from "./mock-library";
 import { CdpClient } from "./monitor-cdp";
+import {
+  AppProfile,
+  CDP_PORT,
+  FIRST_RUN_DONE,
+  NO_DEFAULT_LIBRARY,
+  canonicalView,
+  closeGracefully,
+  isRunning,
+  protectRealWindowState,
+  TRACK_COLUMNS,
+} from "./throwaway-profile";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const CDP_PORT = 9222;
 
 // Seconds to let each scenario settle before sampling (startup/scan/playback
 // allocations churn for a while before memory flattens out).
@@ -159,38 +168,6 @@ function exeRepoRoot(exe: string): string {
 const sleep = (sec: number) => new Promise((r) => setTimeout(r, sec * 1000));
 const log = (msg: string) => console.log(`[perf] ${msg}`);
 
-// ── Win32 window helpers (via PowerShell) ─────────────────────────────────
-
-const PIN_WINDOW = `
-Add-Type -Namespace LumPerf -Name Win -MemberDefinition @'
-[DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int c);
-[DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int w, int hh, uint f);
-'@
-$main = Get-Process -Name LuminousMusicPlayer -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
-if (-not $main) { throw 'Luminous main window not found' }
-[LumPerf.Win]::ShowWindow($main.MainWindowHandle, 9) | Out-Null
-`;
-
-function ps(script: string): string {
-  return execFileSync("powershell", ["-NoProfile", "-Command", script], { encoding: "utf8" }).trim();
-}
-
-const pinWindow = (w: number, h: number) =>
-  ps(`${PIN_WINDOW}[LumPerf.Win]::SetWindowPos($main.MainWindowHandle, [IntPtr]::Zero, 100, 100, ${w}, ${h}, 0x14) | Out-Null`);
-
-function isRunning(): boolean {
-  return ps("@(Get-Process -Name LuminousMusicPlayer -ErrorAction SilentlyContinue).Count") !== "0";
-}
-
-/** Closes via WM_CLOSE (not a kill) so the app saves its state on the way out. */
-async function closeGracefully() {
-  ps("Get-Process -Name LuminousMusicPlayer -ErrorAction SilentlyContinue | ForEach-Object { $_.CloseMainWindow() | Out-Null }");
-  for (let i = 0; i < 30; i++) {
-    if (!isRunning()) return;
-    await sleep(1);
-  }
-  throw new Error("Luminous didn't exit within 30s of being asked to close; close it by hand.");
-}
 
 // ── IPC over CDP ──────────────────────────────────────────────────────────
 
@@ -269,7 +246,6 @@ interface BaselineTrack {
   length_nanosec: number;
 }
 
-const TRACK_COLUMNS = "id, title, album, filetype, samplerate, bitdepth, bitrate, length_nanosec";
 
 const describeTrack = (t: BaselineTrack) =>
   `"${t.title}" (${FILE_TYPES[t.filetype] ?? `filetype ${t.filetype}`}, ${t.samplerate} Hz` +
@@ -296,136 +272,6 @@ function readRealProfile(trackPath: string): { track: BaselineTrack; folders: st
   }
 }
 
-/**
- * Builds older than #1197 save window placement in the real profile's config
- * folder even under LUMINOUS_DATA_DIR (newer ones keep it in the scratch
- * profile), so the real file is snapshotted up front and put back after.
- * Returns the restore function.
- */
-function protectRealWindowState(): () => void {
-  const file = path.join(path.dirname(defaultDbPath() ?? ""), ".window-state.json");
-  const saved = existsSync(file) ? readFileSync(file) : null;
-  return () => {
-    if (saved) writeFileSync(file, saved);
-    else rmSync(file, { force: true });
-  };
-}
-
-// ── Scratch profile ───────────────────────────────────────────────────────
-
-/** A throwaway app-data + WebView2 folder pair that one source's scenarios run in. */
-class ScratchProfile {
-  readonly root = mkdtempSync(path.join(tmpdir(), "luminous-perf-"));
-  readonly dataDir = path.join(this.root, "data");
-  readonly webviewDir = path.join(this.root, "webview");
-  readonly dbPath = path.join(this.dataDir, "luminous.db");
-
-  constructor(private readonly exe: string) {}
-
-  async launch(window: { width: number; height: number }): Promise<void> {
-    const existing = process.env.WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS ?? "";
-    spawn(this.exe, [], {
-      detached: true,
-      stdio: "ignore",
-      env: {
-        ...process.env,
-        LUMINOUS_DATA_DIR: this.dataDir,
-        // Takes precedence over the folder Tauri asks WebView2 for, in every
-        // release (it's WebView2's own override), so localStorage and the
-        // browser caches start empty too.
-        WEBVIEW2_USER_DATA_FOLDER: this.webviewDir,
-        // Release builds don't open the devtools port themselves (see
-        // remote_devtools_enabled() in src-tauri/src/lib.rs), but they append
-        // to whatever is already in this variable, so we can pass it in.
-        WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `${existing} --remote-debugging-port=${CDP_PORT}`.trim(),
-      },
-    }).unref();
-
-    for (let i = 0; i < 60; i++) {
-      await sleep(1);
-      const cdp = new CdpClient();
-      try {
-        await cdp.connect(CDP_PORT);
-        const ready = await cdp.eval("document.readyState === 'complete' && !!window.__TAURI_INTERNALS__");
-        if (ready.value === true) {
-          pinWindow(window.width, window.height);
-          return;
-        }
-      } catch {
-        // not up yet
-      } finally {
-        cdp.close();
-      }
-    }
-    throw new Error(`Luminous didn't expose a ready page on CDP port ${CDP_PORT} within 60s.`);
-  }
-
-  /** Writes (or, for null, deletes) app_state keys. The app must be closed, or it overwrites them on exit. */
-  writeAppState(keys: Record<string, string | null>) {
-    if (isRunning()) throw new Error("Refusing to write app_state while Luminous is running.");
-    const db = new Database(this.dbPath);
-    try {
-      db.exec("PRAGMA busy_timeout = 5000");
-      const del = db.query("DELETE FROM app_state WHERE key = ?1");
-      const set = db.query(
-        "INSERT INTO app_state (key, value) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-      );
-      db.transaction(() => {
-        for (const [k, v] of Object.entries(keys)) {
-          if (v === null) del.run(k);
-          else set.run(k, v);
-        }
-      })();
-    } finally {
-      db.close();
-    }
-  }
-
-  findSong(where: string, ...params: (string | number)[]): BaselineTrack | null {
-    const db = new Database(this.dbPath, { readonly: true });
-    try {
-      return db
-        .query(`SELECT ${TRACK_COLUMNS} FROM songs WHERE ${where} AND unavailable = 0 AND cue_path IS NULL`)
-        .get(...params) as BaselineTrack | null;
-    } finally {
-      db.close();
-    }
-  }
-
-  /** Cues `song` at 0:00 for the next launch, on its own (playlist 0 with no ad-hoc list makes Player::new restore it as a one-item queue). */
-  cue(song: BaselineTrack) {
-    this.writeAppState({
-      last_song_id: String(song.id),
-      last_position_nanosec: "0",
-      last_playlist_id: "0",
-      last_item_uuid: null,
-      last_adhoc_song_ids: null,
-    });
-  }
-
-  dispose(keep: boolean) {
-    if (keep) {
-      log(`kept scratch profile: ${this.root}`);
-      return;
-    }
-    // WebView2 can hold files for a moment after the app exits.
-    rmSync(this.root, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 });
-  }
-}
-
-// The fixed view every measured launch opens to: Collection → Songs, nothing
-// selected. +page.svelte restores the tab/sub-tab from these app_state keys at
-// boot; a fresh WebView2 profile has no localStorage to override them.
-const canonicalView = (subTab: "songs" | "albums") => ({ active_tab: "collection", active_sub_tab: subTab });
-
-// First-run UI that would otherwise cover the measured view. walkthrough_completed
-// is the legacy flag the tour still honours, and the only one older builds know.
-const FIRST_RUN_DONE = { welcome_seen: "true", walkthrough_completed: "true" };
-
-// An empty value records "no default library" as a deliberate choice, so the
-// app never links a watched folder and writes its genre hierarchy sidecar
-// into your music folder (hierarchy_sidecar::ensure_default).
-const NO_DEFAULT_LIBRARY = { default_library_path: "" };
 
 // ── Scenarios ─────────────────────────────────────────────────────────────
 
@@ -569,7 +415,7 @@ const SCROLL_ALBUM_GRID = `async function () {
 }`;
 
 async function localSource(opts: Options, rec: Recorder, folders: string[]) {
-  const profile = new ScratchProfile(opts.exe);
+  const profile = new AppProfile({ exe: opts.exe });
   log(`local: scratch profile ${profile.root}`);
   try {
     // Setup launch: just creates the database, so the keys below can go in before anything runs.
@@ -640,7 +486,7 @@ async function localSource(opts: Options, rec: Recorder, folders: string[]) {
     await closeGracefully();
   } finally {
     if (isRunning()) await closeGracefully();
-    profile.dispose(opts.keepProfiles);
+    await profile.dispose(opts.keepProfiles);
   }
 }
 
@@ -675,7 +521,7 @@ function remoteServer(source: "webdav" | "subsonic"): RemoteServer {
 
 async function remoteSource(opts: Options, rec: Recorder, baseline: BaselineTrack, server: RemoteServer) {
   const { label } = server;
-  const profile = new ScratchProfile(opts.exe);
+  const profile = new AppProfile({ exe: opts.exe });
   log(`${label}: scratch profile ${profile.root}`);
   try {
     await profile.launch(opts);
@@ -728,7 +574,7 @@ async function remoteSource(opts: Options, rec: Recorder, baseline: BaselineTrac
     await closeGracefully();
   } finally {
     if (isRunning()) await closeGracefully();
-    profile.dispose(opts.keepProfiles);
+    await profile.dispose(opts.keepProfiles);
   }
 }
 

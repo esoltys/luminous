@@ -17,7 +17,7 @@ before/after a change, instead of relying on "it feels heavier." See #706.
 - **Build measured**: a release build (`bun run tauri build --no-bundle`), not the dev server — the
   dev server's Vite/HMR overhead isn't representative of what ships to users.
 - **Where it runs**: each source is measured in a throwaway profile (`LUMINOUS_DATA_DIR` and
-  `WEBVIEW2_USER_DATA_FOLDER` in a temp folder) over the real music library, read in place. The
+  `WEBVIEW2_USER_DATA_FOLDER` in a temp folder, managed by `scripts/throwaway-profile.ts`) over the real music library, read in place. The
   build under test creates its own database, so any past release can be measured, and nothing it
   plays or changes reaches the real profile. Rows from these runs have `profile` = `scratch`; rows
   from before #1197 were taken in the developer's own profile and have `real`. Only compare rows of

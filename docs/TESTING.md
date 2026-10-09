@@ -83,6 +83,13 @@ This causes Luminous to initialize a brand new `luminous.db`, `covers/`, and `lo
 > [!NOTE]
 > On Windows, WebView2 persists `localStorage` (such as last-viewed tabs or navigation state) across sessions in its User Data Directory (`%LOCALAPPDATA%\com.luminous.app\EBWebView`). When testing a genuinely pristine first launch, you can clear `localStorage` via the DevTools console (`Ctrl+Shift+I` -> `localStorage.clear(); location.reload()`) in addition to setting `LUMINOUS_DATA_DIR`.
 
+### Scripted throwaway profiles (`scripts/throwaway-profile.ts`)
+
+For automated scripts driving the real app (benchmarks, screenshots, tutorials), `scripts/throwaway-profile.ts` manages both `LUMINOUS_DATA_DIR` and `WEBVIEW2_USER_DATA_FOLDER` together:
+- Creates an isolated temporary directory pair (`data` and `webview`).
+- Exposes WebView2's remote debugging port (`--remote-debugging-port=9222`).
+- Provides helpers (`startProfile`, `withProfile`, `AppProfile`) to launch, wait for CDP readiness, pre-seed or query SQLite `app_state`, cue songs, pin window geometry, and cleanly tear down.
+
 ## Testing against a local WebDAV server
 
 To exercise WebDAV sync and playback without a real NAS, serve a folder of the repo's short audio
