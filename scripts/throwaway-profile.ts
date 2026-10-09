@@ -104,26 +104,31 @@ if (-not $main) { throw 'Luminous main window not found' }
 `;
 
 function ps(script: string): string {
+  if (process.platform !== "win32") return "";
   return execFileSync("powershell", ["-NoProfile", "-Command", script], { encoding: "utf8" }).trim();
 }
 
 /** Pins the app's main window to position (100, 100) with the given dimensions. */
 export function pinWindow(w: number, h: number): void {
+  if (process.platform !== "win32") return;
   ps(`${PIN_WINDOW}[LumPerf.Win]::SetWindowPos($main.MainWindowHandle, [IntPtr]::Zero, 100, 100, ${w}, ${h}, 0x14) | Out-Null`);
 }
 
 /** Checks whether a Luminous process is currently running on the system. */
 export function isRunning(): boolean {
+  if (process.platform !== "win32") return false;
   return ps("@(Get-Process -Name LuminousMusicPlayer -ErrorAction SilentlyContinue).Count") !== "0";
 }
 
 /** Force-kills any running LuminousMusicPlayer processes. */
 export function killProcess(): void {
+  if (process.platform !== "win32") return;
   ps("Get-Process -Name LuminousMusicPlayer -ErrorAction SilentlyContinue | Stop-Process -Force");
 }
 
 /** Closes via WM_CLOSE (not a kill) so the app saves its state on the way out. */
 export async function closeGracefully(timeoutSec = 30): Promise<void> {
+  if (process.platform !== "win32") return;
   if (!isRunning()) return;
   ps("Get-Process -Name LuminousMusicPlayer -ErrorAction SilentlyContinue | ForEach-Object { $_.CloseMainWindow() | Out-Null }");
   for (let i = 0; i < timeoutSec; i++) {
