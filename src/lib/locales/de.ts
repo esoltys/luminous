@@ -960,6 +960,11 @@ export const de = {
   help: {
     loading: "Benutzerhandbuch wird geladen ..."
   },
+  tray: {
+    playPause: "Wiedergabe/Pause",
+    showHideWindow: "Luminous ein-/ausblenden",
+    quit: "Beenden"
+  },
   playerBar: {
     previous: "Vorheriger Titel",
     play: "Wiedergabe",

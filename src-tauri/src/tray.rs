@@ -18,7 +18,33 @@ use crate::AppState;
 use tauri::image::Image;
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Emitter, Listener, Manager};
+use tauri::{AppHandle, Emitter, Listener, Manager, Wry};
+
+use crate::native_labels::NativeLabels;
+
+/// The menu items, kept in managed state so `set_labels` can retranslate them
+/// after the frontend reports the UI language.
+struct TrayMenuItems {
+    play_pause: MenuItem<Wry>,
+    next: MenuItem<Wry>,
+    previous: MenuItem<Wry>,
+    pause_scrobbling: CheckMenuItem<Wry>,
+    toggle_window: MenuItem<Wry>,
+    quit: MenuItem<Wry>,
+}
+
+/// Retranslates the tray menu; a no-op while the tray doesn't exist (failed init).
+pub fn set_labels(app: &AppHandle, labels: &NativeLabels) {
+    let Some(items) = app.try_state::<TrayMenuItems>() else {
+        return;
+    };
+    let _ = items.play_pause.set_text(&labels.play_pause);
+    let _ = items.next.set_text(&labels.next);
+    let _ = items.previous.set_text(&labels.previous);
+    let _ = items.pause_scrobbling.set_text(&labels.pause_scrobbling);
+    let _ = items.toggle_window.set_text(&labels.show_hide_window);
+    let _ = items.quit.set_text(&labels.quit);
+}
 
 const TRAY_ICON_BYTES: &[u8] = include_bytes!("../icons/32x32.png");
 
@@ -58,6 +84,15 @@ pub fn init(app: &tauri::App) -> tauri::Result<()> {
             &quit,
         ],
     )?;
+
+    app.manage(TrayMenuItems {
+        play_pause,
+        next,
+        previous,
+        pause_scrobbling: pause_scrobbling.clone(),
+        toggle_window,
+        quit,
+    });
 
     let tray = TrayIconBuilder::with_id("main-tray")
         .icon(Image::from_bytes(TRAY_ICON_BYTES)?)

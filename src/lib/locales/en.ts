@@ -960,6 +960,11 @@ export const en = {
   help: {
     loading: "Loading user guide..."
   },
+  tray: {
+    playPause: "Play/Pause",
+    showHideWindow: "Show/Hide Luminous",
+    quit: "Quit"
+  },
   playerBar: {
     previous: "Previous Song",
     play: "Play",

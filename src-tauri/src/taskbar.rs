@@ -93,6 +93,40 @@ struct NowPlayingArt {
     image: Option<Arc<image::DynamicImage>>,
 }
 
+/// Tooltips for the thumbnail buttons; English until the frontend pushes the
+/// UI-language labels (see `native_labels.rs`).
+struct ThumbLabels {
+    previous: String,
+    play: String,
+    pause: String,
+    next: String,
+}
+
+/// Address of the leaked `TaskbarContext`, so `set_labels` can reach it.
+static CONTEXT_PTR: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+
+/// Retranslates the thumbnail button tooltips and re-applies the buttons.
+pub fn set_labels(app: &AppHandle, labels: &crate::native_labels::NativeLabels) {
+    let Some(&ctx_ptr) = CONTEXT_PTR.get() else {
+        return;
+    };
+    // SAFETY: `ctx_ptr` was leaked from a `Box<TaskbarContext>` in `try_init`
+    // and lives for the rest of the process.
+    let ctx = unsafe { &*(ctx_ptr as *const TaskbarContext) };
+    *ctx.labels.lock() = ThumbLabels {
+        previous: labels.previous.clone(),
+        play: labels.play.clone(),
+        pause: labels.pause.clone(),
+        next: labels.next.clone(),
+    };
+    // `ITaskbarList3` may only be called from the thread that created it.
+    let _ = app.run_on_main_thread(move || {
+        let ctx = unsafe { &*(ctx_ptr as *const TaskbarContext) };
+        let (playing, has_song) = *ctx.last_known_state.lock();
+        sync_thumbbar_buttons(ctx, playing, has_song);
+    });
+}
+
 struct TaskbarContext {
     app: AppHandle,
     hwnd: HWND,
@@ -108,6 +142,7 @@ struct TaskbarContext {
     /// restarts and re-broadcasts `TaskbarButtonCreated`) can be seeded
     /// correctly instead of starting from "no track loaded".
     last_known_state: parking_lot::Mutex<(bool, bool)>,
+    labels: parking_lot::Mutex<ThumbLabels>,
     now_playing: parking_lot::Mutex<NowPlayingArt>,
     fallback_art: Arc<image::DynamicImage>,
     taskbar_button_created_msg: u32,
@@ -177,12 +212,19 @@ fn try_init(app: &tauri::App) -> windows::core::Result<()> {
         taskbar: parking_lot::Mutex::new(None),
         icons,
         last_known_state: parking_lot::Mutex::new((false, false)),
+        labels: parking_lot::Mutex::new(ThumbLabels {
+            previous: "Previous".to_string(),
+            play: "Play".to_string(),
+            pause: "Pause".to_string(),
+            next: "Next".to_string(),
+        }),
         now_playing: parking_lot::Mutex::new(NowPlayingArt::default()),
         fallback_art: load_fallback_art(),
         taskbar_button_created_msg,
         art_request_seq: std::sync::atomic::AtomicU64::new(0),
     });
     let ctx_ptr = Box::into_raw(ctx) as usize;
+    let _ = CONTEXT_PTR.set(ctx_ptr);
 
     unsafe { SetWindowSubclass(hwnd, Some(subclass_proc), SUBCLASS_ID, ctx_ptr) }.ok()?;
 
@@ -470,15 +512,16 @@ fn apply_playback_state(app: AppHandle, ctx_ptr: usize, state: PlaybackState) {
 }
 
 fn build_buttons(ctx: &TaskbarContext, playing: bool, has_song: bool) -> [THUMBBUTTON; 3] {
+    let labels = ctx.labels.lock();
     let (play_pause_icon, play_pause_tip) = if playing {
-        (ctx.icons.pause, "Pause")
+        (ctx.icons.pause, labels.pause.as_str())
     } else {
-        (ctx.icons.play, "Play")
+        (ctx.icons.play, labels.play.as_str())
     };
     [
-        thumb_button(BTN_PREVIOUS, ctx.icons.previous, "Previous", has_song),
+        thumb_button(BTN_PREVIOUS, ctx.icons.previous, &labels.previous, has_song),
         thumb_button(BTN_PLAY_PAUSE, play_pause_icon, play_pause_tip, has_song),
-        thumb_button(BTN_NEXT, ctx.icons.next, "Next", has_song),
+        thumb_button(BTN_NEXT, ctx.icons.next, &labels.next, has_song),
     ]
 }
 

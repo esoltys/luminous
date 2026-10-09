@@ -242,3 +242,36 @@ describe("manual language", () => {
     expect(i18n.manualLanguage).toBe("EN");
   });
 });
+
+describe("native labels", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(invoke).mockResolvedValue(null);
+  });
+
+  it("pushes the tray and taskbar labels in the UI language whenever it changes", async () => {
+    await i18n.setLocale("de");
+    expect(invoke).toHaveBeenCalledWith("set_native_labels", {
+      labels: expect.objectContaining({
+        playPause: "Wiedergabe/Pause",
+        showHideWindow: "Luminous ein-/ausblenden",
+        quit: "Beenden",
+      }),
+    });
+
+    await i18n.setLocale("en-CA");
+    expect(invoke).toHaveBeenCalledWith("set_native_labels", {
+      labels: expect.objectContaining({ playPause: "Play/Pause", quit: "Quit" }),
+    });
+  });
+
+  it("pushes them on launch too, so a saved language reaches the tray", async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) =>
+      cmd === "get_all_app_settings" ? { language: "es", language_tags: "1" } : null
+    );
+    await i18n.init();
+    expect(invoke).toHaveBeenCalledWith("set_native_labels", {
+      labels: expect.objectContaining({ quit: "Salir" }),
+    });
+  });
+});

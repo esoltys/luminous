@@ -50,6 +50,7 @@ class I18nStore {
       if (typeof document !== 'undefined') {
         document.documentElement.lang = this.currentLocale;
       }
+      this.pushNativeLabels();
     }
   }
 
@@ -58,11 +59,27 @@ class I18nStore {
     if (typeof document !== 'undefined') {
       document.documentElement.lang = locale;
     }
+    this.pushNativeLabels();
     try {
       await invoke("set_app_setting", { key: "language", value: locale });
     } catch (e) {
       console.error("Failed to save language settings:", e);
     }
+  }
+
+  /** Text the backend shows in the tray menu and taskbar buttons; fire-and-forget (see `native_labels.rs`). */
+  private pushNativeLabels() {
+    const labels = {
+      playPause: this.t("tray.playPause"),
+      play: this.t("playerBar.play"),
+      pause: this.t("playerBar.pause"),
+      previous: this.t("playerBar.previous"),
+      next: this.t("playerBar.next"),
+      pauseScrobbling: this.t("listenbrainz.pauseLabel"),
+      showHideWindow: this.t("tray.showHideWindow"),
+      quit: this.t("tray.quit"),
+    };
+    void invoke("set_native_labels", { labels }).catch(() => {});
   }
 
   async setManualLanguage(language: ManualLanguage) {

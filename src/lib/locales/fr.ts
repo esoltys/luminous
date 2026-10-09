@@ -966,6 +966,11 @@ export const fr: DeepStringRecord<typeof en> = {
   help: {
     loading: "Chargement du guide d'utilisation..."
   },
+  tray: {
+    playPause: "Lecture/Pause",
+    showHideWindow: "Afficher/masquer Luminous",
+    quit: "Quitter"
+  },
   playerBar: {
     previous: "Chanson précédente",
     play: "Lire",
