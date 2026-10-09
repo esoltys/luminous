@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { PinnedItem, PinnedItemType } from "../types";
 import { pinnedRefKeyFor } from "../types";
+import { hasPinnedContent, getNavigablePins, type NavigablePin } from "../utils/pinnedNav";
 
 class PinnedStore {
   items = $state<PinnedItem[]>([]);
@@ -11,6 +12,15 @@ class PinnedStore {
   constructor() {
     this.init();
   }
+
+  get visibleItems(): PinnedItem[] {
+    return this.items.filter(hasPinnedContent);
+  }
+
+  get navigableItems(): NavigablePin[] {
+    return getNavigablePins(this.items);
+  }
+
 
   private async init() {
     try {
@@ -67,6 +77,36 @@ class PinnedStore {
     await invoke("reorder_pinned_items", { order });
     await this.refresh();
   }
+
+  /**
+   * Reorders items within the visible subset, preserving the relative
+   * positions of any hidden (empty) pins in persistent storage.
+   */
+  async reorderVisible(fromIndex: number, toIndex: number): Promise<void> {
+    const visible = this.visibleItems;
+    if (
+      fromIndex === toIndex ||
+      fromIndex < 0 ||
+      fromIndex >= visible.length ||
+      toIndex < 0 ||
+      toIndex >= visible.length
+    ) {
+      return;
+    }
+
+    const moved = visible[fromIndex];
+    const target = visible[toIndex];
+    const items = this.items.filter((item) => item !== moved);
+    const targetPos = items.indexOf(target);
+    items.splice(toIndex > fromIndex ? targetPos + 1 : targetPos, 0, moved);
+
+    const order: Array<[PinnedItemType, string]> = items.map((item) => [
+      item.type,
+      pinnedRefKeyFor(item),
+    ]);
+    await this.reorder(order);
+  }
 }
 
 export const pinnedStore = new PinnedStore();
+

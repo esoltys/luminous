@@ -74,4 +74,36 @@ describe("PinnedStore", () => {
     expect(invoke).toHaveBeenCalledWith("reorder_pinned_items", { order });
     expect(invoke).toHaveBeenCalledWith("get_pinned_items");
   });
+
+  it("filters visible items using hasPinnedContent and preserves hidden items on reorderVisible", async () => {
+    const itemsWithEmpty: PinnedItem[] = [
+      { type: "song", song: { id: 1, title: "Song 1" } as any },
+      { type: "playlist", playlist: { id: 10, name: "Empty Playlist", track_count: 0 } as any },
+      { type: "song", song: { id: 2, title: "Song 2" } as any },
+      { type: "song", song: { id: 3, title: "Song 3" } as any },
+    ];
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_pinned_items") return itemsWithEmpty;
+      return null;
+    });
+
+    await pinnedStore.refresh();
+    expect(pinnedStore.items).toHaveLength(4);
+    // The empty playlist (track_count = 0) is excluded from visibleItems
+    expect(pinnedStore.visibleItems).toHaveLength(3);
+    expect(pinnedStore.visibleItems.map((i) => i.type === "song" && i.song.id)).toEqual([1, 2, 3]);
+
+    // Move visible item 0 ("Song 1") to visible index 2 ("Song 3")
+    await pinnedStore.reorderVisible(0, 2);
+    // Order in persistent storage should have Song 2, Song 3, Song 1 with the empty playlist preserved
+    expect(invoke).toHaveBeenCalledWith("reorder_pinned_items", {
+      order: [
+        ["playlist", "10"],
+        ["song", "2"],
+        ["song", "3"],
+        ["song", "1"],
+      ],
+    });
+  });
 });
+

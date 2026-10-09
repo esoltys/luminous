@@ -26,7 +26,8 @@ export const frFR: DeepStringRecord<typeof en> = {
     scanningPhaseTooltip: "Phase d'analyse : {phase} ({scanned}/{total})",
     scanningPhaseLabel: "Phase : {phase}",
     musicbrainzLogin: "Connexion à MusicBrainz",
-    musicbrainzProfile: "Profil MusicBrainz"
+    musicbrainzProfile: "Profil MusicBrainz",
+    pinned: "Épinglés"
   },
   topNav: {
     filterExample: "p. ex. rating:>=4 year:<2000 genre:jazz \"miles davis\"",

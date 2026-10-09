@@ -20,7 +20,8 @@ export const es = {
     scanningPhaseTooltip: "Fase del análisis: {phase} ({scanned}/{total})",
     scanningPhaseLabel: "Fase: {phase}",
     musicbrainzLogin: "Iniciar sesión en MusicBrainz",
-    musicbrainzProfile: "Perfil de MusicBrainz"
+    musicbrainzProfile: "Perfil de MusicBrainz",
+    pinned: "Anclados"
   },
   topNav: {
     filterExample: "p. ej. rating:>=4 year:<2000 genre:jazz \"miles davis\"",

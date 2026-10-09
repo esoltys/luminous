@@ -12,6 +12,7 @@
   import { prefs } from "../stores/prefs.svelte";
   import MusicBrainzLoginModal from "./MusicBrainzLoginModal.svelte";
   import MusicBrainzProfilePopover from "./MusicBrainzProfilePopover.svelte";
+  import PinnedNavList from "./PinnedNavList.svelte";
   import { untrack, onMount } from "svelte";
   import { fade } from "../utils/motion";
   import {
@@ -116,7 +117,7 @@
 </script>
 
 <aside style="width: {width}px;" class="bg-brand-sidebar flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0 overflow-hidden transition-[width] duration-200 ease-out {themeStore.isGlassTheme ? 'glass-surface' : ''}" class:transition-none={resizing}>
-  <nav data-walkthrough-target="sidebar" class="{layoutCollapsed ? 'p-2' : 'p-4'} space-y-0.5 flex flex-col items-center">
+  <nav data-walkthrough-target="sidebar" class="{layoutCollapsed ? 'p-2' : 'p-4'} space-y-0.5 flex flex-col items-center flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
     <button
       onclick={() => { navigationStore.activeTab = "home"; }}
       class="flex items-center gap-3 transition-colors duration-150 {navigationStore.activeTab === 'home' ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {layoutCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
@@ -127,6 +128,8 @@
         <span class="truncate whitespace-nowrap">{i18n.t('sidebar.home')}</span>
       {/if}
     </button>
+
+    <PinnedNavList collapsed={layoutCollapsed} />
 
     <!-- Collection/Playlists/Lyrics/Stats stay hidden until the library has
          songs — except during the walkthrough, whose "sidebar" step
@@ -333,7 +336,6 @@
     </button>
   </nav>
 
-  <div class="flex-1"></div>
 
   <!-- MusicBrainz Login / Profile Section (#1388); hidden while Offline (#1398) -->
   {#if prefs.onlineEnabled}
