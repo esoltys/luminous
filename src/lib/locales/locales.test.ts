@@ -9,7 +9,7 @@ import { frFR } from "./fr-FR";
 import { it as itMessages } from "./it";
 import { ru } from "./ru";
 import { uk } from "./uk";
-import { BASE_LOCALE, LOCALES, catalogChain, isLocale, legacyLanguageToLocale, localeLabel, localePickerGroups, manualLanguageForLocale } from "./index";
+import { BASE_LOCALE, LOCALES, MANUAL_LANGUAGES, catalogChain, isLocale, legacyLanguageToLocale, localeLabel, localePickerGroups, manualLanguageForLocale } from "./index";
 
 const PLURAL_CATEGORIES = new Set(["zero", "one", "two", "few", "many", "other"]);
 
@@ -770,12 +770,35 @@ describe("Locale picker groups", () => {
   });
 });
 
+const guideScript: string = Object.values(
+  import.meta.glob("/docs/user-guide/guide.js", { query: "?raw", import: "default", eager: true }),
+)[0] as string;
+
 describe("Manual language", () => {
-  it("maps any fr* UI locale to French and everything else to English", () => {
+  it("maps a UI locale to its guide by base language, and to English when there is none", () => {
     expect(manualLanguageForLocale("fr-CA")).toBe("FR");
     expect(manualLanguageForLocale("fr-FR")).toBe("FR");
-    expect(manualLanguageForLocale("de")).toBe("EN");
+    expect(manualLanguageForLocale("es")).toBe("ES");
+    expect(manualLanguageForLocale("de")).toBe("DE");
+    expect(manualLanguageForLocale("uk")).toBe("UK");
     expect(manualLanguageForLocale("en-GB")).toBe("EN");
+    expect(manualLanguageForLocale("ja")).toBe("EN");
+  });
+
+  it("ships a guide for every registered locale", () => {
+    // A locale added without a guide would silently show the English manual.
+    const guides = import.meta.glob("/docs/user-guide/luminous-user-guide-*.html", { query: "?raw", import: "default" });
+    // The guide files, MANUAL_LANGUAGES and guide.js's lightbox labels must name the same languages.
+    const onDisk = Object.keys(guides).map((f) => f.match(/luminous-user-guide-(\w+)\.html$/)![1]);
+    expect([...MANUAL_LANGUAGES].sort()).toEqual(onDisk.sort());
+    for (const code of MANUAL_LANGUAGES) {
+      expect(guideScript.includes(`${code.toLowerCase()}: { fit:`), `guide.js has no labels for ${code}`).toBe(true);
+    }
+    for (const { tag } of LOCALES) {
+      const code = manualLanguageForLocale(tag);
+      expect(guides[`/docs/user-guide/luminous-user-guide-${code}.html`], `${tag} -> ${code}`).toBeDefined();
+      if (tag.split("-")[0] !== "en") expect(code, `${tag} has no guide of its own`).not.toBe("EN");
+    }
   });
 });
 

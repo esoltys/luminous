@@ -28,14 +28,13 @@ function copyDir(src: string, dest: string) {
 const FONT_DIRS = ["expose", "fira-sans"];
 
 const FILE_COPIES = [
-  "luminous-user-guide-EN.html",
-  "luminous-user-guide-FR.html",
   "guide.css",
   "guide.js",
   "luminous-mark.svg",
 ];
 
-for (const file of FILE_COPIES) {
+const guides = fs.readdirSync(userGuideDir).filter((f) => /^luminous-user-guide-[A-Z]{2}\.html$/.test(f));
+for (const file of [...guides, ...FILE_COPIES]) {
   fs.copyFileSync(path.join(userGuideDir, file), path.join(staticDir, file));
 }
 

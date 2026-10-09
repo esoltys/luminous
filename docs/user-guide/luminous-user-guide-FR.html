@@ -295,7 +295,7 @@
     <section id="advanced-search" data-section>
       <div class="eyebrow">Avancé</div>
       <h1>Recherche avancée</h1>
-      <p>Tapez des termes <code>champ:valeur</code> dans la barre de recherche pour filtrer toute votre bibliothèque. Par exemple, <code>genre:rock rating:&gt;=4</code> trouve les chansons rock notées 4 étoiles ou plus.</p>
+      <p>Tapez des termes <code>field:value</code> dans la barre de recherche pour filtrer toute votre bibliothèque. Par exemple, <code>genre:rock rating:&gt;=4</code> trouve les chansons rock notées 4 étoiles ou plus.</p>
       <figure class="shot mw-700 mb-28">
         <img src="assets/fr-CA/screenshots/dark/advanced-search.png" alt="Recherche avancée" width="1280" height="800" loading="lazy">
       </figure>
@@ -349,7 +349,7 @@
       </div>
       <p class="mb-28"><code>duration</code> accepte des secondes (<code>duration:&gt;180</code>), <code>MM:SS</code> (<code>duration:&gt;3:30</code>) ou <code>H:MM:SS</code> (<code>duration:&lt;1:02:03</code>).</p>
       <h2>Enregistrer une recherche comme liste intelligente</h2>
-      <p class="mb-28">Dès que votre recherche contient un terme <code>champ:valeur</code>, cliquez sur <b>Ouvrir le créateur →</b> dans le menu. Chaque terme devient une règle; ajoutez-en d'autres, nommez la liste et enregistrez-la.</p>
+      <p class="mb-28">Dès que votre recherche contient un terme <code>field:value</code>, cliquez sur <b>Ouvrir le créateur →</b> dans le menu. Chaque terme devient une règle; ajoutez-en d'autres, nommez la liste et enregistrez-la.</p>
       <h2>Exemples</h2>
       <div class="table mw-700" style="--cols: 1fr 260px">
         <div class="tr th"><div>Objectif</div><div>Requête</div></div>
@@ -400,8 +400,7 @@
       <div class="eyebrow">Paramètres</div>
       <h1>Général</h1>
       <div class="list">
-        <div class="row"><div class="mk">•</div><div><b>Langue / Language</b> : la langue des menus, des boutons et des messages.</div></div>
-        <div class="row"><div class="mk">•</div><div><b>Langue du guide de l'utilisateur</b> : français ou anglais. Elle suit la langue de l'interface jusqu'à ce que vous en choisissiez une.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Langue / Language</b> : la langue des menus, des boutons, des messages et de ce guide.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Commencer la semaine le</b> : dimanche ou lundi, pour les palmarès et statistiques de la semaine.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Style de notation des morceaux</b> : un cœur, 5 étoiles ou les deux.</div></div>
       </div>
@@ -415,7 +414,7 @@
       <h1>Système</h1>
       <div class="list">
         <div class="row"><div class="mk">•</div><div><b>Faire de Luminous le lecteur de musique par défaut</b> (Windows) : ouvrir les Applications par défaut de Windows pour choisir les types de fichiers que Luminous ouvre.</div></div>
-        <div class="row"><div class="mk">•</div><div><b>Réduire dans la zone de notification</b> : fermer la fenêtre masque Luminous dans la zone de notification. Cliquez avec le bouton droit sur son icône pour Lecture/Pause, Suivant et Précédent.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Réduire dans la zone de notification</b> : fermer la fenêtre masque Luminous dans la zone de notification. Cliquez avec le bouton droit sur son icône pour Lecture/Pause, Chanson suivante et Chanson précédente.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Lancer au démarrage</b> : ouvrir Luminous à l'ouverture de session.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Exporter les diagnostics</b> : enregistrer un fichier journal des plantages et erreurs récents à joindre à un rapport de bogue.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Emplacement des données</b> : où se trouvent la base de données de la bibliothèque, le cache des pochettes et les préférences. La version ZIP pour Windows fonctionne en <b>Mode portable</b> et garde tout dans un dossier <code>data</code> à côté de l'application. Les dossiers de musique situés sur la même unité suivent l'application lorsque cette unité reçoit une nouvelle lettre sur un autre ordinateur. Sous Linux, placez un fichier vide nommé <code>portable</code> à côté de l'AppImage pour faire de même.</div></div>

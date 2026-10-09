@@ -309,8 +309,6 @@ export const uk = {
     systemTitle: "Система",
     systemSubtitle: "Налаштуйте запуск, згортання та сховище даних Luminous.",
     uiLanguageHint: "Вибрати мову меню, кнопок і повідомлень.",
-    manualLanguage: "Мова посібника користувача",
-    manualLanguageHint: "Вибрати мову довідки. Посібник доступний лише англійською та французькою.",
     ratingStyle: "Стиль оцінювання пісень",
     ratingStyleHeart: "Серце (улюблене)",
     ratingStyleStars: "5 зірок",

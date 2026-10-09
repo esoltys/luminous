@@ -297,8 +297,6 @@ export const en = {
     systemTitle: "System",
     systemSubtitle: "Control how Luminous starts, minimizes and stores its data.",
     uiLanguageHint: "Pick the language of menus, buttons and messages.",
-    manualLanguage: "User manual language",
-    manualLanguageHint: "Pick the language of the Help guide. The manual is only available in English and French.",
     ratingStyle: "Song rating style",
     ratingStyleHeart: "Heart (favourite)",
     ratingStyleStars: "5-star",
