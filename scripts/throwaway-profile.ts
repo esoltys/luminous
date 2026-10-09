@@ -178,31 +178,6 @@ export function checkPreconditions(exe: string): void {
   }
 }
 
-// ── IPC over CDP helpers (used for library scanning during setup) ──────────
-
-async function callInPage<T>(cdp: CdpClient, fn: string, ...args: unknown[]): Promise<T> {
-  const global = await cdp.send("Runtime.evaluate", { expression: "globalThis" });
-  const res = await cdp.send("Runtime.callFunctionOn", {
-    objectId: global.result.objectId,
-    functionDeclaration: fn,
-    arguments: args.map((value) => ({ value })),
-    awaitPromise: true,
-    returnByValue: true,
-  });
-  if (res.exceptionDetails) {
-    throw new Error(res.exceptionDetails.exception?.description ?? res.exceptionDetails.text);
-  }
-  return res.result?.value as T;
-}
-
-async function invoke<T = unknown>(cdp: CdpClient, cmd: string, args: Record<string, unknown> = {}): Promise<T> {
-  try {
-    return await callInPage<T>(cdp, "function (cmd, args) { return this.__TAURI_INTERNALS__.invoke(cmd, args); }", cmd, args);
-  } catch (e) {
-    throw new Error(`invoke('${cmd}') failed: ${e instanceof Error ? e.message : e}`);
-  }
-}
-
 // ── Throwaway AppProfile ──────────────────────────────────────────────────
 
 /**
@@ -311,17 +286,11 @@ export class AppProfile {
    * The app must be running. Awaits scan completion before returning.
    */
   async scanLibrary(folders: string[]): Promise<void> {
-    if (!this.isRunning()) throw new Error("Cannot scan library while Luminous is stopped.");
-    const cdp = new CdpClient();
-    await cdp.connect(this.port);
-    try {
-      for (const dir of folders) {
-        await invoke(cdp, "add_directory", { path: dir });
-      }
-      await invoke(cdp, "scan_directories", { force: false });
-    } finally {
-      cdp.close();
+    await using driver = await this.connectDriver();
+    for (const dir of folders) {
+      await driver.invoke("add_directory", { path: dir });
     }
+    await driver.invoke("scan_directories", { force: false });
   }
 
   /** Writes (or deletes, if value is null) app_state keys in the profile DB. */

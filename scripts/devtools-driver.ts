@@ -374,21 +374,32 @@ export class DevtoolsDriver implements AsyncDisposable {
     return await this.evaluate<T>(
       (event: string, timeout: number) => {
         return new Promise<T>((resolve, reject) => {
-          let unlistenFn: (() => void) | null = null;
-          const timer = setTimeout(() => {
-            if (unlistenFn) unlistenFn();
-            reject(new Error(`Timed out waiting ${timeout}ms for Tauri event '${event}'`));
-          }, timeout);
+          let registeredEventId: number | null = null;
+          let settled = false;
 
           const internals = (window as any).__TAURI_INTERNALS__;
           if (!internals?.invoke || !internals?.transformCallback) {
-            clearTimeout(timer);
             return reject(new Error("Tauri internals unavailable for event listening"));
           }
 
+          const cleanup = () => {
+            if (registeredEventId !== null) {
+              internals.invoke("plugin:event|unlisten", { event, eventId: registeredEventId }).catch(() => {});
+              registeredEventId = null;
+            }
+          };
+
+          const timer = setTimeout(() => {
+            settled = true;
+            cleanup();
+            reject(new Error(`Timed out waiting ${timeout}ms for Tauri event '${event}'`));
+          }, timeout);
+
           const handlerId = internals.transformCallback((e: any) => {
+            if (settled) return;
+            settled = true;
             clearTimeout(timer);
-            if (unlistenFn) unlistenFn();
+            cleanup();
             resolve(e ? e.payload : undefined);
           }, true);
 
@@ -399,13 +410,17 @@ export class DevtoolsDriver implements AsyncDisposable {
               handler: handlerId,
             })
             .then((eventId: number) => {
-              unlistenFn = () => {
-                internals.invoke("plugin:event|unlisten", { event, eventId }).catch(() => {});
-              };
+              registeredEventId = eventId;
+              if (settled) {
+                cleanup();
+              }
             })
             .catch((err: unknown) => {
-              clearTimeout(timer);
-              reject(err);
+              if (!settled) {
+                settled = true;
+                clearTimeout(timer);
+                reject(err);
+              }
             });
         });
       },
@@ -442,13 +457,32 @@ export class DevtoolsDriver implements AsyncDisposable {
    * Reloads the page in the webview and waits for document and IPC readiness.
    */
   async reload(): Promise<void> {
+    // Set a transient sentinel on the current window so isReloadFinished does
+    // not prematurely observe the outgoing document before teardown begins.
+    await this.evaluate(() => {
+      (window as any).__LUMINOUS_RELOADING__ = true;
+    }).catch(() => {});
+
     await this.send("Page.reload");
     const deadline = Date.now() + 30_000;
     while (Date.now() < deadline) {
-      if (await this.isPageReady()) return;
+      if (await this.isReloadFinished()) return;
       await sleep(100);
     }
     throw new Error("Page failed to become ready after reload within 30s");
+  }
+
+  private async isReloadFinished(): Promise<boolean> {
+    try {
+      const res = await this.send("Runtime.evaluate", {
+        expression:
+          "!window.__LUMINOUS_RELOADING__ && document.readyState === 'complete' && !!window.__TAURI_INTERNALS__",
+        returnByValue: true,
+      });
+      return res?.result?.value === true;
+    } catch {
+      return false;
+    }
   }
 
   /**

@@ -122,56 +122,8 @@ async function main() {
       // Navigate without reloading (a reload would re-run the startup theme
       // path): search for the album and open its suggestion. Independent of the
       // Albums grid/rows view mode and of where the album sits in the list.
-      for (let attempt = 1; ; attempt++) {
-        const opened = await driver.evaluate(async (name) => {
-          const search = document.querySelector<HTMLInputElement>("header input[type='text']");
-          if (!search) return false;
-
-          search.focus();
-          search.value = name;
-          search.dispatchEvent(new Event("input", { bubbles: true }));
-
-          await new Promise((r) => setTimeout(r, 400));
-
-          const elements = Array.from(document.querySelectorAll("*"));
-          const match =
-            elements.find(
-              (el) =>
-                el.textContent?.trim() === name &&
-                (el.getAttribute("role") === "option" ||
-                  el.closest("[role='listbox']") ||
-                  el.closest("ul"))
-            ) ?? elements.find((el) => el.textContent?.trim() === name);
-
-          if (match && match instanceof HTMLElement) {
-            match.click();
-          }
-
-          await new Promise((r) => setTimeout(r, 400));
-          search.value = "";
-          search.dispatchEvent(new Event("input", { bubbles: true }));
-          search.blur();
-
-          const headings = Array.from(document.querySelectorAll("h1"));
-          return headings.some(
-            (h) => h.textContent?.includes(name) && (h as HTMLElement).offsetParent !== null
-          );
-        }, song.album);
-
-        if (opened) break;
-        if (attempt >= 3)
-          throw new Error(`Couldn't open the album view for "${song.album}".`);
-        await sleep(800);
-      }
-
-      // Dismiss any notification toasts
-      await driver.evaluate(() => {
-        const buttons = document.querySelectorAll<HTMLElement>(
-          "button[aria-label='Dismiss notification']"
-        );
-        for (const b of buttons) b.click();
-      });
-
+      await openAlbum(driver, song.album);
+      await dismissNotificationToasts(driver);
       await sleep(1500); // let the waveform and theme crossfade settle
 
       await driver.screenshot({ path: path.join(OUT_DIR, entry.filename) });
@@ -186,6 +138,66 @@ async function main() {
     if (originalThemeId !== DYNAMIC_THEME_ID) await setTheme(originalThemeId);
     await driver.close();
   }
+}
+
+/**
+ * Searches for an album by name using the app's header search and opens its
+ * suggestion, verifying the album detail view becomes visible.
+ */
+async function openAlbum(driver: DevtoolsDriver, albumName: string): Promise<void> {
+  for (let attempt = 1; ; attempt++) {
+    const opened = await driver.evaluate(async (name) => {
+      const search = document.querySelector<HTMLInputElement>("header input[type='text']");
+      if (!search) return false;
+
+      search.focus();
+      search.value = name;
+      search.dispatchEvent(new Event("input", { bubbles: true }));
+
+      await new Promise((r) => setTimeout(r, 400));
+
+      const elements = Array.from(document.querySelectorAll("*"));
+      const match =
+        elements.find(
+          (el) =>
+            el.textContent?.trim() === name &&
+            (el.getAttribute("role") === "option" ||
+              el.closest("[role='listbox']") ||
+              el.closest("ul"))
+        ) ?? elements.find((el) => el.textContent?.trim() === name);
+
+      if (match && match instanceof HTMLElement) {
+        match.click();
+      }
+
+      await new Promise((r) => setTimeout(r, 400));
+      search.value = "";
+      search.dispatchEvent(new Event("input", { bubbles: true }));
+      search.blur();
+
+      const headings = Array.from(document.querySelectorAll("h1"));
+      return headings.some(
+        (h) => h.textContent?.includes(name) && (h as HTMLElement).offsetParent !== null
+      );
+    }, albumName);
+
+    if (opened) return;
+    if (attempt >= 3)
+      throw new Error(`Couldn't open the album view for "${albumName}".`);
+    await sleep(800);
+  }
+}
+
+/**
+ * Dismisses any active notification toasts that could obstruct screenshot capture.
+ */
+async function dismissNotificationToasts(driver: DevtoolsDriver): Promise<void> {
+  await driver.evaluate(() => {
+    const buttons = document.querySelectorAll<HTMLElement>(
+      "button[aria-label='Dismiss notification']"
+    );
+    for (const b of buttons) b.click();
+  });
 }
 
 main().catch((err) => {

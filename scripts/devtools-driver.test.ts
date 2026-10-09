@@ -235,5 +235,15 @@ describe("devtools-driver", () => {
         receivedMethods.some((m) => m.method === "Emulation.clearDeviceMetricsOverride")
       ).toBe(true);
     });
+
+    it("reloads page and awaits readiness", async () => {
+      const driver = await DevtoolsDriver.connect({ port: serverPort, timeoutMs: 5000 });
+      try {
+        await driver.reload();
+        expect(receivedMethods.some((m) => m.method === "Page.reload")).toBe(true);
+      } finally {
+        await driver.close();
+      }
+    });
   });
 });
