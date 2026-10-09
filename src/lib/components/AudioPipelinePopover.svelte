@@ -1,10 +1,10 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
   import { cubicOut } from "svelte/easing";
-  import { portal } from "$lib/utils/portal";
-  import { prefersReducedMotion } from "$lib/utils/motion";
-  import { playerStore } from "$lib/stores/player.svelte";
-  import { i18n } from "$lib/stores/i18n.svelte";
+  import { portal } from "../utils/portal";
+  import { prefersReducedMotion } from "../utils/motion";
+  import { playerStore } from "../stores/player.svelte";
+  import { i18n } from "../stores/i18n.svelte";
   import AudioPipelineStages from "./AudioPipelineStages.svelte";
   import {
     XIcon as X,

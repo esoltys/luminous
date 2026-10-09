@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { playerStore } from "$lib/stores/player.svelte";
-  import { i18n } from "$lib/stores/i18n.svelte";
-  import type { QualityTier } from "$lib/types";
+  import { playerStore } from "../stores/player.svelte";
+  import { i18n } from "../stores/i18n.svelte";
+  import type { QualityTier } from "../types";
   import AudioPipelinePopover from "./AudioPipelinePopover.svelte";
 
   interface Props {

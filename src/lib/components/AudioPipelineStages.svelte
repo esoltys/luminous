@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { AudioPipelineInfo, LoudnessGainSource } from '$lib/types';
-  import { i18n, formatNumber } from '$lib/stores/i18n.svelte';
+  import type { AudioPipelineInfo, LoudnessGainSource } from '../types';
+  import { i18n, formatNumber } from '../stores/i18n.svelte';
   import {
     CpuIcon as Cpu,
     SlidersIcon as Sliders,
