@@ -5,6 +5,7 @@ import path from "node:path";
 import {
   AppProfile,
   CDP_PORT,
+  DEFAULT_APP_STATE,
   FIRST_RUN_DONE,
   NO_DEFAULT_LIBRARY,
   canonicalView,
@@ -17,6 +18,9 @@ describe("throwaway-profile", () => {
     expect(FIRST_RUN_DONE.welcome_seen).toBe("true");
     expect(FIRST_RUN_DONE.walkthrough_completed).toBe("true");
     expect(NO_DEFAULT_LIBRARY.default_library_path).toBe("");
+    expect(DEFAULT_APP_STATE.welcome_seen).toBe("true");
+    expect(DEFAULT_APP_STATE.active_tab).toBe("collection");
+    expect(DEFAULT_APP_STATE.active_sub_tab).toBe("songs");
     expect(canonicalView("songs")).toEqual({
       active_tab: "collection",
       active_sub_tab: "songs",
@@ -42,43 +46,59 @@ describe("throwaway-profile", () => {
     }
   });
 
-  it("handles offline app_state manipulation and pre-seeding", async () => {
-    const profile = new AppProfile({
-      appState: { initial_key: "initial_value" },
+  it("pulls defaults downward and allows caller overrides in app_state", async () => {
+    // 1. Fresh profile automatically receives downward defaults
+    const defaultProfile = new AppProfile();
+    try {
+      const db = new Database(defaultProfile.dbPath, { readonly: true });
+      const welcome = db.query("SELECT value FROM app_state WHERE key = 'welcome_seen'").get() as { value: string };
+      const subTab = db.query("SELECT value FROM app_state WHERE key = 'active_sub_tab'").get() as { value: string };
+      db.close();
+      expect(welcome.value).toBe("true");
+      expect(subTab.value).toBe("songs");
+    } finally {
+      await defaultProfile.dispose();
+    }
+
+    // 2. Caller-specified appState overrides default values
+    const customProfile = new AppProfile({
+      appState: {
+        active_sub_tab: "albums",
+        custom_flag: "enabled",
+      },
     });
     try {
-      // Check pre-seeded key
-      const db1 = new Database(profile.dbPath, { readonly: true });
-      const row1 = db1.query("SELECT value FROM app_state WHERE key = 'initial_key'").get() as { value: string };
-      db1.close();
-      expect(row1.value).toBe("initial_value");
+      const db = new Database(customProfile.dbPath, { readonly: true });
+      const welcome = db.query("SELECT value FROM app_state WHERE key = 'welcome_seen'").get() as { value: string };
+      const subTab = db.query("SELECT value FROM app_state WHERE key = 'active_sub_tab'").get() as { value: string };
+      const custom = db.query("SELECT value FROM app_state WHERE key = 'custom_flag'").get() as { value: string };
+      db.close();
+      expect(welcome.value).toBe("true"); // retained from DEFAULT_APP_STATE
+      expect(subTab.value).toBe("albums"); // overridden by caller
+      expect(custom.value).toBe("enabled"); // added by caller
 
-      // Write additional keys and update existing
-      profile.writeAppState({
-        initial_key: "updated_value",
+      // Update and delete offline
+      customProfile.writeAppState({
+        custom_flag: "updated",
         second_key: "second_value",
       });
 
-      const db2 = new Database(profile.dbPath, { readonly: true });
-      const row2 = db2.query("SELECT value FROM app_state WHERE key = 'initial_key'").get() as { value: string };
-      const row3 = db2.query("SELECT value FROM app_state WHERE key = 'second_key'").get() as { value: string };
+      const db2 = new Database(customProfile.dbPath, { readonly: true });
+      const customUpdated = db2.query("SELECT value FROM app_state WHERE key = 'custom_flag'").get() as { value: string };
       db2.close();
-      expect(row2.value).toBe("updated_value");
-      expect(row3.value).toBe("second_value");
+      expect(customUpdated.value).toBe("updated");
 
-      // Delete key with null
-      profile.writeAppState({ second_key: null });
-
-      const db3 = new Database(profile.dbPath, { readonly: true });
-      const row4 = db3.query("SELECT value FROM app_state WHERE key = 'second_key'").get();
+      customProfile.writeAppState({ second_key: null });
+      const db3 = new Database(customProfile.dbPath, { readonly: true });
+      const secondDeleted = db3.query("SELECT value FROM app_state WHERE key = 'second_key'").get();
       db3.close();
-      expect(row4).toBeNull();
+      expect(secondDeleted).toBeNull();
     } finally {
-      await profile.dispose();
+      await customProfile.dispose();
     }
   });
 
-  it("finds songs and cues playback state in the profile DB", async () => {
+  it("finds playable songs and cues playback state in the profile DB", async () => {
     const profile = new AppProfile();
     try {
       // Seed songs table in profile database
@@ -101,13 +121,17 @@ describe("throwaway-profile", () => {
       `);
       db.close();
 
-      const song = profile.findSong("title = ?1", "Solar Eclipse");
-      expect(song).not.toBeNull();
-      expect(song?.id).toBe(42);
-      expect(song?.title).toBe("Solar Eclipse");
-      expect(song?.album).toBe("Luminous Album");
+      const playableSong = profile.findPlayableSong("title = ?1", "Solar Eclipse");
+      expect(playableSong).not.toBeNull();
+      expect(playableSong?.id).toBe(42);
+      expect(playableSong?.title).toBe("Solar Eclipse");
+      expect(playableSong?.album).toBe("Luminous Album");
 
-      profile.cue(song as SongRecord);
+      // Verify findSong alias works identically
+      const songAlias = profile.findSong("title = ?1", "Solar Eclipse");
+      expect(songAlias?.id).toBe(playableSong?.id);
+
+      profile.cue(playableSong as SongRecord);
 
       const dbVerify = new Database(profile.dbPath, { readonly: true });
       const lastSongId = dbVerify.query("SELECT value FROM app_state WHERE key = 'last_song_id'").get() as { value: string };

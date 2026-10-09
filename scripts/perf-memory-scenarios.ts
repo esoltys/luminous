@@ -100,11 +100,8 @@ import { CdpClient } from "./monitor-cdp";
 import {
   AppProfile,
   CDP_PORT,
-  FIRST_RUN_DONE,
-  NO_DEFAULT_LIBRARY,
   canonicalView,
-  closeGracefully,
-  isRunning,
+  checkPreconditions as checkProfilePreconditions,
   protectRealWindowState,
   TRACK_COLUMNS,
 } from "./throwaway-profile";
@@ -415,16 +412,11 @@ const SCROLL_ALBUM_GRID = `async function () {
 }`;
 
 async function localSource(opts: Options, rec: Recorder, folders: string[]) {
-  const profile = new AppProfile({ exe: opts.exe });
+  const profile = new AppProfile({ exe: opts.exe, window: opts });
   log(`local: scratch profile ${profile.root}`);
   try {
-    // Setup launch: just creates the database, so the keys below can go in before anything runs.
-    await profile.launch(opts);
-    await closeGracefully();
-    profile.writeAppState({ ...FIRST_RUN_DONE, ...NO_DEFAULT_LIBRARY, ...canonicalView("songs") });
-
     // 1. First scan, with art extraction — the same calls as adding folders in Settings → Library.
-    await profile.launch(opts);
+    await profile.launch();
     rec.begin();
     let tracks: number;
     try {
@@ -441,14 +433,14 @@ async function localSource(opts: Options, rec: Recorder, folders: string[]) {
       await rec.abandon();
       throw e;
     }
-    await closeGracefully();
+    await profile.close();
 
-    const song = profile.findSong("path = ?1 COLLATE NOCASE", path.normalize(opts.track));
+    const song = profile.findPlayableSong("path = ?1 COLLATE NOCASE", path.normalize(opts.track));
     if (!song) throw new Error(`The scan didn't pick up --track "${opts.track}"; is it under ${folders.join(", ")}?`);
     profile.cue(song);
 
     // 2. Idle, in a fresh launch over the already-scanned library.
-    await profile.launch(opts);
+    await profile.launch();
     rec.begin();
     const visualizerMounted = await withCdp((c) => c.eval("document.querySelectorAll('canvas').length > 0"));
     if (visualizerMounted.value !== true) {
@@ -469,11 +461,11 @@ async function localSource(opts: Options, rec: Recorder, folders: string[]) {
 
     // 4. Playback with EQ + analyzer on.
     await playbackScenario(rec, "playback-eq-analyzer", song, tracks);
-    await closeGracefully();
+    await profile.close();
 
     // 5. Album grid: a fresh launch into Collection → Albums, scrolled end to end.
     profile.writeAppState(canonicalView("albums"));
-    await profile.launch(opts);
+    await profile.launch();
     rec.begin();
     try {
       const scroll = await withCdp((c) => timed(() => callInPage<{ steps: number; cards: number }>(c, SCROLL_ALBUM_GRID)));
@@ -483,9 +475,8 @@ async function localSource(opts: Options, rec: Recorder, folders: string[]) {
       await rec.abandon();
       throw e;
     }
-    await closeGracefully();
+    await profile.close();
   } finally {
-    if (isRunning()) await closeGracefully();
     await profile.dispose(opts.keepProfiles);
   }
 }
@@ -521,15 +512,11 @@ function remoteServer(source: "webdav" | "subsonic"): RemoteServer {
 
 async function remoteSource(opts: Options, rec: Recorder, baseline: BaselineTrack, server: RemoteServer) {
   const { label } = server;
-  const profile = new AppProfile({ exe: opts.exe });
+  const profile = new AppProfile({ exe: opts.exe, window: opts });
   log(`${label}: scratch profile ${profile.root}`);
   try {
-    await profile.launch(opts);
-    await closeGracefully();
-    profile.writeAppState({ ...FIRST_RUN_DONE, ...NO_DEFAULT_LIBRARY, ...canonicalView("songs") });
-
     // 1. First sync — the same calls as adding the server in Settings → Sources and Sync Now.
-    await profile.launch(opts);
+    await profile.launch();
     const saved = await withCdp(async (c) => {
       try {
         return await invoke<{ id: number }>(c, server.save, { input: server.input });
@@ -553,10 +540,10 @@ async function remoteSource(opts: Options, rec: Recorder, baseline: BaselineTrac
       await rec.abandon();
       throw e;
     }
-    await closeGracefully();
+    await profile.close();
 
     // The remote copy of the baseline track: same title and album, within a second of its length.
-    const song = profile.findSong(
+    const song = profile.findPlayableSong(
       "title = ?1 COLLATE NOCASE AND album = ?2 COLLATE NOCASE AND ABS(length_nanosec - ?3) < 1000000000",
       baseline.title,
       baseline.album,
@@ -567,13 +554,12 @@ async function remoteSource(opts: Options, rec: Recorder, baseline: BaselineTrac
     profile.cue(song);
 
     // 2. Idle, then 3. streamed playback, in a fresh launch.
-    await profile.launch(opts);
+    await profile.launch();
     rec.begin();
     await rec.finish(`${label}-idle`, SETTLE_IDLE_SEC, { library_tracks: tracks });
     await playbackScenario(rec, `${label}-playback`, song, tracks);
-    await closeGracefully();
+    await profile.close();
   } finally {
-    if (isRunning()) await closeGracefully();
     await profile.dispose(opts.keepProfiles);
   }
 }
@@ -581,15 +567,7 @@ async function remoteSource(opts: Options, rec: Recorder, baseline: BaselineTrac
 // ── Run ───────────────────────────────────────────────────────────────────
 
 function checkPreconditions(opts: Options) {
-  if (process.platform !== "win32") {
-    throw new Error("This script is Windows-only (it needs WebView2's CDP port). See docs/PERFORMANCE.md for the Linux steps.");
-  }
-  if (isRunning()) {
-    throw new Error("Luminous is already running. Close it first — launching a second instance would hand off to yours.");
-  }
-  if (!existsSync(opts.exe)) {
-    throw new Error(`No release build at ${opts.exe}. Build one first: bun run tauri build --no-bundle`);
-  }
+  checkProfilePreconditions(opts.exe);
   const lastSourceChange = Number(
     execFileSync("git", ["log", "-1", "--format=%ct", "--", ...APP_SOURCE_PATHS], { cwd: opts.exeRepo, encoding: "utf8" }).trim(),
   );
