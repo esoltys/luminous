@@ -54,7 +54,7 @@ jobs:
         run: bun run test:run
 
       - name: Run script tests
-        run: bun test scripts/throwaway-profile.test.ts
+        run: bun test scripts/throwaway-profile.test.ts scripts/devtools-driver.test.ts
 
   backend_test:
     name: Backend Tests
