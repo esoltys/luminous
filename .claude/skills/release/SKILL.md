@@ -16,11 +16,12 @@ needs updating to match. Work through it in order:
    worktree (not the main checkout) and it's clean. Abort and tell the user if not. `git fetch
    origin`.
 2. **Scope**: `git log <last-tag>..main --oneline`; confirm every user-facing fix has a linked,
-   `bug`-labeled issue — file one retroactively (and link the PR) if it's missing.
+   `bug`-labeled issue — file one retroactively (and link the PR) if it's missing. Chore PRs
+   do not require an issue and do not need to be listed in the release notes.
 3. **Content**: update the user manual (`docs/user-guide/luminous-user-guide-{EN,FR,DE,ES,IT,RU,UK}.html`) for
    any user-facing changes, editing both languages together. Regenerate screenshots for changed views (`bun run take-screenshots`, or
    `--name=<entry>` for just one) and read the resulting PNGs to confirm they're correct. Write
-   `docs/release-notes/vX.Y.Z.md`.
+   `docs/release-notes/vX.Y.Z.md` (chores do not need to be listed).
 4. **Verification**: `bun run check`, `bun run test:run`, `cargo test` (from `src-tauri/`),
    `cargo clippy --all-targets` (from `src-tauri/` — zero warnings, including pre-existing ones),
    and the manual QA walkthrough in `docs/TESTING.md` (real-hardware smoke test —

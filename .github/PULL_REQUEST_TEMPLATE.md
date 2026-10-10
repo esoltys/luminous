@@ -1,5 +1,5 @@
 ## 📋 Summary
-<!-- What changed and why. Link the issue this addresses, e.g. "Addresses #86" or "Fixes #71". -->
+<!-- What changed and why. Link the issue this addresses, e.g. "Addresses #86" or "Fixes #71". All PRs require a tracked issue, except chore PRs where an issue is optional. -->
 
 ## 🔍 Implementation Notes
 <!-- Anything a reviewer should know: key files/components touched, design decisions, tradeoffs, or things intentionally left out of scope. -->
