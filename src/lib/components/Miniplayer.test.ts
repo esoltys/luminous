@@ -54,6 +54,8 @@ describe("Miniplayer.svelte", () => {
     playerStore.repeatMode = "off";
     prefs.ratingStyle = "heart";
     windowLayoutStore.isMiniplayer = true;
+    playerStore.playlistIndex = null;
+    playerStore.playlistTotal = 0;
   });
 
   it("renders idle layout with current song title and artist", () => {
@@ -61,6 +63,23 @@ describe("Miniplayer.svelte", () => {
     const { getAllByText } = render(Miniplayer);
     expect(getAllByText("Starlight Echoes").length).toBeGreaterThan(0);
     expect(getAllByText("Lunar Drift").length).toBeGreaterThan(0);
+  });
+
+  it("renders queue progress indicator in non-hover layout when playing in multi-track queue (#1605)", () => {
+    playerStore.currentSong = mockSong;
+    playerStore.playlistIndex = 3;
+    playerStore.playlistTotal = 10;
+    const { getByText, getByTitle } = render(Miniplayer);
+    expect(getByText("3/10")).toBeInTheDocument();
+    expect(getByTitle("Track 3 of 10")).toBeInTheDocument();
+  });
+
+  it("omits queue progress indicator when playing a single standalone track or stopped (#1605)", () => {
+    playerStore.currentSong = mockSong;
+    playerStore.playlistIndex = 1;
+    playerStore.playlistTotal = 1;
+    const { queryByText } = render(Miniplayer);
+    expect(queryByText("1/1")).toBeNull();
   });
 
   it("toggles play/pause when play button is clicked", async () => {

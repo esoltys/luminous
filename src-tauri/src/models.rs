@@ -663,6 +663,12 @@ pub struct PlaybackState {
     /// ending, so the frontend skips its "Queue is done" toast.
     #[serde(default)]
     pub auto_continue: bool,
+    /// 1-based index of the currently playing track within the active play order (#1605).
+    #[serde(default)]
+    pub playlist_index: Option<usize>,
+    /// Total number of tracks in the active play order (#1605).
+    #[serde(default)]
+    pub playlist_total: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]

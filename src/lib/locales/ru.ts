@@ -1164,7 +1164,9 @@ export const ru = {
       many: "Воспроизведено {count} композиций",
       other: "Воспроизведено {count} композиции"
     },
-    dropToPlay: "или перетащите аудиофайлы для воспроизведения"
+    dropToPlay: "или перетащите аудиофайлы для воспроизведения",
+    queueProgress: "{current}/{total}",
+    queueProgressAria: "Трек {current} из {total}"
   },
 
   chipInput: {

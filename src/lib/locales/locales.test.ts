@@ -87,6 +87,7 @@ const IDENTICAL_OK_FR = new Set([
   "equalizer.importPlaceholder", // Equalizer APO sample lines, same syntax in every language
   "listenbrainz.critiquebrainzUserPlaceholder", // a URL
   "albumDetail.statsLine", // "{genre} · {year} · {duration}"
+  "miniplayer.queueProgress", // "{current}/{total}"
   "albumTagEditor.genreField", // "Genre"
   "artistDetail.albumsFilter", // "Albums ({count})"
   "artistDetail.epsFilter", // "EPs ({count})"
@@ -254,6 +255,7 @@ const IDENTICAL_OK_IT = new Set<string>([
   "artistEvents.tour", // "Tour"
   "markdownEditor.linkText", // "link"
   "albumDetail.statsLine", // "{genre} · {year} · {duration}"
+  "miniplayer.queueProgress", // "{current}/{total}"
   "picard.integrationTitle", // "MusicBrainz Picard"
   "picard.customPathPlaceholder", // "C:\\Program Files\\MusicBrainz Picard\\picard.exe"
   "picard.customPathPlaceholderLinux", // "/var/lib/flatpak/exports/bin/org.musicbrainz.Picard"
@@ -320,6 +322,7 @@ const IDENTICAL_OK_ES = new Set<string>([
   "themes.sabrina", // "Sabrina"
   "artistEvents.festival", // "Festival"
   "albumDetail.statsLine", // "{genre} · {year} · {duration}"
+  "miniplayer.queueProgress", // "{current}/{total}"
   "organizer.placeholders", // "Variables"
   "organizer.statusError", // "Error"
   "picard.integrationTitle", // "MusicBrainz Picard"
@@ -435,6 +438,7 @@ const IDENTICAL_OK_DE = new Set<string>([
   "artistProfileEditor.website",
   "artistProfileEditor.socialLinks",
   "albumDetail.statsLine",
+  "miniplayer.queueProgress",
   "songTags.viewGenre",
   "songTags.viewTags",
   "songTags.sortName",
@@ -491,6 +495,7 @@ const IDENTICAL_OK_UK = new Set<string>([
   "themes.dynamic-artwork", // "✨ Luminous"
   "themes.sabrina", // a theme name
   "albumDetail.statsLine", // "{genre} · {year} · {duration}"
+  "miniplayer.queueProgress", // "{current}/{total}"
   "picard.integrationTitle", // MusicBrainz Picard
   "picard.customPathPlaceholder", // a Windows path
   "picard.customPathPlaceholderLinux", // a Linux path
@@ -531,6 +536,7 @@ const IDENTICAL_OK_RU = new Set<string>([
   "themes.dynamic-artwork", // "✨ Luminous"
   "themes.sabrina", // a theme name
   "albumDetail.statsLine", // "{genre} · {year} · {duration}"
+  "miniplayer.queueProgress", // "{current}/{total}"
   "picard.integrationTitle", // MusicBrainz Picard
   "picard.customPathPlaceholder", // a Windows path
   "picard.customPathPlaceholderLinux", // a Linux path

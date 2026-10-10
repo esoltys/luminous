@@ -1164,7 +1164,9 @@ export const uk = {
       many: "Відтворено {count} композицій",
       other: "Відтворено {count} композиції"
     },
-    dropToPlay: "або перетягніть аудіофайли для відтворення"
+    dropToPlay: "або перетягніть аудіофайли для відтворення",
+    queueProgress: "{current}/{total}",
+    queueProgressAria: "Трек {current} з {total}"
   },
 
   chipInput: {

@@ -512,6 +512,51 @@ describe("PlayerStore", () => {
       expect(songIds).toHaveLength(3);
       expect(songIds.sort()).toEqual([1, 2, 3]);
     });
+
+    it("updates playlistIndex and playlistTotal on playback-state event and derives queueProgressText (#1605)", async () => {
+      const playbackStateCall = vi.mocked(listen).mock.calls.find(([event]) => event === "playback-state");
+      expect(playbackStateCall).toBeDefined();
+      const playbackStateCallback = playbackStateCall![1] as (event: any) => Promise<void>;
+
+      await playbackStateCallback({
+        payload: {
+          state: "playing",
+          current_song: { id: 1, title: "Track 1" },
+          playlist_index: 3,
+          playlist_total: 10,
+        },
+      });
+
+      expect(store.playlistIndex).toBe(3);
+      expect(store.playlistTotal).toBe(10);
+      expect(store.queueProgressText).toBe("3/10");
+
+      // Standalone single song
+      await playbackStateCallback({
+        payload: {
+          state: "playing",
+          current_song: { id: 1, title: "Single" },
+          playlist_index: 1,
+          playlist_total: 1,
+        },
+      });
+      expect(store.playlistIndex).toBe(1);
+      expect(store.playlistTotal).toBe(1);
+      expect(store.queueProgressText).toBeNull();
+
+      // Stopped / no index
+      await playbackStateCallback({
+        payload: {
+          state: "stopped",
+          current_song: null,
+          playlist_index: null,
+          playlist_total: 0,
+        },
+      });
+      expect(store.playlistIndex).toBeNull();
+      expect(store.playlistTotal).toBe(0);
+      expect(store.queueProgressText).toBeNull();
+    });
   });
 });
 

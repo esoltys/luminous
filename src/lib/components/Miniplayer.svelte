@@ -574,7 +574,7 @@
         {/if}
       </div>
 
-      <div class="w-full text-center px-2 py-1 flex flex-col items-center justify-center flex-shrink-0">
+      <div class="w-full text-center px-8 py-1 flex flex-col items-center justify-center flex-shrink-0">
         <span class="text-sm font-bold text-brand-text-primary truncate w-full" title={playerStore.currentSong?.title}>
           {playerStore.currentSongDisplayTitle}
         </span>
@@ -582,6 +582,17 @@
           {playerStore.currentSong?.artist || (playerStore.currentSong ? i18n.t('collection.unknownArtist') : '')}
         </span>
       </div>
+
+      {#if playerStore.queueProgressText}
+        <span
+          dir="ltr"
+          class="absolute bottom-2.5 right-3 text-[10px] font-mono tabular-nums text-brand-text-secondary/50 pointer-events-none select-none tracking-tight"
+          aria-label={i18n.t('miniplayer.queueProgressAria', { current: playerStore.playlistIndex, total: playerStore.playlistTotal }, `Track ${playerStore.playlistIndex} of ${playerStore.playlistTotal}`)}
+          title={i18n.t('miniplayer.queueProgressAria', { current: playerStore.playlistIndex, total: playerStore.playlistTotal }, `Track ${playerStore.playlistIndex} of ${playerStore.playlistTotal}`)}
+        >
+          {playerStore.queueProgressText}
+        </span>
+      {/if}
     </div>
   {/if}
 

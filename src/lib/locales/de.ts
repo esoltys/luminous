@@ -1106,7 +1106,9 @@ export const de = {
       one: "{count} Titel gespielt",
       other: "{count} Titel gespielt"
     },
-    dropToPlay: "oder Audiodateien zum Abspielen hierher ziehen"
+    dropToPlay: "oder Audiodateien zum Abspielen hierher ziehen",
+    queueProgress: "{current}/{total}",
+    queueProgressAria: "Titel {current} von {total}"
   },
 
   chipInput: {
