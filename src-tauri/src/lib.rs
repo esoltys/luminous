@@ -1022,13 +1022,6 @@ pub fn run() {
                             |row| row.get(0),
                         )
                         .ok();
-                    let template: Option<String> = conn
-                        .query_row(
-                            "SELECT value FROM app_state WHERE key = 'update_notification_template'",
-                            [],
-                            |row| row.get(0),
-                        )
-                        .ok();
                     let current = env!("CARGO_PKG_VERSION");
                     log::debug!(
                         "MSIX update-notification check: format={:?} stored={:?} current={:?}",
@@ -1041,7 +1034,10 @@ pub fn run() {
                         stored.as_deref(),
                         current,
                     ) {
-                        restart_manager::show_update_notification(current, template.as_deref());
+                        restart_manager::show_update_notification(
+                            current,
+                            restart_manager::load_update_template(&conn).as_deref(),
+                        );
                     }
                 }
             }

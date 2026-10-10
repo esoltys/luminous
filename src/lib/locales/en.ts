@@ -1604,7 +1604,9 @@ export const en = {
   toast: {
     copyError: "Copy error to clipboard",
     copied: "Copied to clipboard",
-    dismiss: "Dismiss notification",
+    dismiss: "Dismiss notification"
+  },
+  osNotification: {
     appUpdated: "Luminous updated to v{version}"
   },
   songTags: {

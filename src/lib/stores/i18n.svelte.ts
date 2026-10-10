@@ -52,13 +52,15 @@ class I18nStore {
         if (locale) void invoke("set_app_setting", { key: "language", value: locale }).catch(() => {});
         void invoke("set_app_setting", { key: LANGUAGE_TAGS_KEY, value: "1" }).catch(() => {});
       }
+      // Only once the saved locale is known: a failed load must not replace a good
+      // cached template with the default language's.
+      this.cacheUpdateNotificationTemplate();
     } catch (e) {
       console.error("Failed to load language settings:", e);
     } finally {
       if (typeof document !== 'undefined') {
         document.documentElement.lang = this.currentLocale;
       }
-      this.cacheUpdateNotificationTemplate();
     }
   }
 
@@ -77,7 +79,7 @@ class I18nStore {
 
   /** Fire-and-forget: the backend falls back to English when no template is cached. */
   private cacheUpdateNotificationTemplate() {
-    const value = this.t("toast.appUpdated", { version: "{version}" });
+    const value = this.t("osNotification.appUpdated", { version: "{version}" });
     void invoke("set_app_setting", { key: UPDATE_NOTIFICATION_KEY, value }).catch(() => {});
   }
 

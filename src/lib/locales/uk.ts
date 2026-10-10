@@ -1682,7 +1682,9 @@ export const uk = {
   toast: {
     copyError: "Копіювати помилку до буфера обміну",
     copied: "Скопійовано до буфера обміну",
-    dismiss: "Закрити сповіщення",
+    dismiss: "Закрити сповіщення"
+  },
+  osNotification: {
     appUpdated: "Luminous оновлено до v{version}"
   },
   songTags: {

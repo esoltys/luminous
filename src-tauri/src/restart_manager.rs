@@ -77,14 +77,26 @@ pub(crate) fn current_application_user_model_id() -> Option<String> {
     }
 }
 
-/// English text used when the frontend hasn't cached a translated template yet.
+/// English text used when no translated template is available. Deliberately a
+/// copy of the `osNotification.appUpdated` catalog entry: it is the fallback
+/// for when the frontend has never run to cache a translation.
 const DEFAULT_UPDATE_TEMPLATE: &str = "Luminous updated to v{version}";
 
-/// Body of the "app updated" toast. `template` is the UI-language string the
-/// frontend last cached (`update_notification_template` in `app_state`), with
-/// `{version}` standing for the version. A missing, blank, or placeholder-less
-/// template yields the English default, so callers never handle a "no
-/// translation" case.
+/// Reads the UI-language template the frontend caches in `app_state` (see the
+/// i18n store) because this toast fires at launch, before any catalog is
+/// loaded. `None` when the frontend has never cached one.
+pub fn load_update_template(conn: &rusqlite::Connection) -> Option<String> {
+    conn.query_row(
+        "SELECT value FROM app_state WHERE key = 'update_notification_template'",
+        [],
+        |row| row.get(0),
+    )
+    .ok()
+}
+
+/// Body of the "app updated" toast: `template` with `{version}` replaced by
+/// `version`. A missing, blank, or placeholder-less template yields the English
+/// default, so callers never handle a "no translation" case.
 pub fn update_notification_body(template: Option<&str>, version: &str) -> String {
     template
         .filter(|t| t.contains("{version}"))
@@ -97,7 +109,7 @@ pub fn update_notification_body(template: Option<&str>, version: &str) -> String
 /// uses internally), built with this process's real AUMID rather than the
 /// plugin's hardcoded, MSIX-incompatible one. Fire-and-forget: failures are
 /// logged, never surfaced to the UI. `template` is the cached UI-language text
-/// described on [`update_notification_body`].
+/// described on [`load_update_template`].
 #[cfg(target_os = "windows")]
 pub fn show_update_notification(current_version: &str, template: Option<&str>) {
     use tauri_winrt_notification::Toast;

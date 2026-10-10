@@ -255,6 +255,16 @@ describe("manual language", () => {
       });
     });
 
+    it("leaves the cached template alone when the settings fail to load", async () => {
+      vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+        if (cmd === "get_all_app_settings") throw new Error("db unavailable");
+        return null;
+      });
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      await i18n.init();
+      expect(invoke).not.toHaveBeenCalledWith("set_app_setting", expect.objectContaining({ key: "update_notification_template" }));
+    });
+
     it("re-caches it when the language changes", async () => {
       await i18n.setLocale("de");
       expect(invoke).toHaveBeenCalledWith("set_app_setting", {

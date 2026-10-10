@@ -1604,7 +1604,9 @@ export const it = {
   toast: {
     copyError: "Copia l'errore negli appunti",
     copied: "Copiato negli appunti",
-    dismiss: "Chiudi notifica",
+    dismiss: "Chiudi notifica"
+  },
+  osNotification: {
     appUpdated: "Luminous è stato aggiornato alla v{version}"
   },
   songTags: {

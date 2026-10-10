@@ -1680,7 +1680,9 @@ export const fr: DeepStringRecord<typeof en> = {
   toast: {
     copyError: "Copier l'erreur dans le presse-papiers",
     copied: "Copié dans le presse-papiers",
-    dismiss: "Fermer la notification",
+    dismiss: "Fermer la notification"
+  },
+  osNotification: {
     appUpdated: "Luminous a été mis à jour vers la v{version}"
   },
   organizer: {
