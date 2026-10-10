@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { i18n, formatNumber } from "./i18n.svelte";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -40,8 +40,8 @@ describe("I18nStore", () => {
       expect(invoke).toHaveBeenCalledWith("set_app_setting", { key: "language_tags", value: "1" });
     });
 
-    it("keeps the default and still sets the marker on a fresh install", async () => {
-      mockSettings({});
+    it("keeps the default and still sets the marker for a returning user with no saved language", async () => {
+      mockSettings({ welcome_seen: "true" });
       await i18n.init();
       expect(i18n.currentLocale).toBe("en-CA");
       expect(invoke).toHaveBeenCalledWith("set_app_setting", { key: "language_tags", value: "1" });
@@ -291,5 +291,50 @@ describe("native labels", () => {
         value: "Luminous wurde auf v{version} aktualisiert",
       });
     });
+  });
+});
+
+describe("first launch language", () => {
+  const mockSettings = (settings: Record<string, string>) =>
+    vi.mocked(invoke).mockImplementation(async (cmd: string) =>
+      cmd === "get_all_app_settings" ? settings : null
+    );
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    i18n.currentLocale = "en-CA";
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("adopts the system language on a fresh install and persists it", async () => {
+    vi.spyOn(navigator, "languages", "get").mockReturnValue(["de-AT", "en-US"]);
+    mockSettings({});
+    await i18n.init();
+    expect(i18n.currentLocale).toBe("de");
+    expect(invoke).toHaveBeenCalledWith("set_app_setting", { key: "language", value: "de" });
+  });
+
+  it("keeps the default when the system language is not shipped", async () => {
+    vi.spyOn(navigator, "languages", "get").mockReturnValue(["ja-JP"]);
+    mockSettings({});
+    await i18n.init();
+    expect(i18n.currentLocale).toBe("en-CA");
+  });
+
+  it("never overrides a saved language", async () => {
+    vi.spyOn(navigator, "languages", "get").mockReturnValue(["de"]);
+    mockSettings({ language: "es", language_tags: "1" });
+    await i18n.init();
+    expect(i18n.currentLocale).toBe("es");
+  });
+
+  it("leaves a returning user's language alone even when none was ever chosen", async () => {
+    vi.spyOn(navigator, "languages", "get").mockReturnValue(["de"]);
+    mockSettings({ welcome_seen: "true" });
+    await i18n.init();
+    expect(i18n.currentLocale).toBe("en-CA");
   });
 });

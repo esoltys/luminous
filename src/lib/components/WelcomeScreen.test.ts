@@ -34,9 +34,24 @@ describe("WelcomeScreen.svelte", () => {
     render(WelcomeScreen, { onGetStarted: vi.fn() });
 
     await fireEvent.click(screen.getByRole("button", { name: i18n.t("welcome.termsOfService") }));
-    expect(openExternalUrl).toHaveBeenCalledWith("https://github.com/esoltys/luminous/blob/main/TERMS.md");
+    expect(openExternalUrl).toHaveBeenCalledWith("https://github.com/esoltys/luminous/blob/main/TERMS.md#english");
 
     await fireEvent.click(screen.getByRole("button", { name: i18n.t("welcome.privacyPolicy") }));
-    expect(openExternalUrl).toHaveBeenCalledWith("https://github.com/esoltys/luminous/blob/main/PRIVACY.md");
+    expect(openExternalUrl).toHaveBeenCalledWith("https://github.com/esoltys/luminous/blob/main/PRIVACY.md#english");
+  });
+
+  it("switches the card and the legal links to the language picked on it", async () => {
+    i18n.currentLocale = "en-CA";
+    const { openExternalUrl } = await import("../utils/openExternalUrl");
+    render(WelcomeScreen, { onGetStarted: vi.fn() });
+
+    await fireEvent.change(screen.getByRole("combobox", { name: i18n.t("welcome.language") }), {
+      target: { value: "de" },
+    });
+
+    expect(i18n.currentLocale).toBe("de");
+    await fireEvent.click(screen.getByRole("button", { name: i18n.t("welcome.privacyPolicy") }));
+    expect(openExternalUrl).toHaveBeenLastCalledWith("https://github.com/esoltys/luminous/blob/main/PRIVACY.md#deutsch");
+    i18n.currentLocale = "en-CA";
   });
 });

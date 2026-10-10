@@ -53,6 +53,14 @@ Each source is where a term gets checked, in the order listed. "Microsoft Termin
 
 Link status when this was written: the hosts above that have a URL answered, except the RAE, Gramota.ru and Merriam-Webster sites, which refuse automated requests and need a manual check in a browser. No stable FranceTerme or Ukrainian Orthography URL has been confirmed yet; find and add them when the fr (France) locale is drafted and when the uk draft gets a native review. Treat every authority as "proposed" until the person drafting that language has used it once and confirmed it gives usable answers for UI terms.
 
+## Legal documents
+
+`TERMS.md` and `PRIVACY.md` each hold every language in one file: one `## ` section per language (English, Français, Deutsch, Español, Italiano, Русский, Українська), all with the same numbered `####` headings. Regional UI variants (en-US, en-GB, fr-FR) read their base language's section, so there is no separate legal text per variant. The welcome screen links to the reader's section through `legalDocUrl()` in `src/lib/locales/index.ts`, which uses the lowercased heading as the anchor.
+
+- A new UI language needs its section in both files (same headings, same order) and an entry in `LEGAL_SECTION_ANCHORS`; `legal.test.ts` fails if a section is missing or the structure drifts.
+- A change to the terms or policy goes into every language's section in the same change, with the "Last updated" date bumped in each.
+- **Register:** legal text is formal, unlike the UI (*Sie*, *usted*, *vous*, *вы*; Italian speaks of "l'utente"), because that is the convention for contracts and privacy notices. Terminology follows the language's authority above; the ru and uk sections have not had a native or legal review.
+
 ## French (Canada)
 
 French is Canadian French, for `fr.ts` and the French user guide.

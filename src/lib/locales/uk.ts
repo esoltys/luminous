@@ -104,7 +104,8 @@ export const uk = {
     legalPrefix: "Продовжуючи, ви погоджуєтеся з нашими",
     termsOfService: "Умовами використання",
     and: "та",
-    privacyPolicy: "Політикою конфіденційності"
+    privacyPolicy: "Політикою конфіденційності",
+    language: "Мова"
   },
   dbNewerThanApp: {
     title: "База даних із новішої версії",

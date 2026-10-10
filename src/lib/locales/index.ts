@@ -98,6 +98,24 @@ export function localePickerGroups(): { pinned: Locale[]; rest: Locale[] } {
   return { pinned, rest };
 }
 
+/**
+ * Best shipped locale for a preference-ordered list of BCP 47 tags (e.g. `navigator.languages`).
+ * Per tag: the exact locale, else the locale named by its bare language (`fr-BE` gives `fr`),
+ * else the first locale of that language (`en-AU` gives `en-CA`); the first tag that matches
+ * anything wins. An empty or wholly unsupported list gives `BASE_LOCALE`, so it never fails.
+ */
+export function resolveLocale(preferred: readonly string[]): Locale {
+  const tags = LOCALES.map((def) => def.tag);
+  const find = (wanted: string) => tags.find((tag) => tag.toLowerCase() === wanted);
+  for (const raw of preferred) {
+    const lower = raw.toLowerCase();
+    const language = lower.split("-")[0];
+    const match = find(lower) ?? find(language) ?? tags.find((tag) => tag.toLowerCase().split("-")[0] === language);
+    if (match) return match;
+  }
+  return BASE_LOCALE;
+}
+
 /** User guide languages shipped in `docs/user-guide/luminous-user-guide-{code}.html`: one per UI language. */
 export const MANUAL_LANGUAGES = ["EN", "FR", "DE", "ES", "IT", "RU", "UK"] as const;
 
@@ -107,4 +125,26 @@ export type ManualLanguage = (typeof MANUAL_LANGUAGES)[number];
 export function manualLanguageForLocale(tag: string): ManualLanguage {
   const base = tag.toLowerCase().split("-")[0].toUpperCase();
   return MANUAL_LANGUAGES.find((code) => code === base) ?? "EN";
+}
+
+/**
+ * Heading anchor of each language's section in `TERMS.md` and `PRIVACY.md`, which hold every
+ * language in one file. Same languages as the guide, so a regional variant reads its base
+ * language's text. GitHub derives an anchor by lowercasing the `## ` heading.
+ */
+const LEGAL_SECTION_ANCHORS: Record<ManualLanguage, string> = {
+  EN: "english",
+  FR: "français",
+  DE: "deutsch",
+  ES: "español",
+  IT: "italiano",
+  RU: "русский",
+  UK: "українська",
+};
+
+/** URL of the Terms or Privacy document on GitHub, opened at the section for `tag`'s language. */
+export function legalDocUrl(doc: "terms" | "privacy", tag: string): string {
+  const file = doc === "terms" ? "TERMS.md" : "PRIVACY.md";
+  const anchor = LEGAL_SECTION_ANCHORS[manualLanguageForLocale(tag)];
+  return `https://github.com/esoltys/luminous/blob/main/${file}#${encodeURIComponent(anchor)}`;
 }
