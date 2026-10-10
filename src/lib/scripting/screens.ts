@@ -2,6 +2,7 @@ import type { ScriptScreensApi, ScriptWaitApi } from "./types";
 
 export interface ScreenHooks {
   search(query: string): Promise<void>;
+  setSort(surface: "songs" | "albums" | "artists", field: string, ascending: boolean): void;
   /** Clears the search box and closes its dropdown. */
   closeSearch(): void;
   openAlbumEditor(): void;
@@ -26,6 +27,7 @@ export function registerScreenHook<K extends keyof ScreenHooks>(name: K, hook: S
 
 const SCREEN_FOR: Record<keyof ScreenHooks, string> = {
   search: "the top navigation bar",
+  setSort: "the Collection tab (navigate.to('collection') first)",
   closeSearch: "the top navigation bar",
   openAlbumEditor: "an album detail view (navigate.album first)",
   setEqualizerMode: "Settings → Equalizer (navigate.settings('equalizer') first)",
@@ -33,7 +35,10 @@ const SCREEN_FOR: Record<keyof ScreenHooks, string> = {
   openEqualizerPresetMenu: "Settings → Equalizer in parametric mode",
 };
 
-function hook<K extends keyof ScreenHooks>(name: K): ScreenHooks[K] {
+async function hook<K extends keyof ScreenHooks>(name: K, wait: ScriptWaitApi): Promise<ScreenHooks[K]> {
+  // A screen registers its hooks just after it mounts (a dynamic import), so give a screen that
+  // was only just opened a moment to appear before saying it isn't there.
+  await wait.forState(() => !!hooks[name], 2000).catch(() => {});
   const found = hooks[name];
   if (!found) throw new Error(`"${name}" needs ${SCREEN_FOR[name]} on screen.`);
   return found as ScreenHooks[K];
@@ -48,23 +53,27 @@ export function closeSearchIfOpen(): void {
 export function createScreensController(wait: ScriptWaitApi): ScriptScreensApi {
   return {
     async search(query) {
-      await hook("search")(query);
+      await (await hook("search", wait))(query);
+      await wait.settled();
+    },
+    async setSort(surface, field, ascending) {
+      (await hook("setSort", wait))(surface, field, ascending);
       await wait.settled();
     },
     async openAlbumEditor() {
-      hook("openAlbumEditor")();
+      (await hook("openAlbumEditor", wait))();
       await wait.settled();
     },
     async setEqualizerMode(mode) {
-      await hook("setEqualizerMode")(mode);
+      await (await hook("setEqualizerMode", wait))(mode);
       await wait.settled();
     },
     async selectEqualizerPreset(name) {
-      await hook("selectEqualizerPreset")(name);
+      await (await hook("selectEqualizerPreset", wait))(name);
       await wait.settled();
     },
     async openEqualizerPresetMenu() {
-      hook("openEqualizerPresetMenu")();
+      (await hook("openEqualizerPresetMenu", wait))();
       await wait.settled();
     },
   };

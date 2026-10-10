@@ -12,6 +12,7 @@ const VIEW_MODE_SETTERS: Record<ScriptViewSurface, (mode: ViewMode) => void> = {
   playlistsCustom: (m) => prefs.setPlaylistsCustomViewMode(m),
   genres: (m) => prefs.setGenreCardsViewMode(m),
   pinned: (m) => prefs.setPinnedViewMode(m),
+  artistReleases: (m) => prefs.setArtistReleasesViewMode(m),
 };
 
 /**
@@ -20,8 +21,10 @@ const VIEW_MODE_SETTERS: Record<ScriptViewSurface, (mode: ViewMode) => void> = {
  */
 export function createViewController(wait: ScriptWaitApi): ScriptViewApi {
   return {
-    async setViewMode(surface, mode) {
-      VIEW_MODE_SETTERS[surface](mode);
+    async setViewModes(modes) {
+      for (const [surface, mode] of Object.entries(modes) as Array<[ScriptViewSurface, ViewMode]>) {
+        VIEW_MODE_SETTERS[surface](mode);
+      }
       await wait.settled();
     },
 

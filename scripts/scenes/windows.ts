@@ -1,5 +1,5 @@
 import { defineScene } from "./types";
-import { hoverAt } from "./helpers";
+import { hoverOver, unhover } from "./helpers";
 
 const MINIPLAYER = {
   view: { tab: "collection", subTab: "songs" },
@@ -16,7 +16,7 @@ export const windowScenes = [
     file: "miniplayer-hover.png",
     ...MINIPLAYER,
     // The hover controls only show while the pointer is over the window.
-    run: async (ctx) => hoverAt(ctx, 170, 210),
-    cleanup: async (ctx) => hoverAt(ctx, -1, -1),
+    run: async (ctx) => hoverOver(ctx, MINIPLAYER.clip),
+    cleanup: unhover,
   }),
 ];

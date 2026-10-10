@@ -16,8 +16,7 @@ export const playlistScenes = [
     file: "playlist-auto.png",
     view: { tab: "playlists", subTab: "auto" },
     layout: WIDE_SIDEBAR,
-    run: async ({ api }) => api.view.setViewMode("playlistsAuto", "rows"),
-    cleanup: async ({ api }) => api.view.setViewMode("playlistsAuto", "cards"),
+    views: { playlistsAuto: "rows" },
   }),
   defineScene({
     name: "playlist-auto-detail",

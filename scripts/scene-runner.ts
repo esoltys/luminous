@@ -5,7 +5,7 @@
 // scene is reset to a known state first, so a scene only declares what differs.
 import * as path from "node:path";
 import type { DevtoolsDriver } from "./devtools-driver";
-import type { ColorScheme, Featured, RemoteApi, Scene, SceneContext, SceneLayout } from "./scenes/types";
+import type { ColorScheme, Featured, RemoteApi, Scene, SceneContext, SceneLayout, SortSpec, SortSurface, ViewMode } from "./scenes/types";
 
 /** The slice of DevtoolsDriver the runner uses, so tests can fake it. */
 type SceneDriver = Pick<DevtoolsDriver, "evaluate" | "screenshot" | "setWindowSize" | "invoke">;
@@ -20,6 +20,21 @@ const SCENE_DEFAULTS = {
   position: 176,
   featured: { song: "I Get Weak", artist: "Cannons", album: "Everything Glows" } satisfies Featured,
   settleMs: 400,
+  /** Screenshots show every grid as cards unless a scene says otherwise. */
+  views: {
+    albums: "cards",
+    artists: "cards",
+    playlistsAuto: "cards",
+    playlistsCustom: "cards",
+    genres: "cards",
+    pinned: "cards",
+    artistReleases: "cards",
+  } as Record<string, ViewMode>,
+  sort: {
+    songs: { field: "title", ascending: true },
+    albums: { field: "year", ascending: false },
+    artists: { field: "song_count", ascending: false },
+  } as Record<SortSurface, SortSpec>,
 };
 
 export interface Pass {
@@ -218,11 +233,20 @@ export async function runScenes(opts: RunOptions): Promise<RunReport> {
     if (scene.view?.settings) await api.navigate.settings(scene.view.settings as never);
     else if (scene.view) await api.navigate.to(scene.view.tab as never, scene.view.subTab as never);
 
+    await api.view.setViewModes({ ...SCENE_DEFAULTS.views, ...scene.views });
+    if (scene.view?.tab === "collection") {
+      for (const surface of ["songs", "albums", "artists"] as const) {
+        const { field, ascending } = { ...SCENE_DEFAULTS.sort[surface], ...scene.sort?.[surface] };
+        await api.screens.setSort(surface, field, ascending);
+      }
+    }
+
     const { miniplayer, ...fullWindow } = layout;
     await api.appearance.setLayout(fullWindow);
     try {
-      if (scene.run) await scene.run(ctx);
+      // Enter the miniplayer before `run`, so a scene that hovers or clicks acts on the miniplayer itself.
       if (miniplayer) await api.appearance.setLayout({ miniplayer: true });
+      if (scene.run) await scene.run(ctx);
 
       await api.dialogs.dismissToasts();
       await driver.evaluate(SETTLE_PAGE);

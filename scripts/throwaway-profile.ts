@@ -138,6 +138,8 @@ const OUTWARD_KEY_PATTERNS = ["scrobbler_%", "listenbrainz_%", "discord_%"];
  * outside the machine is switched off:
  * - scrobbling, ListenBrainz and Discord presence (OUTWARD_KEY_PATTERNS) and any queued Subsonic scrobbles;
  * - auto-organize, which moves files on disk when the watcher sees a change;
+ * - songs that are dev fixtures (under tests/fixtures, or served from a loopback test server) are
+ *   dropped from the copy, so docs shots never show them;
  * - a library with no chosen default is pinned to "none" so the app can't link one and
  *   write a hierarchy sidecar into a music folder.
  * Left as is: WebDAV/Subsonic servers (background sync only writes to the copy).
@@ -155,6 +157,12 @@ export function cloneDatabase(source: string, dest: string): void {
   try {
     for (const pattern of OUTWARD_KEY_PATTERNS) copy.run("DELETE FROM app_state WHERE key LIKE ?", [pattern]);
     const hasTable = (name: string) => !!copy.query("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name);
+    if (hasTable("songs")) {
+      copy.run("PRAGMA foreign_keys = ON"); // so dependent rows (stats, playlist entries) go with the songs
+      copy.run(
+        "DELETE FROM songs WHERE path LIKE '%tests%fixtures%' OR path LIKE 'http://127.0.0.1:%' OR path LIKE 'http://localhost:%'"
+      );
+    }
     if (hasTable("subsonic_scrobble_queue")) copy.run("DELETE FROM subsonic_scrobble_queue");
     const organize = copy.query("SELECT value FROM app_state WHERE key = 'organize_config'").get() as { value: string } | null;
     if (organize) {

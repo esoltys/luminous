@@ -173,14 +173,15 @@ export interface ScriptWaitApi {
 }
 
 /** A grid that can show its items as cards or rows. */
-export type ScriptViewSurface = "albums" | "artists" | "playlistsAuto" | "playlistsCustom" | "genres" | "pinned";
+export type ScriptViewSurface = "albums" | "artists" | "playlistsAuto" | "playlistsCustom" | "genres" | "pinned" | "artistReleases";
 
 /**
  * Persistent view preferences scenes need to set without clicking through menus.
  * Every method is idempotent: setting what is already set succeeds without a change.
  */
 export interface ScriptViewApi {
-  setViewMode(surface: ScriptViewSurface, mode: "cards" | "rows"): Promise<void>;
+  /** Sets the cards/rows mode of several grids at once; surfaces not listed are left alone. */
+  setViewModes(modes: Partial<Record<ScriptViewSurface, "cards" | "rows">>): Promise<void>;
   setSeekbarMode(mode: "waveform" | "bands"): Promise<void>;
   /** Shows or hides a song-table column by its key (e.g. "initial_key"). */
   setColumnVisible(column: string, visible: boolean): Promise<void>;
@@ -195,6 +196,8 @@ export interface ScriptViewApi {
  * Each rejects with a hint if its screen isn't showing.
  */
 export interface ScriptScreensApi {
+  /** Sorts the Collection songs, albums or artists view, as its sort menu does. Needs the Collection tab on screen. */
+  setSort(surface: "songs" | "albums" | "artists", field: string, ascending: boolean): Promise<void>;
   /** Types into the top search box as a user would, opening its dropdown. */
   search(query: string): Promise<void>;
   /** Opens the album tag editor from the open album's detail view. */

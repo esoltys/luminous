@@ -256,6 +256,32 @@
     }
   });
 
+  // Dev-only entry point for scripted captures (src/lib/scripting/screens.ts); release builds never load it.
+  $effect(() => {
+    if (!import.meta.env.DEV) return;
+    let off: (() => void) | undefined;
+    let cancelled = false;
+    import("../scripting/screens").then(({ registerScreenHook }) => {
+      if (cancelled) return;
+      off = registerScreenHook("setSort", (surface, field, ascending) => {
+        if (surface === "songs") {
+          sortField = field as keyof Song;
+          sortAsc = ascending;
+        } else if (surface === "albums") {
+          albumSortField = field as typeof albumSortField;
+          albumSortAsc = ascending;
+        } else {
+          artistSortField = field as typeof artistSortField;
+          artistSortAsc = ascending;
+        }
+      });
+    });
+    return () => {
+      cancelled = true;
+      off?.();
+    };
+  });
+
   const albumKey = (album: AlbumItem) => album.artist + "|" + album.album;
 
   let sortedAlbums = $derived.by(() => {

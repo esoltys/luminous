@@ -2,7 +2,7 @@
 // in this folder. A scene is mostly data: where the app should be and what it
 // should look like. `run` is only for scenes that need real interaction.
 import type { DevtoolsDriver } from "../devtools-driver";
-import type { LuminousScriptApi } from "../../src/lib/scripting/types";
+import type { LuminousScriptApi, ScriptViewSurface } from "../../src/lib/scripting/types";
 
 export type ColorScheme = "light" | "dark";
 
@@ -39,6 +39,13 @@ export interface SceneLayout {
   miniplayer?: boolean;
 }
 
+export type ViewMode = "cards" | "rows";
+export type SortSurface = "songs" | "albums" | "artists";
+export interface SortSpec {
+  field: string;
+  ascending: boolean;
+}
+
 export interface SceneContext {
   readonly api: RemoteApi;
   readonly driver: DevtoolsDriver;
@@ -69,6 +76,10 @@ export interface Scene {
   theme?: string;
   layout?: SceneLayout;
   viewport?: { width: number; height: number };
+  /** Cards or rows per grid. Every grid not listed here is captured as cards. */
+  views?: Partial<Record<ScriptViewSurface, ViewMode>>;
+  /** Sort order of the Collection views. Any not listed use the runner's default. */
+  sort?: Partial<Record<SortSurface, SortSpec>>;
   /** Seconds into the featured song when the scene is captured. */
   position?: number;
   featured?: Featured;

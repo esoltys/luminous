@@ -29,7 +29,22 @@ export async function ensureCustomPlaylist(ctx: SceneContext, name: string): Pro
   await ctx.driver.invoke("add_to_playlist", { playlistId: playlist.id, songIds: songs.map((s) => s.id) });
 }
 
-/** Moves the pointer to a point (CSS pixels) so :hover styles apply there. */
-export async function hoverAt(ctx: SceneContext, x: number, y: number): Promise<void> {
+/** Moves the pointer to a point (CSS pixels): :hover styles apply and pointer handlers fire. */
+async function hoverAt(ctx: SceneContext, x: number, y: number): Promise<void> {
   await ctx.driver.send("Input.dispatchMouseEvent", { type: "mouseMoved", x, y });
+}
+
+/** Hovers the centre of the first element matching `selector`, as a real pointer would. */
+export async function hoverOver(ctx: SceneContext, selector: string): Promise<void> {
+  const rect = await ctx.driver.evaluate((sel: string) => {
+    const r = document.querySelector(sel)?.getBoundingClientRect();
+    return r ? { x: r.x + r.width / 2, y: r.y + r.height / 2 } : null;
+  }, selector);
+  if (!rect) throw new Error(`No element matches "${selector}" to hover.`);
+  await hoverAt(ctx, rect.x, rect.y);
+}
+
+/** Moves the pointer to the window corner, which hover-aware components treat as "outside". */
+export async function unhover(ctx: SceneContext): Promise<void> {
+  await hoverAt(ctx, 0, 0);
 }

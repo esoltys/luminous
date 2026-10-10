@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createScriptingApi, installScriptingApi } from "./index";
 import { registerDialogHostControls } from "./dialogs";
-import { registerScreenHook } from "./screens";
+import { createScreensController, registerScreenHook } from "./screens";
+import { createWaitController } from "./wait";
 import { prefs } from "../stores/prefs.svelte";
 import { collectionStore } from "../stores/collection.svelte";
 import { navigationStore } from "../stores/navigation.svelte";
@@ -328,9 +329,14 @@ describe("In-app scripting API", () => {
   describe("View controller", () => {
     it("sets view and seekbar modes idempotently", async () => {
       const api = createScriptingApi();
-      await api.view.setViewMode("albums", "rows");
-      await api.view.setViewMode("albums", "rows");
+      await api.view.setViewModes({ albums: "rows", genres: "rows" });
+      await api.view.setViewModes({ albums: "rows" });
       expect(prefs.albumsViewMode).toBe("rows");
+      expect(prefs.genreCardsViewMode).toBe("rows");
+
+      await api.view.setViewModes({ albums: "cards", genres: "cards" });
+      expect(prefs.albumsViewMode).toBe("cards");
+      expect(prefs.genreCardsViewMode).toBe("cards");
 
       await api.view.setSeekbarMode("bands");
       await api.view.setSeekbarMode("bands");
@@ -392,6 +398,18 @@ describe("In-app scripting API", () => {
       off();
       await api.dialogs.closeAll();
       expect(closed).toBe(1);
+    });
+
+    it("passes sort requests to the Collection view's hook", async () => {
+      const api = createScreensController(createWaitController());
+      const seen: unknown[][] = [];
+      const off = registerScreenHook("setSort", (...args) => {
+        seen.push(args);
+      });
+
+      await api.setSort("albums", "year", false);
+      expect(seen).toEqual([["albums", "year", false]]);
+      off();
     });
 
     it("says which screen to open when its hook is missing", async () => {

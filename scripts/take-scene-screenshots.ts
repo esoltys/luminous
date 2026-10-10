@@ -119,12 +119,8 @@ async function main() {
         // A clone already has its library scanned.
         if (!opts.cloneFrom) await profile.scanLibrary(opts.libraries);
         // Startup-only layout preferences, read once at load: match the current guide
-        // (albums newest first, artists by song count, Album Info collapsed), then reload.
+        // (Album Info collapsed so the track list gets the room), then reload.
         await driver.evaluate(() => {
-          localStorage.setItem("sort_album_field", "year");
-          localStorage.setItem("sort_album_asc", "false");
-          localStorage.setItem("sort_artist_field", "song_count");
-          localStorage.setItem("sort_artist_asc", "false");
           localStorage.setItem("layout_isOverviewExpanded", "false");
         });
         await driver.reload();

@@ -230,6 +230,29 @@ describe("throwaway-profile", () => {
       }
     });
 
+    it("drops dev-fixture songs (and their stats) from the copy, keeps real ones", async () => {
+      const source = new AppProfile();
+      const db = new Database(source.dbPath);
+      db.exec("CREATE TABLE songs (id INTEGER PRIMARY KEY, path TEXT, title TEXT)");
+      db.exec("CREATE TABLE song_stats (song_id INTEGER PRIMARY KEY REFERENCES songs(id) ON DELETE CASCADE, plays INTEGER)");
+      const insert = db.query("INSERT INTO songs (path, title) VALUES (?, ?)");
+      insert.run("G:\\Music\\Cannons\\song.flac", "I Get Weak");
+      insert.run("C:\\src\\luminous\\src-tauri\\tests\\fixtures\\audio\\song_alpha.mp3", "Alpha");
+      insert.run("http://127.0.0.1:8765/Test%20Artist/song.mp3", "Remote Alpha");
+      db.exec("INSERT INTO song_stats VALUES (1, 5), (2, 9)");
+      db.close();
+
+      const clone = new AppProfile({ cloneFrom: source.dbPath });
+      try {
+        expect(rows<{ title: string }>(clone.dbPath, "SELECT title FROM songs")).toEqual([{ title: "I Get Weak" }]);
+        expect(rows(clone.dbPath, "SELECT song_id FROM song_stats")).toEqual([{ song_id: 1 }]);
+        expect(rows(source.dbPath, "SELECT id FROM songs").length).toBe(3);
+      } finally {
+        await clone.dispose();
+        await source.dispose();
+      }
+    });
+
     it("pins an unchosen default library to none so no sidecar can be written, but keeps a chosen one", async () => {
       const unchosen = new AppProfile();
       unchosen.writeAppState({ default_library_path: null });
