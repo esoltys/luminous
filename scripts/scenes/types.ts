@@ -80,6 +80,8 @@ export interface Scene {
   settleMs?: number;
   /** Interaction between reset and capture, for what the declarative fields can't express. */
   run?(ctx: SceneContext): Promise<void>;
+  /** Undoes persistent changes `run` made (a column, the seekbar mode) so later scenes start clean. Runs even when the scene fails. */
+  cleanup?(ctx: SceneContext): Promise<void>;
 }
 
 export function defineScene(scene: Scene): Scene {

@@ -299,6 +299,20 @@
   });
 
   let isEditorOpen = $state(false);
+
+  // Dev-only entry point for scripted captures (src/lib/scripting/screens.ts); release builds never load it.
+  $effect(() => {
+    if (!import.meta.env.DEV) return;
+    let off: (() => void) | undefined;
+    let cancelled = false;
+    import("../scripting/screens").then(({ registerScreenHook }) => {
+      if (!cancelled) off = registerScreenHook("openAlbumEditor", () => { isEditorOpen = true; });
+    });
+    return () => {
+      cancelled = true;
+      off?.();
+    };
+  });
   let albumProfile = $derived(collectionStore.getAlbumProfile(albumName));
   let hasDescription = $derived(!!albumProfile?.description?.trim());
   let hasWebsite = $derived(

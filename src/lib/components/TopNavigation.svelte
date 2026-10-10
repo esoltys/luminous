@@ -48,6 +48,25 @@
     searchDebounceTimer = setTimeout(() => collectionStore.search(query), SEARCH_DEBOUNCE_MS);
   }
 
+  // Dev-only entry point for scripted captures (src/lib/scripting/screens.ts); release builds never load it.
+  $effect(() => {
+    if (!import.meta.env.DEV) return;
+    let off: (() => void) | undefined;
+    let cancelled = false;
+    import("../scripting/screens").then(({ registerScreenHook }) => {
+      if (cancelled) return;
+      off = registerScreenHook("search", async (query) => {
+        collectionStore.searchQuery = query;
+        isSearchFocused = true;
+        await collectionStore.search(query);
+      });
+    });
+    return () => {
+      cancelled = true;
+      off?.();
+    };
+  });
+
   function focusFirstSearchResult() {
     const first = searchDropdownRef?.querySelector<HTMLElement>(".search-result-item");
     first?.focus();

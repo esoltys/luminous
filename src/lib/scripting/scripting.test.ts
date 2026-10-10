@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createScriptingApi, installScriptingApi } from "./index";
 import { registerDialogHostControls } from "./dialogs";
+import { registerScreenHook } from "./screens";
+import { prefs } from "../stores/prefs.svelte";
+import { collectionStore } from "../stores/collection.svelte";
 import { navigationStore } from "../stores/navigation.svelte";
 import { playerStore } from "../stores/player.svelte";
 import { themeStore } from "../stores/theme.svelte";
@@ -319,6 +322,66 @@ describe("In-app scripting API", () => {
     it("times out if condition is never satisfied", async () => {
       const api = createScriptingApi();
       await expect(api.wait.forState(() => false, 50)).rejects.toThrow("Timed out waiting for state condition");
+    });
+  });
+
+  describe("View controller", () => {
+    it("sets view and seekbar modes idempotently", async () => {
+      const api = createScriptingApi();
+      await api.view.setViewMode("albums", "rows");
+      await api.view.setViewMode("albums", "rows");
+      expect(prefs.albumsViewMode).toBe("rows");
+
+      await api.view.setSeekbarMode("bands");
+      await api.view.setSeekbarMode("bands");
+      expect(prefs.seekBarMode).toBe("bands");
+      await api.view.setSeekbarMode("waveform");
+      expect(prefs.seekBarMode).toBe("waveform");
+    });
+
+    it("shows and hides a song-table column, naming valid columns for an unknown one", async () => {
+      const api = createScriptingApi();
+      await api.view.setColumnVisible("initial_key", true);
+      expect(collectionStore.visibleColumns.initial_key).toBe(true);
+      await api.view.setColumnVisible("initial_key", true);
+      expect(collectionStore.visibleColumns.initial_key).toBe(true);
+      await api.view.setColumnVisible("initial_key", false);
+      expect(collectionStore.visibleColumns.initial_key).toBe(false);
+      await expect(api.view.setColumnVisible("nope", true)).rejects.toThrow(/Unknown song-table column "nope"/);
+    });
+
+    it("opens the smart-playlist builder with the given rules", async () => {
+      const api = createScriptingApi();
+      await api.view.openSmartPlaylistBuilder([{ field: "year", op: ">=", value: "1980" }]);
+      expect(collectionStore.isSmartBuilderOpen).toBe(true);
+      expect(collectionStore.smartBuilderRules).toEqual([{ field: "year", op: ">=", value: "1980" }]);
+      collectionStore.closeSmartBuilder();
+    });
+
+    it("navigates to the Playlists sub-tabs", async () => {
+      const api = createScriptingApi();
+      await api.navigate.to("playlists", "auto");
+      expect(navigationStore.activeTab).toBe("playlists");
+      expect(navigationStore.playlistsSubTab).toBe("auto");
+    });
+  });
+
+  describe("Screens controller", () => {
+    it("calls a registered screen hook and stops after it unregisters", async () => {
+      const api = createScriptingApi();
+      const seen: string[] = [];
+      const off = registerScreenHook("search", async (q) => { seen.push(q); });
+
+      await api.screens.search("evan");
+      expect(seen).toEqual(["evan"]);
+
+      off();
+      await expect(api.screens.search("x")).rejects.toThrow(/needs the top navigation bar on screen/);
+    });
+
+    it("says which screen to open when its hook is missing", async () => {
+      const api = createScriptingApi();
+      await expect(api.screens.openAlbumEditor()).rejects.toThrow(/navigate\.album first/);
     });
   });
 });

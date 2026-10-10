@@ -19,7 +19,7 @@ export interface ScriptNavigationApi {
   /**
    * Navigates to a top-level tab and optional sub-tab.
    */
-  to(tab: ActiveTab, subTab?: ActiveSubTab): Promise<void>;
+  to(tab: ActiveTab, subTab?: ActiveSubTab | "auto" | "custom"): Promise<void>;
 
   /**
    * Navigates to an album detail view by name, optionally focusing a specific song.
@@ -172,6 +172,37 @@ export interface ScriptWaitApi {
   settled(): Promise<void>;
 }
 
+/** A grid that can show its items as cards or rows. */
+export type ScriptViewSurface = "albums" | "artists" | "playlistsAuto" | "playlistsCustom" | "genres" | "pinned";
+
+/**
+ * Persistent view preferences scenes need to set without clicking through menus.
+ * Every method is idempotent: setting what is already set succeeds without a change.
+ */
+export interface ScriptViewApi {
+  setViewMode(surface: ScriptViewSurface, mode: "cards" | "rows"): Promise<void>;
+  setSeekbarMode(mode: "waveform" | "bands"): Promise<void>;
+  /** Shows or hides a song-table column by its key (e.g. "initial_key"). */
+  setColumnVisible(column: string, visible: boolean): Promise<void>;
+  /** Switches the Organize view to a custom template pattern. */
+  setOrganizeTemplate(template: string): Promise<void>;
+  /** Opens the smart-playlist builder on Playlists → Custom, pre-filled with rules. */
+  openSmartPlaylistBuilder(rules?: Array<{ field: string; op: string; value: string }>): Promise<void>;
+}
+
+/**
+ * Component-local states reachable only through the component that owns them.
+ * Each rejects with a hint if its screen isn't showing.
+ */
+export interface ScriptScreensApi {
+  /** Types into the top search box as a user would, opening its dropdown. */
+  search(query: string): Promise<void>;
+  /** Opens the album tag editor from the open album's detail view. */
+  openAlbumEditor(): Promise<void>;
+  setEqualizerMode(mode: "graphic10" | "parametric"): Promise<void>;
+  openEqualizerPresetMenu(): Promise<void>;
+}
+
 /**
  * Primary scripting API exposed on window.__LUMINOUS_SCRIPT__.
  */
@@ -181,6 +212,8 @@ export interface LuminousScriptApi {
   readonly playback: ScriptPlaybackApi;
   readonly appearance: ScriptAppearanceApi;
   readonly dialogs: ScriptDialogsApi;
+  readonly view: ScriptViewApi;
+  readonly screens: ScriptScreensApi;
   readonly wait: ScriptWaitApi;
 }
 

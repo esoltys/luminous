@@ -4,9 +4,12 @@ import { createNavigationController } from "./navigation";
 import { createPlaybackController } from "./playback";
 import { createAppearanceController } from "./appearance";
 import { createDialogsController } from "./dialogs";
+import { createViewController } from "./view";
+import { createScreensController } from "./screens";
 
 export * from "./types";
 export { registerDialogHostControls, type DialogHostControls } from "./dialogs";
+export { registerScreenHook, type ScreenHooks } from "./screens";
 
 const SCRIPTING_API_VERSION = "1.0.0";
 
@@ -19,6 +22,8 @@ export function createScriptingApi(): LuminousScriptApi {
   const playback = createPlaybackController(wait);
   const appearance = createAppearanceController(wait);
   const dialogs = createDialogsController(wait);
+  const view = createViewController(wait);
+  const screens = createScreensController(wait);
 
   return {
     version: SCRIPTING_API_VERSION,
@@ -26,6 +31,8 @@ export function createScriptingApi(): LuminousScriptApi {
     playback,
     appearance,
     dialogs,
+    view,
+    screens,
     wait,
   };
 }

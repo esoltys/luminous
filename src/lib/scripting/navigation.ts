@@ -9,12 +9,14 @@ import type { ScriptNavigationApi, ScriptWaitApi } from "./types";
  */
 export function createNavigationController(wait: ScriptWaitApi): ScriptNavigationApi {
   return {
-    async to(tab: ActiveTab, subTab?: ActiveSubTab): Promise<void> {
+    async to(tab: ActiveTab, subTab?: ActiveSubTab | "auto" | "custom"): Promise<void> {
       collectionStore.searchQuery = "";
       collectionStore.searchResults = [];
 
       navigationStore.activeTab = tab;
-      if (subTab) {
+      if (subTab === "auto" || subTab === "custom") {
+        navigationStore.playlistsSubTab = subTab;
+      } else if (subTab) {
         navigationStore.activeSubTab = subTab;
       }
       navigationStore.selectedAlbumName = null;

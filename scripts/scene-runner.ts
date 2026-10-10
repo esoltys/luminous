@@ -216,22 +216,26 @@ export async function runScenes(opts: RunOptions): Promise<RunReport> {
 
     const { miniplayer, ...fullWindow } = layout;
     await api.appearance.setLayout(fullWindow);
-    if (scene.run) await scene.run(ctx);
-    if (miniplayer) await api.appearance.setLayout({ miniplayer: true });
+    try {
+      if (scene.run) await scene.run(ctx);
+      if (miniplayer) await api.appearance.setLayout({ miniplayer: true });
 
-    await api.dialogs.dismissToasts();
-    await driver.evaluate(SETTLE_PAGE);
-    await sleep(scene.settleMs ?? SCENE_DEFAULTS.settleMs);
+      await api.dialogs.dismissToasts();
+      await driver.evaluate(SETTLE_PAGE);
+      await sleep(scene.settleMs ?? SCENE_DEFAULTS.settleMs);
 
-    const file = outputPath(outRoot, scene, pass.locale, pass.scheme);
-    if (scene.clip) {
-      const clip = await driver.evaluate(ELEMENT_RECT, scene.clip);
-      if (!clip) throw new Error(`No element matches "${scene.clip}"`);
-      await driver.screenshot({ path: file, clip });
-    } else {
-      await driver.screenshot({ path: file });
+      const file = outputPath(outRoot, scene, pass.locale, pass.scheme);
+      if (scene.clip) {
+        const clip = await driver.evaluate(ELEMENT_RECT, scene.clip);
+        if (!clip) throw new Error(`No element matches "${scene.clip}"`);
+        await driver.screenshot({ path: file, clip });
+      } else {
+        await driver.screenshot({ path: file });
+      }
+      return file;
+    } finally {
+      await scene.cleanup?.(ctx);
     }
-    return file;
   }
 
   for (const pass of passes) {

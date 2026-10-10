@@ -562,6 +562,27 @@
     }
   }
 
+  // Dev-only entry points for scripted captures (src/lib/scripting/screens.ts); release builds never load them.
+  $effect(() => {
+    if (!import.meta.env.DEV) return;
+    let off: (() => void) | undefined;
+    let cancelled = false;
+    import("../scripting/screens").then(({ registerScreenHook }) => {
+      if (cancelled) return;
+      const offs = [
+        registerScreenHook("setEqualizerMode", handleModeChange),
+        registerScreenHook("openEqualizerPresetMenu", () => {
+          if (!presetMenuPos) togglePresetMenu();
+        }),
+      ];
+      off = () => offs.forEach((o) => o());
+    });
+    return () => {
+      cancelled = true;
+      off?.();
+    };
+  });
+
   onMount(async () => {
     loadLoudnessSettings();
     loadFadeSettings();
