@@ -28,7 +28,7 @@ describe("ContextMenu.svelte vertical placement", () => {
       }
     );
     Object.defineProperty(window, "innerHeight", { value: 800, configurable: true });
-    playerStore.currentSong = null;
+    playerStore.currentSong = undefined;
   });
 
   afterEach(() => {
