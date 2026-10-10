@@ -95,7 +95,7 @@
 </script>
 
 {#if menuVisible}
-<ContextMenu {x} {y} {onClose} estimatedHeight={220}>
+<ContextMenu {x} {y} {onClose}>
   <div class="px-3 py-1 text-[11px] font-bold text-brand-text-primary border-b border-brand-border/40 mb-1 truncate">
     {albumName || i18n.t("collection.unknownAlbum")}
   </div>

@@ -37,7 +37,7 @@
   let refKey = $derived(autoPlaylistRefKeyFor(autoPlaylist));
 </script>
 
-<ContextMenu {x} {y} {onClose} estimatedHeight={180}>
+<ContextMenu {x} {y} {onClose}>
   <div class="px-3 py-1 text-[11px] font-bold text-brand-text-primary border-b border-brand-border/40 mb-1 truncate">
     {label}
   </div>

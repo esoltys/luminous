@@ -935,7 +935,7 @@
   <ContextMenu
     x={overflowMenuPos.x}
     y={overflowMenuPos.y}
-    estimatedHeight={320}
+   
     onClose={() => { showOverflowMenu = false; }}
   >
     <ContextMenuItem
