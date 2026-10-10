@@ -1505,7 +1505,6 @@ export const es = {
     communityRating: "Valoración de la comunidad",
     reviewOnCritiqueBrainz: "Reseña en CritiqueBrainz",
     reviewOnCritiqueBrainzTooltip: "Abre este álbum en CritiqueBrainz para leer o escribir reseñas",
-    viewOnMusicBrainzTooltip: "Abre este álbum en MusicBrainz",
     retrieveDetailsSuccess: {
       one: "Se agregó {count} enlace de MusicBrainz",
       other: "Se agregaron {count} enlaces de MusicBrainz"

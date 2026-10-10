@@ -28,10 +28,6 @@
   import CardSection from "./CardSection.svelte";
   import PlayShuffleButtons from "./PlayShuffleButtons.svelte";
   import ArtistProfileEditor from "./ArtistProfileEditor.svelte";
-  import MarkdownBio from "./MarkdownBio.svelte";
-  import SocialIcon from "./SocialIcon.svelte";
-  import ArtistInformationPanel from "./ArtistInformationPanel.svelte";
-  import ArtistEventsSection from "./ArtistEventsSection.svelte";
   import SongSelectionToolbar from "./SongSelectionToolbar.svelte";
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
   import ContextMenu from "./ContextMenu.svelte";
@@ -45,25 +41,13 @@
     PushPinSlashIcon as PinOff,
     DotsThreeIcon as MoreHorizontal,
     ChartBarIcon as BarChart2,
-    ArrowDownLeftIcon as ArrowDownLeft,
-    ArrowUpRightIcon as ArrowUpRight,
     ShareNetworkIcon as Share,
     ImageIcon as RetrieveImage
   } from "phosphor-svelte";
-  const ExternalLink = OpenInPicard;
+  import InfoSidebarToggle from "./InfoSidebarToggle.svelte";
+  import { contextStore, entitySubject } from "../stores/context.svelte";
   import ShareModal from "./ShareModal.svelte";
-  import type { Song, Playlist, AlbumItem, PlayContext, ArtistProfile, ExtendedArtworkResponse, SongContextEnrichment, ArtistEvent } from "../types";
-  import {
-    resolveSocialUrl,
-    formatDisplayLabel,
-    normalizeWebsitePlatform,
-    resolveArtistMbid,
-    deriveMusicbrainzArtistUrl,
-    deriveMusicbrainzEventsUrl,
-    deriveListenbrainzArtistUrl,
-    deriveFanartTvUrlFromMbid,
-    isBlacklistedLink,
-  } from "../utils/artistSocials";
+  import type { Song, Playlist, AlbumItem, PlayContext, ArtistProfile, ExtendedArtworkResponse } from "../types";
   import { getArtistAlbums, classifyRelease } from "../utils/artist";
   import {
     songsToCoverStack,
@@ -120,14 +104,7 @@
   }
 
   let artistProfile = $derived(collectionStore.getArtistProfile(artistName));
-  let hasWebsite = $derived(
-    !!artistProfile?.website?.trim() && !isBlacklistedLink(artistProfile?.website, "website")
-  );
   let hasTags = $derived((artistProfile?.tags?.length ?? 0) > 0);
-  let hasSocials = $derived(
-    !!artistProfile?.social_links &&
-      artistProfile.social_links.some((l) => !isBlacklistedLink(l.handle_or_url, l.platform))
-  );
 
   // "Retrieve Artist Details" needs a MusicBrainz artist MBID: either
   // already captured on the profile (via "Retrieve Album Details" or a
@@ -137,102 +114,9 @@
       songs.some((s) => (s.musicbrainz_artist_id ?? s.musicbrainz_album_artist_id ?? "").trim().length > 0)
   );
 
-  // Fetched MusicBrainz/Wikipedia context (#23), keyed off a track by
-  // this artist with a MusicBrainz ID (or first song) — neither ArtistProfile
-  // nor a dedicated artist entity carry a MusicBrainz ID of their own,
-  // so the backend resolves it from a song row.
-  let contextData = $state<SongContextEnrichment | null>(null);
-  $effect(() => {
-    const songWithMb = songs.find((s) => s.musicbrainz_artist_id || s.musicbrainz_album_artist_id);
-    const id = songWithMb?.id || songs[0]?.id;
-    if (!id || !prefs.onlineEnabled) {
-      contextData = null;
-      return;
-    }
-    let cancelled = false;
-    invoke<SongContextEnrichment>("get_song_context", { songId: id, locale: i18n.currentLocale })
-      .then((data) => {
-        if (!cancelled) contextData = data;
-      })
-      .catch(() => {
-        if (!cancelled) contextData = null;
-      });
-    return () => {
-      cancelled = true;
-    };
-  });
-
-  // The user's own bio (personal curation) always wins over the fetched
-  // Wikipedia extract — fetched data only fills the gap when nothing local
-  // exists, per the canonical-lookup-vs-personal-curation split in AGENTS.md.
-  let effectiveBio = $derived(artistProfile?.bio || contextData?.wikipedia_extract);
-  let bioIsFromWikipedia = $derived(!artistProfile?.bio && !!contextData?.wikipedia_extract);
-  let hasBio = $derived(!!effectiveBio);
-
-  // Derived, read-only MusicBrainz/ListenBrainz/Fanart.tv links (#98/#761,
-  // #1123) from the artist's resolved MBID — not a fetch, just computed
-  // URLs, same as any other link in this section.
-  let artistMbid = $derived(
-    resolveArtistMbid(artistProfile?.musicbrainz_artist_id, artistProfile?.social_links)
-  );
-  let musicbrainzArtistUrl = $derived(deriveMusicbrainzArtistUrl(artistMbid));
-  let musicbrainzEventsUrl = $derived(deriveMusicbrainzEventsUrl(artistMbid));
-  let listenbrainzArtistUrl = $derived(deriveListenbrainzArtistUrl(artistMbid));
-  let fanartTvUrl = $derived(deriveFanartTvUrlFromMbid(artistMbid));
-
-  let hasArtistInfo = $derived(
-    !!contextData?.artist_begin_date ||
-      !!contextData?.artist_end_date ||
-      !!contextData?.artist_begin_area_name ||
-      !!contextData?.artist_area_name
-  );
-
-  let artistEvents = $state<ArtistEvent[]>([]);
-  let loadingEvents = $state(false);
-
-  $effect(() => {
-    const name = artistName;
-    const songWithMb = songs.find((s) => s.musicbrainz_artist_id || s.musicbrainz_album_artist_id);
-    const id = songWithMb?.id || songs[0]?.id;
-    if (!prefs.onlineEnabled) {
-      artistEvents = [];
-      loadingEvents = false;
-      return;
-    }
-    let cancelled = false;
-    loadingEvents = true;
-    invoke<ArtistEvent[]>("get_artist_events", { artist: name, songId: id })
-      .then((data) => {
-        if (!cancelled) artistEvents = data || [];
-      })
-      .catch(() => {
-        if (!cancelled) artistEvents = [];
-      })
-      .finally(() => {
-        if (!cancelled) loadingEvents = false;
-      });
-    return () => {
-      cancelled = true;
-    };
-  });
-
-  let songkickLink = $derived(
-    artistProfile?.social_links?.find((l) => l.platform === "songkick")?.handle_or_url ?? null
-  );
-  let setlistfmLink = $derived(
-    artistProfile?.social_links?.find((l) => l.platform === "setlistfm")?.handle_or_url ?? null
-  );
-  let bandsintownLink = $derived(
-    artistProfile?.social_links?.find((l) => l.platform === "bandsintown")?.handle_or_url ?? null
-  );
-
-  let hasEvents = $derived(
-    artistEvents.length > 0 || !!songkickLink || !!setlistfmLink || !!bandsintownLink
-  );
-
-  let hasProfileContent = $derived(
-    hasWebsite || hasBio || hasSocials || !!artistMbid || hasArtistInfo || hasEvents
-  );
+  // Everything fetched about the artist (facts, bio, events, links) lives in contextStore and shows
+  // in the info sidebar; this view only refreshes it after curation and offers the toggle.
+  let infoSubject = $derived(entitySubject("artist", artistName, songs));
 
   // Locally-discovered artist visuals (#98/#761) — portrait/logo/fanart,
   // fetched on demand per artist since scanning every artist's folder
@@ -259,87 +143,11 @@
     resolveArtistBackgroundUrl(artistArtwork?.fanart_uri, artistProfile?.fetched_background_filename)
   );
 
-  interface ArtistLinkItem {
-    key: string;
-    platform: string;
-    url: string;
-    label: string;
-    /** The artist's own official site(s) — MusicBrainz's "official
-     * homepage" relation(s) — rendered more prominently than a plain
-     * cross-reference or social link (#1123). */
-    isOfficial: boolean;
-  }
-
-  // Unifies the website, curated social links, and derived MusicBrainz/
-  // ListenBrainz/Fanart.tv links into one alphabetically-sorted list — same
-  // convention as AlbumDetailView's `releaseLinkItems` (#1122) — so the
-  // derived links aren't stuck at a fixed spot at the end regardless of
-  // what else is present. The official website always leads, ahead of the
-  // alphabetical sort, since it's the artist's own page rather than one
-  // more retrieved link.
-  let artistLinkItems = $derived.by((): ArtistLinkItem[] => {
-    const items: ArtistLinkItem[] = [];
-    if (hasWebsite && !isBlacklistedLink(artistProfile?.website, "website")) {
-      const website = artistProfile?.website ?? "";
-      const url = resolveSocialUrl("website", website);
-      items.push({
-        key: "website",
-        platform: normalizeWebsitePlatform("website", url),
-        url,
-        label: formatDisplayLabel("website", website),
-        isOfficial: true,
-      });
-    }
-    for (const link of artistProfile?.social_links ?? []) {
-      if (isBlacklistedLink(link.handle_or_url, link.platform)) continue;
-      const url = resolveSocialUrl(link.platform, link.handle_or_url);
-      items.push({
-        key: `${link.platform}:${link.handle_or_url}`,
-        platform: normalizeWebsitePlatform(link.platform, url),
-        url,
-        label: formatDisplayLabel(link.platform, link.handle_or_url),
-        // A secondary "official homepage" (multiple listed on MB) is still
-        // stored under platform "website" before normalization — it's
-        // official too, just not the primary one.
-        isOfficial: link.platform === "website",
-      });
-    }
-    if (musicbrainzArtistUrl) {
-      items.push({ key: "musicbrainz-derived", platform: "musicbrainz", url: musicbrainzArtistUrl, label: "MusicBrainz", isOfficial: false });
-    }
-    if (listenbrainzArtistUrl) {
-      items.push({ key: "listenbrainz-derived", platform: "listenbrainz", url: listenbrainzArtistUrl, label: "ListenBrainz", isOfficial: false });
-    }
-    if (fanartTvUrl) {
-      items.push({ key: "fanart-tv", platform: "fanart_tv", url: fanartTvUrl, label: "Fanart.tv", isOfficial: false });
-    }
-    // Official homepage(s) lead as a group, ahead of the alphabetical sort —
-    // they're the artist's own page(s) rather than retrieved cross-references,
-    // and grouping them keeps a second/third homepage next to the first
-    // instead of scattered wherever its label happens to sort (#1123).
-    return items.sort((a, b) => {
-      if (a.isOfficial !== b.isOfficial) return a.isOfficial ? -1 : 1;
-      if (a.key === "website") return -1;
-      if (b.key === "website") return 1;
-      return a.label.localeCompare(b.label);
-    });
-  });
-
   function handleTagClick(tag: string) {
     collectionStore.searchQuery = `artist-tag:${tag}`;
     navigationStore.selectedArtistName = null;
     navigationStore.activeTab = "collection";
     navigationStore.activeSubTab = "artists";
-  }
-
-  async function handleOpenUrl(url: string) {
-    if (!url) return;
-    try {
-      const { openUrl } = await import("@tauri-apps/plugin-opener");
-      await openUrl(url);
-    } catch {
-      window.open(url, "_blank");
-    }
   }
 
   function handleAlbumContextMenu(event: MouseEvent, album: AlbumItem) {
@@ -394,21 +202,11 @@
       }
       await collectionStore.refreshLibrary();
       await refetchSongs();
-      const songWithMb = songs.find((s) => s.musicbrainz_artist_id || s.musicbrainz_album_artist_id);
-      const contextSongId = songWithMb?.id ?? songs[0]?.id;
-      const online = prefs.onlineEnabled;
-      const [artwork, context, events] = await Promise.all([
+      const [artwork] = await Promise.all([
         collectionStore.getExtendedArtworkForArtist(artistName, true),
-        online && contextSongId
-          ? invoke<SongContextEnrichment>("get_song_context", { songId: contextSongId, forceRefresh: true, locale: i18n.currentLocale }).catch(() => null)
-          : Promise.resolve(null),
-        online
-          ? invoke<ArtistEvent[]>("get_artist_events", { artist: artistName, songId: contextSongId, forceRefresh: true }).catch(() => null)
-          : Promise.resolve(null)
+        contextStore.refresh(infoSubject),
       ]);
       artistArtwork = artwork;
-      if (context) contextData = context;
-      if (events) artistEvents = events;
       toastStore.show(i18n.t("artistDetail.refreshSuccess", {}, "Artist artwork and bio refreshed"));
     } catch (err) {
       console.error("Failed to refresh artist:", err);
@@ -446,20 +244,9 @@
         current: 1,
         label: i18n.t("artistDetail.retrievingBio", {}, "Retrieving artist summary..."),
       });
-      const songWithMb = songs.find((s) => s.musicbrainz_artist_id || s.musicbrainz_album_artist_id);
-      const contextSongId = songWithMb?.id ?? songs[0]?.id;
-      if (contextSongId) {
-        try {
-          const context = await invoke<SongContextEnrichment>("get_song_context", {
-            songId: contextSongId,
-            forceRefresh: true,
-            locale: i18n.currentLocale,
-          });
-          if (context) contextData = context;
-        } catch (e) {
-          console.warn("Failed to retrieve artist context:", e);
-        }
-      }
+      await contextStore.refresh(infoSubject).catch((e) => {
+        console.warn("Failed to retrieve artist context:", e);
+      });
 
       // Step 3: Artist portrait image
       tasksStore.updateTask(taskId, {
@@ -642,7 +429,6 @@
 
   $effect(() => {
     const requested = artistName;
-    contextData = null;
     isBioExpanded = false;
     // Track collectionStore.songs so artist details update when the library changes (e.g. new albums added)
     const _libraryVersion = collectionStore.songs;
@@ -932,149 +718,19 @@
 
   <div class="px-6 pt-6 flex flex-col gap-8">
     {#if !windowLayoutStore.isDetailHeaderCollapsed}
-      {#if hasChips || (hasProfileContent && !windowLayoutStore.isOverviewExpanded)}
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          {#if hasChips}
-            <GenreChips
-              curatedTags={artistOnlyTags}
-              onCuratedTagClick={handleTagClick}
-              curatedTagTitle={(tag) => `Filter artists tagged "${tag}"`}
-              variant="full"
-            />
-          {/if}
-          {#if hasProfileContent && !windowLayoutStore.isOverviewExpanded}
-            <button
-              type="button"
-              onclick={() => windowLayoutStore.setOverviewExpanded(true)}
-              class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-brand-border bg-brand-sidebar text-brand-text-secondary text-xs font-medium hover:text-brand-text-primary hover:border-brand-accent/40 transition-colors cursor-pointer shrink-0 ml-auto"
-            >
-              <ArrowDownLeft class="w-3.5 h-3.5" />
-              <span>{i18n.t('artistDetail.artistInfo', {}, 'Artist Info')}</span>
-            </button>
-          {/if}
-        </div>
-      {/if}
-    {/if}
-
-    {#snippet factsPanel()}
-      {#if hasArtistInfo}
-        <ArtistInformationPanel
-          sortName={contextData?.artist_sort_name}
-          gender={contextData?.artist_gender}
-          beginDate={contextData?.artist_begin_date}
-          endDate={contextData?.artist_end_date}
-          ended={contextData?.artist_ended}
-          artistType={contextData?.artist_type}
-          beginAreaName={contextData?.artist_begin_area_name}
-          beginAreaMbid={contextData?.artist_begin_area_mbid}
-          areaName={contextData?.artist_area_name}
-          areaMbid={contextData?.artist_area_mbid}
-          onOpenUrl={handleOpenUrl}
-          variant="plain"
-          class="w-full @xl:max-w-[calc(50%-0.3125rem)] @md:max-w-[calc((200%-0.625rem)/3)]"
-        />
-      {/if}
-    {/snippet}
-
-    {#snippet eventsSection()}
-      {#if prefs.onlineEnabled && (hasEvents || artistMbid)}
-        <ArtistEventsSection
-          events={artistEvents}
-          loading={loadingEvents}
-          artistName={artistName}
-          songkickUrl={songkickLink}
-          setlistfmUrl={setlistfmLink}
-          bandsintownUrl={bandsintownLink}
-          musicbrainzUrl={musicbrainzEventsUrl}
-          onOpenUrl={handleOpenUrl}
-        />
-      {/if}
-    {/snippet}
-
-    {#snippet linksSection(gridColsClass: string)}
-      {#if hasWebsite || hasSocials || artistMbid}
-        <div class="grid {gridColsClass} gap-2.5">
-          <!-- Website, curated social links, and derived MusicBrainz/
-               ListenBrainz/Fanart.tv links, unified and sorted
-               alphabetically with the website first (#1122, #1123) -->
-          {#each artistLinkItems as item (item.key)}
-            <button
-              type="button"
-              onclick={() => handleOpenUrl(item.url)}
-              title={item.url}
-              class="flex items-center gap-2.5 @xl:gap-3 group/link text-left transition-colors cursor-pointer min-w-0"
-            >
-              <div class="w-7 h-7 @xl:w-8 @xl:h-8 rounded-full bg-brand-main/60 {item.isOfficial ? 'border-[3px]' : 'border'} border-brand-border flex items-center justify-center text-brand-text-secondary group-hover/link:text-brand-accent group-hover/link:border-brand-accent/40 transition-colors shrink-0 shadow-2xs">
-                <SocialIcon platform={item.platform} size={14} />
-              </div>
-              <div class="flex items-center gap-1 min-w-0 flex-1">
-                <span class="text-xs font-medium text-brand-text-primary truncate transition-colors">
-                  {item.label}
-                </span>
-                <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover/link:opacity-100 transition-opacity shrink-0" />
-              </div>
-            </button>
-          {/each}
-        </div>
-      {/if}
-    {/snippet}
-
-    <!-- Artist Profile Card (About & Links) -->
-    {#if hasProfileContent && !windowLayoutStore.isDetailHeaderCollapsed && windowLayoutStore.isOverviewExpanded}
-      <details
-        open
-        ontoggle={(e) => windowLayoutStore.setOverviewExpanded(e.currentTarget.open)}
-        class="group/overview border border-brand-border rounded-xl bg-brand-sidebar/40 backdrop-blur-md overflow-hidden shadow-xs transition-all @container"
-      >
-        <summary class="flex items-center justify-between px-4 py-2.5 @xl:px-5 @xl:py-3 text-xs font-semibold text-brand-text-secondary cursor-pointer select-none hover:text-brand-text-primary transition-colors">
-          <span>{i18n.t('artistDetail.artistInfo', {}, 'Artist Info')}</span>
-          <ArrowUpRight class="w-3.5 h-3.5 text-brand-text-secondary/70" />
-        </summary>
-        {#if hasBio}
-          {@const bioText = effectiveBio ?? ""}
-          <div class="p-4 @xl:p-5 @3xl:p-6 border-t border-brand-border/60 flex flex-col @2xl:flex-row gap-5 @3xl:gap-6 justify-between items-start">
-            <!-- Left Column (Bio & Links) -->
-            <div class="flex-1 flex flex-col gap-5 min-w-0 w-full">
-              <!-- Bio -->
-              <div class="flex flex-col gap-3 min-w-0">
-                <div class="text-xs text-brand-text-secondary leading-relaxed">
-                  {#if bioIsFromWikipedia}
-                    <button
-                      type="button"
-                      onclick={() => contextData?.wikipedia_page_url && handleOpenUrl(contextData.wikipedia_page_url)}
-                      class="group/wiki relative inline-flex items-center gap-1 mb-1 text-[11px] font-semibold text-brand-text-secondary/70 hover:text-brand-accent transition-colors cursor-pointer -mt-0.5"
-                    >
-                      <span class="underline decoration-brand-text-secondary/40 group-hover/wiki:decoration-brand-accent">{i18n.t('playerBar.wikipediaSectionLabel', {}, 'Wikipedia')}</span>
-                      <ExternalLink class="w-3 h-3 opacity-0 group-hover/wiki:opacity-100 transition-opacity" />
-                    </button>
-                  {/if}
-                  <MarkdownBio
-                    text={bioText}
-                    disableClamp={true}
-                  />
-                </div>
-              </div>
-
-              <!-- Links -->
-              {@render linksSection("grid-cols-1 @sm:grid-cols-2")}
-            </div>
-
-            <!-- Right Column (Facts & Events) -->
-            {#if hasArtistInfo || hasEvents || artistMbid}
-              <div class="flex-1 flex flex-col gap-5 min-w-0 w-full">
-                {@render factsPanel()}
-                {@render eventsSection()}
-              </div>
-            {/if}
-          </div>
-        {:else}
-          <div class="p-4 @xl:p-5 @3xl:p-6 border-t border-brand-border/60 flex flex-col gap-5 w-full">
-            {@render factsPanel()}
-            {@render eventsSection()}
-            {@render linksSection("grid-cols-1 @sm:grid-cols-2 @md:grid-cols-3 @xl:grid-cols-4")}
-          </div>
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        {#if hasChips}
+          <GenreChips
+            curatedTags={artistOnlyTags}
+            onCuratedTagClick={handleTagClick}
+            curatedTagTitle={(tag) => `Filter artists tagged "${tag}"`}
+            variant="full"
+          />
         {/if}
-      </details>
+        <div class="ml-auto">
+          <InfoSidebarToggle label={i18n.t('artistDetail.artistInfo', {}, 'Artist Info')} />
+        </div>
+      </div>
     {/if}
 
     {#if sets.length > 0}

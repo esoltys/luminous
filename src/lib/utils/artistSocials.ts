@@ -447,36 +447,11 @@ export function deriveMusicbrainzEventsUrl(mbid: string | null | undefined): str
   return mbid ? `https://musicbrainz.org/artist/${mbid}/events` : null;
 }
 
-/** Derives a ListenBrainz artist page URL from a resolved MBID (#1123). */
-export function deriveListenbrainzArtistUrl(mbid: string | null | undefined): string | null {
-  return mbid ? `https://listenbrainz.org/artist/${mbid}/` : null;
-}
-
 /** Derives a fanart.tv artist page URL from a resolved MBID (#1123) — same
  * destination as {@link deriveFanartTvUrl}, computed from the resolved MBID
  * directly instead of re-deriving it from `socialLinks`. */
 export function deriveFanartTvUrlFromMbid(mbid: string | null | undefined): string | null {
   return mbid ? `https://fanart.tv/artist/${mbid}` : null;
-}
-
-/**
- * Derives a ListenBrainz album/release page URL from a representative song's
- * MusicBrainz release group or release ID (#950).
- */
-export function deriveListenbrainzAlbumUrl(song: {
-  musicbrainz_release_group_id?: string | null;
-  musicbrainz_album_id?: string | null;
-} | null | undefined): string | null {
-  if (!song) return null;
-  const releaseGroupMbid = song.musicbrainz_release_group_id?.trim();
-  if (releaseGroupMbid && MBID_PATTERN.test(releaseGroupMbid)) {
-    return `https://listenbrainz.org/album/${releaseGroupMbid}/`;
-  }
-  const albumMbid = song.musicbrainz_album_id?.trim();
-  if (albumMbid && MBID_PATTERN.test(albumMbid)) {
-    return `https://listenbrainz.org/release/${albumMbid}/`;
-  }
-  return null;
 }
 
 /**

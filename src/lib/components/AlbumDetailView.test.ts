@@ -11,6 +11,8 @@ import { prefs } from "../stores/prefs.svelte";
 import { tasksStore } from "../stores/tasks.svelte";
 import { toastStore } from "../stores/toast.svelte";
 import { statsExclusionsStore } from "../stores/statsExclusions.svelte";
+import { windowLayoutStore } from "../stores/windowLayout.svelte";
+import { contextStore } from "../stores/context.svelte";
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { tick } from "svelte";
@@ -54,6 +56,8 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
 
   beforeEach(() => {
     vi.clearAllMocks();
+    windowLayoutStore.rightPanelOpen = true;
+    contextStore.clearAll();
     navigationStore.selectedAlbumName = mockAlbumName;
     navigationStore.activeTab = "collection";
     collectionStore.albums = [];
@@ -256,7 +260,7 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     expect(item.closest("button")).toBeDisabled();
   });
 
-  it("shows the CritiqueBrainz community rating in place of the Album Info title (#1387)", async () => {
+  it("shows the CritiqueBrainz community rating in the header (#1387)", async () => {
     vi.mocked(invoke).mockImplementation(async (cmd: string) => {
       if (cmd === "get_songs_by_album") return [{ ...mockSongs[0], musicbrainz_release_group_id: "rg-123" }];
       if (cmd === "get_song_context") return { critiquebrainz_rating: 4.2, critiquebrainz_review_count: 7, critiquebrainz_review_links: [] };
@@ -269,7 +273,7 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     expect(await findByText("(7)")).toBeInTheDocument();
   });
 
-  it("shows the community rating on its own when the album has no Album Info content (#1387)", async () => {
+  it("shows the community rating even when the album has no profile content (#1387)", async () => {
     collectionStore.albumProfiles = {};
     vi.mocked(invoke).mockImplementation(async (cmd: string) => {
       if (cmd === "get_songs_by_album") return [{ ...mockSongs[0], musicbrainz_release_group_id: "rg-123" }];
@@ -289,12 +293,41 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     collectionStore.albumProfiles = {
       "abbey road": { album_key: "abbey road", artist_key: "the beatles", description: "Classic album", links: [] },
     };
-    const { findByText, findByTitle } = render(AlbumDetailView, { props: { albumName: mockAlbumName } });
-    expect(await findByText("(4)")).toBeInTheDocument();
-    const btn = await findByTitle("Open this album on MusicBrainz");
-    expect(btn).toBeInTheDocument();
-    await fireEvent.click(btn);
-    expect(openUrl).toHaveBeenCalledWith("https://musicbrainz.org/release-group/rg-123");
+    const { findByText } = render(AlbumDetailView, { props: { albumName: mockAlbumName } });
+    const votes = await findByText("(4)");
+    expect(votes).toBeInTheDocument();
+    // Display only: a stray click on the header must never leave the app.
+    expect(votes.closest("button, a")).toBeNull();
+  });
+
+  describe("info sidebar toggle (#1630)", () => {
+    beforeEach(() => {
+      collectionStore.albumProfiles = {
+        "abbey road": { album_key: "abbey road", artist_key: "the beatles", description: "Classic album", links: [] },
+      };
+    });
+
+    it("never renders the description itself, since the info sidebar owns it", async () => {
+      const { queryByText } = render(AlbumDetailView, { props: { albumName: mockAlbumName } });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(queryByText("Classic album")).toBeNull();
+    });
+
+    it("offers the Album Info pill while the sidebar can be shown", () => {
+      const { getByRole } = render(AlbumDetailView, { props: { albumName: mockAlbumName } });
+      expect(getByRole("button", { name: /Album Info/ })).toBeInTheDocument();
+    });
+
+    it("hides the pill when the window is too narrow to show the sidebar", () => {
+      const width = windowLayoutStore.viewportWidth;
+      windowLayoutStore.viewportWidth = 500;
+      try {
+        const { queryByRole } = render(AlbumDetailView, { props: { albumName: mockAlbumName } });
+        expect(queryByRole("button", { name: /Album Info/ })).toBeNull();
+      } finally {
+        windowLayoutStore.viewportWidth = width;
+      }
+    });
   });
 
   it("toggles album stats exclusion from the overflow menu (#1252)", async () => {
@@ -336,96 +369,6 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(getByText("Include in Stats")).toBeInTheDocument();
     expect(queryByText("Don't Include in Stats")).toBeNull();
-  });
-
-  it("scopes Album Info card to group/overview, buttons to group/link, and shows domain-only for unrecognized sites (#1133)", async () => {
-    collectionStore.albumProfiles = {
-      "abbey road": {
-        album_key: "abbey road",
-        artist_key: "the beatles",
-        description: "Classic album",
-        website: "https://thebeatles.com",
-        links: [
-          {
-            platform: "other_databases",
-            handle_or_url: "https://vgmdb.net/album/12345/",
-          },
-          {
-            platform: "allmusic",
-            handle_or_url: "https://www.allmusic.com/album/mw0000192938",
-          },
-        ],
-      },
-    };
-
-    const { getByText, container } = render(AlbumDetailView, {
-      props: { albumName: mockAlbumName },
-    });
-
-    await new Promise((resolve) => setTimeout(resolve, 50));
-
-    // Album Info card should exist and use group/overview rather than un-namespaced group
-    const details = container.querySelector("details");
-    expect(details).not.toBeNull();
-    expect(details?.classList.contains("group/overview")).toBe(true);
-    expect(details?.classList.contains("group")).toBe(false);
-
-    // Unrecognized / other_databases link must show only domain name
-    expect(getByText("vgmdb.net")).toBeInTheDocument();
-    // Branded platform link shows its label
-    expect(getByText("AllMusic")).toBeInTheDocument();
-
-    // Release link buttons should use group/link scoping
-    const vgmdbButton = getByText("vgmdb.net").closest("button")!;
-    expect(vgmdbButton.classList.contains("group/link")).toBe(true);
-    expect(vgmdbButton.classList.contains("group")).toBe(false);
-
-    // External link icon should have group-hover/link:opacity-100
-    const extIcon = vgmdbButton.querySelector("svg.opacity-0");
-    expect(extIcon?.classList.contains("group-hover/link:opacity-100")).toBe(true);
-    expect(extIcon?.classList.contains("group-hover:opacity-100")).toBe(false);
-  });
-
-  it("does not show blacklisted links (rateyourmusic.com, twitter.com, x.com) in Album Info", async () => {
-    collectionStore.albumProfiles = {
-      "abbey road": {
-        album_key: "abbey road",
-        artist_key: "the beatles",
-        description: "Classic album",
-        website: "https://thebeatles.com",
-        links: [
-          {
-            platform: "other_databases",
-            handle_or_url: "https://rateyourmusic.com/release/album/the-beatles/abbey-road/",
-          },
-          {
-            platform: "custom",
-            handle_or_url: "https://twitter.com/thebeatles",
-          },
-          {
-            platform: "x",
-            handle_or_url: "https://x.com/thebeatles",
-          },
-          {
-            platform: "allmusic",
-            handle_or_url: "https://www.allmusic.com/album/mw0000192938",
-          },
-        ],
-      },
-    };
-
-    const { getByText, queryByText } = render(AlbumDetailView, {
-      props: { albumName: mockAlbumName },
-    });
-
-    await new Promise((resolve) => setTimeout(resolve, 50));
-
-    expect(queryByText("rateyourmusic.com")).toBeNull();
-    expect(queryByText("twitter.com")).toBeNull();
-    expect(queryByText("x.com")).toBeNull();
-    expect(queryByText("X (Twitter)")).toBeNull();
-    expect(getByText("AllMusic")).toBeInTheDocument();
-    expect(getByText("thebeatles.com")).toBeInTheDocument();
   });
 
   it("auto-fetches album details on visit when details_fetched is false and context enrichment is enabled (#1143)", async () => {

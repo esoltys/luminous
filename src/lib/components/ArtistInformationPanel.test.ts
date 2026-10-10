@@ -107,17 +107,15 @@ describe("ArtistInformationPanel", () => {
     expect(screen.queryByText("Group")).toBeNull();
   });
 
-  it("renders card variant with collapsible details tag", () => {
+  it("renders a titled, non-collapsible card", () => {
     const { container } = render(ArtistInformationPanel, {
       props: {
         beginDate: "1990-01-01",
         artistType: "Person",
-        variant: "card",
       },
     });
 
-    const details = container.querySelector("details");
-    expect(details).toBeTruthy();
+    expect(container.querySelector("details")).toBeNull();
     expect(screen.getByText("Artist Information")).toBeTruthy();
   });
 });
