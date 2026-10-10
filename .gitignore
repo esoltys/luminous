@@ -19,8 +19,8 @@ vite.config.ts.timestamp-*
 !.claude/skills/**
 /.worktrees
 
-# Personal override for the Tauri IPC mock config (scripts/mock-config.json is tracked directly)
-scripts/mock-config.local.json
+# Personal override for the Tauri IPC mock config (scripts/screenshot-scenes.json is tracked directly)
+scripts/screenshot-scenes.local.json
 
 # Local Cargo configuration
 .cargo/

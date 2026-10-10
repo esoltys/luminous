@@ -1,6 +1,6 @@
 // Loads the data the Tauri IPC mock serves: either the small bundled fixture
 // library (mock-data.ts) or, if configured, a live read from a real Luminous
-// SQLite database. See mock-config.json for the config shape.
+// SQLite database. See screenshot-scenes.json for the config shape.
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -10,8 +10,8 @@ import { hydrateEmbeddedArt } from "./embedded-art-cache.ts";
 import { FALLBACK_ARTIST_PROFILES, FALLBACK_LYRICS, FALLBACK_PLAYLISTS, FALLBACK_SONGS } from "./mock-data.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const CONFIG_PATH = path.join(__dirname, "mock-config.json");
-const LOCAL_CONFIG_PATH = path.join(__dirname, "mock-config.local.json");
+const CONFIG_PATH = path.join(__dirname, "screenshot-scenes.json");
+const LOCAL_CONFIG_PATH = path.join(__dirname, "screenshot-scenes.local.json");
 const TAURI_CONF_PATH = path.join(__dirname, "../src-tauri/tauri.conf.json");
 // Tauri merges platform-specific config files (tauri.<platform>.conf.json)
 // over the base tauri.conf.json at build time. Windows overrides `identifier`
@@ -77,7 +77,7 @@ const FILE_TYPES = [
 ] as const;
 
 /** The subset of per-screenshot settings that also have a run-wide fallback under `default`. */
-interface MockConfigDefaults {
+interface SceneDefaults {
   theme?: string;
   sidebarOpen?: boolean;
   rightPanelOpen?: boolean;
@@ -94,7 +94,7 @@ interface MockConfigDefaults {
 /** Default capture size (CSS px, 16:10); wide enough for the Home page's two-column layout. */
 export const DEFAULT_VIEWPORT = { width: 1280, height: 800 };
 
-export interface ScreenshotConfig extends MockConfigDefaults {
+export interface ScreenshotConfig extends SceneDefaults {
   name: string;
   tab: string;
   subTab?: string;
@@ -119,13 +119,13 @@ export interface ScreenshotConfig extends MockConfigDefaults {
   schemes?: Array<"light" | "dark" | "dynamic">;
 }
 
-export interface MockConfig {
+export interface SceneConfig {
   /** Absolute path to a real luminous.db. When set (and readable), overrides the bundled fixture data. Not overridable per-screenshot. */
   dbPath?: string;
   /** Cap on how many songs to pull from a real database. Defaults to 2000. Not overridable per-screenshot. */
   songLimit?: number;
   /** Run-wide fallback values for the settings each screenshot entry may override. */
-  default?: MockConfigDefaults;
+  default?: SceneDefaults;
   screenshots?: ScreenshotConfig[];
 }
 
@@ -142,7 +142,7 @@ export interface ResolvedScreenshotSettings {
 }
 
 export function resolveScreenshotSettings(
-  config: MockConfig,
+  config: SceneConfig,
   screenshot: Partial<ScreenshotConfig> = {}
 ): ResolvedScreenshotSettings {
   const d = config.default ?? {};
@@ -209,7 +209,7 @@ interface PlayHistoryRow {
   played_at: number;
 }
 
-function readJsonConfig(configPath: string): MockConfig {
+function readJsonConfig(configPath: string): SceneConfig {
   try {
     return JSON.parse(readFileSync(configPath, "utf8"));
   } catch (err) {
@@ -219,12 +219,12 @@ function readJsonConfig(configPath: string): MockConfig {
 }
 
 /**
- * scripts/mock-config.json is tracked and defines the real capture list —
- * every clone gets it for free. scripts/mock-config.local.json (gitignored)
+ * scripts/screenshot-scenes.json is tracked and defines the real capture list —
+ * every clone gets it for free. scripts/screenshot-scenes.local.json (gitignored)
  * lets you override it locally (e.g. point dbPath at your own library)
  * without touching the tracked file, so it takes priority when present.
  */
-export function loadMockConfig(): MockConfig {
+export function loadSceneConfig(): SceneConfig {
   if (existsSync(LOCAL_CONFIG_PATH)) return readJsonConfig(LOCAL_CONFIG_PATH);
   if (existsSync(CONFIG_PATH)) return readJsonConfig(CONFIG_PATH);
   return {};
@@ -548,11 +548,11 @@ async function loadFromDatabase(dbPath: string, limit: number, silentIfMissing =
  * exact same path loadMockLibrary used, instead of re-deriving it and
  * silently diverging when dbPath is left unset.
  */
-export function resolveDbPath(config: MockConfig): string | undefined {
+export function resolveDbPath(config: SceneConfig): string | undefined {
   return config.dbPath || defaultDbPath();
 }
 
-export async function loadMockLibrary(config: MockConfig = loadMockConfig()): Promise<MockLibrary> {
+export async function loadMockLibrary(config: SceneConfig = loadSceneConfig()): Promise<MockLibrary> {
   const limit = config.songLimit ?? 2000;
   // An explicit dbPath is a firm request — warn if it's wrong. Falling back
   // to the auto-detected Tauri app-data location is best-effort and should

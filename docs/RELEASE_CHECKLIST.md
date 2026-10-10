@@ -23,7 +23,7 @@ manual.
   ```
   Use `--name=<entry>` (e.g. `bun run take-screenshots --name=equalizer`) to capture just
   one view instead of the whole suite. New screenshot-worthy features get an entry added
-  to the tracked `scripts/mock-config.json` (see `.claude/CLAUDE.md` for the harness
+  to the tracked `scripts/screenshot-scenes.json` (see `.claude/CLAUDE.md` for the harness
   details). Read the resulting PNGs to confirm they rendered correctly before committing.
 - [ ] Write `docs/release-notes/vX.Y.Z.md` for the new version.
 

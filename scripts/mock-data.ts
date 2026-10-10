@@ -1,5 +1,5 @@
 // Small, hand-picked fixture library used by the Tauri IPC mock when no local
-// database is configured (see mock-config.json). Intentionally tiny —
+// database is configured (see screenshot-scenes.json). Intentionally tiny —
 // this used to be a ~8,000-line dump of one real library; a handful of
 // albums is enough to exercise every view in the UI.
 import type { ArtistProfile, Playlist, Song } from "../src/lib/types/index.ts";
@@ -336,7 +336,7 @@ export const FALLBACK_PLAYLISTS: Playlist[] = [
 // Enhanced Artist Profiles (#473, #474) — bio/website/social links demo
 // data. Shania Twain (a widely-recognized real artist, already used as the
 // canonical example throughout src/lib/utils/artistSocials.ts's own
-// placeholder text) is the featured example in mock-config.json's
+// placeholder text) is the featured example in screenshot-scenes.json's
 // artist-detail screenshot target; the mock library's own "Eric Soltys"
 // fixture artist gets a lighter-weight profile too.
 export const FALLBACK_ARTIST_PROFILES: ArtistProfile[] = [
