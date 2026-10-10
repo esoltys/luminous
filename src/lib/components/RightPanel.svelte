@@ -204,7 +204,7 @@
       </div>
 
       {#if effectiveTab === "context"}
-        <InfoSections view={info} entity={isEntitySubject} />
+        <InfoSections view={info} isEntity={isEntitySubject} />
       {:else}
         <div class="space-y-3">
           {#if isPlayingSubject}

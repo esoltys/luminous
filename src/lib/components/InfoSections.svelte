@@ -13,10 +13,10 @@
     /** What to render; see `contextStore.for()`. */
     view: ContextView;
     /** Wording of the empty state: an album/artist has no single track. */
-    entity?: boolean;
+    isEntity?: boolean;
   }
 
-  let { view, entity = false }: Props = $props();
+  let { view, isEntity = false }: Props = $props();
 
   let sections = $derived(view.sections);
 </script>
@@ -153,7 +153,7 @@
     </div>
   {:else if sections.length === 0 && !view.offline}
     <p class="text-brand-text-secondary/60 py-2">
-      {entity
+      {isEntity
         ? i18n.t('playerBar.contextEmptyStateEntity', {}, 'No enrichment data available.')
         : i18n.t('playerBar.contextEmptyState', {}, 'No enrichment data available for this track.')}
     </p>

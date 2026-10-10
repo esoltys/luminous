@@ -115,9 +115,8 @@
   );
 
   // Everything fetched about the artist (facts, bio, events, links) lives in contextStore and shows
-  // in the info sidebar; this view only keeps it fresh and offers the toggle.
+  // in the info sidebar; this view only refreshes it after curation and offers the toggle.
   let infoSubject = $derived(entitySubject("artist", artistName, songs));
-  const info = contextStore.for(() => infoSubject);
 
   // Locally-discovered artist visuals (#98/#761) — portrait/logo/fanart,
   // fetched on demand per artist since scanning every artist's folder
@@ -205,7 +204,7 @@
       await refetchSongs();
       const [artwork] = await Promise.all([
         collectionStore.getExtendedArtworkForArtist(artistName, true),
-        info.refresh(),
+        contextStore.refresh(infoSubject),
       ]);
       artistArtwork = artwork;
       toastStore.show(i18n.t("artistDetail.refreshSuccess", {}, "Artist artwork and bio refreshed"));
@@ -245,7 +244,7 @@
         current: 1,
         label: i18n.t("artistDetail.retrievingBio", {}, "Retrieving artist summary..."),
       });
-      await info.refresh().catch((e) => {
+      await contextStore.refresh(infoSubject).catch((e) => {
         console.warn("Failed to retrieve artist context:", e);
       });
 

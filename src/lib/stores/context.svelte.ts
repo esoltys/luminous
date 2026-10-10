@@ -332,8 +332,7 @@ export class ContextView {
   /** Re-fetches the subject's context (and events) from the network, bypassing the backend cache. */
   async refresh(): Promise<void> {
     const subject = this.getSubject();
-    if (!subject || !prefs.onlineEnabled) return;
-    await contextStore.ensure(subject, { events: this.wantsEvents(subject), force: true });
+    if (subject) await contextStore.refresh(subject, this.wantsEvents(subject));
   }
 }
 
@@ -399,6 +398,15 @@ class ContextStore {
     })().finally(() => this.inflight.delete(flightKey));
     this.inflight.set(flightKey, run);
     return run;
+  }
+
+  /**
+   * Re-fetches `subject` (and its artist's events) from the network, bypassing the backend cache.
+   * For callers that curate data and only need it fresh, without reading sections themselves.
+   * A missing subject (an album/artist with no songs) has nothing to refresh.
+   */
+  async refresh(subject: ContextSubject | null, events = subject?.kind === "artist"): Promise<void> {
+    if (subject && prefs.onlineEnabled) await this.ensure(subject, { events, force: true });
   }
 
   /** Drops everything fetched (test helper). */
