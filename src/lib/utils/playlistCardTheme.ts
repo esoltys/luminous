@@ -36,7 +36,7 @@ export type PlaylistCardThemeKind =
 export interface PlaylistCardTheme {
   /** Phosphor glyph that identifies the kind. */
   icon: Component<any>;
-  /** Flat tinted frame (background + border) for the small icon tile on row cards. */
+  /** Flat tinted frame (background + border) for the small icon tile on row cards and sidebar pins. */
   tintClass: string;
   /** Gradient/border/shadow classes for the cover-art frame (Tailwind `bg-gradient-to-br {gradientClass}`). */
   gradientClass: string;

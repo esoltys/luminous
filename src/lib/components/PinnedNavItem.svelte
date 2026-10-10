@@ -1,6 +1,8 @@
 <script lang="ts">
   import type { NavigablePin } from "../utils/pinnedNav";
   import CoverArt from "./CoverArt.svelte";
+  import PlaylistKindIcon from "./PlaylistKindIcon.svelte";
+  import { getPlaylistCardTheme } from "../utils/playlistCardTheme";
   import { collectionStore } from "../stores/collection.svelte";
   import { resolveArtistPortraitUrl, getArtistCoverStack } from "../utils/covers";
   import { getArtistAlbums, getArtistSongs } from "../utils/artist";
@@ -63,6 +65,8 @@
   });
 
   const IconComponent = $derived(pin.icon);
+  const autoKind = $derived(pin.type === "auto_playlist" ? pin.autoPlaylist?.kind : undefined);
+  const tintClass = $derived(autoKind ? getPlaylistCardTheme(autoKind).tintClass : null);
   const tooltipText = $derived(pin.subtitle ? `${pin.title} • ${pin.subtitle}` : pin.title);
 </script>
 
@@ -95,7 +99,7 @@
 
   <!-- Artwork / Thumbnail Container (square with no rounded corners) -->
   <div
-    class="shrink-0 relative overflow-hidden flex items-center justify-center {pin.tintClass ? `border ${pin.tintClass}` : 'bg-brand-main/60'} {collapsed
+    class="shrink-0 relative overflow-hidden flex items-center justify-center {tintClass ? `border ${tintClass}` : 'bg-brand-main/60'} {collapsed
       ? 'w-8 h-8'
       : 'w-7 h-7'}"
   >
@@ -125,9 +129,10 @@
       {:else}
         <IconComponent class={collapsed ? "w-4 h-4 text-brand-text-secondary" : "w-3.5 h-3.5 text-brand-text-secondary"} />
       {/if}
+    {:else if autoKind}
+      <PlaylistKindIcon kind={autoKind} sizeClass={collapsed ? "w-4 h-4" : "w-3.5 h-3.5"} />
     {:else}
-      {@const iconColor = pin.iconColorClass ?? "text-brand-accent-text"}
-      <IconComponent class="{collapsed ? 'w-4 h-4' : 'w-3.5 h-3.5'} {iconColor} {pin.autoPlaylist?.kind === 'favourites' ? 'fill-current' : ''}" />
+      <IconComponent class={collapsed ? "w-4 h-4 text-brand-accent-text" : "w-3.5 h-3.5 text-brand-accent-text"} />
     {/if}
   </div>
 

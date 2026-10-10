@@ -96,15 +96,12 @@ describe("pinnedNav.ts", () => {
     expect(autoPin.title).toBe(i18n.t("playlists.autoFavourites"));
   });
 
-  it("gives pinned auto-playlists the same icon and colour as their card theme", () => {
+  it("gives pinned auto-playlists the same icon as their card theme", () => {
     for (const kind of ["genre", "decade", "daypart"] as const) {
       const pin = toNavigablePin({ type: "auto_playlist", autoPlaylist: { kind, trackCount: 3 } } as PinnedItem);
       const theme = getPlaylistCardTheme(kind);
       expect(pin.icon).toBe(theme.icon);
-      expect(pin.iconColorClass).toBe(theme.iconColorClass);
-      expect(pin.tintClass).toBe(theme.tintClass);
     }
-    expect(toNavigablePin(songItem).iconColorClass).toBeUndefined();
   });
 
   it("detects active state across playerStore and navigationStore", () => {

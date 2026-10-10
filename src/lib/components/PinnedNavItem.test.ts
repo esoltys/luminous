@@ -68,14 +68,12 @@ describe("PinnedNavItem.svelte", () => {
       ...mockPin,
       type: "auto_playlist",
       icon: Music,
-      iconColorClass: "text-[#34D399]",
-      tintClass: "bg-[#34D399]/15 border-[#34D399]/30",
       autoPlaylist: { kind: "genre", trackCount: 3 } as any,
     };
     const { container } = render(PinnedNavItem, { props: { pin, collapsed: false } });
-    expect(container.querySelector('[class*="bg-[#34D399]/15"]')).not.toBeNull();
+    expect(container.querySelector('[class*="bg-[#4ADE80]/15"]')).not.toBeNull();
     const svg = container.querySelector("svg");
-    expect(svg?.getAttribute("class")).toContain("text-[#34D399]");
+    expect(svg?.getAttribute("class")).toContain("text-[#4ADE80]");
     expect(svg?.getAttribute("class")).not.toContain("text-brand-accent-text");
   });
 });

@@ -16,7 +16,7 @@ describe("playlistCardTheme", () => {
     }
   });
 
-  it("keeps every kind's icon colour distinct, except the intentionally shared Tag kinds' hues", () => {
+  it("gives every kind its own icon colour", () => {
     const colours = KINDS.map((k) => getPlaylistCardTheme(k).iconColorClass);
     expect(new Set(colours).size).toBe(colours.length);
   });
