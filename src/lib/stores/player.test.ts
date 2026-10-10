@@ -239,6 +239,10 @@ describe("PlayerStore", () => {
       expect(showSpy).toHaveBeenCalledTimes(1);
       // No durationMs: the toast must wait for the user to dismiss it.
       expect(showSpy).toHaveBeenCalledWith("Audio output unavailable. Connect a device and press play.", "error");
+
+      // A failed retry replaces the toast rather than stacking a second one.
+      unavailableCallback?.({ payload: { message: "still no device" } });
+      expect(toastStore.messages.filter((m) => m.text.startsWith("Audio output unavailable"))).toHaveLength(1);
     } finally {
       vi.useRealTimers();
       showSpy.mockRestore();

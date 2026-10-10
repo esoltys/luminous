@@ -80,6 +80,7 @@ export class PlayerStore {
    *  toast instead of a notification per failed track. */
   private _playbackErrorBatch: { title: string; path: string | null; message: string }[] = [];
   private _playbackErrorTimer: ReturnType<typeof setTimeout> | null = null;
+  private _outputUnavailableToastId: number | null = null;
 
   constructor() {
     this.init();
@@ -219,9 +220,11 @@ export class PlayerStore {
 
       // The output device couldn't be opened. The backend already parked the
       // track paused at its position; this just says why. Persistent (no
-      // durationMs) so it stays until dismissed or play is pressed again.
+      // durationMs), and each failed retry replaces the previous toast
+      // instead of stacking another one.
       await listen("audio-output-unavailable", () => {
-        toastStore.show(
+        if (this._outputUnavailableToastId !== null) toastStore.dismiss(this._outputUnavailableToastId);
+        this._outputUnavailableToastId = toastStore.show(
           i18n.t("playerBar.outputUnavailableToast", undefined, "Audio output unavailable. Connect a device and press play."),
           "error"
         );
