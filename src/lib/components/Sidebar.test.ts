@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, fireEvent } from "@testing-library/svelte";
 import Sidebar from "./Sidebar.svelte";
 import { collectionStore } from "../stores/collection.svelte";
@@ -131,11 +131,19 @@ describe("Sidebar.svelte", () => {
     const pinnedBtn = getAllByTitle("OK Computer • Radiohead");
     expect(pinnedBtn.length).toBeGreaterThan(0);
   });
+
   describe("MusicBrainz login indicator", () => {
     beforeEach(() => {
       musicbrainzStore.isLoggedIn = true;
       musicbrainzStore.username = "soltys";
       scrobblerStore.enabled = true;
+      scrobblerStore.paused = false;
+    });
+
+    afterEach(() => {
+      musicbrainzStore.isLoggedIn = false;
+      musicbrainzStore.username = null;
+      scrobblerStore.enabled = false;
       scrobblerStore.paused = false;
     });
 

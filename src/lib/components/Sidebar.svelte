@@ -47,7 +47,8 @@
   let showLoginModal = $state(false);
   let showProfilePopover = $state(false);
   const scrobblingPaused = $derived(scrobblerStore.status === "paused");
-  const pausedLabel = $derived(i18n.t("sidebar.scrobblingPaused"));
+  // Undefined unless paused, so the dot and title only carry text when the state differs from the default.
+  const pausedLabel = $derived(scrobblingPaused ? i18n.t("sidebar.scrobblingPaused") : undefined);
   let profileButtonEl = $state<HTMLButtonElement | null>(null);
 
   onMount(() => {
@@ -390,7 +391,7 @@
         bind:this={profileButtonEl}
         onclick={() => { showProfilePopover = !showProfilePopover; }}
         class="flex items-center gap-2.5 transition-colors duration-150 {showProfilePopover ? 'bg-brand-accent/20 text-brand-accent-text' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {layoutCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-2.5 py-1.5 rounded-lg text-sm font-medium'}"
-        title={scrobblingPaused ? `${musicbrainzStore.username} (MusicBrainz) – ${pausedLabel}` : `${musicbrainzStore.username} (MusicBrainz)`}
+        title={`${musicbrainzStore.username} (MusicBrainz)${pausedLabel ? ` – ${pausedLabel}` : ""}`}
       >
         <div class="relative shrink-0 flex items-center justify-center">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 25 28" class="{layoutCollapsed ? 'w-5 h-5' : 'w-4 h-4'} shrink-0">
@@ -400,8 +401,8 @@
           <span
             class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-brand-sidebar {scrobblingPaused ? 'bg-amber-500' : 'bg-emerald-500'}"
             data-testid="musicbrainz-status-dot"
-            role={scrobblingPaused ? 'img' : undefined}
-            aria-label={scrobblingPaused ? pausedLabel : undefined}
+            role={pausedLabel ? 'img' : undefined}
+            aria-label={pausedLabel}
           ></span>
         </div>
         {#if !layoutCollapsed}
