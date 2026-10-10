@@ -99,17 +99,21 @@ async function main() {
       // Play first: the theme re-extracts from the playing song's own cover on
       // track-changed, which is what a user sees after pressing Play.
       const playedTitle = await driver.evaluate(
-        async (title, artist, position, albumName) => {
+        async (title, artist, position, albumName, sidebarWidth) => {
           const script = window.__LUMINOUS_SCRIPT__!;
           const played = await script.playback.play({ title, artist });
           await script.playback.seek(position);
           await script.navigate.album(albumName ?? played.album);
+          // Playing can surface first-run tour steps; the info panel isn't in these shots.
+          await script.dialogs.closeAll();
+          await script.appearance.setLayout({ rightPanelOpen: false, sidebarWidth });
           return played.title;
         },
         entry.featuredSong,
         entry.featuredArtist,
         entry.positionSeconds ?? 60,
-        entry.featuredAlbum
+        entry.featuredAlbum,
+        entry.sidebarWidth
       );
 
       await driver.evaluate(() => {
