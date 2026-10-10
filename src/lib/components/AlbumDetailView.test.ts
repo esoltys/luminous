@@ -11,6 +11,8 @@ import { prefs } from "../stores/prefs.svelte";
 import { tasksStore } from "../stores/tasks.svelte";
 import { toastStore } from "../stores/toast.svelte";
 import { statsExclusionsStore } from "../stores/statsExclusions.svelte";
+import { windowLayoutStore } from "../stores/windowLayout.svelte";
+import { contextStore } from "../stores/context.svelte";
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { tick } from "svelte";
@@ -54,6 +56,9 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // The info sidebar owns this context; these tests cover the narrow-window fallback card.
+    windowLayoutStore.rightPanelOpen = false;
+    contextStore.clearAll();
     navigationStore.selectedAlbumName = mockAlbumName;
     navigationStore.activeTab = "collection";
     collectionStore.albums = [];
@@ -336,6 +341,26 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(getByText("Include in Stats")).toBeInTheDocument();
     expect(queryByText("Don't Include in Stats")).toBeNull();
+  });
+
+  it("leaves the description to the info sidebar while it is visible, and shows it when it is not (#1630)", async () => {
+    collectionStore.albumProfiles = {
+      "abbey road": { album_key: "abbey road", artist_key: "the beatles", description: "Classic album", links: [] },
+    };
+    windowLayoutStore.rightPanelOpen = true;
+    const { queryByText, findByText } = render(AlbumDetailView, { props: { albumName: mockAlbumName } });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(queryByText("Classic album")).toBeNull();
+    expect(queryByText("Album Info")).toBeNull();
+
+    // Narrowing the window auto-hides the sidebar, so the view takes the description over.
+    const width = windowLayoutStore.viewportWidth;
+    windowLayoutStore.viewportWidth = 500;
+    try {
+      expect(await findByText("Classic album")).toBeInTheDocument();
+    } finally {
+      windowLayoutStore.viewportWidth = width;
+    }
   });
 
   it("scopes Album Info card to group/overview, buttons to group/link, and shows domain-only for unrecognized sites (#1133)", async () => {

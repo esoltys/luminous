@@ -342,6 +342,14 @@ class WindowLayoutStore {
     return this.viewportWidth < BREAKPOINT_RIGHT_PANEL_PX;
   }
 
+  /**
+   * Whether the info sidebar is on screen. Entity context (artist/album info) shows there when it
+   * is, and in the detail view itself only when it is not. `+layout.svelte` mounts the panel on this.
+   */
+  get isInfoSidebarVisible(): boolean {
+    return this.rightPanelOpen && !this.isRightPanelAutoHidden;
+  }
+
   get isPlayerBarCompact(): boolean {
     return this.viewportWidth < BREAKPOINT_MEDIUM_PX;
   }

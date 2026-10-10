@@ -3,15 +3,14 @@ import { untrack } from "svelte";
 import type { Song } from "../types";
 import { navigationStore } from "./navigation.svelte";
 import { playerStore } from "./player.svelte";
+import { entitySubject, type ContextSubject } from "./context.svelte";
 
-/** What the info sidebar describes. */
-interface InspectorSubject {
-  kind: "song" | "album" | "artist";
-  /** Drives the panel's tags and context lookup; for an album/artist, a representative song of it. */
-  song: Song;
+/**
+ * What the info sidebar describes. `song` drives the panel's tags and context lookup (for an
+ * album/artist, a representative song of it) and `key` changes if and only if the subject does.
+ */
+interface InspectorSubject extends ContextSubject {
   source: "selection" | "view" | "playing";
-  /** Changes if and only if the subject changes — use it to key fetches and caches. */
-  key: string;
 }
 
 interface Entity {
@@ -30,7 +29,7 @@ interface Entity {
 class InspectorStore {
   /** Single-song selections by reporting view, oldest first; the newest wins. */
   private selections = $state<{ viewId: string; song: Song }[]>([]);
-  private resolved = $state<{ key: string; song: Song } | null>(null);
+  private resolved = $state<ContextSubject | null>(null);
   private requestId = 0;
 
   constructor() {
@@ -58,32 +57,31 @@ class InspectorStore {
 
   private async resolveEntity(entity: Entity) {
     const id = ++this.requestId;
-    const key = `${entity.kind}:${entity.name}`;
-    let song: Song | undefined;
+    let subject: ContextSubject | null = null;
     try {
       const songs =
         entity.kind === "album"
           ? await invoke<Song[]>("get_songs_by_album", { album: entity.name })
           : await invoke<Song[]>("get_songs_by_artist", { artist: entity.name });
-      song = songs?.[0];
+      subject = entitySubject(entity.kind, entity.name, songs ?? []);
     } catch {
       // An entity we can't resolve is simply one with no context to show.
     }
     if (id !== this.requestId) return;
-    this.resolved = song ? { key, song } : null;
+    this.resolved = subject;
   }
 
   get subject(): InspectorSubject | null {
     const selected = this.selections.at(-1);
-    if (selected) return { kind: "song", song: selected.song, source: "selection", key: `song:${selected.song.id}` };
+    if (selected) return { kind: "song", song: selected.song, source: "selection", key: `song:${selected.song.id}`, name: selected.song.artist ?? "" };
 
     const entity = this.viewedEntity;
     if (entity && this.resolved?.key === `${entity.kind}:${entity.name}`) {
-      return { kind: entity.kind, song: this.resolved.song, source: "view", key: this.resolved.key };
+      return { ...this.resolved, source: "view" };
     }
 
     const playing = playerStore.currentSong;
-    if (playing) return { kind: "song", song: playing, source: "playing", key: `song:${playing.id}` };
+    if (playing) return { kind: "song", song: playing, source: "playing", key: `song:${playing.id}`, name: playing.artist ?? "" };
     return null;
   }
 

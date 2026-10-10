@@ -17,8 +17,8 @@
   import GenreChips from "./GenreChips.svelte";
   import CommunityRating from "./CommunityRating.svelte";
   import AudioPipelineStages from "./AudioPipelineStages.svelte";
-  import ArtistInformationPanel from "./ArtistInformationPanel.svelte";
-  import type { SongContextEnrichment } from "../types";
+  import InfoSections from "./InfoSections.svelte";
+  import { contextStore } from "../stores/context.svelte";
 
   interface Props {
     isOpen?: boolean;
@@ -64,60 +64,10 @@
       .catch(() => {});
   });
 
-  let contextData = $state<SongContextEnrichment | null>(null);
-  let isLoadingContext = $state(false);
-  let contextErrorMsg = $state("");
-
-  // A request-id guard, since switching tracks quickly can otherwise let an
-  // earlier, slower fetch resolve after a newer one and overwrite
-  // contextData with stale data for a track the user has already left.
-  let contextRequestId = 0;
-
-  async function loadContext(songId: number | undefined, forceRefresh = false) {
-    const requestId = ++contextRequestId;
-    if (!songId || !prefs.onlineEnabled) {
-      contextData = null;
-      contextErrorMsg = "";
-      return;
-    }
-    isLoadingContext = true;
-    contextErrorMsg = "";
-    try {
-      const data = await invoke<SongContextEnrichment>("get_song_context", { songId, forceRefresh, locale: i18n.currentLocale });
-      if (requestId !== contextRequestId) return;
-      contextData = data;
-    } catch (e) {
-      if (requestId !== contextRequestId) return;
-      contextErrorMsg = e instanceof Error ? e.message : String(e);
-    } finally {
-      if (requestId === contextRequestId) isLoadingContext = false;
-    }
-  }
-
-  // Selection changes far more often than tracks do (arrowing through rows), so
-  // debounce the fetch; the request-id guard in loadContext covers stale replies.
-  $effect(() => {
-    const songId = currentSong?.id;
-    const timer = setTimeout(() => loadContext(songId), 150);
-    return () => clearTimeout(timer);
-  });
-
-  let hasArtistInfo = $derived(
-    !!contextData?.artist_begin_date ||
-      !!contextData?.artist_end_date ||
-      !!contextData?.artist_begin_area_name ||
-      !!contextData?.artist_area_name
-  );
-
-  let hasContextData = $derived.by(() => {
-    if (listenbrainzRows.length > 0) return true;
-    if (!contextData) return false;
-    return !!(
-      contextData.wikipedia_extract ||
-      contextData.critiquebrainz_rating != null ||
-      hasArtistInfo
-    );
-  });
+  // Selection changes far more often than tracks do (arrowing through rows); the store debounces
+  // its fetches. Events are only worth fetching for a song while the Information tab is showing.
+  const info = contextStore.for(() => subject ?? null, { songEvents: () => effectiveTab === "context" });
+  let contextData = $derived(info.context);
 
   // Per-track DR/Peak/RMS parsed from a foobar2000 foo_dr.txt log (#57) —
   // shown alongside Loudness since Peak/RMS feed that gain calculation as a
@@ -181,62 +131,6 @@
     return entries.filter((e): e is { label: string; value: string } => !!e.value);
   });
 
-  const listenbrainzRows = $derived.by(() => {
-    if (!currentSong) return [];
-    const albumMbid = currentSong.musicbrainz_release_group_id || currentSong.musicbrainz_album_id;
-    const albumPath = currentSong.musicbrainz_release_group_id ? "album" : "release";
-    const recordingMbid = currentSong.musicbrainz_recording_id || currentSong.musicbrainz_track_id;
-    const recordingPath = currentSong.musicbrainz_recording_id ? "recording" : "track";
-
-    const entries: { label: string; id?: string; url: string; name?: string }[] = [
-      {
-        label: i18n.t('playerBar.listenbrainzArtistLabel', {}, 'Artist'),
-        id: currentSong.musicbrainz_artist_id,
-        url: currentSong.musicbrainz_artist_id ? `https://listenbrainz.org/artist/${currentSong.musicbrainz_artist_id}/` : "",
-        name: currentSong.artist,
-      },
-      ...(currentSong.musicbrainz_album_artist_id && currentSong.musicbrainz_album_artist_id !== currentSong.musicbrainz_artist_id
-        ? [{
-            label: i18n.t('playerBar.listenbrainzAlbumArtistLabel', {}, 'Album Artist'),
-            id: currentSong.musicbrainz_album_artist_id,
-            url: `https://listenbrainz.org/artist/${currentSong.musicbrainz_album_artist_id}/`,
-            name: currentSong.album_artist,
-          }]
-        : []),
-      {
-        label: i18n.t('playerBar.listenbrainzAlbumLabel', {}, 'Album'),
-        id: albumMbid,
-        url: albumMbid ? `https://listenbrainz.org/${albumPath}/${albumMbid}/` : "",
-        name: currentSong.album,
-      },
-      {
-        label: i18n.t('playerBar.listenbrainzRecordingLabel', {}, 'Track'),
-        id: recordingMbid,
-        url: recordingMbid ? `https://listenbrainz.org/${recordingPath}/${recordingMbid}/` : "",
-        name: currentSong.title,
-      },
-    ];
-    // An artist subject links only the artist; an album subject drops the track.
-    const relevant = subject?.kind === "artist"
-      ? entries.slice(0, entries.length - 2)
-      : subject?.kind === "album"
-        ? entries.slice(0, entries.length - 1)
-        : entries;
-    return relevant.filter((e): e is typeof entries[number] & { id: string } => !!e.id);
-  });
-
-  const listenbrainzLogoUrl = $derived.by(() => {
-    if (!currentSong) return "https://listenbrainz.org";
-    const albumMbid = currentSong.musicbrainz_release_group_id || currentSong.musicbrainz_album_id;
-    if (albumMbid) {
-      const albumPath = currentSong.musicbrainz_release_group_id ? "album" : "release";
-      return `https://listenbrainz.org/${albumPath}/${albumMbid}/`;
-    }
-    if (currentSong.musicbrainz_artist_id) {
-      return `https://listenbrainz.org/artist/${currentSong.musicbrainz_artist_id}/`;
-    }
-    return "https://listenbrainz.org";
-  });
 </script>
 
 <aside
@@ -297,132 +191,7 @@
       </div>
 
       {#if effectiveTab === "context"}
-        {#if !prefs.onlineEnabled}
-          <p class="text-xs text-brand-text-secondary/60 py-2">{i18n.t('playerBar.contextOffline')}</p>
-        {:else if isLoadingContext}
-          <div class="flex items-center gap-2 text-xs text-brand-text-secondary/60 py-2">
-            <RefreshCw class="w-3.5 h-3.5 animate-spin" />
-            <span>{i18n.t('playerBar.contextLoading', {}, 'Fetching context…')}</span>
-          </div>
-        {:else if contextErrorMsg}
-          <div class="space-y-2 py-2">
-            <p class="text-xs text-brand-text-secondary/60">{i18n.t('playerBar.contextFetchError', {}, "Couldn't fetch context data. Check your connection and retry.")}</p>
-            <button
-              type="button"
-              onclick={() => loadContext(currentSong?.id, true)}
-              class="text-xs text-brand-accent hover:underline"
-            >
-              {i18n.t('playerBar.contextRetry', {}, 'Retry')}
-            </button>
-          </div>
-        {:else}
-          {#if hasArtistInfo}
-            <ArtistInformationPanel
-              sortName={contextData?.artist_sort_name}
-              gender={contextData?.artist_gender}
-              beginDate={contextData?.artist_begin_date}
-              endDate={contextData?.artist_end_date}
-              ended={contextData?.artist_ended}
-              artistType={contextData?.artist_type}
-              beginAreaName={contextData?.artist_begin_area_name}
-              beginAreaMbid={contextData?.artist_begin_area_mbid}
-              areaName={contextData?.artist_area_name}
-              areaMbid={contextData?.artist_area_mbid}
-              variant="card"
-            />
-          {/if}
-
-          {#if contextData?.wikipedia_extract}
-            <details
-              open
-              class="group border border-brand-border/60 rounded-lg bg-brand-sidebar/40 overflow-hidden"
-            >
-              <summary class="flex items-center justify-between px-3 py-2 text-xs font-semibold text-brand-text-secondary cursor-pointer select-none hover:text-brand-text-primary transition-colors">
-                <div class="flex items-center gap-1 min-w-0">
-                  <span>{i18n.t('playerBar.wikipediaSectionLabel', {}, 'Wikipedia')}</span>
-                  {#if contextData.wikipedia_page_url}
-                    <button
-                      type="button"
-                      onclick={(e) => {
-                        e.stopPropagation();
-                        if (contextData?.wikipedia_page_url) openExternalUrl(contextData.wikipedia_page_url);
-                      }}
-                      class="inline-flex items-center text-brand-text-secondary/60 hover:text-brand-accent transition-colors ml-0.5 p-0.5"
-                      title={i18n.t('playerBar.wikipediaSectionLabel', {}, 'Wikipedia')}
-                    >
-                      <ExternalLink class="w-3 h-3" />
-                    </button>
-                  {/if}
-                </div>
-                <CaretDown class="w-3.5 h-3.5 text-brand-text-secondary/70 group-open:rotate-180 transition-transform shrink-0" />
-              </summary>
-              <div class="px-3 pb-3 pt-1 border-t border-brand-border/40 text-xs">
-                <p class="text-brand-text-secondary leading-relaxed whitespace-pre-line">{contextData.wikipedia_extract}</p>
-              </div>
-            </details>
-          {/if}
-
-          {#if listenbrainzRows.length > 0}
-            <div class="space-y-2 text-xs">
-              <button
-                type="button"
-                onclick={() => openExternalUrl(listenbrainzLogoUrl)}
-                class="group relative inline-flex items-center gap-1 cursor-pointer"
-              >
-                <img src="/listenbrainz-logo.png" alt={i18n.t('playerBar.listenbrainzSectionLabel', {}, 'ListenBrainz')} class="h-4.5 w-auto opacity-80 group-hover:opacity-100 transition-opacity" />
-                <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity" />
-              </button>
-
-              {#each listenbrainzRows as row (row.label)}
-                <div class="flex items-start justify-between gap-3">
-                  <span class="text-brand-text-secondary/60 shrink-0">{row.label}</span>
-                  <button
-                    type="button"
-                    onclick={() => openExternalUrl(row.url)}
-                    class="group relative text-right transition-colors cursor-pointer min-w-0"
-                  >
-                    <span class="text-brand-text-primary underline decoration-brand-text-secondary/40 break-words transition-colors">{row.name || row.id}</span>
-                    <ExternalLink class="absolute -right-4 top-1/2 -translate-y-1/2 w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </button>
-                </div>
-              {/each}
-            </div>
-          {/if}
-
-          {#if contextData?.critiquebrainz_rating != null && subject?.kind !== "artist"}
-            <div class="space-y-1.5 text-xs">
-              {#if currentSong.musicbrainz_release_group_id}
-                <button
-                  type="button"
-                  onclick={() => openExternalUrl(`https://critiquebrainz.org/release-group/${currentSong.musicbrainz_release_group_id}`)}
-                  class="group relative inline-flex items-center gap-1 cursor-pointer"
-                >
-                  <img src="/critiquebrainz-logo.svg" alt={i18n.t('playerBar.critiquebrainzSectionLabel', {}, 'CritiqueBrainz')} class="h-5 w-auto opacity-80 group-hover:opacity-100 transition-opacity" />
-                  <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity" />
-                </button>
-              {:else}
-                <img src="/critiquebrainz-logo.svg" alt={i18n.t('playerBar.critiquebrainzSectionLabel', {}, 'CritiqueBrainz')} class="h-5 w-auto opacity-80" />
-              {/if}
-              {#if contextData?.critiquebrainz_rating != null}
-                <div class="text-brand-text-secondary">
-                  <CommunityRating
-                    rating={contextData.critiquebrainz_rating}
-                    count={contextData.critiquebrainz_review_count}
-                    releaseGroupMbid={currentSong.musicbrainz_release_group_id}
-                  />
-                </div>
-              {/if}
-            </div>
-          {/if}
-
-          {#if !hasContextData}
-            <div class="text-xs text-brand-text-secondary/60 py-2">
-              {isEntitySubject
-                ? i18n.t('playerBar.contextEmptyStateEntity', {}, 'No enrichment data available.')
-                : i18n.t('playerBar.contextEmptyState', {}, 'No enrichment data available for this track.')}
-            </div>
-          {/if}
-        {/if}
+        <InfoSections view={info} entity={isEntitySubject} />
       {:else}
         <div class="space-y-3">
           {#if isPlayingSubject}

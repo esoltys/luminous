@@ -44,14 +44,13 @@
     ArrowSquareOutIcon as ExternalLink,
     ChartBarIcon as BarChart2,
     ShareNetworkIcon as Share,
-    ArrowDownLeftIcon as ArrowDownLeft,
-    ArrowUpRightIcon as ArrowUpRight
+    ArrowDownLeftIcon as ArrowDownLeft
   } from "phosphor-svelte";
   import ShareModal from "./ShareModal.svelte";
   import AlbumProfileEditor from "./AlbumProfileEditor.svelte";
-  import MarkdownBio from "./MarkdownBio.svelte";
-  import SocialIcon from "./SocialIcon.svelte";
-  import type { Song, AlbumItem, PlayContext, SongContextEnrichment } from "../types";
+  import EntityInfoCard from "./EntityInfoCard.svelte";
+  import { contextStore, entitySubject } from "../stores/context.svelte";
+  import type { Song, AlbumItem, PlayContext } from "../types";
   import { getCoverArtUrl, resolveArtUrl } from "../types";
   import { i18n, formatNumber } from "../stores/i18n.svelte";
   import { formatHoursMinutes } from "../utils/formatters";
@@ -63,13 +62,6 @@
   import { rememberScroll } from "../utils/scrollMemory";
   import { openInPicard } from "../utils/picard";
   import { openExternalUrl } from "../utils/openExternalUrl";
-  import {
-    resolveSocialUrl,
-    formatDisplayLabel,
-    normalizeWebsitePlatform,
-    deriveListenbrainzAlbumUrl,
-    isBlacklistedLink,
-  } from "../utils/artistSocials";
 
   let { albumName }: { albumName: string } = $props();
 
@@ -119,38 +111,13 @@
   );
   let hasReleaseGroupMbid = $derived(releaseGroupMbid.length > 0);
 
-  /** CritiqueBrainz or MusicBrainz community rating for the album's release group (cached backend-side). */
-  let communityRating = $state<{
-    rating: number;
-    count: number | null;
-    source: "critiquebrainz" | "musicbrainz";
-  } | null>(null);
-  $effect(() => {
-    const songId = songs.find((s) => (s.musicbrainz_release_group_id ?? "").trim() === releaseGroupMbid)?.id;
-    const mbid = releaseGroupMbid;
-    communityRating = null;
-    if (!mbid || songId == null || !prefs.onlineEnabled) return;
-    let stale = false;
-    invoke<SongContextEnrichment>("get_song_context", { songId, forceRefresh: false, locale: i18n.currentLocale })
-      .then((ctx) => {
-        if (stale) return;
-        if (ctx.critiquebrainz_rating != null) {
-          communityRating = {
-            rating: ctx.critiquebrainz_rating,
-            count: ctx.critiquebrainz_review_count || null,
-            source: "critiquebrainz",
-          };
-        } else if (ctx.mb_rating != null) {
-          communityRating = {
-            rating: ctx.mb_rating,
-            count: ctx.mb_rating_votes || null,
-            source: "musicbrainz",
-          };
-        }
-      })
-      .catch(() => {});
-    return () => { stale = true; };
-  });
+  // Everything fetched about the album (description, links, ratings) lives in contextStore and shows in
+  // the info sidebar; this view only renders it, as a card, while the sidebar is hidden.
+  let infoSubject = $derived(entitySubject("album", albumName, songs));
+  const info = contextStore.for(() => infoSubject);
+  /** CritiqueBrainz or MusicBrainz community rating for the album's release group. */
+  let communityRating = $derived(hasReleaseGroupMbid ? info.communityRating : null);
+  let showInfoCard = $derived(!windowLayoutStore.isInfoSidebarVisible && info.sections.length > 0);
 
   /** fanart.tv cover and disc art (#1277). New disc art re-scans the cover
    * stack so it's counted. Failures only warn: art is a bonus on top of
@@ -307,28 +274,7 @@
     return onDevScreenHooks((hook) => [hook("openAlbumEditor", () => { isEditorOpen = true; })]);
   });
   let albumProfile = $derived(collectionStore.getAlbumProfile(albumName));
-  let hasDescription = $derived(!!albumProfile?.description?.trim());
-  let hasWebsite = $derived(
-    !!albumProfile?.website?.trim() && !isBlacklistedLink(albumProfile?.website, "website")
-  );
-  let hasLinks = $derived(
-    !!albumProfile?.links &&
-      albumProfile.links.some((l) => !isBlacklistedLink(l.handle_or_url, l.platform))
-  );
   let hasChips = $derived(Boolean(rawGenre?.trim()));
-
-  // Derived ListenBrainz album URL (#950): derived from representative songs
-  // that have a MusicBrainz release group or release ID.
-  let listenbrainzUrl = $derived.by(() => {
-    const representative = songs.find(
-      (s) => s.musicbrainz_release_group_id || s.musicbrainz_album_id
-    );
-    return deriveListenbrainzAlbumUrl(representative);
-  });
-
-  let hasProfileContent = $derived(
-    hasDescription || hasWebsite || hasLinks || !!listenbrainzUrl
-  );
 
   let lastAutoFetchedAlbum = $state<string | null>(null);
   $effect(() => {
@@ -359,62 +305,6 @@
       } else {
         handleRetrieveAlbumDetails(true);
       }
-    });
-  });
-
-  interface ReleaseLinkItem {
-    key: string;
-    platform: string;
-    url: string;
-    label: string;
-    /** The release's own official page, rendered more prominently than a
-     * plain cross-reference or curated link (#1123). */
-    isOfficial: boolean;
-  }
-
-  // Unifies the website, curated (#950), and derived ListenBrainz links into
-  // one alphabetically-sorted list so the "Release Links" panel doesn't read
-  // as source-ordered clutter once an album has a dozen retrieved links (#1122).
-  let releaseLinkItems = $derived.by((): ReleaseLinkItem[] => {
-    const items: ReleaseLinkItem[] = [];
-    if (hasWebsite && !isBlacklistedLink(albumProfile?.website, "website")) {
-      const website = albumProfile?.website ?? "";
-      const url = resolveSocialUrl("website", website);
-      items.push({
-        key: "website",
-        platform: normalizeWebsitePlatform("website", url),
-        url,
-        label: formatDisplayLabel("website", website),
-        isOfficial: true,
-      });
-    }
-    for (const link of albumProfile?.links ?? []) {
-      if (isBlacklistedLink(link.handle_or_url, link.platform)) continue;
-      const url = resolveSocialUrl(link.platform, link.handle_or_url);
-      items.push({
-        key: `${link.platform}:${link.handle_or_url}`,
-        platform: normalizeWebsitePlatform(link.platform, url),
-        url,
-        label: formatDisplayLabel(link.platform, link.handle_or_url),
-        isOfficial: false,
-      });
-    }
-    if (listenbrainzUrl) {
-      items.push({
-        key: "listenbrainz",
-        platform: "listenbrainz",
-        url: listenbrainzUrl,
-        label: "ListenBrainz",
-        isOfficial: false,
-      });
-    }
-    // Official homepage(s) lead as a group, ahead of the alphabetical sort —
-    // it's the artist/label's own page, not just one more retrieved link.
-    return items.sort((a, b) => {
-      if (a.isOfficial !== b.isOfficial) return a.isOfficial ? -1 : 1;
-      if (a.key === "website") return -1;
-      if (b.key === "website") return 1;
-      return a.label.localeCompare(b.label);
     });
   });
 
@@ -806,12 +696,12 @@
             <span>{genreLabel}</span>
           </div>
         {/if}
-        {#if !hasProfileContent && communityRating}
+        {#if !showInfoCard && communityRating}
           <div class="inline-flex items-center px-3 py-1 text-xs font-medium text-brand-text-secondary shrink-0 ml-auto">
             <CommunityRating rating={communityRating.rating} count={communityRating.count} {releaseGroupMbid} source={communityRating.source} />
           </div>
         {/if}
-        {#if hasProfileContent && !windowLayoutStore.isOverviewExpanded}
+        {#if showInfoCard && !windowLayoutStore.isOverviewExpanded}
           <button
             type="button"
             onclick={() => windowLayoutStore.setOverviewExpanded(true)}
@@ -825,61 +715,10 @@
     {/if}
 
     <!-- Album Profile Card (Liner Notes & Release Links) -->
-    {#if hasProfileContent && !windowLayoutStore.isDetailHeaderCollapsed && windowLayoutStore.isOverviewExpanded}
-      <details
-        open
-        ontoggle={(e) => windowLayoutStore.setOverviewExpanded(e.currentTarget.open)}
-        class="group/overview border border-brand-border rounded-xl bg-brand-sidebar/95 backdrop-blur-xl overflow-hidden shadow-md transition-all @container"
-      >
-        <summary class="flex items-center justify-between px-4 py-2.5 @xl:px-5 @xl:py-3 text-xs font-semibold text-brand-text-secondary cursor-pointer select-none hover:text-brand-text-primary transition-colors">
-          {@render albumInfoTitle()}
-          <ArrowUpRight class="w-3.5 h-3.5 text-brand-text-secondary/70" />
-        </summary>
-        <div class="p-4 @xl:p-5 @3xl:p-6 border-t border-brand-border/60 flex flex-col @2xl:flex-row gap-5 @3xl:gap-6 justify-between">
-          <!-- Liner Notes / Description (Left) -->
-          {#if hasDescription}
-            <div class="flex-1 flex flex-col gap-3 min-w-0">
-              <div class="text-xs text-brand-text-secondary leading-relaxed">
-                <MarkdownBio
-                  text={albumProfile?.description}
-                  disableClamp={true}
-                />
-              </div>
-            </div>
-          {/if}
-
-          <!-- Release Links (Right or Below) -->
-          {#if hasWebsite || hasLinks || listenbrainzUrl}
-            <div
-              class={hasDescription
-                ? "@2xl:w-[22rem] @3xl:w-[28rem] shrink-0 border-t border-brand-border/40 pt-4 @2xl:border-t-0 @2xl:border-l @2xl:border-brand-border/60 @2xl:pt-0 @2xl:pl-6 flex flex-col gap-3"
-                : "w-full flex flex-col gap-3"}
-            >
-              <div class="grid grid-cols-1 @sm:grid-cols-2 {hasDescription ? '@2xl:grid @2xl:grid-cols-2' : '@md:grid-cols-3 @xl:grid-cols-4'} gap-2.5">
-                <!-- Website, curated (#950) and derived ListenBrainz links, unified and sorted alphabetically (#1122) -->
-                {#each releaseLinkItems as item (item.key)}
-                  <button
-                    type="button"
-                    onclick={() => handleOpenUrl(item.url)}
-                    title={item.url}
-                    class="flex items-center gap-2.5 @xl:gap-3 group/link text-left transition-colors cursor-pointer min-w-0"
-                  >
-                    <div class="w-7 h-7 @xl:w-8 @xl:h-8 rounded-full bg-brand-main/60 {item.isOfficial ? 'border-[3px]' : 'border'} border-brand-border flex items-center justify-center text-brand-text-secondary group-hover/link:text-brand-accent group-hover/link:border-brand-accent/40 transition-colors shrink-0 shadow-2xs">
-                      <SocialIcon platform={item.platform} size={14} />
-                    </div>
-                    <div class="flex items-center gap-1 min-w-0 flex-1">
-                      <span class="text-xs font-medium text-brand-text-primary truncate transition-colors">
-                        {item.label}
-                      </span>
-                      <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover/link:opacity-100 transition-opacity shrink-0" />
-                    </div>
-                  </button>
-                {/each}
-              </div>
-            </div>
-          {/if}
-        </div>
-      </details>
+    {#if showInfoCard && !windowLayoutStore.isDetailHeaderCollapsed && windowLayoutStore.isOverviewExpanded}
+      <EntityInfoCard view={info} hideRating={!!communityRating}>
+        {#snippet title()}{@render albumInfoTitle()}{/snippet}
+      </EntityInfoCard>
     {/if}
 
     <div class="border border-brand-border rounded-lg bg-brand-sidebar/50 backdrop-blur-xl shadow-2xl overflow-hidden table-surface-blur">

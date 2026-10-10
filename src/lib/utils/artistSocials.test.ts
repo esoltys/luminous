@@ -8,7 +8,6 @@ import {
   resolveArtistMbid,
   deriveMusicbrainzArtistUrl,
   deriveMusicbrainzEventsUrl,
-  deriveListenbrainzArtistUrl,
   deriveFanartTvUrlFromMbid,
   normalizeWebsitePlatform,
   isBlacklistedLink,
@@ -145,15 +144,13 @@ describe("artistSocials", () => {
       expect(resolveArtistMbid("not-a-valid-mbid", [{ platform: "discogs", handle_or_url: "https://discogs.com/artist/1" }])).toBeNull();
     });
 
-    it("derives MusicBrainz/ListenBrainz/Fanart.tv URLs from the resolved MBID", () => {
+    it("derives MusicBrainz/Fanart.tv URLs from the resolved MBID", () => {
       expect(deriveMusicbrainzArtistUrl(mbid)).toBe(`https://musicbrainz.org/artist/${mbid}`);
-      expect(deriveListenbrainzArtistUrl(mbid)).toBe(`https://listenbrainz.org/artist/${mbid}/`);
       expect(deriveFanartTvUrlFromMbid(mbid)).toBe(`https://fanart.tv/artist/${mbid}`);
     });
 
-    it("returns null from all three derivers when there is no MBID", () => {
+    it("returns null from the derivers when there is no MBID", () => {
       expect(deriveMusicbrainzArtistUrl(null)).toBeNull();
-      expect(deriveListenbrainzArtistUrl(null)).toBeNull();
       expect(deriveFanartTvUrlFromMbid(null)).toBeNull();
     });
   });

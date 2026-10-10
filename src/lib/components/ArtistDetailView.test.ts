@@ -5,12 +5,15 @@ import { collectionStore } from "../stores/collection.svelte";
 import { navigationStore } from "../stores/navigation.svelte";
 import { picardStore } from "../stores/picard.svelte";
 import { windowLayoutStore } from "../stores/windowLayout.svelte";
+import { contextStore } from "../stores/context.svelte";
 import { prefs } from "../stores/prefs.svelte";
 import { invoke } from "@tauri-apps/api/core";
 
+const SONG = { id: 1, title: "Song", artist: "Shania Twain", album: "Album", path: "/a.mp3", duration: 100 };
+
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn((cmd: string, args?: any) => {
-    if (cmd === "get_songs_by_artist") return Promise.resolve([]);
+    if (cmd === "get_songs_by_artist") return Promise.resolve([SONG]);
     if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
     if (cmd === "get_compilations_by_artist") return Promise.resolve([]);
     if (cmd === "get_artist_profile") {
@@ -46,6 +49,9 @@ describe("ArtistDetailView", () => {
     // between tests (#98/#761).
     collectionStore.extendedArtworkByArtist = {};
     windowLayoutStore.setOverviewExpanded(true);
+    // The info sidebar owns this context; these tests cover the narrow-window fallback card.
+    windowLayoutStore.rightPanelOpen = false;
+    contextStore.clearAll();
   });
 
   it("renders artist name and action buttons including overflow menu", async () => {
@@ -63,7 +69,7 @@ describe("ArtistDetailView", () => {
     expect(screen.getByText("country")).toBeTruthy();
     expect(screen.getByText("canadian")).toBeTruthy();
     expect(screen.getByText("pop")).toBeTruthy();
-    expect(screen.getByText("Canadian music icon")).toBeTruthy();
+    expect(await screen.findByText("Canadian music icon")).toBeTruthy();
     expect(screen.getByText("shaniatwain.com")).toBeTruthy();
     expect(screen.getByText("Instagram")).toBeTruthy();
   });
@@ -86,10 +92,35 @@ describe("ArtistDetailView", () => {
 
     render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
 
-    expect(screen.getByText("Instagram")).toBeTruthy();
+    expect(await screen.findByText("Instagram")).toBeTruthy();
     expect(screen.queryByText(/rateyourmusic/i)).toBeNull();
     expect(screen.queryByText(/twitter/i)).toBeNull();
     expect(screen.queryByText(/^x$/i)).toBeNull();
+  });
+
+  describe("info placement (#1630)", () => {
+    it("leaves the bio and links to the info sidebar while it is visible", async () => {
+      windowLayoutStore.rightPanelOpen = true;
+      render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(screen.queryByText("Canadian music icon")).toBeNull();
+      expect(screen.queryByText("Artist Info")).toBeNull();
+      expect(screen.getByText("country")).toBeTruthy();
+    });
+
+    it("shows them in the view when the sidebar is auto-hidden at a narrow width", async () => {
+      const width = windowLayoutStore.viewportWidth;
+      windowLayoutStore.rightPanelOpen = true;
+      windowLayoutStore.viewportWidth = 500;
+      try {
+        render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
+        expect(await screen.findByText("Canadian music icon")).toBeTruthy();
+        expect(screen.getByText("Artist Info")).toBeTruthy();
+      } finally {
+        windowLayoutStore.viewportWidth = width;
+      }
+    });
   });
 
   it("clicking tag sets search query to artist-tag filter", async () => {
@@ -302,7 +333,7 @@ describe("ArtistDetailView", () => {
     it("renders a discovered band logo beside the portrait while keeping the text heading", async () => {
       const invokeMock = vi.mocked(invoke);
       invokeMock.mockImplementation((cmd: string, args?: any) => {
-        if (cmd === "get_songs_by_artist") return Promise.resolve([]);
+        if (cmd === "get_songs_by_artist") return Promise.resolve([SONG] as any);
         if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
         if (cmd === "get_compilations_by_artist") return Promise.resolve([]);
         if (cmd === "get_artist_profile") {
@@ -345,7 +376,7 @@ describe("ArtistDetailView", () => {
     it("shows a derived fanart.tv link when a MusicBrainz link with a recognizable MBID is present", async () => {
       const invokeMock = vi.mocked(invoke);
       invokeMock.mockImplementation((cmd: string, args?: any) => {
-        if (cmd === "get_songs_by_artist") return Promise.resolve([]);
+        if (cmd === "get_songs_by_artist") return Promise.resolve([SONG] as any);
         if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
         if (cmd === "get_compilations_by_artist") return Promise.resolve([]);
         if (cmd === "get_artist_profile") {
@@ -383,7 +414,7 @@ describe("ArtistDetailView", () => {
     it("renders bio and links in an Artist Info accordion without inline show more buttons", async () => {
       const invokeMock = vi.mocked(invoke);
       invokeMock.mockImplementation((cmd: string, args?: any) => {
-        if (cmd === "get_songs_by_artist") return Promise.resolve([]);
+        if (cmd === "get_songs_by_artist") return Promise.resolve([SONG] as any);
         if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
         if (cmd === "get_compilations_by_artist") return Promise.resolve([]);
         if (cmd === "get_artist_profile") {
@@ -419,7 +450,7 @@ describe("ArtistDetailView", () => {
     it("collapses to a corner button and expands the Artist Info accordion", async () => {
       const invokeMock = vi.mocked(invoke);
       invokeMock.mockImplementation((cmd: string, args?: any) => {
-        if (cmd === "get_songs_by_artist") return Promise.resolve([]);
+        if (cmd === "get_songs_by_artist") return Promise.resolve([SONG] as any);
         if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
         if (cmd === "get_compilations_by_artist") return Promise.resolve([]);
         if (cmd === "get_artist_profile") {
@@ -459,104 +490,7 @@ describe("ArtistDetailView", () => {
       expect(screen.queryByRole("button", { name: /Artist Info/ })).toBeTruthy();
     });
 
-    it("limits ArtistInformationPanel max-width to two columns of links and uses 4-column links when artist has no bio", async () => {
-      const invokeMock = vi.mocked(invoke);
-      invokeMock.mockImplementation((cmd: string) => {
-        if (cmd === "get_songs_by_artist") return Promise.resolve([{ id: 1, title: "El Bueno Y El Malo", artist: "Hermanos Gutiérrez" }] as any);
-        if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
-        if (cmd === "get_compilations_by_artist") return Promise.resolve([]);
-        if (cmd === "get_artist_profile") {
-          return Promise.resolve({
-            artist_key: "Hermanos Gutiérrez",
-            website: "https://hermanosgutierrez.ch",
-            tags: [],
-            social_links: [
-              { platform: "bandcamp", handle_or_url: "https://hermanosgutierrez.bandcamp.com" },
-              { platform: "discogs", handle_or_url: "https://discogs.com/artist/123" },
-            ],
-            bio: null,
-          });
-        }
-        if (cmd === "get_song_context") {
-          return Promise.resolve({
-            artist_begin_date: "2015",
-            artist_begin_area_name: "Zürich",
-            artist_area_name: "Switzerland",
-          });
-        }
-        return Promise.resolve();
-      });
 
-      const { container } = render(ArtistDetailView, { props: { artistName: "Hermanos Gutiérrez" } });
-      await waitFor(() => {
-        expect(screen.getByText("Formed")).toBeTruthy();
-      });
-
-      expect(screen.getByText("Artist Info")).toBeTruthy();
-      expect(screen.getByText(/2015/)).toBeTruthy();
-
-      // Facts panel container must have max-width constraint for two columns of links
-      const factsContainer = container.querySelector(".space-y-2.text-xs");
-      expect(factsContainer).toBeTruthy();
-      expect(factsContainer?.className).toContain("@xl:max-w-[calc(50%-0.3125rem)]");
-
-      // Links grid must expand to up to 4 columns when there is no bio
-      const linksGrid = container.querySelector(".grid.grid-cols-1");
-      expect(linksGrid).toBeTruthy();
-      expect(linksGrid?.className).toContain("@xl:grid-cols-4");
-    });
-
-    it("limits ArtistInformationPanel max-width and renders 2-column links beside bio when bio is present", async () => {
-      const invokeMock = vi.mocked(invoke);
-      invokeMock.mockImplementation((cmd: string) => {
-        if (cmd === "get_songs_by_artist") return Promise.resolve([{ id: 1, title: "Song 1", artist: "Shania Twain" }] as any);
-        if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
-        if (cmd === "get_compilations_by_artist") return Promise.resolve([]);
-        if (cmd === "get_artist_profile") {
-          return Promise.resolve({
-            artist_key: "Shania Twain",
-            website: "https://www.shaniatwain.com",
-            tags: ["country"],
-            social_links: [{ platform: "instagram", handle_or_url: "@shaniatwain" }],
-            bio: longBio,
-          });
-        }
-        if (cmd === "get_song_context") {
-          return Promise.resolve({
-            artist_begin_date: "1965-08-28",
-            artist_type: "Person",
-            artist_gender: "female",
-            artist_begin_area_name: "Windsor",
-            artist_area_name: "Canada",
-          });
-        }
-        return Promise.resolve();
-      });
-
-      const { container } = render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
-      await waitFor(() => {
-        expect(screen.getByText("Born")).toBeTruthy();
-      });
-
-      expect(screen.getByText("Artist Info")).toBeTruthy();
-
-      // Facts panel container in two-column mode also has the max-width constraint
-      const factsContainer = container.querySelector(".space-y-2.text-xs");
-      expect(factsContainer).toBeTruthy();
-      expect(factsContainer?.className).toContain("@xl:max-w-[calc(50%-0.3125rem)]");
-
-      // Links grid beside bio uses 2 columns
-      const linksGrid = container.querySelector(".grid.grid-cols-1");
-      expect(linksGrid).toBeTruthy();
-      expect(linksGrid?.className).toContain("@sm:grid-cols-2");
-      expect(linksGrid?.className).not.toContain("@xl:grid-cols-4");
-
-      // Reset get_songs_by_artist to empty array so subsequent tests don't see mock songs
-      invokeMock.mockImplementation((cmd: string) => {
-        if (cmd === "get_songs_by_artist") return Promise.resolve([]);
-        return Promise.resolve();
-      });
-    });
   });
 
     it("hides tags and bio/profile section while keeping action buttons visible when detail header is collapsed", async () => {
@@ -790,7 +724,7 @@ describe("ArtistDetailView", () => {
         { ...release, album: "Short Cuts", track_count: 5, total_duration_nanosec: 1_200_000_000_000 },
       ];
       vi.mocked(invoke).mockImplementation((cmd: string) => {
-        if (cmd === "get_songs_by_artist") return Promise.resolve([]);
+        if (cmd === "get_songs_by_artist") return Promise.resolve([SONG] as any);
         if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
         if (cmd === "get_compilations_by_artist") return Promise.resolve([]);
         if (cmd === "get_artist_profile") return Promise.resolve(collectionStore.artistProfiles["shania twain"]);

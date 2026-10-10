@@ -532,7 +532,7 @@
             </main>
 
             <!-- Right Contextual Panel -->
-            {#if windowLayoutStore.rightPanelOpen && !windowLayoutStore.isRightPanelAutoHidden}
+            {#if windowLayoutStore.isInfoSidebarVisible}
               <div transition:slide={{ axis: 'x', duration: instantLayout ? 0 : PANEL_SLIDE_MS }} class="h-full flex-shrink-0 flex overflow-hidden">
                 <!-- Right Resize Handle -->
                 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->

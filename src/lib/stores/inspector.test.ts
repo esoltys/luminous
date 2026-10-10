@@ -86,6 +86,20 @@ describe("inspectorStore", () => {
     expect(inspectorStore.subject).toMatchObject({ kind: "artist", source: "view", key: "artist:Pink Floyd", song: { id: 200 } });
   });
 
+  it("prefers a song with MusicBrainz IDs as the representative of an artist or album", async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_songs_by_artist") return [song(1), song(2, { musicbrainz_artist_id: "artist-mbid" })];
+      if (cmd === "get_songs_by_album") return [song(3), song(4, { musicbrainz_release_group_id: "rg-mbid" })];
+      return null;
+    });
+    navigationStore.selectedArtistName = "Pink Floyd";
+    await settle();
+    expect(inspectorStore.subject?.song.id).toBe(2);
+    navigationStore.selectedAlbumName = "Dark Side";
+    await settle();
+    expect(inspectorStore.subject?.song.id).toBe(4);
+  });
+
   it("a selected song beats the viewed entity", async () => {
     navigationStore.selectedAlbumName = "Dark Side";
     await settle();
