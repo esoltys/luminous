@@ -1080,6 +1080,7 @@ export const es = {
     contextFetchError: "No se pudieron obtener los datos de contexto. Revisa tu conexión e inténtalo de nuevo.",
     contextOffline: "Sin conexión. Activa «En línea» en Ajustes › Integraciones para obtener biografías y contexto.",
     trackSkippedToast: "No se pudo reproducir «{title}»: archivo no encontrado. Se omitió.",
+    outputUnavailableToast: 'Salida de audio no disponible. Conecta un dispositivo y pulsa reproducir.',
     tracksSkippedToast: {
       one: "Se omitió {count} pista no disponible.",
       other: "Se omitieron {count} pistas no disponibles."

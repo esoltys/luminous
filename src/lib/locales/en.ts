@@ -1080,6 +1080,7 @@ export const en = {
     contextFetchError: "Couldn't fetch context data. Check your connection and retry.",
     contextOffline: "Offline. Turn Online on in Settings › Integrations to fetch bios and context.",
     trackSkippedToast: 'Couldn\'t play "{title}" — file not found. Skipped.',
+    outputUnavailableToast: 'Audio output unavailable. Connect a device and press play.',
     tracksSkippedToast: {
       one: "Skipped {count} unavailable track.",
       other: "Skipped {count} unavailable tracks."

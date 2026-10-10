@@ -1080,6 +1080,7 @@ export const de = {
     contextFetchError: "Die Kontextdaten konnten nicht abgerufen werden. Verbindung prüfen und erneut versuchen.",
     contextOffline: "Offline. „Online“ unter Einstellungen › Integrationen einschalten, um Biografien und Kontext abzurufen.",
     trackSkippedToast: '„{title}“ konnte nicht abgespielt werden – Datei nicht gefunden. Übersprungen.',
+    outputUnavailableToast: 'Audioausgabe nicht verfügbar. Gerät verbinden und Wiedergabe drücken.',
     tracksSkippedToast: {
       one: "{count} nicht verfügbarer Titel übersprungen.",
       other: "{count} nicht verfügbare Titel übersprungen."

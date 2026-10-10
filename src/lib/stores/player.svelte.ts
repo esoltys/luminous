@@ -217,6 +217,16 @@ export class PlayerStore {
         }
       );
 
+      // The output device couldn't be opened. The backend already parked the
+      // track paused at its position; this just says why. Persistent (no
+      // durationMs) so it stays until dismissed or play is pressed again.
+      await listen("audio-output-unavailable", () => {
+        toastStore.show(
+          i18n.t("playerBar.outputUnavailableToast", undefined, "Audio output unavailable. Connect a device and press play."),
+          "error"
+        );
+      });
+
       // Keep the current song's stats in sync when they change elsewhere
       // (rating edits in list views, scrobble-point playcount bumps).
       await listen<SongStatsPayload>("song-stats-changed", (event) => {

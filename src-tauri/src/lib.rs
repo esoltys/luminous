@@ -660,6 +660,16 @@ fn spawn_audio_event_loop(
                             };
                             let _ = app.emit("audio-pipeline-changed", pipeline);
                         }
+                        // The engine already parked the track paused (and sent
+                        // `Paused`); this is a device problem, not a bad track,
+                        // so nothing is skipped or counted as a playback error.
+                        crate::audio::AudioEvent::OutputUnavailable { message } => {
+                            log::error!("Audio output unavailable: {}", message);
+                            let _ = app.emit(
+                                "audio-output-unavailable",
+                                serde_json::json!({ "message": message }),
+                            );
+                        }
                         crate::audio::AudioEvent::Error { message } => {
                             log::error!("Audio engine error: {}", message);
 
