@@ -34,6 +34,7 @@
   import { generateEllipseGradientSvg } from '../lib/utils/ellipseGradient';
   import { formatWindowTitle } from '../lib/utils/formatters';
   import { FrontendErrorReporter } from '../lib/utils/frontendError';
+  import TagEditor from '../lib/components/TagEditor.svelte';
   import { onMount } from 'svelte';
   import { getCurrentWebview } from '@tauri-apps/api/webview';
   import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -57,6 +58,7 @@
     walkthroughStore.start();
   }
   let isShortcutsModalOpen = $state(false);
+  let editingSongId = $state<number | null>(null);
   let isDragActive = $state(false);
   let isShiftHeld = $state(false);
   let isResizingSidebar = $state(false);
@@ -165,6 +167,22 @@
         if (enabled) windowTitleAppName = 'Luminous Debug';
       })
       .catch(() => {});
+
+    if (import.meta.env.DEV) {
+      import('../lib/scripting').then(({ installScriptingApi, registerDialogHostControls }) => {
+        installScriptingApi();
+        registerDialogHostControls({
+          openShortcuts: () => { isShortcutsModalOpen = true; },
+          openTagEditor: (songId: number) => { editingSongId = songId; },
+          closeAll: () => {
+            isShortcutsModalOpen = false;
+            editingSongId = null;
+          },
+          isShortcutsOpen: () => isShortcutsModalOpen,
+          isTagEditorOpen: () => editingSongId !== null,
+        });
+      });
+    }
 
     function handleGlobalHotkeys(e: KeyboardEvent) {
       if (!(e.ctrlKey || e.metaKey)) return;
@@ -650,6 +668,10 @@
 
 {#if isShortcutsModalOpen}
   <KeyboardShortcutsModal onClose={() => (isShortcutsModalOpen = false)} />
+{/if}
+
+{#if editingSongId !== null}
+  <TagEditor songId={editingSongId} onClose={() => { editingSongId = null; }} />
 {/if}
 
 {#if welcomeStore.initialized && !welcomeStore.hasSeen}

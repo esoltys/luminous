@@ -98,19 +98,13 @@ export function localePickerGroups(): { pinned: Locale[]; rest: Locale[] } {
   return { pinned, rest };
 }
 
-/** User guide languages shipped in `docs/user-guide/`; independent of the UI languages. */
-export const MANUAL_LANGUAGES = [
-  { code: "EN", label: "English" },
-  { code: "FR", label: "Français" },
-] as const;
+/** User guide languages shipped in `docs/user-guide/luminous-user-guide-{code}.html`: one per UI language. */
+export const MANUAL_LANGUAGES = ["EN", "FR", "DE", "ES", "IT", "RU", "UK"] as const;
 
-export type ManualLanguage = (typeof MANUAL_LANGUAGES)[number]["code"];
+export type ManualLanguage = (typeof MANUAL_LANGUAGES)[number];
 
-export function isManualLanguage(code: unknown): code is ManualLanguage {
-  return MANUAL_LANGUAGES.some((m) => m.code === code);
-}
-
-/** The manual language implied by a UI locale: any `fr*` gives French, everything else English. */
+/** The manual language implied by a UI locale, by base language (`fr-CA` gives FR); English when no guide matches. */
 export function manualLanguageForLocale(tag: string): ManualLanguage {
-  return tag.toLowerCase().startsWith("fr") ? "FR" : "EN";
+  const base = tag.toLowerCase().split("-")[0].toUpperCase();
+  return MANUAL_LANGUAGES.find((code) => code === base) ?? "EN";
 }

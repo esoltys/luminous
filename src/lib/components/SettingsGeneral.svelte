@@ -1,6 +1,6 @@
 <script lang="ts">
   import { i18n, type Locale } from "../stores/i18n.svelte";
-  import { MANUAL_LANGUAGES, localeLabel, localePickerGroups, isManualLanguage } from "../locales";
+  import { localeLabel, localePickerGroups } from "../locales";
   import { prefs, type RatingStyle, type WeekStart } from "../stores/prefs.svelte";
   import Select from "./Select.svelte";
   import { GearIcon as Settings } from "phosphor-svelte";
@@ -42,26 +42,6 @@
           <option value={tag} lang={tag}>{localeLabel(tag)}</option>
         {/each}
       {/if}
-    </Select>
-  </div>
-
-  <div class="flex items-center justify-between gap-4 py-4">
-    <div class="flex flex-col gap-0.5 min-w-0">
-      <label for="manual-language-select" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.manualLanguage')}</label>
-      <p class="text-xs text-brand-text-secondary">{i18n.t('settings.manualLanguageHint')}</p>
-    </div>
-    <Select
-      id="manual-language-select"
-      value={i18n.manualLanguage}
-      onchange={(e) => {
-        const code = e.currentTarget.value;
-        if (isManualLanguage(code)) void i18n.setManualLanguage(code);
-      }}
-      class="shrink-0 bg-brand-main border border-brand-border hover:border-brand-accent/60 text-brand-text-primary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
-    >
-      {#each MANUAL_LANGUAGES as m (m.code)}
-        <option value={m.code} lang={m.code.toLowerCase()}>{m.label}</option>
-      {/each}
     </Select>
   </div>
 

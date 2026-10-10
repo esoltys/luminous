@@ -297,8 +297,6 @@ export const it = {
     systemTitle: "Sistema",
     systemSubtitle: "Controlla come Luminous si avvia, si riduce a icona e archivia i dati.",
     uiLanguageHint: "Scegli la lingua di menu, pulsanti e messaggi.",
-    manualLanguage: "Lingua del manuale utente",
-    manualLanguageHint: "Scegli la lingua della guida. Il manuale è disponibile solo in inglese e francese.",
     ratingStyle: "Stile di valutazione dei brani",
     ratingStyleHeart: "Cuore (preferito)",
     ratingStyleStars: "5 stelle",
@@ -959,6 +957,11 @@ export const it = {
   },
   help: {
     loading: "Caricamento del manuale utente..."
+  },
+  tray: {
+    playPause: "Riproduci/Pausa",
+    showHideWindow: "Mostra/nascondi Luminous",
+    quit: "Esci"
   },
   playerBar: {
     previous: "Brano precedente",

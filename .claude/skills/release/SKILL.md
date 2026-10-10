@@ -17,7 +17,7 @@ needs updating to match. Work through it in order:
    origin`.
 2. **Scope**: `git log <last-tag>..main --oneline`; confirm every user-facing fix has a linked,
    `bug`-labeled issue — file one retroactively (and link the PR) if it's missing.
-3. **Content**: update the user manual (`docs/user-guide/luminous-user-guide-{EN,FR}.html`) for
+3. **Content**: update the user manual (`docs/user-guide/luminous-user-guide-{EN,FR,DE,ES,IT,RU,UK}.html`) for
    any user-facing changes, editing both languages together. Regenerate screenshots for changed views (`bun run take-screenshots`, or
    `--name=<entry>` for just one) and read the resulting PNGs to confirm they're correct. Write
    `docs/release-notes/vX.Y.Z.md`.

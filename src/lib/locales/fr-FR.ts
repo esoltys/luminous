@@ -303,8 +303,6 @@ export const frFR: DeepStringRecord<typeof en> = {
     systemTitle: "Système",
     systemSubtitle: "Gérer le démarrage et la réduction de Luminous, et l'emplacement de ses données.",
     uiLanguageHint: "Choisissez la langue des menus, des boutons et des messages.",
-    manualLanguage: "Langue du guide de l'utilisateur",
-    manualLanguageHint: "Choisissez la langue du guide d'aide. Le guide n'est offert qu'en anglais et en français.",
     ratingStyle: "Style de notation des morceaux",
     ratingStyleHeart: "Cœur (favori)",
     ratingStyleStars: "5 étoiles",
@@ -965,6 +963,11 @@ export const frFR: DeepStringRecord<typeof en> = {
   },
   help: {
     loading: "Chargement du guide d'utilisation..."
+  },
+  tray: {
+    playPause: "Lecture/Pause",
+    showHideWindow: "Afficher/masquer Luminous",
+    quit: "Quitter"
   },
   playerBar: {
     previous: "Chanson précédente",

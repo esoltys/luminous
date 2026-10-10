@@ -309,8 +309,6 @@ export const ru = {
     systemTitle: "Система",
     systemSubtitle: "Выберите, как Luminous запускается, сворачивается и хранит данные.",
     uiLanguageHint: "Выберите язык меню, кнопок и сообщений.",
-    manualLanguage: "Язык руководства пользователя",
-    manualLanguageHint: "Выберите язык справки. Руководство доступно только на английском и французском языках.",
     ratingStyle: "Стиль оценки песен",
     ratingStyleHeart: "Сердечко (избранное)",
     ratingStyleStars: "5 звёзд",
@@ -1009,6 +1007,11 @@ export const ru = {
   },
   help: {
     loading: "Загрузка руководства пользователя…"
+  },
+  tray: {
+    playPause: "Воспроизведение/Пауза",
+    showHideWindow: "Показать или скрыть Luminous",
+    quit: "Выход"
   },
   playerBar: {
     previous: "Предыдущая песня",

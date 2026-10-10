@@ -8,10 +8,16 @@
 
   const DEFAULT_SECTION = "getting-started";
   const STORAGE_KEY = "luminous-guide-section";
-  const FR = root.lang === "fr";
-  const LABELS = FR
-    ? { fit: "Ajuster à l’écran", actual: "Taille réelle (1:1)", close: "Fermer (Échap)" }
-    : { fit: "Fit to screen", actual: "Actual size (1:1)", close: "Close (Esc)" };
+  const LABELS_BY_LANG = {
+    en: { fit: "Fit to screen", actual: "Actual size (1:1)", close: "Close (Esc)" },
+    fr: { fit: "Ajuster à l’écran", actual: "Taille réelle (1:1)", close: "Fermer (Échap)" },
+    de: { fit: "An Bildschirm anpassen", actual: "Originalgröße (1:1)", close: "Schließen (Esc)" },
+    es: { fit: "Ajustar a la pantalla", actual: "Tamaño real (1:1)", close: "Cerrar (Esc)" },
+    it: { fit: "Adatta allo schermo", actual: "Dimensioni reali (1:1)", close: "Chiudi (Esc)" },
+    ru: { fit: "По размеру экрана", actual: "Реальный размер (1:1)", close: "Закрыть (Esc)" },
+    uk: { fit: "За розміром екрана", actual: "Справжній розмір (1:1)", close: "Закрити (Esc)" },
+  };
+  const LABELS = LABELS_BY_LANG[root.lang] || LABELS_BY_LANG.en;
 
   // ── Theme: mirror the app's colours when embedded in the Help view ──
 

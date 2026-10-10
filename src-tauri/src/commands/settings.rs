@@ -234,6 +234,14 @@ pub async fn get_all_app_settings(
     .map_err(|e| e.to_string())
 }
 
+/// Applies the UI-language labels for the tray menu and taskbar buttons.
+/// Fire-and-forget like the other persistence-only writes: it only changes
+/// native text, so a failure is nothing the caller could act on.
+#[tauri::command]
+pub fn set_native_labels(app: tauri::AppHandle, labels: crate::native_labels::NativeLabels) {
+    crate::native_labels::apply(&app, &labels);
+}
+
 /// Reads the in-memory flag `tray.rs` already keeps in sync with the
 /// `app_state` row of the same name — no DB round-trip needed for the read.
 #[tauri::command]
