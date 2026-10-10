@@ -1687,6 +1687,9 @@ export const ru = {
     copied: "Скопировано в буфер обмена",
     dismiss: "Закрыть уведомление"
   },
+  osNotification: {
+    appUpdated: "Luminous обновлён до v{version}"
+  },
   songTags: {
     groupNamePlaceholder: "напр. Награждённые",
     genresTabDescription: {

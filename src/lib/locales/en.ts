@@ -1609,6 +1609,9 @@ export const en = {
     copied: "Copied to clipboard",
     dismiss: "Dismiss notification"
   },
+  osNotification: {
+    appUpdated: "Luminous updated to v{version}"
+  },
   songTags: {
     groupNamePlaceholder: "e.g. Award-Winning",
     genresTabDescription: {

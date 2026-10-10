@@ -1685,6 +1685,9 @@ export const frFR: DeepStringRecord<typeof en> = {
     copied: "Copié dans le presse-papiers",
     dismiss: "Fermer la notification"
   },
+  osNotification: {
+    appUpdated: "Luminous a été mis à jour vers la v{version}"
+  },
   organizer: {
     chipAlbumArtist: "Artiste de l'album",
     chipArtist: "Artiste",

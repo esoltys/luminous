@@ -52,7 +52,8 @@ describe("I18nStore", () => {
       mockSettings({ language: "fr-CA", language_tags: "1" });
       await i18n.init();
       expect(i18n.currentLocale).toBe("fr-CA");
-      expect(invoke).not.toHaveBeenCalledWith("set_app_setting", expect.anything());
+      expect(invoke).not.toHaveBeenCalledWith("set_app_setting", expect.objectContaining({ key: "language" }));
+      expect(invoke).not.toHaveBeenCalledWith("set_app_setting", expect.objectContaining({ key: "language_tags" }));
     });
 
     it("does not alias a bare legacy value once the marker is set", async () => {
@@ -258,6 +259,37 @@ describe("native labels", () => {
     await i18n.init();
     expect(invoke).toHaveBeenCalledWith("set_native_labels", {
       labels: expect.objectContaining({ quit: "Salir" }),
+    });
+  });
+
+  describe("update-notification template", () => {
+    it("caches the UI-language template, keeping {version} for the backend, on launch", async () => {
+      vi.mocked(invoke).mockImplementation(async (cmd: string) =>
+        cmd === "get_all_app_settings" ? { language: "fr-CA", language_tags: "1" } : null,
+      );
+      await i18n.init();
+      expect(invoke).toHaveBeenCalledWith("set_app_setting", {
+        key: "update_notification_template",
+        value: "Luminous a été mis à jour vers la v{version}",
+      });
+    });
+
+    it("leaves the cached template alone when the settings fail to load", async () => {
+      vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+        if (cmd === "get_all_app_settings") throw new Error("db unavailable");
+        return null;
+      });
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      await i18n.init();
+      expect(invoke).not.toHaveBeenCalledWith("set_app_setting", expect.objectContaining({ key: "update_notification_template" }));
+    });
+
+    it("re-caches it when the language changes", async () => {
+      await i18n.setLocale("de");
+      expect(invoke).toHaveBeenCalledWith("set_app_setting", {
+        key: "update_notification_template",
+        value: "Luminous wurde auf v{version} aktualisiert",
+      });
     });
   });
 });

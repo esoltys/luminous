@@ -18,6 +18,14 @@ export type { Locale };
  */
 const LANGUAGE_TAGS_KEY = "language_tags";
 
+/**
+ * The "Luminous updated to v{version}" toast is raised by the backend at launch, before this
+ * store exists, so the backend reads the UI-language template cached under this key. It is
+ * rewritten whenever the locale is known or changes, which keeps the catalogs the only home of
+ * the text.
+ */
+const UPDATE_NOTIFICATION_KEY = "update_notification_template";
+
 class I18nStore {
   currentLocale = $state<Locale>(BASE_LOCALE);
 
@@ -37,6 +45,9 @@ class I18nStore {
         if (locale) void invoke("set_app_setting", { key: "language", value: locale }).catch(() => {});
         void invoke("set_app_setting", { key: LANGUAGE_TAGS_KEY, value: "1" }).catch(() => {});
       }
+      // Only once the saved locale is known: a failed load must not replace a good
+      // cached template with the default language's.
+      this.cacheUpdateNotificationTemplate();
     } catch (e) {
       console.error("Failed to load language settings:", e);
     } finally {
@@ -58,6 +69,13 @@ class I18nStore {
     } catch (e) {
       console.error("Failed to save language settings:", e);
     }
+    this.cacheUpdateNotificationTemplate();
+  }
+
+  /** Fire-and-forget: the backend falls back to English when no template is cached. */
+  private cacheUpdateNotificationTemplate() {
+    const value = this.t("osNotification.appUpdated", { version: "{version}" });
+    void invoke("set_app_setting", { key: UPDATE_NOTIFICATION_KEY, value }).catch(() => {});
   }
 
   /** Text the backend shows in the tray menu and taskbar buttons; fire-and-forget (see `native_labels.rs`). */

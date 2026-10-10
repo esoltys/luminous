@@ -1035,7 +1035,10 @@ pub fn run() {
                         stored.as_deref(),
                         current,
                     ) {
-                        restart_manager::show_update_notification(current);
+                        restart_manager::show_update_notification(
+                            current,
+                            restart_manager::load_update_template(&conn).as_deref(),
+                        );
                     }
                 }
             }
