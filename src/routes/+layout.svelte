@@ -129,6 +129,7 @@
   $effect(() => {
     if (walkthroughStore.isActive) return;
     if (!welcomeStore.initialized || !welcomeStore.hasSeen) return;
+    if (!walkthroughStore.initialized) return;
     if (!collectionStore.statsLoaded) return;
     void playerStore.currentSong;
     if (walkthroughStore.hasPendingSteps) {

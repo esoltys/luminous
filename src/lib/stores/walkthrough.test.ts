@@ -31,6 +31,18 @@ describe("WalkthroughStore", () => {
     expect(walkthroughStore.seenStepIds).toEqual(new Set(["sidebar", "top-navigation"]));
   });
 
+  it("is initialized only once init() has loaded the saved progress, even if loading fails", async () => {
+    walkthroughStore.initialized = false;
+    vi.mocked(invoke).mockRejectedValueOnce(new Error("backend unavailable"));
+    vi.spyOn(console, "error").mockImplementationOnce(() => {});
+
+    const pending = walkthroughStore.init();
+    expect(walkthroughStore.initialized).toBe(false);
+    await pending;
+
+    expect(walkthroughStore.initialized).toBe(true);
+  });
+
   it("defaults to no seen steps when the backend has no flag", async () => {
     vi.mocked(invoke).mockImplementationOnce(async (cmd) => {
       if (cmd === "get_all_app_settings") return {};
