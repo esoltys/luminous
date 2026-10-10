@@ -4,7 +4,7 @@
 import type { Plugin } from "vite";
 import { compileMockScript } from "./compile-mock-script.ts";
 import { EMBEDDED_ART_CACHE_DIR } from "./embedded-art-cache.ts";
-import { loadMockConfig, loadMockLibrary, resolveDbPath, resolveFeatured } from "./mock-library.ts";
+import { loadSceneConfig, loadMockLibrary, resolveDbPath, resolveFeatured } from "./mock-library.ts";
 import { existsSync, readFileSync } from "fs";
 import { join, dirname } from "path";
 
@@ -39,7 +39,7 @@ export function tauriIpcMockPlugin(): Plugin {
             // resolved db (explicit dbPath or the auto-detected default —
             // *not* the raw config value, which is empty whenever dbPath is
             // left unset for auto-detection).
-            const dbPath = resolveDbPath(loadMockConfig());
+            const dbPath = resolveDbPath(loadSceneConfig());
             const coversDir = dbPath ? join(dirname(dbPath), "covers") : undefined;
             const filePath =
               findCoverFile(EMBEDDED_ART_CACHE_DIR, filename) ?? (coversDir ? findCoverFile(coversDir, filename) : undefined);
@@ -80,7 +80,7 @@ export function tauriIpcMockPlugin(): Plugin {
           return;
         }
         try {
-          const config = loadMockConfig();
+          const config = loadSceneConfig();
           const library = await loadMockLibrary(config);
           const featured = resolveFeatured(library, {
             featuredSong: config.default?.featuredSong,

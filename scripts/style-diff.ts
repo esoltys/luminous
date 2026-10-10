@@ -25,7 +25,7 @@ import { fileURLToPath } from "url";
 import type { Browser, Page } from "playwright";
 import { compileMockScript } from "./compile-mock-script";
 import { DEV_SERVER_URL, startViteDevServer } from "./vite-dev-server";
-import { loadMockConfig, loadMockLibrary, resolveFeatured } from "./mock-library";
+import { loadSceneConfig, loadMockLibrary, resolveFeatured } from "./mock-library";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const OUT = path.join(ROOT, ".style-diff");
@@ -113,18 +113,18 @@ async function capture(name: string, stateFilter?: string[]) {
   const killDevServer = await startViteDevServer();
   const browser = await chromium.launch({ headless: true });
   try {
-    const mockConfig = loadMockConfig();
-    const library = await loadMockLibrary(mockConfig);
+    const sceneConfig = loadSceneConfig();
+    const library = await loadMockLibrary(sceneConfig);
     const featured = resolveFeatured(library, {
-      featuredSong: mockConfig.default?.featuredSong,
-      featuredArtist: mockConfig.default?.featuredArtist,
-      featuredAlbum: mockConfig.default?.featuredAlbum,
+      featuredSong: sceneConfig.default?.featuredSong,
+      featuredArtist: sceneConfig.default?.featuredArtist,
+      featuredAlbum: sceneConfig.default?.featuredAlbum,
     });
     const setup = {
       library: JSON.stringify(library),
       featured: JSON.stringify(featured),
       mockCode: compileMockScript(),
-      positionSeconds: mockConfig.default?.positionSeconds ?? 122,
+      positionSeconds: sceneConfig.default?.positionSeconds ?? 122,
     };
     for (const [i, state] of states.entries()) {
       console.log(`[${i + 1}/${states.length}] ${state.name}`);

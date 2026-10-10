@@ -1,15 +1,15 @@
 // Docs-screenshot harness: boots its own Vite dev server, injects the mocked
 // Tauri IPC bridge (see tauri-ipc-mock.ts), captures each view listed in
-// mock-config.json via Playwright (once per color scheme, into
+// screenshot-scenes.json via Playwright (once per color scheme, into
 // docs/user-guide/assets/{locale}/screenshots/{light,dark}/), then kills the dev server. See
-// .claude/CLAUDE.md for the mock-config.json setup trap in a fresh worktree.
+// .claude/CLAUDE.md for the screenshot-scenes.json setup trap in a fresh worktree.
 // Usage: bun run take-screenshots [--name=<entry>] [--locale=<tag>]
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { compileMockScript } from "./compile-mock-script";
 import { DEV_SERVER_URL, startViteDevServer } from "./vite-dev-server";
-import { DEFAULT_VIEWPORT, loadMockConfig, loadMockLibrary, resolveFeatured, resolveScreenshotSettings } from "./mock-library";
+import { DEFAULT_VIEWPORT, loadSceneConfig, loadMockLibrary, resolveFeatured, resolveScreenshotSettings } from "./mock-library";
 import type { FeaturedSelection } from "./mock-library";
 import { BASE_LOCALE, LOCALES, catalogChain } from "../src/lib/locales";
 
@@ -100,12 +100,12 @@ async function main() {
   const { chromium } = playwright;
   const browser = await chromium.launch({ headless: true });
 
-  const mockConfig = loadMockConfig();
-  const mockLibrary = await loadMockLibrary(mockConfig);
+  const sceneConfig = loadSceneConfig();
+  const mockLibrary = await loadMockLibrary(sceneConfig);
   const defaultFeatured = resolveFeatured(mockLibrary, {
-    featuredSong: mockConfig.default?.featuredSong,
-    featuredArtist: mockConfig.default?.featuredArtist,
-    featuredAlbum: mockConfig.default?.featuredAlbum,
+    featuredSong: sceneConfig.default?.featuredSong,
+    featuredArtist: sceneConfig.default?.featuredArtist,
+    featuredAlbum: sceneConfig.default?.featuredAlbum,
   });
   console.log(
     `Mock library: ${mockLibrary.source} (${mockLibrary.songs.length} songs, ${mockLibrary.artists.length} artists). Featured artist: ${defaultFeatured.artist ?? "none"}. Featured album: ${defaultFeatured.album ?? "none"}.`
@@ -586,17 +586,17 @@ async function main() {
   };
 
   try {
-    if (mockConfig.screenshots && mockConfig.screenshots.length > 0) {
-      const headless = mockConfig.screenshots.filter((s) => !s.liveApp);
+    if (sceneConfig.screenshots && sceneConfig.screenshots.length > 0) {
+      const headless = sceneConfig.screenshots.filter((s) => !s.liveApp);
       const screenshotsToRun = nameFilter ? headless.filter((s) => s.name === nameFilter) : headless;
       if (nameFilter && screenshotsToRun.length === 0) {
-        logWarn(`No screenshot named "${nameFilter}" found in mock-config.json. Available: ${mockConfig.screenshots.map((s) => s.name).join(", ")}`);
+        logWarn(`No screenshot named "${nameFilter}" found in screenshot-scenes.json. Available: ${sceneConfig.screenshots.map((s) => s.name).join(", ")}`);
       }
       const schemesFor = (s: { schemes?: ColorScheme[] }) => s.schemes ?? colorSchemes;
       const totalCaptures = screenshotsToRun.reduce((n, s) => n + localesFor(s.locales, localeFilter).length * schemesFor(s).length, 0);
       let captureIndex = 0;
       for (const s of screenshotsToRun) {
-        const settings = resolveScreenshotSettings(mockConfig, s);
+        const settings = resolveScreenshotSettings(sceneConfig, s);
         const featured = resolveFeatured(mockLibrary, settings);
         const afterLoad = s.action ? actionRegistry[s.action] : undefined;
 

@@ -3,14 +3,14 @@
 // colors from the track-changed path) and screenshots that song's album detail.
 // Start `bun run tauri dev` first (remote devtools on :9222), and nothing else
 // that should keep playing — this REPLACES THE QUEUE and moves playback.
-// Entries are the `liveApp` rows in mock-config.json. It switches the app to the
+// Entries are the `liveApp` rows in screenshot-scenes.json. It switches the app to the
 // Dynamic Artwork ("✨ Luminous") theme itself and restores your theme afterwards.
 // Usage: bun scripts/capture-dynamic-themes.ts [--name=theme-dynamic-<artist>]
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { DevtoolsDriver } from "./devtools-driver";
-import { DEFAULT_VIEWPORT, loadMockConfig } from "./mock-library";
+import { DEFAULT_VIEWPORT, loadSceneConfig } from "./mock-library";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = path.join(__dirname, "../docs/user-guide/assets/en-CA/screenshots/dynamic");
@@ -26,7 +26,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function main() {
   const nameFilter = process.argv.find((a) => a.startsWith("--name="))?.slice("--name=".length);
-  const entries = (loadMockConfig().screenshots ?? []).filter(
+  const entries = (loadSceneConfig().screenshots ?? []).filter(
     (s) => s.liveApp && (!nameFilter || s.name === nameFilter)
   );
   if (entries.length === 0) throw new Error("No theme-dynamic-* entries to capture.");
