@@ -36,8 +36,6 @@
   import { isSmartPlaylistSpec } from "../utils/filterParser";
   import { SIDEBAR_MIN_WIDTH_PX } from "../constants";
 
-  import { invoke } from "@tauri-apps/api/core";
-
   let { width = 256, resizing = false }: { width?: number; resizing?: boolean } = $props();
 
   let showAddDirModal = $state(false);
@@ -89,11 +87,6 @@
     navigationStore.activeTab = "playlists";
     navigationStore.selectedPlaylistId = null;
     navigationStore.selectedAutoPlaylist = null;
-  }
-
-  function navigateToSourcesSettings() {
-    navigationStore.activeTab = "settings";
-    invoke("set_app_setting", { key: "active_settings_tab", value: "sources" });
   }
 
   async function handleAddDirectory() {
