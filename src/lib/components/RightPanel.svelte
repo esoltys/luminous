@@ -255,7 +255,7 @@
       onclick={onClose}
       aria-label={i18n.t('common.close', {}, 'Close')}
       title={i18n.t('common.close', {}, 'Close')}
-      class="absolute top-2 right-2 z-10 p-1.5 rounded-md text-brand-text-secondary/60 hover:text-brand-text hover:bg-brand-text/10 transition-colors"
+      class="absolute top-2 right-2 z-10 p-1.5 rounded-md text-brand-text-secondary/60 hover:text-brand-text-primary hover:bg-brand-text-primary/10 transition-colors"
     >
       <X size={14} />
     </button>
