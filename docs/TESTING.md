@@ -90,6 +90,16 @@ For automated scripts driving the real app (benchmarks, screenshots, tutorials),
 - Exposes WebView2's remote debugging port (`--remote-debugging-port=9222`).
 - Provides helpers (`startProfile`, `withProfile`, `AppProfile`) to launch, wait for CDP readiness, pre-seed or query SQLite `app_state`, cue songs, pin window geometry, and cleanly tear down.
 
+### Scene screenshots (`bun run take-scene-screenshots`)
+
+Docs and Store screenshots are scenes in `scripts/scenes/` run against the real app by `scripts/scene-runner.ts`. The app boots once; the runner loops locale × light/dark, then resets and captures each scene. `AppProfile` takes a `cloneFrom` database to start from a private copy of a real profile (scrobbling and Discord cleared, a missing default library pinned to "none").
+- Needs a dev build of the app (it drives `window.__LUMINOUS_SCRIPT__`): run `bun run dev` in this checkout, build a debug exe once with `cd src-tauri && cargo build`, and close your own Luminous first.
+- `bun run take-scene-screenshots --library <dir>` scans that folder into an empty throwaway profile (about 2 minutes) and also runs the first-run scenes.
+- `bun run take-scene-screenshots --clone-profile` skips the scan and shows your real stats, pins and playlists; plays and setting changes stay in the copy.
+- `--name=a,b`, `--locale=<tag>`, `--scheme=light|dark` narrow a run; one scene in one locale takes seconds once the app is up.
+- A scene is data (`view`, `theme`, `layout`, `viewport`, `position`, `featured`) plus an optional `run`/`cleanup` that calls the scripting API. Component-local states are reached through `screens` hooks registered by the component itself under `import.meta.env.DEV`.
+- The viewport is set by CDP device-metrics override, not by resizing the real window, so output is the exact requested size. A screen recording of the real window needs a real resize.
+
 ## Testing against a local WebDAV server
 
 To exercise WebDAV sync and playback without a real NAS, serve a folder of the repo's short audio

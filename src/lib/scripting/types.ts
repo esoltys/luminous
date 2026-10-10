@@ -1,6 +1,7 @@
 import type { ActiveTab, ActiveSubTab, SettingsTab, AutoPlaylistRef } from "../stores/navigation.svelte";
 import type { Song, PlaybackState } from "../types";
 import type { Locale } from "../stores/i18n.svelte";
+import type { VisibleColumns } from "../stores/collection.svelte";
 
 /**
  * Filter or target criteria for playing a song via the scripting API.
@@ -19,7 +20,7 @@ export interface ScriptNavigationApi {
   /**
    * Navigates to a top-level tab and optional sub-tab.
    */
-  to(tab: ActiveTab, subTab?: ActiveSubTab): Promise<void>;
+  to(tab: ActiveTab, subTab?: ActiveSubTab | "auto" | "custom"): Promise<void>;
 
   /**
    * Navigates to an album detail view by name, optionally focusing a specific song.
@@ -101,6 +102,7 @@ export interface ScriptAppearanceApi {
     rightPanelOpen?: boolean;
     sidebarWidth?: number;
     miniplayer?: boolean;
+    immersive?: boolean;
   }): Promise<void>;
 }
 
@@ -122,6 +124,11 @@ export interface ScriptDialogsApi {
    * Closes any open top-level modal or dialog.
    */
   closeAll(): Promise<void>;
+
+  /**
+   * Dismisses every toast on screen, whatever language its text is in.
+   */
+  dismissToasts(): Promise<void>;
 
   /**
    * First-run welcome screen controls.
@@ -166,6 +173,42 @@ export interface ScriptWaitApi {
   settled(): Promise<void>;
 }
 
+/** A grid that can show its items as cards or rows. */
+export type ScriptViewSurface = "albums" | "artists" | "playlistsAuto" | "playlistsCustom" | "genres" | "pinned" | "artistReleases";
+
+/**
+ * Persistent view preferences scenes need to set without clicking through menus.
+ * Every method is idempotent: setting what is already set succeeds without a change.
+ */
+export interface ScriptViewApi {
+  /** Sets the cards/rows mode of several grids at once; surfaces not listed are left alone. */
+  setViewModes(modes: Partial<Record<ScriptViewSurface, "cards" | "rows">>): Promise<void>;
+  setSeekbarMode(mode: "waveform" | "bands"): Promise<void>;
+  /** Shows or hides a song-table column by its key (e.g. "initial_key"). */
+  setColumnVisible(column: keyof VisibleColumns, visible: boolean): Promise<void>;
+  /** Switches the Organize view to a custom template pattern. */
+  setOrganizeTemplate(template: string): Promise<void>;
+  /** Opens the smart-playlist builder on Playlists → Custom, pre-filled with rules. */
+  openSmartPlaylistBuilder(rules?: Array<{ field: string; op: string; value: string }>): Promise<void>;
+}
+
+/**
+ * Component-local states reachable only through the component that owns them.
+ * Each rejects with a hint if its screen isn't showing.
+ */
+export interface ScriptScreensApi {
+  /** Sorts the Collection songs, albums or artists view, as its sort menu does. Needs the Collection tab on screen. */
+  setSort(surface: "songs" | "albums" | "artists", field: string, ascending: boolean): Promise<void>;
+  /** Types into the top search box as a user would, opening its dropdown. */
+  search(query: string): Promise<void>;
+  /** Opens the album tag editor from the open album's detail view. */
+  openAlbumEditor(): Promise<void>;
+  setEqualizerMode(mode: "graphic10" | "parametric"): Promise<void>;
+  openEqualizerPresetMenu(): Promise<void>;
+  /** Loads a built-in or user equalizer preset by name, as the preset picker does. */
+  selectEqualizerPreset(name: string): Promise<void>;
+}
+
 /**
  * Primary scripting API exposed on window.__LUMINOUS_SCRIPT__.
  */
@@ -175,6 +218,8 @@ export interface LuminousScriptApi {
   readonly playback: ScriptPlaybackApi;
   readonly appearance: ScriptAppearanceApi;
   readonly dialogs: ScriptDialogsApi;
+  readonly view: ScriptViewApi;
+  readonly screens: ScriptScreensApi;
   readonly wait: ScriptWaitApi;
 }
 

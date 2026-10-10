@@ -9,12 +9,14 @@ import type { ScriptNavigationApi, ScriptWaitApi } from "./types";
  */
 export function createNavigationController(wait: ScriptWaitApi): ScriptNavigationApi {
   return {
-    async to(tab: ActiveTab, subTab?: ActiveSubTab): Promise<void> {
+    async to(tab: ActiveTab, subTab?: ActiveSubTab | "auto" | "custom"): Promise<void> {
       collectionStore.searchQuery = "";
       collectionStore.searchResults = [];
 
       navigationStore.activeTab = tab;
-      if (subTab) {
+      if (subTab === "auto" || subTab === "custom") {
+        navigationStore.playlistsSubTab = subTab;
+      } else if (subTab) {
         navigationStore.activeSubTab = subTab;
       }
       navigationStore.selectedAlbumName = null;
@@ -53,10 +55,21 @@ export function createNavigationController(wait: ScriptWaitApi): ScriptNavigatio
     async settings(section: SettingsTab = "general"): Promise<void> {
       navigationStore.openSettings(section);
       await wait.settled();
+      if (section === "general") {
+        // SettingsView restores the last-saved tab when it mounts on "general", which
+        // would override this request a moment later. Let that land, then ask again.
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        navigationStore.openSettings(section);
+        await wait.settled();
+      }
       await wait.forState(
         () => navigationStore.activeTab === "settings" && navigationStore.settingsSubTab === section,
         3000
-      );
+      ).catch((err: Error) => {
+        throw new Error(
+          `${err.message} (wanted settings/${section}, got ${navigationStore.activeTab}/${navigationStore.settingsSubTab})`
+        );
+      });
     },
   };
 }

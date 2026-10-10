@@ -16,6 +16,7 @@
   import { parseSearchRules, hasAdvancedSearchTerms, isSmartPlaylistSpec } from "../utils/filterParser";
   import { invoke } from "@tauri-apps/api/core";
   import { collectionStore } from "../stores/collection.svelte";
+  import { onDevScreenHooks } from "../scripting/devHooks";
   import { navigationStore, type AutoPlaylistRef } from "../stores/navigation.svelte";
   import { windowLayoutStore } from "../stores/windowLayout.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
@@ -47,6 +48,22 @@
     clearTimeout(searchDebounceTimer);
     searchDebounceTimer = setTimeout(() => collectionStore.search(query), SEARCH_DEBOUNCE_MS);
   }
+
+  // Dev-only entry points for scripted captures (src/lib/scripting/screens.ts).
+  $effect(() => {
+    if (!import.meta.env.DEV) return;
+    return onDevScreenHooks((hook) => [
+      hook("search", async (query) => {
+        collectionStore.searchQuery = query;
+        isSearchFocused = true;
+        await collectionStore.search(query);
+      }),
+      hook("closeSearch", () => {
+        clearSearch();
+        isSearchFocused = false;
+      }),
+    ]);
+  });
 
   function focusFirstSearchResult() {
     const first = searchDropdownRef?.querySelector<HTMLElement>(".search-result-item");

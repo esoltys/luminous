@@ -91,6 +91,12 @@ export interface ProfileOptions {
   appState?: Record<string, string | null>;
   /** If true, keeps temporary profile folders on disk after disposal. */
   keepProfiles?: boolean;
+  /**
+   * Path to a real luminous.db to start from. The profile gets a private copy (stats,
+   * pins, playlists, library), so anything the run does lands in the copy and is
+   * discarded; the original is only read. See {@link cloneDatabase}.
+   */
+  cloneFrom?: string;
 }
 
 export interface LaunchOptions {
@@ -117,6 +123,58 @@ if (-not $main) { throw 'Luminous main window not found' }
 function ps(script: string): string {
   if (process.platform !== "win32") return "";
   return execFileSync("powershell", ["-NoProfile", "-Command", script], { encoding: "utf8" }).trim();
+}
+
+/**
+ * Keys in the clone that would reach outside the machine: scrobbling to Last.fm /
+ * ListenBrainz (a played song would otherwise scrobble for real) and Discord presence.
+ */
+const OUTWARD_KEY_PATTERNS = ["scrobbler_%", "listenbrainz_%", "discord_%"];
+
+/**
+ * Copies `source` to `dest` with VACUUM INTO (consistent even while the app has it open
+ * in WAL mode; the source is opened read-only) and makes the copy safe to run. The copy
+ * still points at the real library files, so anything that would write to them or reach
+ * outside the machine is switched off:
+ * - scrobbling, ListenBrainz and Discord presence (OUTWARD_KEY_PATTERNS) and any queued Subsonic scrobbles;
+ * - auto-organize, which moves files on disk when the watcher sees a change;
+ * - songs that are dev fixtures (under tests/fixtures, or served from a loopback test server) are
+ *   dropped from the copy, so docs shots never show them;
+ * - a library with no chosen default is pinned to "none" so the app can't link one and
+ *   write a hierarchy sidecar into a music folder.
+ * Left as is: WebDAV/Subsonic servers (background sync only writes to the copy).
+ */
+export function cloneDatabase(source: string, dest: string): void {
+  if (!existsSync(source)) throw new Error(`No database to clone at ${source}.`);
+  const src = new Database(source, { readonly: true });
+  try {
+    src.exec("PRAGMA busy_timeout = 5000");
+    src.run("VACUUM INTO ?", [dest]);
+  } finally {
+    src.close();
+  }
+  const copy = new Database(dest);
+  try {
+    for (const pattern of OUTWARD_KEY_PATTERNS) copy.run("DELETE FROM app_state WHERE key LIKE ?", [pattern]);
+    const hasTable = (name: string) => !!copy.query("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name);
+    if (hasTable("songs")) {
+      copy.run("PRAGMA foreign_keys = ON"); // so dependent rows (stats, playlist entries) go with the songs
+      copy.run(
+        "DELETE FROM songs WHERE path LIKE '%tests%fixtures%' OR path LIKE 'http://127.0.0.1:%' OR path LIKE 'http://localhost:%'"
+      );
+    }
+    if (hasTable("subsonic_scrobble_queue")) copy.run("DELETE FROM subsonic_scrobble_queue");
+    const organize = copy.query("SELECT value FROM app_state WHERE key = 'organize_config'").get() as { value: string } | null;
+    if (organize) {
+      const config = JSON.parse(organize.value) as Record<string, unknown>;
+      config.auto_organize = false;
+      copy.run("UPDATE app_state SET value = ? WHERE key = 'organize_config'", [JSON.stringify(config)]);
+    }
+    const hasDefault = copy.query("SELECT 1 FROM app_state WHERE key = 'default_library_path'").get();
+    if (!hasDefault) copy.run("INSERT INTO app_state (key, value) VALUES ('default_library_path', '')");
+  } finally {
+    copy.close();
+  }
 }
 
 /** Pins the app's main window to position (100, 100) with the given dimensions. */
@@ -208,9 +266,20 @@ export class AppProfile {
     this.port = options?.port ?? CDP_PORT;
     this.defaultWindow = options?.window;
 
+    // A clone keeps its own library choice; everything else gets the downward defaults.
+    if (options?.cloneFrom) {
+      try {
+        cloneDatabase(options.cloneFrom, this.dbPath);
+      } catch (err) {
+        rmSync(this.root, { recursive: true, force: true });
+        throw err;
+      }
+    }
+    const baseState = options?.cloneFrom ? { ...FIRST_RUN_DONE, ...canonicalView("songs") } : DEFAULT_APP_STATE;
+
     // Pull defaults downward: suppress first-run popups, set canonical songs view, and apply caller overrides
     this.writeAppState({
-      ...DEFAULT_APP_STATE,
+      ...baseState,
       ...(options?.appState ?? {}),
     });
   }

@@ -107,7 +107,7 @@ export interface ScreenshotConfig extends SceneDefaults {
   viewportHeight?: number;
   /** Serves a zeroed-out library (no songs/albums/artists/directories) instead of the real mock data — for the no-folders-added empty-state capture. */
   emptyLibrary?: boolean;
-  /** Captured from the real running app by capture-dynamic-themes.ts, so take-screenshots.ts skips it. */
+  /** Captured from the real running app by the scene runner (scripts/scenes/dynamic.ts), so take-screenshots.ts skips it. */
   liveApp?: boolean;
   /** Locale tags to capture in. Defaults to every shipped locale. */
   locales?: string[];

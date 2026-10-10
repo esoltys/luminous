@@ -48,6 +48,8 @@ export interface ScreenshotOptions {
   quality?: number;
   /** Whether to capture the full page beyond the viewport. */
   captureBeyondViewport?: boolean;
+  /** Capture only this rectangle, in CSS pixels relative to the viewport. */
+  clip?: { x: number; y: number; width: number; height: number };
 }
 
 export interface WaitForEventOptions {
@@ -316,6 +318,7 @@ export class DevtoolsDriver implements AsyncDisposable {
       format,
       captureBeyondViewport: opts.captureBeyondViewport ?? false,
     };
+    if (opts.clip) params.clip = { ...opts.clip, scale: 1 };
     if (opts.quality !== undefined && (format === "jpeg" || format === "webp")) {
       params.quality = opts.quality;
     }
