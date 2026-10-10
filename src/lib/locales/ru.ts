@@ -1008,6 +1008,11 @@ export const ru = {
   help: {
     loading: "Загрузка руководства пользователя…"
   },
+  tray: {
+    playPause: "Воспроизведение/Пауза",
+    showHideWindow: "Показать или скрыть Luminous",
+    quit: "Выход"
+  },
   playerBar: {
     previous: "Предыдущая песня",
     play: "Воспроизвести",

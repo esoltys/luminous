@@ -958,6 +958,11 @@ export const es = {
   help: {
     loading: "Cargando la guía del usuario..."
   },
+  tray: {
+    playPause: "Reproducir/Pausar",
+    showHideWindow: "Mostrar/ocultar Luminous",
+    quit: "Salir"
+  },
   playerBar: {
     previous: "Canción anterior",
     play: "Reproducir",

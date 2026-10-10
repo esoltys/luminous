@@ -1008,6 +1008,11 @@ export const uk = {
   help: {
     loading: "Завантаження посібника користувача…"
   },
+  tray: {
+    playPause: "Відтворення/Пауза",
+    showHideWindow: "Показати або сховати Luminous",
+    quit: "Вийти"
+  },
   playerBar: {
     previous: "Попередня пісня",
     play: "Відтворити",

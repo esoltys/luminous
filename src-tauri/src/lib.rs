@@ -40,6 +40,7 @@ pub mod lyrics;
 pub mod media_session;
 pub mod models;
 pub mod musicbrainz;
+pub mod native_labels;
 pub mod organizer;
 pub mod paths;
 pub mod picard;
@@ -1530,6 +1531,7 @@ pub fn run() {
             commands::settings::get_db_schema_status,
             commands::settings::get_fade_settings,
             commands::settings::set_fade_settings,
+            commands::settings::set_native_labels,
             commands::settings::get_minimize_to_tray_enabled,
             commands::settings::set_minimize_to_tray_enabled,
             commands::settings::get_autostart_enabled,
