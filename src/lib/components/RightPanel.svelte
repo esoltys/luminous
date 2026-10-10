@@ -417,7 +417,9 @@
 
           {#if !hasContextData}
             <div class="text-xs text-brand-text-secondary/60 py-2">
-              {i18n.t('playerBar.contextEmptyState', {}, 'No enrichment data available for this track.')}
+              {isEntitySubject
+                ? i18n.t('playerBar.contextEmptyStateEntity', {}, 'No enrichment data available.')
+                : i18n.t('playerBar.contextEmptyState', {}, 'No enrichment data available for this track.')}
             </div>
           {/if}
         {/if}

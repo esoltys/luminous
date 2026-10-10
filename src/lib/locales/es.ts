@@ -1078,6 +1078,7 @@ export const es = {
     contextReadMore: "Leer más",
     contextReadLess: "Leer menos",
     contextEmptyState: "No hay datos de enriquecimiento disponibles para esta pista.",
+    contextEmptyStateEntity: "No hay datos de enriquecimiento disponibles.",
     contextRetry: "Reintentar",
     contextLoading: "Obteniendo contexto…",
     contextFetchError: "No se pudieron obtener los datos de contexto. Revisa tu conexión e inténtalo de nuevo.",

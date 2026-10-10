@@ -1084,6 +1084,7 @@ export const fr: DeepStringRecord<typeof en> = {
     contextReadMore: "Lire la suite",
     contextReadLess: "Réduire",
     contextEmptyState: "Aucune donnée enrichie disponible pour ce morceau.",
+    contextEmptyStateEntity: "Aucune donnée enrichie disponible.",
     contextRetry: "Réessayer",
     contextLoading: "Récupération du contexte…",
     contextFetchError: "Impossible de récupérer les données de contexte. Vérifiez votre connexion et réessayez.",

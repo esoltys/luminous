@@ -1078,6 +1078,7 @@ export const en = {
     contextReadMore: "Read more",
     contextReadLess: "Read less",
     contextEmptyState: "No enrichment data available for this track.",
+    contextEmptyStateEntity: "No enrichment data available.",
     contextRetry: "Retry",
     contextLoading: "Fetching context…",
     contextFetchError: "Couldn't fetch context data. Check your connection and retry.",

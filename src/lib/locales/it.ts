@@ -1078,6 +1078,7 @@ export const it = {
     contextReadMore: "Leggi tutto",
     contextReadLess: "Mostra meno",
     contextEmptyState: "Nessun dato di approfondimento disponibile per questo brano.",
+    contextEmptyStateEntity: "Nessun dato di approfondimento disponibile.",
     contextRetry: "Riprova",
     contextLoading: "Recupero del contesto in corso…",
     contextFetchError: "Impossibile recuperare i dati di contesto. Controlla la connessione e riprova.",
