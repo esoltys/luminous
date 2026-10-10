@@ -1,4 +1,5 @@
-import { describe, expect, it } from "bun:test";
+// @vitest-environment node
+import { describe, expect, it } from "vitest";
 import path from "node:path";
 import { clampPosition, outputPath, planPasses, runScenes, summarize } from "./scene-runner";
 import type { RemoteApi, Scene } from "./scenes/types";
