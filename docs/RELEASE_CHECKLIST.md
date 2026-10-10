@@ -11,7 +11,8 @@ manual.
       Confirm every user-facing fix has a linked, `bug`-labeled GitHub issue — PRs
       occasionally merge without one (e.g. #433 shipped before #453 existed to track it).
       Create one retroactively and link the PR if it's missing, so the release notes and
-      the post-build issue-closing step below have something to point at.
+      the post-build issue-closing step below have something to point at. (Chore PRs do
+      not require an issue and do not need to be listed in the release notes.)
 
 ## Content
 
@@ -25,7 +26,7 @@ manual.
   one view instead of the whole suite. New screenshot-worthy features get an entry added
   to the tracked `scripts/screenshot-scenes.json` (see `.claude/CLAUDE.md` for the harness
   details). Read the resulting PNGs to confirm they rendered correctly before committing.
-- [ ] Write `docs/release-notes/vX.Y.Z.md` for the new version.
+- [ ] Write `docs/release-notes/vX.Y.Z.md` for the new version. Chores do not need to be listed in the release notes.
 
 ## Verification
 
