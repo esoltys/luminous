@@ -692,12 +692,12 @@
             limit={4}
           />
         {:else}
-          <div class="text-xs text-brand-text-secondary italic">
+          <div class="inline-flex items-center px-3 py-1 rounded-full border border-brand-border bg-brand-sidebar text-xs text-brand-text-secondary italic">
             <span>{genreLabel}</span>
           </div>
         {/if}
         {#if !showInfoCard && communityRating}
-          <div class="inline-flex items-center px-3 py-1 text-xs font-medium text-brand-text-secondary shrink-0 ml-auto">
+          <div class="inline-flex items-center px-3 py-1 rounded-full border border-brand-border bg-brand-sidebar text-xs font-medium text-brand-text-secondary shrink-0 ml-auto">
             <CommunityRating rating={communityRating.rating} count={communityRating.count} {releaseGroupMbid} source={communityRating.source} />
           </div>
         {/if}
