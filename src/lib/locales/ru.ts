@@ -104,7 +104,8 @@ export const ru = {
     legalPrefix: "Продолжая, вы принимаете наши",
     termsOfService: "Условия использования",
     and: "и",
-    privacyPolicy: "Политику конфиденциальности"
+    privacyPolicy: "Политику конфиденциальности",
+    language: "Язык"
   },
   dbNewerThanApp: {
     title: "База данных из более новой версии",

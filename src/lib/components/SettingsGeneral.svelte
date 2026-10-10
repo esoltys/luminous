@@ -1,11 +1,9 @@
 <script lang="ts">
-  import { i18n, type Locale } from "../stores/i18n.svelte";
-  import { localeLabel, localePickerGroups } from "../locales";
+  import { i18n } from "../stores/i18n.svelte";
   import { prefs, type RatingStyle, type WeekStart } from "../stores/prefs.svelte";
+  import LanguageSelect from "./LanguageSelect.svelte";
   import Select from "./Select.svelte";
   import { GearIcon as Settings } from "phosphor-svelte";
-
-  const languageGroups = localePickerGroups();
 </script>
 
 <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6">
@@ -26,23 +24,10 @@
       <label for="language-select" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.selectLanguage')}</label>
       <p class="text-xs text-brand-text-secondary">{i18n.t('settings.uiLanguageHint')}</p>
     </div>
-    <Select
+    <LanguageSelect
       id="language-select"
-      value={i18n.currentLocale}
-      onchange={(e) => i18n.setLocale(e.currentTarget.value as Locale)}
       class="shrink-0 bg-brand-main border border-brand-border hover:border-brand-accent/60 text-brand-text-primary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
-    >
-      {#each languageGroups.pinned as tag (tag)}
-        <option value={tag} lang={tag}>{localeLabel(tag)}</option>
-      {/each}
-      {#if languageGroups.rest.length > 0}
-        <!-- Non-focusable separator: a disabled option is skipped by keyboard navigation. -->
-        <option disabled>──────────</option>
-        {#each languageGroups.rest as tag (tag)}
-          <option value={tag} lang={tag}>{localeLabel(tag)}</option>
-        {/each}
-      {/if}
-    </Select>
+    />
   </div>
 
   <div class="flex items-center justify-between gap-4 py-4">

@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 // One-off first-run flag, persisted the same lightweight way as
 // walkthrough_completed (see walkthrough.svelte.ts) — a single UI-only
 // boolean doesn't need its own Rust field.
-const SEEN_SETTING_KEY = "welcome_seen";
+export const SEEN_SETTING_KEY = "welcome_seen";
 
 class WelcomeStore {
   hasSeen = $state(false);

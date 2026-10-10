@@ -4,10 +4,12 @@ import {
   isLocale,
   legacyLanguageToLocale,
   manualLanguageForLocale,
+  resolveLocale,
   type Locale,
   type ManualLanguage,
 } from '../locales';
 import { invoke } from '@tauri-apps/api/core';
+import { SEEN_SETTING_KEY } from './welcome.svelte';
 
 export type { Locale };
 
@@ -41,6 +43,7 @@ class I18nStore {
       const migrating = settings?.[LANGUAGE_TAGS_KEY] !== "1";
       const locale = saved ? (migrating ? legacyLanguageToLocale(saved) : null) ?? (isLocale(saved) ? saved : null) : null;
       if (locale) this.currentLocale = locale;
+      else if (!saved && settings?.[SEEN_SETTING_KEY] !== "true") this.adoptSystemLocale();
       if (migrating) {
         if (locale) void invoke("set_app_setting", { key: "language", value: locale }).catch(() => {});
         void invoke("set_app_setting", { key: LANGUAGE_TAGS_KEY, value: "1" }).catch(() => {});
@@ -56,6 +59,17 @@ class I18nStore {
       }
       this.pushNativeLabels();
     }
+  }
+
+  /**
+   * First launch only (nothing saved, welcome screen not yet seen): use the OS language and
+   * persist it, so the welcome screen opens in the user's language and the choice sticks.
+   * Never runs for returning users, so an upgrade cannot switch the language they already have.
+   */
+  private adoptSystemLocale() {
+    const preferred = typeof navigator === "undefined" ? [] : navigator.languages?.length ? navigator.languages : [navigator.language ?? ""];
+    this.currentLocale = resolveLocale(preferred);
+    void invoke("set_app_setting", { key: "language", value: this.currentLocale }).catch(() => {});
   }
 
   async setLocale(locale: Locale) {

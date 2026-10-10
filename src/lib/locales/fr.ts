@@ -106,7 +106,8 @@ export const fr: DeepStringRecord<typeof en> = {
     legalPrefix: "En continuant, vous acceptez nos",
     termsOfService: "Conditions d'utilisation",
     and: "et notre",
-    privacyPolicy: "Politique de confidentialité"
+    privacyPolicy: "Politique de confidentialité",
+    language: "Langue"
   },
   dbNewerThanApp: {
     title: "Base de données d'une version plus récente",

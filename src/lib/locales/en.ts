@@ -100,7 +100,8 @@ export const en = {
     legalPrefix: "By continuing, you agree to our",
     termsOfService: "Terms of Service",
     and: "and",
-    privacyPolicy: "Privacy Policy"
+    privacyPolicy: "Privacy Policy",
+    language: "Language"
   },
   dbNewerThanApp: {
     title: "Database From a Newer Version",
