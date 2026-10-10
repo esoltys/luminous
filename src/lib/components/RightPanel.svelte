@@ -5,6 +5,7 @@
   import { themeStore } from "../stores/theme.svelte";
   import {
     MusicNotesIcon as Music,
+    ArrowUUpLeftIcon as Return,
     ClockIcon as Clock,
     ArrowSquareOutIcon as ExternalLink,
     ArrowsClockwiseIcon as RefreshCw,
@@ -147,14 +148,14 @@
         <h2 class="text-xs font-bold text-brand-text-secondary uppercase tracking-wider">
           {headingLabel}
         </h2>
-        <!-- The panel follows what you look at; this is the way back to what is playing. -->
+        <!-- The panel follows what you look at; the return arrow marks this as the way back to what is playing, not a title. -->
         {#if !isPlayingSubject && playerStore.currentSong}
           <button
             type="button"
             onclick={() => inspectorStore.showPlaying()}
             class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-brand-border text-xs font-medium text-brand-text-secondary hover:text-brand-text-primary hover:border-brand-accent/40 transition-colors cursor-pointer"
           >
-            <Music class="w-3 h-3" />
+            <Return class="w-3 h-3" />
             <span>{i18n.t('playerBar.nowPlayingHeading', {}, 'Now Playing')}</span>
           </button>
         {/if}
