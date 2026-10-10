@@ -381,6 +381,19 @@ describe("In-app scripting API", () => {
       await expect(api.screens.search("x")).rejects.toThrow(/needs the top navigation bar on screen/);
     });
 
+    it("closeAll closes the search dropdown when the search box is on screen", async () => {
+      const api = createScriptingApi();
+      let closed = 0;
+      const off = registerScreenHook("closeSearch", () => { closed++; });
+
+      await api.dialogs.closeAll();
+      expect(closed).toBe(1);
+
+      off();
+      await api.dialogs.closeAll();
+      expect(closed).toBe(1);
+    });
+
     it("says which screen to open when its hook is missing", async () => {
       const api = createScriptingApi();
       await expect(api.screens.openAlbumEditor()).rejects.toThrow(/navigate\.album first/);

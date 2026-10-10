@@ -1,4 +1,5 @@
 import { collectionStore } from "../stores/collection.svelte";
+import { closeSearchIfOpen } from "./screens";
 import { toastStore } from "../stores/toast.svelte";
 import { welcomeStore } from "../stores/welcome.svelte";
 import { walkthroughStore } from "../stores/walkthrough.svelte";
@@ -46,6 +47,7 @@ export function createDialogsController(wait: ScriptWaitApi): ScriptDialogsApi {
         activeHostControls.closeAll();
       }
       collectionStore.closeSmartBuilder();
+      closeSearchIfOpen();
       if (walkthroughStore.isActive) {
         walkthroughStore.finish();
       }

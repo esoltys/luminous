@@ -2,6 +2,8 @@ import type { ScriptScreensApi, ScriptWaitApi } from "./types";
 
 export interface ScreenHooks {
   search(query: string): Promise<void>;
+  /** Clears the search box and closes its dropdown. */
+  closeSearch(): void;
   openAlbumEditor(): void;
   setEqualizerMode(mode: "graphic10" | "parametric"): Promise<void>;
   openEqualizerPresetMenu(): void;
@@ -23,6 +25,7 @@ export function registerScreenHook<K extends keyof ScreenHooks>(name: K, hook: S
 
 const SCREEN_FOR: Record<keyof ScreenHooks, string> = {
   search: "the top navigation bar",
+  closeSearch: "the top navigation bar",
   openAlbumEditor: "an album detail view (navigate.album first)",
   setEqualizerMode: "Settings → Equalizer (navigate.settings('equalizer') first)",
   openEqualizerPresetMenu: "Settings → Equalizer in parametric mode",
@@ -32,6 +35,11 @@ function hook<K extends keyof ScreenHooks>(name: K): ScreenHooks[K] {
   const found = hooks[name];
   if (!found) throw new Error(`"${name}" needs ${SCREEN_FOR[name]} on screen.`);
   return found as ScreenHooks[K];
+}
+
+/** Closes the search dropdown if the search box is on screen; nothing to close otherwise. */
+export function closeSearchIfOpen(): void {
+  hooks.closeSearch?.();
 }
 
 /** Creates the controller for component-local screen states. */

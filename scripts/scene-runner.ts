@@ -43,9 +43,11 @@ export interface PlanFilters {
  * last in a pass so the full window is never restored mid-pass.
  */
 export function planPasses(scenes: Scene[], filters: PlanFilters): Pass[] {
-  const selected = filters.name ? scenes.filter((s) => s.name === filters.name) : scenes;
-  if (filters.name && selected.length === 0) {
-    throw new Error(`No scene named "${filters.name}". Valid names: ${scenes.map((s) => s.name).join(", ")}`);
+  const wanted = filters.name?.split(",").map((n) => n.trim());
+  const selected = wanted ? scenes.filter((s) => wanted.includes(s.name)) : scenes;
+  const unknown = wanted?.filter((n) => !scenes.some((s) => s.name === n));
+  if (unknown?.length) {
+    throw new Error(`No scene named "${unknown.join('", "')}". Valid names: ${scenes.map((s) => s.name).join(", ")}`);
   }
   const schemes = filters.schemes ?? ALL_SCHEMES;
   const passes: Pass[] = [];

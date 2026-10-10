@@ -60,6 +60,15 @@
         isSearchFocused = true;
         await collectionStore.search(query);
       });
+      const offClose = registerScreenHook("closeSearch", () => {
+        clearSearch();
+        isSearchFocused = false;
+      });
+      const offSearch = off;
+      off = () => {
+        offSearch?.();
+        offClose();
+      };
     });
     return () => {
       cancelled = true;

@@ -58,7 +58,11 @@ export function createNavigationController(wait: ScriptWaitApi): ScriptNavigatio
       await wait.forState(
         () => navigationStore.activeTab === "settings" && navigationStore.settingsSubTab === section,
         3000
-      );
+      ).catch((err: Error) => {
+        throw new Error(
+          `${err.message} (wanted settings/${section}, got ${navigationStore.activeTab}/${navigationStore.settingsSubTab})`
+        );
+      });
     },
   };
 }
