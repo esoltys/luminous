@@ -1,8 +1,7 @@
 <script lang="ts">
+  import ViewModeToggle from "./ViewModeToggle.svelte";
   import {
     TagIcon,
-    SquaresFourIcon as LayoutGrid,
-    RowsIcon as Rows3,
     PlusIcon as Plus
   } from "phosphor-svelte";
   import { onMount } from "svelte";
@@ -114,31 +113,7 @@
         {/if}
         <div class="flex items-center gap-2">
           <!-- Cards / rows toggle -->
-          <div class="relative inline-flex items-center gap-0.5 bg-brand-sidebar border border-brand-border rounded-full p-1">
-            <!-- Sliding background indicator -->
-            <span
-              class="absolute top-1 bottom-1 left-1 w-7 h-7 rounded-full bg-brand-accent shadow-sm pointer-events-none transition-transform duration-200 ease-out {prefs.genreCardsViewMode === 'rows' ? 'translate-x-[30px]' : 'translate-x-0'}"
-              aria-hidden="true"
-            ></span>
-            <button
-              onclick={() => prefs.setGenreCardsViewMode("cards")}
-              class="relative z-10 flex items-center justify-center w-7 h-7 rounded-full transition-colors duration-200 {prefs.genreCardsViewMode === 'cards' ? 'text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-              title={i18n.t("collection.viewCards", {}, "Card view")}
-              aria-label={i18n.t("collection.viewCards", {}, "Card view")}
-              aria-pressed={prefs.genreCardsViewMode === "cards"}
-            >
-              <LayoutGrid class="w-4 h-4" />
-            </button>
-            <button
-              onclick={() => prefs.setGenreCardsViewMode("rows")}
-              class="relative z-10 flex items-center justify-center w-7 h-7 rounded-full transition-colors duration-200 {prefs.genreCardsViewMode === 'rows' ? 'text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-              title={i18n.t("collection.viewRows", {}, "Row view")}
-              aria-label={i18n.t("collection.viewRows", {}, "Row view")}
-              aria-pressed={prefs.genreCardsViewMode === "rows"}
-            >
-              <Rows3 class="w-4 h-4" />
-            </button>
-          </div>
+          <ViewModeToggle mode={prefs.genreCardsViewMode} onChange={(m) => prefs.setGenreCardsViewMode(m)} />
           <!-- Sort dropdown -->
           <div class="relative">
             <Select

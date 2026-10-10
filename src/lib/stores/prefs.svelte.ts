@@ -25,6 +25,8 @@ interface UiPreferences {
   playlists_custom_view_mode: CollectionViewMode;
   genre_view_mode: string;
   genre_cards_view_mode: CollectionViewMode;
+  pinned_view_mode: CollectionViewMode;
+  artist_releases_view_mode: CollectionViewMode;
   genre_sort_field: GenreSortField;
   genre_sort_asc: boolean;
   week_start: WeekStart;
@@ -53,6 +55,9 @@ class PrefsStore {
   /** Collapses primary-genre cards down to compact header rows on the
    * Genres tab (mirrors the Albums/Artists cards-vs-rows toggle). */
   genreCardsViewMode = $state<CollectionViewMode>("cards");
+  pinnedViewMode = $state<CollectionViewMode>("cards");
+  /** Shared by every release and playlist section of the artist view. */
+  artistReleasesViewMode = $state<CollectionViewMode>("cards");
   /** Sorts both the primary-genre cards and each card's own sub-genre chips —
    * display-only, doesn't touch the persisted drag-reorder sort_order. */
   genreSortField = $state<GenreSortField>("name");
@@ -85,6 +90,8 @@ class PrefsStore {
     this.playlistsAutoViewMode = prefs.playlists_auto_view_mode;
     this.playlistsCustomViewMode = prefs.playlists_custom_view_mode;
     this.genreCardsViewMode = prefs.genre_cards_view_mode;
+    this.pinnedViewMode = prefs.pinned_view_mode;
+    this.artistReleasesViewMode = prefs.artist_releases_view_mode;
     this.genreSortField = prefs.genre_sort_field;
     this.genreSortAsc = prefs.genre_sort_asc;
     this.weekStart = prefs.week_start;
@@ -123,6 +130,8 @@ class PrefsStore {
       playlists_custom_view_mode: this.playlistsCustomViewMode,
       genre_view_mode: "genre",
       genre_cards_view_mode: this.genreCardsViewMode,
+      pinned_view_mode: this.pinnedViewMode,
+      artist_releases_view_mode: this.artistReleasesViewMode,
       genre_sort_field: this.genreSortField,
       genre_sort_asc: this.genreSortAsc,
       week_start: this.weekStart,
@@ -196,6 +205,16 @@ class PrefsStore {
   }
   setGenreCardsViewMode(mode: CollectionViewMode) {
     this.genreCardsViewMode = mode;
+    this.save();
+  }
+
+  setPinnedViewMode(mode: CollectionViewMode) {
+    this.pinnedViewMode = mode;
+    this.save();
+  }
+
+  setArtistReleasesViewMode(mode: CollectionViewMode) {
+    this.artistReleasesViewMode = mode;
     this.save();
   }
 

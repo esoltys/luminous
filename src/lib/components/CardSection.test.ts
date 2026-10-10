@@ -17,10 +17,37 @@ describe("CardSection", () => {
     expect(grid.className).toContain("auto-fill");
   });
 
-  it("has no scroll controls", () => {
+  it("has no toggle or scroll controls unless a mode handler is provided", () => {
     const { queryByRole } = render(CardSection, { title: "Albums", children: items });
 
     expect(queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("uses wider, tighter grid tracks in rows mode", () => {
+    const { getByTestId } = render(CardSection, { title: "Albums", viewMode: "rows", children: items });
+
+    const grid = getByTestId("card-section-grid");
+    expect(grid.className).toContain("minmax(280px,1fr)");
+    expect(grid.className).toContain("gap-2");
+  });
+
+  it("passes the current mode to its children", () => {
+    const modeProbe = createRawSnippet((mode: () => string) => ({
+      render: () => `<div data-testid="mode">${mode()}</div>`,
+    }));
+    const { getByTestId } = render(CardSection, { viewMode: "rows", children: modeProbe });
+
+    expect(getByTestId("mode").textContent).toBe("rows");
+  });
+
+  it("renders a Cards/Rows toggle that reports the chosen mode", async () => {
+    const onViewModeChange = vi.fn();
+    const { getByRole } = render(CardSection, { title: "Albums", viewMode: "cards", onViewModeChange, children: items });
+
+    expect(getByRole("button", { name: "Card view" })).toHaveAttribute("aria-pressed", "true");
+    await fireEvent.click(getByRole("button", { name: "Row view" }));
+
+    expect(onViewModeChange).toHaveBeenCalledWith("rows");
   });
 
   it("renders the title as a button when onHeaderClick is provided", async () => {
