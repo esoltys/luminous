@@ -49,6 +49,12 @@
     fit?: boolean;
     align?: "start" | "end";
     minTile?: number;
+    /**
+     * Output only (`bind:spareWidth`), `fit` mode: px of the box the grid doesn't
+     * cover, on the side opposite `align` (0 until measured). Lets a neighbour
+     * centre itself in the visible gap rather than against the box's edge.
+     */
+    spareWidth?: number;
   }
 
   let {
@@ -62,6 +68,7 @@
     fit = false,
     align = "start",
     minTile = 40,
+    spareWidth = $bindable(0),
   }: Props = $props();
 
   let hasHero = $derived(!!heroImageUrl);
@@ -144,6 +151,11 @@
   );
   // With no quarter covers (or nothing fitting) the big tile stands alone, as a square.
   let fitSoloEdge = $derived(Math.max(0, Math.min(measuredHeight, measuredBoxWidth)));
+
+  $effect(() => {
+    const drawn = !fit || !hasBigTile ? measuredBoxWidth : (fitLayout?.width ?? fitSoloEdge);
+    spareWidth = Math.max(0, measuredBoxWidth - drawn);
+  });
 </script>
 
 {#snippet bigTile()}

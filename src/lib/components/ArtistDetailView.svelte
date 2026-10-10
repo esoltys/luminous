@@ -249,6 +249,7 @@
   let artistPortraitUrl = $derived(
     resolveArtistPortraitUrl(artistArtwork?.artist_portrait_uri, artistProfile?.fetched_image_filename)
   );
+  let mosaicSpareWidth = $state(0);
   let bandLogoUrl = $derived(
     resolveArtistLogoUrl(artistArtwork?.band_logo_uri, artistProfile?.fetched_logo_filename)
   );
@@ -887,19 +888,22 @@
       </div>
 
       {#if !windowLayoutStore.isDetailHeaderCollapsed && (bandLogoUrl || artistPortraitUrl || headerCovers.length > 0)}
-        <!-- The logo sits beside the photo rather than replacing the name: logos are often hard to read. -->
+        <!-- The logo sits beside the photo rather than replacing the name: logos are often hard to read.
+             The mosaic's box is wider than its grid, so the logo shifts right by half the empty
+             width to centre between the action buttons and the covers. -->
         <div class="hidden @xl:flex items-center justify-end gap-6 min-w-0 flex-1">
           {#if bandLogoUrl}
             <img
               src={bandLogoUrl}
               alt=""
-              class="h-16 w-auto max-w-64 min-w-0 shrink object-contain object-right"
+              class="hidden @4xl:block h-16 @5xl:h-20 @6xl:h-24 w-auto max-w-64 @5xl:max-w-80 @6xl:max-w-96 min-w-0 shrink object-contain object-right"
+              style:transform="translateX({mosaicSpareWidth / 2}px)"
             />
           {/if}
           {#if artistPortraitUrl || headerCovers.length > 0}
-            <!-- Fills the header's spare width: more albums = more columns/rows, never overflowing (#1496). -->
-            <div class="flex-1 min-w-0">
-              <CoverMosaic covers={headerCovers} heroImageUrl={artistPortraitUrl} heroImageAlt={artistName} sizeClass="h-36" fit align="end" maxCovers={16} />
+            <!-- Fills the header's spare width: more albums = more columns/rows, never overflowing (#1496). min-w-36 = the mosaic's h-36, so it never collapses below one full tile; the logo yields first. -->
+            <div class="flex-1 min-w-36">
+              <CoverMosaic covers={headerCovers} heroImageUrl={artistPortraitUrl} heroImageAlt={artistName} sizeClass="h-36" fit align="end" maxCovers={16} bind:spareWidth={mosaicSpareWidth} />
             </div>
           {/if}
         </div>
