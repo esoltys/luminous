@@ -44,7 +44,8 @@ export function createAppearanceController(wait: ScriptWaitApi): ScriptAppearanc
         windowLayoutStore.sidebarWidth = layout.sidebarWidth;
       }
       if (layout.miniplayer !== undefined && layout.miniplayer !== windowLayoutStore.isMiniplayer) {
-        windowLayoutStore.toggleMiniplayerMode();
+        // The window resize behind the toggle is async, and an overlapping toggle is dropped.
+        await windowLayoutStore.toggleMiniplayerMode();
       }
       if (layout.immersive !== undefined && layout.immersive !== windowLayoutStore.immersiveMode) {
         windowLayoutStore.toggleImmersiveMode();

@@ -355,7 +355,9 @@ describe("In-app scripting API", () => {
       await api.view.openSmartPlaylistBuilder([{ field: "year", op: ">=", value: "1980" }]);
       expect(collectionStore.isSmartBuilderOpen).toBe(true);
       expect(collectionStore.smartBuilderRules).toEqual([{ field: "year", op: ">=", value: "1980" }]);
-      collectionStore.closeSmartBuilder();
+
+      await api.dialogs.closeAll();
+      expect(collectionStore.isSmartBuilderOpen).toBe(false);
     });
 
     it("navigates to the Playlists sub-tabs", async () => {
