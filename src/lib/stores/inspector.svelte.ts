@@ -31,6 +31,8 @@ class InspectorStore {
   private selections = $state<{ viewId: string; song: Song }[]>([]);
   private resolved = $state<ContextSubject | null>(null);
   private requestId = 0;
+  /** The user asked for Now Playing; holds until they pick something else to look at. */
+  private playingRequested = $state(false);
 
   constructor() {
     // Resolving an album/artist to a representative song is async, so it runs
@@ -38,6 +40,8 @@ class InspectorStore {
     $effect.root(() => {
       $effect(() => {
         const entity = this.viewedEntity;
+        // Viewing a different album/artist is picking something else to look at.
+        untrack(() => (this.playingRequested = false));
         if (!entity) {
           this.resolved = null;
           return;
@@ -72,6 +76,9 @@ class InspectorStore {
   }
 
   get subject(): InspectorSubject | null {
+    const requested = this.playingRequested ? playerStore.currentSong : undefined;
+    if (requested) return { kind: "song", song: requested, source: "playing", key: `song:${requested.id}`, name: requested.artist ?? "" };
+
     const selected = this.selections.at(-1);
     if (selected) return { kind: "song", song: selected.song, source: "selection", key: `song:${selected.song.id}`, name: selected.song.artist ?? "" };
 
@@ -85,6 +92,11 @@ class InspectorStore {
     return null;
   }
 
+  /** Describes the playing song, over any selection or viewed album/artist, until the user picks something else. */
+  showPlaying(): void {
+    this.playingRequested = true;
+  }
+
   /**
    * Reports the sole selected song in `viewId`, or null to clear it. Idempotent;
    * clearing a view that reported nothing is a no-op. A multi-selection has no
@@ -93,6 +105,9 @@ class InspectorStore {
   setSelection(viewId: string, song: Song | null): void {
     // Untracked: callers invoke this from effects, which must not subscribe to the list they write.
     untrack(() => {
+      // Tables re-report their current selection; only a different song counts as picking something.
+      const previous = this.selections.find((s) => s.viewId === viewId);
+      if (song && previous?.song.id !== song.id) this.playingRequested = false;
       const rest = this.selections.filter((s) => s.viewId !== viewId);
       this.selections = song ? [...rest, { viewId, song }] : rest;
     });
@@ -102,6 +117,7 @@ class InspectorStore {
   clearAll(): void {
     this.selections = [];
     this.resolved = null;
+    this.playingRequested = false;
   }
 }
 

@@ -303,11 +303,11 @@ describe("RightPanel.svelte", () => {
     playerStore.currentSong = mockSong;
     playerStore.audioPipeline = mockAudioPipeline;
     inspectorStore.setSelection("album-view", { ...mockSong, id: 7, genre: "Jazz" });
-    const { getByText, queryByText } = render(RightPanel);
+    const { getByText, queryByText, queryByRole } = render(RightPanel);
 
     expect(getByText("Selected Track")).toBeInTheDocument();
     expect(getByText("Jazz")).toBeInTheDocument();
-    expect(queryByText("Now Playing")).not.toBeInTheDocument();
+    expect(queryByRole("heading", { name: "Now Playing" })).not.toBeInTheDocument();
     expect(queryByText("Processing")).not.toBeInTheDocument();
   });
 
@@ -317,5 +317,29 @@ describe("RightPanel.svelte", () => {
 
     expect(getByText("Selected Track")).toBeInTheDocument();
     expect(queryByText(/nothing playing/i)).not.toBeInTheDocument();
+  });
+
+  it("offers a way back to Now Playing while describing something else, and takes it", async () => {
+    playerStore.currentSong = mockSong;
+    inspectorStore.setSelection("album-view", { ...mockSong, id: 7 });
+    const { getByRole, queryByRole } = render(RightPanel);
+
+    await fireEvent.click(getByRole("button", { name: "Now Playing" }));
+
+    expect(getByRole("heading", { name: "Now Playing" })).toBeInTheDocument();
+    expect(queryByRole("button", { name: "Now Playing" })).not.toBeInTheDocument();
+    expect(queryByRole("heading", { name: "Selected Track" })).not.toBeInTheDocument();
+  });
+
+  it("offers no way back when the panel already shows Now Playing, or nothing is playing", () => {
+    playerStore.currentSong = mockSong;
+    const playing = render(RightPanel);
+    expect(playing.queryByRole("button", { name: "Now Playing" })).not.toBeInTheDocument();
+    playing.unmount();
+
+    playerStore.currentSong = undefined;
+    inspectorStore.setSelection("album-view", mockSong);
+    const idle = render(RightPanel);
+    expect(idle.queryByRole("button", { name: "Now Playing" })).not.toBeInTheDocument();
   });
 });

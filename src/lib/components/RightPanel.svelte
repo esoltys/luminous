@@ -143,9 +143,22 @@
        above the dock instead of running the full sidebar height behind it. -->
   <div class="flex-1 min-h-0 overflow-y-auto px-6 pt-6 pb-6 space-y-6 {currentSong ? 'mb-24' : ''}">
     {#if currentSong}
-      <h2 class="text-xs font-bold text-brand-text-secondary uppercase tracking-wider">
-        {headingLabel}
-      </h2>
+      <div class="flex items-center justify-between gap-3">
+        <h2 class="text-xs font-bold text-brand-text-secondary uppercase tracking-wider">
+          {headingLabel}
+        </h2>
+        <!-- The panel follows what you look at; this is the way back to what is playing. -->
+        {#if !isPlayingSubject && playerStore.currentSong}
+          <button
+            type="button"
+            onclick={() => inspectorStore.showPlaying()}
+            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-brand-border text-xs font-medium text-brand-text-secondary hover:text-brand-text-primary hover:border-brand-accent/40 transition-colors cursor-pointer"
+          >
+            <Music class="w-3 h-3" />
+            <span>{i18n.t('playerBar.nowPlayingHeading', {}, 'Now Playing')}</span>
+          </button>
+        {/if}
+      </div>
 
       <div class="space-y-2 text-xs">
         {#if currentSong.year}

@@ -139,4 +139,46 @@ describe("inspectorStore", () => {
     await settle();
     expect(inspectorStore.subject).toMatchObject({ key: "album:Fast", song: { id: 300 } });
   });
+
+  describe("showPlaying", () => {
+    it("beats a selection and a viewed entity", async () => {
+      playerStore.currentSong = song(1);
+      inspectorStore.setSelection("album-view", song(2));
+      navigationStore.selectedAlbumName = "Dark Side";
+      await settle();
+      expect(inspectorStore.subject?.source).not.toBe("playing");
+
+      inspectorStore.showPlaying();
+      expect(inspectorStore.subject).toMatchObject({ kind: "song", source: "playing", song: { id: 1 } });
+    });
+
+    it("holds when a table re-reports the same selection, but yields to a different song", () => {
+      playerStore.currentSong = song(1);
+      inspectorStore.setSelection("songs", song(2));
+      inspectorStore.showPlaying();
+      inspectorStore.setSelection("songs", song(2));
+      expect(inspectorStore.subject?.source).toBe("playing");
+
+      inspectorStore.setSelection("songs", song(3));
+      expect(inspectorStore.subject).toMatchObject({ source: "selection", song: { id: 3 } });
+    });
+
+    it("yields when another album or artist is opened", async () => {
+      playerStore.currentSong = song(1);
+      navigationStore.selectedAlbumName = "Dark Side";
+      await settle();
+      inspectorStore.showPlaying();
+      expect(inspectorStore.subject?.source).toBe("playing");
+
+      navigationStore.selectedAlbumName = "Animals";
+      await settle();
+      expect(inspectorStore.subject).toMatchObject({ kind: "album", key: "album:Animals" });
+    });
+
+    it("is a no-op when nothing is playing", () => {
+      inspectorStore.setSelection("songs", song(2));
+      inspectorStore.showPlaying();
+      expect(inspectorStore.subject).toMatchObject({ source: "selection" });
+    });
+  });
 });
