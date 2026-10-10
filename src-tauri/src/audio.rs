@@ -1273,7 +1273,7 @@ fn get_default_device_name() -> Option<String> {
 /// lost: `check_and_rebuild_output` already polls the default and rebuilds.
 /// Falls back to the virtual default handle if the endpoint can't be matched.
 fn select_output_device(host: &cpal::Host) -> Result<cpal::Device, String> {
-    use cpal::traits::{DeviceTrait, HostTrait};
+    use cpal::traits::HostTrait;
 
     let default = host
         .default_output_device()
@@ -1281,6 +1281,8 @@ fn select_output_device(host: &cpal::Host) -> Result<cpal::Device, String> {
 
     #[cfg(windows)]
     {
+        use cpal::traits::DeviceTrait;
+
         let specific = default.id().ok().and_then(|default_id| {
             host.output_devices()
                 .ok()?
