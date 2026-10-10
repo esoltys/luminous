@@ -167,6 +167,8 @@ class WalkthroughStore {
   isActive = $state(false);
   currentStepIndex = $state(0);
   seenStepIds = $state<Set<string>>(new Set());
+  /** True once init() has settled (saved progress loaded, or loading failed). Auto-resume must wait for it: before then seenStepIds is empty and every step looks unseen. */
+  initialized = $state(false);
 
   private runMode: WalkthroughRunMode = "full";
   private visitedThisRun = new Set<string>();
@@ -212,6 +214,8 @@ class WalkthroughStore {
       }
     } catch (e) {
       console.error("Failed to load walkthrough progress:", e);
+    } finally {
+      this.initialized = true;
     }
   }
 
