@@ -4,6 +4,7 @@ import { render, fireEvent } from "@testing-library/svelte";
 import { prefs } from "../stores/prefs.svelte";
 import RightPanel from "./RightPanel.svelte";
 import { playerStore } from "../stores/player.svelte";
+import { inspectorStore } from "../stores/inspector.svelte";
 import type { Song, AudioPipelineInfo } from "../types";
 
 import { invoke } from "@tauri-apps/api/core";
@@ -49,6 +50,7 @@ describe("RightPanel.svelte", () => {
     playerStore.state = "stopped";
     playerStore.currentSong = undefined;
     prefs.onlineEnabled = true;
+    inspectorStore.clearAll();
   });
 
   it("renders 'Not Playing' when no current song", () => {
@@ -297,5 +299,25 @@ describe("RightPanel.svelte", () => {
 
     expect(await findByText(/Offline\. Turn Online on/)).toBeInTheDocument();
     expect(vi.mocked(invoke).mock.calls.some(([cmd]) => cmd === "get_song_context")).toBe(false);
+  });
+
+  it("describes a selected song instead of the playing one, without the live pipeline (info sidebar context)", () => {
+    playerStore.currentSong = mockSong;
+    playerStore.audioPipeline = mockAudioPipeline;
+    inspectorStore.setSelection("album-view", { ...mockSong, id: 7, genre: "Jazz" });
+    const { getByText, queryByText } = render(RightPanel);
+
+    expect(getByText("Selected Track")).toBeInTheDocument();
+    expect(getByText("Jazz")).toBeInTheDocument();
+    expect(queryByText("Now Playing")).not.toBeInTheDocument();
+    expect(queryByText("Processing")).not.toBeInTheDocument();
+  });
+
+  it("shows context for a selected song even when nothing is playing", () => {
+    inspectorStore.setSelection("album-view", mockSong);
+    const { getByText, queryByText } = render(RightPanel);
+
+    expect(getByText("Selected Track")).toBeInTheDocument();
+    expect(queryByText(/nothing playing/i)).not.toBeInTheDocument();
   });
 });

@@ -1,6 +1,8 @@
 <script lang="ts" module>
   import type { Song } from "../types";
 
+  let songTableInstanceCount = 0;
+
   /** One renderable row. `song` is optional because a playlist item can point at an unavailable/missing song. */
   export interface SongTableRow {
     /** Stable identity for selection/keying — `String(song.id)` for song-keyed views, `item.uuid` for playlist views. */
@@ -23,6 +25,7 @@
   import { collectionStore } from "../stores/collection.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
   import { playerStore } from "../stores/player.svelte";
+  import { inspectorStore } from "../stores/inspector.svelte";
   import { prefs } from "../stores/prefs.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { formatFileSize, formatSampleRate, formatBitDepth, formatChannels, formatDuration } from "../utils/formatters";
@@ -144,6 +147,16 @@
     if (isRowPlaying) return isRowPlaying(row);
     return !!row.song && !!playerStore.currentSong && playerStore.currentSong.id === row.song.id;
   }
+
+  // Report the sole selected song to the info sidebar. A multi-selection (or
+  // an empty one) has no single subject, so it clears; the view's teardown
+  // clears too, so a closed view never leaves a stale subject behind.
+  const inspectorViewId = `song-table-${++songTableInstanceCount}`;
+  $effect(() => {
+    const only = selectedKeys.size === 1 ? rows.find((r) => r.key === [...selectedKeys][0])?.song : undefined;
+    inspectorStore.setSelection(inspectorViewId, only ?? null);
+  });
+  $effect(() => () => inspectorStore.setSelection(inspectorViewId, null));
 
   let lastSelectedKey = $state<string | null>(null);
   let keyIndex = $derived.by(() => {
