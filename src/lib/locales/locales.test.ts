@@ -79,6 +79,7 @@ function extractPlaceholders(str: string): string[] {
  */
 const IDENTICAL_OK_FR = new Set([
   "organizer.chipAlbum", // Same word in this language
+  "playerBar.albumHeading", // "Album"
   "organizer.chipGenre", // Same word in this language
   "units.hz", // SI unit symbols are the same in this language
   "units.khz",
@@ -188,6 +189,7 @@ const IDENTICAL_OK_IT = new Set<string>([
   "settings.onlineLabel", // "Online" is the usual word in this language
   "settings.offlineLabel", // "Offline" is the usual word in this language
   "organizer.chipAlbum", // Same word in this language
+  "playerBar.albumHeading", // "Album"
   "units.hz", // SI unit symbols are the same in this language
   "units.khz",
   "units.db",
@@ -350,6 +352,7 @@ const IDENTICAL_OK_DE = new Set<string>([
   "settings.textFilesFilter", // Same word in this language
   "collection.columnSelectorMetatags", // Same word in this language
   "organizer.chipAlbum", // Same word in this language
+  "playerBar.albumHeading", // "Album"
   "organizer.chipGenre", // Same word in this language
   "units.hz", // SI unit symbols are the same in this language
   "units.khz",

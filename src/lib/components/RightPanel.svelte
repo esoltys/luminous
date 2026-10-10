@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { playerStore } from "../stores/player.svelte";
+  import { inspectorStore } from "../stores/inspector.svelte";
   import { themeStore } from "../stores/theme.svelte";
   import {
     MusicNotesIcon as Music,
@@ -27,11 +28,27 @@
 
   let { isOpen = true, width = 288, onClose }: Props = $props();
 
-  let currentSong = $derived(playerStore.currentSong);
+  // What the panel describes: the selected song, the viewed album/artist, or the
+  // playing song (see inspectorStore). "currentSong" below is that subject's song.
+  let subject = $derived(inspectorStore.subject);
+  let currentSong = $derived(subject?.song);
+  let isPlayingSubject = $derived(subject?.source === "playing");
+  // An album/artist has no single track, so track-level detail (recording IDs,
+  // file path, pipeline) is omitted and only the Information tab applies.
+  let isEntitySubject = $derived(subject?.kind === "album" || subject?.kind === "artist");
+  let headingLabel = $derived.by(() => {
+    switch (subject?.kind === "song" ? subject.source : subject?.kind) {
+      case "selection": return i18n.t('playerBar.selectedTrackHeading', {}, 'Selected Track');
+      case "album": return i18n.t('playerBar.albumHeading', {}, 'Album');
+      case "artist": return i18n.t('playerBar.artistHeading', {}, 'Artist');
+      default: return i18n.t('playerBar.nowPlayingHeading', {}, 'Now Playing');
+    }
+  });
   // Technicals is the default tab until the user's own choice loads from
   // app_state (below) — it's the pre-existing content users already relied
   // on seeing immediately (format/bitrate/etc.).
   let activeTab = $state<"context" | "technical">("technical");
+  let effectiveTab = $derived(isEntitySubject ? "context" : activeTab);
 
   function setActiveTab(tab: "context" | "technical") {
     activeTab = tab;
@@ -77,8 +94,12 @@
     }
   }
 
+  // Selection changes far more often than tracks do (arrowing through rows), so
+  // debounce the fetch; the request-id guard in loadContext covers stale replies.
   $effect(() => {
-    loadContext(currentSong?.id);
+    const songId = currentSong?.id;
+    const timer = setTimeout(() => loadContext(songId), 150);
+    return () => clearTimeout(timer);
   });
 
   let hasArtistInfo = $derived(
@@ -125,7 +146,7 @@
   }
 
   const musicbrainzRows = $derived.by(() => {
-    if (!currentSong) return [];
+    if (!currentSong || isEntitySubject) return [];
     const entries: { label: string; id?: string; entityPath: string; name?: string }[] = [
       { label: i18n.t('playerBar.musicbrainzArtistLabel', {}, 'Artist'), id: currentSong.musicbrainz_artist_id, entityPath: "artist", name: currentSong.artist },
       // Skip Album Artist when it's the same MusicBrainz entity as Artist (the common case for a
@@ -146,7 +167,7 @@
       IDs, but not IDs themselves — no entity page to link to, so these
       render as plain text rows rather than clickable rows like `musicbrainzRows`. */
   const musicbrainzMetaRows = $derived.by(() => {
-    if (!currentSong) return [];
+    if (!currentSong || isEntitySubject) return [];
     const entries: { label: string; value?: string }[] = [
       {
         label: i18n.t('playerBar.musicbrainzReleaseTypeLabel', {}, 'Type'),
@@ -195,7 +216,13 @@
         name: currentSong.title,
       },
     ];
-    return entries.filter((e): e is typeof entries[number] & { id: string } => !!e.id);
+    // An artist subject links only the artist; an album subject drops the track.
+    const relevant = subject?.kind === "artist"
+      ? entries.slice(0, entries.length - 2)
+      : subject?.kind === "album"
+        ? entries.slice(0, entries.length - 1)
+        : entries;
+    return relevant.filter((e): e is typeof entries[number] & { id: string } => !!e.id);
   });
 
   const listenbrainzLogoUrl = $derived.by(() => {
@@ -224,7 +251,7 @@
   <div class="flex-1 min-h-0 overflow-y-auto px-6 pt-6 pb-6 space-y-6 {currentSong ? 'mb-24' : ''}">
     {#if currentSong}
       <h2 class="text-xs font-bold text-brand-text-secondary uppercase tracking-wider">
-        {i18n.t('playerBar.nowPlayingHeading', {}, 'Now Playing')}
+        {headingLabel}
       </h2>
 
       <div class="space-y-2 text-xs">
@@ -254,20 +281,22 @@
         <button
           type="button"
           onclick={() => setActiveTab("context")}
-          class="flex-1 px-3 py-1.5 rounded-md transition-all {activeTab === 'context' ? 'bg-brand-accent text-brand-accent-contrast shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+          class="flex-1 px-3 py-1.5 rounded-md transition-all {effectiveTab === 'context' ? 'bg-brand-accent text-brand-accent-contrast shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
         >
           {i18n.t('playerBar.tabContextBio', {}, 'Information')}
         </button>
+        {#if !isEntitySubject}
         <button
           type="button"
           onclick={() => setActiveTab("technical")}
-          class="flex-1 px-3 py-1.5 rounded-md transition-all {activeTab === 'technical' ? 'bg-brand-accent text-brand-accent-contrast shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+          class="flex-1 px-3 py-1.5 rounded-md transition-all {effectiveTab === 'technical' ? 'bg-brand-accent text-brand-accent-contrast shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
         >
           {i18n.t('playerBar.tabAudioTechnicals', {}, 'Technical')}
         </button>
+        {/if}
       </div>
 
-      {#if activeTab === "context"}
+      {#if effectiveTab === "context"}
         {#if !prefs.onlineEnabled}
           <p class="text-xs text-brand-text-secondary/60 py-2">{i18n.t('playerBar.contextOffline')}</p>
         {:else if isLoadingContext}
@@ -360,7 +389,7 @@
             </div>
           {/if}
 
-          {#if contextData?.critiquebrainz_rating != null}
+          {#if contextData?.critiquebrainz_rating != null && subject?.kind !== "artist"}
             <div class="space-y-1.5 text-xs">
               {#if currentSong.musicbrainz_release_group_id}
                 <button
@@ -394,7 +423,9 @@
         {/if}
       {:else}
         <div class="space-y-3">
-          <AudioPipelineStages pipeline={playerStore.audioPipeline} class="pb-3 border-b border-brand-border/40" />
+          {#if isPlayingSubject}
+            <AudioPipelineStages pipeline={playerStore.audioPipeline} class="pb-3 border-b border-brand-border/40" />
+          {/if}
           {#if currentSong.dynamic_range != null}
             <div class="flex items-start justify-between gap-3 text-xs">
               <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.dynamicRangeLabel', {}, 'Dynamic Range')}</span>

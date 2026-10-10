@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render } from "@testing-library/svelte";
 import SongTable, { type SongTableRow } from "./SongTable.svelte";
 import { collectionStore } from "../stores/collection.svelte";
+import { inspectorStore } from "../stores/inspector.svelte";
 import type { Song } from "../types";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -152,6 +153,45 @@ describe("SongTable.svelte — Last Played column", () => {
     const { getByText } = renderTable([{ key: "1", song }]);
 
     expect(getByText(expectedDate)).toBeInTheDocument();
+  });
+});
+
+describe("SongTable.svelte — info sidebar selection", () => {
+  const song = (id: number) => ({ id, title: `Song ${id}`, source: "local_file", filetype: "MP3" }) as Song;
+
+  function renderTable(rows: SongTableRow[], selectedKeys: Set<string>) {
+    return render(SongTable, {
+      props: {
+        rows,
+        mode: "track",
+        leadingColumnWidth: "3rem",
+        colDefaults: {},
+        sortField: "title",
+        sortAsc: true,
+        onToggleSort: () => {},
+        onRowDoubleClick: () => {},
+        onRowContextMenu: () => {},
+        onRate: () => {},
+        onEditTags: () => {},
+        selectedKeys,
+      },
+    });
+  }
+
+  beforeEach(() => inspectorStore.clearAll());
+
+  it("reports a single selected song and clears when the table unmounts", () => {
+    const rows = [{ key: "1", song: song(1) }, { key: "2", song: song(2) }];
+    const { unmount } = renderTable(rows, new Set(["2"]));
+    expect(inspectorStore.subject).toMatchObject({ source: "selection", song: { id: 2 } });
+    unmount();
+    expect(inspectorStore.subject).toBeNull();
+  });
+
+  it("reports nothing for a multi-selection", () => {
+    const rows = [{ key: "1", song: song(1) }, { key: "2", song: song(2) }];
+    renderTable(rows, new Set(["1", "2"]));
+    expect(inspectorStore.subject).toBeNull();
   });
 });
 

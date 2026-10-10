@@ -1,10 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
+import { untrack } from "svelte";
 import type { Song } from "../types";
 import { navigationStore } from "./navigation.svelte";
 import { playerStore } from "./player.svelte";
 
 /** What the info sidebar describes. */
-export interface InspectorSubject {
+interface InspectorSubject {
   kind: "song" | "album" | "artist";
   /** Drives the panel's tags and context lookup; for an album/artist, a representative song of it. */
   song: Song;
@@ -92,8 +93,11 @@ class InspectorStore {
    * single subject and should be reported as null.
    */
   setSelection(viewId: string, song: Song | null): void {
-    const rest = this.selections.filter((s) => s.viewId !== viewId);
-    this.selections = song ? [...rest, { viewId, song }] : rest;
+    // Untracked: callers invoke this from effects, which must not subscribe to the list they write.
+    untrack(() => {
+      const rest = this.selections.filter((s) => s.viewId !== viewId);
+      this.selections = song ? [...rest, { viewId, song }] : rest;
+    });
   }
 
   /** Drops every reported selection (test and teardown helper). */
