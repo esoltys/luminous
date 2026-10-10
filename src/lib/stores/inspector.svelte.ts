@@ -31,8 +31,8 @@ class InspectorStore {
   private selections = $state<{ viewId: string; song: Song }[]>([]);
   private resolved = $state<ContextSubject | null>(null);
   private requestId = 0;
-  /** The user asked for Now Playing; holds until they pick something else to look at. */
-  private playingRequested = $state(false);
+  /** What the user explicitly asked to see; holds until they pick something else to look at. */
+  private focus = $state<"playing" | "viewed" | null>(null);
 
   constructor() {
     // Resolving an album/artist to a representative song is async, so it runs
@@ -41,7 +41,7 @@ class InspectorStore {
       $effect(() => {
         const entity = this.viewedEntity;
         // Viewing a different album/artist is picking something else to look at.
-        untrack(() => (this.playingRequested = false));
+        untrack(() => (this.focus = null));
         if (!entity) {
           this.resolved = null;
           return;
@@ -75,26 +75,42 @@ class InspectorStore {
     this.resolved = subject;
   }
 
+  /** The viewed album/artist, once resolved to a song to look it up by. */
+  private get viewedSubject(): InspectorSubject | null {
+    const entity = this.viewedEntity;
+    if (entity && this.resolved?.key === `${entity.kind}:${entity.name}`) return { ...this.resolved, source: "view" };
+    return null;
+  }
+
   get subject(): InspectorSubject | null {
-    const requested = this.playingRequested ? playerStore.currentSong : undefined;
+    const viewed = this.viewedSubject;
+    const requested = this.focus === "playing" ? playerStore.currentSong : undefined;
     if (requested) return { kind: "song", song: requested, source: "playing", key: `song:${requested.id}`, name: requested.artist ?? "" };
+    if (this.focus === "viewed" && viewed) return viewed;
 
     const selected = this.selections.at(-1);
     if (selected) return { kind: "song", song: selected.song, source: "selection", key: `song:${selected.song.id}`, name: selected.song.artist ?? "" };
 
-    const entity = this.viewedEntity;
-    if (entity && this.resolved?.key === `${entity.kind}:${entity.name}`) {
-      return { ...this.resolved, source: "view" };
-    }
+    if (viewed) return viewed;
 
     const playing = playerStore.currentSong;
     if (playing) return { kind: "song", song: playing, source: "playing", key: `song:${playing.id}`, name: playing.artist ?? "" };
     return null;
   }
 
+  /** True while the sidebar describes the album/artist being viewed. */
+  get isShowingViewed(): boolean {
+    return this.subject?.source === "view";
+  }
+
   /** Describes the playing song, over any selection or viewed album/artist, until the user picks something else. */
   showPlaying(): void {
-    this.playingRequested = true;
+    this.focus = "playing";
+  }
+
+  /** Describes the viewed album/artist, over any selection or the playing song, until the user picks something else. */
+  showViewed(): void {
+    this.focus = "viewed";
   }
 
   /**
@@ -107,7 +123,7 @@ class InspectorStore {
     untrack(() => {
       // Tables re-report their current selection; only a different song counts as picking something.
       const previous = this.selections.find((s) => s.viewId === viewId);
-      if (song && previous?.song.id !== song.id) this.playingRequested = false;
+      if (song && previous?.song.id !== song.id) this.focus = null;
       const rest = this.selections.filter((s) => s.viewId !== viewId);
       this.selections = song ? [...rest, { viewId, song }] : rest;
     });
@@ -117,7 +133,7 @@ class InspectorStore {
   clearAll(): void {
     this.selections = [];
     this.resolved = null;
-    this.playingRequested = false;
+    this.focus = null;
   }
 }
 

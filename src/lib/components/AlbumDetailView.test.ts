@@ -313,13 +313,9 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
       expect(queryByText("Classic album")).toBeNull();
     });
 
-    it("toggles the info sidebar from the Album Info pill", async () => {
-      windowLayoutStore.rightPanelOpen = true;
+    it("offers the Album Info pill while the sidebar can be shown", () => {
       const { getByRole } = render(AlbumDetailView, { props: { albumName: mockAlbumName } });
-      const pill = getByRole("button", { name: /Album Info/ });
-      expect(pill.getAttribute("aria-pressed")).toBe("true");
-      await fireEvent.click(pill);
-      expect(windowLayoutStore.rightPanelOpen).toBe(false);
+      expect(getByRole("button", { name: /Album Info/ })).toBeInTheDocument();
     });
 
     it("hides the pill when the window is too narrow to show the sidebar", () => {

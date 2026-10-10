@@ -175,6 +175,23 @@ describe("inspectorStore", () => {
       expect(inspectorStore.subject).toMatchObject({ kind: "album", key: "album:Animals" });
     });
 
+    it("showViewed returns to the viewed album from Now Playing, and a selection ends it", async () => {
+      playerStore.currentSong = song(1);
+      navigationStore.selectedAlbumName = "Dark Side";
+      await settle();
+      expect(inspectorStore.isShowingViewed).toBe(true);
+
+      inspectorStore.showPlaying();
+      expect(inspectorStore.isShowingViewed).toBe(false);
+      inspectorStore.showViewed();
+      expect(inspectorStore.subject).toMatchObject({ kind: "album", source: "view" });
+
+      inspectorStore.setSelection("album-view", song(2));
+      expect(inspectorStore.subject).toMatchObject({ source: "selection" });
+      inspectorStore.showViewed();
+      expect(inspectorStore.subject).toMatchObject({ kind: "album", source: "view" });
+    });
+
     it("is a no-op when nothing is playing", () => {
       inspectorStore.setSelection("songs", song(2));
       inspectorStore.showPlaying();

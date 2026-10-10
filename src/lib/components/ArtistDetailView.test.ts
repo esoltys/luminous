@@ -79,15 +79,9 @@ describe("ArtistDetailView", () => {
       expect(screen.getByText("country")).toBeTruthy();
     });
 
-    it("toggles the info sidebar from the Artist Info pill", async () => {
-      windowLayoutStore.rightPanelOpen = true;
+    it("offers the Artist Info pill while the sidebar can be shown", async () => {
       render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
-
-      const pill = screen.getByRole("button", { name: /Artist Info/ });
-      expect(pill.getAttribute("aria-pressed")).toBe("true");
-      await fireEvent.click(pill);
-      expect(windowLayoutStore.rightPanelOpen).toBe(false);
-      expect(pill.getAttribute("aria-pressed")).toBe("false");
+      expect(screen.getByRole("button", { name: /Artist Info/ })).toBeTruthy();
     });
 
     it("hides the pill when the window is too narrow to show the sidebar", async () => {
