@@ -81,6 +81,8 @@
     toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name }, `Added ${name} to Queue`));
   }
 
+  /** Matches the flyout's `max-h-60` (15rem). */
+  const SUBMENU_MAX_HEIGHT_PX = 240;
   let isSubmenuOpen = $state(false);
   let submenuCloseTimer: ReturnType<typeof setTimeout> | null = null;
   let submenuTriggerEl = $state<HTMLDivElement | null>(null);
@@ -106,7 +108,7 @@
       const rect = submenuTriggerEl.getBoundingClientRect();
       opensLeft = rect.right + 208 + VIEWPORT_EDGE_PADDING_PX > window.innerWidth;
       const dockClearance = playerStore.currentSong ? PLAYER_DOCK_CLEARANCE_PX : 0;
-      opensUp = rect.top + 200 > window.innerHeight - dockClearance - VIEWPORT_EDGE_PADDING_PX;
+      opensUp = rect.top + SUBMENU_MAX_HEIGHT_PX > window.innerHeight - dockClearance - VIEWPORT_EDGE_PADDING_PX;
     }
     isSubmenuOpen = true;
   }
