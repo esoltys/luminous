@@ -43,12 +43,19 @@
      * (#1496): the grid gains columns (extra width) and rows (extra height)
      * while there are covers to put in them and tiles stay at least `minTile`
      * px, and never overflows the box. The grid is aligned to `align` inside it.
-     * Needs a parent that gives this a definite width (e.g. a `flex-1 min-w-0`
-     * cell), since the box is measured, not derived from the tile count.
+     * The component is itself the flex item: it takes the row's spare width but never
+     * less than its own height, so at least one full tile always fits. Needs a flex
+     * row parent, since the box is measured, not derived from the tile count.
      */
     fit?: boolean;
     align?: "start" | "end";
     minTile?: number;
+    /**
+     * Output only (`bind:spareWidth`), `fit` mode: px of the box the grid doesn't
+     * cover, on the side opposite `align` (0 until measured). Lets a neighbour
+     * centre itself in the visible gap rather than against the box's edge.
+     */
+    spareWidth?: number;
   }
 
   let {
@@ -62,6 +69,7 @@
     fit = false,
     align = "start",
     minTile = 40,
+    spareWidth = $bindable(0),
   }: Props = $props();
 
   let hasHero = $derived(!!heroImageUrl);
@@ -144,6 +152,12 @@
   );
   // With no quarter covers (or nothing fitting) the big tile stands alone, as a square.
   let fitSoloEdge = $derived(Math.max(0, Math.min(measuredHeight, measuredBoxWidth)));
+
+  $effect(() => {
+    // Only a fit-mode grid is narrower than its box; every other layout fills it.
+    const gridWidth = !fit || !hasBigTile ? measuredBoxWidth : (fitLayout?.width ?? fitSoloEdge);
+    spareWidth = Math.max(0, measuredBoxWidth - gridWidth);
+  });
 </script>
 
 {#snippet bigTile()}
@@ -172,8 +186,8 @@
 -->
 <div
   bind:this={rootEl}
-  class="{sizeClass} select-none {fit ? `w-full min-w-0 flex items-center ${align === 'end' ? 'justify-end' : 'justify-start'}` : 'shrink-0'}"
-  style={fit ? "" : measuredWidth > 0 ? `width: ${measuredWidth}px;` : `aspect-ratio: ${ratio};`}
+  class="{sizeClass} select-none {fit ? `w-full flex-1 min-w-0 flex items-center ${align === 'end' ? 'justify-end' : 'justify-start'}` : 'shrink-0'}"
+  style={fit ? `min-width: ${measuredHeight}px;` : measuredWidth > 0 ? `width: ${measuredWidth}px;` : `aspect-ratio: ${ratio};`}
 >
   {#if fit && hasBigTile}
     {#if fitLayout}

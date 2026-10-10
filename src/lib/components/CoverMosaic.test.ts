@@ -143,3 +143,39 @@ describe("CoverMosaic.svelte fit mode (#1496)", () => {
     expect(tiles(container).length).toBe(3);
   });
 });
+
+describe("CoverMosaic.svelte spareWidth", () => {
+  // A getter/setter props object is how a test stands in for `bind:spareWidth`.
+  function renderFit(count: number, box: { width: number; height: number }, align: "start" | "end" = "end") {
+    let spare = -1;
+    const spy = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+      ...box, x: 0, y: 0, top: 0, left: 0, right: box.width, bottom: box.height, toJSON: () => ({}),
+    } as DOMRect);
+    const { container } = render(CoverMosaic, {
+      props: {
+        covers: Array.from({ length: count }, (_, i) => cover(i + 1)),
+        fit: true,
+        align,
+        maxCovers: 16,
+        get spareWidth() { return spare; },
+        set spareWidth(v: number) { spare = v; },
+      },
+    });
+    spy.mockRestore();
+    return { container, spare: () => spare };
+  }
+
+  it("reports the box width the grid leaves uncovered", async () => {
+    const { container, spare } = renderFit(3, { width: 800, height: 144 });
+    await Promise.resolve();
+    const grid = container.querySelector(".grid") as HTMLElement;
+    expect(spare()).toBeCloseTo(800 - parseFloat(grid.style.width), 1);
+    expect(spare()).toBeGreaterThan(0);
+  });
+
+  it("is 0 when the grid fills the box", async () => {
+    const { spare } = renderFit(8, { width: 144, height: 144 });
+    await Promise.resolve();
+    expect(spare()).toBe(0);
+  });
+});
