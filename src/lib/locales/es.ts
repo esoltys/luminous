@@ -1604,7 +1604,8 @@ export const es = {
   toast: {
     copyError: "Copiar el error al portapapeles",
     copied: "Copiado al portapapeles",
-    dismiss: "Descartar notificación"
+    dismiss: "Descartar notificación",
+    appUpdated: "Luminous se ha actualizado a la v{version}"
   },
   songTags: {
     groupNamePlaceholder: "p. ej. Premiados",

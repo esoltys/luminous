@@ -22,6 +22,14 @@ const LANGUAGE_TAGS_KEY = "language_tags";
 /** Explicit user-manual language; absent until the user picks one, so it follows the UI language. */
 const MANUAL_LANGUAGE_KEY = "manual_language";
 
+/**
+ * The "Luminous updated to v{version}" toast is raised by the backend at launch, before this
+ * store exists, so the backend reads the UI-language template cached under this key. It is
+ * rewritten whenever the locale is known or changes, which keeps the catalogs the only home of
+ * the text.
+ */
+const UPDATE_NOTIFICATION_KEY = "update_notification_template";
+
 class I18nStore {
   currentLocale = $state<Locale>(BASE_LOCALE);
   private explicitManualLanguage = $state<ManualLanguage | null>(null);
@@ -50,6 +58,7 @@ class I18nStore {
       if (typeof document !== 'undefined') {
         document.documentElement.lang = this.currentLocale;
       }
+      this.cacheUpdateNotificationTemplate();
     }
   }
 
@@ -63,6 +72,13 @@ class I18nStore {
     } catch (e) {
       console.error("Failed to save language settings:", e);
     }
+    this.cacheUpdateNotificationTemplate();
+  }
+
+  /** Fire-and-forget: the backend falls back to English when no template is cached. */
+  private cacheUpdateNotificationTemplate() {
+    const value = this.t("toast.appUpdated", { version: "{version}" });
+    void invoke("set_app_setting", { key: UPDATE_NOTIFICATION_KEY, value }).catch(() => {});
   }
 
   async setManualLanguage(language: ManualLanguage) {

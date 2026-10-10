@@ -77,13 +77,29 @@ pub(crate) fn current_application_user_model_id() -> Option<String> {
     }
 }
 
+/// English text used when the frontend hasn't cached a translated template yet.
+const DEFAULT_UPDATE_TEMPLATE: &str = "Luminous updated to v{version}";
+
+/// Body of the "app updated" toast. `template` is the UI-language string the
+/// frontend last cached (`update_notification_template` in `app_state`), with
+/// `{version}` standing for the version. A missing, blank, or placeholder-less
+/// template yields the English default, so callers never handle a "no
+/// translation" case.
+pub fn update_notification_body(template: Option<&str>, version: &str) -> String {
+    template
+        .filter(|t| t.contains("{version}"))
+        .unwrap_or(DEFAULT_UPDATE_TEMPLATE)
+        .replace("{version}", version)
+}
+
 /// Shows the "Luminous updated to vX.Y.Z" OS notification directly via
 /// `tauri-winrt-notification` (the same crate `tauri-plugin-notification`
 /// uses internally), built with this process's real AUMID rather than the
 /// plugin's hardcoded, MSIX-incompatible one. Fire-and-forget: failures are
-/// logged, never surfaced to the UI.
+/// logged, never surfaced to the UI. `template` is the cached UI-language text
+/// described on [`update_notification_body`].
 #[cfg(target_os = "windows")]
-pub fn show_update_notification(current_version: &str) {
+pub fn show_update_notification(current_version: &str, template: Option<&str>) {
     use tauri_winrt_notification::Toast;
 
     let Some(aumid) = current_application_user_model_id() else {
@@ -95,7 +111,7 @@ pub fn show_update_notification(current_version: &str) {
     };
     log::debug!("Resolved AUMID for update notification: {aumid:?}");
 
-    let body = format!("Luminous updated to v{current_version}");
+    let body = update_notification_body(template, current_version);
     match Toast::new(&aumid).title("Luminous").text1(&body).show() {
         Ok(()) => log::info!("Sent MSIX update notification (updated to v{current_version})"),
         Err(e) => log::warn!("Failed to show update notification: {e:?}"),
@@ -119,6 +135,36 @@ mod tests {
     #[test]
     fn test_does_not_notify_on_first_launch() {
         assert!(!should_notify_update("msix", None, "1.1.0"));
+    }
+
+    #[test]
+    fn test_body_uses_cached_template() {
+        assert_eq!(
+            update_notification_body(
+                Some("Luminous a été mis à jour vers la v{version}"),
+                "1.2.3"
+            ),
+            "Luminous a été mis à jour vers la v1.2.3"
+        );
+    }
+
+    #[test]
+    fn test_body_falls_back_to_english() {
+        let english = "Luminous updated to v1.2.3";
+        assert_eq!(update_notification_body(None, "1.2.3"), english);
+        assert_eq!(update_notification_body(Some(""), "1.2.3"), english);
+        assert_eq!(
+            update_notification_body(Some("no placeholder"), "1.2.3"),
+            english
+        );
+    }
+
+    #[test]
+    fn test_body_replaces_every_placeholder() {
+        assert_eq!(
+            update_notification_body(Some("v{version} / {version}"), "2.0.0"),
+            "v2.0.0 / 2.0.0"
+        );
     }
 
     #[test]

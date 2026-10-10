@@ -1682,7 +1682,8 @@ export const ru = {
   toast: {
     copyError: "Копировать ошибку в буфер обмена",
     copied: "Скопировано в буфер обмена",
-    dismiss: "Закрыть уведомление"
+    dismiss: "Закрыть уведомление",
+    appUpdated: "Luminous обновлён до v{version}"
   },
   songTags: {
     groupNamePlaceholder: "напр. Награждённые",

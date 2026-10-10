@@ -1604,7 +1604,8 @@ export const de = {
   toast: {
     copyError: "Fehler in die Zwischenablage kopieren",
     copied: "In die Zwischenablage kopiert",
-    dismiss: "Benachrichtigung schließen"
+    dismiss: "Benachrichtigung schließen",
+    appUpdated: "Luminous wurde auf v{version} aktualisiert"
   },
   songTags: {
     groupNamePlaceholder: "z. B. Preisgekrönt",
