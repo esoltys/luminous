@@ -48,9 +48,7 @@ describe("ArtistDetailView", () => {
     // Extended-artwork cache is on the singleton store — must not leak
     // between tests (#98/#761).
     collectionStore.extendedArtworkByArtist = {};
-    windowLayoutStore.setOverviewExpanded(true);
-    // The info sidebar owns this context; these tests cover the narrow-window fallback card.
-    windowLayoutStore.rightPanelOpen = false;
+    windowLayoutStore.rightPanelOpen = true;
     contextStore.clearAll();
   });
 
@@ -63,60 +61,41 @@ describe("ArtistDetailView", () => {
     expect(screen.getByTitle("More actions")).toBeTruthy();
   });
 
-  it("renders Profile Card with Tags, Bio, and Links", async () => {
+  it("renders the artist's tags in the header", async () => {
     render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
 
     expect(screen.getByText("country")).toBeTruthy();
     expect(screen.getByText("canadian")).toBeTruthy();
     expect(screen.getByText("pop")).toBeTruthy();
-    expect(await screen.findByText("Canadian music icon")).toBeTruthy();
-    expect(screen.getByText("shaniatwain.com")).toBeTruthy();
-    expect(screen.getByText("Instagram")).toBeTruthy();
   });
 
-  it("does not show blacklisted links (rateyourmusic.com, twitter.com, x.com) in Artist Info", async () => {
-    collectionStore.artistProfiles = {
-      "shania twain": {
-        artist_key: "Shania Twain",
-        website: "https://rateyourmusic.com/artist/shania-twain",
-        tags: ["country"],
-        social_links: [
-          { platform: "other_databases", handle_or_url: "https://rateyourmusic.com/artist/shania-twain" },
-          { platform: "twitter", handle_or_url: "https://twitter.com/shaniatwain" },
-          { platform: "x", handle_or_url: "https://x.com/shaniatwain" },
-          { platform: "instagram", handle_or_url: "@shaniatwain" },
-        ],
-        bio: "Bio",
-      },
-    };
-
-    render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
-
-    expect(await screen.findByText("Instagram")).toBeTruthy();
-    expect(screen.queryByText(/rateyourmusic/i)).toBeNull();
-    expect(screen.queryByText(/twitter/i)).toBeNull();
-    expect(screen.queryByText(/^x$/i)).toBeNull();
-  });
-
-  describe("info placement (#1630)", () => {
-    it("leaves the bio and links to the info sidebar while it is visible", async () => {
-      windowLayoutStore.rightPanelOpen = true;
+  describe("info sidebar toggle (#1630)", () => {
+    it("never renders the bio or links itself, since the info sidebar owns them", async () => {
       render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
       await new Promise((resolve) => setTimeout(resolve, 50));
 
       expect(screen.queryByText("Canadian music icon")).toBeNull();
-      expect(screen.queryByText("Artist Info")).toBeNull();
+      expect(screen.queryByText("shaniatwain.com")).toBeNull();
       expect(screen.getByText("country")).toBeTruthy();
     });
 
-    it("shows them in the view when the sidebar is auto-hidden at a narrow width", async () => {
-      const width = windowLayoutStore.viewportWidth;
+    it("toggles the info sidebar from the Artist Info pill", async () => {
       windowLayoutStore.rightPanelOpen = true;
+      render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
+
+      const pill = screen.getByRole("button", { name: /Artist Info/ });
+      expect(pill.getAttribute("aria-pressed")).toBe("true");
+      await fireEvent.click(pill);
+      expect(windowLayoutStore.rightPanelOpen).toBe(false);
+      expect(pill.getAttribute("aria-pressed")).toBe("false");
+    });
+
+    it("hides the pill when the window is too narrow to show the sidebar", async () => {
+      const width = windowLayoutStore.viewportWidth;
       windowLayoutStore.viewportWidth = 500;
       try {
         render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
-        expect(await screen.findByText("Canadian music icon")).toBeTruthy();
-        expect(screen.getByText("Artist Info")).toBeTruthy();
+        expect(screen.queryByRole("button", { name: /Artist Info/ })).toBeNull();
       } finally {
         windowLayoutStore.viewportWidth = width;
       }
@@ -373,127 +352,10 @@ describe("ArtistDetailView", () => {
       expect(await screen.findByRole("heading", { name: "Shania Twain" })).toBeTruthy();
     });
 
-    it("shows a derived fanart.tv link when a MusicBrainz link with a recognizable MBID is present", async () => {
-      const invokeMock = vi.mocked(invoke);
-      invokeMock.mockImplementation((cmd: string, args?: any) => {
-        if (cmd === "get_songs_by_artist") return Promise.resolve([SONG] as any);
-        if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
-        if (cmd === "get_compilations_by_artist") return Promise.resolve([]);
-        if (cmd === "get_artist_profile") {
-          return Promise.resolve({
-            artist_key: args?.artist || "Shania Twain",
-            website: null,
-            tags: [],
-            social_links: [
-              { platform: "musicbrainz", handle_or_url: "https://musicbrainz.org/artist/7249b899-8db8-43e7-9e6e-22f1e736024e" },
-            ],
-            bio: null,
-          });
-        }
-        return Promise.resolve();
-      });
-      collectionStore.artistProfiles = {
-        "shania twain": {
-          artist_key: "Shania Twain",
-          tags: [],
-          social_links: [
-            { platform: "musicbrainz", handle_or_url: "https://musicbrainz.org/artist/7249b899-8db8-43e7-9e6e-22f1e736024e" },
-          ],
-        },
-      };
-
-      render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
-
-      expect(await screen.findByText("Fanart.tv")).toBeTruthy();
-    });
   });
 
-  describe("biography accordion", () => {
-    const longBio = "Shania Twain is a Canadian singer and songwriter. She has sold over 100 million records, making her the best-selling female artist in country music history and one of the best-selling music artists of all time. Her success garnered her several titles including the Queen of Country Pop.";
-
-    it("renders bio and links in an Artist Info accordion without inline show more buttons", async () => {
-      const invokeMock = vi.mocked(invoke);
-      invokeMock.mockImplementation((cmd: string, args?: any) => {
-        if (cmd === "get_songs_by_artist") return Promise.resolve([SONG] as any);
-        if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
-        if (cmd === "get_compilations_by_artist") return Promise.resolve([]);
-        if (cmd === "get_artist_profile") {
-          return Promise.resolve({
-            artist_key: "Shania Twain",
-            website: "https://www.shaniatwain.com",
-            tags: ["country"],
-            social_links: [],
-            bio: longBio,
-          });
-        }
-        return Promise.resolve();
-      });
-      collectionStore.artistProfiles = {
-        "shania twain": {
-          artist_key: "Shania Twain",
-          website: "https://www.shaniatwain.com",
-          tags: ["country"],
-          social_links: [],
-          bio: longBio,
-        },
-      };
-
-      render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
-      await new Promise((resolve) => setTimeout(resolve, 50));
-
-      expect(screen.getByText("Artist Info")).toBeTruthy();
-      expect(screen.getByText(longBio)).toBeTruthy();
-      expect(screen.queryByRole("button", { name: "Show more" })).toBeNull();
-      expect(screen.queryByRole("button", { name: "Show less" })).toBeNull();
-    });
-
-    it("collapses to a corner button and expands the Artist Info accordion", async () => {
-      const invokeMock = vi.mocked(invoke);
-      invokeMock.mockImplementation((cmd: string, args?: any) => {
-        if (cmd === "get_songs_by_artist") return Promise.resolve([SONG] as any);
-        if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
-        if (cmd === "get_compilations_by_artist") return Promise.resolve([]);
-        if (cmd === "get_artist_profile") {
-          return Promise.resolve({
-            artist_key: "Shania Twain",
-            website: "https://www.shaniatwain.com",
-            tags: ["country"],
-            social_links: [],
-            bio: longBio,
-          });
-        }
-        return Promise.resolve();
-      });
-      collectionStore.artistProfiles = {
-        "shania twain": {
-          artist_key: "Shania Twain",
-          website: "https://www.shaniatwain.com",
-          tags: ["country"],
-          social_links: [],
-          bio: longBio,
-        },
-      };
-
-      render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
-      await new Promise((resolve) => setTimeout(resolve, 50));
-
-      const overviewHeader = screen.getByText("Artist Info");
-      const detailsEl = overviewHeader.closest("details");
-      expect(detailsEl).toBeTruthy();
-      expect(detailsEl?.hasAttribute("open")).toBe(true);
-
-      // Closing the accordion updates the global layout store and swaps
-      // the inline accordion for a floating corner-tuck button
-      windowLayoutStore.setOverviewExpanded(false);
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      expect(windowLayoutStore.isOverviewExpanded).toBe(false);
-      expect(screen.queryByRole("button", { name: /Artist Info/ })).toBeTruthy();
-    });
-
-
-  });
-
-    it("hides tags and bio/profile section while keeping action buttons visible when detail header is collapsed", async () => {
+  describe("collapsed header and enrichment", () => {
+    it("hides the tags while keeping action buttons visible when detail header is collapsed", async () => {
       const originalHeight = windowLayoutStore.viewportHeight;
       try {
         // Set viewportHeight to less than HEIGHT_BREAKPOINT_SHORT_PX (600)
@@ -750,4 +612,5 @@ describe("ArtistDetailView", () => {
         prefs.artistReleasesViewMode = "cards";
       }
     });
+  });
 });

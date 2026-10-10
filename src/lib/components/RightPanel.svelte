@@ -15,7 +15,6 @@
   import { lyricsStatus } from "../utils/lyrics";
   import { openExternalUrl } from "../utils/openExternalUrl";
   import GenreChips from "./GenreChips.svelte";
-  import CommunityRating from "./CommunityRating.svelte";
   import AudioPipelineStages from "./AudioPipelineStages.svelte";
   import InfoSections from "./InfoSections.svelte";
   import { contextStore } from "../stores/context.svelte";

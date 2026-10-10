@@ -14,11 +14,9 @@
     view: ContextView;
     /** Wording of the empty state: an album/artist has no single track. */
     entity?: boolean;
-    /** Skip the CritiqueBrainz block when the host already shows the rating (e.g. in its title). */
-    hideRating?: boolean;
   }
 
-  let { view, entity = false, hideRating = false }: Props = $props();
+  let { view, entity = false }: Props = $props();
 
   let sections = $derived(view.sections);
 </script>
@@ -118,7 +116,7 @@
           {/each}
         </div>
       {/if}
-      {#if section.critiquebrainz && !hideRating}
+      {#if section.critiquebrainz}
         {@const cb = section.critiquebrainz}
         <div class="space-y-1.5">
           {#if cb.releaseGroupMbid}
@@ -134,7 +132,7 @@
             <img src="/critiquebrainz-logo.svg" alt={i18n.t('playerBar.critiquebrainzSectionLabel', {}, 'CritiqueBrainz')} class="h-5 w-auto opacity-80" />
           {/if}
           <div class="text-brand-text-secondary">
-            <CommunityRating rating={cb.rating} count={cb.count} releaseGroupMbid={cb.releaseGroupMbid} />
+            <CommunityRating rating={cb.rating} count={cb.count} />
           </div>
         </div>
       {/if}

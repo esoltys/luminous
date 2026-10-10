@@ -44,11 +44,10 @@
     ArrowSquareOutIcon as ExternalLink,
     ChartBarIcon as BarChart2,
     ShareNetworkIcon as Share,
-    ArrowDownLeftIcon as ArrowDownLeft
   } from "phosphor-svelte";
   import ShareModal from "./ShareModal.svelte";
   import AlbumProfileEditor from "./AlbumProfileEditor.svelte";
-  import EntityInfoCard from "./EntityInfoCard.svelte";
+  import InfoSidebarToggle from "./InfoSidebarToggle.svelte";
   import { contextStore, entitySubject } from "../stores/context.svelte";
   import type { Song, AlbumItem, PlayContext } from "../types";
   import { getCoverArtUrl, resolveArtUrl } from "../types";
@@ -112,12 +111,11 @@
   let hasReleaseGroupMbid = $derived(releaseGroupMbid.length > 0);
 
   // Everything fetched about the album (description, links, ratings) lives in contextStore and shows in
-  // the info sidebar; this view only renders it, as a card, while the sidebar is hidden.
+  // the info sidebar; this view only needs its rating and offers the toggle.
   let infoSubject = $derived(entitySubject("album", albumName, songs));
   const info = contextStore.for(() => infoSubject);
   /** CritiqueBrainz or MusicBrainz community rating for the album's release group. */
   let communityRating = $derived(hasReleaseGroupMbid ? info.communityRating : null);
-  let showInfoCard = $derived(!windowLayoutStore.isInfoSidebarVisible && info.sections.length > 0);
 
   /** fanart.tv cover and disc art (#1277). New disc art re-scans the cover
    * stack so it's counted. Failures only warn: art is a bonus on top of
@@ -696,29 +694,15 @@
             <span>{genreLabel}</span>
           </div>
         {/if}
-        {#if !showInfoCard && communityRating}
-          <div class="inline-flex items-center px-3 py-1 rounded-full border border-brand-border bg-brand-sidebar text-xs font-medium text-brand-text-secondary shrink-0 ml-auto">
-            <CommunityRating rating={communityRating.rating} count={communityRating.count} {releaseGroupMbid} source={communityRating.source} />
-          </div>
-        {/if}
-        {#if showInfoCard && !windowLayoutStore.isOverviewExpanded}
-          <button
-            type="button"
-            onclick={() => windowLayoutStore.setOverviewExpanded(true)}
-            class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-brand-border bg-brand-sidebar text-brand-text-secondary text-xs font-medium hover:text-brand-text-primary hover:border-brand-accent/40 transition-colors cursor-pointer shrink-0 ml-auto"
-          >
-            <ArrowDownLeft class="w-3.5 h-3.5" />
-            {@render albumInfoTitle()}
-          </button>
-        {/if}
+        <div class="flex flex-wrap items-center gap-3 ml-auto">
+          {#if communityRating}
+            <div class="inline-flex items-center px-3 py-1 rounded-full border border-brand-border bg-brand-sidebar text-xs font-medium text-brand-text-secondary shrink-0">
+              <CommunityRating rating={communityRating.rating} count={communityRating.count} />
+            </div>
+          {/if}
+          <InfoSidebarToggle label={i18n.t('albumDetail.albumInfo', {}, 'Album Info')} />
+        </div>
       </div>
-    {/if}
-
-    <!-- Album Profile Card (Liner Notes & Release Links) -->
-    {#if showInfoCard && !windowLayoutStore.isDetailHeaderCollapsed && windowLayoutStore.isOverviewExpanded}
-      <EntityInfoCard view={info} hideRating={!!communityRating}>
-        {#snippet title()}{@render albumInfoTitle()}{/snippet}
-      </EntityInfoCard>
     {/if}
 
     <div class="border border-brand-border rounded-lg bg-brand-sidebar/50 backdrop-blur-xl shadow-2xl overflow-hidden table-surface-blur">
@@ -783,14 +767,6 @@
     onClose={() => { contextMenuState = null; }}
   />
 {/if}
-
-{#snippet albumInfoTitle()}
-  {#if communityRating}
-    <CommunityRating rating={communityRating.rating} count={communityRating.count} {releaseGroupMbid} source={communityRating.source} />
-  {:else}
-    <span>{i18n.t('albumDetail.albumInfo', {}, 'Album Info')}</span>
-  {/if}
-{/snippet}
 
 {#if overflowMenuPos}
   <ContextMenu

@@ -112,6 +112,23 @@ describe("contextStore", () => {
     expect(links && links.id === "links" && links.items.map((i) => i.platform)).toEqual(["fanart_tv", "musicbrainz"]);
   });
 
+  it("filters blacklisted links out of an album's links and leads with the official site", async () => {
+    collectionStore.albumProfiles = {
+      "dark side": {
+        album_key: "dark side",
+        website: "https://thebeatles.com",
+        links: [
+          { platform: "other_databases", handle_or_url: "https://rateyourmusic.com/release/album/x/y/" },
+          { platform: "x", handle_or_url: "https://x.com/thebeatles" },
+          { platform: "allmusic", handle_or_url: "https://www.allmusic.com/album/mw0000192938" },
+        ],
+      },
+    } as never;
+    const view = await mount(() => album());
+    const links = view.sections.find((s) => s.id === "links");
+    expect(links && links.id === "links" && links.items.map((i) => i.label)).toEqual(["thebeatles.com", "AllMusic"]);
+  });
+
   it("hides CritiqueBrainz for an artist but exposes the rating for an album", async () => {
     context = ctx({ critiquebrainz_rating: 4.2, critiquebrainz_review_count: 7 });
     const withRg = song(1, { musicbrainz_release_group_id: MBID });

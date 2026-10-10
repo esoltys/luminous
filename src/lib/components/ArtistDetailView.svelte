@@ -41,11 +41,10 @@
     PushPinSlashIcon as PinOff,
     DotsThreeIcon as MoreHorizontal,
     ChartBarIcon as BarChart2,
-    ArrowDownLeftIcon as ArrowDownLeft,
     ShareNetworkIcon as Share,
     ImageIcon as RetrieveImage
   } from "phosphor-svelte";
-  import EntityInfoCard from "./EntityInfoCard.svelte";
+  import InfoSidebarToggle from "./InfoSidebarToggle.svelte";
   import { contextStore, entitySubject } from "../stores/context.svelte";
   import ShareModal from "./ShareModal.svelte";
   import type { Song, Playlist, AlbumItem, PlayContext, ArtistProfile, ExtendedArtworkResponse } from "../types";
@@ -116,12 +115,9 @@
   );
 
   // Everything fetched about the artist (facts, bio, events, links) lives in contextStore and shows
-  // in the info sidebar; this view only renders it, as a card, while the sidebar is hidden.
+  // in the info sidebar; this view only keeps it fresh and offers the toggle.
   let infoSubject = $derived(entitySubject("artist", artistName, songs));
   const info = contextStore.for(() => infoSubject);
-  let showInfoCard = $derived(
-    !windowLayoutStore.isInfoSidebarVisible && (info.sections.length > 0 || info.loading)
-  );
 
   // Locally-discovered artist visuals (#98/#761) — portrait/logo/fanart,
   // fetched on demand per artist since scanning every artist's folder
@@ -723,34 +719,19 @@
 
   <div class="px-6 pt-6 flex flex-col gap-8">
     {#if !windowLayoutStore.isDetailHeaderCollapsed}
-      {#if hasChips || (showInfoCard && !windowLayoutStore.isOverviewExpanded)}
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          {#if hasChips}
-            <GenreChips
-              curatedTags={artistOnlyTags}
-              onCuratedTagClick={handleTagClick}
-              curatedTagTitle={(tag) => `Filter artists tagged "${tag}"`}
-              variant="full"
-            />
-          {/if}
-          {#if showInfoCard && !windowLayoutStore.isOverviewExpanded}
-            <button
-              type="button"
-              onclick={() => windowLayoutStore.setOverviewExpanded(true)}
-              class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-brand-border bg-brand-sidebar text-brand-text-secondary text-xs font-medium hover:text-brand-text-primary hover:border-brand-accent/40 transition-colors cursor-pointer shrink-0 ml-auto"
-            >
-              <ArrowDownLeft class="w-3.5 h-3.5" />
-              <span>{i18n.t('artistDetail.artistInfo', {}, 'Artist Info')}</span>
-            </button>
-          {/if}
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        {#if hasChips}
+          <GenreChips
+            curatedTags={artistOnlyTags}
+            onCuratedTagClick={handleTagClick}
+            curatedTagTitle={(tag) => `Filter artists tagged "${tag}"`}
+            variant="full"
+          />
+        {/if}
+        <div class="ml-auto">
+          <InfoSidebarToggle label={i18n.t('artistDetail.artistInfo', {}, 'Artist Info')} />
         </div>
-      {/if}
-    {/if}
-
-    {#if showInfoCard && !windowLayoutStore.isDetailHeaderCollapsed && windowLayoutStore.isOverviewExpanded}
-      <EntityInfoCard view={info}>
-        {#snippet title()}<span>{i18n.t('artistDetail.artistInfo', {}, 'Artist Info')}</span>{/snippet}
-      </EntityInfoCard>
+      </div>
     {/if}
 
     {#if sets.length > 0}
