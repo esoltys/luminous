@@ -1,16 +1,6 @@
 <script lang="ts">
-  import {
-    HeartIcon as Heart,
-    ClockIcon as Clock,
-    HourglassIcon as Hourglass,
-    CalendarIcon as Calendar,
-    MusicNotesIcon as Music,
-    GaugeIcon as Gauge,
-    TagIcon as Tag,
-    TrendUpIcon as TrendingUp,
-    WarningIcon as AlertTriangle,
-    SunHorizonIcon as SunHorizon
-  } from "phosphor-svelte";
+  import PlaylistKindIcon from "./PlaylistKindIcon.svelte";
+  import { getPlaylistCardTheme } from "../utils/playlistCardTheme";
   import { i18n } from "../stores/i18n.svelte";
   import { formatRelativeDate } from "../utils/date";
   import { playlistsStore } from "../stores/playlists.svelte";
@@ -77,51 +67,9 @@
   class="group flex items-center gap-3 px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 select-none"
 >
   <div
-    class="relative shrink-0 w-11 h-11 flex items-center justify-center overflow-hidden border {kind === 'decade'
-      ? 'bg-[#38BDF8]/15 border-[#38BDF8]/30'
-      : kind === 'genre'
-        ? 'bg-[#34D399]/15 border-[#34D399]/30'
-        : kind === 'artist_tag'
-          ? 'bg-[#FB923C]/15 border-[#FB923C]/30'
-          : kind === 'bpm'
-            ? 'bg-[#E879F9]/15 border-[#E879F9]/30'
-            : kind === 'favourites'
-              ? 'bg-[#F43F5E]/15 border-[#F43F5E]/30'
-              : kind === 'most_played'
-                ? 'bg-[#DC2626]/15 border-[#DC2626]/30'
-                : kind === 'history'
-                  ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/30'
-                  : kind === 'missing_metadata'
-                    ? 'bg-amber-500/15 border-amber-500/30'
-                    : kind === 'missing_musicbrainz'
-                      ? 'bg-indigo-500/15 border-indigo-500/30'
-                      : kind === 'daypart'
-                        ? 'bg-[#2DD4BF]/15 border-[#2DD4BF]/30'
-                        : 'bg-[#FACC15]/15 border-[#FACC15]/30'}"
+    class="relative shrink-0 w-11 h-11 flex items-center justify-center overflow-hidden border {getPlaylistCardTheme(kind).tintClass}"
   >
-    {#if kind === "favourites"}
-      <Heart class="w-5 h-5 text-[#F43F5E] fill-current" />
-    {:else if kind === "recently_added"}
-      <Clock class="w-5 h-5 text-[#CA8A04]" />
-    {:else if kind === "most_played"}
-      <TrendingUp class="w-5 h-5 text-[#DC2626]" />
-    {:else if kind === "history"}
-      <Hourglass class="w-5 h-5 text-[#8B5CF6]" />
-    {:else if kind === "decade"}
-      <Calendar class="w-5 h-5 text-[#38BDF8]" />
-    {:else if kind === "artist_tag"}
-      <Tag class="w-5 h-5 text-[#FB923C]" />
-    {:else if kind === "bpm"}
-      <Gauge class="w-5 h-5 text-[#E879F9]" />
-    {:else if kind === "missing_metadata"}
-      <AlertTriangle class="w-5 h-5 text-amber-500" />
-    {:else if kind === "missing_musicbrainz"}
-      <img src="/picard-icon.png" alt="Picard" class="w-5 h-5 object-contain" />
-    {:else if kind === "daypart"}
-      <SunHorizon class="w-5 h-5 text-[#2DD4BF]" />
-    {:else}
-      <Music class="w-5 h-5 text-[#34D399]" />
-    {/if}
+    <PlaylistKindIcon {kind} sizeClass="w-5 h-5" />
   </div>
 
   <div class="min-w-0 flex-1">

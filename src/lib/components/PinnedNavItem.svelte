@@ -126,7 +126,8 @@
         <IconComponent class={collapsed ? "w-4 h-4 text-brand-text-secondary" : "w-3.5 h-3.5 text-brand-text-secondary"} />
       {/if}
     {:else}
-      <IconComponent class={collapsed ? "w-4 h-4 text-brand-accent-text" : "w-3.5 h-3.5 text-brand-accent-text"} />
+      {@const iconColor = pin.iconColorClass ?? "text-brand-accent-text"}
+      <IconComponent class="{collapsed ? 'w-4 h-4' : 'w-3.5 h-3.5'} {iconColor} {pin.autoPlaylist?.kind === 'favourites' ? 'fill-current' : ''}" />
     {/if}
   </div>
 

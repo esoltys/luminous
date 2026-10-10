@@ -1,0 +1,23 @@
+import { describe, it, expect } from "vitest";
+import { getPlaylistCardTheme, type PlaylistCardThemeKind } from "./playlistCardTheme";
+
+const KINDS: PlaylistCardThemeKind[] = [
+  "queue", "genre", "decade", "smart", "bpm", "artist_tag", "favourites", "recently_added",
+  "most_played", "history", "missing_metadata", "missing_musicbrainz", "daypart",
+];
+
+describe("playlistCardTheme", () => {
+  it("gives every kind an icon, tint and colours", () => {
+    for (const kind of KINDS) {
+      const t = getPlaylistCardTheme(kind);
+      expect(t.icon, kind).toBeTruthy();
+      expect(t.tintClass, kind).toContain("bg-");
+      expect(t.iconColorClass, kind).toContain("text-");
+    }
+  });
+
+  it("uses the Tag icon for genre and the brand indigo for Moment Mix", () => {
+    expect(getPlaylistCardTheme("genre").icon).toBe(getPlaylistCardTheme("artist_tag").icon);
+    expect(getPlaylistCardTheme("daypart").iconColorClass).toBe("text-[#4F5BD5]");
+  });
+});

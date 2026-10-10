@@ -709,7 +709,7 @@
             <CoverMosaic covers={topCovers} sizeClass="h-full" />
           </div>
         {:else if kind === "daypart" && topCovers.length > 0}
-          <div class="h-full p-3.5 bg-brand-main bg-gradient-to-br from-[#0D9488]/25 to-[#2DD4BF]/15 border-[#2DD4BF]/30 shadow-[0_0_28px_3px_rgba(45,212,191,0.4)] flex items-center justify-center overflow-hidden border relative">
+          <div class="h-full p-3.5 bg-brand-main bg-gradient-to-br from-[#3A45B0]/25 to-[#626FE8]/15 border-[#626FE8]/30 shadow-[0_0_28px_3px_rgba(98,111,232,0.4)] flex items-center justify-center overflow-hidden border relative">
             <CoverMosaic covers={topCovers} sizeClass="h-full" />
           </div>
         {:else if kind === "no_genre" && topCovers.length > 0}
@@ -777,8 +777,8 @@
             <img src="/picard-icon.png" alt="Picard" class="w-16 h-16 object-contain" />
           </div>
         {:else if kind === "daypart"}
-          <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#0D9488]/25 to-[#2DD4BF]/15 flex items-center justify-center overflow-hidden border border-[#2DD4BF]/30 shadow-[0_0_28px_3px_rgba(45,212,191,0.4)]">
-            <SunHorizon class="w-16 h-16 text-[#2DD4BF]" />
+          <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#3A45B0]/25 to-[#626FE8]/15 flex items-center justify-center overflow-hidden border border-[#626FE8]/30 shadow-[0_0_28px_3px_rgba(98,111,232,0.4)]">
+            <SunHorizon class="w-16 h-16 text-[#4F5BD5]" />
           </div>
         {:else}
           <div
@@ -787,7 +787,7 @@
               ? `background-image: linear-gradient(to bottom right, color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 25%, transparent), color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 15%, transparent)); border-color: color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 30%, transparent); box-shadow: 0 0 28px 3px color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 40%, transparent);`
               : "background-image: linear-gradient(to bottom right, rgb(5 150 105 / 0.25), rgb(52 211 153 / 0.15)); border-color: rgb(52 211 153 / 0.3); box-shadow: 0 0 28px 3px rgb(52 211 153 / 0.4);"}
           >
-            <Music class="w-16 h-16" style={genreColorIndex !== undefined ? `color: ${genreColorHsl(genreColorIndex)}` : "color: #34D399"} />
+            <Tag class="w-16 h-16" style={genreColorIndex !== undefined ? `color: ${genreColorHsl(genreColorIndex)}` : "color: #34D399"} />
           </div>
         {/if}
       </div>
