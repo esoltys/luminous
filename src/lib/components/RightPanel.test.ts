@@ -53,6 +53,18 @@ describe("RightPanel.svelte", () => {
     inspectorStore.clearAll();
   });
 
+  it("renders a close button that calls onClose", async () => {
+    const onClose = vi.fn();
+    const { getByRole } = render(RightPanel, { props: { onClose } });
+    await fireEvent.click(getByRole("button", { name: /close/i }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("omits the close button when no onClose is provided", () => {
+    const { queryByRole } = render(RightPanel);
+    expect(queryByRole("button", { name: /close/i })).toBeNull();
+  });
+
   it("renders 'Not Playing' when no current song", () => {
     const { getByText } = render(RightPanel);
     expect(getByText(/nothing playing/i)).toBeInTheDocument();
