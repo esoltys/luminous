@@ -2,7 +2,6 @@
   import { playerStore } from "../stores/player.svelte";
   import { navigationStore, type SettingsTab } from "../stores/navigation.svelte";
   import { i18n } from "../stores/i18n.svelte";
-  import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { rememberScroll } from "../utils/scrollMemory";
   import SettingsGeneral from "./SettingsGeneral.svelte";
@@ -14,7 +13,6 @@
   import Equalizer from "./Equalizer.svelte";
 
   let settingsTab = $state<SettingsTab>(navigationStore.settingsSubTab || "general");
-  let isTabInitialized = $state(false);
 
   const TABS: { value: SettingsTab; label: () => string }[] = [
     { value: "general", label: () => i18n.t('settings.tabGeneral') },
@@ -26,10 +24,6 @@
     { value: "about", label: () => i18n.t('settings.tabAbout') }
   ];
 
-  onMount(() => {
-    isTabInitialized = true;
-  });
-
   $effect(() => {
     if (navigationStore.settingsSubTab && settingsTab !== navigationStore.settingsSubTab) {
       settingsTab = navigationStore.settingsSubTab;
@@ -37,9 +31,7 @@
   });
 
   $effect(() => {
-    if (isTabInitialized) {
-      invoke("set_app_setting", { key: "active_settings_tab", value: settingsTab });
-    }
+    invoke("set_app_setting", { key: "active_settings_tab", value: settingsTab });
   });
 </script>
 

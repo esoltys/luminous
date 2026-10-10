@@ -3,8 +3,8 @@ import { playlistsStore } from "./playlists.svelte";
 
 export type ActiveTab = "home" | "collection" | "playlists" | "settings" | "lyrics" | "stats" | "organize" | "help";
 export type ActiveSubTab = "songs" | "albums" | "artists" | "genres";
-export type SettingsTab = "general" | "system" | "sources" | "integrations" | "themes" | "equalizer" | "about";
-const SETTINGS_TABS: readonly SettingsTab[] = ["general", "system", "sources", "integrations", "themes", "equalizer", "about"];
+const SETTINGS_TABS = ["general", "system", "sources", "integrations", "themes", "equalizer", "about"] as const;
+export type SettingsTab = (typeof SETTINGS_TABS)[number];
 
 /** Which grid is shown under the Playlists tab (mirrors `ActiveSubTab` for Collection). */
 type PlaylistsSubTab = "auto" | "custom";
@@ -104,7 +104,7 @@ class NavigationStore {
    */
   restoreSettingsSubTab(saved: string | undefined) {
     if (saved === "folders") saved = "sources";
-    if (SETTINGS_TABS.includes(saved as SettingsTab)) {
+    if ((SETTINGS_TABS as readonly string[]).includes(saved as string)) {
       this.settingsSubTab = saved as SettingsTab;
     }
   }
