@@ -9,7 +9,7 @@
     x: number;
     y: number;
     onClose: () => void;
-    /** Approximate rendered height of the menu, used to clamp it inside the viewport. */
+    /** First-paint height hint; replaced by the measured height once rendered. */
     estimatedHeight?: number;
     children: Snippet;
   }
@@ -17,6 +17,8 @@
   let { x, y, onClose, estimatedHeight = 200, children }: Props = $props();
 
   let menuEl = $state<HTMLDivElement | null>(null);
+  // Real rendered height (0 until first layout), so the clamp never depends on a guess.
+  let measuredHeight = $state(0);
 
   // Keep menu inside viewport boundaries
   let adjustedX = $derived.by(() => {
@@ -26,11 +28,13 @@
 
   let adjustedY = $derived.by(() => {
     if (typeof window === "undefined") return y;
-    const menuHeight = estimatedHeight;
+    const menuHeight = measuredHeight || estimatedHeight;
     // Clamp above the floating PlayerBar dock so the menu's lower items
     // aren't hidden underneath it.
     const dockClearance = playerStore.currentSong ? PLAYER_DOCK_CLEARANCE_PX : 0;
-    return Math.min(y, window.innerHeight - menuHeight - dockClearance - VIEWPORT_EDGE_PADDING_PX);
+    const maxY = window.innerHeight - menuHeight - dockClearance - VIEWPORT_EDGE_PADDING_PX;
+    // Never push the top edge off-screen when the menu is taller than the window.
+    return Math.max(VIEWPORT_EDGE_PADDING_PX, Math.min(y, maxY));
   });
 
   function handleWindowClick(e: MouseEvent) {
@@ -58,6 +62,7 @@
 <div
   use:portal
   bind:this={menuEl}
+  bind:offsetHeight={measuredHeight}
   style="left: {adjustedX}px; top: {adjustedY}px;"
   class="fixed z-50 w-52 bg-brand-sidebar border border-brand-border/80 rounded-xl shadow-2xl py-1.5 text-xs text-brand-text-primary backdrop-blur-xl select-none"
   role="menu"
