@@ -11,6 +11,8 @@
   import { autoPlaylistRefKeyFor } from "../types";
   import { songsToCoverStack } from "../utils/covers";
   import CoverMosaic from "./CoverMosaic.svelte";
+  import PlaylistKindIcon from "./PlaylistKindIcon.svelte";
+  import { getPlaylistCardTheme } from "../utils/playlistCardTheme";
   import TagEditor from "./TagEditor.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
   import EmptyState from "./EmptyState.svelte";
@@ -28,27 +30,19 @@
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
   import ShareModal from "./ShareModal.svelte";
   import {
-    ClockIcon as Clock,
     PlusIcon as Plus,
     FolderPlusIcon as FolderPlus,
     MusicNotesIcon as Music,
-    GaugeIcon as Gauge,
     ArrowsClockwiseIcon as RefreshCw,
-    HeartIcon as Heart,
-    CalendarIcon as Calendar,
-    HourglassIcon as Hourglass,
     ArrowCounterClockwiseIcon as RotateCcw,
     ArrowClockwiseIcon as RotateCw,
     DotsThreeIcon as MoreHorizontal,
     XIcon as X,
     EraserIcon as Eraser,
     TagIcon as Tag,
-    TrendUpIcon as TrendingUp,
     PushPinIcon as Pin,
     PushPinSlashIcon as PinOff,
-    WarningIcon as AlertTriangle,
     ArrowSquareOutIcon as OpenInPicard,
-    SunHorizonIcon as SunHorizon,
     ShareNetworkIcon as Share
   } from "phosphor-svelte";
   import { shuffleArray } from "../utils/shuffle";
@@ -206,6 +200,8 @@
   // Whether the header badge shows the cover mosaic (auto width, via
   // CoverMosaic's own aspect-ratio) instead of a fixed-square icon badge.
   let hasCoverMosaic = $derived(topCovers.length > 0);
+  // Every kind except genre (per-genre hue) and no_genre (neutral) takes its frame from the shared theme.
+  let heroTheme = $derived(kind === "genre" || kind === "no_genre" ? null : getPlaylistCardTheme(kind));
 
   /** Genre auto-playlist header color (#548): follows the curated tag's own
    * color — a chip's playlist uses its parent card's color — instead of the
@@ -696,98 +692,34 @@
             class="h-full p-3.5 bg-brand-main flex items-center justify-center overflow-hidden border relative"
             style={genreColorIndex !== undefined
               ? `background-image: linear-gradient(to bottom right, color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 25%, transparent), color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 15%, transparent)); border-color: color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 30%, transparent); box-shadow: 0 0 28px 3px color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 40%, transparent);`
-              : "background-image: linear-gradient(to bottom right, rgb(5 150 105 / 0.25), rgb(52 211 153 / 0.15)); border-color: rgb(52 211 153 / 0.3); box-shadow: 0 0 28px 3px rgb(52 211 153 / 0.4);"}
+              : "background-image: linear-gradient(to bottom right, rgb(22 163 74 / 0.25), rgb(74 222 128 / 0.15)); border-color: rgb(74 222 128 / 0.3); box-shadow: 0 0 28px 3px rgb(74 222 128 / 0.4);"}
           >
-            <CoverMosaic covers={topCovers} sizeClass="h-full" />
-          </div>
-        {:else if kind === "artist_tag" && topCovers.length > 0}
-          <div class="h-full p-3.5 bg-brand-main bg-gradient-to-br from-[#EA580C]/25 to-[#FB923C]/15 border-[#FB923C]/30 shadow-[0_0_28px_3px_rgba(251,146,60,0.4)] flex items-center justify-center overflow-hidden border relative">
-            <CoverMosaic covers={topCovers} sizeClass="h-full" />
-          </div>
-        {:else if (kind === "decade" || kind === "bpm") && topCovers.length > 0}
-          <div class="h-full p-3.5 bg-brand-main bg-gradient-to-br {kind === 'decade' ? 'from-[#2563EB]/25 to-[#38BDF8]/15 border-[#38BDF8]/30 shadow-[0_0_28px_3px_rgba(56,189,248,0.4)]' : 'from-[#C026D3]/25 to-[#E879F9]/15 border-[#E879F9]/30 shadow-[0_0_28px_3px_rgba(232,121,249,0.4)]'} flex items-center justify-center overflow-hidden border relative">
-            <CoverMosaic covers={topCovers} sizeClass="h-full" />
-          </div>
-        {:else if kind === "daypart" && topCovers.length > 0}
-          <div class="h-full p-3.5 bg-brand-main bg-gradient-to-br from-[#0D9488]/25 to-[#2DD4BF]/15 border-[#2DD4BF]/30 shadow-[0_0_28px_3px_rgba(45,212,191,0.4)] flex items-center justify-center overflow-hidden border relative">
             <CoverMosaic covers={topCovers} sizeClass="h-full" />
           </div>
         {:else if kind === "no_genre" && topCovers.length > 0}
           <div class="h-full p-3.5 bg-brand-main bg-gradient-to-br from-slate-700/40 to-slate-900/30 flex items-center justify-center overflow-hidden border border-slate-400/20 shadow-[0_0_28px_3px_rgba(100,116,139,0.3)] relative">
             <CoverMosaic covers={topCovers} sizeClass="h-full" />
           </div>
-        {:else if kind === "favourites" && topCovers.length > 0}
-          <div class="h-full p-3.5 bg-brand-main bg-gradient-to-br from-[#DB2777]/25 to-[#F43F5E]/15 flex items-center justify-center overflow-hidden border border-[#F43F5E]/30 shadow-[0_0_28px_3px_rgba(244,63,94,0.4)] relative">
+        {:else if heroTheme && topCovers.length > 0}
+          <div class="h-full p-3.5 bg-brand-main bg-gradient-to-br {heroTheme.gradientClass} flex items-center justify-center overflow-hidden border relative">
             <CoverMosaic covers={topCovers} sizeClass="h-full" />
-          </div>
-        {:else if kind === "recently_added" && topCovers.length > 0}
-          <div class="h-full p-3.5 bg-brand-main bg-gradient-to-br from-[#CA8A04]/25 to-[#FACC15]/15 flex items-center justify-center overflow-hidden border border-[#FACC15]/30 shadow-[0_0_28px_3px_rgba(250,204,21,0.4)] relative">
-            <CoverMosaic covers={topCovers} sizeClass="h-full" />
-          </div>
-        {:else if kind === "most_played" && topCovers.length > 0}
-          <div class="h-full p-3.5 bg-brand-main bg-gradient-to-br from-[#DC2626]/25 to-[#F87171]/15 flex items-center justify-center overflow-hidden border border-[#F87171]/30 shadow-[0_0_28px_3px_rgba(248,113,113,0.4)] relative">
-            <CoverMosaic covers={topCovers} sizeClass="h-full" />
-          </div>
-        {:else if kind === "history" && topCovers.length > 0}
-          <div class="h-full p-3.5 bg-brand-main bg-gradient-to-br from-[#8B5CF6]/25 to-[#A78BFA]/15 flex items-center justify-center overflow-hidden border border-[#A78BFA]/30 shadow-[0_0_28px_3px_rgba(167,139,250,0.4)] relative">
-            <CoverMosaic covers={topCovers} sizeClass="h-full" />
-          </div>
-        {:else if kind === "missing_musicbrainz" && topCovers.length > 0}
-          <div class="h-full p-3.5 bg-brand-main bg-gradient-to-br from-indigo-600/25 to-indigo-400/15 flex items-center justify-center overflow-hidden border border-indigo-400/30 shadow-[0_0_28px_3px_rgba(99,102,241,0.4)] relative">
-            <CoverMosaic covers={topCovers} sizeClass="h-full" />
-          </div>
-        {:else if kind === "favourites"}
-          <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#DB2777]/25 to-[#F43F5E]/15 flex items-center justify-center overflow-hidden border border-[#F43F5E]/30 shadow-[0_0_28px_3px_rgba(244,63,94,0.4)]">
-            <Heart class="w-16 h-16 text-[#F43F5E] fill-current" />
-          </div>
-        {:else if kind === "recently_added"}
-          <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#CA8A04]/25 to-[#FACC15]/15 flex items-center justify-center overflow-hidden border border-[#FACC15]/30 shadow-[0_0_28px_3px_rgba(250,204,21,0.4)]">
-            <Clock class="w-16 h-16 text-[#CA8A04]" />
-          </div>
-        {:else if kind === "most_played"}
-          <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#DC2626]/25 to-[#F87171]/15 flex items-center justify-center overflow-hidden border border-[#F87171]/30 shadow-[0_0_28px_3px_rgba(248,113,113,0.4)]">
-            <TrendingUp class="w-16 h-16 text-[#DC2626]" />
-          </div>
-        {:else if kind === "history"}
-          <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#8B5CF6]/25 to-[#A78BFA]/15 flex items-center justify-center overflow-hidden border border-[#A78BFA]/30 shadow-[0_0_28px_3px_rgba(167,139,250,0.4)]">
-            <Hourglass class="w-16 h-16 text-[#8B5CF6]" />
-          </div>
-        {:else if kind === "decade"}
-          <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#2563EB]/25 to-[#38BDF8]/15 flex items-center justify-center overflow-hidden border border-[#38BDF8]/30 shadow-[0_0_28px_3px_rgba(56,189,248,0.4)]">
-            <Calendar class="w-16 h-16 text-[#38BDF8]" />
-          </div>
-        {:else if kind === "artist_tag"}
-          <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#EA580C]/25 to-[#FB923C]/15 flex items-center justify-center overflow-hidden border border-[#FB923C]/30 shadow-[0_0_28px_3px_rgba(251,146,60,0.4)]">
-            <Tag class="w-16 h-16 text-[#FB923C]" />
-          </div>
-        {:else if kind === "bpm"}
-          <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#C026D3]/25 to-[#E879F9]/15 flex items-center justify-center overflow-hidden border border-[#E879F9]/30 shadow-[0_0_28px_3px_rgba(232,121,249,0.4)]">
-            <Gauge class="w-16 h-16 text-[#E879F9]" />
           </div>
         {:else if kind === "no_genre"}
           <div class="w-full h-full bg-brand-main bg-gradient-to-br from-slate-700/40 to-slate-900/30 flex items-center justify-center overflow-hidden border border-slate-400/20 shadow-[0_0_28px_3px_rgba(100,116,139,0.3)]">
             <Music class="w-16 h-16 text-slate-300" />
           </div>
-        {:else if kind === "missing_metadata"}
-          <div class="w-full h-full bg-brand-main bg-gradient-to-br from-amber-600/25 to-amber-400/15 flex items-center justify-center overflow-hidden border border-amber-400/30 shadow-[0_0_28px_3px_rgba(245,158,11,0.4)]">
-            <AlertTriangle class="w-16 h-16 text-amber-500" />
-          </div>
-        {:else if kind === "missing_musicbrainz"}
-          <div class="w-full h-full bg-brand-main bg-gradient-to-br from-indigo-600/25 to-indigo-400/15 flex items-center justify-center overflow-hidden border border-indigo-400/30 shadow-[0_0_28px_3px_rgba(99,102,241,0.4)]">
-            <img src="/picard-icon.png" alt="Picard" class="w-16 h-16 object-contain" />
-          </div>
-        {:else if kind === "daypart"}
-          <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#0D9488]/25 to-[#2DD4BF]/15 flex items-center justify-center overflow-hidden border border-[#2DD4BF]/30 shadow-[0_0_28px_3px_rgba(45,212,191,0.4)]">
-            <SunHorizon class="w-16 h-16 text-[#2DD4BF]" />
+        {:else if heroTheme}
+          <div class="w-full h-full bg-brand-main bg-gradient-to-br {heroTheme.gradientClass} flex items-center justify-center overflow-hidden border">
+            <PlaylistKindIcon {kind} sizeClass="w-16 h-16" />
           </div>
         {:else}
           <div
             class="w-full h-full bg-brand-main flex items-center justify-center overflow-hidden border"
             style={genreColorIndex !== undefined
               ? `background-image: linear-gradient(to bottom right, color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 25%, transparent), color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 15%, transparent)); border-color: color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 30%, transparent); box-shadow: 0 0 28px 3px color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 40%, transparent);`
-              : "background-image: linear-gradient(to bottom right, rgb(5 150 105 / 0.25), rgb(52 211 153 / 0.15)); border-color: rgb(52 211 153 / 0.3); box-shadow: 0 0 28px 3px rgb(52 211 153 / 0.4);"}
+              : "background-image: linear-gradient(to bottom right, rgb(22 163 74 / 0.25), rgb(74 222 128 / 0.15)); border-color: rgb(74 222 128 / 0.3); box-shadow: 0 0 28px 3px rgb(74 222 128 / 0.4);"}
           >
-            <Music class="w-16 h-16" style={genreColorIndex !== undefined ? `color: ${genreColorHsl(genreColorIndex)}` : "color: #34D399"} />
+            <Tag class="w-16 h-16" style={genreColorIndex !== undefined ? `color: ${genreColorHsl(genreColorIndex)}` : "color: #4ADE80"} />
           </div>
         {/if}
       </div>

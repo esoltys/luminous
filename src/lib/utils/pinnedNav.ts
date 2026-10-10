@@ -28,16 +28,8 @@ import {
   MicrophoneStageIcon as Mic2,
   MusicNotesIcon as Music,
   PlaylistIcon as ListMusic,
-  SparkleIcon as Sparkles,
-  HeartIcon as Heart,
-  ClockIcon as Clock,
-  HourglassIcon as Hourglass,
-  TagIcon as Tag,
-  CalendarIcon as Calendar,
-  GaugeIcon as Gauge,
-  SunHorizonIcon as SunHorizon,
-  TrendUpIcon as TrendingUp,
 } from "phosphor-svelte";
+import { getPlaylistCardTheme } from "./playlistCardTheme";
 
 /**
  * Presentation-ready projection of a pinned entity for navigation components.
@@ -106,32 +98,6 @@ export function autoPlaylistLabel(ap: AutoPlaylistItem): string {
       const pl = playlistsStore.playlists.find((p) => p.id === ap.playlistId);
       return pl ? getPlaylistDisplayName(pl) : (ap.genre ?? ap.decade ?? ap.bpm ?? ap.artistTag ?? ap.kind);
     }
-  }
-}
-
-/**
- * Selects an appropriate Phosphor icon for an auto-playlist kind.
- */
-function autoPlaylistIcon(kind: AutoPlaylistItem["kind"]): Component<any> {
-  switch (kind) {
-    case "favourites":
-      return Heart;
-    case "recently_added":
-      return Clock;
-    case "most_played":
-      return TrendingUp;
-    case "history":
-      return Hourglass;
-    case "genre":
-      return Tag;
-    case "decade":
-      return Calendar;
-    case "bpm":
-      return Gauge;
-    case "daypart":
-      return SunHorizon;
-    default:
-      return Sparkles;
   }
 }
 
@@ -239,14 +205,14 @@ export function toNavigablePin(item: PinnedItem): NavigablePin {
 
     case "auto_playlist": {
       const title = autoPlaylistLabel(item.autoPlaylist);
-      const icon = autoPlaylistIcon(item.autoPlaylist.kind);
+      const theme = getPlaylistCardTheme(item.autoPlaylist.kind);
       const isActive = isAutoPlaylistActive(item.autoPlaylist);
       return {
         id,
         rawItem: item,
         type: "auto_playlist",
         title,
-        icon,
+        icon: theme.icon,
         autoPlaylist: item.autoPlaylist,
         isActive,
         open: () =>

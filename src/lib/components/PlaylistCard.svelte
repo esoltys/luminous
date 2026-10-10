@@ -2,10 +2,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import {
     PlaylistIcon as ListMusic,
-    CalendarIcon as Calendar,
-    MusicNotesIcon as Music,
     BroadcastIcon as Radio,
-    StackIcon as Layers,
     SparkleIcon as Sparkles
   } from "phosphor-svelte";
   import CardBadge from "./CardBadge.svelte";
@@ -18,6 +15,7 @@
   import CoverStack from "./CoverStack.svelte";
   import PlaylistCardShell from "./PlaylistCardShell.svelte";
   import PlaylistCoverFrame from "./PlaylistCoverFrame.svelte";
+  import PlaylistKindIcon from "./PlaylistKindIcon.svelte";
   import { getPlaylistCardTheme } from "../utils/playlistCardTheme";
 
   import { getPlaylistDisplayName } from "../utils/playlist";
@@ -86,7 +84,7 @@
 {#snippet cover()}
   {#if isQueue}
     <PlaylistCoverFrame gradientClass={queueTheme.gradientClass}>
-      <Layers class="w-10 h-10 {queueTheme.iconColorClass}" />
+      <PlaylistKindIcon kind="queue" sizeClass="w-10 h-10" />
     </PlaylistCoverFrame>
   {:else if topAlbums.length > 0 && autoKind}
     {@const t = getPlaylistCardTheme(autoKind)}
@@ -98,13 +96,7 @@
   {:else if autoKind}
     {@const t = getPlaylistCardTheme(autoKind)}
     <PlaylistCoverFrame gradientClass={t.gradientClass}>
-      {#if autoKind === "decade"}
-        <Calendar class="w-10 h-10 {t.iconColorClass}" />
-      {:else if autoKind === "genre"}
-        <Music class="w-10 h-10 {t.iconColorClass}" />
-      {:else}
-        <Sparkles class="w-10 h-10 {t.iconColorClass}" />
-      {/if}
+      <PlaylistKindIcon kind={autoKind} sizeClass="w-10 h-10" />
     </PlaylistCoverFrame>
   {:else}
     <!-- Custom (user-made) playlist with no art yet: flat, no gradient —

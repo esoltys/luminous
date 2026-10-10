@@ -1,17 +1,5 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import {
-    HeartIcon as Heart,
-    ClockIcon as Clock,
-    HourglassIcon as Hourglass,
-    CalendarIcon as Calendar,
-    MusicNotesIcon as Music,
-    GaugeIcon as Gauge,
-    TagIcon as Tag,
-    TrendUpIcon as TrendingUp,
-    WarningIcon as AlertTriangle,
-    SunHorizonIcon as SunHorizon
-  } from "phosphor-svelte";
   import type { PlaylistItem, Song } from "../types";
   import { songsToCoverStack } from "../utils/covers";
   import { i18n } from "../stores/i18n.svelte";
@@ -19,6 +7,7 @@
   import CoverStack from "./CoverStack.svelte";
   import PlaylistCardShell from "./PlaylistCardShell.svelte";
   import PlaylistCoverFrame from "./PlaylistCoverFrame.svelte";
+  import PlaylistKindIcon from "./PlaylistKindIcon.svelte";
   import { getPlaylistCardTheme } from "../utils/playlistCardTheme";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { getPlaylistDisplayName } from "../utils/playlist";
@@ -165,29 +154,7 @@
   {:else}
     {@const t = getPlaylistCardTheme(kind)}
     <PlaylistCoverFrame gradientClass={t.gradientClass}>
-      {#if kind === "favourites"}
-        <Heart class="w-10 h-10 {t.iconColorClass} fill-current" />
-      {:else if kind === "recently_added"}
-        <Clock class="w-10 h-10 {t.iconColorClass}" />
-      {:else if kind === "most_played"}
-        <TrendingUp class="w-10 h-10 {t.iconColorClass}" />
-      {:else if kind === "history"}
-        <Hourglass class="w-10 h-10 {t.iconColorClass}" />
-      {:else if kind === "decade"}
-        <Calendar class="w-10 h-10 {t.iconColorClass}" />
-      {:else if kind === "genre"}
-        <Music class="w-10 h-10 {t.iconColorClass}" />
-      {:else if kind === "artist_tag"}
-        <Tag class="w-10 h-10 {t.iconColorClass}" />
-      {:else if kind === "bpm"}
-        <Gauge class="w-10 h-10 {t.iconColorClass}" />
-      {:else if kind === "missing_metadata"}
-        <AlertTriangle class="w-10 h-10 {t.iconColorClass}" />
-      {:else if kind === "missing_musicbrainz"}
-        <img src="/picard-icon.png" alt="Picard" class="w-10 h-10 object-contain" />
-      {:else}
-        <SunHorizon class="w-10 h-10 {t.iconColorClass}" />
-      {/if}
+      <PlaylistKindIcon {kind} sizeClass="w-10 h-10" />
     </PlaylistCoverFrame>
   {/if}
 {/snippet}

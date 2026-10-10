@@ -62,4 +62,18 @@ describe("PinnedNavItem.svelte", () => {
 
     expect(getByRole("button").className).toContain("bg-brand-accent/20");
   });
+
+  it("colours an auto-playlist icon with its kind colour instead of the accent", () => {
+    const pin: NavigablePin = {
+      ...mockPin,
+      type: "auto_playlist",
+      icon: Music,
+      autoPlaylist: { kind: "genre", trackCount: 3 } as any,
+    };
+    const { container } = render(PinnedNavItem, { props: { pin, collapsed: false } });
+    expect(container.querySelector('[class*="bg-[#4ADE80]/15"]')).not.toBeNull();
+    const svg = container.querySelector("svg");
+    expect(svg?.getAttribute("class")).toContain("text-[#4ADE80]");
+    expect(svg?.getAttribute("class")).not.toContain("text-brand-accent-text");
+  });
 });

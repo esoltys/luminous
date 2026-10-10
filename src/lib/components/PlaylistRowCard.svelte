@@ -1,15 +1,13 @@
 <script lang="ts">
   import {
-    PlaylistIcon as ListMusic,
-    CalendarIcon as Calendar,
-    MusicNotesIcon as Music,
-    StackIcon as Layers,
-    SparkleIcon as Sparkles
+    PlaylistIcon as ListMusic
   } from "phosphor-svelte";
   import type { Playlist } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import { formatRelativeDate } from "../utils/date";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
+  import PlaylistKindIcon from "./PlaylistKindIcon.svelte";
+  import { getPlaylistCardTheme } from "../utils/playlistCardTheme";
   import { getPlaylistDisplayName } from "../utils/playlist";
 
   let {
@@ -53,23 +51,15 @@
 >
   <div
     class="relative shrink-0 w-11 h-11 flex items-center justify-center overflow-hidden border {isQueue
-      ? 'bg-[#7C3AED]/15 border-[#7C3AED]/30'
-      : autoKind === 'decade'
-        ? 'bg-[#38BDF8]/15 border-[#38BDF8]/30'
-        : autoKind === 'genre'
-          ? 'bg-[#34D399]/15 border-[#34D399]/30'
-          : autoKind === 'smart'
-            ? 'bg-[#F59E0B]/15 border-[#F59E0B]/30'
-            : 'bg-brand-main border-brand-border/60'}"
+      ? getPlaylistCardTheme("queue").tintClass
+      : autoKind
+        ? getPlaylistCardTheme(autoKind).tintClass
+        : 'bg-brand-main border-brand-border/60'}"
   >
     {#if isQueue}
-      <Layers class="w-5 h-5 text-[#7C3AED]" />
-    {:else if autoKind === "decade"}
-      <Calendar class="w-5 h-5 text-[#38BDF8]" />
-    {:else if autoKind === "genre"}
-      <Music class="w-5 h-5 text-[#34D399]" />
-    {:else if autoKind === "smart"}
-      <Sparkles class="w-5 h-5 text-[#F59E0B]" />
+      <PlaylistKindIcon kind="queue" sizeClass="w-5 h-5" />
+    {:else if autoKind}
+      <PlaylistKindIcon kind={autoKind} sizeClass="w-5 h-5" />
     {:else}
       <ListMusic class="w-5 h-5 text-brand-text-secondary" />
     {/if}
