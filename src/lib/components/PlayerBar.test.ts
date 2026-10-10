@@ -568,4 +568,25 @@ describe("PlayerBar.svelte", () => {
     expect(footerNormal).toHaveClass("h-20");
     expect(footerNormal).toHaveClass("max-w-[1200px]");
   });
+
+  it("closes the song menu when its button is pressed again instead of reopening it", async () => {
+    playerStore.currentSong = mockSong;
+    const { getByTitle, queryByRole } = render(PlayerBar);
+    const btn = getByTitle("Song menu");
+
+    // Open: mousedown then click, as a real press does.
+    await fireEvent.mouseDown(btn);
+    await fireEvent.click(btn);
+    expect(queryByRole("menu")).toBeInTheDocument();
+
+    // Press again: the open menu closes on mousedown, and the click must not reopen it.
+    await fireEvent.mouseDown(btn);
+    await fireEvent.click(btn);
+    expect(queryByRole("menu")).not.toBeInTheDocument();
+
+    // A third press opens it again.
+    await fireEvent.mouseDown(btn);
+    await fireEvent.click(btn);
+    expect(queryByRole("menu")).toBeInTheDocument();
+  });
 });

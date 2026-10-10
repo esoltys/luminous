@@ -199,7 +199,14 @@
   let contextMenuState = $state<{ x: number; y: number } | null>(null);
   let editingSongId = $state<number | null>(null);
 
+  // The open menu closes itself on any outside mousedown, which runs before this
+  // button's click; remember the state at press time so the click toggles it shut.
+  let menuWasOpenOnPress = false;
+
   function openCurrentSongMenu(e: MouseEvent) {
+    const wasOpen = menuWasOpenOnPress;
+    menuWasOpenOnPress = false;
+    if (wasOpen) return;
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     contextMenuState = { x: rect.left, y: rect.top };
   }
@@ -472,6 +479,7 @@
     >
       <div class="h-5 flex items-center gap-3 md:gap-5">
         <button
+          onmousedown={() => (menuWasOpenOnPress = contextMenuState !== null)}
           onclick={openCurrentSongMenu}
           disabled={!playerStore.currentSong}
           class="inline-flex items-center justify-center flex-shrink-0 text-brand-text-secondary hover:text-brand-text-primary transition-colors disabled:opacity-40 disabled:pointer-events-none"
