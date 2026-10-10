@@ -64,8 +64,6 @@ async function main() {
 
   try {
     await profile.launch();
-    await profile.scanLibrary(opts.libraries);
-
     await using driver = await profile.connectDriver();
 
     // Album Info starts collapsed so the track list gets the room. It's a
@@ -73,58 +71,59 @@ async function main() {
     await driver.evaluate(() => localStorage.setItem("layout_isOverviewExpanded", "false"));
     await driver.reload();
 
-    const hasScripting = await driver.evaluate(() => !!window.__LUMINOUS_SCRIPT__);
-    if (!hasScripting) {
-      throw new Error(
-        `window.__LUMINOUS_SCRIPT__ is missing: ${opts.exe} is not a dev-mode build. ` +
-          "Run `bun run dev`, build a debug exe (`cd src-tauri && cargo build`) and pass it with --exe."
-      );
-    }
+    // Fail before the slow library scan if this isn't a dev build. The layout
+    // installs the API from a dynamic import, so it can land just after load.
+    await driver
+      .waitForCondition(() => driver.evaluate(() => !!window.__LUMINOUS_SCRIPT__), { timeoutMs: 10000 })
+      .catch(() => {
+        throw new Error(
+          `window.__LUMINOUS_SCRIPT__ is missing: ${opts.exe} is not a dev-mode build. ` +
+            "Run `bun run dev`, build a debug exe (`cd src-tauri && cargo build`) and pass it with --exe."
+        );
+      });
+
+    await profile.scanLibrary(opts.libraries);
 
     // Online services off keeps enrichment toasts and fetched panels out of the frame.
     await driver.invoke("set_online_enabled", { enabled: false });
 
     fs.mkdirSync(OUT_DIR, { recursive: true });
 
-    try {
-      for (const entry of entries) {
-        console.log(`Capturing ${entry.name}...`);
-        await driver.setWindowSize(
-          entry.viewportWidth ?? DEFAULT_VIEWPORT.width,
-          entry.viewportHeight ?? DEFAULT_VIEWPORT.height
-        );
+    for (const entry of entries) {
+      console.log(`Capturing ${entry.name}...`);
+      await driver.setWindowSize(
+        entry.viewportWidth ?? DEFAULT_VIEWPORT.width,
+        entry.viewportHeight ?? DEFAULT_VIEWPORT.height
+      );
 
-        // Play first: the theme re-extracts from the playing song's own cover on
-        // track-changed, which is what a user sees after pressing Play.
-        const song = await driver.evaluate(
-          async (title, artist, position, albumName) => {
-            const script = window.__LUMINOUS_SCRIPT__!;
-            const played = await script.playback.play({ title, artist });
-            await script.playback.seek(position);
-            await script.navigate.album(albumName ?? played.album);
-            return { title: played.title, album: played.album };
-          },
-          entry.featuredSong,
-          entry.featuredArtist,
-          entry.positionSeconds ?? 60,
-          entry.featuredAlbum
-        );
+      // Play first: the theme re-extracts from the playing song's own cover on
+      // track-changed, which is what a user sees after pressing Play.
+      const playedTitle = await driver.evaluate(
+        async (title, artist, position, albumName) => {
+          const script = window.__LUMINOUS_SCRIPT__!;
+          const played = await script.playback.play({ title, artist });
+          await script.playback.seek(position);
+          await script.navigate.album(albumName ?? played.album);
+          return played.title;
+        },
+        entry.featuredSong,
+        entry.featuredArtist,
+        entry.positionSeconds ?? 60,
+        entry.featuredAlbum
+      );
 
-        await driver.evaluate(() => {
-          for (const b of document.querySelectorAll<HTMLElement>("button[aria-label='Dismiss notification']")) b.click();
-          return window.__LUMINOUS_SCRIPT__!.wait.settled();
-        });
-        await sleep(1500); // let the waveform and theme crossfade settle
+      await driver.evaluate(() => {
+        for (const b of document.querySelectorAll<HTMLElement>("button[aria-label='Dismiss notification']")) b.click();
+        return window.__LUMINOUS_SCRIPT__!.wait.settled();
+      });
+      await sleep(1500); // let the waveform and theme crossfade settle
 
-        const palette = await driver.evaluate(() =>
-          document.documentElement.style.getPropertyValue("--color-artwork-primary")
-        );
-        const file = path.join(OUT_DIR, entry.filename);
-        await driver.screenshot({ path: file });
-        console.log(`Saved ${path.relative(REPO_ROOT, file)} ("${song.title}", palette ${palette})`);
-      }
-    } finally {
-      await driver.clearWindowSize();
+      const palette = await driver.evaluate(() =>
+        document.documentElement.style.getPropertyValue("--color-artwork-primary")
+      );
+      const file = path.join(OUT_DIR, entry.filename);
+      await driver.screenshot({ path: file });
+      console.log(`Saved ${path.relative(REPO_ROOT, file)} ("${playedTitle}", palette ${palette})`);
     }
   } finally {
     await profile.dispose(opts.keepProfiles);
