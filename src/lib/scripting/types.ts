@@ -101,6 +101,7 @@ export interface ScriptAppearanceApi {
     rightPanelOpen?: boolean;
     sidebarWidth?: number;
     miniplayer?: boolean;
+    immersive?: boolean;
   }): Promise<void>;
 }
 
@@ -122,6 +123,11 @@ export interface ScriptDialogsApi {
    * Closes any open top-level modal or dialog.
    */
   closeAll(): Promise<void>;
+
+  /**
+   * Dismisses every toast on screen, whatever language its text is in.
+   */
+  dismissToasts(): Promise<void>;
 
   /**
    * First-run welcome screen controls.

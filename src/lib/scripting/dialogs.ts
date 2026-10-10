@@ -1,3 +1,4 @@
+import { toastStore } from "../stores/toast.svelte";
 import { welcomeStore } from "../stores/welcome.svelte";
 import { walkthroughStore } from "../stores/walkthrough.svelte";
 import type { ScriptDialogsApi, ScriptWaitApi } from "./types";
@@ -46,6 +47,11 @@ export function createDialogsController(wait: ScriptWaitApi): ScriptDialogsApi {
       if (walkthroughStore.isActive) {
         walkthroughStore.finish();
       }
+      await wait.settled();
+    },
+
+    async dismissToasts(): Promise<void> {
+      for (const msg of [...toastStore.messages]) toastStore.dismiss(msg.id);
       await wait.settled();
     },
 

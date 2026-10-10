@@ -32,6 +32,7 @@ export function createAppearanceController(wait: ScriptWaitApi): ScriptAppearanc
       rightPanelOpen?: boolean;
       sidebarWidth?: number;
       miniplayer?: boolean;
+      immersive?: boolean;
     }): Promise<void> {
       if (layout.sidebarOpen !== undefined) {
         windowLayoutStore.sidebarOpen = layout.sidebarOpen;
@@ -44,6 +45,9 @@ export function createAppearanceController(wait: ScriptWaitApi): ScriptAppearanc
       }
       if (layout.miniplayer !== undefined && layout.miniplayer !== windowLayoutStore.isMiniplayer) {
         windowLayoutStore.toggleMiniplayerMode();
+      }
+      if (layout.immersive !== undefined && layout.immersive !== windowLayoutStore.immersiveMode) {
+        windowLayoutStore.toggleImmersiveMode();
       }
       await wait.settled();
     },

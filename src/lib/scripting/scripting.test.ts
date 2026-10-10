@@ -6,6 +6,7 @@ import { playerStore } from "../stores/player.svelte";
 import { themeStore } from "../stores/theme.svelte";
 import { i18n } from "../stores/i18n.svelte";
 import { windowLayoutStore } from "../stores/windowLayout.svelte";
+import { toastStore } from "../stores/toast.svelte";
 import { welcomeStore } from "../stores/welcome.svelte";
 import { walkthroughStore } from "../stores/walkthrough.svelte";
 import { invoke } from "@tauri-apps/api/core";
@@ -224,9 +225,33 @@ describe("In-app scripting API", () => {
       expect(windowLayoutStore.rightPanelOpen).toBe(true);
       expect(windowLayoutStore.sidebarWidth).toBe(280);
     });
+
+    it("toggles immersive mode only when it differs from the requested state", async () => {
+      const api = createScriptingApi();
+      windowLayoutStore.immersiveMode = false;
+
+      await api.appearance.setLayout({ immersive: true });
+      expect(windowLayoutStore.immersiveMode).toBe(true);
+
+      await api.appearance.setLayout({ immersive: true });
+      expect(windowLayoutStore.immersiveMode).toBe(true);
+
+      await api.appearance.setLayout({ immersive: false });
+      expect(windowLayoutStore.immersiveMode).toBe(false);
+    });
   });
 
   describe("Dialogs controller", () => {
+    it("dismisses every toast regardless of its text", async () => {
+      const api = createScriptingApi();
+      toastStore.show("Hello", "info");
+      toastStore.show("Bonjour", "info");
+      expect(toastStore.messages.length).toBe(2);
+
+      await api.dialogs.dismissToasts();
+      expect(toastStore.messages.length).toBe(0);
+    });
+
     it("integrates with registered dialog host controls", async () => {
       const api = createScriptingApi();
       let shortcutsOpen = false;
