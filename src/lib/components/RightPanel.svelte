@@ -9,7 +9,8 @@
     ClockIcon as Clock,
     ArrowSquareOutIcon as ExternalLink,
     ArrowsClockwiseIcon as RefreshCw,
-    CaretDownIcon as CaretDown
+    CaretDownIcon as CaretDown,
+    XIcon as X
   } from "phosphor-svelte";
   import { i18n, formatNumber } from "../stores/i18n.svelte";
   import { prefs } from "../stores/prefs.svelte";
@@ -138,6 +139,17 @@
   style="width: {width}px;"
   class="relative bg-brand-sidebar flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0 overflow-hidden {themeStore.isGlassTheme ? 'glass-surface' : ''}"
 >
+  {#if onClose}
+    <button
+      type="button"
+      onclick={onClose}
+      aria-label={i18n.t('common.close', {}, 'Close')}
+      title={i18n.t('common.close', {}, 'Close')}
+      class="absolute top-2 right-2 z-10 p-1.5 rounded-md text-brand-text-secondary/60 hover:text-brand-text-primary hover:bg-brand-text-primary/10 transition-colors"
+    >
+      <X size={14} />
+    </button>
+  {/if}
   <!-- The floating PlayerBar dock (h-20 + bottom-4 inset = 96px = mb-24) overlays
        the bottom of the app on top of this panel — a bottom *margin* (rather than
        inner padding) actually shrinks this div's own box, so its scrollbar ends
