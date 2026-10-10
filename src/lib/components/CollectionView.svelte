@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ViewModeToggle from "./ViewModeToggle.svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { collectionStore } from "../stores/collection.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
@@ -13,8 +14,6 @@
     MusicNotesIcon as Music,
     DiscIcon as DiscAlbum,
     MicrophoneStageIcon as Mic2,
-    SquaresFourIcon as LayoutGrid,
-    RowsIcon as Rows3
   } from "phosphor-svelte";
   import type { Song, AlbumItem, ArtistItem } from "../types";
   import { i18n } from "../stores/i18n.svelte";
@@ -464,31 +463,7 @@
           </div>
 
           <div class="flex items-center gap-2">
-            <div data-walkthrough-target="collection-view" class="relative inline-flex items-center gap-0.5 bg-brand-sidebar border border-brand-border rounded-full p-1">
-              <!-- Sliding background indicator -->
-              <span
-                class="absolute top-1 bottom-1 left-1 w-7 h-7 rounded-full bg-brand-accent shadow-sm pointer-events-none transition-transform duration-200 ease-out {activeViewMode === 'rows' ? 'translate-x-[30px]' : 'translate-x-0'}"
-                aria-hidden="true"
-              ></span>
-              <button
-                onclick={() => setActiveViewMode("cards")}
-                class="relative z-10 flex items-center justify-center w-7 h-7 rounded-full transition-colors duration-200 {activeViewMode === 'cards' ? 'text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-                title={i18n.t('collection.viewCards')}
-                aria-label={i18n.t('collection.viewCards')}
-                aria-pressed={activeViewMode === "cards"}
-              >
-                <LayoutGrid class="w-4 h-4" />
-              </button>
-              <button
-                onclick={() => setActiveViewMode("rows")}
-                class="relative z-10 flex items-center justify-center w-7 h-7 rounded-full transition-colors duration-200 {activeViewMode === 'rows' ? 'text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-                title={i18n.t('collection.viewRows')}
-                aria-label={i18n.t('collection.viewRows')}
-                aria-pressed={activeViewMode === "rows"}
-              >
-                <Rows3 class="w-4 h-4" />
-              </button>
-            </div>
+            <ViewModeToggle mode={activeViewMode} onChange={setActiveViewMode} walkthroughTarget="collection-view" />
             {#if navigationStore.activeSubTab === "albums"}
               <div class="relative">
                 <Select

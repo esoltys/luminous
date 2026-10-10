@@ -1260,13 +1260,53 @@ fn get_default_device_name() -> Option<String> {
     Some(device.to_string())
 }
 
-fn build_output(shared: &Arc<AudioShared>) -> Result<AudioOutput, String> {
-    use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+/// The device to open for the system default output.
+///
+/// On Windows, cpal's `default_output_device()` is a virtual handle that
+/// activates through `ActivateAudioInterfaceAsync` (cpal 0.18 reroute support).
+/// For some Bluetooth endpoints that activation fails every time with
+/// `RPC_E_CHANGED_MODE` ("Cannot change thread mode after it is set"),
+/// whatever the calling thread's COM mode and however often it is retried
+/// (#1617). So
+/// resolve the current default to the concrete endpoint with the same id and
+/// open that, which activates through `IMMDevice::Activate`. Rerouting is not
+/// lost: `check_and_rebuild_output` already polls the default and rebuilds.
+/// Falls back to the virtual default handle if the endpoint can't be matched.
+fn select_output_device(host: &cpal::Host) -> Result<cpal::Device, String> {
+    use cpal::traits::HostTrait;
 
-    let host = cpal::default_host();
-    let device = host
+    let default = host
         .default_output_device()
         .ok_or_else(|| "No audio output device".to_string())?;
+
+    #[cfg(windows)]
+    {
+        use cpal::traits::DeviceTrait;
+
+        let specific = default.id().ok().and_then(|default_id| {
+            host.output_devices()
+                .ok()?
+                .find(|d| d.id().is_ok_and(|id| id == default_id))
+        });
+        match specific {
+            Some(d) => {
+                log::debug!("Opening default output as a specific endpoint");
+                return Ok(d);
+            }
+            None => {
+                log::warn!("Default output endpoint not found by id; using the virtual default")
+            }
+        }
+    }
+
+    Ok(default)
+}
+
+fn build_output(shared: &Arc<AudioShared>) -> Result<AudioOutput, String> {
+    use cpal::traits::{DeviceTrait, StreamTrait};
+
+    let host = cpal::default_host();
+    let device = select_output_device(&host)?;
     let device_name = Some(device.to_string());
     let default_config = device
         .default_output_config()

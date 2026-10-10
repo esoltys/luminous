@@ -16,11 +16,17 @@
   } from "../utils/playlist";
   import { collectionStore } from "../stores/collection.svelte";
   import CardSection from "./CardSection.svelte";
+  import { prefs } from "../stores/prefs.svelte";
   import AlbumCard from "./AlbumCard.svelte";
+  import AlbumRowCard from "./AlbumRowCard.svelte";
   import ArtistCard from "./ArtistCard.svelte";
+  import ArtistRowCard from "./ArtistRowCard.svelte";
   import PlaylistCard from "./PlaylistCard.svelte";
+  import PlaylistRowCard from "./PlaylistRowCard.svelte";
   import AutoPlaylistCard from "./AutoPlaylistCard.svelte";
+  import AutoPlaylistRowCard from "./AutoPlaylistRowCard.svelte";
   import PinnedSongCard from "./PinnedSongCard.svelte";
+  import PinnedSongRowCard from "./PinnedSongRowCard.svelte";
   import AlbumContextMenu from "./AlbumContextMenu.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
   import ArtistContextMenu from "./ArtistContextMenu.svelte";
@@ -192,64 +198,119 @@
 </script>
 
 {#if visibleItems.length > 0}
-  <CardSection title={i18n.t('home.pinned')}>
-    {#each visibleItems as item, index (keyFor(item))}
-      <!-- svelte-ignore a11y_no_static_element_interactions -->
-      <div
-        data-pinned-index={index}
-        onpointerdown={(e) => handleCardPointerDown(e, index)}
-        oncontextmenu={(e) => handleContextMenu(e, item)}
-        ondragstart={(e) => e.preventDefault()}
-        class="relative transition-opacity rounded-xl cursor-grab active:cursor-grabbing {draggedIndex === index ? 'opacity-40' : ''}"
-      >
-        {#if item.type === "album"}
-          <AlbumCard
-            album={item.album}
-            widthClass="w-full"
-            onclick={() => openItem(item)}
-            oncontextmenu={(e) => handleContextMenu(e, item)}
-          />
-        {:else if item.type === "artist"}
-          <ArtistCard
-            artist={item.artist}
-            artistAlbums={getArtistAlbums(collectionStore.albums, item.artist.name)}
-            artistSongs={getArtistSongs(collectionStore.songs, item.artist.name)}
-            onclick={() => openItem(item)}
-            oncontextmenu={(e) => handleContextMenu(e, item)}
-          />
-        {:else if item.type === "playlist"}
-          <PlaylistCard
-            playlist={item.playlist}
-            widthClass="w-full"
-            onClick={() => openItem(item)}
-            oncontextmenu={(e) => handleContextMenu(e, item)}
-          />
-        {:else if item.type === "auto_playlist"}
-          <AutoPlaylistCard
-            label={autoPlaylistLabel(item.autoPlaylist)}
-            kind={item.autoPlaylist.kind}
-            genre={item.autoPlaylist.genre}
-            artistTag={item.autoPlaylist.artistTag}
-            decade={item.autoPlaylist.decade}
-            bpm={item.autoPlaylist.bpm}
-            playlistId={item.autoPlaylist.playlistId}
-            updated={item.autoPlaylist.updated}
-            trackCount={item.autoPlaylist.trackCount}
-            onClick={() => openItem(item)}
-            oncontextmenu={(e) => handleContextMenu(e, item)}
-          />
-        {:else}
-          <PinnedSongCard
-            song={item.song}
-            onclick={() => openItem(item)}
-            oncontextmenu={(e) => handleContextMenu(e, item)}
-          />
-        {/if}
-        {#if dragOverIndex === index && draggedIndex !== null && draggedIndex !== index}
-          <div class="absolute inset-0 bg-brand-accent/30 rounded-xl pointer-events-none"></div>
-        {/if}
-      </div>
-    {/each}
+  <CardSection
+    title={i18n.t('home.pinned')}
+    viewMode={prefs.pinnedViewMode}
+    onViewModeChange={(m) => prefs.setPinnedViewMode(m)}
+  >
+    {#snippet children(mode)}
+      {@const rows = mode === "rows"}
+      {#each visibleItems as item, index (keyFor(item))}
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div
+          data-pinned-index={index}
+          onpointerdown={(e) => handleCardPointerDown(e, index)}
+          oncontextmenu={(e) => handleContextMenu(e, item)}
+          ondragstart={(e) => e.preventDefault()}
+          class="relative transition-opacity cursor-grab active:cursor-grabbing {rows ? 'rounded-lg' : 'rounded-xl'} {draggedIndex === index ? 'opacity-40' : ''}"
+        >
+          {#if item.type === "album"}
+            {#if rows}
+              <AlbumRowCard
+                album={item.album}
+                onclick={() => openItem(item)}
+                oncontextmenu={(e) => handleContextMenu(e, item)}
+              />
+            {:else}
+              <AlbumCard
+                album={item.album}
+                widthClass="w-full"
+                onclick={() => openItem(item)}
+                oncontextmenu={(e) => handleContextMenu(e, item)}
+              />
+            {/if}
+          {:else if item.type === "artist"}
+            {#if rows}
+              <ArtistRowCard
+                artist={item.artist}
+                artistAlbums={getArtistAlbums(collectionStore.albums, item.artist.name)}
+                artistSongs={getArtistSongs(collectionStore.songs, item.artist.name)}
+                onclick={() => openItem(item)}
+                oncontextmenu={(e) => handleContextMenu(e, item)}
+              />
+            {:else}
+              <ArtistCard
+                artist={item.artist}
+                artistAlbums={getArtistAlbums(collectionStore.albums, item.artist.name)}
+                artistSongs={getArtistSongs(collectionStore.songs, item.artist.name)}
+                onclick={() => openItem(item)}
+                oncontextmenu={(e) => handleContextMenu(e, item)}
+              />
+            {/if}
+          {:else if item.type === "playlist"}
+            {#if rows}
+              <PlaylistRowCard
+                playlist={item.playlist}
+                onClick={() => openItem(item)}
+                oncontextmenu={(e) => handleContextMenu(e, item)}
+              />
+            {:else}
+              <PlaylistCard
+                playlist={item.playlist}
+                widthClass="w-full"
+                onClick={() => openItem(item)}
+                oncontextmenu={(e) => handleContextMenu(e, item)}
+              />
+            {/if}
+          {:else if item.type === "auto_playlist"}
+            {#if rows}
+              <AutoPlaylistRowCard
+                label={autoPlaylistLabel(item.autoPlaylist)}
+                kind={item.autoPlaylist.kind}
+                genre={item.autoPlaylist.genre}
+                artistTag={item.autoPlaylist.artistTag}
+                decade={item.autoPlaylist.decade}
+                bpm={item.autoPlaylist.bpm}
+                playlistId={item.autoPlaylist.playlistId}
+                updated={item.autoPlaylist.updated}
+                trackCount={item.autoPlaylist.trackCount}
+                onClick={() => openItem(item)}
+                oncontextmenu={(e) => handleContextMenu(e, item)}
+              />
+            {:else}
+              <AutoPlaylistCard
+                label={autoPlaylistLabel(item.autoPlaylist)}
+                kind={item.autoPlaylist.kind}
+                genre={item.autoPlaylist.genre}
+                artistTag={item.autoPlaylist.artistTag}
+                decade={item.autoPlaylist.decade}
+                bpm={item.autoPlaylist.bpm}
+                playlistId={item.autoPlaylist.playlistId}
+                updated={item.autoPlaylist.updated}
+                trackCount={item.autoPlaylist.trackCount}
+                onClick={() => openItem(item)}
+                oncontextmenu={(e) => handleContextMenu(e, item)}
+              />
+            {/if}
+          {:else if rows}
+            <PinnedSongRowCard
+              song={item.song}
+              onclick={() => openItem(item)}
+              oncontextmenu={(e) => handleContextMenu(e, item)}
+            />
+          {:else}
+            <PinnedSongCard
+              song={item.song}
+              onclick={() => openItem(item)}
+              oncontextmenu={(e) => handleContextMenu(e, item)}
+            />
+          {/if}
+          {#if dragOverIndex === index && draggedIndex !== null && draggedIndex !== index}
+            <div class="absolute inset-0 bg-brand-accent/30 pointer-events-none {rows ? 'rounded-lg' : 'rounded-xl'}"></div>
+          {/if}
+        </div>
+      {/each}
+    {/snippet}
   </CardSection>
 {/if}
 

@@ -14,13 +14,15 @@
   import CoverMosaic from "./CoverMosaic.svelte";
   import GenreChips from "./GenreChips.svelte";
   import AlbumCard from "./AlbumCard.svelte";
+  import AlbumRowCard from "./AlbumRowCard.svelte";
   import PlaylistCard from "./PlaylistCard.svelte";
+  import PlaylistRowCard from "./PlaylistRowCard.svelte";
   import AlbumContextMenu from "./AlbumContextMenu.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
   import PlaylistCardContextMenu from "./PlaylistCardContextMenu.svelte";
   import { tagsStore } from "../stores/tags.svelte";
   import { tasksStore } from "../stores/tasks.svelte";
-  import { prefs } from "../stores/prefs.svelte";
+  import { prefs, type CollectionViewMode } from "../stores/prefs.svelte";
   import TagEditor from "./TagEditor.svelte";
   import IconActionButton from "./IconActionButton.svelte";
   import CardSection from "./CardSection.svelte";
@@ -720,6 +722,24 @@
   let eps = $derived(albums.filter((a) => classifyRelease(a.track_count, a.disc_count, a.total_duration_nanosec) === "ep"));
   let singles = $derived(albums.filter((a) => classifyRelease(a.track_count, a.disc_count, a.total_duration_nanosec) === "single"));
 
+  // One Cards/Rows toggle serves every release and playlist section; it sits
+  // on the header of the top-most one that is showing.
+  let viewModeSection = $derived(
+    sets.length > 0
+      ? "sets"
+      : fullAlbums.length > 0
+        ? "albums"
+        : eps.length > 0
+          ? "eps"
+          : compilations.length > 0
+            ? "compilations"
+            : "playlists"
+  );
+
+  function viewModeChangeFor(section: string) {
+    return section === viewModeSection ? (mode: CollectionViewMode) => prefs.setArtistReleasesViewMode(mode) : undefined;
+  }
+
   let songsText = $derived(
     i18n.plural("playlists.songsCount", songs.length)
   );
@@ -1055,38 +1075,80 @@
     {/if}
 
     {#if sets.length > 0}
-      <CardSection title={i18n.t('artistDetail.setsFilter', { count: sets.length })}>
-        {#each sets as album (album.album)}
-          <AlbumCard
-            {album}
-            onclick={() => openAlbum(album)}
-            oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
-          />
-        {/each}
+      <CardSection
+        title={i18n.t('artistDetail.setsFilter', { count: sets.length })}
+        viewMode={prefs.artistReleasesViewMode}
+        onViewModeChange={viewModeChangeFor("sets")}
+      >
+        {#snippet children(mode)}
+          {#each sets as album (album.album)}
+            {#if mode === "rows"}
+              <AlbumRowCard
+                {album}
+                onclick={() => openAlbum(album)}
+                oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
+              />
+            {:else}
+              <AlbumCard
+                {album}
+                onclick={() => openAlbum(album)}
+                oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
+              />
+            {/if}
+          {/each}
+        {/snippet}
       </CardSection>
     {/if}
 
     {#if fullAlbums.length > 0}
-      <CardSection title={i18n.t('artistDetail.albumsFilter', { count: fullAlbums.length })}>
-        {#each fullAlbums as album (album.album)}
-          <AlbumCard
-            {album}
-            onclick={() => openAlbum(album)}
-            oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
-          />
-        {/each}
+      <CardSection
+        title={i18n.t('artistDetail.albumsFilter', { count: fullAlbums.length })}
+        viewMode={prefs.artistReleasesViewMode}
+        onViewModeChange={viewModeChangeFor("albums")}
+      >
+        {#snippet children(mode)}
+          {#each fullAlbums as album (album.album)}
+            {#if mode === "rows"}
+              <AlbumRowCard
+                {album}
+                onclick={() => openAlbum(album)}
+                oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
+              />
+            {:else}
+              <AlbumCard
+                {album}
+                onclick={() => openAlbum(album)}
+                oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
+              />
+            {/if}
+          {/each}
+        {/snippet}
       </CardSection>
     {/if}
 
     {#if eps.length > 0}
-      <CardSection title={i18n.t('artistDetail.epsFilter', { count: eps.length })}>
-        {#each eps as album (album.album)}
-          <AlbumCard
-            {album}
-            onclick={() => openAlbum(album)}
-            oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
-          />
-        {/each}
+      <CardSection
+        title={i18n.t('artistDetail.epsFilter', { count: eps.length })}
+        viewMode={prefs.artistReleasesViewMode}
+        onViewModeChange={viewModeChangeFor("eps")}
+      >
+        {#snippet children(mode)}
+          {#each eps as album (album.album)}
+            {#if mode === "rows"}
+              <AlbumRowCard
+                {album}
+                onclick={() => openAlbum(album)}
+                oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
+              />
+            {:else}
+              <AlbumCard
+                {album}
+                onclick={() => openAlbum(album)}
+                oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
+              />
+            {/if}
+          {/each}
+        {/snippet}
       </CardSection>
     {/if}
 
@@ -1121,28 +1183,56 @@
 
   {#if compilations.length > 0}
     <div class="px-6 pt-10">
-      <CardSection title={i18n.t('artistDetail.compilationsFeaturing', { artist: artistName })}>
-        {#each compilations as album (album.album)}
-          <AlbumCard
-            {album}
-            onclick={() => openAlbum(album)}
-            oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
-          />
-        {/each}
+      <CardSection
+        title={i18n.t('artistDetail.compilationsFeaturing', { artist: artistName })}
+        viewMode={prefs.artistReleasesViewMode}
+        onViewModeChange={viewModeChangeFor("compilations")}
+      >
+        {#snippet children(mode)}
+          {#each compilations as album (album.album)}
+            {#if mode === "rows"}
+              <AlbumRowCard
+                {album}
+                onclick={() => openAlbum(album)}
+                oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
+              />
+            {:else}
+              <AlbumCard
+                {album}
+                onclick={() => openAlbum(album)}
+                oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
+              />
+            {/if}
+          {/each}
+        {/snippet}
       </CardSection>
     </div>
   {/if}
 
   {#if playlists.length > 0}
     <div class="px-6 pt-10 {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
-      <CardSection title={i18n.t('artistDetail.playlistsFeaturing', { artist: artistName })}>
-        {#each playlists as playlist (playlist.id)}
-          <PlaylistCard
-            {playlist}
-            onClick={() => openPlaylist(playlist)}
-            oncontextmenu={(e) => handlePlaylistContextMenu(e, playlist)}
-          />
-        {/each}
+      <CardSection
+        title={i18n.t('artistDetail.playlistsFeaturing', { artist: artistName })}
+        viewMode={prefs.artistReleasesViewMode}
+        onViewModeChange={viewModeChangeFor("playlists")}
+      >
+        {#snippet children(mode)}
+          {#each playlists as playlist (playlist.id)}
+            {#if mode === "rows"}
+              <PlaylistRowCard
+                {playlist}
+                onClick={() => openPlaylist(playlist)}
+                oncontextmenu={(e) => handlePlaylistContextMenu(e, playlist)}
+              />
+            {:else}
+              <PlaylistCard
+                {playlist}
+                onClick={() => openPlaylist(playlist)}
+                oncontextmenu={(e) => handlePlaylistContextMenu(e, playlist)}
+              />
+            {/if}
+          {/each}
+        {/snippet}
       </CardSection>
     </div>
   {:else}

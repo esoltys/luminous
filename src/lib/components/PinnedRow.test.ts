@@ -5,6 +5,7 @@ import PinnedRow from "./PinnedRow.svelte";
 import { pinnedStore } from "../stores/pinned.svelte";
 import { playlistsStore } from "../stores/playlists.svelte";
 import { navigationStore } from "../stores/navigation.svelte";
+import { prefs } from "../stores/prefs.svelte";
 import type { PinnedItem, Song, AlbumItem, ArtistItem, Playlist, AutoPlaylistItem } from "../types";
 
 describe("PinnedRow.svelte", () => {
@@ -76,6 +77,29 @@ describe("PinnedRow.svelte", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     pinnedStore.items = [...allItems];
+    prefs.pinnedViewMode = "cards";
+  });
+
+  it("renders every pinned item type as a row when the pinned view mode is rows", () => {
+    prefs.pinnedViewMode = "rows";
+    const { getByText, container } = render(PinnedRow);
+
+    expect(getByText("OK Computer")).toBeInTheDocument();
+    expect(getByText("Paranoid Android")).toBeInTheDocument();
+    expect(getByText("Portishead")).toBeInTheDocument();
+    expect(getByText("My Best Songs")).toBeInTheDocument();
+    expect(getByText("Favourite Songs")).toBeInTheDocument();
+    expect(container.querySelectorAll("[data-pinned-index]")).toHaveLength(5);
+    expect(container.querySelector('[data-testid="card-section-grid"]')!.className).toContain("minmax(280px,1fr)");
+  });
+
+  it("saves the layout chosen with the header toggle", async () => {
+    const setMode = vi.spyOn(prefs, "setPinnedViewMode").mockImplementation(() => {});
+    const { getByRole } = render(PinnedRow);
+
+    await fireEvent.click(getByRole("button", { name: "Row view" }));
+
+    expect(setMode).toHaveBeenCalledWith("rows");
   });
 
   it("renders pinned cards when items exist", () => {
