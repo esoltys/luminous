@@ -109,7 +109,9 @@ struct TaskbarContext {
     /// correctly instead of starting from "no track loaded".
     last_known_state: parking_lot::Mutex<(bool, bool)>,
     now_playing: parking_lot::Mutex<NowPlayingArt>,
-    fallback_art: Arc<image::DynamicImage>,
+    /// Whether DWM is currently forced to ask us for iconic bitmaps; see
+    /// `sync_iconic_mode`. Starts `false` (DWM shows the real window).
+    iconic_active: std::sync::atomic::AtomicBool,
     taskbar_button_created_msg: u32,
     /// Bumped once per `apply_playback_state` call. Lets an art-decode task
     /// that's still running when a *newer* track change comes in tell it's
@@ -156,8 +158,6 @@ fn try_init(app: &tauri::App) -> windows::core::Result<()> {
         next: build_icon(ButtonGlyph::Next, icon_size)?,
     };
 
-    force_iconic_representation(hwnd)?;
-
     // Registered once here (rather than hardcoding WM_APP+N) so Explorer can
     // tell every top-level window when a taskbar button becomes available
     // for it — see `try_register_thumbbar`.
@@ -178,7 +178,7 @@ fn try_init(app: &tauri::App) -> windows::core::Result<()> {
         icons,
         last_known_state: parking_lot::Mutex::new((false, false)),
         now_playing: parking_lot::Mutex::new(NowPlayingArt::default()),
-        fallback_art: load_fallback_art(),
+        iconic_active: std::sync::atomic::AtomicBool::new(false),
         taskbar_button_created_msg,
         art_request_seq: std::sync::atomic::AtomicU64::new(0),
     });
@@ -233,21 +233,39 @@ fn try_register_thumbbar(ctx: &TaskbarContext) -> windows::core::Result<()> {
     Ok(())
 }
 
-fn force_iconic_representation(hwnd: HWND) -> windows::core::Result<()> {
-    let enabled = BOOL(1);
-    unsafe {
-        DwmSetWindowAttribute(
-            hwnd,
-            DWMWA_HAS_ICONIC_BITMAP,
-            &enabled as *const _ as *const core::ffi::c_void,
-            std::mem::size_of::<BOOL>() as u32,
-        )?;
-        DwmSetWindowAttribute(
-            hwnd,
-            DWMWA_FORCE_ICONIC_REPRESENTATION,
-            &enabled as *const _ as *const core::ffi::c_void,
-            std::mem::size_of::<BOOL>() as u32,
-        )?;
+/// Makes the taskbar thumbnail / Aero Peek preview match what we can show.
+///
+/// With cover art in `now_playing`, DWM is forced to ask us for iconic
+/// bitmaps (`WM_DWMSENDICONIC*`) so the art is what the user sees. With no
+/// art — idle, or a track without embedded art — DWM renders the real
+/// window instead. Idempotent: does nothing if the mode is already correct.
+/// Main thread only, like every other DWM call here; failures are logged
+/// and ignored because the preview is cosmetic.
+fn sync_iconic_mode(ctx: &TaskbarContext) {
+    let want = ctx.now_playing.lock().image.is_some();
+    if ctx
+        .iconic_active
+        .swap(want, std::sync::atomic::Ordering::SeqCst)
+        == want
+    {
+        return;
+    }
+    if let Err(e) = set_iconic_attributes(ctx.hwnd, want) {
+        log::warn!("Failed to set taskbar iconic mode to {want}: {e:?}");
+    }
+}
+
+fn set_iconic_attributes(hwnd: HWND, enabled: bool) -> windows::core::Result<()> {
+    let value = BOOL::from(enabled);
+    for attribute in [DWMWA_HAS_ICONIC_BITMAP, DWMWA_FORCE_ICONIC_REPRESENTATION] {
+        unsafe {
+            DwmSetWindowAttribute(
+                hwnd,
+                attribute,
+                &value as *const _ as *const core::ffi::c_void,
+                std::mem::size_of::<BOOL>() as u32,
+            )?;
+        }
     }
     Ok(())
 }
@@ -323,7 +341,8 @@ unsafe extern "system" fn subclass_proc(
 /// window transitions *out* of the minimized state, so this only fires on
 /// restore, not on every resize.
 ///
-/// `force_iconic_representation`'s `DWMWA_FORCE_ICONIC_REPRESENTATION` tells
+/// While cover art is showing, `sync_iconic_mode`'s
+/// `DWMWA_FORCE_ICONIC_REPRESENTATION` tells
 /// DWM to always ask us for iconic bitmaps instead of taking its own live
 /// capture of the window. That capture is also what DWM's compositor falls
 /// back on to reconnect a window's surface after it's been minimized —
@@ -459,12 +478,16 @@ fn apply_playback_state(app: AppHandle, ctx_ptr: usize, state: PlaybackState) {
         // WM_DWMSENDICONICTHUMBNAIL/LIVEPREVIEWBITMAP) instead of continuing
         // to show whatever was last handed to it, which could otherwise
         // persist until some unrelated event happens to invalidate it.
-        // `HWND` wraps a raw pointer and isn't `Send`; it's just an opaque
-        // handle value here; reconstructed on the main thread it's actually
-        // used on.
-        let hwnd_value = ctx.hwnd.0 as isize;
-        let _ = app.run_on_main_thread(move || unsafe {
-            let _ = DwmInvalidateIconicBitmaps(HWND(hwnd_value as *mut core::ffi::c_void));
+        // `ctx_ptr` is a plain integer, so it crosses to the main thread
+        // where the HWND is actually used.
+        // The mode switch goes first so it and the bitmap change together.
+        let _ = app.run_on_main_thread(move || {
+            // SAFETY: same as above.
+            let ctx = unsafe { &*(ctx_ptr as *const TaskbarContext) };
+            sync_iconic_mode(ctx);
+            unsafe {
+                let _ = DwmInvalidateIconicBitmaps(ctx.hwnd);
+            }
         });
     });
 }
@@ -499,10 +522,11 @@ fn sync_thumbbar_buttons(ctx: &TaskbarContext, playing: bool, has_song: bool) {
 
 fn send_iconic_thumbnail(ctx: &TaskbarContext, hwnd: HWND, width: u32, height: u32) {
     match build_iconic_bitmap(ctx, width, height) {
-        Ok(hbitmap) => unsafe {
+        Ok(Some(hbitmap)) => unsafe {
             let _ = DwmSetIconicThumbnail(hwnd, hbitmap, 0);
             let _ = DeleteObject(hbitmap.into());
         },
+        Ok(None) => {}
         Err(e) => log::warn!("Failed to build taskbar iconic thumbnail: {e:?}"),
     }
 }
@@ -519,27 +543,28 @@ fn send_live_preview(ctx: &TaskbarContext, hwnd: HWND) {
     };
 
     match build_iconic_bitmap(ctx, width, height) {
-        Ok(hbitmap) => unsafe {
+        Ok(Some(hbitmap)) => unsafe {
             let _ = DwmSetIconicLivePreviewBitmap(hwnd, hbitmap, None, 0);
             let _ = DeleteObject(hbitmap.into());
         },
+        Ok(None) => {}
         Err(e) => log::warn!("Failed to build taskbar live preview bitmap: {e:?}"),
     }
 }
 
+/// Renders the current cover art for DWM, or `None` when there is none.
+/// `None` only happens in a race with `sync_iconic_mode` switching DWM back
+/// to the real window preview; the caller then sends nothing and DWM falls
+/// back to its own capture.
 fn build_iconic_bitmap(
     ctx: &TaskbarContext,
     box_w: u32,
     box_h: u32,
-) -> windows::core::Result<HBITMAP> {
-    let image = {
-        let now_playing = ctx.now_playing.lock();
-        now_playing
-            .image
-            .clone()
-            .unwrap_or_else(|| ctx.fallback_art.clone())
-    };
-    render_premultiplied_bitmap(&image, box_w, box_h)
+) -> windows::core::Result<Option<HBITMAP>> {
+    let image = ctx.now_playing.lock().image.clone();
+    image
+        .map(|image| render_premultiplied_bitmap(&image, box_w, box_h))
+        .transpose()
 }
 
 /// Scales `(src_w, src_h)` down (or up) to fit within `(max_w, max_h)`
@@ -747,14 +772,6 @@ fn point_in_triangle(pt: (f32, f32), v0: (f32, f32), v1: (f32, f32), v2: (f32, f
     let has_neg = d1 < 0.0 || d2 < 0.0 || d3 < 0.0;
     let has_pos = d1 > 0.0 || d2 > 0.0 || d3 > 0.0;
     !(has_neg && has_pos)
-}
-
-fn load_fallback_art() -> Arc<image::DynamicImage> {
-    const FALLBACK_ART_BYTES: &[u8] = include_bytes!("../icons/128x128.png");
-    Arc::new(
-        image::load_from_memory(FALLBACK_ART_BYTES)
-            .unwrap_or_else(|_| image::DynamicImage::new_rgba8(1, 1)),
-    )
 }
 
 #[cfg(test)]
