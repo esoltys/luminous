@@ -1634,8 +1634,6 @@ export const uk = {
   common: {
     closeDialog: "Закрити діалог",
     aboutField: "Про {field}",
-    scrollLeft: "Прокрутити ліворуч",
-    scrollRight: "Прокрутити праворуч",
     albumArtAlt: "Обкладинка альбому",
     openImages: "Відкрити зображення",
     openImagesCount: {

@@ -92,9 +92,9 @@ describe("AlbumCard.svelte", () => {
     expect(queryByTestId("favourite-corner-flag")).toBeNull();
   });
 
-  it("defaults widthClass to w-56 shrink-0", () => {
+  it("defaults widthClass to w-full so it fills its grid cell", () => {
     const { getByText } = render(AlbumCard, { props: { album: mockAlbum } });
     const card = getByText("Fake Nudes").closest("div.bg-brand-sidebar")!;
-    expect(card.className).toContain("w-56 shrink-0");
+    expect(card.className).toContain("w-full");
   });
 });
