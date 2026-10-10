@@ -304,6 +304,7 @@ verify with the user, not a reason to skip telling them.
 - Never hand-wrap lines in GitHub issue/PR bodies — GitHub renders single newlines as hard breaks. Write paragraphs as one long line.
 - Always use the repo PR template and the Epic/issue templates in `.github/`.
 - For Epic issues: do not list sub-issues in the description body — GitHub automatically shows them below the description if they are properly added as sub-issues (e.g. `gh issue edit <epic-id> --add-sub-issue <ids>`). If there are no related issues, leave the `## Related` section out entirely.
+- Epic sub-issue order is manual: `--add-sub-issue` does not keep the order you pass, so after linking, set the order yourself (dependencies first, cutover or cleanup last) with the GraphQL `reprioritizeSubIssue` mutation (`issueId`, `subIssueId`, and `afterId`, or `beforeId` to move one to the top), then re-read `subIssues` to confirm. Append later additions in place the same way.
 - Do NOT apply priority labels to issues. Priority lives in the Project board only.
 
 ## Issue Priority
@@ -338,7 +339,7 @@ punt either to the user.
   6. Create the issue using the GitHub CLI:
      - For bugs: `gh issue create --title "<Title>" --body-file "<PathToScratchFile>" --label "bug" --milestone "<Milestone>"`
      - For features: `gh issue create --title "<Title>" --body-file "<PathToScratchFile>" --milestone "<Milestone>"` (no label needed)
-     - For epics: `gh issue create --title "Epic: <Title>" --body-file "<PathToScratchFile>" --milestone "<Milestone>"` (no label needed). After creating the epic, link its sub-issues with `gh issue edit <epic-id> --add-sub-issue <id1>,<id2>...`. Never list sub-issues in the issue description body (GitHub automatically shows them below the description when added as sub-issues). If there are no related issues, leave the `## Related` section out entirely.
+     - For epics: `gh issue create --title "Epic: <Title>" --body-file "<PathToScratchFile>" --milestone "<Milestone>"` (no label needed). After creating the epic, link its sub-issues with `gh issue edit <epic-id> --add-sub-issue <id1>,<id2>...`, then put them in dependency order (see Issue & PR Formatting). Never list sub-issues in the issue description body (GitHub automatically shows them below the description when added as sub-issues). If there are no related issues, leave the `## Related` section out entirely.
      - Never add `--label P1`/`P2`/`P3`/`P4` (see Issue Priority above) — priority is a Project
        field, not a label.
   7. Verify the created issue by running `gh issue view <id>`.
