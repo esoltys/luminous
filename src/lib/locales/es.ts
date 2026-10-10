@@ -1107,7 +1107,9 @@ export const es = {
       one: "{count} pista reproducida",
       other: "{count} pistas reproducidas"
     },
-    dropToPlay: "o suelta archivos de audio para reproducirlos"
+    dropToPlay: "o suelta archivos de audio para reproducirlos",
+    queueProgress: "{current}/{total}",
+    queueProgressAria: "Pista {current} de {total}"
   },
 
   chipInput: {

@@ -38,6 +38,25 @@ export class PlayerStore {
   /** Auto Continue (#1235): the backend tops up the Queue with similar songs
    * as it nears its end, so the Queue never "finishes". */
   autoContinue = $state<boolean>(false);
+  /** 1-based index of the currently playing track within the active play order (#1605). */
+  playlistIndex = $state<number | null>(null);
+  /** Total number of tracks in the active play order (#1605). */
+  playlistTotal = $state<number>(0);
+
+  /**
+   * Formatted progress string for the active playlist/queue (e.g. "3/10"),
+   * or null if inactive, stopped, or playing a standalone single track (#1605).
+   */
+  get queueProgressText(): string | null {
+    if (this.playlistIndex === null || this.playlistTotal <= 1) {
+      return null;
+    }
+    return i18n.t(
+      "miniplayer.queueProgress",
+      { current: this.playlistIndex, total: this.playlistTotal },
+      `${this.playlistIndex}/${this.playlistTotal}`
+    );
+  }
 
   /** Celebration: queue just finished naturally (#182, Milestone tier). */
   queueJustCompleted = $state<boolean>(false);
@@ -273,6 +292,8 @@ export class PlayerStore {
     this.loudnessGainDb = state.loudness_gain_db;
     this.remainingPlaylistItems = state.remaining_playlist_items ?? 0;
     this.autoContinue = state.auto_continue ?? false;
+    this.playlistIndex = state.playlist_index ?? null;
+    this.playlistTotal = state.playlist_total ?? 0;
     if (!state.current_song) {
       this.audioPipeline = null;
     } else if (this.audioPipeline) {

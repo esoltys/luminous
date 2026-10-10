@@ -1864,6 +1864,10 @@ impl Player {
     /// Get the current playback state snapshot for the frontend.
     pub async fn get_state(&self) -> PlaybackState {
         let audio = self.audio.lock().await;
+        let (playlist_index, playlist_total) = match self.current_index {
+            Some(idx) => (Some(idx + 1), self.virtual_len()),
+            None => (None, self.virtual_len()),
+        };
         PlaybackState {
             state: audio.current_state(),
             current_song: self.current_song.clone(),
@@ -1881,6 +1885,8 @@ impl Player {
             loudness_gain_db: self.current_loudness_gain_db,
             remaining_playlist_items: self.remaining_playlist_items(),
             auto_continue: self.auto_continue,
+            playlist_index,
+            playlist_total,
         }
     }
 
@@ -3455,5 +3461,32 @@ mod tests {
             2,
             "without repeat, Previous must not wrap past the start"
         );
+    }
+
+    /// #1605: PlaybackState exposes 1-based playlist_index and total active tracks.
+    #[tokio::test]
+    async fn test_playback_state_playlist_index_and_total() {
+        let (_temp_dir, mut player, items) = player_with_songs(5, &[]);
+
+        // When stopped / idle before play
+        let idle_state = player.get_state().await;
+        assert_eq!(idle_state.playlist_index, None);
+        assert_eq!(idle_state.playlist_total, 0);
+
+        // Playing track at index 2 (the 3rd track, 1-based index 3)
+        player
+            .play_playlist(items.clone(), 2, 1, None)
+            .await
+            .unwrap();
+
+        let state = player.get_state().await;
+        assert_eq!(state.playlist_index, Some(3));
+        assert_eq!(state.playlist_total, 5);
+
+        // Advancing to next track
+        player.next_track().await.unwrap();
+        let next_state = player.get_state().await;
+        assert_eq!(next_state.playlist_index, Some(4));
+        assert_eq!(next_state.playlist_total, 5);
     }
 }

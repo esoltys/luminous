@@ -1107,7 +1107,9 @@ export const it = {
       one: "{count} brano riprodotto",
       other: "{count} brani riprodotti"
     },
-    dropToPlay: "oppure trascina file audio per riprodurli"
+    dropToPlay: "oppure trascina file audio per riprodurli",
+    queueProgress: "{current}/{total}",
+    queueProgressAria: "Traccia {current} di {total}"
   },
 
   chipInput: {

@@ -1113,7 +1113,9 @@ export const frFR: DeepStringRecord<typeof en> = {
       one: "{count} morceau lu",
       other: "{count} morceaux lus"
     },
-    dropToPlay: "ou déposez des fichiers audio pour lire"
+    dropToPlay: "ou déposez des fichiers audio pour lire",
+    queueProgress: "{current}/{total}",
+    queueProgressAria: "Piste {current} sur {total}"
   },
 
   chipInput: {

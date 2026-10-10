@@ -31,6 +31,7 @@
   import { parseLrc } from "../utils/lrc";
 
   let isSessionCompleted = $derived(!playerStore.currentSong && playerStore.completedSession !== null);
+  let coverWidth = $state(0);
 
   async function handleShuffleLibrary() {
     let songs = collectionStore.songs;
@@ -562,7 +563,10 @@
             {/if}
           </div>
         {:else}
-          <div class="relative aspect-square h-full max-h-full max-w-[90%] rounded-none overflow-hidden border border-brand-border/30 bg-brand-sidebar flex items-center justify-center {isHovered ? 'scale-[0.98]' : ''} transition-transform duration-300">
+          <div
+            bind:clientWidth={coverWidth}
+            class="relative aspect-square h-full max-h-full max-w-[90%] rounded-none overflow-hidden border border-brand-border/30 bg-brand-sidebar flex items-center justify-center {isHovered ? 'scale-[0.98]' : ''} transition-transform duration-300"
+          >
             <CoverArt
               songId={playerStore.currentSong?.id}
               artEmbedded={playerStore.currentSong?.art_embedded}
@@ -574,13 +578,28 @@
         {/if}
       </div>
 
-      <div class="w-full text-center px-2 py-1 flex flex-col items-center justify-center flex-shrink-0">
-        <span class="text-sm font-bold text-brand-text-primary truncate w-full" title={playerStore.currentSong?.title}>
+      <div
+        class="relative w-full max-w-[90%] text-center py-1 flex flex-col items-center justify-center flex-shrink-0"
+        style={coverWidth > 0 ? `width: ${coverWidth}px` : undefined}
+      >
+        <span class="text-sm font-bold text-brand-text-primary truncate w-full px-2" title={playerStore.currentSong?.title}>
           {playerStore.currentSongDisplayTitle}
         </span>
-        <span class="text-xs text-brand-text-secondary/70 truncate w-full mt-0.5" title={playerStore.currentSong?.artist}>
-          {playerStore.currentSong?.artist || (playerStore.currentSong ? i18n.t('collection.unknownArtist') : '')}
-        </span>
+        <div class="relative w-full flex items-center justify-center mt-0.5">
+          <span class="text-xs text-brand-text-secondary/70 truncate w-full px-8" title={playerStore.currentSong?.artist}>
+            {playerStore.currentSong?.artist || (playerStore.currentSong ? i18n.t('collection.unknownArtist') : '')}
+          </span>
+          {#if playerStore.queueProgressText}
+            <span
+              dir="ltr"
+              class="absolute right-0 top-1/2 -translate-y-1/2 text-[10px] font-mono tabular-nums text-brand-text-secondary/50 pointer-events-none select-none tracking-tight leading-none"
+              aria-label={i18n.t('miniplayer.queueProgressAria', { current: playerStore.playlistIndex, total: playerStore.playlistTotal }, `Track ${playerStore.playlistIndex} of ${playerStore.playlistTotal}`)}
+              title={i18n.t('miniplayer.queueProgressAria', { current: playerStore.playlistIndex, total: playerStore.playlistTotal }, `Track ${playerStore.playlistIndex} of ${playerStore.playlistTotal}`)}
+            >
+              {playerStore.queueProgressText}
+            </span>
+          {/if}
+        </div>
       </div>
     </div>
   {/if}

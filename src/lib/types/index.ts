@@ -283,6 +283,10 @@ export interface PlaybackState {
   remaining_playlist_items?: number;
   /** Auto Continue (#1235): top up the Queue with similar songs near its end. */
   auto_continue?: boolean;
+  /** 1-based index of the currently playing track within the active play order (#1605). */
+  playlist_index?: number;
+  /** Total number of tracks in the active play order (#1605). */
+  playlist_total?: number;
 }
 
 /** Shared shape for anything rendered as a `LibraryBadge` — a music source's
