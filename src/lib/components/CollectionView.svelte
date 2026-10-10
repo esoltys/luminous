@@ -2,6 +2,7 @@
   import ViewModeToggle from "./ViewModeToggle.svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { collectionStore } from "../stores/collection.svelte";
+  import { onDevScreenHooks } from "../scripting/devHooks";
   import { navigationStore } from "../stores/navigation.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
@@ -256,14 +257,11 @@
     }
   });
 
-  // Dev-only entry point for scripted captures (src/lib/scripting/screens.ts); release builds never load it.
+  // Dev-only entry points for scripted captures (src/lib/scripting/screens.ts).
   $effect(() => {
     if (!import.meta.env.DEV) return;
-    let off: (() => void) | undefined;
-    let cancelled = false;
-    import("../scripting/screens").then(({ registerScreenHook }) => {
-      if (cancelled) return;
-      off = registerScreenHook("setSort", (surface, field, ascending) => {
+    return onDevScreenHooks((hook) => [
+      hook("setSort", (surface, field, ascending) => {
         if (surface === "songs") {
           sortField = field as keyof Song;
           sortAsc = ascending;
@@ -274,12 +272,8 @@
           artistSortField = field as typeof artistSortField;
           artistSortAsc = ascending;
         }
-      });
-    });
-    return () => {
-      cancelled = true;
-      off?.();
-    };
+      }),
+    ]);
   });
 
   const albumKey = (album: AlbumItem) => album.artist + "|" + album.album;

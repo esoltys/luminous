@@ -2,6 +2,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { open, save } from "@tauri-apps/plugin-dialog";
   import { onMount } from "svelte";
+  import { onDevScreenHooks } from "../scripting/devHooks";
   import { i18n, formatNumber } from "../stores/i18n.svelte";
   import { loudnessStore } from "../stores/loudness.svelte";
   import {
@@ -562,26 +563,16 @@
     }
   }
 
-  // Dev-only entry points for scripted captures (src/lib/scripting/screens.ts); release builds never load them.
+  // Dev-only entry points for scripted captures (src/lib/scripting/screens.ts).
   $effect(() => {
     if (!import.meta.env.DEV) return;
-    let off: (() => void) | undefined;
-    let cancelled = false;
-    import("../scripting/screens").then(({ registerScreenHook }) => {
-      if (cancelled) return;
-      const offs = [
-        registerScreenHook("setEqualizerMode", handleModeChange),
-        registerScreenHook("selectEqualizerPreset", selectPreset),
-        registerScreenHook("openEqualizerPresetMenu", () => {
-          if (!presetMenuPos) togglePresetMenu();
-        }),
-      ];
-      off = () => offs.forEach((o) => o());
-    });
-    return () => {
-      cancelled = true;
-      off?.();
-    };
+    return onDevScreenHooks((hook) => [
+      hook("setEqualizerMode", handleModeChange),
+      hook("selectEqualizerPreset", selectPreset),
+      hook("openEqualizerPresetMenu", () => {
+        if (!presetMenuPos) togglePresetMenu();
+      }),
+    ]);
   });
 
   onMount(async () => {

@@ -3,6 +3,11 @@
 // should look like. `run` is only for scenes that need real interaction.
 import type { DevtoolsDriver } from "../devtools-driver";
 import type { LuminousScriptApi, ScriptViewSurface } from "../../src/lib/scripting/types";
+import type { ActiveSubTab, ActiveTab, SettingsTab } from "../../src/lib/stores/navigation.svelte";
+import type { Locale } from "../../src/lib/locales";
+
+/** The slice of DevtoolsDriver scenes and the runner use, so tests can fake it. */
+export type SceneDriver = Pick<DevtoolsDriver, "evaluate" | "screenshot" | "setWindowSize" | "invoke" | "send">;
 
 export type ColorScheme = "light" | "dark";
 
@@ -25,10 +30,10 @@ export interface Featured {
 }
 
 interface SceneView {
-  tab: string;
-  subTab?: string;
+  tab: ActiveTab;
+  subTab?: ActiveSubTab | "auto" | "custom";
   /** Opens Settings on this section instead of `tab`. */
-  settings?: string;
+  settings?: SettingsTab;
 }
 
 export interface SceneLayout {
@@ -48,8 +53,8 @@ export interface SortSpec {
 
 export interface SceneContext {
   readonly api: RemoteApi;
-  readonly driver: DevtoolsDriver;
-  readonly locale: string;
+  readonly driver: SceneDriver;
+  readonly locale: Locale;
   readonly scheme: ColorScheme;
   readonly featured: Featured;
   /** Looks up a UI string in the locale being captured (falls back like the app does). */
@@ -67,7 +72,7 @@ export interface Scene {
    */
   stage?: "fresh" | "library";
   /** Narrow to these locale tags. Defaults to every shipped locale. */
-  locales?: string[];
+  locales?: Locale[];
   /** Narrow to these schemes. Defaults to light and dark. */
   schemes?: ColorScheme[];
   /** Write into this folder instead of the scheme folder (e.g. "dynamic"). */

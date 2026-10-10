@@ -353,7 +353,7 @@ describe("In-app scripting API", () => {
       expect(collectionStore.visibleColumns.initial_key).toBe(true);
       await api.view.setColumnVisible("initial_key", false);
       expect(collectionStore.visibleColumns.initial_key).toBe(false);
-      await expect(api.view.setColumnVisible("nope", true)).rejects.toThrow(/Unknown song-table column "nope"/);
+      await expect(api.view.setColumnVisible("nope" as never, true)).rejects.toThrow(/Unknown song-table column "nope"/);
     });
 
     it("opens the smart-playlist builder with the given rules", async () => {

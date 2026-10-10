@@ -27,7 +27,7 @@ import { createRemoteApi } from "./scenes/remote-api";
 import { scenes } from "./scenes";
 import { ALL_SCHEMES, runScenes, summarize } from "./scene-runner";
 import type { ColorScheme } from "./scenes/types";
-import { LOCALES, catalogChain } from "../src/lib/locales";
+import { LOCALES, catalogChain, type Locale } from "../src/lib/locales";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const OUT_ROOT = path.join(REPO_ROOT, "docs/user-guide/assets");
@@ -43,8 +43,8 @@ function parseArgs(argv: string[]) {
   const scheme = value("scheme");
   if (scheme && !ALL_SCHEMES.includes(scheme as ColorScheme)) throw new Error(`--scheme must be light or dark, got "${scheme}".`);
   const locale = value("locale");
-  const allLocales: string[] = LOCALES.map((l) => l.tag);
-  if (locale && !allLocales.includes(locale)) throw new Error(`Unknown --locale "${locale}". Valid: ${allLocales.join(", ")}`);
+  const allLocales: Locale[] = LOCALES.map((l) => l.tag);
+  if (locale && !allLocales.includes(locale as Locale)) throw new Error(`Unknown --locale "${locale}". Valid: ${allLocales.join(", ")}`);
   const stage = value("stage");
   if (stage && stage !== "fresh" && stage !== "library") throw new Error(`--stage must be fresh or library, got "${stage}".`);
   const cloneArg = argv.find((a) => a === "--clone-profile" || a.startsWith("--clone-profile="));
@@ -56,14 +56,14 @@ function parseArgs(argv: string[]) {
     libraries,
     exe: value("exe") ?? path.join(REPO_ROOT, "target", "debug", "LuminousMusicPlayer.exe"),
     name: value("name"),
-    locales: locale ? [locale] : allLocales,
+    locales: locale ? [locale as Locale] : allLocales,
     schemes: scheme ? [scheme as ColorScheme] : undefined,
     stage: (cloneArg ? "library" : stage) as "fresh" | "library" | undefined,
     keepProfiles: argv.includes("--keep-profiles"),
   };
 }
 
-function translate(locale: string, keyPath: string): string {
+function translate(locale: Locale, keyPath: string): string {
   for (const catalog of catalogChain(locale)) {
     const found = keyPath.split(".").reduce<unknown>((obj, key) => (obj as Record<string, unknown> | undefined)?.[key], catalog);
     if (typeof found === "string") return found;
@@ -109,7 +109,6 @@ async function main() {
 
     const report = await runScenes({
       driver,
-      sceneDriver: driver,
       api,
       outRoot: OUT_ROOT,
       scenes,

@@ -1,6 +1,7 @@
 import type { ActiveTab, ActiveSubTab, SettingsTab, AutoPlaylistRef } from "../stores/navigation.svelte";
 import type { Song, PlaybackState } from "../types";
 import type { Locale } from "../stores/i18n.svelte";
+import type { VisibleColumns } from "../stores/collection.svelte";
 
 /**
  * Filter or target criteria for playing a song via the scripting API.
@@ -184,7 +185,7 @@ export interface ScriptViewApi {
   setViewModes(modes: Partial<Record<ScriptViewSurface, "cards" | "rows">>): Promise<void>;
   setSeekbarMode(mode: "waveform" | "bands"): Promise<void>;
   /** Shows or hides a song-table column by its key (e.g. "initial_key"). */
-  setColumnVisible(column: string, visible: boolean): Promise<void>;
+  setColumnVisible(column: keyof VisibleColumns, visible: boolean): Promise<void>;
   /** Switches the Organize view to a custom template pattern. */
   setOrganizeTemplate(template: string): Promise<void>;
   /** Opens the smart-playlist builder on Playlists → Custom, pre-filled with rules. */

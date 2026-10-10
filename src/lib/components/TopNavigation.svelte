@@ -16,6 +16,7 @@
   import { parseSearchRules, hasAdvancedSearchTerms, isSmartPlaylistSpec } from "../utils/filterParser";
   import { invoke } from "@tauri-apps/api/core";
   import { collectionStore } from "../stores/collection.svelte";
+  import { onDevScreenHooks } from "../scripting/devHooks";
   import { navigationStore, type AutoPlaylistRef } from "../stores/navigation.svelte";
   import { windowLayoutStore } from "../stores/windowLayout.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
@@ -48,32 +49,20 @@
     searchDebounceTimer = setTimeout(() => collectionStore.search(query), SEARCH_DEBOUNCE_MS);
   }
 
-  // Dev-only entry point for scripted captures (src/lib/scripting/screens.ts); release builds never load it.
+  // Dev-only entry points for scripted captures (src/lib/scripting/screens.ts).
   $effect(() => {
     if (!import.meta.env.DEV) return;
-    let off: (() => void) | undefined;
-    let cancelled = false;
-    import("../scripting/screens").then(({ registerScreenHook }) => {
-      if (cancelled) return;
-      off = registerScreenHook("search", async (query) => {
+    return onDevScreenHooks((hook) => [
+      hook("search", async (query) => {
         collectionStore.searchQuery = query;
         isSearchFocused = true;
         await collectionStore.search(query);
-      });
-      const offClose = registerScreenHook("closeSearch", () => {
+      }),
+      hook("closeSearch", () => {
         clearSearch();
         isSearchFocused = false;
-      });
-      const offSearch = off;
-      off = () => {
-        offSearch?.();
-        offClose();
-      };
-    });
-    return () => {
-      cancelled = true;
-      off?.();
-    };
+      }),
+    ]);
   });
 
   function focusFirstSearchResult() {

@@ -4,11 +4,9 @@
 // per pass, then runs every applicable scene without restarting anything. Each
 // scene is reset to a known state first, so a scene only declares what differs.
 import * as path from "node:path";
-import type { DevtoolsDriver } from "./devtools-driver";
-import type { ColorScheme, Featured, RemoteApi, Scene, SceneContext, SceneLayout, SortSpec, SortSurface, ViewMode } from "./scenes/types";
-
-/** The slice of DevtoolsDriver the runner uses, so tests can fake it. */
-type SceneDriver = Pick<DevtoolsDriver, "evaluate" | "screenshot" | "setWindowSize" | "invoke">;
+import type { Locale } from "../src/lib/locales";
+import type { ScriptViewSurface } from "../src/lib/scripting/types";
+import type { ColorScheme, Featured, RemoteApi, Scene, SceneContext, SceneDriver, SceneLayout, SortSpec, SortSurface, ViewMode } from "./scenes/types";
 
 export const ALL_SCHEMES: ColorScheme[] = ["light", "dark"];
 
@@ -29,7 +27,7 @@ const SCENE_DEFAULTS = {
     genres: "cards",
     pinned: "cards",
     artistReleases: "cards",
-  } as Record<string, ViewMode>,
+  } satisfies Record<ScriptViewSurface, ViewMode>,
   sort: {
     songs: { field: "title", ascending: true },
     albums: { field: "year", ascending: false },
@@ -39,13 +37,13 @@ const SCENE_DEFAULTS = {
 
 export interface Pass {
   stage: "fresh" | "library";
-  locale: string;
+  locale: Locale;
   scheme: ColorScheme;
   scenes: Scene[];
 }
 
 export interface PlanFilters {
-  locales: string[];
+  locales: Locale[];
   schemes?: ColorScheme[];
   name?: string;
   stage?: "fresh" | "library";
@@ -92,41 +90,31 @@ export function planPasses(scenes: Scene[], filters: PlanFilters): Pass[] {
   return passes;
 }
 
-export function outputPath(outRoot: string, scene: Scene, locale: string, scheme: ColorScheme): string {
+export function outputPath(outRoot: string, scene: Scene, locale: Locale, scheme: ColorScheme): string {
   return path.join(outRoot, locale, "screenshots", scene.outputSubdir ?? scheme, scene.file);
 }
 
 interface SceneFailure {
   scene: string;
-  locale: string;
+  locale: Locale;
   scheme: ColorScheme;
   error: string;
-}
-
-interface SceneTiming {
-  scene: string;
-  locale: string;
-  scheme: ColorScheme;
-  ms: number;
 }
 
 export interface RunReport {
   saved: string[];
   failures: SceneFailure[];
-  timings: SceneTiming[];
   totalMs: number;
 }
 
 export interface RunOptions {
   driver: SceneDriver;
-  /** The driver again, typed as a full DevtoolsDriver for scenes' escape hatch. */
-  sceneDriver?: DevtoolsDriver;
   api: RemoteApi;
   outRoot: string;
   filters: PlanFilters;
   scenes: Scene[];
   /** Looks up a UI string in a locale. */
-  translate(locale: string, keyPath: string): string;
+  translate(locale: Locale, keyPath: string): string;
   /** Runs between the fresh and library phases: add the library, seed startup prefs. */
   prepareLibrary?(): Promise<void>;
   log?(line: string): void;
@@ -175,26 +163,42 @@ export async function runScenes(opts: RunOptions): Promise<RunReport> {
   const log = opts.log ?? ((line: string) => console.log(line));
   const sleep = opts.sleep ?? realSleep;
   const started = Date.now();
-  const report: RunReport = { saved: [], failures: [], timings: [], totalMs: 0 };
+  const report: RunReport = { saved: [], failures: [], totalMs: 0 };
 
   const passes = planPasses(opts.scenes, opts.filters);
   const total = passes.reduce((n, p) => n + p.scenes.length, 0);
   let done = 0;
 
-  let viewportKey = "";
-  let playingKey = "";
-  let onlineNow: boolean | undefined;
-  let playingLength: number | undefined;
+  // What the app is showing right now, so a reset only re-applies what a scene changes.
+  const shown = {
+    viewport: "",
+    song: "",
+    songLength: undefined as number | undefined,
+    online: undefined as boolean | undefined,
+    locale: "",
+    scheme: "",
+  };
   let libraryPrepared = false;
-  let currentLocale = "";
-  let currentScheme = "";
+
+  // Windows can briefly lock a PNG that a previewer or indexer just opened; retry the write.
+  async function writeScreenshot(file: string, clip?: { x: number; y: number; width: number; height: number } | null) {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        await driver.screenshot({ path: file, ...(clip ? { clip } : {}) });
+        return;
+      } catch (err) {
+        if (attempt >= 3) throw err;
+        await sleep(300);
+      }
+    }
+  }
 
   async function resetAndCapture(scene: Scene, pass: Pass): Promise<string> {
     const featured = { ...SCENE_DEFAULTS.featured, ...scene.featured };
     const layout = { ...SCENE_DEFAULTS.layout, ...scene.layout };
     const ctx: SceneContext = {
       api,
-      driver: (opts.sceneDriver ?? driver) as DevtoolsDriver,
+      driver,
       locale: pass.locale,
       scheme: pass.scheme,
       featured,
@@ -207,31 +211,31 @@ export async function runScenes(opts: RunOptions): Promise<RunReport> {
 
     const viewport = scene.viewport ?? SCENE_DEFAULTS.viewport;
     const key = `${viewport.width}x${viewport.height}`;
-    if (key !== viewportKey) {
+    if (key !== shown.viewport) {
       await driver.setWindowSize(viewport.width, viewport.height);
-      viewportKey = key;
+      shown.viewport = key;
     }
 
     const online = scene.online ?? false;
-    if (online !== onlineNow) {
+    if (online !== shown.online) {
       await driver.invoke("set_online_enabled", { enabled: online });
-      onlineNow = online;
+      shown.online = online;
     }
 
     await api.appearance.setTheme(scene.theme ?? SCENE_DEFAULTS.theme);
 
     if (pass.stage === "library") {
       const songKey = `${featured.artist}\u0000${featured.song}`;
-      if (songKey !== playingKey) {
+      if (songKey !== shown.song) {
         const played = await api.playback.play({ title: featured.song, artist: featured.artist });
-        playingLength = played.length_nanosec;
-        playingKey = songKey;
+        shown.songLength = played.length_nanosec;
+        shown.song = songKey;
       }
-      await api.playback.seek(clampPosition(scene.position ?? SCENE_DEFAULTS.position, playingLength));
+      await api.playback.seek(clampPosition(scene.position ?? SCENE_DEFAULTS.position, shown.songLength));
     }
 
-    if (scene.view?.settings) await api.navigate.settings(scene.view.settings as never);
-    else if (scene.view) await api.navigate.to(scene.view.tab as never, scene.view.subTab as never);
+    if (scene.view?.settings) await api.navigate.settings(scene.view.settings);
+    else if (scene.view) await api.navigate.to(scene.view.tab, scene.view.subTab);
 
     await api.view.setViewModes({ ...SCENE_DEFAULTS.views, ...scene.views });
     if (scene.view?.tab === "collection") {
@@ -255,19 +259,11 @@ export async function runScenes(opts: RunOptions): Promise<RunReport> {
       const file = outputPath(outRoot, scene, pass.locale, pass.scheme);
       const clip = scene.clip ? await driver.evaluate(ELEMENT_RECT, scene.clip) : undefined;
       if (scene.clip && !clip) throw new Error(`No element matches "${scene.clip}"`);
-      // Windows can briefly lock a PNG that a previewer or indexer just opened; retry the write.
-      for (let attempt = 1; ; attempt++) {
-        try {
-          await driver.screenshot({ path: file, ...(clip ? { clip } : {}) });
-          break;
-        } catch (err) {
-          if (attempt >= 3) throw err;
-          await sleep(300);
-        }
-      }
+      await writeScreenshot(file, clip);
       return file;
     } finally {
-      await scene.cleanup?.(ctx);
+      // A failing cleanup must not hide why the scene itself failed.
+      await scene.cleanup?.(ctx).catch((err) => log(`cleanup of ${scene.name} failed: ${err instanceof Error ? err.message : err}`));
     }
   }
 
@@ -275,16 +271,16 @@ export async function runScenes(opts: RunOptions): Promise<RunReport> {
     if (pass.stage === "library" && !libraryPrepared) {
       await opts.prepareLibrary?.();
       libraryPrepared = true;
-      viewportKey = "";
-      playingKey = "";
+      shown.viewport = "";
+      shown.song = "";
     }
-    if (pass.locale !== currentLocale) {
-      await api.appearance.setLocale(pass.locale as never);
-      currentLocale = pass.locale;
+    if (pass.locale !== shown.locale) {
+      await api.appearance.setLocale(pass.locale);
+      shown.locale = pass.locale;
     }
-    if (pass.scheme !== currentScheme) {
+    if (pass.scheme !== shown.scheme) {
       await api.appearance.setColorScheme(pass.scheme);
-      currentScheme = pass.scheme;
+      shown.scheme = pass.scheme;
     }
     for (const scene of pass.scenes) {
       done++;
@@ -292,9 +288,7 @@ export async function runScenes(opts: RunOptions): Promise<RunReport> {
       try {
         const file = await resetAndCapture(scene, pass);
         report.saved.push(file);
-        const ms = Date.now() - t0;
-        report.timings.push({ scene: scene.name, locale: pass.locale, scheme: pass.scheme, ms });
-        log(`[${done}/${total}] ${pass.locale}/${pass.scheme}/${scene.name} ${ms}ms`);
+        log(`[${done}/${total}] ${pass.locale}/${pass.scheme}/${scene.name} ${Date.now() - t0}ms`);
       } catch (err) {
         const error = err instanceof Error ? err.message : String(err);
         report.failures.push({ scene: scene.name, locale: pass.locale, scheme: pass.scheme, error });

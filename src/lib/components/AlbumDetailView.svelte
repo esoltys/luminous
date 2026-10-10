@@ -5,6 +5,7 @@
   import { listen } from "@tauri-apps/api/event";
   import { applySongStats, type SongStatsPayload, applyAlbumStats, type AlbumStatsPayload } from "../utils/stats";
   import { collectionStore } from "../stores/collection.svelte";
+  import { onDevScreenHooks } from "../scripting/devHooks";
   import { navigationStore } from "../stores/navigation.svelte";
   import { windowLayoutStore } from "../stores/windowLayout.svelte";
   import { playerStore } from "../stores/player.svelte";
@@ -300,18 +301,10 @@
 
   let isEditorOpen = $state(false);
 
-  // Dev-only entry point for scripted captures (src/lib/scripting/screens.ts); release builds never load it.
+  // Dev-only entry points for scripted captures (src/lib/scripting/screens.ts).
   $effect(() => {
     if (!import.meta.env.DEV) return;
-    let off: (() => void) | undefined;
-    let cancelled = false;
-    import("../scripting/screens").then(({ registerScreenHook }) => {
-      if (!cancelled) off = registerScreenHook("openAlbumEditor", () => { isEditorOpen = true; });
-    });
-    return () => {
-      cancelled = true;
-      off?.();
-    };
+    return onDevScreenHooks((hook) => [hook("openAlbumEditor", () => { isEditorOpen = true; })]);
   });
   let albumProfile = $derived(collectionStore.getAlbumProfile(albumName));
   let hasDescription = $derived(!!albumProfile?.description?.trim());
