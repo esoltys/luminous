@@ -1555,8 +1555,6 @@ export const es = {
   common: {
     closeDialog: "Cerrar el cuadro de diálogo",
     aboutField: "Acerca de {field}",
-    scrollLeft: "Desplazar a la izquierda",
-    scrollRight: "Desplazar a la derecha",
     albumArtAlt: "Carátula del álbum",
     openImages: "Abrir imágenes",
     openImagesCount: {

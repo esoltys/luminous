@@ -1555,8 +1555,6 @@ export const it = {
   common: {
     closeDialog: "Chiudi la finestra di dialogo",
     aboutField: "Informazioni su {field}",
-    scrollLeft: "Scorri a sinistra",
-    scrollRight: "Scorri a destra",
     albumArtAlt: "Copertina dell'album",
     openImages: "Apri immagini",
     openImagesCount: {

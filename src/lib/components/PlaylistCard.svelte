@@ -25,7 +25,7 @@
   let {
     playlist,
     onClick,
-    widthClass = "w-56 shrink-0",
+    widthClass = "w-full",
     oncontextmenu,
     onContextMenu,
   }: {
