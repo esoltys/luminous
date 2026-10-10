@@ -1634,8 +1634,6 @@ export const fr: DeepStringRecord<typeof en> = {
   common: {
     closeDialog: "Fermer la boîte de dialogue",
     aboutField: "À propos de {field}",
-    scrollLeft: "Défiler vers la gauche",
-    scrollRight: "Défiler vers la droite",
     albumArtAlt: "Pochette d'album",
     openImages: "Ouvrir les images",
     openImagesCount: {

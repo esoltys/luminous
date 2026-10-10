@@ -1558,8 +1558,6 @@ export const en = {
   common: {
     closeDialog: "Close dialog",
     aboutField: "About {field}",
-    scrollLeft: "Scroll left",
-    scrollRight: "Scroll right",
     albumArtAlt: "Album Art",
     openImages: "Open images",
     openImagesCount: {

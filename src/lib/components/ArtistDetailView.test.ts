@@ -747,7 +747,7 @@ describe("ArtistDetailView", () => {
       }
     });
 
-    it("renders album cards with w-56 width to match Album collection view size", async () => {
+    it("lays album cards out in a responsive grid, each filling its cell", async () => {
       collectionStore.albums = [
         {
           album: "Come On Over",
@@ -778,7 +778,8 @@ describe("ArtistDetailView", () => {
 
       const { findByText } = render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
       const albumTitle = await findByText("Come On Over");
-      const card = albumTitle.closest(".w-56.shrink-0");
+      const card = albumTitle.closest(".w-full.bg-brand-sidebar");
       expect(card).toBeTruthy();
+      expect(card!.closest("[data-testid=card-section-grid]")).toBeTruthy();
     });
 });

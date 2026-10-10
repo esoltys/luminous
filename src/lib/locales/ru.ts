@@ -1634,8 +1634,6 @@ export const ru = {
   common: {
     closeDialog: "Закрыть диалог",
     aboutField: "Подробнее: {field}",
-    scrollLeft: "Прокрутить влево",
-    scrollRight: "Прокрутить вправо",
     albumArtAlt: "Обложка альбома",
     openImages: "Открыть изображения",
     openImagesCount: {

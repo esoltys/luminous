@@ -23,7 +23,7 @@
   import { prefs } from "../stores/prefs.svelte";
   import TagEditor from "./TagEditor.svelte";
   import IconActionButton from "./IconActionButton.svelte";
-  import HorizontalScrollRow from "./HorizontalScrollRow.svelte";
+  import CardSection from "./CardSection.svelte";
   import PlayShuffleButtons from "./PlayShuffleButtons.svelte";
   import ArtistProfileEditor from "./ArtistProfileEditor.svelte";
   import MarkdownBio from "./MarkdownBio.svelte";
@@ -1055,7 +1055,7 @@
     {/if}
 
     {#if sets.length > 0}
-      <HorizontalScrollRow title={i18n.t('artistDetail.setsFilter', { count: sets.length })}>
+      <CardSection title={i18n.t('artistDetail.setsFilter', { count: sets.length })}>
         {#each sets as album (album.album)}
           <AlbumCard
             {album}
@@ -1063,11 +1063,11 @@
             oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
           />
         {/each}
-      </HorizontalScrollRow>
+      </CardSection>
     {/if}
 
     {#if fullAlbums.length > 0}
-      <HorizontalScrollRow title={i18n.t('artistDetail.albumsFilter', { count: fullAlbums.length })}>
+      <CardSection title={i18n.t('artistDetail.albumsFilter', { count: fullAlbums.length })}>
         {#each fullAlbums as album (album.album)}
           <AlbumCard
             {album}
@@ -1075,11 +1075,11 @@
             oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
           />
         {/each}
-      </HorizontalScrollRow>
+      </CardSection>
     {/if}
 
     {#if eps.length > 0}
-      <HorizontalScrollRow title={i18n.t('artistDetail.epsFilter', { count: eps.length })}>
+      <CardSection title={i18n.t('artistDetail.epsFilter', { count: eps.length })}>
         {#each eps as album (album.album)}
           <AlbumCard
             {album}
@@ -1087,7 +1087,7 @@
             oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
           />
         {/each}
-      </HorizontalScrollRow>
+      </CardSection>
     {/if}
 
     {#if singleSongs.length > 0}
@@ -1121,7 +1121,7 @@
 
   {#if compilations.length > 0}
     <div class="px-6 pt-10">
-      <HorizontalScrollRow title={i18n.t('artistDetail.compilationsFeaturing', { artist: artistName })}>
+      <CardSection title={i18n.t('artistDetail.compilationsFeaturing', { artist: artistName })}>
         {#each compilations as album (album.album)}
           <AlbumCard
             {album}
@@ -1129,13 +1129,13 @@
             oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
           />
         {/each}
-      </HorizontalScrollRow>
+      </CardSection>
     </div>
   {/if}
 
   {#if playlists.length > 0}
     <div class="px-6 pt-10 {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
-      <HorizontalScrollRow title={i18n.t('artistDetail.playlistsFeaturing', { artist: artistName })}>
+      <CardSection title={i18n.t('artistDetail.playlistsFeaturing', { artist: artistName })}>
         {#each playlists as playlist (playlist.id)}
           <PlaylistCard
             {playlist}
@@ -1143,7 +1143,7 @@
             oncontextmenu={(e) => handlePlaylistContextMenu(e, playlist)}
           />
         {/each}
-      </HorizontalScrollRow>
+      </CardSection>
     </div>
   {:else}
     <div class="{playerStore.currentSong ? 'pb-28' : 'pb-6'}"></div>

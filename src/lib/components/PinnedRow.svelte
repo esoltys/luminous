@@ -15,7 +15,7 @@
     queueAutoPlaylistAsPlaylist
   } from "../utils/playlist";
   import { collectionStore } from "../stores/collection.svelte";
-  import HorizontalScrollRow from "./HorizontalScrollRow.svelte";
+  import CardSection from "./CardSection.svelte";
   import AlbumCard from "./AlbumCard.svelte";
   import ArtistCard from "./ArtistCard.svelte";
   import PlaylistCard from "./PlaylistCard.svelte";
@@ -192,7 +192,7 @@
 </script>
 
 {#if visibleItems.length > 0}
-  <HorizontalScrollRow title={i18n.t('home.pinned')}>
+  <CardSection title={i18n.t('home.pinned')}>
     {#each visibleItems as item, index (keyFor(item))}
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div
@@ -200,7 +200,7 @@
         onpointerdown={(e) => handleCardPointerDown(e, index)}
         oncontextmenu={(e) => handleContextMenu(e, item)}
         ondragstart={(e) => e.preventDefault()}
-        class="relative w-44 shrink-0 snap-start transition-opacity rounded-xl cursor-grab active:cursor-grabbing {draggedIndex === index ? 'opacity-40' : ''}"
+        class="relative transition-opacity rounded-xl cursor-grab active:cursor-grabbing {draggedIndex === index ? 'opacity-40' : ''}"
       >
         {#if item.type === "album"}
           <AlbumCard
@@ -250,7 +250,7 @@
         {/if}
       </div>
     {/each}
-  </HorizontalScrollRow>
+  </CardSection>
 {/if}
 
 {#if contextMenuState}
