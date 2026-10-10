@@ -245,10 +245,6 @@
   style="width: {width}px;"
   class="relative bg-brand-sidebar flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0 overflow-hidden {themeStore.isGlassTheme ? 'glass-surface' : ''}"
 >
-  <!-- The floating PlayerBar dock (h-20 + bottom-4 inset = 96px = mb-24) overlays
-       the bottom of the app on top of this panel — a bottom *margin* (rather than
-       inner padding) actually shrinks this div's own box, so its scrollbar ends
-       above the dock instead of running the full sidebar height behind it. -->
   {#if onClose}
     <button
       type="button"
@@ -260,6 +256,10 @@
       <X size={14} />
     </button>
   {/if}
+  <!-- The floating PlayerBar dock (h-20 + bottom-4 inset = 96px = mb-24) overlays
+       the bottom of the app on top of this panel — a bottom *margin* (rather than
+       inner padding) actually shrinks this div's own box, so its scrollbar ends
+       above the dock instead of running the full sidebar height behind it. -->
   <div class="flex-1 min-h-0 overflow-y-auto px-6 pt-6 pb-6 space-y-6 {currentSong ? 'mb-24' : ''}">
     {#if currentSong}
       <h2 class="text-xs font-bold text-brand-text-secondary uppercase tracking-wider">
