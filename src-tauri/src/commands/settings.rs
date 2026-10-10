@@ -43,6 +43,11 @@ pub struct UiPreferences {
     pub playlists_custom_view_mode: String,
     pub genre_view_mode: String,
     pub genre_cards_view_mode: String,
+    /// Cards/Rows layout of Home > Pinned (#1620).
+    pub pinned_view_mode: String,
+    /// Cards/Rows layout shared by every release and playlist section of the
+    /// artist view (#1620).
+    pub artist_releases_view_mode: String,
     pub genre_sort_field: String,
     pub genre_sort_asc: bool,
     pub week_start: String,
@@ -73,6 +78,8 @@ impl Default for UiPreferences {
             playlists_custom_view_mode: "cards".into(),
             genre_view_mode: "genre".into(),
             genre_cards_view_mode: "cards".into(),
+            pinned_view_mode: "cards".into(),
+            artist_releases_view_mode: "cards".into(),
             genre_sort_field: "name".into(),
             genre_sort_asc: true,
             week_start: "sunday".into(),
@@ -89,7 +96,7 @@ impl Default for UiPreferences {
 impl UiPreferences {
     /// Field ↔ app_state key mapping, shared by load and store so the two
     /// can't drift.
-    fn fields(&mut self) -> [(&'static str, &mut String, &'static [&'static str]); 11] {
+    fn fields(&mut self) -> [(&'static str, &mut String, &'static [&'static str]); 13] {
         const RATING: &[&str] = &["heart", "stars", "both"];
         const SEEKBAR: &[&str] = &["waveform", "bands"];
         const VIEW: &[&str] = &["cards", "rows"];
@@ -117,6 +124,12 @@ impl UiPreferences {
             (
                 "genre_cards_view_mode",
                 &mut self.genre_cards_view_mode,
+                VIEW,
+            ),
+            ("pinned_view_mode", &mut self.pinned_view_mode, VIEW),
+            (
+                "artist_releases_view_mode",
+                &mut self.artist_releases_view_mode,
                 VIEW,
             ),
             ("genre_sort_field", &mut self.genre_sort_field, GENRE_SORT),
@@ -451,6 +464,23 @@ mod tests {
         conn.execute_batch("CREATE TABLE app_state (key TEXT PRIMARY KEY, value TEXT)")
             .unwrap();
         conn
+    }
+
+    #[test]
+    fn pinned_and_artist_view_modes_default_to_cards_and_reject_unknown_values() {
+        let prefs = load_ui_preferences(&app_state_conn());
+        assert_eq!(prefs.pinned_view_mode, "cards");
+        assert_eq!(prefs.artist_releases_view_mode, "cards");
+
+        let conn = app_state_conn();
+        conn.execute_batch(
+            "INSERT INTO app_state VALUES ('pinned_view_mode', 'rows');
+             INSERT INTO app_state VALUES ('artist_releases_view_mode', 'bogus');",
+        )
+        .unwrap();
+        let prefs = load_ui_preferences(&conn);
+        assert_eq!(prefs.pinned_view_mode, "rows");
+        assert_eq!(prefs.artist_releases_view_mode, "cards");
     }
 
     #[test]

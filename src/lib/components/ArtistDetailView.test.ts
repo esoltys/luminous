@@ -782,4 +782,38 @@ describe("ArtistDetailView", () => {
       expect(card).toBeTruthy();
       expect(card!.closest("[data-testid=card-section-grid]")).toBeTruthy();
     });
+
+    it("shows one Cards/Rows toggle that switches every release section to rows", async () => {
+      const release = { artist: "Shania Twain", year: 1997, disc_count: 1, art_embedded: false, art_automatic: null, art_manual: null, rating: -1 };
+      collectionStore.albums = [
+        { ...release, album: "Come On Over", track_count: 16, total_duration_nanosec: 3_600_000_000_000 },
+        { ...release, album: "Short Cuts", track_count: 5, total_duration_nanosec: 1_200_000_000_000 },
+      ];
+      vi.mocked(invoke).mockImplementation((cmd: string) => {
+        if (cmd === "get_songs_by_artist") return Promise.resolve([]);
+        if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
+        if (cmd === "get_compilations_by_artist") return Promise.resolve([]);
+        if (cmd === "get_artist_profile") return Promise.resolve(collectionStore.artistProfiles["shania twain"]);
+        return Promise.resolve();
+      });
+      const setMode = vi.spyOn(prefs, "setArtistReleasesViewMode").mockImplementation(() => {});
+      prefs.artistReleasesViewMode = "rows";
+
+      try {
+        const { findByText, getAllByRole, container } = render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
+        await findByText("Come On Over");
+        await findByText("Short Cuts");
+
+        const grids = container.querySelectorAll("[data-testid=card-section-grid]");
+        expect(grids).toHaveLength(2);
+        grids.forEach((grid) => expect(grid.className).toContain("minmax(280px,1fr)"));
+
+        const toggles = getAllByRole("button", { name: "Card view" });
+        expect(toggles).toHaveLength(1);
+        await fireEvent.click(toggles[0]);
+        expect(setMode).toHaveBeenCalledWith("cards");
+      } finally {
+        prefs.artistReleasesViewMode = "cards";
+      }
+    });
 });
