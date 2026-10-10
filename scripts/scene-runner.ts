@@ -131,6 +131,10 @@ const SETTLE_PAGE = async () => {
   );
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   await window.__LUMINOUS_SCRIPT__!.wait.settled();
+  // View crossfades and slides are Web Animations; looping ones (spinners, glow) never end, so skip them.
+  const finite = () => document.getAnimations().filter((a) => a.effect?.getComputedTiming().iterations !== Infinity && a.playState === "running");
+  const deadline = Date.now() + 3000;
+  while (finite().length > 0 && Date.now() < deadline) await Promise.allSettled(finite().map((a) => a.finished));
 };
 
 const ELEMENT_RECT = (selector: string) => {
