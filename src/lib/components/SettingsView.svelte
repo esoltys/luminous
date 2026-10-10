@@ -27,29 +27,7 @@
   ];
 
   onMount(() => {
-    (async () => {
-      try {
-        if (!navigationStore.settingsSubTab || navigationStore.settingsSubTab === "general") {
-          const settings = await invoke<Record<string, string>>("get_all_app_settings");
-          if (settings && settings.active_settings_tab) {
-            const savedTab = settings.active_settings_tab as SettingsTab;
-            if (savedTab === "general" || savedTab === "system" || savedTab === "sources" || savedTab === "integrations" || savedTab === "themes" || savedTab === "equalizer" || savedTab === "about") {
-              settingsTab = savedTab;
-              navigationStore.settingsSubTab = savedTab;
-            } else if ((savedTab as string) === "folders") {
-              settingsTab = "sources";
-              navigationStore.settingsSubTab = "sources";
-            }
-          }
-        } else {
-          settingsTab = navigationStore.settingsSubTab;
-        }
-      } catch (e) {
-        console.error("Failed to fetch settings on mount:", e);
-      } finally {
-        isTabInitialized = true;
-      }
-    })();
+    isTabInitialized = true;
   });
 
   $effect(() => {

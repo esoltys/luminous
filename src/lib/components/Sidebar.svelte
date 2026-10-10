@@ -92,8 +92,7 @@
   }
 
   function navigateToSourcesSettings() {
-    navigationStore.activeTab = "settings";
-    invoke("set_app_setting", { key: "active_settings_tab", value: "sources" });
+    navigationStore.openSettings("sources");
   }
 
   async function handleAddDirectory() {

@@ -32,6 +32,14 @@ describe("SettingsView.svelte", () => {
     expect(await findByText("General Settings")).toBeInTheDocument();
   });
 
+  it("does not read the saved tab from the backend on mount", async () => {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const { findByText } = render(SettingsView);
+    await findByText("General Settings");
+
+    expect(invoke).not.toHaveBeenCalledWith("get_all_app_settings");
+  });
+
   it("persists the active tab via set_app_setting when switching tabs", async () => {
     const { invoke } = await import("@tauri-apps/api/core");
     const { findByText, getByText } = render(SettingsView);
@@ -68,21 +76,6 @@ describe("SettingsView.svelte", () => {
     await findByText("General Settings");
 
     await fireEvent.click(getByText("Sources"));
-
-    expect(invoke).toHaveBeenCalledWith("set_app_setting", { key: "active_settings_tab", value: "sources" });
-  });
-
-  it("migrates legacy folders setting to sources on mount", async () => {
-    const { invoke } = await import("@tauri-apps/api/core");
-    vi.mocked(invoke).mockImplementation((cmd: string) => {
-      if (cmd === "get_all_app_settings") {
-        return Promise.resolve({ active_settings_tab: "folders" });
-      }
-      return Promise.resolve([]);
-    });
-
-    const { findByText } = render(SettingsView);
-    await findByText("Watched Folders");
 
     expect(invoke).toHaveBeenCalledWith("set_app_setting", { key: "active_settings_tab", value: "sources" });
   });

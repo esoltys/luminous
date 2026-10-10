@@ -76,6 +76,7 @@
               navigationStore.activeTab = settings.active_tab as ActiveTab;
             }
           }
+          navigationStore.restoreSettingsSubTab(settings.active_settings_tab);
           if (settings.active_sub_tab) {
             navigationStore.activeSubTab = settings.active_sub_tab as ActiveSubTab;
           }
