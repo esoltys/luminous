@@ -133,9 +133,14 @@ const OUTWARD_KEY_PATTERNS = ["scrobbler_%", "listenbrainz_%", "discord_%"];
 
 /**
  * Copies `source` to `dest` with VACUUM INTO (consistent even while the app has it open
- * in WAL mode; the source is opened read-only) and makes the copy safe to run:
- * outward-facing integrations are cleared, and a library with no chosen default is
- * pinned to "none" so the app can't link one and write a hierarchy sidecar into a music folder.
+ * in WAL mode; the source is opened read-only) and makes the copy safe to run. The copy
+ * still points at the real library files, so anything that would write to them or reach
+ * outside the machine is switched off:
+ * - scrobbling, ListenBrainz and Discord presence (OUTWARD_KEY_PATTERNS) and any queued Subsonic scrobbles;
+ * - auto-organize, which moves files on disk when the watcher sees a change;
+ * - a library with no chosen default is pinned to "none" so the app can't link one and
+ *   write a hierarchy sidecar into a music folder.
+ * Left as is: WebDAV/Subsonic servers (background sync only writes to the copy).
  */
 export function cloneDatabase(source: string, dest: string): void {
   if (!existsSync(source)) throw new Error(`No database to clone at ${source}.`);
@@ -149,6 +154,14 @@ export function cloneDatabase(source: string, dest: string): void {
   const copy = new Database(dest);
   try {
     for (const pattern of OUTWARD_KEY_PATTERNS) copy.run("DELETE FROM app_state WHERE key LIKE ?", [pattern]);
+    const hasTable = (name: string) => !!copy.query("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name);
+    if (hasTable("subsonic_scrobble_queue")) copy.run("DELETE FROM subsonic_scrobble_queue");
+    const organize = copy.query("SELECT value FROM app_state WHERE key = 'organize_config'").get() as { value: string } | null;
+    if (organize) {
+      const config = JSON.parse(organize.value) as Record<string, unknown>;
+      config.auto_organize = false;
+      copy.run("UPDATE app_state SET value = ? WHERE key = 'organize_config'", [JSON.stringify(config)]);
+    }
     const hasDefault = copy.query("SELECT 1 FROM app_state WHERE key = 'default_library_path'").get();
     if (!hasDefault) copy.run("INSERT INTO app_state (key, value) VALUES ('default_library_path', '')");
   } finally {

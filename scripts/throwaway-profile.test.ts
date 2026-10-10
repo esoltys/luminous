@@ -207,6 +207,29 @@ describe("throwaway-profile", () => {
       }
     });
 
+    it("turns auto-organize off in the copy only, and empties the Subsonic scrobble queue", async () => {
+      const source = new AppProfile();
+      const config = { auto_organize: true, template: "%albumartist/%title", preset: "default" };
+      source.writeAppState({ organize_config: JSON.stringify(config) });
+      const db = new Database(source.dbPath);
+      db.exec("CREATE TABLE subsonic_scrobble_queue (server_id INTEGER, remote_id TEXT, listened_at INTEGER)");
+      db.exec("INSERT INTO subsonic_scrobble_queue VALUES (1, 't0', 1700000000)");
+      db.close();
+
+      const clone = new AppProfile({ cloneFrom: source.dbPath });
+      try {
+        const read = (p: AppProfile) =>
+          JSON.parse(rows<{ value: string }>(p.dbPath, "SELECT value FROM app_state WHERE key = 'organize_config'")[0].value);
+        expect(read(clone)).toEqual({ ...config, auto_organize: false });
+        expect(read(source).auto_organize).toBe(true);
+        expect(rows(clone.dbPath, "SELECT * FROM subsonic_scrobble_queue")).toEqual([]);
+        expect(rows(source.dbPath, "SELECT * FROM subsonic_scrobble_queue").length).toBe(1);
+      } finally {
+        await clone.dispose();
+        await source.dispose();
+      }
+    });
+
     it("pins an unchosen default library to none so no sidecar can be written, but keeps a chosen one", async () => {
       const unchosen = new AppProfile();
       unchosen.writeAppState({ default_library_path: null });
