@@ -21,6 +21,7 @@ export const es = {
     scanningPhaseLabel: "Fase: {phase}",
     musicbrainzLogin: "Iniciar sesión en MusicBrainz",
     musicbrainzProfile: "Perfil de MusicBrainz",
+    scrobblingPaused: "Scrobbling en pausa",
     pinned: "Anclados"
   },
   topNav: {

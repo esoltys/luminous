@@ -164,18 +164,16 @@
         <span class="text-xs font-semibold text-brand-text-primary">
           {i18n.t('auth.scrobbling', {}, 'Scrobbling')}
         </span>
-        {#if scrobblerStore.enabled}
-          {#if scrobblerStore.paused}
-            <span class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 font-medium">
-              <Pause class="w-2.5 h-2.5" />
-              {i18n.t('common.paused', {}, 'Paused')}
-            </span>
-          {:else}
-            <span class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-medium">
-              <Check class="w-2.5 h-2.5" />
-              {i18n.t('common.active', {}, 'Active')}
-            </span>
-          {/if}
+        {#if scrobblerStore.status === 'paused'}
+          <span class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 font-medium">
+            <Pause class="w-2.5 h-2.5" />
+            {i18n.t('common.paused', {}, 'Paused')}
+          </span>
+        {:else if scrobblerStore.status === 'active'}
+          <span class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-medium">
+            <Check class="w-2.5 h-2.5" />
+            {i18n.t('common.active', {}, 'Active')}
+          </span>
         {:else}
           <span class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-500/15 text-zinc-400 font-medium">
             {i18n.t('common.inactive', {}, 'Inactive')}

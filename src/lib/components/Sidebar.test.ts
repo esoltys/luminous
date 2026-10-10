@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, fireEvent } from "@testing-library/svelte";
 import Sidebar from "./Sidebar.svelte";
 import { collectionStore } from "../stores/collection.svelte";
@@ -7,6 +7,8 @@ import { navigationStore } from "../stores/navigation.svelte";
 import { playlistsStore } from "../stores/playlists.svelte";
 import { pinnedStore } from "../stores/pinned.svelte";
 import { i18n } from "../stores/i18n.svelte";
+import { musicbrainzStore } from "../stores/musicbrainz.svelte";
+import { scrobblerStore } from "../stores/scrobbler.svelte";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockResolvedValue([]),
@@ -128,6 +130,44 @@ describe("Sidebar.svelte", () => {
     });
     const pinnedBtn = getAllByTitle("OK Computer • Radiohead");
     expect(pinnedBtn.length).toBeGreaterThan(0);
+  });
+
+  describe("MusicBrainz login indicator", () => {
+    beforeEach(() => {
+      musicbrainzStore.isLoggedIn = true;
+      musicbrainzStore.username = "soltys";
+      scrobblerStore.enabled = true;
+      scrobblerStore.paused = false;
+    });
+
+    afterEach(() => {
+      musicbrainzStore.isLoggedIn = false;
+      musicbrainzStore.username = null;
+      scrobblerStore.enabled = false;
+      scrobblerStore.paused = false;
+    });
+
+    it("shows a green dot and plain title while scrobbling is active", () => {
+      const { getByTestId, getByTitle } = render(Sidebar, { props: { width: 256 } });
+      expect(getByTestId("musicbrainz-status-dot")).toHaveClass("bg-emerald-500");
+      expect(getByTitle("soltys (MusicBrainz)")).toBeInTheDocument();
+    });
+
+    it("shows an amber dot, title suffix and label while scrobbling is paused", () => {
+      scrobblerStore.paused = true;
+      const { getByTestId, getByTitle } = render(Sidebar, { props: { width: 256 } });
+      const dot = getByTestId("musicbrainz-status-dot");
+      expect(dot).toHaveClass("bg-amber-500");
+      expect(dot).toHaveAttribute("aria-label", "Scrobbling paused");
+      expect(getByTitle("soltys (MusicBrainz) – Scrobbling paused")).toBeInTheDocument();
+    });
+
+    it("ignores a stale paused flag when scrobbling is disabled", () => {
+      scrobblerStore.enabled = false;
+      scrobblerStore.paused = true;
+      const { getByTestId } = render(Sidebar, { props: { width: 256 } });
+      expect(getByTestId("musicbrainz-status-dot")).toHaveClass("bg-emerald-500");
+    });
   });
 });
 
