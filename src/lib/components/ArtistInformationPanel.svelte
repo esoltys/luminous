@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { CaretDownIcon as CaretDown } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import {
     formatArtistLifeEvent,
@@ -18,7 +17,6 @@
     areaName?: string | null;
     areaMbid?: string | null;
     onOpenUrl?: (url: string) => void;
-    variant?: "card" | "plain";
     class?: string;
   }
 
@@ -34,7 +32,6 @@
     areaName,
     areaMbid,
     onOpenUrl: _onOpenUrl,
-    variant = "plain",
     class: className = ""
   }: Props = $props();
 
@@ -96,24 +93,10 @@
 {/snippet}
 
 {#if hasContent}
-  {#if variant === "card"}
-    <details
-      open
-      class="group border border-brand-border/60 rounded-lg bg-brand-sidebar/40 overflow-hidden {className}"
-    >
-      <summary class="flex items-center justify-between px-3 py-2 text-xs font-semibold text-brand-text-secondary cursor-pointer select-none hover:text-brand-text-primary transition-colors">
-        <div class="flex items-center gap-1.5 min-w-0">
-          <span>{i18n.t("artistInfo.panelTitle", {}, "Artist Information")}</span>
-        </div>
-        <CaretDown class="w-3.5 h-3.5 text-brand-text-secondary/70 group-open:rotate-180 transition-transform shrink-0" />
-      </summary>
-      <div class="px-3 pb-3 pt-1 border-t border-brand-border/40 space-y-2 text-xs">
-        {@render contentRows()}
-      </div>
-    </details>
-  {:else}
-    <div class="space-y-2 text-xs {className}">
+  <section class="border border-brand-border/60 rounded-lg bg-brand-sidebar/40 overflow-hidden {className}">
+    <h3 class="px-3 py-2 text-xs font-semibold text-brand-text-secondary">{i18n.t("artistInfo.panelTitle", {}, "Artist Information")}</h3>
+    <div class="px-3 pb-3 pt-2 border-t border-brand-border/40 space-y-2 text-xs">
       {@render contentRows()}
     </div>
-  {/if}
+  </section>
 {/if}

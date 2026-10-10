@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ArrowSquareOutIcon as ExternalLink, ArrowsClockwiseIcon as RefreshCw, CaretDownIcon as CaretDown } from "phosphor-svelte";
+  import { ArrowSquareOutIcon as ExternalLink, ArrowsClockwiseIcon as RefreshCw } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import type { ContextView } from "../stores/context.svelte";
   import { openExternalUrl } from "../utils/openExternalUrl";
@@ -42,35 +42,28 @@
         beginAreaMbid={section.context.artist_begin_area_mbid}
         areaName={section.context.artist_area_name}
         areaMbid={section.context.artist_area_mbid}
-        variant="card"
       />
     {:else if section.id === "bio"}
       {#if section.source === "wikipedia"}
-        <details open class="group border border-brand-border/60 rounded-lg bg-brand-sidebar/40 overflow-hidden">
-          <summary class="flex items-center justify-between px-3 py-2 text-xs font-semibold text-brand-text-secondary cursor-pointer select-none hover:text-brand-text-primary transition-colors">
-            <div class="flex items-center gap-1 min-w-0">
-              <span>{i18n.t('playerBar.wikipediaSectionLabel', {}, 'Wikipedia')}</span>
-              {#if section.wikipediaUrl}
-                {@const url = section.wikipediaUrl}
-                <button
-                  type="button"
-                  onclick={(e) => {
-                    e.stopPropagation();
-                    openExternalUrl(url);
-                  }}
-                  class="inline-flex items-center text-brand-text-secondary/60 hover:text-brand-accent transition-colors ml-0.5 p-0.5"
-                  title={i18n.t('playerBar.wikipediaSectionLabel', {}, 'Wikipedia')}
-                >
-                  <ExternalLink class="w-3 h-3" />
-                </button>
-              {/if}
-            </div>
-            <CaretDown class="w-3.5 h-3.5 text-brand-text-secondary/70 group-open:rotate-180 transition-transform shrink-0" />
-          </summary>
-          <div class="px-3 pb-3 pt-1 border-t border-brand-border/40">
+        <section class="border border-brand-border/60 rounded-lg bg-brand-sidebar/40 overflow-hidden">
+          <div class="flex items-center gap-1 px-3 py-2 text-xs font-semibold text-brand-text-secondary">
+            <h3>{i18n.t('playerBar.wikipediaSectionLabel', {}, 'Wikipedia')}</h3>
+            {#if section.wikipediaUrl}
+              {@const url = section.wikipediaUrl}
+              <button
+                type="button"
+                onclick={() => openExternalUrl(url)}
+                class="inline-flex items-center text-brand-text-secondary/60 hover:text-brand-accent transition-colors ml-0.5 p-0.5"
+                title={i18n.t('playerBar.wikipediaSectionLabel', {}, 'Wikipedia')}
+              >
+                <ExternalLink class="w-3 h-3" />
+              </button>
+            {/if}
+          </div>
+          <div class="px-3 pb-3 pt-2 border-t border-brand-border/40">
             <p class="text-brand-text-secondary leading-relaxed whitespace-pre-line">{section.text}</p>
           </div>
-        </details>
+        </section>
       {:else}
         <div class="text-brand-text-secondary leading-relaxed">
           <MarkdownBio text={section.text} disableClamp={true} />
