@@ -158,6 +158,14 @@
 
       {#if topAlbums.length > 0 || featuredAlbums.length > 0 || recentlyAdded.length > 0}
         <div class="grid grid-cols-1 @5xl:grid-cols-2 gap-8">
+          {#if recentlyAdded.length > 0}
+            <HomeRowList
+              title={i18n.t('home.recentlyAdded')}
+              items={recentlyAdded}
+              variant="added"
+              onHeaderClick={() => navigationStore.viewAutoPlaylist({ kind: "recently_added" })}
+            />
+          {/if}
           {#if topAlbums.length > 0}
             <TopTenList
               title={topAlbumsTitle}
@@ -169,14 +177,6 @@
             />
           {:else if featuredAlbums.length > 0}
             <HomeRowList title={i18n.t('home.exploreLibrary')} items={featuredAlbums} variant="added" />
-          {/if}
-          {#if recentlyAdded.length > 0}
-            <HomeRowList
-              title={i18n.t('home.recentlyAdded')}
-              items={recentlyAdded}
-              variant="added"
-              onHeaderClick={() => navigationStore.viewAutoPlaylist({ kind: "recently_added" })}
-            />
           {/if}
         </div>
       {/if}
