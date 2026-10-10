@@ -36,7 +36,6 @@
   import { isSmartPlaylistSpec } from "../utils/filterParser";
   import { SIDEBAR_MIN_WIDTH_PX } from "../constants";
 
-
   let { width = 256, resizing = false }: { width?: number; resizing?: boolean } = $props();
 
   let showAddDirModal = $state(false);

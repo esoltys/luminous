@@ -40,6 +40,14 @@ describe("SettingsView.svelte", () => {
     expect(invoke).not.toHaveBeenCalledWith("get_all_app_settings");
   });
 
+  it("does not save the initial tab on mount", async () => {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const { findByText } = render(SettingsView);
+    await findByText("General Settings");
+
+    expect(invoke).not.toHaveBeenCalledWith("set_app_setting", expect.anything());
+  });
+
   it("persists the active tab via set_app_setting when switching tabs", async () => {
     const { invoke } = await import("@tauri-apps/api/core");
     const { findByText, getByText } = render(SettingsView);

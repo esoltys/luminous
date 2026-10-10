@@ -2,6 +2,7 @@
   import { playerStore } from "../stores/player.svelte";
   import { navigationStore, type SettingsTab } from "../stores/navigation.svelte";
   import { i18n } from "../stores/i18n.svelte";
+  import { untrack } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { rememberScroll } from "../utils/scrollMemory";
   import SettingsGeneral from "./SettingsGeneral.svelte";
@@ -30,8 +31,14 @@
     }
   });
 
+  // Only a change is saved, never the initial value: SettingsView can mount before the
+  // startup restore in +page.svelte has read the backend, and must not overwrite it.
+  let savedTab = untrack(() => settingsTab);
   $effect(() => {
-    invoke("set_app_setting", { key: "active_settings_tab", value: settingsTab });
+    if (settingsTab !== savedTab) {
+      savedTab = settingsTab;
+      invoke("set_app_setting", { key: "active_settings_tab", value: settingsTab });
+    }
   });
 </script>
 
