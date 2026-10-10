@@ -10,6 +10,7 @@
   import { walkthroughStore } from "../stores/walkthrough.svelte";
   import { musicbrainzStore } from "../stores/musicbrainz.svelte";
   import { prefs } from "../stores/prefs.svelte";
+  import { scrobblerStore } from "../stores/scrobbler.svelte";
   import MusicBrainzLoginModal from "./MusicBrainzLoginModal.svelte";
   import MusicBrainzProfilePopover from "./MusicBrainzProfilePopover.svelte";
   import PinnedNavList from "./PinnedNavList.svelte";
@@ -45,6 +46,8 @@
   let showUpdateBadge = $derived(updaterStore.updateAvailable || updaterStore.installStatus === "ready-to-restart");
   let showLoginModal = $state(false);
   let showProfilePopover = $state(false);
+  const scrobblingPaused = $derived(scrobblerStore.status === "paused");
+  const pausedLabel = $derived(i18n.t("sidebar.scrobblingPaused"));
   let profileButtonEl = $state<HTMLButtonElement | null>(null);
 
   onMount(() => {
@@ -387,14 +390,19 @@
         bind:this={profileButtonEl}
         onclick={() => { showProfilePopover = !showProfilePopover; }}
         class="flex items-center gap-2.5 transition-colors duration-150 {showProfilePopover ? 'bg-brand-accent/20 text-brand-accent-text' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {layoutCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-2.5 py-1.5 rounded-lg text-sm font-medium'}"
-        title="{musicbrainzStore.username} (MusicBrainz)"
+        title={scrobblingPaused ? `${musicbrainzStore.username} (MusicBrainz) – ${pausedLabel}` : `${musicbrainzStore.username} (MusicBrainz)`}
       >
         <div class="relative shrink-0 flex items-center justify-center">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 25 28" class="{layoutCollapsed ? 'w-5 h-5' : 'w-4 h-4'} shrink-0">
             <polygon fill="#ba478f" points="12 0 0 7 0 21 12 28 12 0"/>
             <polygon fill="#eb743b" points="13 0 25 7 25 21 13 28 13 0"/>
           </svg>
-          <span class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 border border-brand-sidebar"></span>
+          <span
+            class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-brand-sidebar {scrobblingPaused ? 'bg-amber-500' : 'bg-emerald-500'}"
+            data-testid="musicbrainz-status-dot"
+            role={scrobblingPaused ? 'img' : undefined}
+            aria-label={scrobblingPaused ? pausedLabel : undefined}
+          ></span>
         </div>
         {#if !layoutCollapsed}
           <span class="truncate text-xs font-semibold text-brand-text-primary text-left flex-1 min-w-0">

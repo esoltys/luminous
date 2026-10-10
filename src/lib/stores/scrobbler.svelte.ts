@@ -69,6 +69,16 @@ class ScrobblerStore {
 
   private initialized = false;
 
+  /**
+   * What the user-facing indicators (sidebar dot, profile popover badge) should
+   * show. `paused` only counts while scrobbling is enabled, so a stale paused
+   * flag on a disabled scrobbler reads as inactive.
+   */
+  get status(): "inactive" | "paused" | "active" {
+    if (!this.enabled) return "inactive";
+    return this.paused ? "paused" : "active";
+  }
+
   async init() {
     if (this.initialized) return;
     this.initialized = true;

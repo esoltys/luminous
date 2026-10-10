@@ -11,6 +11,16 @@ describe("scrobblerStore", () => {
     vi.clearAllMocks();
   });
 
+  it("reports status: paused counts only while scrobbling is enabled", () => {
+    scrobblerStore.enabled = false;
+    scrobblerStore.paused = true;
+    expect(scrobblerStore.status).toBe("inactive");
+    scrobblerStore.enabled = true;
+    expect(scrobblerStore.status).toBe("paused");
+    scrobblerStore.paused = false;
+    expect(scrobblerStore.status).toBe("active");
+  });
+
   it("initializes settings and cache status from backend", async () => {
     vi.mocked(invoke).mockImplementation((cmd: string) => {
       if (cmd === "get_scrobbler_settings") {

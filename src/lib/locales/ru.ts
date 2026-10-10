@@ -21,6 +21,7 @@ export const ru = {
     scanningPhaseLabel: "Этап: {phase}",
     musicbrainzLogin: "Войти в MusicBrainz",
     musicbrainzProfile: "Профиль MusicBrainz",
+    scrobblingPaused: "Скробблинг приостановлен",
     pinned: "Закреплённые"
   },
   topNav: {

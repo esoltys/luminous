@@ -219,10 +219,12 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config libayatana-appind
   are fine as descriptive text.
 
 - **i18n is not optional**: every new user-facing string key added to `src/lib/locales/en.ts` must be
-  added to `src/lib/locales/fr.ts` (with an actual French translation, not a copy of the English text)
-  in the same change. `i18n.t()` falls back to English when a key is missing, but this is strictly a
+  added to every other base locale file in `src/lib/locales/` (`fr`, `de`, `es`, `it`, `ru`, `uk`;
+  list the directory, since the set grows), including the full-file `fr-FR`, with an actual translation,
+  not a copy of the English text, in the same change. The partial `en-US` / `en-GB` variants fall back
+  to their base and only carry keys that differ. `i18n.t()` falls back to English when a key is missing, but this is strictly a
   runtime fallback for safety — never a substitute for translating. Completeness (no missing keys, no
-  stale keys), placeholder token matching, and non-identical French translations (unless explicitly
+  stale keys), placeholder token matching, and non-identical translations (unless explicitly
   allowlisted in `IDENTICAL_OK`) are enforced in CI by `src/lib/locales/locales.test.ts`.
 
 - **Translation guidelines**: adding a locale, per-language terminology authorities, register and
