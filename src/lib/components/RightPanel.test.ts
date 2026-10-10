@@ -266,7 +266,7 @@ describe("RightPanel.svelte", () => {
     expect(getByText("/music/test.flac")).toBeInTheDocument();
   });
 
-  it("renders Wikipedia bio extract in an open details accordion on the Information tab", async () => {
+  it("renders the Wikipedia bio extract as a plain card on the Information tab", async () => {
     vi.mocked(invoke).mockImplementation(async (cmd: string) => {
       if (cmd === "get_song_context") {
         return {
@@ -286,9 +286,7 @@ describe("RightPanel.svelte", () => {
     const bioText = await findByText("Test Wikipedia Bio Extract");
     expect(bioText).toBeInTheDocument();
 
-    const detailsEl = bioText.closest("details");
-    expect(detailsEl).toBeTruthy();
-    expect(detailsEl?.hasAttribute("open")).toBe(true);
+    expect(bioText.closest("details")).toBeNull();
   });
 
   it("shows an offline notice on the Information tab and makes no online call (#1398)", async () => {
