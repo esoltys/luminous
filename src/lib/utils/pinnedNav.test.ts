@@ -102,6 +102,7 @@ describe("pinnedNav.ts", () => {
       const theme = getPlaylistCardTheme(kind);
       expect(pin.icon).toBe(theme.icon);
       expect(pin.iconColorClass).toBe(theme.iconColorClass);
+      expect(pin.tintClass).toBe(theme.tintClass);
     }
     expect(toNavigablePin(songItem).iconColorClass).toBeUndefined();
   });

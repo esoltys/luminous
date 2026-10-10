@@ -16,6 +16,11 @@ describe("playlistCardTheme", () => {
     }
   });
 
+  it("keeps every kind's icon colour distinct, except the intentionally shared Tag kinds' hues", () => {
+    const colours = KINDS.map((k) => getPlaylistCardTheme(k).iconColorClass);
+    expect(new Set(colours).size).toBe(colours.length);
+  });
+
   it("uses the Tag icon for genre and the brand indigo for Moment Mix", () => {
     expect(getPlaylistCardTheme("genre").icon).toBe(getPlaylistCardTheme("artist_tag").icon);
     expect(getPlaylistCardTheme("daypart").iconColorClass).toBe("text-[#4F5BD5]");

@@ -95,7 +95,7 @@
 
   <!-- Artwork / Thumbnail Container (square with no rounded corners) -->
   <div
-    class="shrink-0 relative overflow-hidden bg-brand-main/60 flex items-center justify-center {collapsed
+    class="shrink-0 relative overflow-hidden flex items-center justify-center {pin.tintClass ? `border ${pin.tintClass}` : 'bg-brand-main/60'} {collapsed
       ? 'w-8 h-8'
       : 'w-7 h-7'}"
   >

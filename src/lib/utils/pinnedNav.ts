@@ -56,6 +56,9 @@ export interface NavigablePin {
   /** Tailwind text-colour class for the icon, set for auto-playlists (kind colour from the card theme). */
   readonly iconColorClass?: string;
 
+  /** Tailwind background + border classes for the icon tile, set for auto-playlists (kind tint from the card theme). */
+  readonly tintClass?: string;
+
   /** Cover art resolution properties when applicable (songs and albums). */
   readonly coverArt?: {
     songId?: number;
@@ -217,6 +220,7 @@ export function toNavigablePin(item: PinnedItem): NavigablePin {
         title,
         icon: theme.icon,
         iconColorClass: theme.iconColorClass,
+        tintClass: theme.tintClass,
         autoPlaylist: item.autoPlaylist,
         isActive,
         open: () =>
