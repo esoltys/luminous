@@ -221,6 +221,35 @@ describe("PlayerStore", () => {
     }
   });
 
+  it("shows a persistent toast when the audio output is unavailable", async () => {
+    const originalListenImpl = vi.mocked(listen).getMockImplementation();
+    let unavailableCallback: ((event: { payload: unknown }) => void) | undefined;
+    vi.mocked(listen).mockImplementation(async (event: string, callback: any) => {
+      if (event === "audio-output-unavailable") unavailableCallback = callback;
+      return () => {};
+    });
+    const showSpy = vi.spyOn(toastStore, "show");
+    vi.useFakeTimers();
+
+    try {
+      store = new PlayerStore();
+      await vi.advanceTimersByTimeAsync(50);
+
+      unavailableCallback?.({ payload: { message: "no device" } });
+      expect(showSpy).toHaveBeenCalledTimes(1);
+      // No durationMs: the toast must wait for the user to dismiss it.
+      expect(showSpy).toHaveBeenCalledWith("Audio output unavailable. Connect a device and press play.", "error");
+
+      // A failed retry replaces the toast rather than stacking a second one.
+      unavailableCallback?.({ payload: { message: "still no device" } });
+      expect(toastStore.messages.filter((m) => m.text.startsWith("Audio output unavailable"))).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+      showSpy.mockRestore();
+      if (originalListenImpl) vi.mocked(listen).mockImplementation(originalListenImpl);
+    }
+  });
+
   it("should clear the Queue playlist when queue playback naturally completes", async () => {
     const originalListenImpl = vi.mocked(listen).getMockImplementation();
     let playbackStateCallback: ((event: { payload: any }) => Promise<void>) | undefined;

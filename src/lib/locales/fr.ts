@@ -1090,6 +1090,7 @@ export const fr: DeepStringRecord<typeof en> = {
     contextFetchError: "Impossible de récupérer les données de contexte. Vérifiez votre connexion et réessayez.",
     contextOffline: "Hors ligne. Activez « En ligne » dans Paramètres › Intégrations pour récupérer les biographies et le contexte.",
     trackSkippedToast: 'Impossible de lire « {title} » — fichier introuvable. Morceau ignoré.',
+    outputUnavailableToast: 'Sortie audio indisponible. Branchez un appareil et appuyez sur lecture.',
     tracksSkippedToast: {
       one: "{count} morceau indisponible ignoré.",
       other: "{count} morceaux indisponibles ignorés."

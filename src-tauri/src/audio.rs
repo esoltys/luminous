@@ -217,6 +217,13 @@ pub enum AudioEvent {
     },
     /// The audio pipeline has changed (e.g. output device reconnected or changed format).
     PipelineChanged,
+    /// The output stream could not be (re)built — typically a device switch
+    /// whose new device can't be opened. The track is already parked paused at
+    /// its position (a `Paused` event precedes this one); informational only,
+    /// so the player must not treat it as a bad track. Play retries.
+    OutputUnavailable {
+        message: String,
+    },
     Error {
         message: String,
     },
@@ -1571,6 +1578,9 @@ struct DecodeSession {
 enum DeviceCheckOutcome {
     Ok,
     BreakDecode,
+    /// The output couldn't be rebuilt; park this request (the interrupted
+    /// track at its current position) via `park_without_output`.
+    OutputLost(PlayRequest, String),
 }
 
 enum CmdOutcome {
@@ -1625,7 +1635,13 @@ fn decode_thread(
                                     output = Some(o);
                                 }
                                 Err(message) => {
-                                    let _ = event_tx.send(AudioEvent::Error { message });
+                                    park_without_output(
+                                        &shared,
+                                        &event_tx,
+                                        &mut paused_req,
+                                        r,
+                                        message,
+                                    );
                                     continue;
                                 }
                             }
@@ -1752,7 +1768,7 @@ fn decode_thread(
                     output = Some(o);
                 }
                 Err(message) => {
-                    let _ = event_tx.send(AudioEvent::Error { message });
+                    park_without_output(&shared, &event_tx, &mut paused_req, req, message);
                     continue;
                 }
             }
@@ -1828,6 +1844,10 @@ fn decode_thread(
             match check_and_rebuild_output(&mut output, &mut session, &shared, &event_tx) {
                 DeviceCheckOutcome::Ok => {}
                 DeviceCheckOutcome::BreakDecode => break 'decode,
+                DeviceCheckOutcome::OutputLost(lost_req, message) => {
+                    park_without_output(&shared, &event_tx, &mut paused_req, lost_req, message);
+                    break 'decode;
+                }
             }
 
             let out = output.as_mut().unwrap();
@@ -1899,6 +1919,12 @@ fn check_and_rebuild_output(
             );
 
             let cur_pos = shared.position.load(Ordering::Relaxed);
+            // Position still belongs to the finished track while a transition
+            // is draining, so that's the song to park on a failed rebuild.
+            let song_if_lost = match session.transition.as_ref() {
+                Some(t) => t.finished_song.clone(),
+                None => session.current.song.clone(),
+            };
             if let Some(old_out) = output.as_ref() {
                 let _ = old_out.stream.pause();
             }
@@ -1985,13 +2011,39 @@ fn check_and_rebuild_output(
                     let _ = event_tx.send(AudioEvent::PipelineChanged);
                 }
                 Err(message) => {
-                    let _ = event_tx.send(AudioEvent::Error { message });
-                    return DeviceCheckOutcome::BreakDecode;
+                    return DeviceCheckOutcome::OutputLost(
+                        PlayRequest {
+                            song: song_if_lost,
+                            start_nanosec: cur_pos,
+                        },
+                        message,
+                    );
                 }
             }
         }
     }
     DeviceCheckOutcome::Ok
+}
+
+/// Parks `req` as a paused track because there is no output to play it on
+/// (a device switch or lazy build failed). Afterwards the track sits at
+/// `req.start_nanosec` exactly as if the user had paused it, so `Resume`
+/// reopens it and retries the output build; a repeated failure parks it
+/// again. Emits `Paused` (so the UI, scrobbler and media session update as
+/// for any pause) and then `OutputUnavailable`. The caller leaves the decode
+/// loop; the player never sees a track error, so nothing is skipped.
+fn park_without_output(
+    shared: &AudioShared,
+    event_tx: &mpsc::Sender<AudioEvent>,
+    paused_req: &mut Option<PlayRequest>,
+    req: PlayRequest,
+    message: String,
+) {
+    shared.position.store(req.start_nanosec, Ordering::Relaxed);
+    *shared.play_state.lock() = PlayState::Paused;
+    *paused_req = Some(req);
+    let _ = event_tx.send(AudioEvent::Paused);
+    let _ = event_tx.send(AudioEvent::OutputUnavailable { message });
 }
 
 /// Drives step 2 of one `'decode` iteration: handle exactly one
@@ -2642,6 +2694,47 @@ impl Resampler {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn test_shared() -> AudioShared {
+        AudioShared {
+            position: Arc::new(AtomicU64::new(0)),
+            volume: Arc::new(AtomicU32::new(1.0f32.to_bits())),
+            play_state: Arc::new(Mutex::new(PlayState::Playing)),
+            visualizer_buf: Arc::new(crate::analyzer::AudioVisualizerBuffer::new(4096)),
+            output_sample_rate: Arc::new(AtomicU32::new(44100)),
+            output_channels: Arc::new(std::sync::atomic::AtomicU16::new(2)),
+            output_device_name: Arc::new(parking_lot::RwLock::new(None)),
+            active_decoder_name: Arc::new(parking_lot::RwLock::new(None)),
+            equalizer: Arc::new(Mutex::new(crate::equalizer::Equalizer::new())),
+            loudness_gain: Arc::new(AtomicU32::new(1.0f32.to_bits())),
+            loudness_switch_at: AtomicU64::new(NO_LOUDNESS_SWITCH),
+            loudness_switch_gain: AtomicU32::new(1.0f32.to_bits()),
+            fade_gain: Arc::new(AtomicU32::new(1.0f32.to_bits())),
+        }
+    }
+
+    #[test]
+    fn park_without_output_pauses_at_position_and_reports_device_failure() {
+        let shared = test_shared();
+        let (tx, rx) = mpsc::channel();
+        let mut paused_req = None;
+        let req = PlayRequest {
+            song: Box::new(Song::default()),
+            start_nanosec: 42_000,
+        };
+
+        park_without_output(&shared, &tx, &mut paused_req, req, "no device".into());
+
+        assert_eq!(shared.position.load(Ordering::Relaxed), 42_000);
+        assert_eq!(*shared.play_state.lock(), PlayState::Paused);
+        assert_eq!(paused_req.expect("parked").start_nanosec, 42_000);
+        assert!(matches!(rx.try_recv(), Ok(AudioEvent::Paused)));
+        match rx.try_recv() {
+            Ok(AudioEvent::OutputUnavailable { message }) => assert_eq!(message, "no device"),
+            other => panic!("expected OutputUnavailable, got {other:?}"),
+        }
+        assert!(rx.try_recv().is_err(), "no track Error may be emitted");
+    }
 
     #[test]
     fn equal_power_gains_keep_constant_power() {

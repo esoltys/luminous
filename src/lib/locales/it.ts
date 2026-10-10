@@ -1084,6 +1084,7 @@ export const it = {
     contextFetchError: "Impossibile recuperare i dati di contesto. Controlla la connessione e riprova.",
     contextOffline: "Offline. Attiva «Online» in Impostazioni › Integrazioni per recuperare biografie e contesto.",
     trackSkippedToast: "Impossibile riprodurre «{title}»: file non trovato. Brano saltato.",
+    outputUnavailableToast: 'Uscita audio non disponibile. Collega un dispositivo e premi riproduci.',
     tracksSkippedToast: {
       one: "{count} brano non disponibile saltato.",
       other: "{count} brani non disponibili saltati."
