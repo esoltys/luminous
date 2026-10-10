@@ -43,9 +43,11 @@ export interface PlanFilters {
  * last in a pass so the full window is never restored mid-pass.
  */
 export function planPasses(scenes: Scene[], filters: PlanFilters): Pass[] {
+  // Comma-separated names; a trailing * matches a prefix (theme-dynamic-*).
   const wanted = filters.name?.split(",").map((n) => n.trim());
-  const selected = wanted ? scenes.filter((s) => wanted.includes(s.name)) : scenes;
-  const unknown = wanted?.filter((n) => !scenes.some((s) => s.name === n));
+  const matches = (pattern: string, name: string) => (pattern.endsWith("*") ? name.startsWith(pattern.slice(0, -1)) : name === pattern);
+  const selected = wanted ? scenes.filter((s) => wanted.some((n) => matches(n, s.name))) : scenes;
+  const unknown = wanted?.filter((n) => !scenes.some((s) => matches(n, s.name)));
   if (unknown?.length) {
     throw new Error(`No scene named "${unknown.join('", "')}". Valid names: ${scenes.map((s) => s.name).join(", ")}`);
   }

@@ -9,7 +9,7 @@
 // Vite serves on :1420, so make sure that is this checkout's.
 //
 // Usage: bun scripts/take-scene-screenshots.ts --library <dir> [--library <dir>...]
-//          [--exe <path>] [--name=<scene>[,<scene>...]] [--locale=<tag>] [--scheme=light|dark]
+//          [--exe <path>] [--name=<scene>[,<scene>...|prefix*]] [--locale=<tag>] [--scheme=light|dark]
 //          [--stage=fresh|library] [--keep-profiles]
 //        bun scripts/take-scene-screenshots.ts --clone-profile[=<luminous.db>] [...same filters]
 //

@@ -41,6 +41,11 @@ describe("planPasses", () => {
     expect(passes.length).toBe(1);
   });
 
+  it("matches a trailing * as a name prefix", () => {
+    const names = planPasses(scenes, { locales: ["en-CA"], name: "mi*,dyn" }).flatMap((p) => p.scenes.map((s) => s.name));
+    expect([...new Set(names)].sort()).toEqual(["dyn", "mini"]);
+  });
+
   it("filters by name and lists valid names for an unknown one", () => {
     expect(planPasses(scenes, { locales: ["en-CA"], name: "a" }).every((p) => p.scenes.length === 1)).toBe(true);
     expect(() => planPasses(scenes, { locales: ["en-CA"], name: "nope" })).toThrow(/Valid names: a, mini/);
