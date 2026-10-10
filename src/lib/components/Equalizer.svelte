@@ -722,7 +722,7 @@
       <ContextMenu
         x={presetMenuPos.x}
         y={presetMenuPos.y}
-        estimatedHeight={activeUserPreset ? 220 : 140}
+       
         onClose={() => (presetMenuPos = null)}
       >
         <ContextMenuItem

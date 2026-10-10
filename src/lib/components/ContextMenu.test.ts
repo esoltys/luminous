@@ -36,9 +36,9 @@ describe("ContextMenu.svelte vertical placement", () => {
     vi.unstubAllGlobals();
   });
 
-  it("clamps by the measured height, not the estimate", () => {
+  it("clamps by the measured height", () => {
     mockMenuHeight(600);
-    render(ContextMenu, { props: { x: 10, y: 700, onClose: vi.fn(), estimatedHeight: 100, children } });
+    render(ContextMenu, { props: { x: 10, y: 700, onClose: vi.fn(), children } });
     expect(menuTop()).toBe(800 - 600 - VIEWPORT_EDGE_PADDING_PX);
   });
 

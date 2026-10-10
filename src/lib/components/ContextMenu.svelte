@@ -9,15 +9,13 @@
     x: number;
     y: number;
     onClose: () => void;
-    /** First-paint height hint; replaced by the measured height once rendered. */
-    estimatedHeight?: number;
     children: Snippet;
   }
 
-  let { x, y, onClose, estimatedHeight = 200, children }: Props = $props();
+  let { x, y, onClose, children }: Props = $props();
 
   let menuEl = $state<HTMLDivElement | null>(null);
-  // Real rendered height (0 until first layout), so the clamp never depends on a guess.
+  // Real rendered height measured on mount, so callers never supply a height.
   let measuredHeight = $state(0);
 
   // Keep menu inside viewport boundaries
@@ -28,7 +26,7 @@
 
   let adjustedY = $derived.by(() => {
     if (typeof window === "undefined") return y;
-    const menuHeight = measuredHeight || estimatedHeight;
+    const menuHeight = measuredHeight;
     // Clamp above the floating PlayerBar dock so the menu's lower items
     // aren't hidden underneath it.
     const dockClearance = playerStore.currentSong ? PLAYER_DOCK_CLEARANCE_PX : 0;
