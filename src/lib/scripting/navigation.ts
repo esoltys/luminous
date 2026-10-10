@@ -55,6 +55,13 @@ export function createNavigationController(wait: ScriptWaitApi): ScriptNavigatio
     async settings(section: SettingsTab = "general"): Promise<void> {
       navigationStore.openSettings(section);
       await wait.settled();
+      if (section === "general") {
+        // SettingsView restores the last-saved tab when it mounts on "general", which
+        // would override this request a moment later. Let that land, then ask again.
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        navigationStore.openSettings(section);
+        await wait.settled();
+      }
       await wait.forState(
         () => navigationStore.activeTab === "settings" && navigationStore.settingsSubTab === section,
         3000

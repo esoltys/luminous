@@ -164,4 +164,69 @@ describe("throwaway-profile", () => {
     const { rmSync } = await import("node:fs");
     rmSync(root, { recursive: true, force: true });
   });
+
+  describe("cloneFrom", () => {
+    /** One query on a fresh read-only handle, closed straight away so Windows can delete the folder. */
+    const rows = <T>(dbPath: string, sql: string): T[] => {
+      const db = new Database(dbPath, { readonly: true });
+      try {
+        return db.query(sql).all() as T[];
+      } finally {
+        db.close();
+      }
+    };
+    const keysOf = (dbPath: string) => rows<{ key: string }>(dbPath, "SELECT key FROM app_state").map((r) => r.key);
+
+    it("copies stats and settings, drops outward integrations, never writes the source", async () => {
+      const source = new AppProfile();
+      source.writeAppState({
+        scrobbler_lastfm_session: "secret",
+        listenbrainz_token: "secret",
+        discord_enabled: "true",
+        theme_mode: "dark",
+      });
+      const db = new Database(source.dbPath);
+      db.exec("CREATE TABLE pins (id INTEGER PRIMARY KEY, name TEXT)");
+      db.exec("INSERT INTO pins (name) VALUES ('My pinned album')");
+      db.close();
+      const sourceKeysBefore = keysOf(source.dbPath);
+
+      const clone = new AppProfile({ cloneFrom: source.dbPath });
+      try {
+        expect(rows(clone.dbPath, "SELECT name FROM pins")).toEqual([{ name: "My pinned album" }]);
+        const cloneKeys = keysOf(clone.dbPath);
+        expect(cloneKeys).toContain("theme_mode");
+        expect(cloneKeys.filter((k) => /^(scrobbler_|listenbrainz_|discord_)/.test(k))).toEqual([]);
+
+        // The source keeps its integrations and gains nothing.
+        expect(keysOf(source.dbPath)).toEqual(sourceKeysBefore);
+        expect(sourceKeysBefore).toContain("scrobbler_lastfm_session");
+      } finally {
+        await clone.dispose();
+        await source.dispose();
+      }
+    });
+
+    it("pins an unchosen default library to none so no sidecar can be written, but keeps a chosen one", async () => {
+      const unchosen = new AppProfile();
+      unchosen.writeAppState({ default_library_path: null });
+      const chosen = new AppProfile();
+      chosen.writeAppState({ default_library_path: "Z:/Music" });
+
+      const a = new AppProfile({ cloneFrom: unchosen.dbPath });
+      const b = new AppProfile({ cloneFrom: chosen.dbPath });
+      try {
+        const value = (p: AppProfile) =>
+          rows<{ value: string }>(p.dbPath, "SELECT value FROM app_state WHERE key = 'default_library_path'")[0]?.value;
+        expect(value(a)).toBe("");
+        expect(value(b)).toBe("Z:/Music");
+      } finally {
+        for (const p of [a, b, unchosen, chosen]) await p.dispose();
+      }
+    });
+
+    it("refuses a missing source", () => {
+      expect(() => new AppProfile({ cloneFrom: path.join("nope", "luminous.db") })).toThrow(/No database to clone/);
+    });
+  });
 });

@@ -11,9 +11,17 @@
 // Usage: bun scripts/take-scene-screenshots.ts --library <dir> [--library <dir>...]
 //          [--exe <path>] [--name=<scene>[,<scene>...]] [--locale=<tag>] [--scheme=light|dark]
 //          [--stage=fresh|library] [--keep-profiles]
+//        bun scripts/take-scene-screenshots.ts --clone-profile[=<luminous.db>] [...same filters]
+//
+// --clone-profile starts from a copy of your real database instead of an empty profile,
+// so Home shows your real stats, pins and playlists and there is no library scan to wait
+// for. Plays and setting changes land in the copy and are discarded; scrobbling and
+// Discord presence are switched off in it. The first-run scenes need an empty library,
+// so they are skipped. Close your own Luminous first.
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
+import { defaultDbPath } from "./mock-library";
 import { AppProfile } from "./throwaway-profile";
 import { createRemoteApi } from "./scenes/remote-api";
 import { scenes } from "./scenes";
@@ -39,13 +47,18 @@ function parseArgs(argv: string[]) {
   if (locale && !allLocales.includes(locale)) throw new Error(`Unknown --locale "${locale}". Valid: ${allLocales.join(", ")}`);
   const stage = value("stage");
   if (stage && stage !== "fresh" && stage !== "library") throw new Error(`--stage must be fresh or library, got "${stage}".`);
+  const cloneArg = argv.find((a) => a === "--clone-profile" || a.startsWith("--clone-profile="));
+  const cloneFrom = cloneArg ? (cloneArg.split("=")[1] ?? defaultDbPath()) : undefined;
+  if (cloneArg && !cloneFrom) throw new Error("Can't find your luminous.db; pass --clone-profile=<path to luminous.db>.");
+  if (cloneArg && stage === "fresh") throw new Error("--stage=fresh needs an empty library, so it can't run with --clone-profile.");
   return {
+    cloneFrom,
     libraries,
     exe: value("exe") ?? path.join(REPO_ROOT, "target", "debug", "LuminousMusicPlayer.exe"),
     name: value("name"),
     locales: locale ? [locale] : allLocales,
     schemes: scheme ? [scheme as ColorScheme] : undefined,
-    stage: stage as "fresh" | "library" | undefined,
+    stage: (cloneArg ? "library" : stage) as "fresh" | "library" | undefined,
     keepProfiles: argv.includes("--keep-profiles"),
   };
 }
@@ -65,18 +78,20 @@ async function main() {
   }
   const opts = parseArgs(process.argv.slice(2));
   const needsLibrary = scenes.some((s) => (s.stage ?? "library") === "library") && opts.stage !== "fresh";
-  if (needsLibrary && opts.libraries.length === 0) {
+  if (needsLibrary && !opts.cloneFrom && opts.libraries.length === 0) {
     throw new Error("Pass at least one --library <dir> holding the music the scenes feature (the albums named in scripts/scenes/).");
   }
 
   const version = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, "package.json"), "utf8")).version as string;
   const profile = new AppProfile({
     exe: opts.exe,
+    cloneFrom: opts.cloneFrom,
     // launched_version stops the first-launch celebration toast from landing in frames.
     appState: { launched_version: version, active_theme_id: "system" },
   });
 
   try {
+    if (opts.cloneFrom) console.log(`Cloned ${opts.cloneFrom}: runs use a private copy; your profile is not written.`);
     await profile.launch();
     await using driver = await profile.connectDriver();
     const api = createRemoteApi(driver);
@@ -101,7 +116,8 @@ async function main() {
       translate,
       filters: { locales: opts.locales, schemes: opts.schemes, name: opts.name, stage: opts.stage },
       async prepareLibrary() {
-        await profile.scanLibrary(opts.libraries);
+        // A clone already has its library scanned.
+        if (!opts.cloneFrom) await profile.scanLibrary(opts.libraries);
         // Startup-only layout preferences, read once at load: match the current guide
         // (albums newest first, artists by song count, Album Info collapsed), then reload.
         await driver.evaluate(() => {

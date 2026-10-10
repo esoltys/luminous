@@ -7,6 +7,7 @@ export interface ScreenHooks {
   openAlbumEditor(): void;
   setEqualizerMode(mode: "graphic10" | "parametric"): Promise<void>;
   openEqualizerPresetMenu(): void;
+  selectEqualizerPreset(name: string): Promise<void>;
 }
 
 const hooks: Partial<ScreenHooks> = {};
@@ -28,6 +29,7 @@ const SCREEN_FOR: Record<keyof ScreenHooks, string> = {
   closeSearch: "the top navigation bar",
   openAlbumEditor: "an album detail view (navigate.album first)",
   setEqualizerMode: "Settings → Equalizer (navigate.settings('equalizer') first)",
+  selectEqualizerPreset: "Settings → Equalizer (navigate.settings('equalizer') first)",
   openEqualizerPresetMenu: "Settings → Equalizer in parametric mode",
 };
 
@@ -55,6 +57,10 @@ export function createScreensController(wait: ScriptWaitApi): ScriptScreensApi {
     },
     async setEqualizerMode(mode) {
       await hook("setEqualizerMode")(mode);
+      await wait.settled();
+    },
+    async selectEqualizerPreset(name) {
+      await hook("selectEqualizerPreset")(name);
       await wait.settled();
     },
     async openEqualizerPresetMenu() {

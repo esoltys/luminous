@@ -201,6 +201,8 @@ export interface ScriptScreensApi {
   openAlbumEditor(): Promise<void>;
   setEqualizerMode(mode: "graphic10" | "parametric"): Promise<void>;
   openEqualizerPresetMenu(): Promise<void>;
+  /** Loads a built-in or user equalizer preset by name, as the preset picker does. */
+  selectEqualizerPreset(name: string): Promise<void>;
 }
 
 /**

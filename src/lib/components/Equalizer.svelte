@@ -571,6 +571,7 @@
       if (cancelled) return;
       const offs = [
         registerScreenHook("setEqualizerMode", handleModeChange),
+        registerScreenHook("selectEqualizerPreset", selectPreset),
         registerScreenHook("openEqualizerPresetMenu", () => {
           if (!presetMenuPos) togglePresetMenu();
         }),

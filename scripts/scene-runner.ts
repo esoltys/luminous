@@ -227,12 +227,17 @@ export async function runScenes(opts: RunOptions): Promise<RunReport> {
       await sleep(scene.settleMs ?? SCENE_DEFAULTS.settleMs);
 
       const file = outputPath(outRoot, scene, pass.locale, pass.scheme);
-      if (scene.clip) {
-        const clip = await driver.evaluate(ELEMENT_RECT, scene.clip);
-        if (!clip) throw new Error(`No element matches "${scene.clip}"`);
-        await driver.screenshot({ path: file, clip });
-      } else {
-        await driver.screenshot({ path: file });
+      const clip = scene.clip ? await driver.evaluate(ELEMENT_RECT, scene.clip) : undefined;
+      if (scene.clip && !clip) throw new Error(`No element matches "${scene.clip}"`);
+      // Windows can briefly lock a PNG that a previewer or indexer just opened; retry the write.
+      for (let attempt = 1; ; attempt++) {
+        try {
+          await driver.screenshot({ path: file, ...(clip ? { clip } : {}) });
+          break;
+        } catch (err) {
+          if (attempt >= 3) throw err;
+          await sleep(300);
+        }
       }
       return file;
     } finally {

@@ -91,6 +91,12 @@ export interface ProfileOptions {
   appState?: Record<string, string | null>;
   /** If true, keeps temporary profile folders on disk after disposal. */
   keepProfiles?: boolean;
+  /**
+   * Path to a real luminous.db to start from. The profile gets a private copy (stats,
+   * pins, playlists, library), so anything the run does lands in the copy and is
+   * discarded; the original is only read. See {@link cloneDatabase}.
+   */
+  cloneFrom?: string;
 }
 
 export interface LaunchOptions {
@@ -117,6 +123,37 @@ if (-not $main) { throw 'Luminous main window not found' }
 function ps(script: string): string {
   if (process.platform !== "win32") return "";
   return execFileSync("powershell", ["-NoProfile", "-Command", script], { encoding: "utf8" }).trim();
+}
+
+/**
+ * Keys in the clone that would reach outside the machine: scrobbling to Last.fm /
+ * ListenBrainz (a played song would otherwise scrobble for real) and Discord presence.
+ */
+const OUTWARD_KEY_PATTERNS = ["scrobbler_%", "listenbrainz_%", "discord_%"];
+
+/**
+ * Copies `source` to `dest` with VACUUM INTO (consistent even while the app has it open
+ * in WAL mode; the source is opened read-only) and makes the copy safe to run:
+ * outward-facing integrations are cleared, and a library with no chosen default is
+ * pinned to "none" so the app can't link one and write a hierarchy sidecar into a music folder.
+ */
+export function cloneDatabase(source: string, dest: string): void {
+  if (!existsSync(source)) throw new Error(`No database to clone at ${source}.`);
+  const src = new Database(source, { readonly: true });
+  try {
+    src.exec("PRAGMA busy_timeout = 5000");
+    src.run("VACUUM INTO ?", [dest]);
+  } finally {
+    src.close();
+  }
+  const copy = new Database(dest);
+  try {
+    for (const pattern of OUTWARD_KEY_PATTERNS) copy.run("DELETE FROM app_state WHERE key LIKE ?", [pattern]);
+    const hasDefault = copy.query("SELECT 1 FROM app_state WHERE key = 'default_library_path'").get();
+    if (!hasDefault) copy.run("INSERT INTO app_state (key, value) VALUES ('default_library_path', '')");
+  } finally {
+    copy.close();
+  }
 }
 
 /** Pins the app's main window to position (100, 100) with the given dimensions. */
@@ -208,9 +245,20 @@ export class AppProfile {
     this.port = options?.port ?? CDP_PORT;
     this.defaultWindow = options?.window;
 
+    // A clone keeps its own library choice; everything else gets the downward defaults.
+    if (options?.cloneFrom) {
+      try {
+        cloneDatabase(options.cloneFrom, this.dbPath);
+      } catch (err) {
+        rmSync(this.root, { recursive: true, force: true });
+        throw err;
+      }
+    }
+    const baseState = options?.cloneFrom ? { ...FIRST_RUN_DONE, ...canonicalView("songs") } : DEFAULT_APP_STATE;
+
     // Pull defaults downward: suppress first-run popups, set canonical songs view, and apply caller overrides
     this.writeAppState({
-      ...DEFAULT_APP_STATE,
+      ...baseState,
       ...(options?.appState ?? {}),
     });
   }

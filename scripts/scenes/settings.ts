@@ -31,6 +31,7 @@ export const settingsScenes = [
     // Open the preset actions menu so the guide shows where Import, Export and the user-preset actions live.
     run: async ({ api }) => {
       await api.screens.setEqualizerMode("parametric");
+      await api.screens.selectEqualizerPreset("Rock"); // a real curve, not "Flat"
       await api.screens.openEqualizerPresetMenu();
     },
     cleanup: async ({ api }) => api.screens.setEqualizerMode("graphic10"),
