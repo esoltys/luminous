@@ -3,7 +3,8 @@ import { playlistsStore } from "./playlists.svelte";
 
 export type ActiveTab = "home" | "collection" | "playlists" | "settings" | "lyrics" | "stats" | "organize" | "help";
 export type ActiveSubTab = "songs" | "albums" | "artists" | "genres";
-export type SettingsTab = "general" | "system" | "sources" | "integrations" | "themes" | "equalizer" | "about";
+const SETTINGS_TABS = ["general", "system", "sources", "integrations", "themes", "equalizer", "about"] as const;
+export type SettingsTab = (typeof SETTINGS_TABS)[number];
 
 /** Which grid is shown under the Playlists tab (mirrors `ActiveSubTab` for Collection). */
 type PlaylistsSubTab = "auto" | "custom";
@@ -92,6 +93,19 @@ class NavigationStore {
     this._settingsSubTab = val;
     if (typeof window !== "undefined") {
       localStorage.setItem("navigation_settingsSubTab", val);
+    }
+  }
+
+  /**
+   * Applies the Settings tab saved by the previous session. Called once at startup,
+   * before any navigation can happen, so a later `openSettings(tab)` is always an
+   * explicit request that nothing overrides. Unknown values are ignored; "folders" is
+   * the legacy name of "sources".
+   */
+  restoreSettingsSubTab(saved: string | undefined) {
+    if (saved === "folders") saved = "sources";
+    if ((SETTINGS_TABS as readonly string[]).includes(saved as string)) {
+      this.settingsSubTab = saved as SettingsTab;
     }
   }
 

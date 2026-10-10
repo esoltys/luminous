@@ -171,3 +171,33 @@ describe("CollectionStore - artist/album navigation and history", () => {
     expect(playlistsStore.activePlaylistId).toBe(42);
   });
 });
+
+describe("navigationStore - settings sub-tab restore", () => {
+  beforeEach(() => {
+    navigationStore.settingsSubTab = "general";
+  });
+
+  it("restores a saved tab", () => {
+    navigationStore.restoreSettingsSubTab("equalizer");
+    expect(navigationStore.settingsSubTab).toBe("equalizer");
+  });
+
+  it("keeps an explicit General request after a restore", () => {
+    navigationStore.restoreSettingsSubTab("equalizer");
+    navigationStore.openSettings("general");
+    expect(navigationStore.settingsSubTab).toBe("general");
+    expect(navigationStore.activeTab).toBe("settings");
+  });
+
+  it("maps the legacy folders tab to sources", () => {
+    navigationStore.restoreSettingsSubTab("folders");
+    expect(navigationStore.settingsSubTab).toBe("sources");
+  });
+
+  it("ignores missing and unknown values", () => {
+    navigationStore.restoreSettingsSubTab("themes");
+    navigationStore.restoreSettingsSubTab(undefined);
+    navigationStore.restoreSettingsSubTab("bogus");
+    expect(navigationStore.settingsSubTab).toBe("themes");
+  });
+});

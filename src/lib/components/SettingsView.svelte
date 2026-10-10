@@ -2,7 +2,7 @@
   import { playerStore } from "../stores/player.svelte";
   import { navigationStore, type SettingsTab } from "../stores/navigation.svelte";
   import { i18n } from "../stores/i18n.svelte";
-  import { onMount } from "svelte";
+  import { untrack } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { rememberScroll } from "../utils/scrollMemory";
   import SettingsGeneral from "./SettingsGeneral.svelte";
@@ -14,7 +14,6 @@
   import Equalizer from "./Equalizer.svelte";
 
   let settingsTab = $state<SettingsTab>(navigationStore.settingsSubTab || "general");
-  let isTabInitialized = $state(false);
 
   const TABS: { value: SettingsTab; label: () => string }[] = [
     { value: "general", label: () => i18n.t('settings.tabGeneral') },
@@ -26,40 +25,18 @@
     { value: "about", label: () => i18n.t('settings.tabAbout') }
   ];
 
-  onMount(() => {
-    (async () => {
-      try {
-        if (!navigationStore.settingsSubTab || navigationStore.settingsSubTab === "general") {
-          const settings = await invoke<Record<string, string>>("get_all_app_settings");
-          if (settings && settings.active_settings_tab) {
-            const savedTab = settings.active_settings_tab as SettingsTab;
-            if (savedTab === "general" || savedTab === "system" || savedTab === "sources" || savedTab === "integrations" || savedTab === "themes" || savedTab === "equalizer" || savedTab === "about") {
-              settingsTab = savedTab;
-              navigationStore.settingsSubTab = savedTab;
-            } else if ((savedTab as string) === "folders") {
-              settingsTab = "sources";
-              navigationStore.settingsSubTab = "sources";
-            }
-          }
-        } else {
-          settingsTab = navigationStore.settingsSubTab;
-        }
-      } catch (e) {
-        console.error("Failed to fetch settings on mount:", e);
-      } finally {
-        isTabInitialized = true;
-      }
-    })();
-  });
-
   $effect(() => {
     if (navigationStore.settingsSubTab && settingsTab !== navigationStore.settingsSubTab) {
       settingsTab = navigationStore.settingsSubTab;
     }
   });
 
+  // Only a change is saved, never the initial value: SettingsView can mount before the
+  // startup restore in +page.svelte has read the backend, and must not overwrite it.
+  let savedTab = untrack(() => settingsTab);
   $effect(() => {
-    if (isTabInitialized) {
+    if (settingsTab !== savedTab) {
+      savedTab = settingsTab;
       invoke("set_app_setting", { key: "active_settings_tab", value: settingsTab });
     }
   });
