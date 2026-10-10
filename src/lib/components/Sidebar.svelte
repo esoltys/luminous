@@ -91,10 +91,6 @@
     navigationStore.selectedAutoPlaylist = null;
   }
 
-  function navigateToSourcesSettings() {
-    navigationStore.openSettings("sources");
-  }
-
   async function handleAddDirectory() {
     try {
       const selected = await open({
