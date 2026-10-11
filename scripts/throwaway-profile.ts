@@ -16,7 +16,7 @@
 
 import { Database } from "bun:sqlite";
 import { execFileSync, spawn } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -195,6 +195,16 @@ export function killProcess(): void {
   ps("Get-Process -Name LuminousMusicPlayer -ErrorAction SilentlyContinue | Stop-Process -Force");
 }
 
+/** How many WebView2 processes are still running against `userDataDir` (they outlive the main exe for a moment). */
+function webviewProcessCount(userDataDir: string): number {
+  const escaped = userDataDir.replace(/'/g, "''");
+  return Number(
+    ps(
+      `@(Get-CimInstance Win32_Process -Filter "Name='msedgewebview2.exe'" | Where-Object { $_.CommandLine -like '*${escaped}*' }).Count`,
+    ),
+  );
+}
+
 /** Closes via WM_CLOSE (not a kill) so the app saves its state on the way out. */
 export async function closeGracefully(timeoutSec = 30): Promise<void> {
   if (process.platform !== "win32") return;
@@ -249,6 +259,11 @@ export class AppProfile {
   readonly dbPath: string;
   readonly exe: string;
   readonly port: number;
+  /**
+   * Where the app's stdout/stderr go (its `log::` output, e.g. the stall watchdog's warnings). Kept beside the
+   * profile folder, not in it, so a profile dispose or an app that holds files open can't affect it.
+   */
+  readonly logPath: string;
   private readonly defaultWindow?: WindowDimensions;
   private isDisposed = false;
   private hasLaunched = false;
@@ -258,6 +273,7 @@ export class AppProfile {
     this.dataDir = path.join(this.root, "data");
     this.webviewDir = path.join(this.root, "webview");
     this.dbPath = path.join(this.dataDir, "luminous.db");
+    this.logPath = `${this.root}.log`;
 
     mkdirSync(this.dataDir, { recursive: true });
     mkdirSync(this.webviewDir, { recursive: true });
@@ -291,17 +307,21 @@ export class AppProfile {
 
   /**
    * Spawns the app process with isolated environment variables and waits
-   * until CDP is responding and the page is fully loaded.
+   * until CDP is responding and the page is fully loaded. Resolves to the
+   * seconds from spawn to that point (polled every 250ms).
    */
-  async launch(options?: LaunchOptions): Promise<void> {
+  async launch(options?: LaunchOptions): Promise<number> {
     if (this.isDisposed) throw new Error("Cannot launch a disposed AppProfile.");
     checkPreconditions(this.exe);
     this.hasLaunched = true;
 
     const existing = process.env.WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS ?? "";
+    // A file, not a pipe: a detached app whose pipe nobody drains would eventually block on a full buffer.
+    const logFd = openSync(this.logPath, "a");
+    const startedAt = performance.now();
     spawn(this.exe, [], {
       detached: true,
-      stdio: "ignore",
+      stdio: ["ignore", logFd, logFd],
       env: {
         ...process.env,
         LUMINOUS_DATA_DIR: this.dataDir,
@@ -309,19 +329,21 @@ export class AppProfile {
         WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `${existing} --remote-debugging-port=${this.port}`.trim(),
       },
     }).unref();
+    closeSync(logFd);
 
     const timeoutSec = options?.timeoutSec ?? 60;
     const win = options?.window ?? this.defaultWindow;
 
-    for (let i = 0; i < timeoutSec; i++) {
-      await sleep(1);
+    for (let i = 0; i < timeoutSec * 4; i++) {
+      await sleep(0.25);
       const cdp = new CdpClient();
       try {
         await cdp.connect(this.port);
         const ready = await cdp.eval("document.readyState === 'complete' && !!window.__TAURI_INTERNALS__");
         if (ready.value === true) {
+          const readySec = (performance.now() - startedAt) / 1000;
           if (win) pinWindow(win.width, win.height);
-          return;
+          return readySec;
         }
       } catch {
         // App or devtools port not up yet
@@ -340,6 +362,21 @@ export class AppProfile {
     if (!this.hasLaunched || !this.isRunning()) return;
     await closeGracefully(timeoutSec);
     this.hasLaunched = false;
+    // The main exe exiting isn't the app being gone: WebView2's processes linger, holding the profile folder
+    // open (so it can't be deleted) and skewing the next launch's startup time and CPU.
+    for (let i = 0; i < 40 && webviewProcessCount(this.webviewDir) > 0; i++) await sleep(0.5);
+  }
+
+  /** Bytes of app output written so far; pass it to {@link stallWarningsSince} to count what came after. */
+  logSize(): number {
+    return existsSync(this.logPath) ? statSync(this.logPath).size : 0;
+  }
+
+  /** Stall-watchdog warnings (`Tokio stall:` / `UI stall:`, stall_monitor.rs) the app logged after `offset`. */
+  stallWarningsSince(offset: number): number {
+    if (!existsSync(this.logPath)) return 0;
+    const text = readFileSync(this.logPath).subarray(offset).toString("utf8");
+    return (text.match(/\b(?:Tokio|UI) stall:/g) ?? []).length;
   }
 
   /**
@@ -434,9 +471,10 @@ export class AppProfile {
     }
 
     if (keep) {
-      console.log(`[throwaway-profile] kept profile: ${this.root}`);
+      console.log(`[throwaway-profile] kept profile: ${this.root} (app log: ${this.logPath})`);
       return;
     }
+    rmSync(this.logPath, { force: true });
 
     if (existsSync(this.root)) {
       rmSync(this.root, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 });

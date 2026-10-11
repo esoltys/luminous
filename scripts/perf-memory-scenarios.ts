@@ -29,7 +29,13 @@
  *
  * Each row has the settled median of --samples readings, plus the peak seen by
  * a background poll across the whole scenario (the work, the settle and the
- * samples). A remote source's baseline track is found by title, album and
+ * samples). Besides memory it records: cpu_percent (the whole process tree's CPU
+ * over the sampling window, as a share of all logical cores, so after a scan it is
+ * the settled cost, not the scan's), work_cpu_seconds (CPU the scan / sync /
+ * thumbnail pass itself used), startup_seconds (spawn to a loaded page with the IPC
+ * bridge up, on the idle row's relaunch), stall_warnings (the watchdog's "Tokio
+ * stall:" / "UI stall:" log lines during the scenario; blank for builds without
+ * the watchdog) and binary_mb (the exe's size). A remote source's baseline track is found by title, album and
  * length, so the server must serve the same file the local library has.
  *
  * What it holds constant between runs, so two versions' rows are comparable:
@@ -68,6 +74,7 @@
  *                        (e.g. a baseline worktree) is checked and labelled against that checkout
  *   --keep-profiles      leave the scratch profiles in the temp folder for inspection (they hold
  *                        the remote servers' passwords, so they're deleted by default)
+ *   --allow-busy         measure even while rustc/cargo are running (the readings won't be comparable)
  *   --dry-run            run everything but print the rows instead of appending them
  *
  * Remote servers come from the environment, so credentials stay out of the
@@ -79,19 +86,21 @@
 
 import { Database } from "bun:sqlite";
 import { execFileSync } from "node:child_process";
-import { existsSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   APP_SOURCE_PATHS,
   appCommit,
   appendCsvRow,
+  cpuSecondsBetween,
   csvLine,
   formatSnapshot,
   osLabel,
   packageVersion,
   PeakTracker,
   sampleMedian,
+  snapshot,
   type CsvRow,
   type Snapshot,
 } from "./measure-memory";
@@ -150,6 +159,7 @@ function parseArgs() {
     exeRepo: exeRepoRoot(exe),
     keepProfiles: args.includes("--keep-profiles"),
     dryRun: args.includes("--dry-run"),
+    allowBusy: args.includes("--allow-busy"),
   };
 }
 type Options = ReturnType<typeof parseArgs>;
@@ -282,20 +292,56 @@ interface EqualizerConfig {
   [key: string]: unknown;
 }
 
+/** Whether this build carries the stall watchdog (stall_monitor.rs), so zero means "none" and not "can't tell". */
+function exeHasStallWatchdog(exe: string): boolean {
+  return readFileSync(exe).includes("Tokio stall:");
+}
+
 /** Shared by every source: builds rows, measures a scenario's settled median and peak. */
 class Recorder {
   readonly rows: CsvRow[] = [];
   private readonly peak = new PeakTracker();
+  private readonly binaryMb: string;
+  private readonly hasWatchdog: boolean;
+  private profile: AppProfile | null = null;
+  private logOffset = 0;
+  private workStart: Snapshot | null = null;
 
-  constructor(private readonly opts: Options) {}
+  constructor(private readonly opts: Options) {
+    this.binaryMb = (statSync(opts.exe).size / 1024 / 1024).toFixed(1);
+    this.hasWatchdog = exeHasStallWatchdog(opts.exe);
+  }
 
-  /** Starts the background peak poll; call before the scenario's work begins. */
+  /** Points the recorder at the profile whose app output the stall counts are read from. */
+  use(profile: AppProfile) {
+    this.profile = profile;
+  }
+
+  /** Starts the background peak poll and marks where the scenario's work (and its stall count) begins. */
   begin() {
+    this.logOffset = this.profile?.logSize() ?? 0;
+    try {
+      this.workStart = snapshot();
+    } catch {
+      this.workStart = null;
+    }
     this.peak.start();
   }
 
-  /** Settles, samples, stops the peak poll and records the row. */
-  async finish(label: string, settleSec: number, extra: Partial<CsvRow> = {}) {
+  /**
+   * Settles, samples, stops the peak poll and records the row. `work` also records the CPU the scenario's work
+   * cost (from begin() to now, before settling) — for a scan or thumbnail pass, where that work is the point;
+   * `cpu_percent` always covers only the settled sampling window.
+   */
+  async finish(label: string, settleSec: number, extra: Partial<CsvRow> = {}, work = false) {
+    let workCpuSeconds: number | null = null;
+    if (work && this.workStart) {
+      try {
+        workCpuSeconds = cpuSecondsBetween(this.workStart, snapshot());
+      } catch {
+        // The app can't be read right now; leave the cell blank rather than fail the scenario.
+      }
+    }
     log(`${label}: settling ${settleSec}s`);
     await sleep(settleSec);
     const settled = await sampleMedian(this.opts.samples, this.opts.intervalSec, {
@@ -306,7 +352,15 @@ class Recorder {
     });
     const peak = (await this.peak.stop()) ?? settled;
     log(`${label}: peak working set ${peak.workingSetMb.toFixed(1)} MB, private bytes ${peak.privateBytesMb.toFixed(1)} MB`);
-    this.rows.push(this.row(label, settled, peak, extra));
+    const stalls = this.hasWatchdog && this.profile ? this.profile.stallWarningsSince(this.logOffset) : "";
+    this.rows.push(
+      this.row(label, settled, peak, {
+        cpu_percent: settled.cpuPercent === null ? "" : settled.cpuPercent.toFixed(2),
+        work_cpu_seconds: workCpuSeconds === null ? "" : workCpuSeconds.toFixed(1),
+        stall_warnings: stalls,
+        ...extra,
+      }),
+    );
   }
 
   /** Stops a peak poll whose scenario failed, so it doesn't keep polling into the next one. */
@@ -331,6 +385,11 @@ class Recorder {
       profile: "scratch",
       peak_working_set_mb: peak.workingSetMb.toFixed(1),
       peak_private_bytes_mb: peak.privateBytesMb.toFixed(1),
+      cpu_percent: "",
+      work_cpu_seconds: "",
+      startup_seconds: "",
+      stall_warnings: "",
+      binary_mb: this.binaryMb,
       ...extra,
     };
   }
@@ -414,6 +473,7 @@ const SCROLL_ALBUM_GRID = `async function () {
 async function localSource(opts: Options, rec: Recorder, folders: string[]) {
   const profile = new AppProfile({ exe: opts.exe, window: opts });
   log(`local: scratch profile ${profile.root}`);
+  rec.use(profile);
   try {
     // 1. First scan, with art extraction — the same calls as adding folders in Settings → Library.
     await profile.launch();
@@ -428,7 +488,7 @@ async function localSource(opts: Options, rec: Recorder, folders: string[]) {
       );
       tracks = await withCdp(libraryTracks);
       log(`initial scan of ${tracks} tracks in ${folders.length} folder(s) took ${scan.seconds}s`);
-      await rec.finish("initial-scan", SETTLE_AFTER_SCAN_SEC, { library_tracks: tracks, scan_seconds: scan.seconds });
+      await rec.finish("initial-scan", SETTLE_AFTER_SCAN_SEC, { library_tracks: tracks, scan_seconds: scan.seconds }, true);
     } catch (e) {
       await rec.abandon();
       throw e;
@@ -439,21 +499,22 @@ async function localSource(opts: Options, rec: Recorder, folders: string[]) {
     if (!song) throw new Error(`The scan didn't pick up --track "${opts.track}"; is it under ${folders.join(", ")}?`);
     profile.cue(song);
 
-    // 2. Idle, in a fresh launch over the already-scanned library.
-    await profile.launch();
+    // 2. Idle, in a fresh launch over the already-scanned library. This is the launch whose startup time is
+    // recorded: the first one also creates the WebView2 user data folder, so it isn't comparable.
+    const startup = await profile.launch();
     rec.begin();
     const visualizerMounted = await withCdp((c) => c.eval("document.querySelectorAll('canvas').length > 0"));
     if (visualizerMounted.value !== true) {
       log("warning: no visualizer canvas found — the playback scenario won't exercise the analyzer's rendering.");
     }
-    await rec.finish("idle", SETTLE_IDLE_SEC, { library_tracks: tracks });
+    await rec.finish("idle", SETTLE_IDLE_SEC, { library_tracks: tracks, startup_seconds: startup.toFixed(2) });
 
     // 3. Forced full scan — same call as Settings → Force Full Scan.
     rec.begin();
     try {
       const scan = await withCdp((c) => timed(() => invoke(c, "scan_directories", { force: true })));
       log(`forced full scan took ${scan.seconds}s`);
-      await rec.finish("after-full-scan", SETTLE_AFTER_SCAN_SEC, { library_tracks: tracks, scan_seconds: scan.seconds });
+      await rec.finish("after-full-scan", SETTLE_AFTER_SCAN_SEC, { library_tracks: tracks, scan_seconds: scan.seconds }, true);
     } catch (e) {
       await rec.abandon();
       throw e;
@@ -470,7 +531,7 @@ async function localSource(opts: Options, rec: Recorder, folders: string[]) {
     try {
       const scroll = await withCdp((c) => timed(() => callInPage<{ steps: number; cards: number }>(c, SCROLL_ALBUM_GRID)));
       log(`scrolled the Albums grid in ${scroll.result.steps} steps (${scroll.seconds}s)`);
-      await rec.finish("album-grid", SETTLE_AFTER_SCAN_SEC, { library_tracks: tracks });
+      await rec.finish("album-grid", SETTLE_AFTER_SCAN_SEC, { library_tracks: tracks }, true);
     } catch (e) {
       await rec.abandon();
       throw e;
@@ -514,6 +575,7 @@ async function remoteSource(opts: Options, rec: Recorder, baseline: BaselineTrac
   const { label } = server;
   const profile = new AppProfile({ exe: opts.exe, window: opts });
   log(`${label}: scratch profile ${profile.root}`);
+  rec.use(profile);
   try {
     // 1. First sync — the same calls as adding the server in Settings → Sources and Sync Now.
     await profile.launch();
@@ -535,7 +597,7 @@ async function remoteSource(opts: Options, rec: Recorder, baseline: BaselineTrac
       const sync = await withCdp((c) => timed(() => invoke(c, server.sync, { id: saved.id })));
       tracks = await withCdp(libraryTracks);
       log(`${label} sync of ${tracks} tracks took ${sync.seconds}s`);
-      await rec.finish(`${label}-sync`, SETTLE_AFTER_SCAN_SEC, { library_tracks: tracks, scan_seconds: sync.seconds });
+      await rec.finish(`${label}-sync`, SETTLE_AFTER_SCAN_SEC, { library_tracks: tracks, scan_seconds: sync.seconds }, true);
     } catch (e) {
       await rec.abandon();
       throw e;
@@ -554,9 +616,9 @@ async function remoteSource(opts: Options, rec: Recorder, baseline: BaselineTrac
     profile.cue(song);
 
     // 2. Idle, then 3. streamed playback, in a fresh launch.
-    await profile.launch();
+    const startup = await profile.launch();
     rec.begin();
-    await rec.finish(`${label}-idle`, SETTLE_IDLE_SEC, { library_tracks: tracks });
+    await rec.finish(`${label}-idle`, SETTLE_IDLE_SEC, { library_tracks: tracks, startup_seconds: startup.toFixed(2) });
     await playbackScenario(rec, `${label}-playback`, song, tracks);
     await profile.close();
   } finally {
@@ -566,8 +628,18 @@ async function remoteSource(opts: Options, rec: Recorder, baseline: BaselineTrac
 
 // ── Run ───────────────────────────────────────────────────────────────────
 
+/** Compiler processes that would put their own CPU load, and disk and memory pressure, into the readings. */
+function busyBuilders(): string[] {
+  const out = execFileSync("tasklist", ["/FO", "CSV", "/NH"], { encoding: "utf8" });
+  return [...new Set((out.match(/"(?:rustc|cargo|cl|link|tsc)\.exe"/gi) ?? []).map((m) => m.replaceAll('"', "").toLowerCase()))];
+}
+
 function checkPreconditions(opts: Options) {
   checkProfilePreconditions(opts.exe);
+  const busy = opts.allowBusy ? [] : busyBuilders();
+  if (busy.length) {
+    throw new Error(`${busy.join(", ")} running: its CPU and memory load would skew the readings. Wait for it, or pass --allow-busy.`);
+  }
   const lastSourceChange = Number(
     execFileSync("git", ["log", "-1", "--format=%ct", "--", ...APP_SOURCE_PATHS], { cwd: opts.exeRepo, encoding: "utf8" }).trim(),
   );

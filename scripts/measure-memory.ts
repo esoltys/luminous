@@ -26,6 +26,7 @@
 
 import { execFile, execFileSync } from "node:child_process";
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { availableParallelism } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -48,6 +49,12 @@ export const CSV_COLUMNS = [
   "profile",
   "peak_working_set_mb",
   "peak_private_bytes_mb",
+  // Added with the CPU/startup/stall/size columns; rows recorded before them have these blank.
+  "cpu_percent",
+  "work_cpu_seconds",
+  "startup_seconds",
+  "stall_warnings",
+  "binary_mb",
 ] as const;
 
 export type CsvRow = Record<(typeof CSV_COLUMNS)[number], string | number>;
@@ -59,6 +66,30 @@ export interface Snapshot {
   workingSetMb: number;
   privateBytesMb: number;
   windowState: WindowState;
+  /** Cumulative CPU seconds per process id, across the app's process tree (Windows only; empty elsewhere). */
+  cpuSeconds: ReadonlyMap<number, number>;
+  /** `performance.now()` when the reading finished, to turn two CPU readings into a rate. */
+  takenAtMs: number;
+}
+
+/**
+ * CPU seconds the process tree used between two readings. Works per process id, so a child that appeared or
+ * exited in between still counts (a process missing from `from` counts from zero; one missing from `to` is lost).
+ * Null when either reading has no CPU data.
+ */
+export function cpuSecondsBetween(from: Snapshot, to: Snapshot): number | null {
+  if (!from.cpuSeconds.size || !to.cpuSeconds.size) return null;
+  let total = 0;
+  for (const [pid, secs] of to.cpuSeconds) total += Math.max(0, secs - (from.cpuSeconds.get(pid) ?? 0));
+  return total;
+}
+
+/** The tree's CPU use between two readings as a percentage of the whole machine (all logical cores). */
+export function cpuPercentBetween(from: Snapshot, to: Snapshot): number | null {
+  const secs = cpuSecondsBetween(from, to);
+  const wallSec = (to.takenAtMs - from.takenAtMs) / 1000;
+  if (secs === null || wallSec <= 0) return null;
+  return (secs / wallSec / availableParallelism()) * 100;
 }
 
 function parseArgs() {
@@ -113,16 +144,17 @@ while ($frontier.Count -gt 0) {
   }
   $frontier = $next
 }
-$ws = 0; $priv = 0; $count = 0
+$ws = 0; $priv = 0; $count = 0; $cpu = @()
 foreach ($procId in $pids) {
   $proc = Get-Process -Id $procId -ErrorAction SilentlyContinue
   if ($proc) {
     $ws += $proc.WorkingSet64
     $priv += $proc.PrivateMemorySize64
     $count++
+    try { $cpu += ('{0}={1}' -f $procId, $proc.TotalProcessorTime.TotalSeconds.ToString([cultureinfo]::InvariantCulture)) } catch {}
   }
 }
-Write-Output "$count,$ws,$priv,$winState"
+Write-Output "$count,$ws,$priv,$winState,$($cpu -join '|')"
 `;
 
 function parseWindowsSnapshot(raw: string): Snapshot {
@@ -132,12 +164,19 @@ function parseWindowsSnapshot(raw: string): Snapshot {
       `Process '${BINARY_NAME}' not found. Is Luminous running? (Task Manager shows the exe as "${BINARY_NAME}.exe")`,
     );
   }
-  const [count, ws, priv, winState] = out.split(",");
+  const [count, ws, priv, winState, cpu = ""] = out.split(",");
+  const cpuSeconds = new Map<number, number>();
+  for (const entry of cpu.split("|")) {
+    const [pid, secs] = entry.split("=");
+    if (pid && secs) cpuSeconds.set(Number(pid), Number(secs));
+  }
   return {
     processCount: Number(count),
     workingSetMb: Number(ws) / 1024 / 1024,
     privateBytesMb: Number(priv) / 1024 / 1024,
     windowState: winState as WindowState,
+    cpuSeconds,
+    takenAtMs: performance.now(),
   };
 }
 
@@ -209,6 +248,8 @@ function snapshotLinux(): Snapshot {
     // No portable way to ask a Wayland/X11 compositor whether the window is
     // minimized — keep it on screen by hand when measuring on Linux.
     windowState: "unknown",
+    cpuSeconds: new Map(),
+    takenAtMs: performance.now(),
   };
 }
 
@@ -296,7 +337,7 @@ export async function sampleMedian(
   count: number,
   intervalSec: number,
   { allowHidden = false, onSample }: { allowHidden?: boolean; onSample?: (s: Snapshot) => void } = {},
-): Promise<Snapshot> {
+): Promise<Snapshot & { cpuPercent: number | null }> {
   const samples: Snapshot[] = [];
   for (let i = 0; i < count; i++) {
     if (i > 0) await new Promise((r) => setTimeout(r, intervalSec * 1000));
@@ -305,11 +346,16 @@ export async function sampleMedian(
     onSample?.(s);
     samples.push(s);
   }
+  const last = samples[samples.length - 1];
   return {
-    processCount: samples[samples.length - 1].processCount,
+    processCount: last.processCount,
     workingSetMb: median(samples.map((s) => s.workingSetMb)),
     privateBytesMb: median(samples.map((s) => s.privateBytesMb)),
-    windowState: samples[samples.length - 1].windowState,
+    windowState: last.windowState,
+    cpuSeconds: last.cpuSeconds,
+    takenAtMs: last.takenAtMs,
+    // CPU over the whole sampling window, from the first reading to the last (needs 2+ readings).
+    cpuPercent: samples.length > 1 ? cpuPercentBetween(samples[0], last) : null,
   };
 }
 
@@ -358,15 +404,27 @@ export function appCommit(repoRoot: string = REPO_ROOT): string {
   }
 }
 
-/** Appends a row, creating the file with a header if needed; refuses on a header mismatch. */
+/**
+ * Appends a row, creating the file with a header if needed. A file whose header is an older, shorter run of
+ * CSV_COLUMNS is widened first (existing rows get blank cells); any other header is refused.
+ */
 export function appendCsvRow(csv: string, row: CsvRow) {
   const header = CSV_COLUMNS.join(",");
   if (!existsSync(csv)) {
     writeFileSync(csv, `${header}\n`);
   } else {
-    const existing = readFileSync(csv, "utf8").split(/\r?\n/, 1)[0];
+    const text = readFileSync(csv, "utf8");
+    const existing = text.split(/\r?\n/, 1)[0];
     if (existing !== header) {
-      throw new Error(`${csv} has header "${existing}", expected "${header}". Refusing to append a mismatched row.`);
+      if (!header.startsWith(`${existing},`)) {
+        throw new Error(`${csv} has header "${existing}", expected "${header}". Refusing to append a mismatched row.`);
+      }
+      const missing = CSV_COLUMNS.length - existing.split(",").length;
+      const widened = text
+        .split(/\r?\n/)
+        .map((line, i) => (i === 0 ? header : line === "" ? line : line + ",".repeat(missing)))
+        .join("\n");
+      writeFileSync(csv, widened);
     }
   }
   appendFileSync(csv, `${csvLine(row)}\n`);
@@ -406,6 +464,11 @@ async function report(opts: ReturnType<typeof parseArgs>) {
       profile: "real",
       peak_working_set_mb: "",
       peak_private_bytes_mb: "",
+      cpu_percent: "",
+      work_cpu_seconds: "",
+      startup_seconds: "",
+      stall_warnings: "",
+      binary_mb: "",
     });
   }
 }

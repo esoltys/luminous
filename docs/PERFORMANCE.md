@@ -31,6 +31,22 @@ before/after a change, instead of relying on "it feels heavier." See #706.
 - **Peak**: each row also records the highest working set and private bytes polled during the
   scenario (the work, the settle and the samples). Polls are a second or two apart, so a shorter
   spike can slip between them.
+- **CPU, startup, stalls and size** (recorded from the 3.0 check on; older rows have these blank):
+  - `cpu_percent`: CPU of the whole process tree over the sampling window, as a share of all logical
+    cores. Each process counts from its own start, so children that appear or exit mid-run still
+    count. After a scan or thumbnail pass it's the settled cost, not the work's.
+  - `work_cpu_seconds`: CPU the scan, sync or thumbnail pass itself used, from the start of the work
+    to the end of it (the first scan, forced rescan and Albums grid scroll).
+  - `startup_seconds`: spawn to a loaded page with the IPC bridge up, polled every 250ms, taken on the
+    idle scenario's relaunch over an existing library. The very first launch also creates the
+    WebView2 data folder, so it isn't comparable.
+  - `stall_warnings`: the stall watchdog's `Tokio stall:` / `UI stall:` log lines during the scenario.
+    The watchdog first shipped after 2.6, so this is blank for older builds, not zero.
+  - `binary_mb`: the exe's size.
+- **A quiet machine**: CPU and startup are far more sensitive to other work than memory is. The script
+  refuses to run while `rustc`/`cargo` are running (`--allow-busy` overrides it, and the readings then
+  aren't comparable). A cold network library inflated the first scan from 2s to 3 minutes during one
+  trial run while two builds were compiling.
 
 ## Running it
 
@@ -81,9 +97,10 @@ scratch-profile rows by default; pass `--profile real` for the history before #1
 bun run perf:chart -- --baseline 2.5.0 --candidate 2.6.0 --runs 2
 ```
 
-`--trend` instead draws every recorded version as a line per scenario (`bun run perf:chart -- --trend --runs 2`,
-written to `performance-trend.png`). The real-profile and scratch-profile histories are separate lines, so
-read a trend within one line, not across them.
+`--trend` instead draws every recorded version as a line (`bun run perf:chart -- --trend --runs 2`),
+into `performance-trend.png` for memory and `performance-trend-speed.png` for CPU, startup, scan time
+and binary size. It draws scratch-profile rows only; `--include-real` adds the pre-#1197 history as a
+separate line, which isn't comparable with the scratch one.
 
 ## Scenarios
 
@@ -199,26 +216,36 @@ comparison now draws on them.
 
 | Scenario | Private bytes Δ | Working set Δ |
 | --- | --- | --- |
-| Idle | −15.0 MB (−3.5%) | +18.4 MB (+3.9%) |
-| After full scan | +23.8 MB (+6.6%) | +8.2 MB (+1.6%) |
-| During playback (EQ + analyzer on) | +8.3 MB (+2.2%) | +7.8 MB (+1.5%) |
-| First scan (with artwork) | −9.4 MB (−2.7%) | +21.2 MB (+4.4%) |
-| Albums grid scrolled (thumbnails) | −68.4 MB (−9.0%) | −63.2 MB (−10.1%) |
+| Idle | −76.5 MB (−15.4%) | +10.8 MB (+2.3%) |
+| After full scan | +27.5 MB (+7.5%) | +8.4 MB (+1.7%) |
+| During playback (EQ + analyzer on) | +10.9 MB (+2.9%) | +10.6 MB (+2.0%) |
+| First scan (with artwork) | −32.9 MB (−9.1%) | +3.5 MB (+0.7%) |
+| Albums grid scrolled (thumbnails) | −76.1 MB (−9.8%) | −56.7 MB (−8.9%) |
 
-No regression. Measured on 2026-10-11 from `main` at `a0f1d5b3` (3.0 is pre-release, so `package.json` still says 2.6.0), in scratch profiles over the same 3,247-track library, alternating 3.0 and 2.6.0 builds and playing the baseline track. The table is the mean of the newest two runs per version; the CSV has three 3.0 runs and two 2.6.0 runs. These are the first scratch-profile rows (#1197), so don't compare them with the 2.5/2.6 `real` rows above.
+Measured on 2026-10-11 from `main` at `a0f1d5b3` (3.0 is pre-release, so `package.json` still says 2.6.0), in scratch profiles over the same 3,247-track library, alternating builds and playing the baseline track. The table is the mean of the newest two runs per version. These are the first scratch-profile rows (#1197), so don't compare them with the 2.5/2.6 `real` rows above.
 
-The Albums grid is the clear win, in every run: −68 MB private bytes, in line with the thumbnail work in #1528/#1530. Scans are faster too: the first scan took 2.0s against 2.4s, and the forced full rescan 1.4s against 2.2s.
+**Memory.** No regression worth acting on, with one small exception. The Albums grid is lower in every run (about −75 MB private bytes, in line with #1528/#1530). After full scan is the only result past the ~3% noise band in the wrong direction: all five 3.0 runs read 378-402 MB against 353-370 MB for all four 2.6.0 runs, so the +27 MB looks real but small. Idle private bytes jump between launches (2.6.0 has read 376, 479, 490 and 512 MB), so ignore the idle delta; the peak columns are noisy for the same reason. Process count was 7 in every scenario.
 
-After full scan is the one result past the ~3% noise band. All three 3.0 runs read 378-393 MB private bytes against 353-370 MB for 2.6.0, so the +24 MB looks real but small. Idle private bytes jump between launches (2.6.0 read 376 then 490 MB), so ignore the idle delta. The peak columns are noisy for the same reason, and the large peak drops in the idle and after-scan rows come from erratic 2.6.0 peaks, not from a 3.0 improvement. Process count was 7 in every scenario.
+| Scenario | CPU, settled (% of machine) | CPU used by the work (CPU-seconds) | Time |
+| --- | --- | --- | --- |
+| Idle | 0.0 → 0.1 | | startup 1.4s → 1.4s |
+| After full scan | 0.0 → 0.0 | 10.7 → 13.9 | 2.2s → 1.6s |
+| Playback (EQ + analyzer on) | 1.1 → 0.8 | | |
+| First scan (with artwork) | 0.0 → 0.0 | 10.8 → 13.8 | 2.4s → 1.5s |
+| Albums grid scrolled | 0.1 → 0.1 | 3.7 → 14.4 | |
+
+**Speed.** Scans finish about a third faster in wall time (2.4s to 1.5s) by using more CPU (+28%). Startup, idle CPU and playback CPU are unchanged or slightly better, and the stall watchdog logged no warnings in any 3.0 scenario. Two results need a decision:
+
+- **Scrolling the Albums grid costs about 3.9x the CPU** (3.6-4.4 CPU-seconds in every 2.0-2.6 run, 14.0-14.8 in both 3.0 runs). Wall time for the scroll is the same, 9.4s, and memory went down, so this is extra work per thumbnail, not extra time.
+- **The binary is 3.2x larger**: 179 MB against 55 MB. The release profile is unchanged. The cause is `docs/user-guide/assets`, 139 MB of user-guide screenshots across the locales that `bun run sync-docs` copies into the frontend build and Tauri embeds in the exe.
 
 ### Trend across versions (Windows)
 
 ![Memory by version](performance-trend.png)
 
-Private bytes in the real-profile history fell from 2.0 to 2.5 and then held flat, and the scratch-profile line
-is flat from 2.6 to 3.0 apart from the Albums grid drop. 2.6.0 appears in both histories (idle private bytes read
-390 MB in the real profile and 433 MB in the scratch one), which shows the offset between the two kinds, so
-don't join the lines. The library also grew from 2,375 to 3,247 tracks over the same span.
+![CPU, startup and size by version](performance-trend-speed.png)
+
+Every point is a scratch-profile run, the mean of the newest two for that version, over the same 3,247-track library. Private bytes are flat from 2.0 to 3.0 apart from the Albums grid, which has fallen from 795 MB to 698 MB, and the noisy idle and after-scan readings. Working set varies by under 5% in every scenario except the Albums grid. Playback CPU fell from 1.9% in 2.0 to about 1% from 2.5 on, startup stayed at 1.4-1.5s in every version, and scans got faster in 3.0. The CPU the first scan uses rose from 11 to 14 CPU-seconds in 3.0 and the Albums grid scroll from 4 to 14, and the binary tripled in 3.0.
 
 ## Candidate areas if numbers look high in the future
 
