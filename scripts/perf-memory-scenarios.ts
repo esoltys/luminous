@@ -630,8 +630,12 @@ async function remoteSource(opts: Options, rec: Recorder, baseline: BaselineTrac
 
 /** Compiler processes that would put their own CPU load, and disk and memory pressure, into the readings. */
 function busyBuilders(): string[] {
-  const out = execFileSync("tasklist", ["/FO", "CSV", "/NH"], { encoding: "utf8" });
-  return [...new Set((out.match(/"(?:rustc|cargo|cl|link|tsc)\.exe"/gi) ?? []).map((m) => m.replaceAll('"', "").toLowerCase()))];
+  const out = execFileSync(
+    "powershell",
+    ["-NoProfile", "-Command", "Get-Process -Name rustc,cargo,cl,link,tsc -ErrorAction SilentlyContinue | ForEach-Object { $_.ProcessName }; exit 0"],
+    { encoding: "utf8" },
+  );
+  return [...new Set(out.split(/\r?\n/).map((n) => n.trim().toLowerCase()).filter(Boolean))];
 }
 
 function checkPreconditions(opts: Options) {
