@@ -189,6 +189,24 @@ scenarios.
 These 2.5 rows replace the 2026-09-25 ones as the newest 2.5 baseline, so re-running the 2.5 vs. 2.0
 comparison now draws on them.
 
+### 3.0 vs. 2.6 (Windows)
+
+![Memory: 3.0.0 vs. 2.6.0](performance-2.6.0-vs-3.0.0.png)
+
+| Scenario | Private bytes Δ | Working set Δ |
+| --- | --- | --- |
+| Idle | −15.0 MB (−3.5%) | +18.4 MB (+3.9%) |
+| After full scan | +23.8 MB (+6.6%) | +8.2 MB (+1.6%) |
+| During playback (EQ + analyzer on) | +8.3 MB (+2.2%) | +7.8 MB (+1.5%) |
+| First scan (with artwork) | −9.4 MB (−2.7%) | +21.2 MB (+4.4%) |
+| Albums grid scrolled (thumbnails) | −68.4 MB (−9.0%) | −63.2 MB (−10.1%) |
+
+No regression. Measured on 2026-10-11 from `main` at `a0f1d5b3` (3.0 is pre-release, so `package.json` still says 2.6.0), in scratch profiles over the same 3,247-track library, alternating 3.0 and 2.6.0 builds and playing the baseline track. The table is the mean of the newest two runs per version; the CSV has three 3.0 runs and two 2.6.0 runs. These are the first scratch-profile rows (#1197), so don't compare them with the 2.5/2.6 `real` rows above.
+
+The Albums grid is the clear win, in every run: −68 MB private bytes, in line with the thumbnail work in #1528/#1530. Scans are faster too: the first scan took 2.0s against 2.4s, and the forced full rescan 1.4s against 2.2s.
+
+After full scan is the one result past the ~3% noise band. All three 3.0 runs read 378-393 MB private bytes against 353-370 MB for 2.6.0, so the +24 MB looks real but small. Idle private bytes jump between launches (2.6.0 read 376 then 490 MB), so ignore the idle delta. The peak columns are noisy for the same reason, and the large peak drops in the idle and after-scan rows come from erratic 2.6.0 peaks, not from a 3.0 improvement. Process count was 7 in every scenario.
+
 ## Candidate areas if numbers look high in the future
 
 - `src-tauri/src/db.rs` — the r2d2 pool caps at 8 connections, each with `PRAGMA cache_size=-32000`
