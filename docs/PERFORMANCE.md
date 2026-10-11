@@ -81,6 +81,10 @@ scratch-profile rows by default; pass `--profile real` for the history before #1
 bun run perf:chart -- --baseline 2.5.0 --candidate 2.6.0 --runs 2
 ```
 
+`--trend` instead draws every recorded version as a line per scenario (`bun run perf:chart -- --trend --runs 2`,
+written to `performance-trend.png`). The real-profile and scratch-profile histories are separate lines, so
+read a trend within one line, not across them.
+
 ## Scenarios
 
 | Source | Label | What happens |
@@ -206,6 +210,15 @@ No regression. Measured on 2026-10-11 from `main` at `a0f1d5b3` (3.0 is pre-rele
 The Albums grid is the clear win, in every run: −68 MB private bytes, in line with the thumbnail work in #1528/#1530. Scans are faster too: the first scan took 2.0s against 2.4s, and the forced full rescan 1.4s against 2.2s.
 
 After full scan is the one result past the ~3% noise band. All three 3.0 runs read 378-393 MB private bytes against 353-370 MB for 2.6.0, so the +24 MB looks real but small. Idle private bytes jump between launches (2.6.0 read 376 then 490 MB), so ignore the idle delta. The peak columns are noisy for the same reason, and the large peak drops in the idle and after-scan rows come from erratic 2.6.0 peaks, not from a 3.0 improvement. Process count was 7 in every scenario.
+
+### Trend across versions (Windows)
+
+![Memory by version](performance-trend.png)
+
+Private bytes in the real-profile history fell from 2.0 to 2.5 and then held flat, and the scratch-profile line
+is flat from 2.6 to 3.0 apart from the Albums grid drop. 2.6.0 appears in both histories (idle private bytes read
+390 MB in the real profile and 433 MB in the scratch one), which shows the offset between the two kinds, so
+don't join the lines. The library also grew from 2,375 to 3,247 tracks over the same span.
 
 ## Candidate areas if numbers look high in the future
 
