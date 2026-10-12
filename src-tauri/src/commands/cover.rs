@@ -1,5 +1,5 @@
 use crate::covermanager::{
-    local_artwork_uri, scan_extended_artwork, ArtworkCategory, ArtworkEntry, ExtendedArtworkSet,
+    local_artwork_uri, scan_extended_artwork, ArtworkCategory, ExtendedArtworkSet,
 };
 use crate::AppState;
 use rusqlite::{params, OptionalExtension};
@@ -104,6 +104,19 @@ async fn scan_extended_artwork_blocking(
         .map_err(|e| e.to_string())
 }
 
+/// Keeps only album-level entries (dropping artist portrait/logo/fanart from
+/// the parent directory) in hierarchy order.
+fn album_level_artwork(set: ExtendedArtworkSet) -> ExtendedArtworkSet {
+    ExtendedArtworkSet {
+        entries: set
+            .entries
+            .into_iter()
+            .filter(|e| e.category.is_album_level())
+            .collect(),
+    }
+    .sorted()
+}
+
 /// Album-level slice of the hierarchical scan (#98/#757/#760) for one song's
 /// album directory, exposed over IPC. Artist-level categories (portrait,
 /// band logo, fanart banner) and media residing in parent directories are
@@ -119,6 +132,10 @@ async fn scan_extended_artwork_blocking(
 /// virtualized list, so a filesystem scan per call is cheap enough — no
 /// schema/cache table added here. Revisit if a future caller needs this at
 /// list-row frequency.
+///
+/// Only files that exist in the album folder are returned, so every counted
+/// image is one "Open Images" can open. The fanart.tv disc art (#1277) lives
+/// in the app's cover cache and is deliberately not included.
 #[tauri::command]
 pub async fn get_extended_artwork_for_song(
     state: State<'_, AppState>,
@@ -145,37 +162,7 @@ pub async fn get_extended_artwork_for_song(
     };
 
     let set = scan_extended_artwork_blocking(path, album).await?;
-    let mut album_only = ExtendedArtworkSet {
-        entries: set
-            .entries
-            .into_iter()
-            .filter(|e| e.category.is_album_level())
-            .collect(),
-    }
-    .sorted();
-
-    // fanart.tv disc art (#1277) goes after any local disc image.
-    let manager = state.cover_manager.clone();
-    let (_, fanart_disc) = tokio::task::spawn_blocking(move || manager.fanart_album_art(song_id))
-        .await
-        .map_err(|e| e.to_string())?
-        .map_err(|e| e.to_string())?;
-    if let Some(disc) = fanart_disc {
-        let at = album_only
-            .entries
-            .iter()
-            .position(|e| e.category > ArtworkCategory::DiscMedia)
-            .unwrap_or(album_only.entries.len());
-        album_only.entries.insert(
-            at,
-            ArtworkEntry {
-                category: ArtworkCategory::DiscMedia,
-                path: state.cover_manager.covers_dir().join(disc),
-            },
-        );
-    }
-
-    Ok(build_extended_artwork_response(album_only))
+    Ok(build_extended_artwork_response(album_level_artwork(set)))
 }
 
 /// Artist-level slice of the same hierarchical scan (portrait, band logo,
@@ -346,14 +333,7 @@ mod tests {
             ],
         };
 
-        let album_only = ExtendedArtworkSet {
-            entries: set
-                .entries
-                .into_iter()
-                .filter(|e| e.category.is_album_level())
-                .collect(),
-        }
-        .sorted();
+        let album_only = album_level_artwork(set);
 
         let response = build_extended_artwork_response(album_only);
 
