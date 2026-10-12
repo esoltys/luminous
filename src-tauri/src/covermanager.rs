@@ -1447,10 +1447,8 @@ impl CoverManager {
     /// flag is set on a miss so future scans (and the frontend's per-row
     /// retry-on-mount) don't keep re-querying it.
     ///
-    /// Offloads all SQLite operations to the blocking thread pool via
-    /// [`crate::db::run_blocking`], image downscaling and sidecar/cache writes
-    /// via [`tokio::task::spawn_blocking`], and coalesces concurrent lookups for
-    /// the same album to prevent Tokio worker stalls (#1671).
+    /// Concurrent lookups for the same album are automatically coalesced to prevent
+    /// redundant network queries and scheduler stalls (#1671).
     pub async fn fetch_remote_cover(&self, song_id: i64) -> Result<Option<String>> {
         let query_info = crate::db::run_blocking(&self.db, move |conn| {
             if !crate::commands::context::is_online_enabled(conn) {
@@ -1514,18 +1512,12 @@ impl CoverManager {
             } else {
                 format!("{hash_name}.png")
             };
-            let q_art = query_artist.clone();
-            let q_alb = query_album.clone();
-            let fname = filename.clone();
-            crate::db::run_blocking(&self.db, move |conn| {
-                conn.execute(
-                    "UPDATE songs SET art_automatic = ?1, art_unset = 0
-                     WHERE id = ?2
-                        OR (COALESCE(NULLIF(album_artist, ''), artist) = ?3 COLLATE NOCASE AND album = ?4 COLLATE NOCASE AND art_automatic IS NULL AND art_embedded = 0)",
-                    params![fname, song_id, q_art, q_alb],
-                )?;
-                Ok(())
-            })
+            self.persist_album_cover(
+                song_id,
+                &query_artist,
+                &query_album,
+                Some(filename.clone()),
+            )
             .await?;
             return Ok(Some(filename));
         }
@@ -1549,6 +1541,7 @@ impl CoverManager {
             return Ok(None);
         }
 
+        // None in outer Option = in progress; Some(None) = miss; Some(Some(name)) = hit.
         let (tx, rx) = tokio::sync::watch::channel(None);
         self.remote_fetches.lock().insert(hash_name.clone(), rx);
         let _guard = InflightGuard {
@@ -1584,7 +1577,7 @@ impl CoverManager {
             .await?;
         let results = response.get("results").and_then(|r| r.as_array());
 
-        let mut auto_val = None;
+        let mut artwork_filename = None;
         if let Some(results) = results {
             if let Some(first_result) = results.first() {
                 // Get 100x100 URL and replace with 600x600 for higher resolution
@@ -1594,7 +1587,7 @@ impl CoverManager {
 
                     let img_bytes = client.get(&url_600).send().await?.bytes().await?;
 
-                    let this = self.clone();
+                    let manager = self.clone();
                     let q_art = query_artist.clone();
                     let q_alb = query_album.clone();
                     let h_name = hash_name.clone();
@@ -1602,7 +1595,7 @@ impl CoverManager {
 
                     let saved = tokio::task::spawn_blocking(move || -> Result<String> {
                         let sidecar = s_path.as_deref().and_then(|p| {
-                            this.try_save_album_cover_sidecar(
+                            manager.try_save_album_cover_sidecar(
                                 Path::new(p),
                                 &q_art,
                                 &q_alb,
@@ -1615,7 +1608,7 @@ impl CoverManager {
                         } else {
                             let (cache_bytes, ext) = downscale_for_cache(&img_bytes);
                             let filename = format!("{}.{}", h_name, ext);
-                            let dest_path = this.covers_dir.join(&filename);
+                            let dest_path = manager.covers_dir.join(&filename);
 
                             std::fs::write(&dest_path, cache_bytes)?;
                             log::info!("Saved remote cover art to: {}", dest_path.display());
@@ -1625,43 +1618,53 @@ impl CoverManager {
                     .await
                     .context("cover processing task panicked")??;
 
-                    auto_val = Some(saved);
+                    artwork_filename = Some(saved);
                 }
             }
         }
 
-        if let Some(ref val) = auto_val {
-            let val_clone = val.clone();
-            let q_art = query_artist.clone();
-            let q_alb = query_album.clone();
-            crate::db::run_blocking(&self.db, move |conn| {
+        self.persist_album_cover(
+            song_id,
+            &query_artist,
+            &query_album,
+            artwork_filename.clone(),
+        )
+        .await?;
+
+        let _ = tx.send(Some(artwork_filename.clone()));
+        Ok(artwork_filename)
+    }
+
+    /// Persists cover art discovery or miss to SQLite on the blocking thread pool,
+    /// updating `song_id` and all sibling tracks on the same album that also lack art (#1671).
+    async fn persist_album_cover(
+        &self,
+        song_id: i64,
+        query_artist: &str,
+        query_album: &str,
+        artwork_filename: Option<String>,
+    ) -> Result<()> {
+        let q_art = query_artist.to_string();
+        let q_alb = query_album.to_string();
+        crate::db::run_blocking(&self.db, move |conn| {
+            if let Some(filename) = artwork_filename {
                 conn.execute(
                     "UPDATE songs SET art_automatic = ?1, art_unset = 0
                      WHERE id = ?2
                         OR (COALESCE(NULLIF(album_artist, ''), artist) = ?3 COLLATE NOCASE AND album = ?4 COLLATE NOCASE AND art_automatic IS NULL AND art_embedded = 0)",
-                    params![val_clone, song_id, q_art, q_alb],
+                    params![filename, song_id, q_art, q_alb],
                 )?;
-                Ok(())
-            })
-            .await?;
-        } else {
-            // If no artwork found, mark it as unset so we don't spam requests
-            let q_art = query_artist.clone();
-            let q_alb = query_album.clone();
-            crate::db::run_blocking(&self.db, move |conn| {
+            } else {
                 conn.execute(
                     "UPDATE songs SET art_unset = 1
                      WHERE id = ?1
                         OR (COALESCE(NULLIF(album_artist, ''), artist) = ?2 COLLATE NOCASE AND album = ?3 COLLATE NOCASE AND art_automatic IS NULL AND art_embedded = 0)",
                     params![song_id, q_art, q_alb],
                 )?;
-                Ok(())
-            })
-            .await?;
-        }
-
-        let _ = tx.send(Some(auto_val.clone()));
-        Ok(auto_val)
+            }
+            Ok(())
+        })
+        .await
     }
 
     /// Resolve the on-disk filesystem path (not a `luminous-art://` URI) for
