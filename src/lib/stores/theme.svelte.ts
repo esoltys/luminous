@@ -972,6 +972,10 @@ export class ThemeStore {
     const elevation = isDark ? "0 8px 32px rgba(0, 0, 0, 0.45)" : "0 8px 32px rgba(15, 15, 20, 0.10)";
     const highlight = isDark ? "inset 0 1px 0 rgba(255, 255, 255, 0.14)" : "inset 0 1px 0 rgba(255, 255, 255, 0.9)";
     root.style.setProperty("--glass-shadow", `${elevation}, ${highlight}`);
+    // The top nav splits the two (see its shadow layer): the elevation is
+    // painted on its own compositor layer, the highlight stays on the header.
+    root.style.setProperty("--glass-elevation", elevation);
+    root.style.setProperty("--glass-highlight", highlight);
 
     // PlayDock-only accent glow — kept out of --glass-shadow above since
     // the other three panels don't get it. Two-layer glow (tight bright

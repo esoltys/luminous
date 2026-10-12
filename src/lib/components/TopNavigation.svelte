@@ -311,6 +311,14 @@
 <svelte:window on:keydown={handleKeyDown} on:mouseup={handleMouseUp} on:mousedown={handleWindowMouseDown} />
 
 <header data-walkthrough-target="top-navigation" in:fade={{ duration: 200 }} class="w-full h-20 bg-brand-sidebar flex items-center px-6 gap-6 z-50 overflow-visible {themeStore.isGlassTheme ? 'glass-surface' : ''}">
+  <!-- Drop shadow on its own compositor layer. The reactive logo repaints this
+       header every frame; as the header's own box-shadow the shadow was
+       re-rasterized with it and flickered against the song tables' separately
+       composited backdrop-blur layers (#1655). Only rendered for the glass
+       theme, which is the only one with a shadow. -->
+  {#if themeStore.isGlassTheme}
+    <div class="header-shadow" aria-hidden="true"></div>
+  {/if}
   <div class="flex items-center gap-2">
     {#if !windowLayoutStore.isSidebarAutoCollapsed}
       <button
@@ -802,7 +810,19 @@
     backdrop-filter: none !important;
     background-color: var(--glass-solid-sidebar) !important;
     border-color: var(--glass-border-color, var(--color-border)) !important;
-    box-shadow: var(--glass-shadow, none);
+    box-shadow: var(--glass-highlight, none);
+  }
+
+  /* Negative z-index keeps it behind the header's content but above its
+     background; the shadow only shows outside its own border box, i.e. below
+     the header. will-change gives it a layer the logo's repaints can't touch. */
+  .header-shadow {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    box-shadow: var(--glass-elevation, none);
+    will-change: transform;
   }
 </style>
 
