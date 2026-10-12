@@ -7,25 +7,46 @@ pub async fn get_waveform_data(
     state: State<'_, AppState>,
     song_id: i64,
 ) -> Result<Option<Vec<u8>>, String> {
-    if let Ok(Some(cached)) = crate::waveform::get_cached_waveform(&state.db, song_id) {
-        return Ok(Some(cached));
-    }
+    let db = &state.db;
+    let query_result = crate::db::run_blocking(db, move |conn| {
+        let row: Option<(Vec<u8>, i64)> = conn
+            .query_row(
+                "SELECT data, style FROM waveforms WHERE song_id = ?1",
+                rusqlite::params![song_id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .ok();
 
-    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
-    let path_str: Option<String> = conn
-        .query_row(
-            "SELECT path FROM songs WHERE id = ?1",
-            rusqlite::params![song_id],
-            |row| row.get(0),
-        )
-        .ok();
+        if let Some((data, style)) = row {
+            if style == crate::waveform::WAVEFORM_STYLE_VERSION {
+                return Ok((Some(data), None));
+            }
+        }
+
+        let path: Option<String> = conn
+            .query_row(
+                "SELECT path FROM songs WHERE id = ?1",
+                rusqlite::params![song_id],
+                |r| r.get(0),
+            )
+            .ok();
+
+        Ok((None, path))
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let (cached, path_str) = query_result;
+    if let Some(data) = cached {
+        return Ok(Some(data));
+    }
 
     let path = match path_str {
         Some(p) => std::path::PathBuf::from(p),
         None => return Ok(None),
     };
 
-    // 3. Generate waveform in a blocking threadpool task (so we don't block tokio)
+    // Generate waveform in a blocking threadpool task
     let db_clone = Arc::clone(&state.db);
     let waveform_data = tauri::async_runtime::spawn_blocking(move || {
         crate::waveform::generate_waveform(&db_clone, song_id, &path)
@@ -42,25 +63,46 @@ pub async fn get_band_waveform_data(
     state: State<'_, AppState>,
     song_id: i64,
 ) -> Result<Option<Vec<u8>>, String> {
-    if let Ok(Some(cached)) = crate::band_waveform::get_cached_band_waveform(&state.db, song_id) {
-        return Ok(Some(cached));
-    }
+    let db = &state.db;
+    let query_result = crate::db::run_blocking(db, move |conn| {
+        let row: Option<(Vec<u8>, i64)> = conn
+            .query_row(
+                "SELECT data, style FROM band_waveforms WHERE song_id = ?1",
+                rusqlite::params![song_id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .ok();
 
-    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
-    let path_str: Option<String> = conn
-        .query_row(
-            "SELECT path FROM songs WHERE id = ?1",
-            rusqlite::params![song_id],
-            |row| row.get(0),
-        )
-        .ok();
+        if let Some((data, style)) = row {
+            if style == crate::band_waveform::BAND_WAVEFORM_STYLE_VERSION {
+                return Ok((Some(data), None));
+            }
+        }
+
+        let path: Option<String> = conn
+            .query_row(
+                "SELECT path FROM songs WHERE id = ?1",
+                rusqlite::params![song_id],
+                |r| r.get(0),
+            )
+            .ok();
+
+        Ok((None, path))
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let (cached, path_str) = query_result;
+    if let Some(data) = cached {
+        return Ok(Some(data));
+    }
 
     let path = match path_str {
         Some(p) => std::path::PathBuf::from(p),
         None => return Ok(None),
     };
 
-    // 3. Generate band waveform in a blocking threadpool task
+    // Generate band waveform in a blocking threadpool task
     let db_clone = Arc::clone(&state.db);
     let band_waveform_data = tauri::async_runtime::spawn_blocking(move || {
         crate::band_waveform::generate_band_waveform(&db_clone, song_id, &path)

@@ -466,7 +466,7 @@ impl Player {
         let has_uuid = is_same_playlist && self.playlist_items.iter().any(|i| i.uuid == uuid);
 
         if !has_uuid {
-            let items = db_playlists.get_playlist_tracks(playlist_id)?;
+            let items = tokio::task::block_in_place(|| db_playlists.get_playlist_tracks(playlist_id))?;
             self.playlist_items = items;
             self.current_playlist_id = Some(playlist_id);
             self.current_play_context = if playlist_id > 0 && !self.is_queue_playlist(playlist_id) {
@@ -1958,7 +1958,8 @@ impl Player {
             return None;
         }
         let song_id = self.current_song.as_ref()?.id;
-        match self._db.pool.get() {
+        let db = self._db.clone();
+        tokio::task::block_in_place(move || match db.pool.get() {
             Ok(conn) => match stats::record_skip(&conn, song_id) {
                 Ok(()) => Some(stats::stats_payload(&conn, song_id)),
                 Err(e) => {
@@ -1970,7 +1971,7 @@ impl Player {
                 log::warn!("Failed to get db connection for skip stats: {e}");
                 None
             }
-        }
+        })
     }
 }
 
