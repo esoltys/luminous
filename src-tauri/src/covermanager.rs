@@ -623,7 +623,7 @@ fn serve_embedded_art(covers_dir: &Path, rest: &str) -> tauri::http::Response<Ve
     serve_image_file(&covers_dir.join(cache_file))
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CoverManager {
     db: Arc<Database>,
     covers_dir: PathBuf,
@@ -632,8 +632,22 @@ pub struct CoverManager {
     /// this instance. `None` unless `with_per_scan_album_dedup` enabled it:
     /// only a scan's short-lived manager may skip re-extraction, since the
     /// long-lived watcher/app managers must pick up art changed by a retag.
-    extracted_albums: Option<parking_lot::Mutex<std::collections::HashMap<String, String>>>,
+    extracted_albums: Option<Arc<parking_lot::Mutex<std::collections::HashMap<String, String>>>>,
     self_writes: Option<Arc<SelfWriteTracker>>,
+    /// Active remote cover fetches keyed by canonical album hash (`get_album_hash`).
+    /// Concurrent callers for the same album await the in-flight result instead of
+    /// dispatching duplicate network searches and downloads (#1671).
+    remote_fetches: Arc<
+        parking_lot::Mutex<
+            std::collections::HashMap<
+                String,
+                tokio::sync::watch::Receiver<Option<Option<String>>>,
+            >,
+        >,
+    >,
+    /// Limits concurrent outbound remote cover lookups to prevent network thread
+    /// saturation and rate limits (HTTP 429) during large view mounts (#1671).
+    remote_fetch_semaphore: Arc<tokio::sync::Semaphore>,
 }
 
 /// Inspects raw image bytes to detect magic headers for PNG, JPEG, WEBP, GIF, BMP.
@@ -833,6 +847,24 @@ pub struct CacheUsage {
     pub thumbnail_bytes: u64,
 }
 
+struct InflightGuard {
+    fetches: Arc<
+        parking_lot::Mutex<
+            std::collections::HashMap<
+                String,
+                tokio::sync::watch::Receiver<Option<Option<String>>>,
+            >,
+        >,
+    >,
+    key: String,
+}
+
+impl Drop for InflightGuard {
+    fn drop(&mut self) {
+        self.fetches.lock().remove(&self.key);
+    }
+}
+
 impl CoverManager {
     pub fn new(db: Arc<Database>, app_data_dir: PathBuf) -> Self {
         let covers_dir = app_data_dir.join("covers");
@@ -845,6 +877,8 @@ impl CoverManager {
             itunes_base_url: "https://itunes.apple.com".to_string(),
             extracted_albums: None,
             self_writes: None,
+            remote_fetches: Arc::new(parking_lot::Mutex::new(std::collections::HashMap::new())),
+            remote_fetch_semaphore: Arc::new(tokio::sync::Semaphore::new(4)),
         }
     }
 
@@ -859,7 +893,9 @@ impl CoverManager {
     /// lifetime, instead of re-reading and re-writing the same cache file for
     /// every track. For managers scoped to a single library scan only.
     pub fn with_per_scan_album_dedup(mut self) -> Self {
-        self.extracted_albums = Some(parking_lot::Mutex::new(std::collections::HashMap::new()));
+        self.extracted_albums = Some(Arc::new(parking_lot::Mutex::new(
+            std::collections::HashMap::new(),
+        )));
         self
     }
 
@@ -1411,20 +1447,17 @@ impl CoverManager {
     /// flag is set on a miss so future scans (and the frontend's per-row
     /// retry-on-mount) don't keep re-querying it.
     ///
-    /// Deliberately never holds a pooled DB connection across the network
-    /// `.await`s below — the pool only has a handful of connections (see
-    /// `Database::new`), and a stalled/slow request holding one would
-    /// starve every other DB-backed command in the app (#362 follow-up).
+    /// Offloads all SQLite operations to the blocking thread pool via
+    /// [`crate::db::run_blocking`], image downscaling and sidecar/cache writes
+    /// via [`tokio::task::spawn_blocking`], and coalesces concurrent lookups for
+    /// the same album to prevent Tokio worker stalls (#1671).
     pub async fn fetch_remote_cover(&self, song_id: i64) -> Result<Option<String>> {
-        let (artist, album, album_artist, art_unset) = {
-            let conn = self.db.pool.get()?;
-            // Offline master toggle (#1398). Returns before touching `art_unset`
-            // so the lookup is retried once the user is back online.
-            if !crate::commands::context::is_online_enabled(&conn) {
+        let query_info = crate::db::run_blocking(&self.db, move |conn| {
+            if !crate::commands::context::is_online_enabled(conn) {
                 return Ok(None);
             }
             conn.query_row(
-                "SELECT artist, album, album_artist, art_unset FROM songs WHERE id = ?1",
+                "SELECT artist, album, album_artist, art_unset, path FROM songs WHERE id = ?1",
                 params![song_id],
                 |row| {
                     Ok((
@@ -1432,9 +1465,17 @@ impl CoverManager {
                         row.get::<_, Option<String>>(1)?,
                         row.get::<_, Option<String>>(2)?,
                         row.get::<_, bool>(3)?,
+                        row.get::<_, Option<String>>(4)?,
                     ))
                 },
-            )?
+            )
+            .optional()
+            .map_err(anyhow::Error::from)
+        })
+        .await?;
+
+        let Some((artist, album, album_artist, art_unset, song_path)) = query_info else {
+            return Ok(None);
         };
 
         // Already tried and failed (no metadata or no API match) — don't
@@ -1445,18 +1486,78 @@ impl CoverManager {
 
         let artist_query = album_artist.as_ref().or(artist.as_ref());
         let (query_artist, query_album) = match (artist_query, album.as_ref()) {
-            (Some(art), Some(alb)) => (art, alb),
+            (Some(art), Some(alb)) => (art.clone(), alb.clone()),
             _ => {
                 // No artist/album to search with — mark unset immediately so
                 // untagged songs don't get re-queried on every remount.
-                let conn = self.db.pool.get()?;
-                conn.execute(
-                    "UPDATE songs SET art_unset = 1 WHERE id = ?1",
-                    params![song_id],
-                )?;
+                crate::db::run_blocking(&self.db, move |conn| {
+                    conn.execute(
+                        "UPDATE songs SET art_unset = 1 WHERE id = ?1",
+                        params![song_id],
+                    )?;
+                    Ok(())
+                })
+                .await?;
                 return Ok(None);
             }
         };
+
+        let hash_name = self.get_album_hash(&query_artist, &query_album);
+
+        // Fast-path: if the artwork has already been cached on disk by an earlier
+        // fetch or scan, avoid network queries entirely (#1671).
+        let cached_jpg = self.covers_dir.join(format!("{hash_name}.jpg"));
+        let cached_png = self.covers_dir.join(format!("{hash_name}.png"));
+        if cached_jpg.exists() || cached_png.exists() {
+            let filename = if cached_jpg.exists() {
+                format!("{hash_name}.jpg")
+            } else {
+                format!("{hash_name}.png")
+            };
+            let q_art = query_artist.clone();
+            let q_alb = query_album.clone();
+            let fname = filename.clone();
+            crate::db::run_blocking(&self.db, move |conn| {
+                conn.execute(
+                    "UPDATE songs SET art_automatic = ?1, art_unset = 0
+                     WHERE id = ?2
+                        OR (COALESCE(NULLIF(album_artist, ''), artist) = ?3 COLLATE NOCASE AND album = ?4 COLLATE NOCASE AND art_automatic IS NULL AND art_embedded = 0)",
+                    params![fname, song_id, q_art, q_alb],
+                )?;
+                Ok(())
+            })
+            .await?;
+            return Ok(Some(filename));
+        }
+
+        // In-flight coalescing: check if another task is already fetching artwork
+        // for this exact album hash (#1671).
+        let existing_rx = {
+            let fetches = self.remote_fetches.lock();
+            fetches.get(&hash_name).cloned()
+        };
+
+        if let Some(mut rx) = existing_rx {
+            while rx.borrow().is_none() {
+                if rx.changed().await.is_err() {
+                    break;
+                }
+            }
+            if let Some(res) = rx.borrow().as_ref() {
+                return Ok(res.clone());
+            }
+            return Ok(None);
+        }
+
+        let (tx, rx) = tokio::sync::watch::channel(None);
+        self.remote_fetches.lock().insert(hash_name.clone(), rx);
+        let _guard = InflightGuard {
+            fetches: Arc::clone(&self.remote_fetches),
+            key: hash_name.clone(),
+        };
+
+        // Bound concurrent remote queries to prevent network saturation (#1671).
+        let _permit = self.remote_fetch_semaphore.acquire().await.ok();
 
         log::info!(
             "Fetching remote cover art for: {} - {}",
@@ -1483,6 +1584,7 @@ impl CoverManager {
             .await?;
         let results = response.get("results").and_then(|r| r.as_array());
 
+        let mut auto_val = None;
         if let Some(results) = results {
             if let Some(first_result) = results.first() {
                 // Get 100x100 URL and replace with 600x600 for higher resolution
@@ -1491,58 +1593,75 @@ impl CoverManager {
                     log::info!("Downloading remote cover art from: {}", url_600);
 
                     let img_bytes = client.get(&url_600).send().await?.bytes().await?;
-                    let hash_name = self.get_album_hash(query_artist, query_album);
 
-                    let song_path: Option<String> = {
-                        let conn = self.db.pool.get()?;
-                        conn.query_row(
-                            "SELECT path FROM songs WHERE id = ?1",
-                            params![song_id],
-                            |r| r.get(0),
-                        )
-                        .ok()
-                    };
+                    let this = self.clone();
+                    let q_art = query_artist.clone();
+                    let q_alb = query_album.clone();
+                    let h_name = hash_name.clone();
+                    let s_path = song_path.clone();
 
-                    let sidecar = song_path.as_deref().and_then(|p| {
-                        self.try_save_album_cover_sidecar(
-                            Path::new(p),
-                            query_artist,
-                            query_album,
-                            &img_bytes,
-                        )
-                    });
+                    let saved = tokio::task::spawn_blocking(move || -> Result<String> {
+                        let sidecar = s_path.as_deref().and_then(|p| {
+                            this.try_save_album_cover_sidecar(
+                                Path::new(p),
+                                &q_art,
+                                &q_alb,
+                                &img_bytes,
+                            )
+                        });
 
-                    let auto_val = if let Some(sidecar_path) = sidecar {
-                        sidecar_path.to_string_lossy().to_string()
-                    } else {
-                        let (cache_bytes, ext) = downscale_for_cache(&img_bytes);
-                        let filename = format!("{}.{}", hash_name, ext);
-                        let dest_path = self.covers_dir.join(&filename);
+                        if let Some(sidecar_path) = sidecar {
+                            Ok(sidecar_path.to_string_lossy().to_string())
+                        } else {
+                            let (cache_bytes, ext) = downscale_for_cache(&img_bytes);
+                            let filename = format!("{}.{}", h_name, ext);
+                            let dest_path = this.covers_dir.join(&filename);
 
-                        std::fs::write(&dest_path, cache_bytes)?;
-                        log::info!("Saved remote cover art to: {}", dest_path.display());
-                        filename
-                    };
+                            std::fs::write(&dest_path, cache_bytes)?;
+                            log::info!("Saved remote cover art to: {}", dest_path.display());
+                            Ok(filename)
+                        }
+                    })
+                    .await
+                    .context("cover processing task panicked")??;
 
-                    let conn = self.db.pool.get()?;
-                    conn.execute(
-                        "UPDATE songs SET art_automatic = ?1, art_unset = 0 WHERE id = ?2",
-                        params![auto_val, song_id],
-                    )?;
-
-                    return Ok(Some(auto_val));
+                    auto_val = Some(saved);
                 }
             }
         }
 
-        // If no artwork found, mark it as unset so we don't spam requests
-        let conn = self.db.pool.get()?;
-        conn.execute(
-            "UPDATE songs SET art_unset = 1 WHERE id = ?1",
-            params![song_id],
-        )?;
+        if let Some(ref val) = auto_val {
+            let val_clone = val.clone();
+            let q_art = query_artist.clone();
+            let q_alb = query_album.clone();
+            crate::db::run_blocking(&self.db, move |conn| {
+                conn.execute(
+                    "UPDATE songs SET art_automatic = ?1, art_unset = 0
+                     WHERE id = ?2
+                        OR (COALESCE(NULLIF(album_artist, ''), artist) = ?3 COLLATE NOCASE AND album = ?4 COLLATE NOCASE AND art_automatic IS NULL AND art_embedded = 0)",
+                    params![val_clone, song_id, q_art, q_alb],
+                )?;
+                Ok(())
+            })
+            .await?;
+        } else {
+            // If no artwork found, mark it as unset so we don't spam requests
+            let q_art = query_artist.clone();
+            let q_alb = query_album.clone();
+            crate::db::run_blocking(&self.db, move |conn| {
+                conn.execute(
+                    "UPDATE songs SET art_unset = 1
+                     WHERE id = ?1
+                        OR (COALESCE(NULLIF(album_artist, ''), artist) = ?2 COLLATE NOCASE AND album = ?3 COLLATE NOCASE AND art_automatic IS NULL AND art_embedded = 0)",
+                    params![song_id, q_art, q_alb],
+                )?;
+                Ok(())
+            })
+            .await?;
+        }
 
-        Ok(None)
+        let _ = tx.send(Some(auto_val.clone()));
+        Ok(auto_val)
     }
 
     /// Resolve the on-disk filesystem path (not a `luminous-art://` URI) for
@@ -1959,6 +2078,124 @@ mod tests {
         let result2 = manager.fetch_remote_cover(song_id).await.unwrap();
         assert_eq!(result2, None);
 
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    /// Verifies that multiple concurrent `fetch_remote_cover` calls for tracks on
+    /// the same album coalesce into a single remote search and image download (#1671).
+    #[tokio::test]
+    async fn test_fetch_remote_cover_coalesces_concurrent_album_requests() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_covermanager_coalesce_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+
+        let (song1_id, song2_id) = {
+            let conn = db.pool.get().unwrap();
+            crate::collection::upsert_song(
+                &conn,
+                &crate::models::Song {
+                    artist: Some("Coalesce Band".to_string()),
+                    album: Some("Coalesce Album".to_string()),
+                    title: Some("Track 1".to_string()),
+                    source: crate::models::SongSource::LocalFile,
+                    path: Some(r"C:\Music\track1.mp3".to_string()),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+            crate::collection::upsert_song(
+                &conn,
+                &crate::models::Song {
+                    artist: Some("Coalesce Band".to_string()),
+                    album: Some("Coalesce Album".to_string()),
+                    title: Some("Track 2".to_string()),
+                    source: crate::models::SongSource::LocalFile,
+                    path: Some(r"C:\Music\track2.mp3".to_string()),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+
+            let id1: i64 = conn
+                .query_row(
+                    "SELECT id FROM songs WHERE path = ?1",
+                    params![r"C:\Music\track1.mp3"],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            let id2: i64 = conn
+                .query_row(
+                    "SELECT id FROM songs WHERE path = ?1",
+                    params![r"C:\Music\track2.mp3"],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            (id1, id2)
+        };
+
+        let mock_server = MockServer::start().await;
+        let artwork_url_100 = format!("{}/img/100x100bb.jpg", mock_server.uri());
+
+        // Expect exactly 1 search call across both concurrent song fetches (#1671)
+        Mock::given(method("GET"))
+            .and(path("/search"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "results": [{ "artworkUrl100": artwork_url_100 }]
+            })))
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        let mut cover_bytes = vec![0xFF, 0xD8, 0xFF, 0xE0];
+        cover_bytes.extend(std::iter::repeat_n(0u8, 64));
+
+        // Expect exactly 1 image download across both concurrent song fetches (#1671)
+        Mock::given(method("GET"))
+            .and(path("/img/600x600bb.jpg"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(cover_bytes))
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        let manager = CoverManager::new(db.clone(), temp_dir.clone())
+            .with_itunes_base_url(mock_server.uri());
+
+        let (res1, res2) = tokio::join!(
+            manager.fetch_remote_cover(song1_id),
+            manager.fetch_remote_cover(song2_id)
+        );
+
+        let auto1 = res1.unwrap();
+        let auto2 = res2.unwrap();
+        assert!(auto1.is_some());
+        assert_eq!(auto1, auto2);
+
+        // Verify both songs had art_automatic set in DB
+        let conn = db.pool.get().unwrap();
+        let db_auto1: Option<String> = conn
+            .query_row(
+                "SELECT art_automatic FROM songs WHERE id = ?1",
+                params![song1_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        let db_auto2: Option<String> = conn
+            .query_row(
+                "SELECT art_automatic FROM songs WHERE id = ?1",
+                params![song2_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(db_auto1, auto1);
+        assert_eq!(db_auto2, auto2);
+
+        mock_server.verify().await;
         let _ = std::fs::remove_dir_all(&temp_dir);
     }
 

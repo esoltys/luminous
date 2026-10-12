@@ -1434,7 +1434,7 @@ impl CollectionScanner {
             // Last, try remote fetch (limit to 50 to avoid long scans / rate limits)
             if !resolved && resolve_remote_art && remote_fetch_count < 50 {
                 remote_fetch_count += 1;
-                std::thread::sleep(std::time::Duration::from_millis(150));
+                tokio::time::sleep(std::time::Duration::from_millis(150)).await;
 
                 if let Ok(Some(filename)) = cover_manager.fetch_remote_cover(song_id).await {
                     if let Ok(conn) = self.db.pool.get() {
