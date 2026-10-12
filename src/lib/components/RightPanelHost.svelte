@@ -36,7 +36,7 @@
   let timer: ReturnType<typeof setTimeout> | null = null;
 
   const layout = windowLayoutStore;
-  let docked = $derived(layout.rightPanelPinned && layout.rightPanelOpen && !layout.isRightPanelAutoHidden);
+  let docked = $derived(layout.rightPanelPinned && !layout.isRightPanelAutoHidden);
   let showRail = $derived(!layout.rightPanelPinned && !layout.isRightPanelAutoHidden);
   let showOverlay = $derived(showRail && layout.rightPanelPeeking);
 

@@ -32,6 +32,11 @@
 
   let { isOpen = true, width = 288, pinned = true, onTogglePin }: Props = $props();
 
+  // Names the action, not the state, so the label and glyph agree.
+  let pinLabel = $derived(
+    pinned ? i18n.t('topNav.unpinRightPanel', {}, 'Unpin info sidebar') : i18n.t('topNav.pinRightPanel', {}, 'Pin info sidebar')
+  );
+
   // What the panel describes: the selected song, the viewed album/artist, or the
   // playing song (see inspectorStore). "currentSong" below is that subject's song.
   let subject = $derived(inspectorStore.subject);
@@ -137,6 +142,17 @@
 
 </script>
 
+{#snippet returnPill(onclick: () => void, label: string)}
+  <button
+    type="button"
+    {onclick}
+    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-brand-border text-xs font-medium text-brand-text-secondary hover:text-brand-text-primary hover:border-brand-accent/40 transition-colors cursor-pointer"
+  >
+    <Return class="w-3 h-3" />
+    <span>{label}</span>
+  </button>
+{/snippet}
+
 <aside
   data-walkthrough-target="right-panel"
   style="width: {width}px;"
@@ -146,10 +162,9 @@
     <button
       type="button"
       onclick={onTogglePin}
-      aria-pressed={pinned}
-      aria-label={pinned ? i18n.t('topNav.unpinRightPanel', {}, 'Unpin info sidebar') : i18n.t('topNav.pinRightPanel', {}, 'Pin info sidebar')}
-      title={pinned ? i18n.t('topNav.unpinRightPanel', {}, 'Unpin info sidebar') : i18n.t('topNav.pinRightPanel', {}, 'Pin info sidebar')}
-      class="absolute top-2 right-2 z-10 p-1.5 rounded-md transition-colors {pinned ? 'text-brand-accent-text' : 'text-brand-text-secondary/60 hover:text-brand-text-primary'} hover:bg-brand-text-primary/10"
+      aria-label={pinLabel}
+      title={pinLabel}
+      class="absolute top-1.5 left-1.5 z-10 p-1 rounded-md transition-colors {pinned ? 'text-brand-accent-text' : 'text-brand-text-secondary/60 hover:text-brand-text-primary'} hover:bg-brand-text-primary/10"
     >
       <!-- The glyph names the action, like the label: a slashed pin to unpin, a pin to pin. -->
       {#if pinned}<PinOff size={14} />{:else}<Pin size={14} />{/if}
@@ -159,7 +174,7 @@
        the bottom of the app on top of this panel — a bottom *margin* (rather than
        inner padding) actually shrinks this div's own box, so its scrollbar ends
        above the dock instead of running the full sidebar height behind it. -->
-  <div class="flex-1 min-h-0 overflow-y-auto px-6 pt-6 pb-6 space-y-6 {currentSong ? 'mb-24' : ''}">
+  <div class="flex-1 min-h-0 overflow-y-auto px-6 pt-8 pb-6 space-y-6 {currentSong ? 'mb-24' : ''}">
     {#if currentSong}
       <div class="flex items-center justify-between gap-3">
         <h2 class="text-xs font-bold text-brand-text-secondary uppercase tracking-wider">
@@ -167,24 +182,10 @@
         </h2>
         <!-- The panel follows what you look at; the return arrow marks this as the way back to what is playing, not a title. -->
         {#if inspectorStore.otherViewedKind}
-          <button
-            type="button"
-            onclick={() => inspectorStore.showViewed()}
-            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-brand-border text-xs font-medium text-brand-text-secondary hover:text-brand-text-primary hover:border-brand-accent/40 transition-colors cursor-pointer"
-          >
-            <Return class="w-3 h-3" />
-            <span>{inspectorStore.otherViewedKind === 'album' ? i18n.t('albumDetail.albumInfo', {}, 'Album Info') : i18n.t('artistDetail.artistInfo', {}, 'Artist Info')}</span>
-          </button>
+          {@render returnPill(() => inspectorStore.showViewed(), inspectorStore.otherViewedKind === 'album' ? i18n.t('albumDetail.albumInfo', {}, 'Album Info') : i18n.t('artistDetail.artistInfo', {}, 'Artist Info'))}
         {/if}
         {#if !isPlayingSubject && playerStore.currentSong}
-          <button
-            type="button"
-            onclick={() => inspectorStore.showPlaying()}
-            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-brand-border text-xs font-medium text-brand-text-secondary hover:text-brand-text-primary hover:border-brand-accent/40 transition-colors cursor-pointer"
-          >
-            <Return class="w-3 h-3" />
-            <span>{i18n.t('playerBar.nowPlayingHeading', {}, 'Now Playing')}</span>
-          </button>
+          {@render returnPill(() => inspectorStore.showPlaying(), i18n.t('playerBar.nowPlayingHeading', {}, 'Now Playing'))}
         {/if}
       </div>
 

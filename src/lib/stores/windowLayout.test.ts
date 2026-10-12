@@ -33,43 +33,41 @@ describe("CollectionStore - sidebar/right-panel layout and responsive breakpoint
   describe("info sidebar pinning", () => {
     beforeEach(() => {
       localStorage.clear();
-      windowLayoutStore.rightPanelOpen = true;
       windowLayoutStore.setRightPanelPinned(true);
     });
 
-    it("toggleRightPanel hides and unpins a docked sidebar, leaving the rail without an overlay", () => {
+    it("toggleRightPanel hides a docked sidebar to the rail, without an overlay", () => {
       windowLayoutStore.toggleRightPanel();
       expect(windowLayoutStore.rightPanelPinned).toBe(false);
       expect(windowLayoutStore.rightPanelPeeking).toBe(false);
       expect(windowLayoutStore.rightPanelVisible).toBe(false);
     });
 
-    it("toggleRightPanel docks the sidebar from the rail, an overlay, or a pinned-but-closed state", () => {
+    it("toggleRightPanel docks the sidebar from the rail or an overlay", () => {
       windowLayoutStore.setRightPanelPinned(false);
       windowLayoutStore.setRightPanelPeeking(false);
       windowLayoutStore.toggleRightPanel();
       expect(windowLayoutStore.rightPanelPinned).toBe(true);
-      expect(windowLayoutStore.rightPanelOpen).toBe(true);
 
       windowLayoutStore.setRightPanelPinned(false);
       expect(windowLayoutStore.rightPanelPeeking).toBe(true);
       windowLayoutStore.toggleRightPanel();
       expect(windowLayoutStore.rightPanelPinned).toBe(true);
       expect(windowLayoutStore.rightPanelPeeking).toBe(false);
-
-      windowLayoutStore.rightPanelOpen = false;
-      windowLayoutStore.toggleRightPanel();
-      expect(windowLayoutStore.rightPanelOpen).toBe(true);
     });
 
-    it("keeps the panel on screen as an overlay when unpinned, and docks and shows it when pinned", () => {
+    it("unpinning keeps the sidebar up as an overlay", () => {
       windowLayoutStore.setRightPanelPinned(false);
       expect(windowLayoutStore.rightPanelPeeking).toBe(true);
+      expect(windowLayoutStore.rightPanelVisible).toBe(true);
+    });
 
+    it("treats the legacy rightPanelOpen name as docked", () => {
       windowLayoutStore.rightPanelOpen = false;
-      windowLayoutStore.setRightPanelPinned(true);
+      expect(windowLayoutStore.rightPanelPinned).toBe(false);
       expect(windowLayoutStore.rightPanelPeeking).toBe(false);
-      expect(windowLayoutStore.rightPanelOpen).toBe(true);
+      windowLayoutStore.rightPanelOpen = true;
+      expect(windowLayoutStore.rightPanelPinned).toBe(true);
     });
 
     it("persists the pinned state", () => {
