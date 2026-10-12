@@ -65,6 +65,21 @@ describe("CollectionStore - sidebar/right-panel layout and responsive breakpoint
       expect(windowLayoutStore.rightPanelOpen).toBe(true);
     });
 
+    it("toggleRightPanelDocked pins and opens the sidebar from any other state, and hides it when docked", () => {
+      windowLayoutStore.setRightPanelPinned(false);
+      windowLayoutStore.toggleRightPanelDocked();
+      expect(windowLayoutStore.rightPanelPinned).toBe(true);
+      expect(windowLayoutStore.rightPanelOpen).toBe(true);
+      expect(windowLayoutStore.rightPanelPeeking).toBe(false);
+
+      windowLayoutStore.toggleRightPanelDocked();
+      expect(windowLayoutStore.rightPanelOpen).toBe(false);
+      expect(windowLayoutStore.rightPanelPinned).toBe(true);
+
+      windowLayoutStore.toggleRightPanelDocked();
+      expect(windowLayoutStore.rightPanelOpen).toBe(true);
+    });
+
     it("persists the pinned state", () => {
       windowLayoutStore.setRightPanelPinned(false);
       expect(localStorage.getItem("layout_rightPanelPinned")).toBe("false");

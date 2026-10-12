@@ -222,11 +222,10 @@
   function handleInfoClick() {
     if (windowLayoutStore.immersiveMode) {
       windowLayoutStore.exitImmersiveMode();
-      if (!windowLayoutStore.rightPanelVisible) {
-        windowLayoutStore.toggleRightPanel();
-      }
+      // Leaving immersive to see the sidebar: dock it, never hide it.
+      windowLayoutStore.setRightPanelPinned(true);
     } else {
-      windowLayoutStore.toggleRightPanel();
+      windowLayoutStore.toggleRightPanelDocked();
     }
   }
 

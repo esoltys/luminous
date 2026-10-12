@@ -339,6 +339,21 @@ class WindowLayoutStore {
     }
   }
 
+  // The player bar's info button: docks the sidebar (pinning it) when it isn't
+  // docked, hides the docked sidebar when it is. Unlike toggleRightPanel it
+  // never leaves the sidebar as an overlay, so the click always means "pinned and
+  // open" or "closed".
+  toggleRightPanelDocked() {
+    if (this.rightPanelPinned && this.rightPanelOpen) {
+      this.rightPanelOpen = false;
+      if (typeof window !== "undefined") {
+        localStorage.setItem("layout_rightPanelOpen", "false");
+      }
+    } else {
+      this.setRightPanelPinned(true);
+    }
+  }
+
   // Pinning docks the sidebar (and shows it: pinning is an explicit ask to have
   // it there). Unpinning keeps it on screen as the overlay it just was, so the
   // pointer that clicked the pin icon is still over the panel; it closes when

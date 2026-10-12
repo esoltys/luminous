@@ -374,6 +374,21 @@ describe("PlayerBar.svelte", () => {
     expect(windowLayoutStore.rightPanelOpen).toBe(true);
   });
 
+  it("pins and opens the info sidebar from the button when it was unpinned, then hides it on the next click", async () => {
+    playerStore.currentSong = mockSong;
+    windowLayoutStore.setRightPanelPinned(false);
+    const { getByTitle } = render(PlayerBar);
+    const infoBtn = getByTitle("Show Info Panel (Ctrl+I)");
+
+    await fireEvent.click(infoBtn);
+    expect(windowLayoutStore.rightPanelPinned).toBe(true);
+    expect(windowLayoutStore.rightPanelOpen).toBe(true);
+
+    await fireEvent.click(infoBtn);
+    expect(windowLayoutStore.rightPanelOpen).toBe(false);
+    windowLayoutStore.setRightPanelPinned(true);
+  });
+
   it("exits Immersive Mode and opens the right panel when Info button is clicked while immersive and panel was closed (#909)", async () => {
     playerStore.currentSong = mockSong;
     windowLayoutStore.immersiveMode = true;
