@@ -20,6 +20,13 @@ export interface MosaicLayoutOptions {
   minTile?: number;
   maxRows?: number;
   maxCols?: number;
+  /**
+   * For a box with height to spare (e.g. beside a tall track list): among grids that show
+   * every cover, take the one covering the most of the box, tolerating a single empty cell,
+   * rather than the widest exact fit. Without it a cover count that happens to fill a wide
+   * grid exactly never grows taller, however tall the box is.
+   */
+  fillBox?: boolean;
 }
 
 export interface MosaicLayout {
@@ -71,12 +78,16 @@ export function computeMosaicLayout(opts: MosaicLayoutOptions): MosaicLayout | n
         if (!(unit > 0) || unit < minTile) continue;
         const shown = Math.min(slots, quarterCount);
         const empty = slots - shown;
+        if (opts.fillBox && empty > 1) continue;
+        const gridArea = (cols * unit + (cols - 1) * gap) * (rows * unit + (rows - 1) * gap);
         const better =
           !best ||
           shown > best.shown ||
           (shown === best.shown &&
-            (effective(unit, empty) > effective(best.unit, bestEmpty) + 0.5 ||
-              (Math.abs(effective(unit, empty) - effective(best.unit, bestEmpty)) <= 0.5 && empty < bestEmpty)));
+            (opts.fillBox
+              ? gridArea > best.width * best.height * 1.02
+              : effective(unit, empty) > effective(best.unit, bestEmpty) + 0.5 ||
+                (Math.abs(effective(unit, empty) - effective(best.unit, bestEmpty)) <= 0.5 && empty < bestEmpty)));
         if (better) {
           best = {
             cols,
@@ -93,5 +104,7 @@ export function computeMosaicLayout(opts: MosaicLayoutOptions): MosaicLayout | n
       }
     }
   }
+  // Nothing fit within one empty cell: fall back to the ordinary ranking.
+  if (!best && opts.fillBox) return computeMosaicLayout({ ...opts, fillBox: false });
   return best;
 }

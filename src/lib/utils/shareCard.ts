@@ -89,16 +89,43 @@ function rowBarStyle(percent: number | null | undefined, isDark: boolean): strin
   return `background:linear-gradient(90deg,${color} ${p}%,transparent ${p}%);border-radius:6px;padding-left:10px;padding-right:10px;`;
 }
 
+/** Secondary text (an artist) is drawn on its own line at this fraction of the row's font size. */
+const SECONDARY_FONT_SCALE = 0.85;
+const ROW_LINE_HEIGHT = 1.3;
+const ELLIPSIS_STYLE = "overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
+
+/**
+ * A row's label, with its secondary text (e.g. the artist) on a second line so a
+ * long title can't push it out of the row. Each line is ellipsized on its own.
+ * Rows without a secondary stay a single line.
+ */
+function rowLabelHtml(label: string, secondary: string | null | undefined, fontSize: number): string {
+  const second = secondary
+    ? `<div style="${ELLIPSIS_STYLE}font-size:${Math.round(fontSize * SECONDARY_FONT_SCALE)}px;opacity:0.65;">${escapeHtml(secondary)}</div>`
+    : "";
+  return `<div style="min-width:0;flex:1;line-height:${ROW_LINE_HEIGHT};"><div style="${ELLIPSIS_STYLE}">${escapeHtml(label)}</div>${second}</div>`;
+}
+
+/** Rendered height of one row from {@link rowLabelHtml}, with `vPad` px of padding above and below. */
+function rowHeight(fontSize: number, hasSecondary: boolean, vPad: number): number {
+  return fontSize * ROW_LINE_HEIGHT * (hasSecondary ? 1 + SECONDARY_FONT_SCALE : 1) + 2 * vPad;
+}
+
 /**
  * Track list is laid out as CSS columns so a long tracklist fans out
  * sideways instead of forcing one tall, mostly-empty-feeling column —
  * landscape frames have the width to spare for a third column, portrait/
- * square ones cap out at two.
+ * square ones cap out at two. Two-line rows (title + artist) are about twice
+ * as tall, so fewer of them fit a column.
  */
-function trackListLayout(dims: { width: number; height: number }, trackCount: number): { columns: number; maxVisible: number } {
+function trackListLayout(
+  dims: { width: number; height: number },
+  trackCount: number,
+  twoLine: boolean
+): { columns: number; maxVisible: number } {
   const isPortrait = dims.height > dims.width;
   const isSquareish = Math.abs(dims.width - dims.height) < dims.width * 0.15;
-  const rowsPerColumn = isPortrait ? 10 : isSquareish ? 7 : 6;
+  const rowsPerColumn = twoLine ? (isPortrait ? 7 : 5) : isPortrait ? 10 : isSquareish ? 7 : 6;
   const maxColumns = isPortrait || isSquareish ? 2 : 3;
   const columns = Math.min(maxColumns, Math.max(1, Math.ceil(trackCount / rowsPerColumn)));
   return { columns, maxVisible: columns * rowsPerColumn };
@@ -173,7 +200,7 @@ export function buildMosaicCoverHtml(
   stackUris: (string | null)[] | null | undefined,
   size: number,
   fallbackSingleSize = size,
-  fit?: { width: number; height: number }
+  fit?: { width: number; height: number; fillBox?: boolean }
 ): string {
   const stack = (stackUris ?? []).filter((u): u is string => !!u).slice(0, fit ? MOSAIC_FIT_MAX_COVERS : 5);
   if (stack.length < 2) {
@@ -187,7 +214,7 @@ export function buildMosaicCoverHtml(
   const quarterCovers = stack.slice(1);
   const layout = computeMosaicLayout(
     fit
-      ? { width: fit.width, height: fit.height, quarterCount: quarterCovers.length, minTile: Math.round(Math.min(fit.width, fit.height) * 0.1), maxRows: 8, maxCols: 8 }
+      ? { width: fit.width, height: fit.height, quarterCount: quarterCovers.length, minTile: Math.round(Math.min(fit.width, fit.height) * 0.1), maxRows: 8, maxCols: 8, fillBox: fit.fillBox }
       : { width: Infinity, height: size, quarterCount: quarterCovers.length }
   );
   if (!layout) return "";
@@ -272,6 +299,9 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
   // long enough to need its "+N more" overflow row — shrink gradually past
   // ~12 tracks, capped so it never gets *too* small either.
   const trackCount = options.tracks?.length ?? 0;
+  const trackListHasSecondary = !!options.tracks?.some((t) => t.secondary);
+  // Two-line rows are twice as tall, so their text steps down a little to keep the card within its frame.
+  const trackRowFontScale = trackListHasSecondary ? 0.85 : 1;
   const trackListDensityScale = willShowTrackList ? Math.max(0.82, 1 - Math.max(0, trackCount - 12) * 0.006) : 1;
   const coverSize = Math.round(
     isPortrait
@@ -288,10 +318,10 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
 
   let trackListHtml = "";
   if (willShowTrackList && options.tracks) {
-    const { columns, maxVisible } = trackListLayout(dims, options.tracks.length);
+    const { columns, maxVisible } = trackListLayout(dims, options.tracks.length, trackListHasSecondary);
     const visible = options.tracks.slice(0, maxVisible);
     const overflow = options.tracks.length - visible.length;
-    const rowFontSize = Math.round(width * 0.017 * textScale);
+    const rowFontSize = Math.round(width * 0.017 * textScale * trackRowFontScale);
 
     const rows = visible.map(
       (track) =>
@@ -299,9 +329,7 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
           (track.number != null
             ? `<span style="min-width:1.8em;text-align:right;opacity:0.7;">${track.number}</span>`
             : "") +
-          `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(track.title)}${
-            track.secondary ? ` <span style="opacity:0.65;">— ${escapeHtml(track.secondary)}</span>` : ""
-          }</span>` +
+          rowLabelHtml(track.title, track.secondary, rowFontSize) +
         `</div>`
     );
     const overflowRow =
@@ -314,7 +342,9 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
     // trackListLayout already sizes for the expected case, cap the block's
     // own height and clip it so it can never grow past the LUMINOUS mark
     // pinned near the bottom of the frame, rather than overlapping it.
-    const trackListMaxHeight = Math.round(height * (noCover ? (isPortrait ? 0.5 : 0.62) : isPortrait ? 0.36 : 0.4));
+    const trackListMaxHeight = Math.round(
+      height * (noCover ? (isPortrait ? 0.5 : 0.62) : isPortrait ? 0.36 : 0.4) * (trackListHasSecondary ? 1.3 : 1)
+    );
 
     trackListHtml =
       `<div style="margin-top:${Math.round(width * 0.025 * textScale)}px;text-align:left;width:100%;column-count:${columns};column-gap:${Math.round(width * 0.03)}px;max-height:${trackListMaxHeight}px;overflow:hidden;">` +
@@ -347,35 +377,42 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
   // big tile above the grid instead of leaving the space empty.
   const listRows = willShowTrackList
     ? (() => {
-        const { columns, maxVisible } = trackListLayout(dims, trackCount);
+        const { columns, maxVisible } = trackListLayout(dims, trackCount, trackListHasSecondary);
         const visible = Math.min(trackCount, maxVisible);
         return Math.ceil(visible / columns) + (trackCount > visible ? 1 : 0);
       })()
     : 0;
-  const rowFont = width * 0.017 * textScale;
+  const rowFont = width * 0.017 * textScale * trackRowFontScale;
+  // The title wraps to a second line (clamped at two) once it outgrows the text block.
+  const titleFont = width * 0.046 * textScale;
+  const titleBlockWidth = textBlockMaxWidth ?? maxMosaicWidth;
+  const titleLines = options.title.length * titleFont * 0.55 > titleBlockWidth ? 2 : 1;
   const estTextHeight =
-    width * 0.046 * textScale * 1.3 +
+    titleFont * 1.25 * titleLines +
     (options.subtitle ? width * 0.026 * textScale * 1.3 + 6 : 0) +
     (options.metadataLine ? width * 0.019 * textScale * 1.3 + 6 : 0) +
-    (listRows > 0 ? width * 0.025 * textScale + listRows * (rowFont * 1.35 + 8) : 0);
+    (listRows > 0 ? width * 0.025 * textScale + listRows * rowHeight(rowFont, trackListHasSecondary, 4) : 0);
   // The LUMINOUS mark is pinned bottom-left, so tall frames reserve a strip for
   // it under the centered content rather than letting a long list run into it.
   const footerReserve = isPortrait ? Math.round(width * 0.075) : noCover ? Math.round(width * 0.05) : 0;
   const portraitMosaicHeight = Math.round(
-    Math.max(coverSize * 0.8, Math.min(height - 2 * cardPad - footerReserve - estTextHeight * 1.06 - contentGap, coverSize * 2))
+    Math.max(coverSize * (trackListHasSecondary ? 0.4 : 0.8), Math.min(height - 2 * cardPad - footerReserve - estTextHeight * (trackListHasSecondary ? 1.2 : 1.06) - contentGap, coverSize * 2))
   );
   const hasMosaic = (options.coverStackDataUris ?? []).filter(Boolean).length >= 2;
+  // Landscape: the mosaic grows to the height of the text column beside it (a
+  // track list makes that taller than coverSize), never past the frame's padding.
+  const landscapeMosaicHeight = Math.round(Math.min(height - 2 * cardPad, Math.max(coverSize, estTextHeight)));
 
   const contentHtml = `
     <div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;width:100%;height:100%;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:${cardPad}px ${cardPad}px ${cardPad + footerReserve}px;box-sizing:border-box;font-family:'Fira Sans','Inter','Segoe UI',system-ui,sans-serif;">
       <div style="display:flex;flex-direction:${groupDirection};align-items:center;gap:${contentGap}px;max-width:100%;${noCover ? `width:${noCoverWidth}px;` : ""}">
         ${!isPortrait
-          ? buildMosaicCoverHtml(options.coverDataUri, options.coverStackDataUris, coverSize, coverSize, { width: maxMosaicWidth, height: coverSize })
+          ? buildMosaicCoverHtml(options.coverDataUri, options.coverStackDataUris, coverSize, coverSize, { width: maxMosaicWidth, height: landscapeMosaicHeight, fillBox: willShowTrackList })
           : hasMosaic
           ? buildMosaicCoverHtml(options.coverDataUri, options.coverStackDataUris, coverSize, coverSize, { width: portraitMosaicWidth, height: portraitMosaicHeight })
           : buildCoverHtml(options.coverDataUri, options.coverStackDataUris, coverSize, false)}
         <div style="min-width:0;${isPortrait ? "" : "flex:1;"}display:flex;flex-direction:column;gap:2px;align-items:${isPortrait ? "center" : "flex-start"};text-align:${textAlign};${noCover ? "width:100%;" : textBlockMaxWidth ? `max-width:${textBlockMaxWidth}px;` : ""}">
-          <div style="font-size:${Math.round(width * 0.046 * textScale)}px;font-weight:800;color:${textPrimary};line-height:1.3;padding-bottom:0.08em;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${escapeHtml(options.title)}</div>
+          <div style="font-size:${Math.round(width * 0.046 * textScale)}px;font-weight:800;color:${textPrimary};line-height:1.25;padding-bottom:0.08em;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${escapeHtml(options.title)}</div>
           <div style="font-size:${Math.round(width * 0.026 * textScale)}px;font-weight:600;color:${textSecondary};margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">${escapeHtml(options.subtitle)}</div>
           <div style="font-size:${Math.round(width * 0.019 * textScale)}px;color:${textSecondary};margin-top:6px;">${escapeHtml(options.metadataLine)}</div>
           ${showTrackList ? trackListHtml : ""}
@@ -478,7 +515,32 @@ export function buildStatsShareCardSvg(options: StatsShareCardOptions): { svg: s
   // within the frame on any aspect ratio, while the grid's own max-width
   // still scales off `width` so it uses the extra horizontal room a
   // landscape frame has instead of going unnecessarily narrow.
-  const scaleBasis = Math.min(width, height);
+  // Rows with an artist are two lines tall, which can push the whole block past
+  // the frame, so the basis shrinks until the estimated height fits (every
+  // metric below is linear in it, so one proportional step lands on the fit).
+  const estimateContentHeight = (s: number) => {
+    const rowSz = s * 0.021 * textBoost;
+    const sectionHeights = options.sections.map(
+      (sec) =>
+        2 * s * 0.024 +
+        s * 0.026 * textBoost * 1.3 +
+        s * 0.006 +
+        sec.items.reduce((h, item) => h + rowHeight(rowSz, !!item.secondary, s * 0.005), 0)
+    );
+    const gridGap = s * 0.022;
+    const gridHeight = isTall
+      ? sectionHeights.reduce((a, b) => a + b, 0) + gridGap * Math.max(0, sectionHeights.length - 1)
+      : (Math.max(0, ...sectionHeights.slice(0, 2)) + (sectionHeights.length > 2 ? gridGap + Math.max(0, ...sectionHeights.slice(2)) : 0));
+    return s * 0.05 * textBoost * 1.3 + s * 0.026 * 1.3 + s * 0.044 + gridHeight + s * (0.028 + 0.1 + 0.006 + 0.018 * 1.3);
+  };
+  // Symmetric padding plus room for the LUMINOUS mark pinned at the bottom.
+  const availableHeight = (s: number) => height - 2 * (s * 0.055 + s * 0.03);
+  let scaleBasis = Math.min(width, height);
+  for (let i = 0; i < 2; i++) {
+    const est = estimateContentHeight(scaleBasis);
+    const avail = availableHeight(scaleBasis);
+    if (est > avail) scaleBasis *= (avail / est) * 0.98;
+  }
   const pad = Math.round(scaleBasis * 0.055);
 
   const background = generateEllipseGradientSvg({ colors: options.backgroundColors, seed: options.seed });
@@ -499,9 +561,7 @@ export function buildStatsShareCardSvg(options: StatsShareCardOptions): { svg: s
           (item, i) =>
             `<div style="display:flex;gap:${rowGap}px;align-items:baseline;padding:${rowPad}px 0;font-size:${rowSize}px;color:${textSecondary};${rowBarStyle(item.percent, isDark)}">` +
               `<span style="min-width:1.6em;opacity:0.6;">${i + 1}</span>` +
-              `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">${escapeHtml(item.label)}${
-                item.secondary ? ` <span style="opacity:0.65;">— ${escapeHtml(item.secondary)}</span>` : ""
-              }</span>` +
+              rowLabelHtml(item.label, item.secondary, rowSize) +
             `</div>`
         )
         .join("");
@@ -518,7 +578,7 @@ export function buildStatsShareCardSvg(options: StatsShareCardOptions): { svg: s
       const sectionInnerWidth = (Math.min(width * 0.86, width - 2 * pad) - (sectionColumns - 1) * Math.round(scaleBasis * 0.022)) / sectionColumns - 2 * Math.round(scaleBasis * 0.024);
       const statsMosaicBox = {
         width: Math.round(sectionInnerWidth * 0.42),
-        height: Math.round(Math.max(1, section.items.length) * (rowSize * 1.2 + 2 * rowPad)),
+        height: Math.round(Math.max(rowHeight(rowSize, false, rowPad), section.items.reduce((h, item) => h + rowHeight(rowSize, !!item.secondary, rowPad), 0))),
       };
       const coverHtml = hasCover
         ? buildMosaicCoverHtml(null, section.coverStackDataUris, statsMosaicBox.height, statsCoverSize, statsMosaicBox)

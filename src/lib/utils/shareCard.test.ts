@@ -52,6 +52,35 @@ describe("buildShareCardSvg", () => {
     expect(svg).toContain("Some Artist");
   });
 
+  it("puts a track's secondary text (artist) on its own second line instead of a \"Title — Artist\" run", () => {
+    const { svg } = buildShareCardSvg({
+      ...baseOptions,
+      aspectRatio: "16:9",
+      tracks: [{ number: 1, title: "Opening Track", secondary: "Some Artist" }],
+    });
+    expect(svg).toMatch(/>Opening Track<\/div><div[^>]*>Some Artist<\/div>/);
+    expect(svg).not.toContain("— Some Artist");
+  });
+
+  it("keeps rows without secondary text to a single line", () => {
+    const { svg } = buildShareCardSvg({
+      ...baseOptions,
+      aspectRatio: "16:9",
+      tracks: [{ number: 1, title: "Opening Track" }],
+    });
+    expect(svg).toMatch(/>Opening Track<\/div><\/div>/);
+  });
+
+  it("fits fewer two-line rows per column than single-line rows, showing +N more instead of clipping", () => {
+    const withArtist = Array.from({ length: 30 }, (_, i) => ({ number: i + 1, title: `Track ${i + 1}`, secondary: "Artist" }));
+    const without = withArtist.map(({ secondary: _s, ...t }) => t);
+    const count = (svg: string) => (svg.match(/>Track \d+</g) ?? []).length;
+    const two = buildShareCardSvg({ ...baseOptions, aspectRatio: "16:9", tracks: withArtist }).svg;
+    const one = buildShareCardSvg({ ...baseOptions, aspectRatio: "16:9", tracks: without }).svg;
+    expect(count(two)).toBeLessThan(count(one));
+    expect(two).toMatch(/\+\d+ more/);
+  });
+
   it("caps visible tracks and shows a +N more overflow row", () => {
     const tracks = Array.from({ length: 20 }, (_, i) => ({ number: i + 1, title: `Track ${i + 1}` }));
     const { svg } = buildShareCardSvg({ ...baseOptions, aspectRatio: "16:9", tracks });
@@ -283,6 +312,27 @@ describe("buildStatsShareCardSvg", () => {
     expect(svg).toContain("Artist A");
     expect(svg).toContain("Song A");
     expect(svg).toContain("Rock");
+  });
+
+  it("puts a stats row's artist on its own second line; rows without one stay single-line", () => {
+    const { svg } = buildStatsShareCardSvg({ ...baseStatsOptions, aspectRatio: "16:9" });
+    expect(svg).toMatch(/>Song A<\/div><div[^>]*>Artist A<\/div>/);
+    expect(svg).toMatch(/>Album A<\/div><div[^>]*>Artist A<\/div>/);
+    expect(svg).toMatch(/>Rock<\/div><\/div>/);
+    expect(svg).not.toContain("— Artist A");
+  });
+
+  it("shrinks its content when two-line rows would otherwise overflow the frame", () => {
+    const items = (secondary: string | null) =>
+      Array.from({ length: 5 }, (_, i) => ({ label: `Item ${i}`, secondary }));
+    const sections = (secondary: string | null) =>
+      ["Top Artists", "Top Albums", "Top Songs", "Top Genres"].map((title) => ({ title, items: items(secondary) }));
+    const titleSize = (svg: string) => Number(svg.match(/font-size:(\d+)px;font-weight:800;color:[^;]+;text-align:center/)![1]);
+    for (const ratio of SHARE_ASPECT_RATIOS) {
+      const flat = buildStatsShareCardSvg({ ...baseStatsOptions, aspectRatio: ratio.id, sections: sections(null) });
+      const stacked = buildStatsShareCardSvg({ ...baseStatsOptions, aspectRatio: ratio.id, sections: sections("Artist") });
+      expect(titleSize(stacked.svg)).toBeLessThanOrEqual(titleSize(flat.svg));
+    }
   });
 
   it("escapes section item text", () => {
