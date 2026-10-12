@@ -21,11 +21,10 @@ export interface MosaicLayoutOptions {
   maxRows?: number;
   maxCols?: number;
   /**
-   * For a box with height to spare (e.g. beside a tall track list): among completely filled
-   * grids that show every cover or all but one (every cover preferred), take the one covering the most of the box,
-   * rather than the widest exact fit. Dropping a cover beats a dangling empty cell. Without
-   * it a cover count that happens to fill a wide grid exactly never grows taller, however
-   * tall the box is.
+   * Fill the box instead of fitting the widest grid. Among completely filled grids showing
+   * every cover (or all but one, only when that fills the box clearly better), take the one
+   * covering the most area. Use it beside a tall track list: without it, a cover count that
+   * happens to fill a wide grid exactly never grows taller, however tall the box is.
    */
   fillBox?: boolean;
 }
@@ -70,6 +69,15 @@ export function computeMosaicLayout(opts: MosaicLayoutOptions): MosaicLayout | n
   // Effective size: each empty cell discounts a grid by 35%, so an exact fill
   // wins unless a gapped grid has much bigger tiles.
   const effective = (unit: number, empty: number) => unit / (1 + 0.35 * empty);
+  // Ordinary ranking: most covers shown, then the biggest tiles (discounting empty cells).
+  const fitsBetter = (unit: number, empty: number, shown: number, cur: MosaicLayout, curEmpty: number) =>
+    shown > cur.shown ||
+    (shown === cur.shown &&
+      (effective(unit, empty) > effective(cur.unit, curEmpty) + 0.5 ||
+        (Math.abs(effective(unit, empty) - effective(cur.unit, curEmpty)) <= 0.5 && empty < curEmpty)));
+  // `fillBox` ranking: area covered, near-ties going to the grid showing more covers.
+  const fillsBetter = (weighted: number, shown: number, cur: MosaicLayout, curWeighted: number) =>
+    weighted > curWeighted * 1.02 || (weighted >= curWeighted / 1.02 && shown > cur.shown);
   // `cols === heroSpan` stacks the big tile on top of the grid of singles
   // (a tall box's best fit, e.g. a Top 10 on a 9:16 card).
   for (let heroSpan = 2; heroSpan <= 4; heroSpan++) {
@@ -84,14 +92,7 @@ export function computeMosaicLayout(opts: MosaicLayoutOptions): MosaicLayout | n
         const gridArea = (cols * unit + (cols - 1) * gap) * (rows * unit + (rows - 1) * gap);
         // Showing every cover counts for 20% more area, so a grid only drops one for a clearly bigger fill.
         const weighted = gridArea * (shown === quarterCount ? 1.2 : 1);
-        const better = !best
-          ? true
-          : opts.fillBox
-            ? weighted > bestWeighted * 1.02 || (weighted >= bestWeighted / 1.02 && shown > best.shown)
-            : shown > best.shown ||
-              (shown === best.shown &&
-                (effective(unit, empty) > effective(best.unit, bestEmpty) + 0.5 ||
-                  (Math.abs(effective(unit, empty) - effective(best.unit, bestEmpty)) <= 0.5 && empty < bestEmpty)));
+        const better = !best || (opts.fillBox ? fillsBetter(weighted, shown, best, bestWeighted) : fitsBetter(unit, empty, shown, best, bestEmpty));
         if (better) {
           best = {
             cols,

@@ -63,6 +63,14 @@ describe("computeMosaicLayout", () => {
     expect(filled.cols * filled.rows - filled.heroSpan ** 2).toBe(6);
   });
 
+  it("fillBox drops one cover when that fills the box clearly better", () => {
+    // 6 quarters fit a 3x3 box exactly only as a wide, short grid; 3x3 with 5 is a full square.
+    const box = { width: 600, height: 600, quarterCount: 6, minTile: 58, maxRows: 8, maxCols: 8 };
+    const l = computeMosaicLayout({ ...box, fillBox: true })!;
+    expect(l.shown).toBe(5);
+    expect(l.cols * l.rows - l.heroSpan ** 2).toBe(5);
+  });
+
   it("fillBox leaves no empty cell", () => {
     for (let q = 2; q <= 12; q++) {
       const l = computeMosaicLayout({ width: 779, height: 585, quarterCount: q, minTile: 58, maxRows: 8, maxCols: 8, fillBox: true })!;
