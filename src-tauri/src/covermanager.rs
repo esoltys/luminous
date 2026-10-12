@@ -639,10 +639,7 @@ pub struct CoverManager {
     /// dispatching duplicate network searches and downloads (#1671).
     remote_fetches: Arc<
         parking_lot::Mutex<
-            std::collections::HashMap<
-                String,
-                tokio::sync::watch::Receiver<Option<Option<String>>>,
-            >,
+            std::collections::HashMap<String, tokio::sync::watch::Receiver<Option<Option<String>>>>,
         >,
     >,
     /// Limits concurrent outbound remote cover lookups to prevent network thread
@@ -850,10 +847,7 @@ pub struct CacheUsage {
 struct InflightGuard {
     fetches: Arc<
         parking_lot::Mutex<
-            std::collections::HashMap<
-                String,
-                tokio::sync::watch::Receiver<Option<Option<String>>>,
-            >,
+            std::collections::HashMap<String, tokio::sync::watch::Receiver<Option<Option<String>>>>,
         >,
     >,
     key: String,
@@ -1512,13 +1506,8 @@ impl CoverManager {
             } else {
                 format!("{hash_name}.png")
             };
-            self.persist_album_cover(
-                song_id,
-                &query_artist,
-                &query_album,
-                Some(filename.clone()),
-            )
-            .await?;
+            self.persist_album_cover(song_id, &query_artist, &query_album, Some(filename.clone()))
+                .await?;
             return Ok(Some(filename));
         }
 
@@ -2166,8 +2155,8 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let manager = CoverManager::new(db.clone(), temp_dir.clone())
-            .with_itunes_base_url(mock_server.uri());
+        let manager =
+            CoverManager::new(db.clone(), temp_dir.clone()).with_itunes_base_url(mock_server.uri());
 
         let (res1, res2) = tokio::join!(
             manager.fetch_remote_cover(song1_id),
