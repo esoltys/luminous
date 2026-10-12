@@ -17,11 +17,8 @@
    * overlay that opens when the pointer rests on the rail and closes shortly after the
    * pointer leaves it, or on Escape or a click outside.
    *
-   * An overlay opened by a hover is dismissed by the pointer leaving; one opened any
-   * other way (Ctrl+I, the player bar button) stays until Escape, a click outside, or
-   * pinning, since there is no pointer to leave. Must sit inside a `relative` container
-   * that spans the area the overlay should cover. `instant` snaps the slide, for
-   * keyboard-driven changes.
+   * Must sit inside a `relative` container that spans the area the overlay should cover.
+   * `instant` snaps the slide, for keyboard-driven changes.
    */
   let { instant = false }: { instant?: boolean } = $props();
 
@@ -35,7 +32,6 @@
   // Set when a close leaves the pointer resting on the rail, which would otherwise reopen the overlay
   // straight away; cleared once the pointer moves off the rail.
   let railSuppressed = false;
-  let hoverOpened = false;
   let resizing = false;
   let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -61,32 +57,22 @@
 
   function onRailEnter() {
     if (layout.rightPanelPeeking || railSuppressed) return;
-    later(() => {
-      hoverOpened = true;
-      layout.setRightPanelPeeking(true);
-    }, OPEN_DELAY_MS);
+    later(() => layout.setRightPanelPeeking(true), OPEN_DELAY_MS);
   }
 
   function onOverlayLeave() {
-    if (hoverOpened && !resizing) later(closeOverlay, CLOSE_DELAY_MS);
+    if (!resizing) later(closeOverlay, CLOSE_DELAY_MS);
   }
 
+  // Unpinning leaves the sidebar up as an overlay: the pointer that clicked the pin icon is still
+  // over the panel, and moving it away dismisses it.
   function togglePin() {
-    if (layout.rightPanelPinned) {
-      layout.setRightPanelPinned(false);
-      // The pointer that clicked the pin icon is still over the panel; let it leave to dismiss.
-      hoverOpened = true;
-    } else {
-      layout.setRightPanelPinned(true);
-    }
+    layout.setRightPanelPinned(!layout.rightPanelPinned);
   }
 
-  // Whatever closed the overlay, the next one starts without a pending timer or a hover origin.
+  // However the overlay closed, no timer may outlive it.
   $effect(() => {
-    if (!layout.rightPanelPeeking) {
-      hoverOpened = false;
-      cancelTimer();
-    }
+    if (!layout.rightPanelPeeking) cancelTimer();
   });
 
   $effect(() => {
@@ -109,9 +95,7 @@
     const onPointerDown = (e: PointerEvent) => {
       if (overlayEl && !overlayEl.contains(e.target as Node)) closeOverlay();
     };
-    const onBlur = () => {
-      if (hoverOpened) closeOverlay();
-    };
+    const onBlur = () => closeOverlay();
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("pointerdown", onPointerDown);
     window.addEventListener("blur", onBlur);

@@ -374,7 +374,7 @@ describe("PlayerBar.svelte", () => {
     expect(windowLayoutStore.rightPanelOpen).toBe(true);
   });
 
-  it("pins and opens the info sidebar from the button when it was unpinned, then hides it on the next click", async () => {
+  it("docks the info sidebar from the button when it was unpinned, then hides it to the rail on the next click", async () => {
     playerStore.currentSong = mockSong;
     windowLayoutStore.setRightPanelPinned(false);
     const { getByTitle } = render(PlayerBar);
@@ -385,7 +385,9 @@ describe("PlayerBar.svelte", () => {
     expect(windowLayoutStore.rightPanelOpen).toBe(true);
 
     await fireEvent.click(infoBtn);
-    expect(windowLayoutStore.rightPanelOpen).toBe(false);
+    expect(windowLayoutStore.rightPanelVisible).toBe(false);
+    expect(windowLayoutStore.rightPanelPinned).toBe(false);
+    expect(windowLayoutStore.rightPanelPeeking).toBe(false);
     windowLayoutStore.setRightPanelPinned(true);
   });
 

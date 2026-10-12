@@ -225,7 +225,7 @@
       // Leaving immersive to see the sidebar: dock it, never hide it.
       windowLayoutStore.setRightPanelPinned(true);
     } else {
-      windowLayoutStore.toggleRightPanelDocked();
+      windowLayoutStore.toggleRightPanel();
     }
   }
 

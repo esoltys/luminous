@@ -37,21 +37,28 @@ describe("CollectionStore - sidebar/right-panel layout and responsive breakpoint
       windowLayoutStore.setRightPanelPinned(true);
     });
 
-    it("toggles the docked panel when pinned", () => {
+    it("toggleRightPanel hides and unpins a docked sidebar, leaving the rail without an overlay", () => {
       windowLayoutStore.toggleRightPanel();
-      expect(windowLayoutStore.rightPanelOpen).toBe(false);
+      expect(windowLayoutStore.rightPanelPinned).toBe(false);
+      expect(windowLayoutStore.rightPanelPeeking).toBe(false);
       expect(windowLayoutStore.rightPanelVisible).toBe(false);
-      windowLayoutStore.toggleRightPanel();
-      expect(windowLayoutStore.rightPanelVisible).toBe(true);
     });
 
-    it("toggles the overlay, leaving the docked state alone, when unpinned", () => {
+    it("toggleRightPanel docks the sidebar from the rail, an overlay, or a pinned-but-closed state", () => {
       windowLayoutStore.setRightPanelPinned(false);
       windowLayoutStore.setRightPanelPeeking(false);
-      expect(windowLayoutStore.rightPanelVisible).toBe(false);
       windowLayoutStore.toggleRightPanel();
+      expect(windowLayoutStore.rightPanelPinned).toBe(true);
+      expect(windowLayoutStore.rightPanelOpen).toBe(true);
+
+      windowLayoutStore.setRightPanelPinned(false);
       expect(windowLayoutStore.rightPanelPeeking).toBe(true);
-      expect(windowLayoutStore.rightPanelVisible).toBe(true);
+      windowLayoutStore.toggleRightPanel();
+      expect(windowLayoutStore.rightPanelPinned).toBe(true);
+      expect(windowLayoutStore.rightPanelPeeking).toBe(false);
+
+      windowLayoutStore.rightPanelOpen = false;
+      windowLayoutStore.toggleRightPanel();
       expect(windowLayoutStore.rightPanelOpen).toBe(true);
     });
 
@@ -62,21 +69,6 @@ describe("CollectionStore - sidebar/right-panel layout and responsive breakpoint
       windowLayoutStore.rightPanelOpen = false;
       windowLayoutStore.setRightPanelPinned(true);
       expect(windowLayoutStore.rightPanelPeeking).toBe(false);
-      expect(windowLayoutStore.rightPanelOpen).toBe(true);
-    });
-
-    it("toggleRightPanelDocked pins and opens the sidebar from any other state, and hides it when docked", () => {
-      windowLayoutStore.setRightPanelPinned(false);
-      windowLayoutStore.toggleRightPanelDocked();
-      expect(windowLayoutStore.rightPanelPinned).toBe(true);
-      expect(windowLayoutStore.rightPanelOpen).toBe(true);
-      expect(windowLayoutStore.rightPanelPeeking).toBe(false);
-
-      windowLayoutStore.toggleRightPanelDocked();
-      expect(windowLayoutStore.rightPanelOpen).toBe(false);
-      expect(windowLayoutStore.rightPanelPinned).toBe(true);
-
-      windowLayoutStore.toggleRightPanelDocked();
       expect(windowLayoutStore.rightPanelOpen).toBe(true);
     });
 
@@ -97,9 +89,9 @@ describe("CollectionStore - sidebar/right-panel layout and responsive breakpoint
     windowLayoutStore.toggleSidebarCompact();
     expect(windowLayoutStore.sidebarWidth).toBe(300);
 
-    const initialRight = windowLayoutStore.rightPanelOpen;
+    const initialRight = windowLayoutStore.rightPanelVisible;
     windowLayoutStore.toggleRightPanel();
-    expect(windowLayoutStore.rightPanelOpen).toBe(!initialRight);
+    expect(windowLayoutStore.rightPanelVisible).toBe(!initialRight);
 
     windowLayoutStore.setRightPanelWidth(320);
     expect(windowLayoutStore.rightPanelWidth).toBe(320);

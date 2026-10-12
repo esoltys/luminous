@@ -85,17 +85,18 @@ describe("RightPanelHost.svelte", () => {
     expect(windowLayoutStore.rightPanelPeeking).toBe(false);
   });
 
-  it("keeps an overlay opened by the keyboard when the pointer is elsewhere, until Escape", async () => {
-    const { container } = renderUnpinned();
-    windowLayoutStore.toggleRightPanel();
-    flushSync();
-    const overlay = overlayOf(container);
-
-    await fireEvent.pointerLeave(overlay);
-    vi.advanceTimersByTime(CLOSE_DELAY_MS * 4);
+  it("closes on Escape, or when the window loses focus", async () => {
+    const { getByRole } = renderUnpinned();
+    const rail = getByRole("group", { name: /info sidebar/i });
+    await fireEvent.pointerEnter(rail);
+    vi.advanceTimersByTime(OPEN_DELAY_MS);
     expect(windowLayoutStore.rightPanelPeeking).toBe(true);
-
     await fireEvent.keyDown(window, { key: "Escape" });
+    expect(windowLayoutStore.rightPanelPeeking).toBe(false);
+
+    windowLayoutStore.setRightPanelPeeking(true);
+    flushSync();
+    await fireEvent.blur(window);
     expect(windowLayoutStore.rightPanelPeeking).toBe(false);
   });
 
@@ -121,7 +122,7 @@ describe("RightPanelHost.svelte", () => {
 
   it("closes the overlay on a click outside it but not inside it", async () => {
     const { container } = renderUnpinned();
-    windowLayoutStore.toggleRightPanel();
+    windowLayoutStore.setRightPanelPeeking(true);
     flushSync();
     const overlay = overlayOf(container);
 

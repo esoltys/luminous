@@ -325,30 +325,13 @@ class WindowLayoutStore {
     }
   }
 
-  // "Show or hide the info sidebar", whichever mode it is in: flips the docked
-  // panel when pinned, or the transient overlay when unpinned. Callers (hotkey,
-  // player bar, tour) never need to know which.
+  // "Show or hide the info sidebar" (Ctrl+I, the player bar button, the tour).
+  // Docked, it hides and unpins, leaving the rail; otherwise it docks. Callers
+  // never need to know which state the sidebar was in.
   toggleRightPanel() {
-    if (this.rightPanelPinned) {
-      this.rightPanelOpen = !this.rightPanelOpen;
-      if (typeof window !== "undefined") {
-        localStorage.setItem("layout_rightPanelOpen", this.rightPanelOpen.toString());
-      }
-    } else {
-      this.rightPanelPeeking = !this.rightPanelPeeking;
-    }
-  }
-
-  // The player bar's info button: docks the sidebar (pinning it) when it isn't
-  // docked, hides the docked sidebar when it is. Unlike toggleRightPanel it
-  // never leaves the sidebar as an overlay, so the click always means "pinned and
-  // open" or "closed".
-  toggleRightPanelDocked() {
     if (this.rightPanelPinned && this.rightPanelOpen) {
-      this.rightPanelOpen = false;
-      if (typeof window !== "undefined") {
-        localStorage.setItem("layout_rightPanelOpen", "false");
-      }
+      this.setRightPanelPinned(false);
+      this.rightPanelPeeking = false;
     } else {
       this.setRightPanelPinned(true);
     }

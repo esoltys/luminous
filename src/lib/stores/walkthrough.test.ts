@@ -142,24 +142,24 @@ describe("WalkthroughStore", () => {
       walkthroughStore.next();
     }
 
-    expect(windowLayoutStore.rightPanelOpen).toBe(true);
+    expect(windowLayoutStore.rightPanelVisible).toBe(true);
   });
 
   it("leaves the right panel open if it was already open before the tour", () => {
     windowLayoutStore.rightPanelOpen = true;
     walkthroughStore.start();
     while (walkthroughStore.currentStep.id !== "right-panel") walkthroughStore.next();
-    expect(windowLayoutStore.rightPanelOpen).toBe(true);
+    expect(windowLayoutStore.rightPanelVisible).toBe(true);
 
     walkthroughStore.next(); // library-folders — leaving right-panel
-    expect(windowLayoutStore.rightPanelOpen).toBe(true);
+    expect(windowLayoutStore.rightPanelVisible).toBe(true);
   });
 
   it("closes the right panel again as soon as the tour moves past that step, not just at the end", () => {
     windowLayoutStore.rightPanelOpen = false;
     walkthroughStore.start();
     while (walkthroughStore.currentStep.id !== "right-panel") walkthroughStore.next();
-    expect(windowLayoutStore.rightPanelOpen).toBe(true);
+    expect(windowLayoutStore.rightPanelVisible).toBe(true);
 
     // Playback stops right as they move on — no visible PlayerBar left to
     // close the panel with, so the tour must restore it itself here rather
@@ -167,18 +167,18 @@ describe("WalkthroughStore", () => {
     playerStore.currentSong = undefined;
     walkthroughStore.next(); // library-folders
 
-    expect(windowLayoutStore.rightPanelOpen).toBe(false);
+    expect(windowLayoutStore.rightPanelVisible).toBe(false);
   });
 
   it("closes the right panel it opened if the tour is skipped while still on that step", () => {
     windowLayoutStore.rightPanelOpen = false;
     walkthroughStore.start();
     while (walkthroughStore.currentStep.id !== "right-panel") walkthroughStore.next();
-    expect(windowLayoutStore.rightPanelOpen).toBe(true);
+    expect(windowLayoutStore.rightPanelVisible).toBe(true);
 
     walkthroughStore.skip();
 
-    expect(windowLayoutStore.rightPanelOpen).toBe(false);
+    expect(windowLayoutStore.rightPanelVisible).toBe(false);
   });
 
   it("returns to Home when the tour ends on the library-folders step", () => {
@@ -205,12 +205,12 @@ describe("WalkthroughStore", () => {
     windowLayoutStore.rightPanelOpen = false;
     walkthroughStore.start();
     while (walkthroughStore.currentStep.id !== "right-panel") walkthroughStore.next();
-    expect(windowLayoutStore.rightPanelOpen).toBe(true);
+    expect(windowLayoutStore.rightPanelVisible).toBe(true);
 
     windowLayoutStore.rightPanelOpen = false; // user closes it manually
     walkthroughStore.next(); // library-folders
 
-    expect(windowLayoutStore.rightPanelOpen).toBe(false);
+    expect(windowLayoutStore.rightPanelVisible).toBe(false);
   });
 
   describe("skipping steps unavailable in the current app state", () => {
