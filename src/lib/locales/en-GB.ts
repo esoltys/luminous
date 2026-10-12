@@ -9,9 +9,6 @@ export const enGB: Messages = {
     emptyState: "Start adding music to see your personalised collections"
   },
   settings: {
-    aboutTechBs1770: "EBU R128 / ITU BS.1770 loudness normalisation.",
-    aboutTechLrcLib: "Primary synchronised (.lrc) lyrics provider.",
-    aboutTechNetEase: "Synchronised lyrics with extensive Asian and international coverage.",
     systemSubtitle: "Control how Luminous starts, minimises and stores its data.",
     minimizeToTrayLabel: "Minimise to tray",
     loudnessAnalysisActive: {
