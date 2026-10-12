@@ -218,7 +218,7 @@ jobs:
           sudo flatpak install -y --noninteractive flathub \
             org.gnome.Platform//50 org.gnome.Sdk//50 \
             org.freedesktop.Sdk.Extension.rust-stable//25.08 \
-            org.freedesktop.Sdk.Extension.node20//25.08
+            org.freedesktop.Sdk.Extension.node22//25.08
           flatpak-builder --disable-rofiles-fuse --repo=repo --force-clean \
             --default-branch=master flatpak_app flatpak/org.luminous.music.yml
           flatpak build-bundle repo LuminousMusicPlayer.flatpak org.luminous.music master

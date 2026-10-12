@@ -4,7 +4,7 @@ runtime-version: '50'
 sdk: org.gnome.Sdk
 sdk-extensions:
   - org.freedesktop.Sdk.Extension.rust-stable
-  - org.freedesktop.Sdk.Extension.node20
+  - org.freedesktop.Sdk.Extension.node22
 
 command: LuminousMusicPlayer
 
@@ -30,7 +30,7 @@ finish-args:
   - --own-name=org.mpris.MediaPlayer2.luminous
 
 build-options:
-  append-path: /usr/lib/sdk/rust-stable/bin:/usr/lib/sdk/node20/bin:/var/tmp/bun/bin
+  append-path: /usr/lib/sdk/rust-stable/bin:/usr/lib/sdk/node22/bin:/var/tmp/bun/bin
 
 modules:
   # System tray icon (tray-icon crate) dlopens libayatana-appindicator3 or
@@ -49,7 +49,7 @@ modules:
       build-args:
         - --share=network
     build-commands:
-      # The node20 SDK extension provides Node.js/npm, not Bun — install it
+      # The node22 SDK extension provides Node.js/npm, not Bun — install it
       # directly since this repo uses bun.lock (see the network-access note above).
       - curl -fsSL https://bun.sh/install | BUN_INSTALL=/var/tmp/bun bash
       - bun install --frozen-lockfile

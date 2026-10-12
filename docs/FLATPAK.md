@@ -34,7 +34,7 @@ Requires `flatpak` and `flatpak-builder`, plus the GNOME runtime/SDK and the Rus
 ```bash
 flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 flatpak install flathub org.gnome.Platform//50 org.gnome.Sdk//50 \
-  org.freedesktop.Sdk.Extension.rust-stable org.freedesktop.Sdk.Extension.node20
+  org.freedesktop.Sdk.Extension.rust-stable org.freedesktop.Sdk.Extension.node22
 ```
 
 ```bash
