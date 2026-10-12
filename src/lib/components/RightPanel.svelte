@@ -151,7 +151,8 @@
       title={pinned ? i18n.t('topNav.unpinRightPanel', {}, 'Unpin info sidebar') : i18n.t('topNav.pinRightPanel', {}, 'Pin info sidebar')}
       class="absolute top-2 right-2 z-10 p-1.5 rounded-md transition-colors {pinned ? 'text-brand-accent-text' : 'text-brand-text-secondary/60 hover:text-brand-text-primary'} hover:bg-brand-text-primary/10"
     >
-      {#if pinned}<Pin size={14} />{:else}<PinOff size={14} />{/if}
+      <!-- The glyph names the action, like the label: a slashed pin to unpin, a pin to pin. -->
+      {#if pinned}<PinOff size={14} />{:else}<Pin size={14} />{/if}
     </button>
   {/if}
   <!-- The floating PlayerBar dock (h-20 + bottom-4 inset = 96px = mb-24) overlays
