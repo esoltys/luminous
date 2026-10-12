@@ -623,6 +623,14 @@ fn serve_embedded_art(covers_dir: &Path, rest: &str) -> tauri::http::Response<Ve
     serve_image_file(&covers_dir.join(cache_file))
 }
 
+/// In-flight remote fetch broadcast map keyed by canonical album identity (#1671).
+/// The inner watch value is `None` while pending, and `Some(result)` once complete.
+type InflightRemoteFetches = Arc<
+    parking_lot::Mutex<
+        std::collections::HashMap<String, tokio::sync::watch::Receiver<Option<Option<String>>>>,
+    >,
+>;
+
 #[derive(Debug, Clone)]
 pub struct CoverManager {
     db: Arc<Database>,
@@ -637,11 +645,7 @@ pub struct CoverManager {
     /// Active remote cover fetches keyed by canonical album hash (`get_album_hash`).
     /// Concurrent callers for the same album await the in-flight result instead of
     /// dispatching duplicate network searches and downloads (#1671).
-    remote_fetches: Arc<
-        parking_lot::Mutex<
-            std::collections::HashMap<String, tokio::sync::watch::Receiver<Option<Option<String>>>>,
-        >,
-    >,
+    remote_fetches: InflightRemoteFetches,
     /// Limits concurrent outbound remote cover lookups to prevent network thread
     /// saturation and rate limits (HTTP 429) during large view mounts (#1671).
     remote_fetch_semaphore: Arc<tokio::sync::Semaphore>,
@@ -845,11 +849,7 @@ pub struct CacheUsage {
 }
 
 struct InflightGuard {
-    fetches: Arc<
-        parking_lot::Mutex<
-            std::collections::HashMap<String, tokio::sync::watch::Receiver<Option<Option<String>>>>,
-        >,
-    >,
+    fetches: InflightRemoteFetches,
     key: String,
 }
 
