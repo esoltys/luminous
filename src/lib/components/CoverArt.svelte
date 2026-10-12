@@ -149,6 +149,7 @@
   {#if displaySrc && boxPixels !== null && !hasFailed}
     <img
       src={displaySrc}
+      crossorigin="anonymous"
       alt={i18n.t('common.albumArtAlt')}
       loading="lazy"
       class="w-full h-full object-cover transition-opacity duration-300 {isLoading ? 'opacity-0' : 'opacity-100'} {animateSpin ? 'animate-spin' : ''}"
