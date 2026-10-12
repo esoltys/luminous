@@ -1,5 +1,6 @@
-// Bumps the app version across package.json, src-tauri/tauri.conf.json, and
-// src-tauri/Cargo.toml in one shot, so a release doesn't miss one of them.
+// Bumps the app version across package.json, src-tauri/tauri.conf.json,
+// src-tauri/Cargo.toml, and src-tauri/metainfo/org.luminous.music.metainfo.xml
+// in one shot, so a release doesn't miss one of them.
 // Usage: bun run scripts/bump-version.ts <version>
 import * as fs from "fs";
 import * as path from "path";
@@ -66,7 +67,30 @@ function main() {
     console.error(`[Error] Cargo.toml not found at ${cargoPath}`);
   }
 
-  // 4. Sync bun.lock — package.json's version bump doesn't touch dependency ranges,
+  // 4. src-tauri/metainfo/org.luminous.music.metainfo.xml
+  const metainfoPath = path.join(rootDir, "src-tauri", "metainfo", "org.luminous.music.metainfo.xml");
+  if (fs.existsSync(metainfoPath)) {
+    let metainfo = fs.readFileSync(metainfoPath, "utf-8");
+    const today = new Date().toISOString().split("T")[0];
+    const releaseRegex = new RegExp(`<release\\s+version="${version.replace(/\\./g, "\\\\.")}"[^>]*/>`);
+    if (releaseRegex.test(metainfo)) {
+      metainfo = metainfo.replace(releaseRegex, `<release version="${version}" date="${today}" />`);
+      fs.writeFileSync(metainfoPath, metainfo);
+      console.log(`[Version Bump] Updated existing release in metainfo.xml: ${version} (${today})`);
+    } else {
+      if (metainfo.includes("<releases>")) {
+        metainfo = metainfo.replace("<releases>", `<releases>\n    <release version="${version}" date="${today}" />`);
+        fs.writeFileSync(metainfoPath, metainfo);
+        console.log(`[Version Bump] Added release to metainfo.xml: ${version} (${today})`);
+      } else {
+        console.error(`[Error] <releases> block not found in ${metainfoPath}`);
+      }
+    }
+  } else {
+    console.error(`[Error] metainfo.xml not found at ${metainfoPath}`);
+  }
+
+  // 5. Sync bun.lock — package.json's version bump doesn't touch dependency ranges,
   // but this keeps the lockfile from silently drifting release over release if it
   // was already stale (e.g. a prior dependency bump that never got a fresh install).
   console.log("[Version Bump] Syncing bun.lock...");
