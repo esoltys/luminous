@@ -54,16 +54,24 @@ describe("computeMosaicLayout", () => {
     const l = computeMosaicLayout({ width: 600, height: 400, quarterCount: 5, maxRows: 4, maxCols: 8 })!;
     expect(l.cols * l.rows - l.heroSpan ** 2).toBe(5);
   });
-  it("fillBox grows a tall box's grid taller instead of keeping the widest exact fit", () => {
+  it("fillBox grows a tall box's grid taller while still showing every cover", () => {
     const box = { width: 779, height: 585, quarterCount: 6, minTile: 58, maxRows: 8, maxCols: 8 };
     const plain = computeMosaicLayout(box)!;
     const filled = computeMosaicLayout({ ...box, fillBox: true })!;
-    expect(plain.height).toBeLessThan(filled.height);
+    expect(filled.height).toBeGreaterThan(plain.height * 1.3);
     expect(filled.shown).toBe(6);
-    expect(filled.cols * filled.rows - filled.heroSpan ** 2 - filled.shown).toBeLessThanOrEqual(1);
+    expect(filled.cols * filled.rows - filled.heroSpan ** 2).toBe(6);
   });
 
-  it("fillBox falls back to the ordinary layout when no grid has at most one empty cell", () => {
+  it("fillBox leaves no empty cell", () => {
+    for (let q = 2; q <= 12; q++) {
+      const l = computeMosaicLayout({ width: 779, height: 585, quarterCount: q, minTile: 58, maxRows: 8, maxCols: 8, fillBox: true })!;
+      expect(l.cols * l.rows - l.heroSpan ** 2).toBe(l.shown);
+      expect(l.shown).toBeGreaterThanOrEqual(q - 1);
+    }
+  });
+
+  it("fillBox falls back to the ordinary layout when no completely filled grid shows enough covers", () => {
     const l = computeMosaicLayout({ width: 100, height: 100, quarterCount: 1, fillBox: true });
     expect(l).toEqual(computeMosaicLayout({ width: 100, height: 100, quarterCount: 1 }));
   });

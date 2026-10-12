@@ -21,10 +21,11 @@ export interface MosaicLayoutOptions {
   maxRows?: number;
   maxCols?: number;
   /**
-   * For a box with height to spare (e.g. beside a tall track list): among grids that show
-   * every cover, take the one covering the most of the box, tolerating a single empty cell,
-   * rather than the widest exact fit. Without it a cover count that happens to fill a wide
-   * grid exactly never grows taller, however tall the box is.
+   * For a box with height to spare (e.g. beside a tall track list): among completely filled
+   * grids that show every cover or all but one (every cover preferred), take the one covering the most of the box,
+   * rather than the widest exact fit. Dropping a cover beats a dangling empty cell. Without
+   * it a cover count that happens to fill a wide grid exactly never grows taller, however
+   * tall the box is.
    */
   fillBox?: boolean;
 }
@@ -65,6 +66,7 @@ export function computeMosaicLayout(opts: MosaicLayoutOptions): MosaicLayout | n
 
   let best: MosaicLayout | null = null;
   let bestEmpty = 0;
+  let bestWeighted = 0;
   // Effective size: each empty cell discounts a grid by 35%, so an exact fill
   // wins unless a gapped grid has much bigger tiles.
   const effective = (unit: number, empty: number) => unit / (1 + 0.35 * empty);
@@ -78,16 +80,18 @@ export function computeMosaicLayout(opts: MosaicLayoutOptions): MosaicLayout | n
         if (!(unit > 0) || unit < minTile) continue;
         const shown = Math.min(slots, quarterCount);
         const empty = slots - shown;
-        if (opts.fillBox && empty > 1) continue;
+        if (opts.fillBox && (empty > 0 || shown < Math.max(1, quarterCount - 1))) continue;
         const gridArea = (cols * unit + (cols - 1) * gap) * (rows * unit + (rows - 1) * gap);
-        const better =
-          !best ||
-          shown > best.shown ||
-          (shown === best.shown &&
-            (opts.fillBox
-              ? gridArea > best.width * best.height * 1.02
-              : effective(unit, empty) > effective(best.unit, bestEmpty) + 0.5 ||
-                (Math.abs(effective(unit, empty) - effective(best.unit, bestEmpty)) <= 0.5 && empty < bestEmpty)));
+        // Showing every cover counts for 20% more area, so a grid only drops one for a clearly bigger fill.
+        const weighted = gridArea * (shown === quarterCount ? 1.2 : 1);
+        const better = !best
+          ? true
+          : opts.fillBox
+            ? weighted > bestWeighted * 1.02 || (weighted >= bestWeighted / 1.02 && shown > best.shown)
+            : shown > best.shown ||
+              (shown === best.shown &&
+                (effective(unit, empty) > effective(best.unit, bestEmpty) + 0.5 ||
+                  (Math.abs(effective(unit, empty) - effective(best.unit, bestEmpty)) <= 0.5 && empty < bestEmpty)));
         if (better) {
           best = {
             cols,
@@ -100,11 +104,12 @@ export function computeMosaicLayout(opts: MosaicLayoutOptions): MosaicLayout | n
             shown,
           };
           bestEmpty = empty;
+          bestWeighted = weighted;
         }
       }
     }
   }
-  // Nothing fit within one empty cell: fall back to the ordinary ranking.
+  // No completely filled grid showed enough covers: fall back to the ordinary ranking.
   if (!best && opts.fillBox) return computeMosaicLayout({ ...opts, fillBox: false });
   return best;
 }
