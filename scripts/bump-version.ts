@@ -70,17 +70,28 @@ function main() {
   // 4. src-tauri/metainfo/org.luminous.music.metainfo.xml
   const metainfoPath = path.join(rootDir, "src-tauri", "metainfo", "org.luminous.music.metainfo.xml");
   if (fs.existsSync(metainfoPath)) {
-    let metainfo = fs.readFileSync(metainfoPath, "utf-8");
+    const metainfo = fs.readFileSync(metainfoPath, "utf-8");
     const today = new Date().toISOString().split("T")[0];
-    const releaseRegex = new RegExp(`<release\\s+version="${version.replace(/\\./g, "\\\\.")}"[^>]*/>`);
-    if (releaseRegex.test(metainfo)) {
-      metainfo = metainfo.replace(releaseRegex, `<release version="${version}" date="${today}" />`);
-      fs.writeFileSync(metainfoPath, metainfo);
+    const lines = metainfo.split("\n");
+    const targetPattern = `version="${version}"`;
+    let updated = false;
+
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].includes("<release ") && lines[i].includes(targetPattern)) {
+        lines[i] = `    <release version="${version}" date="${today}" />`;
+        updated = true;
+        break;
+      }
+    }
+
+    if (updated) {
+      fs.writeFileSync(metainfoPath, lines.join("\n"));
       console.log(`[Version Bump] Updated existing release in metainfo.xml: ${version} (${today})`);
     } else {
-      if (metainfo.includes("<releases>")) {
-        metainfo = metainfo.replace("<releases>", `<releases>\n    <release version="${version}" date="${today}" />`);
-        fs.writeFileSync(metainfoPath, metainfo);
+      const releasesIndex = lines.findIndex(l => l.includes("<releases>"));
+      if (releasesIndex !== -1) {
+        lines.splice(releasesIndex + 1, 0, `    <release version="${version}" date="${today}" />`);
+        fs.writeFileSync(metainfoPath, lines.join("\n"));
         console.log(`[Version Bump] Added release to metainfo.xml: ${version} (${today})`);
       } else {
         console.error(`[Error] <releases> block not found in ${metainfoPath}`);
