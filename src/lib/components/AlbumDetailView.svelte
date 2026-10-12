@@ -47,7 +47,6 @@
   } from "phosphor-svelte";
   import ShareModal from "./ShareModal.svelte";
   import AlbumProfileEditor from "./AlbumProfileEditor.svelte";
-  import InfoSidebarToggle from "./InfoSidebarToggle.svelte";
   import { contextStore, entitySubject } from "../stores/context.svelte";
   import type { Song, AlbumItem, PlayContext } from "../types";
   import { getCoverArtUrl, resolveArtUrl } from "../types";
@@ -694,14 +693,11 @@
             <span>{genreLabel}</span>
           </div>
         {/if}
-        <div class="flex flex-wrap items-center gap-3 ml-auto">
-          {#if communityRating}
-            <div class="inline-flex items-center px-3 py-1 rounded-full border border-brand-border bg-brand-sidebar text-xs font-medium text-brand-text-secondary shrink-0">
-              <CommunityRating rating={communityRating.rating} count={communityRating.count} />
-            </div>
-          {/if}
-          <InfoSidebarToggle label={i18n.t('albumDetail.albumInfo', {}, 'Album Info')} />
-        </div>
+        {#if communityRating}
+          <div class="inline-flex items-center px-3 py-1 rounded-full border border-brand-border bg-brand-sidebar text-xs font-medium text-brand-text-secondary shrink-0 ml-auto">
+            <CommunityRating rating={communityRating.rating} count={communityRating.count} />
+          </div>
+        {/if}
       </div>
     {/if}
 

@@ -5,6 +5,8 @@ import { prefs } from "../stores/prefs.svelte";
 import RightPanel from "./RightPanel.svelte";
 import { playerStore } from "../stores/player.svelte";
 import { inspectorStore } from "../stores/inspector.svelte";
+import { navigationStore } from "../stores/navigation.svelte";
+import { flushSync } from "svelte";
 import type { Song, AudioPipelineInfo } from "../types";
 
 import { invoke } from "@tauri-apps/api/core";
@@ -53,16 +55,38 @@ describe("RightPanel.svelte", () => {
     inspectorStore.clearAll();
   });
 
-  it("renders a close button that calls onClose", async () => {
-    const onClose = vi.fn();
-    const { getByRole } = render(RightPanel, { props: { onClose } });
-    await fireEvent.click(getByRole("button", { name: /close/i }));
-    expect(onClose).toHaveBeenCalledTimes(1);
+  it("renders an unpin button while pinned and a pin button while unpinned", async () => {
+    const onTogglePin = vi.fn();
+    const pinned = render(RightPanel, { props: { pinned: true, onTogglePin } });
+    await fireEvent.click(pinned.getByRole("button", { name: /unpin info sidebar/i }));
+    expect(onTogglePin).toHaveBeenCalledTimes(1);
+    pinned.unmount();
+
+    const unpinned = render(RightPanel, { props: { pinned: false, onTogglePin } });
+    expect(unpinned.getByRole("button", { name: /^pin info sidebar/i })).toBeInTheDocument();
   });
 
-  it("omits the close button when no onClose is provided", () => {
+  it("omits the pin button when no onTogglePin is provided", () => {
     const { queryByRole } = render(RightPanel);
-    expect(queryByRole("button", { name: /close/i })).toBeNull();
+    expect(queryByRole("button", { name: /pin info sidebar/i })).toBeNull();
+  });
+
+  it("offers a way back to the viewed album while a selected song is described", async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) =>
+      cmd === "get_songs_by_album" ? [{ ...mockSong, id: 100 }] : null
+    );
+    navigationStore.activeTab = "collection";
+    navigationStore.selectedAlbumName = "Test Album";
+    await vi.waitFor(() => expect(inspectorStore.isShowingViewed).toBe(true));
+    inspectorStore.setSelection("table", { ...mockSong, id: 7 });
+    flushSync();
+    expect(inspectorStore.isShowingViewed).toBe(false);
+
+    const { getByRole } = render(RightPanel);
+    await fireEvent.click(getByRole("button", { name: /album info/i }));
+    expect(inspectorStore.isShowingViewed).toBe(true);
+
+    navigationStore.selectedAlbumName = null;
   });
 
   it("renders 'Not Playing' when no current song", () => {

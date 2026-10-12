@@ -103,6 +103,12 @@ class InspectorStore {
     return this.subject?.source === "view";
   }
 
+  /** The kind of album/artist being viewed while the sidebar describes something else (a selected or playing song); null otherwise. */
+  get otherViewedKind(): "album" | "artist" | null {
+    const viewed = this.viewedSubject;
+    return viewed && !this.isShowingViewed && (viewed.kind === "album" || viewed.kind === "artist") ? viewed.kind : null;
+  }
+
   /** Describes the playing song, over any selection or viewed album/artist, until the user picks something else. */
   showPlaying(): void {
     this.focus = "playing";

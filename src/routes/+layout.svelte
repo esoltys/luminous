@@ -2,7 +2,7 @@
   import '../app.css';
   import TopNavigation from '../lib/components/TopNavigation.svelte';
   import Sidebar from '../lib/components/Sidebar.svelte';
-  import RightPanel from '../lib/components/RightPanel.svelte';
+  import RightPanelHost from '../lib/components/RightPanelHost.svelte';
   import PlayerBar from '../lib/components/PlayerBar.svelte';
   import { slide, fly, fade, prefersReducedMotion } from '../lib/utils/motion';
   import { cubicOut } from 'svelte/easing';
@@ -43,8 +43,6 @@
     SIDEBAR_MIN_WIDTH_PX,
     SIDEBAR_MAX_WIDTH_PX,
     SIDEBAR_COLLAPSED_WIDTH_PX,
-    RIGHT_PANEL_MIN_WIDTH_PX,
-    RIGHT_PANEL_MAX_WIDTH_PX,
     PANEL_RESIZE_STEP_PX,
   } from '../lib/constants';
 
@@ -406,26 +404,6 @@
     window.addEventListener("pointerup", onPointerUp);
   }
 
-  // Pointer drag resizing for RightPanel (right-to-left increase)
-  function startResizeRightPanel(e: PointerEvent) {
-    e.preventDefault();
-    const startX = e.clientX;
-    const startWidth = windowLayoutStore.rightPanelWidth;
-
-    function onPointerMove(moveEvent: PointerEvent) {
-      const deltaX = moveEvent.clientX - startX;
-      windowLayoutStore.setRightPanelWidth(Math.max(RIGHT_PANEL_MIN_WIDTH_PX, Math.min(RIGHT_PANEL_MAX_WIDTH_PX, startWidth - deltaX)));
-    }
-
-    function onPointerUp() {
-      window.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("pointerup", onPointerUp);
-    }
-
-    window.addEventListener("pointermove", onPointerMove);
-    window.addEventListener("pointerup", onPointerUp);
-  }
-
   // Accessible keyboard resizing for Sidebar
   function handleSidebarKeyDown(e: KeyboardEvent) {
     if (e.key === "ArrowLeft") {
@@ -446,19 +424,6 @@
       } else {
         windowLayoutStore.setSidebarWidth(Math.min(SIDEBAR_MAX_WIDTH_PX, currentWidth + PANEL_RESIZE_STEP_PX));
       }
-    }
-  }
-
-  // Accessible keyboard resizing for RightPanel
-  function handleRightPanelKeyDown(e: KeyboardEvent) {
-    if (e.key === "ArrowLeft") {
-      e.preventDefault();
-      e.stopPropagation();
-      windowLayoutStore.setRightPanelWidth(Math.min(RIGHT_PANEL_MAX_WIDTH_PX, windowLayoutStore.rightPanelWidth + PANEL_RESIZE_STEP_PX));
-    } else if (e.key === "ArrowRight") {
-      e.preventDefault();
-      e.stopPropagation();
-      windowLayoutStore.setRightPanelWidth(Math.max(RIGHT_PANEL_MIN_WIDTH_PX, windowLayoutStore.rightPanelWidth - PANEL_RESIZE_STEP_PX));
     }
   }
 </script>
@@ -495,7 +460,7 @@
           </div>
 
           <!-- Main Grid Layout -->
-          <div class="flex flex-1 overflow-hidden">
+          <div class="relative flex flex-1 overflow-hidden">
             <!-- Left Sidebar -->
             {#if windowLayoutStore.sidebarOpen}
               <div transition:slide={{ axis: 'x', duration: instantLayout ? 0 : PANEL_SLIDE_MS }} class="h-full flex-shrink-0 flex overflow-hidden">
@@ -531,30 +496,8 @@
               {@render children()}
             </main>
 
-            <!-- Right Contextual Panel -->
-            {#if windowLayoutStore.rightPanelOpen && !windowLayoutStore.isRightPanelAutoHidden}
-              <div transition:slide={{ axis: 'x', duration: instantLayout ? 0 : PANEL_SLIDE_MS }} class="h-full flex-shrink-0 flex overflow-hidden">
-                <!-- Right Resize Handle -->
-                <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-                <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-                <div 
-                  role="separator"
-                  aria-valuenow={windowLayoutStore.rightPanelWidth}
-                  aria-valuemin={RIGHT_PANEL_MIN_WIDTH_PX}
-                  aria-valuemax={RIGHT_PANEL_MAX_WIDTH_PX}
-                  aria-label={i18n.t('topNav.resizeRightPanel')}
-                  tabindex="0"
-                  class="relative w-1 bg-brand-border hover:bg-brand-accent/50 active:bg-brand-accent cursor-col-resize transition-colors self-stretch flex-shrink-0 z-30 touch-none focus:outline-none focus:bg-brand-accent"
-                  onpointerdown={startResizeRightPanel}
-                  onkeydown={handleRightPanelKeyDown}
-                >
-                  <!-- Expanded hover/touch area wrapper -->
-                  <div class="absolute left-0 -right-2 top-0 bottom-0 cursor-col-resize"></div>
-                </div>
-
-                <RightPanel isOpen={windowLayoutStore.rightPanelOpen} width={windowLayoutStore.rightPanelWidth} onClose={() => windowLayoutStore.toggleRightPanel()} />
-              </div>
-            {/if}
+            <!-- Right Contextual Panel: docked, or a rail plus hover overlay when unpinned -->
+            <RightPanelHost instant={instantLayout} />
           </div>
         </div>
 

@@ -312,22 +312,6 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
       await new Promise((resolve) => setTimeout(resolve, 50));
       expect(queryByText("Classic album")).toBeNull();
     });
-
-    it("offers the Album Info pill while the sidebar can be shown", () => {
-      const { getByRole } = render(AlbumDetailView, { props: { albumName: mockAlbumName } });
-      expect(getByRole("button", { name: /Album Info/ })).toBeInTheDocument();
-    });
-
-    it("hides the pill when the window is too narrow to show the sidebar", () => {
-      const width = windowLayoutStore.viewportWidth;
-      windowLayoutStore.viewportWidth = 500;
-      try {
-        const { queryByRole } = render(AlbumDetailView, { props: { albumName: mockAlbumName } });
-        expect(queryByRole("button", { name: /Album Info/ })).toBeNull();
-      } finally {
-        windowLayoutStore.viewportWidth = width;
-      }
-    });
   });
 
   it("toggles album stats exclusion from the overflow menu (#1252)", async () => {

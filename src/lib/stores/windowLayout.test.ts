@@ -30,6 +30,49 @@ describe("CollectionStore - sidebar/right-panel layout and responsive breakpoint
     });
   });
 
+  describe("info sidebar pinning", () => {
+    beforeEach(() => {
+      localStorage.clear();
+      windowLayoutStore.rightPanelOpen = true;
+      windowLayoutStore.setRightPanelPinned(true);
+    });
+
+    it("toggles the docked panel when pinned", () => {
+      windowLayoutStore.toggleRightPanel();
+      expect(windowLayoutStore.rightPanelOpen).toBe(false);
+      expect(windowLayoutStore.rightPanelVisible).toBe(false);
+      windowLayoutStore.toggleRightPanel();
+      expect(windowLayoutStore.rightPanelVisible).toBe(true);
+    });
+
+    it("toggles the overlay, leaving the docked state alone, when unpinned", () => {
+      windowLayoutStore.setRightPanelPinned(false);
+      windowLayoutStore.setRightPanelPeeking(false);
+      expect(windowLayoutStore.rightPanelVisible).toBe(false);
+      windowLayoutStore.toggleRightPanel();
+      expect(windowLayoutStore.rightPanelPeeking).toBe(true);
+      expect(windowLayoutStore.rightPanelVisible).toBe(true);
+      expect(windowLayoutStore.rightPanelOpen).toBe(true);
+    });
+
+    it("keeps the panel on screen as an overlay when unpinned, and docks and shows it when pinned", () => {
+      windowLayoutStore.setRightPanelPinned(false);
+      expect(windowLayoutStore.rightPanelPeeking).toBe(true);
+
+      windowLayoutStore.rightPanelOpen = false;
+      windowLayoutStore.setRightPanelPinned(true);
+      expect(windowLayoutStore.rightPanelPeeking).toBe(false);
+      expect(windowLayoutStore.rightPanelOpen).toBe(true);
+    });
+
+    it("persists the pinned state", () => {
+      windowLayoutStore.setRightPanelPinned(false);
+      expect(localStorage.getItem("layout_rightPanelPinned")).toBe("false");
+      windowLayoutStore.setRightPanelPinned(true);
+      expect(localStorage.getItem("layout_rightPanelPinned")).toBe("true");
+    });
+  });
+
   it("toggles and persists layout states (sidebar, right panel, immersive mode)", () => {
     windowLayoutStore.sidebarOpen = false;
     windowLayoutStore.setSidebarWidth(300);

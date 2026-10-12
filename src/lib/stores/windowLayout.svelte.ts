@@ -13,7 +13,12 @@ import {
 class WindowLayoutStore {
   // Layout panel states
   sidebarOpen = $state<boolean>(true);
+  // Pinned: the info sidebar is docked in the layout and `rightPanelOpen`
+  // shows or hides it. Unpinned: it leaves the layout, a slim rail stays, and
+  // the sidebar is only ever a transient overlay (`rightPanelPeeking`).
   rightPanelOpen = $state<boolean>(true);
+  rightPanelPinned = $state<boolean>(true);
+  rightPanelPeeking = $state<boolean>(false);
   sidebarWidth = $state<number>(256);
   lastExpandedSidebarWidth = $state<number>(256);
   rightPanelWidth = $state<number>(288);
@@ -70,6 +75,9 @@ class WindowLayoutStore {
       if (savedLastExpanded) {
         this.lastExpandedSidebarWidth = parseInt(savedLastExpanded, 10);
       }
+
+      const savedPinned = localStorage.getItem("layout_rightPanelPinned");
+      if (savedPinned !== null) this.rightPanelPinned = savedPinned === "true";
 
       const savedRightWidth = localStorage.getItem("layout_rightPanelWidth");
       if (savedRightWidth) this.rightPanelWidth = parseInt(savedRightWidth, 10);
@@ -317,11 +325,36 @@ class WindowLayoutStore {
     }
   }
 
+  // "Show or hide the info sidebar", whichever mode it is in: flips the docked
+  // panel when pinned, or the transient overlay when unpinned. Callers (hotkey,
+  // player bar, tour) never need to know which.
   toggleRightPanel() {
-    this.rightPanelOpen = !this.rightPanelOpen;
-    if (typeof window !== "undefined") {
-      localStorage.setItem("layout_rightPanelOpen", this.rightPanelOpen.toString());
+    if (this.rightPanelPinned) {
+      this.rightPanelOpen = !this.rightPanelOpen;
+      if (typeof window !== "undefined") {
+        localStorage.setItem("layout_rightPanelOpen", this.rightPanelOpen.toString());
+      }
+    } else {
+      this.rightPanelPeeking = !this.rightPanelPeeking;
     }
+  }
+
+  // Pinning docks the sidebar (and shows it: pinning is an explicit ask to have
+  // it there). Unpinning keeps it on screen as the overlay it just was, so the
+  // pointer that clicked the pin icon is still over the panel; it closes when
+  // the pointer leaves.
+  setRightPanelPinned(pinned: boolean) {
+    this.rightPanelPinned = pinned;
+    this.rightPanelPeeking = !pinned;
+    if (pinned) this.rightPanelOpen = true;
+    if (typeof window !== "undefined") {
+      localStorage.setItem("layout_rightPanelPinned", pinned.toString());
+      if (pinned) localStorage.setItem("layout_rightPanelOpen", "true");
+    }
+  }
+
+  setRightPanelPeeking(peeking: boolean) {
+    this.rightPanelPeeking = peeking;
   }
 
   // Responsive breakpoint flags (issue #413) — pure functions of
@@ -335,6 +368,12 @@ class WindowLayoutStore {
 
   get isRightPanelAutoHidden(): boolean {
     return this.viewportWidth < BREAKPOINT_RIGHT_PANEL_PX;
+  }
+
+  // Whether the info sidebar is switched on, docked or as an overlay. Like
+  // rightPanelOpen it ignores the narrow-window override (isRightPanelAutoHidden).
+  get rightPanelVisible(): boolean {
+    return this.rightPanelPinned ? this.rightPanelOpen : this.rightPanelPeeking;
   }
 
   get isPlayerBarCompact(): boolean {

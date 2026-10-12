@@ -107,14 +107,14 @@ const STEPS: WalkthroughStep[] = [
     // nothing playing there'd be no way back except the Ctrl+I shortcut.
     isAvailable: () => !!playerStore.currentSong,
     beforeStep: () => {
-      if (!windowLayoutStore.rightPanelOpen) {
+      if (!windowLayoutStore.rightPanelVisible) {
         windowLayoutStore.toggleRightPanel();
         openedRightPanelForTour = true;
       }
     },
     afterStep: () => {
       if (openedRightPanelForTour) {
-        if (windowLayoutStore.rightPanelOpen) {
+        if (windowLayoutStore.rightPanelVisible) {
           windowLayoutStore.toggleRightPanel();
         }
         openedRightPanelForTour = false;

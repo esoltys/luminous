@@ -222,7 +222,7 @@
   function handleInfoClick() {
     if (windowLayoutStore.immersiveMode) {
       windowLayoutStore.exitImmersiveMode();
-      if (!windowLayoutStore.rightPanelOpen) {
+      if (!windowLayoutStore.rightPanelVisible) {
         windowLayoutStore.toggleRightPanel();
       }
     } else {
@@ -511,7 +511,7 @@
           <button
             transition:collapseFade={{ duration: 250 }}
             onclick={handleInfoClick}
-            class="inline-flex items-center justify-center flex-shrink-0 transition-colors {windowLayoutStore.rightPanelOpen ? 'text-brand-accent-text' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+            class="inline-flex items-center justify-center flex-shrink-0 transition-colors {windowLayoutStore.rightPanelVisible ? 'text-brand-accent-text' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
             title={i18n.t('topNav.toggleRightPanel')}
           >
             <Info class="w-5 h-5" />

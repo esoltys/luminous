@@ -78,22 +78,6 @@ describe("ArtistDetailView", () => {
       expect(screen.queryByText("shaniatwain.com")).toBeNull();
       expect(screen.getByText("country")).toBeTruthy();
     });
-
-    it("offers the Artist Info pill while the sidebar can be shown", async () => {
-      render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
-      expect(screen.getByRole("button", { name: /Artist Info/ })).toBeTruthy();
-    });
-
-    it("hides the pill when the window is too narrow to show the sidebar", async () => {
-      const width = windowLayoutStore.viewportWidth;
-      windowLayoutStore.viewportWidth = 500;
-      try {
-        render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
-        expect(screen.queryByRole("button", { name: /Artist Info/ })).toBeNull();
-      } finally {
-        windowLayoutStore.viewportWidth = width;
-      }
-    });
   });
 
   it("clicking tag sets search query to artist-tag filter", async () => {

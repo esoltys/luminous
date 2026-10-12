@@ -44,7 +44,6 @@
     ShareNetworkIcon as Share,
     ImageIcon as RetrieveImage
   } from "phosphor-svelte";
-  import InfoSidebarToggle from "./InfoSidebarToggle.svelte";
   import { contextStore, entitySubject } from "../stores/context.svelte";
   import ShareModal from "./ShareModal.svelte";
   import type { Song, Playlist, AlbumItem, PlayContext, ArtistProfile, ExtendedArtworkResponse } from "../types";
@@ -717,19 +716,14 @@
   </div>
 
   <div class="px-6 pt-6 flex flex-col gap-8">
-    {#if !windowLayoutStore.isDetailHeaderCollapsed}
+    {#if !windowLayoutStore.isDetailHeaderCollapsed && hasChips}
       <div class="flex flex-wrap items-center justify-between gap-3">
-        {#if hasChips}
-          <GenreChips
-            curatedTags={artistOnlyTags}
-            onCuratedTagClick={handleTagClick}
-            curatedTagTitle={(tag) => `Filter artists tagged "${tag}"`}
-            variant="full"
-          />
-        {/if}
-        <div class="ml-auto">
-          <InfoSidebarToggle label={i18n.t('artistDetail.artistInfo', {}, 'Artist Info')} />
-        </div>
+        <GenreChips
+          curatedTags={artistOnlyTags}
+          onCuratedTagClick={handleTagClick}
+          curatedTagTitle={(tag) => `Filter artists tagged "${tag}"`}
+          variant="full"
+        />
       </div>
     {/if}
 

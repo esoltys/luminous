@@ -10,7 +10,8 @@
     ArrowSquareOutIcon as ExternalLink,
     ArrowsClockwiseIcon as RefreshCw,
     CaretDownIcon as CaretDown,
-    XIcon as X
+    PushPinIcon as Pin,
+    PushPinSlashIcon as PinOff
   } from "phosphor-svelte";
   import { i18n, formatNumber } from "../stores/i18n.svelte";
   import { prefs } from "../stores/prefs.svelte";
@@ -24,10 +25,12 @@
   interface Props {
     isOpen?: boolean;
     width?: number;
-    onClose?: () => void;
+    /** Docked in the layout (true) or shown as a transient overlay (false). */
+    pinned?: boolean;
+    onTogglePin?: () => void;
   }
 
-  let { isOpen = true, width = 288, onClose }: Props = $props();
+  let { isOpen = true, width = 288, pinned = true, onTogglePin }: Props = $props();
 
   // What the panel describes: the selected song, the viewed album/artist, or the
   // playing song (see inspectorStore). "currentSong" below is that subject's song.
@@ -139,15 +142,16 @@
   style="width: {width}px;"
   class="relative bg-brand-sidebar flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0 overflow-hidden {themeStore.isGlassTheme ? 'glass-surface' : ''}"
 >
-  {#if onClose}
+  {#if onTogglePin}
     <button
       type="button"
-      onclick={onClose}
-      aria-label={i18n.t('common.close', {}, 'Close')}
-      title={i18n.t('common.close', {}, 'Close')}
-      class="absolute top-2 right-2 z-10 p-1.5 rounded-md text-brand-text-secondary/60 hover:text-brand-text-primary hover:bg-brand-text-primary/10 transition-colors"
+      onclick={onTogglePin}
+      aria-pressed={pinned}
+      aria-label={pinned ? i18n.t('topNav.unpinRightPanel', {}, 'Unpin info sidebar') : i18n.t('topNav.pinRightPanel', {}, 'Pin info sidebar')}
+      title={pinned ? i18n.t('topNav.unpinRightPanel', {}, 'Unpin info sidebar') : i18n.t('topNav.pinRightPanel', {}, 'Pin info sidebar')}
+      class="absolute top-2 right-2 z-10 p-1.5 rounded-md transition-colors {pinned ? 'text-brand-accent-text' : 'text-brand-text-secondary/60 hover:text-brand-text-primary'} hover:bg-brand-text-primary/10"
     >
-      <X size={14} />
+      {#if pinned}<Pin size={14} />{:else}<PinOff size={14} />{/if}
     </button>
   {/if}
   <!-- The floating PlayerBar dock (h-20 + bottom-4 inset = 96px = mb-24) overlays
@@ -161,6 +165,16 @@
           {headingLabel}
         </h2>
         <!-- The panel follows what you look at; the return arrow marks this as the way back to what is playing, not a title. -->
+        {#if inspectorStore.otherViewedKind}
+          <button
+            type="button"
+            onclick={() => inspectorStore.showViewed()}
+            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-brand-border text-xs font-medium text-brand-text-secondary hover:text-brand-text-primary hover:border-brand-accent/40 transition-colors cursor-pointer"
+          >
+            <Return class="w-3 h-3" />
+            <span>{inspectorStore.otherViewedKind === 'album' ? i18n.t('albumDetail.albumInfo', {}, 'Album Info') : i18n.t('artistDetail.artistInfo', {}, 'Artist Info')}</span>
+          </button>
+        {/if}
         {#if !isPlayingSubject && playerStore.currentSong}
           <button
             type="button"
