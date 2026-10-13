@@ -15,7 +15,7 @@ use std::ffi::OsStr;
 use std::fs;
 use std::io;
 use std::path::{Component, Path, PathBuf};
-use std::sync::atomic::AtomicU32;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
 
 pub const DEFAULT_ORGANIZE_TEMPLATE: &str =
@@ -1337,13 +1337,17 @@ pub fn auto_organize_song_ids(
 
 /// Auto-organizes every local song in the library, with the same guardrails as
 /// [`auto_organize_song_ids`]: the set the Organize view lists as ready to move.
-/// A no-op when auto-organization is off.
+/// A no-op when auto-organization is off or another catch-up is already running.
 pub fn auto_organize_library(
     db: &Database,
     watcher_paused: &Arc<AtomicU32>,
     self_writes: &Arc<crate::collection::SelfWriteTracker>,
     cover_manager: Option<&CoverManager>,
 ) -> Result<AutoOrganizeResult> {
+    let Some(_guard) = CatchUpGuard::acquire() else {
+        // The catch-up already running re-checks the setting between batches.
+        return Ok(AutoOrganizeResult::default());
+    };
     // `compute_preview` reads an empty id list as "the whole local library".
     auto_organize(db, watcher_paused, self_writes, cover_manager, &[])
 }
@@ -1400,29 +1404,56 @@ fn auto_organize(
         }
     }
 
-    if items_to_apply.is_empty() {
-        return Ok(AutoOrganizeResult {
-            moved_count: 0,
-            duplicates_count,
-            errors: vec![],
-        });
+    let mut result = AutoOrganizeResult {
+        moved_count: 0,
+        duplicates_count,
+        errors: vec![],
+    };
+
+    // Moves go in batches, re-reading the setting before each one, so turning
+    // auto-organization off stops a long library catch-up within a batch (#1689).
+    for (i, batch) in items_to_apply.chunks(AUTO_ORGANIZE_BATCH).enumerate() {
+        if i > 0 && !get_organize_config(db)?.auto_organize {
+            break;
+        }
+        let apply_res = execute_apply(
+            db,
+            watcher_paused,
+            self_writes,
+            batch,
+            config.clean_empty_dirs,
+            config.move_extra_files,
+            cover_manager,
+        )?;
+        result.moved_count += apply_res.moved_count;
+        result.errors.extend(apply_res.errors);
     }
 
-    let apply_res = execute_apply(
-        db,
-        watcher_paused,
-        self_writes,
-        &items_to_apply,
-        config.clean_empty_dirs,
-        config.move_extra_files,
-        cover_manager,
-    )?;
+    Ok(result)
+}
 
-    Ok(AutoOrganizeResult {
-        moved_count: apply_res.moved_count,
-        duplicates_count,
-        errors: apply_res.errors,
-    })
+/// How many moves auto-organize applies between checks that the setting is still on.
+const AUTO_ORGANIZE_BATCH: usize = 25;
+
+/// Set while a whole-library catch-up runs, so toggling the setting off and on
+/// again can't start a second one over the same files.
+static LIBRARY_CATCH_UP_RUNNING: AtomicBool = AtomicBool::new(false);
+
+struct CatchUpGuard;
+
+impl CatchUpGuard {
+    fn acquire() -> Option<Self> {
+        LIBRARY_CATCH_UP_RUNNING
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .ok()
+            .map(|_| CatchUpGuard)
+    }
+}
+
+impl Drop for CatchUpGuard {
+    fn drop(&mut self) {
+        LIBRARY_CATCH_UP_RUNNING.store(false, Ordering::Release);
+    }
 }
 
 #[cfg(test)]
@@ -2280,6 +2311,15 @@ mod tests {
             ..OrganizeConfig::default()
         };
         assert!(set_organize_config(&db, &cfg).unwrap());
+
+        // A catch-up already running blocks a second one from starting.
+        {
+            let _running = CatchUpGuard::acquire().unwrap();
+            let res_busy = auto_organize_library(&db, &watcher_paused, &self_writes, None).unwrap();
+            assert_eq!(res_busy.moved_count, 0);
+            assert!(files.iter().all(|f| f.exists()));
+        }
+
         let res_on = auto_organize_library(&db, &watcher_paused, &self_writes, None).unwrap();
         assert_eq!(res_on.moved_count, 2);
         assert!(res_on.errors.is_empty());
