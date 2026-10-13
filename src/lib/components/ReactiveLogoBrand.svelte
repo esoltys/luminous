@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { themeStore } from "../stores/theme.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { listen } from "@tauri-apps/api/event";
   import { onMount, onDestroy } from "svelte";

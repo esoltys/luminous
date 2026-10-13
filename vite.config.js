@@ -66,6 +66,25 @@ function safeTailwindcss() {
   });
 }
 
+/**
+ * Guard against HMR race conditions where Vite requests a component's virtual
+ * CSS module (`?svelte&type=style&lang.css`) before vite-plugin-svelte has
+ * compiled the component. Without this, an unhandled virtual module request
+ * falls back to Vite's default file loader, which reads the raw .svelte file
+ * from disk and feeds its <script> tags into PostCSS, throwing syntax errors.
+ */
+function svelteVirtualStyleGuard() {
+  return {
+    name: "svelte-virtual-style-guard",
+    enforce: "post",
+    load(id) {
+      if (id.includes("?svelte&type=style") || id.includes("&type=style")) {
+        return { code: "", map: null };
+      }
+    },
+  };
+}
+
 const isTest = process.env.VITEST !== undefined || process.env.NODE_ENV === "test";
 
 /**
@@ -117,7 +136,7 @@ export default defineConfig(async () => ({
   define: {
     "import.meta.env.VITE_COMMIT_HASH": JSON.stringify(commitHash),
   },
-  plugins: [...resolveSveltePlugins(), safeTailwindcss(), tauriIpcMockPlugin()],
+  plugins: [...resolveSveltePlugins(), safeTailwindcss(), svelteVirtualStyleGuard(), tauriIpcMockPlugin()],
 
   // These are only reachable once specific views actually render (icons,
   // Tauri API shims, the virtualized song list), not from the initial
