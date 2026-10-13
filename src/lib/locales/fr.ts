@@ -2019,7 +2019,7 @@ export const fr: DeepStringRecord<typeof en> = {
       },
       libraryFolders: {
         title: "Personnalisez Luminous",
-        description: "Ouvrez les Paramètres pour ajouter des dossiers de musique, choisir un thème et connecter des intégrations. Luminous garde votre bibliothèque à jour quand vos dossiers changent."
+        description: "Ouvrez les Paramètres pour ajouter des dossiers de musique et des serveurs, choisir un thème et une langue, et connecter des intégrations."
       }
     }
   },

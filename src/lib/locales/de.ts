@@ -2011,7 +2011,7 @@ export const de = {
       },
       libraryFolders: {
         title: "Luminous zu deinem machen",
-        description: "Öffne die Einstellungen, um Musikordner hinzuzufügen, ein Design zu wählen und Integrationen zu verbinden. Luminous hält deine Mediathek aktuell, wenn sich deine Ordner ändern."
+        description: "Öffne die Einstellungen, um Musikordner und Server hinzuzufügen, Design und Sprache zu wählen und Integrationen zu verbinden."
       }
     }
   },

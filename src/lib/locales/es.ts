@@ -2011,7 +2011,7 @@ export const es = {
       },
       libraryFolders: {
         title: "Haz Luminous a tu medida",
-        description: "Abre Configuración para agregar carpetas de música, elegir un tema y conectar integraciones. Luminous mantiene tu biblioteca al día cuando tus carpetas cambian."
+        description: "Abre Configuración para agregar carpetas de música y servidores, elegir un tema y un idioma, y conectar integraciones."
       }
     }
   },

@@ -2011,7 +2011,7 @@ export const it = {
       },
       libraryFolders: {
         title: "Rendi Luminous tuo",
-        description: "Apri Impostazioni per aggiungere cartelle musicali, scegliere un tema e collegare le integrazioni. Luminous mantiene aggiornata la libreria quando le cartelle cambiano."
+        description: "Apri Impostazioni per aggiungere cartelle musicali e server, scegliere tema e lingua e collegare le integrazioni."
       }
     }
   },

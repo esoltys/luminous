@@ -2011,7 +2011,7 @@ export const en = {
       },
       libraryFolders: {
         title: "Make Luminous yours",
-        description: "Open Settings to add music folders, choose a theme, and connect integrations. Luminous keeps your library up to date as your folders change."
+        description: "Open Settings to add music folders and servers, choose a theme and language, and connect integrations."
       }
     }
   },
