@@ -421,7 +421,7 @@
           </svg>
         </div>
         {#if !layoutCollapsed}
-          <span class="truncate whitespace-nowrap">{i18n.t('sidebar.musicbrainzLogin', {}, 'Log In to MusicBrainz')}</span>
+          <span class="text-left leading-tight min-w-0">{i18n.t('sidebar.musicbrainzLogin', {}, 'Log In to MusicBrainz')}</span>
         {/if}
       </button>
     {/if}
