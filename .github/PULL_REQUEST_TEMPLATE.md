@@ -16,4 +16,4 @@
 
 ## ✅ Checklist
 - [ ] No unrelated changes bundled in
-- [ ] Docs/screenshots updated if user-facing behavior changed (see `.claude/CLAUDE.md` for the screenshot harness)
+- [ ] Docs/screenshots updated if user-facing behavior changed (see `docs/TESTING.md` "Scene screenshots")

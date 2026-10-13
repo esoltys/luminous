@@ -19,12 +19,18 @@ needs updating to match. Work through it in order:
    `bug`-labeled issue — file one retroactively (and link the PR) if it's missing. Chore PRs
    do not require an issue and do not need to be listed in the release notes.
 3. **Content**: update the user manual (`docs/user-guide/luminous-user-guide-{EN,FR,DE,ES,IT,RU,UK}.html`) for
-   any user-facing changes, editing both languages together. Regenerate screenshots for changed views (`bun run take-screenshots`, or
-   `--name=<entry>` for just one) and read the resulting PNGs to confirm they're correct. Write
-   `docs/release-notes/vX.Y.Z.md` (chores do not need to be listed).
-4. **Verification**: `bun run check`, `bun run test:run`, `cargo test` (from `src-tauri/`),
-   `cargo clippy --all-targets` (from `src-tauri/` — zero warnings, including pre-existing ones),
-   and the manual QA walkthrough in `docs/TESTING.md` (real-hardware smoke test —
+   any user-facing changes, editing every guide in the same change. Regenerate screenshots for
+   changed views with your own Luminous closed (`bun run take-scene-screenshots`, or
+   `bun run take-screenshots` for mocked-only views; `--name=` / `--locale=` to narrow; every
+   locale is captured) and read the resulting PNGs — at least en-CA, en-US and ru or uk. Write
+   `docs/release-notes/vX.Y.Z.md` (chores do not need to be listed). Prepare the Store listing
+   in `esoltys/luminous-store` as its own PR: screenshots per Store language (`en-us` ← en-US,
+   `fr` ← fr-CA, `de`/`es`/`it`/`ru`/`uk` ← same tag), `ReleaseNotes` in every `listing.csv`
+   column, then a dry run.
+4. **Verification**: `bun run check`, `bun run lint:ast`, `bun run test:run`, `cargo test`
+   (from `src-tauri/`), `cargo fmt --check` and `cargo clippy --all-targets -- -D warnings`
+   (from `src-tauri/` — zero warnings, including pre-existing ones), a `bun run tauri dev`
+   check of new UI in de and ru for overflow, and the manual QA walkthrough in `docs/TESTING.md` (real-hardware smoke test —
    `cargo test --test smoke_test -- --ignored --nocapture` from `src-tauri/` — plus a
    `bun run tauri dev` exercise of anything specific to this release). Compare memory against
    the previous release on Windows (Luminous closed, a track over 2.5 min loaded; pass the
@@ -56,7 +62,8 @@ needs updating to match. Work through it in order:
    remind the user to toggle "Create a discussion for this release" before publishing, and walk
    through (don't run unprompted):
    - the Microsoft Store submission, which lives in the separate private `esoltys/luminous-store`
-     repo (`gh workflow run publish-store.yml -f tag=vX.Y.Z` there), then its certification
+     repo (`gh workflow run publish-store.yml -f tag=vX.Y.Z` there, plus
+     `-f update_screenshots=true` if the listing prep changed anything), then its certification
      status via `./Get-StoreSubmissionStatus.ps1` from `~/source/luminous-store`
    - installing the build on a real machine per platform (Windows + Linux)
    - confirming the `.flatpak` is attached and `flatpak update org.luminous.music` picks up the

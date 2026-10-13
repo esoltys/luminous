@@ -17,24 +17,44 @@ manual.
 ## Content
 
 - [ ] Update the user manual (`docs/user-guide/luminous-user-guide-{EN,FR,DE,ES,IT,RU,UK}.html`) for any
-      user-facing changes, editing both languages together.
-- [ ] Regenerate screenshots for any changed views:
+      user-facing changes. Edit every guide in the same change, and quote button and menu
+      names exactly as that locale's catalog shows them (see [TRANSLATIONS.md](TRANSLATIONS.md)).
+- [ ] Regenerate screenshots for any changed views, with your own Luminous closed:
   ```bash
-  bun run take-screenshots
+  bun run take-scene-screenshots
   ```
-  Use `--name=<entry>` (e.g. `bun run take-screenshots --name=equalizer`) to capture just
-  one view instead of the whole suite. New screenshot-worthy features get an entry added
-  to the tracked `scripts/screenshot-scenes.json` (see `.claude/CLAUDE.md` for the harness
-  details). Read the resulting PNGs to confirm they rendered correctly before committing.
+  This drives the real app (setup in [TESTING.md](TESTING.md)'s "Scene screenshots"); use
+  `bun run take-screenshots` (mocked IPC, entries in `scripts/screenshot-scenes.json`) for
+  views that only exist there. Both capture every shipped locale into
+  `docs/user-guide/assets/<tag>/screenshots/{light,dark}/`; narrow a run with
+  `--name=<entry>` / `--locale=<tag>`. After replacing a PNG by hand, run
+  `bun run guide-webp`; `scripts/guide-assets.test.ts` fails if the embedded set exceeds
+  its size budget. Read the resulting PNGs before committing — at least en-CA, en-US and
+  one Cyrillic locale (ru or uk).
 - [ ] Write `docs/release-notes/vX.Y.Z.md` for the new version. Chores do not need to be listed in the release notes.
+- [ ] Prepare the Microsoft Store listing in `esoltys/luminous-store` (its own PR there):
+      - Copy screenshots into `assets/<store-lang>/screenshots/` as `N-Name-XX.png`. Each
+        Store language has one source locale: `en-us` ← `en-US`, `fr` ← `fr-CA` (the `fr`
+        listing serves every French market, written in Canadian French), and `de`, `es`,
+        `it`, `ru`, `uk` ← the same tag.
+      - Update `ReleaseNotes` in every language column of `listing.csv`, and check that
+        `Description`, `Feature1..N` and the screenshot captions still match what ships. The
+        `en-us` column uses US spelling.
+      - Dry-run `ConvertTo-Pdp.ps1` + `New-SubmissionPackage` (that repo's README, "Testing
+        changes").
 
 ## Verification
 
 - [ ] `bun run check` — svelte-check / TypeScript
-- [ ] `bun run test:run` — frontend unit tests
+- [ ] `bun run lint:ast` — architecture-invariant rules
+- [ ] `bun run test:run` — frontend unit tests, including locale completeness and the
+      guide-asset size budget
 - [ ] `cargo test` (from `src-tauri/`) — Rust unit tests + BDD suites
-- [ ] `cargo clippy --all-targets` (from `src-tauri/`) — no warnings at all, not just no
-      new ones; fix any pre-existing warnings you encounter rather than leaving them
+- [ ] `cargo fmt --check` and `cargo clippy --all-targets -- -D warnings` (from
+      `src-tauri/`) — no warnings at all, not just no new ones; fix any pre-existing
+      warnings you encounter rather than leaving them
+- [ ] In `bun run tauri dev`, check this release's new UI in the longest locales (de, ru)
+      for overflow or truncation.
 - [ ] Do the manual QA walkthrough in [docs/TESTING.md](TESTING.md) (real-hardware smoke
       test + dev-build exercise), plus anything specific to what changed this release.
 - [ ] Compare memory against the previous release on Windows (from a local machine, with
@@ -92,8 +112,9 @@ manual.
   ```bash
   gh workflow run publish-store.yml -f tag=vX.Y.Z
   ```
-  (add `-f update_screenshots=true` to also replace the live listing text/screenshots —
-  see that repo's `README.md`). Watch this run too, not just the build — a green run
+  Add `-f update_screenshots=true` whenever the Store listing prep above changed anything —
+  without it the new screenshots and release notes never reach the Store (it replaces the
+  whole live listing; see that repo's `README.md`). Watch this run too, not just the build — a green run
   only means the submission was committed for certification, not that it's live yet;
   Microsoft's cert pass still has to complete.
 - [ ] Check actual certification status from `~/source/luminous-store` (set

@@ -2,7 +2,7 @@
 // Tauri IPC bridge (see tauri-ipc-mock.ts), captures each view listed in
 // screenshot-scenes.json via Playwright (once per color scheme, into
 // docs/user-guide/assets/{locale}/screenshots/{light,dark}/), then kills the dev server. See
-// .claude/CLAUDE.md for the screenshot-scenes.json setup trap in a fresh worktree.
+// docs/TROUBLESHOOTING.md for harness pitfalls.
 // Usage: bun run take-screenshots [--name=<entry>] [--locale=<tag>]
 import * as fs from "fs";
 import * as path from "path";
