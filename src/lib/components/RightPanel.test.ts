@@ -468,4 +468,21 @@ describe("RightPanel.svelte", () => {
     const dialog = await findByRole("dialog");
     expect(dialog).toBeInTheDocument();
   });
+
+  it("resets scroll position to top when the inspected subject changes", async () => {
+    playerStore.currentSong = mockSong;
+    const { container } = render(RightPanel);
+    const scrollEl = container.querySelector(".overflow-y-auto") as HTMLDivElement;
+    expect(scrollEl).not.toBeNull();
+
+    // Simulate user having scrolled down
+    scrollEl.scrollTop = 300;
+    expect(scrollEl.scrollTop).toBe(300);
+
+    // Switch subject to another song
+    playerStore.currentSong = { ...mockSong, id: 99, title: "New Track" };
+    flushSync();
+
+    expect(scrollEl.scrollTop).toBe(0);
+  });
 });

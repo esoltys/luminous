@@ -140,6 +140,29 @@ describe("inspectorStore", () => {
     expect(inspectorStore.subject).toMatchObject({ key: "album:Fast", song: { id: 300 } });
   });
 
+  it("holds the previous viewed subject while a new album or artist is resolving", async () => {
+    let releaseSecond: (v: Song[]) => void = () => {};
+    vi.mocked(invoke).mockImplementation(async (_cmd: string, args?: unknown) => {
+      const a = args as { album?: string } | undefined;
+      if (a?.album === "First") return [song(10, { album: "First" })];
+      if (a?.album === "Second") return new Promise<Song[]>((r) => (releaseSecond = r));
+      return [];
+    });
+    playerStore.currentSong = song(1);
+    navigationStore.selectedAlbumName = "First";
+    await settle();
+    expect(inspectorStore.subject).toMatchObject({ key: "album:First", song: { id: 10 } });
+
+    navigationStore.selectedAlbumName = "Second";
+    flushSync();
+    // While Second is in-flight, it holds First instead of flashing Now Playing
+    expect(inspectorStore.subject).toMatchObject({ key: "album:First", song: { id: 10 } });
+
+    releaseSecond([song(20, { album: "Second" })]);
+    await settle();
+    expect(inspectorStore.subject).toMatchObject({ key: "album:Second", song: { id: 20 } });
+  });
+
   describe("showPlaying", () => {
     it("beats a selection and a viewed entity", async () => {
       playerStore.currentSong = song(1);

@@ -21,6 +21,8 @@
   import AudioPipelineStages from "./AudioPipelineStages.svelte";
   import InfoSections from "./InfoSections.svelte";
   import { contextStore } from "../stores/context.svelte";
+  import { fade, prefersReducedMotion } from "../utils/motion";
+  import { cubicOut } from "svelte/easing";
 
   interface Props {
     isOpen?: boolean;
@@ -51,6 +53,17 @@
       case "album": return i18n.t('playerBar.albumHeading', {}, 'Album');
       case "artist": return i18n.t('playerBar.artistHeading', {}, 'Artist');
       default: return i18n.t('playerBar.nowPlayingHeading', {}, 'Now Playing');
+    }
+  });
+
+  let scrollContainer = $state<HTMLDivElement>();
+
+  // Reset scroll position when the inspected subject changes so the new
+  // content starts predictably at the top.
+  $effect(() => {
+    const _key = subject?.key;
+    if (scrollContainer) {
+      scrollContainer.scrollTop = 0;
     }
   });
   // Technicals is the default tab until the user's own choice loads from
@@ -174,7 +187,7 @@
        the bottom of the app on top of this panel — a bottom *margin* (rather than
        inner padding) actually shrinks this div's own box, so its scrollbar ends
        above the dock instead of running the full sidebar height behind it. -->
-  <div class="flex-1 min-h-0 overflow-y-auto px-6 pt-8 pb-6 space-y-6 {currentSong ? 'mb-24' : ''}">
+  <div bind:this={scrollContainer} class="flex-1 min-h-0 overflow-y-auto px-6 pt-8 pb-6 space-y-6 {currentSong ? 'mb-24' : ''}">
     {#if currentSong}
       <div class="flex items-center justify-between gap-3">
         <h2 class="text-xs font-bold text-brand-text-secondary uppercase tracking-wider">
@@ -189,7 +202,12 @@
         {/if}
       </div>
 
-      <div class="space-y-2 text-xs">
+      {#key subject?.key}
+        <div
+          in:fade={{ duration: prefersReducedMotion() ? 0 : 150, easing: cubicOut }}
+          class="space-y-6"
+        >
+          <div class="space-y-2 text-xs">
         {#if currentSong.year}
           <div class="flex items-start justify-between gap-3">
             <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.releasedLabel', {}, 'Released')}</span>
@@ -305,6 +323,8 @@
           {/if}
         </div>
       {/if}
+        </div>
+      {/key}
     {:else}
       <div class="flex flex-col items-center justify-center h-full text-center">
         <Music class="w-12 h-12 text-brand-text-secondary/30 mb-3" />

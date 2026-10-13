@@ -75,10 +75,14 @@ class InspectorStore {
     this.resolved = subject;
   }
 
-  /** The viewed album/artist, once resolved to a song to look it up by. */
+  /**
+   * The viewed album/artist, once resolved to a song to look it up by.
+   * Holds the previously resolved subject while a new entity is resolving,
+   * preventing the panel from flashing through interim states.
+   */
   private get viewedSubject(): InspectorSubject | null {
     const entity = this.viewedEntity;
-    if (entity && this.resolved?.key === `${entity.kind}:${entity.name}`) return { ...this.resolved, source: "view" };
+    if (entity && this.resolved) return { ...this.resolved, source: "view" };
     return null;
   }
 
