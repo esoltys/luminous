@@ -21,8 +21,7 @@
   import AudioPipelineStages from "./AudioPipelineStages.svelte";
   import InfoSections from "./InfoSections.svelte";
   import { contextStore } from "../stores/context.svelte";
-  import { fade, prefersReducedMotion } from "../utils/motion";
-  import { cubicOut } from "svelte/easing";
+
 
   interface Props {
     isOpen?: boolean;
@@ -202,12 +201,7 @@
         {/if}
       </div>
 
-      {#key subject?.key}
-        <div
-          in:fade={{ duration: prefersReducedMotion() ? 0 : 150, easing: cubicOut }}
-          class="space-y-6"
-        >
-          <div class="space-y-2 text-xs">
+      <div class="space-y-2 text-xs">
         {#if currentSong.year}
           <div class="flex items-start justify-between gap-3">
             <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.releasedLabel', {}, 'Released')}</span>
@@ -323,8 +317,7 @@
           {/if}
         </div>
       {/if}
-        </div>
-      {/key}
+
     {:else}
       <div class="flex flex-col items-center justify-center h-full text-center">
         <Music class="w-12 h-12 text-brand-text-secondary/30 mb-3" />

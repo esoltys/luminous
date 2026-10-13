@@ -78,7 +78,7 @@ function svelteVirtualStyleGuard() {
     name: "svelte-virtual-style-guard",
     enforce: "post",
     load(id) {
-      if (id.includes("?svelte&type=style") || id.includes("&type=style")) {
+      if (id.includes(".svelte") && (id.includes("?svelte&type=style") || id.includes("&type=style"))) {
         return { code: "", map: null };
       }
     },
