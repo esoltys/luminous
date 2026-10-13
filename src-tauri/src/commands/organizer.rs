@@ -52,10 +52,42 @@ pub async fn get_organize_config(
     organizer::get_organize_config(&state.db).map_err(|e| e.to_string())
 }
 
+/// Saves the organizer config. Turning auto-organization on also organizes the songs
+/// already waiting in the library, in the background, reporting through the same
+/// `auto-organize-result` / `library-changed` events as the per-song hooks (#1689).
 #[tauri::command]
 pub async fn set_organize_config(
+    app: AppHandle,
     state: State<'_, AppState>,
     config: organizer::OrganizeConfig,
 ) -> Result<(), String> {
-    organizer::set_organize_config(&state.db, &config).map_err(|e| e.to_string())
+    let turned_on =
+        organizer::set_organize_config(&state.db, &config).map_err(|e| e.to_string())?;
+    if !turned_on {
+        return Ok(());
+    }
+
+    let db = state.db.clone();
+    let watcher_paused = state.watcher_paused.clone();
+    let self_writes = state.self_writes.clone();
+    let cover_manager = state.cover_manager.clone();
+    tokio::task::spawn_blocking(move || {
+        match organizer::auto_organize_library(
+            &db,
+            &watcher_paused,
+            &self_writes,
+            Some(&cover_manager),
+        ) {
+            Ok(res) => {
+                if res.moved_count > 0 || res.duplicates_count > 0 || !res.errors.is_empty() {
+                    let _ = app.emit("auto-organize-result", &res);
+                }
+                if res.moved_count > 0 {
+                    let _ = app.emit("library-changed", ());
+                }
+            }
+            Err(e) => log::error!("Auto-organize catch-up failed: {e}"),
+        }
+    });
+    Ok(())
 }
