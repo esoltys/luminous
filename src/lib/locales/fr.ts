@@ -292,7 +292,7 @@ export const fr: DeepStringRecord<typeof en> = {
     aboutLicenseSubtitle: "Licence MIT",
     generalTitle: "Paramètres généraux",
     generalSubtitle: "Configurer la langue de l'application et les préférences de format.",
-    selectLanguage: "Langue / Language",
+    selectLanguage: "Langue",
     systemTitle: "Système",
     systemSubtitle: "Gérer le démarrage et la réduction de Luminous, et l'emplacement de ses données.",
     uiLanguageHint: "Choisissez la langue des menus, des boutons et des messages.",

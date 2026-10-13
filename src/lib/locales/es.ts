@@ -286,7 +286,7 @@ export const es = {
     aboutLicenseSubtitle: "Licencia MIT",
     generalTitle: "Configuración general",
     generalSubtitle: "Configura el idioma de la aplicación y las preferencias de formato.",
-    selectLanguage: "Idioma / Language",
+    selectLanguage: "Idioma",
     systemTitle: "Sistema",
     systemSubtitle: "Controla cómo Luminous se inicia, se minimiza y guarda sus datos.",
     uiLanguageHint: "Elige el idioma de los menús, los botones y los mensajes.",

@@ -298,7 +298,7 @@ export const ru = {
     aboutLicenseSubtitle: "Лицензия MIT",
     generalTitle: "Общие параметры",
     generalSubtitle: "Выберите язык приложения и настройте форматирование.",
-    selectLanguage: "Язык / Language",
+    selectLanguage: "Язык",
     systemTitle: "Система",
     systemSubtitle: "Выберите, как Luminous запускается, сворачивается и хранит данные.",
     uiLanguageHint: "Выберите язык меню, кнопок и сообщений.",
