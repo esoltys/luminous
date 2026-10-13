@@ -36,12 +36,13 @@ Luminous doesn't accept PRs as this is a hobby project that I enjoy working on i
 
 ## Upcoming 3.0 Release
 
-- **Nine UI locales**: English (CA/US/UK), French (CA/FR), Spanish, German, Italian, Russian and Ukrainian, with the UI language and user-manual language set separately
+- **Ten UI locales**: English (CA/US/UK), French (CA/FR), Spanish, German, Italian, Russian and Ukrainian
 - **Cosmetic add-on themes**, including the free Mothman theme on the Microsoft Store
 - **Large-library performance**: faster scanning and WebDAV sync on network drives, with remote-deletion detection
 - **Parametric EQ editor**: free-frequency bands, drag-to-edit response graph, user presets and AutoEq headphone profile import
 - **Auto Continue**, richer lyrics (word-by-word sync, `.srt`/`.vtt` sidecars, timing offset) and Love plus 5-star ratings with ListenBrainz/MusicBrainz sync
 - **Portable mode** and a portable ZIP release for Windows
+- **AppImage** release for Linux
 
 ## Architecture
 
@@ -80,7 +81,7 @@ luminous/
     │   ├── loudness.rs       # EBU R128 loudness analysis & ReplayGain fallback
     │   ├── lyrics.rs         # LRCLIB & Lyrics.ovh client integrations
     │   ├── main.rs           # Binary entry point invoking luminous_lib::run()
-    │   ├── media_session.rs  # OS media transport integration (SMTC, MPRIS2, Now Playing)
+    │   ├── media_session/    # OS media transport integration (SMTC, MPRIS2, Now Playing)
     │   ├── models.rs         # Shared structs and types
     │   ├── musicbrainz.rs    # MusicBrainz lookups, OAuth2 login, artist events
     │   ├── organizer.rs      # Tag-based file/folder reorganizer
@@ -117,7 +118,7 @@ Ensure the required build tools, GTK, WebKit, ALSA, and SSL development headers 
     ```
 *   **Arch/CachyOS**:
     ```bash
-    sudo pacman -S --needed base-devel curl wget file openssl gtk3 webkit2gtk-4.1 libappindicator-gtk3 librsvg pkg-config
+    sudo pacman -S --needed base-devel curl wget file openssl gtk3 webkit2gtk-4.1 libappindicator-gtk3 librsvg pkg-config alsa-lib cmake
     ```
 
 #### 2. Install Bun & Rust
@@ -143,8 +144,6 @@ Production bundles include updater artifacts, which must be signed. If you haven
 bun run tauri build
 ```
 This produces `.deb`/`.rpm`/AppImage on Linux.
-> [!NOTE]
-> On rolling-release distros (Arch/CachyOS), the AppImage step bundles `strip` binaries too old to handle the RELR relocations in current system libraries. `bun run tauri build` sets `NO_STRIP=true` for this automatically, so no extra steps are needed here — it only skips stripping debug symbols from vendored libraries, slightly increasing AppImage size.
 
 ---
 
