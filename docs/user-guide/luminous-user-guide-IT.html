@@ -43,7 +43,7 @@
     <div class="nav-label">Consigli e trucchi</div>
     <div class="nav-group">
       <a href="#shortcuts"><span class="icon"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M224,48H32A16,16,0,0,0,16,64V192a16,16,0,0,0,16,16H224a16,16,0,0,0,16-16V64A16,16,0,0,0,224,48Zm0,144H32V64H224V192Zm-16-64a8,8,0,0,1-8,8H56a8,8,0,0,1,0-16H200A8,8,0,0,1,208,128Zm0-32a8,8,0,0,1-8,8H56a8,8,0,0,1,0-16H200A8,8,0,0,1,208,96ZM72,160a8,8,0,0,1-8,8H56a8,8,0,0,1,0-16h8A8,8,0,0,1,72,160Zm96,0a8,8,0,0,1-8,8H96a8,8,0,0,1,0-16h64A8,8,0,0,1,168,160Zm40,0a8,8,0,0,1-8,8h-8a8,8,0,0,1,0-16h8A8,8,0,0,1,208,160Z"/></svg></span>Scorciatoie da tastiera</a>
-      <a href="#context-menus"><span class="icon"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M88,24V16a8,8,0,0,1,16,0v8a8,8,0,0,1-16,0ZM16,104h8a8,8,0,0,0,0-16H16a8,8,0,0,0,0,16ZM124.42,39.16a8,8,0,0,0,10.74-3.58l8-16a8,8,0,0,0-14.31-7.16l-8,16A8,8,0,0,0,124.42,39.16Zm-96,81.69-16,8a8,8,0,0,0,7.16,14.31l16-8a8,8,0,1,0-7.16-14.31ZM219.31,184a16,16,0,0,1,0,22.63l-12.68,12.68a16,16,0,0,1-22.63,0L132.7,168,115,214.09c0,.1-.08.21-.13.32a15.83,15.83,0,0,1-14.6,9.59l-.79,0a15.83,15.83,0,0,1-14.41-11L32.8,52.92A16,16,0,0,1,52.92,32.8L213,85.07a16,16,0,0,1,1.41,29.8l-.32.13L168,132.69ZM208,195.31,156.69,144h0a16,16,0,0,1,4.93-26l.32-.14,45.95-17.64L48,48l52.2,159.86,17.65-46c0-.11.08-.22.13-.33a16,16,0,0,1,11.69-9.34,16.72,16.72,0,0,1,3-.28,16,16,0,0,1,11.3,4.69L195.31,208Z"/></svg></span>Menu contestuali e selezione multipla</a>
+      <a href="#context-menus"><span class="icon"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M88,24V16a8,8,0,0,1,16,0v8a8,8,0,0,1-16,0ZM16,104h8a8,8,0,0,0,0-16H16a8,8,0,0,0,0,16ZM124.42,39.16a8,8,0,0,0,10.74-3.58l8-16a8,8,0,0,0-14.31-7.16l-8,16A8,8,0,0,0,124.42,39.16Zm-96,81.69-16,8a8,8,0,0,0,7.16,14.31l16-8a8,8,0,1,0-7.16-14.31ZM219.31,184a16,16,0,0,1,0,22.63l-12.68,12.68a16,16,0,0,1-22.63,0L132.7,168,115,214.09c0,.1-.08.21-.13.32a15.83,15.83,0,0,1-14.6,9.59l-.79,0a15.83,15.83,0,0,1-14.41-11L32.8,52.92A16,16,0,0,1,52.92,32.8L213,85.07a16,16,0,0,1,1.41,29.8l-.32.13L168,132.69ZM208,195.31,156.69,144h0a16,16,0,0,1,4.93-26l.32-.14,45.95-17.64L48,48l52.2,159.86,17.65-46c0-.11.08-.22.13-.33a16,16,0,0,1,11.69-9.34,16.72,16.72,0,0,1,3-.28,16,16,0,0,1,11.3,4.69L195.31,208Z"/></svg></span>Lo sapevi?</a>
     </div>
   </nav>
   <main class="content">
@@ -288,6 +288,7 @@
         <div class="row"><div class="mk">•</div><div><b>Modifica</b> corregge il testo o la sincronizzazione.</div></div>
         <div class="row"><div class="mk">•</div><div>I testi senza marcatori temporali vengono mostrati come testo semplice.</div></div>
         <div class="row"><div class="mk">•</div><div>Per un brano strumentale, scegli <b>Contrassegna come strumentale</b> così Luminous smette di cercare.</div></div>
+        <div class="row"><div class="mk">•</div><div>I testi compaiono anche nel <a href="#now-playing">miniplayer</a>: usa il suo pulsante dei testi per sostituire la copertina con i testi in tempo reale.</div></div>
       </div>
       <figure class="shot mw-640 mb-28">
         <img src="assets/it/screenshots/dark/lyrics.webp" alt="Testi sincronizzati" width="1280" height="800" loading="lazy">
@@ -389,6 +390,9 @@
         <div class="tr"><code>%track3</code><div>Numero di traccia, con zeri iniziali fino a tre cifre</div></div>
         <div class="tr"><code>%rawtrack</code><div>Numero di traccia esattamente come memorizzato nel tag, senza zeri iniziali</div></div>
       </div>
+      <h2>Parti facoltative</h2>
+      <p class="mb-18">Tutto ciò che sta tra <b>{ }</b> viene scritto solo se la traccia ha un valore per una delle sue variabili. Altrimenti l'intera parte viene omessa, insieme al testo, agli spazi e alle barre tra le parentesi graffe. Così <code>{%year - }%album</code> dà «2019 - Reservoir», oppure solo «Reservoir» per una traccia senza anno.</p>
+      <p class="mb-24">Fuori dalle parentesi graffe, un valore mancante viene sostituito: Unknown Artist, Unknown Album o Unknown Genre, il nome del file per il titolo, 1 per il disco e 00 per la traccia. Un anno mancante resta vuoto, quindi <code>%year - %album</code> darebbe « - Reservoir».</p>
       <h2>Esempi</h2>
       <div class="table roomy mw-640 mb-8" style="--cols: 200px 1fr">
         <div class="tr"><code>%disc-%track</code><div>2-07</div></div>
@@ -617,6 +621,8 @@
     <section id="about" data-section>
       <div class="eyebrow">Impostazioni</div>
       <h1>Informazioni e crediti</h1>
+      <p class="note">Ciao, sono Eric, lo sviluppatore software senior canadese dietro Luminous. Mi piace molto lavorare a questa app e spero che si veda. Scrivimi per salutarmi e dirmi cosa ne pensi. Mi trovi su <a href="https://esoltys.dev" target="_blank" rel="noopener">esoltys.dev</a>.</p>
+      <span class="signature" role="img" aria-label="Eric"></span>
       <p>Il codice sorgente è su <a href="https://github.com/esoltys/luminous" target="_blank" rel="noopener">GitHub</a>, insieme ai crediti di ogni libreria usata da Luminous e alla licenza con cui è condiviso.</p>
       <figure class="shot mw-640 mb-28">
         <img src="assets/it/screenshots/dark/settings-about.webp" alt="Informazioni e crediti" width="1280" height="950" loading="lazy">
@@ -625,12 +631,15 @@
 
     <section id="context-menus" data-section>
       <div class="eyebrow">Consigli e trucchi</div>
-      <h1>Menu contestuali e selezione multipla</h1>
+      <h1>Lo sapevi?</h1>
+      <p>Fai clic con il tasto destro su quasi tutto in Luminous (brani, album, artisti, playlist, generi, elementi fissati) per altre opzioni.</p>
       <div class="list">
-        <div class="row"><div class="mk">•</div><div>Fai clic con il tasto destro su un brano per Riproduci, Aggiungi a playlist, Vai all'artista, Vai all'album, Modifica tag e altro.</div></div>
-        <div class="row"><div class="mk">•</div><div>Fai clic con il tasto destro su un album per <b>Riproduci album</b>, <b>Aggiungi alla coda</b>, <b>Modifica le informazioni dell'album</b>, <b>Apri in Picard</b>, <b>Scheda da condividere...</b>, <b>Fissa nella Home</b> e <b>Non includere nelle statistiche</b>.</div></div>
-        <div class="row"><div class="mk">•</div><div>Maiusc + clic seleziona un intervallo, Ctrl + clic aggiunge righe, e <kbd>Ctrl</kbd><kbd>A</kbd> seleziona tutto nell'elenco.</div></div>
-        <div class="row"><div class="mk">•</div><div>Con dei brani selezionati, una barra degli strumenti offre <b>Riproduci selezionati</b>, <b>Aggiungi a playlist</b> e <b>Deseleziona tutto</b>.</div></div>
+        <div class="row"><div class="mk">•</div><div>Per ordinare i brani in base a un campo, mostra prima la sua colonna: fai clic con il tasto destro sull'intestazione di una colonna, attiva la colonna, poi fai clic sulla sua intestazione. Fai di nuovo clic per invertire l'ordine.</div></div>
+        <div class="row"><div class="mk">•</div><div>Fai clic con il tasto destro sul cuore per segnare un brano con «non mi piace». Rifallo per annullare.</div></div>
+        <div class="row"><div class="mk">•</div><div>Fai doppio clic su un album per riprodurlo.</div></div>
+        <div class="row"><div class="mk">•</div><div>Maiusc + clic seleziona un intervallo, Ctrl + clic aggiunge righe, e <kbd>Ctrl</kbd><kbd>A</kbd> seleziona tutto nell'elenco. Una barra degli strumenti offre poi <b>Riproduci selezionati</b>, <b>Aggiungi a playlist</b> e <b>Deseleziona tutto</b>.</div></div>
+        <div class="row"><div class="mk">•</div><div>Trascina file o cartelle sulla finestra per riprodurli subito.</div></div>
+        <div class="row"><div class="mk">•</div><div>Premi <kbd>Alt</kbd><kbd>↑</kbd> o <kbd>Alt</kbd><kbd>↓</kbd> per spostare in su o in giù un elemento fissato nella barra laterale.</div></div>
       </div>
     </section>
   </main>

@@ -43,7 +43,7 @@
     <div class="nav-label">Tips &amp; tricks</div>
     <div class="nav-group">
       <a href="#shortcuts"><span class="icon"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M224,48H32A16,16,0,0,0,16,64V192a16,16,0,0,0,16,16H224a16,16,0,0,0,16-16V64A16,16,0,0,0,224,48Zm0,144H32V64H224V192Zm-16-64a8,8,0,0,1-8,8H56a8,8,0,0,1,0-16H200A8,8,0,0,1,208,128Zm0-32a8,8,0,0,1-8,8H56a8,8,0,0,1,0-16H200A8,8,0,0,1,208,96ZM72,160a8,8,0,0,1-8,8H56a8,8,0,0,1,0-16h8A8,8,0,0,1,72,160Zm96,0a8,8,0,0,1-8,8H96a8,8,0,0,1,0-16h64A8,8,0,0,1,168,160Zm40,0a8,8,0,0,1-8,8h-8a8,8,0,0,1,0-16h8A8,8,0,0,1,208,160Z"/></svg></span>Keyboard shortcuts</a>
-      <a href="#context-menus"><span class="icon"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M88,24V16a8,8,0,0,1,16,0v8a8,8,0,0,1-16,0ZM16,104h8a8,8,0,0,0,0-16H16a8,8,0,0,0,0,16ZM124.42,39.16a8,8,0,0,0,10.74-3.58l8-16a8,8,0,0,0-14.31-7.16l-8,16A8,8,0,0,0,124.42,39.16Zm-96,81.69-16,8a8,8,0,0,0,7.16,14.31l16-8a8,8,0,1,0-7.16-14.31ZM219.31,184a16,16,0,0,1,0,22.63l-12.68,12.68a16,16,0,0,1-22.63,0L132.7,168,115,214.09c0,.1-.08.21-.13.32a15.83,15.83,0,0,1-14.6,9.59l-.79,0a15.83,15.83,0,0,1-14.41-11L32.8,52.92A16,16,0,0,1,52.92,32.8L213,85.07a16,16,0,0,1,1.41,29.8l-.32.13L168,132.69ZM208,195.31,156.69,144h0a16,16,0,0,1,4.93-26l.32-.14,45.95-17.64L48,48l52.2,159.86,17.65-46c0-.11.08-.22.13-.33a16,16,0,0,1,11.69-9.34,16.72,16.72,0,0,1,3-.28,16,16,0,0,1,11.3,4.69L195.31,208Z"/></svg></span>Context menus &amp; multi-select</a>
+      <a href="#context-menus"><span class="icon"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M88,24V16a8,8,0,0,1,16,0v8a8,8,0,0,1-16,0ZM16,104h8a8,8,0,0,0,0-16H16a8,8,0,0,0,0,16ZM124.42,39.16a8,8,0,0,0,10.74-3.58l8-16a8,8,0,0,0-14.31-7.16l-8,16A8,8,0,0,0,124.42,39.16Zm-96,81.69-16,8a8,8,0,0,0,7.16,14.31l16-8a8,8,0,1,0-7.16-14.31ZM219.31,184a16,16,0,0,1,0,22.63l-12.68,12.68a16,16,0,0,1-22.63,0L132.7,168,115,214.09c0,.1-.08.21-.13.32a15.83,15.83,0,0,1-14.6,9.59l-.79,0a15.83,15.83,0,0,1-14.41-11L32.8,52.92A16,16,0,0,1,52.92,32.8L213,85.07a16,16,0,0,1,1.41,29.8l-.32.13L168,132.69ZM208,195.31,156.69,144h0a16,16,0,0,1,4.93-26l.32-.14,45.95-17.64L48,48l52.2,159.86,17.65-46c0-.11.08-.22.13-.33a16,16,0,0,1,11.69-9.34,16.72,16.72,0,0,1,3-.28,16,16,0,0,1,11.3,4.69L195.31,208Z"/></svg></span>Did you know?</a>
     </div>
   </nav>
   <main class="content">
@@ -288,6 +288,7 @@
         <div class="row"><div class="mk">•</div><div><b>Edit</b> corrects the text or timing.</div></div>
         <div class="row"><div class="mk">•</div><div>Lyrics without timestamps show as plain text.</div></div>
         <div class="row"><div class="mk">•</div><div>For an instrumental, choose <b>Mark as Instrumental</b> so Luminous stops searching.</div></div>
+        <div class="row"><div class="mk">•</div><div>Lyrics also show in the <a href="#now-playing">mini player</a>: use its lyrics button to swap the cover for live lyrics.</div></div>
       </div>
       <figure class="shot mw-640 mb-28">
         <img src="assets/en-CA/screenshots/dark/lyrics.webp" alt="Synced lyrics" width="1280" height="800" loading="lazy">
@@ -389,6 +390,9 @@
         <div class="tr"><code>%track3</code><div>Track number, padded to three digits</div></div>
         <div class="tr"><code>%rawtrack</code><div>Track number exactly as stored in the tag, no padding</div></div>
       </div>
+      <h2>Optional parts</h2>
+      <p class="mb-18">Anything inside <b>{ }</b> is written only when the track has a value for a variable in it. When it doesn't, the whole piece is left out, along with the text, spaces and slashes inside the braces. So <code>{%year - }%album</code> gives "2019 - Reservoir", or just "Reservoir" for a track with no year.</p>
+      <p class="mb-24">Outside braces, a missing value is filled in instead: Unknown Artist, Unknown Album or Unknown Genre, the file name for the title, 1 for the disc and 00 for the track. A missing year is left blank, so <code>%year - %album</code> would give " - Reservoir".</p>
       <h2>Examples</h2>
       <div class="table roomy mw-640 mb-8" style="--cols: 200px 1fr">
         <div class="tr"><code>%disc-%track</code><div>2-07</div></div>
@@ -617,6 +621,8 @@
     <section id="about" data-section>
       <div class="eyebrow">Settings</div>
       <h1>About &amp; Credits</h1>
+      <p class="note">Hi, I'm Eric, the Canadian senior software developer behind Luminous. I really enjoy working on this app, and I hope it shows. Please reach out to say hello and share your feedback. You'll find me at <a href="https://esoltys.dev" target="_blank" rel="noopener">esoltys.dev</a>.</p>
+      <span class="signature" role="img" aria-label="Eric"></span>
       <p>The source code is on <a href="https://github.com/esoltys/luminous" target="_blank" rel="noopener">GitHub</a>, with the credits for every library Luminous uses and the licence it's shared under.</p>
       <figure class="shot mw-640 mb-28">
         <img src="assets/en-CA/screenshots/dark/settings-about.webp" alt="About &amp; Credits" width="1280" height="950" loading="lazy">
@@ -625,12 +631,15 @@
 
     <section id="context-menus" data-section>
       <div class="eyebrow">Tips &amp; tricks</div>
-      <h1>Context menus &amp; multi-select</h1>
+      <h1>Did you know?</h1>
+      <p>Right-click almost anything in Luminous (songs, albums, artists, playlists, genres, pinned items) for more options.</p>
       <div class="list">
-        <div class="row"><div class="mk">•</div><div>Right-click a song for Play, Add to Playlist, Go to Artist, Go to Album, Edit Tags and more.</div></div>
-        <div class="row"><div class="mk">•</div><div>Right-click an album for <b>Play Album</b>, <b>Add to Queue</b>, <b>Edit album info</b>, <b>Open in Picard</b>, <b>Share Card...</b>, <b>Pin to Home</b> and <b>Don't Include in Stats</b>.</div></div>
-        <div class="row"><div class="mk">•</div><div>Shift-click to select a range, Ctrl-click to add rows, and <kbd>Ctrl</kbd><kbd>A</kbd> to select everything in the list.</div></div>
-        <div class="row"><div class="mk">•</div><div>With songs selected, a toolbar offers <b>Play Selected</b>, <b>Add to Playlist</b> and <b>Clear Selection</b>.</div></div>
+        <div class="row"><div class="mk">•</div><div>To sort songs by a field, show its column first: right-click a column header, turn the column on, then click its header. Click again to reverse the order.</div></div>
+        <div class="row"><div class="mk">•</div><div>Right-click the heart to mark a song as disliked. Right-click it again to clear the dislike.</div></div>
+        <div class="row"><div class="mk">•</div><div>Double-click an album to play it.</div></div>
+        <div class="row"><div class="mk">•</div><div>Shift-click to select a range, Ctrl-click to add rows, and <kbd>Ctrl</kbd><kbd>A</kbd> to select everything in the list. A toolbar then offers <b>Play Selected</b>, <b>Add to Playlist</b> and <b>Clear Selection</b>.</div></div>
+        <div class="row"><div class="mk">•</div><div>Drop files or folders onto the window to play them straight away.</div></div>
+        <div class="row"><div class="mk">•</div><div>Press <kbd>Alt</kbd><kbd>↑</kbd> or <kbd>Alt</kbd><kbd>↓</kbd> to move a pinned sidebar item up or down.</div></div>
       </div>
     </section>
   </main>

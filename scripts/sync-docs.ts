@@ -19,6 +19,7 @@ const FILE_COPIES = [
   "guide.css",
   "guide.js",
   "luminous-mark.svg",
+  "signature.svg",
 ];
 
 const guides = fs.readdirSync(userGuideDir).filter((f) => /^luminous-user-guide-[A-Z]{2}\.html$/.test(f));

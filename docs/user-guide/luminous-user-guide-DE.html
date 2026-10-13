@@ -43,7 +43,7 @@
     <div class="nav-label">Tipps &amp; Tricks</div>
     <div class="nav-group">
       <a href="#shortcuts"><span class="icon"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M224,48H32A16,16,0,0,0,16,64V192a16,16,0,0,0,16,16H224a16,16,0,0,0,16-16V64A16,16,0,0,0,224,48Zm0,144H32V64H224V192Zm-16-64a8,8,0,0,1-8,8H56a8,8,0,0,1,0-16H200A8,8,0,0,1,208,128Zm0-32a8,8,0,0,1-8,8H56a8,8,0,0,1,0-16H200A8,8,0,0,1,208,96ZM72,160a8,8,0,0,1-8,8H56a8,8,0,0,1,0-16h8A8,8,0,0,1,72,160Zm96,0a8,8,0,0,1-8,8H96a8,8,0,0,1,0-16h64A8,8,0,0,1,168,160Zm40,0a8,8,0,0,1-8,8h-8a8,8,0,0,1,0-16h8A8,8,0,0,1,208,160Z"/></svg></span>Tastenkürzel</a>
-      <a href="#context-menus"><span class="icon"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M88,24V16a8,8,0,0,1,16,0v8a8,8,0,0,1-16,0ZM16,104h8a8,8,0,0,0,0-16H16a8,8,0,0,0,0,16ZM124.42,39.16a8,8,0,0,0,10.74-3.58l8-16a8,8,0,0,0-14.31-7.16l-8,16A8,8,0,0,0,124.42,39.16Zm-96,81.69-16,8a8,8,0,0,0,7.16,14.31l16-8a8,8,0,1,0-7.16-14.31ZM219.31,184a16,16,0,0,1,0,22.63l-12.68,12.68a16,16,0,0,1-22.63,0L132.7,168,115,214.09c0,.1-.08.21-.13.32a15.83,15.83,0,0,1-14.6,9.59l-.79,0a15.83,15.83,0,0,1-14.41-11L32.8,52.92A16,16,0,0,1,52.92,32.8L213,85.07a16,16,0,0,1,1.41,29.8l-.32.13L168,132.69ZM208,195.31,156.69,144h0a16,16,0,0,1,4.93-26l.32-.14,45.95-17.64L48,48l52.2,159.86,17.65-46c0-.11.08-.22.13-.33a16,16,0,0,1,11.69-9.34,16.72,16.72,0,0,1,3-.28,16,16,0,0,1,11.3,4.69L195.31,208Z"/></svg></span>Kontextmenüs &amp; Mehrfachauswahl</a>
+      <a href="#context-menus"><span class="icon"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M88,24V16a8,8,0,0,1,16,0v8a8,8,0,0,1-16,0ZM16,104h8a8,8,0,0,0,0-16H16a8,8,0,0,0,0,16ZM124.42,39.16a8,8,0,0,0,10.74-3.58l8-16a8,8,0,0,0-14.31-7.16l-8,16A8,8,0,0,0,124.42,39.16Zm-96,81.69-16,8a8,8,0,0,0,7.16,14.31l16-8a8,8,0,1,0-7.16-14.31ZM219.31,184a16,16,0,0,1,0,22.63l-12.68,12.68a16,16,0,0,1-22.63,0L132.7,168,115,214.09c0,.1-.08.21-.13.32a15.83,15.83,0,0,1-14.6,9.59l-.79,0a15.83,15.83,0,0,1-14.41-11L32.8,52.92A16,16,0,0,1,52.92,32.8L213,85.07a16,16,0,0,1,1.41,29.8l-.32.13L168,132.69ZM208,195.31,156.69,144h0a16,16,0,0,1,4.93-26l.32-.14,45.95-17.64L48,48l52.2,159.86,17.65-46c0-.11.08-.22.13-.33a16,16,0,0,1,11.69-9.34,16.72,16.72,0,0,1,3-.28,16,16,0,0,1,11.3,4.69L195.31,208Z"/></svg></span>Schon gewusst?</a>
     </div>
   </nav>
   <main class="content">
@@ -288,6 +288,7 @@
         <div class="row"><div class="mk">•</div><div><b>Bearbeiten</b> korrigiert Text oder Zeitangaben.</div></div>
         <div class="row"><div class="mk">•</div><div>Songtexte ohne Zeitstempel werden als reiner Text angezeigt.</div></div>
         <div class="row"><div class="mk">•</div><div>Bei einem Instrumental <b>Als Instrumental markieren</b> wählen, damit Luminous die Suche einstellt.</div></div>
+        <div class="row"><div class="mk">•</div><div>Songtexte gibt es auch im <a href="#now-playing">Miniplayer</a>: Mit seiner Songtext-Schaltfläche statt des Covers den Live-Songtext anzeigen.</div></div>
       </div>
       <figure class="shot mw-640 mb-28">
         <img src="assets/de/screenshots/dark/lyrics.webp" alt="Synchronisierte Songtexte" width="1280" height="800" loading="lazy">
@@ -389,6 +390,9 @@
         <div class="tr"><code>%track3</code><div>Titelnummer, auf drei Stellen aufgefüllt</div></div>
         <div class="tr"><code>%rawtrack</code><div>Titelnummer genau wie im Tag gespeichert, ohne Auffüllen</div></div>
       </div>
+      <h2>Optionale Teile</h2>
+      <p class="mb-18">Alles in <b>{ }</b> wird nur geschrieben, wenn der Titel für eine Variable darin einen Wert hat. Sonst entfällt der ganze Teil, samt Text, Leerzeichen und Schrägstrichen in den Klammern. So ergibt <code>{%year - }%album</code> „2019 - Reservoir“ oder nur „Reservoir“ bei einem Titel ohne Jahr.</p>
+      <p class="mb-24">Außerhalb der Klammern wird ein fehlender Wert ersetzt: Unknown Artist, Unknown Album oder Unknown Genre, der Dateiname für den Titel, 1 für die Disc und 00 für die Tracknummer. Ein fehlendes Jahr bleibt leer, <code>%year - %album</code> ergäbe also „ - Reservoir“.</p>
       <h2>Beispiele</h2>
       <div class="table roomy mw-640 mb-8" style="--cols: 200px 1fr">
         <div class="tr"><code>%disc-%track</code><div>2-07</div></div>
@@ -617,6 +621,8 @@
     <section id="about" data-section>
       <div class="eyebrow">Einstellungen</div>
       <h1>Info &amp; Danksagungen</h1>
+      <p class="note">Hallo, ich bin Eric, der kanadische Senior-Softwareentwickler hinter Luminous. Ich arbeite sehr gern an dieser App und hoffe, dass man das merkt. Melde dich gern, sag Hallo und schick mir dein Feedback. Du findest mich unter <a href="https://esoltys.dev" target="_blank" rel="noopener">esoltys.dev</a>.</p>
+      <span class="signature" role="img" aria-label="Eric"></span>
       <p>Der Quellcode liegt auf <a href="https://github.com/esoltys/luminous" target="_blank" rel="noopener">GitHub</a>, mit den Danksagungen für jede von Luminous verwendete Bibliothek und der Lizenz, unter der es geteilt wird.</p>
       <figure class="shot mw-640 mb-28">
         <img src="assets/de/screenshots/dark/settings-about.webp" alt="Info &amp; Danksagungen" width="1280" height="950" loading="lazy">
@@ -625,12 +631,15 @@
 
     <section id="context-menus" data-section>
       <div class="eyebrow">Tipps &amp; Tricks</div>
-      <h1>Kontextmenüs &amp; Mehrfachauswahl</h1>
+      <h1>Schon gewusst?</h1>
+      <p>Fast alles in Luminous (Titel, Alben, Künstler, Wiedergabelisten, Genres, angeheftete Elemente) bietet per Rechtsklick weitere Optionen.</p>
       <div class="list">
-        <div class="row"><div class="mk">•</div><div>Mit der rechten Maustaste auf einen Titel klicken für Abspielen, Zur Wiedergabeliste hinzufügen, Zum Interpreten, Zum Album, Tags bearbeiten und mehr.</div></div>
-        <div class="row"><div class="mk">•</div><div>Mit der rechten Maustaste auf ein Album klicken für <b>Album abspielen</b>, <b>Zur Warteschlange hinzufügen</b>, <b>Albuminfo bearbeiten</b>, <b>In Picard öffnen</b>, <b>Teilen-Karte ...</b>, <b>An Start anheften</b> und <b>Nicht in Statistik einbeziehen</b>.</div></div>
-        <div class="row"><div class="mk">•</div><div>Mit Umschalt-Klick einen Bereich auswählen, mit Strg-Klick Zeilen hinzufügen und mit <kbd>Strg</kbd><kbd>A</kbd> alles in der Liste auswählen.</div></div>
-        <div class="row"><div class="mk">•</div><div>Bei ausgewählten Titeln bietet eine Symbolleiste <b>Ausgewählte abspielen</b>, <b>Zur Wiedergabeliste hinzufügen</b> und <b>Auswahl aufheben</b>.</div></div>
+        <div class="row"><div class="mk">•</div><div>Um Titel nach einem Feld zu sortieren, zuerst dessen Spalte einblenden: Rechtsklick auf einen Spaltenkopf, die Spalte einschalten, dann auf ihren Kopf klicken. Ein weiterer Klick kehrt die Reihenfolge um.</div></div>
+        <div class="row"><div class="mk">•</div><div>Rechtsklick auf das Herz markiert einen Titel als nicht gemocht. Ein weiterer Rechtsklick nimmt das zurück.</div></div>
+        <div class="row"><div class="mk">•</div><div>Doppelklick auf ein Album spielt es ab.</div></div>
+        <div class="row"><div class="mk">•</div><div>Mit Umschalt-Klick einen Bereich auswählen, mit Strg-Klick Zeilen hinzufügen und mit <kbd>Strg</kbd><kbd>A</kbd> alles in der Liste auswählen. Eine Symbolleiste bietet dann <b>Ausgewählte abspielen</b>, <b>Zur Wiedergabeliste hinzufügen</b> und <b>Auswahl aufheben</b>.</div></div>
+        <div class="row"><div class="mk">•</div><div>Dateien oder Ordner auf das Fenster ziehen, um sie sofort abzuspielen.</div></div>
+        <div class="row"><div class="mk">•</div><div>Mit <kbd>Alt</kbd><kbd>↑</kbd> oder <kbd>Alt</kbd><kbd>↓</kbd> ein angeheftetes Element in der Seitenleiste nach oben oder unten verschieben.</div></div>
       </div>
     </section>
   </main>

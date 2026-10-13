@@ -397,6 +397,19 @@ p, .p {
 .subnote { color: var(--color-text-secondary); font-size: 13px; margin-top: 2px; }
 .sublist { margin: 4px 0 0 -10px; padding-left: 20px; }
 
+/* Hand-signed note on About & Credits. The SVG is used as a mask so the
+   signature takes the theme's text colour in light and dark. */
+.note { max-width: 640px; }
+.signature {
+  display: block;
+  width: 120px;
+  aspect-ratio: 856 / 438;
+  margin: 4px 0 28px;
+  background: var(--color-text-primary);
+  -webkit-mask: url(signature.svg) no-repeat left center / contain;
+  mask: url(signature.svg) no-repeat left center / contain;
+}
+
 figure { margin: 0; }
 .shot {
   border-radius: 14px;
