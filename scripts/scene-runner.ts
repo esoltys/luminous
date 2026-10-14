@@ -14,7 +14,7 @@ export const ALL_SCHEMES: ColorScheme[] = ["light", "dark"];
 const SCENE_DEFAULTS = {
   theme: "system",
   layout: { sidebarOpen: true, rightPanelOpen: false, sidebarWidth: 64, immersive: false, miniplayer: false } satisfies SceneLayout,
-  viewport: { width: 1280, height: 800 },
+  viewport: { width: 1440, height: 900 },
   position: 176,
   featured: { song: "I Get Weak", artist: "Cannons", album: "Everything Glows" } satisfies Featured,
   settleMs: 400,

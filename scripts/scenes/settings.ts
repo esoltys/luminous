@@ -1,6 +1,6 @@
 import { defineScene } from "./types";
 
-const tall = (height: number) => ({ width: 1280, height });
+const tall = (height: number) => ({ width: 1440, height });
 
 export const settingsScenes = [
   defineScene({ name: "settings-general", file: "settings-general.png", view: { tab: "settings", settings: "general" } }),
@@ -20,7 +20,10 @@ export const settingsScenes = [
     view: { tab: "settings", settings: "equalizer" },
     viewport: tall(1500),
     position: 79,
-    run: async ({ api }) => api.screens.setEqualizerMode("graphic10"),
+    run: async ({ api }) => {
+      await api.screens.setEqualizerMode("graphic10");
+      await api.screens.selectEqualizerPreset("Pop"); // a real curve, not "Flat"
+    },
   }),
   defineScene({
     name: "equalizer-parametric",

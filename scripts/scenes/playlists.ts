@@ -16,7 +16,6 @@ export const playlistScenes = [
     file: "playlist-auto.png",
     view: { tab: "playlists", subTab: "auto" },
     layout: WIDE_SIDEBAR,
-    views: { playlistsAuto: "rows" },
   }),
   defineScene({
     name: "playlist-auto-detail",

@@ -1,10 +1,17 @@
 import { defineScene } from "./types";
-import { featuredSongId } from "./helpers";
+import { featuredSongId, restorePins, trimPinsToOneRow } from "./helpers";
 
 const WIDE_SIDEBAR = { sidebarWidth: 220 };
 
 export const collectionScenes = [
-  defineScene({ name: "home", file: "home.png", view: { tab: "home" }, layout: WIDE_SIDEBAR }),
+  defineScene({
+    name: "home",
+    file: "home.png",
+    view: { tab: "home" },
+    layout: WIDE_SIDEBAR,
+    run: trimPinsToOneRow,
+    cleanup: restorePins,
+  }),
   defineScene({ name: "albums", file: "albums.png", view: { tab: "collection", subTab: "albums" }, layout: WIDE_SIDEBAR }),
   defineScene({ name: "artists", file: "artists.png", view: { tab: "collection", subTab: "artists" }, layout: WIDE_SIDEBAR }),
   defineScene({ name: "songs", file: "songs.png", view: { tab: "collection", subTab: "songs" }, layout: WIDE_SIDEBAR }),
@@ -13,7 +20,8 @@ export const collectionScenes = [
     name: "artist-detail",
     file: "artist-detail.png",
     view: { tab: "collection", subTab: "artists" },
-    layout: WIDE_SIDEBAR,
+    // The info sidebar shows the artist's bio, links and concerts beside the page.
+    layout: { ...WIDE_SIDEBAR, rightPanelOpen: true },
     online: true,
     run: async ({ api, featured }) => api.navigate.artist(featured.artist!),
   }),

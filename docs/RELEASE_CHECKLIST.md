@@ -19,27 +19,37 @@ manual.
 - [ ] Update the user manual (`docs/user-guide/luminous-user-guide-{EN,FR,DE,ES,IT,RU,UK}.html`) for any
       user-facing changes. Edit every guide in the same change, and quote button and menu
       names exactly as that locale's catalog shows them (see [TRANSLATIONS.md](TRANSLATIONS.md)).
-- [ ] Regenerate screenshots for any changed views, with your own Luminous closed:
+- [ ] Regenerate screenshots, with your own Luminous closed. Library scenes come from a copy of
+      your real database (real stats, pins and playlists); the first-run scenes need an empty
+      profile, scanned from a music folder:
   ```bash
-  bun run take-scene-screenshots
+  bun run take-scene-screenshots --clone-profile
   ```
-  This drives the real app (setup in [TESTING.md](TESTING.md)'s "Scene screenshots"); use
-  `bun run take-screenshots` (mocked IPC, entries in `scripts/screenshot-scenes.json`) for
-  views that only exist there. Both capture every shipped locale into
-  `docs/user-guide/assets/<tag>/screenshots/{light,dark}/`; narrow a run with
-  `--name=<entry>` / `--locale=<tag>`. After replacing a PNG by hand, run
+  ```bash
+  bun run take-scene-screenshots --library <music-folder> --stage=fresh
+  ```
+  This drives the real app at 1440×900 (setup in [TESTING.md](TESTING.md)'s "Scene
+  screenshots") and captures every shipped locale into
+  `docs/user-guide/assets/<tag>/screenshots/{light,dark}/`. A full run takes about 25
+  minutes, so capture one locale first (`--locale=en-US`) and review it; `--name=<scene>`
+  narrows further. Don't edit files in this checkout while it runs: Vite reloads the page and
+  the run fails. `bun run take-screenshots` (mocked IPC, `scripts/screenshot-scenes.json`)
+  covers views that only exist there. After replacing a PNG by hand, run
   `bun run guide-webp`; `scripts/guide-assets.test.ts` fails if the embedded set exceeds
   its size budget. Read the resulting PNGs before committing — at least en-CA, en-US and
   one Cyrillic locale (ru or uk).
 - [ ] Write `docs/release-notes/vX.Y.Z.md` for the new version. Chores do not need to be listed in the release notes.
 - [ ] Prepare the Microsoft Store listing in `esoltys/luminous-store` (its own PR there):
-      - Copy screenshots into `assets/<store-lang>/screenshots/` as `N-Name-XX.png`. Each
-        Store language has one source locale: `en-us` ← `en-US`, `fr` ← `fr-CA` (the `fr`
-        listing serves every French market, written in Canadian French), and `de`, `es`,
-        `it`, `ru`, `uk` ← the same tag.
+      - Build the 1366×768 composites (wallpaper, headline, window) from the dark captures
+        above, which include the Store-only `store-*` scenes, with
+        `./New-StoreScreenshots.ps1 -GuideAssets <luminous>/docs/user-guide/assets` in that
+        repo. Its `store-screenshots.json` lists the shots, their scenes and the headline per
+        language. Each Store language has one source locale: `en-us` ← `en-US`, `fr` ←
+        `fr-CA` (the `fr` listing serves every French market, written in Canadian French), and
+        `de`, `es`, `it`, `ru`, `uk` ← the same tag. Read a few results before committing.
       - Update `ReleaseNotes` in every language column of `listing.csv`, and check that
-        `Description`, `Feature1..N` and the screenshot captions still match what ships. The
-        `en-us` column uses US spelling.
+        `Description`, `Feature1..N` and the screenshot captions (one per shot, in shot order)
+        still match what ships. The `en-us` column uses US spelling.
       - Dry-run `ConvertTo-Pdp.ps1` + `New-SubmissionPackage` (that repo's README, "Testing
         changes").
 

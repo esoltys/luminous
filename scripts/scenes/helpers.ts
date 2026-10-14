@@ -48,3 +48,33 @@ export async function hoverOver(ctx: SceneContext, selector: string): Promise<vo
 export async function unhover(ctx: SceneContext): Promise<void> {
   await hoverAt(ctx, 0, 0);
 }
+
+/** One row of pin cards on Home at the default 1440px width. */
+const PINS_SHOWN = 5;
+
+/**
+ * Unpins all but the first row of Home's pins, so the sections below them are in frame. Runs in a
+ * scene's profile (a clone or a throwaway), never the real one; `restorePins` puts them back.
+ */
+export async function trimPinsToOneRow({ driver }: SceneContext): Promise<void> {
+  await driver.evaluate(`(async () => {
+    const { pinnedStore } = await import("/src/lib/stores/pinned.svelte.ts");
+    const { pinnedRefKeyFor } = await import("/src/lib/types/index.ts");
+    await pinnedStore.refresh();
+    const extra = pinnedStore.items.slice(${PINS_SHOWN}).map((i) => [i.type, pinnedRefKeyFor(i)]);
+    window.__scenePinsTrimmed = { order: pinnedStore.items.map((i) => [i.type, pinnedRefKeyFor(i)]), extra };
+    for (const [type, key] of extra) await pinnedStore.unpin(type, key);
+  })()`);
+}
+
+/** Re-pins what `trimPinsToOneRow` removed, in the original order. */
+export async function restorePins({ driver }: SceneContext): Promise<void> {
+  await driver.evaluate(`(async () => {
+    const saved = window.__scenePinsTrimmed;
+    if (!saved) return;
+    const { pinnedStore } = await import("/src/lib/stores/pinned.svelte.ts");
+    for (const [type, key] of saved.extra) await pinnedStore.pin(type, key);
+    await pinnedStore.reorder(saved.order);
+    delete window.__scenePinsTrimmed;
+  })()`);
+}
