@@ -41,6 +41,7 @@ export type DriftChecks = [
 
 type Version = [number, number, number];
 const parse = (v: string) => v.split(".").map(Number) as Version;
+const compare = (a: Version, b: Version) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
 
 describe("Scripting contract", () => {
   describe("connect()", () => {
@@ -102,19 +103,14 @@ describe("Scripting contract", () => {
       for (let i = 1; i < versions.length; i++) {
         const [before, after] = [versions[i - 1], versions[i]];
         const [prev, next] = [parse(before), parse(after)];
+        const step = `${before} → ${after}`;
+        expect(compare(next, prev), `${step} must go up`).toBeGreaterThan(0);
         const removed = history[before].filter((m) => !(history[after] as string[]).includes(m));
         const added = history[after].filter((m) => !(history[before] as string[]).includes(m));
         const majorBump = next[0] > prev[0];
-        const minorBump = majorBump || (next[0] === prev[0] && next[1] > prev[1]);
-        expect({ step: `${before} → ${after}`, removedWithoutMajor: majorBump ? [] : removed }).toEqual({
-          step: `${before} → ${after}`,
-          removedWithoutMajor: [],
-        });
-        expect({ step: `${before} → ${after}`, addedWithoutMinor: minorBump ? [] : added }).toEqual({
-          step: `${before} → ${after}`,
-          addedWithoutMinor: [],
-        });
-        expect(prev[0] < next[0] || (prev[0] === next[0] && (prev[1] < next[1] || (prev[1] === next[1] && prev[2] < next[2])))).toBe(true);
+        const minorBump = majorBump || next[1] > prev[1];
+        if (!majorBump) expect(removed, `${step} removes methods without a major bump`).toEqual([]);
+        if (!minorBump) expect(added, `${step} adds methods without a minor bump`).toEqual([]);
       }
     });
   });

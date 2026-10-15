@@ -2,8 +2,9 @@
 // needs, in one file with no imports so another repo can vendor it as is.
 // Versioning policy (semver): adding a method bumps minor; removing or renaming one,
 // changing its signature, or changing when it resolves bumps major.
-// contract-history.json records each version's methods and contract.test.ts checks
-// the bumps against it (and that the app-type copies below haven't drifted); signature and resolve-condition changes are only caught in review.
+// contract-history.json records each version's methods, and contract.test.ts checks
+// the bumps against it and that the app-type copies below haven't drifted.
+// Signature and resolve-condition changes are only caught in review.
 
 /** Version of this contract. Callers pass their vendored copy to `connect()`. */
 export const SCRIPT_API_VERSION = "1.1.0";

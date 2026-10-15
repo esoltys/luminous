@@ -29,12 +29,16 @@ export function methodPaths(api: object, prefix = ""): string[] {
 
 /**
  * The handshake behind `connect()`: resolves the contract when SCRIPT_API_VERSION
- * satisfies the caret range of `requires` and every required capability is offered,
- * and otherwise throws one message naming everything that is wrong.
+ * satisfies the caret range of `requiredVersion` and every required capability is
+ * offered, and otherwise throws one message naming everything that is wrong.
  */
-export function negotiateContract(requires: string, required: readonly string[], offered: string[]): ScriptContract {
-  const needed = parseVersion(requires);
-  if (!needed) throw new Error(`connect() needs a version like "1", "1.2" or "1.2.3", not "${requires}".`);
+export function negotiateContract(
+  requiredVersion: string,
+  requiredCapabilities: readonly string[],
+  offered: string[]
+): ScriptContract {
+  const needed = parseVersion(requiredVersion);
+  if (!needed) throw new Error(`connect() needs a version like "1", "1.2" or "1.2.3", not "${requiredVersion}".`);
   const running = parseVersion(SCRIPT_API_VERSION)!;
 
   const problems: string[] = [];
@@ -42,7 +46,7 @@ export function negotiateContract(requires: string, required: readonly string[],
     const wanted = needed.join(".");
     problems.push(`does not satisfy ^${wanted} (needs ≥${wanted} <${needed[0] + 1}.0.0)`);
   }
-  const missing = required.filter((name) => !offered.includes(name));
+  const missing = requiredCapabilities.filter((name) => !offered.includes(name));
   if (missing.length > 0) problems.push(`lacks ${missing.join(", ")}`);
   if (problems.length > 0) throw new Error(`Luminous scripting API ${SCRIPT_API_VERSION} ${problems.join(" and ")}.`);
 
