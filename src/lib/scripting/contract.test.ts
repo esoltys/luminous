@@ -31,8 +31,11 @@ export type DriftChecks = [
   Assert<Equal<ScriptSettingsTab, SettingsTab>>,
   Assert<Equal<ScriptAutoPlaylistKind, AutoPlaylistRef["kind"]>>,
   Assert<Equal<ScriptSongColumn, keyof VisibleColumns>>,
-  // The contract promises a subset of the real song and playback snapshot.
+  // The contract promises a subset of the real song and playback snapshot: every field
+  // it names must still exist (a dropped optional field would stay assignable) and fit.
+  Assert<Equal<Exclude<keyof ScriptSong, keyof Song>, never>>,
   Assert<Song extends ScriptSong ? true : false>,
+  Assert<Equal<Exclude<keyof ScriptPlaybackState, keyof PlaybackState>, never>>,
   Assert<PlaybackState extends ScriptPlaybackState ? true : false>,
 ];
 
@@ -89,8 +92,9 @@ describe("Scripting contract", () => {
 
     it("ends at the current version with exactly the live surface", () => {
       expect(versions.at(-1)).toBe(SCRIPT_API_VERSION);
-      // If this fails, add a new ledger entry for the new surface and bump
+      // If this fails, append a ledger entry for the new surface and bump
       // SCRIPT_API_VERSION in types.ts: minor for additions, major for removals.
+      // Editing the newest entry in place instead of appending passes; review catches that.
       expect(history[SCRIPT_API_VERSION as keyof typeof history]).toEqual(methodPaths(createScriptingApi()));
     });
 

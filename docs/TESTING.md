@@ -96,7 +96,7 @@ Dev builds expose the scripting API that scenes and external capture tools drive
 - `src/lib/scripting/types.ts` is the whole contract, with no imports, so another repo can vendor the file as is. It holds `SCRIPT_API_VERSION`.
 - Call `connect(requires, capabilities?)` once before anything else, passing the vendored `SCRIPT_API_VERSION`. It resolves `{ version, capabilities }`, where capabilities are the dotted method paths (`wait.settled`, `dialogs.welcome.show`). It rejects with one message naming the range needed (caret: same major, at least that minor), the running version and any missing capabilities.
 - Policy: adding a method bumps minor. Removing or renaming one, or changing its signature or when it resolves, bumps major.
-- `src/lib/scripting/contract-history.json` is an append-only ledger of each version's method paths. `contract.test.ts` fails when the live surface doesn't match its newest entry, or when an entry removes a method without a major bump or adds one without a minor bump. When you change the surface, add an entry; never edit an old one. The ledger can't see signature or resolve-condition changes, so review enforces those bumps.
+- `src/lib/scripting/contract-history.json` is an append-only ledger of each version's method paths. `contract.test.ts` fails when the live surface doesn't match its newest entry, or when any step recorded in the ledger removes a method without a major bump or adds one without a minor bump. When you change the surface, append an entry. Review enforces what the test can't see: editing the newest entry in place instead of appending, and signature or resolve-condition changes.
 
 ### Scene screenshots (`bun run take-scene-screenshots`)
 
