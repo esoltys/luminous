@@ -571,20 +571,6 @@ impl AudioEngine {
         self.shared.output_config.read().clone()
     }
 
-    /// Open the hardware control panel for the currently configured ASIO driver.
-    pub fn open_asio_control_panel(&self) -> Result<(), String> {
-        let dev = self.shared.output_config.read().device_id.clone();
-        #[cfg(windows)]
-        {
-            crate::asio::open_asio_control_panel_by_clsid(dev.as_deref().unwrap_or_default())
-        }
-        #[cfg(not(windows))]
-        {
-            let _ = dev;
-            Err("ASIO is only supported on Windows".to_string())
-        }
-    }
-
     /// The engine's event stream, handed out once: the first call returns
     /// it, later calls `None`. Drain it on a dedicated thread (blocking on
     /// `Receiver::iter()`), not while holding a lock on the engine.
