@@ -976,8 +976,7 @@ pub fn register_webdav_auth_resolver(
 }
 
 /// Open a playable media source. Local files or remote HTTP/WebDAV endpoints (#682).
-/// Shared with the offline analyzers (`analyzer::decode_all_samples`,
-/// `loudness::decode_channels`) so waveform/band-waveform generation and R128
+/// Shared with `OfflineDecoder` so waveform/band-waveform generation and R128
 /// loudness analysis also work against WebDAV songs, not just live playback.
 pub(crate) fn open_media_source(path: &str) -> Result<Box<dyn MediaSource>, String> {
     if path.starts_with(crate::subsonic::URI_SCHEME) {
@@ -998,6 +997,83 @@ pub(crate) fn open_media_source(path: &str) -> Result<Box<dyn MediaSource>, Stri
         let file =
             std::fs::File::open(path).map_err(|e| format!("Cannot open file '{path}': {e}"))?;
         Ok(Box::new(file))
+    }
+}
+
+/// Whole-file decode for offline analysis (waveform peaks, R128 loudness):
+/// runs as fast as the CPU allows, with none of playback's pacing, seeking or
+/// resampling. Open it, read `sample_rate()`, then drive `decode_blocks`.
+pub(crate) struct OfflineDecoder {
+    format: Box<dyn FormatReader>,
+    decoder: Box<dyn AudioDecoder>,
+    track_id: u32,
+    sample_rate: u32,
+}
+
+impl OfflineDecoder {
+    /// Open and probe `path` (local or remote, via `open_media_source`) and
+    /// build a decoder for its default audio track.
+    pub(crate) fn open(path: &Path) -> Result<Self> {
+        let source = open_media_source(&path.to_string_lossy()).map_err(|e| anyhow!(e))?;
+        let mss = MediaSourceStream::new(source, Default::default());
+        let format = symphonia::default::get_probe()
+            .probe(
+                &Hint::new(),
+                mss,
+                FormatOptions::default(),
+                MetadataOptions::default(),
+            )
+            .map_err(|e| anyhow!("format probe failed: {e}"))?;
+        let track = format
+            .default_track(TrackType::Audio)
+            .ok_or_else(|| anyhow!("no active audio track found"))?;
+        let track_id = track.id;
+        let audio_params = track
+            .codec_params
+            .as_ref()
+            .and_then(|c| c.audio())
+            .ok_or_else(|| anyhow!("no audio codec parameters"))?;
+        let sample_rate = audio_params.sample_rate.unwrap_or(44100);
+        let decoder = CODEC_REGISTRY
+            .make_audio_decoder(audio_params, &AudioDecoderOptions::default())
+            .map_err(|e| anyhow!("failed to create decoder: {e}"))?;
+        Ok(Self {
+            format,
+            decoder,
+            track_id,
+            sample_rate,
+        })
+    }
+
+    pub(crate) fn sample_rate(&self) -> u32 {
+        self.sample_rate
+    }
+
+    /// Decode to the end, handing each decoded packet to `on_block` as planar
+    /// f32 channels: at most `max_channels`, all the same length. The planes
+    /// are a scratch buffer reused for the next packet, so callers accumulate
+    /// what they need rather than the whole file being held here. Corrupt
+    /// packets are skipped; any other error ends the decode early with
+    /// whatever was delivered so far.
+    pub(crate) fn decode_blocks(
+        mut self,
+        max_channels: usize,
+        mut on_block: impl FnMut(&[Vec<f32>]),
+    ) {
+        let mut planes: Vec<Vec<f32>> = Vec::new();
+        while let Ok(Some(packet)) = self.format.next_packet() {
+            if packet.track_id != self.track_id {
+                continue;
+            }
+            match self.decoder.decode(&packet) {
+                Ok(decoded) => {
+                    decoded.copy_to_vecs_planar(&mut planes);
+                    on_block(&planes[..planes.len().min(max_channels)]);
+                }
+                Err(SymphoniaError::DecodeError(_)) => continue,
+                Err(_) => break,
+            }
+        }
     }
 }
 
@@ -2679,6 +2755,38 @@ impl Resampler {
 
         output
     }
+}
+
+/// Writes a 16-bit PCM WAV with one `Vec` of samples per channel (all the
+/// same length), for tests that need a real file on the offline decode path.
+#[cfg(test)]
+pub(crate) fn write_test_pcm16_wav(path: &Path, sample_rate: u32, channels: &[Vec<i16>]) {
+    let channel_count = channels.len() as u16;
+    let frames = channels.first().map_or(0, Vec::len);
+    let block_align = channel_count * 2;
+    let mut data = Vec::with_capacity(frames * block_align as usize);
+    for frame in 0..frames {
+        for channel in channels {
+            data.extend_from_slice(&channel[frame].to_le_bytes());
+        }
+    }
+
+    let mut wav = Vec::with_capacity(44 + data.len());
+    wav.extend_from_slice(b"RIFF");
+    wav.extend_from_slice(&(36 + data.len() as u32).to_le_bytes());
+    wav.extend_from_slice(b"WAVE");
+    wav.extend_from_slice(b"fmt ");
+    wav.extend_from_slice(&16u32.to_le_bytes());
+    wav.extend_from_slice(&1u16.to_le_bytes()); // PCM
+    wav.extend_from_slice(&channel_count.to_le_bytes());
+    wav.extend_from_slice(&sample_rate.to_le_bytes());
+    wav.extend_from_slice(&(sample_rate * block_align as u32).to_le_bytes());
+    wav.extend_from_slice(&block_align.to_le_bytes());
+    wav.extend_from_slice(&16u16.to_le_bytes());
+    wav.extend_from_slice(b"data");
+    wav.extend_from_slice(&(data.len() as u32).to_le_bytes());
+    wav.extend_from_slice(&data);
+    std::fs::write(path, wav).expect("failed to write test wav fixture");
 }
 
 #[cfg(test)]

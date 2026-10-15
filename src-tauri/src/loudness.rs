@@ -2,8 +2,8 @@
 //! analysis, with a ReplayGain 2.0 tag fallback for tracks not yet analyzed.
 //!
 //! A low-priority background thread (`spawn_background_analyzer`) decodes
-//! each not-yet-analyzed local track once (reusing the offline Symphonia
-//! decode path, same pattern as the band_waveform/waveform analyzers) and writes
+//! each not-yet-analyzed local track once (through `audio::OfflineDecoder`,
+//! the same decode path as the band_waveform/waveform analyzers) and writes
 //! `songs.ebur128_integrated_loudness_lufs`. Playback consults, in order:
 //! measured R128 loudness -> ReplayGain tag (track or album, per settings) ->
 //! a fixed fallback gain. The resulting linear multiplier is written to
@@ -142,96 +142,36 @@ pub fn compute_gain(
 // EBU R128 / BS.1770 analysis
 // ---------------------------------------------------------------------------
 
-/// Decode an entire audio file, deinterleaved per channel (capped at stereo —
-/// BS.1770 channel weighting beyond L/R is a rare-surround edge case not
-/// worth the added complexity here). Mirrors `analyzer::decode_all_samples`'s
-/// decode loop but keeps channels separate instead of downmixing to mono.
-fn decode_channels(path: &Path) -> Result<(Vec<Vec<f32>>, u32)> {
-    use symphonia::core::{
-        codecs::audio::AudioDecoderOptions,
-        errors::Error as SymphoniaError,
-        formats::{probe::Hint, FormatOptions, TrackType},
-        io::MediaSourceStream,
-        meta::MetadataOptions,
-    };
-
-    let source = crate::audio::open_media_source(&path.to_string_lossy())
-        .map_err(|e| anyhow!("failed to open audio file for R128 analysis: {e}"))?;
-    let mss = MediaSourceStream::new(source, Default::default());
-
-    let mut format = symphonia::default::get_probe()
-        .probe(
-            &Hint::new(),
-            mss,
-            FormatOptions::default(),
-            MetadataOptions::default(),
-        )
-        .context("format probe failed during R128 analysis")?;
-
-    let track = format
-        .default_track(TrackType::Audio)
-        .cloned()
-        .ok_or_else(|| anyhow!("no active audio track found for R128 analysis"))?;
-
-    let track_id = track.id;
-    let audio_params = track
-        .codec_params
-        .as_ref()
-        .and_then(|c| c.audio())
-        .ok_or_else(|| anyhow!("no audio codec parameters for R128 analysis"))?;
-    let sample_rate = audio_params.sample_rate.unwrap_or(44100);
-
-    let mut decoder = crate::codecs::CODEC_REGISTRY
-        .make_audio_decoder(audio_params, &AudioDecoderOptions::default())
-        .context("failed to create decoder for R128 analysis")?;
-
-    let mut out_channels: Vec<Vec<f32>> = Vec::new();
-
-    while let Ok(Some(packet)) = format.next_packet() {
-        if packet.track_id != track_id {
-            continue;
-        }
-        match decoder.decode(&packet) {
-            Ok(decoded) => {
-                let channels = decoded.spec().channels().count().max(1);
-                let out_count = channels.min(2);
-                if out_channels.is_empty() {
-                    out_channels = vec![Vec::new(); out_count];
-                }
-                let mut decoded_samples: Vec<f32> = Vec::new();
-                decoded.copy_to_vec_interleaved(&mut decoded_samples);
-
-                for chunk in decoded_samples.chunks(channels) {
-                    for (c, out) in out_channels.iter_mut().enumerate() {
-                        out.push(chunk[c]);
-                    }
-                }
-            }
-            Err(SymphoniaError::DecodeError(_)) => continue,
-            Err(_) => break,
-        }
-    }
-
-    Ok((out_channels, sample_rate))
-}
-
 /// Analyze a track's integrated loudness (LUFS) per ITU-R BS.1770-4.
+/// Channels beyond L/R are not measured: BS.1770 surround weighting is a
+/// rare edge case not worth the added complexity here. Samples stream
+/// straight into the meters, so memory doesn't grow with the track's length.
 pub fn analyze_integrated_loudness(path: &Path) -> Result<f64> {
-    let (channels, sample_rate) = decode_channels(path)?;
+    let decoder = crate::audio::OfflineDecoder::open(path)
+        .context("failed to open audio file for R128 analysis")?;
+    let sample_rate = decoder.sample_rate();
+    // One meter per channel, sized by the first decoded packet.
+    let mut meters: Vec<bs1770::ChannelLoudnessMeter> = Vec::new();
+    decoder.decode_blocks(2, |planes| {
+        if meters.is_empty() {
+            meters = planes
+                .iter()
+                .map(|_| bs1770::ChannelLoudnessMeter::new(sample_rate))
+                .collect();
+        }
+        for (meter, plane) in meters.iter_mut().zip(planes) {
+            meter.push(plane.iter().copied());
+        }
+    });
 
-    let loudness_lkfs = match channels.len() {
-        0 => return Err(anyhow!("no decodable audio channels")),
-        1 => {
-            let mut meter = bs1770::ChannelLoudnessMeter::new(sample_rate);
-            meter.push(channels[0].iter().copied());
-            let windows = meter.into_100ms_windows();
+    let mut meters = meters.into_iter();
+    let loudness_lkfs = match (meters.next(), meters.next()) {
+        (None, _) => return Err(anyhow!("no decodable audio channels")),
+        (Some(mono), None) => {
+            let windows = mono.into_100ms_windows();
             bs1770::gated_mean(windows.as_ref()).loudness_lkfs()
         }
-        _ => {
-            let mut left = bs1770::ChannelLoudnessMeter::new(sample_rate);
-            left.push(channels[0].iter().copied());
-            let mut right = bs1770::ChannelLoudnessMeter::new(sample_rate);
-            right.push(channels[1].iter().copied());
+        (Some(left), Some(right)) => {
             let stereo = bs1770::reduce_stereo(
                 left.into_100ms_windows().as_ref(),
                 right.into_100ms_windows().as_ref(),
@@ -352,6 +292,31 @@ pub fn spawn_background_analyzer(app: AppHandle, db: Arc<Database>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn sine(freq_hz: f32, amplitude: f32, sample_rate: u32, seconds: u32) -> Vec<i16> {
+        (0..sample_rate * seconds)
+            .map(|i| {
+                let t = i as f32 / sample_rate as f32;
+                (amplitude * (2.0 * std::f32::consts::PI * freq_hz * t).sin() * 32_767.0) as i16
+            })
+            .collect()
+    }
+
+    /// Pinned against the measurement made before the decode loop was shared
+    /// with the waveform path (#1555): a stereo file with a different tone on
+    /// each side, so a swapped, dropped or downmixed channel would move it.
+    #[test]
+    fn analyze_integrated_loudness_measures_both_stereo_channels() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("stereo.wav");
+        let left = sine(1_000.0, 0.5, 48_000, 3);
+        let right = sine(250.0, 0.125, 48_000, 3);
+        crate::audio::write_test_pcm16_wav(&path, 48_000, &[left, right]);
+
+        let lufs = analyze_integrated_loudness(&path).expect("analysis");
+
+        assert!((lufs - -8.807_231_903_076).abs() < 1e-6, "{lufs}");
+    }
 
     fn settings(target_lufs: f32, mode: LoudnessMode, fallback_gain_db: f32) -> LoudnessSettings {
         LoudnessSettings {
