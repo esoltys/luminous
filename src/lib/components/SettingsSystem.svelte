@@ -237,6 +237,17 @@
     prefs.audioOutputDevices.filter((d) => d.backend === prefs.audioOutputConfig.backend)
   );
 
+  let selectedDeviceId = $derived.by(() => {
+    const id = prefs.audioOutputConfig.device_id;
+    if (prefs.audioOutputConfig.backend === "asio") {
+      if (id && currentBackendDevices.some((d) => d.id === id)) {
+        return id;
+      }
+      return currentBackendDevices.length > 0 ? currentBackendDevices[0].id : "";
+    }
+    return id ?? "";
+  });
+
   async function handleBackendChange(backend: "cpal" | "asio") {
     const devices = prefs.audioOutputDevices.filter((d) => d.backend === backend);
     const newDeviceId = backend === "asio" && devices.length > 0 ? devices[0].id : null;
@@ -395,7 +406,7 @@
     {:else}
       <Select
         id="audio-device-select"
-        value={prefs.audioOutputConfig.device_id ?? ""}
+        value={selectedDeviceId}
         onchange={(e) => handleDeviceChange(e.currentTarget.value || null)}
         class="shrink-0 max-w-[280px] bg-brand-main border border-brand-border hover:border-brand-accent/60 text-brand-text-primary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium truncate"
       >

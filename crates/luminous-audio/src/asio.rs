@@ -131,10 +131,15 @@ mod imp {
 
     pub fn open_asio_control_panel_by_clsid(clsid_str: &str) -> Result<(), String> {
         let all = Metadata::enumerate().map_err(|e| format!("Registry enumeration failed: {e:?}"))?;
-        let meta = all
-            .into_iter()
-            .find(|m| format!("{:?}", m.clsid) == clsid_str || m.description.to_string_lossy() == clsid_str)
-            .ok_or_else(|| format!("ASIO driver not found: {clsid_str}"))?;
+        let meta = if clsid_str.is_empty() {
+            all.into_iter()
+                .next()
+                .ok_or_else(|| "No ASIO drivers registered on this system".to_string())?
+        } else {
+            all.into_iter()
+                .find(|m| format!("{:?}", m.clsid) == clsid_str || m.description.to_string_lossy() == clsid_str)
+                .ok_or_else(|| format!("ASIO driver not found: {clsid_str}"))?
+        };
 
         let host = azo::Host::new();
         let proxy = host
@@ -290,6 +295,11 @@ mod imp {
             .channel_info(ch0)
             .map_err(|e| format!("Failed to query channel info: {e:?}"))?;
         let sample_format: AsioSampleFormat = sample_info.sample_type.into();
+        if !sample_format.is_supported() {
+            return Err(format!(
+                "ASIO driver '{device_name}' uses unsupported sample format: {sample_format:?}"
+            ));
+        }
 
         let buffer_size_info = proxy
             .buffer_size()

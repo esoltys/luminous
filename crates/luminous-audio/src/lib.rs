@@ -1572,26 +1572,35 @@ fn check_and_rebuild_output(
     event_tx: &mpsc::Sender<AudioEvent>,
 ) -> DeviceCheckOutcome {
     let now = std::time::Instant::now();
-    let check_due =
-        now.duration_since(session.last_device_check) >= std::time::Duration::from_millis(500);
+    let force_rebuild = std::mem::take(&mut session.force_device_rebuild);
     let stream_errored = output
         .as_ref()
         .map(|o| o.stream_error_flag.load(Ordering::Relaxed))
         .unwrap_or(false);
 
-    if stream_errored || check_due {
+    let output_cfg = shared.output_config.read().clone();
+    let is_tracking_default =
+        output_cfg.backend == AudioBackendKind::Cpal && output_cfg.device_id.is_none();
+
+    let check_due =
+        now.duration_since(session.last_device_check) >= std::time::Duration::from_millis(500);
+
+    let default_changed = if is_tracking_default && (check_due || stream_errored) {
         session.last_device_check = now;
         let current_dev_name = get_default_device_name();
         let old_dev_name = output.as_ref().and_then(|o| o.device_name.clone());
-        let device_changed = current_dev_name != old_dev_name;
+        current_dev_name != old_dev_name
+    } else {
+        if check_due {
+            session.last_device_check = now;
+        }
+        false
+    };
 
-        if stream_errored || device_changed {
-            log::info!(
-                "Audio output device change/error detected (old: {:?}, new: {:?}, errored: {}). Rebuilding audio stream...",
-                old_dev_name,
-                current_dev_name,
-                stream_errored
-            );
+    if force_rebuild || stream_errored || default_changed {
+        log::info!(
+            "Audio output rebuild triggered (forced: {force_rebuild}, errored: {stream_errored}, default_changed: {default_changed}). Rebuilding audio stream..."
+        );
 
             let cur_pos = shared.position.load(Ordering::Relaxed);
             // Position still belongs to the finished track while a transition
@@ -1698,7 +1707,7 @@ fn check_and_rebuild_output(
                 }
             }
         }
-    }
+
     DeviceCheckOutcome::Ok
 }
 

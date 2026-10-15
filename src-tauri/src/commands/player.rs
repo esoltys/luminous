@@ -698,12 +698,18 @@ pub async fn open_asio_control_panel(
     state: State<'_, AppState>,
     device_id: Option<String>,
 ) -> Result<(), String> {
-    if let Some(id) = device_id.filter(|s| !s.is_empty()) {
-        luminous_audio::asio::open_asio_control_panel_by_clsid(&id)
-    } else {
-        let audio = state.audio.lock().await;
-        audio.open_asio_control_panel()
-    }
+    let dev = match device_id.filter(|s| !s.is_empty()) {
+        Some(id) => Some(id),
+        None => {
+            let audio = state.audio.lock().await;
+            audio.output_config().device_id
+        }
+    };
+    tokio::task::spawn_blocking(move || {
+        luminous_audio::asio::open_asio_control_panel_by_clsid(dev.as_deref().unwrap_or_default())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[cfg(test)]
