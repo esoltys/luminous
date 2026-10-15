@@ -61,12 +61,3 @@ body:
       placeholder: Drag and drop images or paste log text here.
     validations:
       required: false
-
-  - type: textarea
-    id: dev_notes
-    attributes:
-      label: Technical Context / Suggested Fix (Optional)
-      description: If you've looked at the source code, feel free to link files or suggest a fix here!
-      placeholder: File paths, root cause thoughts, or proposed code changes...
-    validations:
-      required: false
