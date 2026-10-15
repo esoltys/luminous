@@ -256,9 +256,13 @@ pub fn load_auth(conn: &rusqlite::Connection, server_id: i64) -> Result<Option<(
 pub fn resolve_stream_url(conn: &rusqlite::Connection, path: &str) -> Result<String> {
     let (server_id, track_id) =
         parse_track_uri(path).ok_or_else(|| anyhow!("Invalid Subsonic track path '{path}'"))?;
-    let (url, auth) = load_auth(conn, server_id)?
+    // Every error names the track by `path` (never the signed URL), so the
+    // opener can pass them through without wrapping them again.
+    let (url, auth) = load_auth(conn, server_id)
+        .with_context(|| format!("Couldn't read the Subsonic server for '{path}'"))?
         .ok_or_else(|| anyhow!("The Subsonic server for '{path}' has been removed"))?;
     stream_url(&url, &auth, &track_id)
+        .with_context(|| format!("Couldn't build a stream URL for '{path}'"))
 }
 
 // ---------------------------------------------------------------------------

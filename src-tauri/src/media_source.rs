@@ -54,8 +54,9 @@ fn open_with(
 ) -> Result<Box<dyn MediaSource>, String> {
     if location.starts_with(crate::subsonic::URI_SCHEME) {
         // Signed fresh on every open; the URL itself never leaves this
-        // function, and errors name the track by its `subsonic://` path.
-        let url = sign_subsonic(location).map_err(|e| format!("Can't play '{location}': {e}"))?;
+        // function. The signer's errors already name the track by its
+        // `subsonic://` path, and the UI prefixes the song title.
+        let url = sign_subsonic(location)?;
         Ok(Box::new(HttpRangeReader::new_with_label(&url, location)?))
     } else if location.starts_with("http://") || location.starts_with("https://") {
         let (url, embedded) = extract_basic_auth(location);
@@ -592,15 +593,19 @@ mod tests {
     }
 
     #[test]
-    fn open_media_source_names_the_track_when_subsonic_resolution_fails() {
+    /// The signer already names the track; wrapping its error again showed
+    /// the `subsonic://` path twice in the skipped-track toast.
+    fn subsonic_signing_errors_pass_through_unwrapped() {
         let err = open_with(
             "subsonic://4/abc",
-            |_| Err("The Subsonic server has been removed".into()),
+            |path| Err(format!("The Subsonic server for '{path}' has been removed")),
             |_| None,
         )
         .err()
         .expect("resolution failure must surface");
-        assert!(err.contains("subsonic://4/abc"), "{err}");
-        assert!(err.contains("has been removed"), "{err}");
+        assert_eq!(
+            err,
+            "The Subsonic server for 'subsonic://4/abc' has been removed"
+        );
     }
 }
