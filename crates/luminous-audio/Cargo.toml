@@ -22,6 +22,10 @@ rustfft.workspace = true
 parking_lot.workspace = true
 log.workspace = true
 anyhow.workspace = true
+serde = { workspace = true, features = ["derive"] }
+
+[target.'cfg(windows)'.dependencies]
+azo = "0.5"
 
 [features]
 # Exposes `write_test_pcm16_wav` to the app crate's tests.
