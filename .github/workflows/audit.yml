@@ -18,55 +18,16 @@ permissions:
 
 jobs:
   security_audit:
-    name: Cargo Security Audit
+    name: Cargo Security & Licence Audit
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      # rustsec/audit-check installs cargo-audit via a plain `cargo install
-      # cargo-audit` with no version pin and no --locked, so it re-resolves
-      # cargo-audit's own dependencies fresh. That currently pulls tinyvec
-      # 1.13.0, which fails to compile on the runner's Rust toolchain
-      # (upstream tinyvec/rustc edition-resolution bug). Installing here
-      # with --locked (using cargo-audit's own tested Cargo.lock, which
-      # pins an older working tinyvec) puts a working binary on PATH first,
-      # so the action's own install step just finds and reuses it.
-      - name: Install cargo-audit
-        run: cargo install cargo-audit --locked
-
-      - name: Security audit Cargo.lock
-        uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2.0.0
+      - name: Cargo Deny Check (Security, Licences, Sources)
+        uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          # These are informational "unmaintained"/"unsound" advisories, not
-          # vulnerabilities, all coming from transitive deps we don't control
-          # directly: Tauri's Linux webview stack (webkit2gtk/tray-icon still
-          # pull the archived gtk-rs 0.18 GTK3 bindings) and souvlaki's MPRIS
-          # backend (zbus 3.x, itself pulling `derivative`/`instant`).
-          # Re-check and prune this list whenever those upstreams move off
-          # the flagged crates.
-          ignore: >-
-            RUSTSEC-2024-0413,
-            RUSTSEC-2024-0416,
-            RUSTSEC-2024-0388,
-            RUSTSEC-2024-0412,
-            RUSTSEC-2024-0418,
-            RUSTSEC-2024-0411,
-            RUSTSEC-2024-0417,
-            RUSTSEC-2024-0414,
-            RUSTSEC-2024-0415,
-            RUSTSEC-2024-0420,
-            RUSTSEC-2024-0419,
-            RUSTSEC-2024-0384,
-            RUSTSEC-2024-0436,
-            RUSTSEC-2024-0370,
-            RUSTSEC-2025-0081,
-            RUSTSEC-2025-0075,
-            RUSTSEC-2025-0080,
-            RUSTSEC-2025-0100,
-            RUSTSEC-2025-0098,
-            RUSTSEC-2024-0429
+          command: check
 
   lockfile_check:
     name: Lockfile Drift Check

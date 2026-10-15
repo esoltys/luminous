@@ -113,6 +113,7 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config libayatana-appind
 - **Architecture-invariant lint** (ast-grep rules in `ast-grep/rules/`): `bun run lint:ast`
 - **Frontend tests**: `bun run test:run` (Vitest)
 - **Backend tests**: `cargo test --workspace` (from the repo root, so the `crates/` members run too)
+- **Cargo security & licence audit**: `bun run audit:cargo` (or `cargo deny check`)
 - **Windows UI automation smoke test** (real backend/IPC/SQLite, Windows only): `bun run test:e2e:windows`. One-time setup needed — see [docs/TESTING.md](docs/TESTING.md).
 - **Release build**: `bun run tauri build`
 - **MSIX build (Windows)**: `bun run tauri:windows:build`, but only after `bun run tauri build` (or a `cargo build --release`) has produced the exe — and only with `CARGO_TARGET_DIR` set to the workspace-root `target/` dir, or it looks in the wrong place. See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
