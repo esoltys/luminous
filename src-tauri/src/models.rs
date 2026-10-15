@@ -1728,4 +1728,23 @@ mod tests {
         );
         assert_eq!(value["autoPlaylist"]["trackCount"], 3);
     }
+
+    /// The settings UI reads these bounds over IPC; their JSON shape is a
+    /// frontend contract, pinned here so moving the EQ's ranges into their own
+    /// crate (#1554) can't change it.
+    #[test]
+    fn audio_setting_ranges_json_shape_is_pinned() {
+        assert_eq!(
+            serde_json::to_string(&AUDIO_SETTING_RANGES).unwrap(),
+            concat!(
+                r#"{"target_lufs":{"min":-23.0,"max":-9.0},"#,
+                r#""fallback_gain_db":{"min":-12.0,"max":0.0},"#,
+                r#""fade_pause_duration_ms":{"min":0.0,"max":1000.0},"#,
+                r#""crossfade_auto_duration_secs":{"min":0.0,"max":8.0},"#,
+                r#""eq":{"freq":{"min":20.0,"max":20000.0},"gain_db":{"min":-20.0,"max":20.0},"#,
+                r#""q":{"min":0.1,"max":10.0},"preamp":{"min":-24.0,"max":12.0},"#,
+                r#""max_bands":20,"min_bands":1}}"#,
+            )
+        );
+    }
 }

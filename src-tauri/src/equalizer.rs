@@ -1510,4 +1510,39 @@ mod tests {
         assert!(sub_bass > 3.0, "bass boost at 31.5Hz was {sub_bass} dB");
         assert!(treble < sub_bass, "bass was not higher than treble");
     }
+
+    /// `EqualizerConfig` crosses IPC and its bands are stored as JSON in
+    /// SQLite, so its serialized shape is a contract (#1554).
+    #[test]
+    fn config_json_shape_is_pinned() {
+        let config = EqualizerConfig {
+            enabled: true,
+            mode: EqMode::Parametric,
+            gains: [1.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -2.0],
+            preamp: -3.5,
+            parametric: vec![
+                band(ParametricKind::LowShelf, 60.0, 4.0, 0.5),
+                ParametricBand {
+                    enabled: false,
+                    ..band(ParametricKind::HighShelf, 8000.0, -2.0, 1.0)
+                },
+            ],
+            active_preset: Some("user:3".into()),
+        };
+        let json = serde_json::to_string(&config).unwrap();
+        assert_eq!(
+            json,
+            concat!(
+                r#"{"enabled":true,"mode":"parametric","#,
+                r#""gains":[1.5,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,-2.0],"preamp":-3.5,"#,
+                r#""parametric":[{"kind":"low_shelf","freq":60.0,"gain_db":4.0,"q":0.5,"enabled":true},"#,
+                r#"{"kind":"high_shelf","freq":8000.0,"gain_db":-2.0,"q":1.0,"enabled":false}],"#,
+                r#""active_preset":"user:3"}"#,
+            )
+        );
+        assert_eq!(
+            serde_json::from_str::<EqualizerConfig>(&json).unwrap(),
+            config
+        );
+    }
 }
