@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { createScriptingApi, installScriptingApi } from "./index";
+import { createScriptingApi, installScriptingApi, SCRIPT_API_VERSION } from "./index";
 import { registerDialogHostControls } from "./dialogs";
 import { createScreensController, registerScreenHook } from "./screens";
 import { createWaitController } from "./wait";
@@ -37,7 +37,7 @@ describe("In-app scripting API", () => {
   describe("Assembly and Installation", () => {
     it("creates an API instance with expected deep controllers and version", () => {
       const api = createScriptingApi();
-      expect(api.version).toBe("1.0.0");
+      expect(api.version).toBe(SCRIPT_API_VERSION);
       expect(api.navigate).toBeDefined();
       expect(api.playback).toBeDefined();
       expect(api.appearance).toBeDefined();
@@ -214,6 +214,13 @@ describe("In-app scripting API", () => {
       await api.appearance.setLocale("fr-CA");
       expect(setLocaleSpy).toHaveBeenCalledWith("fr-CA");
       expect(i18n.currentLocale).toBe("fr-CA");
+    });
+
+    it("rejects a locale the app doesn't ship without touching the current one", async () => {
+      const api = createScriptingApi();
+      const setLocaleSpy = vi.spyOn(i18n, "setLocale");
+      await expect(api.appearance.setLocale("xx-YY")).rejects.toThrow(/Unknown locale "xx-YY"; supported: .*fr-CA/);
+      expect(setLocaleSpy).not.toHaveBeenCalled();
     });
 
     it("sets window layout dimensions and panel toggles", async () => {
