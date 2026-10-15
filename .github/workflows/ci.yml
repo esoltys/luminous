@@ -79,8 +79,10 @@ jobs:
       # touch app state or talk to a server from the playback path (#1556).
       - name: Check the audio engine's dependency boundary
         run: |
-          forbidden=$(cargo tree -p luminous-audio -e normal --prefix none \
-            | grep -E '^(tauri|rusqlite|reqwest|tokio)[ -]' | sort -u || true)
+          # Captured first, so a failing `cargo tree` fails the step rather
+          # than reading as an empty (clean) dependency list.
+          tree=$(cargo tree -p luminous-audio -e normal --prefix none)
+          forbidden=$(grep -E '^(tauri|rusqlite|reqwest|tokio)[ -]' <<< "$tree" | sort -u || true)
           if [ -n "$forbidden" ]; then
             echo "::error::luminous-audio must not depend on: $forbidden"
             exit 1
