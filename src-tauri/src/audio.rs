@@ -1000,53 +1000,88 @@ pub(crate) fn open_media_source(path: &str) -> Result<Box<dyn MediaSource>, Stri
     }
 }
 
-/// Whole-file decode for offline analysis (waveform peaks, R128 loudness):
-/// runs as fast as the CPU allows, with none of playback's pacing, seeking or
-/// resampling. Open it, read `sample_rate()`, then drive `decode_blocks`.
-pub(crate) struct OfflineDecoder {
+/// A media source opened and probed, with a decoder built for its default
+/// audio track. The one place that knows how to get from a path to decodable
+/// packets; playback (`ActiveTrack`) and offline analysis (`OfflineDecoder`)
+/// each add their own reading policy on top.
+struct ProbedTrack {
     format: Box<dyn FormatReader>,
     decoder: Box<dyn AudioDecoder>,
     track_id: u32,
+    /// Falls back to 44.1 kHz when the container doesn't say.
     sample_rate: u32,
+    /// Falls back to stereo when the container doesn't say.
+    channels: usize,
 }
 
-impl OfflineDecoder {
-    /// Open and probe `path` (local or remote, via `open_media_source`) and
-    /// build a decoder for its default audio track.
-    pub(crate) fn open(path: &Path) -> Result<Self> {
-        let source = open_media_source(&path.to_string_lossy()).map_err(|e| anyhow!(e))?;
+impl ProbedTrack {
+    /// Open `path` (local file or remote URL, via `open_media_source`). Its
+    /// extension hints the probe; when it has none (e.g. a stream URL),
+    /// `hint_fallback`'s extension is used instead.
+    fn open(path: &str, hint_fallback: Option<&str>) -> Result<Self, String> {
+        let source = open_media_source(path)?;
+        let mut hint = Hint::new();
+        if let Some(ext) = std::iter::once(path)
+            .chain(hint_fallback)
+            .find_map(|p| Path::new(p).extension().and_then(|e| e.to_str()))
+        {
+            hint.with_extension(ext);
+        }
+
         let mss = MediaSourceStream::new(source, Default::default());
         let format = symphonia::default::get_probe()
             .probe(
-                &Hint::new(),
+                &hint,
                 mss,
                 FormatOptions::default(),
                 MetadataOptions::default(),
             )
-            .map_err(|e| anyhow!("format probe failed: {e}"))?;
+            .map_err(|e| format!("Format probe failed: {e}"))?;
+
         let track = format
             .default_track(TrackType::Audio)
-            .ok_or_else(|| anyhow!("no active audio track found"))?;
+            .ok_or_else(|| "No audio track found".to_string())?;
         let track_id = track.id;
         let audio_params = track
             .codec_params
             .as_ref()
             .and_then(|c| c.audio())
-            .ok_or_else(|| anyhow!("no audio codec parameters"))?;
-        let sample_rate = audio_params.sample_rate.unwrap_or(44100);
+            .ok_or_else(|| "No audio codec parameters".to_string())?;
         let decoder = CODEC_REGISTRY
             .make_audio_decoder(audio_params, &AudioDecoderOptions::default())
-            .map_err(|e| anyhow!("failed to create decoder: {e}"))?;
+            .map_err(|e| format!("Decoder init failed: {e}"))?;
+        let sample_rate = audio_params.sample_rate.unwrap_or(44100);
+        let channels = audio_params
+            .channels
+            .as_ref()
+            .map(|c| c.count())
+            .unwrap_or(2);
+
         Ok(Self {
             format,
             decoder,
             track_id,
             sample_rate,
+            channels,
         })
+    }
+}
+
+/// Whole-file decode for offline analysis (waveform peaks, R128 loudness):
+/// runs as fast as the CPU allows, with none of playback's pacing, seeking or
+/// resampling. Open it, read `sample_rate()`, then drive `decode_blocks`.
+pub(crate) struct OfflineDecoder {
+    track: ProbedTrack,
+}
+
+impl OfflineDecoder {
+    pub(crate) fn open(path: &Path) -> Result<Self> {
+        let track = ProbedTrack::open(&path.to_string_lossy(), None).map_err(|e| anyhow!(e))?;
+        Ok(Self { track })
     }
 
     pub(crate) fn sample_rate(&self) -> u32 {
-        self.sample_rate
+        self.track.sample_rate
     }
 
     /// Decode to the end, handing each decoded packet to `on_block` as planar
@@ -1060,12 +1095,13 @@ impl OfflineDecoder {
         max_channels: usize,
         mut on_block: impl FnMut(&[Vec<f32>]),
     ) {
+        let track = &mut self.track;
         let mut planes: Vec<Vec<f32>> = Vec::new();
-        while let Ok(Some(packet)) = self.format.next_packet() {
-            if packet.track_id != self.track_id {
+        while let Ok(Some(packet)) = track.format.next_packet() {
+            if packet.track_id != track.track_id {
                 continue;
             }
-            match self.decoder.decode(&packet) {
+            match track.decoder.decode(&packet) {
                 Ok(decoded) => {
                     decoded.copy_to_vecs_planar(&mut planes);
                     on_block(&planes[..planes.len().min(max_channels)]);
@@ -1113,43 +1149,13 @@ impl ActiveTrack {
             .ok_or("Song has no playable path or URL".to_string())?
             .to_owned();
 
-        let source = open_media_source(&path)?;
-        let mut hint = Hint::new();
-        if let Some(ext) = Path::new(&path).extension().and_then(|e| e.to_str()) {
-            hint.with_extension(ext);
-        } else if let Some(ext) = song
-            .path
-            .as_deref()
-            .and_then(|p| Path::new(p).extension())
-            .and_then(|e| e.to_str())
-        {
-            hint.with_extension(ext);
-        }
-
-        let mss = MediaSourceStream::new(source, Default::default());
-        let mut format = symphonia::default::get_probe()
-            .probe(
-                &hint,
-                mss,
-                FormatOptions::default(),
-                MetadataOptions::default(),
-            )
-            .map_err(|e| format!("Format probe failed: {e}"))?;
-
-        let track = format
-            .default_track(TrackType::Audio)
-            .cloned()
-            .ok_or_else(|| "No audio track found".to_string())?;
-
-        let track_id = track.id;
-        let audio_params = track
-            .codec_params
-            .as_ref()
-            .and_then(|c| c.audio())
-            .ok_or_else(|| "No audio codec parameters".to_string())?;
-        let mut decoder = CODEC_REGISTRY
-            .make_audio_decoder(audio_params, &AudioDecoderOptions::default())
-            .map_err(|e| format!("Decoder init failed: {e}"))?;
+        let ProbedTrack {
+            mut format,
+            mut decoder,
+            track_id,
+            sample_rate: src_rate,
+            channels: src_channels,
+        } = ProbedTrack::open(&path, song.path.as_deref())?;
 
         if start_nanosec > 0 {
             let target_time = symphonia::core::units::Time::from_nanos(start_nanosec as i64);
@@ -1164,13 +1170,6 @@ impl ActiveTrack {
                 Err(e) => log::warn!("Initial seek to {start_nanosec}ns failed: {e:?}"),
             }
         }
-
-        let src_rate = audio_params.sample_rate.unwrap_or(44100);
-        let src_channels = audio_params
-            .channels
-            .as_ref()
-            .map(|c| c.count())
-            .unwrap_or(2);
 
         let end_ns = (song.end_nanosec > 0).then_some(song.end_nanosec as u64);
         let about_end_ns = end_ns.or_else(|| song.length_nanosec.map(|ns| ns.max(0) as u64));
