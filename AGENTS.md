@@ -71,7 +71,7 @@ into Picard's territory; it's a different, complementary axis Picard was never m
 - `collection.rs` — library scanner (incremental; respects file mod times) + file watcher
 - `db.rs` — SQLite schema, connection pool (r2d2), migrations
 - `playlist.rs` — playlist CRUD + undo/redo command stack
-- `crates/luminous-equalizer` — biquad DSP filters (10-band graphic, up-to-20-band parametric with peak/shelf types); presets and persistence stay in `eq_presets.rs`
+- `crates/luminous-equalizer` — biquad DSP filters (10-band graphic, up-to-20-band parametric with peak/shelf types); presets and persistence stay in `eq_store.rs`
 - `analyzer.rs` — real-time FFT spectrum processing
 - `lyrics.rs` — LRCLIB + Lyrics.ovh clients
 - `covermanager.rs` — embedded art extraction + iTunes API fallback

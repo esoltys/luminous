@@ -29,7 +29,7 @@ pub mod diagnostics;
 pub mod discord;
 pub mod dr_parser;
 pub mod eq_import;
-pub mod eq_presets;
+pub mod eq_store;
 pub mod fade;
 pub mod filter_parser;
 pub mod hierarchy_sidecar;
@@ -302,7 +302,7 @@ fn with_webview2_remote_debugging(current: &str, port: u16) -> String {
 /// playback starts with the user's last-saved EQ instead of engine defaults.
 fn restore_equalizer_from_db(db: &Database, audio_engine: &AudioEngine) {
     let Ok(conn) = db.pool.get() else { return };
-    if let Some(state) = crate::eq_presets::load_state(&conn) {
+    if let Some(state) = crate::eq_store::load_state(&conn) {
         audio_engine.with_equalizer(|eq| eq.restore(&state));
     }
 }

@@ -438,7 +438,7 @@ mod tests {
             .map(|b| {
                 let mut single = Equalizer::new();
                 single.update_format(48_000, 2);
-                single.load_parametric_preset(String::new(), std::slice::from_ref(b), 0.0);
+                single.load_parametric_preset("reference".into(), std::slice::from_ref(b), 0.0);
                 single.parametric_response_db(&freqs)
             })
             .collect();

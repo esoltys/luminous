@@ -1,13 +1,13 @@
-use crate::eq_presets::{self, parse_user_preset_key, user_preset_key, UserPreset};
+use crate::eq_store::{self, parse_user_preset_key, user_preset_key, UserPreset};
 use crate::AppState;
 use luminous_equalizer::{EqMode, Equalizer, EqualizerConfig, BUILTIN_PRESETS};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, State};
 
-/// Fire-and-forget persistence — see `eq_presets::save_state`.
+/// Fire-and-forget persistence — see `eq_store::save_state`.
 fn save_eq_settings(db: &crate::db::Database, eq: &Equalizer) {
     if let Ok(conn) = db.pool.get() {
-        eq_presets::save_state(&conn, &eq.state());
+        eq_store::save_state(&conn, &eq.state());
     }
 }
 
@@ -78,7 +78,7 @@ pub async fn load_equalizer_preset(
     let user = match parse_user_preset_key(&preset_name) {
         Some(id) => {
             let conn = db.pool.get().map_err(|e| e.to_string())?;
-            Some((id, eq_presets::get(&conn, id)?))
+            Some((id, eq_store::get(&conn, id)?))
         }
         None => None,
     };
@@ -111,12 +111,12 @@ pub async fn list_eq_presets(state: State<'_, AppState>) -> Result<EqPresetList,
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     Ok(EqPresetList {
         builtin: BUILTIN_PRESETS.to_vec(),
-        user: eq_presets::list(&conn)?,
+        user: eq_store::list(&conn)?,
     })
 }
 
 /// Save the running parametric bands and preamp as a new user preset, which
-/// becomes the active one. Errors with an `eq_presets::ERR_*` code.
+/// becomes the active one. Errors with an `eq_store::ERR_*` code.
 #[tauri::command]
 pub async fn save_eq_user_preset(
     state: State<'_, AppState>,
@@ -130,7 +130,7 @@ pub async fn save_eq_user_preset(
                 return Err("user presets are parametric-only".to_string());
             }
             let conn = db.pool.get().map_err(|e| e.to_string())?;
-            let id = eq_presets::create(&conn, &name, &config.parametric, config.preamp)?;
+            let id = eq_store::create(&conn, &name, &config.parametric, config.preamp)?;
             eq.set_active_preset(Some(user_preset_key(id)));
             save_eq_settings(&db, eq);
             Ok(eq.config())
@@ -145,7 +145,7 @@ pub async fn save_eq_user_preset(
 /// All-or-nothing: the text is parsed and the preset saved before the engine
 /// is touched, so a bad file or a taken name changes nothing. Errors are a
 /// JSON `{ "code": ... }` string — an `eq_import::ImportError`, or an
-/// `eq_presets::ERR_*` code.
+/// `eq_store::ERR_*` code.
 pub fn import_profile_into(
     db: &crate::db::Database,
     eq: &mut Equalizer,
@@ -155,7 +155,7 @@ pub fn import_profile_into(
     let profile = crate::eq_import::parse_parametric_profile(text).map_err(|e| e.to_json())?;
     let preset_err = |code: String| serde_json::json!({ "code": code }).to_string();
     let conn = db.pool.get().map_err(|e| preset_err(e.to_string()))?;
-    let id = eq_presets::create(&conn, name, &profile.bands, profile.preamp).map_err(preset_err)?;
+    let id = eq_store::create(&conn, name, &profile.bands, profile.preamp).map_err(preset_err)?;
     eq.load_parametric_preset(user_preset_key(id), &profile.bands, profile.preamp);
     eq.set_enabled(true);
     save_eq_settings(db, eq);
@@ -214,7 +214,7 @@ pub async fn rename_eq_user_preset(
     name: String,
 ) -> Result<(), String> {
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
-    eq_presets::rename(&conn, id, &name)
+    eq_store::rename(&conn, id, &name)
 }
 
 /// Delete a user preset. If it was active, the current bands become Custom.
@@ -227,7 +227,7 @@ pub async fn delete_eq_user_preset(
     crate::audio::with_audio(&state.audio, move |engine| {
         engine.with_equalizer(|eq| {
             let conn = db.pool.get().map_err(|e| e.to_string())?;
-            eq_presets::delete(&conn, id)?;
+            eq_store::delete(&conn, id)?;
             let active = eq.config().active_preset;
             if active.as_deref().and_then(parse_user_preset_key) == Some(id) {
                 eq.set_active_preset(None);
@@ -284,16 +284,12 @@ pub async fn get_eq_preset_previews(
     let mut config = offline_eq.config();
     config.mode = mode;
     offline_eq.apply(&config);
-    let response_db = |eq: &Equalizer| match mode {
-        EqMode::Graphic10 => eq.graphic_response_db(&frequencies),
-        EqMode::Parametric => eq.parametric_response_db(&frequencies),
-    };
 
     let mut previews = Vec::with_capacity(BUILTIN_PRESETS.len());
 
     for &name in &BUILTIN_PRESETS {
         offline_eq.load_builtin_preset(name);
-        let response = response_db(&offline_eq);
+        let response = offline_eq.response_db(&frequencies);
         previews.push(EqPresetPreview {
             key: name.to_string(),
             response_db: response,
@@ -302,11 +298,11 @@ pub async fn get_eq_preset_previews(
 
     if mode == EqMode::Parametric {
         let conn = state.db.pool.get().map_err(|e| e.to_string())?;
-        let user_presets = eq_presets::list_with_bands(&conn)?;
+        let user_presets = eq_store::list_with_bands(&conn)?;
         for user_preset in user_presets {
             let key = user_preset_key(user_preset.id);
             offline_eq.load_parametric_preset(key.clone(), &user_preset.bands, user_preset.preamp);
-            let response = response_db(&offline_eq);
+            let response = offline_eq.response_db(&frequencies);
             previews.push(EqPresetPreview {
                 key,
                 response_db: response,
@@ -354,10 +350,10 @@ mod tests {
         let echo = import_profile_into(&db, &mut eq, PROFILE, " HD 600 ").unwrap();
 
         let conn = db.pool.get().unwrap();
-        let presets = eq_presets::list(&conn).unwrap();
+        let presets = eq_store::list(&conn).unwrap();
         assert_eq!(presets.len(), 1);
         assert_eq!(presets[0].name, "HD 600");
-        let stored = eq_presets::get(&conn, presets[0].id).unwrap();
+        let stored = eq_store::get(&conn, presets[0].id).unwrap();
         let parsed = crate::eq_import::parse_parametric_profile(PROFILE).unwrap();
         assert_eq!(stored.bands, parsed.bands);
         assert_eq!(stored.preamp, -6.3);
@@ -376,23 +372,21 @@ mod tests {
         let err = import_profile_into(&db, &mut eq, "Filter 1: ON LP Fc 100 Hz", "X").unwrap_err();
         assert_eq!(code(&err), "unsupported_filters");
         assert_eq!(eq.config(), before);
-        assert!(eq_presets::list(&db.pool.get().unwrap())
-            .unwrap()
-            .is_empty());
+        assert!(eq_store::list(&db.pool.get().unwrap()).unwrap().is_empty());
     }
 
     #[test]
     fn taken_or_empty_name_saves_nothing_and_leaves_eq_alone() {
         let (_dir, db, mut eq) = setup();
-        eq_presets::create(&db.pool.get().unwrap(), "HD 600", &[], 0.0).unwrap();
+        eq_store::create(&db.pool.get().unwrap(), "HD 600", &[], 0.0).unwrap();
         let before = eq.config();
 
         let err = import_profile_into(&db, &mut eq, PROFILE, "hd 600").unwrap_err();
-        assert_eq!(code(&err), eq_presets::ERR_DUPLICATE_NAME);
+        assert_eq!(code(&err), eq_store::ERR_DUPLICATE_NAME);
         let err = import_profile_into(&db, &mut eq, PROFILE, "  ").unwrap_err();
-        assert_eq!(code(&err), eq_presets::ERR_EMPTY_NAME);
+        assert_eq!(code(&err), eq_store::ERR_EMPTY_NAME);
 
         assert_eq!(eq.config(), before);
-        assert_eq!(eq_presets::list(&db.pool.get().unwrap()).unwrap().len(), 1);
+        assert_eq!(eq_store::list(&db.pool.get().unwrap()).unwrap().len(), 1);
     }
 }

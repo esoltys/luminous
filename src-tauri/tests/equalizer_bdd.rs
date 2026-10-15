@@ -4,7 +4,7 @@ use luminous_equalizer::{Equalizer, EqualizerConfig};
 use luminous_lib::commands::equalizer::import_profile_into;
 use luminous_lib::db::Database;
 use luminous_lib::eq_import::{parse_parametric_profile, read_profile_file};
-use luminous_lib::eq_presets;
+use luminous_lib::eq_store;
 use std::path::PathBuf;
 
 #[derive(Debug, World)]
@@ -48,9 +48,9 @@ impl EqualizerWorld {
         self.import_result = Some(import_profile_into(db, &mut self.equalizer, text, name));
     }
 
-    fn user_presets(&mut self) -> Vec<eq_presets::UserPreset> {
+    fn user_presets(&mut self) -> Vec<eq_store::UserPreset> {
         let conn = self.db().pool.get().unwrap();
-        eq_presets::list(&conn).unwrap()
+        eq_store::list(&conn).unwrap()
     }
 }
 

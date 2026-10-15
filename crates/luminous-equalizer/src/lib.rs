@@ -14,9 +14,10 @@
 use serde::{Deserialize, Serialize};
 use std::f32::consts::PI;
 
-/// Inclusive bounds of one EQ value. The EQ clamps with these, and the UI
-/// reads them over IPC for its controls' min and max, so each range is stated
-/// once, at the layer that enforces it. Serializes as `{"min": .., "max": ..}`.
+/// Inclusive bounds of one EQ value. The EQ clamps with these; callers that
+/// need the limits (e.g. for a control's min and max) read them from here, so
+/// each range is stated once, at the layer that enforces it. Serializes as
+/// `{"min": .., "max": ..}`.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct Bounds {
     pub min: f32,
@@ -863,10 +864,17 @@ impl Equalizer {
         self.cascade_response_db(idx.min(end)..end, freqs)
     }
 
-    /// Combined magnitude response of the 10-band graphic cascade (preamp
-    /// excluded) at each of `freqs`, in dB — evaluated from the graphic filter
-    /// coefficients. Used by preset previews (#1344).
-    pub fn graphic_response_db(&self, freqs: &[f32]) -> Vec<f32> {
+    /// Combined magnitude response of the active mode's cascade (preamp
+    /// excluded) at each of `freqs`, in dB — what `process_interleaved`
+    /// applies when enabled. Used by preset previews (#1344).
+    pub fn response_db(&self, freqs: &[f32]) -> Vec<f32> {
+        match self.mode {
+            EqMode::Graphic10 => self.graphic_response_db(freqs),
+            EqMode::Parametric => self.parametric_response_db(freqs),
+        }
+    }
+
+    fn graphic_response_db(&self, freqs: &[f32]) -> Vec<f32> {
         let fs = self.sample_rate as f32;
         let nyquist = fs / 2.0;
         let Some(filters) = self.channel_filters.first() else {

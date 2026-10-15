@@ -277,7 +277,7 @@ mod tests {
 
     fn test_db() -> (tempfile::TempDir, Database) {
         let dir = tempfile::Builder::new()
-            .prefix("luminous_eq_presets_test_")
+            .prefix("luminous_eq_store_test_")
             .tempdir()
             .unwrap();
         let db = Database::new(dir.path().to_path_buf()).unwrap();
