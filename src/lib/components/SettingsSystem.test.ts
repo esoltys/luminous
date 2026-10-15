@@ -23,6 +23,15 @@ vi.mock("@tauri-apps/api/core", () => ({
     if (cmd === "get_minimize_to_tray_enabled" || cmd === "get_autostart_enabled") {
       return Promise.resolve(false);
     }
+    if (cmd === "get_audio_output_devices") {
+      return Promise.resolve([
+        { id: "def-1", name: "Speakers (Realtek Audio)", backend: "cpal", is_default: true },
+        { id: "asio-1", name: "FlexASIO", backend: "asio", is_default: false },
+      ]);
+    }
+    if (cmd === "get_audio_output_settings") {
+      return Promise.resolve({ backend: "cpal", device_id: null });
+    }
     return Promise.resolve([]);
   }),
 }));
@@ -99,5 +108,40 @@ describe("SettingsSystem.svelte", () => {
     flushSync();
 
     expect(container.querySelector(".anim-check-pop")).toBeNull();
+  });
+
+  it("renders the audio output settings card with devices", async () => {
+    platform.isWindows = true;
+    const { findByText } = render(SettingsSystem);
+
+    expect(await findByText("Audio Output")).toBeInTheDocument();
+    expect(await findByText("Speakers (Realtek Audio) (Default Output Device)")).toBeInTheDocument();
+  });
+
+  it("handles switching output backend and device", async () => {
+    platform.isWindows = true;
+    const { findByLabelText } = render(SettingsSystem);
+
+    const backendSelect = await findByLabelText("Output Mode");
+    expect(backendSelect).toBeInTheDocument();
+
+    await fireEvent.change(backendSelect, { target: { value: "asio" } });
+    expect(invoke).toHaveBeenCalledWith("set_audio_output_settings", {
+      settings: { backend: "asio", device_id: "asio-1" },
+    });
+  });
+
+  it("opens the ASIO control panel when requested", async () => {
+    platform.isWindows = true;
+    prefs.audioOutputConfig = { backend: "asio", device_id: "asio-1" };
+    prefs.audioOutputDevices = [
+      { id: "asio-1", name: "FlexASIO", backend: "asio", is_default: false },
+    ];
+    const { findByRole } = render(SettingsSystem);
+
+    const btn = await findByRole("button", { name: "Open Driver Control Panel" });
+    await fireEvent.click(btn);
+
+    expect(invoke).toHaveBeenCalledWith("open_asio_control_panel", { deviceId: "asio-1" });
   });
 });

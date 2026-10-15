@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import type { AudioDeviceInfo, AudioOutputConfig } from "../types";
 
 export type RatingStyle = "heart" | "stars" | "both";
 type SeekBarMode = "waveform" | "bands";
@@ -73,6 +74,9 @@ class PrefsStore {
    * so the UI can hide online-only actions. */
   onlineEnabled = $state<boolean>(true);
   private onlineUnlisten: (() => void) | null = null;
+  audioOutputDevices = $state<AudioDeviceInfo[]>([]);
+  audioOutputConfig = $state<AudioOutputConfig>({ backend: "cpal", device_id: null });
+  audioOutputLoading = $state<boolean>(false);
 
   async init() {
     const prefs = await invoke<UiPreferences>("get_ui_preferences");
@@ -110,6 +114,7 @@ class PrefsStore {
     } catch (e) {
       console.error("Failed to read autostart state:", e);
     }
+    await this.refreshAudioDevices();
   }
 
   /** Persist the whole current state — fire-and-forget on the backend. */
@@ -264,6 +269,41 @@ class PrefsStore {
     } catch (e) {
       console.error("Failed to set autostart:", e);
       this.autostartEnabled = previous;
+    }
+  }
+
+  async refreshAudioDevices() {
+    try {
+      const [devices, config] = await Promise.all([
+        invoke<AudioDeviceInfo[]>("get_audio_output_devices"),
+        invoke<AudioOutputConfig>("get_audio_output_settings"),
+      ]);
+      this.audioOutputDevices = devices;
+      this.audioOutputConfig = config;
+    } catch (e) {
+      console.error("Failed to load audio devices:", e);
+    }
+  }
+
+  async setAudioOutput(config: AudioOutputConfig) {
+    this.audioOutputLoading = true;
+    try {
+      await invoke("set_audio_output_settings", { settings: config });
+      this.audioOutputConfig = config;
+    } catch (e) {
+      console.error("Failed to set audio output settings:", e);
+      throw e;
+    } finally {
+      this.audioOutputLoading = false;
+    }
+  }
+
+  async openAsioControlPanel(deviceId?: string | null) {
+    try {
+      await invoke("open_asio_control_panel", { deviceId: deviceId ?? null });
+    } catch (e) {
+      console.error("Failed to open ASIO control panel:", e);
+      throw e;
     }
   }
 }
