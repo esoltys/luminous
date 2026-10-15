@@ -5,10 +5,10 @@
 
 #[cfg(windows)]
 mod imp {
+    use parking_lot::Mutex;
     use std::ffi::{c_long, c_void};
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
-    use parking_lot::Mutex;
 
     use azo::driver::{Driver, Metadata, Proxy};
     use azo::dto::ChannelId;
@@ -53,7 +53,9 @@ mod imp {
                 if state.interleaved_scratch.len() < needed_samples {
                     return;
                 }
-                state.renderer.render(&mut state.interleaved_scratch[..needed_samples]);
+                state
+                    .renderer
+                    .render(&mut state.interleaved_scratch[..needed_samples]);
                 unsafe {
                     pcm::convert_and_deinterleave(
                         &state.interleaved_scratch[..needed_samples],
@@ -130,14 +132,18 @@ mod imp {
     }
 
     pub fn open_asio_control_panel_by_clsid(clsid_str: &str) -> Result<(), String> {
-        let all = Metadata::enumerate().map_err(|e| format!("Registry enumeration failed: {e:?}"))?;
+        let all =
+            Metadata::enumerate().map_err(|e| format!("Registry enumeration failed: {e:?}"))?;
         let meta = if clsid_str.is_empty() {
             all.into_iter()
                 .next()
                 .ok_or_else(|| "No ASIO drivers registered on this system".to_string())?
         } else {
             all.into_iter()
-                .find(|m| format!("{:?}", m.clsid) == clsid_str || m.description.to_string_lossy() == clsid_str)
+                .find(|m| {
+                    format!("{:?}", m.clsid) == clsid_str
+                        || m.description.to_string_lossy() == clsid_str
+                })
                 .ok_or_else(|| format!("ASIO driver not found: {clsid_str}"))?
         };
 
@@ -165,12 +171,16 @@ mod imp {
     impl AudioSink for AsioSink {
         fn play(&self) -> Result<(), String> {
             self.is_playing.store(true, Ordering::Relaxed);
-            self.driver.start().map_err(|e| format!("ASIO start failed: {e:?}"))
+            self.driver
+                .start()
+                .map_err(|e| format!("ASIO start failed: {e:?}"))
         }
 
         fn pause(&self) -> Result<(), String> {
             self.is_playing.store(false, Ordering::Relaxed);
-            self.driver.stop().map_err(|e| format!("ASIO stop failed: {e:?}"))
+            self.driver
+                .stop()
+                .map_err(|e| format!("ASIO stop failed: {e:?}"))
         }
 
         fn sample_rate(&self) -> u32 {
@@ -237,14 +247,17 @@ mod imp {
         played_samples: Arc<std::sync::atomic::AtomicU64>,
         target_sample_rate: u32,
     ) -> Result<AsioSink, String> {
-        let all = Metadata::enumerate().map_err(|e| format!("Failed to enumerate ASIO drivers: {e:?}"))?;
+        let all = Metadata::enumerate()
+            .map_err(|e| format!("Failed to enumerate ASIO drivers: {e:?}"))?;
         if all.is_empty() {
             return Err("No ASIO drivers registered on this system".to_string());
         }
 
         let meta = if let Some(target) = device_id_or_name {
             all.into_iter()
-                .find(|m| format!("{:?}", m.clsid) == target || m.description.to_string_lossy() == target)
+                .find(|m| {
+                    format!("{:?}", m.clsid) == target || m.description.to_string_lossy() == target
+                })
                 .ok_or_else(|| format!("Requested ASIO driver '{target}' not found"))?
         } else {
             all.into_iter()
@@ -254,7 +267,11 @@ mod imp {
 
         let device_name = {
             let d = meta.description.to_string_lossy();
-            if d.is_empty() { "ASIO Device".to_string() } else { d }
+            if d.is_empty() {
+                "ASIO Device".to_string()
+            } else {
+                d
+            }
         };
 
         let host = azo::Host::new();
@@ -288,8 +305,14 @@ mod imp {
                 .unwrap_or(target_sample_rate)
         };
 
-        let ch0 = ChannelId { input: false, index: 0 };
-        let ch1 = ChannelId { input: false, index: 1 };
+        let ch0 = ChannelId {
+            input: false,
+            index: 0,
+        };
+        let ch1 = ChannelId {
+            input: false,
+            index: 1,
+        };
 
         let sample_info = proxy
             .channel_info(ch0)
@@ -309,10 +332,9 @@ mod imp {
         let driver = Arc::new(proxy);
 
         let callbacks_ptr: *const Callbacks = &raw const CALLBACKS;
-        let mut created_buffers = unsafe {
-            driver.create_buffers([ch0, ch1], buffer_size as c_long, callbacks_ptr)
-        }
-        .map_err(|e| format!("Failed to create ASIO buffers: {e:?}"))?;
+        let mut created_buffers =
+            unsafe { driver.create_buffers([ch0, ch1], buffer_size as c_long, callbacks_ptr) }
+                .map_err(|e| format!("Failed to create ASIO buffers: {e:?}"))?;
 
         let left_pair = created_buffers
             .next()

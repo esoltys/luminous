@@ -481,4 +481,3 @@ mod tests {
         assert_eq!(AsioSampleFormat::Unknown(99).bytes_per_sample(), 0);
     }
 }
-

@@ -32,10 +32,10 @@
 //! or blocks. When every stage is neutral (EQ off, gains at 1.0) samples pass
 //! through bit-perfect.
 
+pub mod asio;
 mod codecs;
 pub mod pcm;
 pub mod sink;
-pub mod asio;
 mod source;
 mod spectrum;
 
@@ -556,7 +556,11 @@ impl AudioEngine {
             sample_rate: if rate > 0 { rate } else { 44100 },
             channels: if channels > 0 { channels } else { 2 },
             device_name,
-            backend_name: if backend_name.is_empty() { "CPAL".to_string() } else { backend_name },
+            backend_name: if backend_name.is_empty() {
+                "CPAL".to_string()
+            } else {
+                backend_name
+            },
         }
     }
 
@@ -1588,111 +1592,108 @@ fn check_and_rebuild_output(
             "Audio output rebuild triggered (forced: {force_rebuild}, errored: {stream_errored}, default_changed: {default_changed}). Rebuilding audio stream..."
         );
 
-            let cur_pos = shared.position.load(Ordering::Relaxed);
-            // Position still belongs to the finished track while a transition
-            // is draining, so that's the song to park on a failed rebuild.
-            let track_if_lost = match session.transition.as_ref() {
-                Some(t) => t.finished.clone(),
-                None => session.current.spec.clone(),
-            };
-            if let Some(old_out) = output.as_ref() {
-                let _ = old_out.sink.pause();
-            }
-            *output = None;
+        let cur_pos = shared.position.load(Ordering::Relaxed);
+        // Position still belongs to the finished track while a transition
+        // is draining, so that's the song to park on a failed rebuild.
+        let track_if_lost = match session.transition.as_ref() {
+            Some(t) => t.finished.clone(),
+            None => session.current.spec.clone(),
+        };
+        if let Some(old_out) = output.as_ref() {
+            let _ = old_out.sink.pause();
+        }
+        *output = None;
 
-            match build_output_on_fresh_thread(shared) {
-                Ok(new_out) => {
-                    shared
-                        .output_sample_rate
-                        .store(new_out.sample_rate, Ordering::Relaxed);
-                    shared
-                        .output_channels
-                        .store(new_out.channels, Ordering::Relaxed);
-                    *shared.output_device_name.write() = new_out.device_name.clone();
-                    *shared.output_backend_name.write() = new_out.backend_name.clone();
-                    session.target_sample_rate = new_out.sample_rate;
-                    session.target_channels = new_out.channels;
+        match build_output_on_fresh_thread(shared) {
+            Ok(new_out) => {
+                shared
+                    .output_sample_rate
+                    .store(new_out.sample_rate, Ordering::Relaxed);
+                shared
+                    .output_channels
+                    .store(new_out.channels, Ordering::Relaxed);
+                *shared.output_device_name.write() = new_out.device_name.clone();
+                *shared.output_backend_name.write() = new_out.backend_name.clone();
+                session.target_sample_rate = new_out.sample_rate;
+                session.target_channels = new_out.channels;
 
-                    session.outgoing = None;
-                    shared.cancel_loudness_switch();
-                    if let Some(t) = session.transition.take() {
-                        // Mid-handover: `cur_pos` is still on the finished
-                        // track's timeline, so reopen that track there (as
-                        // SeekTo does) rather than seeking the new one to it.
-                        session.next = None;
-                        match ActiveTrack::open(
-                            &shared.open_source,
-                            t.finished,
-                            cur_pos,
-                            session.target_sample_rate,
-                            session.target_channels as usize,
-                        ) {
-                            Ok(t) => session.current = t,
-                            Err(message) => {
-                                let _ = event_tx.send(AudioEvent::Error { message });
-                                return DeviceCheckOutcome::BreakDecode;
-                            }
-                        }
-                    } else {
-                        let target_time = symphonia::core::units::Time::from_nanos(cur_pos as i64);
-                        let _ = session.current.format.seek(
-                            symphonia::core::formats::SeekMode::Accurate,
-                            symphonia::core::formats::SeekTo::Time {
-                                time: target_time,
-                                track_id: Some(session.current.track_id),
-                            },
-                        );
-                        session.current.decoder.reset();
-                        session.current.decoded_pos_ns = cur_pos;
-                        session.current.eof = false;
-                        session.current.resampler = Resampler::new(
-                            session.current.src_rate,
-                            session.target_sample_rate,
-                            session.target_channels as usize,
-                        );
-                    }
-
-                    if let Some(n) = session.next.as_mut() {
-                        n.resampler = Resampler::new(
-                            n.src_rate,
-                            session.target_sample_rate,
-                            session.target_channels as usize,
-                        );
-                    }
-
-                    {
-                        let mut consumer = new_out.consumer.lock();
-                        while consumer.try_pop().is_some() {}
-                    }
-                    let start_samples = samples_for_ns(
+                session.outgoing = None;
+                shared.cancel_loudness_switch();
+                if let Some(t) = session.transition.take() {
+                    // Mid-handover: `cur_pos` is still on the finished
+                    // track's timeline, so reopen that track there (as
+                    // SeekTo does) rather than seeking the new one to it.
+                    session.next = None;
+                    match ActiveTrack::open(
+                        &shared.open_source,
+                        t.finished,
                         cur_pos,
                         session.target_sample_rate,
-                        session.target_channels,
-                    );
-                    new_out
-                        .played_samples
-                        .store(start_samples, Ordering::Relaxed);
-                    session.pushed_samples = start_samples;
-
-                    if let Err(e) = new_out.sink.play() {
-                        let _ = event_tx.send(AudioEvent::Error {
-                            message: format!("Audio sink play failed: {e}"),
-                        });
+                        session.target_channels as usize,
+                    ) {
+                        Ok(t) => session.current = t,
+                        Err(message) => {
+                            let _ = event_tx.send(AudioEvent::Error { message });
+                            return DeviceCheckOutcome::BreakDecode;
+                        }
                     }
-                    *output = Some(new_out);
-                    let _ = event_tx.send(AudioEvent::PipelineChanged);
-                }
-                Err(message) => {
-                    return DeviceCheckOutcome::OutputLost(
-                        PlayRequest {
-                            track: track_if_lost,
-                            start_nanosec: cur_pos,
+                } else {
+                    let target_time = symphonia::core::units::Time::from_nanos(cur_pos as i64);
+                    let _ = session.current.format.seek(
+                        symphonia::core::formats::SeekMode::Accurate,
+                        symphonia::core::formats::SeekTo::Time {
+                            time: target_time,
+                            track_id: Some(session.current.track_id),
                         },
-                        message,
+                    );
+                    session.current.decoder.reset();
+                    session.current.decoded_pos_ns = cur_pos;
+                    session.current.eof = false;
+                    session.current.resampler = Resampler::new(
+                        session.current.src_rate,
+                        session.target_sample_rate,
+                        session.target_channels as usize,
                     );
                 }
+
+                if let Some(n) = session.next.as_mut() {
+                    n.resampler = Resampler::new(
+                        n.src_rate,
+                        session.target_sample_rate,
+                        session.target_channels as usize,
+                    );
+                }
+
+                {
+                    let mut consumer = new_out.consumer.lock();
+                    while consumer.try_pop().is_some() {}
+                }
+                let start_samples =
+                    samples_for_ns(cur_pos, session.target_sample_rate, session.target_channels);
+                new_out
+                    .played_samples
+                    .store(start_samples, Ordering::Relaxed);
+                session.pushed_samples = start_samples;
+
+                if let Err(e) = new_out.sink.play() {
+                    let _ = event_tx.send(AudioEvent::Error {
+                        message: format!("Audio sink play failed: {e}"),
+                    });
+                }
+                *output = Some(new_out);
+                let _ = event_tx.send(AudioEvent::PipelineChanged);
+            }
+            Err(message) => {
+                return DeviceCheckOutcome::OutputLost(
+                    PlayRequest {
+                        track: track_if_lost,
+                        start_nanosec: cur_pos,
+                    },
+                    message,
+                );
             }
         }
+    }
 
     DeviceCheckOutcome::Ok
 }

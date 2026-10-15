@@ -3,21 +3,16 @@
 //! Provides a deep interface decoupling the playback/decode loop from specific
 //! audio backends (CPAL shared audio vs ASIO bit-perfect output).
 
+use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum AudioBackendKind {
+    #[default]
     Cpal,
     Asio,
-}
-
-impl Default for AudioBackendKind {
-    fn default() -> Self {
-        Self::Cpal
-    }
 }
 
 impl std::fmt::Display for AudioBackendKind {
@@ -103,12 +98,16 @@ impl CpalSink {
 impl AudioSink for CpalSink {
     fn play(&self) -> Result<(), String> {
         use cpal::traits::StreamTrait;
-        self.stream.play().map_err(|e| format!("CPAL stream play failed: {e}"))
+        self.stream
+            .play()
+            .map_err(|e| format!("CPAL stream play failed: {e}"))
     }
 
     fn pause(&self) -> Result<(), String> {
         use cpal::traits::StreamTrait;
-        self.stream.pause().map_err(|e| format!("CPAL stream pause failed: {e}"))
+        self.stream
+            .pause()
+            .map_err(|e| format!("CPAL stream pause failed: {e}"))
     }
 
     fn sample_rate(&self) -> u32 {

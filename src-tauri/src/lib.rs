@@ -331,10 +331,7 @@ fn restore_audio_output_from_db(db: &Database, audio_engine: &AudioEngine) {
         _ => luminous_audio::AudioBackendKind::Cpal,
     };
 
-    let config = luminous_audio::AudioOutputConfig {
-        backend,
-        device_id,
-    };
+    let config = luminous_audio::AudioOutputConfig { backend, device_id };
     let _ = audio_engine.set_output_config(config);
 }
 
