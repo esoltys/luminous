@@ -1,4 +1,4 @@
-// Mirrors `src-tauri/src/equalizer.rs`. The backend clamps every value and
+// Mirrors `crates/luminous-equalizer/src/lib.rs`. The backend clamps every value and
 // echoes the canonical config; `EqRanges` carries the bounds it clamps to.
 
 export type EqMode = "graphic10" | "parametric";
