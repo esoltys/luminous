@@ -1,6 +1,6 @@
 //! The real-time spectrum: a ring buffer of recently played samples fed by
 //! the audio callback, and the FFT that turns it into visualizer bins.
-//! Whole-file decoding for offline analysis lives in `audio::OfflineDecoder`.
+//! Private to the engine: callers see only `AudioEngine::spectrum_snapshot`.
 
 use parking_lot::Mutex;
 use rustfft::{num_complex::Complex, FftPlanner};
@@ -11,17 +11,17 @@ use std::collections::VecDeque;
 // ---------------------------------------------------------------------------
 
 /// Fixed-capacity ring buffer of the most recently played samples, fed
-/// continuously from the CPAL output callback (`audio.rs::build_output`) and
-/// polled roughly 30 times/sec by the visualizer's spectrum loop (`lib.rs`).
+/// continuously from the CPAL output callback (`OutputRenderer::render`) and
+/// polled roughly 30 times/sec by the app's spectrum loop.
 /// Producer and consumer run on different threads/tasks — all access goes
 /// through the internal mutex.
-pub struct AudioVisualizerBuffer {
+pub(crate) struct AudioVisualizerBuffer {
     buffer: Mutex<VecDeque<f32>>,
     max_size: usize,
 }
 
 impl AudioVisualizerBuffer {
-    pub fn new(max_size: usize) -> Self {
+    pub(crate) fn new(max_size: usize) -> Self {
         Self {
             buffer: Mutex::new(VecDeque::with_capacity(max_size)),
             max_size,
@@ -31,7 +31,7 @@ impl AudioVisualizerBuffer {
     /// Append newly played samples, evicting the oldest ones once the
     /// buffer is at `max_size` (so it always holds the *most recent*
     /// window, not the earliest).
-    pub fn push(&self, samples: &[f32]) {
+    pub(crate) fn push(&self, samples: &[f32]) {
         let mut buf = self.buffer.lock();
         for &s in samples {
             if buf.len() >= self.max_size {
@@ -45,7 +45,7 @@ impl AudioVisualizerBuffer {
     /// `size` samples have ever been pushed (e.g. right after playback
     /// starts), the result is zero-padded at the front rather than
     /// shortened, so callers can always assume a fixed-length buffer.
-    pub fn get_samples(&self, size: usize) -> Vec<f32> {
+    pub(crate) fn get_samples(&self, size: usize) -> Vec<f32> {
         let buf = self.buffer.lock();
         let len = buf.len();
         if len == 0 {
@@ -71,7 +71,7 @@ impl AudioVisualizerBuffer {
 ///
 /// `fft_size` must be a power of two (required by `rustfft`'s planner) and
 /// should stay small enough to run every animation frame — callers use 1024.
-pub fn calculate_spectrum(
+pub(crate) fn calculate_spectrum(
     visualizer_buf: &AudioVisualizerBuffer,
     fft_size: usize,
     sample_rate: u32,

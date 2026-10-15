@@ -88,12 +88,13 @@ pub fn generate_visualizer_data(
         return Ok((w, m));
     }
 
-    let (samples, sample_rate) = decode_mono(path).with_context(|| {
+    let decoder = crate::media_source::open_offline(db, path).with_context(|| {
         format!(
             "failed to decode samples for song_id {} at path {:?}",
             song_id, path
         )
     })?;
+    let (samples, sample_rate) = decode_mono(decoder);
 
     let waveform_peaks = compute_waveform_peaks(&samples, WAVEFORM_POINTS);
     // Higher point resolution than the waveform: transient (hi-hat/percussion)
@@ -130,8 +131,7 @@ pub fn generate_visualizer_data(
 /// Decode a whole file and downmix it to mono by averaging every channel.
 /// Returns `(samples, sample_rate)`. Only the mono result grows with the
 /// track's length; each packet's channels are folded in as it decodes.
-fn decode_mono(path: &Path) -> Result<(Vec<f32>, u32)> {
-    let decoder = crate::audio::OfflineDecoder::open(path)?;
+fn decode_mono(decoder: luminous_audio::OfflineDecoder) -> (Vec<f32>, u32) {
     let sample_rate = decoder.sample_rate();
     let mut mono = Vec::new();
     decoder.decode_blocks(usize::MAX, |planes| match planes {
@@ -151,7 +151,7 @@ fn decode_mono(path: &Path) -> Result<(Vec<f32>, u32)> {
             }
         }
     });
-    Ok((mono, sample_rate))
+    (mono, sample_rate)
 }
 
 /// Generate peak waveform amplitudes for a song, save to SQLite, and return them.
@@ -282,13 +282,14 @@ mod tests {
         let left: Vec<i16> = (0..4_000).map(|i| (i % 2_000) as i16 * 8).collect();
         let centre: Vec<i16> = (0..4_000).map(|i| -((i % 1_000) as i16) * 16).collect();
         let right: Vec<i16> = vec![12_000; 4_000];
-        crate::audio::write_test_pcm16_wav(
+        luminous_audio::write_test_pcm16_wav(
             &path,
             8_000,
             &[left.clone(), centre.clone(), right.clone()],
         );
 
-        let (mono, sample_rate) = decode_mono(&path).expect("decode");
+        let (mono, sample_rate) =
+            decode_mono(luminous_audio::OfflineDecoder::open_file(&path).expect("open"));
 
         assert_eq!(sample_rate, 8_000);
         assert_eq!(mono.len(), 4_000);

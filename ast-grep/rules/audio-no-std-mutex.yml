@@ -6,7 +6,6 @@ note: |
   AGENTS.md "Allocation-free audio thread": parking_lot's Mutex can't be
   poisoned, so a panic elsewhere can't take down the playback path.
 files:
-  - src-tauri/src/audio.rs
   - src-tauri/src/player.rs
   - src-tauri/src/player/**
   - crates/*/src/**

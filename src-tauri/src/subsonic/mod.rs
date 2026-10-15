@@ -252,7 +252,7 @@ pub fn load_auth(conn: &rusqlite::Connection, server_id: i64) -> Result<Option<(
 
 /// Resolves a stored `subsonic://{server_id}/{track_id}` path to a freshly
 /// signed stream URL, using the server's saved credentials. Called by
-/// `audio::open_media_source` at open time (#1163).
+/// `media_source::open` at open time (#1163).
 pub fn resolve_stream_url(conn: &rusqlite::Connection, path: &str) -> Result<String> {
     let (server_id, track_id) =
         parse_track_uri(path).ok_or_else(|| anyhow!("Invalid Subsonic track path '{path}'"))?;

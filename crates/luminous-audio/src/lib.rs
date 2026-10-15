@@ -32,59 +32,29 @@
 //! or blocks. When every stage is neutral (EQ off, gains at 1.0) samples pass
 //! through bit-perfect.
 
-use crate::codecs::CODEC_REGISTRY;
-use crate::models::{
-    AudioPipelineInfo, FileType, LoudnessGainSource, PlayState, QualityTier, Song,
-};
+mod codecs;
+mod source;
+mod spectrum;
+
 use anyhow::{anyhow, Result};
 use cpal::traits::StreamTrait;
 use parking_lot::Mutex;
+use source::ProbedTrack;
+use std::path::Path;
 
-/// Pure function mapping codec + bitrate + sample rate + bit depth to a `QualityTier` (#1041).
-/// - LQ — lossy codec below 256 kbps
-/// - SQ — lossy codec at 256 kbps or higher
-/// - HQ — lossless codec (standard resolution: <= 48 kHz and <= 16-bit)
-/// - Hi-Res — lossless codec with sample rate above 48 kHz or bit depth above 16-bit
-pub fn classify_quality_tier(
-    filetype: FileType,
-    bitrate_kbps: Option<i32>,
-    sample_rate: Option<u32>,
-    bit_depth: Option<i32>,
-) -> QualityTier {
-    if filetype.is_lossless() {
-        let is_hires = sample_rate.is_some_and(|r| r > 48_000) || bit_depth.is_some_and(|d| d > 16);
-        if is_hires {
-            QualityTier::HiRes
-        } else {
-            QualityTier::Hq
-        }
-    } else {
-        let kbps = bitrate_kbps.unwrap_or(0);
-        if kbps >= 256 {
-            QualityTier::Sq
-        } else {
-            QualityTier::Lq
-        }
-    }
-}
+pub use source::OfflineDecoder;
+pub use symphonia::core::io::MediaSource;
 
 use ringbuf::{
     traits::{Consumer, Observer, Producer, Split},
     HeapRb,
 };
-use std::io::{Read, Seek, SeekFrom};
-use std::path::Path;
 use std::sync::{
     atomic::{AtomicU32, AtomicU64, Ordering},
-    mpsc, Arc, OnceLock,
+    mpsc, Arc,
 };
 use symphonia::core::{
-    codecs::audio::{AudioDecoder, AudioDecoderOptions},
-    errors::Error as SymphoniaError,
-    formats::{probe::Hint, FormatOptions, FormatReader, TrackType},
-    io::MediaSource,
-    io::MediaSourceStream,
-    meta::MetadataOptions,
+    codecs::audio::AudioDecoder, errors::Error as SymphoniaError, formats::FormatReader,
 };
 
 /// How far before the end boundary the `AboutToFinish` signal fires.
@@ -94,17 +64,26 @@ use symphonia::core::{
 /// auto-crossfade (`CROSSFADE_AUTO_DURATION_SECS_RANGE`, 8s) plus that lead
 /// plus time to open the next track — otherwise the crossfade window has
 /// already been decoded by the time the preload arrives (#1238).
-pub const PRELOAD_LEAD_NS: u64 = 12_000_000_000;
+const PRELOAD_LEAD_NS: u64 = 12_000_000_000;
+
+/// The longest auto-crossfade the engine can honour (#79): the preload must
+/// arrive before the crossfade window has been decoded, so `PRELOAD_LEAD_NS`
+/// is sized from this. The app's crossfade setting takes its upper bound
+/// from here rather than retyping it.
+pub const MAX_AUTO_CROSSFADE_SECS: f32 = 8.0;
+
+/// Decode runs up to ~1.5 s ahead of what is audible, and opening the next
+/// track takes time too; this much must remain after the longest crossfade.
+const _: () = assert!(PRELOAD_LEAD_NS >= (MAX_AUTO_CROSSFADE_SECS as u64 + 3) * 1_000_000_000);
 
 /// Maximum linear amplitude allowed when dynamic processing (loudness normalization
 /// or equalizer) is active. Set to -1.0 dBTP (True Peak) ≈ 0.8912509 linear amplitude
 /// (10^(-1/20)) to prevent inter-sample clipping during digital-to-analog reconstruction.
-pub const TRUE_PEAK_CEILING: f32 = 0.891_250_9;
+const TRUE_PEAK_CEILING: f32 = 0.891_250_9;
 
 /// Step count and per-step sleep duration for a gain ramp spread over
-/// `duration_ms` in ~10ms increments. Shared by `apply_fade_ramp`
-/// (decode-thread, `std::thread::sleep`) and `ramp_gain` (async callers,
-/// `tokio::time::sleep`) — only the sleep primitive differs between them.
+/// `duration_ms` in ~10ms increments. Shared by `fade_out_then` (on the
+/// decode thread) and `AudioEngine::ramp_loudness_gain` (on its own thread).
 fn ramp_steps(duration_ms: u32) -> (u32, std::time::Duration) {
     let steps = (duration_ms / 10).max(1);
     let step_dur = std::time::Duration::from_millis((duration_ms / steps) as u64);
@@ -118,59 +97,39 @@ fn ramp_gain_at_step(start_gain: f32, end_gain: f32, steps: u32, i: u32) -> f32 
     start_gain + (end_gain - start_gain) * t
 }
 
-fn apply_fade_ramp(fade_gain: &Arc<AtomicU32>, start_gain: f32, end_gain: f32, duration_ms: u32) {
+/// Ramp the fade envelope down over `duration_ms`, run `then` (pause or
+/// stop the stream), and restore the envelope for the next start. With no
+/// duration the envelope is never touched, so an instant pause stays
+/// bit-identical to playing up to that point.
+fn fade_out_then(fade_gain: &Arc<AtomicU32>, duration_ms: u32, then: impl FnOnce()) {
     if duration_ms == 0 {
-        fade_gain.store(end_gain.to_bits(), Ordering::Relaxed);
+        then();
         return;
     }
     let (steps, step_dur) = ramp_steps(duration_ms);
     for i in 0..=steps {
-        let g = ramp_gain_at_step(start_gain, end_gain, steps, i);
+        let g = ramp_gain_at_step(1.0, 0.0, steps, i);
         fade_gain.store(g.to_bits(), Ordering::Relaxed);
         std::thread::sleep(step_dur);
     }
-}
-
-/// Ramp a gain atomic smoothly from its current value to `target` over
-/// `duration_ms`, for a caller already on an async task (e.g.
-/// `Player::refresh_loudness_gain`, which uses this on `AudioEngine`'s
-/// `loudness_gain` handle after a mid-playback settings change — unlike a
-/// track-start's instant `set_loudness_gain`, stepping the level hard here
-/// would be an audible click/zipper in the middle of continuous audio).
-/// Shares its step math with `apply_fade_ramp`; uses `tokio::time::sleep`
-/// instead of blocking the decode thread, and operates on a handle
-/// (`AudioEngine::loudness_gain_handle`) rather than the engine itself so
-/// the caller isn't holding `AudioEngine`'s lock for the ramp's duration.
-pub async fn ramp_gain(handle: &Arc<AtomicU32>, target: f32, duration_ms: u32) {
-    let start = f32::from_bits(handle.load(Ordering::Relaxed));
-    if (target - start).abs() < f32::EPSILON {
-        return;
-    }
-    if duration_ms == 0 {
-        handle.store(target.to_bits(), Ordering::Relaxed);
-        return;
-    }
-    let (steps, step_dur) = ramp_steps(duration_ms);
-    for i in 0..=steps {
-        let g = ramp_gain_at_step(start, target, steps, i);
-        handle.store(g.to_bits(), Ordering::Relaxed);
-        tokio::time::sleep(step_dur).await;
-    }
+    then();
+    fade_gain.store(1.0f32.to_bits(), Ordering::Relaxed);
 }
 
 // ---------------------------------------------------------------------------
 // Control messages sent to the decode thread
 // ---------------------------------------------------------------------------
 
-pub enum AudioCommand {
+enum AudioCommand {
     Play(PlayRequest),
     Cue(PlayRequest),
-    Pause,
-    PauseWithFade(u32),
-    Resume,
-    ResumeWithFade(u32),
-    Stop,
-    StopWithFade(u32),
+    /// Fade out over this many ms (0 = at once), then pause.
+    Pause(u32),
+    // The fade-in length is accepted but not yet honoured (#1718).
+    #[allow(dead_code)]
+    Resume(u32),
+    /// Fade out over this many ms (0 = at once), then stop.
+    Stop(u32),
     SeekTo(u64), // target position in nanoseconds
     /// Prime the next track for a gapless transition after the current one.
     PreloadNext(PlayRequest),
@@ -183,9 +142,55 @@ pub enum AudioCommand {
     ClearPreload,
 }
 
-pub struct PlayRequest {
-    pub song: Box<Song>,
-    pub start_nanosec: u64,
+struct PlayRequest {
+    track: Track,
+    start_nanosec: u64,
+}
+
+/// What the engine needs to know to play one track; the app builds it from
+/// its own song model.
+#[derive(Debug, Clone, Default)]
+pub struct Track {
+    /// The app's id for the track, echoed back in [`AudioEvent`]s.
+    pub id: i64,
+    /// Handed to the source opener: a file path for the default opener, or
+    /// whatever the app's opener understands (URLs, custom schemes). Its
+    /// extension, if any, hints the format probe.
+    pub location: String,
+    /// Extension (without the dot) to hint the format probe when `location`
+    /// has none, e.g. a stream URL for a song whose file is known to be FLAC.
+    pub extension_hint: Option<String>,
+    /// Hard stop inside the file (a CUE sheet track's end); `None` plays to EOF.
+    pub end_ns: Option<u64>,
+    /// The tagged length, used for the `AboutToFinish` signal when there is
+    /// no `end_ns`.
+    pub length_ns: Option<u64>,
+}
+
+/// Playback state as the engine sees it.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum EngineState {
+    #[default]
+    Stopped,
+    Playing,
+    Paused,
+}
+
+/// Opens the bytes behind a [`Track::location`]. The engine's default opener
+/// reads local files; the app injects one that also knows its remote sources.
+type SourceOpener = dyn Fn(&str) -> Result<Box<dyn MediaSource>, String> + Send + Sync;
+
+fn open_file(path: &str) -> Result<Box<dyn MediaSource>, String> {
+    let file = std::fs::File::open(path).map_err(|e| format!("Cannot open file '{path}': {e}"))?;
+    Ok(Box::new(file))
+}
+
+/// Facts about the output stage, for the app's pipeline display.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OutputInfo {
+    pub sample_rate: u32,
+    pub channels: u16,
+    pub device_name: String,
 }
 
 // ---------------------------------------------------------------------------
@@ -195,25 +200,22 @@ pub struct PlayRequest {
 #[derive(Debug, Clone)]
 pub enum AudioEvent {
     Playing {
-        song_id: i64,
+        track_id: i64,
     },
     Paused,
     Stopped,
-    PositionChanged {
-        position_nanosec: u64,
-    },
     TrackFinished {
-        song_id: i64,
+        track_id: i64,
     },
     /// The playing track is within `PRELOAD_LEAD_NS` of its end boundary.
     AboutToFinish {
-        song_id: i64,
+        track_id: i64,
     },
-    /// A gapless transition completed: `finished_song_id` played to its end
-    /// and `song_id` is now audible, with no interruption of the stream.
+    /// A gapless transition completed: `finished_track_id` played to its end
+    /// and `track_id` is now audible, with no interruption of the stream.
     TrackTransitioned {
-        finished_song_id: i64,
-        song_id: i64,
+        finished_track_id: i64,
+        track_id: i64,
     },
     /// The audio pipeline has changed (e.g. output device reconnected or changed format).
     PipelineChanged,
@@ -234,17 +236,21 @@ pub enum AudioEvent {
 // a single value instead of 6-10 individual Arcs through every layer.
 // ---------------------------------------------------------------------------
 
-pub(crate) struct AudioShared {
+struct AudioShared {
+    open_source: Box<SourceOpener>,
     position: Arc<AtomicU64>,
     volume: Arc<AtomicU32>,
-    play_state: Arc<Mutex<PlayState>>,
-    visualizer_buf: Arc<crate::analyzer::AudioVisualizerBuffer>,
+    play_state: Arc<Mutex<EngineState>>,
+    visualizer_buf: Arc<spectrum::AudioVisualizerBuffer>,
     output_sample_rate: Arc<AtomicU32>,
     output_channels: Arc<std::sync::atomic::AtomicU16>,
     output_device_name: Arc<parking_lot::RwLock<Option<String>>>,
-    active_decoder_name: Arc<parking_lot::RwLock<Option<String>>>,
     equalizer: Arc<Mutex<luminous_equalizer::Equalizer>>,
     loudness_gain: Arc<AtomicU32>,
+    /// Bumped by every loudness-gain write that isn't a ramp step, so an
+    /// in-flight `ramp_loudness_gain` stops instead of overwriting it: the
+    /// newest write always wins.
+    loudness_generation: AtomicU64,
     /// A loudness-gain change scheduled at an exact played-sample index
     /// (`AudioOutput::played_samples` space), applied by the output callback
     /// mid-buffer so a crossfade's incoming track takes over its gain at the
@@ -262,6 +268,7 @@ impl AudioShared {
     /// Switch the loudness gain to `gain` when the output callback plays
     /// sample `at`, replacing any switch already scheduled.
     fn schedule_loudness_switch(&self, at: u64, gain: f32) {
+        self.loudness_generation.fetch_add(1, Ordering::AcqRel);
         self.loudness_switch_gain
             .store(gain.max(0.0).to_bits(), Ordering::Relaxed);
         self.loudness_switch_at.store(at, Ordering::Release);
@@ -279,74 +286,45 @@ impl AudioShared {
 // AudioEngine — public handle
 // ---------------------------------------------------------------------------
 
+/// The playback engine. Commands are queued to a dedicated decode thread
+/// and return immediately; what actually happened is reported as
+/// [`AudioEvent`]s on [`AudioEngine::events`], so callers react to the engine
+/// instead of assuming the outcome of a call.
 pub struct AudioEngine {
     cmd_tx: mpsc::SyncSender<AudioCommand>,
     event_rx: Arc<Mutex<mpsc::Receiver<AudioEvent>>>,
-    pub position_nanosec: Arc<AtomicU64>,
-    pub volume: Arc<AtomicU32>,
-    pub play_state: Arc<Mutex<PlayState>>,
-    visualizer_buf: Arc<crate::analyzer::AudioVisualizerBuffer>,
-    spectrum_enabled: Arc<std::sync::atomic::AtomicBool>,
-    /// Actual output device sample rate, updated once the CPAL stream is
-    /// built. The spectrum analyzer needs this to convert FFT bin indices
-    /// to real Hz instead of assuming a fixed rate.
-    output_sample_rate: Arc<AtomicU32>,
-    equalizer: Arc<Mutex<luminous_equalizer::Equalizer>>,
-    /// Per-track loudness-normalization multiplier (#77). f32 bits in an
-    /// atomic so the audio callback reads it without locking. 1.0 = neutral.
-    loudness_gain: Arc<AtomicU32>,
-    /// Fade-envelope multiplier slot (#79). 1.0 = neutral.
-    pub fade_gain: Arc<AtomicU32>,
-    pub(crate) shared: Arc<AudioShared>,
-}
-
-/// Runs a synchronous `AudioEngine` operation while `audio`'s async mutex is
-/// held, via `block_in_place` rather than directly — some `AudioEngine`
-/// callers (e.g. equalizer preset persistence) do rusqlite work, and running
-/// that straight on the tokio worker would both stall the runtime and block
-/// every other task waiting on the same mutex for the duration (#1097, #1102).
-/// Mirrors `playlist::with_playlists`. Note: this locks `AppState.audio`
-/// (`tokio::sync::Mutex<AudioEngine>`), distinct from the `parking_lot::Mutex`
-/// fields inside `AudioEngine` used on the allocation-free audio callback path.
-pub async fn with_audio<F, R>(audio: &tokio::sync::Mutex<AudioEngine>, f: F) -> R
-where
-    F: FnOnce(&mut AudioEngine) -> R,
-{
-    let mut a = audio.lock().await;
-    tokio::task::block_in_place(move || f(&mut a))
+    spectrum_enabled: std::sync::atomic::AtomicBool,
+    shared: Arc<AudioShared>,
 }
 
 impl AudioEngine {
+    /// An engine that opens [`Track::location`]s as local file paths.
     pub fn new() -> Self {
+        Self::with_source_opener(open_file)
+    }
+
+    /// An engine that opens every [`Track::location`] through `open_source`,
+    /// on the decode thread, each time a track starts or is reopened.
+    pub fn with_source_opener(
+        open_source: impl Fn(&str) -> Result<Box<dyn MediaSource>, String> + Send + Sync + 'static,
+    ) -> Self {
         let (cmd_tx, cmd_rx) = mpsc::sync_channel::<AudioCommand>(64);
         let (event_tx, event_rx) = mpsc::channel::<AudioEvent>();
-        let position = Arc::new(AtomicU64::new(0));
-        let volume = Arc::new(AtomicU32::new(1.0f32.to_bits()));
-        let play_state = Arc::new(Mutex::new(PlayState::Stopped));
-        let visualizer_buf = Arc::new(crate::analyzer::AudioVisualizerBuffer::new(4096));
-        let spectrum_enabled = Arc::new(std::sync::atomic::AtomicBool::new(false));
-        let output_sample_rate = Arc::new(AtomicU32::new(44100));
-        let output_channels = Arc::new(std::sync::atomic::AtomicU16::new(2));
-        let output_device_name = Arc::new(parking_lot::RwLock::new(get_default_device_name()));
-        let active_decoder_name = Arc::new(parking_lot::RwLock::new(None));
-        let equalizer = Arc::new(Mutex::new(luminous_equalizer::Equalizer::new()));
-        let loudness_gain = Arc::new(AtomicU32::new(1.0f32.to_bits()));
-        let fade_gain = Arc::new(AtomicU32::new(1.0f32.to_bits()));
-
         let shared = Arc::new(AudioShared {
-            position: Arc::clone(&position),
-            volume: Arc::clone(&volume),
-            play_state: Arc::clone(&play_state),
-            visualizer_buf: Arc::clone(&visualizer_buf),
-            output_sample_rate: Arc::clone(&output_sample_rate),
-            output_channels: Arc::clone(&output_channels),
-            output_device_name: Arc::clone(&output_device_name),
-            active_decoder_name: Arc::clone(&active_decoder_name),
-            equalizer: Arc::clone(&equalizer),
-            loudness_gain: Arc::clone(&loudness_gain),
+            open_source: Box::new(open_source),
+            position: Arc::new(AtomicU64::new(0)),
+            volume: Arc::new(AtomicU32::new(1.0f32.to_bits())),
+            play_state: Arc::new(Mutex::new(EngineState::Stopped)),
+            visualizer_buf: Arc::new(spectrum::AudioVisualizerBuffer::new(4096)),
+            output_sample_rate: Arc::new(AtomicU32::new(44100)),
+            output_channels: Arc::new(std::sync::atomic::AtomicU16::new(2)),
+            output_device_name: Arc::new(parking_lot::RwLock::new(get_default_device_name())),
+            equalizer: Arc::new(Mutex::new(luminous_equalizer::Equalizer::new())),
+            loudness_gain: Arc::new(AtomicU32::new(1.0f32.to_bits())),
+            loudness_generation: AtomicU64::new(0),
             loudness_switch_at: AtomicU64::new(NO_LOUDNESS_SWITCH),
             loudness_switch_gain: AtomicU32::new(1.0f32.to_bits()),
-            fade_gain: Arc::clone(&fade_gain),
+            fade_gain: Arc::new(AtomicU32::new(1.0f32.to_bits())),
         });
         let shared_clone = Arc::clone(&shared);
 
@@ -361,15 +339,7 @@ impl AudioEngine {
         Self {
             cmd_tx,
             event_rx: Arc::new(Mutex::new(event_rx)),
-            position_nanosec: position,
-            volume,
-            play_state,
-            visualizer_buf,
-            spectrum_enabled,
-            output_sample_rate,
-            equalizer,
-            loudness_gain,
-            fade_gain,
+            spectrum_enabled: std::sync::atomic::AtomicBool::new(false),
             shared,
         }
     }
@@ -380,43 +350,45 @@ impl AudioEngine {
             .map_err(|_| anyhow!("audio thread shut down"))
     }
 
-    pub fn play(&self, song: Box<Song>, start_nanosec: u64) -> Result<()> {
+    pub fn play(&self, track: Track, start_nanosec: u64) -> Result<()> {
         self.send_cmd(AudioCommand::Play(PlayRequest {
-            song,
+            track,
             start_nanosec,
         }))
     }
 
-    pub fn cue(&self, song: Box<Song>, start_nanosec: u64) -> Result<()> {
-        {
-            let mut s = self.play_state.lock();
-            *s = crate::models::PlayState::Paused;
-        }
-        self.position_nanosec
-            .store(start_nanosec, Ordering::Relaxed);
+    /// Load `track` paused at `start_nanosec`, ready for `resume`.
+    pub fn cue(&self, track: Track, start_nanosec: u64) -> Result<()> {
+        *self.shared.play_state.lock() = EngineState::Paused;
+        self.shared.position.store(start_nanosec, Ordering::Relaxed);
         self.send_cmd(AudioCommand::Cue(PlayRequest {
-            song,
+            track,
             start_nanosec,
         }))
     }
 
-    pub fn preload_next(&self, song: Box<Song>, start_nanosec: u64) -> Result<()> {
+    /// Prime the track that follows the current one, for a gapless handover.
+    /// The usual answer to [`AudioEvent::AboutToFinish`].
+    pub fn preload_next(&self, track: Track, start_nanosec: u64) -> Result<()> {
         self.send_cmd(AudioCommand::PreloadNext(PlayRequest {
-            song,
+            track,
             start_nanosec,
         }))
     }
 
+    /// Like `preload_next`, but overlap the two tracks for `crossfade_secs`
+    /// (at most [`MAX_AUTO_CROSSFADE_SECS`]); `loudness_gain` takes over
+    /// when the overlap starts.
     pub fn preload_next_with_crossfade(
         &self,
-        song: Box<Song>,
+        track: Track,
         start_nanosec: u64,
         crossfade_secs: f32,
         loudness_gain: f32,
     ) -> Result<()> {
         self.send_cmd(AudioCommand::PreloadNextCrossfade(
             PlayRequest {
-                song,
+                track,
                 start_nanosec,
             },
             crossfade_secs,
@@ -424,72 +396,113 @@ impl AudioEngine {
         ))
     }
 
+    /// Drop a primed next track (the playback context changed) and re-arm
+    /// `AboutToFinish` so a fresh preload can be requested.
     pub fn clear_preload(&self) -> Result<()> {
         self.send_cmd(AudioCommand::ClearPreload)
     }
 
-    pub fn pause(&self) -> Result<()> {
-        self.send_cmd(AudioCommand::Pause)
+    /// Pause, fading out over `fade_ms` first (0 pauses at once).
+    pub fn pause(&self, fade_ms: u32) -> Result<()> {
+        self.send_cmd(AudioCommand::Pause(fade_ms))
     }
 
-    pub fn pause_with_fade(&self, fade_ms: u32) -> Result<()> {
-        self.send_cmd(AudioCommand::PauseWithFade(fade_ms))
+    /// Resume a paused or cued track. `fade_ms` is the fade-in length
+    /// (not yet honoured, #1718).
+    pub fn resume(&self, fade_ms: u32) -> Result<()> {
+        self.send_cmd(AudioCommand::Resume(fade_ms))
     }
 
-    pub fn resume(&self) -> Result<()> {
-        self.send_cmd(AudioCommand::Resume)
-    }
-
-    pub fn resume_with_fade(&self, fade_ms: u32) -> Result<()> {
-        self.send_cmd(AudioCommand::ResumeWithFade(fade_ms))
-    }
-
-    pub fn stop(&self) -> Result<()> {
-        self.send_cmd(AudioCommand::Stop)
-    }
-
-    pub fn stop_with_fade(&self, fade_ms: u32) -> Result<()> {
-        self.send_cmd(AudioCommand::StopWithFade(fade_ms))
+    /// Stop, fading out over `fade_ms` first (0 stops at once).
+    pub fn stop(&self, fade_ms: u32) -> Result<()> {
+        self.send_cmd(AudioCommand::Stop(fade_ms))
     }
 
     pub fn seek_to(&self, position_nanosec: u64) -> Result<()> {
         self.send_cmd(AudioCommand::SeekTo(position_nanosec))
     }
 
+    /// Master volume, clamped to 0.0–1.0.
     pub fn set_volume(&self, vol: f32) -> Result<()> {
         let vol = vol.clamp(0.0, 1.0);
-        self.volume.store(vol.to_bits(), Ordering::Relaxed);
+        self.shared.volume.store(vol.to_bits(), Ordering::Relaxed);
         Ok(())
     }
 
-    /// Set the per-track loudness-normalization multiplier (#77).
+    /// Step the per-track loudness-normalization multiplier (#77) at once,
+    /// e.g. as a track starts. Cancels any ramp in progress.
     pub fn set_loudness_gain(&self, gain: f32) {
-        self.loudness_gain
+        self.shared
+            .loudness_generation
+            .fetch_add(1, Ordering::AcqRel);
+        self.shared
+            .loudness_gain
             .store(gain.max(0.0).to_bits(), Ordering::Relaxed);
     }
 
-    /// Set the fade-envelope multiplier (#79).
-    pub fn set_fade_gain(&self, gain: f32) {
-        self.fade_gain
-            .store(gain.clamp(0.0, 1.0).to_bits(), Ordering::Relaxed);
+    /// Glide the loudness multiplier to `target` over `duration_ms`, for a
+    /// change in the middle of continuous audio where a hard step would be
+    /// an audible click. Returns at once; the ramp runs on its own thread
+    /// and stops early if any newer loudness write (a set, another ramp, a
+    /// crossfade's switch) lands first.
+    pub fn ramp_loudness_gain(&self, target: f32, duration_ms: u32) {
+        let target = target.max(0.0);
+        let generation = self
+            .shared
+            .loudness_generation
+            .fetch_add(1, Ordering::AcqRel)
+            + 1;
+        let start = f32::from_bits(self.shared.loudness_gain.load(Ordering::Relaxed));
+        if duration_ms == 0 || (target - start).abs() < f32::EPSILON {
+            self.shared
+                .loudness_gain
+                .store(target.to_bits(), Ordering::Relaxed);
+            return;
+        }
+        let shared = Arc::clone(&self.shared);
+        let spawned = std::thread::Builder::new()
+            .name("luminous-loudness-ramp".into())
+            .spawn(move || {
+                let (steps, step_dur) = ramp_steps(duration_ms);
+                for i in 0..=steps {
+                    if shared.loudness_generation.load(Ordering::Acquire) != generation {
+                        return;
+                    }
+                    let g = ramp_gain_at_step(start, target, steps, i);
+                    shared.loudness_gain.store(g.to_bits(), Ordering::Relaxed);
+                    std::thread::sleep(step_dur);
+                }
+            });
+        if spawned.is_err() {
+            // No thread to ramp on: land on the target rather than stay put.
+            self.shared
+                .loudness_gain
+                .store(target.to_bits(), Ordering::Relaxed);
+        }
     }
 
+    /// Audible position in the current track.
     pub fn current_position_nanosec(&self) -> u64 {
-        self.position_nanosec.load(Ordering::Relaxed)
+        self.shared.position.load(Ordering::Relaxed)
     }
 
     pub fn current_volume(&self) -> f32 {
-        f32::from_bits(self.volume.load(Ordering::Relaxed))
+        f32::from_bits(self.shared.volume.load(Ordering::Relaxed))
     }
 
-    pub fn current_state(&self) -> PlayState {
-        *self.play_state.lock()
+    /// The loudness multiplier in effect now (mid-ramp, the current step).
+    pub fn current_loudness_gain(&self) -> f32 {
+        f32::from_bits(self.shared.loudness_gain.load(Ordering::Relaxed))
+    }
+
+    pub fn current_state(&self) -> EngineState {
+        *self.shared.play_state.lock()
     }
 
     /// One controlled escape hatch for equalizer mutation/inspection —
     /// centralizes locking instead of callers reaching into the field.
     pub fn with_equalizer<R>(&self, f: impl FnOnce(&mut luminous_equalizer::Equalizer) -> R) -> R {
-        let mut eq = self.equalizer.lock();
+        let mut eq = self.shared.equalizer.lock();
         f(&mut eq)
     }
 
@@ -501,132 +514,30 @@ impl AudioEngine {
         self.spectrum_enabled.store(enabled, Ordering::Relaxed);
     }
 
-    /// Compute a spectrum snapshot from the current visualizer buffer at the
-    /// engine's actual output sample rate. Returns `None` before the output
-    /// stream has been built (sample rate not yet known to be accurate).
+    /// Magnitude spectrum of what was most recently played, `fft_size / 2`
+    /// bins scaled for display, computed at the output's actual sample rate.
     pub fn spectrum_snapshot(&self, fft_size: usize) -> Vec<f32> {
-        let sample_rate = self.output_sample_rate.load(Ordering::Relaxed);
-        crate::analyzer::calculate_spectrum(&self.visualizer_buf, fft_size, sample_rate)
+        let sample_rate = self.shared.output_sample_rate.load(Ordering::Relaxed);
+        spectrum::calculate_spectrum(&self.shared.visualizer_buf, fft_size, sample_rate)
     }
 
-    /// Snapshots the current audio pipeline configuration for the active track (#1041).
-    pub fn get_pipeline_info(
-        &self,
-        current_song: Option<&Song>,
-        loudness_source: LoudnessGainSource,
-        loudness_gain_db: Option<f32>,
-    ) -> Option<AudioPipelineInfo> {
-        let song = current_song?;
-
-        let bitrate = song.bitrate;
-        let sample_rate = song.samplerate.map(|r| r as u32);
-        let bit_depth = song.bitdepth;
-        let quality_tier = classify_quality_tier(song.filetype, bitrate, sample_rate, bit_depth);
-
-        let input_source = song.source;
-        let input_format = song.filetype.display_name().to_string();
-        let input_codec = match song.filetype {
-            FileType::Mp3 => "mp3",
-            FileType::Flac | FileType::OggFlac => "flac",
-            FileType::OggVorbis => "vorbis",
-            FileType::OggOpus => "opus",
-            FileType::OggSpeex => "speex",
-            FileType::Aac => "aac",
-            FileType::Alac => "alac",
-            FileType::Aiff => "pcm_s16be",
-            FileType::Wav => "pcm_s16le",
-            FileType::WavPack => "wavpack",
-            FileType::Mpc => "musepack",
-            FileType::TrueAudio => "trueaudio",
-            FileType::Ape => "monkeys_audio",
-            FileType::Dsf | FileType::Dsdiff => "dsd",
-            FileType::Asf => "wma",
-            FileType::Stream => "stream",
-            FileType::Unknown => "unknown",
-        }
-        .to_string();
-
-        let decoder_name = self
-            .shared
-            .active_decoder_name
-            .read()
-            .clone()
-            .unwrap_or_else(|| format!("Symphonia {} decoder", song.filetype.display_name()));
-        let headroom = "32-bit float PCM".to_string();
-
-        let out_rate = self.shared.output_sample_rate.load(Ordering::Relaxed);
-        let resample_rate = if let Some(in_rate) = sample_rate {
-            if in_rate != out_rate && out_rate > 0 {
-                Some(out_rate)
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        let (eq_enabled, eq_mode, eq_preamp_db, eq_active_bands_count) = {
-            let eq = self.equalizer.lock();
-            let config = eq.config();
-            let mode_str = match config.mode {
-                luminous_equalizer::EqMode::Graphic10 => "10-band Graphic",
-                luminous_equalizer::EqMode::Parametric => "Parametric",
-            };
-            (
-                config.enabled,
-                Some(mode_str.to_string()),
-                Some(config.preamp),
-                eq.active_band_count(),
-            )
-        };
-
-        let limiter = "-1.0 dBTP True Peak limiter".to_string();
-        let output_sample_rate = if out_rate > 0 { out_rate } else { 44100 };
-        let output_channels = {
-            let ch = self.shared.output_channels.load(Ordering::Relaxed);
-            if ch > 0 {
-                ch
-            } else {
-                2
-            }
-        };
-        let output_format = "32-bit float PCM".to_string();
-        let output_device_name = self
+    /// The output stage as currently configured, with sensible defaults
+    /// before the first stream is built.
+    pub fn output_info(&self) -> OutputInfo {
+        let rate = self.shared.output_sample_rate.load(Ordering::Relaxed);
+        let channels = self.shared.output_channels.load(Ordering::Relaxed);
+        let device_name = self
             .shared
             .output_device_name
             .read()
             .clone()
-            .unwrap_or_else(|| {
-                get_default_device_name().unwrap_or_else(|| "Default Audio Device".to_string())
-            });
-        let output_backend = "CPAL".to_string();
-
-        Some(AudioPipelineInfo {
-            quality_tier,
-            input_source,
-            input_format,
-            input_codec,
-            input_bitrate_kbps: bitrate,
-            input_sample_rate: sample_rate,
-            input_bit_depth: bit_depth,
-            input_channels: song.channels.map(|c| c as u16),
-            input_path: song.path.clone().or_else(|| song.url.clone()),
-            decoder_name,
-            headroom,
-            resample_rate,
-            loudness_source,
-            loudness_gain_db,
-            eq_enabled,
-            eq_mode,
-            eq_preamp_db,
-            eq_active_bands_count,
-            limiter,
-            output_sample_rate,
-            output_channels,
-            output_format,
-            output_device_name,
-            output_backend,
-        })
+            .or_else(get_default_device_name)
+            .unwrap_or_else(|| "Default Audio Device".to_string());
+        OutputInfo {
+            sample_rate: if rate > 0 { rate } else { 44100 },
+            channels: if channels > 0 { channels } else { 2 },
+            device_name,
+        }
     }
 
     /// A cheaply-cloneable handle to the event receiver. Callers lock it
@@ -636,13 +547,6 @@ impl AudioEngine {
     pub fn events(&self) -> Arc<Mutex<mpsc::Receiver<AudioEvent>>> {
         Arc::clone(&self.event_rx)
     }
-
-    /// A cheaply-cloneable handle to the loudness-gain atomic, for
-    /// subsystems that need shared cross-thread read/write access (e.g.
-    /// ramping it smoothly rather than stepping it via `set_loudness_gain`).
-    pub fn loudness_gain_handle(&self) -> Arc<AtomicU32> {
-        Arc::clone(&self.loudness_gain)
-    }
 }
 
 impl Default for AudioEngine {
@@ -651,471 +555,9 @@ impl Default for AudioEngine {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Media source & track opening (source-agnostic seam for #682 WebDAV / #82 streaming)
-// ---------------------------------------------------------------------------
-
-/// Splits a `user:pass@` prefix out of a URL's authority, if present, returning
-/// the credential-free URL and a ready-to-use `Authorization: Basic ...` header
-/// value. WebDAV songs synced before #1492 may still carry credentials embedded
-/// as userinfo until the migration scrubs them; current rows are credential-free
-/// and get their header from the registered WebDAV resolver instead.
-fn extract_basic_auth(url: &str) -> (String, Option<String>) {
-    let Ok(mut parsed) = reqwest::Url::parse(url) else {
-        return (url.to_string(), None);
-    };
-    let username = parsed.username().to_string();
-    let password = parsed.password().map(|p| p.to_string());
-    if username.is_empty() && password.is_none() {
-        return (url.to_string(), None);
-    }
-
-    use percent_encoding::percent_decode_str;
-    let decoded_user = percent_decode_str(&username)
-        .decode_utf8_lossy()
-        .to_string();
-    let decoded_pass = password
-        .as_deref()
-        .map(|p| percent_decode_str(p).decode_utf8_lossy().to_string())
-        .unwrap_or_default();
-
-    let _ = parsed.set_username("");
-    let _ = parsed.set_password(None);
-
-    use base64::Engine;
-    let encoded =
-        base64::engine::general_purpose::STANDARD.encode(format!("{decoded_user}:{decoded_pass}"));
-    (parsed.to_string(), Some(format!("Basic {encoded}")))
-}
-
-/// A seekable HTTP media source using HTTP Range requests (`Range: bytes=start-end`).
-/// Enables streaming audio from WebDAV and remote HTTP endpoints without full downloads.
-pub struct HttpRangeReader {
-    url: String,
-    /// Names the source in error messages instead of `url`, which for
-    /// Subsonic carries a password-equivalent auth token.
-    label: String,
-    auth_header: Option<String>,
-    client: reqwest::blocking::Client,
-    content_length: u64,
-    position: u64,
-    buffer: Vec<u8>,
-    buffer_start: u64,
-    chunk_size: usize,
-}
-
-/// True for replies that are an API error document rather than media —
-/// Subsonic servers answer a bad `stream.view` request with HTTP 200 and a
-/// JSON (or XML) body.
-fn is_error_content_type(headers: &reqwest::header::HeaderMap) -> bool {
-    headers
-        .get(reqwest::header::CONTENT_TYPE)
-        .and_then(|v| v.to_str().ok())
-        .map(|ct| {
-            let ct = ct.to_ascii_lowercase();
-            ct.starts_with("application/json")
-                || ct.starts_with("application/xml")
-                || ct.starts_with("text/xml")
-        })
-        .unwrap_or(false)
-}
-
-/// Parses `Content-Range: bytes {first}-{last}/{total}` into `(first, total)`;
-/// `total` is `None` when the server sends `*`.
-fn parse_content_range(headers: &reqwest::header::HeaderMap) -> Option<(u64, Option<u64>)> {
-    let value = headers.get(reqwest::header::CONTENT_RANGE)?.to_str().ok()?;
-    let (range, total) = value.trim().strip_prefix("bytes ")?.split_once('/')?;
-    let first = range.split_once('-')?.0.trim().parse().ok()?;
-    Some((first, total.trim().parse().ok()))
-}
-
-impl HttpRangeReader {
-    pub fn new(url: &str) -> Result<Self, String> {
-        let (url, auth_header) = extract_basic_auth(url);
-        let label = url.clone();
-        Self::open(url, label, auth_header)
-    }
-
-    /// Like `new`, but sends `auth_header` as the `Authorization` value.
-    pub fn new_with_auth(url: &str, auth_header: Option<String>) -> Result<Self, String> {
-        Self::open(url.to_string(), url.to_string(), auth_header)
-    }
-
-    /// Like `new`, but error messages name the source as `label` rather than
-    /// quoting `url` — for signed URLs that must never reach logs or the UI.
-    pub fn new_with_label(url: &str, label: &str) -> Result<Self, String> {
-        Self::open(url.to_string(), label.to_string(), None)
-    }
-
-    fn open(url: String, label: String, auth_header: Option<String>) -> Result<Self, String> {
-        let client = reqwest::blocking::Client::builder()
-            .timeout(std::time::Duration::from_secs(30))
-            .build()
-            .map_err(|e| format!("Failed to build HTTP client: {e}"))?;
-
-        // HEAD discovers Content-Length cheaply. Not every server answers HEAD
-        // (or answers it with a length), so a failure here isn't fatal: the
-        // first range GET below reports the real error, and its Content-Range
-        // supplies the length instead.
-        let mut head_req = client.head(&url);
-        if let Some(ref h) = auth_header {
-            head_req = head_req.header(reqwest::header::AUTHORIZATION, h);
-        }
-        let content_length = head_req
-            .send()
-            .ok()
-            .filter(|resp| resp.status().is_success() && !is_error_content_type(resp.headers()))
-            .and_then(|resp| {
-                resp.headers()
-                    .get(reqwest::header::CONTENT_LENGTH)
-                    .and_then(|v| v.to_str().ok())
-                    .and_then(|s| s.parse::<u64>().ok())
-            })
-            .unwrap_or(0);
-
-        let mut reader = Self {
-            url,
-            label,
-            auth_header,
-            client,
-            content_length,
-            position: 0,
-            buffer: Vec::new(),
-            buffer_start: 0,
-            chunk_size: 256 * 1024, // 256 KB buffer chunk
-        };
-
-        // Pre-fetch initial chunk so first read is immediate
-        reader.fill_buffer(0)?;
-        Ok(reader)
-    }
-
-    fn fill_buffer(&mut self, start: u64) -> Result<(), String> {
-        let end = if self.content_length > 0 {
-            (start + self.chunk_size as u64 - 1).min(self.content_length - 1)
-        } else {
-            start + self.chunk_size as u64 - 1
-        };
-
-        let range_header = format!("bytes={start}-{end}");
-        let mut req = self
-            .client
-            .get(&self.url)
-            .header(reqwest::header::RANGE, range_header);
-        if let Some(ref h) = self.auth_header {
-            req = req.header(reqwest::header::AUTHORIZATION, h);
-        }
-        // `without_url`: reqwest errors otherwise quote the (signed) URL.
-        let mut resp = req.send().map_err(|e| {
-            format!(
-                "Range request failed for '{}': {}",
-                self.label,
-                e.without_url()
-            )
-        })?;
-
-        if resp.status() == reqwest::StatusCode::RANGE_NOT_SATISFIABLE {
-            self.buffer_start = start;
-            self.buffer.clear();
-            return Ok(());
-        }
-
-        if !resp.status().is_success() {
-            return Err(format!(
-                "HTTP error {} when accessing '{}'",
-                resp.status(),
-                self.label
-            ));
-        }
-
-        if is_error_content_type(resp.headers()) {
-            let body = resp.text().unwrap_or_default();
-            let reason = crate::subsonic::describe_error_body(&body)
-                .unwrap_or_else(|| "the server sent an error page instead of audio".into());
-            return Err(format!("Can't play '{}': {reason}", self.label));
-        }
-
-        let partial = resp.status() == reqwest::StatusCode::PARTIAL_CONTENT;
-        let content_range = if partial {
-            parse_content_range(resp.headers())
-        } else {
-            None
-        };
-
-        let mut data = Vec::new();
-        resp.copy_to(&mut data)
-            .map_err(|e| format!("Failed to read stream chunk: {}", e.without_url()))?;
-
-        if partial {
-            if let Some((_, Some(total))) = content_range {
-                if self.content_length == 0 {
-                    self.content_length = total;
-                }
-            }
-            self.buffer_start = content_range.map_or(start, |(first, _)| first);
-        } else {
-            // A plain 200 ignored the Range header and sent the whole file
-            // from byte 0, whatever offset was asked for.
-            if self.content_length == 0 {
-                self.content_length = data.len() as u64;
-            }
-            self.buffer_start = 0;
-        }
-        self.buffer = data;
-        Ok(())
-    }
-}
-
-impl Read for HttpRangeReader {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        if self.content_length > 0 && self.position >= self.content_length {
-            return Ok(0); // EOF
-        }
-
-        let in_buffer = self.position >= self.buffer_start
-            && self.position < self.buffer_start + self.buffer.len() as u64;
-
-        if !in_buffer {
-            if let Err(e) = self.fill_buffer(self.position) {
-                return Err(std::io::Error::other(e));
-            }
-            if self.buffer.is_empty() {
-                return Ok(0);
-            }
-            if self.position < self.buffer_start {
-                return Err(std::io::Error::other(format!(
-                    "Server returned the wrong byte range for '{}'",
-                    self.label
-                )));
-            }
-        }
-
-        let offset_in_buffer = (self.position - self.buffer_start) as usize;
-        let available = self.buffer.len().saturating_sub(offset_in_buffer);
-        if available == 0 {
-            return Ok(0);
-        }
-
-        let to_read = buf.len().min(available);
-        buf[..to_read].copy_from_slice(&self.buffer[offset_in_buffer..offset_in_buffer + to_read]);
-        self.position += to_read as u64;
-        Ok(to_read)
-    }
-}
-
-impl Seek for HttpRangeReader {
-    fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
-        let new_pos = match pos {
-            SeekFrom::Start(offset) => offset as i64,
-            SeekFrom::Current(offset) => self.position as i64 + offset,
-            SeekFrom::End(offset) => {
-                if self.content_length > 0 {
-                    self.content_length as i64 + offset
-                } else {
-                    return Err(std::io::Error::new(
-                        std::io::ErrorKind::InvalidInput,
-                        "Cannot seek from end of stream with unknown length",
-                    ));
-                }
-            }
-        };
-
-        if new_pos < 0 {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                "Cannot seek to a negative position",
-            ));
-        }
-
-        self.position = new_pos as u64;
-        Ok(self.position)
-    }
-}
-
-impl MediaSource for HttpRangeReader {
-    fn is_seekable(&self) -> bool {
-        true
-    }
-
-    fn byte_len(&self) -> Option<u64> {
-        if self.content_length > 0 {
-            Some(self.content_length)
-        } else {
-            None
-        }
-    }
-}
-
-/// Turns a stored `subsonic://` path into a signed stream URL. Registered at
-/// startup (it needs the database, which this module doesn't own).
-type StreamUrlResolver = dyn Fn(&str) -> Result<String, String> + Send + Sync;
-
-static SUBSONIC_RESOLVER: OnceLock<Box<StreamUrlResolver>> = OnceLock::new();
-
-/// Installs the `subsonic://` resolver used by `open_media_source` (#1163).
-/// Only the first registration takes effect.
-pub fn register_subsonic_resolver(
-    resolver: impl Fn(&str) -> Result<String, String> + Send + Sync + 'static,
-) {
-    let _ = SUBSONIC_RESOLVER.set(Box::new(resolver));
-}
-
-/// Looks up the `Authorization` header for a credential-free WebDAV song URL
-/// from the saved server it belongs to (#1492). Registered at startup (it needs
-/// the database, which this module doesn't own).
-type WebDavAuthResolver = dyn Fn(&str) -> Option<String> + Send + Sync;
-
-static WEBDAV_AUTH_RESOLVER: OnceLock<Box<WebDavAuthResolver>> = OnceLock::new();
-
-/// Installs the WebDAV credential resolver used by `open_media_source`.
-/// Only the first registration takes effect.
-pub fn register_webdav_auth_resolver(
-    resolver: impl Fn(&str) -> Option<String> + Send + Sync + 'static,
-) {
-    let _ = WEBDAV_AUTH_RESOLVER.set(Box::new(resolver));
-}
-
-/// Open a playable media source. Local files or remote HTTP/WebDAV endpoints (#682).
-/// Shared with `OfflineDecoder` so waveform/band-waveform generation and R128
-/// loudness analysis also work against WebDAV songs, not just live playback.
-pub(crate) fn open_media_source(path: &str) -> Result<Box<dyn MediaSource>, String> {
-    if path.starts_with(crate::subsonic::URI_SCHEME) {
-        // Signed fresh on every open; the URL itself never leaves this
-        // function, and errors name the track by its `subsonic://` path.
-        let resolver = SUBSONIC_RESOLVER
-            .get()
-            .ok_or_else(|| format!("Can't play '{path}': Subsonic playback isn't available"))?;
-        let url = resolver(path).map_err(|e| format!("Can't play '{path}': {e}"))?;
-        let reader = HttpRangeReader::new_with_label(&url, path)?;
-        Ok(Box::new(reader))
-    } else if path.starts_with("http://") || path.starts_with("https://") {
-        let (url, embedded) = extract_basic_auth(path);
-        let auth = embedded.or_else(|| WEBDAV_AUTH_RESOLVER.get().and_then(|r| r(&url)));
-        let reader = HttpRangeReader::new_with_auth(&url, auth)?;
-        Ok(Box::new(reader))
-    } else {
-        let file =
-            std::fs::File::open(path).map_err(|e| format!("Cannot open file '{path}': {e}"))?;
-        Ok(Box::new(file))
-    }
-}
-
-/// A media source opened and probed, with a decoder built for its default
-/// audio track. The one place that knows how to get from a path to decodable
-/// packets; playback (`ActiveTrack`) and offline analysis (`OfflineDecoder`)
-/// each add their own reading policy on top.
-struct ProbedTrack {
-    format: Box<dyn FormatReader>,
-    decoder: Box<dyn AudioDecoder>,
-    track_id: u32,
-    /// Falls back to 44.1 kHz when the container doesn't say.
-    sample_rate: u32,
-    /// Falls back to stereo when the container doesn't say.
-    channels: usize,
-}
-
-impl ProbedTrack {
-    /// Open `path` (local file or remote URL, via `open_media_source`). Its
-    /// extension hints the probe; when it has none (e.g. a stream URL),
-    /// `hint_fallback`'s extension is used instead.
-    fn open(path: &str, hint_fallback: Option<&str>) -> Result<Self, String> {
-        let source = open_media_source(path)?;
-        let mut hint = Hint::new();
-        if let Some(ext) = std::iter::once(path)
-            .chain(hint_fallback)
-            .find_map(|p| Path::new(p).extension().and_then(|e| e.to_str()))
-        {
-            hint.with_extension(ext);
-        }
-
-        let mss = MediaSourceStream::new(source, Default::default());
-        let format = symphonia::default::get_probe()
-            .probe(
-                &hint,
-                mss,
-                FormatOptions::default(),
-                MetadataOptions::default(),
-            )
-            .map_err(|e| format!("Format probe failed: {e}"))?;
-
-        let track = format
-            .default_track(TrackType::Audio)
-            .ok_or_else(|| "No audio track found".to_string())?;
-        let track_id = track.id;
-        let audio_params = track
-            .codec_params
-            .as_ref()
-            .and_then(|c| c.audio())
-            .ok_or_else(|| "No audio codec parameters".to_string())?;
-        let decoder = CODEC_REGISTRY
-            .make_audio_decoder(audio_params, &AudioDecoderOptions::default())
-            .map_err(|e| format!("Decoder init failed: {e}"))?;
-        let sample_rate = audio_params.sample_rate.unwrap_or(44100);
-        let channels = audio_params
-            .channels
-            .as_ref()
-            .map(|c| c.count())
-            .unwrap_or(2);
-
-        Ok(Self {
-            format,
-            decoder,
-            track_id,
-            sample_rate,
-            channels,
-        })
-    }
-}
-
-/// Whole-file decode for offline analysis (waveform peaks, R128 loudness):
-/// runs as fast as the CPU allows, with none of playback's pacing, seeking or
-/// resampling. Open it, read `sample_rate()`, then drive `decode_blocks`.
-pub(crate) struct OfflineDecoder {
-    track: ProbedTrack,
-}
-
-impl OfflineDecoder {
-    pub(crate) fn open(path: &Path) -> Result<Self> {
-        let track = ProbedTrack::open(&path.to_string_lossy(), None).map_err(|e| anyhow!(e))?;
-        Ok(Self { track })
-    }
-
-    pub(crate) fn sample_rate(&self) -> u32 {
-        self.track.sample_rate
-    }
-
-    /// Decode to the end, handing each decoded packet to `on_block` as planar
-    /// f32 channels: at most `max_channels`, all the same length. The planes
-    /// are a scratch buffer reused for the next packet, so callers accumulate
-    /// what they need rather than the whole file being held here. Corrupt
-    /// packets are skipped; any other error ends the decode early with
-    /// whatever was delivered so far.
-    pub(crate) fn decode_blocks(
-        mut self,
-        max_channels: usize,
-        mut on_block: impl FnMut(&[Vec<f32>]),
-    ) {
-        let track = &mut self.track;
-        let mut planes: Vec<Vec<f32>> = Vec::new();
-        while let Ok(Some(packet)) = track.format.next_packet() {
-            if packet.track_id != track.track_id {
-                continue;
-            }
-            match track.decoder.decode(&packet) {
-                Ok(decoded) => {
-                    decoded.copy_to_vecs_planar(&mut planes);
-                    on_block(&planes[..planes.len().min(max_channels)]);
-                }
-                Err(SymphoniaError::DecodeError(_)) => continue,
-                Err(_) => break,
-            }
-        }
-    }
-}
-
 /// A fully opened, probed, decode-ready track.
 struct ActiveTrack {
-    song: Box<Song>,
+    spec: Track,
     format: Box<dyn FormatReader>,
     decoder: Box<dyn AudioDecoder>,
     track_id: u32,
@@ -1123,7 +565,7 @@ struct ActiveTrack {
     src_channels: usize,
     resampler: Resampler,
     start_ns: u64,
-    /// Hard decode cutoff (CUE end boundary), from `songs.end_nanosec`.
+    /// Hard decode cutoff (CUE end boundary).
     end_ns: Option<u64>,
     /// Where `AboutToFinish` is measured from: the CUE end boundary if set,
     /// otherwise the tagged track length.
@@ -1136,26 +578,29 @@ struct ActiveTrack {
 
 impl ActiveTrack {
     fn open(
-        song: Box<Song>,
+        open_source: &SourceOpener,
+        spec: Track,
         start_nanosec: u64,
         target_rate: u32,
         target_channels: usize,
     ) -> Result<Self, String> {
-        let path = song
-            .path
-            .as_deref()
-            .or(song.stream_url.as_deref())
-            .or(song.url.as_deref())
-            .ok_or("Song has no playable path or URL".to_string())?
-            .to_owned();
-
+        if spec.location.is_empty() {
+            return Err("Track has no playable location".to_string());
+        }
+        let source = open_source(&spec.location)?;
+        // The location's own extension wins; a stream URL has none, so the
+        // spec's hint stands in.
+        let extension = Path::new(&spec.location)
+            .extension()
+            .and_then(|e| e.to_str())
+            .or(spec.extension_hint.as_deref());
         let ProbedTrack {
             mut format,
             mut decoder,
             track_id,
             sample_rate: src_rate,
             channels: src_channels,
-        } = ProbedTrack::open(&path, song.path.as_deref())?;
+        } = ProbedTrack::open(source, extension)?;
 
         if start_nanosec > 0 {
             let target_time = symphonia::core::units::Time::from_nanos(start_nanosec as i64);
@@ -1171,11 +616,11 @@ impl ActiveTrack {
             }
         }
 
-        let end_ns = (song.end_nanosec > 0).then_some(song.end_nanosec as u64);
-        let about_end_ns = end_ns.or_else(|| song.length_nanosec.map(|ns| ns.max(0) as u64));
+        let end_ns = spec.end_ns.filter(|&ns| ns > 0);
+        let about_end_ns = end_ns.or(spec.length_ns);
 
         Ok(Self {
-            song,
+            spec,
             format,
             decoder,
             track_id,
@@ -1204,7 +649,7 @@ fn samples_for_ns(ns: u64, rate: u32, channels: u16) -> u64 {
 struct PendingTransition {
     /// Absolute pushed-sample count at which the next track's audio begins.
     boundary_samples: u64,
-    finished_song: Box<Song>,
+    finished: Track,
 }
 
 /// The outgoing track of an auto-crossfade (#1238). Once the crossfade
@@ -1733,7 +1178,8 @@ fn decode_thread(
                         let target_channels = out.channels;
 
                         match ActiveTrack::open(
-                            r.song.clone(),
+                            &shared.open_source,
+                            r.track.clone(),
                             r.start_nanosec,
                             target_sample_rate,
                             target_channels as usize,
@@ -1752,7 +1198,7 @@ fn decode_thread(
                                 let _ = out.stream.pause();
                                 {
                                     let mut s = shared.play_state.lock();
-                                    *s = PlayState::Paused;
+                                    *s = EngineState::Paused;
                                 }
                                 shared.position.store(r.start_nanosec, Ordering::Relaxed);
                                 paused_req = Some(r);
@@ -1764,18 +1210,18 @@ fn decode_thread(
                         }
                         continue;
                     }
-                    Ok(AudioCommand::Resume) | Ok(AudioCommand::ResumeWithFade(_)) => {
+                    Ok(AudioCommand::Resume(_)) => {
                         if let Some(r) = paused_req.take() {
                             let cur_pos = shared.position.load(Ordering::Relaxed);
                             PlayRequest {
-                                song: r.song,
+                                track: r.track,
                                 start_nanosec: cur_pos,
                             }
                         } else {
                             continue;
                         }
                     }
-                    Ok(AudioCommand::Stop) | Ok(AudioCommand::StopWithFade(_)) => {
+                    Ok(AudioCommand::Stop(_)) => {
                         if let Some(out) = output.as_ref() {
                             let _ = out.stream.pause();
                         }
@@ -1783,7 +1229,7 @@ fn decode_thread(
                         shared.position.store(0, Ordering::Relaxed);
                         {
                             let mut s = shared.play_state.lock();
-                            *s = PlayState::Stopped;
+                            *s = EngineState::Stopped;
                         }
                         let _ = event_tx.send(AudioEvent::Stopped);
                         continue;
@@ -1813,7 +1259,7 @@ fn decode_thread(
         loop {
             match cmd_rx.try_recv() {
                 Ok(AudioCommand::Play(newer)) => req = newer,
-                Ok(AudioCommand::Stop) | Ok(AudioCommand::StopWithFade(_)) => {
+                Ok(AudioCommand::Stop(_)) => {
                     if let Some(out) = output.as_ref() {
                         let _ = out.stream.pause();
                     }
@@ -1821,7 +1267,7 @@ fn decode_thread(
                     shared.position.store(0, Ordering::Relaxed);
                     {
                         let mut s = shared.play_state.lock();
-                        *s = PlayState::Stopped;
+                        *s = EngineState::Stopped;
                     }
                     let _ = event_tx.send(AudioEvent::Stopped);
                     continue 'main;
@@ -1860,30 +1306,19 @@ fn decode_thread(
         let target_channels = out.channels;
 
         let current = match ActiveTrack::open(
-            req.song,
+            &shared.open_source,
+            req.track,
             req.start_nanosec,
             target_sample_rate,
             target_channels as usize,
         ) {
-            Ok(t) => {
-                // Every format decodes natively inside Symphonia except Opus (#1121),
-                // which has no first-party Symphonia decoder and goes through the
-                // libopus adapter instead — label it distinctly so the Audio Pipeline
-                // panel doesn't misattribute the decode to Symphonia itself.
-                *shared.active_decoder_name.write() =
-                    Some(if t.song.filetype == FileType::OggOpus {
-                        "libopus (via Symphonia)".to_string()
-                    } else {
-                        format!("Symphonia {} decoder", t.song.filetype.display_name())
-                    });
-                t
-            }
+            Ok(t) => t,
             Err(message) => {
                 let _ = event_tx.send(AudioEvent::Error { message });
                 continue;
             }
         };
-        let song_id = current.song.id;
+        let track_id = current.spec.id;
 
         // Clear whatever was left in the buffer from the previous track and
         // reset the played-sample counter for this track's start offset.
@@ -1904,10 +1339,10 @@ fn decode_thread(
 
         {
             let mut s = shared.play_state.lock();
-            *s = PlayState::Playing;
+            *s = EngineState::Playing;
         }
         shared.position.store(current.start_ns, Ordering::Relaxed);
-        let _ = event_tx.send(AudioEvent::Playing { song_id });
+        let _ = event_tx.send(AudioEvent::Playing { track_id });
 
         let mut session = DecodeSession {
             current,
@@ -2003,9 +1438,9 @@ fn check_and_rebuild_output(
             let cur_pos = shared.position.load(Ordering::Relaxed);
             // Position still belongs to the finished track while a transition
             // is draining, so that's the song to park on a failed rebuild.
-            let song_if_lost = match session.transition.as_ref() {
-                Some(t) => t.finished_song.clone(),
-                None => session.current.song.clone(),
+            let track_if_lost = match session.transition.as_ref() {
+                Some(t) => t.finished.clone(),
+                None => session.current.spec.clone(),
             };
             if let Some(old_out) = output.as_ref() {
                 let _ = old_out.stream.pause();
@@ -2032,7 +1467,8 @@ fn check_and_rebuild_output(
                         // SeekTo does) rather than seeking the new one to it.
                         session.next = None;
                         match ActiveTrack::open(
-                            t.finished_song,
+                            &shared.open_source,
+                            t.finished,
                             cur_pos,
                             session.target_sample_rate,
                             session.target_channels as usize,
@@ -2095,7 +1531,7 @@ fn check_and_rebuild_output(
                 Err(message) => {
                     return DeviceCheckOutcome::OutputLost(
                         PlayRequest {
-                            song: song_if_lost,
+                            track: track_if_lost,
                             start_nanosec: cur_pos,
                         },
                         message,
@@ -2122,7 +1558,7 @@ fn park_without_output(
     message: String,
 ) {
     shared.position.store(req.start_nanosec, Ordering::Relaxed);
-    *shared.play_state.lock() = PlayState::Paused;
+    *shared.play_state.lock() = EngineState::Paused;
     *paused_req = Some(req);
     let _ = event_tx.send(AudioEvent::Paused);
     let _ = event_tx.send(AudioEvent::OutputUnavailable { message });
@@ -2142,60 +1578,32 @@ fn handle_decode_command(
     let fade_gain = &shared.fade_gain;
     let position = &shared.position;
     match cmd {
-        Ok(AudioCommand::Pause) => {
-            let _ = out.stream.pause();
+        Ok(AudioCommand::Pause(dur_ms)) => {
+            fade_out_then(fade_gain, dur_ms, || {
+                let _ = out.stream.pause();
+            });
             {
                 let mut s = play_state.lock();
-                *s = PlayState::Paused;
+                *s = EngineState::Paused;
             }
             let _ = event_tx.send(AudioEvent::Paused);
-            // Position still belongs to the finished track while a
-            // transition is draining — resume must reopen that song.
             let song_for_resume = match session.transition.as_ref() {
-                Some(t) => t.finished_song.clone(),
-                None => session.current.song.clone(),
+                Some(t) => t.finished.clone(),
+                None => session.current.spec.clone(),
             };
             *paused_req = Some(PlayRequest {
-                song: song_for_resume,
+                track: song_for_resume,
                 start_nanosec: position.load(Ordering::Relaxed),
             });
             CmdOutcome::BreakDecode
         }
-        Ok(AudioCommand::PauseWithFade(dur_ms)) => {
-            apply_fade_ramp(fade_gain, 1.0, 0.0, dur_ms);
-            let _ = out.stream.pause();
-            fade_gain.store(1.0f32.to_bits(), Ordering::Relaxed);
-            {
-                let mut s = play_state.lock();
-                *s = PlayState::Paused;
-            }
-            let _ = event_tx.send(AudioEvent::Paused);
-            let song_for_resume = match session.transition.as_ref() {
-                Some(t) => t.finished_song.clone(),
-                None => session.current.song.clone(),
-            };
-            *paused_req = Some(PlayRequest {
-                song: song_for_resume,
-                start_nanosec: position.load(Ordering::Relaxed),
+        Ok(AudioCommand::Stop(dur_ms)) => {
+            fade_out_then(fade_gain, dur_ms, || {
+                let _ = out.stream.pause();
             });
-            CmdOutcome::BreakDecode
-        }
-        Ok(AudioCommand::Stop) => {
-            let _ = out.stream.pause();
             {
                 let mut s = play_state.lock();
-                *s = PlayState::Stopped;
-            }
-            let _ = event_tx.send(AudioEvent::Stopped);
-            CmdOutcome::BreakDecode
-        }
-        Ok(AudioCommand::StopWithFade(dur_ms)) => {
-            apply_fade_ramp(fade_gain, 1.0, 0.0, dur_ms);
-            let _ = out.stream.pause();
-            fade_gain.store(1.0f32.to_bits(), Ordering::Relaxed);
-            {
-                let mut s = play_state.lock();
-                *s = PlayState::Stopped;
+                *s = EngineState::Stopped;
             }
             let _ = event_tx.send(AudioEvent::Stopped);
             CmdOutcome::BreakDecode
@@ -2217,7 +1625,8 @@ fn handle_decode_command(
                 // AboutToFinish re-arms naturally on the new track.
                 session.next = None;
                 match ActiveTrack::open(
-                    t.finished_song,
+                    &shared.open_source,
+                    t.finished,
                     target_ns,
                     session.target_sample_rate,
                     session.target_channels as usize,
@@ -2272,13 +1681,14 @@ fn handle_decode_command(
         }
         Ok(AudioCommand::PreloadNext(preq)) => {
             match ActiveTrack::open(
-                preq.song,
+                &shared.open_source,
+                preq.track,
                 preq.start_nanosec,
                 session.target_sample_rate,
                 session.target_channels as usize,
             ) {
                 Ok(t) => {
-                    log::debug!("Preloaded next track {} for gapless", t.song.id);
+                    log::debug!("Preloaded next track {} for gapless", t.spec.id);
                     session.next = Some(t);
                     session.crossfade_secs = 0.0;
                 }
@@ -2293,13 +1703,14 @@ fn handle_decode_command(
         }
         Ok(AudioCommand::PreloadNextCrossfade(preq, secs, gain)) => {
             match ActiveTrack::open(
-                preq.song,
+                &shared.open_source,
+                preq.track,
                 preq.start_nanosec,
                 session.target_sample_rate,
                 session.target_channels as usize,
             ) {
                 Ok(t) => {
-                    log::debug!("Preloaded next track {} for crossfade", t.song.id);
+                    log::debug!("Preloaded next track {} for crossfade", t.spec.id);
                     session.next = Some(t);
                     session.crossfade_secs = secs;
                     session.crossfade_incoming_gain = gain;
@@ -2322,8 +1733,8 @@ fn handle_decode_command(
         }
         Err(mpsc::TryRecvError::Empty) => CmdOutcome::Continue,
         Err(mpsc::TryRecvError::Disconnected) => CmdOutcome::BreakDecode,
-        Ok(AudioCommand::Resume) | Ok(AudioCommand::ResumeWithFade(_)) => CmdOutcome::Continue, // already playing
-        Ok(AudioCommand::Cue(_)) => CmdOutcome::Continue, // already playing
+        Ok(AudioCommand::Resume(_)) => CmdOutcome::Continue, // already playing
+        Ok(AudioCommand::Cue(_)) => CmdOutcome::Continue,    // already playing
     }
 }
 
@@ -2361,10 +1772,10 @@ fn advance_transition_and_preload_signal(
                 session.pushed_samples += delta;
             }
             position.store(session.current.start_ns, Ordering::Relaxed);
-            let finished_song_id = t.finished_song.id;
+            let finished_track_id = t.finished.id;
             let _ = event_tx.send(AudioEvent::TrackTransitioned {
-                finished_song_id,
-                song_id: session.current.song.id,
+                finished_track_id,
+                track_id: session.current.spec.id,
             });
             session.transition = None;
         }
@@ -2380,7 +1791,7 @@ fn advance_transition_and_preload_signal(
             if pos + PRELOAD_LEAD_NS >= about_end {
                 session.current.about_to_finish_sent = true;
                 let _ = event_tx.send(AudioEvent::AboutToFinish {
-                    song_id: session.current.song.id,
+                    track_id: session.current.spec.id,
                 });
             }
         }
@@ -2393,7 +1804,7 @@ fn advance_transition_and_preload_signal(
 fn handle_eof(
     out: &mut AudioOutput,
     session: &mut DecodeSession,
-    play_state: &Arc<Mutex<PlayState>>,
+    play_state: &Arc<Mutex<EngineState>>,
     event_tx: &mpsc::Sender<AudioEvent>,
 ) -> EofOutcome {
     if !session.current.eof {
@@ -2416,7 +1827,7 @@ fn handle_eof(
         session.crossfade_secs = 0.0;
         session.transition = Some(PendingTransition {
             boundary_samples: session.pushed_samples,
-            finished_song: std::mem::replace(&mut session.current, n).song,
+            finished: std::mem::replace(&mut session.current, n).spec,
         });
         return EofOutcome::ContinueDecode;
     }
@@ -2425,12 +1836,12 @@ fn handle_eof(
     let is_empty = out.producer.occupied_len() == 0;
     if is_empty {
         let _ = event_tx.send(AudioEvent::TrackFinished {
-            song_id: session.current.song.id,
+            track_id: session.current.spec.id,
         });
         let _ = out.stream.pause();
         {
             let mut s = play_state.lock();
-            *s = PlayState::Stopped;
+            *s = EngineState::Stopped;
         }
         EofOutcome::BreakDecode
     } else {
@@ -2643,13 +2054,13 @@ fn maybe_start_crossfade(session: &mut DecodeSession, shared: &AudioShared) {
     let old = std::mem::replace(&mut session.current, incoming);
     log::debug!(
         "Crossfading {} -> {} over {} samples",
-        old.song.id,
-        session.current.song.id,
+        old.spec.id,
+        session.current.spec.id,
         total
     );
     session.transition = Some(PendingTransition {
         boundary_samples: session.pushed_samples,
-        finished_song: old.song.clone(),
+        finished: old.spec.clone(),
     });
     // The loudness gain is one global slot applied after mixing: switch it to
     // the incoming track's at the overlap's first sample, and pre-scale the
@@ -2775,8 +2186,9 @@ impl Resampler {
 
 /// Writes a 16-bit PCM WAV with one `Vec` of samples per channel (all the
 /// same length), for tests that need a real file on the offline decode path.
-#[cfg(test)]
-pub(crate) fn write_test_pcm16_wav(path: &Path, sample_rate: u32, channels: &[Vec<i16>]) {
+/// Also used by the app crate's tests, through the `test-util` feature.
+#[cfg(any(test, feature = "test-util"))]
+pub fn write_test_pcm16_wav(path: &Path, sample_rate: u32, channels: &[Vec<i16>]) {
     let channel_count = channels.len() as u16;
     let frames = channels.first().map_or(0, Vec::len);
     let block_align = channel_count * 2;
@@ -2813,14 +2225,15 @@ mod tests {
         AudioShared {
             position: Arc::new(AtomicU64::new(0)),
             volume: Arc::new(AtomicU32::new(1.0f32.to_bits())),
-            play_state: Arc::new(Mutex::new(PlayState::Playing)),
-            visualizer_buf: Arc::new(crate::analyzer::AudioVisualizerBuffer::new(4096)),
+            open_source: Box::new(open_file),
+            play_state: Arc::new(Mutex::new(EngineState::Playing)),
+            visualizer_buf: Arc::new(spectrum::AudioVisualizerBuffer::new(4096)),
             output_sample_rate: Arc::new(AtomicU32::new(44100)),
             output_channels: Arc::new(std::sync::atomic::AtomicU16::new(2)),
             output_device_name: Arc::new(parking_lot::RwLock::new(None)),
-            active_decoder_name: Arc::new(parking_lot::RwLock::new(None)),
             equalizer: Arc::new(Mutex::new(luminous_equalizer::Equalizer::new())),
             loudness_gain: Arc::new(AtomicU32::new(1.0f32.to_bits())),
+            loudness_generation: AtomicU64::new(0),
             loudness_switch_at: AtomicU64::new(NO_LOUDNESS_SWITCH),
             loudness_switch_gain: AtomicU32::new(1.0f32.to_bits()),
             fade_gain: Arc::new(AtomicU32::new(1.0f32.to_bits())),
@@ -2833,14 +2246,14 @@ mod tests {
         let (tx, rx) = mpsc::channel();
         let mut paused_req = None;
         let req = PlayRequest {
-            song: Box::new(Song::default()),
+            track: Track::default(),
             start_nanosec: 42_000,
         };
 
         park_without_output(&shared, &tx, &mut paused_req, req, "no device".into());
 
         assert_eq!(shared.position.load(Ordering::Relaxed), 42_000);
-        assert_eq!(*shared.play_state.lock(), PlayState::Paused);
+        assert_eq!(*shared.play_state.lock(), EngineState::Paused);
         assert_eq!(paused_req.expect("parked").start_nanosec, 42_000);
         assert!(matches!(rx.try_recv(), Ok(AudioEvent::Paused)));
         match rx.try_recv() {
@@ -3006,299 +2419,10 @@ mod tests {
         assert_eq!(out, vec![0.5, 0.5, -0.5, -0.5]);
     }
 
-    #[test]
-    fn extract_basic_auth_strips_credentials_and_builds_header() {
-        let (clean_url, header) =
-            extract_basic_auth("http://test:test@127.0.0.1:8080/Music/song.mp3");
-        assert_eq!(clean_url, "http://127.0.0.1:8080/Music/song.mp3");
-        // base64("test:test") == "dGVzdDp0ZXN0"
-        assert_eq!(header.as_deref(), Some("Basic dGVzdDp0ZXN0"));
-    }
-
-    #[test]
-    fn extract_basic_auth_no_credentials_is_unchanged() {
-        let (clean_url, header) = extract_basic_auth("http://127.0.0.1:8080/Music/song.mp3");
-        assert_eq!(clean_url, "http://127.0.0.1:8080/Music/song.mp3");
-        assert!(header.is_none());
-    }
-
-    #[tokio::test]
-    async fn http_range_reader_reads_and_seeks_correctly() {
-        use wiremock::matchers::{method, path};
-        use wiremock::{Mock, MockServer, ResponseTemplate};
-
-        let mock_server = MockServer::start().await;
-        let test_data = b"0123456789ABCDEFabcdefghijklmnopqrstuvwxyz";
-
-        // Mock HEAD request
-        Mock::given(method("HEAD"))
-            .and(path("/track.mp3"))
-            .respond_with(
-                ResponseTemplate::new(200)
-                    .insert_header("content-length", test_data.len().to_string())
-                    .insert_header("accept-ranges", "bytes"),
-            )
-            .mount(&mock_server)
-            .await;
-
-        // Mock GET request with Range parsing
-        Mock::given(method("GET"))
-            .and(path("/track.mp3"))
-            .respond_with(|req: &wiremock::Request| {
-                if let Some(range) = req
-                    .headers
-                    .get(wiremock::http::HeaderName::from_static("range"))
-                {
-                    let range_str = range.to_str().unwrap();
-                    if let Some(bytes_part) = range_str.strip_prefix("bytes=") {
-                        let parts: Vec<&str> = bytes_part.split('-').collect();
-                        let start: usize = parts[0].parse().unwrap_or(0);
-                        let end: usize = parts
-                            .get(1)
-                            .and_then(|s| s.parse().ok())
-                            .unwrap_or(test_data.len() - 1);
-                        let end = end.min(test_data.len() - 1);
-                        if start <= end && start < test_data.len() {
-                            let slice = &test_data[start..=end];
-                            return ResponseTemplate::new(206)
-                                .insert_header(
-                                    "content-range",
-                                    format!("bytes {start}-{end}/{}", test_data.len()),
-                                )
-                                .insert_header("content-length", slice.len().to_string())
-                                .set_body_bytes(slice.to_vec());
-                        }
-                    }
-                }
-                ResponseTemplate::new(200).set_body_bytes(test_data.to_vec())
-            })
-            .mount(&mock_server)
-            .await;
-
-        let url = format!("{}/track.mp3", mock_server.uri());
-        tokio::task::spawn_blocking(move || {
-            let mut reader = HttpRangeReader::new(&url).expect("reader failed to initialize");
-            assert_eq!(reader.byte_len(), Some(test_data.len() as u64));
-            assert!(reader.is_seekable());
-
-            // Read first 10 bytes
-            let mut buf = [0u8; 10];
-            reader.read_exact(&mut buf).unwrap();
-            assert_eq!(&buf, b"0123456789");
-
-            // Seek to 16
-            let pos = reader.seek(SeekFrom::Start(16)).unwrap();
-            assert_eq!(pos, 16);
-
-            // Read next 5 bytes
-            let mut buf2 = [0u8; 5];
-            reader.read_exact(&mut buf2).unwrap();
-            assert_eq!(&buf2, b"abcde");
-
-            // Seek from current (+2)
-            let pos = reader.seek(SeekFrom::Current(2)).unwrap();
-            assert_eq!(pos, 23); // 16 + 5 + 2
-
-            let mut buf3 = [0u8; 3];
-            reader.read_exact(&mut buf3).unwrap();
-            assert_eq!(&buf3, b"hij");
-        })
-        .await
-        .unwrap();
-    }
-
-    const RANGE_TEST_DATA: &[u8] = b"0123456789ABCDEFabcdefghijklmnopqrstuvwxyz";
-
-    /// Answers `Range` GETs with 206 + `Content-Range`, like a well-behaved server.
-    fn ranged_response(req: &wiremock::Request) -> wiremock::ResponseTemplate {
-        let data = RANGE_TEST_DATA;
-        let (start, end) = req
-            .headers
-            .get(wiremock::http::HeaderName::from_static("range"))
-            .and_then(|r| r.to_str().ok())
-            .and_then(|r| r.strip_prefix("bytes="))
-            .and_then(|r| r.split_once('-'))
-            .map(|(s, e)| {
-                let start: usize = s.parse().unwrap();
-                let end: usize = e.parse().unwrap_or(data.len() - 1);
-                (start, end.min(data.len() - 1))
-            })
-            .expect("test server expects a Range header");
-        wiremock::ResponseTemplate::new(206)
-            .insert_header(
-                "content-range",
-                format!("bytes {start}-{end}/{}", data.len()),
-            )
-            .set_body_bytes(data[start..=end].to_vec())
-    }
-
-    #[tokio::test]
-    async fn http_range_reader_takes_length_from_content_range_when_head_fails() {
-        use wiremock::matchers::method;
-        use wiremock::{Mock, MockServer, ResponseTemplate};
-
-        let server = MockServer::start().await;
-        Mock::given(method("HEAD"))
-            .respond_with(ResponseTemplate::new(405))
-            .mount(&server)
-            .await;
-        Mock::given(method("GET"))
-            .respond_with(ranged_response)
-            .mount(&server)
-            .await;
-
-        let url = format!("{}/rest/stream.view?id=1", server.uri());
-        tokio::task::spawn_blocking(move || {
-            let mut reader = HttpRangeReader::new_with_label(&url, "subsonic://1/1").unwrap();
-            assert_eq!(reader.byte_len(), Some(RANGE_TEST_DATA.len() as u64));
-            reader.chunk_size = 8;
-            reader.seek(SeekFrom::End(-4)).unwrap();
-            let mut tail = Vec::new();
-            reader.read_to_end(&mut tail).unwrap();
-            assert_eq!(tail, b"wxyz");
-        })
-        .await
-        .unwrap();
-    }
-
-    #[tokio::test]
-    async fn http_range_reader_handles_a_server_that_ignores_range() {
-        use wiremock::matchers::method;
-        use wiremock::{Mock, MockServer, ResponseTemplate};
-
-        let server = MockServer::start().await;
-        Mock::given(method("HEAD"))
-            .respond_with(
-                ResponseTemplate::new(200)
-                    .insert_header("content-length", RANGE_TEST_DATA.len().to_string()),
-            )
-            .mount(&server)
-            .await;
-        // Always the whole file with a plain 200, whatever range was asked for.
-        Mock::given(method("GET"))
-            .respond_with(ResponseTemplate::new(200).set_body_bytes(RANGE_TEST_DATA.to_vec()))
-            .mount(&server)
-            .await;
-
-        let url = format!("{}/track.mp3", server.uri());
-        tokio::task::spawn_blocking(move || {
-            let mut reader = HttpRangeReader::new(&url).unwrap();
-            reader.chunk_size = 8;
-            // Force a refill at a non-zero offset: drop the buffered prefix.
-            reader.buffer.clear();
-            reader.seek(SeekFrom::Start(16)).unwrap();
-            let mut buf = [0u8; 5];
-            reader.read_exact(&mut buf).unwrap();
-            assert_eq!(&buf, b"abcde");
-        })
-        .await
-        .unwrap();
-    }
-
-    #[tokio::test]
-    async fn http_range_reader_rejects_a_subsonic_error_sent_as_200() {
-        use wiremock::matchers::any;
-        use wiremock::{Mock, MockServer, ResponseTemplate};
-
-        let server = MockServer::start().await;
-        Mock::given(any())
-            .respond_with(ResponseTemplate::new(200).set_body_raw(
-                r#"{"subsonic-response":{"status":"failed","version":"1.16.1","error":{"code":70,"message":"data not found"}}}"#,
-                "application/json",
-            ))
-            .mount(&server)
-            .await;
-
-        let url = format!("{}/rest/stream.view?id=1&t=SECRETTOKEN", server.uri());
-        let err = tokio::task::spawn_blocking(move || {
-            HttpRangeReader::new_with_label(&url, "subsonic://1/1")
-                .err()
-                .expect("an error body must not be decoded as audio")
-        })
-        .await
-        .unwrap();
-        assert!(err.contains("Not found on the server"), "{err}");
-        assert!(err.contains("subsonic://1/1"), "{err}");
-        assert!(!err.contains("SECRETTOKEN"), "{err}");
-    }
-
-    #[test]
-    fn http_range_reader_errors_never_quote_a_signed_url() {
-        // Nothing listens on port 9 (discard) locally, so the request fails
-        // at connect time — reqwest's own message would include the URL.
-        let url = "http://127.0.0.1:9/rest/stream.view?t=SECRETTOKEN";
-        let err = HttpRangeReader::new_with_label(url, "subsonic://1/1")
-            .err()
-            .expect("connection should fail");
-        assert!(err.contains("subsonic://1/1"), "{err}");
-        assert!(!err.contains("SECRETTOKEN"), "{err}");
-    }
-
-    #[test]
-    fn open_media_source_names_the_track_when_subsonic_resolution_fails() {
-        // Registration is process-wide and first-wins; this is the only test
-        // that installs one.
-        register_subsonic_resolver(|_| Err("The Subsonic server has been removed".into()));
-        let err = open_media_source("subsonic://4/abc")
-            .err()
-            .expect("resolution failure must surface");
-        assert!(err.contains("subsonic://4/abc"), "{err}");
-        assert!(err.contains("has been removed"), "{err}");
-    }
-
-    /// Pins the `AudioPipelineInfo` JSON the frontend's Audio Pipeline panel
-    /// reads, so moving its assembly across the crate boundary (#1556) can't
-    /// silently change the contract.
-    #[test]
-    fn pipeline_info_json_is_pinned() {
-        let engine = AudioEngine::new();
-        *engine.shared.output_device_name.write() = Some("Test DAC".into());
-        engine
-            .shared
-            .output_sample_rate
-            .store(48_000, Ordering::Relaxed);
-        let song = Song {
-            filetype: FileType::Flac,
-            bitrate: Some(900),
-            samplerate: Some(44_100),
-            bitdepth: Some(16),
-            channels: Some(2),
-            source: crate::models::SongSource::Collection,
-            path: Some("/music/a.flac".into()),
-            ..Song::default()
-        };
-        let info = engine
-            .get_pipeline_info(Some(&song), LoudnessGainSource::Analyzed, Some(-3.5))
-            .unwrap();
-        assert_eq!(
-            serde_json::to_string(&info).unwrap(),
-            r#"{"quality_tier":"hq","input_source":"collection","input_format":"FLAC","input_codec":"flac","input_bitrate_kbps":900,"input_sample_rate":44100,"input_bit_depth":16,"input_channels":2,"input_path":"/music/a.flac","decoder_name":"Symphonia FLAC decoder","headroom":"32-bit float PCM","resample_rate":48000,"loudness_source":"analyzed","loudness_gain_db":-3.5,"eq_enabled":false,"eq_mode":"10-band Graphic","eq_preamp_db":0.0,"eq_active_bands_count":0,"limiter":"-1.0 dBTP True Peak limiter","output_sample_rate":48000,"output_channels":2,"output_format":"32-bit float PCM","output_device_name":"Test DAC","output_backend":"CPAL"}"#
-        );
-
-        *engine.shared.active_decoder_name.write() = Some("libopus (via Symphonia)".into());
-        let opus = Song {
-            filetype: FileType::OggOpus,
-            bitrate: Some(128),
-            samplerate: Some(48_000),
-            url: Some("https://x/a.opus".into()),
-            ..Song::default()
-        };
-        let info = engine
-            .get_pipeline_info(Some(&opus), LoudnessGainSource::Disabled, None)
-            .unwrap();
-        assert_eq!(
-            serde_json::to_string(&info).unwrap(),
-            r#"{"quality_tier":"lq","input_source":"unknown","input_format":"Opus","input_codec":"opus","input_bitrate_kbps":128,"input_sample_rate":48000,"input_bit_depth":null,"input_channels":null,"input_path":"https://x/a.opus","decoder_name":"libopus (via Symphonia)","headroom":"32-bit float PCM","resample_rate":null,"loudness_source":"disabled","loudness_gain_db":null,"eq_enabled":false,"eq_mode":"10-band Graphic","eq_preamp_db":0.0,"eq_active_bands_count":0,"limiter":"-1.0 dBTP True Peak limiter","output_sample_rate":48000,"output_channels":2,"output_format":"32-bit float PCM","output_device_name":"Test DAC","output_backend":"CPAL"}"#
-        );
-        assert!(engine
-            .get_pipeline_info(None, LoudnessGainSource::Disabled, None)
-            .is_none());
-    }
-
     /// Times the output callback's hot path (gain chain, EQ, limiter,
     /// visualizer downmix) on a 48 kHz stereo, 1024-frame buffer, the
     /// comparison point for "no callback-timing regression" (#1556). Run it
-    /// in release: `cargo test --release -p luminous --lib
+    /// in release: `cargo test --release -p luminous-audio
     /// output_render_timing -- --ignored --nocapture`.
     #[test]
     #[ignore = "timing benchmark; run manually in release"]
@@ -3348,73 +2472,63 @@ mod tests {
     }
 
     #[test]
-    fn test_classify_quality_tier() {
-        // Lossless: Standard (<= 48kHz, <= 16-bit) -> HQ
+    fn set_loudness_gain_cancels_a_ramp_in_flight() {
+        let engine = AudioEngine::new();
+        engine.set_loudness_gain(1.0);
+        engine.ramp_loudness_gain(0.0, 2_000);
+        engine.set_loudness_gain(0.5);
+        // Give the ramp thread several of its ~10 ms steps to (not) run.
+        std::thread::sleep(std::time::Duration::from_millis(60));
         assert_eq!(
-            classify_quality_tier(FileType::Flac, Some(900), Some(44100), Some(16)),
-            QualityTier::Hq
+            f32::from_bits(engine.shared.loudness_gain.load(Ordering::Relaxed)),
+            0.5
         );
-        assert_eq!(
-            classify_quality_tier(FileType::Wav, None, Some(48000), Some(16)),
-            QualityTier::Hq
-        );
-        assert_eq!(
-            classify_quality_tier(FileType::Alac, Some(850), Some(44100), None),
-            QualityTier::Hq
-        );
+    }
 
-        // Lossless: High-Res (> 48kHz or > 16-bit) -> HiRes
-        assert_eq!(
-            classify_quality_tier(FileType::Flac, Some(1500), Some(96000), Some(24)),
-            QualityTier::HiRes
-        );
-        assert_eq!(
-            classify_quality_tier(FileType::Flac, Some(1100), Some(44100), Some(24)),
-            QualityTier::HiRes
-        );
-        assert_eq!(
-            classify_quality_tier(FileType::Aiff, None, Some(88200), Some(16)),
-            QualityTier::HiRes
-        );
-        assert_eq!(
-            classify_quality_tier(FileType::Dsf, None, Some(2822400), Some(1)),
-            QualityTier::HiRes
-        );
+    #[test]
+    fn ramp_loudness_gain_lands_on_its_target() {
+        let engine = AudioEngine::new();
+        engine.set_loudness_gain(1.0);
+        engine.ramp_loudness_gain(0.25, 30);
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        while f32::from_bits(engine.shared.loudness_gain.load(Ordering::Relaxed)) != 0.25 {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "ramp never reached its target"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+    }
 
-        // Lossy: >= 256 kbps -> SQ
-        assert_eq!(
-            classify_quality_tier(FileType::Mp3, Some(320), Some(44100), None),
-            QualityTier::Sq
-        );
-        assert_eq!(
-            classify_quality_tier(FileType::Mp3, Some(256), Some(44100), None),
-            QualityTier::Sq
-        );
-        assert_eq!(
-            classify_quality_tier(FileType::Aac, Some(256), Some(48000), None),
-            QualityTier::Sq
-        );
-        assert_eq!(
-            classify_quality_tier(FileType::OggOpus, Some(320), Some(48000), None),
-            QualityTier::Sq
-        );
+    #[test]
+    fn a_track_without_a_location_fails_to_open() {
+        let err = ActiveTrack::open(&open_file, Track::default(), 0, 48_000, 2)
+            .err()
+            .expect("an empty location can't open");
+        assert_eq!(err, "Track has no playable location");
+    }
 
-        // Lossy: < 256 kbps -> LQ
-        assert_eq!(
-            classify_quality_tier(FileType::Mp3, Some(192), Some(44100), None),
-            QualityTier::Lq
-        );
-        assert_eq!(
-            classify_quality_tier(FileType::Mp3, Some(128), Some(44100), None),
-            QualityTier::Lq
-        );
-        assert_eq!(
-            classify_quality_tier(FileType::Aac, Some(96), Some(44100), None),
-            QualityTier::Lq
-        );
-        assert_eq!(
-            classify_quality_tier(FileType::Unknown, None, None, None),
-            QualityTier::Lq
-        );
+    #[test]
+    fn active_track_reads_its_location_through_the_injected_opener() {
+        let dir =
+            std::env::temp_dir().join(format!("luminous-audio-opener-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let wav = dir.join("a.wav");
+        write_test_pcm16_wav(&wav, 48_000, &[vec![0; 4_800]]);
+        let real = wav.to_string_lossy().into_owned();
+        let opener = move |location: &str| {
+            assert_eq!(location, "custom://song/1");
+            open_file(&real)
+        };
+        let spec = Track {
+            id: 7,
+            location: "custom://song/1".into(),
+            extension_hint: Some("wav".into()),
+            ..Track::default()
+        };
+        let track = ActiveTrack::open(&opener, spec, 0, 48_000, 2).expect("opens via the opener");
+        assert_eq!(track.spec.id, 7);
+        assert_eq!(track.src_rate, 48_000);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

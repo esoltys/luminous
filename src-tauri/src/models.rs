@@ -757,7 +757,12 @@ pub const FADE_PAUSE_DURATION_MS_RANGE: SettingRange = SettingRange {
     min: 0.0,
     max: 1000.0,
 };
-pub const CROSSFADE_AUTO_DURATION_SECS_RANGE: SettingRange = SettingRange { min: 0.0, max: 8.0 };
+/// The upper bound is the engine's: its preload lead is sized to fit this
+/// much overlap.
+pub const CROSSFADE_AUTO_DURATION_SECS_RANGE: SettingRange = SettingRange {
+    min: 0.0,
+    max: luminous_audio::MAX_AUTO_CROSSFADE_SECS,
+};
 
 /// Every range above, in one payload for the settings UI.
 #[derive(Debug, Clone, Copy, Serialize)]

@@ -6,7 +6,7 @@ note: |
   AGENTS.md "Allocation-free audio thread": pre-allocate buffers outside the
   `build_output_stream` callback and only reuse them inside it.
 files:
-  - src-tauri/src/audio.rs
+  - crates/luminous-audio/src/**
 rule:
   any:
     - pattern: Vec::new()

@@ -9,7 +9,7 @@
 use std::sync::LazyLock;
 use symphonia::core::codecs::registry::CodecRegistry;
 
-pub static CODEC_REGISTRY: LazyLock<CodecRegistry> = LazyLock::new(|| {
+pub(crate) static CODEC_REGISTRY: LazyLock<CodecRegistry> = LazyLock::new(|| {
     let mut registry = CodecRegistry::new();
     symphonia::default::register_enabled_codecs(&mut registry);
     registry.register_audio_decoder::<symphonia_adapter_libopus::OpusDecoder>();
