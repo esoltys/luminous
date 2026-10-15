@@ -9,15 +9,11 @@
 //!
 //! Parsing is all-or-nothing: a profile is returned only if every line maps
 //! exactly onto the engine's filters and every value is inside its
-//! `EQ_*_RANGE`. Anything else — an unsupported filter type, an unknown
+//! `EQUALIZER_RANGES` bound. Anything else — an unsupported filter type, an unknown
 //! directive, an out-of-range gain — rejects the whole file, because applying
 //! the rest would not sound like the profile. Nothing is clamped.
 
-use crate::equalizer::{
-    ParametricBand, ParametricKind, EQ_FREQ_RANGE, EQ_GAIN_RANGE, EQ_PREAMP_RANGE, EQ_Q_RANGE,
-    PARAMETRIC_MAX_BANDS,
-};
-use crate::models::SettingRange;
+use luminous_equalizer::{ParametricBand, ParametricKind, EQUALIZER_RANGES as RANGES};
 use serde::Serialize;
 use std::path::Path;
 
@@ -179,18 +175,18 @@ pub fn parse_parametric_profile(text: &str) -> Result<ImportedProfile, ImportErr
     if bands.is_empty() {
         return Err(ImportError::Empty);
     }
-    if bands.len() > PARAMETRIC_MAX_BANDS {
+    if bands.len() > RANGES.max_bands {
         return Err(ImportError::TooManyFilters {
             count: bands.len(),
-            max: PARAMETRIC_MAX_BANDS,
+            max: RANGES.max_bands,
         });
     }
     let preamp = preamp.unwrap_or(0.0);
-    if !in_range(EQ_PREAMP_RANGE, preamp) {
+    if !RANGES.preamp.contains(preamp) {
         return Err(ImportError::PreampOutOfRange {
             value: preamp,
-            min: EQ_PREAMP_RANGE.min,
-            max: EQ_PREAMP_RANGE.max,
+            min: RANGES.preamp.min,
+            max: RANGES.preamp.max,
         });
     }
     Ok(ImportedProfile { preamp, bands })
@@ -205,10 +201,6 @@ fn is_filter_directive(directive: &str) -> bool {
         }
         None => false,
     }
-}
-
-fn in_range(range: SettingRange, value: f32) -> bool {
-    value.is_finite() && value >= range.min && value <= range.max
 }
 
 fn parse_number(token: Option<&str>) -> Option<f32> {
@@ -290,11 +282,11 @@ fn parse_filter(rest: &str, line: usize) -> Result<ParametricBand, ImportError> 
     };
 
     for (field, range, value) in [
-        (RangeField::Freq, EQ_FREQ_RANGE, freq),
-        (RangeField::Gain, EQ_GAIN_RANGE, gain_db),
-        (RangeField::Q, EQ_Q_RANGE, q),
+        (RangeField::Freq, RANGES.freq, freq),
+        (RangeField::Gain, RANGES.gain_db, gain_db),
+        (RangeField::Q, RANGES.q, q),
     ] {
-        if !in_range(range, value) {
+        if !range.contains(value) {
             return Err(ImportError::OutOfRange {
                 line,
                 field,
@@ -340,7 +332,7 @@ pub fn format_parametric_profile(preamp: f32, bands: &[ParametricBand]) -> Strin
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::equalizer::{BiquadFilter, Equalizer, EqualizerConfig};
+    use luminous_equalizer::Equalizer;
     use ParametricKind::{HighShelf, LowShelf, Peak};
 
     fn fixture(name: &str) -> String {
@@ -434,24 +426,28 @@ mod tests {
         let profile = parse_parametric_profile(&text).unwrap();
         let mut eq = Equalizer::new();
         eq.update_format(48_000, 2);
-        eq.load_user_preset(1, &profile.bands, profile.preamp);
+        eq.load_parametric_preset("user:1".into(), &profile.bands, profile.preamp);
 
         let freqs: Vec<f32> = (0..200)
             .map(|i| 20.0 * 1000f32.powf(i as f32 / 199.0))
             .collect();
+        // Reference: each filter alone, built straight from the file's
+        // numbers, summed in dB.
+        let per_filter: Vec<Vec<f32>> = anker_q20_bands()
+            .iter()
+            .map(|b| {
+                let mut single = Equalizer::new();
+                single.update_format(48_000, 2);
+                single.load_parametric_preset(String::new(), std::slice::from_ref(b), 0.0);
+                single.parametric_response_db(&freqs)
+            })
+            .collect();
         let got = eq.parametric_response_db(&freqs);
-        for (f, got) in freqs.iter().zip(got) {
-            let expected: f32 = anker_q20_bands()
-                .iter()
-                .map(|b| {
-                    let mut filter = BiquadFilter::new();
-                    filter.calculate_for_kind(b.kind, b.freq, 48_000.0, b.gain_db, b.q);
-                    filter.magnitude_db(*f, 48_000.0)
-                })
-                .sum();
+        for (i, (f, got)) in freqs.iter().zip(got).enumerate() {
+            let expected: f32 = per_filter.iter().map(|curve| curve[i]).sum();
             assert!((got - expected).abs() < 0.01, "{f} Hz: {got} vs {expected}");
         }
-        assert_eq!(eq.preamp, -3.78);
+        assert_eq!(eq.config().preamp, -3.78);
     }
 
     /// A rejected file never reaches the engine: the caller only loads a
@@ -460,16 +456,16 @@ mod tests {
     fn rejected_profile_leaves_running_config_unchanged() {
         let mut eq = Equalizer::new();
         eq.update_format(48_000, 2);
-        eq.load_user_preset(7, &[band(Peak, 1000.0, 4.0, 1.0)], -2.5);
-        let before = EqualizerConfig::snapshot(&eq);
+        eq.load_parametric_preset("user:7".into(), &[band(Peak, 1000.0, 4.0, 1.0)], -2.5);
+        let before = eq.config();
 
         let text = "Preamp: -3 dB
 Filter 1: ON PK Fc 100 Hz Gain 2 dB Q 1
 Filter 2: ON LP Fc 15000 Hz";
         if let Ok(profile) = parse_parametric_profile(text) {
-            eq.load_user_preset(8, &profile.bands, profile.preamp);
+            eq.load_parametric_preset("user:8".into(), &profile.bands, profile.preamp);
         }
-        assert_eq!(EqualizerConfig::snapshot(&eq), before);
+        assert_eq!(eq.config(), before);
     }
 
     #[test]
@@ -613,8 +609,8 @@ Filter 2: ON LP Fc 15000 Hz";
                 line: 1,
                 field: RangeField::Gain,
                 value: 20.5,
-                min: EQ_GAIN_RANGE.min,
-                max: EQ_GAIN_RANGE.max,
+                min: RANGES.gain_db.min,
+                max: RANGES.gain_db.max,
             })
         );
         assert_eq!(
@@ -623,16 +619,16 @@ Filter 2: ON LP Fc 15000 Hz";
                 line: 1,
                 field: RangeField::Freq,
                 value: 10.0,
-                min: EQ_FREQ_RANGE.min,
-                max: EQ_FREQ_RANGE.max,
+                min: RANGES.freq.min,
+                max: RANGES.freq.max,
             })
         );
         assert_eq!(
             parse_parametric_profile("Preamp: -30 dB\nFilter 1: ON PK Fc 100 Hz Gain 1 dB Q 1"),
             Err(ImportError::PreampOutOfRange {
                 value: -30.0,
-                min: EQ_PREAMP_RANGE.min,
-                max: EQ_PREAMP_RANGE.max,
+                min: RANGES.preamp.min,
+                max: RANGES.preamp.max,
             })
         );
     }

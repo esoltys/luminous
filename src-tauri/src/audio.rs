@@ -243,7 +243,7 @@ pub(crate) struct AudioShared {
     output_channels: Arc<std::sync::atomic::AtomicU16>,
     output_device_name: Arc<parking_lot::RwLock<Option<String>>>,
     active_decoder_name: Arc<parking_lot::RwLock<Option<String>>>,
-    equalizer: Arc<Mutex<crate::equalizer::Equalizer>>,
+    equalizer: Arc<Mutex<luminous_equalizer::Equalizer>>,
     loudness_gain: Arc<AtomicU32>,
     /// A loudness-gain change scheduled at an exact played-sample index
     /// (`AudioOutput::played_samples` space), applied by the output callback
@@ -291,7 +291,7 @@ pub struct AudioEngine {
     /// built. The spectrum analyzer needs this to convert FFT bin indices
     /// to real Hz instead of assuming a fixed rate.
     output_sample_rate: Arc<AtomicU32>,
-    equalizer: Arc<Mutex<crate::equalizer::Equalizer>>,
+    equalizer: Arc<Mutex<luminous_equalizer::Equalizer>>,
     /// Per-track loudness-normalization multiplier (#77). f32 bits in an
     /// atomic so the audio callback reads it without locking. 1.0 = neutral.
     loudness_gain: Arc<AtomicU32>,
@@ -329,7 +329,7 @@ impl AudioEngine {
         let output_channels = Arc::new(std::sync::atomic::AtomicU16::new(2));
         let output_device_name = Arc::new(parking_lot::RwLock::new(get_default_device_name()));
         let active_decoder_name = Arc::new(parking_lot::RwLock::new(None));
-        let equalizer = Arc::new(Mutex::new(crate::equalizer::Equalizer::new()));
+        let equalizer = Arc::new(Mutex::new(luminous_equalizer::Equalizer::new()));
         let loudness_gain = Arc::new(AtomicU32::new(1.0f32.to_bits()));
         let fade_gain = Arc::new(AtomicU32::new(1.0f32.to_bits()));
 
@@ -488,7 +488,7 @@ impl AudioEngine {
 
     /// One controlled escape hatch for equalizer mutation/inspection —
     /// centralizes locking instead of callers reaching into the field.
-    pub fn with_equalizer<R>(&self, f: impl FnOnce(&mut crate::equalizer::Equalizer) -> R) -> R {
+    pub fn with_equalizer<R>(&self, f: impl FnOnce(&mut luminous_equalizer::Equalizer) -> R) -> R {
         let mut eq = self.equalizer.lock();
         f(&mut eq)
     }
@@ -567,25 +567,16 @@ impl AudioEngine {
 
         let (eq_enabled, eq_mode, eq_preamp_db, eq_active_bands_count) = {
             let eq = self.equalizer.lock();
-            let mode_str = match eq.mode {
-                crate::equalizer::EqMode::Graphic10 => "10-band Graphic",
-                crate::equalizer::EqMode::Parametric => "Parametric",
-            };
-            let active_bands = match eq.mode {
-                crate::equalizer::EqMode::Graphic10 => {
-                    eq.gains.iter().filter(|&&g| g.abs() > 0.01).count()
-                }
-                crate::equalizer::EqMode::Parametric => eq
-                    .parametric_bands()
-                    .iter()
-                    .filter(|b| b.enabled && b.gain_db.abs() > 0.01)
-                    .count(),
+            let config = eq.config();
+            let mode_str = match config.mode {
+                luminous_equalizer::EqMode::Graphic10 => "10-band Graphic",
+                luminous_equalizer::EqMode::Parametric => "Parametric",
             };
             (
-                eq.enabled,
+                config.enabled,
                 Some(mode_str.to_string()),
-                Some(eq.preamp),
-                active_bands,
+                Some(config.preamp),
+                eq.active_band_count(),
             )
         };
 
@@ -1434,8 +1425,7 @@ fn build_output(shared: &Arc<AudioShared>) -> Result<AudioOutput, String> {
                 // 2) Equalizer (preamp + band cascade; no-op when disabled)
                 let mut eq_applied = false;
                 if let Some(mut eq) = eq_cpal.try_lock() {
-                    eq_applied = eq.enabled;
-                    eq.process_interleaved(&mut output[..played]);
+                    eq_applied = eq.process_interleaved(&mut output[..played]);
                 }
 
                 // 3) Fade envelope (#79)
@@ -2705,7 +2695,7 @@ mod tests {
             output_channels: Arc::new(std::sync::atomic::AtomicU16::new(2)),
             output_device_name: Arc::new(parking_lot::RwLock::new(None)),
             active_decoder_name: Arc::new(parking_lot::RwLock::new(None)),
-            equalizer: Arc::new(Mutex::new(crate::equalizer::Equalizer::new())),
+            equalizer: Arc::new(Mutex::new(luminous_equalizer::Equalizer::new())),
             loudness_gain: Arc::new(AtomicU32::new(1.0f32.to_bits())),
             loudness_switch_at: AtomicU64::new(NO_LOUDNESS_SWITCH),
             loudness_switch_gain: AtomicU32::new(1.0f32.to_bits()),

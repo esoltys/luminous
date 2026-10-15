@@ -1,10 +1,10 @@
 use cucumber::gherkin::Step;
 use cucumber::{given, then, when, World};
+use luminous_equalizer::{Equalizer, EqualizerConfig};
 use luminous_lib::commands::equalizer::import_profile_into;
 use luminous_lib::db::Database;
 use luminous_lib::eq_import::{parse_parametric_profile, read_profile_file};
 use luminous_lib::eq_presets;
-use luminous_lib::equalizer::{Equalizer, EqualizerConfig};
 use std::path::PathBuf;
 
 #[derive(Debug, World)]
@@ -34,8 +34,15 @@ impl EqualizerWorld {
             .1
     }
 
+    /// Edit the running config the way the UI does: change it, apply it whole.
+    fn edit(&mut self, change: impl FnOnce(&mut EqualizerConfig)) {
+        let mut config = self.equalizer.config();
+        change(&mut config);
+        self.equalizer.apply(&config);
+    }
+
     fn import(&mut self, text: &str, name: &str) {
-        self.before_import = Some(EqualizerConfig::snapshot(&self.equalizer));
+        self.before_import = Some(self.equalizer.config());
         self.db();
         let db = &self.store.as_ref().unwrap().1;
         self.import_result = Some(import_profile_into(db, &mut self.equalizer, text, name));
@@ -71,23 +78,22 @@ fn player_is_playing(w: &mut EqualizerWorld) {
 
 #[given("the equalizer is currently disabled")]
 fn equalizer_is_disabled(w: &mut EqualizerWorld) {
-    w.equalizer.enabled = false;
+    w.equalizer.set_enabled(false);
 }
 
 #[given("the equalizer is enabled")]
 fn equalizer_is_enabled(w: &mut EqualizerWorld) {
-    w.equalizer.enabled = true;
+    w.equalizer.set_enabled(true);
 }
 
 #[when(expr = "I toggle the equalizer {string}")]
 fn toggle_equalizer(w: &mut EqualizerWorld, state: String) {
-    w.equalizer.enabled = state == "On";
+    w.equalizer.set_enabled(state == "On");
 }
 
 #[then("the audio engine should process all playback samples through the 10-band filter cascade")]
 fn process_samples(w: &mut EqualizerWorld) {
-    w.equalizer.set_preamp(3.0);
-    w.equalizer.recalculate();
+    w.edit(|config| config.preamp = 3.0);
 
     w.processed_samples = w.samples.clone();
     w.equalizer.process_interleaved(&mut w.processed_samples);
@@ -117,7 +123,7 @@ fn bypass_samples(w: &mut EqualizerWorld) {
 fn set_band_gain(w: &mut EqualizerWorld, _band_name: String, band_idx: usize, gain_str: String) {
     let gain_clean = gain_str.replace("dB", "").replace("+", "");
     let gain_db: f32 = gain_clean.trim().parse().unwrap();
-    w.equalizer.set_gain(band_idx, gain_db);
+    w.edit(|config| config.gains[band_idx] = gain_db);
 }
 
 #[then(regex = r#"the audio engine should boost frequencies around (\d+kHz) by ([\d.]+)dB"#)]
@@ -151,8 +157,7 @@ fn check_frequency_boost(w: &mut EqualizerWorld, _freq_str: String, boost_db_str
 
 #[when("I select the \"Rock\" equalizer preset")]
 fn select_rock_preset(w: &mut EqualizerWorld) {
-    let gains = [4.0, 3.0, 1.0, -1.0, -2.0, -1.0, 1.0, 3.0, 3.5, 3.5];
-    w.equalizer.load_preset(gains);
+    assert!(w.equalizer.load_builtin_preset("Rock"));
 }
 
 #[then("the gains for all 10 bands should update to preset values:")]
@@ -162,7 +167,7 @@ fn check_preset_table(w: &mut EqualizerWorld, step: &Step) {
         let gain_str = &row[1];
         let gain_clean = gain_str.replace("dB", "").replace("+", "");
         let expected_gain: f32 = gain_clean.trim().parse().unwrap();
-        let actual_gain = w.equalizer.gains[i];
+        let actual_gain = w.equalizer.config().gains[i];
         assert!(
             (actual_gain - expected_gain).abs() < 0.01,
             "Band {} expected gain {}, got {}",
@@ -195,7 +200,7 @@ fn all_coefficients_recalculate(w: &mut EqualizerWorld) {
 #[given(expr = "the graphic band gains are set to {string}")]
 fn graphic_gains_set(w: &mut EqualizerWorld, gain_str: String) {
     let gain: f32 = gain_str.replace("dB", "").replace('+', "").parse().unwrap();
-    w.equalizer.load_preset([gain; 10]);
+    w.edit(|config| config.gains = [gain; 10]);
 }
 
 #[when(expr = "I import the AutoEq profile {string} as {string}")]
@@ -226,20 +231,20 @@ fn user_preset_active(w: &mut EqualizerWorld, name: String) {
         .expect("preset saved");
     let key = format!("user:{}", preset.id);
     assert_eq!(config.active_preset.as_deref(), Some(key.as_str()));
-    assert!(w.equalizer.enabled);
+    assert!(w.equalizer.config().enabled);
 }
 
 #[then("the parametric bands should match the profile file exactly")]
 fn bands_match_file(w: &mut EqualizerWorld) {
     let text = read_profile_file(w.fixture.as_ref().unwrap()).unwrap();
     let expected = parse_parametric_profile(&text).unwrap();
-    assert_eq!(w.equalizer.parametric_bands(), expected.bands.as_slice());
+    assert_eq!(w.equalizer.config().parametric, expected.bands);
 }
 
 #[then(regex = r"^the preamp should be (-?[\d.]+)dB$")]
 fn preamp_is(w: &mut EqualizerWorld, db: String) {
     let expected: f32 = db.parse().unwrap();
-    assert_eq!(w.equalizer.preamp, expected);
+    assert_eq!(w.equalizer.config().preamp, expected);
 }
 
 #[then(expr = "the import should fail with {string}")]
@@ -260,10 +265,7 @@ fn no_preset_saved(w: &mut EqualizerWorld) {
 
 #[then("the equalizer settings should be unchanged")]
 fn settings_unchanged(w: &mut EqualizerWorld) {
-    assert_eq!(
-        Some(EqualizerConfig::snapshot(&w.equalizer)),
-        w.before_import
-    );
+    assert_eq!(Some(w.equalizer.config()), w.before_import);
 }
 
 #[tokio::main]

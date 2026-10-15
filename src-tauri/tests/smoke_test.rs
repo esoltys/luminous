@@ -9,8 +9,8 @@
 //!   cargo test --test smoke_test -- --ignored --nocapture --test-threads=1
 
 use luminous_lib::{
-    audio::AudioEngine, db::Database, equalizer::Equalizer, models::PlayState, player::Player,
-    playlist::PlaylistManager, tageditor,
+    audio::AudioEngine, db::Database, models::PlayState, player::Player, playlist::PlaylistManager,
+    tageditor,
 };
 use std::sync::Arc;
 use std::time::Duration;
@@ -105,11 +105,12 @@ async fn smoke_full_pipeline() {
     println!("[ok] playlist create/add/list");
 
     // --- Equalizer actually processes samples when enabled ---
-    let mut eq = Equalizer::new();
+    let mut eq = luminous_equalizer::Equalizer::new();
     eq.update_format(44_100, 2);
-    eq.enabled = true;
-    eq.set_preamp(3.0);
-    eq.recalculate();
+    let mut config = eq.config();
+    config.enabled = true;
+    config.preamp = 3.0;
+    eq.apply(&config);
     let mut samples = vec![0.3f32; 200];
     let original = samples.clone();
     eq.process_interleaved(&mut samples);

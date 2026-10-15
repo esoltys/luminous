@@ -30,7 +30,6 @@ pub mod discord;
 pub mod dr_parser;
 pub mod eq_import;
 pub mod eq_presets;
-pub mod equalizer;
 pub mod fade;
 pub mod filter_parser;
 pub mod hierarchy_sidecar;
@@ -299,73 +298,12 @@ fn with_webview2_remote_debugging(current: &str, port: u16) -> String {
     }
 }
 
-/// Reads persisted equalizer settings (linear + parametric) from the DB and
-/// applies them to a freshly-constructed `AudioEngine`, so playback starts
-/// with the user's last-saved EQ state instead of engine defaults.
+/// Applies the saved EQ state to a freshly-constructed `AudioEngine`, so
+/// playback starts with the user's last-saved EQ instead of engine defaults.
 fn restore_equalizer_from_db(db: &Database, audio_engine: &AudioEngine) {
-    if let Ok(conn) = db.pool.get() {
-        if let Ok((
-            (enabled, preamp, gains_str, mode_str, parametric_json, active_preset),
-            (inactive_preamp, inactive_preset),
-        )) = conn.query_row(
-            "SELECT enabled, preamp, gains, mode, parametric, active_preset,
-                    inactive_preamp, inactive_preset
-             FROM equalizer_settings WHERE id = 1",
-            [],
-            |row| {
-                Ok((
-                    (
-                        row.get::<_, i32>(0)? != 0,
-                        row.get::<_, f64>(1)? as f32,
-                        row.get::<_, String>(2)?,
-                        row.get::<_, String>(3)?,
-                        row.get::<_, String>(4)?,
-                        row.get::<_, String>(5)?,
-                    ),
-                    (row.get::<_, f64>(6)? as f32, row.get::<_, String>(7)?),
-                ))
-            },
-        ) {
-            let mut gains = [0.0f32; 10];
-            for (i, val) in gains_str.split(',').enumerate() {
-                if i < 10 {
-                    if let Ok(gain) = val.parse::<f32>() {
-                        gains[i] = gain;
-                    }
-                }
-            }
-            // '' is Custom, and so is a built-in that has since been
-            // removed (e.g. "Headphones"): the bands themselves are kept.
-            let preset = |p: String| {
-                Some(p).filter(|p| {
-                    crate::equalizer::parse_user_preset_key(p).is_some()
-                        || crate::equalizer::builtin_preset_name(p).is_some()
-                })
-            };
-            audio_engine.with_equalizer(|eq| {
-                use crate::equalizer::EqMode;
-                eq.enabled = enabled;
-                eq.load_preset(gains);
-                // `load_parametric` bounds the band count and clamps every
-                // field; an empty/unparseable row keeps the default layout.
-                if let Ok(bands) =
-                    serde_json::from_str::<Vec<crate::equalizer::ParametricBand>>(&parametric_json)
-                {
-                    if !bands.is_empty() {
-                        eq.load_parametric(&bands);
-                    }
-                }
-                // "parametric20" is the pre-#1332 name (migration 53 rewrites it).
-                let (mode, other) = if mode_str == "parametric" || mode_str == "parametric20" {
-                    (EqMode::Parametric, EqMode::Graphic10)
-                } else {
-                    (EqMode::Graphic10, EqMode::Parametric)
-                };
-                eq.set_mode(mode);
-                eq.set_mode_state(mode, preamp, preset(active_preset));
-                eq.set_mode_state(other, inactive_preamp, preset(inactive_preset));
-            });
-        }
+    let Ok(conn) = db.pool.get() else { return };
+    if let Some(state) = crate::eq_presets::load_state(&conn) {
+        audio_engine.with_equalizer(|eq| eq.restore(&state));
     }
 }
 

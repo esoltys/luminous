@@ -1,6 +1,11 @@
 [workspace]
-members = ["src-tauri"]
+members = ["src-tauri", "crates/*"]
 resolver = "2"
+
+# Versions shared by more than one member, so the crates can't drift apart.
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 
 [profile.release]
 codegen-units = 1

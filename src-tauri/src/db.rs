@@ -574,6 +574,11 @@ fn migrate_strip_webdav_song_credentials(conn: &rusqlite::Connection) -> Result<
 /// the exact RBJ equivalent of slope 1, so the curve is unchanged — mark every
 /// band enabled, and rename the `parametric20` mode. An empty or unparseable
 /// value is left alone (it already means "defaults").
+///
+/// The Q is frozen here rather than read from the equalizer: a migration must
+/// keep writing what it wrote when it shipped, whatever the EQ defaults become.
+const MIGRATION_53_SHELF_Q: f32 = std::f32::consts::FRAC_1_SQRT_2;
+
 fn migrate_parametric_band_kinds(conn: &rusqlite::Connection) -> Result<()> {
     let rows: Vec<(i64, String)> = conn
         .prepare("SELECT id, parametric FROM equalizer_settings")?
@@ -596,7 +601,7 @@ fn migrate_parametric_band_kinds(conn: &rusqlite::Connection) -> Result<()> {
                 "peak"
             };
             if kind != "peak" {
-                obj.insert("q".into(), crate::equalizer::SHELF_Q.into());
+                obj.insert("q".into(), MIGRATION_53_SHELF_Q.into());
             }
             obj.insert("kind".into(), kind.into());
             obj.insert("enabled".into(), true.into());
@@ -665,12 +670,14 @@ fn builtin_matching_gains(gains_str: &str) -> Option<&'static str> {
     if gains.len() != 10 {
         return None;
     }
-    crate::equalizer::BUILTIN_PRESETS.into_iter().find(|name| {
-        crate::equalizer::preset_gains(name)
-            .iter()
-            .zip(&gains)
-            .all(|(a, b)| (a - b).abs() < 0.1)
-    })
+    luminous_equalizer::BUILTIN_PRESETS
+        .into_iter()
+        .find(|name| {
+            luminous_equalizer::preset_gains(name)
+                .iter()
+                .zip(&gains)
+                .all(|(a, b)| (a - b).abs() < 0.1)
+        })
 }
 
 /// Migration 56: each EQ mode keeps its own preamp and preset. The existing
@@ -3411,7 +3418,7 @@ mod tests {
 
     #[test]
     fn migration_53_converts_legacy_parametric_losslessly() {
-        use crate::equalizer::{legacy_parametric_response_db, Equalizer, ParametricBand};
+        use luminous_equalizer::{EqMode, Equalizer, ParametricBand};
         let conn = rusqlite::Connection::open_in_memory().unwrap();
         conn.execute_batch(MIGRATION_2).unwrap();
         conn.execute_batch(MIGRATION_4).unwrap();
@@ -3451,7 +3458,10 @@ mod tests {
         assert!(bands.iter().all(|b| b.enabled));
 
         let mut eq = Equalizer::new();
-        eq.load_parametric(&bands);
+        let mut config = eq.config();
+        config.mode = EqMode::Parametric;
+        config.parametric = bands;
+        eq.apply(&config);
         let freqs: Vec<f32> = (0..200)
             .map(|i| 20.0 * 1000f32.powf(i as f32 / 199.0))
             .collect();
@@ -3463,6 +3473,84 @@ mod tests {
                 "{f} Hz: legacy {b} dB, migrated {a} dB"
             );
         }
+    }
+
+    /// Response (dB) of a pre-#1332 parametric layout — `{freq, gain_db, q}`
+    /// bands whose first and last entries were slope (`S = 1`) shelves
+    /// ignoring `q` — computed from the RBJ cookbook formulas as they stood
+    /// then. A frozen reference, deliberately independent of the equalizer
+    /// crate, so migration 53 is checked against what users actually heard —
+    /// hence f32 coefficients, as the shipped filter computed them (an f64
+    /// low shelf differs by ~0.01 dB near 20 Hz).
+    fn legacy_parametric_response_db(
+        bands: &[(f32, f32, f32)],
+        fs: f32,
+        freqs: &[f32],
+    ) -> Vec<f32> {
+        // Normalized biquad coefficients [b0, b1, b2, a1, a2].
+        let coefficients = |i: usize, freq: f32, gain_db: f32, q: f32| -> [f64; 5] {
+            if gain_db.abs() < 0.05 {
+                return [1.0, 0.0, 0.0, 0.0, 0.0];
+            }
+            let a = 10f32.powf(gain_db / 40.0);
+            let w0 = 2.0 * std::f32::consts::PI * freq / fs;
+            let (cos, sin) = (w0.cos(), w0.sin());
+            let [b0, b1, b2, a0, a1, a2] = if i == 0 || i == bands.len() - 1 {
+                // Slope shelf, S = 1.
+                let alpha = sin / 2.0 * 2f32.sqrt();
+                let t = 2.0 * a.sqrt() * alpha;
+                if i == 0 {
+                    [
+                        a * ((a + 1.0) - (a - 1.0) * cos + t),
+                        2.0 * a * ((a - 1.0) - (a + 1.0) * cos),
+                        a * ((a + 1.0) - (a - 1.0) * cos - t),
+                        (a + 1.0) + (a - 1.0) * cos + t,
+                        -2.0 * ((a - 1.0) + (a + 1.0) * cos),
+                        (a + 1.0) + (a - 1.0) * cos - t,
+                    ]
+                } else {
+                    [
+                        a * ((a + 1.0) + (a - 1.0) * cos + t),
+                        -2.0 * a * ((a - 1.0) + (a + 1.0) * cos),
+                        a * ((a + 1.0) + (a - 1.0) * cos - t),
+                        (a + 1.0) - (a - 1.0) * cos + t,
+                        2.0 * ((a - 1.0) - (a + 1.0) * cos),
+                        (a + 1.0) - (a - 1.0) * cos - t,
+                    ]
+                }
+            } else {
+                let alpha = sin / (2.0 * q);
+                [
+                    1.0 + alpha * a,
+                    -2.0 * cos,
+                    1.0 - alpha * a,
+                    1.0 + alpha / a,
+                    -2.0 * cos,
+                    1.0 - alpha / a,
+                ]
+            };
+            [b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0].map(f64::from)
+        };
+        let filters: Vec<[f64; 5]> = bands
+            .iter()
+            .enumerate()
+            .map(|(i, &(freq, gain_db, q))| coefficients(i, freq, gain_db, q))
+            .collect();
+        freqs
+            .iter()
+            .map(|&f| {
+                let w = 2.0 * std::f64::consts::PI * f as f64 / fs as f64;
+                let (c1, s1, c2, s2) = (w.cos(), w.sin(), (2.0 * w).cos(), (2.0 * w).sin());
+                filters
+                    .iter()
+                    .map(|[b0, b1, b2, a1, a2]| {
+                        let num = (b0 + b1 * c1 + b2 * c2).powi(2) + (b1 * s1 + b2 * s2).powi(2);
+                        let den = (1.0 + a1 * c1 + a2 * c2).powi(2) + (a1 * s1 + a2 * s2).powi(2);
+                        (10.0 * (num / den).log10()) as f32
+                    })
+                    .sum()
+            })
+            .collect()
     }
 
     #[test]
@@ -3503,7 +3591,7 @@ mod tests {
 
     #[test]
     fn migration_56_gives_the_inactive_mode_the_shared_preamp_and_its_matching_preset() {
-        let rock = crate::equalizer::preset_gains("Rock")
+        let rock = luminous_equalizer::preset_gains("Rock")
             .iter()
             .map(|g| g.to_string())
             .collect::<Vec<_>>()
@@ -3530,7 +3618,7 @@ mod tests {
         let conn = rusqlite::Connection::open_in_memory().unwrap();
         conn.execute_batch(MIGRATION_2).unwrap();
         conn.execute_batch(MIGRATION_4).unwrap();
-        let rock = crate::equalizer::preset_gains("Rock")
+        let rock = luminous_equalizer::preset_gains("Rock")
             .iter()
             .map(|g| g.to_string())
             .collect::<Vec<_>>()

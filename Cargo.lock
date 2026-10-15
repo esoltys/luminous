@@ -3506,6 +3506,7 @@ dependencies = [
  "libc",
  "lofty",
  "log",
+ "luminous-equalizer",
  "md-5",
  "notify",
  "parking_lot",
@@ -3553,6 +3554,14 @@ dependencies = [
  "wiremock",
  "zbus",
  "zvariant",
+]
+
+[[package]]
+name = "luminous-equalizer"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

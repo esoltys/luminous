@@ -1,0 +1,12 @@
+[package]
+name = "luminous-equalizer"
+version = "0.1.0"
+description = "Luminous's 10-band graphic and parametric biquad equalizer"
+edition = "2021"
+publish = false
+
+[dependencies]
+serde.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

@@ -9,7 +9,7 @@ files:
   - src-tauri/src/audio.rs
   - src-tauri/src/player.rs
   - src-tauri/src/player/**
-  - src-tauri/src/equalizer.rs
+  - crates/*/src/**
 rule:
   any:
     - kind: scoped_identifier
