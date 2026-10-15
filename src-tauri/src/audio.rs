@@ -1375,6 +1375,143 @@ fn select_output_device(host: &cpal::Host) -> Result<cpal::Device, String> {
     Ok(default)
 }
 
+/// The output callback's state: everything it reads, plus its preallocated
+/// scratch. Kept out of the closure so the hot path can be driven (and timed)
+/// without a CPAL device.
+struct OutputRenderer {
+    shared: Arc<AudioShared>,
+    consumer: Arc<Mutex<ringbuf::HeapCons<f32>>>,
+    played_samples: Arc<AtomicU64>,
+    mono_scratch: Vec<f32>,
+    sample_rate: u32,
+    channels: u16,
+}
+
+impl OutputRenderer {
+    /// Fill one device buffer from the ring buffer and run the gain chain.
+    /// Runs on the real-time audio thread: never allocates or blocks.
+    fn render(&mut self, output: &mut [f32]) {
+        let vol = f32::from_bits(self.shared.volume.load(Ordering::Relaxed));
+        let mut loudness = f32::from_bits(self.shared.loudness_gain.load(Ordering::Relaxed));
+        let played_before = self.played_samples.load(Ordering::Relaxed);
+        let fade = f32::from_bits(self.shared.fade_gain.load(Ordering::Relaxed));
+        let mut played = 0;
+
+        // Non-blocking try_lock ensures CPAL callback never stalls
+        if let Some(mut consumer) = self.consumer.try_lock() {
+            for sample in output.iter_mut() {
+                if let Some(s) = consumer.try_pop() {
+                    *sample = s;
+                    played += 1;
+                } else {
+                    *sample = 0.0;
+                }
+            }
+        } else {
+            for sample in output.iter_mut() {
+                *sample = 0.0;
+            }
+        }
+
+        // DSP chain: loudness gain → EQ preamp → EQ bands → fade
+        // envelope → volume. Every stage is skipped when neutral, so
+        // with the EQ disabled and all gains at 1.0 the decoded
+        // samples reach the device untouched (bit-perfect).
+
+        // 1) Per-track loudness normalization gain (#77). A switch
+        // scheduled inside this buffer (crossfade start, #1238)
+        // splits it: the old gain up to the switch sample, the new
+        // one from there on.
+        let loudness_before = loudness;
+        let mut split = 0;
+        let switch_at = self.shared.loudness_switch_at.load(Ordering::Acquire);
+        if let Some(k) = loudness_switch_offset(switch_at, played_before, played) {
+            if self
+                .shared
+                .loudness_switch_at
+                .compare_exchange(
+                    switch_at,
+                    NO_LOUDNESS_SWITCH,
+                    Ordering::AcqRel,
+                    Ordering::Relaxed,
+                )
+                .is_ok()
+            {
+                let new_bits = self.shared.loudness_switch_gain.load(Ordering::Relaxed);
+                self.shared.loudness_gain.store(new_bits, Ordering::Relaxed);
+                loudness = f32::from_bits(new_bits);
+                split = k;
+            }
+        }
+        if loudness_before != 1.0 {
+            for sample in output[..split].iter_mut() {
+                *sample *= loudness_before;
+            }
+        }
+        if loudness != 1.0 {
+            for sample in output[split..played].iter_mut() {
+                *sample *= loudness;
+            }
+        }
+
+        // 2) Equalizer (preamp + band cascade; no-op when disabled)
+        let mut eq_applied = false;
+        if let Some(mut eq) = self.shared.equalizer.try_lock() {
+            eq_applied = eq.process_interleaved(&mut output[..played]);
+        }
+
+        // 3) Fade envelope (#79)
+        if fade != 1.0 {
+            for sample in output[..played].iter_mut() {
+                *sample *= fade;
+            }
+        }
+
+        // 4) Master volume
+        if vol != 1.0 {
+            for sample in output[..played].iter_mut() {
+                *sample *= vol;
+            }
+        }
+
+        // 5) Final clip guard and true-peak ceiling limiter.
+        // When loudness normalization or EQ is active, samples can be boosted
+        // significantly past full scale (loudness boost up to +12 dB, or EQ
+        // preamp up to +12 dB stacked on top of positive band gains).
+        // We enforce a true-peak ceiling (-1.0 dBTP = 0.8912509) to prevent inter-sample
+        // clipping during D/A reconstruction.
+        // When both loudness normalization and EQ are neutral/disabled, the signal
+        // passes through unaltered for bit-perfect output.
+        if loudness_before != 1.0 || loudness != 1.0 || eq_applied {
+            for sample in output[..played].iter_mut() {
+                *sample = sample.clamp(-TRUE_PEAK_CEILING, TRUE_PEAK_CEILING);
+            }
+        }
+
+        if played > 0 {
+            let channels_u = self.channels as usize;
+            self.mono_scratch.clear();
+            for chunk in output[..played].chunks(channels_u) {
+                let sum: f32 = chunk.iter().sum();
+                // Reserved to buffer_capacity up front and cleared per callback.
+                // ast-grep-ignore: audio-callback-no-alloc
+                self.mono_scratch.push(sum / self.channels as f32);
+            }
+            // Bounded ring buffer: evicts the oldest block at max_size.
+            // ast-grep-ignore: audio-callback-no-alloc
+            self.shared.visualizer_buf.push(&self.mono_scratch);
+        }
+
+        let total_played = self
+            .played_samples
+            .fetch_add(played as u64, Ordering::Relaxed)
+            + played as u64;
+        let pos_ns = (total_played as f64 * 1_000_000_000.0
+            / (self.sample_rate as f64 * self.channels as f64)) as u64;
+        self.shared.position.store(pos_ns, Ordering::Relaxed);
+    }
+}
+
 fn build_output(shared: &Arc<AudioShared>) -> Result<AudioOutput, String> {
     use cpal::traits::{DeviceTrait, StreamTrait};
 
@@ -1411,22 +1548,19 @@ fn build_output(shared: &Arc<AudioShared>) -> Result<AudioOutput, String> {
     // Seek/track-change, while the audio callback can perform a
     // non-blocking `try_lock()` on it.
     let shared_consumer = Arc::new(Mutex::new(cons));
-    let shared_consumer_reader = Arc::clone(&shared_consumer);
 
     let played_samples = Arc::new(AtomicU64::new(0));
-    let played_samples_cpal = Arc::clone(&played_samples);
-    let vol_ref = Arc::clone(&shared.volume);
-    let position_cpal = Arc::clone(&shared.position);
-    let visualizer_buf_cpal = Arc::clone(&shared.visualizer_buf);
-    let eq_cpal = Arc::clone(&shared.equalizer);
-    let loudness_cpal = Arc::clone(&shared.loudness_gain);
-    let shared_cpal = Arc::clone(shared);
-    let fade_cpal = Arc::clone(&shared.fade_gain);
-
-    // Pre-allocated scratch for the visualizer's mono downmix — the output
-    // callback must never allocate. Sized for the whole ring buffer, far
-    // larger than any single callback burst.
-    let mut mono_scratch: Vec<f32> = Vec::with_capacity(buffer_capacity);
+    let mut renderer = OutputRenderer {
+        shared: Arc::clone(shared),
+        consumer: Arc::clone(&shared_consumer),
+        played_samples: Arc::clone(&played_samples),
+        // Pre-allocated scratch for the visualizer's mono downmix — the
+        // output callback must never allocate. Sized for the whole ring
+        // buffer, far larger than any single callback burst.
+        mono_scratch: Vec::with_capacity(buffer_capacity),
+        sample_rate: target_sample_rate,
+        channels: target_channels,
+    };
 
     let stream_error_flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let err_flag_cpal = Arc::clone(&stream_error_flag);
@@ -1434,124 +1568,7 @@ fn build_output(shared: &Arc<AudioShared>) -> Result<AudioOutput, String> {
     let stream = device
         .build_output_stream(
             config,
-            move |output: &mut [f32], _| {
-                let vol = f32::from_bits(vol_ref.load(Ordering::Relaxed));
-                let mut loudness = f32::from_bits(loudness_cpal.load(Ordering::Relaxed));
-                let played_before = played_samples_cpal.load(Ordering::Relaxed);
-                let fade = f32::from_bits(fade_cpal.load(Ordering::Relaxed));
-                let mut played = 0;
-
-                // Non-blocking try_lock ensures CPAL callback never stalls
-                if let Some(mut consumer) = shared_consumer_reader.try_lock() {
-                    for sample in output.iter_mut() {
-                        if let Some(s) = consumer.try_pop() {
-                            *sample = s;
-                            played += 1;
-                        } else {
-                            *sample = 0.0;
-                        }
-                    }
-                } else {
-                    for sample in output.iter_mut() {
-                        *sample = 0.0;
-                    }
-                }
-
-                // DSP chain: loudness gain → EQ preamp → EQ bands → fade
-                // envelope → volume. Every stage is skipped when neutral, so
-                // with the EQ disabled and all gains at 1.0 the decoded
-                // samples reach the device untouched (bit-perfect).
-
-                // 1) Per-track loudness normalization gain (#77). A switch
-                // scheduled inside this buffer (crossfade start, #1238)
-                // splits it: the old gain up to the switch sample, the new
-                // one from there on.
-                let loudness_before = loudness;
-                let mut split = 0;
-                let switch_at = shared_cpal.loudness_switch_at.load(Ordering::Acquire);
-                if let Some(k) = loudness_switch_offset(switch_at, played_before, played) {
-                    if shared_cpal
-                        .loudness_switch_at
-                        .compare_exchange(
-                            switch_at,
-                            NO_LOUDNESS_SWITCH,
-                            Ordering::AcqRel,
-                            Ordering::Relaxed,
-                        )
-                        .is_ok()
-                    {
-                        let new_bits = shared_cpal.loudness_switch_gain.load(Ordering::Relaxed);
-                        loudness_cpal.store(new_bits, Ordering::Relaxed);
-                        loudness = f32::from_bits(new_bits);
-                        split = k;
-                    }
-                }
-                if loudness_before != 1.0 {
-                    for sample in output[..split].iter_mut() {
-                        *sample *= loudness_before;
-                    }
-                }
-                if loudness != 1.0 {
-                    for sample in output[split..played].iter_mut() {
-                        *sample *= loudness;
-                    }
-                }
-
-                // 2) Equalizer (preamp + band cascade; no-op when disabled)
-                let mut eq_applied = false;
-                if let Some(mut eq) = eq_cpal.try_lock() {
-                    eq_applied = eq.process_interleaved(&mut output[..played]);
-                }
-
-                // 3) Fade envelope (#79)
-                if fade != 1.0 {
-                    for sample in output[..played].iter_mut() {
-                        *sample *= fade;
-                    }
-                }
-
-                // 4) Master volume
-                if vol != 1.0 {
-                    for sample in output[..played].iter_mut() {
-                        *sample *= vol;
-                    }
-                }
-
-                // 5) Final clip guard and true-peak ceiling limiter.
-                // When loudness normalization or EQ is active, samples can be boosted
-                // significantly past full scale (loudness boost up to +12 dB, or EQ
-                // preamp up to +12 dB stacked on top of positive band gains).
-                // We enforce a true-peak ceiling (-1.0 dBTP = 0.8912509) to prevent inter-sample
-                // clipping during D/A reconstruction.
-                // When both loudness normalization and EQ are neutral/disabled, the signal
-                // passes through unaltered for bit-perfect output.
-                if loudness_before != 1.0 || loudness != 1.0 || eq_applied {
-                    for sample in output[..played].iter_mut() {
-                        *sample = sample.clamp(-TRUE_PEAK_CEILING, TRUE_PEAK_CEILING);
-                    }
-                }
-
-                if played > 0 {
-                    let channels_u = target_channels as usize;
-                    mono_scratch.clear();
-                    for chunk in output[..played].chunks(channels_u) {
-                        let sum: f32 = chunk.iter().sum();
-                        // Reserved to buffer_capacity up front and cleared per callback.
-                        // ast-grep-ignore: audio-callback-no-alloc
-                        mono_scratch.push(sum / target_channels as f32);
-                    }
-                    // Bounded ring buffer: evicts the oldest block at max_size.
-                    // ast-grep-ignore: audio-callback-no-alloc
-                    visualizer_buf_cpal.push(&mono_scratch);
-                }
-
-                let total_played =
-                    played_samples_cpal.fetch_add(played as u64, Ordering::Relaxed) + played as u64;
-                let pos_ns = (total_played as f64 * 1_000_000_000.0
-                    / (target_sample_rate as f64 * target_channels as f64))
-                    as u64;
-                position_cpal.store(pos_ns, Ordering::Relaxed);
-            },
+            move |output: &mut [f32], _| renderer.render(output),
             move |err| {
                 log::error!("CPAL stream error: {err}");
                 err_flag_cpal.store(true, Ordering::Relaxed);
@@ -3276,6 +3293,58 @@ mod tests {
         assert!(engine
             .get_pipeline_info(None, LoudnessGainSource::Disabled, None)
             .is_none());
+    }
+
+    /// Times the output callback's hot path (gain chain, EQ, limiter,
+    /// visualizer downmix) on a 48 kHz stereo, 1024-frame buffer, the
+    /// comparison point for "no callback-timing regression" (#1556). Run it
+    /// in release: `cargo test --release -p luminous --lib
+    /// output_render_timing -- --ignored --nocapture`.
+    #[test]
+    #[ignore = "timing benchmark; run manually in release"]
+    fn output_render_timing() {
+        const FRAMES: usize = 1024;
+        const CHANNELS: u16 = 2;
+        const ITERS: usize = 20_000;
+        let shared = Arc::new(test_shared());
+        {
+            let mut eq = shared.equalizer.lock();
+            eq.update_format(48_000, CHANNELS as usize);
+            assert!(eq.load_builtin_preset("Rock"));
+            eq.set_enabled(true);
+        }
+        shared
+            .loudness_gain
+            .store(0.8f32.to_bits(), Ordering::Relaxed);
+        shared.volume.store(0.7f32.to_bits(), Ordering::Relaxed);
+        let len = FRAMES * CHANNELS as usize;
+        let (mut producer, consumer) = HeapRb::<f32>::new(len * 2).split();
+        let mut renderer = OutputRenderer {
+            shared: Arc::clone(&shared),
+            consumer: Arc::new(Mutex::new(consumer)),
+            played_samples: Arc::new(AtomicU64::new(0)),
+            mono_scratch: Vec::with_capacity(len),
+            sample_rate: 48_000,
+            channels: CHANNELS,
+        };
+        let input: Vec<f32> = (0..len).map(|i| ((i as f32) * 0.01).sin() * 0.5).collect();
+        let mut output = vec![0.0f32; len];
+        let mut total = std::time::Duration::ZERO;
+        for _ in 0..ITERS {
+            producer.push_slice(&input);
+            let t = std::time::Instant::now();
+            renderer.render(&mut output);
+            total += t.elapsed();
+        }
+        let per = total / ITERS as u32;
+        let budget_us = FRAMES as f64 / 48_000.0 * 1e6;
+        println!(
+            "output render: {:.2} us per {FRAMES}-frame buffer ({:.3}% of the {:.0} us budget)",
+            per.as_secs_f64() * 1e6,
+            per.as_secs_f64() * 1e6 / budget_us * 100.0,
+            budget_us
+        );
+        std::hint::black_box(&output);
     }
 
     #[test]
