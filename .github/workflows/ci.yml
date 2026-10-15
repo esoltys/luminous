@@ -74,6 +74,20 @@ jobs:
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
 
+      # The audio engine must not reach app layers: with no Tauri, SQLite,
+      # HTTP client or async runtime in its dependency tree, it can't block,
+      # touch app state or talk to a server from the playback path (#1556).
+      - name: Check the audio engine's dependency boundary
+        run: |
+          # Captured first, so a failing `cargo tree` fails the step rather
+          # than reading as an empty (clean) dependency list.
+          tree=$(cargo tree -p luminous-audio -e normal --prefix none)
+          forbidden=$(grep -E '^(tauri|rusqlite|reqwest|tokio)[ -]' <<< "$tree" | sort -u || true)
+          if [ -n "$forbidden" ]; then
+            echo "::error::luminous-audio must not depend on: $forbidden"
+            exit 1
+          fi
+
       # From the repo root with --workspace, so every crate under crates/ is
       # tested and linted, not just the app package in src-tauri (#1554).
       - name: Run cargo test

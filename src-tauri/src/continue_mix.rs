@@ -25,7 +25,7 @@ pub const BATCH_SIZE: usize = 5;
 pub const SEED_COUNT: usize = 3;
 /// Top up once this many (or fewer) songs remain after the current one —
 /// before the last song ends, so the next one is already queued and the
-/// gapless preload in `audio.rs` still has something to prime.
+/// engine's gapless preload still has something to prime.
 pub const TOP_UP_THRESHOLD: usize = 1;
 /// Songs played within this window are skipped so the mix favours songs the
 /// user hasn't heard lately.

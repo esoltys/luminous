@@ -223,7 +223,7 @@ impl Player {
             if let Some(v) = app_state_get_parsed::<f32>(&conn, "volume") {
                 volume = v.clamp(0.0, 1.0);
                 if let Ok(engine) = audio.try_lock() {
-                    let _ = engine.set_volume(volume);
+                    engine.set_volume(volume);
                 }
             }
             if let Some(s) = app_state_get(&conn, "shuffle_mode") {
@@ -379,7 +379,7 @@ impl Player {
         if let Some(song) = restored_song {
             if let Ok(engine) = player.audio.try_lock() {
                 engine.set_loudness_gain(loudness_gain);
-                let _ = engine.cue(Box::new(song), restored_position_ns);
+                let _ = engine.cue(crate::audio::track_for(&song), restored_position_ns);
             }
         }
 
@@ -738,7 +738,7 @@ impl Player {
 
         if real_play {
             let audio = self.audio.lock().await;
-            audio.play(Box::new(song), start_ns)
+            audio.play(crate::audio::track_for(&song), start_ns)
         } else {
             Ok(())
         }
@@ -969,8 +969,10 @@ impl Player {
         self.current_loudness_source = source;
         self.current_loudness_gain_db = gain_db;
 
-        let handle = self.audio.lock().await.loudness_gain_handle();
-        crate::audio::ramp_gain(&handle, target_gain, Self::LOUDNESS_REFRESH_RAMP_MS).await;
+        self.audio
+            .lock()
+            .await
+            .ramp_loudness_gain(target_gain, Self::LOUDNESS_REFRESH_RAMP_MS);
     }
 
     /// Sync `is_instrumental` into this song's in-memory copies (current
@@ -1000,8 +1002,8 @@ impl Player {
         }
     }
 
-    /// `Some(ms)` when pause/resume/stop transitions should fade over `ms`
-    /// milliseconds, `None` when they should apply instantly — the one
+    /// How long pause/resume/stop transitions should fade, in ms (0 when
+    /// fading is off, so they apply instantly) — the one
     /// decision `pause`, `resume`, and `stop` each otherwise re-derived from
     /// the same DB settings independently.
     ///
@@ -1009,31 +1011,30 @@ impl Player {
     /// itself called while `AppState.player`'s async mutex is held, so a
     /// synchronous read here would stall every other IPC command waiting on
     /// that lock for as long as the r2d2 pool takes.
-    async fn fade_duration_ms(&self) -> Option<u32> {
+    async fn fade_duration_ms(&self) -> u32 {
         let db = self._db.clone();
         let settings = tokio::task::spawn_blocking(move || {
             crate::fade::get_fade_settings_from_db(&db).unwrap_or_default()
         })
         .await
         .unwrap_or_default();
-        (settings.fade_pause_enabled && settings.fade_pause_duration_ms > 0)
-            .then_some(settings.fade_pause_duration_ms)
+        if settings.fade_pause_enabled {
+            settings.fade_pause_duration_ms
+        } else {
+            0
+        }
     }
 
     pub async fn pause(&self) -> Result<()> {
         let pos = self.audio.lock().await.current_position_nanosec();
         self.persist_position(pos).await;
-        match self.fade_duration_ms().await {
-            Some(ms) => self.audio.lock().await.pause_with_fade(ms),
-            None => self.audio.lock().await.pause(),
-        }
+        let fade_ms = self.fade_duration_ms().await;
+        self.audio.lock().await.pause(fade_ms)
     }
 
     pub async fn resume(&self) -> Result<()> {
-        match self.fade_duration_ms().await {
-            Some(ms) => self.audio.lock().await.resume_with_fade(ms),
-            None => self.audio.lock().await.resume(),
-        }
+        let fade_ms = self.fade_duration_ms().await;
+        self.audio.lock().await.resume(fade_ms)
     }
 
     /// Called by the audio-event loop before treating a playback failure as a
@@ -1158,10 +1159,8 @@ impl Player {
         self.current_playlist_id = None;
         self.persist_current_song().await;
         self.persist_position(0).await;
-        match self.fade_duration_ms().await {
-            Some(ms) => self.audio.lock().await.stop_with_fade(ms),
-            None => self.audio.lock().await.stop(),
-        }
+        let fade_ms = self.fade_duration_ms().await;
+        self.audio.lock().await.stop(fade_ms)
     }
 
     /// `position_nanosec` is track-relative (0 at the start of the current
@@ -1189,7 +1188,7 @@ impl Player {
     pub async fn set_volume(&mut self, vol: f32) -> Result<()> {
         self.volume = vol.clamp(0.0, 1.0);
         let audio = self.audio.lock().await;
-        let _ = audio.set_volume(self.volume);
+        audio.set_volume(self.volume);
         if let Ok(conn) = self._db.pool.get() {
             app_state_set(&conn, "volume", &self.volume.to_string());
         }
@@ -1441,7 +1440,7 @@ impl Player {
                 }
             };
             self.audio.lock().await.preload_next_with_crossfade(
-                Box::new(target.song),
+                crate::audio::track_for(&target.song),
                 start_ns,
                 fade_settings.crossfade_auto_duration_secs,
                 incoming_gain,
@@ -1450,7 +1449,7 @@ impl Player {
             self.audio
                 .lock()
                 .await
-                .preload_next(Box::new(target.song), start_ns)
+                .preload_next(crate::audio::track_for(&target.song), start_ns)
         }
     }
 
@@ -1870,7 +1869,7 @@ impl Player {
             None => (None, self.virtual_len()),
         };
         PlaybackState {
-            state: audio.current_state(),
+            state: audio.current_state().into(),
             current_song: self.current_song.clone(),
             playlist_id: self.current_playlist_id,
             playlist_item_uuid: self.current_item_uuid.clone(),
@@ -1896,7 +1895,8 @@ impl Player {
         &self,
         audio: &AudioEngine,
     ) -> Option<crate::models::AudioPipelineInfo> {
-        audio.get_pipeline_info(
+        crate::audio::pipeline_info(
+            audio,
             self.current_song.as_ref(),
             self.current_loudness_source,
             self.current_loudness_gain_db,

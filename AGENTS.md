@@ -66,13 +66,12 @@ into Picard's territory; it's a different, complementary axis Picard was never m
 
 **Core Rust modules** (`src-tauri/src/`):
 
-- `audio.rs` — Symphonia decode + CPAL output pipeline with gapless playback
+- `crates/luminous-audio` — the playback engine: Symphonia decode, CPAL output, gapless/crossfade handover, gain chain, spectrum. No `tauri`/`rusqlite`/`reqwest`/`tokio` (CI-checked); remote sources come in through the opener `media_source.rs` injects, and `audio.rs` maps `Song`/`PlayState`/pipeline info at the edge
 - `player.rs` — playback state machine (shuffle, repeat, queue control)
 - `collection.rs` — library scanner (incremental; respects file mod times) + file watcher
 - `db.rs` — SQLite schema, connection pool (r2d2), migrations
 - `playlist.rs` — playlist CRUD + undo/redo command stack
 - `crates/luminous-equalizer` — biquad DSP filters (10-band graphic, up-to-20-band parametric with peak/shelf types); presets and persistence stay in `eq_store.rs`
-- `analyzer.rs` — real-time FFT spectrum processing
 - `lyrics.rs` — LRCLIB + Lyrics.ovh clients
 - `covermanager.rs` — embedded art extraction + iTunes API fallback
 - `tageditor.rs` — lofty tag reader/writer
@@ -126,7 +125,7 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config libayatana-appind
 
 ## Architecture Invariants
 
-- **Allocation-free audio thread**: the playback callback in `audio.rs` must never allocate (no `Vec::push`, `String`, or other heap ops). Pre-allocate buffers on init; use `parking_lot::Mutex` (no poisoning) over `std::sync::Mutex`. Enforced by `audio-callback-no-alloc` / `audio-no-std-mutex` — a pre-reserved or bounded push needs a justified `// ast-grep-ignore:` comment.
+- **Allocation-free audio thread**: the output callback in `crates/luminous-audio` (`OutputRenderer`) must never allocate (no `Vec::push`, `String`, or other heap ops). Pre-allocate buffers on init; use `parking_lot::Mutex` (no poisoning) over `std::sync::Mutex`. Enforced by `audio-callback-no-alloc` / `audio-no-std-mutex` — a pre-reserved or bounded push needs a justified `// ast-grep-ignore:` comment.
 - **Event-driven state**: the frontend always reacts to backend events (e.g. `playback-state`, `track-changed`) and never assumes state after an `invoke()`. This keeps the UI consistent with backend reality.
 - **Database migrations**: any schema change in `db.rs` must bump the migration version and stay backwards-compatible during rollout.
 - **Command pattern**: IPC handlers in `src-tauri/src/commands/*.rs` are `async`, return `Result<T, String>` (errors serialize to `String`), and access shared state via `AppState` (thread-safe through Arc + Mutex/parking_lot). Prefer *deep* commands that own a whole workflow (e.g. `apply_equalizer_config`, `add_songs_to_queue`) over per-field setters; persistence-only writes the UI can't act on (`set_app_setting`, `set_fade_settings`, EQ saves) are fire-and-forget — they log failures backend-side and never reject.

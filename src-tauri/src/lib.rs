@@ -10,13 +10,11 @@
 //   playlist  — Playlist CRUD + undo/redo
 
 pub mod addons;
-pub mod analyzer;
 pub mod artist_image;
 pub mod audio;
 pub mod band_waveform;
 pub mod biomanager;
 pub mod bridge;
-pub mod codecs;
 pub mod collection;
 pub mod commands;
 pub mod context;
@@ -37,6 +35,7 @@ pub mod install_format;
 pub mod loudness;
 pub mod lyrics;
 pub mod media_session;
+pub mod media_source;
 pub mod models;
 pub mod musicbrainz;
 pub mod native_labels;
@@ -351,7 +350,7 @@ fn spawn_visualizer_loop(app_handle: tauri::AppHandle, audio: Arc<Mutex<AudioEng
                 let engine = audio.lock().await;
                 let enabled = engine.spectrum_enabled();
                 let state = engine.current_state();
-                let spectrum = if enabled && state == crate::models::PlayState::Playing {
+                let spectrum = if enabled && state == luminous_audio::EngineState::Playing {
                     Some(engine.spectrum_snapshot(1024))
                 } else {
                     None
@@ -388,7 +387,7 @@ fn spawn_position_tick_loop(
                 let engine = audio.lock().await;
                 (engine.current_position_nanosec(), engine.current_state())
             };
-            if state == crate::models::PlayState::Playing {
+            if state == luminous_audio::EngineState::Playing {
                 let mut p = player.lock().await;
                 // `pos` is the audio engine's absolute position within the
                 // current file; the UI and play-stats logic below both deal
@@ -470,10 +469,13 @@ fn spawn_audio_event_loop(
         .spawn(move || {
             let rx = {
                 let engine = tauri::async_runtime::block_on(async { audio.lock().await });
-                engine.events()
+                engine.take_events()
+            };
+            let Some(rx) = rx else {
+                log::error!("Audio event stream was already taken; player events won't run");
+                return;
             };
 
-            let rx = rx.lock();
             for event in rx.iter() {
                 log::trace!("Received audio event: {:?}", event);
                 let app = app_handle.clone();
@@ -559,8 +561,8 @@ fn spawn_audio_event_loop(
                                 log::warn!("Gapless preload failed: {e}");
                             }
                         }
-                        crate::audio::AudioEvent::TrackTransitioned { song_id, .. } => {
-                            let _ = p.on_gapless_transition(song_id).await;
+                        crate::audio::AudioEvent::TrackTransitioned { track_id, .. } => {
+                            let _ = p.on_gapless_transition(track_id).await;
                             let state = p.get_state().await;
                             if let Some(ref song) = p.current_song {
                                 if let Some(app_state) = app.try_state::<AppState>() {
@@ -652,7 +654,6 @@ fn spawn_audio_event_loop(
                             let state = p.get_state().await;
                             let _ = app.emit("playback-state", state);
                         }
-                        _ => {}
                     }
                 });
             }
@@ -934,26 +935,6 @@ pub fn run() {
                 }
             }
 
-            // `subsonic://` library paths are signed into stream URLs at open
-            // time from the server's saved credentials (#1163).
-            {
-                let db = db.clone();
-                audio::register_subsonic_resolver(move |path| {
-                    let conn = db.pool.get().map_err(|e| e.to_string())?;
-                    subsonic::resolve_stream_url(&conn, path).map_err(|e| e.to_string())
-                });
-            }
-
-            // WebDAV song URLs are stored credential-free; the Basic auth
-            // header comes from the saved server at open time (#1492).
-            {
-                let db = db.clone();
-                audio::register_webdav_auth_resolver(move |url| {
-                    let conn = db.pool.get().ok()?;
-                    webdav::resolve_auth_header(&conn, url)
-                });
-            }
-
             // Graceful Store (MSIX) update handling (#744): register for
             // Restart Manager-driven relaunch, and fire a one-time "app
             // updated" OS notification if the previous launch's persisted
@@ -991,7 +972,11 @@ pub fn run() {
                 }
             }
 
-            let audio_engine = AudioEngine::new();
+            // Song locations are opened through `media_source`, which signs
+            // `subsonic://` paths into stream URLs (#1163) and adds saved
+            // WebDAV credentials (#1492) at open time.
+            let audio_engine =
+                AudioEngine::with_source_opener(media_source::opener(Arc::clone(&db)));
             restore_equalizer_from_db(&db, &audio_engine);
 
             let audio = Arc::new(Mutex::new(audio_engine));

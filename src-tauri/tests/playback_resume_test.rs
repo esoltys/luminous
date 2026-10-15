@@ -55,13 +55,7 @@ async fn test_playback_resume_on_startup() {
         luminous_lib::models::LoudnessGainSource::Disabled
     );
     assert_eq!(state.loudness_gain_db, None);
-    let engine_loudness = f32::from_bits(
-        audio
-            .lock()
-            .await
-            .loudness_gain_handle()
-            .load(std::sync::atomic::Ordering::Relaxed),
-    );
+    let engine_loudness = audio.lock().await.current_loudness_gain();
     assert_eq!(engine_loudness, 1.0);
 
     drop(temp_dir);
@@ -114,13 +108,7 @@ async fn test_playback_resume_with_volume_and_analyzed_loudness() {
         luminous_lib::models::LoudnessGainSource::Analyzed
     );
     assert_eq!(state.loudness_gain_db, Some(-6.0));
-    let engine_loudness = f32::from_bits(
-        audio
-            .lock()
-            .await
-            .loudness_gain_handle()
-            .load(std::sync::atomic::Ordering::Relaxed),
-    );
+    let engine_loudness = audio.lock().await.current_loudness_gain();
     assert!((engine_loudness - 0.5011872).abs() < 1e-4);
 
     drop(temp_dir);
@@ -160,13 +148,7 @@ async fn test_playback_resume_with_fallback_loudness() {
         luminous_lib::models::LoudnessGainSource::Fallback
     );
     assert_eq!(state.loudness_gain_db, Some(-6.0));
-    let engine_loudness = f32::from_bits(
-        audio
-            .lock()
-            .await
-            .loudness_gain_handle()
-            .load(std::sync::atomic::Ordering::Relaxed),
-    );
+    let engine_loudness = audio.lock().await.current_loudness_gain();
     assert!((engine_loudness - 0.5011872).abs() < 1e-4);
 
     drop(temp_dir);

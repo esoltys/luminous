@@ -54,6 +54,7 @@ tauri-plugin-prevent-default = "6"
 
 # --- Workspace crates ---
 luminous-equalizer = { path = "../crates/luminous-equalizer" }
+luminous-audio = { path = "../crates/luminous-audio" }
 
 # --- Serialization ---
 serde.workspace = true
@@ -71,24 +72,15 @@ rusqlite = { version = "0.40", features = ["bundled"] }
 r2d2 = "0.8"
 r2d2_sqlite = "0.35"
 
-# --- Audio decoding ---
-# `all` enables every codec and format symphonia supports.
-# Note: AIFF is not yet a supported format in symphonia 0.5.x.
-symphonia = { version = "0.6", features = ["all"] }
-# Symphonia has no native Opus decoder (#1121); this adapter bridges to libopus,
-# which is compiled from vendored C source and statically linked (`bundled`,
-# the default feature) so no runtime DLL or system libopus install is needed.
-symphonia-adapter-libopus = "0.3"
-
-# --- Audio output ---
-cpal = "0.18"
-ringbuf = "0.5"
+# --- Audio decoding (the engine itself is crates/luminous-audio) ---
+# The app implements `MediaSource` for remote sources it hands the engine.
+symphonia.workspace = true
 
 # --- Tag reading/writing ---
 lofty = "0.25"
 
 # --- FFT (spectrum analyzer, band waveform) ---
-rustfft = "6"
+rustfft.workspace = true
 
 # --- EBU R128 / BS.1770 loudness measurement (#77) ---
 bs1770 = "1"
@@ -107,16 +99,16 @@ uuid = { version = "1", features = ["v4"] }
 
 # --- Error handling ---
 thiserror = "2"
-anyhow = "1"
+anyhow.workspace = true
 
 # --- Logging ---
-log = "0.4"
+log.workspace = true
 env_logger = "0.11"
 
 # --- Utilities ---
 walkdir = "2"
 chrono = { version = "0.4", features = ["serde"] }
-parking_lot = "0.12"
+parking_lot.workspace = true
 rand = "0.10"
 percent-encoding = "2"
 # --- Data-parallel tag reading during library scan ---
@@ -188,6 +180,7 @@ zbus = { version = "5", default-features = false, features = ["tokio"] }
 zvariant = "5"
 
 [dev-dependencies]
+luminous-audio = { path = "../crates/luminous-audio", features = ["test-util"] }
 cucumber = { version = "0.23", features = ["macros"] }
 proptest = "1.11.0"
 tempfile = "3"

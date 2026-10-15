@@ -1,0 +1,30 @@
+[package]
+name = "luminous-audio"
+version = "0.1.0"
+description = "Luminous's playback engine: decode, gapless/crossfade handover, gain chain and output"
+edition = "2021"
+publish = false
+
+# Must never depend on tauri, rusqlite, reqwest or tokio: CI checks
+# `cargo tree -p luminous-audio -e normal` for them (#1556). Remote sources
+# reach the engine only through the opener the app injects.
+[dependencies]
+luminous-equalizer = { path = "../luminous-equalizer" }
+symphonia.workspace = true
+# Symphonia has no native Opus decoder (#1121); this adapter bridges to libopus,
+# which is compiled from vendored C source and statically linked (`bundled`,
+# the default feature) so no runtime DLL or system libopus install is needed.
+symphonia-adapter-libopus = "0.3"
+cpal = "0.18"
+ringbuf = "0.5"
+rustfft.workspace = true
+parking_lot.workspace = true
+log.workspace = true
+anyhow.workspace = true
+
+[features]
+# Exposes `write_test_pcm16_wav` to the app crate's tests.
+test-util = []
+
+[dev-dependencies]
+serde_json.workspace = true

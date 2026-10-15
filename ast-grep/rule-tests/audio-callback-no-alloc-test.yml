@@ -9,6 +9,10 @@ valid:
     }
   - |
     fn not_audio() { let v = vec![1, 2, 3]; items.push(4); }
+  - |
+    impl OtherThing {
+        fn render(&mut self) { self.items.push(1); }
+    }
 invalid:
   - |
     fn setup() {
@@ -22,4 +26,10 @@ invalid:
         let stream = device.build_output_stream(&config, move |output: &mut [f32], _| {
             log(format!("{}", output.len()));
         }, err_fn, None);
+    }
+  - |
+    impl OutputRenderer {
+        fn render(&mut self, output: &mut [f32]) {
+            let label = format!("{}", output.len());
+        }
     }

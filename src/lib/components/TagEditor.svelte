@@ -56,7 +56,7 @@
   // Remote songs (WebDAV #682, OpenSubsonic #916) have no local file Luminous can write lofty tags to,
   // and there's no write-back to the remote server -- edits here only ever
   // reach Luminous's own DB. Derived from the path scheme rather than a
-  // dedicated field since it's the same signal audio.rs/collection.rs
+  // dedicated field since it's the same signal media_source.rs/collection.rs
   // already key off of for "is this a remote source" checks.
   let isRemoteSource = $derived(isRemotePath(path));
   // CUE sheet tracks (#78) share one physical file's embedded tags across

@@ -3498,7 +3498,6 @@ dependencies = [
  "chacha20poly1305",
  "chrono",
  "console-subscriber",
- "cpal",
  "cucumber",
  "ed25519-dalek",
  "env_logger",
@@ -3506,6 +3505,7 @@ dependencies = [
  "libc",
  "lofty",
  "log",
+ "luminous-audio",
  "luminous-equalizer",
  "md-5",
  "notify",
@@ -3518,14 +3518,12 @@ dependencies = [
  "rand 0.10.2",
  "rayon",
  "reqwest",
- "ringbuf",
  "rusqlite",
  "rustfft",
  "serde",
  "serde_json",
  "sha2 0.11.0",
  "symphonia",
- "symphonia-adapter-libopus",
  "tauri",
  "tauri-build",
  "tauri-plugin-autostart",
@@ -3554,6 +3552,22 @@ dependencies = [
  "wiremock",
  "zbus",
  "zvariant",
+]
+
+[[package]]
+name = "luminous-audio"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cpal",
+ "log",
+ "luminous-equalizer",
+ "parking_lot",
+ "ringbuf",
+ "rustfft",
+ "serde_json",
+ "symphonia",
+ "symphonia-adapter-libopus",
 ]
 
 [[package]]

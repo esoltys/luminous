@@ -2,7 +2,7 @@
 //! analysis, with a ReplayGain 2.0 tag fallback for tracks not yet analyzed.
 //!
 //! A low-priority background thread (`spawn_background_analyzer`) decodes
-//! each not-yet-analyzed local track once (through `audio::OfflineDecoder`,
+//! each not-yet-analyzed local track once (through `luminous_audio::OfflineDecoder`,
 //! the same decode path as the band_waveform/waveform analyzers) and writes
 //! `songs.ebur128_integrated_loudness_lufs`. Playback consults, in order:
 //! measured R128 loudness -> ReplayGain tag (track or album, per settings) ->
@@ -147,7 +147,9 @@ pub fn compute_gain(
 /// rare edge case not worth the added complexity here. Samples stream
 /// straight into the meters, so memory doesn't grow with the track's length.
 pub fn analyze_integrated_loudness(path: &Path) -> Result<f64> {
-    let decoder = crate::audio::OfflineDecoder::open(path)
+    // Local files only (`LOCAL_SOURCES_SQL`), so no remote opener is needed.
+    let decoder = luminous_audio::OfflineDecoder::open_file(path)
+        .map_err(anyhow::Error::msg)
         .context("failed to open audio file for R128 analysis")?;
     let sample_rate = decoder.sample_rate();
     // One meter per channel, sized by the first decoded packet.
@@ -311,7 +313,7 @@ mod tests {
         let path = dir.path().join("stereo.wav");
         let left = sine(1_000.0, 0.5, 48_000, 3);
         let right = sine(250.0, 0.125, 48_000, 3);
-        crate::audio::write_test_pcm16_wav(&path, 48_000, &[left, right]);
+        luminous_audio::write_test_pcm16_wav(&path, 48_000, &[left, right]);
 
         let lufs = analyze_integrated_loudness(&path).expect("analysis");
 
@@ -325,7 +327,7 @@ mod tests {
     fn analyze_integrated_loudness_measures_a_mono_file() {
         let dir = tempfile::tempdir().expect("temp dir");
         let path = dir.path().join("mono.wav");
-        crate::audio::write_test_pcm16_wav(&path, 48_000, &[sine(1_000.0, 0.5, 48_000, 3)]);
+        luminous_audio::write_test_pcm16_wav(&path, 48_000, &[sine(1_000.0, 0.5, 48_000, 3)]);
 
         let lufs = analyze_integrated_loudness(&path).expect("analysis");
 

@@ -68,3 +68,27 @@ snapshots:
       style: secondary
       start: 66
       end: 144
+  ? |
+    impl OutputRenderer {
+        fn render(&mut self, output: &mut [f32]) {
+            let label = format!("{}", output.len());
+        }
+    }
+  : labels:
+    - source: format!("{}", output.len())
+      style: primary
+      start: 89
+      end: 116
+    - source: OutputRenderer
+      style: secondary
+      start: 5
+      end: 19
+    - source: |-
+        impl OutputRenderer {
+            fn render(&mut self, output: &mut [f32]) {
+                let label = format!("{}", output.len());
+            }
+        }
+      style: secondary
+      start: 0
+      end: 125

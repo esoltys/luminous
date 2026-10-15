@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 
 // The backend's `set_spectrum_enabled` command is a single global on/off
-// flag (see src-tauri/src/audio.rs's `spectrum_enabled: AtomicBool`) shared
+// flag (the audio engine's `spectrum_enabled` in crates/luminous-audio) shared
 // by every consumer of "spectrum-data" events — currently ReactiveLogoBrand
 // and SpectrumVisualizer. Each one calling invoke("set_spectrum_enabled", ...)
 // directly from its own onMount/onDestroy is unsafe: it's not reference-
