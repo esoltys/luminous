@@ -318,6 +318,20 @@ mod tests {
         assert!((lufs - -8.807_231_903_076).abs() < 1e-6, "{lufs}");
     }
 
+    /// A mono file is measured from its single channel. A 0.5-amplitude
+    /// 1 kHz tone sits about 9 dB below full scale (K-weighting is near
+    /// unity at 1 kHz).
+    #[test]
+    fn analyze_integrated_loudness_measures_a_mono_file() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("mono.wav");
+        crate::audio::write_test_pcm16_wav(&path, 48_000, &[sine(1_000.0, 0.5, 48_000, 3)]);
+
+        let lufs = analyze_integrated_loudness(&path).expect("analysis");
+
+        assert!((-10.0..=-8.0).contains(&lufs), "{lufs}");
+    }
+
     fn settings(target_lufs: f32, mode: LoudnessMode, fallback_gain_db: f32) -> LoudnessSettings {
         LoudnessSettings {
             enabled: true,
