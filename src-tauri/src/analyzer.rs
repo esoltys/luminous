@@ -1,15 +1,10 @@
-//! Audio analysis primitives used by two unrelated consumers: a live
-//! ring-buffer + FFT path for the real-time visualizer, and an offline
-//! whole-file decode used wherever a module needs every sample of a track
-//! at once (`loudness.rs`'s R128 analysis, `waveform.rs`'s peak envelope).
-//! The two halves don't interact — they're grouped here because both are
-//! "decode audio and do math on it", not because they share code.
+//! The real-time spectrum: a ring buffer of recently played samples fed by
+//! the audio callback, and the FFT that turns it into visualizer bins.
+//! Whole-file decoding for offline analysis lives in `audio::OfflineDecoder`.
 
-use anyhow::{anyhow, Context, Result};
 use parking_lot::Mutex;
 use rustfft::{num_complex::Complex, FftPlanner};
 use std::collections::VecDeque;
-use std::path::Path;
 
 // ---------------------------------------------------------------------------
 // Real-time Playback Buffer for Spectrum Analyzer
@@ -157,84 +152,4 @@ pub fn calculate_spectrum(
     }
 
     bins
-}
-
-// ---------------------------------------------------------------------------
-// Offline Fast Audio Decoder
-// ---------------------------------------------------------------------------
-
-/// Decode an entire audio file as fast as the CPU allows (no real-time
-/// pacing, unlike playback) and downmix to mono by averaging all channels.
-/// Returns `(samples, sample_rate)`. Individual corrupt packets are skipped
-/// rather than aborting the whole decode; any other decoder error stops
-/// early and returns whatever was decoded so far. Used by `waveform.rs` for
-/// its peak envelope; `loudness.rs` needs channels kept separate for BS.1770
-/// weighting and so has its own near-identical `decode_channels` instead of
-/// calling this.
-pub fn decode_all_samples(path: &Path) -> Result<(Vec<f32>, u32)> {
-    use symphonia::core::{
-        codecs::audio::AudioDecoderOptions,
-        errors::Error as SymphoniaError,
-        formats::{probe::Hint, FormatOptions, TrackType},
-        io::MediaSourceStream,
-        meta::MetadataOptions,
-    };
-
-    let source = crate::audio::open_media_source(&path.to_string_lossy())
-        .map_err(|e| anyhow!("failed to open audio file for offline decode: {e}"))?;
-    let mss = MediaSourceStream::new(source, Default::default());
-
-    let mut format = symphonia::default::get_probe()
-        .probe(
-            &Hint::new(),
-            mss,
-            FormatOptions::default(),
-            MetadataOptions::default(),
-        )
-        .context("format probe failed during offline decode")?;
-
-    let track = format
-        .default_track(TrackType::Audio)
-        .cloned()
-        .ok_or_else(|| anyhow!("no active audio track found for offline decode"))?;
-
-    let track_id = track.id;
-    let audio_params = track
-        .codec_params
-        .as_ref()
-        .and_then(|c| c.audio())
-        .ok_or_else(|| anyhow!("no audio codec parameters for offline decode"))?;
-    let sample_rate = audio_params.sample_rate.unwrap_or(44100);
-
-    let mut decoder = crate::codecs::CODEC_REGISTRY
-        .make_audio_decoder(audio_params, &AudioDecoderOptions::default())
-        .context("failed to create decoder for offline decode")?;
-
-    let mut samples = Vec::new();
-
-    while let Ok(Some(packet)) = format.next_packet() {
-        if packet.track_id != track_id {
-            continue;
-        }
-        match decoder.decode(&packet) {
-            Ok(decoded) => {
-                let channels = decoded.spec().channels().count();
-                let mut decoded_samples: Vec<f32> = Vec::new();
-                decoded.copy_to_vec_interleaved(&mut decoded_samples);
-
-                if channels == 1 {
-                    samples.extend_from_slice(&decoded_samples);
-                } else {
-                    for chunk in decoded_samples.chunks(channels) {
-                        let sum: f32 = chunk.iter().sum();
-                        samples.push(sum / channels as f32);
-                    }
-                }
-            }
-            Err(SymphoniaError::DecodeError(_)) => continue,
-            Err(_) => break,
-        }
-    }
-
-    Ok((samples, sample_rate))
 }

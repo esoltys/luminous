@@ -1,4 +1,3 @@
-use crate::analyzer::decode_all_samples;
 use crate::band_waveform::compute_band_waveform_data;
 use crate::db::Database;
 use anyhow::{Context, Result};
@@ -89,7 +88,7 @@ pub fn generate_visualizer_data(
         return Ok((w, m));
     }
 
-    let (samples, sample_rate) = decode_all_samples(path).with_context(|| {
+    let (samples, sample_rate) = decode_mono(path).with_context(|| {
         format!(
             "failed to decode samples for song_id {} at path {:?}",
             song_id, path
@@ -126,6 +125,33 @@ pub fn generate_visualizer_data(
     tx.commit()?;
 
     Ok((waveform_peaks, band_waveform_data))
+}
+
+/// Decode a whole file and downmix it to mono by averaging every channel.
+/// Returns `(samples, sample_rate)`. Only the mono result grows with the
+/// track's length; each packet's channels are folded in as it decodes.
+fn decode_mono(path: &Path) -> Result<(Vec<f32>, u32)> {
+    let decoder = crate::audio::OfflineDecoder::open(path)?;
+    let sample_rate = decoder.sample_rate();
+    let mut mono = Vec::new();
+    decoder.decode_blocks(usize::MAX, |planes| match planes {
+        [] => {}
+        [only] => mono.extend_from_slice(only),
+        [first, rest @ ..] => {
+            let start = mono.len();
+            mono.extend_from_slice(first);
+            for plane in rest {
+                for (out, &s) in mono[start..].iter_mut().zip(plane) {
+                    *out += s;
+                }
+            }
+            let count = planes.len() as f32;
+            for out in &mut mono[start..] {
+                *out /= count;
+            }
+        }
+    });
+    Ok((mono, sample_rate))
 }
 
 /// Generate peak waveform amplitudes for a song, save to SQLite, and return them.
@@ -245,6 +271,35 @@ pub fn backfill_missing_visualizers(db: &Database) -> Result<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The waveform path averages *every* channel into one mono stream, not
+    /// just the first two, so a centre/surround channel still shapes the
+    /// envelope.
+    #[test]
+    fn decode_averages_all_channels_to_mono() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("three.wav");
+        let left: Vec<i16> = (0..4_000).map(|i| (i % 2_000) as i16 * 8).collect();
+        let centre: Vec<i16> = (0..4_000).map(|i| -((i % 1_000) as i16) * 16).collect();
+        let right: Vec<i16> = vec![12_000; 4_000];
+        crate::audio::write_test_pcm16_wav(
+            &path,
+            8_000,
+            &[left.clone(), centre.clone(), right.clone()],
+        );
+
+        let (mono, sample_rate) = decode_mono(&path).expect("decode");
+
+        assert_eq!(sample_rate, 8_000);
+        assert_eq!(mono.len(), 4_000);
+        for (i, &sample) in mono.iter().enumerate() {
+            let expected = (left[i] as f32 + centre[i] as f32 + right[i] as f32) / 32_768.0 / 3.0;
+            assert!(
+                (sample - expected).abs() < 1e-6,
+                "frame {i}: {sample} != {expected}"
+            );
+        }
+    }
 
     #[test]
     fn test_compute_waveform_peaks_empty() {
