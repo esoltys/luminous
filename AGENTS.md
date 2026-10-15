@@ -53,7 +53,7 @@ into Picard's territory; it's a different, complementary axis Picard was never m
 
 ## Project Structure
 
-- Rust source lives in `src-tauri/src/`; Svelte source in `src/`
+- Rust source lives in `src-tauri/src/` (the app crate) and `crates/` (engine crates with no Tauri or SQLite dependency, epic #1553); Svelte source in `src/`
 - Shared TypeScript types in `src/lib/types/`; Svelte 5 stores (Runes) in `src/lib/stores/`
 - No dedicated IPC wrapper layer — components and stores call Tauri commands directly via `invoke()` from `@tauri-apps/api/core`
 
@@ -71,7 +71,7 @@ into Picard's territory; it's a different, complementary axis Picard was never m
 - `collection.rs` — library scanner (incremental; respects file mod times) + file watcher
 - `db.rs` — SQLite schema, connection pool (r2d2), migrations
 - `playlist.rs` — playlist CRUD + undo/redo command stack
-- `equalizer.rs` — biquad DSP filters (10-band graphic, up-to-20-band parametric with peak/shelf types)
+- `crates/luminous-equalizer` — biquad DSP filters (10-band graphic, up-to-20-band parametric with peak/shelf types); presets and persistence stay in `eq_presets.rs`
 - `analyzer.rs` — real-time FFT spectrum processing
 - `lyrics.rs` — LRCLIB + Lyrics.ovh clients
 - `covermanager.rs` — embedded art extraction + iTunes API fallback
@@ -113,7 +113,7 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config libayatana-appind
 - **Type check / lint**: `bun run check`
 - **Architecture-invariant lint** (ast-grep rules in `ast-grep/rules/`): `bun run lint:ast`
 - **Frontend tests**: `bun run test:run` (Vitest)
-- **Backend tests**: `cd src-tauri && cargo test`
+- **Backend tests**: `cargo test --workspace` (from the repo root, so the `crates/` members run too)
 - **Windows UI automation smoke test** (real backend/IPC/SQLite, Windows only): `bun run test:e2e:windows`. One-time setup needed — see [docs/TESTING.md](docs/TESTING.md).
 - **Release build**: `bun run tauri build`
 - **MSIX build (Windows)**: `bun run tauri:windows:build`, but only after `bun run tauri build` (or a `cargo build --release`) has produced the exe — and only with `CARGO_TARGET_DIR` set to the workspace-root `target/` dir, or it looks in the wrong place. See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).

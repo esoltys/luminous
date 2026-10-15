@@ -56,6 +56,8 @@ The IPC commands are deliberately *deep*: each one owns a whole workflow rather 
 
 ```
 luminous/
+├── crates/                   # Engine crates with no Tauri/SQLite dependency
+│   └── luminous-equalizer/   # Biquad DSP: 10-band graphic & up-to-20-band parametric filters
 ├── features/                 # BDD Gherkin Feature Specifications
 ├── src/                      # Svelte 5 + TypeScript Frontend
 │   ├── lib/
@@ -74,7 +76,6 @@ luminous/
     │   ├── collection.rs     # Lofty scanner & folder watcher (query/reconcile/watcher split into collection/)
     │   ├── covermanager.rs   # Cover art extractor and iTunes search API fallback
     │   ├── db.rs             # SQLite schema migration & connection pool
-    │   ├── equalizer.rs      # Biquad DSP: 10-band graphic & up-to-20-band parametric filters
     │   ├── filter_parser.rs  # Search filter syntax parser (artist:, album:, year:, etc.)
     │   ├── install_format.rs # Distro/package format detection for the updater
     │   ├── lib.rs            # Library entry point, background loops, & IPC registry
