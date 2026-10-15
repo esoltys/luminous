@@ -90,6 +90,14 @@ For automated scripts driving the real app (benchmarks, screenshots, tutorials),
 - Exposes WebView2's remote debugging port (`--remote-debugging-port=9222`).
 - Provides helpers (`startProfile`, `withProfile`, `AppProfile`) to launch, wait for CDP readiness, pre-seed or query SQLite `app_state`, cue songs, pin window geometry, and cleanly tear down.
 
+### Scripting contract (`window.__LUMINOUS_SCRIPT__`)
+
+Dev builds expose the scripting API that scenes and external capture tools drive. It is a versioned contract:
+- `src/lib/scripting/types.ts` is the whole contract, with no imports, so another repo can vendor the file as is. It holds `SCRIPT_API_VERSION`.
+- Call `connect(requires, capabilities?)` once before anything else, passing the vendored `SCRIPT_API_VERSION`. It resolves `{ version, capabilities }`, where capabilities are the dotted method paths (`wait.settled`, `dialogs.welcome.show`). It rejects with one message naming the range needed (caret: same major, at least that minor), the running version and any missing capabilities.
+- Policy: adding a method bumps minor. Removing or renaming one, or changing its signature or when it resolves, bumps major.
+- `src/lib/scripting/contract-history.json` is an append-only ledger of each version's method paths. `contract.test.ts` fails when the live surface doesn't match its newest entry, or when any step recorded in the ledger removes a method without a major bump or adds one without a minor bump. When you change the surface, append an entry. Review enforces what the test can't see: editing the newest entry in place instead of appending, and signature or resolve-condition changes.
+
 ### Scene screenshots (`bun run take-scene-screenshots`)
 
 Docs and Store screenshots are scenes in `scripts/scenes/` run against the real app by `scripts/scene-runner.ts`. The app boots once; the runner loops locale × light/dark, then resets and captures each scene. `AppProfile` takes a `cloneFrom` database to start from a private copy of a real profile (scrobbling and Discord cleared, a missing default library pinned to "none").

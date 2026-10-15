@@ -28,6 +28,7 @@ import { scenes } from "./scenes";
 import { ALL_SCHEMES, runScenes, summarize } from "./scene-runner";
 import { encodeGuideWebp } from "./guide-assets";
 import type { ColorScheme } from "./scenes/types";
+import { SCRIPT_API_VERSION } from "../src/lib/scripting/types";
 import { LOCALES, catalogChain, type Locale } from "../src/lib/locales";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -107,6 +108,8 @@ async function main() {
             "Run `bun run dev`, build a debug exe (`cd src-tauri && cargo build`) and pass it with --exe."
         );
       });
+    // An app serving another checkout's frontend fails here, naming the range these scenes need.
+    await api.connect(SCRIPT_API_VERSION);
 
     const report = await runScenes({
       driver,

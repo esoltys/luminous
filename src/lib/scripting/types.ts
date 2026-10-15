@@ -1,7 +1,96 @@
-import type { ActiveTab, ActiveSubTab, SettingsTab, AutoPlaylistRef } from "../stores/navigation.svelte";
-import type { Song, PlaybackState } from "../types";
-import type { Locale } from "../stores/i18n.svelte";
-import type { VisibleColumns } from "../stores/collection.svelte";
+// The scripting contract: everything an external caller of window.__LUMINOUS_SCRIPT__
+// needs, in one file with no imports so another repo can vendor it as is.
+// Versioning policy (semver): adding a method bumps minor; removing or renaming one,
+// changing its signature, or changing when it resolves bumps major.
+// contract-history.json records each version's methods, and contract.test.ts checks
+// the bumps against it and that the app-type copies below haven't drifted.
+// Signature and resolve-condition changes are only caught in review.
+
+/** Version of this contract. Callers pass their vendored copy to `connect()`. */
+export const SCRIPT_API_VERSION = "1.1.0";
+
+/** What `connect()` resolves with: the running app's version and every method it offers. */
+export interface ScriptContract {
+  version: string;
+  /** Dotted method paths, e.g. "screens.setSort" or "dialogs.welcome.show". */
+  capabilities: string[];
+}
+
+// Copies of app types, checked against the originals in contract.test.ts.
+export type ScriptTab = "home" | "collection" | "playlists" | "settings" | "lyrics" | "stats" | "organize" | "help";
+export type ScriptSubTab = "songs" | "albums" | "artists" | "genres";
+export type ScriptSettingsTab = "general" | "system" | "sources" | "integrations" | "themes" | "equalizer" | "about";
+export type ScriptAutoPlaylistKind =
+  | "favourites"
+  | "recently_added"
+  | "most_played"
+  | "history"
+  | "genre"
+  | "decade"
+  | "bpm"
+  | "no_genre"
+  | "artist_tag"
+  | "missing_metadata"
+  | "missing_musicbrainz"
+  | "daypart";
+/** A song-table column key. */
+export type ScriptSongColumn =
+  | "track"
+  | "title"
+  | "artist"
+  | "album"
+  | "album_artist"
+  | "artist_tag"
+  | "bitdepth"
+  | "bitrate"
+  | "bpm"
+  | "channels"
+  | "composer"
+  | "filesize"
+  | "format"
+  | "genre"
+  | "grouping"
+  | "initial_key"
+  | "musicbrainz_id"
+  | "path"
+  | "samplerate"
+  | "year"
+  | "originalyear"
+  | "actions"
+  | "added"
+  | "duration"
+  | "lastplayed"
+  | "library"
+  | "playcount"
+  | "rating"
+  | "skipcount";
+/** A BCP 47 UI locale tag such as "fr-CA"; `setLocale` rejects tags the app doesn't ship. */
+export type ScriptLocale = string;
+
+/** The song fields the contract promises; the app's real songs carry more. */
+export interface ScriptSong {
+  id: number;
+  title?: string;
+  artist?: string;
+  album?: string;
+  album_artist?: string;
+  track?: number;
+  disc?: number;
+  year?: number;
+  genre?: string;
+  length_nanosec?: number;
+}
+
+export type ScriptPlayState = "stopped" | "playing" | "paused";
+
+/** The playback fields the contract promises; the app's real snapshot carries more. */
+export interface ScriptPlaybackState {
+  state: ScriptPlayState;
+  current_song?: ScriptSong;
+  playlist_id?: number;
+  position_nanosec: number;
+  volume: number;
+}
 
 /**
  * Filter or target criteria for playing a song via the scripting API.
@@ -20,7 +109,7 @@ export interface ScriptNavigationApi {
   /**
    * Navigates to a top-level tab and optional sub-tab.
    */
-  to(tab: ActiveTab, subTab?: ActiveSubTab | "auto" | "custom"): Promise<void>;
+  to(tab: ScriptTab, subTab?: ScriptSubTab | "auto" | "custom"): Promise<void>;
 
   /**
    * Navigates to an album detail view by name, optionally focusing a specific song.
@@ -35,12 +124,12 @@ export interface ScriptNavigationApi {
   /**
    * Navigates to a playlist detail view by ID or auto-playlist kind.
    */
-  playlist(target: number | AutoPlaylistRef["kind"]): Promise<void>;
+  playlist(target: number | ScriptAutoPlaylistKind): Promise<void>;
 
   /**
    * Opens the settings view on a specific section.
    */
-  settings(section?: SettingsTab): Promise<void>;
+  settings(section?: ScriptSettingsTab): Promise<void>;
 }
 
 /**
@@ -52,7 +141,7 @@ export interface ScriptPlaybackApi {
    * Plays a song by ID or by title/artist search selector.
    * Resolves when the backend confirms playback state is 'playing' for that song.
    */
-  play(target: number | PlaySongSelector): Promise<Song>;
+  play(target: number | PlaySongSelector): Promise<ScriptSong>;
 
   /**
    * Pauses active playback, resolving when paused.
@@ -72,7 +161,7 @@ export interface ScriptPlaybackApi {
   /**
    * Returns current playback state snapshot.
    */
-  status(): PlaybackState;
+  status(): ScriptPlaybackState;
 }
 
 /**
@@ -92,7 +181,7 @@ export interface ScriptAppearanceApi {
   /**
    * Updates the active UI locale.
    */
-  setLocale(locale: Locale): Promise<void>;
+  setLocale(locale: ScriptLocale): Promise<void>;
 
   /**
    * Configures layout parameters (sidebar visibility/width, right panel visibility).
@@ -185,7 +274,7 @@ export interface ScriptViewApi {
   setViewModes(modes: Partial<Record<ScriptViewSurface, "cards" | "rows">>): Promise<void>;
   setSeekbarMode(mode: "waveform" | "bands"): Promise<void>;
   /** Shows or hides a song-table column by its key (e.g. "initial_key"). */
-  setColumnVisible(column: keyof VisibleColumns, visible: boolean): Promise<void>;
+  setColumnVisible(column: ScriptSongColumn, visible: boolean): Promise<void>;
   /** Switches the Organize view to a custom template pattern. */
   setOrganizeTemplate(template: string): Promise<void>;
   /** Opens the smart-playlist builder on Playlists → Custom, pre-filled with rules. */
@@ -214,6 +303,13 @@ export interface ScriptScreensApi {
  */
 export interface LuminousScriptApi {
   readonly version: string;
+  /**
+   * The handshake: call once before anything else with the contract version the caller
+   * was written against (caret semantics: "1.2" accepts 1.2.0 up to, not including, 2.0.0)
+   * and any methods it can't do without. Rejects with a message naming the needed range,
+   * the running version and the missing methods; has no side effects.
+   */
+  connect(requires: string, capabilities?: string[]): Promise<ScriptContract>;
   readonly navigate: ScriptNavigationApi;
   readonly playback: ScriptPlaybackApi;
   readonly appearance: ScriptAppearanceApi;

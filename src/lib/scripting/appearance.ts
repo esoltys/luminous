@@ -1,5 +1,6 @@
 import { themeStore } from "../stores/theme.svelte";
-import { i18n, type Locale } from "../stores/i18n.svelte";
+import { i18n } from "../stores/i18n.svelte";
+import { isLocale, LOCALES } from "../locales";
 import { windowLayoutStore } from "../stores/windowLayout.svelte";
 import type { ScriptAppearanceApi, ScriptWaitApi } from "./types";
 
@@ -21,7 +22,10 @@ export function createAppearanceController(wait: ScriptWaitApi): ScriptAppearanc
       await wait.forState(() => themeStore.colorSchemeMode === scheme, 3000);
     },
 
-    async setLocale(locale: Locale): Promise<void> {
+    async setLocale(locale: string): Promise<void> {
+      if (!isLocale(locale)) {
+        throw new Error(`Unknown locale "${locale}"; supported: ${LOCALES.map((l) => l.tag).join(", ")}.`);
+      }
       await i18n.setLocale(locale);
       await wait.settled();
       await wait.forState(() => i18n.currentLocale === locale, 3000);

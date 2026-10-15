@@ -1,4 +1,5 @@
-import type { LuminousScriptApi } from "./types";
+import { SCRIPT_API_VERSION, type LuminousScriptApi } from "./types";
+import { methodPaths, negotiateContract } from "./contract";
 import { createWaitController } from "./wait";
 import { createNavigationController } from "./navigation";
 import { createPlaybackController } from "./playback";
@@ -10,8 +11,6 @@ import { createScreensController } from "./screens";
 export * from "./types";
 export { registerDialogHostControls, type DialogHostControls } from "./dialogs";
 export { registerScreenHook, type ScreenHooks } from "./screens";
-
-const SCRIPTING_API_VERSION = "1.0.0";
 
 /**
  * Builds the Luminous in-app scripting API facade.
@@ -25,8 +24,11 @@ export function createScriptingApi(): LuminousScriptApi {
   const view = createViewController(wait);
   const screens = createScreensController(wait);
 
-  return {
-    version: SCRIPTING_API_VERSION,
+  const api: LuminousScriptApi = {
+    version: SCRIPT_API_VERSION,
+    async connect(requires, capabilities = []) {
+      return negotiateContract(requires, capabilities, methodPaths(api));
+    },
     navigate,
     playback,
     appearance,
@@ -35,6 +37,7 @@ export function createScriptingApi(): LuminousScriptApi {
     screens,
     wait,
   };
+  return api;
 }
 
 /**
