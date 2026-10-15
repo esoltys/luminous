@@ -306,6 +306,38 @@ fn restore_equalizer_from_db(db: &Database, audio_engine: &AudioEngine) {
     }
 }
 
+/// Applies the saved audio output backend/device settings from app_state so
+/// startup state matches what the user previously configured.
+fn restore_audio_output_from_db(db: &Database, audio_engine: &AudioEngine) {
+    let Ok(conn) = db.pool.get() else { return };
+    let backend_str: Option<String> = conn
+        .query_row(
+            "SELECT value FROM app_state WHERE key = 'audio_output_backend'",
+            [],
+            |row| row.get(0),
+        )
+        .ok();
+    let device_id: Option<String> = conn
+        .query_row(
+            "SELECT value FROM app_state WHERE key = 'audio_output_device_id'",
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .ok()
+        .filter(|s: &String| !s.is_empty());
+
+    let backend = match backend_str.as_deref() {
+        Some("asio") => luminous_audio::AudioBackendKind::Asio,
+        _ => luminous_audio::AudioBackendKind::Cpal,
+    };
+
+    let config = luminous_audio::AudioOutputConfig {
+        backend,
+        device_id,
+    };
+    let _ = audio_engine.set_output_config(config);
+}
+
 /// Spawns the ~30 FPS spectrum-emission loop that pushes `spectrum-data`
 /// events to the frontend while the spectrum visualizer is enabled and
 /// something is playing.
@@ -977,6 +1009,7 @@ pub fn run() {
             // WebDAV credentials (#1492) at open time.
             let audio_engine =
                 AudioEngine::with_source_opener(media_source::opener(Arc::clone(&db)));
+            restore_audio_output_from_db(&db, &audio_engine);
             restore_equalizer_from_db(&db, &audio_engine);
 
             let audio = Arc::new(Mutex::new(audio_engine));
@@ -1343,6 +1376,10 @@ pub fn run() {
             commands::player::set_repeat_mode,
             commands::player::set_auto_continue,
             commands::player::get_audio_pipeline_info,
+            commands::player::get_audio_output_devices,
+            commands::player::get_audio_output_settings,
+            commands::player::set_audio_output_settings,
+            commands::player::open_asio_control_panel,
             // Pinned Home shelf commands (#222)
             commands::pins::pin_item,
             commands::pins::unpin_item,

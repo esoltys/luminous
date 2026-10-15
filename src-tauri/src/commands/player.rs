@@ -641,6 +641,71 @@ pub async fn get_audio_pipeline_info(
     Ok(player.get_pipeline_info(&audio))
 }
 
+/// Returns all available audio output devices across supported backends (CPAL, ASIO).
+#[tauri::command]
+pub async fn get_audio_output_devices() -> Result<Vec<luminous_audio::AudioDeviceInfo>, String> {
+    tokio::task::spawn_blocking(luminous_audio::enumerate_output_devices)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Returns the current active audio output settings (backend and selected device).
+#[tauri::command]
+pub async fn get_audio_output_settings(
+    state: State<'_, AppState>,
+) -> Result<luminous_audio::AudioOutputConfig, String> {
+    let audio = state.audio.lock().await;
+    Ok(audio.output_config())
+}
+
+/// Applies audio output backend/device settings and persists them to app_state.
+#[tauri::command]
+pub async fn set_audio_output_settings(
+    state: State<'_, AppState>,
+    settings: luminous_audio::AudioOutputConfig,
+) -> Result<(), String> {
+    {
+        let audio = state.audio.lock().await;
+        let _ = audio.set_output_config(settings.clone());
+    }
+
+    let backend_str = settings.backend.to_string().to_lowercase();
+    let dev_id = settings.device_id.unwrap_or_default();
+
+    let _ = crate::db::run_blocking(&state.db, move |conn| {
+        let pairs = [
+            ("audio_output_backend", backend_str),
+            ("audio_output_device_id", dev_id),
+        ];
+        for (k, v) in pairs {
+            if let Err(e) = conn.execute(
+                "INSERT OR REPLACE INTO app_state (key, value) VALUES (?1, ?2)",
+                rusqlite::params![k, v],
+            ) {
+                log::error!("Failed to persist audio output setting '{k}': {e}");
+            }
+        }
+        Ok(())
+    })
+    .await;
+
+    Ok(())
+}
+
+/// Opens the native ASIO control panel for the active driver or specified device.
+#[tauri::command]
+pub async fn open_asio_control_panel(
+    state: State<'_, AppState>,
+    device_id: Option<String>,
+) -> Result<(), String> {
+    if let Some(id) = device_id.filter(|s| !s.is_empty()) {
+        luminous_audio::asio::open_asio_control_panel_by_clsid(&id)
+    } else {
+        let audio = state.audio.lock().await;
+        audio.open_asio_control_panel()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
