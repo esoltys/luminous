@@ -3229,6 +3229,55 @@ mod tests {
         assert!(err.contains("has been removed"), "{err}");
     }
 
+    /// Pins the `AudioPipelineInfo` JSON the frontend's Audio Pipeline panel
+    /// reads, so moving its assembly across the crate boundary (#1556) can't
+    /// silently change the contract.
+    #[test]
+    fn pipeline_info_json_is_pinned() {
+        let engine = AudioEngine::new();
+        *engine.shared.output_device_name.write() = Some("Test DAC".into());
+        engine
+            .shared
+            .output_sample_rate
+            .store(48_000, Ordering::Relaxed);
+        let song = Song {
+            filetype: FileType::Flac,
+            bitrate: Some(900),
+            samplerate: Some(44_100),
+            bitdepth: Some(16),
+            channels: Some(2),
+            source: crate::models::SongSource::Collection,
+            path: Some("/music/a.flac".into()),
+            ..Song::default()
+        };
+        let info = engine
+            .get_pipeline_info(Some(&song), LoudnessGainSource::Analyzed, Some(-3.5))
+            .unwrap();
+        assert_eq!(
+            serde_json::to_string(&info).unwrap(),
+            r#"{"quality_tier":"hq","input_source":"collection","input_format":"FLAC","input_codec":"flac","input_bitrate_kbps":900,"input_sample_rate":44100,"input_bit_depth":16,"input_channels":2,"input_path":"/music/a.flac","decoder_name":"Symphonia FLAC decoder","headroom":"32-bit float PCM","resample_rate":48000,"loudness_source":"analyzed","loudness_gain_db":-3.5,"eq_enabled":false,"eq_mode":"10-band Graphic","eq_preamp_db":0.0,"eq_active_bands_count":0,"limiter":"-1.0 dBTP True Peak limiter","output_sample_rate":48000,"output_channels":2,"output_format":"32-bit float PCM","output_device_name":"Test DAC","output_backend":"CPAL"}"#
+        );
+
+        *engine.shared.active_decoder_name.write() = Some("libopus (via Symphonia)".into());
+        let opus = Song {
+            filetype: FileType::OggOpus,
+            bitrate: Some(128),
+            samplerate: Some(48_000),
+            url: Some("https://x/a.opus".into()),
+            ..Song::default()
+        };
+        let info = engine
+            .get_pipeline_info(Some(&opus), LoudnessGainSource::Disabled, None)
+            .unwrap();
+        assert_eq!(
+            serde_json::to_string(&info).unwrap(),
+            r#"{"quality_tier":"lq","input_source":"unknown","input_format":"Opus","input_codec":"opus","input_bitrate_kbps":128,"input_sample_rate":48000,"input_bit_depth":null,"input_channels":null,"input_path":"https://x/a.opus","decoder_name":"libopus (via Symphonia)","headroom":"32-bit float PCM","resample_rate":null,"loudness_source":"disabled","loudness_gain_db":null,"eq_enabled":false,"eq_mode":"10-band Graphic","eq_preamp_db":0.0,"eq_active_bands_count":0,"limiter":"-1.0 dBTP True Peak limiter","output_sample_rate":48000,"output_channels":2,"output_format":"32-bit float PCM","output_device_name":"Test DAC","output_backend":"CPAL"}"#
+        );
+        assert!(engine
+            .get_pipeline_info(None, LoudnessGainSource::Disabled, None)
+            .is_none());
+    }
+
     #[test]
     fn test_classify_quality_tier() {
         // Lossless: Standard (<= 48kHz, <= 16-bit) -> HQ
