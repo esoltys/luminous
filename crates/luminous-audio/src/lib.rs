@@ -101,7 +101,7 @@ fn ramp_gain_at_step(start_gain: f32, end_gain: f32, steps: u32, i: u32) -> f32 
 /// stop the stream), and restore the envelope for the next start. With no
 /// duration the envelope is never touched, so an instant pause stays
 /// bit-identical to playing up to that point.
-fn fade_out_then(fade_gain: &Arc<AtomicU32>, duration_ms: u32, then: impl FnOnce()) {
+fn fade_out_then(fade_gain: &AtomicU32, duration_ms: u32, then: impl FnOnce()) {
     if duration_ms == 0 {
         then();
         return;
@@ -238,15 +238,18 @@ pub enum AudioEvent {
 
 struct AudioShared {
     open_source: Box<SourceOpener>,
-    position: Arc<AtomicU64>,
-    volume: Arc<AtomicU32>,
-    play_state: Arc<Mutex<EngineState>>,
-    visualizer_buf: Arc<spectrum::AudioVisualizerBuffer>,
-    output_sample_rate: Arc<AtomicU32>,
-    output_channels: Arc<std::sync::atomic::AtomicU16>,
-    output_device_name: Arc<parking_lot::RwLock<Option<String>>>,
-    equalizer: Arc<Mutex<luminous_equalizer::Equalizer>>,
-    loudness_gain: Arc<AtomicU32>,
+    position: AtomicU64,
+    volume: AtomicU32,
+    play_state: Mutex<EngineState>,
+    visualizer_buf: spectrum::AudioVisualizerBuffer,
+    /// Whether the output callback feeds `visualizer_buf` at all: the
+    /// downmix is skipped while nothing displays a spectrum.
+    spectrum_enabled: std::sync::atomic::AtomicBool,
+    output_sample_rate: AtomicU32,
+    output_channels: std::sync::atomic::AtomicU16,
+    output_device_name: parking_lot::RwLock<Option<String>>,
+    equalizer: Mutex<luminous_equalizer::Equalizer>,
+    loudness_gain: AtomicU32,
     /// Bumped by every loudness-gain write that isn't a ramp step, so an
     /// in-flight `ramp_loudness_gain` stops instead of overwriting it: the
     /// newest write always wins.
@@ -258,7 +261,7 @@ struct AudioShared {
     loudness_switch_at: AtomicU64,
     /// The gain `loudness_switch_at` switches to; written before it.
     loudness_switch_gain: AtomicU32,
-    fade_gain: Arc<AtomicU32>,
+    fade_gain: AtomicU32,
 }
 
 /// `AudioShared::loudness_switch_at` value meaning no switch is scheduled.
@@ -292,8 +295,7 @@ impl AudioShared {
 /// instead of assuming the outcome of a call.
 pub struct AudioEngine {
     cmd_tx: mpsc::SyncSender<AudioCommand>,
-    event_rx: Arc<Mutex<mpsc::Receiver<AudioEvent>>>,
-    spectrum_enabled: std::sync::atomic::AtomicBool,
+    event_rx: Mutex<Option<mpsc::Receiver<AudioEvent>>>,
     shared: Arc<AudioShared>,
 }
 
@@ -312,19 +314,20 @@ impl AudioEngine {
         let (event_tx, event_rx) = mpsc::channel::<AudioEvent>();
         let shared = Arc::new(AudioShared {
             open_source: Box::new(open_source),
-            position: Arc::new(AtomicU64::new(0)),
-            volume: Arc::new(AtomicU32::new(1.0f32.to_bits())),
-            play_state: Arc::new(Mutex::new(EngineState::Stopped)),
-            visualizer_buf: Arc::new(spectrum::AudioVisualizerBuffer::new(4096)),
-            output_sample_rate: Arc::new(AtomicU32::new(44100)),
-            output_channels: Arc::new(std::sync::atomic::AtomicU16::new(2)),
-            output_device_name: Arc::new(parking_lot::RwLock::new(get_default_device_name())),
-            equalizer: Arc::new(Mutex::new(luminous_equalizer::Equalizer::new())),
-            loudness_gain: Arc::new(AtomicU32::new(1.0f32.to_bits())),
+            position: AtomicU64::new(0),
+            volume: AtomicU32::new(1.0f32.to_bits()),
+            play_state: Mutex::new(EngineState::Stopped),
+            visualizer_buf: spectrum::AudioVisualizerBuffer::new(4096),
+            spectrum_enabled: std::sync::atomic::AtomicBool::new(false),
+            output_sample_rate: AtomicU32::new(44100),
+            output_channels: std::sync::atomic::AtomicU16::new(2),
+            output_device_name: parking_lot::RwLock::new(get_default_device_name()),
+            equalizer: Mutex::new(luminous_equalizer::Equalizer::new()),
+            loudness_gain: AtomicU32::new(1.0f32.to_bits()),
             loudness_generation: AtomicU64::new(0),
             loudness_switch_at: AtomicU64::new(NO_LOUDNESS_SWITCH),
             loudness_switch_gain: AtomicU32::new(1.0f32.to_bits()),
-            fade_gain: Arc::new(AtomicU32::new(1.0f32.to_bits())),
+            fade_gain: AtomicU32::new(1.0f32.to_bits()),
         });
         let shared_clone = Arc::clone(&shared);
 
@@ -338,8 +341,7 @@ impl AudioEngine {
 
         Self {
             cmd_tx,
-            event_rx: Arc::new(Mutex::new(event_rx)),
-            spectrum_enabled: std::sync::atomic::AtomicBool::new(false),
+            event_rx: Mutex::new(Some(event_rx)),
             shared,
         }
     }
@@ -423,10 +425,9 @@ impl AudioEngine {
     }
 
     /// Master volume, clamped to 0.0–1.0.
-    pub fn set_volume(&self, vol: f32) -> Result<()> {
+    pub fn set_volume(&self, vol: f32) {
         let vol = vol.clamp(0.0, 1.0);
         self.shared.volume.store(vol.to_bits(), Ordering::Relaxed);
-        Ok(())
     }
 
     /// Step the per-track loudness-normalization multiplier (#77) at once,
@@ -507,11 +508,16 @@ impl AudioEngine {
     }
 
     pub fn spectrum_enabled(&self) -> bool {
-        self.spectrum_enabled.load(Ordering::Relaxed)
+        self.shared.spectrum_enabled.load(Ordering::Relaxed)
     }
 
+    /// Start or stop feeding the spectrum analyzer. While it is off the
+    /// output callback skips the work, and `spectrum_snapshot` describes
+    /// whatever played before it was turned off.
     pub fn set_spectrum_enabled(&self, enabled: bool) {
-        self.spectrum_enabled.store(enabled, Ordering::Relaxed);
+        self.shared
+            .spectrum_enabled
+            .store(enabled, Ordering::Relaxed);
     }
 
     /// Magnitude spectrum of what was most recently played, `fft_size / 2`
@@ -540,12 +546,11 @@ impl AudioEngine {
         }
     }
 
-    /// A cheaply-cloneable handle to the event receiver. Callers lock it
-    /// themselves and block on `Receiver::iter()` on their own thread —
-    /// cloning the handle (rather than blocking here) lets the caller drop
-    /// its `AudioEngine` lock before entering that blocking loop.
-    pub fn events(&self) -> Arc<Mutex<mpsc::Receiver<AudioEvent>>> {
-        Arc::clone(&self.event_rx)
+    /// The engine's event stream, handed out once: the first call returns
+    /// it, later calls `None`. Drain it on a dedicated thread (blocking on
+    /// `Receiver::iter()`), not while holding a lock on the engine.
+    pub fn take_events(&self) -> Option<mpsc::Receiver<AudioEvent>> {
+        self.event_rx.lock().take()
     }
 }
 
@@ -933,7 +938,7 @@ impl OutputRenderer {
             }
         }
 
-        if played > 0 {
+        if played > 0 && self.shared.spectrum_enabled.load(Ordering::Relaxed) {
             let channels_u = self.channels as usize;
             self.mono_scratch.clear();
             for chunk in output[..played].chunks(channels_u) {
@@ -1746,7 +1751,7 @@ fn handle_decode_command(
 fn advance_transition_and_preload_signal(
     out: &AudioOutput,
     session: &mut DecodeSession,
-    position: &Arc<AtomicU64>,
+    position: &AtomicU64,
     event_tx: &mpsc::Sender<AudioEvent>,
 ) {
     // Complete a pending gapless handover once the output callback has
@@ -1804,7 +1809,7 @@ fn advance_transition_and_preload_signal(
 fn handle_eof(
     out: &mut AudioOutput,
     session: &mut DecodeSession,
-    play_state: &Arc<Mutex<EngineState>>,
+    play_state: &Mutex<EngineState>,
     event_tx: &mpsc::Sender<AudioEvent>,
 ) -> EofOutcome {
     if !session.current.eof {
@@ -2223,20 +2228,21 @@ mod tests {
 
     fn test_shared() -> AudioShared {
         AudioShared {
-            position: Arc::new(AtomicU64::new(0)),
-            volume: Arc::new(AtomicU32::new(1.0f32.to_bits())),
+            position: AtomicU64::new(0),
+            volume: AtomicU32::new(1.0f32.to_bits()),
             open_source: Box::new(open_file),
-            play_state: Arc::new(Mutex::new(EngineState::Playing)),
-            visualizer_buf: Arc::new(spectrum::AudioVisualizerBuffer::new(4096)),
-            output_sample_rate: Arc::new(AtomicU32::new(44100)),
-            output_channels: Arc::new(std::sync::atomic::AtomicU16::new(2)),
-            output_device_name: Arc::new(parking_lot::RwLock::new(None)),
-            equalizer: Arc::new(Mutex::new(luminous_equalizer::Equalizer::new())),
-            loudness_gain: Arc::new(AtomicU32::new(1.0f32.to_bits())),
+            play_state: Mutex::new(EngineState::Playing),
+            visualizer_buf: spectrum::AudioVisualizerBuffer::new(4096),
+            spectrum_enabled: std::sync::atomic::AtomicBool::new(false),
+            output_sample_rate: AtomicU32::new(44100),
+            output_channels: std::sync::atomic::AtomicU16::new(2),
+            output_device_name: parking_lot::RwLock::new(None),
+            equalizer: Mutex::new(luminous_equalizer::Equalizer::new()),
+            loudness_gain: AtomicU32::new(1.0f32.to_bits()),
             loudness_generation: AtomicU64::new(0),
             loudness_switch_at: AtomicU64::new(NO_LOUDNESS_SWITCH),
             loudness_switch_gain: AtomicU32::new(1.0f32.to_bits()),
-            fade_gain: Arc::new(AtomicU32::new(1.0f32.to_bits())),
+            fade_gain: AtomicU32::new(1.0f32.to_bits()),
         }
     }
 
@@ -2441,6 +2447,8 @@ mod tests {
             .loudness_gain
             .store(0.8f32.to_bits(), Ordering::Relaxed);
         shared.volume.store(0.7f32.to_bits(), Ordering::Relaxed);
+        // Measure the worst case: the spectrum downmix runs too.
+        shared.spectrum_enabled.store(true, Ordering::Relaxed);
         let len = FRAMES * CHANNELS as usize;
         let (mut producer, consumer) = HeapRb::<f32>::new(len * 2).split();
         let mut renderer = OutputRenderer {

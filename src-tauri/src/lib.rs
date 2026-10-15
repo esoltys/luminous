@@ -469,10 +469,13 @@ fn spawn_audio_event_loop(
         .spawn(move || {
             let rx = {
                 let engine = tauri::async_runtime::block_on(async { audio.lock().await });
-                engine.events()
+                engine.take_events()
+            };
+            let Some(rx) = rx else {
+                log::error!("Audio event stream was already taken; player events won't run");
+                return;
             };
 
-            let rx = rx.lock();
             for event in rx.iter() {
                 log::trace!("Received audio event: {:?}", event);
                 let app = app_handle.clone();

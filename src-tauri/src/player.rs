@@ -223,7 +223,7 @@ impl Player {
             if let Some(v) = app_state_get_parsed::<f32>(&conn, "volume") {
                 volume = v.clamp(0.0, 1.0);
                 if let Ok(engine) = audio.try_lock() {
-                    let _ = engine.set_volume(volume);
+                    engine.set_volume(volume);
                 }
             }
             if let Some(s) = app_state_get(&conn, "shuffle_mode") {
@@ -1188,7 +1188,7 @@ impl Player {
     pub async fn set_volume(&mut self, vol: f32) -> Result<()> {
         self.volume = vol.clamp(0.0, 1.0);
         let audio = self.audio.lock().await;
-        let _ = audio.set_volume(self.volume);
+        audio.set_volume(self.volume);
         if let Ok(conn) = self._db.pool.get() {
             app_state_set(&conn, "volume", &self.volume.to_string());
         }
