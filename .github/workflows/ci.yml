@@ -73,16 +73,14 @@ jobs:
       # (Symphonia, rusqlite, Tauri, etc.) from scratch on every run.
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          workspaces: src-tauri
 
+      # From the repo root with --workspace, so every crate under crates/ is
+      # tested and linted, not just the app package in src-tauri (#1554).
       - name: Run cargo test
-        working-directory: src-tauri
-        run: cargo test
+        run: cargo test --workspace
 
       - name: Run clippy
-        working-directory: src-tauri
-        run: cargo clippy --all-targets -- -D warnings
+        run: cargo clippy --workspace --all-targets -- -D warnings
 
   # The pre-commit hook (`bun run install:git-hooks`) is opt-in per clone, so
   # this is the only guard against formatting drift reaching main (#1234).
@@ -95,8 +93,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Check formatting
-        working-directory: src-tauri
-        run: cargo fmt --check
+        run: cargo fmt --all --check
 
   # Machine-checked Lean models of the player/playlist state machines
   # (verification/lean/, epic #1224). `--wfail` turns warnings into failures,
@@ -180,11 +177,8 @@ jobs:
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          workspaces: src-tauri
 
       # --locked fails outright if this PR's Cargo.toml bump left Cargo.lock
       # inconsistent, instead of silently re-resolving it.
       - name: Run cargo test (locked)
-        working-directory: src-tauri
-        run: cargo test --locked
+        run: cargo test --workspace --locked
