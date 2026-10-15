@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Luminous's 10-band graphic and parametric biquad equalizer"
 edition = "2021"
 publish = false
+license.workspace = true
 
 [dependencies]
 serde.workspace = true

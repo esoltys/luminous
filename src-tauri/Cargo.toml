@@ -4,6 +4,7 @@ version = "3.0.0"
 description = "A high-performance home for the music you already own"
 authors = ["Eric James Soltys <ericjamessoltys@outlook.com>"]
 edition = "2021"
+license.workspace = true
 
 [lib]
 name = "luminous_lib"

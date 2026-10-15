@@ -32,9 +32,20 @@ separate private repo `esoltys/luminous-store`, triggered manually against a pub
 `audit.yml` and `codeql.yml` also trigger on `pull_request` and `push` targeting `main`,
 plus a weekly `schedule`:
 
-- **`audit.yml` — Security Audit**
-  - `security_audit` job: runs `rustsec/audit-check@v2` against `Cargo.lock` to catch
-    known-vulnerable Rust dependencies.
+- **`audit.yml` — Security & Licence Audit**
+  - `security_audit` job: runs `EmbarkStudios/cargo-deny-action` (`cargo deny check`) against
+    `deny.toml` at the repository root. This validates four distinct checks across all workspace
+    crates in `Cargo.lock`:
+    - **Licences**: enforces that every crate uses an explicitly allowlisted permissive licence
+      (MIT, Apache-2.0, BSD, ISC, Zlib, MPL-2.0, etc.). Any copyleft licence (GPL, AGPL, or
+      LGPL-only) fails CI to prevent shipping incompatible obligations in the MIT-licensed app
+      and Microsoft Store distribution.
+    - **Advisories**: scans the RustSec Advisory Database for known security vulnerabilities
+      and yanked crates. Informational unmaintained/unsound transitive dependencies that we
+      cannot update directly are explicitly suppressed in `deny.toml` under `[advisories].ignore`
+      with documented reasons.
+    - **Sources**: denies crates from unknown git repositories or non-crates.io registries.
+    - **Bans**: warns on duplicate crate versions (`multiple-versions = "warn"`).
   - `lockfile_check` job: runs `bun install --frozen-lockfile` to fail if `bun.lock` has
     drifted from `package.json` (i.e. someone changed a dependency range without
     regenerating the lockfile), and runs `scripts/check-tauri-versions.ts` to ensure
@@ -48,6 +59,18 @@ plus a weekly `schedule`:
 
 Both are also on a `schedule` (audit: weekly Sunday midnight; CodeQL: weekly Saturday
 21:43 UTC), so they catch newly-disclosed vulnerabilities even without new commits.
+
+### Handling a failing cargo-deny check
+
+Run the check locally with `cargo deny check` (or `bun run audit:cargo`).
+
+1. **Licence rejection (`rejected: license is not explicitly allowed`)**:
+   - Inspect the failing crate and its licence expression in `Cargo.lock` / crates.io.
+   - If the crate uses a permissive licence (or a multi-licence expression where at least one choice is permissive) compatible with MIT, add the canonical SPDX identifier to `allow` under `[licenses]` in `deny.toml`.
+   - If the crate is copyleft (GPL, AGPL, or LGPL-only), **do not allow it**. Revert the dependency bump or find an alternative crate with a permissive licence.
+2. **Advisory failure (`advisories FAILED`)**:
+   - For an actionable vulnerability in a direct or indirect dependency, update the crate (`cargo update -p <crate>`) to pull the patched release.
+   - For an informational unmaintained/unsound advisory in an upstream transitive dependency where no fix or alternative currently exists (e.g. Tauri's Linux webview stack bindings), add an entry to `[advisories].ignore` in `deny.toml` documenting the advisory ID and reason (`{ id = "RUSTSEC-...", reason = "..." }`).
 
 ## What runs on merge to `main`
 
@@ -135,7 +158,7 @@ flowchart TD
     ManualDispatch1["Manual workflow_dispatch"]
 
     CI["ci.yml\ncheck + test + clippy + fmt (+ Dependabot gate)"]
-    Audit["audit.yml\nSecurity Audit + bun.lock check"]
+    Audit["audit.yml\nSecurity & Licence Audit + bun.lock check"]
     CodeQL["codeql.yml\nCodeQL Advanced"]
     Release["release.yml\nRelease Build (builds + drafts release)"]
 

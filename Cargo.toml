@@ -2,6 +2,9 @@
 members = ["src-tauri", "crates/*"]
 resolver = "2"
 
+[workspace.package]
+license = "MIT"
+
 # Versions shared by more than one member, so the crates can't drift apart.
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
