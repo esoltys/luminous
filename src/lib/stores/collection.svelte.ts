@@ -213,6 +213,8 @@ class CollectionStore {
    * key (e.g. `ArtistCard` and `TopNavigation` rendering the same artist at
    * once) share one backend call instead of each firing their own. */
   private extendedArtworkFetches = new Map<string, Promise<ExtendedArtworkResponse>>();
+  private refreshLibraryPromise: Promise<void> | null = null;
+  private queuedRefreshLibraryPromise: Promise<void> | null = null;
   searchResults = $state<Song[]>([]);
   searchQuery = $state<string>("");
   searchLoading = $state<boolean>(false);
@@ -351,11 +353,13 @@ class CollectionStore {
         }
       }
 
-      await this.refreshDirectories();
-      await this.refreshWebDavServers();
-      await this.refreshSubsonicServers();
-      await this.refreshDbSchemaStatus();
-      await this.refreshStats();
+      await Promise.all([
+        this.refreshDirectories(),
+        this.refreshWebDavServers(),
+        this.refreshSubsonicServers(),
+        this.refreshDbSchemaStatus(),
+        this.refreshStats(),
+      ]);
       await this.refreshLibrary();
 
       // Load scanning settings from backend settings
@@ -832,8 +836,12 @@ class CollectionStore {
    * user un-watches the folder. This lets the UI show a "disconnected"
    * state proactively instead of waiting for a failed play.
    */
+  get hasDisconnectedDrives(): boolean {
+    return this.directories.some((d) => d.is_available === false);
+  }
+
   isPathOnDisconnectedDrive(path: string | null | undefined): boolean {
-    if (!path) return false;
+    if (!path || !this.hasDisconnectedDrives) return false;
     return this.directories.some((d) => d.is_available === false && path.startsWith(d.path));
   }
 
@@ -850,7 +858,26 @@ class CollectionStore {
     }
   }
 
-  async refreshLibrary() {
+  refreshLibrary(): Promise<void> {
+    if (!this.refreshLibraryPromise) {
+      this.refreshLibraryPromise = this.doRefreshLibrary().finally(() => {
+        this.refreshLibraryPromise = null;
+      });
+      return this.refreshLibraryPromise;
+    }
+
+    if (!this.queuedRefreshLibraryPromise) {
+      this.queuedRefreshLibraryPromise = this.refreshLibraryPromise
+        .catch(() => {})
+        .then(() => {
+          this.queuedRefreshLibraryPromise = null;
+          return this.refreshLibrary();
+        });
+    }
+    return this.queuedRefreshLibraryPromise;
+  }
+
+  private async doRefreshLibrary() {
     const snapshot = await invoke<{ songs: Song[]; albums: AlbumItem[]; artists: ArtistItem[] }>(
       "get_library_snapshot"
     );
