@@ -12,7 +12,7 @@
 //! seamlessly reviving the UI. A rate-limiting circuit breaker prevents infinite
 //! reload loops if a catastrophic failure persists across reloads.
 
-use std::path::PathBuf;
+use std::path::Path;
 use std::time::{Duration, Instant};
 
 /// Maximum automatic recovery reloads permitted within [`CIRCUIT_BREAKER_WINDOW`]
@@ -25,14 +25,14 @@ pub const CIRCUIT_BREAKER_WINDOW: Duration = Duration::from_secs(10);
 /// Protects against infinite crash/reload loops by limiting the number of
 /// automatic recovery reloads within a sliding time window.
 #[derive(Debug)]
-pub struct CrashCircuitBreaker {
+pub(crate) struct CrashCircuitBreaker {
     recent_failures: Vec<Instant>,
     max_failures: usize,
     window: Duration,
 }
 
 impl CrashCircuitBreaker {
-    pub fn new(max_failures: usize, window: Duration) -> Self {
+    pub(crate) fn new(max_failures: usize, window: Duration) -> Self {
         Self {
             recent_failures: Vec::with_capacity(max_failures + 1),
             max_failures,
@@ -40,10 +40,10 @@ impl CrashCircuitBreaker {
         }
     }
 
-    /// Records a failure at the given timestamp. Returns `true` if recovery
-    /// should proceed, or `false` if the circuit breaker has tripped (too many
-    /// failures within the sliding window).
-    pub fn record_failure(&mut self, now: Instant) -> bool {
+    /// Records a failure at the given timestamp and determines whether recovery
+    /// is permitted. Returns `true` if recovery should proceed, or `false` if the
+    /// circuit breaker has tripped (too many failures within the sliding window).
+    pub(crate) fn try_acquire_recovery(&mut self, now: Instant) -> bool {
         self.recent_failures
             .retain(|&t| now.duration_since(t) < self.window);
         self.recent_failures.push(now);
@@ -51,7 +51,7 @@ impl CrashCircuitBreaker {
     }
 
     /// Clears all recorded failures, resetting the circuit breaker.
-    pub fn reset(&mut self) {
+    pub(crate) fn reset(&mut self) {
         self.recent_failures.clear();
     }
 }
@@ -83,7 +83,7 @@ use webview2_com::{
 use windows::core::Interface;
 
 #[cfg(target_os = "windows")]
-pub fn format_process_failed_kind(kind: COREWEBVIEW2_PROCESS_FAILED_KIND) -> &'static str {
+pub(crate) fn format_process_failed_kind(kind: COREWEBVIEW2_PROCESS_FAILED_KIND) -> &'static str {
     match kind {
         COREWEBVIEW2_PROCESS_FAILED_KIND_BROWSER_PROCESS_EXITED => "BrowserProcessExited",
         COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_EXITED => "RenderProcessExited",
@@ -95,7 +95,7 @@ pub fn format_process_failed_kind(kind: COREWEBVIEW2_PROCESS_FAILED_KIND) -> &'s
 }
 
 #[cfg(target_os = "windows")]
-pub fn is_recoverable_failure(kind: COREWEBVIEW2_PROCESS_FAILED_KIND) -> bool {
+pub(crate) fn is_recoverable_failure(kind: COREWEBVIEW2_PROCESS_FAILED_KIND) -> bool {
     match kind {
         COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_EXITED
         | COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_UNRESPONSIVE
@@ -115,7 +115,7 @@ pub fn is_recoverable_failure(kind: COREWEBVIEW2_PROCESS_FAILED_KIND) -> bool {
 ///
 /// On non-Windows platforms, this is an inert no-op.
 #[cfg(target_os = "windows")]
-pub fn setup_webview_recovery(app: &tauri::AppHandle, app_data_dir: PathBuf) {
+pub fn setup_webview_recovery(app: &tauri::AppHandle, app_data_dir: &Path) {
     use tauri::Manager;
 
     let Some(webview) = app.get_webview("main") else {
@@ -124,6 +124,7 @@ pub fn setup_webview_recovery(app: &tauri::AppHandle, app_data_dir: PathBuf) {
     };
 
     let breaker = Arc::new(Mutex::new(CrashCircuitBreaker::default()));
+    let app_data_dir_buf = app_data_dir.to_path_buf();
 
     let res = webview.with_webview(move |platform_webview| {
         let controller = platform_webview.controller();
@@ -135,7 +136,7 @@ pub fn setup_webview_recovery(app: &tauri::AppHandle, app_data_dir: PathBuf) {
             }
         };
 
-        let app_data_dir_clone = app_data_dir.clone();
+        let app_data_dir_clone = app_data_dir_buf.clone();
         let breaker_clone = Arc::clone(&breaker);
 
         let handler = ProcessFailedEventHandler::create(Box::new(move |core_opt, args_opt| {
@@ -150,21 +151,21 @@ pub fn setup_webview_recovery(app: &tauri::AppHandle, app_data_dir: PathBuf) {
             }
 
             let kind_str = format_process_failed_kind(kind);
-            let (reason_val, exit_code) =
+            let (failure_reason, exit_code) =
                 if let Ok(args2) = args.cast::<ICoreWebView2ProcessFailedEventArgs2>() {
-                    let mut r = COREWEBVIEW2_PROCESS_FAILED_REASON(0);
-                    let mut ec = 0i32;
+                    let mut reason = COREWEBVIEW2_PROCESS_FAILED_REASON(0);
+                    let mut code = 0i32;
                     unsafe {
-                        let _ = args2.Reason(&mut r);
-                        let _ = args2.ExitCode(&mut ec);
+                        let _ = args2.Reason(&mut reason);
+                        let _ = args2.ExitCode(&mut code);
                     }
-                    (Some(r.0), Some(ec))
+                    (Some(reason.0), Some(code))
                 } else {
                     (None, None)
                 };
 
             let detail = format!(
-                "WebView2 process failed: kind={kind_str} (code={}), reason={reason_val:?}, exit_code={exit_code:?}",
+                "WebView2 process failed: kind={kind_str} (code={}), reason={failure_reason:?}, exit_code={exit_code:?}",
                 kind.0
             );
 
@@ -173,7 +174,7 @@ pub fn setup_webview_recovery(app: &tauri::AppHandle, app_data_dir: PathBuf) {
 
             if is_recoverable_failure(kind) {
                 let mut guard = breaker_clone.lock();
-                if guard.record_failure(Instant::now()) {
+                if guard.try_acquire_recovery(Instant::now()) {
                     log::info!("Attempting automatic WebView2 reload recovery...");
                     if let Some(core_ref) = core_opt {
                         unsafe {
@@ -217,7 +218,7 @@ pub fn setup_webview_recovery(app: &tauri::AppHandle, app_data_dir: PathBuf) {
 
 /// Non-Windows stub for webview crash recovery.
 #[cfg(not(target_os = "windows"))]
-pub fn setup_webview_recovery(_app: &tauri::AppHandle, _app_data_dir: PathBuf) {}
+pub fn setup_webview_recovery(_app: &tauri::AppHandle, _app_data_dir: &Path) {}
 
 #[cfg(test)]
 mod tests {
@@ -228,14 +229,14 @@ mod tests {
         let mut breaker = CrashCircuitBreaker::new(3, Duration::from_secs(10));
         let start = Instant::now();
 
-        assert!(breaker.record_failure(start));
-        assert!(breaker.record_failure(start + Duration::from_secs(1)));
-        assert!(breaker.record_failure(start + Duration::from_secs(2)));
+        assert!(breaker.try_acquire_recovery(start));
+        assert!(breaker.try_acquire_recovery(start + Duration::from_secs(1)));
+        assert!(breaker.try_acquire_recovery(start + Duration::from_secs(2)));
 
         // 4th failure within the 10-second window should trip
-        assert!(!breaker.record_failure(start + Duration::from_secs(3)));
+        assert!(!breaker.try_acquire_recovery(start + Duration::from_secs(3)));
         // 5th failure still tripped
-        assert!(!breaker.record_failure(start + Duration::from_secs(4)));
+        assert!(!breaker.try_acquire_recovery(start + Duration::from_secs(4)));
     }
 
     #[test]
@@ -243,13 +244,13 @@ mod tests {
         let mut breaker = CrashCircuitBreaker::new(2, Duration::from_secs(5));
         let start = Instant::now();
 
-        assert!(breaker.record_failure(start));
-        assert!(breaker.record_failure(start + Duration::from_secs(1)));
+        assert!(breaker.try_acquire_recovery(start));
+        assert!(breaker.try_acquire_recovery(start + Duration::from_secs(1)));
         // 3rd failure at sec 2 trips
-        assert!(!breaker.record_failure(start + Duration::from_secs(2)));
+        assert!(!breaker.try_acquire_recovery(start + Duration::from_secs(2)));
 
         // Advance beyond window (start + 6s) — earlier failures (at 0s and 1s) drop off
-        assert!(breaker.record_failure(start + Duration::from_secs(6)));
+        assert!(breaker.try_acquire_recovery(start + Duration::from_secs(6)));
     }
 
     #[test]
@@ -257,11 +258,11 @@ mod tests {
         let mut breaker = CrashCircuitBreaker::new(1, Duration::from_secs(10));
         let start = Instant::now();
 
-        assert!(breaker.record_failure(start));
-        assert!(!breaker.record_failure(start + Duration::from_millis(500)));
+        assert!(breaker.try_acquire_recovery(start));
+        assert!(!breaker.try_acquire_recovery(start + Duration::from_millis(500)));
 
         breaker.reset();
-        assert!(breaker.record_failure(start + Duration::from_millis(600)));
+        assert!(breaker.try_acquire_recovery(start + Duration::from_millis(600)));
     }
 
     #[cfg(target_os = "windows")]
