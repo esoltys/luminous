@@ -132,6 +132,7 @@ tokio-console = ["dep:console-subscriber"]
 # gated to the Windows target only.
 [target.'cfg(windows)'.dependencies]
 tauri-plugin-prevent-default = { version = "6", features = ["platform-windows"] }
+webview2-com = "0.39"
 # Polls the live Shift-key state at drag-and-drop time via GetAsyncKeyState.
 windows-sys = { version = "0.61", features = ["Win32_UI_Input_KeyboardAndMouse"] }
 windows-collections = "0.3"

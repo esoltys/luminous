@@ -62,6 +62,7 @@ pub mod taskbar;
 pub mod tray;
 pub mod waveform;
 pub mod webdav;
+pub mod webview_recovery;
 
 use std::sync::Arc;
 use tauri::{Emitter, Manager};
@@ -938,12 +939,10 @@ pub fn run() {
         }))
         .setup(move |app| {
             let app_data_dir = crate::paths::resolve_app_data_dir(app);
-            diagnostics::install_panic_hook(app_data_dir);
+            diagnostics::install_panic_hook(app_data_dir.clone());
+            webview_recovery::setup_webview_recovery(app.handle(), &app_data_dir);
 
-            let db = Arc::new(
-                Database::new(crate::paths::resolve_app_data_dir(app))
-                    .expect("failed to initialize database"),
-            );
+            let db = Arc::new(Database::new(app_data_dir).expect("failed to initialize database"));
 
             // Portable mode (#1403): watched folders on the executable's own
             // drive follow it to a new drive letter. Runs before the player,

@@ -3570,6 +3570,7 @@ dependencies = [
  "tokio",
  "uuid",
  "walkdir",
+ "webview2-com",
  "windows",
  "windows-collections",
  "windows-sys 0.61.2",
