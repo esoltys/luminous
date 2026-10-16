@@ -512,10 +512,8 @@ fn write_thumb_file(thumbs_dir: &Path, key: &str, ext: &str, data: &[u8]) {
     }
     let _ = std::fs::create_dir_all(thumbs_dir);
     let tmp = thumbs_dir.join(format!("{key}.tmp"));
-    if std::fs::write(&tmp, data).is_ok() {
-        if std::fs::rename(&tmp, &target).is_err() {
-            let _ = std::fs::remove_file(&tmp);
-        }
+    if std::fs::write(&tmp, data).is_ok() && std::fs::rename(&tmp, &target).is_err() {
+        let _ = std::fs::remove_file(&tmp);
     }
 }
 
