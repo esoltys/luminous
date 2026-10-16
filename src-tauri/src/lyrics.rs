@@ -775,6 +775,28 @@ pub async fn get_lyrics_for_song(
         }
     }
 
+    // 2b. If DB has no cached lyrics, check for embedded lyrics in the audio file (#1721).
+    // This allows existing libraries scanned prior to embedded lyric support (or external tag edits)
+    // to resolve embedded lyrics on demand without requiring a manual album/library rescan.
+    let mut cached_lyrics = cached_lyrics;
+    if cached_lyrics
+        .as_deref()
+        .map(str::trim)
+        .unwrap_or("")
+        .is_empty()
+    {
+        if let Some(ref path_str) = path_str {
+            let audio_path = Path::new(path_str);
+            if let Some(embedded) = crate::collection::read_embedded_lyrics_from_path(audio_path) {
+                let _ = conn.execute(
+                    "UPDATE songs SET lyrics = ?1 WHERE id = ?2",
+                    rusqlite::params![embedded, song_id],
+                );
+                cached_lyrics = Some(embedded);
+            }
+        }
+    }
+
     if let Some(ref lyrics) = cached_lyrics {
         if !lyrics.trim().is_empty() {
             let synced = is_synced_lrc(lyrics);
@@ -907,6 +929,7 @@ pub fn is_synced_lrc(text: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lofty::file::AudioFile;
 
     #[test]
     fn test_clean_featured_title() {
@@ -1169,6 +1192,92 @@ mod tests {
             .query_row("SELECT lyrics FROM songs WHERE id = 1", [], |r| r.get(0))
             .unwrap();
         assert_eq!(cached, Some("[00:10.00] Sidecar lyrics line".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_get_lyrics_for_song_embedded_on_demand_when_db_empty() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db = crate::db::Database::new(temp_dir.path().to_path_buf()).unwrap();
+        let audio_path = temp_dir.path().join("track.flac");
+        std::fs::copy("tests/fixtures/audio/song_gamma.flac", &audio_path).unwrap();
+
+        // Write VorbisComments containing SYNCEDLYRICS into the FLAC file
+        let mut file = std::fs::File::open(&audio_path).unwrap();
+        let mut flac_file =
+            lofty::flac::FlacFile::read_from(&mut file, lofty::config::ParseOptions::default())
+                .unwrap();
+        drop(file);
+
+        let mut vorbis = lofty::ogg::tag::VorbisComments::default();
+        let synced = "[00:10.00] On-demand embedded synced lyric";
+        vorbis.insert(String::from("SYNCEDLYRICS"), synced.to_string());
+        flac_file.set_vorbis_comments(vorbis);
+        flac_file
+            .save_to_path(&audio_path, lofty::config::WriteOptions::default())
+            .unwrap();
+
+        let conn = db.pool.get().unwrap();
+        // Insert song with lyrics = NULL (as if scanned by an earlier Luminous version)
+        conn.execute(
+            "INSERT INTO songs (id, title, artist, path, source, filetype, unavailable)
+             VALUES (1, 'Track', 'Artist', ?1, 1, 1, 0)",
+            rusqlite::params![audio_path.to_str().unwrap()],
+        )
+        .unwrap();
+
+        let lyrics_manager = LyricsManager::new();
+        let result = get_lyrics_for_song(&db, &lyrics_manager, 1, false).await;
+        assert_eq!(result, Ok(synced.to_string()));
+
+        // Check DB was updated with the embedded lyrics
+        let cached: Option<String> = conn
+            .query_row("SELECT lyrics FROM songs WHERE id = 1", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(cached, Some(synced.to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_get_lyrics_for_song_embedded_plain_text_offline() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db = crate::db::Database::new(temp_dir.path().to_path_buf()).unwrap();
+        let audio_path = temp_dir.path().join("plain.flac");
+        std::fs::copy("tests/fixtures/audio/song_gamma.flac", &audio_path).unwrap();
+
+        let mut file = std::fs::File::open(&audio_path).unwrap();
+        let mut flac_file =
+            lofty::flac::FlacFile::read_from(&mut file, lofty::config::ParseOptions::default())
+                .unwrap();
+        drop(file);
+
+        let mut vorbis = lofty::ogg::tag::VorbisComments::default();
+        let plain_lyrics = "Plain text verse line 1\nPlain text verse line 2";
+        vorbis.insert(String::from("LYRICS"), plain_lyrics.to_string());
+        flac_file.set_vorbis_comments(vorbis);
+        flac_file
+            .save_to_path(&audio_path, lofty::config::WriteOptions::default())
+            .unwrap();
+
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "INSERT OR REPLACE INTO app_state (key, value) VALUES ('context_enrichment_enabled', 'false')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO songs (id, title, artist, path, source, filetype, unavailable)
+             VALUES (1, 'Track', 'Artist', ?1, 1, 1, 0)",
+            rusqlite::params![audio_path.to_str().unwrap()],
+        )
+        .unwrap();
+
+        let lyrics_manager = LyricsManager::new();
+        let result = get_lyrics_for_song(&db, &lyrics_manager, 1, false).await;
+        assert_eq!(result, Ok(plain_lyrics.to_string()));
+
+        let cached: Option<String> = conn
+            .query_row("SELECT lyrics FROM songs WHERE id = 1", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(cached, Some(plain_lyrics.to_string()));
     }
 
     /// Offline master toggle (#1398): sidecar/cached lyrics still resolve; with

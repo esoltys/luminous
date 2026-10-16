@@ -1739,6 +1739,25 @@ pub(crate) fn read_embedded_lyrics(
     unsynced_candidate
 }
 
+/// Reads embedded lyrics directly from an audio file on disk, inspecting both native
+/// Vorbis comments (for Vorbis-based containers) and candidate ID3/generic tags.
+pub(crate) fn read_embedded_lyrics_from_path(path: &Path) -> Option<String> {
+    let tagged_file = lofty::probe::Probe::open(path).ok()?.read().ok()?;
+    let mut candidate_tags: Vec<&Tag> = Vec::new();
+    if let Some(primary) = tagged_file.primary_tag() {
+        candidate_tags.push(primary);
+    }
+    for t in tagged_file.tags() {
+        if !candidate_tags
+            .iter()
+            .any(|existing| std::ptr::eq(*existing, t))
+        {
+            candidate_tags.push(t);
+        }
+    }
+    read_embedded_lyrics(path, tagged_file.file_type(), &candidate_tags)
+}
+
 pub(crate) fn read_tags(path: &Path) -> Result<Song> {
     let path_str = path.to_string_lossy().to_string();
     let mtime = get_mtime(path);
