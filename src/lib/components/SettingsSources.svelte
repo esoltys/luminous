@@ -48,6 +48,15 @@
   let syncFeedback = $state<string | null>(null);
   let showSidecarConfirmModal = $state(false);
   let isSweepingArtwork = $state(false);
+  let showAutoOrganizeConfirmModal = $state(false);
+
+  function handleToggleAutoOrganize(v: boolean) {
+    if (v) {
+      showAutoOrganizeConfirmModal = true;
+    } else {
+      organizeStore.setAutoOrganize(false);
+    }
+  }
 
   function handleToggleSaveArtwork(v: boolean) {
     if (v) {
@@ -859,7 +868,7 @@
       </div>
       <Toggle
         checked={organizeStore.autoOrganize}
-        onchange={(v) => organizeStore.setAutoOrganize(v)}
+        onchange={handleToggleAutoOrganize}
         label={i18n.t('settings.autoOrganizeLabel')}
       />
     </div>
@@ -924,5 +933,22 @@
     danger={false}
     onConfirm={handleConfirmSaveArtwork}
     onCancel={handleCancelSaveArtwork}
+  />
+{/if}
+
+{#if showAutoOrganizeConfirmModal}
+  <ConfirmDialog
+    title={i18n.t('organizer.confirmAutoOrganizeTitle')}
+    message={i18n.t('organizer.confirmAutoOrganizeMessage')}
+    confirmLabel={i18n.t('organizer.confirmAutoOrganizeBtn')}
+    cancelLabel={i18n.t('organizer.cancel')}
+    danger={false}
+    onConfirm={() => {
+      showAutoOrganizeConfirmModal = false;
+      organizeStore.setAutoOrganize(true);
+    }}
+    onCancel={() => {
+      showAutoOrganizeConfirmModal = false;
+    }}
   />
 {/if}

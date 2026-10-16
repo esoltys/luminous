@@ -261,5 +261,51 @@ describe("SettingsSources.svelte - Save artwork to folders", () => {
       expect(queryByText("Export Artwork to Music Folders")).not.toBeInTheDocument();
     });
   });
+
+  it("shows confirmation dialog before enabling Auto-Organize and respects cancellation", async () => {
+    const { organizeStore } = await import("../stores/organizer.svelte");
+    const setAutoOrganizeSpy = vi.spyOn(organizeStore, "setAutoOrganize");
+
+    const { findByLabelText, findByText, queryByText, findAllByText } = render(SettingsSources);
+    const toggle = await findByLabelText("Auto-Organize New Files & Tag Updates");
+
+    // Click toggle to enable
+    await fireEvent.click(toggle);
+
+    // Confirmation dialog appears
+    const dialogElements = await findAllByText("Enable Auto-Organize");
+    expect(dialogElements.length).toBeGreaterThanOrEqual(1);
+    expect(setAutoOrganizeSpy).not.toHaveBeenCalled();
+
+    // Cancel
+    const cancelBtn = await findByText("Cancel");
+    await fireEvent.click(cancelBtn);
+
+    await waitFor(() => {
+      expect(queryByText("Enable Auto-Organize")).not.toBeInTheDocument();
+    });
+    expect(setAutoOrganizeSpy).not.toHaveBeenCalled();
+  });
+
+  it("enables Auto-Organize when confirmed in dialog", async () => {
+    const { organizeStore } = await import("../stores/organizer.svelte");
+    const setAutoOrganizeSpy = vi.spyOn(organizeStore, "setAutoOrganize");
+
+    const { findByLabelText, findByText, queryByText, findAllByText } = render(SettingsSources);
+    const toggle = await findByLabelText("Auto-Organize New Files & Tag Updates");
+
+    await fireEvent.click(toggle);
+
+    // Look for confirm button in dialog
+    const confirmBtns = await findAllByText("Enable Auto-Organize");
+    // One is dialog title, one is confirm button
+    const confirmBtn = confirmBtns.find((el) => el.tagName === "BUTTON")!;
+    await fireEvent.click(confirmBtn);
+
+    await waitFor(() => {
+      expect(queryByText("Are you sure you want to turn on Auto-Organize?")).not.toBeInTheDocument();
+    });
+    expect(setAutoOrganizeSpy).toHaveBeenCalledWith(true);
+  });
 });
 
