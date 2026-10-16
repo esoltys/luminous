@@ -94,6 +94,12 @@ pub fn log_frontend_error(app_data_dir: &Path, message: &str, stack: Option<&str
     append_log_entry(&path, "FRONTEND ERROR", &body);
 }
 
+/// Appends a WebView2-level process crash or failure to the diagnostics log.
+pub fn log_webview_error(app_data_dir: &Path, message: &str) {
+    let path = log_file_path(app_data_dir);
+    append_log_entry(&path, "WEBVIEW ERROR", message);
+}
+
 fn raw_append_log_entry(path: &Path, kind: &str, body: &str) {
     let Some(dir) = path.parent() else { return };
     if std::fs::create_dir_all(dir).is_err() {

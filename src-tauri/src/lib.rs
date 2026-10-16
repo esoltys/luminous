@@ -62,6 +62,7 @@ pub mod taskbar;
 pub mod tray;
 pub mod waveform;
 pub mod webdav;
+pub mod webview_recovery;
 
 use std::sync::Arc;
 use tauri::{Emitter, Manager};
@@ -938,7 +939,8 @@ pub fn run() {
         }))
         .setup(move |app| {
             let app_data_dir = crate::paths::resolve_app_data_dir(app);
-            diagnostics::install_panic_hook(app_data_dir);
+            diagnostics::install_panic_hook(app_data_dir.clone());
+            webview_recovery::setup_webview_recovery(app.handle(), app_data_dir);
 
             let db = Arc::new(
                 Database::new(crate::paths::resolve_app_data_dir(app))
