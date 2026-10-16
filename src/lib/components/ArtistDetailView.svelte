@@ -42,9 +42,11 @@
     DotsThreeIcon as MoreHorizontal,
     ChartBarIcon as BarChart2,
     ShareNetworkIcon as Share,
-    ImageIcon as RetrieveImage
+    ImageIcon as RetrieveImage,
+    RadioIcon as Radio
   } from "phosphor-svelte";
   import { contextStore, entitySubject } from "../stores/context.svelte";
+  import { startArtistRadio } from "../utils/playlist";
   import ShareModal from "./ShareModal.svelte";
   import type { Song, Playlist, AlbumItem, PlayContext, ArtistProfile, ExtendedArtworkResponse } from "../types";
   import { getArtistAlbums, classifyRelease } from "../utils/artist";
@@ -634,6 +636,15 @@
       navigationStore.viewPlaylist(queuePl.id);
     }
   }
+
+  async function handleStartArtistRadio() {
+    await startArtistRadio(artistName);
+    const queuePl = playlistsStore.queuePlaylist;
+    if (queuePl) {
+      playlistsStore.selectPlaylist(queuePl.id);
+      navigationStore.viewPlaylist(queuePl.id);
+    }
+  }
 </script>
 
 <div class="flex-1 flex flex-col overflow-y-auto bg-brand-main text-brand-text-secondary h-full" use:rememberScroll={`artist-detail:${artistName}`}>
@@ -662,6 +673,13 @@
             onShufflePlay={handleShufflePlay}
             disabled={loading || songs.length === 0}
           />
+          <IconActionButton
+            onclick={handleStartArtistRadio}
+            title={i18n.t("artistDetail.startArtistRadio", {}, "Start Artist Radio")}
+            disabled={loading || songs.length === 0}
+          >
+            {#snippet icon()}<Radio class="w-4 h-4" />{/snippet}
+          </IconActionButton>
           <IconActionButton
             onclick={() => pinnedStore.toggle("artist", artistName)}
             title={pinnedStore.isPinned("artist", artistName)

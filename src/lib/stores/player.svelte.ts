@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { PlaybackState, Playlist, PlaylistItem, Song, ShuffleMode, RepeatMode, PlayState, LoudnessGainSource, PlayContext, AudioPipelineInfo } from "../types";
+import type { PlaybackState, Playlist, PlaylistItem, Song, ShuffleMode, RepeatMode, PlayState, LoudnessGainSource, PlayContext, AudioPipelineInfo, RadioSeed, RadioResult } from "../types";
 import { applySongStats, type SongStatsPayload } from "../utils/stats";
 import { themeStore } from "./theme.svelte";
 import { toastStore } from "./toast.svelte";
@@ -487,6 +487,30 @@ export class PlayerStore {
     const shuffledIds = shuffleArray(librarySongs.map((s) => s.id));
     await this.setShuffleMode("off");
     await this.playSongs(shuffledIds, 0, queuePl?.id, undefined, i18n.t("playerBar.queueTitle"));
+  }
+
+  /** Generate and start playback of a local library radio queue (#1579). */
+  async startRadio(seed: RadioSeed, limit?: number): Promise<RadioResult> {
+    const result = await invoke<RadioResult>("start_radio", { seed, limit: limit ?? null });
+    if (!result) return { songIds: [], contextName: "", seedTitle: "", songCount: 0 };
+    this._lastSessionSongIds = [...(result.songIds || [])];
+    this._playedSongIdsHistory = [];
+    this.completedSession = null;
+    this.activeContextName = result.contextName;
+
+    const queuePl = playlistsStore.queuePlaylist;
+    if (queuePl) {
+      await playlistsStore.selectPlaylist(queuePl.id);
+      await playlistsStore.refreshPlaylists();
+    }
+    toastStore.show(
+      i18n.t(
+        "playlists.startRadioToast",
+        { name: result.seedTitle, count: result.songCount },
+        `Started ${result.seedTitle} Radio (${result.songCount} songs)`
+      )
+    );
+    return result;
   }
 
   async playPlaylistItem(playlistId: number, itemIndex: number, context?: PlayContext) {

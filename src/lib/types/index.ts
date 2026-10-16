@@ -955,3 +955,15 @@ export interface RecentSearchItem {
   timestamp: number;
 }
 
+export type RadioSeed =
+  | { type: "song"; songId: number }
+  | { type: "artist"; artist: string };
+
+export interface RadioResult {
+  songIds: number[];
+  contextName: string;
+  seedTitle: string;
+  songCount: number;
+}
+
+

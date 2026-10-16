@@ -6,7 +6,8 @@
     PushPinSlashIcon as PinOff,
     ArrowSquareOutIcon as OpenInPicard,
     ChartBarIcon as BarChart2,
-    ShareNetworkIcon as Share
+    ShareNetworkIcon as Share,
+    RadioIcon as Radio
   } from "phosphor-svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { i18n } from "../stores/i18n.svelte";
@@ -15,7 +16,7 @@
   import { picardStore } from "../stores/picard.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { openInPicard } from "../utils/picard";
-  import { queueArtistAsPlaylist, addArtistToQueue } from "../utils/playlist";
+  import { queueArtistAsPlaylist, addArtistToQueue, startArtistRadio } from "../utils/playlist";
   import type { Song } from "../types";
   import ContextMenu from "./ContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
@@ -91,6 +92,15 @@
       } else {
         await addArtistToQueue(artistName);
       }
+      onClose();
+    }}
+  />
+
+  <ContextMenuItem
+    icon={Radio}
+    label={i18n.t("playlists.contextMenuStartArtistRadio", {}, "Start Artist Radio")}
+    onclick={async () => {
+      await startArtistRadio(artistName);
       onClose();
     }}
   />

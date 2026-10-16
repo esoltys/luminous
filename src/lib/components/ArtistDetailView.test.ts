@@ -27,6 +27,14 @@ vi.mock("@tauri-apps/api/core", () => ({
         bio: "Canadian music icon",
       });
     }
+    if (cmd === "start_radio") {
+      return Promise.resolve({
+        songIds: [SONG.id],
+        contextName: `${args?.seed?.artist || "Artist"} Radio`,
+        seedTitle: args?.seed?.artist || "Artist",
+        songCount: 1,
+      });
+    }
     return Promise.resolve();
   }),
 }));
@@ -58,7 +66,29 @@ describe("ArtistDetailView", () => {
     expect(screen.getByText("Shania Twain")).toBeTruthy();
     expect(screen.getByRole("button", { name: /^Play$/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /^Shuffle$/i })).toBeTruthy();
+    expect(screen.getByTitle("Start Artist Radio")).toBeTruthy();
     expect(screen.getByTitle("More actions")).toBeTruthy();
+  });
+
+  it("clicking Start Artist Radio action button starts radio for artist", async () => {
+    render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
+    const radioBtn = await screen.findByTitle("Start Artist Radio");
+    expect(radioBtn).toBeTruthy();
+
+    await fireEvent.click(radioBtn);
+    expect(invoke).toHaveBeenCalledWith("start_radio", {
+      seed: { type: "artist", artist: "Shania Twain" },
+      limit: null,
+    });
+  });
+
+  it("does not duplicate Start Artist Radio in the overflow menu", async () => {
+    render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
+
+    const moreBtn = screen.getByTitle("More actions");
+    await fireEvent.click(moreBtn);
+
+    expect(screen.queryByText("Start Artist Radio")).toBeNull();
   });
 
   it("renders the artist's tags in the header", async () => {

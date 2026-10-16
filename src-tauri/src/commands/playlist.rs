@@ -411,3 +411,33 @@ pub async fn refresh_auto_playlist(
 pub async fn refresh_all_auto_playlists(state: State<'_, AppState>) -> Result<(), String> {
     with_playlists(&state, |pm| pm.refresh_all_dynamic_playlists()).await
 }
+
+/// Populates the Queue with radio songs derived from `seed` and begins playback.
+#[tauri::command]
+pub async fn start_radio(
+    seed: crate::radio::RadioSeed,
+    limit: Option<usize>,
+    state: State<'_, AppState>,
+) -> Result<crate::radio::RadioResult, String> {
+    crate::radio::start_radio_impl(
+        state.inner(),
+        seed,
+        limit.unwrap_or(crate::radio::DEFAULT_RADIO_LIMIT),
+    )
+    .await
+}
+
+/// Generates a curated list of radio songs for `seed` without starting playback.
+#[tauri::command]
+pub async fn get_radio_songs(
+    seed: crate::radio::RadioSeed,
+    limit: Option<usize>,
+    state: State<'_, AppState>,
+) -> Result<crate::radio::RadioResult, String> {
+    crate::radio::generate_radio_songs(
+        state.inner(),
+        seed,
+        limit.unwrap_or(crate::radio::DEFAULT_RADIO_LIMIT),
+    )
+    .await
+}
