@@ -1609,6 +1609,155 @@ fn read_multi_value(tag: &Tag, key: ItemKey) -> Option<String> {
     }
 }
 
+/// Attempts to read native Vorbis comments directly from Vorbis-based containers
+/// (FLAC, Ogg Vorbis, Opus, Speex) before lofty's `split_tag()` converts them to
+/// generic `Tag` and drops unmapped comment keys such as `SYNCEDLYRICS`.
+fn read_native_vorbis_comments(
+    path: &Path,
+    file_type: lofty::file::FileType,
+) -> Option<lofty::ogg::tag::VorbisComments> {
+    // Only Vorbis-based containers store VorbisComments; avoid disk I/O for all others.
+    if !matches!(
+        file_type,
+        lofty::file::FileType::Flac
+            | lofty::file::FileType::Opus
+            | lofty::file::FileType::Vorbis
+            | lofty::file::FileType::Speex
+    ) {
+        return None;
+    }
+
+    let file = std::fs::File::open(path).ok()?;
+    let mut reader = std::io::BufReader::new(file);
+    let parse_options = lofty::config::ParseOptions::new()
+        .read_cover_art(false)
+        .read_properties(false);
+
+    match file_type {
+        lofty::file::FileType::Flac => {
+            use lofty::flac::FlacFile;
+            FlacFile::read_from(&mut reader, parse_options)
+                .ok()?
+                .vorbis_comments()
+                .cloned()
+        }
+        lofty::file::FileType::Opus => {
+            use lofty::ogg::OpusFile;
+            let opus = OpusFile::read_from(&mut reader, parse_options).ok()?;
+            Some(opus.vorbis_comments().clone())
+        }
+        lofty::file::FileType::Vorbis => {
+            use lofty::ogg::VorbisFile;
+            let vorbis = VorbisFile::read_from(&mut reader, parse_options).ok()?;
+            Some(vorbis.vorbis_comments().clone())
+        }
+        lofty::file::FileType::Speex => {
+            use lofty::ogg::SpeexFile;
+            let speex = SpeexFile::read_from(&mut reader, parse_options).ok()?;
+            Some(speex.vorbis_comments().clone())
+        }
+        _ => None,
+    }
+}
+
+/// Extracts embedded lyrics from an audio file, prioritizing synchronized lyrics
+/// over unsynchronized lyrics across container formats.
+///
+/// Encapsulates format-specific tag quirks:
+/// 1. For Vorbis-based containers (FLAC, Ogg Vorbis, Opus, Speex), inspects native
+///    Vorbis comments directly before lofty's `split_tag()` drops unmapped tags
+///    like `SYNCEDLYRICS`.
+/// 2. For ID3v2 and generic containers, inspects both `ItemKey::Lyrics` and
+///    `ItemKey::UnsyncLyrics` (ID3v2 `USLT`).
+///
+/// Precedence hierarchy:
+/// - Tier 1: Dedicated synchronized tags (`SYNCEDLYRICS`) or any field containing
+///   LRC timestamps ([mm:ss.xx]).
+/// - Tier 2: Unsynchronized plain text lyrics fallback.
+pub(crate) fn read_embedded_lyrics(
+    path: &Path,
+    file_type: lofty::file::FileType,
+    candidate_tags: &[&Tag],
+) -> Option<String> {
+    let mut unsynced_candidate: Option<String> = None;
+
+    // 1. Channel 1: Native Vorbis comments for Vorbis-based containers.
+    // lofty's `split_tag()` categorizes unmapped Vorbis comment keys (notably
+    // `SYNCEDLYRICS`) as unmapped remainder and drops them from generic `Tag.items`.
+    // We read native comments directly to recover them.
+    if let Some(vorbis_comments) = read_native_vorbis_comments(path, file_type) {
+        // Dedicated synchronized lyrics tags always win as Tier 1.
+        for key in ["SYNCEDLYRICS", "SYNCED LYRICS", "SYNCED_LYRICS"] {
+            if let Some(val) = vorbis_comments.get(key) {
+                let trimmed = val.trim();
+                if !trimmed.is_empty() {
+                    return Some(trimmed.to_string());
+                }
+            }
+        }
+
+        // General Vorbis lyrics keys: if timestamped, return immediately; otherwise hold as fallback.
+        for key in [
+            "LYRICS",
+            "UNSYNCEDLYRICS",
+            "UNSYNCED LYRICS",
+            "UNSYNCED_LYRICS",
+        ] {
+            if let Some(val) = vorbis_comments.get(key) {
+                let trimmed = val.trim();
+                if !trimmed.is_empty() {
+                    if crate::lyrics::is_synced_lrc(trimmed) {
+                        return Some(trimmed.to_string());
+                    } else if unsynced_candidate.is_none() {
+                        unsynced_candidate = Some(trimmed.to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. Channel 2: Generic and ID3v2 tags from TaggedFile.
+    // In ID3v2, lofty maps USLT frames exclusively to ItemKey::UnsyncLyrics.
+    // Inspect both ItemKey::Lyrics and ItemKey::UnsyncLyrics across all tags.
+    for tag in candidate_tags {
+        for key in [ItemKey::Lyrics, ItemKey::UnsyncLyrics] {
+            for val in tag.get_strings(key) {
+                let trimmed = val.trim();
+                if trimmed.is_empty() {
+                    continue;
+                }
+                if crate::lyrics::is_synced_lrc(trimmed) {
+                    return Some(trimmed.to_string());
+                } else if unsynced_candidate.is_none() {
+                    unsynced_candidate = Some(trimmed.to_string());
+                }
+            }
+        }
+    }
+
+    // Fall back to Tier 2 unsynchronized plain text lyrics if no Tier 1 synced lyrics were found.
+    unsynced_candidate
+}
+
+/// Reads embedded lyrics directly from an audio file on disk, inspecting both native
+/// Vorbis comments (for Vorbis-based containers) and candidate ID3/generic tags.
+pub(crate) fn read_embedded_lyrics_from_path(path: &Path) -> Option<String> {
+    let tagged_file = lofty::probe::Probe::open(path).ok()?.read().ok()?;
+    let mut candidate_tags: Vec<&Tag> = Vec::new();
+    if let Some(primary) = tagged_file.primary_tag() {
+        candidate_tags.push(primary);
+    }
+    for t in tagged_file.tags() {
+        if !candidate_tags
+            .iter()
+            .any(|existing| std::ptr::eq(*existing, t))
+        {
+            candidate_tags.push(t);
+        }
+    }
+    read_embedded_lyrics(path, tagged_file.file_type(), &candidate_tags)
+}
+
 pub(crate) fn read_tags(path: &Path) -> Result<Song> {
     let path_str = path.to_string_lossy().to_string();
     let mtime = get_mtime(path);
@@ -1729,10 +1878,6 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
 
         if song.composer.is_none() {
             song.composer = read_multi_value(tag, ItemKey::Composer);
-        }
-
-        if song.lyrics.is_none() {
-            song.lyrics = tag.get_string(ItemKey::Lyrics).map(|s| s.to_string());
         }
 
         if song.grouping.is_none() {
@@ -1863,6 +2008,8 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
                 .map(|s| s.to_string());
         }
     }
+
+    song.lyrics = read_embedded_lyrics(path, tagged_file.file_type(), &candidate_tags);
 
     song.art_embedded = candidate_tags.iter().any(|t| !t.pictures().is_empty());
 
@@ -4253,5 +4400,135 @@ Official DR value: DR13\n",
         assert_eq!(remaining, vec!["subsonic://1/gone", "subsonic://1/live"]);
 
         let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_read_embedded_lyrics_id3v2_unsync_lyrics() {
+        let mut tag = Tag::new(lofty::tag::TagType::Id3v2);
+        tag.push(lofty::tag::TagItem::new(
+            ItemKey::UnsyncLyrics,
+            lofty::tag::ItemValue::Text("Plain text lyrics without timestamps".to_string()),
+        ));
+
+        let candidate_tags = vec![&tag];
+        let lyrics = read_embedded_lyrics(
+            Path::new("dummy.mp3"),
+            lofty::file::FileType::Mpeg,
+            &candidate_tags,
+        );
+        assert_eq!(
+            lyrics.as_deref(),
+            Some("Plain text lyrics without timestamps")
+        );
+    }
+
+    #[test]
+    fn test_read_embedded_lyrics_id3v2_synced_lrc_in_uslt() {
+        let mut tag = Tag::new(lofty::tag::TagType::Id3v2);
+        let lrc = "[00:12.34] Line one\n[00:15.67] Line two";
+        tag.push(lofty::tag::TagItem::new(
+            ItemKey::UnsyncLyrics,
+            lofty::tag::ItemValue::Text(lrc.to_string()),
+        ));
+
+        let candidate_tags = vec![&tag];
+        let lyrics = read_embedded_lyrics(
+            Path::new("dummy.mp3"),
+            lofty::file::FileType::Mpeg,
+            &candidate_tags,
+        );
+        assert_eq!(lyrics.as_deref(), Some(lrc));
+    }
+
+    #[test]
+    fn test_read_embedded_lyrics_precedence_synced_over_plain() {
+        let mut tag = Tag::new(lofty::tag::TagType::Id3v2);
+        let lrc = "[00:01.00] Synced line";
+        tag.push(lofty::tag::TagItem::new(
+            ItemKey::Lyrics,
+            lofty::tag::ItemValue::Text("Plain text fallback".to_string()),
+        ));
+        tag.push(lofty::tag::TagItem::new(
+            ItemKey::UnsyncLyrics,
+            lofty::tag::ItemValue::Text(lrc.to_string()),
+        ));
+
+        let candidate_tags = vec![&tag];
+        let lyrics = read_embedded_lyrics(
+            Path::new("dummy.mp3"),
+            lofty::file::FileType::Mpeg,
+            &candidate_tags,
+        );
+        // Even though ItemKey::Lyrics was plain, the timestamped UnsyncLyrics wins as Tier 1!
+        assert_eq!(lyrics.as_deref(), Some(lrc));
+    }
+
+    #[test]
+    fn test_read_embedded_lyrics_empty_whitespace_ignored() {
+        let mut tag = Tag::new(lofty::tag::TagType::Id3v2);
+        tag.push(lofty::tag::TagItem::new(
+            ItemKey::Lyrics,
+            lofty::tag::ItemValue::Text("   \n\t  ".to_string()),
+        ));
+
+        let candidate_tags = vec![&tag];
+        let lyrics = read_embedded_lyrics(
+            Path::new("dummy.mp3"),
+            lofty::file::FileType::Mpeg,
+            &candidate_tags,
+        );
+        assert_eq!(lyrics, None);
+    }
+
+    #[test]
+    fn test_read_embedded_lyrics_flac_vorbis_syncedlyrics() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let flac_path = temp_dir.path().join("test_synced.flac");
+        std::fs::copy("tests/fixtures/audio/song_gamma.flac", &flac_path).unwrap();
+
+        // Write VorbisComments containing SYNCEDLYRICS (timed LRC) and LYRICS (plain text)
+        let mut file = std::fs::File::open(&flac_path).unwrap();
+        let mut flac_file =
+            lofty::flac::FlacFile::read_from(&mut file, lofty::config::ParseOptions::default())
+                .unwrap();
+        drop(file);
+
+        let mut vorbis = lofty::ogg::tag::VorbisComments::default();
+        let synced = "[00:10.00] Synced FLAC lyric";
+        vorbis.insert(String::from("SYNCEDLYRICS"), synced.to_string());
+        vorbis.insert(String::from("LYRICS"), "Plain text FLAC lyric".to_string());
+        flac_file.set_vorbis_comments(vorbis);
+        flac_file
+            .save_to_path(&flac_path, lofty::config::WriteOptions::default())
+            .unwrap();
+
+        // read_tags should prioritize SYNCEDLYRICS over LYRICS
+        let song = read_tags(&flac_path).unwrap();
+        assert_eq!(song.lyrics.as_deref(), Some(synced));
+    }
+
+    #[test]
+    fn test_read_embedded_lyrics_flac_only_syncedlyrics() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let flac_path = temp_dir.path().join("test_only_synced.flac");
+        std::fs::copy("tests/fixtures/audio/song_gamma.flac", &flac_path).unwrap();
+
+        let mut file = std::fs::File::open(&flac_path).unwrap();
+        let mut flac_file =
+            lofty::flac::FlacFile::read_from(&mut file, lofty::config::ParseOptions::default())
+                .unwrap();
+        drop(file);
+
+        let mut vorbis = lofty::ogg::tag::VorbisComments::default();
+        let synced = "[00:05.50] Only synced lyric";
+        vorbis.insert(String::from("SYNCEDLYRICS"), synced.to_string());
+        flac_file.set_vorbis_comments(vorbis);
+        flac_file
+            .save_to_path(&flac_path, lofty::config::WriteOptions::default())
+            .unwrap();
+
+        // read_tags should ingest SYNCEDLYRICS even when LYRICS is absent
+        let song = read_tags(&flac_path).unwrap();
+        assert_eq!(song.lyrics.as_deref(), Some(synced));
     }
 }

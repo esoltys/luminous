@@ -34,3 +34,9 @@ Feature: Lyrics View
     When I open the lyrics panel
     Then the system should display the sidecar lyrics immediately without making a network request
 
+  Scenario: Loading embedded lyrics from audio file on demand
+    Given a song is playing with an audio file containing embedded synced lyrics
+    When I open the lyrics panel
+    Then the system should display the embedded lyrics immediately without making a network request
+
+

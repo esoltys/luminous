@@ -158,6 +158,52 @@ fn check_sidecar_displayed(w: &mut LyricsWorld) {
     assert!(!w.network_call_made, "Network call was made unexpectedly");
 }
 
+#[given("a song is playing with an audio file containing embedded synced lyrics")]
+fn song_playing_with_embedded_lyrics(w: &mut LyricsWorld) {
+    use lofty::file::AudioFile;
+
+    w.song_id = 3;
+    w.title = "Song Gamma".to_string();
+    w.artist = "Artist".to_string();
+
+    let audio_file = w._temp_dir.path().join("song_gamma.flac");
+    std::fs::copy("tests/fixtures/audio/song_gamma.flac", &audio_file)
+        .expect("failed to copy audio fixture");
+
+    let mut file = std::fs::File::open(&audio_file).unwrap();
+    let mut flac_file =
+        lofty::flac::FlacFile::read_from(&mut file, lofty::config::ParseOptions::default())
+            .unwrap();
+    drop(file);
+
+    let mut vorbis = lofty::ogg::tag::VorbisComments::default();
+    let lyrics = "[00:05.00] Embedded BDD synced line\n[00:10.00] Second line";
+    vorbis.insert(String::from("SYNCEDLYRICS"), lyrics.to_string());
+    flac_file.set_vorbis_comments(vorbis);
+    flac_file
+        .save_to_path(&audio_file, lofty::config::WriteOptions::default())
+        .unwrap();
+
+    w.audio_path = Some(audio_file.clone());
+    w.expected_sidecar_lyrics = Some(lyrics.to_string());
+
+    let conn = w.db.pool.get().expect("db conn failed");
+    conn.execute(
+        "INSERT OR REPLACE INTO songs (id, title, artist, path, source, filetype, unavailable, lyrics)
+         VALUES (?1, ?2, ?3, ?4, 1, 1, 0, NULL)",
+        rusqlite::params![w.song_id, w.title, w.artist, audio_file.to_str().unwrap()],
+    )
+    .unwrap();
+}
+
+#[then(
+    "the system should display the embedded lyrics immediately without making a network request"
+)]
+fn check_embedded_displayed(w: &mut LyricsWorld) {
+    assert_eq!(w.displayed_lyrics, w.expected_sidecar_lyrics);
+    assert!(!w.network_call_made, "Network call was made unexpectedly");
+}
+
 #[tokio::main]
 async fn main() {
     // with_default_cli() skips clap-parsing argv, so `cargo test <filter>` (which
