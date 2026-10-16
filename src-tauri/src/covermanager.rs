@@ -720,8 +720,7 @@ fn serve_cached_downscale(
         }
 
         let img_target = img_600.resize(max_edge, max_edge, image::imageops::FilterType::Triangle);
-        let target_bytes =
-                encode_image(&img_target, format).unwrap_or_else(|| cleaned.to_vec());
+        let target_bytes = encode_image(&img_target, format).unwrap_or_else(|| cleaned.to_vec());
         write_thumb_file(&thumbs_dir, &key, ext, &target_bytes);
         return image_response(&target_bytes);
     }
