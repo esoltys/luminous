@@ -1779,7 +1779,27 @@ export const de = {
     unknownError: "Unbekannter Fehler",
     applying: "Wird angewendet ...",
     close: "Schließen",
-    toastErrors: "Dateien, die nicht organisiert werden konnten: {count}"
+    toastErrors: "Dateien, die nicht organisiert werden konnten: {count}",
+    confirmApplyTitle: "Dateien organisieren",
+    confirmApplyMessage: "Sie sind im Begriff, {files} in {folders} zu verschieben.",
+    confirmApplyCleanDirs: "Leere Quellordner werden gelöscht.",
+    confirmApplyMoveExtra: "Begleitdateien (Cover, Songtexte und Cue-Sheets) werden ebenfalls verschoben.",
+    confirmApplyAutoOrganize: "Die automatische Organisation übernimmt diese Vorlage für alle zukünftigen Titel.",
+    confirmApplyCustomDest: "Zielordner: {path}",
+    confirmApplyBtn: "Dateien organisieren",
+    confirmAutoOrganizeTitle: "Automatische Organisation aktivieren",
+    confirmAutoOrganizeMessage: "Wenn Sie die automatische Organisation aktivieren, werden vorhandene Titel in Ihrer Bibliothek sofort gemäß der aktuellen Vorlage neu organisiert und Dateien bei Tag-Änderungen oder neuen Titeln automatisch verschoben. Möchten Sie die automatische Organisation wirklich aktivieren?",
+    confirmAutoOrganizeBtn: "Automatische Organisation aktivieren",
+    filesCount: {
+      one: "{count} Datei",
+      other: "{count} Dateien"
+    },
+    foldersCount: {
+      one: "{count} Ordner",
+      other: "{count} Ordner"
+    },
+    draftModifiedBadge: "Vorlage geändert — automatische Organisation pausiert",
+    revertDraftBtn: "Zurücksetzen"
   },
   picard: {
     openInPicard: "In Picard öffnen",

@@ -13,6 +13,7 @@
     onCancel,
   }: {
     title: string;
+    /** Explanatory message. Newlines (`\n`) are preserved via `whitespace-pre-line` to format lists and bullet points. */
     message: string;
     confirmLabel: string;
     cancelLabel: string;
@@ -43,7 +44,7 @@
   </div>
 
   <div class="p-6">
-    <p class="text-sm text-brand-text-secondary text-pretty">{message}</p>
+    <p class="text-sm text-brand-text-secondary text-pretty whitespace-pre-line">{message}</p>
   </div>
 
   <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-brand-border bg-brand-main">

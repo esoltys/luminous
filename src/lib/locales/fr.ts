@@ -1787,7 +1787,27 @@ export const fr: DeepStringRecord<typeof en> = {
     unknownError: "Erreur inconnue",
     applying: "Application en cours...",
     close: "Fermer",
-    toastErrors: "Fichiers qui n'ont pas pu être organisés : {count}"
+    toastErrors: "Fichiers qui n'ont pas pu être organisés : {count}",
+    confirmApplyTitle: "Classer les fichiers",
+    confirmApplyMessage: "Vous vous apprêtez à déplacer {files} dans {folders}.",
+    confirmApplyCleanDirs: "Les dossiers sources vides seront supprimés.",
+    confirmApplyMoveExtra: "Les fichiers d'accompagnement (pochettes, paroles et feuilles CUE) seront également déplacés.",
+    confirmApplyAutoOrganize: "L'organisation automatique adoptera ce modèle pour tous les futurs morceaux.",
+    confirmApplyCustomDest: "Dossier de destination : {path}",
+    confirmApplyBtn: "Classer les fichiers",
+    confirmAutoOrganizeTitle: "Activer l'organisation automatique",
+    confirmAutoOrganizeMessage: "L'activation de l'organisation automatique va immédiatement reclasser les pistes existantes de votre bibliothèque selon votre modèle actuel, et déplacera automatiquement les fichiers sur le disque lors de la modification des étiquettes ou de l'ajout de musique. Voulez-vous vraiment activer l'organisation automatique?",
+    confirmAutoOrganizeBtn: "Activer l'organisation automatique",
+    filesCount: {
+      one: "{count} fichier",
+      other: "{count} fichiers"
+    },
+    foldersCount: {
+      one: "{count} dossier",
+      other: "{count} dossiers"
+    },
+    draftModifiedBadge: "Modèle modifié — organisation automatique suspendue",
+    revertDraftBtn: "Rétablir"
   },
   picard: {
     openInPicard: "Ouvrir dans Picard",

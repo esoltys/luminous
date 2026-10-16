@@ -1881,7 +1881,31 @@ export const uk = {
     unknownError: "Невідома помилка",
     applying: "Застосування…",
     close: "Закрити",
-    toastErrors: "Файлів, які не вдалося впорядкувати: {count}"
+    toastErrors: "Файлів, які не вдалося впорядкувати: {count}",
+    confirmApplyTitle: "Впорядкувати файли",
+    confirmApplyMessage: "Ви збираєтеся перемістити {files} до {folders}.",
+    confirmApplyCleanDirs: "Порожні вихідні папки буде видалено.",
+    confirmApplyMoveExtra: "Супутні файли (обкладинки, тексти пісень і таблиці CUE) також буде переміщено.",
+    confirmApplyAutoOrganize: "Автовпорядкування застосує цей шаблон до всіх майбутніх треків.",
+    confirmApplyCustomDest: "Папка призначення: {path}",
+    confirmApplyBtn: "Впорядкувати файли",
+    confirmAutoOrganizeTitle: "Увімкнути автовпорядкування",
+    confirmAutoOrganizeMessage: "Увімкнення автовпорядкування негайно реорганізує наявні треки у медіатеці за поточним шаблоном і автоматично переміщуватиме файли на диску в разі зміни тегів або додавання музики. Ви впевнені, що хочете ввімкнути автовпорядкування?",
+    confirmAutoOrganizeBtn: "Увімкнути автовпорядкування",
+    filesCount: {
+      one: "{count} файл",
+      few: "{count} файли",
+      many: "{count} файлів",
+      other: "{count} файлу"
+    },
+    foldersCount: {
+      one: "{count} папку",
+      few: "{count} папки",
+      many: "{count} папок",
+      other: "{count} папки"
+    },
+    draftModifiedBadge: "Шаблон змінено — автовпорядкування призупинено",
+    revertDraftBtn: "Скинути"
   },
   picard: {
     openInPicard: "Відкрити в Picard",

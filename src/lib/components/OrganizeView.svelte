@@ -7,6 +7,7 @@
   import OrganizeFiles from "./OrganizeFiles.svelte";
   import Button from "./Button.svelte";
   import Toggle from "./Toggle.svelte";
+  import ConfirmDialog from "./ConfirmDialog.svelte";
   import { EraserIcon as Eraser, ArrowsClockwiseIcon as RefreshCw, BroomIcon as Broom, StarIcon as Star } from "phosphor-svelte";
 
   const PRUNE_MESSAGE_DURATION_MS = 8000;
@@ -17,6 +18,15 @@
   let organizeCanApply = $state(false);
   let organizeIsApplying = $state(false);
   let organizeApplyRequestKey = $state(0);
+  let showConfirmAutoOrganize = $state(false);
+
+  function handleToggleAutoOrganize(enabled: boolean) {
+    if (enabled) {
+      showConfirmAutoOrganize = true;
+    } else {
+      organizeStore.setAutoOrganize(false);
+    }
+  }
 
   async function handlePruneMissing() {
     const { deletedSongs, removedFolders, mergedDuplicates } = await collectionStore.pruneMissing();
@@ -56,7 +66,7 @@
         <div class="flex items-center gap-2">
           <Toggle
             checked={organizeStore.autoOrganize}
-            onchange={(v) => organizeStore.setAutoOrganize(v)}
+            onchange={handleToggleAutoOrganize}
             label={i18n.t("organizer.autoOrganizeToggle")}
             showOnOffLabel={false}
           />
@@ -110,3 +120,20 @@
     </div>
   </div>
 </div>
+
+{#if showConfirmAutoOrganize}
+  <ConfirmDialog
+    title={i18n.t("organizer.confirmAutoOrganizeTitle")}
+    message={i18n.t("organizer.confirmAutoOrganizeMessage")}
+    confirmLabel={i18n.t("organizer.confirmAutoOrganizeBtn")}
+    cancelLabel={i18n.t("organizer.cancel")}
+    danger={false}
+    onConfirm={() => {
+      showConfirmAutoOrganize = false;
+      organizeStore.setAutoOrganize(true);
+    }}
+    onCancel={() => {
+      showConfirmAutoOrganize = false;
+    }}
+  />
+{/if}

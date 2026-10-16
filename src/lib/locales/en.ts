@@ -1779,7 +1779,27 @@ export const en = {
     unknownError: "Unknown error",
     applying: "Applying...",
     close: "Close",
-    toastErrors: "Files that couldn't be organized: {count}"
+    toastErrors: "Files that couldn't be organized: {count}",
+    confirmApplyTitle: "Organize Files",
+    confirmApplyMessage: "You are about to move {files} into {folders}.",
+    confirmApplyCleanDirs: "Empty source folders will be deleted.",
+    confirmApplyMoveExtra: "Companion files (artwork, lyrics, and cue sheets) will also be moved.",
+    confirmApplyAutoOrganize: "Auto-Organize will adopt this template for all future tracks.",
+    confirmApplyCustomDest: "Destination folder: {path}",
+    confirmApplyBtn: "Organize Files",
+    confirmAutoOrganizeTitle: "Enable Auto-Organize",
+    confirmAutoOrganizeMessage: "Enabling Auto-Organize will immediately reorganize existing tracks in your library according to your current template pattern, and automatically move files on disk whenever tags are updated or new music is added. Are you sure you want to turn on Auto-Organize?",
+    confirmAutoOrganizeBtn: "Enable Auto-Organize",
+    filesCount: {
+      one: "{count} file",
+      other: "{count} files"
+    },
+    foldersCount: {
+      one: "{count} folder",
+      other: "{count} folders"
+    },
+    draftModifiedBadge: "Template modified — Auto-Organize paused",
+    revertDraftBtn: "Revert"
   },
   picard: {
     openInPicard: "Open in Picard",

@@ -1779,7 +1779,27 @@ export const it = {
     unknownError: "Errore sconosciuto",
     applying: "Applicazione in corso...",
     close: "Chiudi",
-    toastErrors: "File che non è stato possibile organizzare: {count}"
+    toastErrors: "File che non è stato possibile organizzare: {count}",
+    confirmApplyTitle: "Organizza file",
+    confirmApplyMessage: "Stai per spostare {files} in {folders}.",
+    confirmApplyCleanDirs: "Le cartelle di origine vuote verranno eliminate.",
+    confirmApplyMoveExtra: "Anche i file correlati (copertine, testi e fogli CUE) verranno spostati.",
+    confirmApplyAutoOrganize: "L'organizzazione automatica adotterà questo modello per tutti i brani futuri.",
+    confirmApplyCustomDest: "Cartella di destinazione: {path}",
+    confirmApplyBtn: "Organizza file",
+    confirmAutoOrganizeTitle: "Attiva organizzazione automatica",
+    confirmAutoOrganizeMessage: "L'attivazione dell'organizzazione automatica riorganizzerà immediatamente i brani esistenti nella libreria in base al modello corrente e sposterà automaticamente i file sul disco ogni volta che i tag vengono aggiornati o viene aggiunta nuova musica. Vuoi davvero attivare l'organizzazione automatica?",
+    confirmAutoOrganizeBtn: "Attiva organizzazione automatica",
+    filesCount: {
+      one: "{count} file",
+      other: "{count} file"
+    },
+    foldersCount: {
+      one: "{count} cartella",
+      other: "{count} cartelle"
+    },
+    draftModifiedBadge: "Modello modificato — organizzazione automatica in pausa",
+    revertDraftBtn: "Ripristina"
   },
   picard: {
     openInPicard: "Apri in Picard",
