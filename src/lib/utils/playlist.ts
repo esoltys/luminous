@@ -156,6 +156,25 @@ export async function addArtistToQueue(artistName: string): Promise<void> {
   }
 }
 
+export async function startSongRadio(song: Song): Promise<void> {
+  try {
+    await playerStore.startRadio({ type: "song", songId: song.id });
+  } catch (err) {
+    console.error("Failed to start song radio:", err);
+    toastStore.show(String(err), "error");
+  }
+}
+
+export async function startArtistRadio(artistName: string): Promise<void> {
+  try {
+    await playerStore.startRadio({ type: "artist", artist: artistName });
+  } catch (err) {
+    console.error("Failed to start artist radio:", err);
+    toastStore.show(String(err), "error");
+  }
+}
+
+
 export async function queuePlaylistAsPlaylist(playlist: Playlist): Promise<void> {
   const name = getPlaylistDisplayName(playlist);
   try {

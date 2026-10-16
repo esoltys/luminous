@@ -46,6 +46,7 @@ pub mod pins;
 pub mod player;
 pub mod playlist;
 pub mod playlist_parsers;
+pub mod radio;
 pub mod ratings_sync;
 pub mod remote_scheduler;
 pub mod restart_manager;
@@ -1413,6 +1414,8 @@ pub fn run() {
             commands::playlist::set_playlist_dynamic_config,
             commands::playlist::refresh_auto_playlist,
             commands::playlist::refresh_all_auto_playlists,
+            commands::playlist::start_radio,
+            commands::playlist::get_radio_songs,
             // Cover Art commands
             commands::cover::get_cover_art_uri,
             commands::cover::fetch_remote_cover,

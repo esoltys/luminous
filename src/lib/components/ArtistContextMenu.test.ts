@@ -145,4 +145,24 @@ describe("ArtistContextMenu.svelte", () => {
     expect(queryByText("Play Artist")).not.toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
   });
+
+  it("triggers Start Artist Radio and calls start_radio IPC command", async () => {
+    vi.mocked(invoke).mockResolvedValueOnce({
+      songIds: [1, 2, 3],
+      contextName: "Radiohead Radio",
+      seedTitle: "Radiohead",
+      songCount: 3,
+    });
+    const onClose = vi.fn();
+    const { getByText } = render(ArtistContextMenu, {
+      props: { x: 100, y: 100, artistName: "Radiohead", onClose },
+    });
+
+    await fireEvent.click(getByText("Start Artist Radio"));
+    await vi.waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(invoke).toHaveBeenCalledWith("start_radio", {
+      seed: { type: "artist", artist: "Radiohead" },
+      limit: null,
+    });
+  });
 });

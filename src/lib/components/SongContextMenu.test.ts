@@ -438,4 +438,46 @@ describe("SongContextMenu.svelte", () => {
 
     expect(await screen.findByText("Clear dislike")).toBeInTheDocument();
   });
+
+  it("shows Start Song Radio for single song and starts radio on click", async () => {
+    const onClose = vi.fn();
+    vi.mocked(invoke).mockResolvedValueOnce({
+      songIds: [1, 2],
+      contextName: "Song 1 Radio",
+      seedTitle: "Song 1",
+      songCount: 2,
+    });
+
+    render(SongContextMenu, {
+      x: 0,
+      y: 0,
+      song: localSong,
+      selectedCount: 1,
+      onPlay: () => {},
+      onClose,
+    });
+
+    const item = await screen.findByText("Start Song Radio");
+    expect(item).toBeInTheDocument();
+
+    await fireEvent.click(item);
+    expect(invoke).toHaveBeenCalledWith("start_radio", {
+      seed: { type: "song", songId: 1 },
+      limit: null,
+    });
+    await vi.waitFor(() => expect(onClose).toHaveBeenCalled());
+  });
+
+  it("does not show Start Song Radio when multiple songs are selected", () => {
+    render(SongContextMenu, {
+      x: 0,
+      y: 0,
+      song: localSong,
+      selectedCount: 2,
+      onPlay: () => {},
+      onClose: () => {},
+    });
+
+    expect(screen.queryByText("Start Song Radio")).toBeNull();
+  });
 });

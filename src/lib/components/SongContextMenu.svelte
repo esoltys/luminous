@@ -32,6 +32,7 @@
   import { toastStore } from "../stores/toast.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { VIEWPORT_EDGE_PADDING_PX, PLAYER_DOCK_CLEARANCE_PX } from "../constants";
+  import { startSongRadio } from "../utils/playlist";
   import type { Song, Playlist } from "../types";
   import ContextMenu from "./ContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
@@ -261,6 +262,18 @@
       onClose();
     }}
   />
+
+  {#if selectedCount === 1}
+    <ContextMenuItem
+      icon={Radio}
+      label={i18n.t("playlists.contextMenuStartSongRadio", {}, "Start Song Radio")}
+      onmouseenter={closeSubmenuImmediately}
+      onclick={async () => {
+        await startSongRadio(song);
+        onClose();
+      }}
+    />
+  {/if}
 
   <!-- Add to Playlist submenu trigger & flyout -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
