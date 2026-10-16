@@ -49,11 +49,6 @@ impl CrashCircuitBreaker {
         self.recent_failures.push(now);
         self.recent_failures.len() <= self.max_failures
     }
-
-    /// Clears all recorded failures, resetting the circuit breaker.
-    pub(crate) fn reset(&mut self) {
-        self.recent_failures.clear();
-    }
 }
 
 impl Default for CrashCircuitBreaker {
@@ -73,14 +68,30 @@ use webview2_com::{
         COREWEBVIEW2_PROCESS_FAILED_KIND_BROWSER_PROCESS_EXITED,
         COREWEBVIEW2_PROCESS_FAILED_KIND_FRAME_RENDER_PROCESS_EXITED,
         COREWEBVIEW2_PROCESS_FAILED_KIND_GPU_PROCESS_EXITED,
+        COREWEBVIEW2_PROCESS_FAILED_KIND_PPAPI_BROKER_PROCESS_EXITED,
+        COREWEBVIEW2_PROCESS_FAILED_KIND_PPAPI_PLUGIN_PROCESS_EXITED,
         COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_EXITED,
         COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_UNRESPONSIVE,
+        COREWEBVIEW2_PROCESS_FAILED_KIND_SANDBOX_HELPER_PROCESS_EXITED,
+        COREWEBVIEW2_PROCESS_FAILED_KIND_UNKNOWN_PROCESS_EXITED,
+        COREWEBVIEW2_PROCESS_FAILED_KIND_UTILITY_PROCESS_EXITED,
         COREWEBVIEW2_PROCESS_FAILED_REASON,
     },
     ProcessFailedEventHandler,
 };
 #[cfg(target_os = "windows")]
 use windows::core::Interface;
+
+/// Recovery action to take for a specific WebView2 process failure.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ProcessFailureAction {
+    /// Render or GPU process failed/hung: UI is blank or frozen, reload restores it.
+    Reload,
+    /// Utility or background worker process exited: WebView2 automatically recreates it.
+    SelfHealing,
+    /// The parent browser process exited: webview object is destroyed, manual app restart required.
+    Fatal,
+}
 
 #[cfg(target_os = "windows")]
 pub(crate) fn format_process_failed_kind(kind: COREWEBVIEW2_PROCESS_FAILED_KIND) -> &'static str {
@@ -90,18 +101,37 @@ pub(crate) fn format_process_failed_kind(kind: COREWEBVIEW2_PROCESS_FAILED_KIND)
         COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_UNRESPONSIVE => "RenderProcessUnresponsive",
         COREWEBVIEW2_PROCESS_FAILED_KIND_FRAME_RENDER_PROCESS_EXITED => "FrameRenderProcessExited",
         COREWEBVIEW2_PROCESS_FAILED_KIND_GPU_PROCESS_EXITED => "GpuProcessExited",
+        COREWEBVIEW2_PROCESS_FAILED_KIND_UTILITY_PROCESS_EXITED => "UtilityProcessExited",
+        COREWEBVIEW2_PROCESS_FAILED_KIND_SANDBOX_HELPER_PROCESS_EXITED => {
+            "SandboxHelperProcessExited"
+        }
+        COREWEBVIEW2_PROCESS_FAILED_KIND_PPAPI_PLUGIN_PROCESS_EXITED => "PpapiPluginProcessExited",
+        COREWEBVIEW2_PROCESS_FAILED_KIND_PPAPI_BROKER_PROCESS_EXITED => "PpapiBrokerProcessExited",
+        COREWEBVIEW2_PROCESS_FAILED_KIND_UNKNOWN_PROCESS_EXITED => "UnknownProcessExited",
         _ => "OtherProcessFailed",
     }
 }
 
 #[cfg(target_os = "windows")]
-pub(crate) fn is_recoverable_failure(kind: COREWEBVIEW2_PROCESS_FAILED_KIND) -> bool {
+pub(crate) fn classify_process_failure(
+    kind: COREWEBVIEW2_PROCESS_FAILED_KIND,
+) -> ProcessFailureAction {
     match kind {
         COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_EXITED
         | COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_UNRESPONSIVE
         | COREWEBVIEW2_PROCESS_FAILED_KIND_FRAME_RENDER_PROCESS_EXITED
-        | COREWEBVIEW2_PROCESS_FAILED_KIND_GPU_PROCESS_EXITED => true,
-        _ => false,
+        | COREWEBVIEW2_PROCESS_FAILED_KIND_GPU_PROCESS_EXITED => ProcessFailureAction::Reload,
+
+        COREWEBVIEW2_PROCESS_FAILED_KIND_UTILITY_PROCESS_EXITED
+        | COREWEBVIEW2_PROCESS_FAILED_KIND_SANDBOX_HELPER_PROCESS_EXITED
+        | COREWEBVIEW2_PROCESS_FAILED_KIND_PPAPI_PLUGIN_PROCESS_EXITED
+        | COREWEBVIEW2_PROCESS_FAILED_KIND_PPAPI_BROKER_PROCESS_EXITED => {
+            ProcessFailureAction::SelfHealing
+        }
+
+        COREWEBVIEW2_PROCESS_FAILED_KIND_BROWSER_PROCESS_EXITED
+        | COREWEBVIEW2_PROCESS_FAILED_KIND_UNKNOWN_PROCESS_EXITED
+        | _ => ProcessFailureAction::Fatal,
     }
 }
 
@@ -172,30 +202,40 @@ pub fn setup_webview_recovery(app: &tauri::AppHandle, app_data_dir: &Path) {
             log::warn!("{detail}");
             crate::diagnostics::log_webview_error(&app_data_dir_clone, &detail);
 
-            if is_recoverable_failure(kind) {
-                let mut guard = breaker_clone.lock();
-                if guard.try_acquire_recovery(Instant::now()) {
-                    log::info!("Attempting automatic WebView2 reload recovery...");
-                    if let Some(core_ref) = core_opt {
-                        unsafe {
-                            if let Err(e) = core_ref.Reload() {
-                                log::error!("Failed to reload WebView2 after process failure: {e}");
-                            } else {
-                                log::info!("CoreWebView2.Reload() dispatched successfully");
+            match classify_process_failure(kind) {
+                ProcessFailureAction::Reload => {
+                    let mut guard = breaker_clone.lock();
+                    if guard.try_acquire_recovery(Instant::now()) {
+                        log::info!("Attempting automatic WebView2 reload recovery ({kind_str})...");
+                        if let Some(core_ref) = core_opt {
+                            unsafe {
+                                if let Err(e) = core_ref.Reload() {
+                                    log::error!(
+                                        "Failed to reload WebView2 after process failure: {e}"
+                                    );
+                                } else {
+                                    log::info!("CoreWebView2.Reload() dispatched successfully");
+                                }
                             }
                         }
+                    } else {
+                        let alert = "WebView2 crash circuit breaker tripped (>3 failures in 10s); halting automatic reload";
+                        log::error!("{alert}");
+                        crate::diagnostics::log_webview_error(&app_data_dir_clone, alert);
                     }
-                } else {
-                    let alert = "WebView2 crash circuit breaker tripped (>3 failures in 10s); halting automatic reload";
-                    log::error!("{alert}");
-                    crate::diagnostics::log_webview_error(&app_data_dir_clone, alert);
                 }
-            } else {
-                let alert = format!(
-                    "Unrecoverable WebView2 process failure ({kind_str}); manual restart required"
-                );
-                log::error!("{alert}");
-                crate::diagnostics::log_webview_error(&app_data_dir_clone, &alert);
+                ProcessFailureAction::SelfHealing => {
+                    log::info!(
+                        "WebView2 background process exited ({kind_str}); lifecycle managed automatically by WebView2"
+                    );
+                }
+                ProcessFailureAction::Fatal => {
+                    let alert = format!(
+                        "Unrecoverable WebView2 process failure ({kind_str}); manual restart required"
+                    );
+                    log::error!("{alert}");
+                    crate::diagnostics::log_webview_error(&app_data_dir_clone, &alert);
+                }
             }
 
             Ok(())
@@ -253,35 +293,38 @@ mod tests {
         assert!(breaker.try_acquire_recovery(start + Duration::from_secs(6)));
     }
 
-    #[test]
-    fn test_circuit_breaker_reset() {
-        let mut breaker = CrashCircuitBreaker::new(1, Duration::from_secs(10));
-        let start = Instant::now();
-
-        assert!(breaker.try_acquire_recovery(start));
-        assert!(!breaker.try_acquire_recovery(start + Duration::from_millis(500)));
-
-        breaker.reset();
-        assert!(breaker.try_acquire_recovery(start + Duration::from_millis(600)));
-    }
-
     #[cfg(target_os = "windows")]
     #[test]
-    fn test_windows_recoverable_failure_kinds() {
-        assert!(is_recoverable_failure(
-            COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_EXITED
-        ));
-        assert!(is_recoverable_failure(
-            COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_UNRESPONSIVE
-        ));
-        assert!(is_recoverable_failure(
-            COREWEBVIEW2_PROCESS_FAILED_KIND_FRAME_RENDER_PROCESS_EXITED
-        ));
-        assert!(is_recoverable_failure(
-            COREWEBVIEW2_PROCESS_FAILED_KIND_GPU_PROCESS_EXITED
-        ));
-        assert!(!is_recoverable_failure(
-            COREWEBVIEW2_PROCESS_FAILED_KIND_BROWSER_PROCESS_EXITED
-        ));
+    fn test_windows_process_failure_classification() {
+        assert_eq!(
+            classify_process_failure(COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_EXITED),
+            ProcessFailureAction::Reload
+        );
+        assert_eq!(
+            classify_process_failure(COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_UNRESPONSIVE),
+            ProcessFailureAction::Reload
+        );
+        assert_eq!(
+            classify_process_failure(COREWEBVIEW2_PROCESS_FAILED_KIND_FRAME_RENDER_PROCESS_EXITED),
+            ProcessFailureAction::Reload
+        );
+        assert_eq!(
+            classify_process_failure(COREWEBVIEW2_PROCESS_FAILED_KIND_GPU_PROCESS_EXITED),
+            ProcessFailureAction::Reload
+        );
+        assert_eq!(
+            classify_process_failure(COREWEBVIEW2_PROCESS_FAILED_KIND_UTILITY_PROCESS_EXITED),
+            ProcessFailureAction::SelfHealing
+        );
+        assert_eq!(
+            classify_process_failure(
+                COREWEBVIEW2_PROCESS_FAILED_KIND_SANDBOX_HELPER_PROCESS_EXITED
+            ),
+            ProcessFailureAction::SelfHealing
+        );
+        assert_eq!(
+            classify_process_failure(COREWEBVIEW2_PROCESS_FAILED_KIND_BROWSER_PROCESS_EXITED),
+            ProcessFailureAction::Fatal
+        );
     }
 }
