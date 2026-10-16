@@ -852,8 +852,25 @@ const ARTIST_SIDE_STEMS: &[&str] = &[
 const ARTIST_IMAGE_EXTS: &[&str] = &["jpg", "jpeg", "png", "webp"];
 const LYRIC_EXTS: &[&str] = &["lrc", "vtt", "srt"];
 const ALBUM_SIDE_STEMS: &[&str] = &[
-    "cover", "folder", "front", "album", "albumart", "back", "rear", "backcover", "disc", "cd",
-    "discart", "medium", "booklet", "insert", "inlay", "liner", "tray", "matrix", "spine",
+    "cover",
+    "folder",
+    "front",
+    "album",
+    "albumart",
+    "back",
+    "rear",
+    "backcover",
+    "disc",
+    "cd",
+    "discart",
+    "medium",
+    "booklet",
+    "insert",
+    "inlay",
+    "liner",
+    "tray",
+    "matrix",
+    "spine",
 ];
 const ALBUM_IMAGE_EXTS: &[&str] = &["jpg", "jpeg", "png", "webp"];
 
@@ -1248,10 +1265,11 @@ pub fn execute_companion_moves(
         }
 
         // Try direct filesystem rename; fall back to copy-and-remove for cross-volume / cross-mount relocations
-        let move_res = fs::rename(&companion_move.src_path, &companion_move.dst_path).or_else(|_| {
-            fs::copy(&companion_move.src_path, &companion_move.dst_path)
-                .and_then(|_| fs::remove_file(&companion_move.src_path))
-        });
+        let move_res =
+            fs::rename(&companion_move.src_path, &companion_move.dst_path).or_else(|_| {
+                fs::copy(&companion_move.src_path, &companion_move.dst_path)
+                    .and_then(|_| fs::remove_file(&companion_move.src_path))
+            });
 
         match move_res {
             Ok(_) => {
@@ -2882,14 +2900,8 @@ mod tests {
 
     #[test]
     fn test_classify_companion_file() {
-        assert_eq!(
-            classify_companion_file(Path::new("song.mp3")),
-            None
-        );
-        assert_eq!(
-            classify_companion_file(Path::new("song.flac")),
-            None
-        );
+        assert_eq!(classify_companion_file(Path::new("song.mp3")), None);
+        assert_eq!(classify_companion_file(Path::new("song.flac")), None);
 
         // Track-level lyrics / subtitles
         assert_eq!(
@@ -3057,7 +3069,11 @@ mod tests {
         };
         upsert_song(&conn, &song1).unwrap();
         let id1: i64 = conn
-            .query_row("SELECT id FROM songs WHERE path = ?1", params![song1.path], |r| r.get(0))
+            .query_row(
+                "SELECT id FROM songs WHERE path = ?1",
+                params![song1.path],
+                |r| r.get(0),
+            )
             .unwrap();
 
         let song2 = Song {
@@ -3071,7 +3087,11 @@ mod tests {
         };
         upsert_song(&conn, &song2).unwrap();
         let id2: i64 = conn
-            .query_row("SELECT id FROM songs WHERE path = ?1", params![song2.path], |r| r.get(0))
+            .query_row(
+                "SELECT id FROM songs WHERE path = ?1",
+                params![song2.path],
+                |r| r.get(0),
+            )
             .unwrap();
         drop(conn);
 
@@ -3081,12 +3101,18 @@ mod tests {
             OrganizeApplyItem {
                 song_id: id1,
                 from_path: track1_src.to_string_lossy().to_string(),
-                to_path: album1_dir.join("01 Airbag.mp3").to_string_lossy().to_string(),
+                to_path: album1_dir
+                    .join("01 Airbag.mp3")
+                    .to_string_lossy()
+                    .to_string(),
             },
             OrganizeApplyItem {
                 song_id: id2,
                 from_path: track2_src.to_string_lossy().to_string(),
-                to_path: album2_dir.join("01 2+2=5.mp3").to_string_lossy().to_string(),
+                to_path: album2_dir
+                    .join("01 2+2=5.mp3")
+                    .to_string_lossy()
+                    .to_string(),
             },
         ];
 
@@ -3157,7 +3183,11 @@ mod tests {
         };
         upsert_song(&conn, &song).unwrap();
         let song_id: i64 = conn
-            .query_row("SELECT id FROM songs WHERE path = ?1", params![song.path], |r| r.get(0))
+            .query_row(
+                "SELECT id FROM songs WHERE path = ?1",
+                params![song.path],
+                |r| r.get(0),
+            )
             .unwrap();
         drop(conn);
 
@@ -3166,7 +3196,10 @@ mod tests {
         let items = vec![OrganizeApplyItem {
             song_id,
             from_path: track_src.to_string_lossy().to_string(),
-            to_path: dest_album_dir.join("01 Airbag.mp3").to_string_lossy().to_string(),
+            to_path: dest_album_dir
+                .join("01 Airbag.mp3")
+                .to_string_lossy()
+                .to_string(),
         }];
 
         let watcher_paused = Arc::new(AtomicU32::new(0));
@@ -3225,7 +3258,11 @@ mod tests {
         };
         upsert_song(&conn, &song).unwrap();
         let song_id: i64 = conn
-            .query_row("SELECT id FROM songs WHERE path = ?1", params![song.path], |r| r.get(0))
+            .query_row(
+                "SELECT id FROM songs WHERE path = ?1",
+                params![song.path],
+                |r| r.get(0),
+            )
             .unwrap();
         drop(conn);
 
@@ -3288,7 +3325,11 @@ mod tests {
         };
         upsert_song(&conn, &song1).unwrap();
         let id1: i64 = conn
-            .query_row("SELECT id FROM songs WHERE path = ?1", params![song1.path], |r| r.get(0))
+            .query_row(
+                "SELECT id FROM songs WHERE path = ?1",
+                params![song1.path],
+                |r| r.get(0),
+            )
             .unwrap();
 
         let song2 = Song {
@@ -3303,7 +3344,11 @@ mod tests {
         };
         upsert_song(&conn, &song2).unwrap();
         let id2: i64 = conn
-            .query_row("SELECT id FROM songs WHERE path = ?1", params![song2.path], |r| r.get(0))
+            .query_row(
+                "SELECT id FROM songs WHERE path = ?1",
+                params![song2.path],
+                |r| r.get(0),
+            )
             .unwrap();
         drop(conn);
 
@@ -3313,12 +3358,18 @@ mod tests {
             OrganizeApplyItem {
                 song_id: id1,
                 from_path: track1_src.to_string_lossy().to_string(),
-                to_path: album1_dir.join("01 Airbag.mp3").to_string_lossy().to_string(),
+                to_path: album1_dir
+                    .join("01 Airbag.mp3")
+                    .to_string_lossy()
+                    .to_string(),
             },
             OrganizeApplyItem {
                 song_id: id2,
                 from_path: track2_src.to_string_lossy().to_string(),
-                to_path: album2_dir.join("01 Planet Telex.mp3").to_string_lossy().to_string(),
+                to_path: album2_dir
+                    .join("01 Planet Telex.mp3")
+                    .to_string_lossy()
+                    .to_string(),
             },
         ];
 
@@ -3330,20 +3381,37 @@ mod tests {
         assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
 
         // Ambiguous generic cover.jpg in multi-album folder remains in place
-        assert!(generic_cover.exists(), "generic cover.jpg must remain in place");
+        assert!(
+            generic_cover.exists(),
+            "generic cover.jpg must remain in place"
+        );
         assert!(!album1_dir.join("cover.jpg").exists());
         assert!(!album2_dir.join("cover.jpg").exists());
 
         // In DB, moved songs must disassociate from parent cover art (NULL, not wrong album)
         let conn = db.pool.get().unwrap();
         let art1: Option<String> = conn
-            .query_row("SELECT art_automatic FROM songs WHERE id = ?1", params![id1], |r| r.get(0))
+            .query_row(
+                "SELECT art_automatic FROM songs WHERE id = ?1",
+                params![id1],
+                |r| r.get(0),
+            )
             .unwrap();
         let art2: Option<String> = conn
-            .query_row("SELECT art_automatic FROM songs WHERE id = ?1", params![id2], |r| r.get(0))
+            .query_row(
+                "SELECT art_automatic FROM songs WHERE id = ?1",
+                params![id2],
+                |r| r.get(0),
+            )
             .unwrap();
-        assert_eq!(art1, None, "song 1 must not retain parent folder's cover art");
-        assert_eq!(art2, None, "song 2 must not retain parent folder's cover art");
+        assert_eq!(
+            art1, None,
+            "song 1 must not retain parent folder's cover art"
+        );
+        assert_eq!(
+            art2, None,
+            "song 2 must not retain parent folder's cover art"
+        );
     }
 
     #[test]
@@ -3383,7 +3451,11 @@ mod tests {
         };
         upsert_song(&conn, &song1).unwrap();
         let id1: i64 = conn
-            .query_row("SELECT id FROM songs WHERE path = ?1", params![song1.path], |r| r.get(0))
+            .query_row(
+                "SELECT id FROM songs WHERE path = ?1",
+                params![song1.path],
+                |r| r.get(0),
+            )
             .unwrap();
 
         let song2 = Song {
@@ -3397,7 +3469,11 @@ mod tests {
         };
         upsert_song(&conn, &song2).unwrap();
         let id2: i64 = conn
-            .query_row("SELECT id FROM songs WHERE path = ?1", params![song2.path], |r| r.get(0))
+            .query_row(
+                "SELECT id FROM songs WHERE path = ?1",
+                params![song2.path],
+                |r| r.get(0),
+            )
             .unwrap();
         drop(conn);
 
@@ -3407,12 +3483,18 @@ mod tests {
             OrganizeApplyItem {
                 song_id: id1,
                 from_path: track1_src.to_string_lossy().to_string(),
-                to_path: album1_dir.join("01 Airbag.mp3").to_string_lossy().to_string(),
+                to_path: album1_dir
+                    .join("01 Airbag.mp3")
+                    .to_string_lossy()
+                    .to_string(),
             },
             OrganizeApplyItem {
                 song_id: id2,
                 from_path: track2_src.to_string_lossy().to_string(),
-                to_path: album2_dir.join("01 Planet Telex.mp3").to_string_lossy().to_string(),
+                to_path: album2_dir
+                    .join("01 Planet Telex.mp3")
+                    .to_string_lossy()
+                    .to_string(),
             },
         ];
 
@@ -3424,10 +3506,16 @@ mod tests {
         assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
 
         // Named album cover moves to matching destination album directory
-        assert!(album1_dir.join("OK Computer.jpg").exists(), "OK Computer.jpg must move to album folder");
+        assert!(
+            album1_dir.join("OK Computer.jpg").exists(),
+            "OK Computer.jpg must move to album folder"
+        );
         assert!(!ok_cover.exists());
 
         // Generic cover remains in place because multiple albums were organized
-        assert!(generic_cover.exists(), "generic cover.jpg must remain in place");
+        assert!(
+            generic_cover.exists(),
+            "generic cover.jpg must remain in place"
+        );
     }
 }
