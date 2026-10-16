@@ -183,7 +183,7 @@ fn assemble_pipeline_info(
         output_channels: output.channels,
         output_format: "32-bit float PCM".to_string(),
         output_device_name: output.device_name,
-        output_backend: "CPAL".to_string(),
+        output_backend: output.backend_name,
     }
 }
 
@@ -196,6 +196,7 @@ mod tests {
             sample_rate: 48_000,
             channels: 2,
             device_name: "Test DAC".into(),
+            backend_name: "CPAL".into(),
         }
     }
 

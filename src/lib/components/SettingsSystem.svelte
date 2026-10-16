@@ -17,8 +17,11 @@
     ArrowUpIcon as ArrowUp,
     DownloadSimpleIcon as Download,
     WarningIcon as AlertTriangle,
-    PackageIcon as Package
+    PackageIcon as Package,
+    SpeakerHighIcon as SpeakerHigh,
+    SlidersHorizontalIcon as Sliders
   } from "phosphor-svelte";
+  import Select from "./Select.svelte";
 
   const COPY_FEEDBACK_DURATION_MS = 1500;
 
@@ -226,7 +229,45 @@
     } catch (e) {
       console.error("Failed to fetch data directory info on mount:", e);
     }
+
+    await prefs.refreshAudioDevices();
   });
+
+  let currentBackendDevices = $derived(
+    prefs.audioOutputDevices.filter((d) => d.backend === prefs.audioOutputConfig.backend)
+  );
+
+  let selectedDeviceId = $derived.by(() => {
+    const id = prefs.audioOutputConfig.device_id;
+    if (prefs.audioOutputConfig.backend === "asio") {
+      if (id && currentBackendDevices.some((d) => d.id === id)) {
+        return id;
+      }
+      return currentBackendDevices.length > 0 ? currentBackendDevices[0].id : "";
+    }
+    return id ?? "";
+  });
+
+  async function handleBackendChange(backend: "cpal" | "asio") {
+    const devices = prefs.audioOutputDevices.filter((d) => d.backend === backend);
+    const newDeviceId = backend === "asio" && devices.length > 0 ? devices[0].id : null;
+    await prefs.setAudioOutput({ backend, device_id: newDeviceId });
+  }
+
+  async function handleDeviceChange(deviceId: string | null) {
+    await prefs.setAudioOutput({
+      backend: prefs.audioOutputConfig.backend,
+      device_id: deviceId,
+    });
+  }
+
+  async function openAsioControlPanel() {
+    try {
+      await prefs.openAsioControlPanel(prefs.audioOutputConfig.device_id);
+    } catch (e) {
+      toastStore.show(String(e), "error");
+    }
+  }
 </script>
 
 <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6">
@@ -307,6 +348,96 @@
           {pathCopied ? i18n.t('settings.copiedLabel', {}, 'Copied!') : i18n.t('settings.dataStorageCopyButton', {}, 'Copy Path')}
         </Button>
       </div>
+    </div>
+  {/if}
+</div>
+
+<!-- Audio Output Card -->
+<div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
+  <div class="pb-3 flex items-center justify-between border-b border-brand-border/50">
+    <div class="flex items-center gap-3">
+      <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
+        <SpeakerHigh class="w-5 h-5" />
+      </div>
+      <div class="space-y-1 min-w-0">
+        <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('settings.audioOutputTitle')}</h3>
+        <p class="text-xs text-brand-text-secondary leading-relaxed">{i18n.t('settings.audioOutputSubtitle')}</p>
+      </div>
+    </div>
+    <Button
+      onclick={() => prefs.refreshAudioDevices()}
+      variant="secondary"
+      size="sm"
+      class="shrink-0 text-xs px-3.5 py-1.5"
+      title={i18n.t('settings.audioRefreshDevicesHint')}
+    >
+      <RefreshCw class="w-3.5 h-3.5" />
+      {i18n.t('settings.audioRefreshDevicesBtn')}
+    </Button>
+  </div>
+
+  {#if isWindows}
+    <!-- Output Backend (CPAL vs ASIO) -->
+    <div class="flex items-center justify-between gap-4 py-2">
+      <div class="flex flex-col gap-0.5 min-w-0">
+        <label for="audio-backend-select" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.audioBackendLabel')}</label>
+        <p class="text-xs text-brand-text-secondary">{i18n.t('settings.audioBackendHint')}</p>
+      </div>
+      <Select
+        id="audio-backend-select"
+        value={prefs.audioOutputConfig.backend}
+        onchange={(e) => handleBackendChange(e.currentTarget.value as 'cpal' | 'asio')}
+        class="shrink-0 bg-brand-main border border-brand-border hover:border-brand-accent/60 text-brand-text-primary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+      >
+        <option value="cpal">{i18n.t('settings.audioBackendShared')}</option>
+        <option value="asio">{i18n.t('settings.audioBackendAsio')}</option>
+      </Select>
+    </div>
+  {/if}
+
+  <!-- Device Selection -->
+  <div class="flex items-center justify-between gap-4 py-2">
+    <div class="flex flex-col gap-0.5 min-w-0">
+      <label for="audio-device-select" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.audioDeviceLabel')}</label>
+      <p class="text-xs text-brand-text-secondary">{i18n.t('settings.audioDeviceHint')}</p>
+    </div>
+    {#if currentBackendDevices.length === 0 && prefs.audioOutputConfig.backend === 'asio'}
+      <span class="text-xs text-amber-400 font-medium">{i18n.t('settings.audioAsioNoDevices')}</span>
+    {:else}
+      <Select
+        id="audio-device-select"
+        value={selectedDeviceId}
+        onchange={(e) => handleDeviceChange(e.currentTarget.value || null)}
+        class="shrink-0 max-w-[280px] bg-brand-main border border-brand-border hover:border-brand-accent/60 text-brand-text-primary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium truncate"
+      >
+        {#if prefs.audioOutputConfig.backend === 'cpal'}
+          <option value="">{i18n.t('settings.audioDeviceDefault')}</option>
+        {/if}
+        {#each currentBackendDevices as dev}
+          <option value={dev.id}>
+            {dev.name}{dev.is_default ? ` (${i18n.t('settings.audioDeviceDefault')})` : ''}
+          </option>
+        {/each}
+      </Select>
+    {/if}
+  </div>
+
+  <!-- ASIO Driver Control Panel Button -->
+  {#if prefs.audioOutputConfig.backend === 'asio' && currentBackendDevices.length > 0}
+    <div class="flex items-center justify-between gap-4 pt-2 border-t border-brand-border/40">
+      <div class="flex flex-col gap-0.5 min-w-0">
+        <span class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.audioAsioControlPanelBtn')}</span>
+        <p class="text-xs text-brand-text-secondary">{i18n.t('settings.audioAsioControlPanelHint')}</p>
+      </div>
+      <Button
+        onclick={openAsioControlPanel}
+        variant="secondary"
+        size="sm"
+        class="shrink-0 text-xs px-3.5 py-1.5"
+      >
+        <Sliders class="w-3.5 h-3.5" />
+        {i18n.t('settings.audioAsioControlPanelBtn')}
+      </Button>
     </div>
   {/if}
 </div>

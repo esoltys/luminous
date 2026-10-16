@@ -32,16 +32,21 @@
 //! or blocks. When every stage is neutral (EQ off, gains at 1.0) samples pass
 //! through bit-perfect.
 
+pub mod asio;
 mod codecs;
+pub mod pcm;
+pub mod sink;
 mod source;
 mod spectrum;
 
 use anyhow::{anyhow, Result};
-use cpal::traits::StreamTrait;
 use parking_lot::Mutex;
 use source::ProbedTrack;
 use std::path::Path;
 
+pub use sink::{
+    enumerate_output_devices, AudioBackendKind, AudioDeviceInfo, AudioOutputConfig, AudioSink,
+};
 pub use source::OfflineDecoder;
 pub use symphonia::core::io::MediaSource;
 
@@ -140,6 +145,8 @@ enum AudioCommand {
     /// Drop a primed next track (playback context changed) and re-arm the
     /// `AboutToFinish` signal so a fresh preload can be requested.
     ClearPreload,
+    /// Force a rebuild of the audio output stream (e.g. backend or device changed).
+    RebuildOutput,
 }
 
 struct PlayRequest {
@@ -191,6 +198,7 @@ pub struct OutputInfo {
     pub sample_rate: u32,
     pub channels: u16,
     pub device_name: String,
+    pub backend_name: String,
 }
 
 // ---------------------------------------------------------------------------
@@ -236,32 +244,34 @@ pub enum AudioEvent {
 // a single value instead of 6-10 individual Arcs through every layer.
 // ---------------------------------------------------------------------------
 
-struct AudioShared {
-    open_source: Box<SourceOpener>,
-    position: AtomicU64,
-    volume: AtomicU32,
-    play_state: Mutex<EngineState>,
-    visualizer_buf: spectrum::AudioVisualizerBuffer,
+pub(crate) struct AudioShared {
+    pub(crate) open_source: Box<SourceOpener>,
+    pub(crate) position: AtomicU64,
+    pub(crate) volume: AtomicU32,
+    pub(crate) play_state: Mutex<EngineState>,
+    pub(crate) visualizer_buf: spectrum::AudioVisualizerBuffer,
     /// Whether the output callback feeds `visualizer_buf` at all: the
     /// downmix is skipped while nothing displays a spectrum.
-    spectrum_enabled: std::sync::atomic::AtomicBool,
-    output_sample_rate: AtomicU32,
-    output_channels: std::sync::atomic::AtomicU16,
-    output_device_name: parking_lot::RwLock<Option<String>>,
-    equalizer: Mutex<luminous_equalizer::Equalizer>,
-    loudness_gain: AtomicU32,
+    pub(crate) spectrum_enabled: std::sync::atomic::AtomicBool,
+    pub(crate) output_sample_rate: AtomicU32,
+    pub(crate) output_channels: std::sync::atomic::AtomicU16,
+    pub(crate) output_device_name: parking_lot::RwLock<Option<String>>,
+    pub(crate) output_backend_name: parking_lot::RwLock<String>,
+    pub(crate) output_config: parking_lot::RwLock<AudioOutputConfig>,
+    pub(crate) equalizer: Mutex<luminous_equalizer::Equalizer>,
+    pub(crate) loudness_gain: AtomicU32,
     /// Bumped by every loudness-gain write that isn't a ramp step, so an
     /// in-flight `ramp_loudness_gain` stops instead of overwriting it: the
     /// newest write always wins.
-    loudness_generation: AtomicU64,
+    pub(crate) loudness_generation: AtomicU64,
     /// A loudness-gain change scheduled at an exact played-sample index
     /// (`AudioOutput::played_samples` space), applied by the output callback
     /// mid-buffer so a crossfade's incoming track takes over its gain at the
     /// sample the overlap starts (#1238). `NO_LOUDNESS_SWITCH` when idle.
-    loudness_switch_at: AtomicU64,
+    pub(crate) loudness_switch_at: AtomicU64,
     /// The gain `loudness_switch_at` switches to; written before it.
-    loudness_switch_gain: AtomicU32,
-    fade_gain: AtomicU32,
+    pub(crate) loudness_switch_gain: AtomicU32,
+    pub(crate) fade_gain: AtomicU32,
 }
 
 /// `AudioShared::loudness_switch_at` value meaning no switch is scheduled.
@@ -322,6 +332,8 @@ impl AudioEngine {
             output_sample_rate: AtomicU32::new(44100),
             output_channels: std::sync::atomic::AtomicU16::new(2),
             output_device_name: parking_lot::RwLock::new(get_default_device_name()),
+            output_backend_name: parking_lot::RwLock::new("CPAL".to_string()),
+            output_config: parking_lot::RwLock::new(AudioOutputConfig::default()),
             equalizer: Mutex::new(luminous_equalizer::Equalizer::new()),
             loudness_gain: AtomicU32::new(1.0f32.to_bits()),
             loudness_generation: AtomicU64::new(0),
@@ -539,11 +551,28 @@ impl AudioEngine {
             .clone()
             .or_else(get_default_device_name)
             .unwrap_or_else(|| "Default Audio Device".to_string());
+        let backend_name = self.shared.output_backend_name.read().clone();
         OutputInfo {
             sample_rate: if rate > 0 { rate } else { 44100 },
             channels: if channels > 0 { channels } else { 2 },
             device_name,
+            backend_name: if backend_name.is_empty() {
+                "CPAL".to_string()
+            } else {
+                backend_name
+            },
         }
+    }
+
+    /// Update the preferred audio output configuration (backend and device).
+    pub fn set_output_config(&self, config: AudioOutputConfig) -> Result<()> {
+        *self.shared.output_config.write() = config;
+        self.send_cmd(AudioCommand::RebuildOutput)
+    }
+
+    /// Read the active/preferred audio output configuration.
+    pub fn output_config(&self) -> AudioOutputConfig {
+        self.shared.output_config.read().clone()
     }
 
     /// The engine's event stream, handed out once: the first call returns
@@ -766,13 +795,14 @@ fn crossfade_overlap_samples(
 /// same buffer and use `Stream::play()`/`pause()` instead of dropping and
 /// rebuilding the stream.
 struct AudioOutput {
-    stream: cpal::Stream,
+    sink: Box<dyn AudioSink>,
     producer: ringbuf::HeapProd<f32>,
     consumer: Arc<Mutex<ringbuf::HeapCons<f32>>>,
     played_samples: Arc<AtomicU64>,
     sample_rate: u32,
     channels: u16,
     device_name: Option<String>,
+    backend_name: String,
     stream_error_flag: Arc<std::sync::atomic::AtomicBool>,
 }
 
@@ -825,22 +855,54 @@ fn select_output_device(host: &cpal::Host) -> Result<cpal::Device, String> {
     Ok(default)
 }
 
+fn resolve_cpal_device(
+    host: &cpal::Host,
+    requested_id: Option<&str>,
+) -> Result<(cpal::Device, Option<String>), String> {
+    use cpal::traits::{DeviceTrait, HostTrait};
+    let get_name = |d: &cpal::Device| -> String {
+        d.description()
+            .map(|desc| desc.name().to_string())
+            .unwrap_or_else(|_| d.to_string())
+    };
+    if let Some(req_id) = requested_id {
+        if !req_id.is_empty() {
+            if let Ok(devices) = host.output_devices() {
+                for d in devices {
+                    let name = get_name(&d);
+                    let id = d
+                        .id()
+                        .ok()
+                        .map(|i| i.to_string())
+                        .unwrap_or_else(|| name.clone());
+                    if id == req_id {
+                        return Ok((d, Some(name)));
+                    }
+                }
+            }
+        }
+    }
+    let dev = select_output_device(host)?;
+    let name = Some(get_name(&dev));
+    Ok((dev, name))
+}
+
 /// The output callback's state: everything it reads, plus its preallocated
 /// scratch. Kept out of the closure so the hot path can be driven (and timed)
 /// without a CPAL device.
-struct OutputRenderer {
-    shared: Arc<AudioShared>,
-    consumer: Arc<Mutex<ringbuf::HeapCons<f32>>>,
-    played_samples: Arc<AtomicU64>,
-    mono_scratch: Vec<f32>,
-    sample_rate: u32,
-    channels: u16,
+pub(crate) struct OutputRenderer {
+    pub(crate) shared: Arc<AudioShared>,
+    pub(crate) consumer: Arc<Mutex<ringbuf::HeapCons<f32>>>,
+    pub(crate) played_samples: Arc<AtomicU64>,
+    pub(crate) mono_scratch: Vec<f32>,
+    pub(crate) sample_rate: u32,
+    pub(crate) channels: u16,
 }
 
 impl OutputRenderer {
     /// Fill one device buffer from the ring buffer and run the gain chain.
     /// Runs on the real-time audio thread: never allocates or blocks.
-    fn render(&mut self, output: &mut [f32]) {
+    pub(crate) fn render(&mut self, output: &mut [f32]) {
         let vol = f32::from_bits(self.shared.volume.load(Ordering::Relaxed));
         let mut loudness = f32::from_bits(self.shared.loudness_gain.load(Ordering::Relaxed));
         let played_before = self.played_samples.load(Ordering::Relaxed);
@@ -965,9 +1027,56 @@ impl OutputRenderer {
 fn build_output(shared: &Arc<AudioShared>) -> Result<AudioOutput, String> {
     use cpal::traits::{DeviceTrait, StreamTrait};
 
+    let output_cfg = shared.output_config.read().clone();
+
+    #[cfg(windows)]
+    if output_cfg.backend == AudioBackendKind::Asio {
+        let target_sample_rate = shared.output_sample_rate.load(Ordering::Relaxed).max(44100);
+        let buffer_capacity = target_sample_rate as usize * 2 * 2;
+        let rb = HeapRb::<f32>::new(buffer_capacity);
+        let (prod, cons) = rb.split();
+        let shared_consumer = Arc::new(Mutex::new(cons));
+        let played_samples = Arc::new(AtomicU64::new(0));
+
+        match crate::asio::build_asio_sink(
+            output_cfg.device_id.as_deref(),
+            shared,
+            Arc::clone(&shared_consumer),
+            Arc::clone(&played_samples),
+            target_sample_rate,
+        ) {
+            Ok(asio_sink) => {
+                let sample_rate = asio_sink.sample_rate();
+                let channels = asio_sink.channels();
+                let device_name = asio_sink.device_name();
+                let stream_error_flag = Arc::clone(&asio_sink.stream_error_flag);
+
+                {
+                    let mut eq = shared.equalizer.lock();
+                    eq.update_format(sample_rate, channels as usize);
+                }
+
+                return Ok(AudioOutput {
+                    sink: Box::new(asio_sink),
+                    producer: prod,
+                    consumer: shared_consumer,
+                    played_samples,
+                    sample_rate,
+                    channels,
+                    device_name,
+                    backend_name: "ASIO".to_string(),
+                    stream_error_flag,
+                });
+            }
+            Err(e) => {
+                log::warn!("Failed to initialize ASIO sink ({e}), falling back to CPAL default");
+            }
+        }
+    }
+
     let host = cpal::default_host();
-    let device = select_output_device(&host)?;
-    let device_name = Some(device.to_string());
+    let (device, dev_name) = resolve_cpal_device(&host, output_cfg.device_id.as_deref())?;
+    let device_name = dev_name;
     let default_config = device
         .default_output_config()
         .map_err(|e| format!("Failed to get default output config: {e}"))?;
@@ -1038,14 +1147,23 @@ fn build_output(shared: &Arc<AudioShared>) -> Result<AudioOutput, String> {
         );
     }
 
-    Ok(AudioOutput {
+    let cpal_sink = crate::sink::CpalSink::new(
         stream,
+        target_sample_rate,
+        target_channels,
+        device_name.clone(),
+        Arc::clone(&stream_error_flag),
+    );
+
+    Ok(AudioOutput {
+        sink: Box::new(cpal_sink),
         producer: prod,
         consumer: shared_consumer,
         played_samples,
         sample_rate: target_sample_rate,
         channels: target_channels,
         device_name,
+        backend_name: "CPAL".to_string(),
         stream_error_flag,
     })
 }
@@ -1105,6 +1223,7 @@ struct DecodeSession {
     target_sample_rate: u32,
     target_channels: u16,
     last_device_check: std::time::Instant,
+    force_device_rebuild: bool,
 }
 
 enum DeviceCheckOutcome {
@@ -1200,7 +1319,7 @@ fn decode_thread(
                                     target_channels,
                                 );
                                 out.played_samples.store(start_samples, Ordering::Relaxed);
-                                let _ = out.stream.pause();
+                                let _ = out.sink.pause();
                                 {
                                     let mut s = shared.play_state.lock();
                                     *s = EngineState::Paused;
@@ -1228,7 +1347,7 @@ fn decode_thread(
                     }
                     Ok(AudioCommand::Stop(_)) => {
                         if let Some(out) = output.as_ref() {
-                            let _ = out.stream.pause();
+                            let _ = out.sink.pause();
                         }
                         paused_req = None;
                         shared.position.store(0, Ordering::Relaxed);
@@ -1237,6 +1356,29 @@ fn decode_thread(
                             *s = EngineState::Stopped;
                         }
                         let _ = event_tx.send(AudioEvent::Stopped);
+                        continue;
+                    }
+                    Ok(AudioCommand::RebuildOutput) => {
+                        if let Some(old_out) = output.take() {
+                            let _ = old_out.sink.pause();
+                        }
+                        match build_output_on_fresh_thread(&shared) {
+                            Ok(new_out) => {
+                                shared
+                                    .output_sample_rate
+                                    .store(new_out.sample_rate, Ordering::Relaxed);
+                                shared
+                                    .output_channels
+                                    .store(new_out.channels, Ordering::Relaxed);
+                                *shared.output_device_name.write() = new_out.device_name.clone();
+                                *shared.output_backend_name.write() = new_out.backend_name.clone();
+                                output = Some(new_out);
+                                let _ = event_tx.send(AudioEvent::PipelineChanged);
+                            }
+                            Err(e) => {
+                                log::warn!("Rebuilding output stream failed: {e}");
+                            }
+                        }
                         continue;
                     }
                     // A seek on a cued (restored at startup, never resumed)
@@ -1266,7 +1408,7 @@ fn decode_thread(
                 Ok(AudioCommand::Play(newer)) => req = newer,
                 Ok(AudioCommand::Stop(_)) => {
                     if let Some(out) = output.as_ref() {
-                        let _ = out.stream.pause();
+                        let _ = out.sink.pause();
                     }
                     paused_req = None;
                     shared.position.store(0, Ordering::Relaxed);
@@ -1335,9 +1477,9 @@ fn decode_thread(
         out.played_samples.store(start_samples, Ordering::Relaxed);
         shared.cancel_loudness_switch();
 
-        if let Err(e) = out.stream.play() {
+        if let Err(e) = out.sink.play() {
             let _ = event_tx.send(AudioEvent::Error {
-                message: format!("CPAL stream play failed: {e}"),
+                message: format!("Audio stream play failed: {e}"),
             });
             continue;
         }
@@ -1360,6 +1502,7 @@ fn decode_thread(
             target_sample_rate,
             target_channels,
             last_device_check: std::time::Instant::now(),
+            force_device_rebuild: false,
         };
 
         'decode: loop {
@@ -1419,132 +1562,139 @@ fn check_and_rebuild_output(
     event_tx: &mpsc::Sender<AudioEvent>,
 ) -> DeviceCheckOutcome {
     let now = std::time::Instant::now();
-    let check_due =
-        now.duration_since(session.last_device_check) >= std::time::Duration::from_millis(500);
+    let force_rebuild = std::mem::take(&mut session.force_device_rebuild);
     let stream_errored = output
         .as_ref()
         .map(|o| o.stream_error_flag.load(Ordering::Relaxed))
         .unwrap_or(false);
 
-    if stream_errored || check_due {
+    let output_cfg = shared.output_config.read().clone();
+    let is_tracking_default =
+        output_cfg.backend == AudioBackendKind::Cpal && output_cfg.device_id.is_none();
+
+    let check_due =
+        now.duration_since(session.last_device_check) >= std::time::Duration::from_millis(500);
+
+    let default_changed = if is_tracking_default && (check_due || stream_errored) {
         session.last_device_check = now;
         let current_dev_name = get_default_device_name();
         let old_dev_name = output.as_ref().and_then(|o| o.device_name.clone());
-        let device_changed = current_dev_name != old_dev_name;
+        current_dev_name != old_dev_name
+    } else {
+        if check_due {
+            session.last_device_check = now;
+        }
+        false
+    };
 
-        if stream_errored || device_changed {
-            log::info!(
-                "Audio output device change/error detected (old: {:?}, new: {:?}, errored: {}). Rebuilding audio stream...",
-                old_dev_name,
-                current_dev_name,
-                stream_errored
-            );
+    if force_rebuild || stream_errored || default_changed {
+        log::info!(
+            "Audio output rebuild triggered (forced: {force_rebuild}, errored: {stream_errored}, default_changed: {default_changed}). Rebuilding audio stream..."
+        );
 
-            let cur_pos = shared.position.load(Ordering::Relaxed);
-            // Position still belongs to the finished track while a transition
-            // is draining, so that's the song to park on a failed rebuild.
-            let track_if_lost = match session.transition.as_ref() {
-                Some(t) => t.finished.clone(),
-                None => session.current.spec.clone(),
-            };
-            if let Some(old_out) = output.as_ref() {
-                let _ = old_out.stream.pause();
-            }
-            *output = None;
+        let cur_pos = shared.position.load(Ordering::Relaxed);
+        // Position still belongs to the finished track while a transition
+        // is draining, so that's the song to park on a failed rebuild.
+        let track_if_lost = match session.transition.as_ref() {
+            Some(t) => t.finished.clone(),
+            None => session.current.spec.clone(),
+        };
+        if let Some(old_out) = output.as_ref() {
+            let _ = old_out.sink.pause();
+        }
+        *output = None;
 
-            match build_output_on_fresh_thread(shared) {
-                Ok(new_out) => {
-                    shared
-                        .output_sample_rate
-                        .store(new_out.sample_rate, Ordering::Relaxed);
-                    shared
-                        .output_channels
-                        .store(new_out.channels, Ordering::Relaxed);
-                    *shared.output_device_name.write() = new_out.device_name.clone();
-                    session.target_sample_rate = new_out.sample_rate;
-                    session.target_channels = new_out.channels;
+        match build_output_on_fresh_thread(shared) {
+            Ok(new_out) => {
+                shared
+                    .output_sample_rate
+                    .store(new_out.sample_rate, Ordering::Relaxed);
+                shared
+                    .output_channels
+                    .store(new_out.channels, Ordering::Relaxed);
+                *shared.output_device_name.write() = new_out.device_name.clone();
+                *shared.output_backend_name.write() = new_out.backend_name.clone();
+                session.target_sample_rate = new_out.sample_rate;
+                session.target_channels = new_out.channels;
 
-                    session.outgoing = None;
-                    shared.cancel_loudness_switch();
-                    if let Some(t) = session.transition.take() {
-                        // Mid-handover: `cur_pos` is still on the finished
-                        // track's timeline, so reopen that track there (as
-                        // SeekTo does) rather than seeking the new one to it.
-                        session.next = None;
-                        match ActiveTrack::open(
-                            &shared.open_source,
-                            t.finished,
-                            cur_pos,
-                            session.target_sample_rate,
-                            session.target_channels as usize,
-                        ) {
-                            Ok(t) => session.current = t,
-                            Err(message) => {
-                                let _ = event_tx.send(AudioEvent::Error { message });
-                                return DeviceCheckOutcome::BreakDecode;
-                            }
-                        }
-                    } else {
-                        let target_time = symphonia::core::units::Time::from_nanos(cur_pos as i64);
-                        let _ = session.current.format.seek(
-                            symphonia::core::formats::SeekMode::Accurate,
-                            symphonia::core::formats::SeekTo::Time {
-                                time: target_time,
-                                track_id: Some(session.current.track_id),
-                            },
-                        );
-                        session.current.decoder.reset();
-                        session.current.decoded_pos_ns = cur_pos;
-                        session.current.eof = false;
-                        session.current.resampler = Resampler::new(
-                            session.current.src_rate,
-                            session.target_sample_rate,
-                            session.target_channels as usize,
-                        );
-                    }
-
-                    if let Some(n) = session.next.as_mut() {
-                        n.resampler = Resampler::new(
-                            n.src_rate,
-                            session.target_sample_rate,
-                            session.target_channels as usize,
-                        );
-                    }
-
-                    {
-                        let mut consumer = new_out.consumer.lock();
-                        while consumer.try_pop().is_some() {}
-                    }
-                    let start_samples = samples_for_ns(
+                session.outgoing = None;
+                shared.cancel_loudness_switch();
+                if let Some(t) = session.transition.take() {
+                    // Mid-handover: `cur_pos` is still on the finished
+                    // track's timeline, so reopen that track there (as
+                    // SeekTo does) rather than seeking the new one to it.
+                    session.next = None;
+                    match ActiveTrack::open(
+                        &shared.open_source,
+                        t.finished,
                         cur_pos,
                         session.target_sample_rate,
-                        session.target_channels,
-                    );
-                    new_out
-                        .played_samples
-                        .store(start_samples, Ordering::Relaxed);
-                    session.pushed_samples = start_samples;
-
-                    if let Err(e) = new_out.stream.play() {
-                        let _ = event_tx.send(AudioEvent::Error {
-                            message: format!("CPAL stream play failed: {e}"),
-                        });
+                        session.target_channels as usize,
+                    ) {
+                        Ok(t) => session.current = t,
+                        Err(message) => {
+                            let _ = event_tx.send(AudioEvent::Error { message });
+                            return DeviceCheckOutcome::BreakDecode;
+                        }
                     }
-                    *output = Some(new_out);
-                    let _ = event_tx.send(AudioEvent::PipelineChanged);
-                }
-                Err(message) => {
-                    return DeviceCheckOutcome::OutputLost(
-                        PlayRequest {
-                            track: track_if_lost,
-                            start_nanosec: cur_pos,
+                } else {
+                    let target_time = symphonia::core::units::Time::from_nanos(cur_pos as i64);
+                    let _ = session.current.format.seek(
+                        symphonia::core::formats::SeekMode::Accurate,
+                        symphonia::core::formats::SeekTo::Time {
+                            time: target_time,
+                            track_id: Some(session.current.track_id),
                         },
-                        message,
+                    );
+                    session.current.decoder.reset();
+                    session.current.decoded_pos_ns = cur_pos;
+                    session.current.eof = false;
+                    session.current.resampler = Resampler::new(
+                        session.current.src_rate,
+                        session.target_sample_rate,
+                        session.target_channels as usize,
                     );
                 }
+
+                if let Some(n) = session.next.as_mut() {
+                    n.resampler = Resampler::new(
+                        n.src_rate,
+                        session.target_sample_rate,
+                        session.target_channels as usize,
+                    );
+                }
+
+                {
+                    let mut consumer = new_out.consumer.lock();
+                    while consumer.try_pop().is_some() {}
+                }
+                let start_samples =
+                    samples_for_ns(cur_pos, session.target_sample_rate, session.target_channels);
+                new_out
+                    .played_samples
+                    .store(start_samples, Ordering::Relaxed);
+                session.pushed_samples = start_samples;
+
+                if let Err(e) = new_out.sink.play() {
+                    let _ = event_tx.send(AudioEvent::Error {
+                        message: format!("Audio sink play failed: {e}"),
+                    });
+                }
+                *output = Some(new_out);
+                let _ = event_tx.send(AudioEvent::PipelineChanged);
+            }
+            Err(message) => {
+                return DeviceCheckOutcome::OutputLost(
+                    PlayRequest {
+                        track: track_if_lost,
+                        start_nanosec: cur_pos,
+                    },
+                    message,
+                );
             }
         }
     }
+
     DeviceCheckOutcome::Ok
 }
 
@@ -1585,7 +1735,7 @@ fn handle_decode_command(
     match cmd {
         Ok(AudioCommand::Pause(dur_ms)) => {
             fade_out_then(fade_gain, dur_ms, || {
-                let _ = out.stream.pause();
+                let _ = out.sink.pause();
             });
             {
                 let mut s = play_state.lock();
@@ -1604,7 +1754,7 @@ fn handle_decode_command(
         }
         Ok(AudioCommand::Stop(dur_ms)) => {
             fade_out_then(fade_gain, dur_ms, || {
-                let _ = out.stream.pause();
+                let _ = out.sink.pause();
             });
             {
                 let mut s = play_state.lock();
@@ -1740,6 +1890,10 @@ fn handle_decode_command(
         Err(mpsc::TryRecvError::Disconnected) => CmdOutcome::BreakDecode,
         Ok(AudioCommand::Resume(_)) => CmdOutcome::Continue, // already playing
         Ok(AudioCommand::Cue(_)) => CmdOutcome::Continue,    // already playing
+        Ok(AudioCommand::RebuildOutput) => {
+            session.force_device_rebuild = true;
+            CmdOutcome::Continue
+        }
     }
 }
 
@@ -1843,7 +1997,7 @@ fn handle_eof(
         let _ = event_tx.send(AudioEvent::TrackFinished {
             track_id: session.current.spec.id,
         });
-        let _ = out.stream.pause();
+        let _ = out.sink.pause();
         {
             let mut s = play_state.lock();
             *s = EngineState::Stopped;
@@ -2237,6 +2391,8 @@ mod tests {
             output_sample_rate: AtomicU32::new(44100),
             output_channels: std::sync::atomic::AtomicU16::new(2),
             output_device_name: parking_lot::RwLock::new(None),
+            output_backend_name: parking_lot::RwLock::new("Test".to_string()),
+            output_config: parking_lot::RwLock::new(crate::sink::AudioOutputConfig::default()),
             equalizer: Mutex::new(luminous_equalizer::Equalizer::new()),
             loudness_gain: AtomicU32::new(1.0f32.to_bits()),
             loudness_generation: AtomicU64::new(0),

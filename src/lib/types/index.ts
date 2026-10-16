@@ -268,6 +268,20 @@ export interface AudioPipelineInfo {
   output_backend: string;
 }
 
+export type AudioBackendKind = "cpal" | "asio";
+
+export interface AudioDeviceInfo {
+  id: string;
+  name: string;
+  backend: AudioBackendKind;
+  is_default: boolean;
+}
+
+export interface AudioOutputConfig {
+  backend: AudioBackendKind;
+  device_id?: string | null;
+}
+
 export interface PlaybackState {
   state: PlayState;
   current_song?: Song;
