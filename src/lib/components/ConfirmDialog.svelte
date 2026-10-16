@@ -13,6 +13,7 @@
     onCancel,
   }: {
     title: string;
+    /** Explanatory message. Newlines (`\n`) are preserved via `whitespace-pre-line` to format lists and bullet points. */
     message: string;
     confirmLabel: string;
     cancelLabel: string;
