@@ -17,9 +17,11 @@ use crate::collection::SelfWriteTracker;
 use crate::db::Database;
 use anyhow::{Context, Result};
 use lofty::{file::TaggedFileExt, picture::PictureType, probe::Probe};
+use parking_lot::{Condvar, Mutex};
 use rusqlite::{params, OptionalExtension};
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 /// Position in the Standardized Artwork Hierarchy (#98). Declaration order is
 /// significant: `derive(PartialOrd, Ord)` sorts variants in this order, which
@@ -480,9 +482,82 @@ fn serve_sized_copy(
     serve_cached_downscale(covers_dir, source, &format!("w{max_edge}|"), max_edge)
 }
 
+static THUMB_INFLIGHT: LazyLock<Mutex<HashSet<String>>> =
+    LazyLock::new(|| Mutex::new(HashSet::new()));
+static THUMB_CONDVAR: LazyLock<Condvar> = LazyLock::new(Condvar::new);
+
+struct ThumbGuard(String);
+impl Drop for ThumbGuard {
+    fn drop(&mut self) {
+        THUMB_INFLIGHT.lock().remove(&self.0);
+        THUMB_CONDVAR.notify_all();
+    }
+}
+
+fn find_cached_thumb(thumbs_dir: &Path, key: &str) -> Option<(Vec<u8>, &'static str)> {
+    for ext in ["jpg", "png"] {
+        let cached = thumbs_dir.join(format!("{key}.{ext}"));
+        if let Ok(data) = std::fs::read(&cached) {
+            let ext_str = if ext == "png" { "png" } else { "jpg" };
+            return Some((data, ext_str));
+        }
+    }
+    None
+}
+
+fn write_thumb_file(thumbs_dir: &Path, key: &str, ext: &str, data: &[u8]) {
+    let target = thumbs_dir.join(format!("{key}.{ext}"));
+    if target.exists() {
+        return;
+    }
+    let _ = std::fs::create_dir_all(thumbs_dir);
+    let tmp = thumbs_dir.join(format!("{key}.tmp"));
+    if std::fs::write(&tmp, data).is_ok() && std::fs::rename(&tmp, &target).is_err() {
+        let _ = std::fs::remove_file(&tmp);
+    }
+}
+
+/// Pre-generates the standard card-sized thumbnails (384 px and 256 px) from
+/// an intermediate image (at most 600 px) in a single pass (#1648).
+/// Returns the encoded bytes for `max_edge` if it matches 256 or 384.
+fn generate_card_tiers(
+    thumbs_dir: &Path,
+    img_intermediate: &image::DynamicImage,
+    format: image::ImageFormat,
+    ext: &str,
+    w256_key: &str,
+    w384_key: &str,
+    max_edge: u32,
+) -> Option<Vec<u8>> {
+    let img_384 = img_intermediate.resize(384, 384, image::imageops::FilterType::Triangle);
+    let bytes_384 = encode_image(&img_384, format);
+    if let Some(ref b) = bytes_384 {
+        write_thumb_file(thumbs_dir, w384_key, ext, b);
+    }
+
+    let img_256 = img_384.resize(256, 256, image::imageops::FilterType::Triangle);
+    let bytes_256 = encode_image(&img_256, format);
+    if let Some(ref b) = bytes_256 {
+        write_thumb_file(thumbs_dir, w256_key, ext, b);
+    }
+
+    if max_edge == 256 {
+        bytes_256
+    } else if max_edge == 384 {
+        bytes_384
+    } else {
+        None
+    }
+}
+
 /// Serve `source` downscaled to fit `max_edge`, from `covers_dir/thumbs/`
 /// when it was made before. Keyed on `tag` + path + mtime + size, so an
 /// edited file is redone; folder-art thumbnails use an empty `tag`.
+///
+/// If a canonical 600 px thumbnail is already cached, card-sized copies are
+/// derived directly from it rather than re-reading the original source file (#1648).
+/// On cold requests, canonical (600 px) and card-sized (256/384 px) copies are
+/// generated in a single decode pass.
 fn serve_cached_downscale(
     covers_dir: &Path,
     source: &Path,
@@ -501,6 +576,12 @@ fn serve_cached_downscale(
         .and_then(|m| m.duration_since(std::time::UNIX_EPOCH).ok())
         .map(|d| d.as_nanos())
         .unwrap_or(0);
+    let base_key = fnv1a_hex(&format!(
+        "{}|{}|{}",
+        source.to_string_lossy(),
+        mtime,
+        meta.len()
+    ));
     let key = fnv1a_hex(&format!(
         "{tag}{}|{}|{}",
         source.to_string_lossy(),
@@ -508,26 +589,162 @@ fn serve_cached_downscale(
         meta.len()
     ));
     let thumbs_dir = covers_dir.join("thumbs");
-    for ext in ["jpg", "png"] {
-        let cached = thumbs_dir.join(format!("{key}.{ext}"));
-        if let Ok(data) = std::fs::read(&cached) {
-            return image_response(&data);
+
+    // Fast path: if already cached on disk, return immediately.
+    if let Some((data, _ext)) = find_cached_thumb(&thumbs_dir, &key) {
+        return image_response(&data);
+    }
+
+    // Coalesce concurrent requests for the same source thumbnail: thread contention
+    // during fast grid scrolls waits on `base_key` rather than decoding redundantly.
+    let _guard = {
+        let mut inflight = THUMB_INFLIGHT.lock();
+        loop {
+            if let Some((data, _ext)) = find_cached_thumb(&thumbs_dir, &key) {
+                return image_response(&data);
+            }
+            if !inflight.contains(&base_key) {
+                inflight.insert(base_key.clone());
+                break ThumbGuard(base_key.clone());
+            }
+            THUMB_CONDVAR.wait(&mut inflight);
+        }
+    };
+
+    let w256_key = fnv1a_hex(&format!(
+        "w256|{}|{}|{}",
+        source.to_string_lossy(),
+        mtime,
+        meta.len()
+    ));
+    let w384_key = fnv1a_hex(&format!(
+        "w384|{}|{}|{}",
+        source.to_string_lossy(),
+        mtime,
+        meta.len()
+    ));
+
+    let is_inside_covers_dir = source.starts_with(covers_dir);
+
+    // If source is external folder art, check if the 600 px canonical thumbnail is already cached.
+    // If so, derive card-sized thumbnails directly from it without re-reading the original (#1648).
+    if !is_inside_covers_dir {
+        if let Some((data_600, ext_600)) = find_cached_thumb(&thumbs_dir, &base_key) {
+            if let Ok(img_600) = image::load_from_memory(&data_600) {
+                let format = if img_600.color().has_alpha() {
+                    image::ImageFormat::Png
+                } else {
+                    image::ImageFormat::Jpeg
+                };
+                if img_600.width() <= max_edge && img_600.height() <= max_edge {
+                    write_thumb_file(&thumbs_dir, &key, ext_600, &data_600);
+                    return image_response(&data_600);
+                }
+                if let Some(bytes) = generate_card_tiers(
+                    &thumbs_dir,
+                    &img_600,
+                    format,
+                    ext_600,
+                    &w256_key,
+                    &w384_key,
+                    max_edge,
+                ) {
+                    return image_response(&bytes);
+                }
+                let img_target =
+                    img_600.resize(max_edge, max_edge, image::imageops::FilterType::Triangle);
+                if let Some(target_bytes) = encode_image(&img_target, format) {
+                    write_thumb_file(&thumbs_dir, &key, ext_600, &target_bytes);
+                    return image_response(&target_bytes);
+                }
+            }
         }
     }
 
     let Ok(data) = std::fs::read(source) else {
         return empty_response(500);
     };
-    let (thumb, ext) = downscale_to_fit(&data, max_edge);
-    if std::fs::create_dir_all(&thumbs_dir).is_ok() {
-        let tmp = thumbs_dir.join(format!("{key}.tmp"));
-        if std::fs::write(&tmp, &thumb).is_ok()
-            && std::fs::rename(&tmp, thumbs_dir.join(format!("{key}.{ext}"))).is_err()
-        {
-            let _ = std::fs::remove_file(&tmp);
+    let (cleaned, _mime, _source_ext) = detect_image_format_and_clean(&data);
+    let Ok(img) = image::load_from_memory(cleaned) else {
+        return image_response(cleaned);
+    };
+
+    let format = if img.color().has_alpha() {
+        image::ImageFormat::Png
+    } else {
+        image::ImageFormat::Jpeg
+    };
+    let ext = cache_ext_for(format);
+
+    if !is_inside_covers_dir {
+        // Cold folder art: generate 600 px canonical thumbnail and card-sized copies in one pass.
+        if img.width() <= CACHE_MAX_EDGE && img.height() <= CACHE_MAX_EDGE {
+            write_thumb_file(&thumbs_dir, &base_key, ext, cleaned);
+            if img.width() <= max_edge && img.height() <= max_edge {
+                write_thumb_file(&thumbs_dir, &key, ext, cleaned);
+                return image_response(cleaned);
+            }
+            let img_target = img.resize(max_edge, max_edge, image::imageops::FilterType::Triangle);
+            let target_bytes =
+                encode_image(&img_target, format).unwrap_or_else(|| cleaned.to_vec());
+            write_thumb_file(&thumbs_dir, &key, ext, &target_bytes);
+            return image_response(&target_bytes);
         }
+
+        let img_600 = img.resize(
+            CACHE_MAX_EDGE,
+            CACHE_MAX_EDGE,
+            image::imageops::FilterType::Triangle,
+        );
+        let bytes_600 = encode_image(&img_600, format);
+        if let Some(ref b) = bytes_600 {
+            write_thumb_file(&thumbs_dir, &base_key, ext, b);
+        }
+
+        if tag.is_empty() {
+            return image_response(bytes_600.as_deref().unwrap_or(cleaned));
+        }
+
+        if let Some(bytes) = generate_card_tiers(
+            &thumbs_dir,
+            &img_600,
+            format,
+            ext,
+            &w256_key,
+            &w384_key,
+            max_edge,
+        ) {
+            return image_response(&bytes);
+        }
+
+        let img_target = img_600.resize(max_edge, max_edge, image::imageops::FilterType::Triangle);
+        let target_bytes = encode_image(&img_target, format).unwrap_or_else(|| cleaned.to_vec());
+        write_thumb_file(&thumbs_dir, &key, ext, &target_bytes);
+        return image_response(&target_bytes);
     }
-    image_response(&thumb)
+
+    // Source is inside covers_dir (already at most 600 px)
+    if img.width() <= max_edge && img.height() <= max_edge {
+        write_thumb_file(&thumbs_dir, &key, ext, cleaned);
+        return image_response(cleaned);
+    }
+
+    if let Some(bytes) = generate_card_tiers(
+        &thumbs_dir,
+        &img,
+        format,
+        ext,
+        &w256_key,
+        &w384_key,
+        max_edge,
+    ) {
+        return image_response(&bytes);
+    }
+
+    let img_target = img.resize(max_edge, max_edge, image::imageops::FilterType::Triangle);
+    let target_bytes = encode_image(&img_target, format).unwrap_or_else(|| cleaned.to_vec());
+    write_thumb_file(&thumbs_dir, &key, ext, &target_bytes);
+    image_response(&target_bytes)
 }
 
 /// Total size of the regular files directly inside `dir`; zero if it's missing.
@@ -747,16 +964,20 @@ fn encode_downscaled(
     format: image::ImageFormat,
     max_edge: u32,
 ) -> Option<Vec<u8>> {
-    let resized = img.resize(max_edge, max_edge, image::imageops::FilterType::CatmullRom);
+    let resized = img.resize(max_edge, max_edge, image::imageops::FilterType::Triangle);
+    encode_image(&resized, format)
+}
+
+/// Encode an already-resized `img` as `format` — JPEG at `CACHE_JPEG_QUALITY`, or PNG.
+fn encode_image(img: &image::DynamicImage, format: image::ImageFormat) -> Option<Vec<u8>> {
     let mut out = Vec::new();
     if format == image::ImageFormat::Png {
-        resized
-            .write_to(&mut std::io::Cursor::new(&mut out), image::ImageFormat::Png)
+        img.write_to(&mut std::io::Cursor::new(&mut out), image::ImageFormat::Png)
             .ok()?;
     } else {
         let encoder =
             image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, CACHE_JPEG_QUALITY);
-        resized.to_rgb8().write_with_encoder(encoder).ok()?;
+        img.to_rgb8().write_with_encoder(encoder).ok()?;
     }
     Some(out)
 }
@@ -2431,10 +2652,29 @@ mod tests {
                 .unwrap()
                 .count()
         };
-        assert_eq!(thumbs(), 3);
+        // Multi-tier pre-generation created 2 copies for album-1 (256, 384)
+        // and 3 copies for folder art (600, 384, 256).
+        assert_eq!(thumbs(), 5);
         // Served from the cache the second time.
         served_size(&covers_dir, "luminous-art://album-1.jpg?w=256");
-        assert_eq!(thumbs(), 3);
+        assert_eq!(thumbs(), 5);
+
+        // Subsequent requests for the folder art (w=256 and canonical 600) hit the pre-generated cache.
+        assert_eq!(
+            served_size(
+                &covers_dir,
+                &format!("luminous-art://localhost/thumb/{encoded}?w=256")
+            ),
+            (256, 171)
+        );
+        assert_eq!(
+            served_size(
+                &covers_dir,
+                &format!("luminous-art://localhost/thumb/{encoded}")
+            ),
+            (600, 400)
+        );
+        assert_eq!(thumbs(), 5);
 
         // Out-of-range widths fall back to the regular copy.
         assert_eq!(
@@ -2445,7 +2685,43 @@ mod tests {
             served_size(&covers_dir, "luminous-art://album-1.jpg?w=600"),
             (600, 600)
         );
-        assert_eq!(thumbs(), 3);
+        assert_eq!(thumbs(), 5);
+    }
+
+    #[test]
+    fn test_serve_art_request_derives_card_size_from_existing_canonical_thumbnail() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let covers_dir = temp_dir.path().join("covers");
+        std::fs::create_dir_all(&covers_dir).unwrap();
+        let art = temp_dir.path().join("folder.jpg");
+        std::fs::write(&art, jpeg_bytes(1200, 800)).unwrap();
+        let encoded = percent_encoding::utf8_percent_encode(
+            &art.to_string_lossy(),
+            percent_encoding::NON_ALPHANUMERIC,
+        )
+        .to_string();
+
+        // 1. Request canonical 600 px thumbnail first
+        assert_eq!(
+            served_size(
+                &covers_dir,
+                &format!("luminous-art://localhost/thumb/{encoded}")
+            ),
+            (600, 400)
+        );
+
+        // 2. Lock the original file exclusively on Windows so it cannot be read
+        #[cfg(windows)]
+        let _exclusive_lock = std::fs::OpenOptions::new().write(true).open(&art).unwrap();
+
+        // 3. Requesting a card-sized copy (w=256) succeeds by deriving from the 600 px cache copy (#1648)
+        assert_eq!(
+            served_size(
+                &covers_dir,
+                &format!("luminous-art://localhost/thumb/{encoded}?w=256")
+            ),
+            (256, 171)
+        );
     }
 
     #[test]
