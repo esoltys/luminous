@@ -78,4 +78,42 @@ describe("ToastStore", () => {
 
     expect(toastStore.messages).toHaveLength(1);
   });
+
+  it("startTask strips trailing dots/ellipsis from label and reactivates existing tasks without duplicate toasts", () => {
+    const id = toastStore.startTask({
+      taskId: "watcher-batch",
+      text: "Processing songs (0/1)...",
+      total: 1,
+    });
+
+    expect(toastStore.messages).toHaveLength(1);
+    expect(toastStore.messages[0].task?.taskName).toBe("Processing songs");
+    expect(toastStore.messages[0].task?.status).toBe("running");
+
+    // Complete the task with 2000ms duration
+    toastStore.completeTask("watcher-batch", "1 song updated", 2000);
+    expect(toastStore.messages[0].task?.status).toBe("done");
+
+    // Advance 1000ms
+    vi.advanceTimersByTime(1000);
+    expect(toastStore.messages).toHaveLength(1);
+
+    // Restart the task for next batch
+    const reactivatedId = toastStore.startTask({
+      taskId: "watcher-batch",
+      text: "Processing songs (0/2)...",
+      total: 2,
+    });
+
+    expect(reactivatedId).toBe(id);
+    expect(toastStore.messages).toHaveLength(1);
+    expect(toastStore.messages[0].task?.status).toBe("running");
+    expect(toastStore.messages[0].task?.taskName).toBe("Processing songs");
+    expect(toastStore.messages[0].text).toBe("Processing songs (0/2)...");
+
+    // Advance 1500ms — dismiss timer was cleared so toast remains visible
+    vi.advanceTimersByTime(1500);
+    expect(toastStore.messages).toHaveLength(1);
+    expect(toastStore.messages[0].task?.status).toBe("running");
+  });
 });

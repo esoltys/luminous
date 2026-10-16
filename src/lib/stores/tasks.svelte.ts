@@ -36,6 +36,15 @@ interface UpdateTaskOptions {
 
 const DEFAULT_AGE_OUT_MS = 8000;
 
+/**
+ * Strips parenthetical progress counters (e.g. `(3/10)` or `(5 items)`) and trailing
+ * ellipsis or punctuation from a task label to produce a clean task name for completion
+ * badges and headers.
+ */
+function extractTaskName(label: string): string {
+  return label.replace(/\s*\([^)]*\)\s*(\.{3}|…|\.)?\s*$/, "").trim() || label;
+}
+
 class TasksStore {
   tasks = $state<TrackedTask[]>([]);
   private ageOutTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -82,7 +91,7 @@ class TasksStore {
     } else {
       this.tasks.push(task);
     }
-    const taskName = options.taskName || options.label.replace(/\s*\([^)]*\)\s*$/, "").trim() || options.label;
+    const taskName = options.taskName || extractTaskName(options.label);
     toastStore.startTask({
       taskId: id,
       text: options.label,
@@ -124,7 +133,7 @@ class TasksStore {
     }
   }
 
-  completeTask(id: string, label?: string) {
+  completeTask(id: string, label?: string, ageOutMs?: number) {
     const task = this.tasks.find((t) => t.id === id);
     if (!task) return;
     if (label && label !== "Done") task.label = label;
@@ -132,8 +141,8 @@ class TasksStore {
     task.progress = 1;
     if (task.total !== undefined) task.current = task.total;
     task.finishedAt = Date.now();
-    toastStore.completeTask(id, label);
-    this.scheduleAgeOut(id);
+    toastStore.completeTask(id, label, ageOutMs);
+    this.scheduleAgeOut(id, ageOutMs);
   }
 
   failTask(id: string, error?: string) {

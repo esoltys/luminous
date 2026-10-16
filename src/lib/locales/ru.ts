@@ -2190,7 +2190,8 @@ export const ru = {
     scanPhaseReadingTags: "чтение тегов",
     scanPhaseCheckingMissing: "проверка отсутствующих композиций",
     scanPhaseResolvingArtwork: "поиск обложек",
-    scanPhaseUpdating: "обновление библиотеки"
+    scanPhaseUpdating: "обновление библиотеки",
+    processingSongs: "Обработка песен"
   },
   audioPipeline: {
     channelsStereo: "Стерео (2 кан.)",

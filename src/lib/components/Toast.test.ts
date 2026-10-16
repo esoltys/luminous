@@ -128,7 +128,7 @@ describe("Toast.svelte", () => {
     expect(toastStore.messages.find((m) => m.id === id)).toBeDefined();
   });
 
-  it("renders a task progress notification, updates in place, and completes with line-through on task name", async () => {
+  it("renders a task progress notification, updates in place, and completes without line-through on task name", async () => {
     toastStore.startTask({
       taskId: "album-save",
       taskName: "Saving tags for Nevermind",
@@ -156,7 +156,7 @@ describe("Toast.svelte", () => {
     await tick();
     const completedLabel = screen.getByText("Saving tags for Nevermind");
     expect(completedLabel).toBeInTheDocument();
-    expect(completedLabel.className).toContain("line-through");
+    expect(completedLabel.className).not.toContain("line-through");
     expect(screen.queryByText("Done")).not.toBeInTheDocument();
     expect(screen.queryByText("10 / 15")).not.toBeInTheDocument();
   });

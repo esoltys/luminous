@@ -55,9 +55,10 @@ class ToastStore {
         ? options.current / options.total
         : undefined;
 
-    const taskName = options.taskName || existing?.task?.taskName || options.text.replace(/\s*\([^)]*\)\s*$/, "").trim() || options.text;
+    const taskName = options.taskName || existing?.task?.taskName || options.text.replace(/\s*\([^)]*\)\s*(\.{3}|…|\.)?\s*$/, "").trim() || options.text;
 
     if (existing) {
+      this.scheduleDismiss(existing.id);
       existing.text = options.text;
       existing.variant = "task";
       existing.task = {

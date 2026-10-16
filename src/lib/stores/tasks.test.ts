@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { tasksStore } from "./tasks.svelte";
+import { toastStore } from "./toast.svelte";
 
 describe("TasksStore", () => {
   beforeEach(() => {
@@ -85,5 +86,67 @@ describe("TasksStore", () => {
 
     tasksStore.updateTask(id, { contextName: "Fast SSD" });
     expect(tasksStore.tasks[0].contextName).toBe("Fast SSD");
+  });
+
+  it("strips parenthetical counts followed by trailing dots or ellipsis when extracting taskName", () => {
+    const id1 = tasksStore.startTask({ label: "Processing songs (0/1)..." });
+    const id2 = tasksStore.startTask({ label: "Обработка песен (0/2)…" });
+    const id3 = tasksStore.startTask({ label: "Titel werden verarbeitet (1/5) ..." });
+    const id4 = tasksStore.startTask({ label: "Explicit task name (0/1)...", taskName: "Explicit" });
+
+    // Toast messages verify the extracted taskName passed through
+    const msg1 = toastStore.messages.find((m: any) => m.task?.taskId === id1);
+    const msg2 = toastStore.messages.find((m: any) => m.task?.taskId === id2);
+    const msg3 = toastStore.messages.find((m: any) => m.task?.taskId === id3);
+    const msg4 = toastStore.messages.find((m: any) => m.task?.taskId === id4);
+
+    expect(msg1?.task?.taskName).toBe("Processing songs");
+    expect(msg2?.task?.taskName).toBe("Обработка песен");
+    expect(msg3?.task?.taskName).toBe("Titel werden verarbeitet");
+    expect(msg4?.task?.taskName).toBe("Explicit");
+  });
+
+  it("coalesces successive task starts under the same id and resets ageOut timer", () => {
+    const taskId = "watcher-batch";
+    tasksStore.startTask({ id: taskId, label: "Processing songs (0/1)...", total: 1 });
+    expect(tasksStore.tasks.length).toBe(1);
+    expect(tasksStore.tasks[0].status).toBe("running");
+
+    tasksStore.completeTask(taskId, "1 song updated", 2000);
+    expect(tasksStore.tasks[0].status).toBe("done");
+
+    // Advance 1000ms (within age-out window)
+    vi.advanceTimersByTime(1000);
+    expect(tasksStore.tasks.length).toBe(1);
+
+    // Subsequent batch arrives while previous completed task is aging out
+    tasksStore.startTask({ id: taskId, label: "Processing songs (0/2)...", total: 2 });
+    expect(tasksStore.tasks.length).toBe(1);
+    expect(tasksStore.tasks[0].status).toBe("running");
+    expect(tasksStore.tasks[0].total).toBe(2);
+
+    // Advance 1500ms (original 2000ms would have passed, but age-out was cancelled)
+    vi.advanceTimersByTime(1500);
+    expect(tasksStore.tasks.length).toBe(1);
+    expect(tasksStore.tasks[0].status).toBe("running");
+
+    // Complete the second batch
+    tasksStore.completeTask(taskId, "2 songs updated", 2000);
+    expect(tasksStore.tasks[0].status).toBe("done");
+
+    // Advance 2000ms to allow age-out
+    vi.advanceTimersByTime(2000);
+    expect(tasksStore.tasks.length).toBe(0);
+  });
+
+  it("supports custom ageOutMs on completeTask", () => {
+    const id = tasksStore.startTask({ label: "Micro batch", total: 1 });
+    tasksStore.completeTask(id, "Done", 2000);
+
+    vi.advanceTimersByTime(1999);
+    expect(tasksStore.tasks.length).toBe(1);
+
+    vi.advanceTimersByTime(2);
+    expect(tasksStore.tasks.length).toBe(0);
   });
 });

@@ -507,22 +507,25 @@ class CollectionStore {
         });
       });
 
-      // Track file-watcher batches (#233, #1087) in tasksStore so they stay visible
-      // in the persistent task tracker rather than cluttering toast banners.
+      // Track file-watcher batches (#233, #1087, #1746) in tasksStore so they stay visible
+      // in the persistent task tracker. Reuses a single task ID so rapid sequential writes
+      // (e.g. Picard saving an album one file at a time) coalesce into one notification row
+      // rather than cascading into a stack of separate toasts.
+      const WATCHER_TASK_ID = "watcher-batch";
+
       await listen<BatchProgress>("batch-processing-started", (event) => {
-        const { batch_id, total_count } = event.payload;
-        const taskId = `watcher-batch-${batch_id}`;
+        const { total_count } = event.payload;
         tasksStore.startTask({
-          id: taskId,
+          id: WATCHER_TASK_ID,
           label: i18n.t("settings.batchProcessingToast", { current: 0, total: total_count }),
+          taskName: i18n.t("tasks.processingSongs", {}, "Processing songs"),
           total: total_count,
         });
       });
 
       await listen<BatchProgress>("batch-processing-progress", (event) => {
-        const { batch_id, current_count, total_count } = event.payload;
-        const taskId = `watcher-batch-${batch_id}`;
-        tasksStore.updateTask(taskId, {
+        const { current_count, total_count } = event.payload;
+        tasksStore.updateTask(WATCHER_TASK_ID, {
           label: i18n.t("settings.batchProcessingToast", { current: current_count, total: total_count }),
           current: current_count,
           total: total_count,
@@ -530,10 +533,13 @@ class CollectionStore {
       });
 
       await listen<BatchProgress>("batch-processing-completed", (event) => {
-        const { batch_id, total_count } = event.payload;
-        const taskId = `watcher-batch-${batch_id}`;
+        const { total_count } = event.payload;
         const text = i18n.plural("settings.batchProcessingDoneToast", total_count);
-        tasksStore.completeTask(taskId, text);
+        // Micro-batches (1-2 songs, typical of single tag edits or Picard saving
+        // tracks individually) age out quickly (2s) so the notification doesn't linger
+        // across unrelated work; larger batches retain the standard 8s duration.
+        const ageOutMs = total_count <= 2 ? 2000 : undefined;
+        tasksStore.completeTask(WATCHER_TASK_ID, text, ageOutMs);
       });
 
       // Track WebDAV synchronization (#682, #1083, #1087)
