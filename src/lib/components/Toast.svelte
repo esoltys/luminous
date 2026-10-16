@@ -167,7 +167,6 @@
           <div class="flex items-center justify-between gap-3">
             <span
               class="text-pretty transition-all duration-200"
-              class:line-through={toast.task.status === "done"}
               class:text-brand-text-secondary={toast.task.status === "done"}
             >
               {toast.task.status === "done" ? (toast.task.taskName || toast.text) : toast.text}
