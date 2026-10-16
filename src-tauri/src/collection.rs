@@ -1616,6 +1616,17 @@ fn read_native_vorbis_comments(
     path: &Path,
     file_type: lofty::file::FileType,
 ) -> Option<lofty::ogg::tag::VorbisComments> {
+    // Only Vorbis-based containers store VorbisComments; avoid disk I/O for all others.
+    if !matches!(
+        file_type,
+        lofty::file::FileType::Flac
+            | lofty::file::FileType::Opus
+            | lofty::file::FileType::Vorbis
+            | lofty::file::FileType::Speex
+    ) {
+        return None;
+    }
+
     let file = std::fs::File::open(path).ok()?;
     let mut reader = std::io::BufReader::new(file);
     let parse_options = lofty::config::ParseOptions::new()
@@ -1668,7 +1679,6 @@ pub(crate) fn read_embedded_lyrics(
     file_type: lofty::file::FileType,
     candidate_tags: &[&Tag],
 ) -> Option<String> {
-    let mut synced_candidate: Option<String> = None;
     let mut unsynced_candidate: Option<String> = None;
 
     // 1. Channel 1: Native Vorbis comments for Vorbis-based containers.
@@ -1676,18 +1686,17 @@ pub(crate) fn read_embedded_lyrics(
     // `SYNCEDLYRICS`) as unmapped remainder and drops them from generic `Tag.items`.
     // We read native comments directly to recover them.
     if let Some(vorbis_comments) = read_native_vorbis_comments(path, file_type) {
-        // Check standard synchronized keys: SYNCEDLYRICS, SYNCED LYRICS, SYNCED_LYRICS
+        // Dedicated synchronized lyrics tags always win as Tier 1.
         for key in ["SYNCEDLYRICS", "SYNCED LYRICS", "SYNCED_LYRICS"] {
             if let Some(val) = vorbis_comments.get(key) {
                 let trimmed = val.trim();
                 if !trimmed.is_empty() {
-                    synced_candidate = Some(trimmed.to_string());
-                    break;
+                    return Some(trimmed.to_string());
                 }
             }
         }
 
-        // Check general Vorbis lyrics keys: LYRICS, UNSYNCEDLYRICS, etc.
+        // General Vorbis lyrics keys: if timestamped, return immediately; otherwise hold as fallback.
         for key in [
             "LYRICS",
             "UNSYNCEDLYRICS",
@@ -1698,9 +1707,7 @@ pub(crate) fn read_embedded_lyrics(
                 let trimmed = val.trim();
                 if !trimmed.is_empty() {
                     if crate::lyrics::is_synced_lrc(trimmed) {
-                        if synced_candidate.is_none() {
-                            synced_candidate = Some(trimmed.to_string());
-                        }
+                        return Some(trimmed.to_string());
                     } else if unsynced_candidate.is_none() {
                         unsynced_candidate = Some(trimmed.to_string());
                     }
@@ -1720,9 +1727,7 @@ pub(crate) fn read_embedded_lyrics(
                     continue;
                 }
                 if crate::lyrics::is_synced_lrc(trimmed) {
-                    if synced_candidate.is_none() {
-                        synced_candidate = Some(trimmed.to_string());
-                    }
+                    return Some(trimmed.to_string());
                 } else if unsynced_candidate.is_none() {
                     unsynced_candidate = Some(trimmed.to_string());
                 }
@@ -1730,8 +1735,8 @@ pub(crate) fn read_embedded_lyrics(
         }
     }
 
-    // Precedence: Tier 1 (Synchronized) beats Tier 2 (Unsynchronized).
-    synced_candidate.or(unsynced_candidate)
+    // Fall back to Tier 2 unsynchronized plain text lyrics if no Tier 1 synced lyrics were found.
+    unsynced_candidate
 }
 
 pub(crate) fn read_tags(path: &Path) -> Result<Song> {
