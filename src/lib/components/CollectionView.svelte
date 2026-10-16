@@ -114,9 +114,14 @@
     return map;
   });
 
+  const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+
   let artistSongsIndex = $derived.by(() => {
+    if (navigationStore.activeSubTab !== "artists") return new Map<string, Song[]>();
     const map = new Map<string, Song[]>();
     for (const s of collectionStore.songs) {
+      const artKey = s.art_manual || s.art_automatic || s.art_embedded;
+      if (!artKey) continue;
       const keys = new Set<string>();
       if (s.album_artist) keys.add(s.album_artist.trim().toLowerCase());
       if (s.artist) keys.add(s.artist.trim().toLowerCase());
@@ -126,7 +131,9 @@
           list = [];
           map.set(key, list);
         }
-        list.push(s);
+        if (list.length < 6) {
+          list.push(s);
+        }
       }
     }
     return map;
@@ -210,8 +217,8 @@
 
       if (typeof valA === "string" && typeof valB === "string") {
         return sortAsc
-          ? valA.localeCompare(valB)
-          : valB.localeCompare(valA);
+          ? collator.compare(valA, valB)
+          : collator.compare(valB, valA);
       }
 
       if (typeof valA === "number" && typeof valB === "number") {
@@ -299,7 +306,7 @@
       if (valB === null || valB === undefined) return asc ? -1 : 1;
 
       if (typeof valA === "string" && typeof valB === "string") {
-        return asc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        return asc ? collator.compare(valA, valB) : collator.compare(valB, valA);
       }
       if (typeof valA === "number" && typeof valB === "number") {
         return asc ? valA - valB : valB - valA;
@@ -325,7 +332,7 @@
       if (valB === null || valB === undefined) return asc ? -1 : 1;
 
       if (typeof valA === "string" && typeof valB === "string") {
-        return asc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        return asc ? collator.compare(valA, valB) : collator.compare(valB, valA);
       }
       if (typeof valA === "number" && typeof valB === "number") {
         return asc ? valA - valB : valB - valA;

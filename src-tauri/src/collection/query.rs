@@ -736,40 +736,48 @@ impl CollectionScanner {
         // album_artist is taken as the shared value when all tracks agree on it;
         // if they differ (true various-artist albums), it comes back as NULL.
         let sql = format!(
-            "SELECT
+            "WITH album_genres AS (
+                SELECT album, genre, genresort, COUNT(*) AS g_count
+                FROM songs
+                WHERE source IN ({lib}) AND unavailable = 0
+                  AND album IS NOT NULL AND album != ''
+                  AND genre IS NOT NULL AND genre != ''
+                GROUP BY album, genre
+             ),
+             top_album_genres AS (
+                SELECT album, genre
+                FROM (
+                    SELECT album, genre,
+                           ROW_NUMBER() OVER (PARTITION BY album ORDER BY g_count DESC, COALESCE(genresort, genre) ASC) AS rn
+                    FROM album_genres
+                )
+                WHERE rn = 1
+             )
+             SELECT
                 CASE
-                    WHEN COUNT(DISTINCT NULLIF(album_artist, '')) = 1 THEN MAX(NULLIF(album_artist, ''))
-                    WHEN COUNT(DISTINCT NULLIF(album_artist, '')) = 0 AND COUNT(DISTINCT NULLIF(artist, '')) = 1 THEN MAX(NULLIF(artist, ''))
+                    WHEN COUNT(DISTINCT NULLIF(songs.album_artist, '')) = 1 THEN MAX(NULLIF(songs.album_artist, ''))
+                    WHEN COUNT(DISTINCT NULLIF(songs.album_artist, '')) = 0 AND COUNT(DISTINCT NULLIF(songs.artist, '')) = 1 THEN MAX(NULLIF(songs.artist, ''))
                     ELSE NULL
                 END AS album_artist,
-                album,
-                MIN(year) AS year,
+                songs.album,
+                MIN(songs.year) AS year,
                 COUNT(*) AS track_count,
-                MAX(COALESCE(disc, 1)) AS disc_count,
-                MAX(CAST(art_embedded AS INTEGER)) AS art_embedded,
-                MAX(art_automatic) AS art_automatic,
-                MAX(art_manual) AS art_manual,
-                (
-                    SELECT genre
-                    FROM songs g
-                    WHERE g.album = songs.album AND g.source IN ({lib}) AND g.unavailable = 0
-                      AND g.genre IS NOT NULL AND g.genre != ''
-                    GROUP BY genre
-                    ORDER BY COUNT(*) DESC, COALESCE(genresort, genre) ASC
-                    LIMIT 1
-                ) AS genre,
-                COALESCE(
-                    (SELECT rating FROM album_ratings ar WHERE ar.album_key = songs.album),
-                    -1
-                ) AS rating,
-                MAX(added) AS added,
-                COALESCE(SUM(length_nanosec), 0) AS total_duration_nanosec,
-                COALESCE(MAX(NULLIF(album_artist_sort, '')), MAX(NULLIF(artistsort, ''))) AS artist_sort,
-                MAX(NULLIF(albumsort, '')) AS albumsort
+                MAX(COALESCE(songs.disc, 1)) AS disc_count,
+                MAX(CAST(songs.art_embedded AS INTEGER)) AS art_embedded,
+                MAX(songs.art_automatic) AS art_automatic,
+                MAX(songs.art_manual) AS art_manual,
+                MAX(tag.genre) AS genre,
+                COALESCE(MAX(ar.rating), -1) AS rating,
+                MAX(songs.added) AS added,
+                COALESCE(SUM(songs.length_nanosec), 0) AS total_duration_nanosec,
+                COALESCE(MAX(NULLIF(songs.album_artist_sort, '')), MAX(NULLIF(songs.artistsort, ''))) AS artist_sort,
+                MAX(NULLIF(songs.albumsort, '')) AS albumsort
              FROM songs
-             WHERE source IN ({lib}) AND album IS NOT NULL AND album != '' AND unavailable = 0
-             GROUP BY album
-             ORDER BY COALESCE(MAX(album_artist_sort), MAX(artistsort), MAX(album_artist), MAX(artist)), COALESCE(MAX(albumsort), album)",
+             LEFT JOIN top_album_genres tag ON songs.album = tag.album
+             LEFT JOIN album_ratings ar ON songs.album = ar.album_key
+             WHERE songs.source IN ({lib}) AND songs.album IS NOT NULL AND songs.album != '' AND songs.unavailable = 0
+             GROUP BY songs.album
+             ORDER BY COALESCE(MAX(songs.album_artist_sort), MAX(songs.artistsort), MAX(songs.album_artist), MAX(songs.artist)), COALESCE(MAX(songs.albumsort), songs.album)",
             lib = *LIBRARY_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
@@ -815,43 +823,45 @@ impl CollectionScanner {
                 WHERE source IN ({lib}) AND album IS NOT NULL AND album != '' AND unavailable = 0
                 GROUP BY album
              ),
-             base AS (
-                SELECT s.id, s.album, s.playcount,
-                       COALESCE(NULLIF(s.album_artist, ''), s.artist, '') AS effective_artist,
-                       COALESCE(NULLIF(s.album_artist_sort, ''), NULLIF(s.album_artist, ''), NULLIF(s.artistsort, ''), s.artist, '') AS sort_artist
-                FROM songs s
-                WHERE s.source IN ({lib}) AND s.unavailable = 0
+             artist_genres AS (
+                SELECT
+                    COALESCE(NULLIF(album_artist, ''), artist, '') COLLATE NOCASE AS artist_key,
+                    genre,
+                    genresort,
+                    COUNT(*) AS g_count
+                FROM songs
+                WHERE source IN ({lib}) AND unavailable = 0 AND genre IS NOT NULL AND genre != ''
+                GROUP BY artist_key, genre
              ),
-             grouped AS (
-                SELECT MIN(effective_artist) AS effective_artist,
-                       MIN(sort_artist) AS sort_artist,
-                       COUNT(*) AS song_count,
-                       SUM(COALESCE(playcount, 0)) AS total_playcount
-                FROM base
-                GROUP BY effective_artist COLLATE NOCASE
+             top_artist_genres AS (
+                SELECT artist_key, genre
+                FROM (
+                    SELECT artist_key, genre,
+                           ROW_NUMBER() OVER (PARTITION BY artist_key ORDER BY g_count DESC, COALESCE(genresort, genre) ASC) AS rn
+                    FROM artist_genres
+                )
+                WHERE rn = 1
+             ),
+             base AS (
+                SELECT s.id, s.playcount,
+                       COALESCE(NULLIF(s.album_artist, ''), s.artist, '') AS effective_artist,
+                       COALESCE(NULLIF(s.album_artist_sort, ''), NULLIF(s.album_artist, ''), NULLIF(s.artistsort, ''), s.artist, '') AS sort_artist,
+                       CASE WHEN ac.track_count > 7 THEN s.album END AS qual_album
+                FROM songs s
+                LEFT JOIN album_counts ac ON s.album = ac.album
+                WHERE s.source IN ({lib}) AND s.unavailable = 0
              )
              SELECT
-                g.effective_artist,
-                (
-                    SELECT COUNT(DISTINCT CASE WHEN ac.track_count > 7 THEN b.album END)
-                    FROM base b
-                    LEFT JOIN album_counts ac ON b.album = ac.album
-                    WHERE b.effective_artist = g.effective_artist COLLATE NOCASE
-                ) AS album_count,
-                g.song_count,
-                (
-                    SELECT genre
-                    FROM songs sg
-                    WHERE COALESCE(NULLIF(sg.album_artist, ''), sg.artist, '') = g.effective_artist COLLATE NOCASE
-                      AND sg.source IN ({lib}) AND sg.unavailable = 0 AND sg.genre IS NOT NULL AND sg.genre != ''
-                    GROUP BY sg.genre
-                    ORDER BY COUNT(*) DESC, COALESCE(sg.genresort, sg.genre) ASC
-                    LIMIT 1
-                ) AS genre,
-                g.sort_artist,
-                g.total_playcount
-             FROM grouped g
-             ORDER BY g.sort_artist COLLATE NOCASE",
+                MIN(b.effective_artist) AS effective_artist,
+                COUNT(DISTINCT b.qual_album) AS album_count,
+                COUNT(*) AS song_count,
+                MAX(tag.genre) AS genre,
+                MIN(b.sort_artist) AS sort_artist,
+                SUM(COALESCE(b.playcount, 0)) AS total_playcount
+             FROM base b
+             LEFT JOIN top_artist_genres tag ON (b.effective_artist COLLATE NOCASE) = tag.artist_key
+             GROUP BY b.effective_artist COLLATE NOCASE
+             ORDER BY MIN(b.sort_artist) COLLATE NOCASE",
             lib = *LIBRARY_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;

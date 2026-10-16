@@ -1,10 +1,12 @@
 import type { Song } from "../types";
 import { collectionStore } from "../stores/collection.svelte";
 
+const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+
 /**
  * Comparator for sorting songs by an arbitrary `Song` field, matching the
  * table's sort-header semantics: title/artist/composer/genre prefer their
- * `*sort` field when present, strings compare via localeCompare, numbers
+ * `*sort` field when present, strings compare via Intl.Collator, numbers
  * compare numerically, and missing values always sort to the end regardless
  * of direction.
  */
@@ -35,7 +37,7 @@ export function compareSongs(a: Song, b: Song, field: keyof Song, asc: boolean):
   if (valB === undefined || valB === null) return asc ? -1 : 1;
 
   if (typeof valA === "string" && typeof valB === "string") {
-    const cmp = valA.localeCompare(valB);
+    const cmp = collator.compare(valA, valB);
     return asc ? cmp : -cmp;
   }
   if (typeof valA === "number" && typeof valB === "number") {

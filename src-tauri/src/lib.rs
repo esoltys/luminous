@@ -1038,21 +1038,28 @@ pub fn run() {
             if let Err(e) = manager.queue() {
                 log::error!("Failed to bootstrap Queue playlist: {e}");
             }
-            // Rebuild curated-tag ("tag:") genre auto-playlists once right
-            // after migrations run (see db.rs migration 19, #548), rather
-            // than waiting for the next library scan — an upgrading user's
-            // old bare-genre-name rows were just discarded by that
-            // migration, so without this they'd see an empty genre
-            // auto-playlist section until they happened to trigger a scan.
-            if let Err(e) = manager.sync_all_auto_playlists() {
-                log::error!("Failed to sync auto-playlists at startup: {e}");
-            }
             if let Ok(conn) = db.pool.get() {
                 if let Err(e) = pins::init_default_pins(&conn) {
                     log::error!("Failed to initialize default pinned items: {e}");
                 }
             }
             let playlists = Arc::new(Mutex::new(manager));
+
+            // Rebuild curated-tag ("tag:") genre auto-playlists in the background
+            // once right after migrations run (see db.rs migration 19, #548), rather
+            // than blocking window load and startup setup (#1742).
+            {
+                let playlists_clone = Arc::clone(&playlists);
+                tauri::async_runtime::spawn(async move {
+                    if let Err(e) = crate::playlist::with_playlists(&playlists_clone, |pm| {
+                        pm.sync_all_auto_playlists()
+                    })
+                    .await
+                    {
+                        log::error!("Failed to sync auto-playlists at startup: {e}");
+                    }
+                });
+            }
 
             let self_writes = Arc::new(collection::SelfWriteTracker::new());
 
