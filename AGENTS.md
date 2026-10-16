@@ -109,7 +109,8 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config libayatana-appind
 
 - **Dev server** (frontend hot reload + Rust backend): `bun run tauri dev`
 - **Frontend-only dev** (faster, no backend): `bun run dev`
-- **Type check / lint**: `bun run check`
+- **Type check / lint**: `bun run check` (runs `svelte-check`, `knip`, `lint:css-vars`, and Rust format check)
+- **Format Rust code**: `bun run fmt` (or `cargo fmt --all`)
 - **Architecture-invariant lint** (ast-grep rules in `ast-grep/rules/`): `bun run lint:ast`
 - **Frontend tests**: `bun run test:run` (Vitest)
 - **Backend tests**: `cargo test --workspace` (from the repo root, so the `crates/` members run too)
@@ -264,7 +265,7 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config libayatana-appind
 1. Implement the logic in the appropriate module under `src-tauri/src/`.
 2. Add a command handler in `src-tauri/src/commands/`.
 3. Register the command in `src-tauri/src/commands/mod.rs`.
-4. Add unit or BDD tests.
+4. Add unit or BDD tests, then format and check with `bun run fmt` and `bun run check`.
 5. Frontend invokes via `invoke("my_command", { args })` and listens for events if needed.
 
 **Database schema changes:**
@@ -354,7 +355,7 @@ punt either to the user.
 
 ## Git Hooks
 
-- Run `bun run install:git-hooks` once per clone to enable the pre-commit hook, which auto-formats staged Rust files with `cargo fmt`.
+- Git hooks are configured automatically by `bun install` / `bun run prepare` via `scripts/install-git-hooks.ts`. To manually install them on a fresh clone or worktree, run `bun run install:git-hooks`. The pre-commit hook auto-formats staged Rust files with `cargo fmt`.
 
 ## Release & Versioning
 
