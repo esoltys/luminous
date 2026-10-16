@@ -2074,7 +2074,8 @@ export const it = {
     scanPhaseReadingTags: "lettura dei tag",
     scanPhaseCheckingMissing: "verifica dei brani mancanti",
     scanPhaseResolvingArtwork: "ricerca delle copertine",
-    scanPhaseUpdating: "aggiornamento della libreria"
+    scanPhaseUpdating: "aggiornamento della libreria",
+    processingSongs: "Elaborazione dei brani"
   },
   audioPipeline: {
     channelsStereo: "Stereo (2 can.)",

@@ -2082,7 +2082,8 @@ export const fr: DeepStringRecord<typeof en> = {
     scanPhaseReadingTags: "lecture des étiquettes",
     scanPhaseCheckingMissing: "vérification des pistes manquantes",
     scanPhaseResolvingArtwork: "résolution des pochettes",
-    scanPhaseUpdating: "mise à jour de la bibliothèque"
+    scanPhaseUpdating: "mise à jour de la bibliothèque",
+    processingSongs: "Traitement des chansons"
   },
   audioPipeline: {
     channelsStereo: "Stéréo (2 can.)",

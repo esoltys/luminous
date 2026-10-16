@@ -2074,7 +2074,8 @@ export const de = {
     scanPhaseReadingTags: "Tags werden gelesen",
     scanPhaseCheckingMissing: "Fehlende Titel werden geprüft",
     scanPhaseResolvingArtwork: "Cover werden aufgelöst",
-    scanPhaseUpdating: "Mediathek wird aktualisiert"
+    scanPhaseUpdating: "Mediathek wird aktualisiert",
+    processingSongs: "Titel werden verarbeitet"
   },
   audioPipeline: {
     channelsStereo: "Stereo (2 Kan.)",

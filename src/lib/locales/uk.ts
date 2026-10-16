@@ -2190,7 +2190,8 @@ export const uk = {
     scanPhaseReadingTags: "читання тегів",
     scanPhaseCheckingMissing: "перевірка відсутніх композицій",
     scanPhaseResolvingArtwork: "пошук обкладинок",
-    scanPhaseUpdating: "оновлення бібліотеки"
+    scanPhaseUpdating: "оновлення бібліотеки",
+    processingSongs: "Обробка пісень"
   },
   audioPipeline: {
     channelsStereo: "Стерео (2 кан.)",

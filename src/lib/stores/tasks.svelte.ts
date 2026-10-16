@@ -82,7 +82,7 @@ class TasksStore {
     } else {
       this.tasks.push(task);
     }
-    const taskName = options.taskName || options.label.replace(/\s*\([^)]*\)\s*$/, "").trim() || options.label;
+    const taskName = options.taskName || options.label.replace(/\s*\([^)]*\)\s*(\.{3}|…|\.)?\s*$/, "").trim() || options.label;
     toastStore.startTask({
       taskId: id,
       text: options.label,
@@ -124,7 +124,7 @@ class TasksStore {
     }
   }
 
-  completeTask(id: string, label?: string) {
+  completeTask(id: string, label?: string, ageOutMs?: number) {
     const task = this.tasks.find((t) => t.id === id);
     if (!task) return;
     if (label && label !== "Done") task.label = label;
@@ -132,8 +132,8 @@ class TasksStore {
     task.progress = 1;
     if (task.total !== undefined) task.current = task.total;
     task.finishedAt = Date.now();
-    toastStore.completeTask(id, label);
-    this.scheduleAgeOut(id);
+    toastStore.completeTask(id, label, ageOutMs);
+    this.scheduleAgeOut(id, ageOutMs);
   }
 
   failTask(id: string, error?: string) {
