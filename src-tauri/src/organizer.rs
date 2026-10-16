@@ -805,57 +805,227 @@ pub fn compute_preview(
     Ok(preview_items)
 }
 
-fn move_companion_files(
-    conn: &rusqlite::Connection,
-    src_dir: &Path,
-    dst_dir: &Path,
-) -> Vec<String> {
-    let mut errors = Vec::new();
-    if !src_dir.exists() || !src_dir.is_dir() || src_dir == dst_dir {
-        return errors;
+pub(crate) fn normalize_path_cmp(a: &Path, b: &Path) -> bool {
+    let a_s = a
+        .to_string_lossy()
+        .replace('\\', "/")
+        .trim_end_matches('/')
+        .to_lowercase();
+    let b_s = b
+        .to_string_lossy()
+        .replace('\\', "/")
+        .trim_end_matches('/')
+        .to_lowercase();
+    a_s == b_s
+}
+
+/// Classification of a companion file's domain within the music library.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum CompanionScope {
+    /// Track-specific sidecar (e.g. *.lrc, *.vtt, *.srt) tied 1:1 to an audio file stem.
+    Track,
+    /// Artist-level metadata/imagery (e.g. artist.jpg, artist.md, banner.jpg, logo.png, fanart.jpg).
+    Artist,
+    /// Album-level metadata/imagery (e.g. cover.jpg, folder.jpg, album.md, *.cue, booklet.pdf).
+    Album,
+    /// General accompanying non-audio file (e.g. *.nfo, *.log, *.txt).
+    Other,
+}
+
+/// A planned companion file relocation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompanionMove {
+    pub src_path: PathBuf,
+    pub dst_path: PathBuf,
+    pub scope: CompanionScope,
+}
+
+const ARTIST_SIDE_STEMS: &[&str] = &[
+    "artist",
+    "banner",
+    "logo",
+    "clearlogo",
+    "fanart",
+    "backdrop",
+    "background",
+];
+const ARTIST_IMAGE_EXTS: &[&str] = &["jpg", "jpeg", "png", "webp"];
+const LYRIC_EXTS: &[&str] = &["lrc", "vtt", "srt"];
+const ALBUM_SIDE_STEMS: &[&str] = &[
+    "cover", "folder", "front", "album", "albumart", "back", "rear", "backcover", "disc", "cd",
+    "discart", "medium", "booklet", "insert", "inlay", "liner", "tray", "matrix", "spine",
+];
+const ALBUM_IMAGE_EXTS: &[&str] = &["jpg", "jpeg", "png", "webp"];
+
+/// Determines the companion scope of a file based on its filename stem and extension.
+pub fn classify_companion_file(path: &Path) -> Option<CompanionScope> {
+    if is_audio_file(path) {
+        return None;
     }
 
-    let entries = match fs::read_dir(src_dir) {
-        Ok(e) => e,
-        Err(_) => return errors,
+    let file_name = path.file_name()?.to_str()?;
+    let stem = path.file_stem()?.to_str()?.to_lowercase();
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+
+    // 1. Lyrics / subtitle sidecars
+    if LYRIC_EXTS.contains(&ext.as_str()) {
+        return Some(CompanionScope::Track);
+    }
+
+    // 2. Artist sidecars
+    if file_name.eq_ignore_ascii_case("artist.md") {
+        return Some(CompanionScope::Artist);
+    }
+    if ARTIST_IMAGE_EXTS.contains(&ext.as_str()) && ARTIST_SIDE_STEMS.contains(&stem.as_str()) {
+        return Some(CompanionScope::Artist);
+    }
+
+    // 3. Album sidecars
+    if file_name.eq_ignore_ascii_case("album.md") || ext == "cue" || ext == "pdf" {
+        return Some(CompanionScope::Album);
+    }
+    if ALBUM_IMAGE_EXTS.contains(&ext.as_str()) && ALBUM_SIDE_STEMS.contains(&stem.as_str()) {
+        return Some(CompanionScope::Album);
+    }
+
+    // 4. Other non-audio files (e.g. .nfo, .txt, .log)
+    Some(CompanionScope::Other)
+}
+
+/// Resolves the artist directory from a destination album folder and the artist name.
+pub fn resolve_destination_artist_dir(
+    dst_album_dir: &Path,
+    artist_name: &str,
+    library_dirs: &[String],
+) -> Option<PathBuf> {
+    let is_lib_dir = |p: &Path| -> bool {
+        library_dirs
+            .iter()
+            .any(|lib| normalize_path_cmp(Path::new(lib), p))
     };
 
-    let remaining_entries: Vec<_> = entries.filter_map(|e| e.ok()).collect();
-    let has_audio_left = remaining_entries
-        .iter()
-        .any(|entry| is_audio_file(&entry.path()));
+    let artist_clean = artist_name.trim();
+    let artist_lower = artist_clean.to_lowercase();
+    let artist_sanitized = sanitize_component(artist_clean, false, false).to_lowercase();
 
-    if !has_audio_left {
-        if let Err(e) = fs::create_dir_all(dst_dir) {
-            errors.push(format!(
-                "Failed to create directory {}: {}",
-                dst_dir.display(),
-                e
-            ));
-            return errors;
+    // Check ancestors starting from dst_album_dir
+    for ancestor in dst_album_dir.ancestors() {
+        if is_lib_dir(ancestor) || ancestor.parent().is_none() {
+            break;
         }
+        if let Some(name) = ancestor.file_name().and_then(|n| n.to_str()) {
+            let name_lower = name.to_lowercase();
+            if !artist_lower.is_empty()
+                && (name_lower == artist_lower || name_lower == artist_sanitized)
+            {
+                return Some(ancestor.to_path_buf());
+            }
+        }
+    }
 
-        for entry in remaining_entries {
-            let path = entry.path();
-            if path.is_file() && !is_audio_file(&path) {
-                if let Some(file_name) = path.file_name() {
-                    let dst_file = dst_dir.join(file_name);
-                    if !dst_file.exists() {
-                        let moved = fs::rename(&path, &dst_file).or_else(|_| {
-                            fs::copy(&path, &dst_file).and_then(|_| fs::remove_file(&path))
-                        });
-                        if moved.is_ok() {
-                            // Folder-level cover art is stored as an absolute
-                            // path in art_automatic (see scan_folder_art()) —
-                            // without this, moved albums would show broken
-                            // art until a future full rescan re-derives it.
-                            let _ = conn.execute(
-                                "UPDATE songs SET art_automatic = ?1 WHERE art_automatic = ?2",
-                                params![
-                                    dst_file.to_string_lossy().to_string(),
-                                    path.to_string_lossy().to_string()
-                                ],
-                            );
+    // Fallback: If dst_album_dir.parent() exists and is not a library root, use it
+    if let Some(parent) = dst_album_dir.parent() {
+        if !is_lib_dir(parent) && parent.parent().is_some() {
+            return Some(parent.to_path_buf());
+        }
+    }
+
+    None
+}
+
+fn fetch_songs_meta_for_organize(
+    conn: &rusqlite::Connection,
+    song_ids: &[i64],
+) -> HashMap<i64, (String, String)> {
+    let mut map = HashMap::new();
+    if song_ids.is_empty() {
+        return map;
+    }
+    for chunk in song_ids.chunks(500) {
+        let placeholders = vec!["?"; chunk.len()].join(",");
+        let sql = format!(
+            "SELECT id, COALESCE(NULLIF(album_artist, ''), artist, ''), COALESCE(album, '') FROM songs WHERE id IN ({})",
+            placeholders
+        );
+        if let Ok(mut stmt) = conn.prepare(&sql) {
+            let params_vec: Vec<&dyn rusqlite::ToSql> =
+                chunk.iter().map(|id| id as &dyn rusqlite::ToSql).collect();
+            if let Ok(rows) = stmt.query_map(&params_vec[..], |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                ))
+            }) {
+                for r in rows.flatten() {
+                    map.insert(r.0, (r.1, r.2));
+                }
+            }
+        }
+    }
+    map
+}
+
+/// Plans companion relocations for a batch of applied song moves.
+///
+/// Evaluates track-level companions directly from `items`, and for source directories
+/// that have no remaining audio files, routes artist-level and album-level sidecars
+/// based on destination directory unambiguity.
+pub fn plan_companion_relocations(
+    conn: &rusqlite::Connection,
+    items: &[OrganizeApplyItem],
+    library_dirs: &[String],
+) -> Vec<CompanionMove> {
+    let mut moves = Vec::new();
+    let mut planned_srcs = HashSet::new();
+
+    let song_ids: Vec<i64> = items.iter().map(|i| i.song_id).collect();
+    let meta_map = fetch_songs_meta_for_organize(conn, &song_ids);
+
+    // 1. Plan track-level lyric sidecars for every moved audio item
+    for item in items {
+        if item.from_path == item.to_path {
+            continue;
+        }
+        let src_path = Path::new(&item.from_path);
+        let dst_path = Path::new(&item.to_path);
+        let Some(src_parent) = src_path.parent() else {
+            continue;
+        };
+        let Some(dst_parent) = dst_path.parent() else {
+            continue;
+        };
+        let Some(src_stem) = src_path.file_stem().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        let Some(dst_stem) = dst_path.file_stem().and_then(|s| s.to_str()) else {
+            continue;
+        };
+
+        if let Ok(entries) = fs::read_dir(src_parent) {
+            for entry in entries.filter_map(|e| e.ok()) {
+                let p = entry.path();
+                if p.is_file() {
+                    if let Some(ext) = p.extension().and_then(|e| e.to_str()) {
+                        let ext_lower = ext.to_lowercase();
+                        if LYRIC_EXTS.contains(&ext_lower.as_str()) {
+                            if let Some(stem) = p.file_stem().and_then(|s| s.to_str()) {
+                                if stem.eq_ignore_ascii_case(src_stem) {
+                                    if planned_srcs.insert(p.clone()) {
+                                        let dst_lyric =
+                                            dst_parent.join(format!("{}.{}", dst_stem, ext_lower));
+                                        moves.push(CompanionMove {
+                                            src_path: p,
+                                            dst_path: dst_lyric,
+                                            scope: CompanionScope::Track,
+                                        });
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -863,7 +1033,238 @@ fn move_companion_files(
         }
     }
 
+    // 2. Group items by source directory
+    let mut src_dirs_map: HashMap<PathBuf, Vec<&OrganizeApplyItem>> = HashMap::new();
+    for item in items {
+        if item.from_path == item.to_path {
+            continue;
+        }
+        if let Some(parent) = Path::new(&item.from_path).parent() {
+            src_dirs_map
+                .entry(parent.to_path_buf())
+                .or_default()
+                .push(item);
+        }
+    }
+
+    for (src_dir, dir_items) in src_dirs_map {
+        if !src_dir.exists() || !src_dir.is_dir() {
+            continue;
+        }
+
+        let entries: Vec<_> = match fs::read_dir(&src_dir) {
+            Ok(e) => e.filter_map(|x| x.ok()).collect(),
+            Err(_) => continue,
+        };
+
+        // If any audio files still exist in the source folder, leave directory-level
+        // companion files in place
+        let has_audio_left = entries.iter().any(|entry| is_audio_file(&entry.path()));
+        if has_audio_left {
+            continue;
+        }
+
+        // Determine destination album dirs, artist dirs, and album names
+        let mut distinct_album_dirs: Vec<PathBuf> = Vec::new();
+        let mut distinct_artist_dirs: Vec<PathBuf> = Vec::new();
+        let mut album_names: Vec<String> = Vec::new();
+
+        for item in &dir_items {
+            let dst_p = Path::new(&item.to_path);
+            if let Some(dst_album) = dst_p.parent() {
+                if !distinct_album_dirs
+                    .iter()
+                    .any(|d| normalize_path_cmp(d, dst_album))
+                {
+                    distinct_album_dirs.push(dst_album.to_path_buf());
+                }
+
+                let (artist_name, album_name) =
+                    meta_map.get(&item.song_id).cloned().unwrap_or_default();
+
+                if !album_name.trim().is_empty()
+                    && !album_names.contains(&album_name.to_lowercase())
+                {
+                    album_names.push(album_name.to_lowercase());
+                }
+
+                if let Some(artist_dir) =
+                    resolve_destination_artist_dir(dst_album, &artist_name, library_dirs)
+                {
+                    if !distinct_artist_dirs
+                        .iter()
+                        .any(|d| normalize_path_cmp(d, &artist_dir))
+                    {
+                        distinct_artist_dirs.push(artist_dir);
+                    }
+                }
+            }
+        }
+
+        for entry in entries {
+            let p = entry.path();
+            if !p.is_file() || is_audio_file(&p) || planned_srcs.contains(&p) {
+                continue;
+            }
+
+            let Some(scope) = classify_companion_file(&p) else {
+                continue;
+            };
+            let Some(file_name) = p.file_name() else {
+                continue;
+            };
+
+            match scope {
+                CompanionScope::Track => {
+                    // Handled in step 1; unattached lyric files in multi-track/multi-album
+                    // directories remain in place
+                }
+                CompanionScope::Artist => {
+                    if distinct_artist_dirs.len() == 1 {
+                        let target_artist = &distinct_artist_dirs[0];
+                        if !normalize_path_cmp(&src_dir, target_artist) {
+                            let dst_file = target_artist.join(file_name);
+                            if planned_srcs.insert(p.clone()) {
+                                moves.push(CompanionMove {
+                                    src_path: p,
+                                    dst_path: dst_file,
+                                    scope: CompanionScope::Artist,
+                                });
+                            }
+                        }
+                    }
+                }
+                CompanionScope::Album | CompanionScope::Other => {
+                    let stem = p
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .map(|s| s.to_lowercase())
+                        .unwrap_or_default();
+
+                    // If image matches a specific album title among the destination albums
+                    let matched_album_idx = album_names.iter().position(|a| *a == stem);
+
+                    if let Some(idx) = matched_album_idx {
+                        let target_album_name = &album_names[idx];
+                        if let Some(target_dir) = dir_items.iter().find_map(|item| {
+                            let (_artist, album) = meta_map.get(&item.song_id)?;
+                            if album.to_lowercase() == *target_album_name {
+                                Path::new(&item.to_path).parent().map(Path::to_path_buf)
+                            } else {
+                                None
+                            }
+                        }) {
+                            if !normalize_path_cmp(&src_dir, &target_dir) {
+                                let dst_file = target_dir.join(file_name);
+                                if planned_srcs.insert(p.clone()) {
+                                    moves.push(CompanionMove {
+                                        src_path: p,
+                                        dst_path: dst_file,
+                                        scope: CompanionScope::Album,
+                                    });
+                                }
+                            }
+                            continue;
+                        }
+                    }
+
+                    // Otherwise, route only if destination album is unambiguous
+                    if distinct_album_dirs.len() == 1 {
+                        let target_album = &distinct_album_dirs[0];
+                        if !normalize_path_cmp(&src_dir, target_album) {
+                            let dst_file = target_album.join(file_name);
+                            if planned_srcs.insert(p.clone()) {
+                                moves.push(CompanionMove {
+                                    src_path: p,
+                                    dst_path: dst_file,
+                                    scope,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    moves
+}
+
+/// Executes planned companion file moves, updating SQLite cover art paths where appropriate.
+pub fn execute_companion_moves(
+    conn: &rusqlite::Connection,
+    moves: &[CompanionMove],
+    self_writes: Option<&crate::collection::SelfWriteTracker>,
+) -> Vec<String> {
+    let mut errors = Vec::new();
+
+    for m in moves {
+        if normalize_path_cmp(&m.src_path, &m.dst_path) {
+            continue;
+        }
+
+        if let Some(parent) = m.dst_path.parent() {
+            if let Err(e) = create_dir_all_case_correct(parent) {
+                errors.push(format!(
+                    "Failed to create directory {}: {}",
+                    parent.display(),
+                    e
+                ));
+                continue;
+            }
+        }
+
+        if m.dst_path.exists() {
+            // Do not overwrite existing files
+            continue;
+        }
+
+        if let Some(tracker) = self_writes {
+            tracker.mark_written([m.src_path.clone(), m.dst_path.clone()]);
+        }
+
+        let moved = fs::rename(&m.src_path, &m.dst_path).or_else(|_| {
+            fs::copy(&m.src_path, &m.dst_path).and_then(|_| fs::remove_file(&m.src_path))
+        });
+
+        match moved {
+            Ok(_) => {
+                if m.scope == CompanionScope::Album {
+                    // Folder-level cover art is stored as an absolute
+                    // path in art_automatic (see scan_folder_art()) —
+                    // update it so moved albums keep their cover art.
+                    let _ = conn.execute(
+                        "UPDATE songs SET art_automatic = ?1 WHERE art_automatic = ?2",
+                        params![
+                            m.dst_path.to_string_lossy().to_string(),
+                            m.src_path.to_string_lossy().to_string()
+                        ],
+                    );
+                }
+            }
+            Err(e) => {
+                errors.push(format!(
+                    "Failed to move companion {} -> {}: {}",
+                    m.src_path.display(),
+                    m.dst_path.display(),
+                    e
+                ));
+            }
+        }
+    }
+
     errors
+}
+
+/// Relocates companion files matching moved songs according to their scope and unambiguity.
+pub fn relocate_companion_files(
+    conn: &rusqlite::Connection,
+    items: &[OrganizeApplyItem],
+    library_dirs: &[String],
+    self_writes: Option<&crate::collection::SelfWriteTracker>,
+) -> Vec<String> {
+    let moves = plan_companion_relocations(conn, items, library_dirs);
+    execute_companion_moves(conn, &moves, self_writes)
 }
 
 /// Looks for a directory entry in `dir` whose name matches `name` case-insensitively
@@ -983,7 +1384,6 @@ pub fn execute_apply(
     let mut skipped_count = 0;
     let mut errors = Vec::new();
     let mut source_parents_to_clean: HashSet<PathBuf> = HashSet::new();
-    let mut moved_dir_pairs: HashMap<PathBuf, PathBuf> = HashMap::new();
     let mut moved_items: Vec<(i64, String)> = Vec::new();
 
     let mut conn = db.pool.get()?;
@@ -998,9 +1398,8 @@ pub fn execute_apply(
         let src = Path::new(&item.from_path);
         let dst = Path::new(&item.to_path);
 
-        if let (Some(src_parent), Some(dst_parent)) = (src.parent(), dst.parent()) {
+        if let Some(src_parent) = src.parent() {
             source_parents_to_clean.insert(src_parent.to_path_buf());
-            moved_dir_pairs.insert(src_parent.to_path_buf(), dst_parent.to_path_buf());
         }
 
         if let Some(dst_parent) = dst.parent() {
@@ -1084,10 +1483,26 @@ pub fn execute_apply(
     }
 
     if move_extra_files {
-        for (src_dir, dst_dir) in moved_dir_pairs {
-            let companion_errors = move_companion_files(&conn, &src_dir, &dst_dir);
-            errors.extend(companion_errors);
-        }
+        let successful_ids: HashSet<i64> = moved_items.iter().map(|(id, _)| *id).collect();
+        let successful_items: Vec<OrganizeApplyItem> = items
+            .iter()
+            .filter(|i| successful_ids.contains(&i.song_id))
+            .cloned()
+            .collect();
+
+        let library_dirs: Vec<String> = {
+            let mut stmt = conn.prepare("SELECT path FROM directories")?;
+            let rows = stmt.query_map([], |row| row.get(0))?;
+            rows.filter_map(|r| r.ok()).collect()
+        };
+
+        let companion_errors = relocate_companion_files(
+            &conn,
+            &successful_items,
+            &library_dirs,
+            Some(self_writes.as_ref()),
+        );
+        errors.extend(companion_errors);
     }
 
     if clean_empty_dirs {
@@ -1129,7 +1544,8 @@ pub fn execute_apply(
                 params![art_path, song_id],
             );
         } else {
-            // Check if existing art_automatic points to an unaccessible/non-existent old path
+            // Check if existing art_automatic points to an unaccessible/non-existent old path,
+            // or an external folder art path that does not reside in the song's current directory.
             let current_art: Option<String> = conn
                 .query_row(
                     "SELECT art_automatic FROM songs WHERE id = ?1",
@@ -1140,9 +1556,14 @@ pub fn execute_apply(
 
             if let Some(ref art) = current_art {
                 let art_p = Path::new(art);
-                if (art_p.is_absolute() || art.contains('/') || art.contains('\\'))
-                    && !art_p.exists()
-                {
+                let is_folder_art_path =
+                    art_p.is_absolute() || art.contains('/') || art.contains('\\');
+                let in_song_dir = to_path
+                    .parent()
+                    .and_then(|p| art_p.parent().map(|ap| normalize_path_cmp(p, ap)))
+                    .unwrap_or(false);
+
+                if is_folder_art_path && (!art_p.exists() || !in_song_dir) {
                     let _ = conn.execute(
                         "UPDATE songs SET art_automatic = NULL WHERE id = ?1",
                         params![song_id],
@@ -2431,5 +2852,556 @@ mod tests {
             file2.exists(),
             "song 2 (missing tag) must remain in original place"
         );
+    }
+
+    #[test]
+    fn test_classify_companion_file() {
+        assert_eq!(
+            classify_companion_file(Path::new("song.mp3")),
+            None
+        );
+        assert_eq!(
+            classify_companion_file(Path::new("song.flac")),
+            None
+        );
+
+        // Track-level lyrics / subtitles
+        assert_eq!(
+            classify_companion_file(Path::new("01 Track.lrc")),
+            Some(CompanionScope::Track)
+        );
+        assert_eq!(
+            classify_companion_file(Path::new("01 Track.LRC")),
+            Some(CompanionScope::Track)
+        );
+        assert_eq!(
+            classify_companion_file(Path::new("01 Track.vtt")),
+            Some(CompanionScope::Track)
+        );
+        assert_eq!(
+            classify_companion_file(Path::new("01 Track.srt")),
+            Some(CompanionScope::Track)
+        );
+
+        // Artist-level sidecars
+        assert_eq!(
+            classify_companion_file(Path::new("artist.jpg")),
+            Some(CompanionScope::Artist)
+        );
+        assert_eq!(
+            classify_companion_file(Path::new("artist.png")),
+            Some(CompanionScope::Artist)
+        );
+        assert_eq!(
+            classify_companion_file(Path::new("artist.webp")),
+            Some(CompanionScope::Artist)
+        );
+        assert_eq!(
+            classify_companion_file(Path::new("artist.md")),
+            Some(CompanionScope::Artist)
+        );
+        assert_eq!(
+            classify_companion_file(Path::new("banner.jpg")),
+            Some(CompanionScope::Artist)
+        );
+        assert_eq!(
+            classify_companion_file(Path::new("logo.png")),
+            Some(CompanionScope::Artist)
+        );
+        assert_eq!(
+            classify_companion_file(Path::new("fanart.jpg")),
+            Some(CompanionScope::Artist)
+        );
+
+        // Album-level sidecars
+        assert_eq!(
+            classify_companion_file(Path::new("cover.jpg")),
+            Some(CompanionScope::Album)
+        );
+        assert_eq!(
+            classify_companion_file(Path::new("folder.png")),
+            Some(CompanionScope::Album)
+        );
+        assert_eq!(
+            classify_companion_file(Path::new("front.jpeg")),
+            Some(CompanionScope::Album)
+        );
+        assert_eq!(
+            classify_companion_file(Path::new("back.jpg")),
+            Some(CompanionScope::Album)
+        );
+        assert_eq!(
+            classify_companion_file(Path::new("album.md")),
+            Some(CompanionScope::Album)
+        );
+        assert_eq!(
+            classify_companion_file(Path::new("disc1.cue")),
+            Some(CompanionScope::Album)
+        );
+        assert_eq!(
+            classify_companion_file(Path::new("booklet.pdf")),
+            Some(CompanionScope::Album)
+        );
+
+        // Other non-audio files
+        assert_eq!(
+            classify_companion_file(Path::new("release.nfo")),
+            Some(CompanionScope::Other)
+        );
+        assert_eq!(
+            classify_companion_file(Path::new("info.txt")),
+            Some(CompanionScope::Other)
+        );
+    }
+
+    #[test]
+    fn test_resolve_destination_artist_dir() {
+        let library_dirs = vec!["/music".to_string(), "C:\\Library".to_string()];
+
+        // Standard Artist/Album structure
+        let album_dir = Path::new("/music/Radiohead/OK Computer");
+        assert_eq!(
+            resolve_destination_artist_dir(album_dir, "Radiohead", &library_dirs),
+            Some(PathBuf::from("/music/Radiohead"))
+        );
+
+        // Deeper Genre/Artist/Album structure
+        let deeper_dir = Path::new("/music/Rock/Radiohead/OK Computer");
+        assert_eq!(
+            resolve_destination_artist_dir(deeper_dir, "Radiohead", &library_dirs),
+            Some(PathBuf::from("/music/Rock/Radiohead"))
+        );
+
+        // Shallow single-folder structure (Album dir IS the Artist dir)
+        let shallow_dir = Path::new("/music/Radiohead");
+        assert_eq!(
+            resolve_destination_artist_dir(shallow_dir, "Radiohead", &library_dirs),
+            Some(PathBuf::from("/music/Radiohead"))
+        );
+
+        // Guardrail: Parent is library root itself -> must not return library root as artist dir
+        let root_child = Path::new("/music/OK Computer");
+        assert_eq!(
+            resolve_destination_artist_dir(root_child, "Radiohead", &library_dirs),
+            None
+        );
+    }
+
+    #[test]
+    fn test_organize_artist_sidecars_remain_at_artist_root() {
+        use crate::collection::upsert_song;
+        use crate::db::Database;
+        use crate::models::{FileType, SongSource};
+
+        let base_guard = tempfile::Builder::new()
+            .prefix("luminous_artist_root_test_")
+            .tempdir()
+            .unwrap();
+        let base = base_guard.path().to_path_buf();
+        let artist_dir = base.join("Radiohead");
+        fs::create_dir_all(&artist_dir).unwrap();
+
+        // Audio tracks sitting directly in artist root
+        let track1_src = artist_dir.join("track1.mp3");
+        let track2_src = artist_dir.join("track2.mp3");
+        fs::write(&track1_src, b"audio 1").unwrap();
+        fs::write(&track2_src, b"audio 2").unwrap();
+
+        // Artist-level sidecars sitting directly in artist root
+        let artist_jpg = artist_dir.join("artist.jpg");
+        let artist_md = artist_dir.join("artist.md");
+        let banner_jpg = artist_dir.join("banner.jpg");
+        let logo_png = artist_dir.join("logo.png");
+        fs::write(&artist_jpg, b"portrait").unwrap();
+        fs::write(&artist_md, b"# Bio").unwrap();
+        fs::write(&banner_jpg, b"banner").unwrap();
+        fs::write(&logo_png, b"logo").unwrap();
+
+        let db = Arc::new(Database::new(base.join("appdata")).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        let song1 = Song {
+            path: Some(track1_src.to_string_lossy().to_string()),
+            title: Some("Airbag".to_string()),
+            artist: Some("Radiohead".to_string()),
+            album: Some("OK Computer".to_string()),
+            source: SongSource::LocalFile,
+            filetype: FileType::Mp3,
+            ..Default::default()
+        };
+        upsert_song(&conn, &song1).unwrap();
+        let id1: i64 = conn
+            .query_row("SELECT id FROM songs WHERE path = ?1", params![song1.path], |r| r.get(0))
+            .unwrap();
+
+        let song2 = Song {
+            path: Some(track2_src.to_string_lossy().to_string()),
+            title: Some("2+2=5".to_string()),
+            artist: Some("Radiohead".to_string()),
+            album: Some("Hail to the Thief".to_string()),
+            source: SongSource::LocalFile,
+            filetype: FileType::Mp3,
+            ..Default::default()
+        };
+        upsert_song(&conn, &song2).unwrap();
+        let id2: i64 = conn
+            .query_row("SELECT id FROM songs WHERE path = ?1", params![song2.path], |r| r.get(0))
+            .unwrap();
+        drop(conn);
+
+        let album1_dir = artist_dir.join("OK Computer");
+        let album2_dir = artist_dir.join("Hail to the Thief");
+        let items = vec![
+            OrganizeApplyItem {
+                song_id: id1,
+                from_path: track1_src.to_string_lossy().to_string(),
+                to_path: album1_dir.join("01 Airbag.mp3").to_string_lossy().to_string(),
+            },
+            OrganizeApplyItem {
+                song_id: id2,
+                from_path: track2_src.to_string_lossy().to_string(),
+                to_path: album2_dir.join("01 2+2=5.mp3").to_string_lossy().to_string(),
+            },
+        ];
+
+        let watcher_paused = Arc::new(AtomicU32::new(0));
+        let self_writes = Arc::new(crate::collection::SelfWriteTracker::new());
+        let result =
+            execute_apply(&db, &watcher_paused, &self_writes, &items, true, true, None).unwrap();
+        assert_eq!(result.moved_count, 2);
+        assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
+
+        // Artist sidecars MUST remain at the artist root
+        assert!(artist_jpg.exists(), "artist.jpg must remain at artist root");
+        assert!(artist_md.exists(), "artist.md must remain at artist root");
+        assert!(banner_jpg.exists(), "banner.jpg must remain at artist root");
+        assert!(logo_png.exists(), "logo.png must remain at artist root");
+
+        // They must NOT have been moved into either album subfolder
+        assert!(!album1_dir.join("artist.jpg").exists());
+        assert!(!album1_dir.join("artist.md").exists());
+        assert!(!album1_dir.join("banner.jpg").exists());
+        assert!(!album1_dir.join("logo.png").exists());
+        assert!(!album2_dir.join("artist.jpg").exists());
+        assert!(!album2_dir.join("artist.md").exists());
+
+        // Artist directory must not have been removed by clean_empty_dirs
+        assert!(artist_dir.exists(), "artist directory must be preserved");
+    }
+
+    #[test]
+    fn test_organize_artist_sidecars_move_from_external_dir_to_artist_root() {
+        use crate::collection::upsert_song;
+        use crate::db::Database;
+        use crate::models::{FileType, SongSource};
+
+        let base_guard = tempfile::Builder::new()
+            .prefix("luminous_artist_external_test_")
+            .tempdir()
+            .unwrap();
+        let base = base_guard.path().to_path_buf();
+        let ext_dir = base.join("downloads").join("Radiohead_Unorganized");
+        let dest_music_dir = base.join("music");
+        fs::create_dir_all(&ext_dir).unwrap();
+        fs::create_dir_all(&dest_music_dir).unwrap();
+
+        let track_src = ext_dir.join("track1.mp3");
+        let artist_src = ext_dir.join("artist.jpg");
+        let bio_src = ext_dir.join("artist.md");
+        fs::write(&track_src, b"audio").unwrap();
+        fs::write(&artist_src, b"portrait").unwrap();
+        fs::write(&bio_src, b"bio").unwrap();
+
+        let db = Arc::new(Database::new(base.join("appdata")).unwrap());
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO directories (path) VALUES (?1)",
+            params![dest_music_dir.to_string_lossy().to_string()],
+        )
+        .unwrap();
+
+        let song = Song {
+            path: Some(track_src.to_string_lossy().to_string()),
+            title: Some("Airbag".to_string()),
+            artist: Some("Radiohead".to_string()),
+            album: Some("OK Computer".to_string()),
+            source: SongSource::LocalFile,
+            filetype: FileType::Mp3,
+            ..Default::default()
+        };
+        upsert_song(&conn, &song).unwrap();
+        let song_id: i64 = conn
+            .query_row("SELECT id FROM songs WHERE path = ?1", params![song.path], |r| r.get(0))
+            .unwrap();
+        drop(conn);
+
+        let dest_artist_dir = dest_music_dir.join("Radiohead");
+        let dest_album_dir = dest_artist_dir.join("OK Computer");
+        let items = vec![OrganizeApplyItem {
+            song_id,
+            from_path: track_src.to_string_lossy().to_string(),
+            to_path: dest_album_dir.join("01 Airbag.mp3").to_string_lossy().to_string(),
+        }];
+
+        let watcher_paused = Arc::new(AtomicU32::new(0));
+        let self_writes = Arc::new(crate::collection::SelfWriteTracker::new());
+        let result =
+            execute_apply(&db, &watcher_paused, &self_writes, &items, true, true, None).unwrap();
+        assert_eq!(result.moved_count, 1);
+        assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
+
+        // Artist sidecars must have moved to dest_artist_dir, NOT to dest_album_dir
+        assert!(dest_artist_dir.join("artist.jpg").exists());
+        assert!(dest_artist_dir.join("artist.md").exists());
+        assert!(!dest_album_dir.join("artist.jpg").exists());
+        assert!(!dest_album_dir.join("artist.md").exists());
+        assert!(!artist_src.exists());
+        assert!(!bio_src.exists());
+
+        // Empty source folder was cleaned up
+        assert!(!ext_dir.exists());
+    }
+
+    #[test]
+    fn test_organize_track_lyrics_move_and_rename_to_match_audio_stem() {
+        use crate::collection::upsert_song;
+        use crate::db::Database;
+        use crate::models::{FileType, SongSource};
+
+        let base_guard = tempfile::Builder::new()
+            .prefix("luminous_lyric_rename_test_")
+            .tempdir()
+            .unwrap();
+        let base = base_guard.path().to_path_buf();
+        let src_dir = base.join("src");
+        let dst_dir = base.join("dst");
+        fs::create_dir_all(&src_dir).unwrap();
+        fs::create_dir_all(&dst_dir).unwrap();
+
+        let track_src = src_dir.join("01 - Airbag.mp3");
+        let lrc_src = src_dir.join("01 - Airbag.lrc");
+        let srt_src = src_dir.join("01 - Airbag.srt");
+        fs::write(&track_src, b"audio").unwrap();
+        fs::write(&lrc_src, b"[00:01.00] In the next world war").unwrap();
+        fs::write(&srt_src, b"1\n00:00:01,000 --> 00:00:05,000\nSub").unwrap();
+
+        let db = Arc::new(Database::new(base.join("appdata")).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        let song = Song {
+            path: Some(track_src.to_string_lossy().to_string()),
+            title: Some("Airbag".to_string()),
+            artist: Some("Radiohead".to_string()),
+            album: Some("OK Computer".to_string()),
+            source: SongSource::LocalFile,
+            filetype: FileType::Mp3,
+            ..Default::default()
+        };
+        upsert_song(&conn, &song).unwrap();
+        let song_id: i64 = conn
+            .query_row("SELECT id FROM songs WHERE path = ?1", params![song.path], |r| r.get(0))
+            .unwrap();
+        drop(conn);
+
+        let track_dst = dst_dir.join("01 Airbag.flac");
+        let items = vec![OrganizeApplyItem {
+            song_id,
+            from_path: track_src.to_string_lossy().to_string(),
+            to_path: track_dst.to_string_lossy().to_string(),
+        }];
+
+        let watcher_paused = Arc::new(AtomicU32::new(0));
+        let self_writes = Arc::new(crate::collection::SelfWriteTracker::new());
+        let result =
+            execute_apply(&db, &watcher_paused, &self_writes, &items, true, true, None).unwrap();
+        assert_eq!(result.moved_count, 1);
+        assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
+
+        // Lyrics must follow and match destination audio file stem
+        let expected_lrc = dst_dir.join("01 Airbag.lrc");
+        let expected_srt = dst_dir.join("01 Airbag.srt");
+        assert!(expected_lrc.exists(), "01 Airbag.lrc must exist");
+        assert!(expected_srt.exists(), "01 Airbag.srt must exist");
+        assert!(!lrc_src.exists(), "source .lrc must be moved");
+        assert!(!srt_src.exists(), "source .srt must be moved");
+    }
+
+    #[test]
+    fn test_organize_multi_album_generic_cover_remains_in_place_and_clears_art() {
+        use crate::collection::upsert_song;
+        use crate::db::Database;
+        use crate::models::{FileType, SongSource};
+
+        let base_guard = tempfile::Builder::new()
+            .prefix("luminous_multi_album_cover_test_")
+            .tempdir()
+            .unwrap();
+        let base = base_guard.path().to_path_buf();
+        let flat_dir = base.join("Radiohead_Flat");
+        fs::create_dir_all(&flat_dir).unwrap();
+
+        let track1_src = flat_dir.join("airbag.mp3");
+        let track2_src = flat_dir.join("planet_telex.mp3");
+        let generic_cover = flat_dir.join("cover.jpg");
+        fs::write(&track1_src, b"audio 1").unwrap();
+        fs::write(&track2_src, b"audio 2").unwrap();
+        fs::write(&generic_cover, b"ambiguous cover").unwrap();
+
+        let db = Arc::new(Database::new(base.join("appdata")).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        let song1 = Song {
+            path: Some(track1_src.to_string_lossy().to_string()),
+            title: Some("Airbag".to_string()),
+            artist: Some("Radiohead".to_string()),
+            album: Some("OK Computer".to_string()),
+            art_automatic: Some(generic_cover.to_string_lossy().to_string()),
+            source: SongSource::LocalFile,
+            filetype: FileType::Mp3,
+            ..Default::default()
+        };
+        upsert_song(&conn, &song1).unwrap();
+        let id1: i64 = conn
+            .query_row("SELECT id FROM songs WHERE path = ?1", params![song1.path], |r| r.get(0))
+            .unwrap();
+
+        let song2 = Song {
+            path: Some(track2_src.to_string_lossy().to_string()),
+            title: Some("Planet Telex".to_string()),
+            artist: Some("Radiohead".to_string()),
+            album: Some("The Bends".to_string()),
+            art_automatic: Some(generic_cover.to_string_lossy().to_string()),
+            source: SongSource::LocalFile,
+            filetype: FileType::Mp3,
+            ..Default::default()
+        };
+        upsert_song(&conn, &song2).unwrap();
+        let id2: i64 = conn
+            .query_row("SELECT id FROM songs WHERE path = ?1", params![song2.path], |r| r.get(0))
+            .unwrap();
+        drop(conn);
+
+        let album1_dir = flat_dir.join("OK Computer");
+        let album2_dir = flat_dir.join("The Bends");
+        let items = vec![
+            OrganizeApplyItem {
+                song_id: id1,
+                from_path: track1_src.to_string_lossy().to_string(),
+                to_path: album1_dir.join("01 Airbag.mp3").to_string_lossy().to_string(),
+            },
+            OrganizeApplyItem {
+                song_id: id2,
+                from_path: track2_src.to_string_lossy().to_string(),
+                to_path: album2_dir.join("01 Planet Telex.mp3").to_string_lossy().to_string(),
+            },
+        ];
+
+        let watcher_paused = Arc::new(AtomicU32::new(0));
+        let self_writes = Arc::new(crate::collection::SelfWriteTracker::new());
+        let result =
+            execute_apply(&db, &watcher_paused, &self_writes, &items, true, true, None).unwrap();
+        assert_eq!(result.moved_count, 2);
+        assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
+
+        // Ambiguous generic cover.jpg in multi-album folder remains in place
+        assert!(generic_cover.exists(), "generic cover.jpg must remain in place");
+        assert!(!album1_dir.join("cover.jpg").exists());
+        assert!(!album2_dir.join("cover.jpg").exists());
+
+        // In DB, moved songs must disassociate from parent cover art (NULL, not wrong album)
+        let conn = db.pool.get().unwrap();
+        let art1: Option<String> = conn
+            .query_row("SELECT art_automatic FROM songs WHERE id = ?1", params![id1], |r| r.get(0))
+            .unwrap();
+        let art2: Option<String> = conn
+            .query_row("SELECT art_automatic FROM songs WHERE id = ?1", params![id2], |r| r.get(0))
+            .unwrap();
+        assert_eq!(art1, None, "song 1 must not retain parent folder's cover art");
+        assert_eq!(art2, None, "song 2 must not retain parent folder's cover art");
+    }
+
+    #[test]
+    fn test_organize_multi_album_named_cover_moves_to_matching_album() {
+        use crate::collection::upsert_song;
+        use crate::db::Database;
+        use crate::models::{FileType, SongSource};
+
+        let base_guard = tempfile::Builder::new()
+            .prefix("luminous_named_cover_test_")
+            .tempdir()
+            .unwrap();
+        let base = base_guard.path().to_path_buf();
+        let src_dir = base.join("mixed");
+        fs::create_dir_all(&src_dir).unwrap();
+
+        let track1_src = src_dir.join("track1.mp3");
+        let track2_src = src_dir.join("track2.mp3");
+        let ok_cover = src_dir.join("OK Computer.jpg");
+        let generic_cover = src_dir.join("cover.jpg");
+        fs::write(&track1_src, b"audio 1").unwrap();
+        fs::write(&track2_src, b"audio 2").unwrap();
+        fs::write(&ok_cover, b"ok computer cover").unwrap();
+        fs::write(&generic_cover, b"generic cover").unwrap();
+
+        let db = Arc::new(Database::new(base.join("appdata")).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        let song1 = Song {
+            path: Some(track1_src.to_string_lossy().to_string()),
+            title: Some("Airbag".to_string()),
+            artist: Some("Radiohead".to_string()),
+            album: Some("OK Computer".to_string()),
+            source: SongSource::LocalFile,
+            filetype: FileType::Mp3,
+            ..Default::default()
+        };
+        upsert_song(&conn, &song1).unwrap();
+        let id1: i64 = conn
+            .query_row("SELECT id FROM songs WHERE path = ?1", params![song1.path], |r| r.get(0))
+            .unwrap();
+
+        let song2 = Song {
+            path: Some(track2_src.to_string_lossy().to_string()),
+            title: Some("Planet Telex".to_string()),
+            artist: Some("Radiohead".to_string()),
+            album: Some("The Bends".to_string()),
+            source: SongSource::LocalFile,
+            filetype: FileType::Mp3,
+            ..Default::default()
+        };
+        upsert_song(&conn, &song2).unwrap();
+        let id2: i64 = conn
+            .query_row("SELECT id FROM songs WHERE path = ?1", params![song2.path], |r| r.get(0))
+            .unwrap();
+        drop(conn);
+
+        let album1_dir = base.join("Radiohead").join("OK Computer");
+        let album2_dir = base.join("Radiohead").join("The Bends");
+        let items = vec![
+            OrganizeApplyItem {
+                song_id: id1,
+                from_path: track1_src.to_string_lossy().to_string(),
+                to_path: album1_dir.join("01 Airbag.mp3").to_string_lossy().to_string(),
+            },
+            OrganizeApplyItem {
+                song_id: id2,
+                from_path: track2_src.to_string_lossy().to_string(),
+                to_path: album2_dir.join("01 Planet Telex.mp3").to_string_lossy().to_string(),
+            },
+        ];
+
+        let watcher_paused = Arc::new(AtomicU32::new(0));
+        let self_writes = Arc::new(crate::collection::SelfWriteTracker::new());
+        let result =
+            execute_apply(&db, &watcher_paused, &self_writes, &items, true, true, None).unwrap();
+        assert_eq!(result.moved_count, 2);
+        assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
+
+        // Named album cover moves to matching destination album directory
+        assert!(album1_dir.join("OK Computer.jpg").exists(), "OK Computer.jpg must move to album folder");
+        assert!(!ok_cover.exists());
+
+        // Generic cover remains in place because multiple albums were organized
+        assert!(generic_cover.exists(), "generic cover.jpg must remain in place");
     }
 }
