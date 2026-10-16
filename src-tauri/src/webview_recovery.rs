@@ -144,8 +144,10 @@ mod windows_impl {
             }
 
             COREWEBVIEW2_PROCESS_FAILED_KIND_BROWSER_PROCESS_EXITED
-            | COREWEBVIEW2_PROCESS_FAILED_KIND_UNKNOWN_PROCESS_EXITED
-            | _ => ProcessFailureAction::Fatal,
+            | COREWEBVIEW2_PROCESS_FAILED_KIND_UNKNOWN_PROCESS_EXITED => {
+                ProcessFailureAction::Fatal
+            }
+            _ => ProcessFailureAction::Fatal,
         }
     }
 
