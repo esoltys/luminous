@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
 import { toastStore } from "./toast.svelte";
-import { organizeStore } from "./organizer.svelte";
+import { organizeStore, computeOrganizeConsequences } from "./organizer.svelte";
 import { TOAST_DURATION_MS } from "../constants";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -129,5 +129,52 @@ describe("organizeStore", () => {
     vi.advanceTimersByTime(2000);
 
     expect(toastStore.show).not.toHaveBeenCalled();
+  });
+
+  it("updates isDraftActive state via setDraftActive", () => {
+    expect(organizeStore.isDraftActive).toBe(false);
+    organizeStore.setDraftActive(true);
+    expect(organizeStore.isDraftActive).toBe(true);
+    organizeStore.setDraftActive(false);
+    expect(organizeStore.isDraftActive).toBe(false);
+  });
+
+  describe("computeOrganizeConsequences", () => {
+    it("computes file and folder counts excluding unchanged, collisions, and errors", () => {
+      const items = [
+        { from_path: "/music/a.mp3", to_path: "/music/artist/a.mp3", status: "ok" },
+        { from_path: "/music/b.mp3", to_path: "/music/artist/b.mp3", status: "ok" },
+        { from_path: "/music/c.mp3", to_path: "/music/other/c.mp3", status: "missing_tag" },
+        // unchanged item
+        { from_path: "/music/d.mp3", to_path: "/music/d.mp3", status: "unchanged" },
+        // collision item
+        { from_path: "/music/e.mp3", to_path: "/music/artist/e.mp3", status: "collision" },
+        // collision masked as ok with error message
+        { from_path: "/music/f.mp3", to_path: "/music/artist/f.mp3", status: "ok", error_message: "Collision" },
+        // error item
+        { from_path: "/music/g.mp3", to_path: "/music/artist/g.mp3", status: "error" },
+      ];
+
+      const res = computeOrganizeConsequences(items, {
+        cleanEmptyDirs: true,
+        moveExtraFiles: false,
+      });
+
+      expect(res.fileCount).toBe(3);
+      expect(res.folderCount).toBe(2); // "/music/artist" and "/music/other"
+      expect(res.cleanEmptyDirs).toBe(true);
+      expect(res.moveExtraFiles).toBe(false);
+    });
+
+    it("returns zero counts when items list is empty", () => {
+      const res = computeOrganizeConsequences([], {
+        cleanEmptyDirs: false,
+        moveExtraFiles: true,
+      });
+      expect(res.fileCount).toBe(0);
+      expect(res.folderCount).toBe(0);
+      expect(res.cleanEmptyDirs).toBe(false);
+      expect(res.moveExtraFiles).toBe(true);
+    });
   });
 });

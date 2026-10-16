@@ -16,6 +16,48 @@ interface OrganizeConfig {
   move_extra_files: boolean;
 }
 
+export interface OrganizeConsequences {
+  fileCount: number;
+  folderCount: number;
+  cleanEmptyDirs: boolean;
+  moveExtraFiles: boolean;
+}
+
+/**
+ * Computes the aggregate consequences of applying an organize operation from preview items.
+ * Only items eligible to be moved (ok or missing_tag without collisions and with from_path != to_path)
+ * are counted towards moving files and destination folders.
+ */
+export function computeOrganizeConsequences(
+  items: Array<{ from_path?: string; to_path?: string; status?: string; error_message?: string | null }>,
+  options: { cleanEmptyDirs: boolean; moveExtraFiles: boolean }
+): OrganizeConsequences {
+  const movingItems = items.filter((item) => {
+    const s = String(item.status || "").toLowerCase();
+    const canMove = s === "ok" || s === "missing_tag" || s === "missingtag";
+    const hasCollision = s === "collision" || (s === "ok" && item.error_message);
+    const fromPath = item.from_path ?? "";
+    const toPath = item.to_path ?? "";
+    return canMove && !hasCollision && fromPath.length > 0 && toPath.length > 0 && fromPath !== toPath;
+  });
+
+  const targetFolders = new Set<string>();
+  for (const item of movingItems) {
+    const toPath = item.to_path ?? "";
+    const lastSep = Math.max(toPath.lastIndexOf("/"), toPath.lastIndexOf("\\"));
+    if (lastSep > 0) {
+      targetFolders.add(toPath.slice(0, lastSep));
+    }
+  }
+
+  return {
+    fileCount: movingItems.length,
+    folderCount: targetFolders.size,
+    cleanEmptyDirs: options.cleanEmptyDirs,
+    moveExtraFiles: options.moveExtraFiles,
+  };
+}
+
 interface AutoOrganizeResult {
   moved_count: number;
   duplicates_count: number;
@@ -35,10 +77,15 @@ class OrganizerStore {
   cleanEmptyDirs = $state<boolean>(true);
   moveExtraFiles = $state<boolean>(true);
   isLoaded = $state<boolean>(false);
+  isDraftActive = $state<boolean>(false);
 
   private unlisten: UnlistenFn | null = null;
   private pendingMovedCount = 0;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  setDraftActive(active: boolean) {
+    this.isDraftActive = active;
+  }
 
   async init() {
     try {

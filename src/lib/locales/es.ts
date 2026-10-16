@@ -1779,7 +1779,27 @@ export const es = {
     unknownError: "Error desconocido",
     applying: "Aplicando...",
     close: "Cerrar",
-    toastErrors: "Archivos que no se pudieron organizar: {count}"
+    toastErrors: "Archivos que no se pudieron organizar: {count}",
+    confirmApplyTitle: "Organizar archivos",
+    confirmApplyMessage: "Está a punto de mover {files} a {folders}.",
+    confirmApplyCleanDirs: "Se eliminarán las carpetas de origen vacías.",
+    confirmApplyMoveExtra: "Los archivos complementarios (portadas, letras y hojas CUE) también se moverán.",
+    confirmApplyAutoOrganize: "La organización automática adoptará esta plantilla para todas las pistas futuras.",
+    confirmApplyCustomDest: "Carpeta de destino: {path}",
+    confirmApplyBtn: "Organizar archivos",
+    confirmAutoOrganizeTitle: "Activar organización automática",
+    confirmAutoOrganizeMessage: "Al activar la organización automática, las pistas existentes de su biblioteca se reorganizarán de inmediato según la plantilla actual y los archivos se moverán automáticamente en el disco al editar etiquetas o añadir música. ¿Seguro que desea activar la organización automática?",
+    confirmAutoOrganizeBtn: "Activar organización automática",
+    filesCount: {
+      one: "{count} archivo",
+      other: "{count} archivos"
+    },
+    foldersCount: {
+      one: "{count} carpeta",
+      other: "{count} carpetas"
+    },
+    draftModifiedBadge: "Plantilla modificada — organización automática en pausa",
+    revertDraftBtn: "Restablecer"
   },
   picard: {
     openInPicard: "Abrir en Picard",

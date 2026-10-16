@@ -1881,7 +1881,31 @@ export const ru = {
     unknownError: "Неизвестная ошибка",
     applying: "Применение…",
     close: "Закрыть",
-    toastErrors: "Не удалось упорядочить файлов: {count}"
+    toastErrors: "Не удалось упорядочить файлов: {count}",
+    confirmApplyTitle: "Упорядочить файлы",
+    confirmApplyMessage: "Вы собираетесь переместить {files} в {folders}.",
+    confirmApplyCleanDirs: "Пустые исходные папки будут удалены.",
+    confirmApplyMoveExtra: "Сопутствующие файлы (обложки, тексты песен и таблицы CUE) также будут перемещены.",
+    confirmApplyAutoOrganize: "Автоупорядочение применит этот шаблон ко всем будущим трекам.",
+    confirmApplyCustomDest: "Папка назначения: {path}",
+    confirmApplyBtn: "Упорядочить файлы",
+    confirmAutoOrganizeTitle: "Включить автоупорядочение",
+    confirmAutoOrganizeMessage: "Включение автоупорядочения немедленно реорганизует существующие треки в медиатеке по текущему шаблону и будет автоматически перемещать файлы на диске при изменении тегов или добавлении музыки. Вы уверены, что хотите включить автоупорядочение?",
+    confirmAutoOrganizeBtn: "Включить автоупорядочение",
+    filesCount: {
+      one: "{count} файл",
+      few: "{count} файла",
+      many: "{count} файлов",
+      other: "{count} файла"
+    },
+    foldersCount: {
+      one: "{count} папку",
+      few: "{count} папки",
+      many: "{count} папок",
+      other: "{count} папки"
+    },
+    draftModifiedBadge: "Шаблон изменён — автоупорядочение приостановлено",
+    revertDraftBtn: "Сбросить"
   },
   picard: {
     openInPicard: "Открыть в Picard",

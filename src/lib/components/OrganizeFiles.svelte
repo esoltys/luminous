@@ -4,7 +4,8 @@
   import { open } from "@tauri-apps/plugin-dialog";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
-  import { organizeStore } from "../stores/organizer.svelte";
+  import { organizeStore, computeOrganizeConsequences, type OrganizeConsequences } from "../stores/organizer.svelte";
+  import ConfirmDialog from "./ConfirmDialog.svelte";
   import { TOAST_DURATION_MS } from "../constants";
   import { portal } from "../utils/portal";
   import {
@@ -240,7 +241,7 @@
   let customDestinationDir = $state<string>("");
   let destinationDir = $derived(destinationMode === "custom" ? customDestinationDir : "");
 
-  let initializedFromStore = false;
+  let initializedFromStore = $state(false);
   $effect(() => {
     if (organizeStore.isLoaded && !initializedFromStore) {
       initializedFromStore = true;
@@ -257,21 +258,35 @@
     }
   });
 
+  let isDraftModified = $derived(
+    initializedFromStore &&
+      organizeStore.isLoaded &&
+      (template !== organizeStore.template ||
+        templatePreset !== organizeStore.preset ||
+        destinationMode !== organizeStore.destinationMode ||
+        customDestinationDir !== organizeStore.customDestinationDir ||
+        replaceSpaces !== organizeStore.replaceSpaces ||
+        asciiOnly !== organizeStore.asciiOnly ||
+        cleanEmptyDirs !== organizeStore.cleanEmptyDirs ||
+        moveExtraFiles !== organizeStore.moveExtraFiles)
+  );
+
   $effect(() => {
-    const cfg = {
-      template,
-      preset: templatePreset,
-      destination_mode: destinationMode,
-      custom_destination_dir: customDestinationDir,
-      replace_spaces: replaceSpaces,
-      ascii_only: asciiOnly,
-      clean_empty_dirs: cleanEmptyDirs,
-      move_extra_files: moveExtraFiles,
-    };
-    if (initializedFromStore && organizeStore.isLoaded) {
-      organizeStore.updateConfig(cfg);
-    }
+    organizeStore.setDraftActive(isDraftModified);
   });
+
+  function revertDraft() {
+    templatePreset = (organizeStore.preset as TemplatePresetId) || "default";
+    if (organizeStore.preset === "custom") {
+      customTemplate = organizeStore.template || DEFAULT_TEMPLATE;
+    }
+    replaceSpaces = organizeStore.replaceSpaces;
+    asciiOnly = organizeStore.asciiOnly;
+    cleanEmptyDirs = organizeStore.cleanEmptyDirs;
+    moveExtraFiles = organizeStore.moveExtraFiles;
+    destinationMode = organizeStore.destinationMode;
+    customDestinationDir = organizeStore.customDestinationDir;
+  }
 
   $effect(() => {
     if (effectiveOpen) {
@@ -426,7 +441,7 @@
       lastAppliedRequestKey = key;
     } else if (key !== lastAppliedRequestKey) {
       lastAppliedRequestKey = key;
-      handleApply();
+      requestApply();
     }
   });
 
@@ -438,10 +453,10 @@
       if (!embedded) onClose?.();
     } else if (e.key === "Enter") {
       const target = e.target as HTMLElement;
-      if (target.tagName === "BUTTON" || target.tagName === "TEXTAREA") return;
-      if (!canApply) return;
+      if (target.tagName === "BUTTON" || target.tagName === "TEXTAREA" || target.tagName === "INPUT") return;
+      if (!canApply || showConfirmApply) return;
       e.preventDefault();
-      handleApply();
+      requestApply();
     }
   }
 
@@ -511,7 +526,43 @@
     };
   });
 
-  async function handleApply() {
+  let showConfirmApply = $state(false);
+  let pendingConsequences = $state<OrganizeConsequences | null>(null);
+
+  function requestApply() {
+    if (!canApply || isApplying) return;
+    const consequences = computeOrganizeConsequences(items, { cleanEmptyDirs, moveExtraFiles });
+    if (consequences.fileCount === 0) return;
+    pendingConsequences = consequences;
+    showConfirmApply = true;
+  }
+
+  let confirmApplyMessage = $derived.by(() => {
+    if (!pendingConsequences) return "";
+    let msg = i18n.t("organizer.confirmApplyMessage", {
+      files: i18n.plural("organizer.filesCount", pendingConsequences.fileCount),
+      folders: i18n.plural("organizer.foldersCount", pendingConsequences.folderCount),
+    });
+    const bullets: string[] = [];
+    if (pendingConsequences.cleanEmptyDirs) {
+      bullets.push(i18n.t("organizer.confirmApplyCleanDirs"));
+    }
+    if (pendingConsequences.moveExtraFiles) {
+      bullets.push(i18n.t("organizer.confirmApplyMoveExtra"));
+    }
+    if (organizeStore.autoOrganize) {
+      bullets.push(i18n.t("organizer.confirmApplyAutoOrganize"));
+    }
+    if (destinationMode === "custom" && customDestinationDir) {
+      bullets.push(i18n.t("organizer.confirmApplyCustomDest", { path: customDestinationDir }));
+    }
+    if (bullets.length > 0) {
+      msg += "\n\n" + bullets.map((b) => `• ${b}`).join("\n");
+    }
+    return msg;
+  });
+
+  async function executeApply() {
     if (!canApply) return;
     isApplying = true;
     errorMessage = null;
@@ -533,6 +584,18 @@
           moveExtraFiles: moveExtraFiles,
         }
       );
+
+      // Persist confirmed template and options so future operations and Auto-Organize use them
+      await organizeStore.updateConfig({
+        template,
+        preset: templatePreset,
+        destination_mode: destinationMode,
+        custom_destination_dir: customDestinationDir,
+        replace_spaces: replaceSpaces,
+        ascii_only: asciiOnly,
+        clean_empty_dirs: cleanEmptyDirs,
+        move_extra_files: moveExtraFiles,
+      });
 
       if (result.errors && result.errors.length > 0) {
         errorMessage = result.errors.join("; ");
@@ -610,6 +673,34 @@
 
 {#snippet templateSection()}
   <div class="space-y-4">
+    {#if isDraftModified && organizeStore.autoOrganize}
+      <div class="flex items-center justify-between p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200">
+        <div class="flex items-center gap-2 min-w-0">
+          <AlertTriangle class="w-4 h-4 shrink-0 text-amber-400" />
+          <span class="text-xs font-medium truncate">
+            {i18n.t("organizer.draftModifiedBadge")}
+          </span>
+        </div>
+        <button
+          type="button"
+          onclick={revertDraft}
+          class="text-xs underline hover:text-white shrink-0 ml-2 font-medium"
+        >
+          {i18n.t("organizer.revertDraftBtn")}
+        </button>
+      </div>
+    {:else if isDraftModified}
+      <div class="flex items-center justify-end">
+        <button
+          type="button"
+          onclick={revertDraft}
+          class="text-xs text-brand-text-secondary hover:text-brand-text-primary underline font-medium"
+        >
+          {i18n.t("organizer.revertDraftBtn")}
+        </button>
+      </div>
+    {/if}
+
     <div class="grid grid-cols-1 @xl:grid-cols-3 gap-3">
       {#each TEMPLATE_PRESETS as preset (preset.id)}
         <button
@@ -906,7 +997,7 @@
 {#snippet applyButton()}
   <Button
     variant="primary"
-    onclick={handleApply}
+    onclick={requestApply}
     disabled={!canApply}
   >
     {#if isApplying}
@@ -1027,5 +1118,22 @@
         </div>
       </div>
     </div>
+  {/if}
+
+  {#if showConfirmApply}
+    <ConfirmDialog
+      title={i18n.t("organizer.confirmApplyTitle")}
+      message={confirmApplyMessage}
+      confirmLabel={i18n.t("organizer.confirmApplyBtn")}
+      cancelLabel={i18n.t("organizer.cancel")}
+      danger={false}
+      onConfirm={() => {
+        showConfirmApply = false;
+        executeApply();
+      }}
+      onCancel={() => {
+        showConfirmApply = false;
+      }}
+    />
   {/if}
 {/if}
