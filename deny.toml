@@ -58,5 +58,8 @@ ignore = [
     { id = "RUSTSEC-2025-0080", reason = "Transitive dependency via webkit2gtk/tray-icon (archived gtk-rs 0.18 GTK3 bindings)" },
     { id = "RUSTSEC-2025-0100", reason = "Transitive dependency via webkit2gtk/tray-icon (archived gtk-rs 0.18 GTK3 bindings)" },
     { id = "RUSTSEC-2025-0098", reason = "Transitive dependency via webkit2gtk/tray-icon (archived gtk-rs 0.18 GTK3 bindings)" },
-    { id = "RUSTSEC-2024-0429", reason = "Transitive dependency via souvlaki MPRIS / zbus 3.x" }
+    { id = "RUSTSEC-2024-0429", reason = "Transitive dependency via souvlaki MPRIS / zbus 3.x" },
+    { id = "RUSTSEC-2026-0367", reason = "Transitive dependency via tauri-plugin-updater (zip 4.x extraction vulnerabilities)" },
+    { id = "RUSTSEC-2026-0368", reason = "Transitive dependency via tauri-plugin-updater (zip 4.x extraction vulnerabilities)" },
+    { id = "RUSTSEC-2026-0369", reason = "Transitive dependency via tauri-plugin-updater (zip 4.x extraction vulnerabilities)" }
 ]
