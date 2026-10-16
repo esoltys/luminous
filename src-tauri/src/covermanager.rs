@@ -519,6 +519,39 @@ fn write_thumb_file(thumbs_dir: &Path, key: &str, ext: &str, data: &[u8]) {
     }
 }
 
+/// Pre-generates the standard card-sized thumbnails (384 px and 256 px) from
+/// an intermediate image (at most 600 px) in a single pass (#1648).
+/// Returns the encoded bytes for `max_edge` if it matches 256 or 384.
+fn generate_card_tiers(
+    thumbs_dir: &Path,
+    img_intermediate: &image::DynamicImage,
+    format: image::ImageFormat,
+    ext: &str,
+    w256_key: &str,
+    w384_key: &str,
+    max_edge: u32,
+) -> Option<Vec<u8>> {
+    let img_384 = img_intermediate.resize(384, 384, image::imageops::FilterType::Triangle);
+    let bytes_384 = encode_image(&img_384, format);
+    if let Some(ref b) = bytes_384 {
+        write_thumb_file(thumbs_dir, w384_key, ext, b);
+    }
+
+    let img_256 = img_384.resize(256, 256, image::imageops::FilterType::Triangle);
+    let bytes_256 = encode_image(&img_256, format);
+    if let Some(ref b) = bytes_256 {
+        write_thumb_file(thumbs_dir, w256_key, ext, b);
+    }
+
+    if max_edge == 256 {
+        bytes_256
+    } else if max_edge == 384 {
+        bytes_384
+    } else {
+        None
+    }
+}
+
 /// Serve `source` downscaled to fit `max_edge`, from `covers_dir/thumbs/`
 /// when it was made before. Keyed on `tag` + path + mtime + size, so an
 /// edited file is redone; folder-art thumbnails use an empty `tag`.
@@ -564,7 +597,8 @@ fn serve_cached_downscale(
         return image_response(&data);
     }
 
-    // Coalesce concurrent requests for the same source thumbnail.
+    // Coalesce concurrent requests for the same source thumbnail: thread contention
+    // during fast grid scrolls waits on `base_key` rather than decoding redundantly.
     let _guard = {
         let mut inflight = THUMB_INFLIGHT.lock();
         loop {
@@ -608,20 +642,21 @@ fn serve_cached_downscale(
                     write_thumb_file(&thumbs_dir, &key, ext_600, &data_600);
                     return image_response(&data_600);
                 }
-                let img_target = img_600.resize(max_edge, max_edge, image::imageops::FilterType::Triangle);
+                if let Some(bytes) = generate_card_tiers(
+                    &thumbs_dir,
+                    &img_600,
+                    format,
+                    ext_600,
+                    &w256_key,
+                    &w384_key,
+                    max_edge,
+                ) {
+                    return image_response(&bytes);
+                }
+                let img_target =
+                    img_600.resize(max_edge, max_edge, image::imageops::FilterType::Triangle);
                 if let Some(target_bytes) = encode_image(&img_target, format) {
                     write_thumb_file(&thumbs_dir, &key, ext_600, &target_bytes);
-                    if max_edge == 256 && find_cached_thumb(&thumbs_dir, &w384_key).is_none() {
-                        let img_384 = img_600.resize(384, 384, image::imageops::FilterType::Triangle);
-                        if let Some(bytes_384) = encode_image(&img_384, format) {
-                            write_thumb_file(&thumbs_dir, &w384_key, ext_600, &bytes_384);
-                        }
-                    } else if max_edge == 384 && find_cached_thumb(&thumbs_dir, &w256_key).is_none() {
-                        let img_256 = img_600.resize(256, 256, image::imageops::FilterType::Triangle);
-                        if let Some(bytes_256) = encode_image(&img_256, format) {
-                            write_thumb_file(&thumbs_dir, &w256_key, ext_600, &bytes_256);
-                        }
-                    }
                     return image_response(&target_bytes);
                 }
             }
@@ -652,12 +687,17 @@ fn serve_cached_downscale(
                 return image_response(cleaned);
             }
             let img_target = img.resize(max_edge, max_edge, image::imageops::FilterType::Triangle);
-            let target_bytes = encode_image(&img_target, format).unwrap_or_else(|| cleaned.to_vec());
+            let target_bytes =
+                encode_image(&img_target, format).unwrap_or_else(|| cleaned.to_vec());
             write_thumb_file(&thumbs_dir, &key, ext, &target_bytes);
             return image_response(&target_bytes);
         }
 
-        let img_600 = img.resize(CACHE_MAX_EDGE, CACHE_MAX_EDGE, image::imageops::FilterType::Triangle);
+        let img_600 = img.resize(
+            CACHE_MAX_EDGE,
+            CACHE_MAX_EDGE,
+            image::imageops::FilterType::Triangle,
+        );
         let bytes_600 = encode_image(&img_600, format);
         if let Some(ref b) = bytes_600 {
             write_thumb_file(&thumbs_dir, &base_key, ext, b);
@@ -667,31 +707,21 @@ fn serve_cached_downscale(
             return image_response(bytes_600.as_deref().unwrap_or(cleaned));
         }
 
-        let img_384 = img_600.resize(384, 384, image::imageops::FilterType::Triangle);
-        let bytes_384 = encode_image(&img_384, format);
-        if let Some(ref b) = bytes_384 {
-            write_thumb_file(&thumbs_dir, &w384_key, ext, b);
-        }
-
-        let img_256 = img_384.resize(256, 256, image::imageops::FilterType::Triangle);
-        let bytes_256 = encode_image(&img_256, format);
-        if let Some(ref b) = bytes_256 {
-            write_thumb_file(&thumbs_dir, &w256_key, ext, b);
-        }
-
-        if max_edge == 256 {
-            if let Some(ref b) = bytes_256 {
-                return image_response(b);
-            }
-        }
-        if max_edge == 384 {
-            if let Some(ref b) = bytes_384 {
-                return image_response(b);
-            }
+        if let Some(bytes) = generate_card_tiers(
+            &thumbs_dir,
+            &img_600,
+            format,
+            ext,
+            &w256_key,
+            &w384_key,
+            max_edge,
+        ) {
+            return image_response(&bytes);
         }
 
         let img_target = img_600.resize(max_edge, max_edge, image::imageops::FilterType::Triangle);
-        let target_bytes = encode_image(&img_target, format).unwrap_or_else(|| cleaned.to_vec());
+        let target_bytes =
+                encode_image(&img_target, format).unwrap_or_else(|| cleaned.to_vec());
         write_thumb_file(&thumbs_dir, &key, ext, &target_bytes);
         return image_response(&target_bytes);
     }
@@ -702,27 +732,16 @@ fn serve_cached_downscale(
         return image_response(cleaned);
     }
 
-    let img_384 = img.resize(384, 384, image::imageops::FilterType::Triangle);
-    let bytes_384 = encode_image(&img_384, format);
-    if let Some(ref b) = bytes_384 {
-        write_thumb_file(&thumbs_dir, &w384_key, ext, b);
-    }
-
-    let img_256 = img_384.resize(256, 256, image::imageops::FilterType::Triangle);
-    let bytes_256 = encode_image(&img_256, format);
-    if let Some(ref b) = bytes_256 {
-        write_thumb_file(&thumbs_dir, &w256_key, ext, b);
-    }
-
-    if max_edge == 256 {
-        if let Some(ref b) = bytes_256 {
-            return image_response(b);
-        }
-    }
-    if max_edge == 384 {
-        if let Some(ref b) = bytes_384 {
-            return image_response(b);
-        }
+    if let Some(bytes) = generate_card_tiers(
+        &thumbs_dir,
+        &img,
+        format,
+        ext,
+        &w256_key,
+        &w384_key,
+        max_edge,
+    ) {
+        return image_response(&bytes);
     }
 
     let img_target = img.resize(max_edge, max_edge, image::imageops::FilterType::Triangle);
