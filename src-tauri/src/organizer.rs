@@ -902,10 +902,10 @@ pub fn resolve_destination_artist_dir(
     artist_name: &str,
     library_dirs: &[String],
 ) -> Option<PathBuf> {
-    let is_lib_dir = |p: &Path| -> bool {
+    let is_lib_dir = |candidate: &Path| -> bool {
         library_dirs
             .iter()
-            .any(|lib| normalize_path_cmp(Path::new(lib), p))
+            .any(|lib| normalize_path_cmp(Path::new(lib), candidate))
     };
 
     let artist_clean = artist_name.trim();
@@ -970,6 +970,22 @@ fn fetch_songs_meta_for_organize(
     map
 }
 
+fn record_companion_move(
+    moves: &mut Vec<CompanionMove>,
+    planned_srcs: &mut HashSet<PathBuf>,
+    src: PathBuf,
+    dst: PathBuf,
+    scope: CompanionScope,
+) {
+    if planned_srcs.insert(src.clone()) {
+        moves.push(CompanionMove {
+            src_path: src,
+            dst_path: dst,
+            scope,
+        });
+    }
+}
+
 /// Plans companion relocations for a batch of applied song moves.
 ///
 /// Evaluates track-level companions directly from `items`, and for source directories
@@ -999,31 +1015,34 @@ pub fn plan_companion_relocations(
         let Some(dst_parent) = dst_path.parent() else {
             continue;
         };
-        let Some(src_stem) = src_path.file_stem().and_then(|s| s.to_str()) else {
+        let Some(src_stem) = src_path.file_stem().map(|s| s.to_string_lossy()) else {
             continue;
         };
-        let Some(dst_stem) = dst_path.file_stem().and_then(|s| s.to_str()) else {
+        let Some(dst_stem) = dst_path.file_stem().map(|s| s.to_string_lossy()) else {
             continue;
         };
 
         if let Ok(entries) = fs::read_dir(src_parent) {
             for entry in entries.filter_map(|e| e.ok()) {
-                let p = entry.path();
-                if p.is_file() {
-                    if let Some(ext) = p.extension().and_then(|e| e.to_str()) {
+                let track_companion_path = entry.path();
+                if track_companion_path.is_file() {
+                    if let Some(ext) = track_companion_path.extension().and_then(|e| e.to_str()) {
                         let ext_lower = ext.to_lowercase();
                         if LYRIC_EXTS.contains(&ext_lower.as_str()) {
-                            if let Some(stem) = p.file_stem().and_then(|s| s.to_str()) {
-                                if stem.eq_ignore_ascii_case(src_stem) {
-                                    if planned_srcs.insert(p.clone()) {
-                                        let dst_lyric =
-                                            dst_parent.join(format!("{}.{}", dst_stem, ext_lower));
-                                        moves.push(CompanionMove {
-                                            src_path: p,
-                                            dst_path: dst_lyric,
-                                            scope: CompanionScope::Track,
-                                        });
-                                    }
+                            if let Some(stem) = track_companion_path
+                                .file_stem()
+                                .map(|s| s.to_string_lossy())
+                            {
+                                if stem.eq_ignore_ascii_case(&src_stem) {
+                                    let dst_lyric =
+                                        dst_parent.join(format!("{}.{}", dst_stem, ext_lower));
+                                    record_companion_move(
+                                        &mut moves,
+                                        &mut planned_srcs,
+                                        track_companion_path,
+                                        dst_lyric,
+                                        CompanionScope::Track,
+                                    );
                                 }
                             }
                         }
@@ -1102,15 +1121,18 @@ pub fn plan_companion_relocations(
         }
 
         for entry in entries {
-            let p = entry.path();
-            if !p.is_file() || is_audio_file(&p) || planned_srcs.contains(&p) {
+            let companion_path = entry.path();
+            if !companion_path.is_file()
+                || is_audio_file(&companion_path)
+                || planned_srcs.contains(&companion_path)
+            {
                 continue;
             }
 
-            let Some(scope) = classify_companion_file(&p) else {
+            let Some(scope) = classify_companion_file(&companion_path) else {
                 continue;
             };
-            let Some(file_name) = p.file_name() else {
+            let Some(file_name) = companion_path.file_name() else {
                 continue;
             };
 
@@ -1124,21 +1146,20 @@ pub fn plan_companion_relocations(
                         let target_artist = &distinct_artist_dirs[0];
                         if !normalize_path_cmp(&src_dir, target_artist) {
                             let dst_file = target_artist.join(file_name);
-                            if planned_srcs.insert(p.clone()) {
-                                moves.push(CompanionMove {
-                                    src_path: p,
-                                    dst_path: dst_file,
-                                    scope: CompanionScope::Artist,
-                                });
-                            }
+                            record_companion_move(
+                                &mut moves,
+                                &mut planned_srcs,
+                                companion_path,
+                                dst_file,
+                                CompanionScope::Artist,
+                            );
                         }
                     }
                 }
                 CompanionScope::Album | CompanionScope::Other => {
-                    let stem = p
+                    let stem = companion_path
                         .file_stem()
-                        .and_then(|s| s.to_str())
-                        .map(|s| s.to_lowercase())
+                        .map(|s| s.to_string_lossy().to_lowercase())
                         .unwrap_or_default();
 
                     // If image matches a specific album title among the destination albums
@@ -1156,13 +1177,13 @@ pub fn plan_companion_relocations(
                         }) {
                             if !normalize_path_cmp(&src_dir, &target_dir) {
                                 let dst_file = target_dir.join(file_name);
-                                if planned_srcs.insert(p.clone()) {
-                                    moves.push(CompanionMove {
-                                        src_path: p,
-                                        dst_path: dst_file,
-                                        scope: CompanionScope::Album,
-                                    });
-                                }
+                                record_companion_move(
+                                    &mut moves,
+                                    &mut planned_srcs,
+                                    companion_path,
+                                    dst_file,
+                                    CompanionScope::Album,
+                                );
                             }
                             continue;
                         }
@@ -1173,13 +1194,13 @@ pub fn plan_companion_relocations(
                         let target_album = &distinct_album_dirs[0];
                         if !normalize_path_cmp(&src_dir, target_album) {
                             let dst_file = target_album.join(file_name);
-                            if planned_srcs.insert(p.clone()) {
-                                moves.push(CompanionMove {
-                                    src_path: p,
-                                    dst_path: dst_file,
-                                    scope,
-                                });
-                            }
+                            record_companion_move(
+                                &mut moves,
+                                &mut planned_srcs,
+                                companion_path,
+                                dst_file,
+                                scope,
+                            );
                         }
                     }
                 }
@@ -1198,12 +1219,12 @@ pub fn execute_companion_moves(
 ) -> Vec<String> {
     let mut errors = Vec::new();
 
-    for m in moves {
-        if normalize_path_cmp(&m.src_path, &m.dst_path) {
+    for companion_move in moves {
+        if normalize_path_cmp(&companion_move.src_path, &companion_move.dst_path) {
             continue;
         }
 
-        if let Some(parent) = m.dst_path.parent() {
+        if let Some(parent) = companion_move.dst_path.parent() {
             if let Err(e) = create_dir_all_case_correct(parent) {
                 errors.push(format!(
                     "Failed to create directory {}: {}",
@@ -1214,30 +1235,35 @@ pub fn execute_companion_moves(
             }
         }
 
-        if m.dst_path.exists() {
+        if companion_move.dst_path.exists() {
             // Do not overwrite existing files
             continue;
         }
 
         if let Some(tracker) = self_writes {
-            tracker.mark_written([m.src_path.clone(), m.dst_path.clone()]);
+            tracker.mark_written([
+                companion_move.src_path.clone(),
+                companion_move.dst_path.clone(),
+            ]);
         }
 
-        let moved = fs::rename(&m.src_path, &m.dst_path).or_else(|_| {
-            fs::copy(&m.src_path, &m.dst_path).and_then(|_| fs::remove_file(&m.src_path))
+        // Try direct filesystem rename; fall back to copy-and-remove for cross-volume / cross-mount relocations
+        let move_res = fs::rename(&companion_move.src_path, &companion_move.dst_path).or_else(|_| {
+            fs::copy(&companion_move.src_path, &companion_move.dst_path)
+                .and_then(|_| fs::remove_file(&companion_move.src_path))
         });
 
-        match moved {
+        match move_res {
             Ok(_) => {
-                if m.scope == CompanionScope::Album {
+                if companion_move.scope == CompanionScope::Album {
                     // Folder-level cover art is stored as an absolute
                     // path in art_automatic (see scan_folder_art()) —
                     // update it so moved albums keep their cover art.
                     let _ = conn.execute(
                         "UPDATE songs SET art_automatic = ?1 WHERE art_automatic = ?2",
                         params![
-                            m.dst_path.to_string_lossy().to_string(),
-                            m.src_path.to_string_lossy().to_string()
+                            companion_move.dst_path.to_string_lossy().to_string(),
+                            companion_move.src_path.to_string_lossy().to_string()
                         ],
                     );
                 }
@@ -1245,8 +1271,8 @@ pub fn execute_companion_moves(
             Err(e) => {
                 errors.push(format!(
                     "Failed to move companion {} -> {}: {}",
-                    m.src_path.display(),
-                    m.dst_path.display(),
+                    companion_move.src_path.display(),
+                    companion_move.dst_path.display(),
                     e
                 ));
             }
