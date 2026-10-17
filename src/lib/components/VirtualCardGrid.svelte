@@ -10,9 +10,9 @@
    * scrollbar honest. Scrolls with its nearest scrollable ancestor, so it can
    * sit under a sticky header in an ordinary scrolling view.
    *
-   * Every row is held to one height, so cards may differ in height (an album
-   * with no genre chip is shorter): it's the tallest row measured so far at
-   * the current column width, and the rows are given it as their minimum.
+   * Cards may differ in height: every row is stretched to the tallest card
+   * seen at the current column width, so rows keep one height and the
+   * layout holds still while scrolling.
    */
   interface Props {
     items: T[];
@@ -49,9 +49,12 @@
   // The tallest row seen, and the column width it was measured at: cards are
   // square-ish, so a different width makes the measurement stale. It only
   // grows until then. Taking it from whichever row happened to mount first
-  // made the stride flip between row heights as the view scrolled, jumping
-  // the content by `firstRow` times the difference (#1753).
+  // (an album row with no genre chip is shorter) made the stride flip
+  // between row heights as the view scrolled, jumping the content by
+  // `firstRow` times the difference (#1753).
   let measured = $state<{ columnWidth: number; height: number } | null>(null);
+  // The scrolling ancestor, found by the viewport effect; `measure` scrolls
+  // it to compensate a growing stride. Not reactive: nothing renders from it.
   let scroller: HTMLElement | null = null;
   // The viewport's span in the grid's own coordinates.
   let viewTop = $state(0);
@@ -63,15 +66,16 @@
     return fit ? Math.max(1, Math.min(tracks, items.length)) : tracks;
   });
   let columnWidth = $derived(((width ?? 0) - gap * (columns - 1)) / columns);
-  let measuredFresh = $derived(!!measured && Math.abs(measured.columnWidth - columnWidth) < 0.5);
-  let rowHeight = $derived(
-    measured && measuredFresh ? measured.height : estimateRowHeight(Math.max(columnWidth, minColumnWidth))
+  // The measured height, while it was measured at the current column width.
+  let freshHeight = $derived(
+    measured && Math.abs(measured.columnWidth - columnWidth) < 0.5 ? measured.height : null
   );
+  let rowHeight = $derived(freshHeight ?? estimateRowHeight(Math.max(columnWidth, minColumnWidth)));
   // Shorter rows stretch to the stride, so the mounted rows sit exactly where
   // `firstRow * rowStride` says. `auto` lets a taller card grow its row
   // rather than overflow into the next one; it then raises the measurement.
   // An estimate isn't imposed, so the first measurement is the cards' own.
-  let rowTrack = $derived(measuredFresh ? `minmax(${rowHeight}px, auto)` : "auto");
+  let rowTrack = $derived(freshHeight === null ? "auto" : `minmax(${freshHeight}px, auto)`);
   let rowStride = $derived(rowHeight + gap);
   let rowCount = $derived(Math.ceil(items.length / columns));
   let totalHeight = $derived(rowCount > 0 ? rowCount * rowStride - gap : 0);
