@@ -61,5 +61,8 @@ ignore = [
     { id = "RUSTSEC-2024-0429", reason = "Transitive dependency via souvlaki MPRIS / zbus 3.x" },
     { id = "RUSTSEC-2026-0367", reason = "Transitive dependency via tauri-plugin-updater (zip 4.x extraction vulnerabilities)" },
     { id = "RUSTSEC-2026-0368", reason = "Transitive dependency via tauri-plugin-updater (zip 4.x extraction vulnerabilities)" },
-    { id = "RUSTSEC-2026-0369", reason = "Transitive dependency via tauri-plugin-updater (zip 4.x extraction vulnerabilities)" }
+    { id = "RUSTSEC-2026-0369", reason = "Transitive dependency via tauri-plugin-updater (zip 4.x extraction vulnerabilities)" },
+    { id = "RUSTSEC-2026-0370", reason = "zvariant merged into zbus 6; zbus 5.x is still required by tauri-plugin-opener and tauri-plugin-single-instance, so no upgrade path yet" },
+    { id = "RUSTSEC-2026-0371", reason = "zbus_names merged into zbus 6; zbus 5.x is still required by tauri-plugin-opener and tauri-plugin-single-instance, so no upgrade path yet" },
+    { id = "RUSTSEC-2026-0372", reason = "zvariant_derive merged into zbus 6; zbus 5.x is still required by tauri-plugin-opener and tauri-plugin-single-instance, so no upgrade path yet" }
 ]
