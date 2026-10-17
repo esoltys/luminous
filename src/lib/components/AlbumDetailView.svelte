@@ -12,7 +12,7 @@
   import { playlistsStore } from "../stores/playlists.svelte";
   import { pinnedStore } from "../stores/pinned.svelte";
   import { shuffleArray } from "../utils/shuffle";
-  import { versionedCoverUrl } from "../utils/covers";
+  import { coverRequestUrl } from "../utils/covers";
   import CoverArt from "./CoverArt.svelte";
   import CoverStack from "./CoverStack.svelte";
   import SongRating from "./SongRating.svelte";
@@ -234,7 +234,7 @@
           console.error("Failed to load album backdrop art:", e);
         }
       }
-      if (!cancelled) backdropUrl = url && versionedCoverUrl(url, version);
+      if (!cancelled) backdropUrl = url && coverRequestUrl(url, { version });
     }
 
     resolve();

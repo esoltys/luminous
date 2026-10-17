@@ -58,36 +58,35 @@ const SIZED_COVER_EDGES = [256, 384];
 const ART_URL_PREFIXES = ["http://luminous-art.localhost/", "luminous-art://"];
 
 /**
- * The URL of a cached cover or folder-art thumbnail sized for a box
- * `devicePixels` wide: the smallest card-sized copy that covers it, else
- * `url` itself. Anything else is returned as-is: an original (`local/`,
- * `embedded/`), a remote URL, a mock-library path, or an unmeasured box.
+ * The URL to load a `luminous-art://` cover from.
  *
- * Picked here rather than by `srcset`/`sizes="auto"`, which WebKitGTK lacks
- * and which Chromium re-evaluates as `100vw` when an image is unmounted —
- * fetching the largest candidate for every card a virtualized grid drops.
+ * - `devicePixels`: the width of the box it's drawn in. A cached cover or
+ *   folder-art thumbnail then loads the smallest card-sized copy that covers
+ *   it (#1528); an original (`local/`, `embedded/`), a box bigger than the
+ *   largest copy, or an unmeasured box (0) keeps the unsized URL.
+ * - `version`: `collectionStore.coverArtVersion` (#1755). A rescan rewrites a
+ *   cover under the same name, so only a changed URL makes the webview fetch
+ *   it again; 0 (nothing rescanned yet) adds nothing. The backend drops it.
+ *
+ * Remote and mock-library URLs are returned as-is. Sizes are picked here
+ * rather than by `srcset`/`sizes="auto"`, which WebKitGTK lacks and which
+ * Chromium re-evaluates as `100vw` when an image is unmounted — fetching the
+ * largest candidate for every card a virtualized grid drops.
  */
-export function sizedCoverUrl(url: string, devicePixels: number): string {
+export function coverRequestUrl(
+  url: string,
+  { devicePixels = 0, version = 0 }: { devicePixels?: number; version?: number } = {}
+): string {
   const prefix = ART_URL_PREFIXES.find((p) => url.startsWith(p));
-  if (!prefix || devicePixels <= 0) return url;
+  if (!prefix) return url;
+  const params: string[] = [];
   const rest = url.slice(prefix.length).replace(/^localhost\//, "");
-  if (rest.startsWith("local/") || rest.startsWith("embedded/") || rest.includes("?")) return url;
-  const edge = SIZED_COVER_EDGES.find((e) => e >= devicePixels);
-  return edge ? `${url}?w=${edge}` : url;
-}
-
-/**
- * `url` tagged with the library's cover-art version (`collectionStore.coverArtVersion`,
- * #1755). A rescan rewrites a cover under the same name, so only a changed URL
- * makes the webview fetch it again. Apply it last, after `sizedCoverUrl`.
- * Version 0 (nothing rescanned yet) and anything not served by `luminous-art://`
- * are returned as-is; the backend drops the `v` parameter.
- */
-export function versionedCoverUrl(url: string, version: number): string {
-  if (version <= 0) return url;
-  if (!ART_URL_PREFIXES.some((p) => url.startsWith(p))) return url;
-  // Join `sizedCoverUrl`'s `?w=` query; any other `?` is part of a folder-art path.
-  return `${url}${/\?w=\d+$/.test(url) ? "&" : "?"}v=${version}`;
+  const sizable = !rest.startsWith("local/") && !rest.startsWith("embedded/") && !rest.includes("?");
+  const edge = devicePixels > 0 && sizable ? SIZED_COVER_EDGES.find((e) => e >= devicePixels) : undefined;
+  if (edge) params.push(`w=${edge}`);
+  if (version > 0) params.push(`v=${version}`);
+  // A `?` already in `url` is part of a folder-art path, so the query always starts fresh.
+  return params.length > 0 ? `${url}?${params.join("&")}` : url;
 }
 
 export interface CoverSource {
