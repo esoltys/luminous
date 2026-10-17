@@ -59,8 +59,8 @@ manual.
 - [ ] `bun run lint:ast` — architecture-invariant rules
 - [ ] `bun run test:run` — frontend unit tests, including locale completeness and the
       guide-asset size budget
-- [ ] `cargo test` (from `src-tauri/`) — Rust unit tests + BDD suites
-- [ ] `cargo fmt --check` and `cargo clippy --all-targets -- -D warnings` (from
+- [ ] `cargo test --workspace` (from repo root, so `crates/` members run too) — Rust unit tests + BDD suites
+- [ ] `bun run fmt:check` (or `cargo fmt --all --check`), `bun run audit:cargo` (or `cargo deny check`), and `cargo clippy --all-targets -- -D warnings` (from
       `src-tauri/`) — no warnings at all, not just no new ones; fix any pre-existing
       warnings you encounter rather than leaving them
 - [ ] In `bun run tauri dev`, check this release's new UI in the longest locales (de, ru)
@@ -123,18 +123,25 @@ manual.
   Add `-f update_screenshots=true` whenever the Store listing prep above changed anything —
   without it the new screenshots and release notes never reach the Store (it replaces the
   whole live listing; see that repo's `README.md`). Watch this run too, not just the build — a green run
-  only means the submission was committed for certification, not that it's live yet;
-  Microsoft's cert pass still has to complete.
+  stages the draft submission in Partner Center (`PendingCommit`).
+- [ ] Commit the staged submission into certification. `publish-store.yml` deliberately stops at an
+      uncommitted draft to ensure human review. To commit it (initiating Microsoft certification), run:
+  ```powershell
+  $global:SBDisableTelemetry = $true; Import-Module StoreBroker
+  $cred = New-Object System.Management.Automation.PSCredential($env:STORE_CLIENT_ID, (ConvertTo-SecureString $env:STORE_CLIENT_SECRET -AsPlainText -Force))
+  Set-StoreBrokerAuthentication -TenantId $env:STORE_TENANT_ID -Credential $cred
+  Complete-ApplicationSubmission -AppId $env:STORE_APP_ID -SubmissionId <submissionId>
+  ```
+  (or click **Submit to the Store** in the Partner Center dashboard).
 - [ ] Check actual certification status from `~/source/luminous-store` (set
       `STORE_TENANT_ID`/`STORE_CLIENT_ID`/`STORE_CLIENT_SECRET`/`STORE_APP_ID` as local env
       vars first, from the values used to create that repo's GitHub secrets):
   ```powershell
   ./Get-StoreSubmissionStatus.ps1
   ```
-  Confirm `status` moves from `Certification` to `Published` (or check `statusDetails`
+  Confirm `status` moves from `CommitStarted` / `Certification` to `Published` (or check `statusDetails`
   for errors if it doesn't). This is what actually satisfies "the Microsoft Store
-  submission went through" — a green `publish-store.yml` run only means the submission
-  was committed, not certified/live.
+  submission went through."
 - [ ] Download and install the new build on at least one real machine per platform
       (Windows + Linux) — don't just trust the CI build succeeded.
 - [ ] Confirm the `.flatpak` bundle is attached to the release, and that

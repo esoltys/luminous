@@ -118,7 +118,7 @@ async function main() {
     runCommand("bun run test:run");
 
     console.log("\n--- Running Cargo Check ---");
-    runCommand("cargo check --manifest-path src-tauri/Cargo.toml");
+    runCommand("cargo check --workspace");
 
     // 3. Git Commit
     console.log("\n--- Staging and committing changes ---");
