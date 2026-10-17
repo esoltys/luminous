@@ -10,8 +10,9 @@
    * scrollbar honest. Scrolls with its nearest scrollable ancestor, so it can
    * sit under a sticky header in an ordinary scrolling view.
    *
-   * Rows are assumed to share one height (cards of a kind are uniform); it's
-   * measured from the rows on screen and re-measured as they resize.
+   * Every row is held to one height, so cards may differ in height (an album
+   * with no genre chip is shorter): it's the tallest row measured so far at
+   * the current column width, and the rows are given it as their minimum.
    */
   interface Props {
     items: T[];
@@ -45,9 +46,13 @@
   // Null until first measured: nothing mounts before then, or the first
   // cards would lay out in one full-width column and size their covers for it.
   let width = $state<number | null>(null);
-  // A row's height, and the column width it was measured at: cards are
-  // square-ish, so a different width makes the measurement stale.
+  // The tallest row seen, and the column width it was measured at: cards are
+  // square-ish, so a different width makes the measurement stale. It only
+  // grows until then. Taking it from whichever row happened to mount first
+  // made the stride flip between row heights as the view scrolled, jumping
+  // the content by `firstRow` times the difference (#1753).
   let measured = $state<{ columnWidth: number; height: number } | null>(null);
+  let scroller: HTMLElement | null = null;
   // The viewport's span in the grid's own coordinates.
   let viewTop = $state(0);
   let viewHeight = $state(0);
@@ -58,11 +63,15 @@
     return fit ? Math.max(1, Math.min(tracks, items.length)) : tracks;
   });
   let columnWidth = $derived(((width ?? 0) - gap * (columns - 1)) / columns);
+  let measuredFresh = $derived(!!measured && Math.abs(measured.columnWidth - columnWidth) < 0.5);
   let rowHeight = $derived(
-    measured && Math.abs(measured.columnWidth - columnWidth) < 0.5
-      ? measured.height
-      : estimateRowHeight(Math.max(columnWidth, minColumnWidth))
+    measured && measuredFresh ? measured.height : estimateRowHeight(Math.max(columnWidth, minColumnWidth))
   );
+  // Shorter rows stretch to the stride, so the mounted rows sit exactly where
+  // `firstRow * rowStride` says. `auto` lets a taller card grow its row
+  // rather than overflow into the next one; it then raises the measurement.
+  // An estimate isn't imposed, so the first measurement is the cards' own.
+  let rowTrack = $derived(measuredFresh ? `minmax(${rowHeight}px, auto)` : "auto");
   let rowStride = $derived(rowHeight + gap);
   let rowCount = $derived(Math.ceil(items.length / columns));
   let totalHeight = $derived(rowCount > 0 ? rowCount * rowStride - gap : 0);
@@ -83,23 +92,24 @@
   $effect(() => {
     const node = root;
     if (!node) return;
-    const scroller = findScroller(node);
+    const found = findScroller(node);
+    scroller = found;
     const update = () => {
       width = node.clientWidth;
-      if (!scroller) {
+      if (!found) {
         viewTop = 0;
         viewHeight = window.innerHeight;
         return;
       }
-      const top = node.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
+      const top = node.getBoundingClientRect().top - found.getBoundingClientRect().top;
       viewTop = -top;
-      viewHeight = scroller.clientHeight;
+      viewHeight = found.clientHeight;
     };
     update();
     const ro = new ResizeObserver(update);
     ro.observe(node);
-    if (scroller) ro.observe(scroller);
-    const target = scroller ?? window;
+    if (found) ro.observe(found);
+    const target = found ?? window;
     target.addEventListener("scroll", update, { passive: true });
     return () => {
       ro.disconnect();
@@ -107,19 +117,31 @@
     };
   });
 
-  // Measure a mounted card (grid rows stretch every card to the row's
-  // height) whenever the mounted rows resize: a new column width, a font
-  // load changing the text's height, or different rows scrolling in.
+  // Measure the tallest mounted row (grid rows stretch every card to the
+  // row's height) whenever the mounted rows resize: a new column width, a
+  // font load changing the text's height, or a taller row scrolling in.
   $effect(() => {
     const node = rowsEl;
     if (!node) return;
     const measure = () => {
-      const card = node.firstElementChild as HTMLElement | null;
-      if (!card) return;
-      const height = card.getBoundingClientRect().height;
+      let height = 0;
+      for (const card of node.children) height = Math.max(height, card.getBoundingClientRect().height);
+      if (height <= 0) return;
       const at = untrack(() => columnWidth);
-      if (height > 0 && (measured?.columnWidth !== at || Math.abs(measured.height - height) > 0.5)) {
+      const prev = untrack(() => measured);
+      if (!prev || prev.columnWidth !== at) {
         measured = { columnWidth: at, height };
+      } else if (height > prev.height + 0.5) {
+        // Every row above the view grows too: scroll by as much, so the
+        // rows on screen stay put instead of jumping by `firstRow` times
+        // the growth.
+        const top = untrack(() => viewTop);
+        const shift = top > 0 ? (top * (height - prev.height)) / (prev.height + gap) : 0;
+        measured = { columnWidth: at, height };
+        if (shift && scroller) {
+          scroller.scrollTop += shift;
+          viewTop = top + shift;
+        }
       }
     };
     const ro = new ResizeObserver(measure);
@@ -128,11 +150,13 @@
   });
 </script>
 
-<div bind:this={root} style="height: {totalHeight}px; position: relative;">
+<!-- overflow-anchor: none, so the browser's own scroll anchoring doesn't
+     correct a stride change on top of `measure`'s. -->
+<div bind:this={root} style="height: {totalHeight}px; position: relative; overflow-anchor: none;">
   <div
     bind:this={rowsEl}
     class="grid"
-    style="position: absolute; left: 0; right: 0; top: {firstRow * rowStride}px; grid-template-columns: repeat({columns}, minmax(0, 1fr)); gap: {gap}px;"
+    style="position: absolute; left: 0; right: 0; top: {firstRow * rowStride}px; grid-template-columns: repeat({columns}, minmax(0, 1fr)); grid-auto-rows: {rowTrack}; gap: {gap}px;"
   >
     {#each visible as entry (key(entry))}
       {@render item(entry)}
