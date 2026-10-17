@@ -7,7 +7,9 @@ describe('install-git-hooks', () => {
 			execSync('bun run scripts/install-git-hooks.ts', { stdio: 'pipe' });
 		}).not.toThrow();
 
-		const hooksPath = execSync('git config --get core.hooksPath', { encoding: 'utf-8' }).trim();
+		// --local: the scope the script writes. A worktree's own config.worktree
+		// may set its own hooksPath, which would win an unscoped read.
+		const hooksPath = execSync('git config --local --get core.hooksPath', { encoding: 'utf-8' }).trim();
 		expect(hooksPath).toBe('.githooks');
 	});
 });
