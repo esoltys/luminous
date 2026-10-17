@@ -72,9 +72,24 @@
   let contextMenuState = $state<{ x: number; y: number; song: Song } | null>(null);
   let showShareModal = $state(false);
 
+  /** The album's tracks in disc, then track order. */
+  async function fetchAlbumSongs(album: string): Promise<Song[]> {
+    const fetchedSongs = await invoke<Song[]>("get_songs_by_album", { album });
+    return [...fetchedSongs].sort((a, b) => {
+      if (a.disc !== b.disc) {
+        return (a.disc ?? 1) - (b.disc ?? 1);
+      }
+      return (a.track ?? 0) - (b.track ?? 0);
+    });
+  }
+
   async function handleRefreshAlbum() {
     if (refreshing || collectionStore.isScanning) return;
     refreshing = true;
+    // The rescan can rename the album on disk; the reloaded library then lacks
+    // it, navigationStore.reconcile() drops the selection and this view
+    // unmounts with `albumName` reading null. Stop once the view has moved on.
+    const requested = albumName;
     try {
       // Force re-read this album's own tracks from disk rather than kicking
       // off a whole-library scan: `startScan` doesn't await the scan's
@@ -85,15 +100,9 @@
       // `rescanSongs` is awaited end-to-end and bypasses the mtime-skip a
       // normal scan uses, so it always reflects what's actually on disk.
       await collectionStore.rescanSongs(songs.map((s) => s.id));
-      const fetchedSongs = await invoke<Song[]>("get_songs_by_album", { album: albumName });
-      let filtered = [...fetchedSongs];
-      filtered.sort((a, b) => {
-        if (a.disc !== b.disc) {
-          return (a.disc ?? 1) - (b.disc ?? 1);
-        }
-        return (a.track ?? 0) - (b.track ?? 0);
-      });
-      songs = filtered;
+      const fetchedSongs = await fetchAlbumSongs(requested);
+      if (albumName !== requested) return;
+      songs = fetchedSongs;
       artworkRefreshToken++;
       toastStore.show(i18n.t("albumDetail.refreshSuccess", {}, "Album metadata and artwork refreshed"));
     } catch (err) {
@@ -319,17 +328,10 @@
   $effect(() => {
     const requested = albumName;
     loading = true;
-    invoke<Song[]>("get_songs_by_album", { album: requested })
+    fetchAlbumSongs(requested)
       .then((fetchedSongs) => {
         if (requested !== albumName) return;
-        let filtered = [...fetchedSongs];
-        filtered.sort((a, b) => {
-          if (a.disc !== b.disc) {
-            return (a.disc ?? 1) - (b.disc ?? 1);
-          }
-          return (a.track ?? 0) - (b.track ?? 0);
-        });
-        songs = filtered;
+        songs = fetchedSongs;
         loadedAlbumName = requested;
       })
       .catch((err) => {
