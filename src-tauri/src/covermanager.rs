@@ -1871,15 +1871,15 @@ impl CoverManager {
                 conn.execute(
                     "UPDATE songs SET art_automatic = ?1, art_unset = 0
                      WHERE id = ?2
-                        OR (COALESCE(NULLIF(album_artist, ''), artist) = ?3 COLLATE NOCASE AND album = ?4 COLLATE NOCASE AND art_automatic IS NULL AND art_embedded = 0)",
-                    params![filename, song_id, q_art, q_alb],
+                        OR (COALESCE(NULLIF(album_artist, ''), artist) = ?3 COLLATE NOCASE AND album_key = ?4 AND art_automatic IS NULL AND art_embedded = 0)",
+                    params![filename, song_id, q_art, crate::album_key::album_key(&q_alb)],
                 )?;
             } else {
                 conn.execute(
                     "UPDATE songs SET art_unset = 1
                      WHERE id = ?1
-                        OR (COALESCE(NULLIF(album_artist, ''), artist) = ?2 COLLATE NOCASE AND album = ?3 COLLATE NOCASE AND art_automatic IS NULL AND art_embedded = 0)",
-                    params![song_id, q_art, q_alb],
+                        OR (COALESCE(NULLIF(album_artist, ''), artist) = ?2 COLLATE NOCASE AND album_key = ?3 AND art_automatic IS NULL AND art_embedded = 0)",
+                    params![song_id, q_art, crate::album_key::album_key(&q_alb)],
                 )?;
             }
             Ok(())
@@ -2132,7 +2132,7 @@ impl CoverManager {
             .query_row(
                 "SELECT p.fetched_cover_filename, p.fetched_disc_filename
                  FROM songs s
-                 JOIN album_profiles p ON p.album_key = s.album COLLATE NOCASE
+                 JOIN album_profiles p ON p.album_key = s.album_key
                  WHERE s.id = ?1",
                 params![song_id],
                 |row| {

@@ -1,6 +1,7 @@
 import { navigationStore, type ActiveTab, type ActiveSubTab, type SettingsTab, type AutoPlaylistRef } from "../stores/navigation.svelte";
 import { collectionStore } from "../stores/collection.svelte";
 import type { ScriptNavigationApi, ScriptWaitApi } from "./types";
+import { sameAlbum } from "../utils/albumKey";
 
 /**
  * Creates the navigation controller.
@@ -31,7 +32,8 @@ export function createNavigationController(wait: ScriptWaitApi): ScriptNavigatio
       navigationStore.viewAlbum(albumName, focusSongId);
       await wait.settled();
       // Wait until the view has settled on this album
-      await wait.forState(() => navigationStore.selectedAlbumName === albumName, 3000);
+      // viewAlbum opens the grid's spelling of the title (#1752).
+      await wait.forState(() => sameAlbum(navigationStore.selectedAlbumName, albumName), 3000);
     },
 
     async artist(artistName: string): Promise<void> {

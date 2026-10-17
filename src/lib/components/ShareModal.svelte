@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { sameAlbum } from "$lib/utils/albumKey";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { save } from "@tauri-apps/plugin-dialog";
@@ -145,7 +146,7 @@
   let showBarsToggle = $derived(entity.kind === "stats" || entity.kind === "stats-section");
 
   let albumItem = $derived(
-    entity.kind === "album" ? collectionStore.albums.find((a) => a.album === entity.albumName) || null : null
+    entity.kind === "album" ? collectionStore.albums.find((a) => sameAlbum(a.album, entity.albumName)) || null : null
   );
   let albumSongs = $state<Song[]>([]);
 
@@ -434,7 +435,7 @@
     // Check if the currently playing track/album matches what we are sharing
     const currentSong = playerStore.currentSong;
     const matchesCurrent =
-      (entity.kind === "album" && currentSong?.album && entity.albumName.toLowerCase() === currentSong.album.toLowerCase()) ||
+      (entity.kind === "album" && currentSong?.album && sameAlbum(entity.albumName, currentSong.album)) ||
       (entity.kind === "artist" && currentSong?.artist && entity.artistName.toLowerCase() === currentSong.artist.toLowerCase());
 
     if (matchesCurrent && themeStore.artworkColors) {

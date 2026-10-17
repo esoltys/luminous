@@ -1,0 +1,12 @@
+[
+  { "input": "Songs of the Sea", "key": "songs of the sea" },
+  { "input": "Songs Of The Sea", "key": "songs of the sea" },
+  { "input": "  Songs of the Sea \t", "key": "songs of the sea" },
+  { "input": "ÉLAN", "key": "élan" },
+  { "input": "Élan", "key": "élan" },
+  { "input": "ΟΔΥΣΣΕΙΑ", "key": "οδυσσεια" },
+  { "input": "Кино", "key": "кино" },
+  { "input": "Demons EP", "key": "demons ep" },
+  { "input": "   ", "key": "" },
+  { "input": "", "key": "" }
+]

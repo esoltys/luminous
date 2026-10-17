@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 61;
+pub const CURRENT_SCHEMA_VERSION: i32 = 62;
 
 struct Migration {
     version: i32,
@@ -540,7 +540,119 @@ const MIGRATIONS: &[Migration] = &[
             Ok(())
         },
     },
+    Migration {
+        version: 62,
+        description: "songs.album_key and album-keyed tables rekeyed so albums group case-insensitively (#1752)",
+        apply: migrate_album_keys,
+    },
 ];
+
+/// Migration 62: albums whose titles differ only in case or surrounding
+/// whitespace become one album (#1752, see `album_key`). Adds and backfills
+/// the indexed `songs.album_key`, then rekeys every album-keyed table to the
+/// folded key. Where several spellings of one album each had a row, the row
+/// of the spelling with the most songs in the library wins (ties: the higher
+/// rating for `album_ratings`, the most filled-in fields for
+/// `album_profiles`). Chart history is cleared and rebuilt from play history
+/// on the next chart read. Also adds the trigger that keeps external writers
+/// from leaving stale keys (see `album_key::repair_album_keys`). One
+/// transaction, so an interrupted run leaves the old keys intact and re-runs
+/// from scratch.
+fn migrate_album_keys(conn: &rusqlite::Connection) -> Result<()> {
+    use crate::album_key::album_key;
+    use std::collections::HashMap;
+
+    let tx = conn.unchecked_transaction()?;
+    let has_column: bool = tx
+        .prepare("SELECT 1 FROM pragma_table_info('songs') WHERE name = 'album_key'")?
+        .exists([])?;
+    if !has_column {
+        tx.execute_batch("ALTER TABLE songs ADD COLUMN album_key TEXT;")?;
+    }
+
+    crate::album_key::backfill_song_keys(&tx)?;
+    tx.execute_batch(
+        "CREATE INDEX IF NOT EXISTS idx_songs_album_key ON songs(album_key);
+
+         -- Writers that don't know about album_key (luminous-mcp edits
+         -- songs.album directly) would leave a stale key behind; null it so
+         -- album_key::repair_album_keys recomputes it. Pure SQL so it fires
+         -- on every connection. The lower/trim guard keeps case-only and
+         -- whitespace-only edits (whose key can't change) from being nulled.
+         -- A songs-table rebuild (see migration 34) must recreate this.
+         CREATE TRIGGER IF NOT EXISTS songs_album_key_stale AFTER UPDATE OF album ON songs
+         WHEN new.album IS NOT old.album AND new.album_key IS old.album_key
+              AND lower(trim(new.album)) IS NOT lower(trim(old.album))
+         BEGIN
+             UPDATE songs SET album_key = NULL WHERE id = new.id;
+         END;",
+    )?;
+
+    // album_ratings: (album_key, rating).
+    let ratings: Vec<(String, f64)> = {
+        let mut stmt = tx.prepare("SELECT album_key, rating FROM album_ratings")?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        rows.collect::<rusqlite::Result<_>>()?
+    };
+    let mut best_rating: HashMap<String, (i64, f64)> = HashMap::new();
+    for (raw, rating) in ratings {
+        let rank = (crate::album_key::songs_spelled(&tx, &raw)?, rating);
+        best_rating
+            .entry(album_key(&raw))
+            .and_modify(|best| {
+                if rank.0 > best.0 || (rank.0 == best.0 && rank.1 > best.1) {
+                    *best = rank;
+                }
+            })
+            .or_insert(rank);
+    }
+    tx.execute("DELETE FROM album_ratings", [])?;
+    for (key, (_, rating)) in &best_rating {
+        tx.execute(
+            "INSERT INTO album_ratings (album_key, rating) VALUES (?1, ?2)",
+            params![key, rating],
+        )?;
+    }
+
+    crate::album_key::rekey_album_profiles(&tx)?;
+
+    // stats_exclusions (album rows): PRIMARY KEY (entity_type, entity_key).
+    let excluded_albums: Vec<String> = tx
+        .prepare("SELECT entity_key FROM stats_exclusions WHERE entity_type = 'album'")?
+        .query_map([], |r| r.get(0))?
+        .collect::<rusqlite::Result<_>>()?;
+    tx.execute(
+        "DELETE FROM stats_exclusions WHERE entity_type = 'album'",
+        [],
+    )?;
+    for raw in excluded_albums {
+        tx.execute(
+            "INSERT OR IGNORE INTO stats_exclusions (entity_type, entity_key) VALUES ('album', ?1)",
+            params![album_key(&raw)],
+        )?;
+    }
+
+    // subsonic_album_cache.album_key is not unique, so rekey in place.
+    let cached: Vec<(i64, String)> = tx
+        .prepare("SELECT id, album_key FROM subsonic_album_cache")?
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .collect::<rusqlite::Result<_>>()?;
+    for (id, raw) in cached {
+        tx.execute(
+            "UPDATE subsonic_album_cache SET album_key = ?1 WHERE id = ?2",
+            params![album_key(&raw), id],
+        )?;
+    }
+
+    // Chart history: cleared, and its build key with it, so the next chart
+    // read rebuilds every week from play_history under the folded grouping.
+    tx.execute_batch(
+        "DELETE FROM album_chart_history;
+         DELETE FROM app_state WHERE key = 'album_chart_history_week_start';",
+    )?;
+    tx.commit()?;
+    Ok(())
+}
 
 /// Migration 59: WebDAV songs used to store `user:pass@host/...` as their
 /// path/url/stream_url. Playback now looks credentials up from the saved
@@ -792,6 +904,17 @@ impl Database {
         };
         let schema_version = db.run_migrations()?;
         db.reset_stale_sync_status();
+        // songs.album_key exists from migration 62 on.
+        if schema_version >= 62 {
+            if let Err(e) = db
+                .pool
+                .get()
+                .map_err(anyhow::Error::from)
+                .and_then(|conn| crate::album_key::repair_album_keys(&conn))
+            {
+                log::warn!("Failed to repair album keys: {e:#}");
+            }
+        }
 
         Ok(Self {
             schema_version,
@@ -3864,5 +3987,100 @@ mod tests {
         assert_eq!(row(&plain), Some((plain.clone(), plain)));
         assert!(row(embedded).is_none());
         assert!(row("http://u:p@radio/stream").is_some());
+    }
+
+    /// Migration 62 (#1752): a database from before album keys gets every
+    /// song's `album_key` backfilled, and album-keyed rows saved under
+    /// several spellings of one album collapse to one row under its key —
+    /// the spelling with the most songs winning.
+    #[test]
+    fn test_migration_62_backfills_album_keys_and_merges_spellings() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_migration62_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
+        {
+            let db = Database::new(temp_dir.clone()).unwrap();
+            let conn = db.pool.get().unwrap();
+            // Recreate the pre-62 state: songs without album_key, and rows
+            // keyed by raw spellings.
+            conn.execute_batch(
+                "INSERT INTO songs (path, album) VALUES
+                    ('a.mp3', 'Songs of the Sea'), ('b.mp3', 'Songs of the Sea'),
+                    ('c.mp3', 'Songs Of The Sea ');
+                 UPDATE songs SET album_key = NULL;
+                 INSERT INTO album_ratings (album_key, rating) VALUES
+                    ('Songs of the Sea', 3.0), ('Songs Of The Sea ', 5.0), ('Gone Album', 2.0);
+                 INSERT INTO album_profiles (album_key, description) VALUES
+                    ('Songs Of The Sea ', 'minority notes'), ('Songs of the Sea', 'majority notes');
+                 INSERT INTO stats_exclusions (entity_type, entity_key) VALUES
+                    ('album', 'Songs of the Sea'), ('album', 'SONGS OF THE SEA'), ('artist', 'Mariner');
+                 INSERT INTO album_chart_history (period_start, album_key, rank, play_count)
+                    VALUES (1, 'Songs of the Sea', 1, 2);
+                 DELETE FROM schema_version WHERE version = 62;",
+            )
+            .unwrap();
+        }
+
+        let db = Database::new(temp_dir.clone()).unwrap();
+        assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
+        let conn = db.pool.get().unwrap();
+        let keys: Vec<Option<String>> = conn
+            .prepare("SELECT album_key FROM songs ORDER BY path")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap();
+        assert_eq!(keys, vec![Some("songs of the sea".to_string()); 3]);
+
+        let ratings: Vec<(String, f64)> = conn
+            .prepare("SELECT album_key, rating FROM album_ratings ORDER BY album_key")
+            .unwrap()
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap();
+        assert_eq!(
+            ratings,
+            vec![
+                ("gone album".to_string(), 2.0),
+                // The two-song spelling's rating beats the higher one-song one.
+                ("songs of the sea".to_string(), 3.0),
+            ]
+        );
+
+        let profiles: Vec<(String, String)> = conn
+            .prepare("SELECT album_key, description FROM album_profiles")
+            .unwrap()
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap();
+        assert_eq!(
+            profiles,
+            vec![("songs of the sea".to_string(), "majority notes".to_string())]
+        );
+
+        let exclusions: Vec<(String, String)> = conn
+            .prepare("SELECT entity_type, entity_key FROM stats_exclusions ORDER BY entity_type")
+            .unwrap()
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap();
+        assert_eq!(
+            exclusions,
+            vec![
+                ("album".to_string(), "songs of the sea".to_string()),
+                ("artist".to_string(), "Mariner".to_string()),
+            ]
+        );
+
+        let chart_rows: i64 = conn
+            .query_row("SELECT COUNT(*) FROM album_chart_history", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(chart_rows, 0, "chart history is rebuilt from play history");
     }
 }

@@ -10,6 +10,7 @@
 //   playlist  — Playlist CRUD + undo/redo
 
 pub mod addons;
+pub mod album_key;
 pub mod artist_image;
 pub mod audio;
 pub mod band_waveform;

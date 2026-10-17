@@ -1509,8 +1509,9 @@ impl Player {
     fn album_key(item: &PlaylistItem) -> String {
         if let Some(ref song) = item.song {
             if let Some(ref album) = song.album {
-                if !album.trim().is_empty() {
-                    return album.to_lowercase();
+                let key = crate::album_key::album_key(album);
+                if !key.is_empty() {
+                    return key;
                 }
             }
         }

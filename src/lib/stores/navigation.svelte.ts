@@ -1,5 +1,6 @@
 import { collectionStore } from "./collection.svelte";
 import { playlistsStore } from "./playlists.svelte";
+import { sameAlbum } from "$lib/utils/albumKey";
 
 export type ActiveTab = "home" | "collection" | "playlists" | "settings" | "lyrics" | "stats" | "organize" | "help";
 export type ActiveSubTab = "songs" | "albums" | "artists" | "genres";
@@ -294,7 +295,7 @@ class NavigationStore {
   reconcile() {
     if (collectionStore.statsLoaded && !collectionStore.isScanning) {
       if (this._selectedAlbumName !== null) {
-        const albumExists = collectionStore.albums.some((a) => a.album === this._selectedAlbumName);
+        const albumExists = collectionStore.albums.some((a) => sameAlbum(a.album, this._selectedAlbumName));
         if (!albumExists) {
           this.selectedAlbumName = null;
         }
@@ -380,7 +381,9 @@ class NavigationStore {
     this.selectedArtistName = null;
     this.activeTab = "collection";
     this.activeSubTab = "albums";
-    this.selectedAlbumName = name;
+    // A track's own tag may spell the title differently from the album grid
+    // (#1752); open the grid's spelling so the header matches the card.
+    this.selectedAlbumName = collectionStore.albums.find((a) => sameAlbum(a.album, name))?.album ?? name;
     this.pendingFocusSongId = focusSongId ?? null;
   }
 

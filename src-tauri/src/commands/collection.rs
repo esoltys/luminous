@@ -2057,7 +2057,7 @@ where
                AND (source IN (1, 2) OR source IS NULL)
                AND album IS NOT NULL AND TRIM(album) != ''
                AND path IS NOT NULL
-             GROUP BY album, COALESCE(NULLIF(album_artist, ''), artist), art_automatic",
+             GROUP BY album_key, COALESCE(NULLIF(album_artist, ''), artist), art_automatic",
         )?;
 
         let albums: Vec<(String, String, String, String)> = album_stmt
@@ -2139,10 +2139,10 @@ where
                 let sidecar_val = sidecar_path.to_string_lossy().to_string();
                 if let Err(e) = conn.execute(
                     "UPDATE songs SET art_automatic = ?1
-                     WHERE album = ?2
+                     WHERE album_key = ?2
                        AND COALESCE(NULLIF(album_artist, ''), artist) = ?3
                        AND art_automatic = ?4",
-                    rusqlite::params![sidecar_val, album, artist, cached_filename],
+                    rusqlite::params![sidecar_val, crate::album_key::album_key(&album), artist, cached_filename],
                 ) {
                     log::warn!("Failed to update songs table during sidecar sweep: {e}");
                 }

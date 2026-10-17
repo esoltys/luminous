@@ -193,14 +193,17 @@ pub fn album_item_from_json(value: &serde_json::Value) -> AlbumItem {
 }
 
 /// Finds the album entry (from `get_albums()`'s output) matching `ref_key`
-/// (the bare album title, same key convention as `album_ratings`).
+/// (an album title, matched by `album_key` like `album_ratings`).
 pub fn find_album<'a>(
     albums: &'a [serde_json::Value],
     ref_key: &str,
 ) -> Option<&'a serde_json::Value> {
-    albums
-        .iter()
-        .find(|a| a.get("album").and_then(|v| v.as_str()) == Some(ref_key))
+    let key = crate::album_key::album_key(ref_key);
+    albums.iter().find(|a| {
+        a.get("album")
+            .and_then(|v| v.as_str())
+            .is_some_and(|name| crate::album_key::album_key(name) == key)
+    })
 }
 
 /// Finds the artist entry (from `get_artists()`'s output) matching `ref_key`,

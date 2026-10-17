@@ -155,6 +155,20 @@ describe("CollectionStore - artist/album navigation and history", () => {
     expect(navigationStore.selectedPlaylistId).toBeNull();
   });
 
+  it("opens an album named with a track's differently-cased spelling under the grid's spelling (#1752)", () => {
+    collectionStore.statsLoaded = true;
+    collectionStore.isScanning = false;
+    collectionStore.albums = [{ album: "Songs of the Sea" } as AlbumItem];
+
+    navigationStore.viewAlbum("Songs Of The Sea ");
+    expect(navigationStore.selectedAlbumName).toBe("Songs of the Sea");
+
+    // A restored selection in another spelling is the same album, not stale.
+    navigationStore.selectedAlbumName = "SONGS OF THE SEA";
+    navigationStore.reconcile();
+    expect(navigationStore.selectedAlbumName).toBe("SONGS OF THE SEA");
+  });
+
   it("synchronizes playlistsStore when viewPlaylist is called or selectedPlaylistId is set", async () => {
     playlistsStore.playlists = [
       { id: 1, name: "Queue", is_queue: true } as Playlist,

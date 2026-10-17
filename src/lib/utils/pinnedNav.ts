@@ -30,6 +30,7 @@ import {
   PlaylistIcon as ListMusic,
 } from "phosphor-svelte";
 import { getPlaylistCardTheme } from "./playlistCardTheme";
+import { sameAlbum } from "./albumKey";
 
 /**
  * Presentation-ready projection of a pinned entity for navigation components.
@@ -150,7 +151,7 @@ export function toNavigablePin(item: PinnedItem): NavigablePin {
       const subtitle = item.album.artist || i18n.t("collection.variousArtists");
       const isActive =
         navigationStore.activeTab === "collection" &&
-        navigationStore.selectedAlbumName === (item.album.album ?? "");
+        navigationStore.selectedAlbumName !== null && sameAlbum(navigationStore.selectedAlbumName, item.album.album);
       return {
         id,
         rawItem: item,
