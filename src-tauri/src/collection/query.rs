@@ -1445,8 +1445,8 @@ impl CollectionScanner {
 /// `[from, to)`, as Album cards with their play count, skipping (and
 /// recording) albums already in `seen`. Every result is an Album card
 /// regardless of track count (unlike group_songs_into_home_items, which falls
-/// back to a Song card for single-track "albums"), so this dedups by album
-/// name directly.
+/// back to a Song card for single-track "albums"), so this dedups by
+/// `album_key` directly; `seen` holds album keys.
 fn rank_week_items(
     conn: &rusqlite::Connection,
     from: i64,
