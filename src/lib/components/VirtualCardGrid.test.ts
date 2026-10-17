@@ -5,28 +5,35 @@ import VirtualCardGrid from "./VirtualCardGrid.svelte";
 
 // jsdom has no layout, so the scroller's size, the grid's offset within it and
 // a card's height are stubbed: a 1000x600 viewport, scrolled by `scrollY`.
-const VIEW_WIDTH = 1000;
+// A card's stubbed height includes a row track's `minmax()` floor, the way a
+// grid row stretches it.
 const VIEW_HEIGHT = 600;
 
 let scroller: HTMLDivElement;
+let viewWidth = 1000;
 let scrollY = 0;
-let cardHeight = 0;
+let cardHeight: number | ((n: number) => number) = 0;
 const observers: Array<() => void> = [];
 
 function rect(top: number, height: number): DOMRect {
-  return { top, height, bottom: top + height, left: 0, right: VIEW_WIDTH, width: VIEW_WIDTH, x: 0, y: top, toJSON: () => ({}) };
+  return { top, height, bottom: top + height, left: 0, right: viewWidth, width: viewWidth, x: 0, y: top, toJSON: () => ({}) };
 }
 
 beforeEach(() => {
+  viewWidth = 1000;
   scrollY = 0;
   cardHeight = 0;
   observers.length = 0;
   scroller = document.createElement("div");
   scroller.style.overflowY = "auto";
+  Object.defineProperty(scroller, "scrollTop", {
+    get: () => scrollY,
+    set: (y: number) => (scrollY = y),
+  });
   document.body.append(scroller);
 
   vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockImplementation(function (this: HTMLElement) {
-    return this === scroller || this.parentElement === scroller ? VIEW_WIDTH : 0;
+    return this === scroller || this.parentElement === scroller ? viewWidth : 0;
   });
   vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockImplementation(function (this: HTMLElement) {
     return this === scroller ? VIEW_HEIGHT : 0;
@@ -34,7 +41,12 @@ beforeEach(() => {
   vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
     if (this === scroller) return rect(0, VIEW_HEIGHT);
     if (this.parentElement === scroller) return rect(-scrollY, 0);
-    if (this.dataset.card !== undefined) return rect(0, cardHeight);
+    if (this.dataset.card !== undefined) {
+      const natural = typeof cardHeight === "number" ? cardHeight : cardHeight(Number(this.textContent));
+      // A `minmax(<H>px, auto)` row track stretches the card to at least H.
+      const floor = Number(/minmax\(([\d.]+)px/.exec(this.parentElement?.style.gridAutoRows ?? "")?.[1] ?? 0);
+      return rect(0, Math.max(natural, floor));
+    }
     return rect(0, 0);
   });
   vi.stubGlobal(
@@ -74,6 +86,11 @@ function renderGrid(props: Partial<{ items: number[]; fit: boolean }> = {}) {
       ...props,
     },
   });
+}
+
+function remeasure() {
+  for (const cb of observers) cb();
+  flushSync();
 }
 
 function scrollTo(y: number) {
@@ -120,6 +137,57 @@ describe("VirtualCardGrid", () => {
     scrollTo(10 * 300);
     // Rows 10-11 on screen at 300px apart, plus 2 overscan rows each side.
     expect(mounted()).toEqual(items.slice(40, 70));
+  });
+
+  it("holds every row to the tallest one, so mixed card heights share one stride", () => {
+    // Odd rows have a taller card (an album with a genre chip), even rows don't.
+    cardHeight = (n) => (Math.floor(n / 5) % 2 ? 292 : 280);
+    renderGrid();
+    remeasure();
+    expect(rows().style.gridAutoRows).toBe("minmax(292px, auto)");
+    const height = `${20 * 312 - 20}px`;
+    expect(grid().style.height).toBe(height);
+    // Whichever kind of row mounts first, the stride stays put (#1753).
+    for (const row of [1, 2, 7, 10, 13]) {
+      scrollTo(row * 312);
+      remeasure();
+      expect(grid().style.height).toBe(height);
+      expect(rows().style.top).toBe(`${Math.max(0, row - 2) * 312}px`);
+    }
+  });
+
+  it("only grows the stride, keeping the rows on screen in place as it does", () => {
+    // Rows 0-9 are short; a taller row first mounts once scrolled down.
+    cardHeight = (n) => (n < 50 ? 280 : 292);
+    renderGrid();
+    remeasure();
+    expect(grid().style.height).toBe(`${20 * 300 - 20}px`);
+
+    scrollTo(8 * 300);
+    remeasure();
+    // The rows above the view grew by 12px each: scroll by as much.
+    expect(scrollY).toBe(8 * 312);
+    expect(grid().style.height).toBe(`${20 * 312 - 20}px`);
+    expect(rows().style.top).toBe(`${6 * 312}px`);
+
+    // Back among the short rows, the stride doesn't shrink.
+    scrollTo(0);
+    remeasure();
+    expect(grid().style.height).toBe(`${20 * 312 - 20}px`);
+  });
+
+  it("re-measures from scratch at a new column width", () => {
+    cardHeight = 292;
+    renderGrid();
+    remeasure();
+    expect(rows().style.gridAutoRows).toBe("minmax(292px, auto)");
+
+    // 600px fits 3 columns; the narrower cards are shorter.
+    viewWidth = 600;
+    cardHeight = 250;
+    remeasure();
+    expect(rows().style.gridTemplateColumns).toBe("repeat(3, minmax(0, 1fr))");
+    expect(rows().style.gridAutoRows).toBe("minmax(250px, auto)");
   });
 
   it("stretches a short list across the row with fit", () => {
