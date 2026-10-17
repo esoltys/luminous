@@ -97,4 +97,17 @@ describe("AlbumCard.svelte", () => {
     const card = getByText("Fake Nudes").closest("div.bg-brand-sidebar")!;
     expect(card.className).toContain("w-full");
   });
+
+  // jsdom has no layout, so this checks the reserved height class rather than measured pixels;
+  // the pixel alignment itself was verified in the running app (#1757).
+  it("reserves the genre chip's row height when the album has no genre", () => {
+    const { getByTestId, queryByText } = render(AlbumCard, {
+      props: { album: { ...mockAlbum, genre: null } },
+    });
+
+    expect(queryByText("Alternative")).not.toBeInTheDocument();
+    const row = getByTestId("album-card-genre-row");
+    expect(row.className).toContain("min-h-6");
+    expect(row.className).toContain("items-center");
+  });
 });
