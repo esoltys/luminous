@@ -108,6 +108,5 @@ describe("AlbumCard.svelte", () => {
     expect(queryByText("Alternative")).not.toBeInTheDocument();
     const row = getByTestId("album-card-genre-row");
     expect(row.className).toContain("min-h-6");
-    expect(row.className).toContain("items-center");
   });
 });

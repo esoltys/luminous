@@ -94,7 +94,9 @@
 
   function getChipClass(value: string): string {
     const colorIndex = resolveGenreColorIndex(tagsStore.hierarchy, value);
-    const padding = variant === "compact" ? "px-2 py-0.5" : "px-2.5 py-1";
+    // The compact chip has a fixed h-6 (24px) so rows that hold one can reserve the same height
+    // when there's no chip (AlbumCard, #1757).
+    const padding = variant === "compact" ? "px-2 h-6" : "px-2.5 py-1";
     const base = `inline-flex items-center rounded-full border-2 text-xs font-medium select-none transition-[opacity,box-shadow,transform,filter,colors] hover:brightness-110 active:scale-[0.98] ${padding}`;
     if (colorIndex !== undefined) {
       return base;

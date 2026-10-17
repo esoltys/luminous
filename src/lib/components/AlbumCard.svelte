@@ -113,9 +113,9 @@
       {/if}
       <span class="text-xs text-brand-text-secondary font-medium shrink-0">{album.year || ""}</span>
     </div>
-    <!-- min-h-6 is the compact genre chip's height (16px text-xs line + py-0.5 + border-2), so the
-         stars sit at the same height whether or not the album has a genre (#1757). The chip's
-         wrapper is flex so the inline chip adds no line-box gap below it. -->
+    <!-- min-h-6 matches the compact genre chip's h-6, so the stars sit at the same height whether
+         or not the album has a genre (#1757). The chip's wrapper is flex so the inline chip adds
+         no line-box gap below it. -->
     <div data-testid="album-card-genre-row" class="flex items-center justify-between mt-0.5 gap-2 min-h-6">
       <div class="flex min-w-0"><GenreChips genre={album.genre} /></div>
       <span class="shrink-0"><SongRating isAlbum rating={currentRating} onRate={rateAlbum} size="sm" /></span>
