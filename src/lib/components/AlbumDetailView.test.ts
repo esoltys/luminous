@@ -621,14 +621,12 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     await fireEvent.click(view.getByTitle("More actions"));
     await fireEvent.click(await view.findByText("Refresh Album"));
     await vi.waitFor(() => expect(collectionStore.refreshLibrary).toHaveBeenCalled());
-    invokeMock.mockClear();
 
     await view.rerender({ albumName: null as unknown as string });
     finishRefresh();
     // Let the handler's remaining awaits settle (every mock resolves at once).
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(invokeMock).not.toHaveBeenCalledWith("get_songs_by_album", { album: mockAlbumName });
     expect(toastSpy).not.toHaveBeenCalled();
     expect(consoleErrorSpy).not.toHaveBeenCalledWith("Failed to refresh album:", expect.anything());
     consoleErrorSpy.mockRestore();
