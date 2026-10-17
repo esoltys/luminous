@@ -28,8 +28,8 @@ needs updating to match. Work through it in order:
    Store listing in `esoltys/luminous-store` as its own PR: build the composites from the dark
    captures with that repo's `New-StoreScreenshots.ps1` (`en-us` ← en-US, `fr` ← fr-CA, `de`/`es`/`it`/`ru`/`uk` ← same
    tag), update `ReleaseNotes` and captions in every `listing.csv` column, then a dry run.
-4. **Verification**: `bun run check`, `bun run lint:ast`, `bun run test:run`, `cargo test`
-   (from `src-tauri/`), `cargo fmt --check` and `cargo clippy --all-targets -- -D warnings`
+4. **Verification**: `bun run check`, `bun run lint:ast`, `bun run test:run`, `cargo test --workspace`
+   (from repo root), `bun run audit:cargo`, and `cargo clippy --all-targets -- -D warnings`
    (from `src-tauri/` — zero warnings, including pre-existing ones), a `bun run tauri dev`
    check of new UI in de and ru for overflow, and the manual QA walkthrough in `docs/TESTING.md` (real-hardware smoke test —
    `cargo test --test smoke_test -- --ignored --nocapture` from `src-tauri/` — plus a
@@ -63,8 +63,9 @@ needs updating to match. Work through it in order:
    leave publishing it to the user, and walk through (don't run unprompted):
    - the Microsoft Store submission, which lives in the separate private `esoltys/luminous-store`
      repo (`gh workflow run publish-store.yml -f tag=vX.Y.Z` there, plus
-     `-f update_screenshots=true` if the listing prep changed anything), then its certification
-     status via `./Get-StoreSubmissionStatus.ps1` from `~/source/luminous-store`
+     `-f update_screenshots=true` if the listing prep changed anything). Note that `publish-store.yml`
+     stages the draft submission (`PendingCommit`); commit it into certification via Partner Center
+     or `Complete-ApplicationSubmission`, then check status via `./Get-StoreSubmissionStatus.ps1` from `~/source/luminous-store`
    - installing the build on a real machine per platform (Windows + Linux)
    - confirming the `.flatpak` is attached and `flatpak update org.luminous.music` picks up the
      new version from the shared repo (`docs/FLATPAK.md`)
