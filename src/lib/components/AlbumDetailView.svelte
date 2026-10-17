@@ -74,6 +74,10 @@
   async function handleRefreshAlbum() {
     if (refreshing || collectionStore.isScanning) return;
     refreshing = true;
+    // The rescan can rename the album on disk; the reloaded library then lacks
+    // it, navigationStore.reconcile() drops the selection and this view
+    // unmounts with `albumName` reading null. Stop once the view has moved on.
+    const requested = albumName;
     try {
       // Force re-read this album's own tracks from disk rather than kicking
       // off a whole-library scan: `startScan` doesn't await the scan's
@@ -85,7 +89,9 @@
       // normal scan uses, so it always reflects what's actually on disk.
       await invoke("rescan_songs", { songIds: songs.map((s) => s.id) });
       await collectionStore.refreshLibrary();
-      const fetchedSongs = await invoke<Song[]>("get_songs_by_album", { album: albumName });
+      if (albumName !== requested) return;
+      const fetchedSongs = await invoke<Song[]>("get_songs_by_album", { album: requested });
+      if (albumName !== requested) return;
       let filtered = [...fetchedSongs];
       filtered.sort((a, b) => {
         if (a.disc !== b.disc) {

@@ -590,4 +590,47 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     expect(refreshLibrarySpy).toHaveBeenCalled();
     expect(startScanSpy).not.toHaveBeenCalled();
   });
+
+  it("Refresh Album stops quietly when the view moves off the album mid-refresh", async () => {
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockImplementation((cmd: string, args?: any) => {
+      if (cmd === "get_songs_by_album") {
+        // Tauri rejects a null `album` before the command runs.
+        if (args?.album == null) {
+          return Promise.reject("invalid args `album` for command `get_songs_by_album`: invalid type: null");
+        }
+        return Promise.resolve([
+          { id: 1, title: "Come Together", artist: "The Beatles", album: "Abbey Road", disc: 1, track: 1 },
+        ]);
+      }
+      return Promise.resolve();
+    });
+
+    // The rescan renamed the album on disk, so the reloaded library no longer
+    // has it: navigationStore.reconcile() clears selectedAlbumName and
+    // CollectionView's prop now reads null while the handler is still awaiting.
+    let finishRefresh!: () => void;
+    const refreshDone = new Promise<void>((resolve) => (finishRefresh = resolve));
+    vi.spyOn(collectionStore, "refreshLibrary").mockReturnValue(refreshDone);
+    const toastSpy = vi.spyOn(toastStore, "show");
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const view = render(AlbumDetailView, { props: { albumName: mockAlbumName } });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    await fireEvent.click(view.getByTitle("More actions"));
+    await fireEvent.click(await view.findByText("Refresh Album"));
+    await vi.waitFor(() => expect(collectionStore.refreshLibrary).toHaveBeenCalled());
+    invokeMock.mockClear();
+
+    await view.rerender({ albumName: null as unknown as string });
+    finishRefresh();
+    // Let the handler's remaining awaits settle (every mock resolves at once).
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(invokeMock).not.toHaveBeenCalledWith("get_songs_by_album", { album: mockAlbumName });
+    expect(toastSpy).not.toHaveBeenCalled();
+    expect(consoleErrorSpy).not.toHaveBeenCalledWith("Failed to refresh album:", expect.anything());
+    consoleErrorSpy.mockRestore();
+  });
 });
