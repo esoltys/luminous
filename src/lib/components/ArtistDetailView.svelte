@@ -192,16 +192,13 @@
   // Rescans disk for this artist's tracks, local portrait/band logo/fanart
   // banner (#761) and re-fetches its MusicBrainz/Wikipedia context (#23),
   // bypassing both caches — mirrors AlbumDetailView's handleRefreshAlbum.
-  // Fixes #867 & #1399: rescans only this artist's songs via `rescan_songs`
+  // Fixes #867 & #1399: rescans only this artist's songs via `rescanSongs`
   // rather than triggering a whole-library scan.
   async function handleRescanArtist() {
     if (refreshing || collectionStore.isScanning) return;
     refreshing = true;
     try {
-      if (songs.length > 0) {
-        await invoke("rescan_songs", { songIds: songs.map((s) => s.id) });
-      }
-      await collectionStore.refreshLibrary();
+      await collectionStore.rescanSongs(songs.map((s) => s.id));
       await refetchSongs();
       const [artwork] = await Promise.all([
         collectionStore.getExtendedArtworkForArtist(artistName, true),

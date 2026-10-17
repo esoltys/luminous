@@ -4,6 +4,7 @@ import { render } from "@testing-library/svelte";
 import { invoke } from "@tauri-apps/api/core";
 import CoverArt from "./CoverArt.svelte";
 import { prefs } from "../stores/prefs.svelte";
+import { collectionStore } from "../stores/collection.svelte";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
@@ -63,5 +64,24 @@ describe("CoverArt.svelte - fanart.tv cover fallback (#1277)", () => {
       expect(vi.mocked(invoke).mock.calls.some(([c]) => c === "get_cover_art_uri")).toBe(true);
     });
     expect(vi.mocked(invoke).mock.calls.some(([c]) => c === "fetch_remote_cover")).toBe(false);
+  });
+});
+
+describe("CoverArt.svelte - rescanned covers reload (#1755)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    collectionStore.coverArtVersion = 0;
+  });
+
+  it("changes the image URL when the cover-art version is bumped", async () => {
+    const { container } = render(CoverArt, { props: { songId: 7, artAutomatic: "album-1.jpg" } });
+    const src = () => container.querySelector("img")?.getAttribute("src");
+    await vi.waitFor(() => expect(src()).toContain("album-1.jpg"));
+    const before = src();
+
+    collectionStore.coverArtVersion = 1;
+
+    await vi.waitFor(() => expect(src()).not.toBe(before));
+    expect(src()).toMatch(/[?&]v=1$/);
   });
 });

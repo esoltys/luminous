@@ -12,6 +12,7 @@
   import { playlistsStore } from "../stores/playlists.svelte";
   import { pinnedStore } from "../stores/pinned.svelte";
   import { shuffleArray } from "../utils/shuffle";
+  import { coverRequestUrl } from "../utils/covers";
   import CoverArt from "./CoverArt.svelte";
   import CoverStack from "./CoverStack.svelte";
   import SongRating from "./SongRating.svelte";
@@ -96,10 +97,9 @@
       // so the old code here reloaded the DB snapshot before the rescan had
       // reached this album's files, making Refresh a no-op for exactly the
       // "another install/tool edited this file" case it exists for (#956).
-      // `rescan_songs` is awaited end-to-end and bypasses the mtime-skip a
+      // `rescanSongs` is awaited end-to-end and bypasses the mtime-skip a
       // normal scan uses, so it always reflects what's actually on disk.
-      await invoke("rescan_songs", { songIds: songs.map((s) => s.id) });
-      await collectionStore.refreshLibrary();
+      await collectionStore.rescanSongs(songs.map((s) => s.id));
       const fetchedSongs = await fetchAlbumSongs(requested);
       if (albumName !== requested) return;
       songs = fetchedSongs;
@@ -225,7 +225,7 @@
     const fallbackSongId = item?.sample_song_id ?? songs[0]?.id;
     // A fanart.tv cover arriving or its toggle changing re-resolves (#1277).
     void prefs.fanartFetchAlbumCover;
-    void collectionStore.coverArtVersion;
+    const version = collectionStore.coverArtVersion;
     let cancelled = false;
 
     async function resolve() {
@@ -243,7 +243,7 @@
           console.error("Failed to load album backdrop art:", e);
         }
       }
-      if (!cancelled) backdropUrl = url;
+      if (!cancelled) backdropUrl = url && coverRequestUrl(url, { version });
     }
 
     resolve();

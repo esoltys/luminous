@@ -5,7 +5,7 @@ import {
   resolveArtistPortraitUrl,
   resolveArtistLogoUrl,
   resolveArtistBackgroundUrl,
-  sizedCoverUrl,
+  coverRequestUrl,
 } from "./covers";
 import { prefs } from "../stores/prefs.svelte";
 
@@ -76,24 +76,24 @@ describe("artist image resolvers (#1276)", () => {
   }
 });
 
-describe("sizedCoverUrl (#1528)", () => {
+describe("coverRequestUrl sizing (#1528)", () => {
   it("picks the smallest card-sized copy that covers the box, on both URL forms", () => {
     const url = "http://luminous-art.localhost/album-1.jpg";
-    expect(sizedCoverUrl(url, 72)).toBe(`${url}?w=256`);
-    expect(sizedCoverUrl(url, 256)).toBe(`${url}?w=256`);
-    expect(sizedCoverUrl(url, 360)).toBe(`${url}?w=384`);
-    expect(sizedCoverUrl("luminous-art://album-1.jpg", 300)).toBe("luminous-art://album-1.jpg?w=384");
+    expect(coverRequestUrl(url, { devicePixels: 72 })).toBe(`${url}?w=256`);
+    expect(coverRequestUrl(url, { devicePixels: 256 })).toBe(`${url}?w=256`);
+    expect(coverRequestUrl(url, { devicePixels: 360 })).toBe(`${url}?w=384`);
+    expect(coverRequestUrl("luminous-art://album-1.jpg", { devicePixels: 300 })).toBe("luminous-art://album-1.jpg?w=384");
   });
 
   it("uses the unsized copy for a box bigger than the largest, or one not measured", () => {
     const url = "http://luminous-art.localhost/album-1.jpg";
-    expect(sizedCoverUrl(url, 385)).toBe(url);
-    expect(sizedCoverUrl(url, 0)).toBe(url);
+    expect(coverRequestUrl(url, { devicePixels: 385 })).toBe(url);
+    expect(coverRequestUrl(url, { devicePixels: 0 })).toBe(url);
   });
 
   it("sizes a folder-art thumbnail", () => {
     const url = "http://luminous-art.localhost/thumb/D%3A%2FMusic%2Fcover.jpg";
-    expect(sizedCoverUrl(url, 200)).toBe(`${url}?w=256`);
+    expect(coverRequestUrl(url, { devicePixels: 200 })).toBe(`${url}?w=256`);
   });
 
   it("leaves originals, remote and mock URLs alone", () => {
@@ -103,7 +103,36 @@ describe("sizedCoverUrl (#1528)", () => {
       "https://is1-ssl.mzstatic.com/image/600x600.jpg",
       "/covers/album-1.jpg",
     ]) {
-      expect(sizedCoverUrl(url, 200)).toBe(url);
+      expect(coverRequestUrl(url, { devicePixels: 200 })).toBe(url);
     }
+  });
+});
+
+describe("coverRequestUrl versioning (#1755)", () => {
+  it("adds the version alone or after the size", () => {
+    expect(coverRequestUrl("luminous-art://album-1.jpg", { version: 3 })).toBe("luminous-art://album-1.jpg?v=3");
+    expect(coverRequestUrl("http://luminous-art.localhost/album-1.jpg", { devicePixels: 200, version: 2 })).toBe(
+      "http://luminous-art.localhost/album-1.jpg?w=256&v=2"
+    );
+  });
+
+  it("versions originals it doesn't size", () => {
+    expect(coverRequestUrl("luminous-art://local/D%3A%2Fcover.jpg", { devicePixels: 200, version: 1 })).toBe(
+      "luminous-art://local/D%3A%2Fcover.jpg?v=1"
+    );
+  });
+
+  it("starts the query after a folder-art path that holds a literal ?", () => {
+    expect(coverRequestUrl("luminous-art://thumb/a?b.jpg", { devicePixels: 200, version: 1 })).toBe(
+      "luminous-art://thumb/a?b.jpg?v=1"
+    );
+  });
+
+  it("leaves URLs alone at version 0, and remote or mock URLs always", () => {
+    expect(coverRequestUrl("luminous-art://album-1.jpg", { version: 0 })).toBe("luminous-art://album-1.jpg");
+    expect(coverRequestUrl("https://is1-ssl.mzstatic.com/image/600x600.jpg", { version: 4 })).toBe(
+      "https://is1-ssl.mzstatic.com/image/600x600.jpg"
+    );
+    expect(coverRequestUrl("/covers/album-1.jpg", { version: 4 })).toBe("/covers/album-1.jpg");
   });
 });

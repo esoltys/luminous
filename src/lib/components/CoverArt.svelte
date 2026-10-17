@@ -10,7 +10,7 @@
   import { i18n } from "../stores/i18n.svelte";
   import { prefs } from "../stores/prefs.svelte";
   import { collectionStore } from "../stores/collection.svelte";
-  import { sizedCoverUrl } from "../utils/covers";
+  import { coverRequestUrl } from "../utils/covers";
 
   interface Props {
     songId: number | undefined;
@@ -44,7 +44,11 @@
   let box = $state<HTMLDivElement>();
   let boxPixels = $state<number | null>(null);
   let displaySrc = $derived(
-    imgSrc && boxPixels !== null && !fullResolution ? sizedCoverUrl(imgSrc, boxPixels) : imgSrc
+    imgSrc &&
+      coverRequestUrl(imgSrc, {
+        devicePixels: fullResolution ? 0 : (boxPixels ?? 0),
+        version: collectionStore.coverArtVersion,
+      })
   );
 
   $effect(() => {
