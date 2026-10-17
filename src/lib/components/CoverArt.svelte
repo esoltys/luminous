@@ -10,7 +10,7 @@
   import { i18n } from "../stores/i18n.svelte";
   import { prefs } from "../stores/prefs.svelte";
   import { collectionStore } from "../stores/collection.svelte";
-  import { sizedCoverUrl } from "../utils/covers";
+  import { sizedCoverUrl, versionedCoverUrl } from "../utils/covers";
 
   interface Props {
     songId: number | undefined;
@@ -43,9 +43,11 @@
   // so it never starts loading a copy of the wrong size.
   let box = $state<HTMLDivElement>();
   let boxPixels = $state<number | null>(null);
-  let displaySrc = $derived(
-    imgSrc && boxPixels !== null && !fullResolution ? sizedCoverUrl(imgSrc, boxPixels) : imgSrc
-  );
+  let displaySrc = $derived.by(() => {
+    if (!imgSrc) return imgSrc;
+    const sized = boxPixels !== null && !fullResolution ? sizedCoverUrl(imgSrc, boxPixels) : imgSrc;
+    return versionedCoverUrl(sized, collectionStore.coverArtVersion);
+  });
 
   $effect(() => {
     const node = box;

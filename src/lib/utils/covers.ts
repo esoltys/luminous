@@ -54,6 +54,9 @@ export function resolveArtistBackgroundUrl(
  * (covermanager.rs); a box bigger than the largest gets the unsized copy. */
 const SIZED_COVER_EDGES = [256, 384];
 
+/** The two forms a `luminous-art://` URL takes (WebView2 rewrites the scheme, #715). */
+const ART_URL_PREFIXES = ["http://luminous-art.localhost/", "luminous-art://"];
+
 /**
  * The URL of a cached cover or folder-art thumbnail sized for a box
  * `devicePixels` wide: the smallest card-sized copy that covers it, else
@@ -65,12 +68,26 @@ const SIZED_COVER_EDGES = [256, 384];
  * fetching the largest candidate for every card a virtualized grid drops.
  */
 export function sizedCoverUrl(url: string, devicePixels: number): string {
-  const prefix = ["http://luminous-art.localhost/", "luminous-art://"].find((p) => url.startsWith(p));
+  const prefix = ART_URL_PREFIXES.find((p) => url.startsWith(p));
   if (!prefix || devicePixels <= 0) return url;
   const rest = url.slice(prefix.length).replace(/^localhost\//, "");
   if (rest.startsWith("local/") || rest.startsWith("embedded/") || rest.includes("?")) return url;
   const edge = SIZED_COVER_EDGES.find((e) => e >= devicePixels);
   return edge ? `${url}?w=${edge}` : url;
+}
+
+/**
+ * `url` tagged with the library's cover-art version (`collectionStore.coverArtVersion`,
+ * #1755). A rescan rewrites a cover under the same name, so only a changed URL
+ * makes the webview fetch it again. Apply it last, after `sizedCoverUrl`.
+ * Version 0 (nothing rescanned yet) and anything not served by `luminous-art://`
+ * are returned as-is; the backend drops the `v` parameter.
+ */
+export function versionedCoverUrl(url: string, version: number): string {
+  if (version <= 0) return url;
+  if (!ART_URL_PREFIXES.some((p) => url.startsWith(p))) return url;
+  // Join `sizedCoverUrl`'s `?w=` query; any other `?` is part of a folder-art path.
+  return `${url}${/\?w=\d+$/.test(url) ? "&" : "?"}v=${version}`;
 }
 
 export interface CoverSource {

@@ -376,20 +376,30 @@ pub fn local_artwork_uri(path: &Path) -> String {
 /// cached copy already is the answer.
 const MIN_SIZED_EDGE: u32 = 64;
 
-/// Splits a `?w=<px>` suffix off a `luminous-art://` URI (#1528) — the
-/// `srcset` candidates cover images list so a card loads a cover no larger
-/// than it's drawn. Anything else after a `?` stays part of the path (a
-/// Linux folder-art path isn't percent-encoded, so it may hold a `?`).
+/// Splits the query off a `luminous-art://` URI and returns the `w=<px>`
+/// width it asks for (#1528), so a card loads a cover no larger than it's
+/// drawn. `v=<n>` is the frontend's cover-art version (#1755): it only makes
+/// the webview re-request a rescanned cover, so it's dropped here. A suffix
+/// is a query only when every `k=v` pair has one of those keys; anything
+/// else after a `?` stays part of the path (a Linux folder-art path isn't
+/// percent-encoded, so it may hold a `?`).
 fn split_size_query(uri: &str) -> (&str, Option<u32>) {
-    if let Some((base, query)) = uri.rsplit_once('?') {
-        if let Some(width) = query.strip_prefix("w=").and_then(|w| w.parse::<u32>().ok()) {
-            let width = (MIN_SIZED_EDGE..CACHE_MAX_EDGE)
-                .contains(&width)
-                .then_some(width);
-            return (base, width);
+    let Some((base, query)) = uri.rsplit_once('?') else {
+        return (uri, None);
+    };
+    let mut width = None;
+    for pair in query.split('&') {
+        match pair.split_once('=') {
+            Some(("w", w)) => match w.parse::<u32>() {
+                Ok(w) => width = Some(w),
+                Err(_) => return (uri, None),
+            },
+            Some(("v", v)) if v.parse::<u64>().is_ok() => {}
+            _ => return (uri, None),
         }
     }
-    (uri, None)
+    let width = width.filter(|w| (MIN_SIZED_EDGE..CACHE_MAX_EDGE).contains(w));
+    (base, width)
 }
 
 /// Serves a `luminous-art://` request: `local/<percent-encoded absolute path>`
@@ -2732,6 +2742,24 @@ mod tests {
             ("thumb/a?b.jpg", Some(256))
         );
         assert_eq!(split_size_query("album-1.jpg"), ("album-1.jpg", None));
+    }
+
+    #[test]
+    fn test_split_size_query_drops_the_cover_art_version() {
+        assert_eq!(
+            split_size_query("album-1.jpg?w=256&v=3"),
+            ("album-1.jpg", Some(256))
+        );
+        assert_eq!(split_size_query("album-1.jpg?v=3"), ("album-1.jpg", None));
+        assert_eq!(
+            split_size_query("thumb/a?b.jpg?v=2&w=384"),
+            ("thumb/a?b.jpg", Some(384))
+        );
+        // An unknown key means the `?` belongs to the path.
+        assert_eq!(
+            split_size_query("thumb/a?x=1.jpg"),
+            ("thumb/a?x=1.jpg", None)
+        );
     }
 
     #[test]

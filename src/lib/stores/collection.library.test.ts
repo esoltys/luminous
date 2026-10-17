@@ -117,6 +117,23 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
     expect(collectionStore.artists).toHaveLength(2);
   });
 
+  it("rescanSongs rescans, reloads the library, then bumps the cover-art version (#1755)", async () => {
+    const before = collectionStore.coverArtVersion;
+    await collectionStore.rescanSongs([10, 11]);
+
+    const calls = vi.mocked(invoke).mock.calls.map(([cmd]) => cmd);
+    expect(invoke).toHaveBeenCalledWith("rescan_songs", { songIds: [10, 11] });
+    expect(calls.indexOf("rescan_songs")).toBeLessThan(calls.indexOf("get_library_snapshot"));
+    expect(collectionStore.songs).toHaveLength(3);
+    expect(collectionStore.coverArtVersion).toBe(before + 1);
+  });
+
+  it("rescanSongs with no songs only reloads the library", async () => {
+    await collectionStore.rescanSongs([]);
+    expect(invoke).not.toHaveBeenCalledWith("rescan_songs", expect.anything());
+    expect(invoke).toHaveBeenCalledWith("get_library_snapshot");
+  });
+
   it("resolves a WebDAV server as the Library badge for a song's credentialed URL (#682)", async () => {
     await collectionStore.refreshWebDavServers();
 

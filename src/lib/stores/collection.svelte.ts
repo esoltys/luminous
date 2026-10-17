@@ -200,7 +200,9 @@ class CollectionStore {
    * the filesystem every time. */
   extendedArtworkBySong = $state<Record<number, ExtendedArtworkResponse>>({});
   /** Bumped when a fanart.tv album cover arrives (#1277), so covers showing
-   * the "no art" placeholder re-resolve and pick up the fallback. */
+   * the "no art" placeholder re-resolve and pick up the fallback, and by
+   * `rescanSongs` (#1755). It's also part of every `luminous-art://` cover URL
+   * (`versionedCoverUrl`), so a cover rewritten under the same name reloads. */
   coverArtVersion = $state(0);
   /** The disc-art toggle {@link extendedArtworkBySong} was scanned under —
    * fanart.tv disc art is in the scan only while it's on (#1277). */
@@ -881,6 +883,19 @@ class CollectionStore {
         });
     }
     return this.queuedRefreshLibraryPromise;
+  }
+
+  /** Re-reads these songs from disk (tags and cover art, ignoring the mtime
+   * skip a normal scan uses) and reloads the library. Refresh Album and
+   * Refresh Artist share it. A rescan rewrites a replaced cover under the same
+   * URL, so this bumps `coverArtVersion` to make every cover re-request (#1755).
+   * An empty list only reloads. */
+  async rescanSongs(songIds: number[]): Promise<void> {
+    if (songIds.length > 0) {
+      await invoke("rescan_songs", { songIds });
+    }
+    await this.refreshLibrary();
+    this.coverArtVersion++;
   }
 
   private async doRefreshLibrary() {

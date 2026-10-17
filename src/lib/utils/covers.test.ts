@@ -6,6 +6,7 @@ import {
   resolveArtistLogoUrl,
   resolveArtistBackgroundUrl,
   sizedCoverUrl,
+  versionedCoverUrl,
 } from "./covers";
 import { prefs } from "../stores/prefs.svelte";
 
@@ -105,5 +106,26 @@ describe("sizedCoverUrl (#1528)", () => {
     ]) {
       expect(sizedCoverUrl(url, 200)).toBe(url);
     }
+  });
+});
+
+describe("versionedCoverUrl (#1755)", () => {
+  it("adds the version to a cover URL, joining a sizing query", () => {
+    expect(versionedCoverUrl("luminous-art://album-1.jpg", 3)).toBe("luminous-art://album-1.jpg?v=3");
+    expect(versionedCoverUrl("http://luminous-art.localhost/album-1.jpg?w=256", 2)).toBe(
+      "http://luminous-art.localhost/album-1.jpg?w=256&v=2"
+    );
+  });
+
+  it("starts a query after a folder-art path that holds a literal ?", () => {
+    expect(versionedCoverUrl("luminous-art://thumb/a?b.jpg", 1)).toBe("luminous-art://thumb/a?b.jpg?v=1");
+  });
+
+  it("leaves URLs alone at version 0, and remote or mock URLs always", () => {
+    expect(versionedCoverUrl("luminous-art://album-1.jpg", 0)).toBe("luminous-art://album-1.jpg");
+    expect(versionedCoverUrl("https://is1-ssl.mzstatic.com/image/600x600.jpg", 4)).toBe(
+      "https://is1-ssl.mzstatic.com/image/600x600.jpg"
+    );
+    expect(versionedCoverUrl("/covers/album-1.jpg", 4)).toBe("/covers/album-1.jpg");
   });
 });
