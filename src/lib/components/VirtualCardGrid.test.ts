@@ -5,8 +5,8 @@ import VirtualCardGrid from "./VirtualCardGrid.svelte";
 
 // jsdom has no layout, so the scroller's size, the grid's offset within it and
 // a card's height are stubbed: a 1000x600 viewport, scrolled by `scrollY`.
-// jsdom doesn't stretch cards to their row's height, which `measure`'s
-// tallest-card reading doesn't need.
+// A card's stubbed height includes a row track's `minmax()` floor, the way a
+// grid row stretches it.
 const VIEW_HEIGHT = 600;
 
 let scroller: HTMLDivElement;
@@ -42,7 +42,10 @@ beforeEach(() => {
     if (this === scroller) return rect(0, VIEW_HEIGHT);
     if (this.parentElement === scroller) return rect(-scrollY, 0);
     if (this.dataset.card !== undefined) {
-      return rect(0, typeof cardHeight === "number" ? cardHeight : cardHeight(Number(this.textContent)));
+      const natural = typeof cardHeight === "number" ? cardHeight : cardHeight(Number(this.textContent));
+      // A `minmax(<H>px, auto)` row track stretches the card to at least H.
+      const floor = Number(/minmax\(([\d.]+)px/.exec(this.parentElement?.style.gridAutoRows ?? "")?.[1] ?? 0);
+      return rect(0, Math.max(natural, floor));
     }
     return rect(0, 0);
   });

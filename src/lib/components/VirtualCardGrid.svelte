@@ -123,15 +123,26 @@
   $effect(() => {
     const node = rowsEl;
     if (!node) return;
-    const measure = () => {
+    const tallest = () => {
       let height = 0;
       for (const card of node.children) height = Math.max(height, card.getBoundingClientRect().height);
-      if (height <= 0) return;
+      return height;
+    };
+    const measure = () => {
       const at = untrack(() => columnWidth);
       const prev = untrack(() => measured);
       if (!prev || prev.columnWidth !== at) {
-        measured = { columnWidth: at, height };
-      } else if (height > prev.height + 0.5) {
+        // The rows may still carry the old width's floor, which would hold
+        // a narrower card at the old height; read the cards' own heights.
+        const track = node.style.gridAutoRows;
+        node.style.gridAutoRows = "auto";
+        const height = tallest();
+        node.style.gridAutoRows = track;
+        if (height > 0) measured = { columnWidth: at, height };
+        return;
+      }
+      const height = tallest();
+      if (height > prev.height + 0.5) {
         // Every row above the view grows too: scroll by as much, so the
         // rows on screen stay put instead of jumping by `firstRow` times
         // the growth.
