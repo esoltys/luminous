@@ -2,8 +2,16 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { toastStore } from "./toast.svelte";
 import { i18n } from "./i18n.svelte";
+import { albumKey } from "$lib/utils/albumKey";
 
 export type StatsEntityType = "song" | "album" | "artist" | "genre";
+
+/** How the backend keys an exclusion: songs by id, albums by `albumKey`,
+ * artists and genres case-insensitively. */
+function normalizeKey(entityType: string, entityKey: string): string {
+  if (entityType === "song") return entityKey;
+  return entityType === "album" ? albumKey(entityKey) : entityKey.toLowerCase();
+}
 
 /** Personal Stats exclusion set (#130) — preloaded once and kept in sync via
  * `stats-exclusions-changed`, mirroring how `PinnedStore` preloads
@@ -28,7 +36,7 @@ class StatsExclusionsStore {
     try {
       const pairs = await invoke<[string, string][]>("get_stats_exclusions");
       this.keys = new Set(
-        (pairs ?? []).map(([type, key]) => `${type}:${type === "song" ? key : key.toLowerCase()}`)
+        (pairs ?? []).map(([type, key]) => `${type}:${normalizeKey(type, key)}`)
       );
     } catch (err) {
       console.error("Failed to load stats exclusions:", err);
@@ -36,8 +44,7 @@ class StatsExclusionsStore {
   }
 
   isExcluded(entityType: StatsEntityType, entityKey: string): boolean {
-    const k = entityType === "song" ? entityKey : entityKey.toLowerCase();
-    return this.keys.has(`${entityType}:${k}`);
+    return this.keys.has(`${entityType}:${normalizeKey(entityType, entityKey)}`);
   }
 
   getSongExclusionReason(song: {

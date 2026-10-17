@@ -117,7 +117,7 @@ pub fn normalize_rating(rating: f32) -> f32 {
     snapped.clamp(0.5, 5.0)
 }
 
-/// Persist a rating for an album, keyed by album title (matching how
+/// Persist a rating for an album, keyed by its `album_key` (matching how
 /// `CollectionScanner::get_albums` groups albums), returning the normalized
 /// value actually stored. Independent of any song rating on that album.
 pub fn set_album_rating(conn: &Connection, album: &str, rating: f32) -> Result<f32> {
@@ -125,7 +125,7 @@ pub fn set_album_rating(conn: &Connection, album: &str, rating: f32) -> Result<f
     conn.execute(
         "INSERT INTO album_ratings (album_key, rating) VALUES (?1, ?2)
          ON CONFLICT(album_key) DO UPDATE SET rating = excluded.rating",
-        params![album, normalized],
+        params![crate::album_key::album_key(album), normalized],
     )?;
     Ok(normalized)
 }
@@ -135,7 +135,7 @@ pub fn get_album_rating(conn: &Connection, album: &str) -> Result<f32> {
     let rating = conn
         .query_row(
             "SELECT rating FROM album_ratings WHERE album_key = ?1",
-            params![album],
+            params![crate::album_key::album_key(album)],
             |r| r.get::<_, f32>(0),
         )
         .unwrap_or(RATING_UNRATED);
@@ -157,14 +157,21 @@ pub fn get_stats_exclusions(conn: &Connection) -> Result<Vec<(String, String)>> 
 
 /// Set or clear a Personal Stats exclusion (#130) for a song/album/artist/
 /// genre, keyed the same way `stats_exclusions.entity_key` is queried in
-/// `crate::stats_summary` (song id as text, or the raw album/artist/genre
-/// string).
+/// `crate::stats_summary` (song id as text, an album's `album_key`, or the
+/// raw artist/genre string).
 pub fn set_stats_excluded(
     conn: &Connection,
     entity_type: &str,
     entity_key: &str,
     excluded: bool,
 ) -> Result<()> {
+    let folded;
+    let entity_key = if entity_type == "album" {
+        folded = crate::album_key::album_key(entity_key);
+        folded.as_str()
+    } else {
+        entity_key
+    };
     if excluded {
         conn.execute(
             "INSERT OR IGNORE INTO stats_exclusions (entity_type, entity_key) VALUES (?1, ?2)",

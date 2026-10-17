@@ -139,8 +139,8 @@ pub fn apply_critique_ratings(
             "release_group" => {
                 let albums: Vec<String> = {
                     let mut stmt = tx.prepare(
-                        "SELECT DISTINCT album FROM songs
-                         WHERE musicbrainz_release_group_id = ?1 AND album IS NOT NULL AND album != ''",
+                        "SELECT DISTINCT album_key FROM songs
+                         WHERE musicbrainz_release_group_id = ?1 AND album_key IS NOT NULL AND album_key != ''",
                     )?;
                     let rows = stmt.query_map(params![r.entity_mbid], |r| r.get(0))?;
                     rows.collect::<rusqlite::Result<_>>()?
@@ -175,9 +175,9 @@ mod tests {
 
     fn song(conn: &Connection, path: &str, rec: &str, rg: &str, album: &str, loved: i32) -> i64 {
         conn.execute(
-            "INSERT INTO songs (path, title, album, musicbrainz_recording_id, musicbrainz_release_group_id, loved, source)
-             VALUES (?1, 't', ?2, ?3, ?4, ?5, 1)",
-            params![path, album, rec, rg, loved],
+            "INSERT INTO songs (path, title, album, album_key, musicbrainz_recording_id, musicbrainz_release_group_id, loved, source)
+             VALUES (?1, 't', ?2, ?3, ?4, ?5, ?6, 1)",
+            params![path, album, crate::album_key::album_key(album), rec, rg, loved],
         )
         .unwrap();
         conn.last_insert_rowid()

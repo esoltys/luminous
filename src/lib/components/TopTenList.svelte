@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { sameAlbum } from "$lib/utils/albumKey";
   import type { StatsTopItem, Song, AlbumItem } from "../types";
   import { statsBarPercents } from "../utils/statsBars";
   import { playerStore } from "../stores/player.svelte";
@@ -141,7 +142,7 @@
 
     if (kind === "album") {
       listen<AlbumStatsPayload>("album-stats-changed", (event) => {
-        const match = items.find((it) => it.label === event.payload.album);
+        const match = items.find((it) => sameAlbum(it.label, event.payload.album));
         if (match && typeof event.payload.rating === "number") {
           match.rating = event.payload.rating;
           localRatings[match.key] = event.payload.rating;

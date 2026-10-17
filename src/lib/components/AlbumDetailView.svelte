@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { sameAlbum } from "$lib/utils/albumKey";
   import { isRemoteSource } from "../utils/remoteSource";
   import { tick } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
@@ -189,7 +190,7 @@
   }
 
   let albumItem = $derived(
-    collectionStore.albums.find((a) => a.album === albumName) || null
+    collectionStore.albums.find((a) => sameAlbum(a.album, albumName)) || null
   );
 
   /** Any one track's id, used to look up extended local artwork (#98/#760)
@@ -549,7 +550,7 @@
     let unlisten: (() => void) | undefined;
     let disposed = false;
     listen<AlbumStatsPayload>("album-stats-changed", (event) => {
-      if (albumItem && albumItem.album === event.payload.album) applyAlbumStats(albumItem, event.payload);
+      if (albumItem && sameAlbum(albumItem.album, event.payload.album)) applyAlbumStats(albumItem, event.payload);
     }).then((fn) => {
       if (disposed) fn();
       else unlisten = fn;

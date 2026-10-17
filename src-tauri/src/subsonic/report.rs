@@ -305,7 +305,7 @@ pub fn push_song_loved(db: &Database, path: &str, loved: i32) {
 /// ratings are keyed by bare title, so this only happens when exactly one
 /// server album (across all servers) has that title — pushing to several
 /// would be a guess.
-pub fn push_album_rating(db: &Database, album_key: &str, rating: f32) {
+pub fn push_album_rating(db: &Database, album: &str, rating: f32) {
     let loaded = (|| -> Result<Option<(Server, String, bool)>> {
         let conn = db.pool.get()?;
         let mut stmt = conn.prepare(
@@ -313,7 +313,7 @@ pub fn push_album_rating(db: &Database, album_key: &str, rating: f32) {
              WHERE album_key = ?1",
         )?;
         let matches = stmt
-            .query_map(params![album_key], |r| {
+            .query_map(params![crate::album_key::album_key(album)], |r| {
                 Ok((
                     r.get::<_, i64>(0)?,
                     r.get::<_, String>(1)?,
@@ -328,7 +328,7 @@ pub fn push_album_rating(db: &Database, album_key: &str, rating: f32) {
             [] => Ok(None),
             _ => {
                 log::info!(
-                    "Not pushing album rating for '{album_key}': {} server albums share the title",
+                    "Not pushing album rating for '{album}': {} server albums share the title",
                     matches.len()
                 );
                 Ok(None)
@@ -423,8 +423,8 @@ pub fn spawn_song_loved(db: Arc<Database>, song: &Song, loved: i32) {
     }
 }
 
-pub fn spawn_album_rating(db: Arc<Database>, album_key: String, rating: f32) {
-    tauri::async_runtime::spawn_blocking(move || push_album_rating(&db, &album_key, rating));
+pub fn spawn_album_rating(db: Arc<Database>, album: String, rating: f32) {
+    tauri::async_runtime::spawn_blocking(move || push_album_rating(&db, &album, rating));
 }
 
 #[cfg(test)]
@@ -734,7 +734,7 @@ mod tests {
             .unwrap()
             .execute_batch(
                 "INSERT INTO subsonic_album_cache (server_id, remote_album_id, album_key) VALUES
-                    (1, 'al1', 'Unique'), (1, 'al2', 'Shared'), (1, 'al3', 'Shared');",
+                    (1, 'al1', 'unique'), (1, 'al2', 'shared'), (1, 'al3', 'shared');",
             )
             .unwrap();
         let db2 = db.clone();

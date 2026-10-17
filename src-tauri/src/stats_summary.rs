@@ -64,7 +64,7 @@ const TOP_N: i64 = 10;
 const SONG_EXCLUSION_FILTER: &str = "NOT EXISTS (
     SELECT 1 FROM stats_exclusions se
     WHERE (se.entity_type = 'song' AND se.entity_key = CAST(s.id AS TEXT))
-       OR (se.entity_type = 'album' AND s.album IS NOT NULL AND s.album != '' AND se.entity_key = s.album COLLATE NOCASE)
+       OR (se.entity_type = 'album' AND s.album_key IS NOT NULL AND s.album_key != '' AND se.entity_key = s.album_key)
        OR (se.entity_type = 'artist' AND COALESCE(NULLIF(s.album_artist, ''), s.artist, '') != '' AND se.entity_key = COALESCE(NULLIF(s.album_artist, ''), s.artist, '') COLLATE NOCASE)
 )";
 
@@ -152,14 +152,14 @@ pub fn top_albums_with_limit(
     limit: i64,
 ) -> Result<Vec<StatsTopItem>> {
     let sql = format!(
-        "SELECT s.album,
+        "SELECT {display},
                 MIN(COALESCE(NULLIF(s.album_artist, ''), s.artist, '')),
                 COUNT(*) AS play_count,
                 COALESCE(SUM(COALESCE(NULLIF(ph.duration_secs, 0), s.length_nanosec / 1000000000, 0)), 0) AS total_secs,
                 (
                     SELECT s_sample.id
                     FROM songs s_sample
-                    WHERE s_sample.album = s.album
+                    WHERE s_sample.album_key = s.album_key
                       AND s_sample.source IN ({lib}) AND s_sample.unavailable = 0
                     ORDER BY (s_sample.art_manual IS NOT NULL OR s_sample.art_automatic IS NOT NULL OR s_sample.art_embedded = 1) DESC,
                              s_sample.disc ASC, s_sample.track ASC, s_sample.id ASC
@@ -168,7 +168,7 @@ pub fn top_albums_with_limit(
                 (
                     SELECT s_sample.art_embedded
                     FROM songs s_sample
-                    WHERE s_sample.album = s.album
+                    WHERE s_sample.album_key = s.album_key
                       AND s_sample.source IN ({lib}) AND s_sample.unavailable = 0
                     ORDER BY (s_sample.art_manual IS NOT NULL OR s_sample.art_automatic IS NOT NULL OR s_sample.art_embedded = 1) DESC,
                              s_sample.disc ASC, s_sample.track ASC, s_sample.id ASC
@@ -177,7 +177,7 @@ pub fn top_albums_with_limit(
                 (
                     SELECT s_sample.art_automatic
                     FROM songs s_sample
-                    WHERE s_sample.album = s.album
+                    WHERE s_sample.album_key = s.album_key
                       AND s_sample.source IN ({lib}) AND s_sample.unavailable = 0
                     ORDER BY (s_sample.art_manual IS NOT NULL OR s_sample.art_automatic IS NOT NULL OR s_sample.art_embedded = 1) DESC,
                              s_sample.disc ASC, s_sample.track ASC, s_sample.id ASC
@@ -186,7 +186,7 @@ pub fn top_albums_with_limit(
                 (
                     SELECT s_sample.art_manual
                     FROM songs s_sample
-                    WHERE s_sample.album = s.album
+                    WHERE s_sample.album_key = s.album_key
                       AND s_sample.source IN ({lib}) AND s_sample.unavailable = 0
                     ORDER BY (s_sample.art_manual IS NOT NULL OR s_sample.art_automatic IS NOT NULL OR s_sample.art_embedded = 1) DESC,
                              s_sample.disc ASC, s_sample.track ASC, s_sample.id ASC
@@ -197,16 +197,17 @@ pub fn top_albums_with_limit(
          JOIN songs s ON s.id = ph.song_id
          WHERE ph.played_at >= ?1
            AND s.source IN ({lib}) AND s.unavailable = 0
-           AND s.album IS NOT NULL AND s.album != ''
+           AND s.album_key IS NOT NULL AND s.album_key != ''
            AND NOT EXISTS (
                SELECT 1 FROM stats_exclusions se
-               WHERE (se.entity_type = 'album' AND se.entity_key = s.album COLLATE NOCASE)
+               WHERE (se.entity_type = 'album' AND se.entity_key = s.album_key)
                   OR (se.entity_type = 'artist' AND COALESCE(NULLIF(s.album_artist, ''), s.artist, '') != '' AND se.entity_key = COALESCE(NULLIF(s.album_artist, ''), s.artist, '') COLLATE NOCASE)
            )
-         GROUP BY s.album COLLATE NOCASE
-         ORDER BY total_secs DESC, play_count DESC, s.album COLLATE NOCASE ASC
+         GROUP BY s.album_key
+         ORDER BY total_secs DESC, play_count DESC, s.album_key ASC
          LIMIT ?2",
-        lib = *LIBRARY_SOURCES_SQL
+        lib = *LIBRARY_SOURCES_SQL,
+        display = crate::album_key::album_display_sql("s.album_key"),
     );
     let mut stmt = conn.prepare(&sql)?;
     let mut rows: Vec<StatsTopItem> = stmt
@@ -454,9 +455,16 @@ mod tests {
         genre: &str,
     ) -> i64 {
         conn.execute(
-            "INSERT INTO songs (path, title, artist, album, genre, source, unavailable)
-             VALUES (?1, ?2, ?3, ?4, ?5, 1, 0)",
-            params![path, title, artist, album, genre],
+            "INSERT INTO songs (path, title, artist, album, album_key, genre, source, unavailable)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1, 0)",
+            params![
+                path,
+                title,
+                artist,
+                album,
+                crate::album_key::album_key(album),
+                genre
+            ],
         )
         .unwrap();
         conn.last_insert_rowid()
@@ -835,14 +843,8 @@ mod tests {
         insert_play_with_duration(&conn, s_album_ex, range_start + 10, 200);
         insert_play_with_duration(&conn, s_artist_ex, range_start + 10, 300);
 
-        conn.execute(
-            "INSERT INTO stats_exclusions (entity_type, entity_key) VALUES ('album', 'Excluded Album')",
-            params![],
-        ).unwrap();
-        conn.execute(
-            "INSERT INTO stats_exclusions (entity_type, entity_key) VALUES ('artist', 'Excluded Artist')",
-            params![],
-        ).unwrap();
+        crate::stats::set_stats_excluded(&conn, "album", "Excluded Album", true).unwrap();
+        crate::stats::set_stats_excluded(&conn, "artist", "Excluded Artist", true).unwrap();
 
         let songs = top_songs(&conn, range_start).unwrap();
         assert_eq!(songs.len(), 1);

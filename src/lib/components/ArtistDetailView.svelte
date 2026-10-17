@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { sameAlbum } from "$lib/utils/albumKey";
   import { isRemoteSource } from "../utils/remoteSource";
   import { invoke } from "@tauri-apps/api/core";
   import { collectionStore } from "../stores/collection.svelte";
@@ -548,7 +549,7 @@
   // Grouped singles are AlbumItems (track_count === 1), but they render as a
   // song table alongside loose singles — resolve each back to its one song.
   let singleSongs = $derived([
-    ...singles.map((a) => songs.find((s) => s.album === a.album)).filter((s): s is Song => s !== undefined),
+    ...singles.map((a) => songs.find((s) => sameAlbum(s.album, a.album))).filter((s): s is Song => s !== undefined),
     ...looseSongs,
   ]);
 

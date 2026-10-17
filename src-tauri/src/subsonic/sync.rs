@@ -547,15 +547,16 @@ pub fn apply_library(
 /// Titles shared by several server albums are only imported when those
 /// albums agree; otherwise they're skipped rather than guessed.
 fn apply_album_ratings(tx: &Connection, server_id: i64, albums: &[AlbumId3]) -> Result<()> {
-    let mut by_title: HashMap<&str, Vec<&AlbumId3>> = HashMap::new();
+    let mut by_title: HashMap<String, Vec<&AlbumId3>> = HashMap::new();
     for album in albums {
-        let title = album.name.trim();
+        let title = crate::album_key::album_key(&album.name);
         if !title.is_empty() {
             by_title.entry(title).or_default().push(album);
         }
     }
 
     for (title, group) in by_title {
+        let title = title.as_str();
         let currents: HashSet<Option<u32>> = group
             .iter()
             .map(|a| server_rating(a.user_rating, a.starred.is_some()).map(|r| (r * 2.0) as u32))

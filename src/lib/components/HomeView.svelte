@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { sameAlbum } from "$lib/utils/albumKey";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
@@ -109,17 +110,17 @@
     const unlistenAlbumStats = listen<AlbumStatsPayload>("album-stats-changed", (event) => {
       if (typeof event.payload.rating !== "number") return;
       for (const item of topAlbums) {
-        if (item.label === event.payload.album) {
+        if (sameAlbum(item.label, event.payload.album)) {
           item.rating = event.payload.rating;
         }
       }
       for (const item of featuredAlbums) {
-        if (item.type === "album" && item.album.album === event.payload.album) {
+        if (item.type === "album" && sameAlbum(item.album.album, event.payload.album)) {
           item.album.rating = event.payload.rating;
         }
       }
       for (const item of recentlyAdded) {
-        if (item.type === "album" && item.album.album === event.payload.album) {
+        if (item.type === "album" && sameAlbum(item.album.album, event.payload.album)) {
           item.album.rating = event.payload.rating;
         }
       }

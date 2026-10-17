@@ -1329,7 +1329,7 @@ impl CollectionScanner {
                  WHERE source IN ({lib})
                    AND album IS NOT NULL
                    AND (art_unset = 1 OR (art_automatic IS NULL AND art_manual IS NULL))
-                 GROUP BY effective_artist, album",
+                 GROUP BY effective_artist, album_key",
                 lib = *LOCAL_SOURCES_SQL
             );
             if let Ok(mut stmt) = conn.prepare(&sql) {
@@ -1402,8 +1402,8 @@ impl CollectionScanner {
                 let folder_art_path = cover_manager.scan_folder_art(path)?;
                 if let Ok(conn) = self.db.pool.get() {
                     let _ = conn.execute(
-                        "UPDATE songs SET art_automatic = ?1, art_unset = 0 WHERE COALESCE(NULLIF(album_artist, ''), artist) = ?2 AND album = ?3",
-                        params![folder_art_path.to_string_lossy(), effective_artist, album],
+                        "UPDATE songs SET art_automatic = ?1, art_unset = 0 WHERE COALESCE(NULLIF(album_artist, ''), artist) = ?2 AND album_key = ?3",
+                        params![folder_art_path.to_string_lossy(), effective_artist, crate::album_key::album_key(&album)],
                     );
                 }
                 Some(())
@@ -1419,8 +1419,8 @@ impl CollectionScanner {
                 {
                     if let Ok(conn) = self.db.pool.get() {
                         let _ = conn.execute(
-                            "UPDATE songs SET art_automatic = ?1, art_unset = 0 WHERE COALESCE(NULLIF(album_artist, ''), artist) = ?2 AND album = ?3",
-                            params![cached_filename, effective_artist, album],
+                            "UPDATE songs SET art_automatic = ?1, art_unset = 0 WHERE COALESCE(NULLIF(album_artist, ''), artist) = ?2 AND album_key = ?3",
+                            params![cached_filename, effective_artist, crate::album_key::album_key(&album)],
                         );
                     }
                     resolved = true;
@@ -1439,8 +1439,8 @@ impl CollectionScanner {
                 if let Ok(Some(filename)) = cover_manager.fetch_remote_cover(song_id).await {
                     if let Ok(conn) = self.db.pool.get() {
                         let _ = conn.execute(
-                            "UPDATE songs SET art_automatic = ?1, art_unset = 0 WHERE COALESCE(NULLIF(album_artist, ''), artist) = ?2 AND album = ?3",
-                            params![filename, effective_artist, album],
+                            "UPDATE songs SET art_automatic = ?1, art_unset = 0 WHERE COALESCE(NULLIF(album_artist, ''), artist) = ?2 AND album_key = ?3",
+                            params![filename, effective_artist, crate::album_key::album_key(&album)],
                         );
                     }
                 }
@@ -2283,7 +2283,7 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
                   ON CONFLICT(path, beginning_nanosec) DO UPDATE SET
                     title=excluded.title, titlesort=excluded.titlesort,
                     artist=excluded.artist, artistsort=excluded.artistsort,
-                    album=excluded.album, albumsort=excluded.albumsort,
+                    album=excluded.album, album_key=excluded.album_key, albumsort=excluded.albumsort,
                     album_artist=excluded.album_artist, album_artist_sort=excluded.album_artist_sort,
                     composer=excluded.composer, composersort=excluded.composersort,
                     lyrics=excluded.lyrics, comment=excluded.comment,
@@ -2372,6 +2372,7 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
             song.musicbrainz_release_country,
             song.barcode,
             song.catalog_number,
+            song.album.as_deref().map(crate::album_key::album_key),
         ],
     )?;
     Ok(())
@@ -2476,11 +2477,12 @@ const SONG_INSERT_COLS: &str = "
     musicbrainz_artist_id, musicbrainz_album_artist_id, musicbrainz_album_id,
     musicbrainz_release_group_id, musicbrainz_recording_id, musicbrainz_track_id,
     musicbrainz_work_id,
-    musicbrainz_release_type, musicbrainz_release_country, barcode, catalog_number
+    musicbrainz_release_type, musicbrainz_release_country, barcode, catalog_number,
+    album_key
 ";
 
 const SONG_INSERT_PLACEHOLDERS: &str =
-    "?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33,?34,?35,?36,?37,?38,?39,?40,?41,?42,?43,?44,?45,?46,?47,?48,?49,?50,?51,?52";
+    "?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33,?34,?35,?36,?37,?38,?39,?40,?41,?42,?43,?44,?45,?46,?47,?48,?49,?50,?51,?52,?53";
 
 pub(crate) fn row_to_song(row: &rusqlite::Row) -> rusqlite::Result<Song> {
     row_to_song_at(row, 0)

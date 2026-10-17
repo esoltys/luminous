@@ -8,6 +8,7 @@ use super::{
     mode_query_fragments, parse_decade_range, row_to_song, CollectionScanner, SONG_SELECT_COLS,
     SONG_SELECT_COLS_QUALIFIED, SONG_SELECT_COL_COUNT,
 };
+use crate::album_key::{album_display_sql, album_key};
 use crate::models::{
     AlbumItem, AlbumLink, AlbumProfile, ArtistProfile, ArtistSocialLink, HomeItem, LibraryStats,
     Playlist, QueuePopulationMode, Song, Tag, TopAlbumItem, LIBRARY_SOURCES_SQL,
@@ -166,11 +167,13 @@ impl CollectionScanner {
         Ok(songs)
     }
 
+    /// Every library song of the album `album` names, matched by
+    /// `album_key` so any spelling of the title finds them all (#1752).
     pub fn get_songs_by_album(&self, album: &str) -> Result<Vec<Song>> {
         let conn = self.db.pool.get()?;
         let sql = format!(
             "SELECT {} FROM songs
-             WHERE album = ?1
+             WHERE album_key = ?1
                AND source IN ({lib})
                AND unavailable = 0
              ORDER BY disc, track",
@@ -179,7 +182,7 @@ impl CollectionScanner {
         );
         let mut stmt = conn.prepare(&sql)?;
         let songs = stmt
-            .query_map(params![album], row_to_song)?
+            .query_map(params![album_key(album)], row_to_song)?
             .filter_map(|r| r.ok())
             .collect();
         Ok(songs)
@@ -246,7 +249,7 @@ impl CollectionScanner {
         let conn = self.db.pool.get()?;
         let sql = format!(
             "SELECT
-                album,
+                {display} AS album,
                 MIN(year) AS year,
                 COUNT(*) AS track_count,
                 MAX(COALESCE(disc, 1)) AS disc_count,
@@ -256,28 +259,28 @@ impl CollectionScanner {
                 (
                     SELECT genre
                     FROM songs g
-                    WHERE g.album = songs.album AND g.source IN ({lib}) AND g.unavailable = 0
+                    WHERE g.album_key = songs.album_key AND g.source IN ({lib}) AND g.unavailable = 0
                       AND g.genre IS NOT NULL AND g.genre != ''
                     GROUP BY genre
                     ORDER BY COUNT(*) DESC, COALESCE(genresort, genre) ASC
                     LIMIT 1
                 ) AS genre,
                 COALESCE(
-                    (SELECT rating FROM album_ratings ar WHERE ar.album_key = songs.album),
+                    (SELECT rating FROM album_ratings ar WHERE ar.album_key = songs.album_key),
                     -1
                 ) AS rating,
                 MAX(added) AS added,
                 COALESCE(SUM(length_nanosec), 0) AS total_duration_nanosec
              FROM songs
-             WHERE source IN ({lib}) AND unavailable = 0 AND album IS NOT NULL AND album != ''
-               AND album IN (
-                 SELECT album FROM songs s2
+             WHERE source IN ({lib}) AND unavailable = 0 AND album_key IS NOT NULL AND album_key != ''
+               AND album_key IN (
+                 SELECT album_key FROM songs s2
                  WHERE s2.source IN ({lib}) AND s2.unavailable = 0 AND {}
                )
-               AND album IN (
-                 SELECT album FROM songs s3
+               AND album_key IN (
+                 SELECT album_key FROM songs s3
                  WHERE s3.source IN ({lib}) AND s3.unavailable = 0
-                 GROUP BY album
+                 GROUP BY album_key
                  -- Mirrors get_albums()'s various-artists fallback: a compilation
                  -- either has TCMP set, is explicitly credited to Various
                  -- Artists, or fails to agree on a single effective album
@@ -293,10 +296,11 @@ impl CollectionScanner {
                          )
                        )
                )
-             GROUP BY album
-             ORDER BY COALESCE(MAX(albumsort), album)",
+             GROUP BY album_key
+             ORDER BY COALESCE(MAX(albumsort), MIN(album))",
             multi_value_contains_sql("s2.artist", "?1"),
-            lib = *LIBRARY_SOURCES_SQL
+            lib = *LIBRARY_SOURCES_SQL,
+            display = album_display_sql("songs.album_key"),
         );
         let mut stmt = conn.prepare(&sql)?;
         let albums: Vec<serde_json::Value> = stmt
@@ -725,30 +729,35 @@ impl CollectionScanner {
         Ok(tags)
     }
 
-    /// One aggregated entry per distinct `album` value across the whole
-    /// library (untyped JSON, not a `Song`/`AlbumItem` — see the query below
-    /// for the exact field set), each summarizing every track that shares
-    /// that album name regardless of which artist tagged it.
+    /// One aggregated entry per album (distinct `album_key`, so spellings
+    /// differing only in case or surrounding whitespace are one album, #1752)
+    /// across the whole library (untyped JSON, not a `Song`/`AlbumItem` — see
+    /// the query below for the exact field set), each summarizing every track
+    /// of that album regardless of which artist tagged it. `album` is the
+    /// album's display spelling (`album_display_sql`).
     pub fn get_albums(&self) -> Result<Vec<serde_json::Value>> {
         let conn = self.db.pool.get()?;
-        // Group only by album name so that tracks with different per-track artists
+        // The grid reloads after external edits (luminous-mcp), so pick up any
+        // album keys they left stale before grouping on them.
+        crate::album_key::repair_album_keys(&conn)?;
+        // Group only by album so that tracks with different per-track artists
         // but the same album title are consolidated into a single entry.
         // album_artist is taken as the shared value when all tracks agree on it;
         // if they differ (true various-artist albums), it comes back as NULL.
         let sql = format!(
             "WITH album_genres AS (
-                SELECT album, genre, genresort, COUNT(*) AS g_count
+                SELECT album_key, genre, genresort, COUNT(*) AS g_count
                 FROM songs
                 WHERE source IN ({lib}) AND unavailable = 0
-                  AND album IS NOT NULL AND album != ''
+                  AND album_key IS NOT NULL AND album_key != ''
                   AND genre IS NOT NULL AND genre != ''
-                GROUP BY album, genre
+                GROUP BY album_key, genre
              ),
              top_album_genres AS (
-                SELECT album, genre
+                SELECT album_key, genre
                 FROM (
-                    SELECT album, genre,
-                           ROW_NUMBER() OVER (PARTITION BY album ORDER BY g_count DESC, COALESCE(genresort, genre) ASC) AS rn
+                    SELECT album_key, genre,
+                           ROW_NUMBER() OVER (PARTITION BY album_key ORDER BY g_count DESC, COALESCE(genresort, genre) ASC) AS rn
                     FROM album_genres
                 )
                 WHERE rn = 1
@@ -759,7 +768,7 @@ impl CollectionScanner {
                     WHEN COUNT(DISTINCT NULLIF(songs.album_artist, '')) = 0 AND COUNT(DISTINCT NULLIF(songs.artist, '')) = 1 THEN MAX(NULLIF(songs.artist, ''))
                     ELSE NULL
                 END AS album_artist,
-                songs.album,
+                {display} AS album,
                 MIN(songs.year) AS year,
                 COUNT(*) AS track_count,
                 MAX(COALESCE(songs.disc, 1)) AS disc_count,
@@ -773,12 +782,13 @@ impl CollectionScanner {
                 COALESCE(MAX(NULLIF(songs.album_artist_sort, '')), MAX(NULLIF(songs.artistsort, ''))) AS artist_sort,
                 MAX(NULLIF(songs.albumsort, '')) AS albumsort
              FROM songs
-             LEFT JOIN top_album_genres tag ON songs.album = tag.album
-             LEFT JOIN album_ratings ar ON songs.album = ar.album_key
-             WHERE songs.source IN ({lib}) AND songs.album IS NOT NULL AND songs.album != '' AND songs.unavailable = 0
-             GROUP BY songs.album
-             ORDER BY COALESCE(MAX(songs.album_artist_sort), MAX(songs.artistsort), MAX(songs.album_artist), MAX(songs.artist)), COALESCE(MAX(songs.albumsort), songs.album)",
-            lib = *LIBRARY_SOURCES_SQL
+             LEFT JOIN top_album_genres tag ON songs.album_key = tag.album_key
+             LEFT JOIN album_ratings ar ON songs.album_key = ar.album_key
+             WHERE songs.source IN ({lib}) AND songs.album_key IS NOT NULL AND songs.album_key != '' AND songs.unavailable = 0
+             GROUP BY songs.album_key
+             ORDER BY COALESCE(MAX(songs.album_artist_sort), MAX(songs.artistsort), MAX(songs.album_artist), MAX(songs.artist)), COALESCE(MAX(songs.albumsort), MIN(songs.album))",
+            lib = *LIBRARY_SOURCES_SQL,
+            display = album_display_sql("songs.album_key"),
         );
         let mut stmt = conn.prepare(&sql)?;
         let albums: Vec<serde_json::Value> = stmt
@@ -818,10 +828,10 @@ impl CollectionScanner {
         // issue #295. `MIN(...)` picks one deterministic casing per group to display.
         let sql = format!(
             "WITH album_counts AS (
-                SELECT album, COUNT(*) AS track_count
+                SELECT album_key, COUNT(*) AS track_count
                 FROM songs
-                WHERE source IN ({lib}) AND album IS NOT NULL AND album != '' AND unavailable = 0
-                GROUP BY album
+                WHERE source IN ({lib}) AND album_key IS NOT NULL AND album_key != '' AND unavailable = 0
+                GROUP BY album_key
              ),
              artist_genres AS (
                 SELECT
@@ -846,9 +856,9 @@ impl CollectionScanner {
                 SELECT s.id, s.playcount,
                        COALESCE(NULLIF(s.album_artist, ''), s.artist, '') AS effective_artist,
                        COALESCE(NULLIF(s.album_artist_sort, ''), NULLIF(s.album_artist, ''), NULLIF(s.artistsort, ''), s.artist, '') AS sort_artist,
-                       CASE WHEN ac.track_count > 7 THEN s.album END AS qual_album
+                       CASE WHEN ac.track_count > 7 THEN s.album_key END AS qual_album
                 FROM songs s
-                LEFT JOIN album_counts ac ON s.album = ac.album
+                LEFT JOIN album_counts ac ON s.album_key = ac.album_key
                 WHERE s.source IN ({lib}) AND s.unavailable = 0
              )
              SELECT
@@ -892,13 +902,13 @@ impl CollectionScanner {
         // See get_artists() for why grouping is case-insensitive (issue #295).
         let sql = format!(
             "WITH album_counts AS (
-                SELECT album, COUNT(*) AS track_count
+                SELECT album_key, COUNT(*) AS track_count
                 FROM songs
-                WHERE source IN ({lib}) AND album IS NOT NULL AND album != '' AND unavailable = 0
-                GROUP BY album
+                WHERE source IN ({lib}) AND album_key IS NOT NULL AND album_key != '' AND unavailable = 0
+                GROUP BY album_key
              ),
              base AS (
-                SELECT s.id, s.album, s.playcount,
+                SELECT s.id, s.album_key, s.playcount,
                        COALESCE(NULLIF(s.album_artist, ''), s.artist, '') AS effective_artist,
                        COALESCE(NULLIF(s.album_artist_sort, ''), NULLIF(s.album_artist, ''), NULLIF(s.artistsort, ''), s.artist, '') AS sort_artist
                 FROM songs s
@@ -919,9 +929,9 @@ impl CollectionScanner {
              SELECT
                 g.effective_artist,
                 (
-                    SELECT COUNT(DISTINCT CASE WHEN ac.track_count > 7 THEN b.album END)
+                    SELECT COUNT(DISTINCT CASE WHEN ac.track_count > 7 THEN b.album_key END)
                     FROM base b
-                    LEFT JOIN album_counts ac ON b.album = ac.album
+                    LEFT JOIN album_counts ac ON b.album_key = ac.album_key
                     WHERE b.effective_artist = g.effective_artist COLLATE NOCASE
                 ) AS album_count,
                 g.song_count,
@@ -1023,9 +1033,9 @@ impl CollectionScanner {
         let path = conn
             .query_row(
                 "SELECT path FROM songs
-                 WHERE album = ?1 COLLATE NOCASE AND path IS NOT NULL
+                 WHERE album_key = ?1 AND path IS NOT NULL
                  LIMIT 1",
-                params![album],
+                params![album_key(album)],
                 |row| row.get::<_, Option<String>>(0),
             )
             .optional()?
@@ -1046,11 +1056,11 @@ impl CollectionScanner {
         let id = conn
             .query_row(
                 "SELECT musicbrainz_release_group_id FROM songs
-                 WHERE album = ?1 COLLATE NOCASE
+                 WHERE album_key = ?1
                    AND musicbrainz_release_group_id IS NOT NULL
                    AND musicbrainz_release_group_id != ''
                  LIMIT 1",
-                params![album],
+                params![album_key(album)],
                 |row| row.get::<_, Option<String>>(0),
             )
             .optional()?
@@ -1067,9 +1077,9 @@ impl CollectionScanner {
         let artist = conn
             .query_row(
                 "SELECT COALESCE(NULLIF(album_artist, ''), artist) FROM songs
-                 WHERE album = ?1 COLLATE NOCASE
+                 WHERE album_key = ?1
                  LIMIT 1",
-                params![album],
+                params![album_key(album)],
                 |row| row.get::<_, Option<String>>(0),
             )
             .optional()?
@@ -1117,7 +1127,7 @@ impl CollectionScanner {
             "SELECT
                 COUNT(*) as total_songs,
                 COUNT(DISTINCT COALESCE(NULLIF(album_artist,''), artist)) as total_artists,
-                COUNT(DISTINCT album) as total_albums,
+                COUNT(DISTINCT album_key) as total_albums,
                 COALESCE(SUM(length_nanosec), 0) as total_duration,
                 COALESCE(SUM(filesize), 0) as total_filesize
              FROM songs WHERE source IN ({lib}) AND unavailable = 0",
@@ -1231,11 +1241,9 @@ impl CollectionScanner {
         };
         let playlists_by_id = get_playlists_by_ids(&conn, &playlist_ids)?;
 
-        Ok(group_by_play_context(
-            rows,
-            limit as usize,
-            &playlists_by_id,
-        ))
+        let mut items = group_by_play_context(rows, limit as usize, &playlists_by_id);
+        attach_album_ratings(&conn, &mut items)?;
+        Ok(items)
     }
 
     /// Recently added songs grouped into Album cards where an album's other
@@ -1369,7 +1377,7 @@ impl CollectionScanner {
                     tx.execute(
                         "INSERT INTO album_chart_history (period_start, album_key, rank, play_count)
                          VALUES (?1, ?2, ?3, ?4)",
-                        params![period_start, name, rank, week_plays],
+                        params![period_start, album_key(name), rank, week_plays],
                     )?;
                 }
             }
@@ -1390,21 +1398,21 @@ impl CollectionScanner {
         let mut result = Vec::with_capacity(ranked.len());
         for (i, (mut album, _week_plays)) in ranked.into_iter().enumerate() {
             let rank = (i + 1) as i32;
-            let name = album.album.clone().unwrap_or_default();
-            album.rating = crate::stats::get_album_rating(&conn, &name)?;
+            let key = album_key(album.album.as_deref().unwrap_or_default());
+            album.rating = crate::stats::get_album_rating(&conn, &key)?;
 
-            let previous_rank = previous_ranks.get(&name).copied();
+            let previous_rank = previous_ranks.get(&key).copied();
             let peak_rank: i32 = conn
                 .query_row(
                     "SELECT MIN(rank) FROM album_chart_history WHERE album_key = ?1",
-                    params![name],
+                    params![key],
                     |r| r.get(0),
                 )
                 .unwrap_or(rank);
             let weeks_on_chart: i32 = conn
                 .query_row(
                     "SELECT COUNT(DISTINCT period_start) FROM album_chart_history WHERE album_key = ?1",
-                    params![name],
+                    params![key],
                     |r| r.get(0),
                 )
                 .unwrap_or(1);
@@ -1452,21 +1460,21 @@ fn rank_week_items(
         "SELECT {home_item_select_cols}, wc.week_plays
          FROM songs s
          JOIN (
-             SELECT s2.album AS album, COUNT(*) AS week_plays,
+             SELECT s2.album_key AS album_key, COUNT(*) AS week_plays,
                     COALESCE(SUM(COALESCE(NULLIF(ph.duration_secs, 0), s2.length_nanosec / 1000000000, 0)), 0) AS week_secs
              FROM play_history ph
              JOIN songs s2 ON s2.id = ph.song_id
              WHERE ph.played_at >= ?1 AND ph.played_at < ?2
                AND s2.source IN ({lib}) AND s2.unavailable = 0
-               AND s2.album IS NOT NULL AND s2.album != ''
+               AND s2.album_key IS NOT NULL AND s2.album_key != ''
                AND NOT EXISTS ({excluded})
-             GROUP BY s2.album
-         ) wc ON wc.album = s.album
+             GROUP BY s2.album_key
+         ) wc ON wc.album_key = s.album_key
          WHERE s.source IN ({lib}) AND s.unavailable = 0
          ORDER BY wc.week_secs DESC, wc.week_plays DESC, s.added DESC
          LIMIT ?3",
         lib = *LIBRARY_SOURCES_SQL,
-        excluded = excluded_album_sql("s2.album"),
+        excluded = excluded_album_sql("s2.album_key"),
     );
     let mut stmt = conn.prepare(&sql)?;
     let rows: Vec<(Song, i64, i64, i64)> = stmt
@@ -1488,9 +1496,11 @@ fn rank_week_items(
         let Some(album_name) = song.album.clone() else {
             continue;
         };
-        if album_name.trim().is_empty() || !seen.insert(album_name.clone()) {
+        let key = album_key(&album_name);
+        if key.is_empty() || !seen.insert(key) {
             continue;
         }
+        let album_name = album_display_name(conn, &album_name)?;
         let artist_name = song
             .album_artist
             .clone()
@@ -1525,11 +1535,27 @@ const CHART_HISTORY_WEEK_START_KEY: &str = "album_chart_history_week_start";
 /// Subquery matching a "Don't include in stats" album exclusion for
 /// `album_col` — the same test Stats' Top Albums applies, so the Home chart
 /// and Stats agree on which albums can chart.
-fn excluded_album_sql(album_col: &str) -> String {
+/// `NOT EXISTS` body matching an excluded album; `album_key_col` is a
+/// `songs.album_key` column (album exclusions are stored by `album_key`).
+fn excluded_album_sql(album_key_col: &str) -> String {
     format!(
         "SELECT 1 FROM stats_exclusions se
-         WHERE se.entity_type = 'album' AND se.entity_key = {album_col} COLLATE NOCASE"
+         WHERE se.entity_type = 'album' AND se.entity_key = {album_key_col}"
     )
+}
+
+/// `album_display_sql` for one title: the display spelling of the album
+/// `album` belongs to, or `album` itself when no library song carries it.
+fn album_display_name(conn: &rusqlite::Connection, album: &str) -> Result<String> {
+    let display: Option<String> = conn
+        .query_row(
+            &format!("SELECT {}", album_display_sql("?1")),
+            params![album_key(album)],
+            |row| row.get(0),
+        )
+        .optional()?
+        .flatten();
+    Ok(display.unwrap_or_else(|| album.to_string()))
 }
 
 /// What the chart history must have been built under to be reused: the
@@ -1553,7 +1579,7 @@ fn chart_history_build_key(conn: &rusqlite::Connection, start_sunday: bool) -> R
 }
 
 /// The top `limit` albums by minutes played (then play count) among plays in
-/// `[from, to)`, as `(album, play_count)` — the same order as the current
+/// `[from, to)`, as `(album_key, play_count)` — the same order as the current
 /// week's chart and Stats' Top Albums.
 fn rank_albums_between(
     conn: &rusqlite::Connection,
@@ -1562,19 +1588,19 @@ fn rank_albums_between(
     limit: i64,
 ) -> Result<Vec<(String, i64)>> {
     let sql = format!(
-        "SELECT s.album, COUNT(*)
+        "SELECT s.album_key, COUNT(*)
          FROM play_history ph
          JOIN songs s ON s.id = ph.song_id
          WHERE ph.played_at >= ?1 AND ph.played_at < ?2
            AND s.source IN ({lib}) AND s.unavailable = 0
-           AND s.album IS NOT NULL AND TRIM(s.album) != ''
+           AND s.album_key IS NOT NULL AND s.album_key != ''
            AND NOT EXISTS ({excluded})
-         GROUP BY s.album
+         GROUP BY s.album_key
          ORDER BY COALESCE(SUM(COALESCE(NULLIF(ph.duration_secs, 0), s.length_nanosec / 1000000000, 0)), 0) DESC,
                   COUNT(*) DESC, MAX(s.added) DESC
          LIMIT ?3",
         lib = *LIBRARY_SOURCES_SQL,
-        excluded = excluded_album_sql("s.album"),
+        excluded = excluded_album_sql("s.album_key"),
     );
     let mut stmt = conn.prepare(&sql)?;
     let rows = stmt
@@ -1717,10 +1743,7 @@ fn group_songs_into_home_items(
                     .clone()
                     .or_else(|| song.artist.clone())
                     .unwrap_or_default();
-                let album_key = album_name.trim().to_lowercase();
-
-                if !seen_albums.contains(&album_key) {
-                    seen_albums.insert(album_key);
+                if seen_albums.insert(album_key(album_name)) {
                     items.push(HomeItem::Album {
                         album: AlbumItem {
                             artist: Some(artist_name),
@@ -1750,15 +1773,17 @@ fn group_songs_into_home_items(
     items
 }
 
-/// Fill in the real rating for every `HomeItem::Album` in `items`, looked up
-/// from `album_ratings`. `group_songs_into_home_items`/`home_item_for_context`
-/// build `AlbumItem`s without a DB connection in scope, so they default to
-/// unrated — this backfills the actual value once a connection is available.
+/// Fill in the real rating and display spelling (`album_display_name`) for
+/// every `HomeItem::Album` in `items`. `group_songs_into_home_items`/
+/// `home_item_for_context` build `AlbumItem`s from one song without a DB
+/// connection in scope, so they carry that song's own spelling and default
+/// to unrated — this backfills both once a connection is available.
 fn attach_album_ratings(conn: &rusqlite::Connection, items: &mut [HomeItem]) -> Result<()> {
     for item in items.iter_mut() {
         if let HomeItem::Album { album } = item {
-            if let Some(ref name) = album.album {
-                album.rating = crate::stats::get_album_rating(conn, name)?;
+            if let Some(name) = album.album.take() {
+                album.rating = crate::stats::get_album_rating(conn, &name)?;
+                album.album = Some(album_display_name(conn, &name)?);
             }
         }
     }
@@ -1934,11 +1959,14 @@ fn album_profile_from_row(row: &rusqlite::Row) -> rusqlite::Result<AlbumProfile>
 }
 
 /// Retrieve customizable profile and liner notes for an album from SQLite (#950).
+/// Rows luminous-mcp saved under a raw title are rekeyed first (see
+/// `album_key::repair_album_keys`).
 pub fn get_album_profile_conn(conn: &rusqlite::Connection, album: &str) -> Result<AlbumProfile> {
+    crate::album_key::rekey_album_profiles(conn)?;
     let mut stmt = conn.prepare(&format!(
-        "SELECT {ALBUM_PROFILE_COLUMNS} FROM album_profiles WHERE album_key = ?1 COLLATE NOCASE"
+        "SELECT {ALBUM_PROFILE_COLUMNS} FROM album_profiles WHERE album_key = ?1"
     ))?;
-    match stmt.query_row(params![album], album_profile_from_row) {
+    match stmt.query_row(params![album_key(album)], album_profile_from_row) {
         Ok(profile) => Ok(profile),
         Err(rusqlite::Error::QueryReturnedNoRows) => Ok(AlbumProfile {
             album_key: album.to_string(),
@@ -1948,7 +1976,8 @@ pub fn get_album_profile_conn(conn: &rusqlite::Connection, album: &str) -> Resul
     }
 }
 
-/// Upsert an album profile into SQLite (#950).
+/// Upsert an album profile into SQLite (#950), stored under the
+/// `album_key` of `profile.album_key`.
 pub fn set_album_profile_conn(
     conn: &rusqlite::Connection,
     profile: &AlbumProfile,
@@ -1969,7 +1998,7 @@ pub fn set_album_profile_conn(
             cover_fetched = excluded.cover_fetched,
             disc_fetched = excluded.disc_fetched",
         params![
-            profile.album_key,
+            album_key(&profile.album_key),
             profile.artist_key,
             profile.description,
             profile.website,
@@ -1987,8 +2016,9 @@ pub fn set_album_profile_conn(
 
 /// Retrieve all saved album profiles in SQLite (#950).
 pub fn get_all_album_profiles_conn(conn: &rusqlite::Connection) -> Result<Vec<AlbumProfile>> {
+    crate::album_key::rekey_album_profiles(conn)?;
     let mut stmt = conn.prepare(&format!(
-        "SELECT {ALBUM_PROFILE_COLUMNS} FROM album_profiles ORDER BY album_key COLLATE NOCASE"
+        "SELECT {ALBUM_PROFILE_COLUMNS} FROM album_profiles ORDER BY album_key"
     ))?;
     let profiles = stmt
         .query_map([], album_profile_from_row)?
@@ -2024,7 +2054,7 @@ fn group_by_play_context(
         let key = match context_type.as_str() {
             "playlist" if playlist_id.is_some() => PlayContextKey::Playlist(playlist_id.unwrap()),
             "album" if song.album.as_deref().is_some_and(|a| !a.trim().is_empty()) => {
-                PlayContextKey::Album(song.album.clone().unwrap().trim().to_lowercase())
+                PlayContextKey::Album(album_key(song.album.as_deref().unwrap_or_default()))
             }
             _ => PlayContextKey::Song(song.id),
         };
@@ -2153,10 +2183,10 @@ fn home_item_select_cols() -> String {
     format!(
         "{SONG_SELECT_COLS_QUALIFIED},
     (SELECT COUNT(*) FROM songs s2
-     WHERE s2.source IN ({lib}) AND s2.unavailable = 0 AND s2.album = s.album
+     WHERE s2.source IN ({lib}) AND s2.unavailable = 0 AND s2.album_key = s.album_key
     ) AS album_track_count,
     (SELECT COALESCE(MAX(COALESCE(s2.disc, 1)), 1) FROM songs s2
-     WHERE s2.source IN ({lib}) AND s2.unavailable = 0 AND s2.album = s.album
+     WHERE s2.source IN ({lib}) AND s2.unavailable = 0 AND s2.album_key = s.album_key
     ) AS album_disc_count"
     )
 }
@@ -3449,8 +3479,8 @@ mod tests {
         let conn = db.pool.get().unwrap();
 
         conn.execute(
-            "INSERT INTO songs (title, album, artist, album_artist, source, unavailable)
-             VALUES ('Track', 'Come On Over', 'Shania Twain (feat. Someone)', 'Shania Twain', 1, 0)",
+            "INSERT INTO songs (title, album, album_key, artist, album_artist, source, unavailable)
+             VALUES ('Track', 'Come On Over', 'come on over', 'Shania Twain (feat. Someone)', 'Shania Twain', 1, 0)",
             [],
         )
         .unwrap();
@@ -3622,7 +3652,10 @@ mod tests {
 
         // Retrieve saved profile (case-insensitive key match)
         let loaded = get_album_profile_conn(&conn, "come on over").unwrap();
-        assert_eq!(loaded.album_key, "Come On Over");
+        assert_eq!(
+            loaded.album_key, "come on over",
+            "stored under its album_key"
+        );
         assert_eq!(loaded.artist_key, Some("Shania Twain".to_string()));
         assert_eq!(
             loaded.description,
@@ -3643,7 +3676,7 @@ mod tests {
         // Get all album profiles
         let all = get_all_album_profiles_conn(&conn).unwrap();
         assert_eq!(all.len(), 1);
-        assert_eq!(all[0].album_key, "Come On Over");
+        assert_eq!(all[0].album_key, "come on over");
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
@@ -4117,8 +4150,8 @@ mod tests {
         assert_eq!(
             history,
             vec![
-                (sep13, "Old Favourite".to_string()),
-                (sep20, "Afterburner".to_string())
+                (sep13, "old favourite".to_string()),
+                (sep20, "afterburner".to_string())
             ]
         );
 
@@ -4406,5 +4439,128 @@ mod tests {
         assert_eq!(smart_songs[0].title.as_deref(), Some("Normal Song"));
 
         let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// #1752: tracks whose album tag differs only in letter case or
+    /// surrounding whitespace are one album in the grid, the detail view,
+    /// ratings, Home and the weekly chart — including a non-ASCII case pair,
+    /// which SQLite's ASCII-only NOCASE would have left split.
+    #[test]
+    fn test_album_spellings_differing_in_case_are_one_album() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_album_key_test_")
+            .tempdir()
+            .unwrap();
+        let db = Arc::new(Database::new(temp_dir_guard.path().to_path_buf()).unwrap());
+        let scanner = CollectionScanner::new(db.clone());
+        let conn = db.pool.get().unwrap();
+
+        let insert = |path: &str, album: &str, track: i32| -> i64 {
+            let song = Song {
+                path: Some(path.to_string()),
+                title: Some(format!("Track {track}")),
+                artist: Some("Mariner".to_string()),
+                album: Some(album.to_string()),
+                track: Some(track),
+                source: SongSource::LocalFile,
+                filetype: FileType::Mp3,
+                ..Default::default()
+            };
+            upsert_song(&conn, &song).unwrap();
+            conn.query_row("SELECT id FROM songs WHERE path = ?1", params![path], |r| {
+                r.get(0)
+            })
+            .unwrap()
+        };
+        let majority_a = insert("sea/1.mp3", "Songs of the Sea", 1);
+        insert("sea/2.mp3", "Songs of the Sea", 2);
+        let minority = insert("sea/3.mp3", "Songs Of The Sea ", 3);
+        insert("elan/1.mp3", "Élan", 1);
+        insert("elan/2.mp3", "ÉLAN", 2);
+
+        // Grid: one card per album, shown under its majority spelling.
+        let albums = scanner.get_albums().unwrap();
+        assert_eq!(albums.len(), 2, "{albums:?}");
+        let sea = albums
+            .iter()
+            .find(|a| a["album"] == "Songs of the Sea")
+            .expect("merged album shows its majority spelling");
+        assert_eq!(sea["track_count"], 3);
+        let elan = albums
+            .iter()
+            .find(|a| a["album"].as_str().is_some_and(|n| album_key(n) == "élan"))
+            .unwrap();
+        assert_eq!(elan["track_count"], 2);
+
+        // Detail: any spelling opens every track.
+        assert_eq!(
+            scanner
+                .get_songs_by_album("SONGS OF THE SEA")
+                .unwrap()
+                .len(),
+            3
+        );
+        assert_eq!(scanner.get_songs_by_album("élan").unwrap().len(), 2);
+
+        // Rating set through one spelling is the album's rating everywhere.
+        crate::stats::set_album_rating(&conn, "Songs Of The Sea ", 4.0).unwrap();
+        assert_eq!(
+            crate::stats::get_album_rating(&conn, "songs of the sea").unwrap(),
+            4.0
+        );
+        let sea = scanner
+            .get_albums()
+            .unwrap()
+            .into_iter()
+            .find(|a| a["album"] == "Songs of the Sea")
+            .unwrap();
+        assert_eq!(sea["rating"], 4.0);
+
+        // Home: one Album card with the full track count and display spelling.
+        let recent = scanner.get_recently_added(10).unwrap();
+        let sea_cards: Vec<&AlbumItem> = recent
+            .iter()
+            .filter_map(|i| match i {
+                HomeItem::Album { album } => Some(album),
+                _ => None,
+            })
+            .filter(|a| {
+                a.album
+                    .as_deref()
+                    .is_some_and(|n| album_key(n) == "songs of the sea")
+            })
+            .collect();
+        assert_eq!(sea_cards.len(), 1);
+        assert_eq!(sea_cards[0].album.as_deref(), Some("Songs of the Sea"));
+        assert_eq!(sea_cards[0].track_count, 3);
+        assert_eq!(sea_cards[0].rating, 4.0);
+
+        // Chart: plays of both spellings count toward one entry, and the
+        // following week finds it again as last week's album.
+        let record_play = |song_id: i64, played_at: i64| {
+            conn.execute(
+                "INSERT INTO play_history (context_type, song_id, played_at) VALUES ('song', ?1, ?2)",
+                params![song_id, played_at],
+            )
+            .unwrap();
+        };
+        let week1 = 1_704_153_600; // Monday 2024-01-01 00:00 UTC
+        let week2 = week1 + 7 * 86_400;
+        record_play(majority_a, week1 + 10);
+        record_play(minority, week1 + 20);
+        record_play(minority, week2 + 10);
+        let chart1 = scanner
+            .get_top_albums_at(10, week2 + 3600, &chrono::Utc)
+            .unwrap();
+        assert_eq!(chart1.len(), 1, "{chart1:?}");
+        assert_eq!(chart1[0].album.album.as_deref(), Some("Songs of the Sea"));
+        assert_eq!(chart1[0].album.rating, 4.0);
+        let chart2 = scanner
+            .get_top_albums_at(10, week2 + 7 * 86_400 + 3600, &chrono::Utc)
+            .unwrap();
+        assert_eq!(chart2.len(), 1);
+        assert_eq!(chart2[0].previous_rank, Some(1));
+        assert_eq!(chart2[0].movement, "steady");
+        assert_eq!(chart2[0].weeks_on_chart, 2);
     }
 }

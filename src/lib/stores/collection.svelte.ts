@@ -39,6 +39,7 @@ import { toastStore } from "./toast.svelte";
 import { tasksStore } from "./tasks.svelte";
 import { prefs } from "./prefs.svelte";
 import { MAX_RECENT_SEARCHES } from "../constants";
+import { albumKey, sameAlbum } from "$lib/utils/albumKey";
 
 export interface VisibleColumns {
   // Core columns (on by default)
@@ -674,7 +675,7 @@ class CollectionStore {
       // Keep cached album rows in sync with ratings set from other views
       // (Album Detail view, other Collection grid instances).
       await listen<AlbumStatsPayload>("album-stats-changed", (event) => {
-        const album = this.albums.find((a) => a.album === event.payload.album);
+        const album = this.albums.find((a) => sameAlbum(a.album, event.payload.album));
         if (album) applyAlbumStats(album, event.payload);
       });
 
@@ -809,7 +810,7 @@ class CollectionStore {
     if (!albumName) return [];
     const matched = new Map<number, MusicDirectory>();
     for (const song of this.songs) {
-      if (song.album === albumName && song.path) {
+      if (sameAlbum(song.album, albumName) && song.path) {
         const dir = this.getDirectoryForPath(song.path);
         if (dir) matched.set(dir.id, dir);
       }
@@ -982,7 +983,7 @@ class CollectionStore {
       if (Array.isArray(profiles)) {
         for (const p of profiles) {
           if (p.album_key) {
-            map[p.album_key.toLowerCase()] = p;
+            map[albumKey(p.album_key)] = p;
           }
         }
       }
@@ -994,7 +995,7 @@ class CollectionStore {
 
   getAlbumProfile(albumName: string | null | undefined): AlbumProfile | undefined {
     if (!albumName) return undefined;
-    return this.albumProfiles[albumName.toLowerCase()];
+    return this.albumProfiles[albumKey(albumName)];
   }
 
   async saveAlbumProfile(profile: AlbumProfile): Promise<AlbumProfile> {
@@ -1002,7 +1003,7 @@ class CollectionStore {
     if (saved?.album_key) {
       this.albumProfiles = {
         ...this.albumProfiles,
-        [saved.album_key.toLowerCase()]: saved,
+        [albumKey(saved.album_key)]: saved,
       };
     }
     return saved;
@@ -1018,7 +1019,7 @@ class CollectionStore {
     if (result?.profile?.album_key) {
       this.albumProfiles = {
         ...this.albumProfiles,
-        [result.profile.album_key.toLowerCase()]: result.profile,
+        [albumKey(result.profile.album_key)]: result.profile,
       };
     }
     // The backend backfills the album's artist's musicbrainz_artist_id as a
@@ -1052,7 +1053,7 @@ class CollectionStore {
     if (result?.profile?.album_key) {
       this.albumProfiles = {
         ...this.albumProfiles,
-        [result.profile.album_key.toLowerCase()]: result.profile,
+        [albumKey(result.profile.album_key)]: result.profile,
       };
     }
     if (result?.cover_uri) this.coverArtVersion++;

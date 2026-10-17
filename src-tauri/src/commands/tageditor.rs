@@ -242,7 +242,8 @@ pub async fn save_song_tags(
             originalyear = ?16,
             grouping = ?17,
             bpm = ?18,
-            initial_key = ?19
+            initial_key = ?19,
+            album_key = ?21
          WHERE id = ?20",
         rusqlite::params![
             title,
@@ -264,7 +265,8 @@ pub async fn save_song_tags(
             grouping,
             bpm,
             initial_key,
-            song_id
+            song_id,
+            crate::album_key::album_key(&album)
         ],
     )
     .map_err(|e| e.to_string())?;
@@ -453,7 +455,8 @@ pub async fn save_album_tags(
                 genresort = ?6,
                 year = ?7,
                 disc = ?8,
-                compilation = ?9
+                compilation = ?9,
+                album_key = ?11
              WHERE id = ?10",
             rusqlite::params![
                 album,
@@ -465,7 +468,8 @@ pub async fn save_album_tags(
                 year,
                 disc,
                 compilation,
-                song_id
+                song_id,
+                crate::album_key::album_key(&album)
             ],
         )
         .map_err(|e| e.to_string())?;
