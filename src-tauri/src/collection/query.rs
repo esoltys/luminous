@@ -1242,7 +1242,7 @@ impl CollectionScanner {
         let playlists_by_id = get_playlists_by_ids(&conn, &playlist_ids)?;
 
         let mut items = group_by_play_context(rows, limit as usize, &playlists_by_id);
-        attach_album_ratings(&conn, &mut items)?;
+        fill_home_album_items(&conn, &mut items)?;
         Ok(items)
     }
 
@@ -1273,7 +1273,7 @@ impl CollectionScanner {
             .filter_map(|r| r.ok())
             .collect();
         let mut items = group_songs_into_home_items(songs_with_counts, limit as usize);
-        attach_album_ratings(&conn, &mut items)?;
+        fill_home_album_items(&conn, &mut items)?;
         Ok(items)
     }
 
@@ -1307,7 +1307,7 @@ impl CollectionScanner {
             .filter_map(|r| r.ok())
             .collect();
         let mut items = group_songs_into_home_items(songs_with_counts, limit as usize);
-        attach_album_ratings(&conn, &mut items)?;
+        fill_home_album_items(&conn, &mut items)?;
         Ok(items)
     }
 
@@ -1778,7 +1778,7 @@ fn group_songs_into_home_items(
 /// `home_item_for_context` build `AlbumItem`s from one song without a DB
 /// connection in scope, so they carry that song's own spelling and default
 /// to unrated — this backfills both once a connection is available.
-fn attach_album_ratings(conn: &rusqlite::Connection, items: &mut [HomeItem]) -> Result<()> {
+fn fill_home_album_items(conn: &rusqlite::Connection, items: &mut [HomeItem]) -> Result<()> {
     for item in items.iter_mut() {
         if let HomeItem::Album { album } = item {
             if let Some(name) = album.album.take() {

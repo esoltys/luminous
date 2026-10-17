@@ -165,12 +165,10 @@ pub fn set_stats_excluded(
     entity_key: &str,
     excluded: bool,
 ) -> Result<()> {
-    let folded;
-    let entity_key = if entity_type == "album" {
-        folded = crate::album_key::album_key(entity_key);
-        folded.as_str()
+    let entity_key: std::borrow::Cow<str> = if entity_type == "album" {
+        crate::album_key::album_key(entity_key).into()
     } else {
-        entity_key
+        entity_key.into()
     };
     if excluded {
         conn.execute(

@@ -198,10 +198,11 @@ pub fn find_album<'a>(
     albums: &'a [serde_json::Value],
     ref_key: &str,
 ) -> Option<&'a serde_json::Value> {
+    let key = crate::album_key::album_key(ref_key);
     albums.iter().find(|a| {
-        a.get("album").and_then(|v| v.as_str()).is_some_and(|name| {
-            crate::album_key::album_key(name) == crate::album_key::album_key(ref_key)
-        })
+        a.get("album")
+            .and_then(|v| v.as_str())
+            .is_some_and(|name| crate::album_key::album_key(name) == key)
     })
 }
 

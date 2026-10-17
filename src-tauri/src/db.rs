@@ -904,6 +904,7 @@ impl Database {
         };
         let schema_version = db.run_migrations()?;
         db.reset_stale_sync_status();
+        // songs.album_key exists from migration 62 on.
         if schema_version >= 62 {
             if let Err(e) = db
                 .pool
