@@ -11,6 +11,12 @@
 //! blocks, so it can run inside an audio output callback. Every other method
 //! may allocate and belongs off the audio thread.
 
+pub mod apo;
+pub use apo::{
+    format_parametric_profile, parse_parametric_profile, read_profile_file, ImportError,
+    ImportedProfile, RangeField, UnsupportedFilter, MAX_PROFILE_FILE_BYTES,
+};
+
 use serde::{Deserialize, Serialize};
 use std::f32::consts::PI;
 
