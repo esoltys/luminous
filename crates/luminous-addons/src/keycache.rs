@@ -58,20 +58,24 @@ impl KeyVault for NoVault {
 }
 
 /// Seals bytes so only the signed-in OS user can open them.
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 pub(crate) trait Protector: Send + Sync {
     fn protect(&self, plain: &[u8]) -> Option<Vec<u8>>;
     fn unprotect(&self, sealed: &[u8]) -> Option<Vec<u8>>;
 }
 
 /// Payload: seconds since the Unix epoch (u64, little endian) then the 32 key bytes.
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 const PAYLOAD_LEN: usize = 8 + 32;
 
 /// One protected file per add-on, `<id>.key`, beside the cached bundles.
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 pub(crate) struct FileKeyVault {
     dir: PathBuf,
     protector: Arc<dyn Protector>,
 }
 
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 impl FileKeyVault {
     pub(crate) fn new(dir: PathBuf, protector: Arc<dyn Protector>) -> Self {
         Self { dir, protector }
@@ -84,6 +88,7 @@ impl FileKeyVault {
     }
 }
 
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 impl KeyVault for FileKeyVault {
     fn load(&self, id: &str) -> Option<CachedKey> {
         let sealed = std::fs::read(self.path(id)?).ok()?;
