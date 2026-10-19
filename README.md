@@ -57,6 +57,7 @@ The IPC commands are deliberately *deep*: each one owns a whole workflow rather 
 ```
 luminous/
 ├── crates/                   # Engine crates with no Tauri/SQLite dependency
+│   ├── luminous-addons/      # Add-on runtime: Ed25519/ChaCha20 verification, Store entitlement, key cache, memory URI scheme
 │   ├── luminous-audio/       # Playback engine: Symphonia decode, CPAL output, gapless/crossfade, spectrum
 │   └── luminous-equalizer/   # Biquad DSP: 10-band graphic & up-to-20-band parametric filters
 ├── features/                 # BDD Gherkin Feature Specifications
@@ -70,7 +71,6 @@ luminous/
 │   └── routes/               # Layouts and navigation views
 └── src-tauri/                # Tauri + Rust Backend Core
     ├── src/
-    │   ├── addons/           # Cosmetic add-on themes: signed bundles, Store entitlement, key cache
     │   ├── audio.rs          # Edge of the playback engine: Song → Track, pipeline info
     │   ├── band_waveform.rs  # Layered low/mid/high frequency-band waveform analysis scanner
     │   ├── collection.rs     # Lofty scanner & folder watcher (query/reconcile/watcher split into collection/)

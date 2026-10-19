@@ -1,8 +1,8 @@
 //! IPC handlers for Store-gated add-on themes (#1414). They only start flows;
 //! results arrive as `addon-state-changed` / `addon-theme-defined` events.
 
-use crate::addons::entitlement::{AddonManager, AddonState, Events, ProductPrice, ThemeDefinition};
 use crate::AppState;
+use luminous_addons::{AddonManager, AddonState, Events, ProductPrice, ThemeDefinition};
 use serde::Serialize;
 use std::sync::Arc;
 #[cfg(target_os = "windows")]
@@ -58,35 +58,29 @@ impl Events for TauriEvents {
 
 /// Build the manager for this run. Cached bundles live under `<data>/addons`.
 pub fn build_manager(app: &AppHandle) -> Arc<AddonManager> {
-    use crate::addons::entitlement::{default_backend, default_provisioner};
     let cache_dir = crate::paths::resolve_app_data_dir(app).join("addons");
     #[cfg(debug_assertions)]
     watch_dev_folder(app);
-    let keys = crate::addons::keycache::default_vault(cache_dir.clone());
-    Arc::new(
-        AddonManager::new(
-            default_backend(),
-            default_provisioner(cache_dir),
-            Arc::new(TauriEvents(app.clone())),
-        )
-        .with_key_vault(keys),
-    )
+    Arc::new(AddonManager::new(
+        cache_dir,
+        Arc::new(TauriEvents(app.clone())),
+    ))
 }
 
 /// Debug builds only (#1426): re-announce an unpacked add-on whenever its folder
 /// changes, and tell the overlay frame to reload.
 #[cfg(debug_assertions)]
 fn watch_dev_folder(app: &AppHandle) {
-    use crate::addons::devloader;
+    use luminous_addons::devloader;
     let Some(root) = devloader::dev_dir() else {
         return;
     };
     let app = app.clone();
     let events = TauriEvents(app.clone());
     let watching = devloader::watch(root.clone(), move |id, loaded| match loaded {
-        Ok(manifest) => {
+        Ok(theme) => {
             log::info!("add-on {id}: reloaded from disk");
-            events.theme_defined(&ThemeDefinition::from(&manifest));
+            events.theme_defined(&theme);
             events.state(id, AddonState::Owned, None);
             let _ = app.emit("addon-dev-reloaded", id);
         }

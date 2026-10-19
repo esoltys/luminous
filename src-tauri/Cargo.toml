@@ -56,6 +56,7 @@ tauri-plugin-prevent-default = "6"
 # --- Workspace crates ---
 luminous-equalizer = { path = "../crates/luminous-equalizer" }
 luminous-audio = { path = "../crates/luminous-audio" }
+luminous-addons = { path = "../crates/luminous-addons" }
 
 # --- Serialization ---
 serde.workspace = true
@@ -116,8 +117,6 @@ percent-encoding = "2"
 rayon = "1"
 md-5 = "0.11"
 sha2 = "0.11"
-ed25519-dalek = "3"
-chacha20poly1305 = "0.11"
 
 [features]
 # Enables `tokio-console` task/scheduler introspection — see

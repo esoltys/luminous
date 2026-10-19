@@ -88,6 +88,17 @@ jobs:
             exit 1
           fi
 
+      # The add-on runtime is a security boundary: it must never depend on
+      # Tauri or SQLite (#1764, epic #1762).
+      - name: Check the add-on runtime's dependency boundary
+        run: |
+          tree=$(cargo tree -p luminous-addons -e normal --prefix none)
+          forbidden=$(grep -E '^(tauri|rusqlite)[ -]' <<< "$tree" | sort -u || true)
+          if [ -n "$forbidden" ]; then
+            echo "::error::luminous-addons must not depend on: $forbidden"
+            exit 1
+          fi
+
       # From the repo root with --workspace, so every crate under crates/ is
       # tested and linted, not just the app package in src-tauri (#1554).
       - name: Run cargo test

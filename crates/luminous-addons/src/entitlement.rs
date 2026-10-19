@@ -12,7 +12,9 @@
 //! can localise it. Neither the service ticket, the Store ID key nor the
 //! add-on key is ever logged.
 
-use super::keycache::{CachedKey, KeyVault, NoVault};
+#[cfg(test)]
+use super::keycache::NoVault;
+use super::keycache::{CachedKey, KeyVault};
 use super::keyclient::{self, KeyError};
 use super::{bundle, verifier};
 use parking_lot::Mutex;
@@ -132,7 +134,7 @@ pub trait StoreBackend: Send + Sync {
 }
 
 /// Backend for builds with no Store.
-pub struct Unavailable;
+pub(crate) struct Unavailable;
 
 impl StoreBackend for Unavailable {
     fn is_available(&self) -> bool {
@@ -146,6 +148,17 @@ impl StoreBackend for Unavailable {
     }
     fn store_id_key(&self, _: &str, _: &str) -> Result<String, StoreError> {
         Err(StoreError::Failed("the Store is not available".into()))
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn is_packaged() -> bool {
+    use windows::Win32::Foundation::ERROR_INSUFFICIENT_BUFFER;
+    use windows::Win32::Storage::Packaging::Appx::GetCurrentApplicationUserModelId;
+    unsafe {
+        let mut len: u32 = 0;
+        let result = GetCurrentApplicationUserModelId(&mut len, None);
+        result == ERROR_INSUFFICIENT_BUFFER && len > 0
     }
 }
 
@@ -163,7 +176,7 @@ pub fn default_backend() -> Arc<dyn StoreBackend> {
     }
     #[cfg(target_os = "windows")]
     {
-        if crate::restart_manager::current_application_user_model_id().is_some() {
+        if is_packaged() {
             return Arc::new(windows_store::WindowsStore);
         }
     }
@@ -229,14 +242,14 @@ pub fn default_provisioner(cache_dir: PathBuf) -> Arc<dyn Provisioner> {
     Arc::new(NetworkProvisioner::new(cache_dir))
 }
 
-pub struct NetworkProvisioner {
-    pub key_base_url: String,
-    pub bundle_base_url: String,
-    pub cache_dir: PathBuf,
+pub(crate) struct NetworkProvisioner {
+    pub(crate) key_base_url: String,
+    pub(crate) bundle_base_url: String,
+    pub(crate) cache_dir: PathBuf,
 }
 
 impl NetworkProvisioner {
-    pub fn new(cache_dir: PathBuf) -> Self {
+    pub(crate) fn new(cache_dir: PathBuf) -> Self {
         #[cfg_attr(not(debug_assertions), allow(unused_mut))]
         let mut p = Self {
             key_base_url: keyclient::DEFAULT_KEY_BASE_URL.to_string(),
@@ -306,7 +319,7 @@ fn install_error_code(e: &bundle::InstallError) -> &'static str {
 }
 
 /// Where the manager reads the time, so the key's 30 days can be tested.
-pub type Clock = Arc<dyn Fn() -> SystemTime + Send + Sync>;
+pub(crate) type Clock = Arc<dyn Fn() -> SystemTime + Send + Sync>;
 
 /// Drives refresh and acquire for every known add-on.
 pub struct AddonManager {
@@ -332,7 +345,31 @@ impl Drop for BusyGuard<'_> {
 }
 
 impl AddonManager {
-    pub fn new(
+    /// Create a new add-on manager using the platform's default store backend,
+    /// provisioner, and OS-protected key vault rooted in `cache_dir`.
+    pub fn new(cache_dir: PathBuf, events: Arc<dyn Events>) -> Self {
+        let backend = default_backend();
+        let provisioner = default_provisioner(cache_dir.clone());
+        let keys = super::keycache::default_vault(cache_dir);
+        Self {
+            backend,
+            provisioner,
+            events,
+            keys,
+            clock: Arc::new(SystemTime::now),
+            busy: Mutex::new(HashSet::new()),
+        }
+    }
+
+    /// Override the store backend (e.g. for testing).
+    pub fn with_backend(mut self, backend: Arc<dyn StoreBackend>) -> Self {
+        self.backend = backend;
+        self
+    }
+
+    /// Internal / test constructor with explicit components.
+    #[cfg(test)]
+    pub(crate) fn with_components(
         backend: Arc<dyn StoreBackend>,
         provisioner: Arc<dyn Provisioner>,
         events: Arc<dyn Events>,
@@ -348,7 +385,8 @@ impl AddonManager {
     }
 
     /// Remember released keys in `keys`; without one every launch asks the Worker.
-    pub fn with_key_vault(mut self, keys: Arc<dyn KeyVault>) -> Self {
+    #[cfg(test)]
+    pub(crate) fn with_key_vault(mut self, keys: Arc<dyn KeyVault>) -> Self {
         self.keys = keys;
         self
     }
@@ -899,7 +937,7 @@ mod tests {
 
     fn manager(b: FakeBackend, n: FakeNet) -> (Arc<AddonManager>, Arc<Recorder>) {
         let rec = Arc::new(Recorder::default());
-        let m = Arc::new(AddonManager::new(
+        let m = Arc::new(AddonManager::with_components(
             Arc::new(b),
             Arc::new(n),
             rec.clone() as Arc<dyn Events>,
@@ -954,7 +992,7 @@ mod tests {
     ) -> (Arc<AddonManager>, Arc<Recorder>) {
         let rec = Arc::new(Recorder::default());
         let m = Arc::new(
-            AddonManager::new(Arc::new(b), Arc::new(n), rec.clone() as Arc<dyn Events>)
+            AddonManager::with_components(Arc::new(b), Arc::new(n), rec.clone() as Arc<dyn Events>)
                 .with_key_vault(vault.clone() as Arc<dyn KeyVault>)
                 .with_clock(clock.clock()),
         );
@@ -1243,7 +1281,7 @@ mod tests {
         let releases = net.releases.clone();
         let rec = Arc::new(Recorder::default());
         let m = Arc::new(
-            AddonManager::new(
+            AddonManager::with_components(
                 Arc::new(FakeBackend::default()),
                 Arc::new(net),
                 rec.clone() as Arc<dyn Events>,

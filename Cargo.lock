@@ -3519,16 +3519,15 @@ dependencies = [
  "anyhow",
  "base64 0.23.1",
  "bs1770",
- "chacha20poly1305",
  "chrono",
  "console-subscriber",
  "cucumber",
- "ed25519-dalek",
  "env_logger",
  "image",
  "libc",
  "lofty",
  "log",
+ "luminous-addons",
  "luminous-audio",
  "luminous-equalizer",
  "md-5",
@@ -3577,6 +3576,27 @@ dependencies = [
  "wiremock",
  "zbus",
  "zvariant",
+]
+
+[[package]]
+name = "luminous-addons"
+version = "0.1.0"
+dependencies = [
+ "chacha20poly1305",
+ "ed25519-dalek",
+ "http",
+ "log",
+ "notify",
+ "parking_lot",
+ "percent-encoding",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "tempfile",
+ "tokio",
+ "windows",
+ "windows-collections",
 ]
 
 [[package]]
