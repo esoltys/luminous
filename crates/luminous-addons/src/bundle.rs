@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 /// Where bundles are published. Files are `<base>/<id>.lumadd` and `.lumadd.sig`.
-pub const DEFAULT_BASE_URL: &str = "https://luminous-addons.esoltys.dev";
+pub(crate) const DEFAULT_BASE_URL: &str = "https://luminous-addons.esoltys.dev";
 
 /// Header, nonce and tag overhead allowed on top of the archive cap.
 const MAX_BUNDLE_BYTES: usize = MAX_ARCHIVE_BYTES + 1024;
@@ -21,7 +21,7 @@ const MAX_SIG_BYTES: usize = 128;
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
 
 #[derive(Debug)]
-pub enum InstallError {
+pub(crate) enum InstallError {
     InvalidId,
     /// No network and nothing cached to fall back to.
     Unreachable(String),
@@ -62,7 +62,7 @@ impl From<verifier::Error> for InstallError {
 }
 
 /// Ids appear in URLs and file names, so keep them to a boring alphabet.
-pub fn is_valid_id(id: &str) -> bool {
+pub(crate) fn is_valid_id(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= 64
         && id
@@ -70,7 +70,7 @@ pub fn is_valid_id(id: &str) -> bool {
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
 }
 
-pub fn bundle_urls(base: &str, id: &str) -> (String, String) {
+pub(crate) fn bundle_urls(base: &str, id: &str) -> (String, String) {
     let base = base.trim_end_matches('/');
     (
         format!("{base}/{id}.lumadd"),
@@ -80,7 +80,7 @@ pub fn bundle_urls(base: &str, id: &str) -> (String, String) {
 
 /// Compare dotted numeric versions (`1.2.10` > `1.2.9`). `None` if either is not
 /// purely numeric, in which case the caller must not guess.
-pub fn compare_versions(a: &str, b: &str) -> Option<Ordering> {
+pub(crate) fn compare_versions(a: &str, b: &str) -> Option<Ordering> {
     fn parts(v: &str) -> Option<Vec<u64>> {
         v.split('.').map(|p| p.parse().ok()).collect()
     }
@@ -224,7 +224,7 @@ fn to_assets(addin: &mut Addin) -> AddonAssets {
 /// A bundle that fails verification is never cached and never replaces a good
 /// cached one. A network failure falls back to the cache so an owned add-on
 /// keeps working offline.
-pub async fn install(
+pub(crate) async fn install(
     base_url: &str,
     cache_dir: &Path,
     id: &str,

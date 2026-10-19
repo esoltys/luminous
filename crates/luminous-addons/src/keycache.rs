@@ -18,19 +18,19 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// How long a remembered key stays usable without asking the Worker again.
-pub const GRACE: Duration = Duration::from_secs(30 * 24 * 60 * 60);
+pub(crate) const GRACE: Duration = Duration::from_secs(30 * 24 * 60 * 60);
 
 /// A released key and when the Worker last handed it out.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CachedKey {
-    pub key: [u8; 32],
-    pub checked_at: SystemTime,
+pub(crate) struct CachedKey {
+    pub(crate) key: [u8; 32],
+    pub(crate) checked_at: SystemTime,
 }
 
 impl CachedKey {
     /// Within [`GRACE`] of `now`. A key stamped in the future is not fresh, so
     /// setting the clock back cannot stretch the window.
-    pub fn is_fresh(&self, now: SystemTime) -> bool {
+    pub(crate) fn is_fresh(&self, now: SystemTime) -> bool {
         now.duration_since(self.checked_at)
             .is_ok_and(|age| age <= GRACE)
     }
@@ -38,7 +38,7 @@ impl CachedKey {
 
 /// Where remembered keys live. Failures are swallowed: a key that cannot be
 /// stored or read is simply not remembered, and the online path covers it.
-pub trait KeyVault: Send + Sync {
+pub(crate) trait KeyVault: Send + Sync {
     fn load(&self, id: &str) -> Option<CachedKey>;
     fn save(&self, id: &str, key: &CachedKey);
     /// Forget the key. Forgetting one that is not there is not an error.
@@ -46,7 +46,8 @@ pub trait KeyVault: Send + Sync {
 }
 
 /// A vault that remembers nothing.
-pub struct NoVault;
+#[allow(dead_code)]
+pub(crate) struct NoVault;
 
 impl KeyVault for NoVault {
     fn load(&self, _: &str) -> Option<CachedKey> {
@@ -57,7 +58,7 @@ impl KeyVault for NoVault {
 }
 
 /// Seals bytes so only the signed-in OS user can open them.
-pub trait Protector: Send + Sync {
+pub(crate) trait Protector: Send + Sync {
     fn protect(&self, plain: &[u8]) -> Option<Vec<u8>>;
     fn unprotect(&self, sealed: &[u8]) -> Option<Vec<u8>>;
 }
@@ -66,13 +67,13 @@ pub trait Protector: Send + Sync {
 const PAYLOAD_LEN: usize = 8 + 32;
 
 /// One protected file per add-on, `<id>.key`, beside the cached bundles.
-pub struct FileKeyVault {
+pub(crate) struct FileKeyVault {
     dir: PathBuf,
     protector: Arc<dyn Protector>,
 }
 
 impl FileKeyVault {
-    pub fn new(dir: PathBuf, protector: Arc<dyn Protector>) -> Self {
+    pub(crate) fn new(dir: PathBuf, protector: Arc<dyn Protector>) -> Self {
         Self { dir, protector }
     }
 
@@ -130,7 +131,7 @@ impl KeyVault for FileKeyVault {
 }
 
 /// The vault for this build: DPAPI-protected files on Windows, nothing elsewhere.
-pub fn default_vault(dir: PathBuf) -> Arc<dyn KeyVault> {
+pub(crate) fn default_vault(dir: PathBuf) -> Arc<dyn KeyVault> {
     #[cfg(target_os = "windows")]
     {
         Arc::new(FileKeyVault::new(dir, Arc::new(dpapi::Dpapi)))

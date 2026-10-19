@@ -66,6 +66,7 @@ into Picard's territory; it's a different, complementary axis Picard was never m
 
 **Core Rust modules** (`src-tauri/src/`):
 
+- `crates/luminous-addons` — add-on theme runtime: Ed25519 bundle verification, ChaCha20 decryption, Store entitlement, key cache (DPAPI), in-memory URI scheme asset serving. No `tauri` or `rusqlite` (CI-checked); `commands/addons.rs` maps IPC and events at the edge
 - `crates/luminous-audio` — the playback engine: Symphonia decode, CPAL output, gapless/crossfade handover, gain chain, spectrum. No `tauri`/`rusqlite`/`reqwest`/`tokio` (CI-checked); remote sources come in through the opener `media_source.rs` injects, and `audio.rs` maps `Song`/`PlayState`/pipeline info at the edge
 - `player.rs` — playback state machine (shuffle, repeat, queue control)
 - `collection.rs` — library scanner (incremental; respects file mod times) + file watcher

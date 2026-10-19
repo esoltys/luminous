@@ -9,7 +9,6 @@
 //   collection — Library scanner + file watcher
 //   playlist  — Playlist CRUD + undo/redo
 
-pub mod addons;
 pub mod album_key;
 pub mod artist_image;
 pub mod audio;
@@ -111,7 +110,7 @@ pub struct AppState {
     /// Portable Genres/Artist Tags hierarchy in the default library (#1312).
     pub hierarchy_sidecar: Arc<hierarchy_sidecar::HierarchySidecar>,
     /// Store entitlement and delivery for add-on themes (#1414).
-    pub addons: Arc<addons::entitlement::AddonManager>,
+    pub addons: Arc<luminous_addons::AddonManager>,
 }
 
 /// Suppresses stock webview browser chrome — reload/find/print keybindings and
@@ -877,7 +876,7 @@ pub fn run() {
             move |_ctx, request, responder| {
                 let uri = request.uri().to_string();
                 tauri::async_runtime::spawn_blocking(move || {
-                    responder.respond(crate::addons::serve_request(&uri));
+                    responder.respond(luminous_addons::serve_request(&uri));
                 });
             },
         )

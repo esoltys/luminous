@@ -47,7 +47,7 @@ fn is_plain_relative(path: &str) -> bool {
 /// Read `<root>/<id>/manifest.json` and every asset it declares. Only declared
 /// assets are loaded, symlinks that leave the folder are refused, and the total
 /// is capped like a real bundle.
-pub fn load_folder(root: &Path, id: &str) -> Result<(Manifest, AddonAssets), InstallError> {
+pub(crate) fn load_folder(root: &Path, id: &str) -> Result<(Manifest, AddonAssets), InstallError> {
     if !is_valid_id(id) {
         return Err(InstallError::InvalidId);
     }
@@ -103,19 +103,19 @@ pub fn load_folder(root: &Path, id: &str) -> Result<(Manifest, AddonAssets), Ins
 }
 
 /// Load a folder and make it servable, replacing any earlier registration.
-pub fn install_folder(root: &Path, id: &str) -> Result<Manifest, InstallError> {
+pub(crate) fn install_folder(root: &Path, id: &str) -> Result<Manifest, InstallError> {
     let (manifest, assets) = load_folder(root, id)?;
     super::register(id, assets);
     Ok(manifest)
 }
 
 /// Stands in for the key Worker and CDN: no ticket, no key, no download.
-pub struct DevFolderProvisioner {
+pub(crate) struct DevFolderProvisioner {
     root: PathBuf,
 }
 
 impl DevFolderProvisioner {
-    pub fn new(root: PathBuf) -> Self {
+    pub(crate) fn new(root: PathBuf) -> Self {
         Self { root }
     }
 }
@@ -141,7 +141,7 @@ impl Provisioner for DevFolderProvisioner {
 /// of the process.
 pub fn watch(
     root: PathBuf,
-    on_reload: impl Fn(&str, Result<Manifest, InstallError>) + Send + 'static,
+    on_reload: impl Fn(&str, Result<crate::ThemeDefinition, String>) + Send + 'static,
 ) -> notify::Result<()> {
     let (tx, rx) = mpsc::channel();
     let mut watcher = notify::recommended_watcher(tx)?;
@@ -169,7 +169,10 @@ pub fn watch(
                     // Only reload add-ons that were already registered; an
                     // untouched folder must not appear without being acquired.
                     if super::is_registered(&id) {
-                        on_reload(&id, install_folder(&root, &id));
+                        let res = install_folder(&root, &id)
+                            .map(|m| crate::ThemeDefinition::from(&m))
+                            .map_err(|e| e.to_string());
+                        on_reload(&id, res);
                     }
                 }
             }

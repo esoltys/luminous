@@ -1,0 +1,37 @@
+[package]
+name = "luminous-addons"
+version = "0.1.0"
+description = "Luminous's add-on theme runtime: bundle verification, key release/vault, in-memory decryption and URI scheme serving"
+edition = "2021"
+publish = false
+license.workspace = true
+
+# Must never depend on tauri or rusqlite: CI checks
+# `cargo tree -p luminous-addons -e normal` for them.
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+parking_lot.workspace = true
+log.workspace = true
+percent-encoding = "2"
+http = "1"
+sha2 = "0.11"
+ed25519-dalek = "3"
+chacha20poly1305 = "0.11"
+reqwest = { version = "0.13", default-features = false, features = ["json", "stream", "form", "rustls", "blocking"] }
+tokio = { version = "1", features = ["rt"] }
+notify = { version = "8", features = ["serde"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-collections = "0.3"
+windows = { version = "0.62", features = [
+    "Services_Store",
+    "Win32_Foundation",
+    "Win32_Security_Cryptography",
+    "Win32_UI_Shell",
+    "Win32_Storage_Packaging_Appx",
+] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }
+tempfile = "3"

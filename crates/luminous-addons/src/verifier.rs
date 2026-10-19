@@ -22,16 +22,16 @@ const TAG_LEN: usize = 16;
 const SIG_DOMAIN: &[u8] = b"LUMADD-SIG-v1\0";
 
 /// Largest decrypted archive accepted (the packer enforces the same cap).
-pub const MAX_ARCHIVE_BYTES: usize = 25 * 1024 * 1024;
+pub(crate) const MAX_ARCHIVE_BYTES: usize = 25 * 1024 * 1024;
 
 /// Vendor Ed25519 public key (raw 32 bytes) that every shipped bundle is signed with.
-pub const VENDOR_PUBLIC_KEY: [u8; 32] = [
+pub(crate) const VENDOR_PUBLIC_KEY: [u8; 32] = [
     0xf1, 0x73, 0xd1, 0x44, 0x62, 0xc0, 0xff, 0x71, 0x77, 0xaf, 0xa0, 0xeb, 0xed, 0x23, 0x89, 0x7b,
     0x54, 0x59, 0x5f, 0xfa, 0xf7, 0x00, 0x23, 0xc7, 0xde, 0x84, 0x56, 0xfe, 0x04, 0xe8, 0x92, 0x37,
 ];
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum Error {
+pub(crate) enum Error {
     Malformed(&'static str),
     TooLarge,
     BadSignature,
@@ -63,32 +63,33 @@ impl std::error::Error for Error {}
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ManifestAsset {
-    pub path: String,
-    pub sha256: String,
-    pub content_type: String,
+pub(crate) struct ManifestAsset {
+    pub(crate) path: String,
+    pub(crate) sha256: String,
+    pub(crate) content_type: String,
 }
 
 /// Unknown fields are ignored on purpose, so a newer bundle can add optional ones.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Manifest {
-    pub schema_version: u32,
-    pub id: String,
-    pub name: String,
-    pub version: String,
-    pub store_product_id: String,
-    pub min_api_version: u32,
-    pub colors: HashMap<String, String>,
-    pub overlay_entry: Option<String>,
-    pub assets: Vec<ManifestAsset>,
+#[allow(dead_code)]
+pub(crate) struct Manifest {
+    pub(crate) schema_version: u32,
+    pub(crate) id: String,
+    pub(crate) name: String,
+    pub(crate) version: String,
+    pub(crate) store_product_id: String,
+    pub(crate) min_api_version: u32,
+    pub(crate) colors: HashMap<String, String>,
+    pub(crate) overlay_entry: Option<String>,
+    pub(crate) assets: Vec<ManifestAsset>,
     #[serde(default)]
-    pub capabilities: Vec<String>,
+    pub(crate) capabilities: Vec<String>,
 }
 
-pub struct Addin {
-    pub manifest: Manifest,
-    pub files: HashMap<String, Vec<u8>>,
+pub(crate) struct Addin {
+    pub(crate) manifest: Manifest,
+    pub(crate) files: HashMap<String, Vec<u8>>,
 }
 
 struct Parts<'a> {
@@ -121,7 +122,11 @@ fn split(bundle: &[u8]) -> Result<Parts<'_>, Error> {
 
 /// Check the detached signature. The signed message includes the add-on id, so a bundle
 /// cannot be re-labelled as a different add-on.
-pub fn verify_signature(bundle: &[u8], sig: &[u8], public_key: &[u8; 32]) -> Result<(), Error> {
+pub(crate) fn verify_signature(
+    bundle: &[u8],
+    sig: &[u8],
+    public_key: &[u8; 32],
+) -> Result<(), Error> {
     let p = split(bundle)?;
     let key =
         VerifyingKey::from_bytes(public_key).map_err(|_| Error::Malformed("bad public key"))?;
@@ -137,7 +142,8 @@ pub fn verify_signature(bundle: &[u8], sig: &[u8], public_key: &[u8; 32]) -> Res
 
 /// The add-on id named in the bundle header. Unauthenticated until
 /// [`verify_signature`] passes; use it only to pick a key to try.
-pub fn bundle_id(bundle: &[u8]) -> Result<String, Error> {
+#[allow(dead_code)]
+pub(crate) fn bundle_id(bundle: &[u8]) -> Result<String, Error> {
     String::from_utf8(split(bundle)?.id.to_vec()).map_err(|_| Error::Malformed("id not utf8"))
 }
 
@@ -164,7 +170,7 @@ fn is_safe_path(path: &str) -> bool {
 }
 
 /// Verify the signature, decrypt, and validate the contents. Fails closed on any mismatch.
-pub fn open(
+pub(crate) fn open(
     bundle: &[u8],
     sig: &[u8],
     public_key: &[u8; 32],

@@ -12,12 +12,12 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 /// Where the key-release Worker is deployed.
-pub const DEFAULT_KEY_BASE_URL: &str = "https://luminous-keys.esoltys.dev";
+pub(crate) const DEFAULT_KEY_BASE_URL: &str = "https://luminous-keys.esoltys.dev";
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(20);
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum KeyError {
+pub(crate) enum KeyError {
     /// 403: the account does not own the add-on. Do not retry.
     NotEntitled,
     /// 404: the Worker has no key for this add-on id.
@@ -33,7 +33,8 @@ pub enum KeyError {
 }
 
 impl KeyError {
-    pub fn is_retryable(&self) -> bool {
+    #[allow(dead_code)]
+    pub(crate) fn is_retryable(&self) -> bool {
         matches!(self, KeyError::RateLimited { .. } | KeyError::Upstream)
     }
 }
@@ -128,7 +129,7 @@ async fn post<B: Serialize>(
 }
 
 /// Get the Entra service ticket the Store needs to mint a Store ID key.
-pub async fn fetch_service_ticket(base_url: &str) -> Result<String, KeyError> {
+pub(crate) async fn fetch_service_ticket(base_url: &str) -> Result<String, KeyError> {
     let response = post::<()>(base_url, "/v1/ticket", None).await?;
     let ticket: TicketResponse = response.json().await.map_err(|_| KeyError::BadResponse)?;
     if ticket.service_ticket.is_empty() {
@@ -138,7 +139,7 @@ pub async fn fetch_service_ticket(base_url: &str) -> Result<String, KeyError> {
 }
 
 /// Trade a Store ID key for the add-on's decryption key.
-pub async fn release_key(
+pub(crate) async fn release_key(
     base_url: &str,
     store_id_key: &str,
     addin_id: &str,

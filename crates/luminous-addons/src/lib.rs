@@ -10,18 +10,23 @@ use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock};
 
-pub mod bundle;
+mod bundle;
 #[cfg(debug_assertions)]
 pub mod devloader;
-pub mod entitlement;
-pub mod keycache;
-pub mod keyclient;
-pub mod verifier;
+mod entitlement;
+mod keycache;
+mod keyclient;
+mod verifier;
+
+pub use entitlement::{
+    default_backend, known_addon, AddonManager, AddonState, Events, KnownAddon, ProductPrice,
+    PurchaseOutcome, StoreBackend, StoreError, ThemeDefinition, KNOWN_ADDONS,
+};
 
 /// Version of the host→overlay message API (see `docs/ADDONS.md` in the private
 /// esoltys/luminous-store repo). Bumped when a message shape changes
 /// incompatibly; manifests declare `minApiVersion`.
-pub const OVERLAY_API_VERSION: u32 = 1;
+pub(crate) const OVERLAY_API_VERSION: u32 = 1;
 
 /// Served with every add-on response. The overlay runs in an iframe with
 /// `sandbox="allow-scripts"` (opaque origin, no Tauri IPC); this is the second
@@ -33,47 +38,50 @@ base-uri 'none'; form-action 'none'";
 
 /// One decrypted asset: its declared content type and bytes.
 #[derive(Debug, Clone)]
-pub struct Asset {
-    pub content_type: String,
-    pub data: Arc<Vec<u8>>,
+pub(crate) struct Asset {
+    pub(crate) content_type: String,
+    pub(crate) data: Arc<Vec<u8>>,
 }
 
 /// Decrypted assets of one add-on, keyed by bundle-relative path.
-pub type AddonAssets = HashMap<String, Asset>;
+pub(crate) type AddonAssets = HashMap<String, Asset>;
 
 type Registry = HashMap<String, Arc<AddonAssets>>;
 
 static REGISTRY: LazyLock<RwLock<Registry>> = LazyLock::new(|| RwLock::new(HashMap::new()));
 
 /// Make an add-on's assets servable, replacing any earlier registration.
-pub fn register(id: &str, assets: AddonAssets) {
+pub(crate) fn register(id: &str, assets: AddonAssets) {
     REGISTRY.write().insert(id.to_string(), Arc::new(assets));
 }
 
 /// Whether an add-on currently has assets registered.
 #[cfg(debug_assertions)]
-pub fn is_registered(id: &str) -> bool {
+pub(crate) fn is_registered(id: &str) -> bool {
     REGISTRY.read().contains_key(id)
 }
 
 /// Drop an add-on's assets (e.g. entitlement lost); further requests 404.
-pub fn unregister(id: &str) {
+pub(crate) fn unregister(id: &str) {
     REGISTRY.write().remove(id);
 }
 
+/// HTTP response carrying decrypted add-on asset data and strict security headers.
+pub type AssetResponse = http::Response<Vec<u8>>;
+
 /// Handle a `luminous-addon` request against the process-wide registry.
-pub fn serve_request(uri: &str) -> tauri::http::Response<Vec<u8>> {
+pub fn serve_request(uri: &str) -> AssetResponse {
     serve_request_from(&REGISTRY.read(), uri)
 }
 
-fn serve_request_from(registry: &Registry, uri: &str) -> tauri::http::Response<Vec<u8>> {
+fn serve_request_from(registry: &Registry, uri: &str) -> AssetResponse {
     let Some((id, path)) = parse_request(uri) else {
         return empty_response(404);
     };
     let Some(asset) = registry.get(&id).and_then(|assets| assets.get(&path)) else {
         return empty_response(404);
     };
-    tauri::http::Response::builder()
+    http::Response::builder()
         .status(200)
         .header("content-type", asset.content_type.as_str())
         .header("content-security-policy", CONTENT_SECURITY_POLICY)
@@ -115,8 +123,8 @@ fn parse_request(uri: &str) -> Option<(String, String)> {
     Some((id.to_string(), path.to_string()))
 }
 
-fn empty_response(status: u16) -> tauri::http::Response<Vec<u8>> {
-    tauri::http::Response::builder()
+fn empty_response(status: u16) -> AssetResponse {
+    http::Response::builder()
         .status(status)
         .header("content-security-policy", CONTENT_SECURITY_POLICY)
         .body(Vec::new())
