@@ -27,7 +27,6 @@ pub mod default_apps;
 pub mod diagnostics;
 pub mod discord;
 pub mod dr_parser;
-pub mod eq_import;
 pub mod eq_store;
 pub mod fade;
 pub mod filter_parser;

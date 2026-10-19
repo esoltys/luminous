@@ -1,9 +1,8 @@
 use cucumber::gherkin::Step;
 use cucumber::{given, then, when, World};
-use luminous_equalizer::{Equalizer, EqualizerConfig};
+use luminous_equalizer::{parse_parametric_profile, read_profile_file, Equalizer, EqualizerConfig};
 use luminous_lib::commands::equalizer::import_profile_into;
 use luminous_lib::db::Database;
-use luminous_lib::eq_import::{parse_parametric_profile, read_profile_file};
 use luminous_lib::eq_store;
 use std::path::PathBuf;
 

@@ -1,5 +1,5 @@
-//! Equalizer APO parametric profiles (#1336) — the `ParametricEQ.txt` files
-//! AutoEq publishes for thousands of headphones:
+//! Equalizer APO parametric profiles (#1336, #1763) — the `ParametricEQ.txt`
+//! files AutoEq publishes for thousands of headphones:
 //!
 //! ```text
 //! Preamp: -6.2 dB
@@ -13,9 +13,10 @@
 //! directive, an out-of-range gain — rejects the whole file, because applying
 //! the rest would not sound like the profile. Nothing is clamped.
 
-use luminous_equalizer::{ParametricBand, ParametricKind, EQUALIZER_RANGES as RANGES};
+use crate::{ParametricBand, ParametricKind, EQUALIZER_RANGES as RANGES};
 use serde::Serialize;
 use std::path::Path;
+use std::str::FromStr;
 
 /// Profile files are a few hundred bytes; the cap keeps a mis-picked file
 /// (an album, a disk image) from being read into memory.
@@ -25,6 +26,27 @@ pub const MAX_PROFILE_FILE_BYTES: u64 = 64 * 1024;
 pub struct ImportedProfile {
     pub preamp: f32,
     pub bands: Vec<ParametricBand>,
+}
+
+impl ImportedProfile {
+    /// Parse an Equalizer APO parametric profile from text.
+    pub fn parse(text: &str) -> Result<Self, ImportError> {
+        parse_parametric_profile(text)
+    }
+
+    /// Read and parse an Equalizer APO profile file from disk.
+    pub fn from_file(path: &Path) -> Result<Self, ImportError> {
+        let text = read_profile_file(path)?;
+        parse_parametric_profile(&text)
+    }
+}
+
+impl FromStr for ImportedProfile {
+    type Err = ImportError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        parse_parametric_profile(s)
+    }
 }
 
 /// Why a profile was rejected. Serialises as `{ "code": ..., ...details }`,
@@ -332,7 +354,7 @@ pub fn format_parametric_profile(preamp: f32, bands: &[ParametricBand]) -> Strin
 #[cfg(test)]
 mod tests {
     use super::*;
-    use luminous_equalizer::Equalizer;
+    use crate::Equalizer;
     use ParametricKind::{HighShelf, LowShelf, Peak};
 
     fn fixture(name: &str) -> String {
@@ -374,6 +396,19 @@ mod tests {
                 .unwrap();
         assert_eq!(profile.preamp, -3.78);
         assert_eq!(profile.bands, anker_q20_bands());
+    }
+
+    #[test]
+    fn parses_via_imported_profile_helpers() {
+        let text = fixture("Anker Soundcore Life Q20 ParametricEq.txt");
+        let from_parse = ImportedProfile::parse(&text).unwrap();
+        let from_str: ImportedProfile = text.parse().unwrap();
+        assert_eq!(from_parse, from_str);
+
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/autoeq/Anker Soundcore Life Q20 ParametricEq.txt");
+        let from_file = ImportedProfile::from_file(&path).unwrap();
+        assert_eq!(from_file, from_parse);
     }
 
     #[test]
@@ -644,19 +679,22 @@ Filter 2: ON LP Fc 15000 Hz";
 
     #[test]
     fn rejects_oversized_files_before_reading() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("big.txt");
+        let path =
+            std::env::temp_dir().join(format!("luminous_eq_test_big_{}.txt", std::process::id()));
         std::fs::write(&path, vec![b'#'; MAX_PROFILE_FILE_BYTES as usize + 1]).unwrap();
+        let res = read_profile_file(&path);
+        let _ = std::fs::remove_file(&path);
         assert_eq!(
-            read_profile_file(&path),
+            res,
             Err(ImportError::FileTooLarge {
                 max_bytes: MAX_PROFILE_FILE_BYTES
             })
         );
-        assert_eq!(
-            read_profile_file(&dir.path().join("missing.txt")),
-            Err(ImportError::ReadFailed)
-        );
+        let missing = std::env::temp_dir().join(format!(
+            "luminous_eq_test_missing_{}.txt",
+            std::process::id()
+        ));
+        assert_eq!(read_profile_file(&missing), Err(ImportError::ReadFailed));
     }
 
     #[test]
@@ -674,6 +712,83 @@ Filter 2: ON LP Fc 15000 Hz";
         assert_eq!(v["line"], 4);
         assert_eq!(v["field"], "q");
         assert_eq!(ImportError::Empty.to_json(), r#"{"code":"empty"}"#);
+    }
+
+    #[test]
+    fn pins_wire_json_serialization_of_all_import_error_variants() {
+        assert_eq!(ImportError::Empty.to_json(), r#"{"code":"empty"}"#);
+        assert_eq!(
+            ImportError::TooManyFilters { count: 21, max: 20 }.to_json(),
+            r#"{"code":"too_many_filters","count":21,"max":20}"#
+        );
+        assert_eq!(
+            ImportError::UnsupportedFilters {
+                filters: vec![UnsupportedFilter {
+                    line: 2,
+                    kind: "LP".to_string()
+                }]
+            }
+            .to_json(),
+            r#"{"code":"unsupported_filters","filters":[{"line":2,"kind":"LP"}]}"#
+        );
+        assert_eq!(
+            ImportError::UnsupportedLine { line: 5 }.to_json(),
+            r#"{"code":"unsupported_line","line":5}"#
+        );
+        assert_eq!(
+            ImportError::Malformed { line: 3 }.to_json(),
+            r#"{"code":"malformed","line":3}"#
+        );
+        assert_eq!(
+            ImportError::OutOfRange {
+                line: 7,
+                field: RangeField::Freq,
+                value: 10.0,
+                min: 20.0,
+                max: 20000.0,
+            }
+            .to_json(),
+            r#"{"code":"out_of_range","line":7,"field":"freq","value":10.0,"min":20.0,"max":20000.0}"#
+        );
+        assert_eq!(
+            ImportError::OutOfRange {
+                line: 8,
+                field: RangeField::Gain,
+                value: 25.0,
+                min: -20.0,
+                max: 20.0,
+            }
+            .to_json(),
+            r#"{"code":"out_of_range","line":8,"field":"gain","value":25.0,"min":-20.0,"max":20.0}"#
+        );
+        assert_eq!(
+            ImportError::OutOfRange {
+                line: 9,
+                field: RangeField::Q,
+                value: 15.0,
+                min: 0.1,
+                max: 10.0,
+            }
+            .to_json(),
+            r#"{"code":"out_of_range","line":9,"field":"q","value":15.0,"min":0.1,"max":10.0}"#
+        );
+        assert_eq!(
+            ImportError::PreampOutOfRange {
+                value: -30.0,
+                min: -24.0,
+                max: 12.0,
+            }
+            .to_json(),
+            r#"{"code":"preamp_out_of_range","value":-30.0,"min":-24.0,"max":12.0}"#
+        );
+        assert_eq!(
+            ImportError::FileTooLarge { max_bytes: 65536 }.to_json(),
+            r#"{"code":"file_too_large","max_bytes":65536}"#
+        );
+        assert_eq!(
+            ImportError::ReadFailed.to_json(),
+            r#"{"code":"read_failed"}"#
+        );
     }
 
     #[test]

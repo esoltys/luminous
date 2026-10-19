@@ -144,7 +144,7 @@ pub async fn save_eq_user_preset(
 ///
 /// All-or-nothing: the text is parsed and the preset saved before the engine
 /// is touched, so a bad file or a taken name changes nothing. Errors are a
-/// JSON `{ "code": ... }` string — an `eq_import::ImportError`, or an
+/// JSON `{ "code": ... }` string — a `luminous_equalizer::ImportError`, or an
 /// `eq_store::ERR_*` code.
 pub fn import_profile_into(
     db: &crate::db::Database,
@@ -152,7 +152,7 @@ pub fn import_profile_into(
     text: &str,
     name: &str,
 ) -> Result<EqualizerConfig, String> {
-    let profile = crate::eq_import::parse_parametric_profile(text).map_err(|e| e.to_json())?;
+    let profile = luminous_equalizer::parse_parametric_profile(text).map_err(|e| e.to_json())?;
     let preset_err = |code: String| serde_json::json!({ "code": code }).to_string();
     let conn = db.pool.get().map_err(|e| preset_err(e.to_string()))?;
     let id = eq_store::create(&conn, name, &profile.bands, profile.preamp).map_err(preset_err)?;
@@ -184,7 +184,7 @@ pub async fn import_parametric_profile(
 /// same JSON `{ "code": ... }` string.
 #[tauri::command]
 pub async fn read_eq_profile_file(path: String) -> Result<String, String> {
-    crate::eq_import::read_profile_file(std::path::Path::new(&path)).map_err(|e| e.to_json())
+    luminous_equalizer::read_profile_file(std::path::Path::new(&path)).map_err(|e| e.to_json())
 }
 
 /// Write the parametric bands and the parametric preamp to `path` as an
@@ -197,7 +197,7 @@ pub async fn export_parametric_profile(
     let text = crate::audio::with_audio(&state.audio, |engine| {
         engine.with_equalizer(|eq| {
             let state = eq.state();
-            Ok::<_, String>(crate::eq_import::format_parametric_profile(
+            Ok::<_, String>(luminous_equalizer::format_parametric_profile(
                 state.parametric_settings.preamp,
                 &state.parametric,
             ))
@@ -354,7 +354,7 @@ mod tests {
         assert_eq!(presets.len(), 1);
         assert_eq!(presets[0].name, "HD 600");
         let stored = eq_store::get(&conn, presets[0].id).unwrap();
-        let parsed = crate::eq_import::parse_parametric_profile(PROFILE).unwrap();
+        let parsed = luminous_equalizer::parse_parametric_profile(PROFILE).unwrap();
         assert_eq!(stored.bands, parsed.bands);
         assert_eq!(stored.preamp, -6.3);
 
