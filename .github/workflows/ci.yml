@@ -99,6 +99,18 @@ jobs:
             exit 1
           fi
 
+      # Offline audio analysis DSP must not reach app layers: with no Tauri,
+      # SQLite, HTTP client or async runtime in its dependency tree, it can't
+      # touch app state or talk to a server (#1765, epic #1762).
+      - name: Check the analysis engine's dependency boundary
+        run: |
+          tree=$(cargo tree -p luminous-analysis -e normal --prefix none)
+          forbidden=$(grep -E '^(tauri|rusqlite|reqwest|tokio)[ -]' <<< "$tree" | sort -u || true)
+          if [ -n "$forbidden" ]; then
+            echo "::error::luminous-analysis must not depend on: $forbidden"
+            exit 1
+          fi
+
       # From the repo root with --workspace, so every crate under crates/ is
       # tested and linted, not just the app package in src-tauri (#1554).
       - name: Run cargo test
