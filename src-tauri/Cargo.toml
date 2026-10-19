@@ -57,6 +57,7 @@ tauri-plugin-prevent-default = "6"
 luminous-equalizer = { path = "../crates/luminous-equalizer" }
 luminous-audio = { path = "../crates/luminous-audio" }
 luminous-addons = { path = "../crates/luminous-addons" }
+luminous-analysis = { path = "../crates/luminous-analysis" }
 
 # --- Serialization ---
 serde.workspace = true
@@ -80,12 +81,6 @@ symphonia.workspace = true
 
 # --- Tag reading/writing ---
 lofty = "0.25"
-
-# --- FFT (spectrum analyzer, band waveform) ---
-rustfft.workspace = true
-
-# --- EBU R128 / BS.1770 loudness measurement (#77) ---
-bs1770 = "1"
 
 # --- File watching ---
 notify = { version = "8", features = ["serde"] }

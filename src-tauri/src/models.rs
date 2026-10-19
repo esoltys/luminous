@@ -684,75 +684,11 @@ pub enum PlayState {
 // Loudness normalization (#77) — EBU R128 analysis with ReplayGain fallback
 // ---------------------------------------------------------------------------
 
-/// Which ReplayGain value to prefer when no R128 analysis is available.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(rename_all = "snake_case")]
-pub enum LoudnessMode {
-    #[default]
-    Track,
-    Album,
-}
-
-impl LoudnessMode {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            LoudnessMode::Track => "track",
-            LoudnessMode::Album => "album",
-        }
-    }
-}
-
-impl From<&str> for LoudnessMode {
-    fn from(s: &str) -> Self {
-        match s {
-            "album" => LoudnessMode::Album,
-            _ => LoudnessMode::Track,
-        }
-    }
-}
-
-/// Persisted loudness-normalization settings (`loudness_settings` table).
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct LoudnessSettings {
-    pub enabled: bool,
-    pub target_lufs: f32,
-    pub mode: LoudnessMode,
-    /// Gain applied (in dB) when a track has neither R128 analysis nor a
-    /// ReplayGain tag. Defaults to a conservative negative value to avoid
-    /// clipping unanalyzed, potentially loud tracks.
-    pub fallback_gain_db: f32,
-}
-
-/// Inclusive bounds of a numeric audio setting. The backend clamps with
-/// these on load and save, and the settings UI reads them over IPC
-/// (`get_audio_setting_ranges`) for its slider/knob min and max, so the
-/// range is stated once, at the layer that enforces it (#1249).
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub struct SettingRange {
-    pub min: f32,
-    pub max: f32,
-}
-
-impl SettingRange {
-    /// Clamps `value` into range; NaN (e.g. a hand-edited `"NaN"` row)
-    /// falls to `min` rather than passing through `f32::clamp` unchanged.
-    pub fn clamp(self, value: f32) -> f32 {
-        if value.is_nan() {
-            self.min
-        } else {
-            value.clamp(self.min, self.max)
-        }
-    }
-}
-
-pub const TARGET_LUFS_RANGE: SettingRange = SettingRange {
-    min: -23.0,
-    max: -9.0,
+pub use luminous_analysis::{
+    LoudnessGainSource, LoudnessMode, LoudnessSettings, SettingRange, FALLBACK_GAIN_DB_RANGE,
+    TARGET_LUFS_RANGE,
 };
-pub const FALLBACK_GAIN_DB_RANGE: SettingRange = SettingRange {
-    min: -12.0,
-    max: 0.0,
-};
+
 pub const FADE_PAUSE_DURATION_MS_RANGE: SettingRange = SettingRange {
     min: 0.0,
     max: 1000.0,
@@ -782,52 +718,11 @@ pub const AUDIO_SETTING_RANGES: AudioSettingRanges = AudioSettingRanges {
     eq: luminous_equalizer::EQUALIZER_RANGES,
 };
 
-impl LoudnessSettings {
-    /// This settings value with every numeric field inside its range.
-    pub fn clamped(mut self) -> Self {
-        self.target_lufs = TARGET_LUFS_RANGE.clamp(self.target_lufs);
-        self.fallback_gain_db = FALLBACK_GAIN_DB_RANGE.clamp(self.fallback_gain_db);
-        self
-    }
-}
-
-impl Default for LoudnessSettings {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            target_lufs: -16.0,
-            mode: LoudnessMode::Track,
-            fallback_gain_db: -6.0,
-        }
-    }
-}
-
 /// Background R128 analysis progress, emitted as `loudness-analysis-progress`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoudnessAnalysisProgress {
     pub analyzed: u64,
     pub remaining: u64,
-}
-
-/// Where the currently applied loudness gain came from, for UI display next
-/// to the currently playing track (e.g. an "R128"/"RG" badge in the player
-/// bar).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(rename_all = "snake_case")]
-pub enum LoudnessGainSource {
-    /// Normalization is off, or nothing is playing.
-    #[default]
-    Disabled,
-    /// Gain computed from this track's own R128 analysis.
-    Analyzed,
-    /// Gain derived from a ReplayGain tag (no R128 analysis yet).
-    ReplayGain,
-    /// Gain derived from a foo_dr.txt DR Meter log's Peak/RMS (#57) — no
-    /// R128 analysis or ReplayGain tag is available.
-    DynamicRangeLog,
-    /// Neither analysis, a tag, nor a DR log is available — the fixed
-    /// fallback gain.
-    Fallback,
 }
 
 // ---------------------------------------------------------------------------

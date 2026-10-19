@@ -3518,7 +3518,6 @@ version = "3.1.0"
 dependencies = [
  "anyhow",
  "base64 0.23.1",
- "bs1770",
  "chrono",
  "console-subscriber",
  "cucumber",
@@ -3528,6 +3527,7 @@ dependencies = [
  "lofty",
  "log",
  "luminous-addons",
+ "luminous-analysis",
  "luminous-audio",
  "luminous-equalizer",
  "md-5",
@@ -3542,7 +3542,6 @@ dependencies = [
  "rayon",
  "reqwest",
  "rusqlite",
- "rustfft",
  "serde",
  "serde_json",
  "sha2 0.11.0",
@@ -3597,6 +3596,18 @@ dependencies = [
  "tokio",
  "windows",
  "windows-collections",
+]
+
+[[package]]
+name = "luminous-analysis"
+version = "0.1.0"
+dependencies = [
+ "bs1770",
+ "log",
+ "luminous-audio",
+ "rustfft",
+ "serde",
+ "tempfile",
 ]
 
 [[package]]

@@ -1,0 +1,20 @@
+[package]
+name = "luminous-analysis"
+version = "0.1.0"
+description = "Offline audio analysis DSP: ITU-R BS.1770 loudness, ReplayGain/DR gain law, RMS waveform, and 3-band FFT visualizers"
+edition = "2021"
+publish = false
+license.workspace = true
+
+# Must never depend on tauri, rusqlite, reqwest or tokio: CI checks
+# `cargo tree -p luminous-analysis -e normal` for them (#1765, epic #1762).
+[dependencies]
+luminous-audio = { path = "../luminous-audio" }
+bs1770 = "1"
+rustfft.workspace = true
+serde = { workspace = true, features = ["derive"] }
+log.workspace = true
+
+[dev-dependencies]
+luminous-audio = { path = "../luminous-audio", features = ["test-util"] }
+tempfile = "3"

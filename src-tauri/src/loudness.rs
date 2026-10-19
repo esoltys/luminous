@@ -1,6 +1,7 @@
 //! Loudness normalization (#77) — EBU R128 (BS.1770) integrated-loudness
-//! analysis, with a ReplayGain 2.0 tag fallback for tracks not yet analyzed.
+//! persistence and background analyzer orchestration.
 //!
+//! DSP measurement and gain calculation live in `luminous_analysis`.
 //! A low-priority background thread (`spawn_background_analyzer`) decodes
 //! each not-yet-analyzed local track once (through `luminous_audio::OfflineDecoder`,
 //! the same decode path as the band_waveform/waveform analyzers) and writes
@@ -11,23 +12,16 @@
 //! DSP chain by #47.
 
 use crate::db::Database;
-use crate::models::{LoudnessGainSource, LoudnessMode, LoudnessSettings, LOCAL_SOURCES_SQL};
-use anyhow::{anyhow, Context, Result};
+use crate::models::{LoudnessMode, LoudnessSettings, LOCAL_SOURCES_SQL};
+use anyhow::{Context, Result};
+pub use luminous_analysis::{
+    compute_gain, GainResult, ANALYSIS_FAILED_SENTINEL, PLAUSIBLE_LUFS_RANGE,
+};
 use rusqlite::{params, OptionalExtension};
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
-
-/// Sentinel written when analysis fails (corrupt/unsupported file) so the
-/// background worker doesn't retry it forever. Clearly outside any real
-/// loudness measurement range, and filtered out by `compute_gain`.
-const ANALYSIS_FAILED_SENTINEL: f64 = -100.0;
-
-/// Plausible integrated-loudness range for a successfully analyzed track.
-/// Anything outside this (including the failure sentinel) is treated as "no
-/// usable measurement" rather than fed into the gain calculation.
-const PLAUSIBLE_LUFS_RANGE: std::ops::RangeInclusive<f64> = -70.0..=0.0;
 
 // ---------------------------------------------------------------------------
 // Settings persistence
@@ -73,122 +67,12 @@ pub fn save_settings(db: &Database, settings: &LoudnessSettings) -> Result<()> {
 }
 
 // ---------------------------------------------------------------------------
-// Gain calculation
-// ---------------------------------------------------------------------------
-
-/// Result of a gain computation: the linear multiplier for the DSP chain,
-/// the underlying dB value, and where it came from (for a UI indicator).
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct GainResult {
-    pub linear: f32,
-    pub gain_db: f32,
-    pub source: LoudnessGainSource,
-}
-
-/// Compute the gain to apply for a track, given whatever loudness
-/// information is available and the user's settings. Priority: measured R128
-/// loudness -> ReplayGain tag (track/album per `settings.mode`, falling back
-/// to the other if the preferred one is missing) -> DR Meter log Peak/RMS
-/// (#57) -> fixed fallback gain. The result is clamped to a sane range to
-/// guard against runaway gain from bad tags or measurements.
-#[allow(clippy::too_many_arguments)]
-pub fn compute_gain(
-    measured_lufs: Option<f64>,
-    rg_track_gain: Option<f64>,
-    rg_album_gain: Option<f64>,
-    dr_rms_db: Option<f64>,
-    dr_peak_db: Option<f64>,
-    settings: &LoudnessSettings,
-) -> GainResult {
-    let target = settings.target_lufs as f64;
-    let usable_measurement =
-        measured_lufs.filter(|l| l.is_finite() && PLAUSIBLE_LUFS_RANGE.contains(l));
-
-    let (gain_db, source) = if let Some(lufs) = usable_measurement {
-        (target - lufs, LoudnessGainSource::Analyzed)
-    } else {
-        let rg = match settings.mode {
-            LoudnessMode::Album => rg_album_gain.or(rg_track_gain),
-            LoudnessMode::Track => rg_track_gain.or(rg_album_gain),
-        };
-        match rg {
-            // ReplayGain tags are stored normalized to the -18 LUFS RG
-            // reference; adjust by the difference to the user's target.
-            Some(rg_db) => (rg_db + (target + 18.0), LoudnessGainSource::ReplayGain),
-            None => match (dr_rms_db, dr_peak_db) {
-                // Aim for the target loudness from RMS, but never boost
-                // past the point where Peak would clip (0 dBFS headroom).
-                (Some(rms), Some(peak)) if rms.is_finite() && peak.is_finite() => (
-                    f64::min(target - rms, -peak),
-                    LoudnessGainSource::DynamicRangeLog,
-                ),
-                _ => (
-                    settings.fallback_gain_db as f64,
-                    LoudnessGainSource::Fallback,
-                ),
-            },
-        }
-    };
-
-    let clamped_db = gain_db.clamp(-30.0, 12.0);
-    GainResult {
-        linear: 10f64.powf(clamped_db / 20.0) as f32,
-        gain_db: clamped_db as f32,
-        source,
-    }
-}
-
-// ---------------------------------------------------------------------------
-// EBU R128 / BS.1770 analysis
+// EBU R128 / BS.1770 analysis delegation
 // ---------------------------------------------------------------------------
 
 /// Analyze a track's integrated loudness (LUFS) per ITU-R BS.1770-4.
-/// Channels beyond L/R are not measured: BS.1770 surround weighting is a
-/// rare edge case not worth the added complexity here. Samples stream
-/// straight into the meters, so memory doesn't grow with the track's length.
 pub fn analyze_integrated_loudness(path: &Path) -> Result<f64> {
-    // Local files only (`LOCAL_SOURCES_SQL`), so no remote opener is needed.
-    let decoder = luminous_audio::OfflineDecoder::open_file(path)
-        .map_err(anyhow::Error::msg)
-        .context("failed to open audio file for R128 analysis")?;
-    let sample_rate = decoder.sample_rate();
-    // One meter per channel, sized by the first decoded packet.
-    let mut meters: Vec<bs1770::ChannelLoudnessMeter> = Vec::new();
-    decoder.decode_blocks(2, |planes| {
-        if meters.is_empty() {
-            meters = planes
-                .iter()
-                .map(|_| bs1770::ChannelLoudnessMeter::new(sample_rate))
-                .collect();
-        }
-        for (meter, plane) in meters.iter_mut().zip(planes) {
-            meter.push(plane.iter().copied());
-        }
-    });
-
-    let mut meters = meters.into_iter();
-    let loudness_lkfs = match (meters.next(), meters.next()) {
-        (None, _) => return Err(anyhow!("no decodable audio channels")),
-        (Some(mono), None) => {
-            let windows = mono.into_100ms_windows();
-            bs1770::gated_mean(windows.as_ref()).loudness_lkfs()
-        }
-        (Some(left), Some(right)) => {
-            let stereo = bs1770::reduce_stereo(
-                left.into_100ms_windows().as_ref(),
-                right.into_100ms_windows().as_ref(),
-            );
-            bs1770::gated_mean(stereo.as_ref()).loudness_lkfs()
-        }
-    };
-
-    let lufs = loudness_lkfs as f64;
-    if !lufs.is_finite() {
-        return Err(anyhow!(
-            "non-finite loudness result (likely silent/empty track)"
-        ));
-    }
-    Ok(lufs)
+    luminous_analysis::analyze_integrated_loudness_file(path).map_err(anyhow::Error::msg)
 }
 
 // ---------------------------------------------------------------------------
@@ -295,54 +179,6 @@ pub fn spawn_background_analyzer(app: AppHandle, db: Arc<Database>) {
 mod tests {
     use super::*;
 
-    fn sine(freq_hz: f32, amplitude: f32, sample_rate: u32, seconds: u32) -> Vec<i16> {
-        (0..sample_rate * seconds)
-            .map(|i| {
-                let t = i as f32 / sample_rate as f32;
-                (amplitude * (2.0 * std::f32::consts::PI * freq_hz * t).sin() * 32_767.0) as i16
-            })
-            .collect()
-    }
-
-    /// Pinned against the measurement made before the decode loop was shared
-    /// with the waveform path (#1555): a stereo file with a different tone on
-    /// each side, so a swapped, dropped or downmixed channel would move it.
-    #[test]
-    fn analyze_integrated_loudness_measures_both_stereo_channels() {
-        let dir = tempfile::tempdir().expect("temp dir");
-        let path = dir.path().join("stereo.wav");
-        let left = sine(1_000.0, 0.5, 48_000, 3);
-        let right = sine(250.0, 0.125, 48_000, 3);
-        luminous_audio::write_test_pcm16_wav(&path, 48_000, &[left, right]);
-
-        let lufs = analyze_integrated_loudness(&path).expect("analysis");
-
-        assert!((lufs - -8.807_231_903_076).abs() < 1e-6, "{lufs}");
-    }
-
-    /// A mono file is measured from its single channel. A 0.5-amplitude
-    /// 1 kHz tone sits about 9 dB below full scale (K-weighting is near
-    /// unity at 1 kHz).
-    #[test]
-    fn analyze_integrated_loudness_measures_a_mono_file() {
-        let dir = tempfile::tempdir().expect("temp dir");
-        let path = dir.path().join("mono.wav");
-        luminous_audio::write_test_pcm16_wav(&path, 48_000, &[sine(1_000.0, 0.5, 48_000, 3)]);
-
-        let lufs = analyze_integrated_loudness(&path).expect("analysis");
-
-        assert!((-10.0..=-8.0).contains(&lufs), "{lufs}");
-    }
-
-    fn settings(target_lufs: f32, mode: LoudnessMode, fallback_gain_db: f32) -> LoudnessSettings {
-        LoudnessSettings {
-            enabled: true,
-            target_lufs,
-            mode,
-            fallback_gain_db,
-        }
-    }
-
     /// A fallback gain saved under the old -24 dB floor loads inside the
     /// range the UI can show and set (#1249).
     #[test]
@@ -363,127 +199,5 @@ mod tests {
             s.fallback_gain_db,
             crate::models::FALLBACK_GAIN_DB_RANGE.min
         );
-    }
-
-    #[test]
-    fn measured_loudness_takes_priority() {
-        let s = settings(-18.0, LoudnessMode::Track, -6.0);
-        // Track measured at -12 LUFS needs -6 dB to reach -18 target.
-        let result = compute_gain(Some(-12.0), Some(3.0), None, None, None, &s);
-        let expected = 10f32.powf(-6.0 / 20.0);
-        assert!(
-            (result.linear - expected).abs() < 1e-3,
-            "gain was {}",
-            result.linear
-        );
-        assert_eq!(result.source, LoudnessGainSource::Analyzed);
-    }
-
-    #[test]
-    fn replaygain_tag_used_when_unanalyzed() {
-        let s = settings(-18.0, LoudnessMode::Track, -6.0);
-        // At the -18 LUFS reference (== target), RG gain applies unmodified.
-        let result = compute_gain(None, Some(-4.0), None, None, None, &s);
-        let expected = 10f32.powf(-4.0 / 20.0);
-        assert!(
-            (result.linear - expected).abs() < 1e-3,
-            "gain was {}",
-            result.linear
-        );
-        assert_eq!(result.source, LoudnessGainSource::ReplayGain);
-    }
-
-    #[test]
-    fn replaygain_tag_adjusted_for_non_default_target() {
-        // Target is 4 dB louder than the RG reference (-18 -> -14), so the
-        // effective gain shifts up by 4 dB.
-        let s = settings(-14.0, LoudnessMode::Track, -6.0);
-        let result = compute_gain(None, Some(-4.0), None, None, None, &s);
-        let expected = 10f32.powf(0.0 / 20.0);
-        assert!(
-            (result.linear - expected).abs() < 1e-3,
-            "gain was {}",
-            result.linear
-        );
-    }
-
-    #[test]
-    fn falls_back_when_nothing_available() {
-        let s = settings(-18.0, LoudnessMode::Track, -6.0);
-        let result = compute_gain(None, None, None, None, None, &s);
-        let expected = 10f32.powf(-6.0 / 20.0);
-        assert!(
-            (result.linear - expected).abs() < 1e-3,
-            "gain was {}",
-            result.linear
-        );
-        assert_eq!(result.source, LoudnessGainSource::Fallback);
-    }
-
-    #[test]
-    fn analysis_failure_sentinel_is_ignored() {
-        let s = settings(-18.0, LoudnessMode::Track, -6.0);
-        let result = compute_gain(
-            Some(ANALYSIS_FAILED_SENTINEL),
-            Some(-2.0),
-            None,
-            None,
-            None,
-            &s,
-        );
-        let expected = 10f32.powf(-2.0 / 20.0);
-        assert!(
-            (result.linear - expected).abs() < 1e-3,
-            "sentinel should fall through to RG tag"
-        );
-        assert_eq!(result.source, LoudnessGainSource::ReplayGain);
-    }
-
-    #[test]
-    fn album_mode_prefers_album_gain() {
-        let s = settings(-18.0, LoudnessMode::Album, -6.0);
-        let result = compute_gain(None, Some(-4.0), Some(-2.0), None, None, &s);
-        let expected = 10f32.powf(-2.0 / 20.0);
-        assert!(
-            (result.linear - expected).abs() < 1e-3,
-            "album mode should prefer album gain"
-        );
-    }
-
-    #[test]
-    fn dr_log_used_when_no_analysis_or_replaygain() {
-        let s = settings(-18.0, LoudnessMode::Track, -6.0);
-        // RMS -17.46 dB needs -0.54 dB to reach -18 target; Peak -0.80 dB
-        // only allows +0.80 dB before clipping — RMS-driven gain wins here.
-        let result = compute_gain(None, None, None, Some(-17.46), Some(-0.80), &s);
-        let expected = 10f32.powf(-0.54 / 20.0);
-        assert!(
-            (result.linear - expected).abs() < 1e-3,
-            "gain was {}",
-            result.linear
-        );
-        assert_eq!(result.source, LoudnessGainSource::DynamicRangeLog);
-    }
-
-    #[test]
-    fn dr_log_gain_capped_by_peak_to_avoid_clipping() {
-        let s = settings(-14.0, LoudnessMode::Track, -6.0);
-        // Target-vs-RMS wants +8 dB, but Peak at -3 dB only leaves 3 dB of
-        // headroom before clipping — the smaller (Peak-derived) gain wins.
-        let result = compute_gain(None, None, None, Some(-22.0), Some(-3.0), &s);
-        let expected = 10f32.powf(3.0 / 20.0);
-        assert!(
-            (result.linear - expected).abs() < 1e-3,
-            "gain was {}",
-            result.linear
-        );
-        assert_eq!(result.source, LoudnessGainSource::DynamicRangeLog);
-    }
-
-    #[test]
-    fn dr_log_falls_back_to_fixed_gain_when_incomplete() {
-        let s = settings(-18.0, LoudnessMode::Track, -6.0);
-        let result = compute_gain(None, None, None, Some(-17.46), None, &s);
-        assert_eq!(result.source, LoudnessGainSource::Fallback);
     }
 }
