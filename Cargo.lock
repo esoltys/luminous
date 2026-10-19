@@ -3530,6 +3530,7 @@ dependencies = [
  "luminous-analysis",
  "luminous-audio",
  "luminous-equalizer",
+ "luminous-metadata",
  "md-5",
  "notify",
  "parking_lot",
@@ -3634,6 +3635,18 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "luminous-metadata"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "lofty",
+ "log",
+ "percent-encoding",
+ "serde",
+ "tempfile",
 ]
 
 [[package]]

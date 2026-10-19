@@ -105,31 +105,15 @@ impl PlaylistManager {
             let mut album = track.album.clone();
 
             if (title.is_none() || artist.is_none()) && cleaned_path.is_file() {
-                if let Ok(tagged) = lofty::read_from_path(&cleaned_path) {
-                    use lofty::file::TaggedFileExt;
-                    use lofty::tag::Accessor;
-                    let mut candidate_tags: Vec<&lofty::tag::Tag> = Vec::new();
-                    if let Some(primary) = tagged.primary_tag() {
-                        candidate_tags.push(primary);
+                if let Ok(meta) = luminous_metadata::audio::read_tags(&cleaned_path) {
+                    if title.is_none() {
+                        title = meta.title;
                     }
-                    for t in tagged.tags() {
-                        if !candidate_tags
-                            .iter()
-                            .any(|existing| std::ptr::eq(*existing, t))
-                        {
-                            candidate_tags.push(t);
-                        }
+                    if artist.is_none() {
+                        artist = meta.artist;
                     }
-                    for tag in candidate_tags {
-                        if title.is_none() {
-                            title = tag.title().map(|s| s.to_string());
-                        }
-                        if artist.is_none() {
-                            artist = tag.artist().map(|s| s.to_string());
-                        }
-                        if album.is_none() {
-                            album = tag.album().map(|s| s.to_string());
-                        }
+                    if album.is_none() {
+                        album = meta.album;
                     }
                 }
             }

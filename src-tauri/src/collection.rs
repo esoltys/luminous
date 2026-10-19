@@ -5,19 +5,13 @@ use crate::{
     db::Database,
     dr_parser,
     models::{
-        self, FileType, MusicDirectory, PruneResult, QueuePopulationMode, ScanPhase, ScanProgress,
-        Song, SongSource, LOCAL_SOURCES_SQL,
+        FileType, MusicDirectory, PruneResult, QueuePopulationMode, ScanPhase, ScanProgress, Song,
+        SongSource, LOCAL_SOURCES_SQL,
     },
 };
 use anyhow::{Context, Result};
-use lofty::{
-    config::ParsingMode,
-    file::TaggedFileExt,
-    prelude::*,
-    probe::Probe,
-    tag::{items::Timestamp, Accessor, ItemKey, Tag},
-};
 use rayon::prelude::*;
+
 use rusqlite::params;
 use std::{
     collections::{HashMap, HashSet},
@@ -1563,455 +1557,72 @@ fn detect_filetype(path: &Path) -> FileType {
 }
 
 // ---------------------------------------------------------------------------
-// Tag reading via lofty
+// Tag reading via luminous-metadata
 // ---------------------------------------------------------------------------
-
-/// Reads all values under `key` from `tag`, joined into the `; `-delimited
-/// storage format shared by `songs.genre`/`artist`/`album_artist`/`composer`
-/// (see `models::join_multi_value`). Uses `get_strings` rather than a
-/// singular `Accessor` helper (e.g. `Accessor::artist()`), since lofty
-/// already splits ID3v2.4's null-byte-separated frames (and native
-/// Vorbis/APEv2/MP4 multi-value items) into separate items on read — the
-/// `Accessor` helpers would instead collapse them into one `" / "`-joined
-/// display string. Each resulting value is further run through
-/// `models::parse_multi_value` in case a tool joined multiple values into
-/// one string with `;` (e.g. Mp3tag/Winamp's convention) without a real
-/// multi-value mechanism.
-///
-/// Deliberately does *not* also split on `/`, despite that being a
-/// real legacy join convention too (TPE1's own "Lead performer(s)/
-/// Soloist(s)" convention, Picard's default `id3v23_join_with = "/"` for
-/// ID3v2.3) — auto-splitting on `/` silently corrupts any value that
-/// legitimately contains one, most visibly band names like "AC/DC" (see
-/// `models::parse_multi_value`'s doc comment). A file relying on that
-/// convention reads back as one combined value instead of being auto-split;
-/// the user can split it into separate chips themselves in the tag editor.
-///
-/// Genre gets one extra layer of legacy handling on top of this that
-/// Artist/Album Artist/Composer don't need: lofty's own ID3v2 read path
-/// special-cases `TCON` to translate ID3v1 numeric genre IDs (and the
-/// `(4)Eurodisco`-style parenthesized convention) to their textual
-/// equivalents before this function ever sees them — see lofty's
-/// `GenresIter`. Artist/Composer have no such legacy numeric convention, so
-/// `get_strings` returns their raw text with no extra decoding required.
-fn read_multi_value(tag: &Tag, key: ItemKey) -> Option<String> {
-    let mut seen = std::collections::HashSet::new();
-    let values: Vec<String> = tag
-        .get_strings(key)
-        .flat_map(models::parse_multi_value)
-        .filter(|v| seen.insert(v.to_lowercase()))
-        .collect();
-
-    if values.is_empty() {
-        None
-    } else {
-        Some(models::join_multi_value(&values))
-    }
-}
-
-/// Attempts to read native Vorbis comments directly from Vorbis-based containers
-/// (FLAC, Ogg Vorbis, Opus, Speex) before lofty's `split_tag()` converts them to
-/// generic `Tag` and drops unmapped comment keys such as `SYNCEDLYRICS`.
-fn read_native_vorbis_comments(
-    path: &Path,
-    file_type: lofty::file::FileType,
-) -> Option<lofty::ogg::tag::VorbisComments> {
-    // Only Vorbis-based containers store VorbisComments; avoid disk I/O for all others.
-    if !matches!(
-        file_type,
-        lofty::file::FileType::Flac
-            | lofty::file::FileType::Opus
-            | lofty::file::FileType::Vorbis
-            | lofty::file::FileType::Speex
-    ) {
-        return None;
-    }
-
-    let file = std::fs::File::open(path).ok()?;
-    let mut reader = std::io::BufReader::new(file);
-    let parse_options = lofty::config::ParseOptions::new()
-        .read_cover_art(false)
-        .read_properties(false);
-
-    match file_type {
-        lofty::file::FileType::Flac => {
-            use lofty::flac::FlacFile;
-            FlacFile::read_from(&mut reader, parse_options)
-                .ok()?
-                .vorbis_comments()
-                .cloned()
-        }
-        lofty::file::FileType::Opus => {
-            use lofty::ogg::OpusFile;
-            let opus = OpusFile::read_from(&mut reader, parse_options).ok()?;
-            Some(opus.vorbis_comments().clone())
-        }
-        lofty::file::FileType::Vorbis => {
-            use lofty::ogg::VorbisFile;
-            let vorbis = VorbisFile::read_from(&mut reader, parse_options).ok()?;
-            Some(vorbis.vorbis_comments().clone())
-        }
-        lofty::file::FileType::Speex => {
-            use lofty::ogg::SpeexFile;
-            let speex = SpeexFile::read_from(&mut reader, parse_options).ok()?;
-            Some(speex.vorbis_comments().clone())
-        }
-        _ => None,
-    }
-}
-
-/// Extracts embedded lyrics from an audio file, prioritizing synchronized lyrics
-/// over unsynchronized lyrics across container formats.
-///
-/// Encapsulates format-specific tag quirks:
-/// 1. For Vorbis-based containers (FLAC, Ogg Vorbis, Opus, Speex), inspects native
-///    Vorbis comments directly before lofty's `split_tag()` drops unmapped tags
-///    like `SYNCEDLYRICS`.
-/// 2. For ID3v2 and generic containers, inspects both `ItemKey::Lyrics` and
-///    `ItemKey::UnsyncLyrics` (ID3v2 `USLT`).
-///
-/// Precedence hierarchy:
-/// - Tier 1: Dedicated synchronized tags (`SYNCEDLYRICS`) or any field containing
-///   LRC timestamps ([mm:ss.xx]).
-/// - Tier 2: Unsynchronized plain text lyrics fallback.
-pub(crate) fn read_embedded_lyrics(
-    path: &Path,
-    file_type: lofty::file::FileType,
-    candidate_tags: &[&Tag],
-) -> Option<String> {
-    let mut unsynced_candidate: Option<String> = None;
-
-    // 1. Channel 1: Native Vorbis comments for Vorbis-based containers.
-    // lofty's `split_tag()` categorizes unmapped Vorbis comment keys (notably
-    // `SYNCEDLYRICS`) as unmapped remainder and drops them from generic `Tag.items`.
-    // We read native comments directly to recover them.
-    if let Some(vorbis_comments) = read_native_vorbis_comments(path, file_type) {
-        // Dedicated synchronized lyrics tags always win as Tier 1.
-        for key in ["SYNCEDLYRICS", "SYNCED LYRICS", "SYNCED_LYRICS"] {
-            if let Some(val) = vorbis_comments.get(key) {
-                let trimmed = val.trim();
-                if !trimmed.is_empty() {
-                    return Some(trimmed.to_string());
-                }
-            }
-        }
-
-        // General Vorbis lyrics keys: if timestamped, return immediately; otherwise hold as fallback.
-        for key in [
-            "LYRICS",
-            "UNSYNCEDLYRICS",
-            "UNSYNCED LYRICS",
-            "UNSYNCED_LYRICS",
-        ] {
-            if let Some(val) = vorbis_comments.get(key) {
-                let trimmed = val.trim();
-                if !trimmed.is_empty() {
-                    if crate::lyrics::is_synced_lrc(trimmed) {
-                        return Some(trimmed.to_string());
-                    } else if unsynced_candidate.is_none() {
-                        unsynced_candidate = Some(trimmed.to_string());
-                    }
-                }
-            }
-        }
-    }
-
-    // 2. Channel 2: Generic and ID3v2 tags from TaggedFile.
-    // In ID3v2, lofty maps USLT frames exclusively to ItemKey::UnsyncLyrics.
-    // Inspect both ItemKey::Lyrics and ItemKey::UnsyncLyrics across all tags.
-    for tag in candidate_tags {
-        for key in [ItemKey::Lyrics, ItemKey::UnsyncLyrics] {
-            for val in tag.get_strings(key) {
-                let trimmed = val.trim();
-                if trimmed.is_empty() {
-                    continue;
-                }
-                if crate::lyrics::is_synced_lrc(trimmed) {
-                    return Some(trimmed.to_string());
-                } else if unsynced_candidate.is_none() {
-                    unsynced_candidate = Some(trimmed.to_string());
-                }
-            }
-        }
-    }
-
-    // Fall back to Tier 2 unsynchronized plain text lyrics if no Tier 1 synced lyrics were found.
-    unsynced_candidate
-}
 
 /// Reads embedded lyrics directly from an audio file on disk, inspecting both native
 /// Vorbis comments (for Vorbis-based containers) and candidate ID3/generic tags.
 pub(crate) fn read_embedded_lyrics_from_path(path: &Path) -> Option<String> {
-    let tagged_file = lofty::probe::Probe::open(path).ok()?.read().ok()?;
-    let mut candidate_tags: Vec<&Tag> = Vec::new();
-    if let Some(primary) = tagged_file.primary_tag() {
-        candidate_tags.push(primary);
-    }
-    for t in tagged_file.tags() {
-        if !candidate_tags
-            .iter()
-            .any(|existing| std::ptr::eq(*existing, t))
-        {
-            candidate_tags.push(t);
-        }
-    }
-    read_embedded_lyrics(path, tagged_file.file_type(), &candidate_tags)
+    luminous_metadata::audio::read_embedded_lyrics_from_path(path)
 }
 
 pub(crate) fn read_tags(path: &Path) -> Result<Song> {
+    let meta = luminous_metadata::audio::read_tags(path)?;
+
     let path_str = path.to_string_lossy().to_string();
     let mtime = get_mtime(path);
     let filesize = std::fs::metadata(path).ok().map(|m| m.len() as i64);
     let filetype = detect_filetype(path);
 
-    let tagged_file = Probe::open(path)
-        .context("lofty: cannot open file")?
-        .read()
-        .context("lofty: cannot read file")?;
-
-    let properties = tagged_file.properties();
-
-    let duration_ns = (properties.duration().as_secs_f64() * 1_000_000_000.0) as i64;
-    let bitrate = properties.audio_bitrate().map(|b| b as i32);
-    let samplerate = properties.sample_rate().map(|r| r as i32);
-    let channels = properties.channels().map(|c| c as i32);
-    let bitdepth = properties.bit_depth().map(|b| b as i32);
-
-    // Lofty's public API reports only the average bitrate for VBR MP3s, with no way to
-    // tell VBR and CBR apart. Sniff the Xing/Info/VBRI header ourselves so the UI can
-    // label an average as an average instead of implying a constant rate.
-    let is_vbr = if filetype == FileType::Mp3 {
-        detect_mp3_vbr(path)
-    } else {
-        None
-    };
-
     let mut song = Song {
         source: SongSource::LocalFile,
         filetype,
         path: Some(path_str),
-        length_nanosec: Some(duration_ns),
-        bitrate,
-        samplerate,
-        channels,
-        bitdepth,
+        length_nanosec: Some(meta.properties.duration_nanosec),
+        bitrate: meta.properties.bitrate,
+        samplerate: meta.properties.samplerate,
+        channels: meta.properties.channels,
+        bitdepth: meta.properties.bitdepth,
         filesize,
         mtime,
-        is_vbr,
+        is_vbr: meta.properties.is_vbr,
+        title: meta.title,
+        titlesort: meta.titlesort,
+        artist: meta.artist,
+        artistsort: meta.artistsort,
+        album: meta.album,
+        albumsort: meta.albumsort,
+        album_artist: meta.album_artist,
+        album_artist_sort: meta.album_artist_sort,
+        composer: meta.composer,
+        composersort: meta.composersort,
+        genre: meta.genre,
+        comment: meta.comment,
+        year: meta.year,
+        originalyear: meta.originalyear,
+        track: meta.track,
+        disc: meta.disc,
+        compilation: meta.compilation,
+        grouping: meta.grouping,
+        bpm: meta.bpm,
+        initial_key: meta.initial_key,
+        replaygain_track_gain: meta.replaygain_track_gain,
+        replaygain_album_gain: meta.replaygain_album_gain,
+        musicbrainz_artist_id: meta.musicbrainz_artist_id,
+        musicbrainz_album_artist_id: meta.musicbrainz_album_artist_id,
+        musicbrainz_album_id: meta.musicbrainz_album_id,
+        musicbrainz_release_group_id: meta.musicbrainz_release_group_id,
+        musicbrainz_recording_id: meta.musicbrainz_recording_id,
+        musicbrainz_track_id: meta.musicbrainz_track_id,
+        musicbrainz_work_id: meta.musicbrainz_work_id,
+        musicbrainz_release_type: meta.musicbrainz_release_type,
+        musicbrainz_release_country: meta.musicbrainz_release_country,
+        barcode: meta.barcode,
+        catalog_number: meta.catalog_number,
+        lyrics: meta.lyrics,
+        art_embedded: meta.art_embedded,
         ..Default::default()
     };
-
-    // Prefer the primary tag (ID3v2, VorbisComment, etc.), but fall back to secondary tags
-    // (ID3v1, APE, etc.) if the primary tag is missing or lacks specific fields.
-    let mut candidate_tags: Vec<&Tag> = Vec::new();
-    if let Some(primary) = tagged_file.primary_tag() {
-        candidate_tags.push(primary);
-    }
-    for t in tagged_file.tags() {
-        if !candidate_tags
-            .iter()
-            .any(|existing| std::ptr::eq(*existing, t))
-        {
-            candidate_tags.push(t);
-        }
-    }
-
-    for tag in candidate_tags.iter().copied() {
-        if song.title.is_none() {
-            song.title = tag.title().map(|t| t.to_string());
-        }
-        if song.artist.is_none() {
-            song.artist = read_multi_value(tag, ItemKey::TrackArtist);
-        }
-        if song.album.is_none() {
-            song.album = tag.album().map(|a| a.to_string());
-        }
-        if song.genre.is_none() {
-            song.genre = read_multi_value(tag, ItemKey::Genre);
-        }
-        if song.comment.is_none() {
-            song.comment = tag.comment().map(|c| c.to_string());
-        }
-        // `date()` checks ItemKey::RecordingDate (ID3v2 TDRC, MP4, Vorbis DATE)
-        // before falling back to ItemKey::Year (ID3v1 only) — using Year alone
-        // silently drops the year for every ID3v2-tagged file (#428).
-        if song.year.is_none() {
-            song.year = tag.date().map(|d| d.year as i32).or_else(|| {
-                tag.get_string(ItemKey::Year)
-                    .and_then(|s| s.trim().parse::<i32>().ok())
-            });
-        }
-        // Original release date (ID3v2 TDOR, MP4/Vorbis equivalents) — used by
-        // decade auto-playlists as a fallback when `year` (the pressing's own
-        // date, e.g. a reissue) isn't set. Parsed the same relaxed way `date()`
-        // parses ItemKey::RecordingDate, since lofty has no Accessor helper for it.
-        if song.originalyear.is_none() {
-            song.originalyear = tag
-                .get_string(ItemKey::OriginalReleaseDate)
-                .and_then(|s| {
-                    Timestamp::parse(&mut s.as_bytes(), ParsingMode::Relaxed)
-                        .ok()
-                        .flatten()
-                })
-                .map(|d| d.year as i32);
-        }
-        if song.track.is_none() {
-            song.track = tag.track().map(|t| t as i32);
-        }
-        if song.disc.is_none() {
-            song.disc = tag.disk().map(|d| d as i32);
-        }
-
-        // Album artist (various tag formats store this differently)
-        if song.album_artist.is_none() {
-            song.album_artist = read_multi_value(tag, ItemKey::AlbumArtist);
-        }
-
-        // TCMP/cpil/COMPILATION "part of a compilation" flag — stored as text
-        // "1"/"0" across every format lofty supports (ID3v2, MP4, Vorbis/APE).
-        if !song.compilation {
-            song.compilation = tag
-                .get_string(ItemKey::FlagCompilation)
-                .map(|s| s.trim() == "1")
-                .unwrap_or(false);
-        }
-
-        if song.composer.is_none() {
-            song.composer = read_multi_value(tag, ItemKey::Composer);
-        }
-
-        if song.grouping.is_none() {
-            song.grouping = tag.get_string(ItemKey::ContentGroup).map(|s| s.to_string());
-        }
-        if song.initial_key.is_none() {
-            song.initial_key = tag.get_string(ItemKey::InitialKey).map(|s| s.to_string());
-        }
-        // ID3v2 (TBPM) and MP4 (tmpo) store BPM as an integer field; Vorbis/APE
-        // store it as freeform text — check both generic keys to cover either.
-        // Some taggers write "0" as an "unknown tempo" sentinel rather than
-        // omitting the tag — treat that the same as absent, since 0 is never a
-        // real tempo.
-        if song.bpm.is_none() {
-            song.bpm = tag
-                .get_string(ItemKey::IntegerBpm)
-                .or_else(|| tag.get_string(ItemKey::Bpm))
-                .and_then(|s| s.trim().parse::<f32>().ok())
-                .filter(|&b| b > 0.0);
-        }
-
-        // ReplayGain 2.0 tags (#77) — fallback gain until R128 analysis runs.
-        if song.replaygain_track_gain.is_none() {
-            song.replaygain_track_gain = tag
-                .get_string(ItemKey::ReplayGainTrackGain)
-                .and_then(parse_replaygain_db);
-        }
-        if song.replaygain_album_gain.is_none() {
-            song.replaygain_album_gain = tag
-                .get_string(ItemKey::ReplayGainAlbumGain)
-                .and_then(parse_replaygain_db);
-        }
-
-        // Custom sort order tags (#151)
-        if song.titlesort.is_none() {
-            song.titlesort = tag
-                .get_string(ItemKey::TrackTitleSortOrder)
-                .map(|s| s.to_string());
-        }
-        if song.artistsort.is_none() {
-            song.artistsort = tag
-                .get_string(ItemKey::TrackArtistSortOrder)
-                .map(|s| s.to_string());
-        }
-        if song.albumsort.is_none() {
-            song.albumsort = tag
-                .get_string(ItemKey::AlbumTitleSortOrder)
-                .map(|s| s.to_string());
-        }
-        if song.album_artist_sort.is_none() {
-            song.album_artist_sort = tag
-                .get_string(ItemKey::AlbumArtistSortOrder)
-                .map(|s| s.to_string());
-        }
-        if song.composersort.is_none() {
-            song.composersort = tag
-                .get_string(ItemKey::ComposerSortOrder)
-                .map(|s| s.to_string());
-        }
-
-        // MusicBrainz identifiers (#752). Only the keys lofty maps to a typed
-        // ItemKey are read here — `musicbrainz_disc_id`,
-        // `musicbrainz_original_artist_id`, and `musicbrainz_original_album_id`
-        // have no such mapping in lofty 0.25 (Picard writes them as raw TXXX
-        // frames) and are left unpopulated rather than hand-parsing per-format
-        // frames for them.
-        //
-        // Note for future tag-*writing* support: lofty 0.25's ID3v2 write
-        // path silently drops `MusicBrainzReleaseId`/`ReleaseGroupId`/
-        // `TrackId` when converting a generic `Tag` back to frames (they're
-        // missing from its TXXX write allowlist), even though it reads them
-        // back from an existing frame just fine — see the round-trip test
-        // below for details. Read-only use here is unaffected.
-        if song.musicbrainz_artist_id.is_none() {
-            song.musicbrainz_artist_id = tag
-                .get_string(ItemKey::MusicBrainzArtistId)
-                .map(|s| s.to_string());
-        }
-        if song.musicbrainz_album_artist_id.is_none() {
-            song.musicbrainz_album_artist_id = tag
-                .get_string(ItemKey::MusicBrainzReleaseArtistId)
-                .map(|s| s.to_string());
-        }
-        if song.musicbrainz_album_id.is_none() {
-            song.musicbrainz_album_id = tag
-                .get_string(ItemKey::MusicBrainzReleaseId)
-                .map(|s| s.to_string());
-        }
-        if song.musicbrainz_release_group_id.is_none() {
-            song.musicbrainz_release_group_id = tag
-                .get_string(ItemKey::MusicBrainzReleaseGroupId)
-                .map(|s| s.to_string());
-        }
-        if song.musicbrainz_recording_id.is_none() {
-            song.musicbrainz_recording_id = tag
-                .get_string(ItemKey::MusicBrainzRecordingId)
-                .map(|s| s.to_string());
-        }
-        if song.musicbrainz_track_id.is_none() {
-            song.musicbrainz_track_id = tag
-                .get_string(ItemKey::MusicBrainzTrackId)
-                .map(|s| s.to_string());
-        }
-        if song.musicbrainz_work_id.is_none() {
-            song.musicbrainz_work_id = tag
-                .get_string(ItemKey::MusicBrainzWorkId)
-                .map(|s| s.to_string());
-        }
-
-        // Release metadata Picard writes alongside the MusicBrainz IDs, but
-        // not IDs themselves (#752).
-        if song.musicbrainz_release_type.is_none() {
-            song.musicbrainz_release_type = tag
-                .get_string(ItemKey::MusicBrainzReleaseType)
-                .map(|s| s.to_string());
-        }
-        if song.musicbrainz_release_country.is_none() {
-            song.musicbrainz_release_country = tag
-                .get_string(ItemKey::ReleaseCountry)
-                .map(|s| s.to_string());
-        }
-        if song.barcode.is_none() {
-            song.barcode = tag.get_string(ItemKey::Barcode).map(|s| s.to_string());
-        }
-        if song.catalog_number.is_none() {
-            song.catalog_number = tag
-                .get_string(ItemKey::CatalogNumber)
-                .map(|s| s.to_string());
-        }
-    }
-
-    song.lyrics = read_embedded_lyrics(path, tagged_file.file_type(), &candidate_tags);
-
-    song.art_embedded = candidate_tags.iter().any(|t| !t.pictures().is_empty());
 
     // Check for sidecar .lrc/.vtt/.srt lyrics next to the audio file (#155, #1190).
     // Sidecar files take precedence over embedded tags because they are
@@ -2227,49 +1838,6 @@ pub(crate) fn read_and_upsert_song(
 ) -> Result<()> {
     let song = read_and_prepare_song(cover_manager, path)?;
     upsert_song(conn, &song)
-}
-
-/// Detect whether an MP3 file is VBR-encoded by looking for a Xing/Info/VBRI header
-/// in the first audio frame. "Xing" and "VBRI" mark true VBR; "Info" is the Xing
-/// encoder's own marker for CBR (see http://gabriel.mp3-tech.org/mp3infotag.html).
-/// A plain CBR file has no such header at all, so `Some(false)` covers both cases.
-/// Returns `None` only if the file couldn't be read.
-fn detect_mp3_vbr(path: &Path) -> Option<bool> {
-    use std::io::Read;
-
-    let mut file = std::fs::File::open(path).ok()?;
-    let mut buf = vec![0u8; 8 * 1024];
-    let n = file.read(&mut buf).ok()?;
-    buf.truncate(n);
-
-    // Skip a leading ID3v2 tag so its (rare) text content can't be mistaken for a
-    // VBR marker — the real header lives in the first MPEG frame, right after it.
-    let mut offset = 0;
-    if buf.len() >= 10 && &buf[0..3] == b"ID3" {
-        let size = ((buf[6] as u32 & 0x7f) << 21)
-            | ((buf[7] as u32 & 0x7f) << 14)
-            | ((buf[8] as u32 & 0x7f) << 7)
-            | (buf[9] as u32 & 0x7f);
-        offset = (10 + size as usize).min(buf.len());
-    }
-
-    let audio = &buf[offset..];
-    let has_marker = |needle: &[u8]| audio.windows(needle.len()).any(|w| w == needle);
-
-    if has_marker(b"Xing") || has_marker(b"VBRI") {
-        Some(true)
-    } else {
-        Some(false)
-    }
-}
-
-/// Parse a ReplayGain gain tag value (e.g. "-6.2 dB", "-6.2") into a f64.
-fn parse_replaygain_db(s: &str) -> Option<f64> {
-    s.trim()
-        .trim_end_matches(|c: char| c.is_alphabetic() || c.is_whitespace())
-        .trim()
-        .parse::<f64>()
-        .ok()
 }
 
 // ---------------------------------------------------------------------------
@@ -2607,6 +2175,10 @@ pub fn parse_bpm_range_spec(spec: &str) -> Option<(f64, Option<f64>)> {
 mod tests {
     use super::*;
     use crate::models::{FileType, Song, SongSource};
+    use lofty::prelude::*;
+    use lofty::probe::Probe;
+    use lofty::tag::{Accessor, ItemKey, Tag};
+    use luminous_metadata::audio::{detect_mp3_vbr, read_embedded_lyrics, read_multi_value};
     use std::sync::Arc;
 
     #[test]

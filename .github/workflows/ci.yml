@@ -111,6 +111,18 @@ jobs:
             exit 1
           fi
 
+      # Local tag and sidecar metadata handling must never reach into app state,
+      # mutate SQLite directly, or make network calls (#1766, epic #1762).
+      - name: Check the metadata engine's dependency boundary
+        run: |
+          tree=$(cargo tree -p luminous-metadata -e normal --prefix none)
+          forbidden=$(grep -E '^(tauri|rusqlite|reqwest|tokio)[ -]' <<< "$tree" | sort -u || true)
+          if [ -n "$forbidden" ]; then
+            echo "::error::luminous-metadata must not depend on: $forbidden"
+            exit 1
+          fi
+
+
       # From the repo root with --workspace, so every crate under crates/ is
       # tested and linted, not just the app package in src-tauri (#1554).
       - name: Run cargo test

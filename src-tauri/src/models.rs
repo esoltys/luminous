@@ -217,47 +217,7 @@ impl FileType {
 // ---------------------------------------------------------------------------
 
 /// Delimiter used to pack multiple values into `songs.genre`/`artist`/
-/// `album_artist`/`composer` and the tag editor's corresponding DTO fields,
-/// matching the Mp3tag/Winamp `"; "` convention. Shared by every multi-value
-/// field so the internal storage format stays consistent regardless of what
-/// on-disk tag convention (if any) a given field's legacy fallback uses.
-pub const MULTI_VALUE_DELIMITER: &str = "; ";
-
-/// Splits a `songs.genre`/`artist`/`album_artist`/`composer`-style delimited
-/// string into a clean, deduped list of individual values, trimming
-/// whitespace and dropping empties. This is the single place that owns the
-/// internal storage delimiter (`;`) — use it anywhere one of these columns
-/// (or a single item read off an on-disk tag, in case some other tool joined
-/// multiple values into one string with `;`, e.g. Mp3tag/Winamp's
-/// convention) needs to be treated as a list rather than opaque text.
-///
-/// Deliberately does *not* also split on `/`, even though that's a
-/// long-standing convention for legacy-joined multi-value fields (TPE1's own
-/// "Lead performer(s)/Soloist(s)" convention, and Picard's default
-/// `id3v23_join_with = "/"` for ID3v2.3) — `/` shows up too often inside a
-/// single legitimate value (band names like "AC/DC", not to mention genre
-/// names) to use as a splitting heuristic without silently corrupting them.
-pub fn parse_multi_value(raw: &str) -> Vec<String> {
-    split_and_dedup(raw, &[';'])
-}
-
-/// Joins a value list back into the delimited form stored in `songs.genre`/
-/// `artist`/`album_artist`/`composer`.
-pub fn join_multi_value(values: &[String]) -> String {
-    values.join(MULTI_VALUE_DELIMITER)
-}
-
-/// Splits `raw` on any of `delimiters`, trims, drops empties, and dedupes
-/// case-insensitively while preserving first-seen casing and order.
-fn split_and_dedup(raw: &str, delimiters: &[char]) -> Vec<String> {
-    let mut seen = std::collections::HashSet::new();
-    raw.split(delimiters)
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-        .filter(|s| seen.insert(s.to_lowercase()))
-        .map(|s| s.to_string())
-        .collect()
-}
+pub use luminous_metadata::values::{join_multi_value, parse_multi_value, MULTI_VALUE_DELIMITER};
 
 // ---------------------------------------------------------------------------
 // Song — central data model
