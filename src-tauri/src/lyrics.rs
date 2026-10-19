@@ -902,29 +902,7 @@ pub fn clean_featured_title(title: &str) -> String {
     cleaned.trim().to_string()
 }
 
-/// True if `text` contains at least one LRC timestamp tag (`[MM:SS`).
-/// Used to distinguish synced lyrics from plain text regardless of which
-/// provider they came from, since Lyrics.ovh's plain-only response and
-/// LRCLIB's `plain_lyrics` field share the same `String` shape as synced
-/// lyrics once unwrapped.
-pub fn is_synced_lrc(text: &str) -> bool {
-    let bytes = text.as_bytes();
-    if bytes.len() < 6 {
-        return false;
-    }
-    for i in 0..(bytes.len() - 5) {
-        if bytes[i] == b'['
-            && bytes[i + 1].is_ascii_digit()
-            && bytes[i + 2].is_ascii_digit()
-            && bytes[i + 3] == b':'
-            && bytes[i + 4].is_ascii_digit()
-            && bytes[i + 5].is_ascii_digit()
-        {
-            return true;
-        }
-    }
-    false
-}
+pub use luminous_metadata::audio::is_synced_lrc;
 
 #[cfg(test)]
 mod tests {

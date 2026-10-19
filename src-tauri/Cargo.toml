@@ -58,6 +58,7 @@ luminous-equalizer = { path = "../crates/luminous-equalizer" }
 luminous-audio = { path = "../crates/luminous-audio" }
 luminous-addons = { path = "../crates/luminous-addons" }
 luminous-analysis = { path = "../crates/luminous-analysis" }
+luminous-metadata = { path = "../crates/luminous-metadata" }
 
 # --- Serialization ---
 serde.workspace = true
