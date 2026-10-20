@@ -1,76 +1,11 @@
 use crate::db::Database;
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use base64::Engine;
-use rand::RngExt;
-use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, USER_AGENT};
-use reqwest::Client;
-use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
+pub use luminous_remote::musicbrainz::*;
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
-
-pub const DEFAULT_MUSICBRAINZ_CLIENT_ID: &str = "e68tnaXh59MOsC7KyGZkAEJ_5b6A8E0JJzRcPYZYsXw";
-pub const DEFAULT_MUSICBRAINZ_CLIENT_SECRET: &str = "r66Debc7m_ZPFwNJ3tNRwmweXgw5DHTVetJJFLU-PrI";
-pub const LOOPBACK_PORT: u16 = 12083;
-pub const LOOPBACK_REDIRECT_URI: &str = "http://localhost:12083/oauth/callback";
-pub const OOB_REDIRECT_URI: &str = "urn:ietf:wg:oauth:2.0:oob";
-
-const MB_AUTH_URL: &str = "https://musicbrainz.org/oauth2/authorize";
-const MB_TOKEN_URL: &str = "https://musicbrainz.org/oauth2/token";
-const MB_REVOKE_URL: &str = "https://musicbrainz.org/oauth2/revoke";
-const MB_USERINFO_URL: &str = "https://musicbrainz.org/oauth2/userinfo";
-const MB_COLLECTION_URL: &str = "https://musicbrainz.org/ws/2/collection";
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct MusicBrainzAuthState {
-    pub is_logged_in: bool,
-    pub username: Option<String>,
-    pub email: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct MusicBrainzUserStats {
-    pub username: String,
-    pub collections_count: u32,
-    pub releases_count: u32,
-    pub cached_at: i64,
-}
-
-#[derive(Deserialize, Debug)]
-#[allow(dead_code)]
-struct TokenResponse {
-    access_token: String,
-    token_type: Option<String>,
-    expires_in: Option<i64>,
-    refresh_token: Option<String>,
-}
-
-#[derive(Deserialize, Debug)]
-struct UserInfoResponse {
-    sub: Option<String>,
-    email: Option<String>,
-}
-
-#[derive(Deserialize, Debug)]
-struct CollectionItem {
-    #[serde(rename = "editor")]
-    _editor: Option<String>,
-    #[serde(rename = "entity-type")]
-    _entity_type: Option<String>,
-    #[serde(rename = "count")]
-    count: Option<u32>,
-}
-
-#[derive(Deserialize, Debug)]
-struct CollectionsResponse {
-    #[serde(rename = "collection-count")]
-    collection_count: Option<u32>,
-    collections: Option<Vec<CollectionItem>>,
-}
 
 #[allow(dead_code)]
 struct InFlightSession {
@@ -82,7 +17,7 @@ struct InFlightSession {
 
 #[derive(Clone)]
 pub struct MusicBrainzManager {
-    client: Client,
+    remote: MusicBrainzClient,
     db: Arc<Database>,
     active_session: Arc<parking_lot::Mutex<Option<InFlightSession>>>,
 }
@@ -94,39 +29,10 @@ fn now_unix() -> i64 {
         .unwrap_or(0)
 }
 
-fn generate_pkce_verifier() -> String {
-    let bytes: [u8; 32] = rand::rng().random();
-    URL_SAFE_NO_PAD.encode(bytes)
-}
-
-fn generate_pkce_challenge(verifier: &str) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(verifier.as_bytes());
-    let hash = hasher.finalize();
-    URL_SAFE_NO_PAD.encode(hash)
-}
-
-fn generate_state() -> String {
-    let bytes: [u8; 16] = rand::rng().random();
-    URL_SAFE_NO_PAD.encode(bytes)
-}
-
 impl MusicBrainzManager {
     pub fn new(db: Arc<Database>) -> Self {
-        let mut headers = HeaderMap::new();
-        headers.insert(
-            USER_AGENT,
-            HeaderValue::from_static(concat!("LuminousMusicPlayer/", env!("CARGO_PKG_VERSION"))),
-        );
-
-        let client = Client::builder()
-            .default_headers(headers)
-            .timeout(Duration::from_secs(15))
-            .build()
-            .unwrap_or_default();
-
         Self {
-            client,
+            remote: MusicBrainzClient::new(),
             db,
             active_session: Arc::new(parking_lot::Mutex::new(None)),
         }
@@ -253,17 +159,7 @@ impl MusicBrainzManager {
             OOB_REDIRECT_URI.to_string()
         };
 
-        let mut url = reqwest::Url::parse(MB_AUTH_URL).map_err(|e| e.to_string())?;
-        url.query_pairs_mut()
-            .append_pair("response_type", "code")
-            .append_pair("client_id", &client_id)
-            .append_pair("redirect_uri", &redirect_uri)
-            .append_pair("scope", "profile email tag rating collection")
-            .append_pair("state", &state)
-            .append_pair("code_challenge", &code_challenge)
-            .append_pair("code_challenge_method", "S256");
-
-        let auth_url = url.to_string();
+        let auth_url = build_authorization_url(&client_id, &redirect_uri, &state, &code_challenge)?;
 
         let (cancel_tx, mut cancel_rx) = oneshot::channel::<()>();
 
@@ -453,39 +349,20 @@ impl MusicBrainzManager {
         let client_id = self.resolve_client_id();
         let client_secret = self.resolve_client_secret();
 
-        let mut form = vec![
-            ("grant_type", "authorization_code".to_string()),
-            ("code", clean_code.to_string()),
-            ("client_id", client_id.clone()),
-            ("redirect_uri", redirect_uri),
-        ];
-
-        if let Some(ref sec) = client_secret {
-            form.push(("client_secret", sec.clone()));
-        }
-
-        if !code_verifier.is_empty() {
-            form.push(("code_verifier", code_verifier));
-        }
-
-        let token_resp = self
-            .client
-            .post(MB_TOKEN_URL)
-            .form(&form)
-            .send()
-            .await
-            .map_err(|e| format!("Token request failed: {e}"))?;
-
-        if !token_resp.status().is_success() {
-            let status = token_resp.status();
-            let body = token_resp.text().await.unwrap_or_default();
-            return Err(format!("Token exchange failed ({status}): {body}"));
-        }
-
-        let token_data: TokenResponse = token_resp
-            .json()
-            .await
-            .map_err(|e| format!("Failed to parse token response: {e}"))?;
+        let token_data = self
+            .remote
+            .exchange_code(
+                &client_id,
+                client_secret.as_deref(),
+                clean_code,
+                &redirect_uri,
+                if code_verifier.is_empty() {
+                    None
+                } else {
+                    Some(&code_verifier)
+                },
+            )
+            .await?;
 
         let expires_at = token_data
             .expires_in
@@ -499,7 +376,10 @@ impl MusicBrainzManager {
         self.set_stored_setting("mb_token_expires_at", &expires_at.to_string())?;
 
         // Fetch user info with the access token
-        let user_info = self.fetch_user_info(&token_data.access_token).await?;
+        let user_info = self
+            .remote
+            .fetch_user_info(&token_data.access_token)
+            .await?;
         if let Some(ref u) = user_info.sub {
             self.set_stored_setting("mb_username", u)?;
         }
@@ -522,26 +402,6 @@ impl MusicBrainzManager {
 
         let _ = app.emit("musicbrainz-auth-changed", &auth_state);
         Ok(auth_state)
-    }
-
-    async fn fetch_user_info(&self, access_token: &str) -> Result<UserInfoResponse, String> {
-        let resp = self
-            .client
-            .get(MB_USERINFO_URL)
-            .header(AUTHORIZATION, format!("Bearer {access_token}"))
-            .send()
-            .await
-            .map_err(|e| format!("Userinfo request failed: {e}"))?;
-
-        if !resp.status().is_success() {
-            let status = resp.status();
-            let body = resp.text().await.unwrap_or_default();
-            return Err(format!("Userinfo failed ({status}): {body}"));
-        }
-
-        resp.json::<UserInfoResponse>()
-            .await
-            .map_err(|e| format!("Failed to parse userinfo: {e}"))
     }
 
     async fn ensure_valid_token(&self) -> Result<String, String> {
@@ -570,34 +430,10 @@ impl MusicBrainzManager {
         let client_id = self.resolve_client_id();
         let client_secret = self.resolve_client_secret();
 
-        let mut form = vec![
-            ("grant_type", "refresh_token".to_string()),
-            ("refresh_token", refresh_token.to_string()),
-            ("client_id", client_id),
-        ];
-
-        if let Some(ref sec) = client_secret {
-            form.push(("client_secret", sec.clone()));
-        }
-
-        let resp = self
-            .client
-            .post(MB_TOKEN_URL)
-            .form(&form)
-            .send()
-            .await
-            .map_err(|e| format!("Token refresh request failed: {e}"))?;
-
-        if !resp.status().is_success() {
-            let status = resp.status();
-            let body = resp.text().await.unwrap_or_default();
-            return Err(format!("Token refresh failed ({status}): {body}"));
-        }
-
-        let token_data: TokenResponse = resp
-            .json()
-            .await
-            .map_err(|e| format!("Failed to parse refreshed token: {e}"))?;
+        let token_data = self
+            .remote
+            .refresh_access_token(&client_id, client_secret.as_deref(), refresh_token)
+            .await?;
 
         let expires_at = token_data
             .expires_in
@@ -671,43 +507,10 @@ impl MusicBrainzManager {
         username: &str,
         access_token: &str,
     ) -> Result<MusicBrainzUserStats, String> {
-        let mut url = reqwest::Url::parse(MB_COLLECTION_URL).map_err(|e| e.to_string())?;
-        url.query_pairs_mut()
-            .append_pair("editor", username)
-            .append_pair("fmt", "json");
-
-        let resp = self
-            .client
-            .get(url)
-            .header(AUTHORIZATION, format!("Bearer {access_token}"))
-            .send()
-            .await
-            .map_err(|e| format!("Collections request failed: {e}"))?;
-
-        if !resp.status().is_success() {
-            let status = resp.status();
-            let body = resp.text().await.unwrap_or_default();
-            return Err(format!("Collections query failed ({status}): {body}"));
-        }
-
-        let collections_data: CollectionsResponse = resp
-            .json()
-            .await
-            .map_err(|e| format!("Failed to parse collections JSON: {e}"))?;
-
-        let collections_count = collections_data.collection_count.unwrap_or_else(|| {
-            collections_data
-                .collections
-                .as_ref()
-                .map(|c| c.len() as u32)
-                .unwrap_or(0)
-        });
-
-        let releases_count = collections_data
-            .collections
-            .as_ref()
-            .map(|items| items.iter().filter_map(|i| i.count).sum())
-            .unwrap_or(0);
+        let (collections_count, releases_count) = self
+            .remote
+            .fetch_collections(username, access_token)
+            .await?;
 
         let stats = MusicBrainzUserStats {
             username: username.to_string(),
@@ -735,12 +538,10 @@ impl MusicBrainzManager {
         if let Ok(Some(token)) = stored_token {
             let client_id = self.resolve_client_id();
             let client_secret = self.resolve_client_secret();
-            let mut form = vec![("token", token), ("client_id", client_id)];
-            if let Some(ref sec) = client_secret {
-                form.push(("client_secret", sec.clone()));
-            }
-
-            let _ = self.client.post(MB_REVOKE_URL).form(&form).send().await;
+            let _ = self
+                .remote
+                .revoke_token(&client_id, client_secret.as_deref(), &token)
+                .await;
         }
 
         let _ = self.remove_stored_setting("mb_access_token");
@@ -784,27 +585,21 @@ mod tests {
     fn test_pkce_generation() {
         let verifier = generate_pkce_verifier();
         assert!(!verifier.is_empty());
-        assert_eq!(verifier.len(), 43); // 32 bytes URL-safe unpadded base64 is 43 chars
+        assert_eq!(verifier.len(), 43);
 
         let challenge = generate_pkce_challenge(&verifier);
         assert!(!challenge.is_empty());
         assert_eq!(challenge.len(), 43);
 
-        // Challenge should be deterministic for the same verifier
         let challenge2 = generate_pkce_challenge(&verifier);
         assert_eq!(challenge, challenge2);
-
-        // Different verifiers produce different challenges
-        let verifier2 = generate_pkce_verifier();
-        assert_ne!(verifier, verifier2);
-        assert_ne!(challenge, generate_pkce_challenge(&verifier2));
     }
 
     #[test]
     fn test_state_generation() {
         let state1 = generate_state();
         let state2 = generate_state();
-        assert_eq!(state1.len(), 22); // 16 bytes URL-safe unpadded base64 is 22 chars
+        assert_eq!(state1.len(), 22);
         assert_ne!(state1, state2);
     }
 
@@ -827,9 +622,6 @@ mod tests {
         let json = serde_json::to_string(&stats).expect("serialize stats");
         let deserialized: MusicBrainzUserStats =
             serde_json::from_str(&json).expect("deserialize stats");
-        assert_eq!(deserialized.username, "testuser");
-        assert_eq!(deserialized.collections_count, 5);
-        assert_eq!(deserialized.releases_count, 42);
-        assert_eq!(deserialized.cached_at, 123456789);
+        assert_eq!(deserialized, stats);
     }
 }

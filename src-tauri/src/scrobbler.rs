@@ -6,18 +6,13 @@
 
 use crate::db::Database;
 use crate::models::{Song, SongSource};
-use crate::tageditor::format_error_chain;
 use anyhow::Result;
-use reqwest::Client;
+pub use luminous_remote::scrobbler::*;
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
-
-const LISTENBRAINZ_API_BASE: &str = "https://api.listenbrainz.org/1";
-const CRITIQUEBRAINZ_API_BASE: &str = "https://critiquebrainz.org/ws/1";
-const SUBMISSION_CLIENT_NAME: &str = "Luminous";
 
 /// User configuration for scrobbling services.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -107,91 +102,6 @@ pub struct SyncRatingsResult {
     pub changed_song_ids: Vec<i64>,
 }
 
-#[derive(Deserialize)]
-struct FeedbackPage {
-    feedback: Vec<FeedbackItem>,
-    total_count: usize,
-}
-
-#[derive(Deserialize)]
-struct FeedbackItem {
-    recording_mbid: Option<String>,
-    score: i32,
-}
-
-#[derive(Deserialize)]
-struct CritiquePage {
-    count: usize,
-    reviews: Vec<CritiqueReview>,
-}
-
-#[derive(Deserialize)]
-struct CritiqueReview {
-    entity_id: String,
-    entity_type: String,
-    rating: Option<u8>,
-    #[serde(default)]
-    is_draft: bool,
-    #[serde(default)]
-    is_hidden: bool,
-}
-
-#[derive(Deserialize)]
-struct ValidateTokenResponse {
-    valid: bool,
-    user_name: Option<String>,
-    message: Option<String>,
-}
-
-/// JSON payload structure for ListenBrainz `/1/submit-listens`.
-#[derive(Serialize)]
-struct ListenBrainzSubmitRequest<'a> {
-    listen_type: &'a str,
-    payload: Vec<ListenBrainzPayload<'a>>,
-}
-
-#[derive(Serialize)]
-struct ListenBrainzPayload<'a> {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    listened_at: Option<i64>,
-    track_metadata: ListenBrainzTrackMetadata<'a>,
-}
-
-#[derive(Serialize)]
-struct ListenBrainzTrackMetadata<'a> {
-    artist_name: &'a str,
-    track_name: &'a str,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    release_name: Option<&'a str>,
-    additional_info: ListenBrainzAdditionalInfo<'a>,
-}
-
-#[derive(Serialize)]
-struct ListenBrainzAdditionalInfo<'a> {
-    submission_client: &'a str,
-    submission_client_version: &'a str,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    duration_ms: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    tracknumber: Option<i32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    recording_mbid: Option<&'a str>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    release_mbid: Option<&'a str>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    artist_mbids: Option<Vec<&'a str>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    release_group_mbid: Option<&'a str>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    track_mbid: Option<&'a str>,
-}
-
-#[derive(Serialize)]
-struct FeedbackRequest {
-    recording_mbid: String,
-    score: i32,
-}
-
 /// ListenBrainz feedback score for a Luminous rating (0.5–5, negative =
 /// unrated): "love" (1) at the same 4-star threshold that stars a track on
 /// a Subsonic server, otherwise neutral (0).
@@ -206,7 +116,8 @@ fn feedback_score(rating: f32) -> i32 {
 /// Central manager orchestrating ListenBrainz API calls, offline cache, and Discord Rich Presence.
 pub struct ScrobblerManager {
     db: Arc<Database>,
-    client: Client,
+    listenbrainz: ListenBrainzClient,
+    critiquebrainz: CritiqueBrainzClient,
     settings: Arc<Mutex<ScrobblerSettings>>,
     paused: Arc<std::sync::atomic::AtomicBool>,
     discord: Arc<Mutex<crate::discord::DiscordManager>>,
@@ -218,11 +129,8 @@ pub struct ScrobblerManager {
 
 impl ScrobblerManager {
     pub fn new(db: Arc<Database>) -> Self {
-        let client = Client::builder()
-            .timeout(Duration::from_secs(12))
-            .user_agent(concat!("LuminousMusicPlayer/", env!("CARGO_PKG_VERSION")))
-            .build()
-            .unwrap_or_default();
+        let listenbrainz = ListenBrainzClient::new();
+        let critiquebrainz = CritiqueBrainzClient::new();
 
         let initial_settings = Self::load_settings_from_db(&db);
         let paused = Arc::new(std::sync::atomic::AtomicBool::new(
@@ -237,7 +145,8 @@ impl ScrobblerManager {
 
         Self {
             db,
-            client,
+            listenbrainz,
+            critiquebrainz,
             settings: Arc::new(Mutex::new(initial_settings)),
             paused,
             discord,
@@ -453,35 +362,7 @@ impl ScrobblerManager {
             return Err(crate::commands::context::OFFLINE_ERROR.into());
         }
         let trimmed = token.trim();
-        if trimmed.is_empty() {
-            return Err("Token cannot be empty".into());
-        }
-
-        let url = format!("{LISTENBRAINZ_API_BASE}/validate-token?token={trimmed}");
-        let resp = self
-            .client
-            .get(&url)
-            .send()
-            .await
-            .map_err(|e| format!("Network request failed: {}", format_error_chain(&e)))?;
-
-        if !resp.status().is_success() {
-            return Err(format!("ListenBrainz returned HTTP {}", resp.status()));
-        }
-
-        let body: ValidateTokenResponse = resp
-            .json()
-            .await
-            .map_err(|e| format!("Failed to parse response: {e}"))?;
-
-        if !body.valid {
-            let msg = body.message.unwrap_or_else(|| "Invalid token".into());
-            return Err(msg);
-        }
-
-        let username = body
-            .user_name
-            .ok_or_else(|| "Validated, but no username returned".to_string())?;
+        let username = self.listenbrainz.validate_token(trimmed).await?;
 
         // If validation succeeds and matches current token, update username
         let updated_settings = {
@@ -680,67 +561,28 @@ impl ScrobblerManager {
         let duration_ms = song.length_nanosec.map(|ns| ns / 1_000_000);
         let tracknumber = song.track;
 
-        let artist_mbids_vec: Option<Vec<&str>> =
-            song.musicbrainz_artist_id.as_deref().map(|id| vec![id]);
-
-        let payload = ListenBrainzSubmitRequest {
-            listen_type: "playing_now",
-            payload: vec![ListenBrainzPayload {
-                listened_at: None,
-                track_metadata: ListenBrainzTrackMetadata {
-                    artist_name: artist,
-                    track_name: title,
-                    release_name: release,
-                    additional_info: ListenBrainzAdditionalInfo {
-                        submission_client: SUBMISSION_CLIENT_NAME,
-                        submission_client_version: env!("CARGO_PKG_VERSION"),
-                        duration_ms,
-                        tracknumber,
-                        recording_mbid: song.musicbrainz_recording_id.as_deref(),
-                        release_mbid: song.musicbrainz_album_id.as_deref(),
-                        artist_mbids: artist_mbids_vec,
-                        release_group_mbid: song.musicbrainz_release_group_id.as_deref(),
-                        track_mbid: song.musicbrainz_track_id.as_deref(),
-                    },
-                },
-            }],
-        };
-
-        let payload_json = match serde_json::to_value(&payload) {
-            Ok(v) => v,
-            Err(e) => {
-                log::warn!("Failed to serialize ListenBrainz now-playing payload: {e}");
-                return;
-            }
+        let track = ListenTrackInfo {
+            artist: artist.to_string(),
+            track: title.to_string(),
+            album: release.map(|s| s.to_string()),
+            duration_ms,
+            track_number: tracknumber,
+            recording_mbid: song.musicbrainz_recording_id.clone(),
+            release_mbid: song.musicbrainz_album_id.clone(),
+            artist_mbids: song.musicbrainz_artist_id.clone(),
+            release_group_mbid: song.musicbrainz_release_group_id.clone(),
+            track_mbid: song.musicbrainz_track_id.clone(),
+            listened_at: None,
         };
 
         let token = settings.listenbrainz_token.trim().to_string();
-        let client = self.client.clone();
+        let lb = self.listenbrainz.clone();
 
         tauri::async_runtime::spawn(async move {
-            let res = client
-                .post(format!("{LISTENBRAINZ_API_BASE}/submit-listens"))
-                .header("Authorization", format!("Token {token}"))
-                .json(&payload_json)
-                .send()
-                .await;
-
-            match res {
-                Ok(resp) if resp.status().is_success() => {
-                    log::debug!("ListenBrainz now-playing submitted successfully");
-                }
-                Ok(resp) => {
-                    log::warn!(
-                        "ListenBrainz now-playing returned status: {}",
-                        resp.status()
-                    );
-                }
-                Err(e) => {
-                    log::warn!(
-                        "Failed to submit now-playing to ListenBrainz: {}",
-                        format_error_chain(&e)
-                    );
-                }
+            if let Err(e) = lb.submit_now_playing(&token, &track).await {
+                log::warn!("Failed to submit now-playing to ListenBrainz: {e}");
+            } else {
+                log::debug!("ListenBrainz now-playing submitted successfully");
             }
         });
     }
@@ -857,26 +699,10 @@ impl ScrobblerManager {
             return;
         }
 
-        let client = self.client.clone();
+        let lb = self.listenbrainz.clone();
         tauri::async_runtime::spawn(async move {
-            let payload = FeedbackRequest {
-                recording_mbid: mbid,
-                score,
-            };
-            let res = client
-                .post(format!(
-                    "{LISTENBRAINZ_API_BASE}/feedback/recording-feedback"
-                ))
-                .header("Authorization", format!("Token {token}"))
-                .json(&payload)
-                .send()
-                .await;
-
-            if let Err(e) = res {
-                log::warn!(
-                    "Failed to submit rating feedback to ListenBrainz: {}",
-                    format_error_chain(&e)
-                );
+            if let Err(e) = lb.submit_feedback(&token, &mbid, score).await {
+                log::warn!("Failed to submit rating feedback to ListenBrainz: {e}");
             }
         });
     }
@@ -899,26 +725,10 @@ impl ScrobblerManager {
             return;
         }
 
-        let client = self.client.clone();
+        let lb = self.listenbrainz.clone();
         tauri::async_runtime::spawn(async move {
-            let payload = FeedbackRequest {
-                recording_mbid: mbid,
-                score: loved,
-            };
-            let res = client
-                .post(format!(
-                    "{LISTENBRAINZ_API_BASE}/feedback/recording-feedback"
-                ))
-                .header("Authorization", format!("Token {token}"))
-                .json(&payload)
-                .send()
-                .await;
-
-            if let Err(e) = res {
-                log::warn!(
-                    "Failed to submit loved feedback to ListenBrainz: {}",
-                    format_error_chain(&e)
-                );
+            if let Err(e) = lb.submit_feedback(&token, &mbid, loved).await {
+                log::warn!("Failed to submit loved feedback to ListenBrainz: {e}");
             }
         });
     }
@@ -951,9 +761,24 @@ impl ScrobblerManager {
             )
         };
 
-        let remote = self.fetch_listenbrainz_feedback(&username, &token).await?;
-        let critique = match &cb_user {
-            Some(id) => Some(self.fetch_critiquebrainz_ratings(id).await?),
+        let remote = self
+            .listenbrainz
+            .fetch_user_feedback(&username, &token)
+            .await?;
+        let critique: Option<Vec<crate::ratings_sync::CritiqueRating>> = match &cb_user {
+            Some(id) => {
+                let items = self.critiquebrainz.fetch_user_ratings(id).await?;
+                Some(
+                    items
+                        .into_iter()
+                        .map(|item| crate::ratings_sync::CritiqueRating {
+                            entity_type: item.entity_type,
+                            entity_mbid: item.entity_mbid,
+                            stars: item.stars,
+                        })
+                        .collect(),
+                )
+            }
             None => None,
         };
 
@@ -976,29 +801,14 @@ impl ScrobblerManager {
         let mut pushed = 0u32;
         let mut failed = 0u32;
         for (mbid, score) in pushes {
-            let res = self
-                .client
-                .post(format!(
-                    "{LISTENBRAINZ_API_BASE}/feedback/recording-feedback"
-                ))
-                .header("Authorization", format!("Token {token}"))
-                .json(&FeedbackRequest {
-                    recording_mbid: mbid,
-                    score,
-                })
-                .send()
-                .await;
-            match res {
-                Ok(resp) if resp.status().is_success() => pushed += 1,
-                Ok(resp) => {
-                    log::warn!("ListenBrainz feedback returned HTTP {}", resp.status());
-                    failed += 1;
-                }
+            match self
+                .listenbrainz
+                .submit_feedback(&token, &mbid, score)
+                .await
+            {
+                Ok(()) => pushed += 1,
                 Err(e) => {
-                    log::warn!(
-                        "Failed to submit feedback to ListenBrainz: {}",
-                        format_error_chain(&e)
-                    );
+                    log::warn!("Failed to submit feedback to ListenBrainz: {e}");
                     failed += 1;
                 }
             }
@@ -1017,110 +827,6 @@ impl ScrobblerManager {
             critiquebrainz_checked: critique.is_some(),
             changed_song_ids: outcome.song_ids,
         })
-    }
-
-    /// Every love (1) and hate (-1) the user has recorded on ListenBrainz,
-    /// keyed by recording MBID.
-    async fn fetch_listenbrainz_feedback(
-        &self,
-        username: &str,
-        token: &str,
-    ) -> Result<std::collections::HashMap<String, i32>, String> {
-        const PAGE: usize = 100;
-        let mut feedback = std::collections::HashMap::new();
-        let mut offset = 0usize;
-        loop {
-            let resp = self
-                .client
-                .get(format!(
-                    "{LISTENBRAINZ_API_BASE}/feedback/user/{}/get-feedback?count={PAGE}&offset={offset}",
-                    percent_encoding::utf8_percent_encode(
-                        username,
-                        percent_encoding::NON_ALPHANUMERIC
-                    )
-                ))
-                .header("Authorization", format!("Token {token}"))
-                .send()
-                .await
-                .map_err(|e| {
-                    format!(
-                        "ListenBrainz feedback request failed: {}",
-                        format_error_chain(&e)
-                    )
-                })?;
-            if !resp.status().is_success() {
-                return Err(format!(
-                    "ListenBrainz feedback returned HTTP {}",
-                    resp.status()
-                ));
-            }
-            let page: FeedbackPage = resp
-                .json()
-                .await
-                .map_err(|e| format!("Unreadable ListenBrainz feedback: {e}"))?;
-            let received = page.feedback.len();
-            for item in page.feedback {
-                if let Some(mbid) = item.recording_mbid.filter(|m| !m.trim().is_empty()) {
-                    feedback.insert(mbid.trim().to_string(), item.score);
-                }
-            }
-            offset += received;
-            if received == 0 || offset >= page.total_count {
-                return Ok(feedback);
-            }
-            tokio::time::sleep(Duration::from_millis(50)).await;
-        }
-    }
-
-    /// The user's published CritiqueBrainz reviews that carry a star rating,
-    /// for recordings and release groups.
-    ///
-    /// `reviewer_uuid` is the public CritiqueBrainz profile ID (it appears in
-    /// profile URLs), not a credential, and the request goes over HTTPS. CodeQL's
-    /// `rust/cleartext-transmission` flags it by its `user_id` query-key name;
-    /// that alert is dismissed as a false positive.
-    async fn fetch_critiquebrainz_ratings(
-        &self,
-        reviewer_uuid: &str,
-    ) -> Result<Vec<crate::ratings_sync::CritiqueRating>, String> {
-        const PAGE: usize = 50;
-        let mut ratings = Vec::new();
-        let mut offset = 0usize;
-        loop {
-            let resp = self
-                .client
-                .get(format!(
-                    "{CRITIQUEBRAINZ_API_BASE}/review/?user_id={reviewer_uuid}&limit={PAGE}&offset={offset}"
-                ))
-                .send()
-                .await
-                .map_err(|e| format!("CritiqueBrainz request failed: {}", format_error_chain(&e)))?;
-            if !resp.status().is_success() {
-                return Err(format!("CritiqueBrainz returned HTTP {}", resp.status()));
-            }
-            let page: CritiquePage = resp
-                .json()
-                .await
-                .map_err(|e| format!("Unreadable CritiqueBrainz reviews: {e}"))?;
-            let received = page.reviews.len();
-            for review in page.reviews {
-                if review.is_draft || review.is_hidden {
-                    continue;
-                }
-                if let Some(stars) = review.rating {
-                    ratings.push(crate::ratings_sync::CritiqueRating {
-                        entity_type: review.entity_type,
-                        entity_mbid: review.entity_id,
-                        stars: stars as f32,
-                    });
-                }
-            }
-            offset += received;
-            if received == 0 || offset >= page.count {
-                return Ok(ratings);
-            }
-            tokio::time::sleep(Duration::from_millis(50)).await;
-        }
     }
 
     /// Retrieve live scrobble cache statistics.
@@ -1157,7 +863,7 @@ impl ScrobblerManager {
 
     /// Spawn a flush in the background.
     pub fn trigger_flush(&self) {
-        let client = self.client.clone();
+        let lb = self.listenbrainz.clone();
         let db = self.db.clone();
         let settings_arc = self.settings.clone();
         let online = self.online.clone();
@@ -1171,8 +877,7 @@ impl ScrobblerManager {
             {
                 return;
             }
-            if let Err(e) =
-                Self::flush_cache_internal(&db, &client, &settings.listenbrainz_token).await
+            if let Err(e) = Self::flush_cache_internal(&db, &lb, &settings.listenbrainz_token).await
             {
                 log::warn!("Scrobble cache flush finished with error: {e}");
             }
@@ -1188,12 +893,12 @@ impl ScrobblerManager {
         if settings.listenbrainz_token.trim().is_empty() {
             return Err("ListenBrainz user token is not configured".into());
         }
-        Self::flush_cache_internal(&self.db, &self.client, &settings.listenbrainz_token).await
+        Self::flush_cache_internal(&self.db, &self.listenbrainz, &settings.listenbrainz_token).await
     }
 
     async fn flush_cache_internal(
         db: &Database,
-        client: &Client,
+        lb: &ListenBrainzClient,
         token: &str,
     ) -> Result<u32, String> {
         let entries: Vec<ScrobbleCacheEntry> = {
@@ -1244,55 +949,30 @@ impl ScrobblerManager {
             return Ok(0);
         }
 
-        let listen_type = if entries.len() == 1 {
-            "single"
-        } else {
-            "import"
-        };
-
-        let payload_items: Vec<ListenBrainzPayload<'_>> = entries
+        let payload_items: Vec<ListenTrackInfo> = entries
             .iter()
-            .map(|e| {
-                let artist_mbids_vec = e.artist_mbids.as_deref().map(|id| vec![id]);
-                ListenBrainzPayload {
-                    listened_at: Some(e.listened_at),
-                    track_metadata: ListenBrainzTrackMetadata {
-                        artist_name: &e.artist,
-                        track_name: &e.track,
-                        release_name: e.album.as_deref(),
-                        additional_info: ListenBrainzAdditionalInfo {
-                            submission_client: SUBMISSION_CLIENT_NAME,
-                            submission_client_version: env!("CARGO_PKG_VERSION"),
-                            duration_ms: e.duration_ms,
-                            tracknumber: e.track_number,
-                            recording_mbid: e.recording_mbid.as_deref(),
-                            release_mbid: e.release_mbid.as_deref(),
-                            artist_mbids: artist_mbids_vec,
-                            release_group_mbid: e.release_group_mbid.as_deref(),
-                            track_mbid: e.track_mbid.as_deref(),
-                        },
-                    },
-                }
+            .map(|e| ListenTrackInfo {
+                artist: e.artist.clone(),
+                track: e.track.clone(),
+                album: e.album.clone(),
+                duration_ms: e.duration_ms,
+                track_number: e.track_number,
+                recording_mbid: e.recording_mbid.clone(),
+                release_mbid: e.release_mbid.clone(),
+                artist_mbids: e.artist_mbids.clone(),
+                release_group_mbid: e.release_group_mbid.clone(),
+                track_mbid: e.track_mbid.clone(),
+                listened_at: Some(e.listened_at),
             })
             .collect();
 
-        let request = ListenBrainzSubmitRequest {
-            listen_type,
-            payload: payload_items,
-        };
-
         let now = chrono::Utc::now().timestamp();
-        let resp = client
-            .post(format!("{LISTENBRAINZ_API_BASE}/submit-listens"))
-            .header("Authorization", format!("Token {token}"))
-            .json(&request)
-            .send()
-            .await;
+        let res = lb.submit_listens(token, &payload_items).await;
 
         let conn = db.pool.get().map_err(|e| e.to_string())?;
 
-        match resp {
-            Ok(r) if r.status().is_success() => {
+        match res {
+            Ok(()) => {
                 let ids: Vec<i64> = entries.iter().map(|e| e.id).collect();
                 let flushed_count = ids.len() as u32;
 
@@ -1305,22 +985,7 @@ impl ScrobblerManager {
             }
             // Callers report the returned error (the background flush logs it,
             // the Settings flush shows it), so these arms only record it.
-            Ok(r) => {
-                let status = r.status();
-                let body = r.text().await.unwrap_or_default();
-                let err_msg = describe_error_response(status, &body);
-
-                for e in &entries {
-                    let _ = conn.execute(
-                        "UPDATE scrobble_cache SET attempts = attempts + 1, last_attempt = ?1, last_error = ?2 WHERE id = ?3",
-                        params![now, err_msg, e.id],
-                    );
-                }
-                Err(err_msg)
-            }
-            Err(e) => {
-                let err_msg = format!("Network request failed: {}", format_error_chain(&e));
-
+            Err(err_msg) => {
                 for e in &entries {
                     let _ = conn.execute(
                         "UPDATE scrobble_cache SET attempts = attempts + 1, last_attempt = ?1, last_error = ?2 WHERE id = ?3",
@@ -1330,20 +995,6 @@ impl ScrobblerManager {
                 Err(err_msg)
             }
         }
-    }
-}
-
-/// One-line description of a failed ListenBrainz response. The API's own
-/// errors are JSON with an `error` field worth keeping; anything else (a
-/// proxy's HTML 502 page) is reduced to the status line.
-fn describe_error_response(status: reqwest::StatusCode, body: &str) -> String {
-    #[derive(Deserialize)]
-    struct ApiError {
-        error: String,
-    }
-    match serde_json::from_str::<ApiError>(body) {
-        Ok(api) => format!("HTTP {}: {}", status.as_u16(), api.error),
-        Err(_) => format!("HTTP {status}"),
     }
 }
 
@@ -1389,25 +1040,6 @@ mod tests {
     }
 
     #[test]
-    fn error_response_keeps_api_message_but_drops_html_pages() {
-        assert_eq!(
-            describe_error_response(
-                reqwest::StatusCode::BAD_REQUEST,
-                r#"{"code": 400, "error": "Invalid listened_at"}"#
-            ),
-            "HTTP 400: Invalid listened_at"
-        );
-        assert_eq!(
-            describe_error_response(
-                reqwest::StatusCode::BAD_GATEWAY,
-                "<!DOCTYPE html>
-<html><title>502 Bad Gateway</title></html>"
-            ),
-            "HTTP 502 Bad Gateway"
-        );
-    }
-
-    #[test]
     fn feedback_loves_only_four_stars_and_up() {
         assert_eq!(feedback_score(-1.0), 0);
         assert_eq!(feedback_score(0.5), 0);
@@ -1415,53 +1047,6 @@ mod tests {
         assert_eq!(feedback_score(3.5), 0);
         assert_eq!(feedback_score(4.0), 1);
         assert_eq!(feedback_score(5.0), 1);
-    }
-
-    #[test]
-    fn test_listenbrainz_payload_serialization() {
-        let payload = ListenBrainzSubmitRequest {
-            listen_type: "single",
-            payload: vec![ListenBrainzPayload {
-                listened_at: Some(1725690000),
-                track_metadata: ListenBrainzTrackMetadata {
-                    artist_name: "Radiohead",
-                    track_name: "Karma Police",
-                    release_name: Some("OK Computer"),
-                    additional_info: ListenBrainzAdditionalInfo {
-                        submission_client: SUBMISSION_CLIENT_NAME,
-                        submission_client_version: "2.0.0",
-                        duration_ms: Some(264000),
-                        tracknumber: Some(6),
-                        recording_mbid: Some("0946b553-7a96-4a49-9cfd-f952fdbbe7e8"),
-                        release_mbid: Some("e7011d8d-bf34-4530-9b44-325d2b781bc5"),
-                        artist_mbids: Some(vec!["a74b1b7f-71a5-4011-9441-d0b5e4122711"]),
-                        release_group_mbid: None,
-                        track_mbid: None,
-                    },
-                },
-            }],
-        };
-
-        let json = serde_json::to_string(&payload).unwrap();
-        assert!(json.contains("\"listen_type\":\"single\""));
-        assert!(json.contains("\"artist_name\":\"Radiohead\""));
-        assert!(json.contains("\"track_name\":\"Karma Police\""));
-        assert!(json.contains("\"recording_mbid\":\"0946b553-7a96-4a49-9cfd-f952fdbbe7e8\""));
-        assert!(json.contains("\"listened_at\":1725690000"));
-    }
-
-    #[test]
-    fn test_validate_token_json_parsing() {
-        let json_success =
-            r#"{"valid": true, "user_name": "soltys", "message": "Token is valid."}"#;
-        let parsed: ValidateTokenResponse = serde_json::from_str(json_success).unwrap();
-        assert!(parsed.valid);
-        assert_eq!(parsed.user_name.as_deref(), Some("soltys"));
-
-        let json_invalid = r#"{"valid": false, "user_name": null, "message": "Invalid token."}"#;
-        let parsed_invalid: ValidateTokenResponse = serde_json::from_str(json_invalid).unwrap();
-        assert!(!parsed_invalid.valid);
-        assert_eq!(parsed_invalid.user_name, None);
     }
 
     #[test]

@@ -68,12 +68,13 @@ into Picard's territory; it's a different, complementary axis Picard was never m
 
 - `crates/luminous-addons` — add-on theme runtime: Ed25519 bundle verification, ChaCha20 decryption, Store entitlement, key cache (DPAPI), in-memory URI scheme asset serving. No `tauri` or `rusqlite` (CI-checked); `commands/addons.rs` maps IPC and events at the edge
 - `crates/luminous-audio` — the playback engine: Symphonia decode, CPAL output, gapless/crossfade handover, gain chain, spectrum. No `tauri`/`rusqlite`/`reqwest`/`tokio` (CI-checked); remote sources come in through the opener `media_source.rs` injects, and `audio.rs` maps `Song`/`PlayState`/pipeline info at the edge
+- `crates/luminous-remote` — remote wire-protocol clients: Subsonic, WebDAV, ListenBrainz, CritiqueBrainz, Lyrics (LRCLIB/NetEase/Lyrics.ovh), MusicBrainz OAuth. No `tauri` or `rusqlite` (CI-checked); edge modules in `src-tauri` (`subsonic/`, `webdav/`, `scrobbler.rs`, `lyrics.rs`, `musicbrainz.rs`) handle SQLite caching, token persistence, and Tauri events
 - `player.rs` — playback state machine (shuffle, repeat, queue control)
 - `collection.rs` — library scanner (incremental; respects file mod times) + file watcher
 - `db.rs` — SQLite schema, connection pool (r2d2), migrations
 - `playlist.rs` — playlist CRUD + undo/redo command stack
 - `crates/luminous-equalizer` — biquad DSP filters (10-band graphic, up-to-20-band parametric with peak/shelf types); presets and persistence stay in `eq_store.rs`
-- `lyrics.rs` — LRCLIB + Lyrics.ovh clients
+- `lyrics.rs` — sidecar LRC/subtitles file search, parser, embedded lyrics extraction, and online lookup via `luminous-remote`
 - `covermanager.rs` — embedded art extraction + iTunes API fallback
 - `tageditor.rs` — lofty tag reader/writer
 - `commands/` — all `#[tauri::command]` IPC handlers (registry in `commands/mod.rs`)

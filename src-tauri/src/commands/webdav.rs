@@ -4,7 +4,7 @@ use crate::covermanager::CoverManager;
 use crate::db::Database;
 use crate::models::{SongSource, WebDavServer, WebDavSyncStats};
 use crate::remote_scheduler::{RemoteKind, SyncGuard};
-use crate::webdav::{detect_filetype_from_url, WebDavClient};
+use crate::webdav::{detect_filetype_from_url, WebDavClient, WebDavProbeExt};
 use crate::AppState;
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
