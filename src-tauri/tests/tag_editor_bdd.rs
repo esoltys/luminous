@@ -117,9 +117,9 @@ fn click_save_tags(w: &mut TagEditorWorld) {
     // `save_tags` Tauri command does, so this scenario ("saving back to
     // audio file") actually exercises the write path instead of only the DB.
     let path = w.song_path.clone().expect("song_path not set");
-    luminous_lib::tageditor::write_tags(
+    luminous_metadata::audio::write_tags(
         &path,
-        &luminous_lib::tageditor::TagWriteRequest {
+        &luminous_metadata::audio::TagWriteRequest {
             title: &w.new_title,
             artist: &w.new_artist,
             album: "Parachutes",
@@ -192,7 +192,7 @@ fn song_with_embedded_art(w: &mut TagEditorWorld) {
 #[when("I click \"Clear Artwork\"")]
 fn click_clear_artwork(w: &mut TagEditorWorld) {
     let path = w.song_path.clone().expect("song_path not set");
-    luminous_lib::tageditor::clear_embedded_art(&path).expect("clear_embedded_art should succeed");
+    luminous_metadata::audio::clear_embedded_art(&path).expect("clear_embedded_art should succeed");
 
     let conn = w.db.pool.get().expect("db conn failed");
     conn.execute(

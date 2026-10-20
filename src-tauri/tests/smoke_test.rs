@@ -10,8 +10,8 @@
 
 use luminous_lib::{
     audio::AudioEngine, db::Database, models::PlayState, player::Player, playlist::PlaylistManager,
-    tageditor,
 };
+use luminous_metadata::audio::{self, TagWriteRequest};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
@@ -65,9 +65,9 @@ async fn smoke_full_pipeline() {
     write_test_wav(&song_path, 6.0);
 
     // --- Tag writing (real lofty write to a real file on disk) ---
-    tageditor::write_tags(
+    audio::write_tags(
         &song_path,
-        &tageditor::TagWriteRequest {
+        &TagWriteRequest {
             title: "Smoke Test Tone",
             artist: "Smoke Test Artist",
             album: "Smoke Test Album",

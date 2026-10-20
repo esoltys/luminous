@@ -3,13 +3,13 @@
 use crate::{
     covermanager::CoverManager,
     db::Database,
-    dr_parser,
     models::{
         FileType, MusicDirectory, PruneResult, QueuePopulationMode, ScanPhase, ScanProgress, Song,
         SongSource, LOCAL_SOURCES_SQL,
     },
 };
 use anyhow::{Context, Result};
+use luminous_metadata::dr;
 use rayon::prelude::*;
 
 use rusqlite::params;
@@ -646,11 +646,11 @@ impl CollectionScanner {
             let Ok(content) = std::fs::read_to_string(&log_path) else {
                 continue;
             };
-            let log = dr_parser::parse(&content);
+            let log = dr::parse(&content);
 
-            let candidates: Vec<dr_parser::SongCandidate> = songs
+            let candidates: Vec<dr::SongCandidate> = songs
                 .iter()
-                .map(|s| dr_parser::SongCandidate {
+                .map(|s| dr::SongCandidate {
                     id: s.id,
                     track_number: s.track,
                     title: s.title.clone(),
@@ -661,7 +661,7 @@ impl CollectionScanner {
                         .unwrap_or_default(),
                 })
                 .collect();
-            let matches = dr_parser::match_tracks(&log.tracks, &candidates);
+            let matches = dr::match_tracks(&log.tracks, &candidates);
 
             let tx = conn.unchecked_transaction()?;
             for (song_id, entry) in &matches {
@@ -1708,7 +1708,7 @@ fn use_folder_art(cover_manager: &CoverManager, path: &Path, song: &mut Song) {
 pub(crate) struct CueJob {
     pub cue_path: PathBuf,
     pub media_path: PathBuf,
-    pub sheet: crate::cue::CueSheet,
+    pub sheet: luminous_metadata::cue::CueSheet,
 }
 
 /// Parses every CUE sheet in `cue_paths` and resolves each classic
@@ -1731,7 +1731,7 @@ pub(crate) fn resolve_cue_jobs(cue_paths: &[PathBuf], audio_paths: &[PathBuf]) -
         let Ok(text) = std::fs::read_to_string(cue_path) else {
             continue;
         };
-        let Some(sheet) = crate::cue::parse_single_file_cue(&text) else {
+        let Some(sheet) = luminous_metadata::cue::parse_single_file_cue(&text) else {
             continue;
         };
         let candidate = dir.join(&sheet.media_file);
@@ -2178,7 +2178,9 @@ mod tests {
     use lofty::prelude::*;
     use lofty::probe::Probe;
     use lofty::tag::{Accessor, ItemKey, Tag};
-    use luminous_metadata::audio::{detect_mp3_vbr, read_embedded_lyrics, read_multi_value};
+    use luminous_metadata::audio::{
+        detect_mp3_vbr, read_embedded_lyrics, read_multi_value, write_tags, TagWriteRequest,
+    };
     use std::sync::Arc;
 
     #[test]
@@ -2303,9 +2305,9 @@ mod tests {
         let path = temp_dir.path().join("song.wav");
         write_test_wav(&path);
 
-        crate::tageditor::write_tags(
+        write_tags(
             &path,
-            &crate::tageditor::TagWriteRequest {
+            &TagWriteRequest {
                 title: "Title",
                 artist: "Artist",
                 album: "Album",
@@ -2329,9 +2331,9 @@ mod tests {
         let temp_dir = tempfile::tempdir().expect("temp dir");
         let path = temp_dir.path().join("song.wav");
         write_test_wav(&path);
-        crate::tageditor::write_tags(
+        write_tags(
             &path,
-            &crate::tageditor::TagWriteRequest {
+            &TagWriteRequest {
                 title: "Title",
                 artist: "Artist",
                 album: "Album",
@@ -2365,9 +2367,9 @@ mod tests {
 
         // Simulate an out-of-band edit (another install/tool) changing the
         // embedded genre without Luminous's own write path being involved.
-        crate::tageditor::write_tags(
+        write_tags(
             &path,
-            &crate::tageditor::TagWriteRequest {
+            &TagWriteRequest {
                 title: "Title",
                 artist: "Artist",
                 album: "Album",
@@ -2617,9 +2619,9 @@ mod tests {
         let path = temp_dir.path().join("song.wav");
         write_test_wav(&path);
 
-        crate::tageditor::write_tags(
+        write_tags(
             &path,
-            &crate::tageditor::TagWriteRequest {
+            &TagWriteRequest {
                 title: "Title",
                 artist: "Artist A; Artist B",
                 album: "Album",
@@ -2660,9 +2662,9 @@ mod tests {
         let temp_dir = tempfile::tempdir().expect("temp dir");
         let path = temp_dir.path().join("song.wav");
         write_test_wav(&path);
-        crate::tageditor::write_tags(
+        write_tags(
             &path,
-            &crate::tageditor::TagWriteRequest {
+            &TagWriteRequest {
                 title: "Title",
                 artist: "Artist",
                 album: "Album",
@@ -2702,9 +2704,9 @@ mod tests {
         let temp_dir = tempfile::tempdir().expect("temp dir");
         let path = temp_dir.path().join("song.wav");
         write_test_wav(&path);
-        crate::tageditor::write_tags(
+        write_tags(
             &path,
-            &crate::tageditor::TagWriteRequest {
+            &TagWriteRequest {
                 title: "Title",
                 artist: "Artist",
                 album: "Album",
@@ -2747,9 +2749,9 @@ mod tests {
         let path = temp_dir.path().join("song.wav");
         write_test_wav(&path);
 
-        crate::tageditor::write_tags(
+        write_tags(
             &path,
-            &crate::tageditor::TagWriteRequest {
+            &TagWriteRequest {
                 title: "Title",
                 artist: "Artist",
                 album: "Album",
@@ -2777,9 +2779,9 @@ mod tests {
         let path = temp_dir.path().join("song.wav");
         write_test_wav(&path);
 
-        crate::tageditor::write_tags(
+        write_tags(
             &path,
-            &crate::tageditor::TagWriteRequest {
+            &TagWriteRequest {
                 title: "Title",
                 artist: "Artist",
                 album: "Album",
@@ -2788,9 +2790,9 @@ mod tests {
             },
         )
         .expect("write_tags should succeed");
-        crate::tageditor::write_tags(
+        write_tags(
             &path,
-            &crate::tageditor::TagWriteRequest {
+            &TagWriteRequest {
                 title: "Title",
                 artist: "Artist",
                 album: "Album",
