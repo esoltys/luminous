@@ -18,9 +18,16 @@ separate private repo `esoltys/luminous-store`, triggered manually against a pub
   - `frontend_check` job: `bun run check` (svelte-check + TypeScript, `--fail-on-warnings`)
     and `knip` (unused code/dependency detection).
   - `frontend_test` job: `bun run test:run` (Vitest).
-  - `backend_test` job: `cargo test`, then `cargo clippy --all-targets -- -D warnings`
-    (from `src-tauri/`) — any clippy warning fails the PR, not just errors.
-  - `rust_fmt` job: `cargo fmt --check` (from `src-tauri/`). The pre-commit hook is opt-in
+  - `backend_test` job:
+    - **Architectural Dependency Boundary Checks** (`cargo tree -p <crate> -e normal`): enforces that engine crates in `crates/` never import forbidden application or system dependencies (#1553, #1762):
+      - `luminous-audio`: no `tauri`, `rusqlite`, `reqwest`, or `tokio` (must never block or touch UI/DB state on playback paths).
+      - `luminous-addons`: no `tauri` or `rusqlite` (security boundary: crypto and package verification cannot manipulate app state).
+      - `luminous-analysis`: no `tauri`, `rusqlite`, `reqwest`, or `tokio` (offline DSP analysis cannot reach app state or network).
+      - `luminous-metadata`: no `tauri`, `rusqlite`, `reqwest`, or `tokio` (local tag and sidecar parsing cannot reach app state or network).
+      - `luminous-remote`: no `tauri` or `rusqlite` (wire-protocol clients cannot access SQLite or Tauri events directly).
+    - `cargo test --workspace`: runs unit, integration, and doc-tests across all workspace crates and `src-tauri`.
+    - `cargo clippy --workspace --all-targets -- -D warnings`: fails on any clippy warning across the workspace.
+  - `rust_fmt` job: `cargo fmt --all --check`. The pre-commit hook is opt-in
     per clone, so this is what stops formatting drift reaching `main`. No build needed.
   - `dependabot_regression_gate` job (Dependabot PRs only, `if: github.actor ==
     'dependabot[bot]'`): a real production build (`bun run build`), the Vitest suite
