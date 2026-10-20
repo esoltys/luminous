@@ -3531,6 +3531,7 @@ dependencies = [
  "luminous-audio",
  "luminous-equalizer",
  "luminous-metadata",
+ "luminous-remote",
  "md-5",
  "notify",
  "parking_lot",
@@ -3647,6 +3648,27 @@ dependencies = [
  "percent-encoding",
  "serde",
  "tempfile",
+]
+
+[[package]]
+name = "luminous-remote"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "base64 0.23.1",
+ "log",
+ "md-5",
+ "percent-encoding",
+ "quick-xml 0.42.0",
+ "rand 0.10.2",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "tempfile",
+ "tokio",
+ "uuid",
+ "wiremock",
 ]
 
 [[package]]
