@@ -53,7 +53,7 @@ into Picard's territory; it's a different, complementary axis Picard was never m
 
 ## Project Structure
 
-- Rust source lives in `src-tauri/src/` (the app crate) and `crates/` (engine crates with no Tauri or SQLite dependency, epic #1553); Svelte source in `src/`
+- Rust source lives in `src-tauri/src/` (the app crate) and `crates/` (engine crates with no Tauri or SQLite dependency, epics #1553 and #1762); Svelte source in `src/`
 - Shared TypeScript types in `src/lib/types/`; Svelte 5 stores (Runes) in `src/lib/stores/`
 - No dedicated IPC wrapper layer — components and stores call Tauri commands directly via `invoke()` from `@tauri-apps/api/core`
 
@@ -64,19 +64,23 @@ into Picard's territory; it's a different, complementary axis Picard was never m
 - `playlists.svelte.ts` — playlist CRUD, undo/redo
 - `theme.svelte.ts` — color schemes, artwork extraction
 
+**Engine crates** (`crates/`):
+
+- `crates/luminous-addons` — add-on theme runtime: Ed25519 bundle verification, ChaCha20 decryption, Store entitlement, key cache (DPAPI), in-memory URI scheme asset serving. No `tauri` or `rusqlite` (CI-checked); `commands/addons.rs` maps IPC and events at the edge.
+- `crates/luminous-analysis` — offline audio analysis DSP: EBU R128 integrated loudness & true-peak calculation, mono downmixing, RMS waveforms, and 3-band FFT waveform extraction. No `tauri`, `rusqlite`, `reqwest`, or `tokio` (CI-checked); edge modules in `src-tauri` (`loudness.rs`, `waveform.rs`, `band_waveform.rs`) handle SQLite persistence and background worker threads.
+- `crates/luminous-audio` — the playback engine: Symphonia decode, CPAL output, gapless/crossfade handover, gain chain, spectrum. No `tauri`, `rusqlite`, `reqwest`, or `tokio` (CI-checked); remote sources come in through the opener `media_source.rs` injects, and `audio.rs` maps `Song`/`PlayState`/pipeline info at the edge.
+- `crates/luminous-equalizer` — biquad DSP filters (10-band graphic, up-to-20-band parametric with peak/shelf types), and Equalizer APO profile parser/importer. No `tauri`, `rusqlite`, `reqwest`, or `tokio` (CI-checked); presets and persistence stay in `eq_store.rs`.
+- `crates/luminous-metadata` — local audio metadata and sidecar parsers: Lofty audio tag read/write, CUE sheet parsing, Dynamic Range meter log parsing, and playlist format import/export (M3U, M3U8, PLS, XSPF). No `tauri`, `rusqlite`, `reqwest`, or `tokio` (CI-checked); `collection/` and `tageditor.rs` adapt to the app's SQLite models.
+- `crates/luminous-remote` — remote wire-protocol clients: Subsonic, WebDAV, ListenBrainz, CritiqueBrainz, Lyrics (LRCLIB/NetEase/Lyrics.ovh), MusicBrainz OAuth. No `tauri` or `rusqlite` (CI-checked); edge modules in `src-tauri` (`subsonic/`, `webdav/`, `scrobbler.rs`, `lyrics.rs`, `musicbrainz.rs`) handle SQLite caching, token persistence, and Tauri events.
+
 **Core Rust modules** (`src-tauri/src/`):
 
-- `crates/luminous-addons` — add-on theme runtime: Ed25519 bundle verification, ChaCha20 decryption, Store entitlement, key cache (DPAPI), in-memory URI scheme asset serving. No `tauri` or `rusqlite` (CI-checked); `commands/addons.rs` maps IPC and events at the edge
-- `crates/luminous-audio` — the playback engine: Symphonia decode, CPAL output, gapless/crossfade handover, gain chain, spectrum. No `tauri`/`rusqlite`/`reqwest`/`tokio` (CI-checked); remote sources come in through the opener `media_source.rs` injects, and `audio.rs` maps `Song`/`PlayState`/pipeline info at the edge
-- `crates/luminous-remote` — remote wire-protocol clients: Subsonic, WebDAV, ListenBrainz, CritiqueBrainz, Lyrics (LRCLIB/NetEase/Lyrics.ovh), MusicBrainz OAuth. No `tauri` or `rusqlite` (CI-checked); edge modules in `src-tauri` (`subsonic/`, `webdav/`, `scrobbler.rs`, `lyrics.rs`, `musicbrainz.rs`) handle SQLite caching, token persistence, and Tauri events
 - `player.rs` — playback state machine (shuffle, repeat, queue control)
 - `collection.rs` — library scanner (incremental; respects file mod times) + file watcher
 - `db.rs` — SQLite schema, connection pool (r2d2), migrations
 - `playlist.rs` — playlist CRUD + undo/redo command stack
-- `crates/luminous-equalizer` — biquad DSP filters (10-band graphic, up-to-20-band parametric with peak/shelf types); presets and persistence stay in `eq_store.rs`
-- `lyrics.rs` — sidecar LRC/subtitles file search, parser, embedded lyrics extraction, and online lookup via `luminous-remote`
+- `eq_store.rs` — equalizer presets and persistence
 - `covermanager.rs` — embedded art extraction + iTunes API fallback
-- `tageditor.rs` — lofty tag reader/writer
 - `commands/` — all `#[tauri::command]` IPC handlers (registry in `commands/mod.rs`)
 
 ## User Guide

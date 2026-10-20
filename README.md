@@ -48,7 +48,7 @@ Luminous doesn't accept PRs as this is a hobby project that I enjoy working on i
 
 "Isn't this just a web wrapper?" Not in the Electron sense. Tauri renders the UI in the OS's own webview (WebView2 on Windows, WebKit on Linux/macOS) instead of bundling a full Chromium, so there's no shipped browser engine inflating the binary or idling in RAM. And the UI is the only part that's web tech — audio decoding/output, DSP, the library scanner, and the SQLite index all run as native Rust off the UI thread, driving the frontend through events rather than the other way around. See below for how the two sides split.
 
-Luminous splits cleanly along the Tauri boundary: a Svelte 5 frontend handles UI, state, and rendering, while a Rust backend owns everything performance- or system-sensitive — audio decoding and playback, the SQLite-backed library index, file scanning, and OS media integration. The two sides talk over Tauri's IPC layer, with the frontend invoking commands and the backend emitting events for things like playback position, scan progress, and now-playing metadata. Keeping decoding, DSP, and disk I/O in Rust off the UI thread is what lets a multi-thousand-track library scan, gapless-playback, and real-time visualizers stay smooth at once.
+Luminous splits cleanly along the Tauri boundary: a Svelte 5 frontend handles UI, state, and rendering, while a Rust backend owns everything performance- or system-sensitive — audio decoding and playback, the SQLite-backed library index, file scanning, and OS media integration. Beneath the Tauri IPC layer, pure engine logic is partitioned into dedicated workspace crates under `crates/`: DSP, cryptographic verification, file/tag parsing, and remote wire protocols run with zero dependencies on `tauri` or `rusqlite`. The application crate in `src-tauri` acts as the coordinator, managing SQLite caching, database transactions, background worker loops, and event emission. Keeping decoding, DSP, and disk I/O in Rust off the UI thread is what lets a multi-thousand-track library scan, gapless-playback, and real-time visualizers stay smooth at once.
 
 The IPC commands are deliberately *deep*: each one owns a whole workflow rather than forwarding a single field. The backend owns the built-in Queue (bootstrapped at startup, exposed via an `is_queue` flag — the frontend never infers it from a name), applies equalizer changes as one whole-config call, and keeps every dynamic playlist — genre/decade/BPM auto playlists and user smart playlists alike — *always complete*: whenever the library or a song's stats change, a backend reconciler immediately appends newly-matching songs and evicts stale ones, syncing the live play order without ever reshuffling it. There is no refill logic, and no such setting, anywhere in the frontend.
 
@@ -57,9 +57,12 @@ The IPC commands are deliberately *deep*: each one owns a whole workflow rather 
 ```
 luminous/
 ├── crates/                   # Engine crates with no Tauri/SQLite dependency
-│   ├── luminous-addons/      # Add-on runtime: Ed25519/ChaCha20 verification, Store entitlement, key cache, memory URI scheme
-│   ├── luminous-audio/       # Playback engine: Symphonia decode, CPAL output, gapless/crossfade, spectrum
-│   └── luminous-equalizer/   # Biquad DSP: 10-band graphic & up-to-20-band parametric filters
+│   ├── luminous-addons/      # Add-on runtime: Ed25519 bundle verification, ChaCha20 decryption, Store entitlement, key cache, memory URI scheme
+│   ├── luminous-analysis/    # Audio analysis DSP: EBU R128 loudness metering, true-peak calculation, RMS waveforms, 3-band FFT waveform extraction
+│   ├── luminous-audio/       # Playback engine: Symphonia decode, CPAL output, gapless/crossfade, gain chain, spectrum
+│   ├── luminous-equalizer/   # Biquad DSP: 10-band graphic & up-to-20-band parametric filters, Equalizer APO parser
+│   ├── luminous-metadata/    # Audio & playlist metadata: Lofty tag read/write, CUE sheets, DR meter logs, M3U/PLS/XSPF parsers
+│   └── luminous-remote/      # Wire-protocol clients: Subsonic, WebDAV, ListenBrainz, CritiqueBrainz, Lyrics, MusicBrainz OAuth
 ├── features/                 # BDD Gherkin Feature Specifications
 ├── src/                      # Svelte 5 + TypeScript Frontend
 │   ├── lib/
@@ -69,36 +72,36 @@ luminous/
 │   │   ├── types/            # Frontend interfaces
 │   │   └── utils/            # Shared utilities (color parsing, filter parsing, lyrics, stats, etc.)
 │   └── routes/               # Layouts and navigation views
-└── src-tauri/                # Tauri + Rust Backend Core
+└── src-tauri/                # Tauri + Rust Backend Application Core
     ├── src/
-    │   ├── audio.rs          # Edge of the playback engine: Song → Track, pipeline info
-    │   ├── band_waveform.rs  # Layered low/mid/high frequency-band waveform analysis scanner
-    │   ├── collection.rs     # Lofty scanner & folder watcher (query/reconcile/watcher split into collection/)
+    │   ├── audio.rs          # Playback adapter: Song -> Track translation, pipeline info
+    │   ├── band_waveform.rs  # Layered 3-band waveform SQLite persistence and cache lookup
+    │   ├── collection.rs     # Library scanner & folder watcher (query/reconcile/watcher split into collection/)
     │   ├── covermanager.rs   # Cover art extractor and iTunes search API fallback
-    │   ├── db.rs             # SQLite schema migration & connection pool
+    │   ├── db.rs             # SQLite schema migration & connection pool (r2d2)
+    │   ├── eq_store.rs       # Equalizer presets and persistence
     │   ├── filter_parser.rs  # Search filter syntax parser (artist:, album:, year:, etc.)
     │   ├── install_format.rs # Distro/package format detection for the updater
-    │   ├── lib.rs            # Library entry point, background loops, & IPC registry
-    │   ├── loudness.rs       # EBU R128 loudness analysis & ReplayGain fallback
-    │   ├── lyrics.rs         # LRCLIB & Lyrics.ovh client integrations
+    │   ├── lib.rs            # Application entry point, background loops, & IPC registry
+    │   ├── loudness.rs       # Background R128 loudness analysis worker & SQLite persistence
+    │   ├── lyrics.rs         # Lyrics sidecar discovery, embedded extraction & online lookup adapter
     │   ├── main.rs           # Binary entry point invoking luminous_lib::run()
     │   ├── media_session/    # OS media transport integration (SMTC, MPRIS2, Now Playing)
     │   ├── models.rs         # Shared structs and types
-    │   ├── musicbrainz.rs    # MusicBrainz lookups, OAuth2 login, artist events
+    │   ├── musicbrainz.rs    # MusicBrainz OAuth flow & artist events coordinator
     │   ├── organizer.rs      # Tag-based file/folder reorganizer
     │   ├── player.rs         # Playback controller (Shuffle, Repeat, Next/Prev)
     │   ├── playlist.rs       # Playlist manager & Queue abstraction (auto-sync/dynamic/import-export/undo split into playlist/)
-    │   ├── playlist_parsers.rs # M3U, M3U8, PLS, and XSPF import/export
-    │   ├── ratings_sync.rs   # Two-way rating/Love sync with ListenBrainz & CritiqueBrainz
+    │   ├── ratings_sync.rs   # Two-way rating/Love sync coordinator with ListenBrainz & CritiqueBrainz
+    │   ├── scrobbler.rs      # Scrobble offline queue & background submission coordinator
     │   ├── stats.rs          # Play counts, ratings, and history tracking
-    │   ├── subsonic/         # Subsonic/Navidrome media-server sync
-    │   ├── tageditor.rs      # lofty tag reader & writer
+    │   ├── subsonic/         # Subsonic/Navidrome media-server sync & SQLite caching
     │   ├── tags.rs           # Genre/tag browsing over the existing songs.genre column
     │   ├── tray.rs           # System tray icon, menu, and minimize-to-tray behavior
-    │   ├── waveform.rs       # Background audio peak analyzer
-    │   ├── webdav/           # WebDAV library sync and tag probing
+    │   ├── waveform.rs       # Waveform SQLite persistence and background analysis worker
+    │   ├── webdav/           # WebDAV library sync, tag probing & credential management
     │   └── commands/         # Tauri IPC command handlers
-    └── Cargo.toml            # Rust dependencies (cpal, symphonia, rusqlite, lofty, rustfft)
+    └── Cargo.toml            # App crate dependencies (tauri, rusqlite, r2d2, reqwest, tokio, and engine crates)
 ```
 
 ---
