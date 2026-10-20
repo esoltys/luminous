@@ -9,7 +9,7 @@ use crate::{
     },
 };
 use anyhow::{Context, Result};
-use luminous_metadata::dr;
+use luminous_metadata::{cue, dr};
 use rayon::prelude::*;
 
 use rusqlite::params;
@@ -1698,7 +1698,7 @@ fn use_folder_art(cover_manager: &CoverManager, path: &Path, song: &mut Song) {
 // with more than one `FILE` line (one physical file per track) is a
 // different, far more common shape in the wild — ordinary per-file tagged
 // rips that happen to ship a CUE alongside them — and is left to be scanned
-// as plain per-file tracks; see `cue::parse_single_file_cue`.
+// as plain per-file tracks; see `luminous_metadata::cue::parse_single_file_cue`.
 // ---------------------------------------------------------------------------
 
 /// A CUE sheet resolved against the files an audio-directory walk actually
@@ -1708,7 +1708,7 @@ fn use_folder_art(cover_manager: &CoverManager, path: &Path, song: &mut Song) {
 pub(crate) struct CueJob {
     pub cue_path: PathBuf,
     pub media_path: PathBuf,
-    pub sheet: luminous_metadata::cue::CueSheet,
+    pub sheet: cue::CueSheet,
 }
 
 /// Parses every CUE sheet in `cue_paths` and resolves each classic
@@ -1731,7 +1731,7 @@ pub(crate) fn resolve_cue_jobs(cue_paths: &[PathBuf], audio_paths: &[PathBuf]) -
         let Ok(text) = std::fs::read_to_string(cue_path) else {
             continue;
         };
-        let Some(sheet) = luminous_metadata::cue::parse_single_file_cue(&text) else {
+        let Some(sheet) = cue::parse_single_file_cue(&text) else {
             continue;
         };
         let candidate = dir.join(&sheet.media_file);
