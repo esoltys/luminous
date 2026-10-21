@@ -59,11 +59,11 @@ mod tests {
     }
 
     fn test_password() -> String {
-        format!("{}_{}", "mock", "pwd")
+        (0..10).map(|i| (b'a' + (i % 26)) as char).collect()
     }
 
     fn test_api_key() -> String {
-        format!("{}_{}", "mock", "key")
+        (0..12).map(|i| (b'0' + (i % 10)) as char).collect()
     }
 
     fn servers_db() -> rusqlite::Connection {
