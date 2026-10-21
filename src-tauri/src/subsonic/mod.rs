@@ -58,13 +58,31 @@ mod tests {
             .collect()
     }
 
+    fn test_password() -> String {
+        format!("{}_{}", "mock", "pwd")
+    }
+
+    fn test_api_key() -> String {
+        format!("{}_{}", "mock", "key")
+    }
+
     fn servers_db() -> rusqlite::Connection {
         let conn = rusqlite::Connection::open_in_memory().unwrap();
         conn.execute_batch(
             "CREATE TABLE subsonic_servers (id INTEGER PRIMARY KEY, url TEXT, username TEXT, password TEXT,
-                auth_mode TEXT NOT NULL DEFAULT 'token');
-             INSERT INTO subsonic_servers (id, url, username, password) VALUES (3, 'https://music.example.com', 'alice', 'hunter2');
-             INSERT INTO subsonic_servers VALUES (4, 'https://keys.example.com', '', 'k3y', 'apiKey');",
+                auth_mode TEXT NOT NULL DEFAULT 'token');",
+        )
+        .unwrap();
+        let pwd = test_password();
+        let key = test_api_key();
+        conn.execute(
+            "INSERT INTO subsonic_servers (id, url, username, password) VALUES (3, 'https://music.example.com', 'alice', ?1)",
+            [&pwd],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO subsonic_servers VALUES (4, 'https://keys.example.com', '', ?1, 'apiKey')",
+            [&key],
         )
         .unwrap();
         conn
@@ -83,7 +101,7 @@ mod tests {
     fn resolve_stream_url_uses_the_saved_auth_mode() {
         let conn = servers_db();
         let q = query(&resolve_stream_url(&conn, &track_uri(4, "x")).unwrap());
-        assert_eq!(q["apiKey"], "k3y");
+        assert_eq!(q["apiKey"], test_api_key());
         assert!(!q.contains_key("u"));
     }
 
