@@ -63,6 +63,7 @@ export interface Song {
   grouping?: string;
   comment?: string;
   lyrics?: string;
+  lyrics_source?: LyricsSource;
 
   // Track info
   track?: number;
@@ -964,6 +965,20 @@ export interface RadioResult {
   contextName: string;
   seedTitle: string;
   songCount: number;
+}
+
+export type LyricsSource =
+  | 'embedded'
+  | 'sidecar'
+  | 'lrclib'
+  | 'netease'
+  | 'lyrics_ovh'
+  | 'manual'
+  | 'unknown';
+
+export interface LyricsPayload {
+  text: string;
+  source: LyricsSource;
 }
 
 

@@ -3,12 +3,85 @@
 //! See `LyricsManager::fetch_lyrics` for the fallback chain.
 
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 pub use luminous_remote::lyrics::{
     clean_featured_title, is_synced_lrc, LyricsClient, LyricsEndpoints, LyricsManager,
     LyricsProvider, LyricsQuery, LyricsResult,
 };
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LyricsSource {
+    Embedded,
+    Sidecar,
+    Lrclib,
+    Netease,
+    LyricsOvh,
+    Manual,
+    Unknown,
+}
+
+impl LyricsSource {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Embedded => "embedded",
+            Self::Sidecar => "sidecar",
+            Self::Lrclib => "lrclib",
+            Self::Netease => "netease",
+            Self::LyricsOvh => "lyrics_ovh",
+            Self::Manual => "manual",
+            Self::Unknown => "unknown",
+        }
+    }
+}
+
+impl std::str::FromStr for LyricsSource {
+    type Err = std::convert::Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "embedded" => Self::Embedded,
+            "sidecar" => Self::Sidecar,
+            "lrclib" => Self::Lrclib,
+            "netease" => Self::Netease,
+            "lyrics_ovh" => Self::LyricsOvh,
+            "manual" => Self::Manual,
+            _ => Self::Unknown,
+        })
+    }
+}
+
+impl From<&str> for LyricsSource {
+    fn from(s: &str) -> Self {
+        match s {
+            "embedded" => Self::Embedded,
+            "sidecar" => Self::Sidecar,
+            "lrclib" => Self::Lrclib,
+            "netease" => Self::Netease,
+            "lyrics_ovh" => Self::LyricsOvh,
+            "manual" => Self::Manual,
+            _ => Self::Unknown,
+        }
+    }
+}
+
+impl From<LyricsProvider> for LyricsSource {
+    fn from(p: LyricsProvider) -> Self {
+        match p {
+            LyricsProvider::LrcLib => LyricsSource::Lrclib,
+            LyricsProvider::NetEase => LyricsSource::Netease,
+            LyricsProvider::LyricsOvh => LyricsSource::LyricsOvh,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LyricsPayload {
+    pub text: String,
+    pub source: LyricsSource,
+}
 
 /// Normalize a filename stem or title string for robust matching:
 /// lowercases and replaces punctuation/separators with whitespace.
@@ -422,60 +495,90 @@ pub async fn get_lyrics_for_song(
     lyrics_manager: &LyricsManager,
     song_id: i64,
     force_refresh: bool,
-) -> Result<String, String> {
+) -> Result<LyricsPayload, String> {
     // 1. Check database cache and instrumental flag
     let conn = db.pool.get().map_err(|e| e.to_string())?;
-    let (path_str, cached_lyrics, is_instrumental, title, track): (
-        Option<String>,
-        Option<String>,
-        bool,
-        Option<String>,
-        Option<i32>,
-    ) = conn
-        .query_row(
-            "SELECT path, lyrics, COALESCE(is_instrumental, 0), title, track FROM songs WHERE id = ?1",
-            rusqlite::params![song_id],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
-        )
-        .unwrap_or((None, None, false, None, None));
 
-    if is_instrumental {
+    struct SongLyricsRow {
+        path: Option<String>,
+        cached_lyrics: Option<String>,
+        is_instrumental: bool,
+        title: Option<String>,
+        track: Option<i32>,
+        lyrics_source: Option<String>,
+    }
+
+    let row = conn
+        .query_row(
+            "SELECT path, lyrics, COALESCE(is_instrumental, 0), title, track, lyrics_source FROM songs WHERE id = ?1",
+            rusqlite::params![song_id],
+            |r| {
+                Ok(SongLyricsRow {
+                    path: r.get(0)?,
+                    cached_lyrics: r.get(1)?,
+                    is_instrumental: r.get(2)?,
+                    title: r.get(3)?,
+                    track: r.get(4)?,
+                    lyrics_source: r.get(5)?,
+                })
+            },
+        )
+        .unwrap_or(SongLyricsRow {
+            path: None,
+            cached_lyrics: None,
+            is_instrumental: false,
+            title: None,
+            track: None,
+            lyrics_source: None,
+        });
+
+    if row.is_instrumental {
         return Err("Song is marked as instrumental".to_string());
     }
 
+    let mut current_source = row.lyrics_source.as_deref().map(LyricsSource::from);
+
     // 2. Check for a local sidecar .lrc/.vtt/.srt file next to the audio file (#155, #1190)
-    if let Some(ref path_str) = path_str {
+    if let Some(ref path_str) = row.path {
         let audio_path = Path::new(path_str);
-        if let Some(sidecar_lyrics) = read_sidecar_lyrics(audio_path, title.as_deref(), track) {
+        if let Some(sidecar_lyrics) =
+            read_sidecar_lyrics(audio_path, row.title.as_deref(), row.track)
+        {
             // If cached lyrics differ from the sidecar file (or on force refresh), update the database
-            if cached_lyrics.as_deref() != Some(&sidecar_lyrics) {
+            if row.cached_lyrics.as_deref() != Some(&sidecar_lyrics)
+                || current_source != Some(LyricsSource::Sidecar)
+            {
                 let _ = conn.execute(
-                    "UPDATE songs SET lyrics = ?1 WHERE id = ?2",
+                    "UPDATE songs SET lyrics = ?1, lyrics_source = 'sidecar' WHERE id = ?2",
                     rusqlite::params![sidecar_lyrics, song_id],
                 );
             }
-            return Ok(sidecar_lyrics);
+            return Ok(LyricsPayload {
+                text: sidecar_lyrics,
+                source: LyricsSource::Sidecar,
+            });
         }
     }
 
     // 2b. If DB has no cached lyrics, check for embedded lyrics in the audio file (#1721).
     // This allows existing libraries scanned prior to embedded lyric support (or external tag edits)
     // to resolve embedded lyrics on demand without requiring a manual album/library rescan.
-    let mut cached_lyrics = cached_lyrics;
+    let mut cached_lyrics = row.cached_lyrics;
     if cached_lyrics
         .as_deref()
         .map(str::trim)
         .unwrap_or("")
         .is_empty()
     {
-        if let Some(ref path_str) = path_str {
+        if let Some(ref path_str) = row.path {
             let audio_path = Path::new(path_str);
             if let Some(embedded) = crate::collection::read_embedded_lyrics_from_path(audio_path) {
                 let _ = conn.execute(
-                    "UPDATE songs SET lyrics = ?1 WHERE id = ?2",
+                    "UPDATE songs SET lyrics = ?1, lyrics_source = 'embedded' WHERE id = ?2",
                     rusqlite::params![embedded, song_id],
                 );
                 cached_lyrics = Some(embedded);
+                current_source = Some(LyricsSource::Embedded);
             }
         }
     }
@@ -488,7 +591,10 @@ pub async fn get_lyrics_for_song(
             // If the cached lyrics are synced LRC, or if we have already checked online and marked it unsynced,
             // return immediately without hitting the network! Skipped entirely on a forced refresh.
             if !force_refresh && (synced || has_plain_marker) {
-                return Ok(lyrics.clone());
+                return Ok(LyricsPayload {
+                    text: lyrics.clone(),
+                    source: current_source.unwrap_or(LyricsSource::Unknown),
+                });
             }
         }
     }
@@ -511,7 +617,10 @@ pub async fn get_lyrics_for_song(
     if artist.trim().is_empty() || title.trim().is_empty() {
         if let Some(lyrics) = cached_lyrics {
             if !lyrics.trim().is_empty() {
-                return Ok(lyrics);
+                return Ok(LyricsPayload {
+                    text: lyrics,
+                    source: current_source.unwrap_or(LyricsSource::Unknown),
+                });
             }
         }
         return Err("insufficient song metadata (artist/title) to fetch online lyrics".to_string());
@@ -524,7 +633,10 @@ pub async fn get_lyrics_for_song(
     // leave the cache untouched so lookup resumes when back online.
     if !crate::commands::context::is_online_enabled(&conn) {
         return match cached_lyrics {
-            Some(lyrics) if !lyrics.trim().is_empty() => Ok(lyrics),
+            Some(lyrics) if !lyrics.trim().is_empty() => Ok(LyricsPayload {
+                text: lyrics,
+                source: current_source.unwrap_or(LyricsSource::Unknown),
+            }),
             _ => Err(OFFLINE_LYRICS_ERROR.to_string()),
         };
     }
@@ -541,12 +653,16 @@ pub async fn get_lyrics_for_song(
             } else {
                 format!("[synced:false]\n{}", result.text)
             };
+            let source = LyricsSource::from(result.provider);
             conn.execute(
-                "UPDATE songs SET lyrics = ?1 WHERE id = ?2",
-                rusqlite::params![final_lyrics, song_id],
+                "UPDATE songs SET lyrics = ?1, lyrics_source = ?2 WHERE id = ?3",
+                rusqlite::params![final_lyrics, source.as_str(), song_id],
             )
             .map_err(|e| e.to_string())?;
-            Ok(final_lyrics)
+            Ok(LyricsPayload {
+                text: final_lyrics,
+                source,
+            })
         }
         Err(e) => {
             if let Some(lyrics) = cached_lyrics {
@@ -557,11 +673,15 @@ pub async fn get_lyrics_for_song(
                     } else {
                         format!("[synced:false]\n{lyrics}")
                     };
+                    let source = current_source.unwrap_or(LyricsSource::Unknown);
                     let _ = conn.execute(
-                        "UPDATE songs SET lyrics = ?1 WHERE id = ?2",
-                        rusqlite::params![marked_lyrics, song_id],
+                        "UPDATE songs SET lyrics = ?1, lyrics_source = ?2 WHERE id = ?3",
+                        rusqlite::params![marked_lyrics, source.as_str(), song_id],
                     );
-                    return Ok(marked_lyrics);
+                    return Ok(LyricsPayload {
+                        text: marked_lyrics,
+                        source,
+                    });
                 }
             }
             Err(e.to_string())
@@ -828,13 +948,24 @@ mod tests {
 
         let lyrics_manager = LyricsManager::new();
         let result = get_lyrics_for_song(&db, &lyrics_manager, 1, false).await;
-        assert_eq!(result, Ok("[00:10.00] Sidecar lyrics line".to_string()));
+        assert_eq!(
+            result,
+            Ok(LyricsPayload {
+                text: "[00:10.00] Sidecar lyrics line".to_string(),
+                source: LyricsSource::Sidecar,
+            })
+        );
 
-        // Check DB was updated with sidecar lyrics
-        let cached: Option<String> = conn
-            .query_row("SELECT lyrics FROM songs WHERE id = 1", [], |r| r.get(0))
+        // Check DB was updated with sidecar lyrics and source
+        let cached: (Option<String>, Option<String>) = conn
+            .query_row(
+                "SELECT lyrics, lyrics_source FROM songs WHERE id = 1",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
             .unwrap();
-        assert_eq!(cached, Some("[00:10.00] Sidecar lyrics line".to_string()));
+        assert_eq!(cached.0, Some("[00:10.00] Sidecar lyrics line".to_string()));
+        assert_eq!(cached.1, Some("sidecar".to_string()));
     }
 
     #[tokio::test]
@@ -870,13 +1001,24 @@ mod tests {
 
         let lyrics_manager = LyricsManager::new();
         let result = get_lyrics_for_song(&db, &lyrics_manager, 1, false).await;
-        assert_eq!(result, Ok(synced.to_string()));
+        assert_eq!(
+            result,
+            Ok(LyricsPayload {
+                text: synced.to_string(),
+                source: LyricsSource::Embedded,
+            })
+        );
 
-        // Check DB was updated with the embedded lyrics
-        let cached: Option<String> = conn
-            .query_row("SELECT lyrics FROM songs WHERE id = 1", [], |r| r.get(0))
+        // Check DB was updated with the embedded lyrics and source
+        let cached: (Option<String>, Option<String>) = conn
+            .query_row(
+                "SELECT lyrics, lyrics_source FROM songs WHERE id = 1",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
             .unwrap();
-        assert_eq!(cached, Some(synced.to_string()));
+        assert_eq!(cached.0, Some(synced.to_string()));
+        assert_eq!(cached.1, Some("embedded".to_string()));
     }
 
     #[tokio::test]
@@ -915,12 +1057,23 @@ mod tests {
 
         let lyrics_manager = LyricsManager::new();
         let result = get_lyrics_for_song(&db, &lyrics_manager, 1, false).await;
-        assert_eq!(result, Ok(plain_lyrics.to_string()));
+        assert_eq!(
+            result,
+            Ok(LyricsPayload {
+                text: plain_lyrics.to_string(),
+                source: LyricsSource::Embedded,
+            })
+        );
 
-        let cached: Option<String> = conn
-            .query_row("SELECT lyrics FROM songs WHERE id = 1", [], |r| r.get(0))
+        let cached: (Option<String>, Option<String>) = conn
+            .query_row(
+                "SELECT lyrics, lyrics_source FROM songs WHERE id = 1",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
             .unwrap();
-        assert_eq!(cached, Some(plain_lyrics.to_string()));
+        assert_eq!(cached.0, Some(plain_lyrics.to_string()));
+        assert_eq!(cached.1, Some("embedded".to_string()));
     }
 
     /// Offline master toggle (#1398): sidecar/cached lyrics still resolve; with
@@ -949,10 +1102,57 @@ mod tests {
         conn.execute("UPDATE songs SET lyrics = 'Cached line' WHERE id = 1", [])
             .unwrap();
         let result = get_lyrics_for_song(&db, &LyricsManager::new(), 1, true).await;
-        assert_eq!(result, Ok("Cached line".to_string()));
+        assert_eq!(
+            result,
+            Ok(LyricsPayload {
+                text: "Cached line".to_string(),
+                source: LyricsSource::Unknown,
+            })
+        );
         let cached: Option<String> = conn
             .query_row("SELECT lyrics FROM songs WHERE id = 1", [], |r| r.get(0))
             .unwrap();
         assert_eq!(cached, Some("Cached line".to_string()));
+    }
+
+    #[test]
+    fn test_lyrics_source_conversions_and_serialization() {
+        let sources = [
+            (LyricsSource::Embedded, "embedded"),
+            (LyricsSource::Sidecar, "sidecar"),
+            (LyricsSource::Lrclib, "lrclib"),
+            (LyricsSource::Netease, "netease"),
+            (LyricsSource::LyricsOvh, "lyrics_ovh"),
+            (LyricsSource::Manual, "manual"),
+            (LyricsSource::Unknown, "unknown"),
+        ];
+
+        for (source, string_val) in sources {
+            assert_eq!(source.as_str(), string_val);
+            assert_eq!(LyricsSource::from(string_val), source);
+            assert_eq!(string_val.parse::<LyricsSource>().unwrap(), source);
+            let json = serde_json::to_string(&source).unwrap();
+            assert_eq!(json, format!("\"{string_val}\""));
+            let deserialized: LyricsSource = serde_json::from_str(&json).unwrap();
+            assert_eq!(deserialized, source);
+        }
+
+        assert_eq!(LyricsSource::from("other_val"), LyricsSource::Unknown);
+        assert_eq!(
+            "other_val".parse::<LyricsSource>().unwrap(),
+            LyricsSource::Unknown
+        );
+        assert_eq!(
+            LyricsSource::from(LyricsProvider::LrcLib),
+            LyricsSource::Lrclib
+        );
+        assert_eq!(
+            LyricsSource::from(LyricsProvider::NetEase),
+            LyricsSource::Netease
+        );
+        assert_eq!(
+            LyricsSource::from(LyricsProvider::LyricsOvh),
+            LyricsSource::LyricsOvh
+        );
     }
 }

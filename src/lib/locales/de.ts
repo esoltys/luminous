@@ -921,7 +921,17 @@ export const de = {
     saveFailedPrefix: "Der Songtext konnte nicht gespeichert werden: ",
     noOnlineResults: "Bei keinem Online-Anbieter wurde ein Songtext gefunden.",
     offlineNoLyrics: "Für diesen Titel sind keine Songtexte gespeichert. „Online“ unter Einstellungen › Integrationen einschalten, um danach zu suchen.",
-    insufficientMetadata: "Nicht genügend Angaben zum Titel (Interpret/Titel), um online nach Songtexten zu suchen."
+    insufficientMetadata: "Nicht genügend Angaben zum Titel (Interpret/Titel), um online nach Songtexten zu suchen.",
+    sourceHelpLabel: "Songtext-Quelle",
+    sourceEmbedded: "Eingebettet",
+    sourceEmbeddedTip: "Aus den Metadaten-Tags der Audiodatei geladen",
+    sourceSidecar: "Sidecar-Datei",
+    sourceSidecarTip: "Aus einer lokalen .lrc-, .vtt- oder .srt-Datei geladen",
+    sourceOnlineTip: "Von {provider} heruntergeladen",
+    sourceManual: "Manuell",
+    sourceManualTip: "Lokal gespeicherter benutzerdefinierter Songtext",
+    sourceCached: "Zwischengespeichert",
+    sourceCachedTip: "In der lokalen Bibliotheksdatenbank gespeichert"
   },
   stats: {
     title: "Statistik",

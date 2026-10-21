@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 62;
+pub const CURRENT_SCHEMA_VERSION: i32 = 63;
 
 struct Migration {
     version: i32,
@@ -544,6 +544,19 @@ const MIGRATIONS: &[Migration] = &[
         version: 62,
         description: "songs.album_key and album-keyed tables rekeyed so albums group case-insensitively (#1752)",
         apply: migrate_album_keys,
+    },
+    Migration {
+        version: 63,
+        description: "songs.lyrics_source column for lyrics provenance tracking (#1743)",
+        apply: |conn| {
+            let has_column: bool = conn
+                .prepare("SELECT 1 FROM pragma_table_info('songs') WHERE name = 'lyrics_source'")?
+                .exists([])?;
+            if !has_column {
+                conn.execute_batch("ALTER TABLE songs ADD COLUMN lyrics_source TEXT;")?;
+            }
+            Ok(())
+        },
     },
 ];
 
@@ -4082,5 +4095,21 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM album_chart_history", [], |r| r.get(0))
             .unwrap();
         assert_eq!(chart_rows, 0, "chart history is rebuilt from play history");
+    }
+
+    #[test]
+    fn test_migration_63_adds_songs_lyrics_source() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_migration63_test_")
+            .tempdir()
+            .unwrap();
+        let db = Database::new(temp_dir_guard.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+        let has_col: bool = conn
+            .prepare("SELECT 1 FROM pragma_table_info('songs') WHERE name = 'lyrics_source'")
+            .unwrap()
+            .exists([])
+            .unwrap();
+        assert!(has_col, "songs table should have lyrics_source column");
     }
 }

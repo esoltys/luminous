@@ -965,7 +965,17 @@ export const ru = {
     saveFailedPrefix: "Не удалось сохранить текст: ",
     noOnlineResults: "Ни один сетевой источник не нашёл текст.",
     offlineNoLyrics: "Для этого трека нет сохранённого текста. Включите «В сети» в Настройки › Интеграции, чтобы найти его.",
-    insufficientMetadata: "Недостаточно сведений о песне (исполнитель и название) для поиска текста в сети."
+    insufficientMetadata: "Недостаточно сведений о песне (исполнитель и название) для поиска текста в сети.",
+    sourceHelpLabel: "Источник текста",
+    sourceEmbedded: "Встроенный",
+    sourceEmbeddedTip: "Загружено из тегов метаданных аудиофайла",
+    sourceSidecar: "Внешний файл",
+    sourceSidecarTip: "Загружено из локального файла .lrc, .vtt или .srt",
+    sourceOnlineTip: "Загружено из {provider}",
+    sourceManual: "Вручную",
+    sourceManualTip: "Пользовательский текст, сохранённый локально",
+    sourceCached: "В кэше",
+    sourceCachedTip: "Сохранено в локальной базе данных фонотеки"
   },
   stats: {
     title: "Статистика",

@@ -15,7 +15,7 @@ const SYNCED_LYRICS = [
   "[02:49.13] There's a last time for everything",
 ].join("\n");
 
-let getLyricsResult: string = SYNCED_LYRICS;
+let getLyricsResult: string | { text: string; source: string } = SYNCED_LYRICS;
 let getOffsetResult: number = 0;
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -232,6 +232,40 @@ describe("LyricsView.svelte", () => {
     await Promise.resolve();
     await waitFor(() => expect(queryByText("+1.5s")).not.toBeInTheDocument());
     expect(getByText("0.0s")).toBeInTheDocument();
+  });
+
+  it("renders the lyrics source badge with provider label and accessible HelpTip", async () => {
+    getLyricsResult = { text: SYNCED_LYRICS, source: "lrclib" };
+    playerStore.currentSong = mockSong;
+
+    const { getByTestId } = render(LyricsView);
+
+    await waitFor(() => {
+      const badge = getByTestId("lyrics-source-badge");
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveTextContent("LRCLIB");
+    });
+  });
+
+  it("updates lyrics source badge to Manual after saving manual edits", async () => {
+    getLyricsResult = { text: SYNCED_LYRICS, source: "sidecar" };
+    playerStore.currentSong = mockSong;
+
+    const { getByTestId, getByText } = render(LyricsView);
+
+    await waitFor(() => {
+      expect(getByTestId("lyrics-source-badge")).toHaveTextContent("Sidecar");
+    });
+
+    // Enter edit mode
+    await fireEvent.click(getByText("Edit"));
+
+    // Save edited lyrics
+    await fireEvent.click(getByText("Save"));
+
+    await waitFor(() => {
+      expect(getByTestId("lyrics-source-badge")).toHaveTextContent("Manual");
+    });
   });
 });
 

@@ -28,6 +28,7 @@
     ArrowCounterClockwiseIcon as RotateCcw
   } from "phosphor-svelte";
   import LoadingSpinner from "./LoadingSpinner.svelte";
+  import type { LyricsPayload } from "../types";
   import { parseLrc } from "../utils/lrc";
 
   let isSessionCompleted = $derived(!playerStore.currentSong && playerStore.completedSession !== null);
@@ -273,10 +274,15 @@
     lyricsText = "";
     isLoading = true;
     try {
-      const lyrics = await invoke<string>("get_lyrics", { songId, forceRefresh: false });
+      const payload = await invoke<LyricsPayload | string>("get_lyrics", { songId, forceRefresh: false });
+      const lyrics = typeof payload === "string" ? payload : payload.text;
+      const source = typeof payload === "string" ? undefined : payload.source;
       if (playerStore.currentSong?.id === songId) {
         lyricsText = lyrics || "";
         playerStore.currentSong.lyrics = lyrics;
+        if (source) {
+          playerStore.currentSong.lyrics_source = source;
+        }
       }
     } catch {
       if (playerStore.currentSong?.id === songId) {

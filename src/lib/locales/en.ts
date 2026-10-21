@@ -921,7 +921,17 @@ export const en = {
     saveFailedPrefix: "Failed to save lyrics: ",
     noOnlineResults: "No lyrics found from any online provider.",
     offlineNoLyrics: "No saved lyrics for this track. Turn Online on in Settings › Integrations to search for them.",
-    insufficientMetadata: "Not enough song info (artist/title) to search for lyrics online."
+    insufficientMetadata: "Not enough song info (artist/title) to search for lyrics online.",
+    sourceHelpLabel: "Lyrics Source",
+    sourceEmbedded: "Embedded",
+    sourceEmbeddedTip: "Loaded from audio file metadata tags",
+    sourceSidecar: "Sidecar",
+    sourceSidecarTip: "Loaded from a local .lrc, .vtt, or .srt file",
+    sourceOnlineTip: "Downloaded from {provider}",
+    sourceManual: "Manual",
+    sourceManualTip: "Custom lyrics saved locally",
+    sourceCached: "Cached",
+    sourceCachedTip: "Stored in local library database"
   },
   stats: {
     title: "Stats",
