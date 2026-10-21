@@ -143,7 +143,7 @@ async fn open_lyrics_panel(w: &mut LyricsWorld) {
     let elapsed = start.elapsed();
 
     w.network_call_made = elapsed > std::time::Duration::from_millis(500);
-    w.displayed_lyrics = result.ok();
+    w.displayed_lyrics = result.ok().map(|p| p.text);
 }
 
 #[then("the system should display the cached lyrics immediately without making a network request")]

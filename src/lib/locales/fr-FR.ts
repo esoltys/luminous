@@ -927,7 +927,17 @@ export const frFR: DeepStringRecord<typeof en> = {
     saveFailedPrefix: "Échec de l'enregistrement des paroles : ",
     noOnlineResults: "Aucune parole trouvée auprès des fournisseurs en ligne.",
     offlineNoLyrics: "Aucune parole enregistrée pour cette piste. Activez « En ligne » dans Paramètres › Intégrations pour les rechercher.",
-    insufficientMetadata: "Informations insuffisantes (artiste/titre) pour rechercher des paroles en ligne."
+    insufficientMetadata: "Informations insuffisantes (artiste/titre) pour rechercher des paroles en ligne.",
+    sourceHelpLabel: "Source des paroles",
+    sourceEmbedded: "Intégrées",
+    sourceEmbeddedTip: "Chargées depuis les métadonnées du fichier audio",
+    sourceSidecar: "Fichier associé",
+    sourceSidecarTip: "Chargées depuis un fichier local .lrc, .vtt ou .srt",
+    sourceOnlineTip: "Téléchargées depuis {provider}",
+    sourceManual: "Personnalisées",
+    sourceManualTip: "Paroles personnalisées enregistrées localement",
+    sourceCached: "En cache",
+    sourceCachedTip: "Enregistrées dans la base de données de la bibliothèque locale"
   },
   stats: {
     title: "Statistiques",

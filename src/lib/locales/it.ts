@@ -921,7 +921,17 @@ export const it = {
     saveFailedPrefix: "Salvataggio del testo non riuscito: ",
     noOnlineResults: "Nessun testo trovato presso alcun fornitore online.",
     offlineNoLyrics: "Nessun testo salvato per questo brano. Attiva «Online» in Impostazioni › Integrazioni per cercarlo.",
-    insufficientMetadata: "Informazioni sul brano (artista/titolo) insufficienti per cercare il testo online."
+    insufficientMetadata: "Informazioni sul brano (artista/titolo) insufficienti per cercare il testo online.",
+    sourceHelpLabel: "Fonte del testo",
+    sourceEmbedded: "Incorporato",
+    sourceEmbeddedTip: "Caricato dai tag dei metadati del file audio",
+    sourceSidecar: "File associato",
+    sourceSidecarTip: "Caricato da un file locale .lrc, .vtt o .srt",
+    sourceOnlineTip: "Scaricato da {provider}",
+    sourceManual: "Manuale",
+    sourceManualTip: "Testo personalizzato salvato in locale",
+    sourceCached: "In cache",
+    sourceCachedTip: "Memorizzato nel database della raccolta locale"
   },
   stats: {
     title: "Statistiche",

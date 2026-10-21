@@ -18,8 +18,10 @@
   import { prefs } from "../stores/prefs.svelte";
   import { rememberScroll } from "../utils/scrollMemory";
   import { parseLrc } from "../utils/lrc";
+  import type { LyricsPayload, LyricsSource } from "../types";
 
   let lyricsText = $state("");
+  let lyricsSource = $state<LyricsSource | null>(null);
   let userOffsetMs = $state(0);
   let isLoading = $state(false);
   let errorMsg = $state("");
@@ -61,10 +63,53 @@
     return matchIdx;
   });
 
+  let sourceBadgeInfo = $derived.by(() => {
+    if (!lyricsSource || !lyricsText) return null;
+    switch (lyricsSource) {
+      case "embedded":
+        return {
+          label: i18n.t("lyrics.sourceEmbedded", {}, "Embedded"),
+          tip: i18n.t("lyrics.sourceEmbeddedTip", {}, "Loaded from audio file metadata tags"),
+        };
+      case "sidecar":
+        return {
+          label: i18n.t("lyrics.sourceSidecar", {}, "Sidecar"),
+          tip: i18n.t("lyrics.sourceSidecarTip", {}, "Loaded from a local .lrc, .vtt, or .srt file"),
+        };
+      case "lrclib":
+        return {
+          label: "LRCLIB",
+          tip: i18n.t("lyrics.sourceOnlineTip", { provider: "LRCLIB" }, "Downloaded from LRCLIB"),
+        };
+      case "netease":
+        return {
+          label: "NetEase",
+          tip: i18n.t("lyrics.sourceOnlineTip", { provider: "NetEase" }, "Downloaded from NetEase"),
+        };
+      case "lyrics_ovh":
+        return {
+          label: "Lyrics.ovh",
+          tip: i18n.t("lyrics.sourceOnlineTip", { provider: "Lyrics.ovh" }, "Downloaded from Lyrics.ovh"),
+        };
+      case "manual":
+        return {
+          label: i18n.t("lyrics.sourceManual", {}, "Manual"),
+          tip: i18n.t("lyrics.sourceManualTip", {}, "Custom lyrics saved locally"),
+        };
+      case "unknown":
+      default:
+        return {
+          label: i18n.t("lyrics.sourceCached", {}, "Cached"),
+          tip: i18n.t("lyrics.sourceCachedTip", {}, "Stored in local library database"),
+        };
+    }
+  });
+
   async function loadLyrics(songId: number | undefined, forceRefresh = false) {
     if (songId === undefined) {
       console.log("[LyricsView] loadLyrics: no songId provided");
       lyricsText = "";
+      lyricsSource = null;
       errorMsg = "";
       return;
     }
@@ -72,6 +117,7 @@
     if (playerStore.currentSong?.is_instrumental) {
       console.log("[LyricsView] loadLyrics: track is instrumental, skipping fetch");
       lyricsText = "";
+      lyricsSource = null;
       errorMsg = "";
       return;
     }
@@ -82,15 +128,19 @@
     isEditing = false;
 
     try {
-      const lyrics = await invoke<string>("get_lyrics", { songId, forceRefresh });
-      console.log(`[LyricsView] get_lyrics returned lyrics of length: ${lyrics?.length || 0}`);
+      const payload = await invoke<LyricsPayload | string>("get_lyrics", { songId, forceRefresh });
+      const lyrics = typeof payload === "string" ? payload : payload.text;
+      const source = typeof payload === "string" ? "unknown" : payload.source;
+      console.log(`[LyricsView] get_lyrics returned lyrics of length: ${lyrics?.length || 0}, source: ${source}`);
       lyricsText = lyrics;
+      lyricsSource = source;
 
       // Keep the shared player store in sync so other views (e.g. the Now
       // Playing detail panel's Lyrics status) reflect a freshly downloaded
       // or refetched lyric immediately, not just after the next track change.
       if (playerStore.currentSong && playerStore.currentSong.id === songId) {
         playerStore.currentSong.lyrics = lyrics;
+        playerStore.currentSong.lyrics_source = source;
       }
 
       let cleanEditText = lyrics;
@@ -122,6 +172,7 @@
         errorMsg = errStr;
       }
       lyricsText = "";
+      lyricsSource = null;
       editText = "";
     } finally {
       isLoading = false;
@@ -137,6 +188,7 @@
       playerStore.currentSong.is_instrumental = isInstrumental;
       if (isInstrumental) {
         lyricsText = "";
+        lyricsSource = null;
         errorMsg = "";
       } else {
         await loadLyrics(songId, true);
@@ -153,7 +205,9 @@
       console.log(`[LyricsView] Manually saving lyrics for songId: ${playerStore.currentSong.id}`);
       await invoke("save_lyrics", { songId: playerStore.currentSong.id, lyrics: editText });
       lyricsText = editText;
+      lyricsSource = "manual";
       playerStore.currentSong.lyrics = editText;
+      playerStore.currentSong.lyrics_source = "manual";
       if (playerStore.currentSong.is_instrumental) {
         await invoke("set_instrumental", { songId: playerStore.currentSong.id, isInstrumental: false });
         playerStore.currentSong.is_instrumental = false;
@@ -272,6 +326,22 @@
             <Music2 class="w-3.5 h-3.5" /> {i18n.t('lyrics.unmarkInstrumental', {}, "Unmark Instrumental")}
           </Button>
         {:else if !isEditing}
+          {#if sourceBadgeInfo}
+            <div
+              class="flex items-center bg-brand-sidebar border border-brand-border rounded-lg px-2 py-1 text-xs text-brand-text-secondary gap-1.5 shadow-sm"
+              id="lyrics-source-badge"
+              data-testid="lyrics-source-badge"
+            >
+              <span class="text-[11px] font-medium text-brand-text-primary" id="lyrics-source-value">
+                {sourceBadgeInfo.label}
+              </span>
+              <HelpTip
+                text={sourceBadgeInfo.tip}
+                label={i18n.t('lyrics.sourceHelpLabel', {}, 'Lyrics Source')}
+                describes="lyrics-source-value"
+              />
+            </div>
+          {/if}
           {#if isSynced}
             <div class="flex items-center bg-brand-sidebar border border-brand-border rounded-lg px-2 py-1 text-xs text-brand-text-secondary gap-1.5 shadow-sm">
               <button

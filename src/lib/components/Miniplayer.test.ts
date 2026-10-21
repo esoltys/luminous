@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, fireEvent } from "@testing-library/svelte";
+import { render, fireEvent, waitFor } from "@testing-library/svelte";
 import Miniplayer from "./Miniplayer.svelte";
 import { playerStore } from "../stores/player.svelte";
 import { collectionStore } from "../stores/collection.svelte";
@@ -312,6 +312,33 @@ describe("Miniplayer.svelte", () => {
     const getLyricsCalls = invokeMock.mock.calls.filter(([cmd]) => cmd === "get_lyrics");
     expect(getLyricsCalls.length).toBe(1);
     expect(getByText("No live lyrics available")).toBeInTheDocument();
+  });
+
+  it("unpacks lyrics text and source from structured LyricsPayload", async () => {
+    localStorage.setItem("miniplayer_show_lyrics", "true");
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockImplementation((cmd) => {
+      if (cmd === "get_lyrics") {
+        return Promise.resolve({
+          text: "[00:01.00] Synced line",
+          source: "lrclib",
+        } as any);
+      }
+      return Promise.resolve(0 as any);
+    });
+
+    playerStore.currentSong = {
+      ...mockSong,
+      lyrics: undefined,
+    };
+
+    const { getByText } = render(Miniplayer);
+
+    await waitFor(() => {
+      expect(getByText("Synced line")).toBeInTheDocument();
+    });
+    expect(playerStore.currentSong?.lyrics).toBe("[00:01.00] Synced line");
+    expect(playerStore.currentSong?.lyrics_source).toBe("lrclib");
   });
 
   describe("Session Wrap & Queue Completion (#1379)", () => {

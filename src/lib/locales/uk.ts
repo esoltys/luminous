@@ -965,7 +965,17 @@ export const uk = {
     saveFailedPrefix: "Не вдалося зберегти текст: ",
     noOnlineResults: "Жоден онлайн-постачальник не знайшов тексту.",
     offlineNoLyrics: "Для цього треку немає збереженого тексту. Увімкніть «В мережі» в Налаштування › Інтеграції, щоб знайти його.",
-    insufficientMetadata: "Недостатньо відомостей про пісню (виконавець/назва) для онлайн-пошуку тексту."
+    insufficientMetadata: "Недостатньо відомостей про пісню (виконавець/назва) для онлайн-пошуку тексту.",
+    sourceHelpLabel: "Джерело тексту",
+    sourceEmbedded: "Вбудований",
+    sourceEmbeddedTip: "Завантажено з тегів метаданих аудіофайлу",
+    sourceSidecar: "Зовнішній файл",
+    sourceSidecarTip: "Завантажено з локального файлу .lrc, .vtt або .srt",
+    sourceOnlineTip: "Завантажено з {provider}",
+    sourceManual: "Вручну",
+    sourceManualTip: "Користувацький текст, збережений локально",
+    sourceCached: "У кеші",
+    sourceCachedTip: "Збережено в локальній базі даних фонотеки"
   },
   stats: {
     title: "Статистика",

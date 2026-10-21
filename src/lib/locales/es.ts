@@ -921,7 +921,17 @@ export const es = {
     saveFailedPrefix: "No se pudo guardar la letra: ",
     noOnlineResults: "No se encontró la letra en ningún proveedor en línea.",
     offlineNoLyrics: "No hay letra guardada para esta pista. Activa «En línea» en Ajustes › Integraciones para buscarla.",
-    insufficientMetadata: "No hay suficiente información de la canción (artista y título) para buscar la letra en línea."
+    insufficientMetadata: "No hay suficiente información de la canción (artista y título) para buscar la letra en línea.",
+    sourceHelpLabel: "Fuente de la letra",
+    sourceEmbedded: "Incrustada",
+    sourceEmbeddedTip: "Cargada desde las etiquetas de metadatos del archivo de audio",
+    sourceSidecar: "Archivo asociado",
+    sourceSidecarTip: "Cargada desde un archivo local .lrc, .vtt o .srt",
+    sourceOnlineTip: "Descargada de {provider}",
+    sourceManual: "Manual",
+    sourceManualTip: "Letra personalizada guardada localmente",
+    sourceCached: "En caché",
+    sourceCachedTip: "Almacenada en la base de datos de la biblioteca local"
   },
   stats: {
     title: "Estadísticas",

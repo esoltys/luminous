@@ -252,6 +252,7 @@ pub struct Song {
     pub grouping: Option<String>,
     pub comment: Option<String>,
     pub lyrics: Option<String>,
+    pub lyrics_source: Option<String>,
 
     // Track info
     pub track: Option<i32>,

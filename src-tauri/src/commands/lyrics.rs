@@ -1,4 +1,4 @@
-use crate::lyrics::{get_lyrics_for_song, LyricsManager};
+use crate::lyrics::{get_lyrics_for_song, LyricsManager, LyricsPayload};
 use crate::AppState;
 use tauri::State;
 
@@ -7,7 +7,7 @@ pub async fn get_lyrics(
     state: State<'_, AppState>,
     song_id: i64,
     force_refresh: Option<bool>,
-) -> Result<String, String> {
+) -> Result<LyricsPayload, String> {
     let force_refresh = force_refresh.unwrap_or(false);
     log::debug!("get_lyrics called for song_id: {song_id}, force_refresh: {force_refresh}");
 
@@ -15,7 +15,11 @@ pub async fn get_lyrics(
     let result = get_lyrics_for_song(&state.db, &lyrics_manager, song_id, force_refresh).await;
 
     match &result {
-        Ok(lyrics) => log::debug!("get_lyrics resolved (len: {})", lyrics.len()),
+        Ok(payload) => log::debug!(
+            "get_lyrics resolved (source: {:?}, len: {})",
+            payload.source,
+            payload.text.len()
+        ),
         Err(e) => log::warn!("get_lyrics failed: {e}"),
     }
     result
@@ -53,7 +57,7 @@ pub async fn save_lyrics(
         }
 
         conn.execute(
-            "UPDATE songs SET lyrics = ?1 WHERE id = ?2",
+            "UPDATE songs SET lyrics = ?1, lyrics_source = 'manual' WHERE id = ?2",
             rusqlite::params![lyrics, song_id],
         )?;
         Ok(())
