@@ -6,6 +6,8 @@ import {
   rgbToHex,
   pickAccessibleOnColor,
   clampForContrast,
+  ensureLightnessSeparation,
+  calculateContrastRatio,
   isLightColor,
   rgbToHsl,
   hslToRgb,
@@ -464,6 +466,38 @@ export function buildExtractedColors(colorCounts: ColorCount[]): ExtractedColors
     accentHoverRgb = clampLightness(lightVibrant, 0.45, 0.85);
     borderRgb = clampLightness(muted, 0.20, 0.50);
   }
+
+  const primaryHex = rgbToHex(primaryRgb.r, primaryRgb.g, primaryRgb.b);
+  let accentHex = rgbToHex(accentRgb.r, accentRgb.g, accentRgb.b);
+
+  // Guarantee WCAG 2.1 SC 1.4.11 non-text contrast (>= 3:1) for accent against canvas
+  if (calculateContrastRatio(accentHex, primaryHex) < 3.0) {
+    const altArchetype = isLight ? darkVibrant : lightVibrant;
+    const altHex = rgbToHex(altArchetype.r, altArchetype.g, altArchetype.b);
+    if (calculateContrastRatio(altHex, primaryHex) >= 3.0) {
+      accentRgb = altArchetype;
+      accentHex = altHex;
+    } else {
+      accentHex = clampForContrast(accentHex, primaryHex, 3.0);
+      accentRgb = hexToRgb(accentHex);
+    }
+  }
+
+  // Ensure accent hover maintains non-text contrast and interactive distinction
+  let accentHoverHex = rgbToHex(accentHoverRgb.r, accentHoverRgb.g, accentHoverRgb.b);
+  if (calculateContrastRatio(accentHoverHex, primaryHex) < 3.0) {
+    accentHoverHex = clampForContrast(accentHoverHex, primaryHex, 3.0);
+    accentHoverRgb = hexToRgb(accentHoverHex);
+  }
+  if (accentHoverHex === accentHex) {
+    accentHoverHex = ensureLightnessSeparation(accentHoverHex, accentHex, 0.08);
+    accentHoverRgb = hexToRgb(accentHoverHex);
+  }
+
+  // Ensure border maintains at least 12% lightness separation from canvas
+  let borderHex = rgbToHex(borderRgb.r, borderRgb.g, borderRgb.b);
+  borderHex = ensureLightnessSeparation(borderHex, primaryHex, 0.12);
+  borderRgb = hexToRgb(borderHex);
 
   return {
     vibrant: rgbToHex(vibrant.r, vibrant.g, vibrant.b),
@@ -1095,7 +1129,6 @@ export class ThemeStore {
     const resolvedAccent = theme.id === "dynamic-artwork"
       ? (this.artworkColors || getFallbackColors()).accent
       : colors["color-accent"];
-    const accentContrastText = pickAccessibleOnColor(resolvedAccent);
 
     // "Accent Text" — the only accent-derived color allowed on text/icons
     // (everything else must be Primary or Secondary text). Unlike
@@ -1119,6 +1152,15 @@ export class ThemeStore {
     const resolvedAccentHover = theme.id === "dynamic-artwork"
       ? (this.artworkColors || getFallbackColors()).accentHover
       : colors["color-accent-hover"];
+    const resolvedBorder = theme.id === "dynamic-artwork"
+      ? (this.artworkColors || getFallbackColors()).border
+      : colors["color-border"];
+
+    // Non-text UI components (graphs, curves, nodes, sliders) require >= 3:1 contrast against bg-main (WCAG 2.1 SC 1.4.11).
+    const safeAccent = clampForContrast(resolvedAccent, resolvedBgMain, 3.0);
+    const safeBorder = ensureLightnessSeparation(resolvedBorder, resolvedBgMain, 0.12);
+
+    const accentContrastText = pickAccessibleOnColor(safeAccent);
     const accentText = clampForContrast(resolvedAccent, resolvedBgMain, 4.5);
     const accentTextHover = clampForContrast(resolvedAccentHover, resolvedBgMain, 4.5);
 
@@ -1140,11 +1182,11 @@ export class ThemeStore {
         --bg-main: ${colors["bg-main"]};
         --bg-sidebar: ${colors["bg-sidebar"]};
         --bg-playerbar: ${colors["bg-playerbar"]};
-        --color-accent: ${colors["color-accent"]};
+        --color-accent: ${theme.id === "dynamic-artwork" ? colors["color-accent"] : safeAccent};
         --color-accent-hover: ${colors["color-accent-hover"]};
         --color-text-primary: ${textPrimary};
         --color-text-secondary: ${textSecondary};
-        --color-border: ${colors["color-border"]};
+        --color-border: ${theme.id === "dynamic-artwork" ? colors["color-border"] : safeBorder};
         --color-accent-contrast: ${accentContrastText};
         --color-accent-text: ${accentText};
         --color-accent-text-hover: ${accentTextHover};
@@ -1152,7 +1194,7 @@ export class ThemeStore {
     `;
 
     // resolvedAccent (not colors["color-accent"]) — see applyGlassVars().
-    this.applyGlassVars(resolvedBgMain, resolvedBgSidebar, resolvedBgPlayerbar, resolvedAccent);
+    this.applyGlassVars(resolvedBgMain, resolvedBgSidebar, resolvedBgPlayerbar, safeAccent);
   }
 }
 

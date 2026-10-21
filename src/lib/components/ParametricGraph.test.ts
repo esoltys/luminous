@@ -41,12 +41,28 @@ function mockPlotBox(plot: HTMLElement) {
 
 describe("ParametricGraph.svelte", () => {
   it("labels each node with its kind and values", () => {
-    const { getByRole } = setup([
+    const { getByRole, node } = setup([
       { kind: "low_shelf", freq: 105, gain_db: 3, q: 0.71, enabled: true },
       peak(1000, -2.5, 1.4),
+      { kind: "high_shelf", freq: 8000, gain_db: 2, q: 0.71, enabled: false },
     ]);
     expect(getByRole("button", { name: "Band 1: Low shelf, 105 Hz, +3.0 dB, Q 0.71" })).toBeInTheDocument();
     expect(getByRole("button", { name: "Band 2: Peak, 1000 Hz, -2.5 dB, Q 1.40" })).toBeInTheDocument();
+    expect(getByRole("button", { name: "Band 3: High shelf, 8000 Hz, +2.0 dB, Q 0.71" })).toBeInTheDocument();
+
+    // Node 0: low shelf (gold fill) uses high-contrast dark text
+    expect(node(0).className).toContain("text-neutral-900");
+    expect(node(0).className).toContain("bg-brand-gold");
+    expect(node(0).className).not.toContain("text-brand-main");
+
+    // Node 1: peak (accent fill) uses text-brand-accent-contrast (#1730)
+    expect(node(1).className).toContain("text-brand-accent-contrast");
+    expect(node(1).className).toContain("bg-brand-accent");
+    expect(node(1).className).not.toContain("text-brand-main");
+
+    // Node 2: disabled band uses muted background and secondary text
+    expect(node(2).className).toContain("bg-brand-main");
+    expect(node(2).className).toContain("text-brand-text-secondary");
   });
 
   it("nudges frequency by 1/24 octave, or 1/3 with Shift", async () => {

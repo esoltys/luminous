@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { PREDEFINED_THEMES, LUMINOUS_DARK_COLORS, LUMINOUS_LIGHT_COLORS, withReadableText } from "./theme.svelte";
-import { checkWcagCompliance, pickAccessibleOnColor } from "../utils/colorUtils";
+import { PREDEFINED_THEMES, LUMINOUS_DARK_COLORS, LUMINOUS_LIGHT_COLORS, withReadableText, buildExtractedColors } from "./theme.svelte";
+import { checkWcagCompliance, pickAccessibleOnColor, calculateContrastRatio, hexToRgb, rgbToHsl } from "../utils/colorUtils";
 
 describe("PREDEFINED_THEMES", () => {
   it("has dynamic-artwork (✨ Luminous) as the first theme in the list", () => {
@@ -123,5 +123,40 @@ describe("withReadableText (theme builder)", () => {
   it("ignores half-typed hex values", () => {
     const colors = { ...LUMINOUS_DARK_COLORS, "bg-main": "#ee" };
     expect(withReadableText(colors)).toBe(colors);
+  });
+});
+
+describe("monochromatic album cover contrast invariants (#1730)", () => {
+  it("enforces WCAG 2.1 SC 1.4.11 non-text contrast (>= 3:1) for monochromatic teal art (Radical Optimism)", () => {
+    // Dua Lipa - Radical Optimism oceanic teal (#397077)
+    const tealCounts = [{ r: 57, g: 112, b: 119, count: 1000 }];
+    const extracted = buildExtractedColors(tealCounts);
+
+    // Accent must meet >= 3:1 non-text contrast against primary canvas background
+    const accentContrast = calculateContrastRatio(extracted.accent, extracted.primary);
+    expect(accentContrast).toBeGreaterThanOrEqual(3.0);
+
+    // Border must maintain >= 12% lightness separation from primary canvas
+    const primHsl = rgbToHsl(...(Object.values(hexToRgb(extracted.primary)) as [number, number, number]));
+    const borderHsl = rgbToHsl(...(Object.values(hexToRgb(extracted.border)) as [number, number, number]));
+    expect(Math.abs(borderHsl.l - primHsl.l)).toBeGreaterThanOrEqual(0.12);
+
+    // On-accent contrast text must be legible
+    const onAccent = pickAccessibleOnColor(extracted.accent);
+    expect(calculateContrastRatio(onAccent, extracted.accent)).toBeGreaterThanOrEqual(3.0);
+  });
+
+  it("enforces non-text contrast and border separation for light monochromatic art", () => {
+    // Light pastel mint/teal (#c8e6c9)
+    const lightCounts = [{ r: 200, g: 230, b: 201, count: 1000 }];
+    const extracted = buildExtractedColors(lightCounts);
+
+    expect(extracted.isLight).toBe(true);
+    const accentContrast = calculateContrastRatio(extracted.accent, extracted.primary);
+    expect(accentContrast).toBeGreaterThanOrEqual(3.0);
+
+    const primHsl = rgbToHsl(...(Object.values(hexToRgb(extracted.primary)) as [number, number, number]));
+    const borderHsl = rgbToHsl(...(Object.values(hexToRgb(extracted.border)) as [number, number, number]));
+    expect(Math.abs(borderHsl.l - primHsl.l)).toBeGreaterThanOrEqual(0.12);
   });
 });

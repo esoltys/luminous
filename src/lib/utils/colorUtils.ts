@@ -145,39 +145,97 @@ export function pickAccessibleOnColor(backgroundColor: string): string {
   return brightness > 128 ? '#000000' : '#ffffff';
 }
 
+const HEX6_PATTERN = /^#?[0-9a-f]{6}$/i;
+
 /**
  * Clamps a color to a minimum contrast ratio against a background by
  * stepping its HSL lightness toward black (light backgrounds) or white
  * (dark backgrounds), holding hue+saturation fixed so it stays recognizably
  * "the accent" rather than jumping to an unrelated color the way
  * pickAccessibleOnColor()'s binary white/black choice would. Used to derive
- * an "Accent Text" color — any accent-colored text/icon in the app should
- * use this instead of the raw accent, since the raw accent's own contrast
- * guarantee (enforced in theme.test.ts) is only checked against bg-main at
- * theme-authoring time, not against every surface it might render on, and
- * user-chosen custom/dynamic-artwork accents have no guarantee at all.
+ * accessible accent text and ensure non-text UI components meet WCAG contrast.
+ *
+ * @param hex Foreground color string (#RRGGBB)
+ * @param backgroundHex Background color string (#RRGGBB)
+ * @param minRatio Target WCAG contrast ratio (defaults to 4.5:1 for text, pass 3.0 for non-text/UI components)
+ * @returns Contrast-compliant hex color string
  */
 export function clampForContrast(hex: string, backgroundHex: string, minRatio = 4.5): string {
+  if (!HEX6_PATTERN.test(hex) || !HEX6_PATTERN.test(backgroundHex)) return hex;
   if (calculateContrastRatio(hex, backgroundHex) >= minRatio) return hex;
 
   const bgIsLight = isLightColor(backgroundHex);
   const rgb = hexToRgb(hex);
-  let hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
-  let candidateHex = hex;
+  const initialHsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
 
-  for (let i = 0; i < MAX_CONTRAST_ADJUST_STEPS; i++) {
-    const nextL = bgIsLight ? hsl.l - LIGHTNESS_STEP : hsl.l + LIGHTNESS_STEP;
-    if (nextL < 0 || nextL > 1) break;
-    hsl = { ...hsl, l: nextL };
-    const candidateRgb = hslToRgb(hsl.h, hsl.s, hsl.l);
-    candidateHex = rgbToHex(candidateRgb.r, candidateRgb.g, candidateRgb.b);
-    if (calculateContrastRatio(candidateHex, backgroundHex) >= minRatio) return candidateHex;
+  const stepDirection = (direction: 1 | -1): { hex: string; ratio: number } => {
+    let hsl = { ...initialHsl };
+    let bestHex = hex;
+    let bestRatio = calculateContrastRatio(hex, backgroundHex);
+
+    for (let i = 0; i < MAX_CONTRAST_ADJUST_STEPS; i++) {
+      const nextL = hsl.l + direction * LIGHTNESS_STEP;
+      if (nextL < 0 || nextL > 1) break;
+      hsl = { ...hsl, l: nextL };
+      const candidateRgb = hslToRgb(hsl.h, hsl.s, hsl.l);
+      const candidateHex = rgbToHex(candidateRgb.r, candidateRgb.g, candidateRgb.b);
+      const ratio = calculateContrastRatio(candidateHex, backgroundHex);
+      if (ratio > bestRatio) {
+        bestRatio = ratio;
+        bestHex = candidateHex;
+      }
+      if (ratio >= minRatio) return { hex: candidateHex, ratio };
+    }
+    return { hex: bestHex, ratio: bestRatio };
+  };
+
+  // Primary direction: away from background lightness
+  const primaryDir = bgIsLight ? -1 : 1;
+  const primaryResult = stepDirection(primaryDir);
+  if (primaryResult.ratio >= minRatio) return primaryResult.hex;
+
+  // Secondary direction fallback (if boundaries or mid-luminance backgrounds blocked primary)
+  const secondaryResult = stepDirection(primaryDir === 1 ? -1 : 1);
+  if (secondaryResult.ratio >= minRatio) return secondaryResult.hex;
+
+  return primaryResult.ratio >= secondaryResult.ratio ? primaryResult.hex : secondaryResult.hex;
+}
+
+/**
+ * Ensures a color has at least a minimum lightness separation in HSL space
+ * from a target background, stepping lightness away from the background.
+ *
+ * @param hex Target color string (e.g. border color)
+ * @param backgroundHex Surface background color string
+ * @param minDelta Minimum required lightness delta (0.0 to 1.0, defaults to 0.12)
+ * @returns Lightness-separated hex color string
+ */
+export function ensureLightnessSeparation(hex: string, backgroundHex: string, minDelta = 0.12): string {
+  if (!HEX6_PATTERN.test(hex) || !HEX6_PATTERN.test(backgroundHex)) return hex;
+
+  const fgRgb = hexToRgb(hex);
+  const bgRgb = hexToRgb(backgroundHex);
+  const fgHsl = rgbToHsl(fgRgb.r, fgRgb.g, fgRgb.b);
+  const bgHsl = rgbToHsl(bgRgb.r, bgRgb.g, bgRgb.b);
+
+  if (Math.abs(fgHsl.l - bgHsl.l) >= minDelta - 0.002) {
+    return hex;
   }
 
-  // Ran out of lightness room (e.g. a near-gray accent) without clearing
-  // minRatio — return the most extreme candidate reached rather than the
-  // original, since it's strictly closer to compliant.
-  return candidateHex;
+  const bgIsLight = isLightColor(backgroundHex);
+  // Add slight padding (+0.005) so 8-bit RGB integer quantization does not drop below minDelta
+  const effectiveDelta = minDelta + 0.005;
+  // On light backgrounds, step border darker; on dark backgrounds, step border lighter.
+  let targetL = bgIsLight ? bgHsl.l - effectiveDelta : bgHsl.l + effectiveDelta;
+  if (targetL < 0) {
+    targetL = bgHsl.l + effectiveDelta;
+  } else if (targetL > 1) {
+    targetL = bgHsl.l - effectiveDelta;
+  }
+  targetL = Math.max(0, Math.min(1, targetL));
+
+  const separatedRgb = hslToRgb(fgHsl.h, fgHsl.s, targetL);
+  return rgbToHex(separatedRgb.r, separatedRgb.g, separatedRgb.b);
 }
 
 export interface HSL {
