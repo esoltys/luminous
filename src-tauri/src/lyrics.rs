@@ -5,7 +5,10 @@
 use anyhow::Result;
 use std::path::{Path, PathBuf};
 
-pub use luminous_remote::lyrics::*;
+pub use luminous_remote::lyrics::{
+    clean_featured_title, is_synced_lrc, LyricsClient, LyricsEndpoints, LyricsManager,
+    LyricsProvider, LyricsQuery, LyricsResult,
+};
 
 /// Normalize a filename stem or title string for robust matching:
 /// lowercases and replaces punctuation/separators with whitespace.
@@ -527,16 +530,16 @@ pub async fn get_lyrics_for_song(
     }
 
     // 3. Query online APIs (LRCLIB -> NetEase -> Lyrics.ovh)
-    match lyrics_manager
-        .fetch_lyrics(&artist, &title, &album, duration_sec)
-        .await
-    {
-        Ok(fetched) => {
-            let synced = is_synced_lrc(&fetched);
-            let final_lyrics = if synced {
-                fetched
+    let query = LyricsQuery::new(&artist, &title)
+        .with_album(&album)
+        .with_duration(duration_sec);
+
+    match lyrics_manager.fetch_with_fallback(&query).await {
+        Ok(result) => {
+            let final_lyrics = if result.is_synced {
+                result.text
             } else {
-                format!("[synced:false]\n{fetched}")
+                format!("[synced:false]\n{}", result.text)
             };
             conn.execute(
                 "UPDATE songs SET lyrics = ?1 WHERE id = ?2",

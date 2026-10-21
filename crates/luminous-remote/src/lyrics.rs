@@ -5,7 +5,7 @@
 
 use anyhow::{anyhow, Result};
 use reqwest::Client;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 #[derive(Deserialize, Debug)]
@@ -108,10 +108,91 @@ pub fn clean_featured_title(title: &str) -> String {
     cleaned.trim().to_string()
 }
 
-/// Holds the HTTP client used for provider requests.
+/// Configurable endpoint URLs for lyric providers.
+#[derive(Clone, Debug)]
+pub struct LyricsEndpoints {
+    pub lrclib_base_url: String,
+    pub netease_base_url: String,
+    pub lyrics_ovh_base_url: String,
+}
+
+impl Default for LyricsEndpoints {
+    fn default() -> Self {
+        Self {
+            lrclib_base_url: "https://lrclib.net".to_string(),
+            netease_base_url: "https://music.163.com".to_string(),
+            lyrics_ovh_base_url: "https://api.lyrics.ovh".to_string(),
+        }
+    }
+}
+
+/// Supported online lyric providers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LyricsProvider {
+    LrcLib,
+    NetEase,
+    LyricsOvh,
+}
+
+impl std::fmt::Display for LyricsProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::LrcLib => write!(f, "LRCLIB"),
+            Self::NetEase => write!(f, "NetEase Cloud Music"),
+            Self::LyricsOvh => write!(f, "Lyrics.ovh"),
+        }
+    }
+}
+
+/// Request parameters for online lyrics resolution.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LyricsQuery {
+    pub artist: String,
+    pub title: String,
+    pub album: Option<String>,
+    pub duration_sec: u32,
+}
+
+impl LyricsQuery {
+    pub fn new(artist: impl Into<String>, title: impl Into<String>) -> Self {
+        Self {
+            artist: artist.into(),
+            title: title.into(),
+            album: None,
+            duration_sec: 0,
+        }
+    }
+
+    pub fn with_album(mut self, album: impl Into<String>) -> Self {
+        let alb = album.into();
+        self.album = if alb.trim().is_empty() {
+            None
+        } else {
+            Some(alb)
+        };
+        self
+    }
+
+    pub fn with_duration(mut self, duration_sec: u32) -> Self {
+        self.duration_sec = duration_sec;
+        self
+    }
+}
+
+/// Resolved lyrics and provider provenance.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LyricsResult {
+    pub text: String,
+    pub is_synced: bool,
+    pub provider: LyricsProvider,
+}
+
+/// Holds the HTTP client and endpoint configuration used for provider requests.
 #[derive(Clone)]
 pub struct LyricsClient {
     client: Client,
+    endpoints: LyricsEndpoints,
 }
 
 pub type LyricsManager = LyricsClient;
@@ -124,23 +205,183 @@ impl Default for LyricsClient {
 
 impl LyricsClient {
     pub fn new() -> Self {
-        Self {
-            client: Client::builder()
+        Self::with_client_and_endpoints(
+            Client::builder()
                 .timeout(Duration::from_secs(6))
                 .user_agent(concat!("LuminousMusicPlayer/", env!("CARGO_PKG_VERSION")))
                 .build()
                 .unwrap_or_default(),
-        }
+            LyricsEndpoints::default(),
+        )
     }
 
     pub fn with_client(client: Client) -> Self {
-        Self { client }
+        Self::with_client_and_endpoints(client, LyricsEndpoints::default())
+    }
+
+    pub fn with_endpoints(endpoints: LyricsEndpoints) -> Self {
+        Self::with_client_and_endpoints(
+            Client::builder()
+                .timeout(Duration::from_secs(6))
+                .user_agent(concat!("LuminousMusicPlayer/", env!("CARGO_PKG_VERSION")))
+                .build()
+                .unwrap_or_default(),
+            endpoints,
+        )
+    }
+
+    pub fn with_client_and_endpoints(client: Client, endpoints: LyricsEndpoints) -> Self {
+        Self { client, endpoints }
     }
 
     /// Search LRCLIB, NetEase Cloud Music, and Lyrics.ovh in priority order,
     /// returning the first **synced** result found (short-circuits immediately).
     /// If none of the providers return synced lyrics, falls back to whichever
     /// plain-text result was found first rather than failing outright.
+    pub async fn fetch_with_fallback(&self, query: &LyricsQuery) -> Result<LyricsResult> {
+        let mut best_result: Option<LyricsResult> = None;
+
+        // 1. Try LRCLIB primary (with album if present)
+        if let Ok(lyrics) = self
+            .fetch_lrclib(
+                &query.artist,
+                &query.title,
+                query.album.as_deref(),
+                query.duration_sec,
+            )
+            .await
+        {
+            let is_synced = is_synced_lrc(&lyrics);
+            let result = LyricsResult {
+                text: lyrics,
+                is_synced,
+                provider: LyricsProvider::LrcLib,
+            };
+            if is_synced {
+                return Ok(result);
+            }
+            if best_result.is_none() {
+                best_result = Some(result);
+            }
+        }
+
+        // 1b. Try LRCLIB fallback (omitting the album if it was provided)
+        if query.album.is_some() {
+            if let Ok(lyrics) = self
+                .fetch_lrclib(&query.artist, &query.title, None, query.duration_sec)
+                .await
+            {
+                let is_synced = is_synced_lrc(&lyrics);
+                let result = LyricsResult {
+                    text: lyrics,
+                    is_synced,
+                    provider: LyricsProvider::LrcLib,
+                };
+                if is_synced {
+                    return Ok(result);
+                }
+                if best_result.is_none() {
+                    best_result = Some(result);
+                }
+            }
+        }
+
+        // 2. Try NetEase Cloud Music
+        if let Ok(lyrics) = self
+            .fetch_netease(&query.artist, &query.title, query.duration_sec)
+            .await
+        {
+            let is_synced = is_synced_lrc(&lyrics);
+            let result = LyricsResult {
+                text: lyrics,
+                is_synced,
+                provider: LyricsProvider::NetEase,
+            };
+            if is_synced {
+                return Ok(result);
+            }
+            if best_result.is_none() {
+                best_result = Some(result);
+            }
+        }
+
+        // 3. Try Lyrics.ovh fallback (plain text)
+        if let Ok(lyrics) = self.fetch_lyrics_ovh(&query.artist, &query.title).await {
+            let is_synced = is_synced_lrc(&lyrics);
+            let result = LyricsResult {
+                text: lyrics,
+                is_synced,
+                provider: LyricsProvider::LyricsOvh,
+            };
+            if is_synced {
+                return Ok(result);
+            }
+            if best_result.is_none() {
+                best_result = Some(result);
+            }
+        }
+
+        // 4. Clean title of featured artist annotations and retry
+        let cleaned_title = clean_featured_title(&query.title);
+        if cleaned_title != query.title {
+            if let Ok(lyrics) = self
+                .fetch_lrclib(&query.artist, &cleaned_title, None, query.duration_sec)
+                .await
+            {
+                let is_synced = is_synced_lrc(&lyrics);
+                let result = LyricsResult {
+                    text: lyrics,
+                    is_synced,
+                    provider: LyricsProvider::LrcLib,
+                };
+                if is_synced {
+                    return Ok(result);
+                }
+                if best_result.is_none() {
+                    best_result = Some(result);
+                }
+            }
+            if let Ok(lyrics) = self
+                .fetch_netease(&query.artist, &cleaned_title, query.duration_sec)
+                .await
+            {
+                let is_synced = is_synced_lrc(&lyrics);
+                let result = LyricsResult {
+                    text: lyrics,
+                    is_synced,
+                    provider: LyricsProvider::NetEase,
+                };
+                if is_synced {
+                    return Ok(result);
+                }
+                if best_result.is_none() {
+                    best_result = Some(result);
+                }
+            }
+            if let Ok(lyrics) = self.fetch_lyrics_ovh(&query.artist, &cleaned_title).await {
+                let is_synced = is_synced_lrc(&lyrics);
+                let result = LyricsResult {
+                    text: lyrics,
+                    is_synced,
+                    provider: LyricsProvider::LyricsOvh,
+                };
+                if is_synced {
+                    return Ok(result);
+                }
+                if best_result.is_none() {
+                    best_result = Some(result);
+                }
+            }
+        }
+
+        if let Some(res) = best_result {
+            return Ok(res);
+        }
+
+        Err(anyhow!("no lyrics found on any online provider"))
+    }
+
+    /// Legacy convenience wrapper preserving the previous string-only signature.
     pub async fn fetch_lyrics(
         &self,
         artist: &str,
@@ -148,91 +389,10 @@ impl LyricsClient {
         album: &str,
         duration_sec: u32,
     ) -> Result<String> {
-        let mut best_lyrics: Option<String> = None;
-
-        // 1. Try LRCLIB primary (highly specific with track, album, and duration)
-        if let Ok(lyrics) = self
-            .fetch_lrclib(artist, title, Some(album), duration_sec)
-            .await
-        {
-            if is_synced_lrc(&lyrics) {
-                return Ok(lyrics);
-            }
-            if best_lyrics.is_none() {
-                best_lyrics = Some(lyrics);
-            }
-        }
-
-        // 1b. Try LRCLIB fallback (omitting the album)
-        if let Ok(lyrics) = self.fetch_lrclib(artist, title, None, duration_sec).await {
-            if is_synced_lrc(&lyrics) {
-                return Ok(lyrics);
-            }
-            if best_lyrics.is_none() {
-                best_lyrics = Some(lyrics);
-            }
-        }
-
-        // 2. Try NetEase Cloud Music
-        if let Ok(lyrics) = self.fetch_netease(artist, title, duration_sec).await {
-            if is_synced_lrc(&lyrics) {
-                return Ok(lyrics);
-            }
-            if best_lyrics.is_none() {
-                best_lyrics = Some(lyrics);
-            }
-        }
-
-        // 3. Try Lyrics.ovh fallback (plain text)
-        if let Ok(lyrics) = self.fetch_lyrics_ovh(artist, title).await {
-            if is_synced_lrc(&lyrics) {
-                return Ok(lyrics);
-            }
-            if best_lyrics.is_none() {
-                best_lyrics = Some(lyrics);
-            }
-        }
-
-        // 4. Clean title of featured artist annotations and retry
-        let cleaned_title = clean_featured_title(title);
-        if cleaned_title != title {
-            if let Ok(lyrics) = self
-                .fetch_lrclib(artist, &cleaned_title, None, duration_sec)
-                .await
-            {
-                if is_synced_lrc(&lyrics) {
-                    return Ok(lyrics);
-                }
-                if best_lyrics.is_none() {
-                    best_lyrics = Some(lyrics);
-                }
-            }
-            if let Ok(lyrics) = self
-                .fetch_netease(artist, &cleaned_title, duration_sec)
-                .await
-            {
-                if is_synced_lrc(&lyrics) {
-                    return Ok(lyrics);
-                }
-                if best_lyrics.is_none() {
-                    best_lyrics = Some(lyrics);
-                }
-            }
-            if let Ok(lyrics) = self.fetch_lyrics_ovh(artist, &cleaned_title).await {
-                if is_synced_lrc(&lyrics) {
-                    return Ok(lyrics);
-                }
-                if best_lyrics.is_none() {
-                    best_lyrics = Some(lyrics);
-                }
-            }
-        }
-
-        if let Some(lyrics) = best_lyrics {
-            return Ok(lyrics);
-        }
-
-        Err(anyhow!("no lyrics found on any online provider"))
+        let query = LyricsQuery::new(artist, title)
+            .with_album(album)
+            .with_duration(duration_sec);
+        self.fetch_with_fallback(&query).await.map(|r| r.text)
     }
 
     pub async fn fetch_lrclib(
@@ -243,7 +403,8 @@ impl LyricsClient {
         duration_sec: u32,
     ) -> Result<String> {
         let mut url = format!(
-            "https://lrclib.net/api/get?artist_name={}&track_name={}&duration={}",
+            "{}/api/get?artist_name={}&track_name={}&duration={}",
+            self.endpoints.lrclib_base_url.trim_end_matches('/'),
             percent_encoding::utf8_percent_encode(artist, percent_encoding::NON_ALPHANUMERIC),
             percent_encoding::utf8_percent_encode(title, percent_encoding::NON_ALPHANUMERIC),
             duration_sec
@@ -283,11 +444,14 @@ impl LyricsClient {
         duration_sec: u32,
     ) -> Result<String> {
         let query = format!("{artist} {title}");
-        let search_url = "https://music.163.com/api/cloudsearch/pc";
+        let search_url = format!(
+            "{}/api/cloudsearch/pc",
+            self.endpoints.netease_base_url.trim_end_matches('/')
+        );
 
         let response = self
             .client
-            .post(search_url)
+            .post(&search_url)
             .header("Referer", "https://music.163.com/")
             .form(&[
                 ("s", query.as_str()),
@@ -317,7 +481,8 @@ impl LyricsClient {
         };
 
         let lyric_url = format!(
-            "https://music.163.com/api/song/lyric?id={}&lv=1&kv=1&tv=-1",
+            "{}/api/song/lyric?id={}&lv=1&kv=1&tv=-1",
+            self.endpoints.netease_base_url.trim_end_matches('/'),
             song.id
         );
 
@@ -346,7 +511,8 @@ impl LyricsClient {
 
     pub async fn fetch_lyrics_ovh(&self, artist: &str, title: &str) -> Result<String> {
         let url = format!(
-            "https://api.lyrics.ovh/v1/{}/{}",
+            "{}/v1/{}/{}",
+            self.endpoints.lyrics_ovh_base_url.trim_end_matches('/'),
             percent_encoding::utf8_percent_encode(artist, percent_encoding::NON_ALPHANUMERIC),
             percent_encoding::utf8_percent_encode(title, percent_encoding::NON_ALPHANUMERIC)
         );
@@ -450,5 +616,227 @@ mod tests {
         assert_eq!(res._id, Some(123));
         assert_eq!(res.synced_lyrics.as_deref(), Some("[00:01.00] Hello"));
         assert_eq!(res.plain_lyrics.as_deref(), Some("Hello"));
+    }
+
+    #[tokio::test]
+    async fn test_fetch_with_fallback_lrclib_synced_success() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/get"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "_id": 42,
+                "syncedLyrics": "[00:05.00] Synced line",
+                "plainLyrics": "Plain line"
+            })))
+            .mount(&server)
+            .await;
+
+        let client = LyricsClient::with_endpoints(LyricsEndpoints {
+            lrclib_base_url: server.uri(),
+            netease_base_url: server.uri(),
+            lyrics_ovh_base_url: server.uri(),
+        });
+
+        let query = LyricsQuery::new("Artist", "Track")
+            .with_album("Album")
+            .with_duration(180);
+        let result = client.fetch_with_fallback(&query).await.unwrap();
+
+        assert_eq!(result.provider, LyricsProvider::LrcLib);
+        assert!(result.is_synced);
+        assert_eq!(result.text, "[00:05.00] Synced line");
+    }
+
+    #[tokio::test]
+    async fn test_fetch_with_fallback_lrclib_fails_netease_succeeds() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        // LRCLIB 404
+        Mock::given(method("GET"))
+            .and(path("/api/get"))
+            .respond_with(ResponseTemplate::new(404))
+            .mount(&server)
+            .await;
+
+        // NetEase search
+        Mock::given(method("POST"))
+            .and(path("/api/cloudsearch/pc"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "result": {
+                    "songs": [{ "id": 999, "name": "Track", "dt": 180000 }]
+                },
+                "code": 200
+            })))
+            .mount(&server)
+            .await;
+
+        // NetEase lyrics
+        Mock::given(method("GET"))
+            .and(path("/api/song/lyric"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "lrc": { "lyric": "[00:10.00] NetEase synced" },
+                "code": 200
+            })))
+            .mount(&server)
+            .await;
+
+        let client = LyricsClient::with_endpoints(LyricsEndpoints {
+            lrclib_base_url: server.uri(),
+            netease_base_url: server.uri(),
+            lyrics_ovh_base_url: server.uri(),
+        });
+
+        let query = LyricsQuery::new("Artist", "Track")
+            .with_album("Album")
+            .with_duration(180);
+        let result = client.fetch_with_fallback(&query).await.unwrap();
+
+        assert_eq!(result.provider, LyricsProvider::NetEase);
+        assert!(result.is_synced);
+        assert_eq!(result.text, "[00:10.00] NetEase synced");
+    }
+
+    #[tokio::test]
+    async fn test_fetch_with_fallback_plain_cascade_prefers_first_available() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        // LRCLIB returns plain lyrics only
+        Mock::given(method("GET"))
+            .and(path("/api/get"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "_id": 1,
+                "syncedLyrics": null,
+                "plainLyrics": "Only plain lyrics here"
+            })))
+            .mount(&server)
+            .await;
+
+        // NetEase fails
+        Mock::given(method("POST"))
+            .and(path("/api/cloudsearch/pc"))
+            .respond_with(ResponseTemplate::new(404))
+            .mount(&server)
+            .await;
+
+        // Lyrics.ovh returns plain lyrics
+        Mock::given(method("GET"))
+            .and(path("/v1/Artist/Track"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "lyrics": "Lyrics.ovh plain text"
+            })))
+            .mount(&server)
+            .await;
+
+        let client = LyricsClient::with_endpoints(LyricsEndpoints {
+            lrclib_base_url: server.uri(),
+            netease_base_url: server.uri(),
+            lyrics_ovh_base_url: server.uri(),
+        });
+
+        let query = LyricsQuery::new("Artist", "Track")
+            .with_album("Album")
+            .with_duration(180);
+        let result = client.fetch_with_fallback(&query).await.unwrap();
+
+        // Since no provider returned synced, the first plain-text provider (LRCLIB) wins
+        assert_eq!(result.provider, LyricsProvider::LrcLib);
+        assert!(!result.is_synced);
+        assert_eq!(result.text, "Only plain lyrics here");
+    }
+
+    #[tokio::test]
+    async fn test_fetch_with_fallback_clean_featured_title_retry() {
+        use wiremock::matchers::{method, path, query_param};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        // Initial title "Track (feat. Guest)" returns 404 on all providers
+        Mock::given(method("GET"))
+            .and(path("/api/get"))
+            .and(query_param("track_name", "Track (feat. Guest)"))
+            .respond_with(ResponseTemplate::new(404))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("POST"))
+            .and(path("/api/cloudsearch/pc"))
+            .respond_with(ResponseTemplate::new(404))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/v1/Artist/Track (feat. Guest)"))
+            .respond_with(ResponseTemplate::new(404))
+            .mount(&server)
+            .await;
+
+        // Cleaned title "Track" succeeds on LRCLIB retry
+        Mock::given(method("GET"))
+            .and(path("/api/get"))
+            .and(query_param("track_name", "Track"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "_id": 77,
+                "syncedLyrics": "[00:03.00] Cleaned title synced",
+                "plainLyrics": null
+            })))
+            .mount(&server)
+            .await;
+
+        let client = LyricsClient::with_endpoints(LyricsEndpoints {
+            lrclib_base_url: server.uri(),
+            netease_base_url: server.uri(),
+            lyrics_ovh_base_url: server.uri(),
+        });
+
+        let query = LyricsQuery::new("Artist", "Track (feat. Guest)")
+            .with_album("Album")
+            .with_duration(180);
+        let result = client.fetch_with_fallback(&query).await.unwrap();
+
+        assert_eq!(result.provider, LyricsProvider::LrcLib);
+        assert!(result.is_synced);
+        assert_eq!(result.text, "[00:03.00] Cleaned title synced");
+    }
+
+    #[tokio::test]
+    async fn test_fetch_with_fallback_all_fail_returns_error() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/get"))
+            .respond_with(ResponseTemplate::new(404))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("POST"))
+            .and(path("/api/cloudsearch/pc"))
+            .respond_with(ResponseTemplate::new(404))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/v1/Artist/Track"))
+            .respond_with(ResponseTemplate::new(404))
+            .mount(&server)
+            .await;
+
+        let client = LyricsClient::with_endpoints(LyricsEndpoints {
+            lrclib_base_url: server.uri(),
+            netease_base_url: server.uri(),
+            lyrics_ovh_base_url: server.uri(),
+        });
+
+        let query = LyricsQuery::new("Artist", "Track");
+        let result = client.fetch_with_fallback(&query).await;
+        assert!(result.is_err());
     }
 }
