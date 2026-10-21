@@ -290,6 +290,11 @@ describe("clampForContrast", () => {
     const clamped = clampForContrast(faintAccent, bg, 3.0);
     expect(calculateContrastRatio(clamped, bg)).toBeGreaterThanOrEqual(3.0);
   });
+
+  it("gracefully returns input unchanged for malformed or half-typed hex values", () => {
+    expect(clampForContrast("invalid", "#000000", 3.0)).toBe("invalid");
+    expect(clampForContrast("#123456", "var(--bg-main)", 3.0)).toBe("#123456");
+  });
 });
 
 describe("ensureLightnessSeparation", () => {
@@ -316,6 +321,11 @@ describe("ensureLightnessSeparation", () => {
     const bgHsl = rgbToHsl(...(Object.values(hexToRgb(bg)) as [number, number, number]));
     const sepHsl = rgbToHsl(...(Object.values(hexToRgb(separated)) as [number, number, number]));
     expect(bgHsl.l - sepHsl.l).toBeGreaterThanOrEqual(0.12);
+  });
+
+  it("gracefully returns input unchanged for malformed or half-typed hex values", () => {
+    expect(ensureLightnessSeparation("#33", "#000000", 0.12)).toBe("#33");
+    expect(ensureLightnessSeparation("#123456", "not-a-hex", 0.12)).toBe("#123456");
   });
 });
 

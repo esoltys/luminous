@@ -490,10 +490,8 @@ export function buildExtractedColors(colorCounts: ColorCount[]): ExtractedColors
     accentHoverRgb = hexToRgb(accentHoverHex);
   }
   if (accentHoverHex === accentHex) {
-    const accentHsl = rgbToHsl(accentRgb.r, accentRgb.g, accentRgb.b);
-    const hoverL = isLight ? Math.max(0.1, accentHsl.l - 0.1) : Math.min(0.9, accentHsl.l + 0.1);
-    accentHoverRgb = hslToRgb(accentHsl.h, accentHsl.s, hoverL);
-    accentHoverHex = rgbToHex(accentHoverRgb.r, accentHoverRgb.g, accentHoverRgb.b);
+    accentHoverHex = ensureLightnessSeparation(accentHoverHex, accentHex, 0.08);
+    accentHoverRgb = hexToRgb(accentHoverHex);
   }
 
   // Ensure border maintains at least 12% lightness separation from canvas
@@ -1159,12 +1157,8 @@ export class ThemeStore {
       : colors["color-border"];
 
     // Non-text UI components (graphs, curves, nodes, sliders) require >= 3:1 contrast against bg-main (WCAG 2.1 SC 1.4.11).
-    const safeAccent = HEX6.test(resolvedAccent) && HEX6.test(resolvedBgMain)
-      ? clampForContrast(resolvedAccent, resolvedBgMain, 3.0)
-      : resolvedAccent;
-    const safeBorder = HEX6.test(resolvedBorder) && HEX6.test(resolvedBgMain)
-      ? ensureLightnessSeparation(resolvedBorder, resolvedBgMain, 0.12)
-      : resolvedBorder;
+    const safeAccent = clampForContrast(resolvedAccent, resolvedBgMain, 3.0);
+    const safeBorder = ensureLightnessSeparation(resolvedBorder, resolvedBgMain, 0.12);
 
     const accentContrastText = pickAccessibleOnColor(safeAccent);
     const accentText = clampForContrast(resolvedAccent, resolvedBgMain, 4.5);

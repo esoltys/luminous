@@ -145,6 +145,8 @@ export function pickAccessibleOnColor(backgroundColor: string): string {
   return brightness > 128 ? '#000000' : '#ffffff';
 }
 
+const HEX6_PATTERN = /^#?[0-9a-f]{6}$/i;
+
 /**
  * Clamps a color to a minimum contrast ratio against a background by
  * stepping its HSL lightness toward black (light backgrounds) or white
@@ -159,6 +161,7 @@ export function pickAccessibleOnColor(backgroundColor: string): string {
  * @returns Contrast-compliant hex color string
  */
 export function clampForContrast(hex: string, backgroundHex: string, minRatio = 4.5): string {
+  if (!HEX6_PATTERN.test(hex) || !HEX6_PATTERN.test(backgroundHex)) return hex;
   if (calculateContrastRatio(hex, backgroundHex) >= minRatio) return hex;
 
   const bgIsLight = isLightColor(backgroundHex);
@@ -208,6 +211,8 @@ export function clampForContrast(hex: string, backgroundHex: string, minRatio = 
  * @returns Lightness-separated hex color string
  */
 export function ensureLightnessSeparation(hex: string, backgroundHex: string, minDelta = 0.12): string {
+  if (!HEX6_PATTERN.test(hex) || !HEX6_PATTERN.test(backgroundHex)) return hex;
+
   const fgRgb = hexToRgb(hex);
   const bgRgb = hexToRgb(backgroundHex);
   const fgHsl = rgbToHsl(fgRgb.r, fgRgb.g, fgRgb.b);
