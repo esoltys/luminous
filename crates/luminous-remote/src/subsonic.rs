@@ -831,10 +831,12 @@ mod tests {
         (0..16).map(|i| (b'0' + (i % 10)) as char).collect()
     }
 
+    #[allow(clippy::byte_char_slices)]
     fn test_spec_password() -> String {
         String::from_utf8_lossy(&[b's', b'e', b's', b'a', b'm', b'e']).into_owned()
     }
 
+    #[allow(clippy::byte_char_slices)]
     fn test_spec_salt() -> String {
         String::from_utf8_lossy(&[b'c', b'1', b'9', b'b', b'2', b'd']).into_owned()
     }
