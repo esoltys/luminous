@@ -1,6 +1,7 @@
 use crate::collection::WatcherPauseGuard;
 use crate::models;
 use crate::AppState;
+use luminous_metadata::audio;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State};
@@ -191,9 +192,9 @@ pub async fn save_song_tags(
 
     if !is_remote {
         tauri::async_runtime::spawn_blocking(move || {
-            crate::tageditor::write_tags(
+            audio::write_tags(
                 &path_clone,
-                &crate::tageditor::TagWriteRequest {
+                &audio::TagWriteRequest {
                     title: &title_c,
                     titlesort: titlesort_c.as_deref(),
                     artist: &artist_c,
@@ -407,9 +408,9 @@ pub async fn save_album_tags(
                 continue;
             }
             let path = std::path::PathBuf::from(&item.path);
-            let write_res = crate::tageditor::write_tags(
+            let write_res = audio::write_tags(
                 &path,
-                &crate::tageditor::TagWriteRequest {
+                &audio::TagWriteRequest {
                     title: &item.title,
                     titlesort: item.titlesort.as_deref(),
                     artist: &item.artist,
@@ -538,12 +539,10 @@ pub async fn clear_song_cover_art(state: State<'_, AppState>, song_id: i64) -> R
             .self_writes
             .mark_written(std::iter::once(path.clone()));
         let path_clone = path.clone();
-        tauri::async_runtime::spawn_blocking(move || {
-            crate::tageditor::clear_embedded_art(&path_clone)
-        })
-        .await
-        .map_err(|e| e.to_string())?
-        .map_err(|e| format!("{e:#}"))?;
+        tauri::async_runtime::spawn_blocking(move || audio::clear_embedded_art(&path_clone))
+            .await
+            .map_err(|e| e.to_string())?
+            .map_err(|e| format!("{e:#}"))?;
     }
 
     let folder_art = state
@@ -604,7 +603,7 @@ pub async fn clear_album_cover_art(
         tauri::async_runtime::spawn_blocking(move || {
             local_paths
                 .into_iter()
-                .filter(|(_, path)| crate::tageditor::clear_embedded_art(path).is_ok())
+                .filter(|(_, path)| audio::clear_embedded_art(path).is_ok())
                 .collect()
         })
         .await

@@ -2,6 +2,7 @@ use crate::{
     models::{PlayContext, PlaybackState, RepeatMode, ShuffleMode},
     AppState, CoverManager,
 };
+use luminous_metadata::playlist;
 use std::path::{Path, PathBuf};
 use tauri::State;
 
@@ -78,9 +79,9 @@ fn resolve_dropped_paths(paths: Vec<String>) -> (Vec<PathBuf>, usize) {
             attempted += dir_files.len().max(1);
             resolved_paths.extend(dir_files);
         } else if path.is_file() {
-            if crate::playlist_parsers::PlaylistFormat::from_path(path).is_some() {
+            if playlist::PlaylistFormat::from_path(path).is_some() {
                 // Parse M3U/M3U8/PLS/XSPF playlist file
-                let parsed = match crate::playlist_parsers::parse_playlist(path) {
+                let parsed = match playlist::parse_playlist(path) {
                     Ok(parsed) => parsed,
                     Err(e) => {
                         log::warn!("Failed to read playlist file '{}': {}", path_str, e);

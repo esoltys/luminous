@@ -62,10 +62,10 @@ impl PlaylistManager {
     /// their title/artist/album/path in `additional_metadata` — nothing
     /// from the source file is silently dropped.
     pub fn import_playlist<P: AsRef<std::path::Path>>(&mut self, file_path: P) -> Result<Playlist> {
-        use crate::playlist_parsers;
+        use luminous_metadata::playlist;
 
         let path = file_path.as_ref();
-        let parsed = playlist_parsers::parse_playlist(path)?;
+        let parsed = playlist::parse_playlist(path)?;
 
         let playlist_name = parsed.title.unwrap_or_else(|| {
             path.file_stem()
@@ -188,7 +188,7 @@ impl PlaylistManager {
         export_path: P,
         relative: bool,
     ) -> Result<()> {
-        use crate::playlist_parsers::{self, ExportTrack, PlaylistFormat};
+        use luminous_metadata::playlist::{self, ExportTrack, PlaylistFormat};
 
         let path = export_path.as_ref();
         let format = PlaylistFormat::from_path(path).ok_or_else(|| {
@@ -237,13 +237,8 @@ impl PlaylistManager {
             })
             .collect();
 
-        let content = playlist_parsers::export_playlist(
-            &playlist_name,
-            &export_tracks,
-            format,
-            path,
-            relative,
-        )?;
+        let content =
+            playlist::export_playlist(&playlist_name, &export_tracks, format, path, relative)?;
 
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;

@@ -20,12 +20,10 @@ pub mod commands;
 pub mod context;
 pub mod continue_mix;
 pub mod covermanager;
-pub mod cue;
 pub mod db;
 pub mod default_apps;
 pub mod diagnostics;
 pub mod discord;
-pub mod dr_parser;
 pub mod eq_store;
 pub mod fade;
 pub mod filter_parser;
@@ -44,7 +42,6 @@ pub mod picard;
 pub mod pins;
 pub mod player;
 pub mod playlist;
-pub mod playlist_parsers;
 pub mod radio;
 pub mod ratings_sync;
 pub mod remote_scheduler;
@@ -54,7 +51,6 @@ pub mod stall_monitor;
 pub mod stats;
 pub mod stats_summary;
 pub mod subsonic;
-pub mod tageditor;
 pub mod tags;
 #[cfg(target_os = "windows")]
 pub mod taskbar;
@@ -926,7 +922,7 @@ pub fn run() {
                         .and_then(|e| e.to_str())
                         .unwrap_or("")
                         .to_ascii_lowercase();
-                    crate::playlist_parsers::PlaylistFormat::from_path(path).is_some()
+                    luminous_metadata::playlist::PlaylistFormat::from_path(path).is_some()
                         || crate::collection::AUDIO_EXTENSIONS.contains(&ext.as_str())
                 })
                 .cloned()
@@ -1083,7 +1079,7 @@ pub fn run() {
                         .and_then(|e| e.to_str())
                         .unwrap_or("")
                         .to_ascii_lowercase();
-                    if crate::playlist_parsers::PlaylistFormat::from_path(path).is_some()
+                    if luminous_metadata::playlist::PlaylistFormat::from_path(path).is_some()
                         || crate::collection::AUDIO_EXTENSIONS.contains(&ext.as_str())
                     {
                         Some(p.clone())

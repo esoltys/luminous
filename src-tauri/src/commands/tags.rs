@@ -4,6 +4,7 @@ use crate::{
     tags::TagManager,
     AppState,
 };
+use luminous_metadata::audio;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State};
 
@@ -324,7 +325,7 @@ pub async fn delete_artist_tags(
     persisted(&state, result).await
 }
 
-/// Every field [`crate::tageditor::write_tags`] needs, read fresh per song so
+/// Every field [`luminous_metadata::audio::write_tags`] needs, read fresh per song so
 /// a bulk genre-only rewrite (merge/delete) can preserve everything else
 /// exactly as it already is on disk and in the DB.
 struct SongFullMetadata {
@@ -447,9 +448,9 @@ async fn rewrite_genre_and_persist(
                     continue;
                 }
                 let path = std::path::PathBuf::from(&item.path);
-                let write_res = crate::tageditor::write_tags(
+                let write_res = audio::write_tags(
                     &path,
-                    &crate::tageditor::TagWriteRequest {
+                    &audio::TagWriteRequest {
                         title: &item.title,
                         titlesort: item.titlesort.as_deref(),
                         artist: &item.artist,
