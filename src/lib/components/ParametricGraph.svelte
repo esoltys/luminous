@@ -33,10 +33,10 @@
 
   let plot: HTMLDivElement | undefined = $state();
 
-  const KIND_STYLES: Record<ParametricKind, { fill: string; border: string; stroke: string; area: string }> = {
-    peak: { fill: "bg-brand-accent", border: "border-brand-accent", stroke: "stroke-brand-accent", area: "fill-brand-accent" },
-    low_shelf: { fill: "bg-brand-gold", border: "border-brand-gold", stroke: "stroke-brand-gold", area: "fill-brand-gold" },
-    high_shelf: { fill: "bg-sky-400", border: "border-sky-400", stroke: "stroke-sky-400", area: "fill-sky-400" },
+  const KIND_STYLES: Record<ParametricKind, { fill: string; border: string; stroke: string; area: string; text: string }> = {
+    peak: { fill: "bg-brand-accent", border: "border-brand-accent", stroke: "stroke-brand-accent", area: "fill-brand-accent", text: "text-brand-accent-contrast" },
+    low_shelf: { fill: "bg-brand-gold", border: "border-brand-gold", stroke: "stroke-brand-gold", area: "fill-brand-gold", text: "text-neutral-900" },
+    high_shelf: { fill: "bg-sky-400", border: "border-sky-400", stroke: "stroke-sky-400", area: "fill-sky-400", text: "text-neutral-900" },
   };
 
   const KIND_LABEL_KEYS: Record<ParametricKind, string> = {
@@ -255,7 +255,7 @@
           aria-pressed={selected === idx}
           class="absolute w-5 h-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 flex items-center justify-center text-[9px] font-bold cursor-grab active:cursor-grabbing outline-none touch-none
             {style.border}
-            {band.enabled ? `${style.fill} text-brand-main` : 'bg-brand-main text-brand-text-secondary opacity-60'}
+            {band.enabled ? `${style.fill} ${style.text}` : 'bg-brand-main text-brand-text-secondary opacity-60'}
             {selected === idx ? 'ring-2 ring-brand-text-primary ring-offset-2 ring-offset-brand-main z-10' : 'focus-visible:ring-2 focus-visible:ring-brand-text-primary'}"
           style="left: {xPct(band.freq)}%; top: {yPct(band.gain_db)}%;"
           onpointerdown={(e) => onNodePointerDown(e, idx)}

@@ -6,6 +6,8 @@ import {
   isLightColor,
   calculateContrastRatio,
   checkWcagCompliance,
+  clampForContrast,
+  ensureLightnessSeparation,
   rgbToHsl,
   hslToRgb,
   scoreSwatch,
@@ -260,6 +262,60 @@ describe("extractArchetypes", () => {
     const swatches: Swatch[] = [{ r: 10, g: 10, b: 10, population: 900 }];
     const archetypes = extractArchetypes(swatches);
     expect(archetypes.lightVibrant).toBeNull();
+  });
+});
+
+describe("clampForContrast", () => {
+  it("leaves a color untouched if it already meets the target ratio", () => {
+    // White on black is 21:1
+    expect(clampForContrast("#ffffff", "#000000", 3.0)).toBe("#ffffff");
+  });
+
+  it("steps an identical monochromatic color away from the background to achieve non-text contrast >= 3:1 (#1730)", () => {
+    // Monochromatic teal from Radical Optimism: background #397077 and accent #3A7279
+    const bg = "#397077";
+    const accent = "#3A7279";
+    expect(calculateContrastRatio(accent, bg)).toBeLessThan(1.1);
+
+    const clamped = clampForContrast(accent, bg, 3.0);
+    expect(calculateContrastRatio(clamped, bg)).toBeGreaterThanOrEqual(3.0);
+    // Preserves teal hue (~187°)
+    const { h } = rgbToHsl(...(Object.values(hexToRgb(clamped)) as [number, number, number]));
+    expect(h).toBeCloseTo(187, 0);
+  });
+
+  it("steps a light background accent darker to meet contrast", () => {
+    const bg = "#f8f9fa";
+    const faintAccent = "#e2e8f0";
+    const clamped = clampForContrast(faintAccent, bg, 3.0);
+    expect(calculateContrastRatio(clamped, bg)).toBeGreaterThanOrEqual(3.0);
+  });
+});
+
+describe("ensureLightnessSeparation", () => {
+  it("leaves colors with >= minDelta lightness difference untouched", () => {
+    const bg = "#101010"; // L ~ 0.06
+    const border = "#505050"; // L ~ 0.31
+    expect(ensureLightnessSeparation(border, bg, 0.12)).toBe(border);
+  });
+
+  it("adjusts identical border color on dark background to have at least 12% lightness delta (#1730)", () => {
+    const bg = "#397077";
+    const identicalBorder = "#397077";
+    const separated = ensureLightnessSeparation(identicalBorder, bg, 0.12);
+
+    const bgHsl = rgbToHsl(...(Object.values(hexToRgb(bg)) as [number, number, number]));
+    const sepHsl = rgbToHsl(...(Object.values(hexToRgb(separated)) as [number, number, number]));
+    expect(Math.abs(sepHsl.l - bgHsl.l)).toBeGreaterThanOrEqual(0.12);
+    expect(sepHsl.h).toBeCloseTo(bgHsl.h, 0);
+  });
+
+  it("adjusts identical border color on light background to step darker", () => {
+    const bg = "#f0f0f0";
+    const separated = ensureLightnessSeparation(bg, bg, 0.12);
+    const bgHsl = rgbToHsl(...(Object.values(hexToRgb(bg)) as [number, number, number]));
+    const sepHsl = rgbToHsl(...(Object.values(hexToRgb(separated)) as [number, number, number]));
+    expect(bgHsl.l - sepHsl.l).toBeGreaterThanOrEqual(0.12);
   });
 });
 
