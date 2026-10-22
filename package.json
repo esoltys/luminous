@@ -73,7 +73,7 @@
     "music-metadata": "^12.1.1",
     "playwright": "^1.63.0",
     "svelte": "^5.57.2",
-    "svelte-check": "^4.7.5",
+    "svelte-check": "^4.7.7",
     "typescript": "~6.0.3",
     "vite": "^8.3.4",
     "vitest": "^4.1.11"
