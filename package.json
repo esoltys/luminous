@@ -70,7 +70,7 @@
     "image-js": "^1.7.1",
     "jsdom": "^30.1.2",
     "knip": "^6.41.0",
-    "music-metadata": "^12.1.1",
+    "music-metadata": "^12.2.3",
     "playwright": "^1.63.0",
     "svelte": "^5.57.2",
     "svelte-check": "^4.7.5",
