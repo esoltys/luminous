@@ -103,13 +103,15 @@ pub fn get_cached_waveform(db: &Database, song_id: i64) -> Result<Option<Vec<u8>
 /// regenerating under the current format.
 pub fn get_missing_visualizer_songs(db: &Database) -> Result<Vec<(i64, String)>> {
     let conn = db.pool.get()?;
-    let mut stmt = conn.prepare(
+    let sql = format!(
         "SELECT s.id, s.path FROM songs s
          LEFT JOIN waveforms w ON s.id = w.song_id
          LEFT JOIN band_waveforms m ON s.id = m.song_id
-         WHERE s.unavailable = 0 AND s.path IS NOT NULL
+         WHERE s.source IN ({lib}) AND s.unavailable = 0 AND s.path IS NOT NULL
            AND (w.song_id IS NULL OR m.song_id IS NULL OR w.style != ?1 OR m.style != ?2)",
-    )?;
+        lib = *crate::models::LOCAL_SOURCES_SQL
+    );
+    let mut stmt = conn.prepare(&sql)?;
 
     let missing_songs: Vec<(i64, String)> = stmt
         .query_map(
@@ -258,5 +260,40 @@ mod tests {
         let missing = get_missing_visualizer_songs(&db).unwrap();
         assert_eq!(missing.len(), 1);
         assert_eq!(missing[0].0, song_id);
+    }
+
+    #[test]
+    fn test_missing_visualizer_songs_ignores_remote_sources() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db = Database::new(temp_dir.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+
+        // Local song without waveform -> should be included
+        conn.execute(
+            "INSERT INTO songs (path, unavailable, source) VALUES ('/tmp/local.mp3', 0, ?1)",
+            params![crate::models::SongSource::LocalFile as i32],
+        )
+        .unwrap();
+        let local_id = conn.last_insert_rowid();
+
+        // WebDAV song without waveform -> must NOT be included (#1785)
+        conn.execute(
+            "INSERT INTO songs (path, unavailable, source) VALUES ('https://nas/remote.mp3', 0, ?1)",
+            params![crate::models::SongSource::WebDav as i32],
+        )
+        .unwrap();
+
+        // Subsonic song without waveform -> must NOT be included (#1785)
+        conn.execute(
+            "INSERT INTO songs (path, unavailable, source) VALUES ('subsonic://1/1', 0, ?1)",
+            params![crate::models::SongSource::Subsonic as i32],
+        )
+        .unwrap();
+
+        drop(conn);
+
+        let missing = get_missing_visualizer_songs(&db).unwrap();
+        assert_eq!(missing.len(), 1);
+        assert_eq!(missing[0].0, local_id);
     }
 }

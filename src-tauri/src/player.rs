@@ -185,6 +185,10 @@ pub struct Player {
     /// Consecutive playback failures since the last successful `Playing`
     /// event — see `MAX_CONSECUTIVE_PLAYBACK_ERRORS`.
     consecutive_playback_errors: u32,
+
+    /// Indicator shared across subsystems flagging when a remote audio stream
+    /// (WebDAV/Subsonic) is active or buffering (#1785).
+    pub remote_streaming_active: Option<Arc<std::sync::atomic::AtomicBool>>,
 }
 
 /// Runs a synchronous `Player` operation while `player`'s async mutex is
@@ -372,6 +376,7 @@ impl Player {
             scrobbled: false,
             scrobbler: None,
             consecutive_playback_errors: 0,
+            remote_streaming_active: None,
         };
 
         player.rebuild_shuffle_order();
@@ -410,6 +415,14 @@ impl Player {
     /// Attach the scrobbler service manager to receive scrobble notifications.
     pub fn set_scrobbler(&mut self, scrobbler: Arc<crate::scrobbler::ScrobblerManager>) {
         self.scrobbler = Some(scrobbler);
+    }
+
+    /// Set an atomic boolean indicator to track when remote streaming is active (#1785).
+    pub fn set_remote_streaming_indicator(
+        &mut self,
+        indicator: Arc<std::sync::atomic::AtomicBool>,
+    ) {
+        self.remote_streaming_active = Some(indicator);
     }
 
     /// Load a playlist into the player and start playing the given index.
@@ -731,6 +744,12 @@ impl Player {
         }
 
         self.apply_loudness_gain(&song).await;
+        if let Some(ref ind) = self.remote_streaming_active {
+            ind.store(
+                song.source.is_remote(),
+                std::sync::atomic::Ordering::Relaxed,
+            );
+        }
         self.preload_upcoming_waveforms();
         self.persist_current_song().await;
         self.persist_position(if real_play { start_ns } else { 0 })
@@ -773,19 +792,27 @@ impl Player {
 
     /// Proactively pre-generates waveform visualizer data for the current song
     /// and the upcoming next track in the queue/playlist on a background thread.
+    ///
+    /// Remote sources (WebDAV, Subsonic) are excluded: full-file background decodes
+    /// over HTTP saturate network connections and server worker pools, starving
+    /// real-time audio playback (#1785).
     pub fn preload_upcoming_waveforms(&self) {
         let db = Arc::clone(&self._db);
         let mut songs_to_preload = Vec::new();
 
         if let Some(ref song) = self.current_song {
-            if let Some(ref path_str) = song.path {
-                songs_to_preload.push((song.id, std::path::PathBuf::from(path_str)));
+            if !song.source.is_remote() {
+                if let Some(ref path_str) = song.path {
+                    songs_to_preload.push((song.id, std::path::PathBuf::from(path_str)));
+                }
             }
         }
 
         if let Some(target) = self.peek_next_natural() {
-            if let Some(ref path_str) = target.song.path {
-                songs_to_preload.push((target.song.id, std::path::PathBuf::from(path_str)));
+            if !target.song.source.is_remote() {
+                if let Some(ref path_str) = target.song.path {
+                    songs_to_preload.push((target.song.id, std::path::PathBuf::from(path_str)));
+                }
             }
         }
 
@@ -1154,6 +1181,9 @@ impl Player {
     }
 
     pub async fn stop(&mut self) -> Result<()> {
+        if let Some(ref ind) = self.remote_streaming_active {
+            ind.store(false, std::sync::atomic::Ordering::Relaxed);
+        }
         self.current_song = None;
         self.current_item_uuid = None;
         self.current_playlist_id = None;
@@ -3491,5 +3521,32 @@ mod tests {
         let next_state = player.get_state().await;
         assert_eq!(next_state.playlist_index, Some(4));
         assert_eq!(next_state.playlist_total, 5);
+    }
+
+    #[tokio::test]
+    async fn test_remote_streaming_indicator_tracks_source() {
+        let (_temp_dir, mut player, items) = player_with_songs(2, &[]);
+        let indicator = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        player.set_remote_streaming_indicator(indicator.clone());
+
+        // Playing a local track -> indicator stays false
+        player
+            .play_playlist(items.clone(), 0, 1, None)
+            .await
+            .unwrap();
+        assert!(!indicator.load(std::sync::atomic::Ordering::Relaxed));
+
+        // Now play a remote WebDAV track
+        let mut remote_song = items[1].song.clone().unwrap();
+        remote_song.source = crate::models::SongSource::WebDav;
+        player
+            .start_track(remote_song, None, GaplessTargetKind::Index(1), false)
+            .await
+            .unwrap();
+        assert!(indicator.load(std::sync::atomic::Ordering::Relaxed));
+
+        // Stopping playback clears the indicator (#1785)
+        player.stop().await.unwrap();
+        assert!(!indicator.load(std::sync::atomic::Ordering::Relaxed));
     }
 }

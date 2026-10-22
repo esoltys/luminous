@@ -164,6 +164,8 @@ impl HttpRangeReader {
     fn open(url: String, label: String, auth_header: Option<String>) -> Result<Self, String> {
         let client = reqwest::blocking::Client::builder()
             .timeout(std::time::Duration::from_secs(30))
+            .tcp_keepalive(std::time::Duration::from_secs(60))
+            .pool_idle_timeout(std::time::Duration::from_secs(90))
             .build()
             .map_err(|e| format!("Failed to build HTTP client: {e}"))?;
 
@@ -196,7 +198,7 @@ impl HttpRangeReader {
             position: 0,
             buffer: Vec::new(),
             buffer_start: 0,
-            chunk_size: 256 * 1024, // 256 KB buffer chunk
+            chunk_size: 512 * 1024, // 512 KB buffer chunk for streaming playback
         };
 
         // Pre-fetch initial chunk so first read is immediate

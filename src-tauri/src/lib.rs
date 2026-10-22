@@ -107,6 +107,10 @@ pub struct AppState {
     pub hierarchy_sidecar: Arc<hierarchy_sidecar::HierarchySidecar>,
     /// Store entitlement and delivery for add-on themes (#1414).
     pub addons: Arc<luminous_addons::AddonManager>,
+    /// Whether audio is actively streaming from a remote source (WebDAV or Subsonic).
+    /// Used by background workers (sync, remote cover fetches) to yield or throttle
+    /// concurrency and prevent server worker / bandwidth starvation (#1785).
+    pub remote_streaming_active: Arc<std::sync::atomic::AtomicBool>,
 }
 
 /// Suppresses stock webview browser chrome — reload/find/print keybindings and
@@ -1017,12 +1021,14 @@ pub fn run() {
                 }
             }
 
+            let remote_streaming_active = Arc::new(std::sync::atomic::AtomicBool::new(false));
             let player = Arc::new(Mutex::new(Player::new(Arc::clone(&db), Arc::clone(&audio))));
             let scrobbler = Arc::new(scrobbler::ScrobblerManager::new(Arc::clone(&db)));
             scrobbler.trigger_flush();
             {
                 let mut p = player.blocking_lock();
                 p.set_scrobbler(Arc::clone(&scrobbler));
+                p.set_remote_streaming_indicator(Arc::clone(&remote_streaming_active));
             }
             let volume_before_mute = Arc::new(Mutex::new(1.0));
 
@@ -1127,6 +1133,7 @@ pub fn run() {
                 remote_auto_sync: Arc::new(remote_scheduler::AutoSyncScheduler::new()),
                 hierarchy_sidecar: Arc::new(hierarchy_sidecar::HierarchySidecar::new()),
                 addons: commands::addons::build_manager(app.handle()),
+                remote_streaming_active,
             };
 
             crate::collection::start_watcher(app.handle().clone(), &state);

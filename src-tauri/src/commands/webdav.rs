@@ -10,7 +10,7 @@ use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 /// Progress update emitted during WebDAV library synchronization (#1087).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -606,7 +606,20 @@ pub async fn sync_webdav_server_inner(
                 tasks.extend(work.to_probe.drain(..).map(|task| (dir_index, task)));
             }
             files_probed += tasks.len();
-            let probed_all = run_bounded(tasks, PROBE_CONCURRENCY, |(dir_index, task)| {
+            let is_streaming = app_clone
+                .try_state::<AppState>()
+                .map(|s| s.remote_streaming_active.load(std::sync::atomic::Ordering::Relaxed))
+                .unwrap_or(false);
+
+            // Throttle probe concurrency from 12 to 2 if remote audio is actively streaming,
+            // preventing WebDAV server worker exhaustion and bandwidth contention (#1785).
+            let effective_concurrency = if is_streaming {
+                2
+            } else {
+                PROBE_CONCURRENCY
+            };
+
+            let probed_all = run_bounded(tasks, effective_concurrency, |(dir_index, task)| {
                 let result = client.probe_song_tags(&task.probe_url, task.file_size);
                 (dir_index, task, result)
             });
@@ -764,6 +777,10 @@ pub async fn sync_webdav_server_inner(
                 write_time += write_started
                     .elapsed()
                     .saturating_sub(art_time.saturating_sub(art_before_write));
+            }
+
+            if is_streaming {
+                std::thread::sleep(std::time::Duration::from_millis(50));
             }
 
             level = next_level;
