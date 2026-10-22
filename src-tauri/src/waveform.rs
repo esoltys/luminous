@@ -31,6 +31,16 @@ pub fn generate_visualizer_data(
         return Ok((w, m));
     }
 
+    // Defense-in-depth: remote streams (WebDAV, Subsonic) must not be decoded offline
+    // across the network to avoid worker exhaustion and audio playback starvation (#1785).
+    let location = path.to_string_lossy();
+    if location.starts_with(crate::subsonic::URI_SCHEME)
+        || location.starts_with("http://")
+        || location.starts_with("https://")
+    {
+        anyhow::bail!("skipping offline visualizer generation for remote stream: {location}");
+    }
+
     let decoder = crate::media_source::open_offline(db, path).with_context(|| {
         format!(
             "failed to decode samples for song_id {} at path {:?}",
@@ -103,13 +113,15 @@ pub fn get_cached_waveform(db: &Database, song_id: i64) -> Result<Option<Vec<u8>
 /// regenerating under the current format.
 pub fn get_missing_visualizer_songs(db: &Database) -> Result<Vec<(i64, String)>> {
     let conn = db.pool.get()?;
-    let mut stmt = conn.prepare(
+    let sql = format!(
         "SELECT s.id, s.path FROM songs s
          LEFT JOIN waveforms w ON s.id = w.song_id
          LEFT JOIN band_waveforms m ON s.id = m.song_id
-         WHERE s.unavailable = 0 AND s.path IS NOT NULL
+         WHERE s.source IN ({lib}) AND s.unavailable = 0 AND s.path IS NOT NULL
            AND (w.song_id IS NULL OR m.song_id IS NULL OR w.style != ?1 OR m.style != ?2)",
-    )?;
+        lib = *crate::models::LOCAL_SOURCES_SQL
+    );
+    let mut stmt = conn.prepare(&sql)?;
 
     let missing_songs: Vec<(i64, String)> = stmt
         .query_map(
@@ -186,8 +198,8 @@ mod tests {
         let conn = db.pool.get().unwrap();
 
         conn.execute(
-            "INSERT INTO songs (path, unavailable) VALUES ('/tmp/song.mp3', 0)",
-            [],
+            "INSERT INTO songs (path, unavailable, source) VALUES ('/tmp/song.mp3', 0, ?1)",
+            params![crate::models::SongSource::LocalFile as i32],
         )
         .unwrap();
         let song_id = conn.last_insert_rowid();
@@ -231,8 +243,8 @@ mod tests {
         let conn = db.pool.get().unwrap();
 
         conn.execute(
-            "INSERT INTO songs (path, unavailable) VALUES ('/tmp/song.mp3', 0)",
-            [],
+            "INSERT INTO songs (path, unavailable, source) VALUES ('/tmp/song.mp3', 0, ?1)",
+            params![crate::models::SongSource::LocalFile as i32],
         )
         .unwrap();
         let song_id = conn.last_insert_rowid();
@@ -258,5 +270,62 @@ mod tests {
         let missing = get_missing_visualizer_songs(&db).unwrap();
         assert_eq!(missing.len(), 1);
         assert_eq!(missing[0].0, song_id);
+    }
+
+    #[test]
+    fn test_missing_visualizer_songs_ignores_remote_sources() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db = Database::new(temp_dir.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+
+        // Local song without waveform -> should be included
+        conn.execute(
+            "INSERT INTO songs (path, unavailable, source) VALUES ('/tmp/local.mp3', 0, ?1)",
+            params![crate::models::SongSource::LocalFile as i32],
+        )
+        .unwrap();
+        let local_id = conn.last_insert_rowid();
+
+        // WebDAV song without waveform -> must NOT be included (#1785)
+        conn.execute(
+            "INSERT INTO songs (path, unavailable, source) VALUES ('https://nas/remote.mp3', 0, ?1)",
+            params![crate::models::SongSource::WebDav as i32],
+        )
+        .unwrap();
+
+        // Subsonic song without waveform -> must NOT be included (#1785)
+        conn.execute(
+            "INSERT INTO songs (path, unavailable, source) VALUES ('subsonic://1/1', 0, ?1)",
+            params![crate::models::SongSource::Subsonic as i32],
+        )
+        .unwrap();
+
+        drop(conn);
+
+        let missing = get_missing_visualizer_songs(&db).unwrap();
+        assert_eq!(missing.len(), 1);
+        assert_eq!(missing[0].0, local_id);
+    }
+
+    #[test]
+    fn test_generate_visualizer_data_rejects_remote_paths() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db = Database::new(temp_dir.path().to_path_buf()).unwrap();
+
+        let http_res =
+            generate_visualizer_data(&db, 1, std::path::Path::new("https://nas/remote.flac"));
+        assert!(http_res.is_err());
+        assert!(http_res
+            .unwrap_err()
+            .to_string()
+            .contains("skipping offline visualizer generation"));
+
+        let subsonic_res =
+            generate_visualizer_data(&db, 2, std::path::Path::new("subsonic://server/song/1"));
+        assert!(subsonic_res.is_err());
+        assert!(subsonic_res
+            .unwrap_err()
+            .to_string()
+            .contains("skipping offline visualizer generation"));
     }
 }
