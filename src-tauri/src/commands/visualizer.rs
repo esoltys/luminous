@@ -1,6 +1,31 @@
 use crate::AppState;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::State;
+
+/// Queries the audio file path for a song, returning `None` if the song does not exist
+/// or is from a remote source (WebDAV, Subsonic).
+///
+/// For remote sources, generating visualizer data on a cache miss requires streaming
+/// and decoding the entire multi-megabyte audio file over HTTP. This saturates the remote
+/// server connection and starves the audio playback stream, causing multi-minute buffering
+/// delays (#1785). Returning `None` allows the UI to render a clean standard seek bar without
+/// stalling playback.
+pub(crate) fn query_local_song_path(conn: &rusqlite::Connection, song_id: i64) -> Option<PathBuf> {
+    let song_info: Option<(String, i64)> = conn
+        .query_row(
+            "SELECT path, source FROM songs WHERE id = ?1",
+            rusqlite::params![song_id],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .ok();
+
+    let (path_str, source_raw) = song_info?;
+    if crate::models::SongSource::from(source_raw).is_remote() {
+        return None;
+    }
+    Some(PathBuf::from(path_str))
+}
 
 #[tauri::command]
 pub async fn get_waveform_data(
@@ -23,38 +48,20 @@ pub async fn get_waveform_data(
             }
         }
 
-        let song_info: Option<(String, i64)> = conn
-            .query_row(
-                "SELECT path, source FROM songs WHERE id = ?1",
-                rusqlite::params![song_id],
-                |r| Ok((r.get(0)?, r.get(1)?)),
-            )
-            .ok();
-
-        Ok((None, song_info))
+        let local_path = query_local_song_path(conn, song_id);
+        Ok((None, local_path))
     })
     .await
     .map_err(|e| e.to_string())?;
 
-    let (cached, song_info) = query_result;
+    let (cached, local_path) = query_result;
     if let Some(data) = cached {
         return Ok(Some(data));
     }
 
-    let Some((path_str, source_raw)) = song_info else {
+    let Some(path) = local_path else {
         return Ok(None);
     };
-
-    // For remote sources (WebDAV, Subsonic), generating visualizer data on a cache
-    // miss requires streaming and decoding the entire multi-megabyte audio file over
-    // HTTP. This saturates the remote server connection and starves the audio playback
-    // stream, causing multi-minute buffering delays (#1785). Return None so the UI
-    // falls back to a clean standard seek bar without stalling playback.
-    if crate::models::SongSource::from(source_raw).is_remote() {
-        return Ok(None);
-    }
-
-    let path = std::path::PathBuf::from(path_str);
 
     // Generate waveform in a blocking threadpool task
     let db_clone = Arc::clone(&state.db);
@@ -89,38 +96,20 @@ pub async fn get_band_waveform_data(
             }
         }
 
-        let song_info: Option<(String, i64)> = conn
-            .query_row(
-                "SELECT path, source FROM songs WHERE id = ?1",
-                rusqlite::params![song_id],
-                |r| Ok((r.get(0)?, r.get(1)?)),
-            )
-            .ok();
-
-        Ok((None, song_info))
+        let local_path = query_local_song_path(conn, song_id);
+        Ok((None, local_path))
     })
     .await
     .map_err(|e| e.to_string())?;
 
-    let (cached, song_info) = query_result;
+    let (cached, local_path) = query_result;
     if let Some(data) = cached {
         return Ok(Some(data));
     }
 
-    let Some((path_str, source_raw)) = song_info else {
+    let Some(path) = local_path else {
         return Ok(None);
     };
-
-    // For remote sources (WebDAV, Subsonic), generating visualizer data on a cache
-    // miss requires streaming and decoding the entire multi-megabyte audio file over
-    // HTTP. This saturates the remote server connection and starves the audio playback
-    // stream, causing multi-minute buffering delays (#1785). Return None so the UI
-    // falls back to a clean standard seek bar without stalling playback.
-    if crate::models::SongSource::from(source_raw).is_remote() {
-        return Ok(None);
-    }
-
-    let path = std::path::PathBuf::from(path_str);
 
     // Generate band waveform in a blocking threadpool task
     let db_clone = Arc::clone(&state.db);
@@ -157,24 +146,25 @@ mod tests {
     }
 
     #[test]
-    fn test_remote_song_without_cached_waveform_is_detected() {
+    fn test_query_local_song_path_skips_remote_sources() {
         let conn = setup_test_db();
         conn.execute(
             "INSERT INTO songs (id, path, source) VALUES (1, 'https://nas/track.flac', 11)",
             [],
         )
         .unwrap();
+        conn.execute(
+            "INSERT INTO songs (id, path, source) VALUES (2, '/music/local.flac', 1)",
+            [],
+        )
+        .unwrap();
 
-        let song_info: Option<(String, i64)> = conn
-            .query_row(
-                "SELECT path, source FROM songs WHERE id = ?1",
-                rusqlite::params![1],
-                |r| Ok((r.get(0)?, r.get(1)?)),
-            )
-            .ok();
-
-        let (_, source_raw) = song_info.unwrap();
-        assert!(crate::models::SongSource::from(source_raw).is_remote());
+        assert_eq!(super::query_local_song_path(&conn, 1), None);
+        assert_eq!(
+            super::query_local_song_path(&conn, 2),
+            Some(std::path::PathBuf::from("/music/local.flac"))
+        );
+        assert_eq!(super::query_local_song_path(&conn, 999), None);
     }
 
     #[test]

@@ -31,6 +31,16 @@ pub fn generate_visualizer_data(
         return Ok((w, m));
     }
 
+    // Defense-in-depth: remote streams (WebDAV, Subsonic) must not be decoded offline
+    // across the network to avoid worker exhaustion and audio playback starvation (#1785).
+    let location = path.to_string_lossy();
+    if location.starts_with(crate::subsonic::URI_SCHEME)
+        || location.starts_with("http://")
+        || location.starts_with("https://")
+    {
+        anyhow::bail!("skipping offline visualizer generation for remote stream: {location}");
+    }
+
     let decoder = crate::media_source::open_offline(db, path).with_context(|| {
         format!(
             "failed to decode samples for song_id {} at path {:?}",
@@ -188,8 +198,8 @@ mod tests {
         let conn = db.pool.get().unwrap();
 
         conn.execute(
-            "INSERT INTO songs (path, unavailable) VALUES ('/tmp/song.mp3', 0)",
-            [],
+            "INSERT INTO songs (path, unavailable, source) VALUES ('/tmp/song.mp3', 0, ?1)",
+            params![crate::models::SongSource::LocalFile as i32],
         )
         .unwrap();
         let song_id = conn.last_insert_rowid();
@@ -233,8 +243,8 @@ mod tests {
         let conn = db.pool.get().unwrap();
 
         conn.execute(
-            "INSERT INTO songs (path, unavailable) VALUES ('/tmp/song.mp3', 0)",
-            [],
+            "INSERT INTO songs (path, unavailable, source) VALUES ('/tmp/song.mp3', 0, ?1)",
+            params![crate::models::SongSource::LocalFile as i32],
         )
         .unwrap();
         let song_id = conn.last_insert_rowid();
@@ -295,5 +305,27 @@ mod tests {
         let missing = get_missing_visualizer_songs(&db).unwrap();
         assert_eq!(missing.len(), 1);
         assert_eq!(missing[0].0, local_id);
+    }
+
+    #[test]
+    fn test_generate_visualizer_data_rejects_remote_paths() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db = Database::new(temp_dir.path().to_path_buf()).unwrap();
+
+        let http_res =
+            generate_visualizer_data(&db, 1, std::path::Path::new("https://nas/remote.flac"));
+        assert!(http_res.is_err());
+        assert!(http_res
+            .unwrap_err()
+            .to_string()
+            .contains("skipping offline visualizer generation"));
+
+        let subsonic_res =
+            generate_visualizer_data(&db, 2, std::path::Path::new("subsonic://server/song/1"));
+        assert!(subsonic_res.is_err());
+        assert!(subsonic_res
+            .unwrap_err()
+            .to_string()
+            .contains("skipping offline visualizer generation"));
     }
 }
