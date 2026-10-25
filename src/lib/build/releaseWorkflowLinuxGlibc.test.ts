@@ -58,3 +58,35 @@ describe("release.yml: linux_only and dry_run re-runs", () => {
     expect(workflow).toMatch(/tagName: \$\{\{ !inputs\.dry_run && needs\.create-release\.outputs\.tag \|\| '' \}\}/);
   });
 });
+
+describe("release.yml: AppImage zsync delta updates (#1703)", () => {
+  it("installs zsync in system dependencies on Linux", () => {
+    expect(workflow).toMatch(/apt-get install -y[^\n]*\bzsync\b/);
+  });
+
+  it("sets LDAI_UPDATE_INFORMATION with gh-releases-zsync pattern", () => {
+    expect(workflow).toMatch(
+      /LDAI_UPDATE_INFORMATION:\s*gh-releases-zsync\|esoltys\|luminous\|latest\|Luminous\.Music\.Player_\*_amd64\.AppImage\.zsync/
+    );
+  });
+
+  it("sparse-checkouts fix-appimage-zsync.ts for older tag builds", () => {
+    expect(workflow).toMatch(/sparse-checkout:\s*\|[\s\S]*?scripts\/fix-appimage-zsync\.ts/);
+    expect(fs.existsSync(path.join(root, "scripts/fix-appimage-zsync.ts"))).toBe(true);
+  });
+
+  it("runs fix-appimage-zsync.ts before attaching or uploading assets", () => {
+    expect(workflow).toMatch(/run:\s*bun run workflow-src\/scripts\/fix-appimage-zsync\.ts/);
+  });
+
+  it("includes *.zsync in dry_run artifact upload", () => {
+    expect(workflow).toMatch(/path:\s*\|[\s\S]*?target\/release\/bundle\/appimage\/\*\.zsync/);
+  });
+
+  it("uploads *.zsync to release assets preserving draft state", () => {
+    expect(workflow).toMatch(
+      /Upload AppImage zsync to Release Assets[\s\S]*?draft:\s*\$\{\{\s*needs\.create-release\.outputs\.draft\s*\}\}[\s\S]*?target\/release\/bundle\/appimage\/\*\.zsync/
+    );
+  });
+});
+

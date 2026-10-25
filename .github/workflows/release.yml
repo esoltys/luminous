@@ -143,7 +143,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libasound2-dev libssl-dev pkg-config libayatana-appindicator3-dev librsvg2-dev
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libasound2-dev libssl-dev pkg-config libayatana-appindicator3-dev librsvg2-dev zsync
 
       - name: Cache Tauri bundler tools (NSIS/WiX)
         if: matrix.platform == 'windows-latest'
@@ -163,6 +163,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          LDAI_UPDATE_INFORMATION: gh-releases-zsync|esoltys|luminous|latest|Luminous.Music.Player_*_amd64.AppImage.zsync
         with:
           action: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6.2
           attempt_limit: 3
@@ -183,7 +184,9 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           path: workflow-src
-          sparse-checkout: scripts/check-glibc-floor.sh
+          sparse-checkout: |
+            scripts/check-glibc-floor.sh
+            scripts/fix-appimage-zsync.ts
           sparse-checkout-cone-mode: false
 
       - name: Check the AppImage's glibc floor (Linux)
@@ -194,6 +197,15 @@ jobs:
           [ ${#APPIMAGES[@]} -eq 1 ] || { echo "::error::expected one AppImage, found: ${APPIMAGES[*]}"; exit 1; }
           bash workflow-src/scripts/check-glibc-floor.sh "${APPIMAGES[0]}" 2.35
 
+      # linuxdeploy-plugin-appimage writes <AppImage>.zsync when
+      # LDAI_UPDATE_INFORMATION is set. The AppImage is built with spaces in
+      # its name, but GitHub renames spaces to dots on upload. Fix the .zsync
+      # header (Filename: / URL:) to match the dotted name and rename the file
+      # so AppImageUpdate can locate and download delta blocks (#1703).
+      - name: Fix AppImage zsync metadata and filename (Linux)
+        if: runner.os == 'Linux'
+        run: bun run workflow-src/scripts/fix-appimage-zsync.ts
+
       - name: Attach Linux installers to the run (dry_run)
         if: runner.os == 'Linux' && inputs.dry_run
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -201,9 +213,23 @@ jobs:
           name: linux-installers
           path: |
             target/release/bundle/appimage/*.AppImage
+            target/release/bundle/appimage/*.zsync
             target/release/bundle/deb/*.deb
             target/release/bundle/rpm/*.rpm
           if-no-files-found: error
+
+      - name: Upload AppImage zsync to Release Assets (Linux)
+        if: runner.os == 'Linux' && !inputs.dry_run
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
+        with:
+          tag_name: ${{ needs.create-release.outputs.tag }}
+          # softprops/action-gh-release publishes the release if `draft` is
+          # omitted - it doesn't preserve the existing draft state.
+          draft: ${{ needs.create-release.outputs.draft }}
+          files: |
+            target/release/bundle/appimage/*.zsync
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # tauri:windows:build runs tauri-windows-bundle with `--runner bun`, so it
       # uses the @tauri-apps/cli that bun.lock pins, the same CLI as every other
