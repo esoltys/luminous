@@ -41,6 +41,7 @@ import { tasksStore } from "./tasks.svelte";
 import { prefs } from "./prefs.svelte";
 import { MAX_RECENT_SEARCHES } from "../constants";
 import { albumKey, sameAlbum } from "$lib/utils/albumKey";
+import { matchWebDavPath } from "../webdavDisplay";
 
 export interface VisibleColumns {
   // Core columns (on by default)
@@ -809,22 +810,29 @@ class CollectionStore {
    */
   getWebDavServerForPath(path: string | null | undefined): MusicDirectory | undefined {
     if (!path) return undefined;
-    const credentialFree = path.replace(/^(https?:\/\/)[^@/]*@/i, "$1");
-    const normalized = credentialFree.toLowerCase();
+    let bestMatch: { server: WebDavServer; base: string; prefixLength: number } | undefined;
+
     for (const server of this.webdavServers) {
-      const base = `${server.url.replace(/\/+$/, "")}/${server.remotePath.replace(/^\/+/, "")}`;
-      if (normalized.startsWith(base.toLowerCase())) {
-        return {
-          id: -server.id,
-          path: base,
-          subdirs: true,
-          nickname: server.name,
-          icon: "cloud",
-          is_available: server.syncStatus !== "error",
-        };
+      const match = matchWebDavPath(path, server.url, server.remotePath);
+      if (match.matches) {
+        if (!bestMatch || match.prefixLength > bestMatch.prefixLength) {
+          bestMatch = { server, base: match.base, prefixLength: match.prefixLength };
+        }
       }
     }
-    return undefined;
+
+    if (!bestMatch) return undefined;
+    const { server, base } = bestMatch;
+
+    return {
+      id: -server.id,
+      path: base,
+      subdirs: true,
+      nickname: server.nickname?.trim() || server.name,
+      icon: server.icon || "cloud",
+      color: server.color ?? null,
+      is_available: server.syncStatus !== "error",
+    };
   }
 
   /**
