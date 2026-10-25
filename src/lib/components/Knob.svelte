@@ -1,6 +1,23 @@
 <script lang="ts">
   import { formatNumber } from "../stores/i18n.svelte";
 
+  interface Props {
+    min?: number;
+    max?: number;
+    step?: number;
+    value?: number;
+    label?: string;
+    format?: (v: number) => string;
+    suffix?: string;
+    size?: number;
+    showValue?: boolean;
+    disabled?: boolean;
+    class?: string;
+    onchange?: (value: number) => void;
+    oninput?: (value: number) => void;
+    [key: string]: any;
+  }
+
   let {
     min = 0,
     max = 100,
@@ -16,22 +33,7 @@
     onchange,
     oninput,
     ...rest
-  } = $props<{
-    min?: number;
-    max?: number;
-    step?: number;
-    value?: number;
-    label?: string;
-    format?: (v: number) => string;
-    suffix?: string;
-    size?: number;
-    showValue?: boolean;
-    disabled?: boolean;
-    class?: string;
-    onchange?: (value: number) => void;
-    oninput?: (value: number) => void;
-    [key: string]: any;
-  }>();
+  }: Props = $props();
 
   let isDragging = $state(false);
   let knobElement: HTMLElement;
