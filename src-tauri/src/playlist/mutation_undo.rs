@@ -103,10 +103,21 @@ impl PlaylistManager {
         Ok(items)
     }
 
+    /// Appends `song_ids` to `playlist_id` in order at the end of the playlist.
+    ///
+    /// Inserts are executed within a single SQLite transaction and prepared
+    /// statement to minimize disk commits and lock hold time, even for tens
+    /// of thousands of tracks. An undo op is recorded on success. If `song_ids`
+    /// is empty, this is a no-op.
     pub fn add_songs_to_playlist(&mut self, playlist_id: i64, song_ids: &[i64]) -> Result<()> {
-        let conn = self.db.pool.get()?;
+        if song_ids.is_empty() {
+            return Ok(());
+        }
 
-        let max_pos: i32 = conn
+        let conn = self.db.pool.get()?;
+        let tx = conn.unchecked_transaction()?;
+
+        let max_pos: i32 = tx
             .query_row(
                 "SELECT COALESCE(MAX(position), -1) FROM playlist_items WHERE playlist_id = ?1",
                 params![playlist_id],
@@ -114,18 +125,21 @@ impl PlaylistManager {
             )
             .unwrap_or(-1);
 
-        let mut positions = Vec::new();
-        for (i, &song_id) in song_ids.iter().enumerate() {
-            let pos = max_pos + 1 + i as i32;
-            let uuid = Uuid::new_v4().to_string();
-            conn.execute(
+        let mut positions = Vec::with_capacity(song_ids.len());
+        {
+            let mut stmt = tx.prepare_cached(
                 "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type)
                  VALUES (?1, ?2, ?3, ?4, 0)",
-                params![playlist_id, song_id, pos, uuid],
             )?;
-            positions.push((pos, song_id));
+            for (i, &song_id) in song_ids.iter().enumerate() {
+                let pos = max_pos + 1 + i as i32;
+                let uuid = Uuid::new_v4().to_string();
+                stmt.execute(params![playlist_id, song_id, pos, uuid])?;
+                positions.push((pos, song_id));
+            }
         }
-        self.touch_updated(&conn, playlist_id)?;
+        self.touch_updated(&tx, playlist_id)?;
+        tx.commit()?;
 
         self.undo_stack.push(PlaylistOp::Insert {
             playlist_id,
@@ -911,6 +925,78 @@ mod tests {
             .map(|t| t.song.as_ref().unwrap().title.as_deref().unwrap())
             .collect();
         assert_eq!(titles_undo, vec!["Song 1", "Song 2", "Song 3", "Song 4"]);
+    }
+
+    #[test]
+    fn test_add_songs_to_playlist_empty_slice_is_noop() {
+        let (_temp_dir, db) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+        let mut manager = PlaylistManager::new(db_arc).unwrap();
+        let pl = manager.create_playlist("Empty Test").unwrap();
+
+        manager.add_songs_to_playlist(pl.id, &[]).unwrap();
+
+        let tracks = manager.get_playlist_tracks(pl.id).unwrap();
+        assert!(tracks.is_empty());
+        // No-op operation does not pollute the undo stack
+        assert!(!manager.undo().unwrap());
+    }
+
+    #[test]
+    fn test_add_songs_to_playlist_batched_transaction_and_undo() {
+        let (_temp_dir, db) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+
+        // Insert 1000 songs in a single transaction in setup
+        {
+            let mut conn = db_arc.pool.get().unwrap();
+            let tx = conn.transaction().unwrap();
+            {
+                let mut stmt = tx
+                    .prepare("INSERT INTO songs (id, title, artist, path) VALUES (?1, ?2, ?3, ?4)")
+                    .unwrap();
+                for i in 1..=1000 {
+                    stmt.execute(params![
+                        i,
+                        format!("Title {i}"),
+                        "Batch Artist",
+                        format!("/song_{i}.mp3")
+                    ])
+                    .unwrap();
+                }
+            }
+            tx.commit().unwrap();
+        }
+
+        let mut manager = PlaylistManager::new(db_arc).unwrap();
+        let pl = manager.create_playlist("Batch Test").unwrap();
+
+        let song_ids: Vec<i64> = (1..=1000).collect();
+        let start = std::time::Instant::now();
+        manager.add_songs_to_playlist(pl.id, &song_ids).unwrap();
+        let elapsed = start.elapsed();
+        // 1000 inserts in a single transaction should take single-digit milliseconds, well under 250ms
+        assert!(
+            elapsed.as_millis() < 250,
+            "1000 batched inserts took too long: {elapsed:?}"
+        );
+
+        let tracks = manager.get_playlist_tracks(pl.id).unwrap();
+        assert_eq!(tracks.len(), 1000);
+        for (idx, item) in tracks.iter().enumerate() {
+            assert_eq!(item.position, idx as i32);
+            assert_eq!(item.song.as_ref().map(|s| s.id), Some((idx + 1) as i64));
+        }
+
+        // Verify undo removes all items cleanly
+        assert!(manager.undo().unwrap());
+        let tracks_after_undo = manager.get_playlist_tracks(pl.id).unwrap();
+        assert!(tracks_after_undo.is_empty());
+
+        // Verify redo restores all items
+        assert!(manager.redo().unwrap());
+        let tracks_after_redo = manager.get_playlist_tracks(pl.id).unwrap();
+        assert_eq!(tracks_after_redo.len(), 1000);
     }
 
     proptest::proptest! {
