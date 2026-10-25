@@ -105,7 +105,13 @@ release was published, so the trigger was removed.)
     the AppImage/`.deb`/`.rpm` need the build host's glibc (#1700); after the build,
     `scripts/check-glibc-floor.sh` fails it if the AppImage needs glibc newer than 2.35.
   - Installs deps with `bun install`, plus Linux system deps (webkit2gtk, ALSA, OpenSSL,
-    appindicator, librsvg) on the Ubuntu leg.
+    appindicator, librsvg, zsync) on the Ubuntu leg.
+  - Builds the AppImage with embedded update information (`LDAI_UPDATE_INFORMATION` set to
+    `gh-releases-zsync|esoltys|luminous|latest|Luminous.Music.Player_*_amd64.AppImage.zsync`) so
+    tools like AppImageUpdate and Gear Lever can perform delta downloads (#1703).
+  - Runs `scripts/fix-appimage-zsync.ts` to adjust the `.zsync` control file's `Filename:` and `URL:`
+    headers to match the dotted filename assigned by GitHub Releases on upload, then uploads the
+    `.zsync` file to the release assets via `softprops/action-gh-release` (preserving `draft` state).
   - Runs `tauri-apps/tauri-action@v0` (wrapped in `Wandalen/wretry.action@v3` for retry
     on transient failures) to build and sign the app, uploading artifacts into the draft
     release created above (`releaseDraft: true`).
@@ -114,10 +120,10 @@ release was published, so the trigger was removed.)
     `draft: true` — the action would otherwise publish the release outright).
 
 At the end of this workflow, the GitHub release exists as a **draft** with Linux + Windows
-bundles (and MSIX) attached. It is not visible to end users yet.
+bundles (and MSIX and `.zsync`) attached. It is not visible to end users yet.
 
 Manual re-runs of an existing release: `-f flatpak_only=true` rebuilds only the Flatpak, and
-`-f linux_only=true -f tag=vX.Y.Z` rebuilds only the AppImage/`.deb`/`.rpm` from that tag and
+`-f linux_only=true -f tag=vX.Y.Z` rebuilds only the AppImage/`.zsync`/`.deb`/`.rpm` from that tag and
 replaces them and their `latest.json` entries, leaving the Windows assets and Flatpak alone.
 Test the build first with `-f dry_run=true`, which attaches the Linux installers to the run as
 an artifact and touches no release:
