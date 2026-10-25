@@ -105,10 +105,10 @@ impl PlaylistManager {
 
     /// Appends `song_ids` to `playlist_id` in order at the end of the playlist.
     ///
-    /// Inserts are executed within a single SQLite transaction and prepared
-    /// statement to minimize disk commits and lock hold time, even for tens
-    /// of thousands of tracks. An undo op is recorded on success. If `song_ids`
-    /// is empty, this is a no-op.
+    /// Inserts and playlist timestamp updates execute atomically in a single
+    /// batched transaction to ensure immediate responsiveness even when adding
+    /// tens of thousands of tracks. An undo op is recorded on success. If
+    /// `song_ids` is empty, this is a no-op.
     pub fn add_songs_to_playlist(&mut self, playlist_id: i64, song_ids: &[i64]) -> Result<()> {
         if song_ids.is_empty() {
             return Ok(());
@@ -126,6 +126,8 @@ impl PlaylistManager {
             .unwrap_or(-1);
 
         let mut positions = Vec::with_capacity(song_ids.len());
+        // Scope the cached prepared statement so its borrow on `tx` ends
+        // before touching the updated timestamp and committing.
         {
             let mut stmt = tx.prepare_cached(
                 "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type)
@@ -988,12 +990,10 @@ mod tests {
             assert_eq!(item.song.as_ref().map(|s| s.id), Some((idx + 1) as i64));
         }
 
-        // Verify undo removes all items cleanly
         assert!(manager.undo().unwrap());
         let tracks_after_undo = manager.get_playlist_tracks(pl.id).unwrap();
         assert!(tracks_after_undo.is_empty());
 
-        // Verify redo restores all items
         assert!(manager.redo().unwrap());
         let tracks_after_redo = manager.get_playlist_tracks(pl.id).unwrap();
         assert_eq!(tracks_after_redo.len(), 1000);
