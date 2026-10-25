@@ -826,22 +826,22 @@ impl CollectionScanner {
         // Safety invariant: never delete a WebDAV song that belongs to an active server
         to_delete.retain(|&id| !active_webdav_song_ids.contains(&id));
 
-        if !force {
+        let blocked_incident = if !force {
             let verdict = safeguard::evaluate_missing_tracks(&conn, &to_delete, false)?;
             if !verdict.is_all_safe() {
                 log::warn!(
-                    "Explicit prune blocked by mass-removal safeguard ({} track(s) across {} incident(s))",
+                    "Explicit prune encountered mass-removal safeguard ({} track(s) protected across {} incident(s))",
                     verdict.blocked_ids.len(),
                     verdict.incidents.len()
                 );
-                return Ok(PruneResult {
-                    deleted_songs: 0,
-                    removed_folders: 0,
-                    merged_duplicates,
-                    blocked_incident: verdict.incidents.into_iter().next(),
-                });
+                to_delete = verdict.safe_ids;
+                verdict.incidents.into_iter().next()
+            } else {
+                None
             }
-        }
+        } else {
+            None
+        };
 
         drop(stmt_unavail);
         drop(conn);
@@ -861,7 +861,7 @@ impl CollectionScanner {
             deleted_songs: deleted_count,
             removed_folders,
             merged_duplicates,
-            blocked_incident: None,
+            blocked_incident,
         })
     }
 

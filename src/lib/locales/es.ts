@@ -2158,11 +2158,17 @@ export const es = {
     logout: "Cerrar sesión"
   },
   safeguard: {
-    toastMessage: "El volumen de almacenamiento parece desconectado: no se encontraron {count} pistas en '{folder}'. Se han protegido los registros de la base de datos.",
+    toastMessage: {
+      one: "No se pudo encontrar {count} canción en '{folder}'. Se conserva en tu biblioteca.",
+      other: "No se pudieron encontrar {count} canciones en '{folder}'. Se conservan en tu biblioteca."
+    },
     reviewBtn: "Revisar",
-    dialogTitle: "¿Volumen de almacenamiento desconectado?",
-    dialogMessage: "No se pudieron encontrar {count} de {total} pistas en '{folder}'. Esto suele ocurrir cuando se desconecta una unidad externa o un recurso compartido de red.\n\n¿Desea conservar estas pistas en su biblioteca hasta que se vuelva a conectar la unidad o eliminarlas?",
-    keepRecordsBtn: "Conservar pistas",
-    confirmRemoveBtn: "Eliminar pistas"
+    dialogTitle: "¿Falta la carpeta o la unidad?",
+    dialogMessage: {
+      one: "No se pudo encontrar {count} de {total} canción en '{folder}'. Esto suele ocurrir cuando se desconecta o renombra una carpeta o unidad externa.\n\n¿Deseas conservarla en tu biblioteca hasta reconectarla, o eliminarla?",
+      other: "No se pudieron encontrar {count} de {total} canciones en '{folder}'. Esto suele ocurrir cuando se desconecta o renombra una carpeta o unidad externa.\n\n¿Deseas conservarlas en tu biblioteca hasta reconectarlas, o eliminarlas?"
+    },
+    keepSongsBtn: "Conservar canciones",
+    confirmRemoveBtn: "Eliminar canciones"
   }
 };

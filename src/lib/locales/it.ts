@@ -2158,11 +2158,17 @@ export const it = {
     logout: "Esci"
   },
   safeguard: {
-    toastMessage: "Il volume di archiviazione sembra disconnesso: {count} brani in '{folder}' non sono stati trovati. I dati della libreria sono stati protetti.",
+    toastMessage: {
+      one: "Impossibile trovare {count} brano in '{folder}'. Mantenuto nella tua libreria.",
+      other: "Impossibile trovare {count} brani in '{folder}'. Mantenuti nella tua libreria."
+    },
     reviewBtn: "Esamina",
-    dialogTitle: "Volume di archiviazione disconnesso?",
-    dialogMessage: "Impossibile trovare {count} su {total} brani in '{folder}'. Ciò si verifica in genere quando un disco esterno o una condivisione di rete viene disconnessa.\n\nVuoi mantenere questi brani nella libreria fino alla riconnessione o rimuoverli?",
-    keepRecordsBtn: "Mantieni brani",
+    dialogTitle: "Cartella o unità mancante?",
+    dialogMessage: {
+      one: "Impossibile trovare {count} su {total} brano in '{folder}'. Ciò si verifica in genere quando un'unità esterna o una cartella viene scollegata o rinominata.\n\nVuoi mantenerlo nella libreria fino alla riconnessione o rimuoverlo?",
+      other: "Impossibile trovare {count} su {total} brani in '{folder}'. Ciò si verifica in genere quando un'unità esterna o una cartella viene scollegata o rinominata.\n\nVuoi mantenerli nella libreria fino alla riconnessione o rimuoverli?"
+    },
+    keepSongsBtn: "Mantieni brani",
     confirmRemoveBtn: "Rimuovi brani"
   }
 };

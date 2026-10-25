@@ -2158,11 +2158,17 @@ export const de = {
     logout: "Abmelden"
   },
   safeguard: {
-    toastMessage: "Speichermedium scheint getrennt zu sein: {count} Titel in „{folder}“ wurden nicht gefunden. Datenbankeinträge wurden geschützt.",
+    toastMessage: {
+      one: "{count} Titel in „{folder}“ konnte nicht gefunden werden. In Ihrer Bibliothek behalten.",
+      other: "{count} Titel in „{folder}“ konnten nicht gefunden werden. In Ihrer Bibliothek behalten."
+    },
     reviewBtn: "Überprüfen",
-    dialogTitle: "Speichermedium getrennt?",
-    dialogMessage: "{count} von {total} Titeln in „{folder}“ konnten nicht gefunden werden. Dies geschieht normalerweise, wenn ein externes Laufwerk oder eine Netzwerkfreigabe getrennt wurde.\n\nMöchten Sie diese Titel in Ihrer Bibliothek behalten, bis das Laufwerk wieder verbunden ist, oder entfernen?",
-    keepRecordsBtn: "Einträge behalten",
+    dialogTitle: "Ordner oder Laufwerk fehlt?",
+    dialogMessage: {
+      one: "{count} von {total} Titel in „{folder}“ konnte nicht gefunden werden. Dies geschieht normalerweise, wenn ein externes Laufwerk oder ein Ordner getrennt oder umbenannt wurde.\n\nMöchten Sie ihn in Ihrer Bibliothek behalten, bis er wieder verbunden ist, oder entfernen?",
+      other: "{count} von {total} Titeln in „{folder}“ konnten nicht gefunden werden. Dies geschieht normalerweise, wenn ein externes Laufwerk oder ein Ordner getrennt oder umbenannt wurde.\n\nMöchten Sie sie in Ihrer Bibliothek behalten, bis sie wieder verbunden sind, oder entfernen?"
+    },
+    keepSongsBtn: "Titel behalten",
     confirmRemoveBtn: "Titel entfernen"
   }
 };

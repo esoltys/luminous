@@ -1263,8 +1263,7 @@ class CollectionStore {
       this.pendingMassRemovals.push(incident);
     }
     toastStore.show(
-      i18n.t("safeguard.toastMessage", {
-        count: incident.missing_count,
+      i18n.plural("safeguard.toastMessage", incident.missing_count, {
         folder: incident.directory_path,
       }),
       "warning",

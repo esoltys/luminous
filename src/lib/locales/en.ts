@@ -2158,11 +2158,17 @@ export const en = {
     logout: "Log out"
   },
   safeguard: {
-    toastMessage: "Storage volume appears disconnected: {count} tracks in '{folder}' were not found. Database records have been protected.",
+    toastMessage: {
+      one: "Couldn't find {count} song in '{folder}'. Kept in your library.",
+      other: "Couldn't find {count} songs in '{folder}'. Kept in your library."
+    },
     reviewBtn: "Review",
-    dialogTitle: "Storage Volume Disconnected?",
-    dialogMessage: "{count} of {total} tracks in '{folder}' could not be found. This usually happens when an external drive or network share is disconnected.\n\nKeep these tracks in your library until the drive reconnects, or remove them?",
-    keepRecordsBtn: "Keep Records",
-    confirmRemoveBtn: "Remove Tracks"
+    dialogTitle: "Folder or Drive Missing?",
+    dialogMessage: {
+      one: "{count} of {total} song in '{folder}' couldn't be found. This usually happens when an external drive or folder is unplugged or renamed.\n\nKeep it in your library until reconnected, or remove it?",
+      other: "{count} of {total} songs in '{folder}' couldn't be found. This usually happens when an external drive or folder is unplugged or renamed.\n\nKeep them in your library until reconnected, or remove them?"
+    },
+    keepSongsBtn: "Keep Songs",
+    confirmRemoveBtn: "Remove Songs"
   }
 };

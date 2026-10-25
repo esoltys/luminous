@@ -372,23 +372,60 @@ pub fn evaluate_watcher_removals(
             continue;
         };
 
-        let removed_count = removed_paths.len();
-        let total_count = count_songs_under_dir(conn, &dir_path.to_string_lossy())?;
-
-        let is_unreachable = std::fs::read_dir(dir_path).is_err();
-        if is_unreachable || is_mass_removal(removed_count, total_count) {
-            let incident_id = format!("incident-watcher-{}-{}", dir_id, now_ms);
-            let sample_paths: Vec<String> = removed_paths
+        let mut affected_song_count = 0usize;
+        let mut sample_paths: Vec<String> = Vec::new();
+        for p in &removed_paths {
+            let cnt = count_songs_under_dir(conn, &p.to_string_lossy())?;
+            affected_song_count += cnt;
+            if sample_paths.len() < 5 {
+                let clean = clean_dir_path(&p.to_string_lossy());
+                let path_fw = clean.replace('\\', "/");
+                let path_bw = clean.replace('/', "\\");
+                let mut sample_stmt = conn.prepare(
+                    "SELECT path FROM songs WHERE path IS NOT NULL AND (
+                        path = ?1 OR path = ?2
+                        OR path LIKE ?1 || '/%'
+                        OR path LIKE ?1 || '\\%'
+                        OR path LIKE ?2 || '/%'
+                        OR path LIKE ?2 || '\\%'
+                    ) LIMIT 5",
+                )?;
+                let rows =
+                    sample_stmt.query_map(params![path_fw, path_bw], |r| r.get::<_, String>(0))?;
+                for s in rows.flatten() {
+                    if sample_paths.len() < 5 && !sample_paths.contains(&s) {
+                        sample_paths.push(s);
+                    }
+                }
+            }
+        }
+        if affected_song_count == 0 {
+            affected_song_count = removed_paths.len();
+        }
+        if sample_paths.is_empty() {
+            sample_paths = removed_paths
                 .iter()
                 .take(5)
                 .map(|p| p.to_string_lossy().to_string())
                 .collect();
+        }
+
+        let total_count = count_songs_under_dir(conn, &dir_path.to_string_lossy())?;
+        let is_unreachable = std::fs::read_dir(dir_path).is_err();
+        let effective_missing = if is_unreachable {
+            total_count
+        } else {
+            affected_song_count
+        };
+
+        if is_unreachable || is_mass_removal(effective_missing, total_count) {
+            let incident_id = format!("incident-watcher-{}-{}", dir_id, now_ms);
 
             let incident = MassRemovalIncident {
                 id: incident_id,
                 directory_id: Some(*dir_id),
                 directory_path: dir_path.to_string_lossy().to_string(),
-                missing_count: removed_count,
+                missing_count: effective_missing,
                 total_count,
                 sample_missing_paths: sample_paths,
             };

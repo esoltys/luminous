@@ -2166,11 +2166,17 @@ export const fr: DeepStringRecord<typeof en> = {
     logout: "Se déconnecter"
   },
   safeguard: {
-    toastMessage: "Le volume de stockage semble déconnecté : {count} pistes dans « {folder} » sont introuvables. Les données de la bibliothèque ont été protégées.",
+    toastMessage: {
+      one: "{count} chanson dans « {folder} » est introuvable. Conservée dans votre bibliothèque.",
+      other: "{count} chansons dans « {folder} » sont introuvables. Conservées dans votre bibliothèque."
+    },
     reviewBtn: "Examiner",
-    dialogTitle: "Volume de stockage déconnecté ?",
-    dialogMessage: "{count} pistes sur {total} dans « {folder} » sont introuvables. Cela se produit habituellement lorsqu'un disque externe ou un partage réseau est déconnecté.\n\nVoulez-vous conserver ces pistes dans votre bibliothèque jusqu'à la reconnexion, ou les supprimer ?",
-    keepRecordsBtn: "Conserver les pistes",
-    confirmRemoveBtn: "Supprimer les pistes"
+    dialogTitle: "Dossier ou lecteur manquant?",
+    dialogMessage: {
+      one: "{count} chanson sur {total} dans « {folder} » est introuvable. Cela se produit habituellement lorsqu'un lecteur externe ou un dossier est déconnecté ou renommé.\n\nVoulez-vous la conserver dans votre bibliothèque jusqu'à la reconnexion, ou la supprimer?",
+      other: "{count} chansons sur {total} dans « {folder} » sont introuvables. Cela se produit habituellement lorsqu'un lecteur externe ou un dossier est déconnecté ou renommé.\n\nVoulez-vous les conserver dans votre bibliothèque jusqu'à la reconnexion, ou les supprimer?"
+    },
+    keepSongsBtn: "Conserver les chansons",
+    confirmRemoveBtn: "Supprimer les chansons"
   }
 };
