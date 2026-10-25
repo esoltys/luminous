@@ -33,6 +33,7 @@ pub fn open(db: &Database, location: &str) -> Result<Box<dyn MediaSource>, Strin
             let conn = db.pool.get().ok()?;
             crate::webdav::resolve_auth_header(&conn, url)
         },
+        |loc| lookup_filesize(db, loc),
     )
 }
 
@@ -45,23 +46,52 @@ pub fn open_offline(db: &Database, path: &Path) -> anyhow::Result<OfflineDecoder
     OfflineDecoder::open(source, extension).map_err(anyhow::Error::msg)
 }
 
-/// [`open`] with the two database lookups passed in, so the routing and
+/// Look up a known file size in bytes for a song location from the database,
+/// matching either `path` or `url` with or without embedded credentials.
+fn lookup_filesize(db: &Database, location: &str) -> Option<u64> {
+    let conn = db.pool.get().ok()?;
+    let (clean_url, _) = extract_basic_auth(location);
+    let mut stmt = conn
+        .prepare_cached(
+            "SELECT filesize FROM songs WHERE (path = ?1 OR path = ?2 OR url = ?1 OR url = ?2) AND filesize > 0 LIMIT 1",
+        )
+        .ok()?;
+    let size: Option<i64> = stmt
+        .query_row(rusqlite::params![location, clean_url], |r| r.get(0))
+        .ok()?;
+    size.and_then(|s| if s > 0 { Some(s as u64) } else { None })
+}
+
+/// [`open`] with the database lookups passed in, so the routing and
 /// error wording are testable without a database.
 fn open_with(
     location: &str,
     sign_subsonic: impl FnOnce(&str) -> Result<String, String>,
     webdav_auth: impl FnOnce(&str) -> Option<String>,
+    lookup_filesize: impl FnOnce(&str) -> Option<u64>,
 ) -> Result<Box<dyn MediaSource>, String> {
     if location.starts_with(crate::subsonic::URI_SCHEME) {
         // Signed fresh on every open; the URL itself never leaves this
         // function. The signer's errors already name the track by its
         // `subsonic://` path, and the UI prefixes the song title.
+        let known_length = lookup_filesize(location);
         let url = sign_subsonic(location)?;
-        Ok(Box::new(HttpRangeReader::new_with_label(&url, location)?))
+        Ok(Box::new(HttpRangeReader::new_with_options(
+            &url,
+            Some(location),
+            None,
+            known_length,
+        )?))
     } else if location.starts_with("http://") || location.starts_with("https://") {
+        let known_length = lookup_filesize(location);
         let (url, embedded) = extract_basic_auth(location);
         let auth = embedded.or_else(|| webdav_auth(&url));
-        Ok(Box::new(HttpRangeReader::new_with_auth(&url, auth)?))
+        Ok(Box::new(HttpRangeReader::new_with_options(
+            &url,
+            None,
+            auth,
+            known_length,
+        )?))
     } else {
         let file = std::fs::File::open(location)
             .map_err(|e| format!("Cannot open file '{location}': {e}"))?;
@@ -143,25 +173,60 @@ fn parse_content_range(headers: &reqwest::header::HeaderMap) -> Option<(u64, Opt
     Some((first, total.trim().parse().ok()))
 }
 
+/// Parses total length from `Content-Range: bytes .../{total}`, e.g. on 416 responses
+/// (`bytes */{total}`).
+fn parse_content_range_total(headers: &reqwest::header::HeaderMap) -> Option<u64> {
+    let value = headers.get(reqwest::header::CONTENT_RANGE)?.to_str().ok()?;
+    let (_, total) = value.trim().strip_prefix("bytes ")?.split_once('/')?;
+    total.trim().parse().ok()
+}
+
 impl HttpRangeReader {
     pub fn new(url: &str) -> Result<Self, String> {
         let (url, auth_header) = extract_basic_auth(url);
         let label = url.clone();
-        Self::open(url, label, auth_header)
+        Self::open(url, label, auth_header, None)
     }
 
     /// Like `new`, but sends `auth_header` as the `Authorization` value.
     pub fn new_with_auth(url: &str, auth_header: Option<String>) -> Result<Self, String> {
-        Self::open(url.to_string(), url.to_string(), auth_header)
+        Self::open(url.to_string(), url.to_string(), auth_header, None)
     }
 
     /// Like `new`, but error messages name the source as `label` rather than
     /// quoting `url` — for signed URLs that must never reach logs or the UI.
     pub fn new_with_label(url: &str, label: &str) -> Result<Self, String> {
-        Self::open(url.to_string(), label.to_string(), None)
+        Self::open(url.to_string(), label.to_string(), None, None)
     }
 
-    fn open(url: String, label: String, auth_header: Option<String>) -> Result<Self, String> {
+    /// Like `new`, with label, auth header, and an optional known file length
+    /// (e.g. from database metadata or PROPFIND).
+    pub fn new_with_options(
+        url: &str,
+        label: Option<&str>,
+        auth_header: Option<String>,
+        known_length: Option<u64>,
+    ) -> Result<Self, String> {
+        Self::open(
+            url.to_string(),
+            label.unwrap_or(url).to_string(),
+            auth_header,
+            known_length,
+        )
+    }
+
+    /// Sets or overrides the known content length.
+    pub fn with_known_length(mut self, length: u64) -> Self {
+        self.content_length = length;
+        self
+    }
+
+    fn open(
+        url: String,
+        label: String,
+        auth_header: Option<String>,
+        known_length: Option<u64>,
+    ) -> Result<Self, String> {
         let client = reqwest::blocking::Client::builder()
             .timeout(std::time::Duration::from_secs(30))
             .tcp_keepalive(std::time::Duration::from_secs(60))
@@ -170,8 +235,8 @@ impl HttpRangeReader {
             .map_err(|e| format!("Failed to build HTTP client: {e}"))?;
 
         // HEAD discovers Content-Length cheaply. Not every server answers HEAD
-        // (or answers it with a length), so a failure here isn't fatal: the
-        // first range GET below reports the real error, and its Content-Range
+        // (or answers it with a length, or with 200 rather than 405), so a failure
+        // here isn't fatal: known_length from the database or the first range GET
         // supplies the length instead.
         let mut head_req = client.head(&url);
         if let Some(ref h) = auth_header {
@@ -187,6 +252,8 @@ impl HttpRangeReader {
                     .and_then(|v| v.to_str().ok())
                     .and_then(|s| s.parse::<u64>().ok())
             })
+            .filter(|&len| len > 0)
+            .or(known_length)
             .unwrap_or(0);
 
         let mut reader = Self {
@@ -204,6 +271,34 @@ impl HttpRangeReader {
         // Pre-fetch initial chunk so first read is immediate
         reader.fill_buffer(0)?;
         Ok(reader)
+    }
+
+    /// When neither HEAD, Content-Range, nor database metadata supplied a content length,
+    /// attempt to discover it via a streaming GET without a Range header, reading only the
+    /// response headers before dropping the stream.
+    fn try_discover_content_length(&mut self) -> Option<u64> {
+        if self.content_length > 0 {
+            return Some(self.content_length);
+        }
+        let mut req = self.client.get(&self.url);
+        if let Some(ref h) = self.auth_header {
+            req = req.header(reqwest::header::AUTHORIZATION, h);
+        }
+        if let Ok(resp) = req.send() {
+            if resp.status().is_success() && !is_error_content_type(resp.headers()) {
+                if let Some(len) = resp
+                    .headers()
+                    .get(reqwest::header::CONTENT_LENGTH)
+                    .and_then(|v| v.to_str().ok())
+                    .and_then(|s| s.parse::<u64>().ok())
+                    .filter(|&len| len > 0)
+                {
+                    self.content_length = len;
+                    return Some(len);
+                }
+            }
+        }
+        None
     }
 
     fn fill_buffer(&mut self, start: u64) -> Result<(), String> {
@@ -231,6 +326,11 @@ impl HttpRangeReader {
         })?;
 
         if resp.status() == reqwest::StatusCode::RANGE_NOT_SATISFIABLE {
+            if self.content_length == 0 {
+                if let Some(total) = parse_content_range_total(resp.headers()) {
+                    self.content_length = total;
+                }
+            }
             self.buffer_start = start;
             self.buffer.clear();
             return Ok(());
@@ -266,6 +366,13 @@ impl HttpRangeReader {
             if let Some((_, Some(total))) = content_range {
                 if self.content_length == 0 {
                     self.content_length = total;
+                }
+            } else if self.content_length == 0 {
+                // If Content-Range is omitted (e.g. Files.fm / SabreDAV), and this response
+                // delivered fewer bytes than requested, we have reached the end of the stream.
+                let expected_chunk = end.saturating_sub(start) + 1;
+                if (data.len() as u64) < expected_chunk {
+                    self.content_length = start + data.len() as u64;
                 }
             }
             self.buffer_start = content_range.map_or(start, |(first, _)| first);
@@ -325,6 +432,9 @@ impl Seek for HttpRangeReader {
             SeekFrom::Start(offset) => offset as i64,
             SeekFrom::Current(offset) => self.position as i64 + offset,
             SeekFrom::End(offset) => {
+                if self.content_length == 0 {
+                    self.try_discover_content_length();
+                }
                 if self.content_length > 0 {
                     self.content_length as i64 + offset
                 } else {
@@ -602,6 +712,7 @@ mod tests {
             "subsonic://4/abc",
             |path| Err(format!("The Subsonic server for '{path}' has been removed")),
             |_| None,
+            |_| None,
         )
         .err()
         .expect("resolution failure must surface");
@@ -609,5 +720,136 @@ mod tests {
             err,
             "The Subsonic server for 'subsonic://4/abc' has been removed"
         );
+    }
+
+    /// Answers `Range` GETs with 206 but NO `Content-Range` header (like Files.fm / SabreDAV).
+    fn ranged_response_without_content_range(
+        req: &wiremock::Request,
+    ) -> wiremock::ResponseTemplate {
+        let data = RANGE_TEST_DATA;
+        let (start, end) = req
+            .headers
+            .get(wiremock::http::HeaderName::from_static("range"))
+            .and_then(|r| r.to_str().ok())
+            .and_then(|r| r.strip_prefix("bytes="))
+            .and_then(|r| r.split_once('-'))
+            .map(|(s, e)| {
+                let start: usize = s.parse().unwrap();
+                let end: usize = e.parse().unwrap_or(data.len() - 1);
+                (start, end.min(data.len() - 1))
+            })
+            .expect("test server expects a Range header");
+        let slice = &data[start..=end];
+        wiremock::ResponseTemplate::new(206)
+            .insert_header("content-length", slice.len().to_string())
+            .set_body_bytes(slice.to_vec())
+    }
+
+    #[tokio::test]
+    async fn http_range_reader_handles_206_omitting_content_range_with_known_length() {
+        use wiremock::matchers::method;
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        // SabreDAV/Files.fm may answer HEAD with 405 Method Not Allowed
+        Mock::given(method("HEAD"))
+            .respond_with(ResponseTemplate::new(405))
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .respond_with(ranged_response_without_content_range)
+            .mount(&server)
+            .await;
+
+        let url = format!("{}/track.mp3", server.uri());
+        tokio::task::spawn_blocking(move || {
+            let mut reader = HttpRangeReader::new_with_options(
+                &url,
+                None,
+                None,
+                Some(RANGE_TEST_DATA.len() as u64),
+            )
+            .unwrap();
+            assert_eq!(reader.byte_len(), Some(RANGE_TEST_DATA.len() as u64));
+            reader.chunk_size = 8;
+            // Seeking from End must succeed using the injected known_length
+            reader.seek(SeekFrom::End(-4)).unwrap();
+            let mut tail = Vec::new();
+            reader.read_to_end(&mut tail).unwrap();
+            assert_eq!(tail, b"wxyz");
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn http_range_reader_falls_back_to_get_headers_when_length_unknown_and_head_fails() {
+        use wiremock::matchers::{header_exists, method};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(method("HEAD"))
+            .respond_with(ResponseTemplate::new(405))
+            .mount(&server)
+            .await;
+        // Ranged GET returns 206 omitting Content-Range
+        Mock::given(method("GET"))
+            .and(header_exists("range"))
+            .respond_with(ranged_response_without_content_range)
+            .mount(&server)
+            .await;
+        // Unranged GET returns 200 with Content-Length (header probe)
+        Mock::given(method("GET"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("content-length", RANGE_TEST_DATA.len().to_string())
+                    .set_body_bytes(RANGE_TEST_DATA.to_vec()),
+            )
+            .mount(&server)
+            .await;
+
+        let url = format!("{}/track.mp3", server.uri());
+        tokio::task::spawn_blocking(move || {
+            // No known_length passed upfront
+            let mut reader = HttpRangeReader::new(&url).unwrap();
+            reader.chunk_size = 8;
+            // SeekFrom::End should trigger the lazy GET header check and succeed
+            reader.seek(SeekFrom::End(-4)).unwrap();
+            assert_eq!(reader.byte_len(), Some(RANGE_TEST_DATA.len() as u64));
+            let mut tail = Vec::new();
+            reader.read_to_end(&mut tail).unwrap();
+            assert_eq!(tail, b"wxyz");
+        })
+        .await
+        .unwrap();
+    }
+
+    #[test]
+    fn open_with_queries_filesize_for_webdav_and_subsonic() {
+        let mut looked_up_webdav = false;
+        let _ = open_with(
+            "http://127.0.0.1:9/track.mp3",
+            |_| Ok("".into()),
+            |_| None,
+            |loc| {
+                assert_eq!(loc, "http://127.0.0.1:9/track.mp3");
+                looked_up_webdav = true;
+                Some(5000)
+            },
+        );
+        assert!(looked_up_webdav);
+
+        let mut looked_up_subsonic = false;
+        let _ = open_with(
+            "subsonic://1/42",
+            |_| Err("err".into()),
+            |_| None,
+            |loc| {
+                assert_eq!(loc, "subsonic://1/42");
+                looked_up_subsonic = true;
+                Some(12345)
+            },
+        );
+        assert!(looked_up_subsonic);
     }
 }
