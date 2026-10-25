@@ -9,7 +9,20 @@ use crate::db::Database;
 use luminous_audio::{MediaSource, OfflineDecoder};
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
+
+/// Global shared HTTP client for media sources. Reuses connection pools, DNS caching,
+/// and TLS 1.3 session tickets across sequential track playback, prefetching, and offline analysis.
+static SHARED_CLIENT: LazyLock<reqwest::blocking::Client> =
+    LazyLock::new(|| build_client().expect("Failed to build shared HTTP client for media sources"));
+
+fn build_client() -> Result<reqwest::blocking::Client, reqwest::Error> {
+    reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .tcp_keepalive(std::time::Duration::from_secs(60))
+        .pool_idle_timeout(std::time::Duration::from_secs(90))
+        .build()
+}
 
 /// The opener handed to `AudioEngine::with_source_opener`: the same lookup
 /// as [`open`], owning its database handle.
@@ -23,6 +36,16 @@ pub fn opener(
 /// or remote stream), or a `subsonic://` path. Errors name the location the
 /// user knows, never a signed URL.
 pub fn open(db: &Database, location: &str) -> Result<Box<dyn MediaSource>, String> {
+    open_with_known_length(db, location, None)
+}
+
+/// Open a stored song location with an optionally pre-known file size in bytes,
+/// bypassing the database lookup if already known.
+pub fn open_with_known_length(
+    db: &Database,
+    location: &str,
+    known_length: Option<u64>,
+) -> Result<Box<dyn MediaSource>, String> {
     open_with(
         location,
         |path| {
@@ -33,7 +56,7 @@ pub fn open(db: &Database, location: &str) -> Result<Box<dyn MediaSource>, Strin
             let conn = db.pool.get().ok()?;
             crate::webdav::resolve_auth_header(&conn, url)
         },
-        |loc| lookup_filesize(db, loc),
+        |loc| known_length.or_else(|| lookup_filesize(db, loc)),
     )
 }
 
@@ -47,13 +70,19 @@ pub fn open_offline(db: &Database, path: &Path) -> anyhow::Result<OfflineDecoder
 }
 
 /// Look up a known file size in bytes for a song location from the database,
-/// matching either `path` or `url` with or without embedded credentials.
+/// matching either `path` or `url` with or without embedded credentials,
+/// falling back to `webdav_cache.size` if `songs.filesize` is unset.
 fn lookup_filesize(db: &Database, location: &str) -> Option<u64> {
     let conn = db.pool.get().ok()?;
     let (clean_url, _) = extract_basic_auth(location);
     let mut stmt = conn
         .prepare_cached(
-            "SELECT filesize FROM songs WHERE (path = ?1 OR path = ?2 OR url = ?1 OR url = ?2) AND filesize > 0 LIMIT 1",
+            "SELECT COALESCE(NULLIF(s.filesize, 0), c.size) \
+             FROM songs s \
+             LEFT JOIN webdav_cache c ON c.song_id = s.id \
+             WHERE (s.path = ?1 OR s.path = ?2 OR s.url = ?1 OR s.url = ?2) \
+               AND (s.filesize > 0 OR c.size > 0) \
+             LIMIT 1",
         )
         .ok()?;
     let size: Option<i64> = stmt
@@ -185,18 +214,18 @@ impl HttpRangeReader {
     pub fn new(url: &str) -> Result<Self, String> {
         let (url, auth_header) = extract_basic_auth(url);
         let label = url.clone();
-        Self::open(url, label, auth_header, None)
+        Self::open(url, label, auth_header, None, None)
     }
 
     /// Like `new`, but sends `auth_header` as the `Authorization` value.
     pub fn new_with_auth(url: &str, auth_header: Option<String>) -> Result<Self, String> {
-        Self::open(url.to_string(), url.to_string(), auth_header, None)
+        Self::open(url.to_string(), url.to_string(), auth_header, None, None)
     }
 
     /// Like `new`, but error messages name the source as `label` rather than
     /// quoting `url` — for signed URLs that must never reach logs or the UI.
     pub fn new_with_label(url: &str, label: &str) -> Result<Self, String> {
-        Self::open(url.to_string(), label.to_string(), None, None)
+        Self::open(url.to_string(), label.to_string(), None, None, None)
     }
 
     /// Opens an HTTP range reader with an explicit label for errors, optional authorization,
@@ -212,6 +241,24 @@ impl HttpRangeReader {
             label.unwrap_or(url).to_string(),
             auth_header,
             known_length,
+            None,
+        )
+    }
+
+    /// Opens an HTTP range reader with a specific reqwest client (e.g. for custom connection pools or tests).
+    pub fn new_with_client(
+        url: &str,
+        label: Option<&str>,
+        auth_header: Option<String>,
+        known_length: Option<u64>,
+        client: reqwest::blocking::Client,
+    ) -> Result<Self, String> {
+        Self::open(
+            url.to_string(),
+            label.unwrap_or(url).to_string(),
+            auth_header,
+            known_length,
+            Some(client),
         )
     }
 
@@ -226,35 +273,34 @@ impl HttpRangeReader {
         label: String,
         auth_header: Option<String>,
         known_length: Option<u64>,
+        client: Option<reqwest::blocking::Client>,
     ) -> Result<Self, String> {
-        let client = reqwest::blocking::Client::builder()
-            .timeout(std::time::Duration::from_secs(30))
-            .tcp_keepalive(std::time::Duration::from_secs(60))
-            .pool_idle_timeout(std::time::Duration::from_secs(90))
-            .build()
-            .map_err(|e| format!("Failed to build HTTP client: {e}"))?;
+        let client = client.unwrap_or_else(|| SHARED_CLIENT.clone());
 
-        // HEAD discovers Content-Length cheaply. Not every server answers HEAD
-        // (or answers it with a length, or with 200 rather than 405), so a failure
-        // here isn't fatal: known_length from the database or the first range GET
-        // supplies the length instead.
-        let mut head_req = client.head(&url);
-        if let Some(ref h) = auth_header {
-            head_req = head_req.header(reqwest::header::AUTHORIZATION, h);
-        }
-        let content_length = head_req
-            .send()
-            .ok()
-            .filter(|resp| resp.status().is_success() && !is_error_content_type(resp.headers()))
-            .and_then(|resp| {
-                resp.headers()
-                    .get(reqwest::header::CONTENT_LENGTH)
-                    .and_then(|v| v.to_str().ok())
-                    .and_then(|s| s.parse::<u64>().ok())
-            })
-            .filter(|&len| len > 0)
-            .or(known_length)
-            .unwrap_or(0);
+        // If known_length is already provided (e.g. from database filesize or caller),
+        // we skip the HEAD request entirely, avoiding a synchronous network
+        // round-trip (which can take 2+ seconds on remote servers like Files.fm).
+        // Only if known_length is absent do we issue a HEAD request to discover Content-Length.
+        let content_length = if let Some(len) = known_length.filter(|&len| len > 0) {
+            len
+        } else {
+            let mut head_req = client.head(&url);
+            if let Some(ref h) = auth_header {
+                head_req = head_req.header(reqwest::header::AUTHORIZATION, h);
+            }
+            head_req
+                .send()
+                .ok()
+                .filter(|resp| resp.status().is_success() && !is_error_content_type(resp.headers()))
+                .and_then(|resp| {
+                    resp.headers()
+                        .get(reqwest::header::CONTENT_LENGTH)
+                        .and_then(|v| v.to_str().ok())
+                        .and_then(|s| s.parse::<u64>().ok())
+                })
+                .filter(|&len| len > 0)
+                .unwrap_or(0)
+        };
 
         let mut reader = Self {
             url,
@@ -853,5 +899,181 @@ mod tests {
             },
         );
         assert!(looked_up_subsonic);
+    }
+
+    #[tokio::test]
+    async fn http_range_reader_skips_head_when_known_length_provided() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        // HEAD must NEVER be called when known_length is provided upfront
+        Mock::given(method("HEAD"))
+            .and(path("/track.mp3"))
+            .respond_with(ResponseTemplate::new(200))
+            .expect(0)
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/track.mp3"))
+            .respond_with(ranged_response)
+            .expect(1..)
+            .mount(&server)
+            .await;
+
+        let url = format!("{}/track.mp3", server.uri());
+        tokio::task::spawn_blocking(move || {
+            let mut reader = HttpRangeReader::new_with_options(
+                &url,
+                None,
+                None,
+                Some(RANGE_TEST_DATA.len() as u64),
+            )
+            .unwrap();
+            assert_eq!(reader.byte_len(), Some(RANGE_TEST_DATA.len() as u64));
+            let mut buf = [0u8; 10];
+            reader.read_exact(&mut buf).unwrap();
+            assert_eq!(&buf, &RANGE_TEST_DATA[..10]);
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn http_range_reader_issues_head_when_known_length_absent() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        // HEAD MUST be called to discover Content-Length when known_length is absent
+        Mock::given(method("HEAD"))
+            .and(path("/track.mp3"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("content-length", RANGE_TEST_DATA.len().to_string()),
+            )
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/track.mp3"))
+            .respond_with(ranged_response)
+            .expect(1..)
+            .mount(&server)
+            .await;
+
+        let url = format!("{}/track.mp3", server.uri());
+        tokio::task::spawn_blocking(move || {
+            let mut reader = HttpRangeReader::new(&url).unwrap();
+            assert_eq!(reader.byte_len(), Some(RANGE_TEST_DATA.len() as u64));
+            let mut buf = [0u8; 10];
+            reader.read_exact(&mut buf).unwrap();
+            assert_eq!(&buf, &RANGE_TEST_DATA[..10]);
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn http_range_reader_reuses_connection_pool_across_instances() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer};
+
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/track1.mp3"))
+            .respond_with(ranged_response)
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/track2.mp3"))
+            .respond_with(ranged_response)
+            .mount(&server)
+            .await;
+
+        let url1 = format!("{}/track1.mp3", server.uri());
+        let url2 = format!("{}/track2.mp3", server.uri());
+
+        tokio::task::spawn_blocking(move || {
+            // First track
+            let mut reader1 = HttpRangeReader::new_with_options(
+                &url1,
+                None,
+                None,
+                Some(RANGE_TEST_DATA.len() as u64),
+            )
+            .unwrap();
+            let mut buf1 = [0u8; 10];
+            reader1.read_exact(&mut buf1).unwrap();
+            assert_eq!(&buf1, &RANGE_TEST_DATA[..10]);
+
+            // Second track from same server (sequential playback)
+            let mut reader2 = HttpRangeReader::new_with_options(
+                &url2,
+                None,
+                None,
+                Some(RANGE_TEST_DATA.len() as u64),
+            )
+            .unwrap();
+            let mut buf2 = [0u8; 10];
+            reader2.read_exact(&mut buf2).unwrap();
+            assert_eq!(&buf2, &RANGE_TEST_DATA[..10]);
+        })
+        .await
+        .unwrap();
+    }
+
+    #[test]
+    fn lookup_filesize_resolves_from_songs_and_falls_back_to_webdav_cache() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db = Database::new(temp_dir.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+
+        // Insert song with filesize in songs table
+        conn.execute(
+            "INSERT INTO songs (id, path, url, filesize) VALUES (1, 'https://example.com/song1.mp3', 'https://example.com/song1.mp3', 1048576)",
+            [],
+        )
+        .unwrap();
+
+        // Insert server and song with 0 filesize in songs table, but size in webdav_cache
+        conn.execute(
+            "INSERT INTO webdav_servers (id, name, url) VALUES (1, 'Test Server', 'https://example.com')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO songs (id, path, url, filesize) VALUES (2, 'https://example.com/song2.mp3', 'https://example.com/song2.mp3', 0)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO webdav_cache (server_id, remote_path, size, song_id) VALUES (1, '/song2.mp3', 2097152, 2)",
+            [],
+        )
+        .unwrap();
+
+        // Song 1 gets size directly from songs.filesize
+        assert_eq!(
+            lookup_filesize(&db, "https://example.com/song1.mp3"),
+            Some(1048576)
+        );
+        // Song 2 falls back to webdav_cache.size
+        assert_eq!(
+            lookup_filesize(&db, "https://example.com/song2.mp3"),
+            Some(2097152)
+        );
+        // Also works when location has embedded basic auth
+        assert_eq!(
+            lookup_filesize(&db, "https://user:pass@example.com/song2.mp3"),
+            Some(2097152)
+        );
+        // Unknown song returns None
+        assert_eq!(
+            lookup_filesize(&db, "https://example.com/unknown.mp3"),
+            None
+        );
     }
 }
