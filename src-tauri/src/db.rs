@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 63;
+pub const CURRENT_SCHEMA_VERSION: i32 = 64;
 
 struct Migration {
     version: i32,
@@ -557,6 +557,11 @@ const MIGRATIONS: &[Migration] = &[
             }
             Ok(())
         },
+    },
+    Migration {
+        version: 64,
+        description: "compound order-first index for library song sorting (#1806)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_64)?),
     },
 ];
 
@@ -2304,6 +2309,17 @@ CREATE TABLE IF NOT EXISTS webdav_dir_cache (
     etag        TEXT NOT NULL,
     PRIMARY KEY (server_id, remote_path)
 );
+";
+
+// Migration 64: compound order-first expression index for library song ordering (#1806).
+const MIGRATION_64: &str = "
+CREATE INDEX IF NOT EXISTS idx_songs_library_sort ON songs (
+    COALESCE(album_artist_sort, album_artist),
+    COALESCE(albumsort, album),
+    disc,
+    track,
+    source
+) WHERE unavailable = 0;
 ";
 
 fn seed_artist_tag_hierarchy(conn: &rusqlite::Connection) -> Result<()> {
@@ -4111,5 +4127,53 @@ mod tests {
             .exists([])
             .unwrap();
         assert!(has_col, "songs table should have lyrics_source column");
+    }
+
+    #[test]
+    fn test_migration_64_adds_idx_songs_library_sort_and_eliminates_temp_btree() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_migration64_test_")
+            .tempdir()
+            .unwrap();
+        let db = Database::new(temp_dir_guard.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+
+        let has_index: bool = conn
+            .prepare(
+                "SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_songs_library_sort'",
+            )
+            .unwrap()
+            .exists([])
+            .unwrap();
+        assert!(
+            has_index,
+            "songs table should have idx_songs_library_sort index"
+        );
+
+        // Verify EXPLAIN QUERY PLAN for library songs query eliminates temporary sorting B-tree
+        let sql = format!(
+            "EXPLAIN QUERY PLAN
+             SELECT id FROM songs
+             WHERE +source IN ({lib}) AND unavailable = 0
+             ORDER BY COALESCE(album_artist_sort, album_artist), COALESCE(albumsort, album), disc, track
+             LIMIT 100 OFFSET 0",
+            lib = *crate::models::LIBRARY_SOURCES_SQL
+        );
+        let mut stmt = conn.prepare(&sql).unwrap();
+        let plan_lines: Vec<String> = stmt
+            .query_map([], |r| r.get::<_, String>(3))
+            .unwrap()
+            .filter_map(|r| r.ok())
+            .collect();
+
+        let full_plan = plan_lines.join("\n");
+        assert!(
+            full_plan.contains("idx_songs_library_sort"),
+            "Query plan should use idx_songs_library_sort, got: {full_plan}"
+        );
+        assert!(
+            !full_plan.contains("USE TEMP B-TREE"),
+            "Query plan should not use temporary B-tree for ORDER BY, got: {full_plan}"
+        );
     }
 }

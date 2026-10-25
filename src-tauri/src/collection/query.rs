@@ -151,9 +151,11 @@ impl CollectionScanner {
     /// (not streaming sources), ordered by album artist/album/disc/track.
     pub fn get_songs(&self, limit: i64, offset: i64) -> Result<Vec<Song>> {
         let conn = self.db.pool.get()?;
+        // `+source` suppresses `idx_songs_source` so SQLite uses `idx_songs_library_sort`
+        // directly, eliminating `USE TEMP B-TREE FOR ORDER BY` across 35K+ songs (#1806).
         let sql = format!(
             "SELECT {} FROM songs
-             WHERE source IN ({lib}) AND unavailable = 0
+             WHERE +source IN ({lib}) AND unavailable = 0
              ORDER BY COALESCE(album_artist_sort, album_artist), COALESCE(albumsort, album), disc, track
              LIMIT ?1 OFFSET ?2",
             SONG_SELECT_COLS,
@@ -4562,5 +4564,56 @@ mod tests {
         assert_eq!(chart2[0].previous_rank, Some(1));
         assert_eq!(chart2[0].movement, "steady");
         assert_eq!(chart2[0].weeks_on_chart, 2);
+    }
+
+    #[test]
+    fn test_get_songs_uses_library_sort_index_without_temp_btree() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_get_songs_query_plan_test_")
+            .tempdir()
+            .unwrap();
+        let db = Arc::new(Database::new(temp_dir_guard.path().to_path_buf()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        // Insert songs across different sources (1 = LocalFile, 11 = WebDav)
+        conn.execute(
+            "INSERT INTO songs (id, path, title, artist, album_artist, album, disc, track, source, unavailable)
+             VALUES (1, '/path/1.mp3', 'Track 1', 'Artist B', 'Artist B', 'Album 1', 1, 1, 1, 0),
+                    (2, '/path/2.mp3', 'Track 2', 'Artist A', 'Artist A', 'Album 2', 1, 1, 11, 0)",
+            [],
+        )
+        .unwrap();
+
+        let scanner = CollectionScanner::new(db.clone());
+        let songs = scanner.get_songs(100, 0).unwrap();
+        assert_eq!(songs.len(), 2);
+        assert_eq!(songs[0].artist.as_deref(), Some("Artist A"));
+        assert_eq!(songs[1].artist.as_deref(), Some("Artist B"));
+
+        // Verify EXPLAIN QUERY PLAN
+        let sql = format!(
+            "EXPLAIN QUERY PLAN
+             SELECT id FROM songs
+             WHERE +source IN ({lib}) AND unavailable = 0
+             ORDER BY COALESCE(album_artist_sort, album_artist), COALESCE(albumsort, album), disc, track
+             LIMIT 100 OFFSET 0",
+            lib = *LIBRARY_SOURCES_SQL
+        );
+        let mut stmt = conn.prepare(&sql).unwrap();
+        let plan_lines: Vec<String> = stmt
+            .query_map([], |r| r.get::<_, String>(3))
+            .unwrap()
+            .filter_map(|r| r.ok())
+            .collect();
+
+        let full_plan = plan_lines.join("\n");
+        assert!(
+            full_plan.contains("idx_songs_library_sort"),
+            "Query plan should use idx_songs_library_sort, got: {full_plan}"
+        );
+        assert!(
+            !full_plan.contains("USE TEMP B-TREE"),
+            "Query plan should not use temporary B-tree for ORDER BY, got: {full_plan}"
+        );
     }
 }
