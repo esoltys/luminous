@@ -479,16 +479,6 @@ impl CollectionScanner {
             .map(|d| PathBuf::from(d.path))
             .collect();
 
-        let unreachable_roots = reconcile::unreachable_watched_roots(conn);
-
-        for root in &unreachable_roots {
-            log::warn!(
-                "Watched directory '{}' is unreachable (disconnected drive or network share?); \
-                 songs under it will not be treated as missing this scan",
-                root.display()
-            );
-        }
-
         let (active_webdav_song_ids, active_webdav_servers) = load_active_webdav_servers(conn);
         let subsonic_server_ids = load_subsonic_server_ids(conn);
 
@@ -544,9 +534,6 @@ impl CollectionScanner {
             }
 
             if p.exists() {
-                continue;
-            }
-            if unreachable_roots.iter().any(|root| p.starts_with(root)) {
                 continue;
             }
             missing.push(id);
@@ -3512,6 +3499,77 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM songs", [], |r| r.get(0))
             .unwrap();
         assert_eq!(remaining_count, 0, "database should now have 0 tracks");
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_mass_removal_safeguard_unreachable_directory_triggers_incident() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_safeguard_unreachable_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        // The mount directory does NOT exist on disk (simulating a detached external drive)
+        let disconnected_drive = temp_dir.join("disconnected_usb");
+        let scanner = CollectionScanner::new(db.clone());
+        scanner
+            .add_directory(&disconnected_drive.to_string_lossy())
+            .unwrap();
+
+        // Seed 15 songs under the disconnected drive in the database
+        for i in 0..15 {
+            let p = disconnected_drive.join(format!("track_{i}.mp3"));
+            let song = Song {
+                path: Some(p.to_string_lossy().to_string()),
+                title: Some(format!("Track {i}")),
+                source: SongSource::LocalFile,
+                ..Default::default()
+            };
+            upsert_song(&conn, &song).unwrap();
+        }
+
+        // 1. Automatic scan path: must capture incident and NOT mark tracks unavailable
+        let mut recorded_incidents = Vec::new();
+        let marked = scanner
+            .mark_missing_unavailable_ext(|incident, _ids| {
+                recorded_incidents.push(incident);
+            })
+            .unwrap();
+        assert_eq!(marked, 0);
+        assert_eq!(recorded_incidents.len(), 1);
+        assert_eq!(recorded_incidents[0].missing_count, 15);
+        assert_eq!(recorded_incidents[0].total_count, 15);
+        assert_eq!(
+            recorded_incidents[0].directory_path,
+            disconnected_drive.to_string_lossy().to_string()
+        );
+
+        let unavailable_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM songs WHERE unavailable = 1",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(unavailable_count, 0, "tracks must remain untouched");
+
+        // 2. Explicit prune without force: blocked and returns incident
+        let pruned = scanner.prune_missing_songs().unwrap();
+        assert_eq!(pruned.deleted_songs, 0);
+        assert!(pruned.blocked_incident.is_some());
+
+        // 3. Forced prune: deletes tracks
+        let forced = scanner.prune_missing_songs_ext(true).unwrap();
+        assert_eq!(forced.deleted_songs, 15);
+        assert_eq!(
+            conn.query_row::<i64, _, _>("SELECT COUNT(*) FROM songs", [], |r| r.get(0))
+                .unwrap(),
+            0
+        );
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

@@ -201,12 +201,58 @@ pub fn evaluate_missing_tracks(
 
     // Evaluate each watched directory
     for (dir_id, dir_path) in &dirs {
-        let Some(missing_songs) = dir_missing.remove(dir_id) else {
+        let is_unreachable = std::fs::read_dir(dir_path).is_err();
+        let missing_songs_opt = dir_missing.remove(dir_id);
+
+        let total_count = count_songs_under_dir(conn, &dir_path.to_string_lossy())?;
+        if total_count == 0 {
+            continue;
+        }
+
+        if is_unreachable {
+            // Unmounted drive or disconnected network share: all tracked songs are unreachable.
+            let incident_id = format!("incident-{}-{}", dir_id, now_ms);
+            let clean = clean_dir_path(&dir_path.to_string_lossy());
+            let path_fw = clean.replace('\\', "/");
+            let path_bw = clean.replace('/', "\\");
+
+            let mut stmt = conn.prepare(
+                "SELECT id, path FROM songs WHERE path IS NOT NULL AND (
+                    path = ?1 OR path = ?2
+                    OR path LIKE ?1 || '/%'
+                    OR path LIKE ?1 || '\\%'
+                    OR path LIKE ?2 || '/%'
+                    OR path LIKE ?2 || '\\%'
+                )",
+            )?;
+            let rows = stmt.query_map(params![path_fw, path_bw], |row| {
+                Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+            })?;
+            let all_songs: Vec<(i64, String)> = rows.flatten().collect();
+            let sample_paths: Vec<String> =
+                all_songs.iter().take(5).map(|(_, p)| p.clone()).collect();
+            let missing_ids: Vec<i64> = all_songs.into_iter().map(|(id, _)| id).collect();
+
+            let incident = MassRemovalIncident {
+                id: incident_id.clone(),
+                directory_id: Some(*dir_id),
+                directory_path: dir_path.to_string_lossy().to_string(),
+                missing_count: total_count,
+                total_count,
+                sample_missing_paths: sample_paths,
+            };
+
+            verdict.blocked_ids.extend(missing_ids.iter().copied());
+            verdict.incident_song_map.insert(incident_id, missing_ids);
+            verdict.incidents.push(incident);
+            continue;
+        }
+
+        let Some(missing_songs) = missing_songs_opt else {
             continue;
         };
 
         let missing_count = missing_songs.len();
-        let total_count = count_songs_under_dir(conn, &dir_path.to_string_lossy())?;
 
         if is_mass_removal(missing_count, total_count) {
             let incident_id = format!("incident-{}-{}", dir_id, now_ms);
@@ -329,7 +375,8 @@ pub fn evaluate_watcher_removals(
         let removed_count = removed_paths.len();
         let total_count = count_songs_under_dir(conn, &dir_path.to_string_lossy())?;
 
-        if is_mass_removal(removed_count, total_count) {
+        let is_unreachable = std::fs::read_dir(dir_path).is_err();
+        if is_unreachable || is_mass_removal(removed_count, total_count) {
             let incident_id = format!("incident-watcher-{}-{}", dir_id, now_ms);
             let sample_paths: Vec<String> = removed_paths
                 .iter()
