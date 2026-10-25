@@ -59,7 +59,7 @@ fn lookup_filesize(db: &Database, location: &str) -> Option<u64> {
     let size: Option<i64> = stmt
         .query_row(rusqlite::params![location, clean_url], |r| r.get(0))
         .ok()?;
-    size.and_then(|s| if s > 0 { Some(s as u64) } else { None })
+    size.filter(|&s| s > 0).map(|s| s as u64)
 }
 
 /// [`open`] with the database lookups passed in, so the routing and
@@ -199,8 +199,8 @@ impl HttpRangeReader {
         Self::open(url.to_string(), label.to_string(), None, None)
     }
 
-    /// Like `new`, with label, auth header, and an optional known file length
-    /// (e.g. from database metadata or PROPFIND).
+    /// Opens an HTTP range reader with an explicit label for errors, optional authorization,
+    /// and an optional pre-known stream length in bytes.
     pub fn new_with_options(
         url: &str,
         label: Option<&str>,
@@ -284,6 +284,8 @@ impl HttpRangeReader {
         if let Some(ref h) = self.auth_header {
             req = req.header(reqwest::header::AUTHORIZATION, h);
         }
+        // Inspecting headers without reading the body drops the response stream,
+        // discovering Content-Length without downloading the file.
         if let Ok(resp) = req.send() {
             if resp.status().is_success() && !is_error_content_type(resp.headers()) {
                 if let Some(len) = resp
