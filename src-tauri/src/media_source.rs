@@ -13,16 +13,14 @@ use std::sync::{Arc, LazyLock};
 
 /// Global shared HTTP client for media sources. Reuses connection pools, DNS caching,
 /// and TLS 1.3 session tickets across sequential track playback, prefetching, and offline analysis.
-static SHARED_CLIENT: LazyLock<reqwest::blocking::Client> =
-    LazyLock::new(|| build_client().expect("Failed to build shared HTTP client for media sources"));
-
-fn build_client() -> Result<reqwest::blocking::Client, reqwest::Error> {
+static SHARED_CLIENT: LazyLock<reqwest::blocking::Client> = LazyLock::new(|| {
     reqwest::blocking::Client::builder()
         .timeout(std::time::Duration::from_secs(30))
         .tcp_keepalive(std::time::Duration::from_secs(60))
         .pool_idle_timeout(std::time::Duration::from_secs(90))
         .build()
-}
+        .expect("Failed to build shared HTTP client for media sources")
+});
 
 /// The opener handed to `AudioEngine::with_source_opener`: the same lookup
 /// as [`open`], owning its database handle.
@@ -36,16 +34,6 @@ pub fn opener(
 /// or remote stream), or a `subsonic://` path. Errors name the location the
 /// user knows, never a signed URL.
 pub fn open(db: &Database, location: &str) -> Result<Box<dyn MediaSource>, String> {
-    open_with_known_length(db, location, None)
-}
-
-/// Open a stored song location with an optionally pre-known file size in bytes,
-/// bypassing the database lookup if already known.
-pub fn open_with_known_length(
-    db: &Database,
-    location: &str,
-    known_length: Option<u64>,
-) -> Result<Box<dyn MediaSource>, String> {
     open_with(
         location,
         |path| {
@@ -56,7 +44,7 @@ pub fn open_with_known_length(
             let conn = db.pool.get().ok()?;
             crate::webdav::resolve_auth_header(&conn, url)
         },
-        |loc| known_length.or_else(|| lookup_filesize(db, loc)),
+        |loc| lookup_filesize(db, loc),
     )
 }
 
@@ -214,18 +202,18 @@ impl HttpRangeReader {
     pub fn new(url: &str) -> Result<Self, String> {
         let (url, auth_header) = extract_basic_auth(url);
         let label = url.clone();
-        Self::open(url, label, auth_header, None, None)
+        Self::open(url, label, auth_header, None)
     }
 
     /// Like `new`, but sends `auth_header` as the `Authorization` value.
     pub fn new_with_auth(url: &str, auth_header: Option<String>) -> Result<Self, String> {
-        Self::open(url.to_string(), url.to_string(), auth_header, None, None)
+        Self::open(url.to_string(), url.to_string(), auth_header, None)
     }
 
     /// Like `new`, but error messages name the source as `label` rather than
     /// quoting `url` — for signed URLs that must never reach logs or the UI.
     pub fn new_with_label(url: &str, label: &str) -> Result<Self, String> {
-        Self::open(url.to_string(), label.to_string(), None, None, None)
+        Self::open(url.to_string(), label.to_string(), None, None)
     }
 
     /// Opens an HTTP range reader with an explicit label for errors, optional authorization,
@@ -241,24 +229,6 @@ impl HttpRangeReader {
             label.unwrap_or(url).to_string(),
             auth_header,
             known_length,
-            None,
-        )
-    }
-
-    /// Opens an HTTP range reader with a specific reqwest client (e.g. for custom connection pools or tests).
-    pub fn new_with_client(
-        url: &str,
-        label: Option<&str>,
-        auth_header: Option<String>,
-        known_length: Option<u64>,
-        client: reqwest::blocking::Client,
-    ) -> Result<Self, String> {
-        Self::open(
-            url.to_string(),
-            label.unwrap_or(url).to_string(),
-            auth_header,
-            known_length,
-            Some(client),
         )
     }
 
@@ -273,9 +243,8 @@ impl HttpRangeReader {
         label: String,
         auth_header: Option<String>,
         known_length: Option<u64>,
-        client: Option<reqwest::blocking::Client>,
     ) -> Result<Self, String> {
-        let client = client.unwrap_or_else(|| SHARED_CLIENT.clone());
+        let client = SHARED_CLIENT.clone();
 
         // If known_length is already provided (e.g. from database filesize or caller),
         // we skip the HEAD request entirely, avoiding a synchronous network
