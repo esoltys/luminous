@@ -2156,5 +2156,13 @@ export const de = {
     integrationSettings: "Integrationseinstellungen",
     aboutMusicBrainz: "Über MusicBrainz",
     logout: "Abmelden"
+  },
+  safeguard: {
+    toastMessage: "Speichermedium scheint getrennt zu sein: {count} Titel in „{folder}“ wurden nicht gefunden. Datenbankeinträge wurden geschützt.",
+    reviewBtn: "Überprüfen",
+    dialogTitle: "Speichermedium getrennt?",
+    dialogMessage: "{count} von {total} Titeln in „{folder}“ konnten nicht gefunden werden. Dies geschieht normalerweise, wenn ein externes Laufwerk oder eine Netzwerkfreigabe getrennt wurde.\n\nMöchten Sie diese Titel in Ihrer Bibliothek behalten, bis das Laufwerk wieder verbunden ist, oder entfernen?",
+    keepRecordsBtn: "Einträge behalten",
+    confirmRemoveBtn: "Titel entfernen"
   }
 };

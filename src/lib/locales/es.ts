@@ -2156,5 +2156,13 @@ export const es = {
     integrationSettings: "Configuración de integraciones",
     aboutMusicBrainz: "Acerca de MusicBrainz",
     logout: "Cerrar sesión"
+  },
+  safeguard: {
+    toastMessage: "El volumen de almacenamiento parece desconectado: no se encontraron {count} pistas en '{folder}'. Se han protegido los registros de la base de datos.",
+    reviewBtn: "Revisar",
+    dialogTitle: "¿Volumen de almacenamiento desconectado?",
+    dialogMessage: "No se pudieron encontrar {count} de {total} pistas en '{folder}'. Esto suele ocurrir cuando se desconecta una unidad externa o un recurso compartido de red.\n\n¿Desea conservar estas pistas en su biblioteca hasta que se vuelva a conectar la unidad o eliminarlas?",
+    keepRecordsBtn: "Conservar pistas",
+    confirmRemoveBtn: "Eliminar pistas"
   }
 };

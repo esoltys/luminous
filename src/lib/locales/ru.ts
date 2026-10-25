@@ -2272,5 +2272,13 @@ export const ru = {
     integrationSettings: "Параметры интеграции",
     aboutMusicBrainz: "О MusicBrainz",
     logout: "Выйти"
+  },
+  safeguard: {
+    toastMessage: "Хранилище отключено: {count} треков в «{folder}» не найдены. Записи в базе данных защищены.",
+    reviewBtn: "Проверить",
+    dialogTitle: "Хранилище отключено?",
+    dialogMessage: "Не удалось найти {count} из {total} треков в «{folder}». Обычно это происходит, когда внешний диск или сетевая папка отключены.\n\nСохранить эти треки в фонотеке до повторного подключения или удалить их?",
+    keepRecordsBtn: "Сохранить записи",
+    confirmRemoveBtn: "Удалить треки"
   }
 };

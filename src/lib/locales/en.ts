@@ -2156,5 +2156,13 @@ export const en = {
     integrationSettings: "Integration settings",
     aboutMusicBrainz: "About MusicBrainz",
     logout: "Log out"
+  },
+  safeguard: {
+    toastMessage: "Storage volume appears disconnected: {count} tracks in '{folder}' were not found. Database records have been protected.",
+    reviewBtn: "Review",
+    dialogTitle: "Storage Volume Disconnected?",
+    dialogMessage: "{count} of {total} tracks in '{folder}' could not be found. This usually happens when an external drive or network share is disconnected.\n\nKeep these tracks in your library until the drive reconnects, or remove them?",
+    keepRecordsBtn: "Keep Records",
+    confirmRemoveBtn: "Remove Tracks"
   }
 };

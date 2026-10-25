@@ -47,11 +47,13 @@ fn scan_thread_count() -> usize {
 mod query;
 mod reconcile;
 pub mod relocate;
+pub mod safeguard;
 mod watcher;
 pub(crate) use query::get_artist_profile_conn;
 #[cfg(test)]
 pub(crate) use query::set_artist_profile_conn;
 pub(crate) use reconcile::resolve_case_insensitive_path;
+pub use safeguard::{MassRemovalIncident, MassRemovalRegistry, SafeguardVerdict};
 pub use watcher::{start_watcher, SelfWriteTracker, WatcherPauseGuard};
 
 /// What started a library scan — recorded with its timings so repeated
@@ -558,20 +560,43 @@ impl CollectionScanner {
     /// Songs under a watched directory root that can't currently be verified (see
     /// `find_missing_song_ids`) are left untouched rather than flagged.
     pub fn mark_missing_unavailable(&self) -> Result<usize> {
+        self.mark_missing_unavailable_ext(|_incident, _ids| {})
+    }
+
+    /// Soft-deletes songs whose file no longer exists on disk by flagging them `unavailable`,
+    /// protected by the mass-removal safeguard (#1582). If missing tracks exceed safeguard
+    /// thresholds (e.g. unmounted drive), automatic marking is aborted for those tracks,
+    /// database records are kept intact, and `on_incident` is called.
+    pub fn mark_missing_unavailable_ext(
+        &self,
+        mut on_incident: impl FnMut(MassRemovalIncident, Vec<i64>),
+    ) -> Result<usize> {
         let conn = self.db.pool.get()?;
         let to_mark = self.find_missing_song_ids(&conn, true)?;
 
-        let marked = to_mark.len();
-        if !to_mark.is_empty() {
+        let verdict = safeguard::evaluate_missing_tracks(&conn, &to_mark, false)?;
+        for incident in &verdict.incidents {
+            let ids = verdict.blocked_ids_for_incident(&incident.id);
+            on_incident(incident.clone(), ids);
+        }
+
+        let marked = verdict.safe_ids.len();
+        if !verdict.safe_ids.is_empty() {
             let tx = conn.unchecked_transaction()?;
             {
                 let mut upd_stmt = tx.prepare("UPDATE songs SET unavailable = 1 WHERE id = ?1")?;
-                for id in &to_mark {
+                for id in &verdict.safe_ids {
                     upd_stmt.execute(params![id])?;
                 }
             }
             tx.commit()?;
             log::info!("Marked {marked} song(s) unavailable (file missing on disk)");
+        }
+        if !verdict.blocked_ids.is_empty() {
+            log::warn!(
+                "Safeguard protected {} song(s) from being marked unavailable due to potential unmounted drive",
+                verdict.blocked_ids.len()
+            );
         }
         Ok(marked)
     }
@@ -759,6 +784,16 @@ impl CollectionScanner {
     /// This is only ever invoked explicitly (the "Clean Up Missing Songs" action) — automatic
     /// scans call `mark_missing_unavailable` instead, which never deletes.
     pub fn prune_missing_songs(&self) -> Result<PruneResult> {
+        self.prune_missing_songs_ext(false)
+    }
+
+    /// Hard-deletes songs from the database when their file no longer exists on disk or are marked unavailable.
+    /// Also sweeps every watched directory for empty folders and removes them.
+    ///
+    /// When `force` is false, evaluates the mass-removal safeguard (#1582). If missing tracks
+    /// exceed the threshold (e.g. unmounted drive), pruning aborts and returns `blocked_incident`.
+    /// When `force` is true, bypasses the safeguard and executes the deletion.
+    pub fn prune_missing_songs_ext(&self, force: bool) -> Result<PruneResult> {
         let merged_duplicates = self.merge_duplicate_songs()?;
 
         let conn = self.db.pool.get()?;
@@ -804,6 +839,23 @@ impl CollectionScanner {
         // Safety invariant: never delete a WebDAV song that belongs to an active server
         to_delete.retain(|&id| !active_webdav_song_ids.contains(&id));
 
+        if !force {
+            let verdict = safeguard::evaluate_missing_tracks(&conn, &to_delete, false)?;
+            if !verdict.is_all_safe() {
+                log::warn!(
+                    "Explicit prune blocked by mass-removal safeguard ({} track(s) across {} incident(s))",
+                    verdict.blocked_ids.len(),
+                    verdict.incidents.len()
+                );
+                return Ok(PruneResult {
+                    deleted_songs: 0,
+                    removed_folders: 0,
+                    merged_duplicates,
+                    blocked_incident: verdict.incidents.into_iter().next(),
+                });
+            }
+        }
+
         let deleted_count = to_delete.len();
         if !to_delete.is_empty() {
             let tx = conn.unchecked_transaction()?;
@@ -838,6 +890,7 @@ impl CollectionScanner {
             deleted_songs: deleted_count,
             removed_folders,
             merged_duplicates,
+            blocked_incident: None,
         })
     }
 
@@ -867,14 +920,24 @@ impl CollectionScanner {
             .get()
             .map(|conn| crate::commands::context::is_online_enabled(&conn))
             .unwrap_or(true);
+        let app_for_incidents = app.clone();
         let report = self
-            .scan_all_core(
+            .scan_all_core_ext(
                 app_data_dir,
                 force,
                 silent,
                 resolve_remote_art,
                 move |progress| {
                     let _ = app_for_progress.emit("scan-progress", progress);
+                },
+                move |incident, ids| {
+                    if let Some(state) = app_for_incidents.try_state::<crate::AppState>() {
+                        state
+                            .mass_removal_registry
+                            .lock()
+                            .register(incident.clone(), ids);
+                    }
+                    let _ = app_for_incidents.emit("mass-removal-detected", incident);
                 },
             )
             .await?;
@@ -963,7 +1026,28 @@ impl CollectionScanner {
         force: bool,
         silent: bool,
         resolve_remote_art: bool,
+        on_progress: impl FnMut(ScanProgress),
+    ) -> Result<ScanReport> {
+        self.scan_all_core_ext(
+            app_data_dir,
+            force,
+            silent,
+            resolve_remote_art,
+            on_progress,
+            |_incident, _ids| {},
+        )
+        .await
+    }
+
+    /// Extended variant of `scan_all_core` that receives mass-removal incident events.
+    pub async fn scan_all_core_ext(
+        &self,
+        app_data_dir: PathBuf,
+        force: bool,
+        silent: bool,
+        resolve_remote_art: bool,
         mut on_progress: impl FnMut(ScanProgress),
+        on_incident: impl FnMut(MassRemovalIncident, Vec<i64>) + Send,
     ) -> Result<ScanReport> {
         let scan_started = Instant::now();
         let dirs = self.get_directories()?;
@@ -1293,7 +1377,7 @@ impl CollectionScanner {
         // at scan time can't cause data loss. Hard-deleting is reserved for the explicit
         // "Clean Up Missing Songs" action (`prune_missing_songs`).
         let missing_check_started = Instant::now();
-        match self.mark_missing_unavailable() {
+        match self.mark_missing_unavailable_ext(on_incident) {
             Ok(marked) => report.marked_unavailable = marked,
             Err(e) => log::error!("Failed to mark missing songs during scan: {e}"),
         }
@@ -3334,6 +3418,93 @@ mod tests {
             .query_row("SELECT path FROM songs", [], |r| r.get(0))
             .unwrap();
         assert!(remaining_path.contains("unreachable_share"));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_mass_removal_safeguard_blocks_purge_and_unforced_prune() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_safeguard_prune_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        // The mount directory exists on disk as an empty directory (simulating an unmounted external drive
+        // where the mount point remains present on Linux/macOS).
+        let usb_mount = temp_dir.join("usb_drive");
+        std::fs::create_dir_all(&usb_mount).unwrap();
+
+        let scanner = CollectionScanner::new(db.clone());
+        scanner.add_directory(&usb_mount.to_string_lossy()).unwrap();
+
+        // Seed 20 songs under the USB mount in the database
+        for i in 0..20 {
+            let p = usb_mount.join(format!("track_{i}.mp3"));
+            let song = Song {
+                path: Some(p.to_string_lossy().to_string()),
+                title: Some(format!("Track {i}")),
+                source: SongSource::LocalFile,
+                ..Default::default()
+            };
+            upsert_song(&conn, &song).unwrap();
+        }
+
+        // 1. Automatic scan path: mark_missing_unavailable must NOT mark them unavailable
+        let marked = scanner.mark_missing_unavailable().unwrap();
+        assert_eq!(
+            marked, 0,
+            "mass removal safeguard must block automatic flagging"
+        );
+
+        let unavailable_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM songs WHERE unavailable = 1",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            unavailable_count, 0,
+            "songs must remain available in the database"
+        );
+
+        // 2. Explicit prune without force: must be blocked and return blocked_incident
+        let pruned = scanner.prune_missing_songs().unwrap();
+        assert_eq!(
+            pruned.deleted_songs, 0,
+            "safeguard must prevent hard deletion"
+        );
+        assert!(
+            pruned.blocked_incident.is_some(),
+            "safeguard must return a blocked incident"
+        );
+        let incident = pruned.blocked_incident.unwrap();
+        assert_eq!(incident.missing_count, 20);
+        assert_eq!(incident.total_count, 20);
+
+        let total_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM songs", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(
+            total_count, 20,
+            "all 20 tracks must still exist in the database"
+        );
+
+        // 3. Explicit prune with force: bypasses safeguard and purges
+        let forced_prune = scanner.prune_missing_songs_ext(true).unwrap();
+        assert_eq!(
+            forced_prune.deleted_songs, 20,
+            "forced prune must delete the missing tracks"
+        );
+        assert!(forced_prune.blocked_incident.is_none());
+
+        let remaining_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM songs", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(remaining_count, 0, "database should now have 0 tracks");
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

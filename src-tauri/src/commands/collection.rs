@@ -181,12 +181,73 @@ pub async fn rescan_songs(
 }
 
 #[tauri::command]
-pub async fn prune_missing_songs(state: State<'_, AppState>) -> Result<PruneResult, String> {
-    crate::collection::with_collection_scanner(state.db.clone(), |scanner| {
-        scanner.prune_missing_songs()
+pub async fn prune_missing_songs(
+    state: State<'_, AppState>,
+    force: Option<bool>,
+) -> Result<PruneResult, String> {
+    let force_val = force.unwrap_or(false);
+    crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        scanner.prune_missing_songs_ext(force_val)
     })
     .await
     .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_pending_mass_removals(
+    state: State<'_, AppState>,
+) -> Vec<crate::models::MassRemovalIncident> {
+    state.mass_removal_registry.lock().get_all()
+}
+
+#[tauri::command]
+pub async fn resolve_mass_removal(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    incident_id: String,
+    action: String,
+) -> Result<(), String> {
+    let ctx_opt = state.mass_removal_registry.lock().remove(&incident_id);
+    if action == "keep" {
+        log::info!("Mass removal incident {incident_id} dismissed by user; records preserved");
+        return Ok(());
+    }
+
+    if action == "prune" {
+        if let Some(ctx) = ctx_opt {
+            if !ctx.missing_song_ids.is_empty() {
+                crate::db::run_blocking(&state.db, move |conn| {
+                    let tx = conn.unchecked_transaction()?;
+                    {
+                        let mut stmt = tx.prepare("DELETE FROM songs WHERE id = ?1")?;
+                        for id in &ctx.missing_song_ids {
+                            stmt.execute(rusqlite::params![id])?;
+                        }
+                        tx.execute_batch("DELETE FROM playlist_items WHERE song_id IS NULL;")?;
+                        tx.execute_batch("DELETE FROM webdav_cache WHERE song_id IS NULL OR server_id NOT IN (SELECT id FROM webdav_servers);")?;
+                        tx.execute_batch("DELETE FROM subsonic_cache WHERE song_id IS NULL;")?;
+                    }
+                    tx.commit()?;
+                    Ok(())
+                })
+                .await
+                .map_err(|e| e.to_string())?;
+
+                let _ = app.emit("library-changed", ());
+            } else {
+                let db_clone = state.db.clone();
+                crate::collection::with_collection_scanner(db_clone, move |scanner| {
+                    scanner.prune_missing_songs_ext(true)
+                })
+                .await
+                .map_err(|e| e.to_string())?;
+
+                let _ = app.emit("library-changed", ());
+            }
+        }
+    }
+
+    Ok(())
 }
 
 #[tauri::command]

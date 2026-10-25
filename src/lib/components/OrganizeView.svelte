@@ -29,7 +29,12 @@
   }
 
   async function handlePruneMissing() {
-    const { deletedSongs, removedFolders, mergedDuplicates } = await collectionStore.pruneMissing();
+    const result = await collectionStore.pruneMissing();
+    if (result.blockedIncident) {
+      collectionStore.activeMassRemovalIncident = result.blockedIncident;
+      return;
+    }
+    const { deletedSongs, removedFolders, mergedDuplicates } = result;
     if (removedFolders > 0 && mergedDuplicates > 0) {
       pruneMsg = i18n.t('settings.pruneCompleteMsgWithFoldersAndDuplicates', { count: deletedSongs, folders: removedFolders, duplicates: mergedDuplicates });
     } else if (mergedDuplicates > 0) {

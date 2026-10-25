@@ -111,6 +111,8 @@ pub struct AppState {
     /// Used by background workers (sync, remote cover fetches) to yield or throttle
     /// concurrency and prevent server worker / bandwidth starvation (#1785).
     pub remote_streaming_active: Arc<std::sync::atomic::AtomicBool>,
+    /// In-memory registry for pending mass-removal incidents (#1582).
+    pub mass_removal_registry: Arc<parking_lot::Mutex<collection::MassRemovalRegistry>>,
 }
 
 /// Suppresses stock webview browser chrome — reload/find/print keybindings and
@@ -1134,6 +1136,9 @@ pub fn run() {
                 hierarchy_sidecar: Arc::new(hierarchy_sidecar::HierarchySidecar::new()),
                 addons: commands::addons::build_manager(app.handle()),
                 remote_streaming_active,
+                mass_removal_registry: Arc::new(parking_lot::Mutex::new(
+                    collection::MassRemovalRegistry::new(),
+                )),
             };
 
             crate::collection::start_watcher(app.handle().clone(), &state);
@@ -1316,6 +1321,8 @@ pub fn run() {
             commands::collection::scan_directories,
             commands::collection::rescan_songs,
             commands::collection::prune_missing_songs,
+            commands::collection::get_pending_mass_removals,
+            commands::collection::resolve_mass_removal,
             commands::collection::add_directory,
             commands::collection::remove_directory,
             commands::collection::relocate_directory,

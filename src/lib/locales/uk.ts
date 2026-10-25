@@ -2272,5 +2272,13 @@ export const uk = {
     integrationSettings: "Налаштування інтеграцій",
     aboutMusicBrainz: "Про MusicBrainz",
     logout: "Вийти"
+  },
+  safeguard: {
+    toastMessage: "Сховище від'єднано: {count} треків у «{folder}» не знайдено. Записи в базі даних захищено.",
+    reviewBtn: "Перевірити",
+    dialogTitle: "Сховище від'єднано?",
+    dialogMessage: "Не вдалося знайти {count} з {total} треків у «{folder}». Зазвичай це відбувається, коли зовнішній диск або мережеву папку від'єднано.\n\nЗберегти ці треки у медіатеці до повторного під'єднання чи вилучити їх?",
+    keepRecordsBtn: "Зберегти записи",
+    confirmRemoveBtn: "Вилучити треки"
   }
 };

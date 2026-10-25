@@ -2164,5 +2164,13 @@ export const frFR: DeepStringRecord<typeof en> = {
     integrationSettings: "Paramètres d'intégration",
     aboutMusicBrainz: "À propos de MusicBrainz",
     logout: "Se déconnecter"
+  },
+  safeguard: {
+    toastMessage: "Le volume de stockage semble déconnecté : {count} pistes dans « {folder} » sont introuvables. Les données de la bibliothèque ont été protégées.",
+    reviewBtn: "Examiner",
+    dialogTitle: "Volume de stockage déconnecté ?",
+    dialogMessage: "{count} pistes sur {total} dans « {folder} » sont introuvables. Cela se produit habituellement lorsqu'un disque externe ou un partage réseau est déconnecté.\n\nVoulez-vous conserver ces pistes dans votre bibliothèque jusqu'à la reconnexion, ou les supprimer ?",
+    keepRecordsBtn: "Conserver les pistes",
+    confirmRemoveBtn: "Supprimer les pistes"
   }
 };

@@ -17,6 +17,7 @@
   import Toast from '../lib/components/Toast.svelte';
   import WalkthroughOverlay from '../lib/components/WalkthroughOverlay.svelte';
   import WelcomeScreen from '../lib/components/WelcomeScreen.svelte';
+  import ConfirmDialog from '../lib/components/ConfirmDialog.svelte';
   import { IconContext, MusicNotesIcon as Music, CloudArrowUpIcon as UploadCloud } from 'phosphor-svelte';
 
   import { i18n } from '../lib/stores/i18n.svelte';
@@ -623,6 +624,22 @@
 {/if}
 
 <WalkthroughOverlay />
+
+{#if collectionStore.activeMassRemovalIncident}
+  <ConfirmDialog
+    title={i18n.t('safeguard.dialogTitle', {}, 'Storage Volume Disconnected?')}
+    message={i18n.t('safeguard.dialogMessage', {
+      count: collectionStore.activeMassRemovalIncident.missing_count,
+      total: collectionStore.activeMassRemovalIncident.total_count,
+      folder: collectionStore.activeMassRemovalIncident.directory_path,
+    })}
+    confirmLabel={i18n.t('safeguard.confirmRemoveBtn', {}, 'Remove Tracks')}
+    cancelLabel={i18n.t('safeguard.keepRecordsBtn', {}, 'Keep Records')}
+    danger={true}
+    onConfirm={() => collectionStore.resolveActiveMassRemoval('prune')}
+    onCancel={() => collectionStore.resolveActiveMassRemoval('keep')}
+  />
+{/if}
 
   <Toast />
 </IconContext>

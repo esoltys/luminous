@@ -2156,5 +2156,13 @@ export const it = {
     integrationSettings: "Impostazioni di integrazione",
     aboutMusicBrainz: "Informazioni su MusicBrainz",
     logout: "Esci"
+  },
+  safeguard: {
+    toastMessage: "Il volume di archiviazione sembra disconnesso: {count} brani in '{folder}' non sono stati trovati. I dati della libreria sono stati protetti.",
+    reviewBtn: "Esamina",
+    dialogTitle: "Volume di archiviazione disconnesso?",
+    dialogMessage: "Impossibile trovare {count} su {total} brani in '{folder}'. Ciò si verifica in genere quando un disco esterno o una condivisione di rete viene disconnessa.\n\nVuoi mantenere questi brani nella libreria fino alla riconnessione o rimuoverli?",
+    keepRecordsBtn: "Mantieni brani",
+    confirmRemoveBtn: "Rimuovi brani"
   }
 };
