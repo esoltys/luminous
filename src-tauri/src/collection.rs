@@ -856,31 +856,15 @@ impl CollectionScanner {
             }
         }
 
-        let deleted_count = to_delete.len();
-        if !to_delete.is_empty() {
-            let tx = conn.unchecked_transaction()?;
-            {
-                let mut del_stmt = tx.prepare("DELETE FROM songs WHERE id = ?1")?;
-                for id in &to_delete {
-                    del_stmt.execute(params![id])?;
-                }
-                tx.execute_batch("DELETE FROM playlist_items WHERE song_id IS NULL;")?;
-                tx.execute_batch("DELETE FROM webdav_cache WHERE song_id IS NULL OR server_id NOT IN (SELECT id FROM webdav_servers);")?;
-                // Forget cache rows for pruned Subsonic songs, so the next sync
-                // re-imports the track as new if it's still on the server.
-                tx.execute_batch("DELETE FROM subsonic_cache WHERE song_id IS NULL;")?;
-            }
-            tx.commit()?;
-            log::info!(
-                "Hard-deleted {} song(s) from database (file missing or unavailable)",
-                deleted_count
-            );
-        }
-
-        // `get_directories` takes its own connection, and the empty-folder
-        // sweep is disk I/O — neither should hold this one.
         drop(stmt_unavail);
         drop(conn);
+
+        let deleted_count = if !to_delete.is_empty() {
+            self.delete_songs_by_id(&to_delete)?
+        } else {
+            0
+        };
+
         let mut removed_folders = 0;
         for dir in self.get_directories()? {
             removed_folders += crate::organizer::remove_empty_dirs_under_root(Path::new(&dir.path));
@@ -892,6 +876,29 @@ impl CollectionScanner {
             merged_duplicates,
             blocked_incident: None,
         })
+    }
+
+    /// Hard-deletes songs by ID and cascades cleanup to playlist items and remote caches.
+    pub fn delete_songs_by_id(&self, ids: &[i64]) -> Result<usize> {
+        if ids.is_empty() {
+            return Ok(0);
+        }
+        let conn = self.db.pool.get()?;
+        let tx = conn.unchecked_transaction()?;
+        {
+            let mut del_stmt = tx.prepare("DELETE FROM songs WHERE id = ?1")?;
+            for id in ids {
+                del_stmt.execute(params![id])?;
+            }
+            tx.execute_batch("DELETE FROM playlist_items WHERE song_id IS NULL;")?;
+            tx.execute_batch("DELETE FROM webdav_cache WHERE song_id IS NULL OR server_id NOT IN (SELECT id FROM webdav_servers);")?;
+            // Forget cache rows for pruned Subsonic songs, so the next sync
+            // re-imports the track as new if it's still on the server.
+            tx.execute_batch("DELETE FROM subsonic_cache WHERE song_id IS NULL;")?;
+        }
+        tx.commit()?;
+        log::info!("Hard-deleted {} song(s) from database", ids.len());
+        Ok(ids.len())
     }
 
     /// Scan all watched directories, emitting progress events to the frontend.

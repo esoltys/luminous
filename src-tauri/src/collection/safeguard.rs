@@ -82,7 +82,7 @@ pub fn is_mass_removal(missing_count: usize, total_count: usize) -> bool {
     false
 }
 
-/// Normalizes path separators and trims trailing slashes.
+/// Trims trailing directory separators (`/` or `\`).
 fn clean_dir_path(path_str: &str) -> String {
     path_str.trim_end_matches(['/', '\\']).to_string()
 }

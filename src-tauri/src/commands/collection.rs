@@ -215,27 +215,16 @@ pub async fn resolve_mass_removal(
 
     if action == "prune" {
         if let Some(ctx) = ctx_opt {
+            let db_clone = state.db.clone();
             if !ctx.missing_song_ids.is_empty() {
-                crate::db::run_blocking(&state.db, move |conn| {
-                    let tx = conn.unchecked_transaction()?;
-                    {
-                        let mut stmt = tx.prepare("DELETE FROM songs WHERE id = ?1")?;
-                        for id in &ctx.missing_song_ids {
-                            stmt.execute(rusqlite::params![id])?;
-                        }
-                        tx.execute_batch("DELETE FROM playlist_items WHERE song_id IS NULL;")?;
-                        tx.execute_batch("DELETE FROM webdav_cache WHERE song_id IS NULL OR server_id NOT IN (SELECT id FROM webdav_servers);")?;
-                        tx.execute_batch("DELETE FROM subsonic_cache WHERE song_id IS NULL;")?;
-                    }
-                    tx.commit()?;
-                    Ok(())
+                crate::collection::with_collection_scanner(db_clone, move |scanner| {
+                    scanner.delete_songs_by_id(&ctx.missing_song_ids)
                 })
                 .await
                 .map_err(|e| e.to_string())?;
 
                 let _ = app.emit("library-changed", ());
             } else {
-                let db_clone = state.db.clone();
                 crate::collection::with_collection_scanner(db_clone, move |scanner| {
                     scanner.prune_missing_songs_ext(true)
                 })
