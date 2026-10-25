@@ -148,6 +148,70 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
     expect(badge?.id).toBe(-5);
   });
 
+  it("resolves a WebDAV server when URL has percent-encoded spaces and server has raw spaces (#1804)", async () => {
+    collectionStore.webdavServers = [
+      {
+        id: 7,
+        name: "Files.fm",
+        url: "https://webdav.files.fm/",
+        remotePath: "/Remote Library",
+        nickname: "Files.fm Nick",
+        icon: "broadcast",
+        color: "#ef4444",
+        enabled: true,
+        syncStatus: "idle",
+        createdAt: 0,
+        autoSyncEnabled: false,
+        syncIntervalMinutes: 60,
+      },
+    ];
+
+    const badge = collectionStore.getDirectoryForPath(
+      "https://webdav.files.fm/Remote%20Library/01%20Tell%20Me%20(U%20Want%20It).mp3"
+    );
+
+    expect(badge).toBeDefined();
+    expect(badge?.id).toBe(-7);
+    expect(badge?.nickname).toBe("Files.fm Nick");
+    expect(badge?.icon).toBe("broadcast");
+    expect(badge?.color).toBe("#ef4444");
+    expect(badge?.is_available).toBe(true);
+  });
+
+  it("selects the longest matching WebDAV server prefix", async () => {
+    collectionStore.webdavServers = [
+      {
+        id: 1,
+        name: "Root Server",
+        url: "https://webdav.files.fm",
+        remotePath: "/",
+        enabled: true,
+        syncStatus: "idle",
+        createdAt: 0,
+        autoSyncEnabled: false,
+        syncIntervalMinutes: 60,
+      },
+      {
+        id: 2,
+        name: "Music Server",
+        url: "https://webdav.files.fm",
+        remotePath: "/Music/HiRes",
+        enabled: true,
+        syncStatus: "idle",
+        createdAt: 0,
+        autoSyncEnabled: false,
+        syncIntervalMinutes: 60,
+      },
+    ];
+
+    const badge = collectionStore.getDirectoryForPath(
+      "https://webdav.files.fm/Music/HiRes/song.flac"
+    );
+
+    expect(badge?.id).toBe(-2);
+    expect(badge?.nickname).toBe("Music Server");
+  });
+
   it("returns undefined for a path matching neither a directory nor a WebDAV server", async () => {
     await collectionStore.refreshWebDavServers();
     expect(collectionStore.getDirectoryForPath("http://example.com/other/track.mp3")).toBeUndefined();
