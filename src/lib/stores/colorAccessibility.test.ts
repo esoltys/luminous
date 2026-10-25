@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { PREDEFINED_THEMES, LUMINOUS_DARK_COLORS, LUMINOUS_LIGHT_COLORS, withReadableText, buildExtractedColors } from "./theme.svelte";
-import { checkWcagCompliance, pickAccessibleOnColor, calculateContrastRatio, hexToRgb, rgbToHsl } from "../utils/colorUtils";
+import { checkWcagCompliance, pickAccessibleOnColor, calculateContrastRatio, hexToHsl } from "../utils/colorUtils";
 
 describe("PREDEFINED_THEMES", () => {
   it("has dynamic-artwork (✨ Luminous) as the first theme in the list", () => {
@@ -21,21 +21,12 @@ describe("PREDEFINED_THEMES", () => {
   });
 });
 
-const rubyRedColors = PREDEFINED_THEMES.find(t => t.id === "ruby-red")!.colors;
-const nordicBlueColors = PREDEFINED_THEMES.find(t => t.id === "nordic-blue")!.colors;
-const retroAmberColors = PREDEFINED_THEMES.find(t => t.id === "retro-amber")!.colors;
-const metallicColors = PREDEFINED_THEMES.find(t => t.id === "metallic")!.colors;
-const sabrinaColors = PREDEFINED_THEMES.find(t => t.id === "sabrina")!.colors;
+const staticThemes = [
+  ["Luminous light", LUMINOUS_LIGHT_COLORS],
+  ...PREDEFINED_THEMES.filter(t => t.id !== "dynamic-artwork").map(t => [t.name, t.colors] as const)
+] as const;
 
-describe.each([
-  ["dark", LUMINOUS_DARK_COLORS],
-  ["light", LUMINOUS_LIGHT_COLORS],
-  ["Ruby Red (generated)", rubyRedColors],
-  ["Nordic Blue (generated)", nordicBlueColors],
-  ["Retro Amber (generated)", retroAmberColors],
-  ["Metallic", metallicColors],
-  ["Sabrina", sabrinaColors]
-] as const)("%s palette accessibility", (_scheme, palette) => {
+describe.each(staticThemes)("%s palette accessibility", (_scheme, palette) => {
   const surfaces: (keyof typeof palette)[] = ["bg-main", "bg-sidebar", "bg-playerbar"];
 
   it.each(surfaces)("primary text meets WCAG AA against %s", (surface) => {
@@ -49,15 +40,18 @@ describe.each([
   });
 });
 
-describe("accent color contrast against bg-main (used for accent icons/badges/active-state text)", () => {
-  it("dark scheme accent meets WCAG 1.4.11's 3:1 non-text/UI-component threshold (accent text is lifted to 4.5:1 by clampForContrast)", () => {
-    const result = checkWcagCompliance(LUMINOUS_DARK_COLORS["color-accent"], LUMINOUS_DARK_COLORS["bg-main"]);
+describe("accent color contrast against bg-main (WCAG 1.4.11 non-text threshold >= 3:1)", () => {
+  it.each(staticThemes)("%s: accent meets >= 3:1 contrast against bg-main", (_name, colors) => {
+    const result = checkWcagCompliance(colors["color-accent"], colors["bg-main"]);
     expect(result.ratio).toBeGreaterThanOrEqual(3);
   });
+});
 
-  it("light scheme accent meets WCAG 1.4.11's 3:1 non-text/UI-component threshold", () => {
-    const result = checkWcagCompliance(LUMINOUS_LIGHT_COLORS["color-accent"], LUMINOUS_LIGHT_COLORS["bg-main"]);
-    expect(result.ratio).toBeGreaterThanOrEqual(3);
+describe("border lightness separation against bg-main (>= 12% lightness delta)", () => {
+  it.each(staticThemes)("%s: border maintains >= 12% lightness delta against bg-main", (_name, colors) => {
+    const bgHsl = hexToHsl(colors["bg-main"]);
+    const borderHsl = hexToHsl(colors["color-border"]);
+    expect(Math.abs(borderHsl.l - bgHsl.l)).toBeGreaterThanOrEqual(0.12);
   });
 });
 
@@ -137,8 +131,8 @@ describe("monochromatic album cover contrast invariants (#1730)", () => {
     expect(accentContrast).toBeGreaterThanOrEqual(3.0);
 
     // Border must maintain >= 12% lightness separation from primary canvas
-    const primHsl = rgbToHsl(...(Object.values(hexToRgb(extracted.primary)) as [number, number, number]));
-    const borderHsl = rgbToHsl(...(Object.values(hexToRgb(extracted.border)) as [number, number, number]));
+    const primHsl = hexToHsl(extracted.primary);
+    const borderHsl = hexToHsl(extracted.border);
     expect(Math.abs(borderHsl.l - primHsl.l)).toBeGreaterThanOrEqual(0.12);
 
     // On-accent contrast text must be legible
@@ -155,8 +149,8 @@ describe("monochromatic album cover contrast invariants (#1730)", () => {
     const accentContrast = calculateContrastRatio(extracted.accent, extracted.primary);
     expect(accentContrast).toBeGreaterThanOrEqual(3.0);
 
-    const primHsl = rgbToHsl(...(Object.values(hexToRgb(extracted.primary)) as [number, number, number]));
-    const borderHsl = rgbToHsl(...(Object.values(hexToRgb(extracted.border)) as [number, number, number]));
+    const primHsl = hexToHsl(extracted.primary);
+    const borderHsl = hexToHsl(extracted.border);
     expect(Math.abs(borderHsl.l - primHsl.l)).toBeGreaterThanOrEqual(0.12);
   });
 });
