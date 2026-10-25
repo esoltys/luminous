@@ -165,8 +165,7 @@ export function clampForContrast(hex: string, backgroundHex: string, minRatio = 
   if (calculateContrastRatio(hex, backgroundHex) >= minRatio) return hex;
 
   const bgIsLight = isLightColor(backgroundHex);
-  const rgb = hexToRgb(hex);
-  const initialHsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
+  const initialHsl = hexToHsl(hex);
 
   const stepDirection = (direction: 1 | -1): { hex: string; ratio: number } => {
     let hsl = { ...initialHsl };
@@ -213,10 +212,8 @@ export function clampForContrast(hex: string, backgroundHex: string, minRatio = 
 export function ensureLightnessSeparation(hex: string, backgroundHex: string, minDelta = 0.12): string {
   if (!HEX6_PATTERN.test(hex) || !HEX6_PATTERN.test(backgroundHex)) return hex;
 
-  const fgRgb = hexToRgb(hex);
-  const bgRgb = hexToRgb(backgroundHex);
-  const fgHsl = rgbToHsl(fgRgb.r, fgRgb.g, fgRgb.b);
-  const bgHsl = rgbToHsl(bgRgb.r, bgRgb.g, bgRgb.b);
+  const fgHsl = hexToHsl(hex);
+  const bgHsl = hexToHsl(backgroundHex);
 
   if (Math.abs(fgHsl.l - bgHsl.l) >= minDelta - 0.002) {
     return hex;
@@ -277,6 +274,14 @@ export function rgbToHsl(r: number, g: number, b: number): HSL {
       break;
   }
   return { h: (h / 6) * 360, s, l };
+}
+
+/**
+ * Convenience helper to convert a 6-digit hex color directly into HSL space.
+ */
+export function hexToHsl(hex: string): HSL {
+  const { r, g, b } = hexToRgb(hex);
+  return rgbToHsl(r, g, b);
 }
 
 /**

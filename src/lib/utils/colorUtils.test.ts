@@ -9,6 +9,7 @@ import {
   clampForContrast,
   ensureLightnessSeparation,
   rgbToHsl,
+  hexToHsl,
   hslToRgb,
   scoreSwatch,
   ARCHETYPE_TARGETS,
@@ -136,6 +137,14 @@ describe("rgbToHsl", () => {
     expect(hsl.s).toBeGreaterThan(0.8);
     expect(hsl.l).toBeGreaterThan(0.4);
     expect(hsl.l).toBeLessThan(0.6);
+  });
+});
+
+describe("hexToHsl", () => {
+  it("converts hex directly to HSL", () => {
+    expect(hexToHsl("#ff0000")).toEqual({ h: 0, s: 1, l: 0.5 });
+    expect(hexToHsl("#ffffff")).toEqual({ h: 0, s: 0, l: 1 });
+    expect(hexToHsl("#000000")).toEqual({ h: 0, s: 0, l: 0 });
   });
 });
 

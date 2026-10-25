@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { PREDEFINED_THEMES, LUMINOUS_DARK_COLORS, LUMINOUS_LIGHT_COLORS, withReadableText, buildExtractedColors } from "./theme.svelte";
-import { checkWcagCompliance, pickAccessibleOnColor, calculateContrastRatio, hexToRgb, rgbToHsl } from "../utils/colorUtils";
+import { checkWcagCompliance, pickAccessibleOnColor, calculateContrastRatio, hexToHsl } from "../utils/colorUtils";
 
 describe("PREDEFINED_THEMES", () => {
   it("has dynamic-artwork (✨ Luminous) as the first theme in the list", () => {
@@ -49,8 +49,8 @@ describe("accent color contrast against bg-main (WCAG 1.4.11 non-text threshold 
 
 describe("border lightness separation against bg-main (>= 12% lightness delta)", () => {
   it.each(staticThemes)("%s: border maintains >= 12% lightness delta against bg-main", (_name, colors) => {
-    const bgHsl = rgbToHsl(...(Object.values(hexToRgb(colors["bg-main"])) as [number, number, number]));
-    const borderHsl = rgbToHsl(...(Object.values(hexToRgb(colors["color-border"])) as [number, number, number]));
+    const bgHsl = hexToHsl(colors["bg-main"]);
+    const borderHsl = hexToHsl(colors["color-border"]);
     expect(Math.abs(borderHsl.l - bgHsl.l)).toBeGreaterThanOrEqual(0.12);
   });
 });
@@ -131,8 +131,8 @@ describe("monochromatic album cover contrast invariants (#1730)", () => {
     expect(accentContrast).toBeGreaterThanOrEqual(3.0);
 
     // Border must maintain >= 12% lightness separation from primary canvas
-    const primHsl = rgbToHsl(...(Object.values(hexToRgb(extracted.primary)) as [number, number, number]));
-    const borderHsl = rgbToHsl(...(Object.values(hexToRgb(extracted.border)) as [number, number, number]));
+    const primHsl = hexToHsl(extracted.primary);
+    const borderHsl = hexToHsl(extracted.border);
     expect(Math.abs(borderHsl.l - primHsl.l)).toBeGreaterThanOrEqual(0.12);
 
     // On-accent contrast text must be legible
@@ -149,8 +149,8 @@ describe("monochromatic album cover contrast invariants (#1730)", () => {
     const accentContrast = calculateContrastRatio(extracted.accent, extracted.primary);
     expect(accentContrast).toBeGreaterThanOrEqual(3.0);
 
-    const primHsl = rgbToHsl(...(Object.values(hexToRgb(extracted.primary)) as [number, number, number]));
-    const borderHsl = rgbToHsl(...(Object.values(hexToRgb(extracted.border)) as [number, number, number]));
+    const primHsl = hexToHsl(extracted.primary);
+    const borderHsl = hexToHsl(extracted.border);
     expect(Math.abs(borderHsl.l - primHsl.l)).toBeGreaterThanOrEqual(0.12);
   });
 });

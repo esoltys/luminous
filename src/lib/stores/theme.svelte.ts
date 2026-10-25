@@ -214,6 +214,14 @@ function yieldViewTransitionToInput(transition: ViewTransition | undefined) {
     });
 }
 
+/**
+ * Predefined static theme palettes. Each palette is curated to inherently satisfy:
+ * 1. WCAG 2.1 SC 1.4.11 non-text contrast (>= 3:1) for color-accent against bg-main.
+ * 2. At least 12% lightness delta separation between color-border and bg-main.
+ * 3. WCAG AA text contrast (>= 4.5:1) for primary and secondary text.
+ * 4. Legible on-accent text (>= 3:1) via pickAccessibleOnColor().
+ * (ThemeStore.writeActiveTheme provides defense-in-depth runtime clamping for active themes).
+ */
 const RUBY_RED_COLORS: ThemeColors = {
   "bg-main": "#17110e",
   "bg-sidebar": "#6e0b1b",
