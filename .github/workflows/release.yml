@@ -179,7 +179,7 @@ jobs:
       # step), so on a tag push it fails the run while the release is still a
       # draft. The script comes from the workflow's own commit, since an
       # older tag checked out above may not have it.
-      - name: Checkout the glibc check script (Linux)
+      - name: Checkout Linux release scripts (Linux)
         if: runner.os == 'Linux'
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:

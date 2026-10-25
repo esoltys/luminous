@@ -4,6 +4,7 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import {
+  toDottedFilename,
   findHeaderEnd,
   transformZsyncBuffer,
   fixZsyncFile,
@@ -11,6 +12,13 @@ import {
 } from "../../../scripts/fix-appimage-zsync.js";
 
 describe("fixAppImageZsync: buffer transformation", () => {
+  it("converts spaces to dots in filenames", () => {
+    expect(toDottedFilename("Luminous Music Player_3.1.0_amd64.AppImage")).toBe(
+      "Luminous.Music.Player_3.1.0_amd64.AppImage"
+    );
+    expect(toDottedFilename("Already.Dotted.AppImage")).toBe("Already.Dotted.AppImage");
+  });
+
   it("finds header end with \\n\\n", () => {
     const buf = Buffer.from("zsync: 0.6.2\nFilename: test.AppImage\n\nBINARY_DATA");
     const result = findHeaderEnd(buf);
