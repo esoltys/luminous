@@ -86,7 +86,7 @@ export const LUMINOUS_DARK_COLORS: ThemeColors = {
   "color-accent-hover": "#626fe8",
   "color-text-primary": "#f1f3f8",
   "color-text-secondary": "#a6adc4",
-  "color-border": "#38382f"
+  "color-border": "#3d3d34"
 };
 
 export const LUMINOUS_LIGHT_COLORS: ThemeColors = {
@@ -218,7 +218,7 @@ const RUBY_RED_COLORS: ThemeColors = {
   "bg-main": "#17110e",
   "bg-sidebar": "#6e0b1b",
   "bg-playerbar": "#17110e",
-  "color-accent": "#b51021",
+  "color-accent": "#c6162a",
   "color-accent-hover": "#f06090",
   "color-text-primary": "#ffffff",
   "color-text-secondary": "#e2e8f0",
@@ -233,7 +233,7 @@ const NORDIC_BLUE_COLORS: ThemeColors = {
   "bg-main": "#2e515f",
   "bg-sidebar": "#000910",
   "bg-playerbar": "#2e515f",
-  "color-accent": "#3090a0",
+  "color-accent": "#45a7b9",
   "color-accent-hover": "#a3cfdc",
   "color-text-primary": "#ffffff",
   "color-text-secondary": "#e2e8f0",
@@ -255,11 +255,11 @@ const SABRINA_COLORS: ThemeColors = {
   "bg-main": "#3E4B68",
   "bg-sidebar": "#280C00",
   "bg-playerbar": "#3D4A66",
-  "color-accent": "#255098",
+  "color-accent": "#789de0",
   "color-accent-hover": "#E9B787",
   "color-text-primary": "#ffffff",
   "color-text-secondary": "#e2e8f0",
-  "color-border": "#85674C"
+  "color-border": "#917053"
 };
 
 const TERMINAL_GREEN_COLORS: ThemeColors = {
@@ -270,7 +270,7 @@ const TERMINAL_GREEN_COLORS: ThemeColors = {
   "color-accent-hover": "#34d399",
   "color-text-primary": "#f0fdfa",
   "color-text-secondary": "#99f6e4",
-  "color-border": "#1e3a35"
+  "color-border": "#264842"
 };
 
 /**
@@ -283,7 +283,7 @@ const DRIFTWOOD_COLORS: ThemeColors = {
   "bg-main": "#ddd6d4",
   "bg-sidebar": "#dfdfdf",
   "bg-playerbar": "#ddd6d4",
-  "color-accent": "#a6a6a6",
+  "color-accent": "#765442",
   "color-accent-hover": "#62361e",
   "color-text-primary": "#16181d",
   "color-text-secondary": "#565c6e",
@@ -294,11 +294,11 @@ const FOXGLOVE_COLORS: ThemeColors = {
   "bg-main": "#4a3948",
   "bg-sidebar": "#602336",
   "bg-playerbar": "#4a3948",
-  "color-accent": "#654e62",
+  "color-accent": "#ba79a7",
   "color-accent-hover": "#b4b7db",
   "color-text-primary": "#ffffff",
   "color-text-secondary": "#e2e8f0",
-  "color-border": "#783a46"
+  "color-border": "#853f4e"
 };
 
 export const PREDEFINED_THEMES: Theme[] = [
