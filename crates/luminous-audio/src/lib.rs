@@ -1129,8 +1129,12 @@ fn build_output(shared: &Arc<AudioShared>) -> Result<AudioOutput, String> {
             config,
             move |output: &mut [f32], _| renderer.render(output),
             move |err| {
-                log::error!("CPAL stream error: {err}");
-                err_flag_cpal.store(true, Ordering::Relaxed);
+                if is_fatal_cpal_error(&err) {
+                    log::error!("CPAL stream fatal error: {err}");
+                    err_flag_cpal.store(true, Ordering::Relaxed);
+                } else {
+                    log::warn!("CPAL stream non-fatal glitch: {err}");
+                }
             },
             None,
         )
@@ -1166,6 +1170,21 @@ fn build_output(shared: &Arc<AudioShared>) -> Result<AudioOutput, String> {
         backend_name: "CPAL".to_string(),
         stream_error_flag,
     })
+}
+
+/// Determines whether a CPAL stream error represents a fatal stream breakdown
+/// requiring the audio engine to tear down and rebuild the stream.
+///
+/// Transient conditions like `Xrun` (buffer underrun/overrun) and `RealtimeDenied`
+/// (advisory scheduling notice) are recoverable or non-fatal glitches that the host
+/// audio backend continues streaming through. Tearing down and rebuilding the stream
+/// on such transient hiccups causes audible dropouts, resampler resets, and can trap
+/// playback in an underrun/rebuild loop (#1800).
+pub(crate) fn is_fatal_cpal_error(err: &cpal::Error) -> bool {
+    !matches!(
+        err.kind(),
+        cpal::ErrorKind::Xrun | cpal::ErrorKind::RealtimeDenied
+    )
 }
 
 /// Runs `build_output` on a brand-new, short-lived OS thread instead of the
@@ -2694,5 +2713,34 @@ mod tests {
         assert_eq!(track.spec.id, 7);
         assert_eq!(track.src_rate, 48_000);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn cpal_error_fatality_classification() {
+        assert!(!is_fatal_cpal_error(&cpal::Error::new(
+            cpal::ErrorKind::Xrun
+        )));
+        assert!(!is_fatal_cpal_error(&cpal::Error::new(
+            cpal::ErrorKind::RealtimeDenied
+        )));
+
+        assert!(is_fatal_cpal_error(&cpal::Error::new(
+            cpal::ErrorKind::DeviceNotAvailable
+        )));
+        assert!(is_fatal_cpal_error(&cpal::Error::new(
+            cpal::ErrorKind::StreamInvalidated
+        )));
+        assert!(is_fatal_cpal_error(&cpal::Error::new(
+            cpal::ErrorKind::DeviceBusy
+        )));
+        assert!(is_fatal_cpal_error(&cpal::Error::new(
+            cpal::ErrorKind::DeviceChanged
+        )));
+        assert!(is_fatal_cpal_error(&cpal::Error::new(
+            cpal::ErrorKind::BackendError
+        )));
+        assert!(is_fatal_cpal_error(&cpal::Error::new(
+            cpal::ErrorKind::Other
+        )));
     }
 }
