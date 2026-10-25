@@ -181,12 +181,62 @@ pub async fn rescan_songs(
 }
 
 #[tauri::command]
-pub async fn prune_missing_songs(state: State<'_, AppState>) -> Result<PruneResult, String> {
-    crate::collection::with_collection_scanner(state.db.clone(), |scanner| {
-        scanner.prune_missing_songs()
+pub async fn prune_missing_songs(
+    state: State<'_, AppState>,
+    force: Option<bool>,
+) -> Result<PruneResult, String> {
+    let force_val = force.unwrap_or(false);
+    crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        scanner.prune_missing_songs_ext(force_val)
     })
     .await
     .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_pending_mass_removals(
+    state: State<'_, AppState>,
+) -> Vec<crate::models::MassRemovalIncident> {
+    state.mass_removal_registry.lock().get_all()
+}
+
+#[tauri::command]
+pub async fn resolve_mass_removal(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    incident_id: String,
+    action: String,
+) -> Result<(), String> {
+    let ctx_opt = state.mass_removal_registry.lock().remove(&incident_id);
+    if action == "keep" {
+        log::info!("Mass removal incident {incident_id} dismissed by user; records preserved");
+        return Ok(());
+    }
+
+    if action == "prune" {
+        if let Some(ctx) = ctx_opt {
+            let db_clone = state.db.clone();
+            if !ctx.missing_song_ids.is_empty() {
+                crate::collection::with_collection_scanner(db_clone, move |scanner| {
+                    scanner.delete_songs_by_id(&ctx.missing_song_ids)
+                })
+                .await
+                .map_err(|e| e.to_string())?;
+
+                let _ = app.emit("library-changed", ());
+            } else {
+                crate::collection::with_collection_scanner(db_clone, move |scanner| {
+                    scanner.prune_missing_songs_ext(true)
+                })
+                .await
+                .map_err(|e| e.to_string())?;
+
+                let _ = app.emit("library-changed", ());
+            }
+        }
+    }
+
+    Ok(())
 }
 
 #[tauri::command]

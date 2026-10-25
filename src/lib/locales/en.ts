@@ -2156,5 +2156,19 @@ export const en = {
     integrationSettings: "Integration settings",
     aboutMusicBrainz: "About MusicBrainz",
     logout: "Log out"
+  },
+  safeguard: {
+    toastMessage: {
+      one: "Couldn't find {count} song in '{folder}'. Kept in your library.",
+      other: "Couldn't find {count} songs in '{folder}'. Kept in your library."
+    },
+    reviewBtn: "Review",
+    dialogTitle: "Folder or Drive Missing?",
+    dialogMessage: {
+      one: "{count} of {total} song in '{folder}' couldn't be found. This usually happens when an external drive or folder is unplugged or renamed.\n\nKeep it in your library until reconnected, or remove it?",
+      other: "{count} of {total} songs in '{folder}' couldn't be found. This usually happens when an external drive or folder is unplugged or renamed.\n\nKeep them in your library until reconnected, or remove them?"
+    },
+    keepSongsBtn: "Keep Songs",
+    confirmRemoveBtn: "Remove Songs"
   }
 };

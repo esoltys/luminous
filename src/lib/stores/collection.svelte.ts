@@ -29,6 +29,7 @@ import type {
   SubsonicSyncProgressPayload,
   TagBatchProgressPayload,
   ArtworkSweepProgressPayload,
+  MassRemovalIncident,
 } from "../types";
 import { parseSubsonicPath } from "../utils/remoteSource";
 import { applySongStats, type SongStatsPayload, applyAlbumStats, type AlbumStatsPayload } from "../utils/stats";
@@ -186,6 +187,10 @@ class CollectionStore {
   isFirstLaunch = $state<boolean>(false);
   justAddedFirstFolder = $state<boolean>(false);
   milestoneReached = $state<number | null>(null);
+
+  /** Quarantined mass-removal safeguard incidents (#1582) */
+  activeMassRemovalIncident = $state<MassRemovalIncident | null>(null);
+  pendingMassRemovals = $state<MassRemovalIncident[]>([]);
 
   // Cached collections
   songs = $state<Song[]>([]);
@@ -680,6 +685,23 @@ class CollectionStore {
         const album = this.albums.find((a) => sameAlbum(a.album, event.payload.album));
         if (album) applyAlbumStats(album, event.payload);
       });
+
+      // Listen for mass-removal safeguard events (#1582)
+      await listen<MassRemovalIncident>("mass-removal-detected", (event) => {
+        this.handleMassRemovalDetected(event.payload);
+      });
+
+      invoke<MassRemovalIncident[]>("get_pending_mass_removals")
+        .then((incidents) => {
+          if (Array.isArray(incidents)) {
+            for (const inc of incidents) {
+              this.handleMassRemovalDetected(inc);
+            }
+          }
+        })
+        .catch((err) => {
+          console.error("Failed to load pending mass removals:", err);
+        });
 
       if (this.scanOnStartup) {
         this.startScan(false, "startup");
@@ -1236,15 +1258,65 @@ class CollectionStore {
     });
   }
 
-  async pruneMissing(): Promise<{ deletedSongs: number; removedFolders: number; mergedDuplicates: number }> {
+  handleMassRemovalDetected(incident: MassRemovalIncident) {
+    if (!this.pendingMassRemovals.some((p) => p.id === incident.id)) {
+      this.pendingMassRemovals.push(incident);
+    }
+    toastStore.show(
+      i18n.plural("safeguard.toastMessage", incident.missing_count, {
+        folder: incident.directory_path,
+      }),
+      "warning",
+      0,
+      undefined,
+      {
+        label: i18n.t("safeguard.reviewBtn", {}, "Review"),
+        onClick: () => {
+          this.activeMassRemovalIncident = incident;
+        },
+      }
+    );
+  }
+
+  async resolveActiveMassRemoval(action: "keep" | "prune") {
+    const incident = this.activeMassRemovalIncident;
+    if (!incident) return;
+    this.activeMassRemovalIncident = null;
+    this.pendingMassRemovals = this.pendingMassRemovals.filter((p) => p.id !== incident.id);
     try {
-      const result = await invoke<{ deleted_songs: number; removed_folders: number; merged_duplicates: number }>("prune_missing_songs");
+      await invoke("resolve_mass_removal", {
+        incidentId: incident.id,
+        action,
+      });
+      if (action === "prune") {
+        await this.refreshStats();
+        await this.refreshLibrary();
+      }
+    } catch (err) {
+      console.error("Failed to resolve mass removal:", err);
+    }
+  }
+
+  async pruneMissing(force: boolean = false): Promise<{
+    deletedSongs: number;
+    removedFolders: number;
+    mergedDuplicates: number;
+    blockedIncident?: MassRemovalIncident;
+  }> {
+    try {
+      const result = await invoke<{
+        deleted_songs: number;
+        removed_folders: number;
+        merged_duplicates: number;
+        blocked_incident?: MassRemovalIncident;
+      }>("prune_missing_songs", { force });
       await this.refreshStats();
       await this.refreshLibrary();
       return {
         deletedSongs: result.deleted_songs,
         removedFolders: result.removed_folders,
         mergedDuplicates: result.merged_duplicates,
+        blockedIncident: result.blocked_incident,
       };
     } catch (err) {
       console.error("Failed to prune missing songs:", err);

@@ -317,11 +317,71 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
     expect(getScanPhaseLabel("updating")).toBe("updating library");
   });
 
-  it("handles pruneMissing songs call", async () => {
+  it("handles pruneMissing songs call with force option", async () => {
     vi.mocked(invoke).mockResolvedValueOnce({ deleted_songs: 3, removed_folders: 2, merged_duplicates: 1 } as any);
     const result = await collectionStore.pruneMissing();
-    expect(invoke).toHaveBeenCalledWith("prune_missing_songs");
-    expect(result).toEqual({ deletedSongs: 3, removedFolders: 2, mergedDuplicates: 1 });
+    expect(invoke).toHaveBeenCalledWith("prune_missing_songs", { force: false });
+    expect(result).toEqual({ deletedSongs: 3, removedFolders: 2, mergedDuplicates: 1, blockedIncident: undefined });
+
+    vi.mocked(invoke).mockResolvedValueOnce({ deleted_songs: 500, removed_folders: 10, merged_duplicates: 0 } as any);
+    const forcedResult = await collectionStore.pruneMissing(true);
+    expect(invoke).toHaveBeenCalledWith("prune_missing_songs", { force: true });
+    expect(forcedResult).toEqual({ deletedSongs: 500, removedFolders: 10, mergedDuplicates: 0, blockedIncident: undefined });
+  });
+
+  it("handles mass removal safeguard in pruneMissing and activeMassRemovalIncident lifecycle", async () => {
+    const mockIncident = {
+      id: "inc-1",
+      directory_path: "/media/external/music",
+      missing_count: 120,
+      total_count: 120,
+      sample_missing_paths: [],
+    };
+
+    // 1. pruneMissing blocked by safeguard
+    vi.mocked(invoke).mockResolvedValueOnce({
+      deleted_songs: 0,
+      removed_folders: 0,
+      merged_duplicates: 0,
+      blocked_incident: mockIncident,
+    } as any);
+
+    const result = await collectionStore.pruneMissing(false);
+    expect(result.blockedIncident).toEqual(mockIncident);
+
+    // 2. handleMassRemovalDetected adds to pending and creates a persistent toast with action
+    collectionStore.handleMassRemovalDetected(mockIncident);
+    expect(collectionStore.pendingMassRemovals).toContainEqual(mockIncident);
+
+    const safeguardToast = toastStore.messages.find((m) => m.variant === "warning" && m.action);
+    expect(safeguardToast).toBeDefined();
+    expect(safeguardToast?.action?.label).toBeDefined();
+
+    // Click toast action
+    safeguardToast?.action?.onClick();
+    expect(collectionStore.activeMassRemovalIncident).toEqual(mockIncident);
+
+    // 3. Resolve active incident with "keep"
+    vi.mocked(invoke).mockResolvedValueOnce(undefined as any);
+    await collectionStore.resolveActiveMassRemoval("keep");
+    expect(invoke).toHaveBeenCalledWith("resolve_mass_removal", {
+      incidentId: "inc-1",
+      action: "keep",
+    });
+    expect(collectionStore.activeMassRemovalIncident).toBeNull();
+    expect(collectionStore.pendingMassRemovals.length).toBe(0);
+
+    // 4. Resolve another incident with "prune"
+    collectionStore.activeMassRemovalIncident = mockIncident;
+    collectionStore.pendingMassRemovals = [mockIncident];
+    vi.mocked(invoke).mockResolvedValueOnce(undefined as any);
+    await collectionStore.resolveActiveMassRemoval("prune");
+    expect(invoke).toHaveBeenCalledWith("resolve_mass_removal", {
+      incidentId: "inc-1",
+      action: "prune",
+    });
+    expect(collectionStore.activeMassRemovalIncident).toBeNull();
+    expect(collectionStore.pendingMassRemovals.length).toBe(0);
   });
 
   describe("relocateDirectoryDialog (#1403)", () => {

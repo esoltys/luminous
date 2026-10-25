@@ -319,6 +319,15 @@ export interface MusicDirectory extends BadgeSource {
   subdirs: boolean;
 }
 
+export interface MassRemovalIncident {
+  id: string;
+  directory_id?: number | null;
+  directory_path: string;
+  missing_count: number;
+  total_count: number;
+  sample_missing_paths: string[];
+}
+
 export interface WebDavServer {
   id: number;
   name: string;

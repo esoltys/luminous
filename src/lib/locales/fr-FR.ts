@@ -2164,5 +2164,19 @@ export const frFR: DeepStringRecord<typeof en> = {
     integrationSettings: "Paramètres d'intégration",
     aboutMusicBrainz: "À propos de MusicBrainz",
     logout: "Se déconnecter"
+  },
+  safeguard: {
+    toastMessage: {
+      one: "{count} chanson dans « {folder} » est introuvable. Conservée dans votre bibliothèque.",
+      other: "{count} chansons dans « {folder} » sont introuvables. Conservées dans votre bibliothèque."
+    },
+    reviewBtn: "Examiner",
+    dialogTitle: "Dossier ou lecteur manquant ?",
+    dialogMessage: {
+      one: "{count} chanson sur {total} dans « {folder} » est introuvable. Cela se produit habituellement lorsqu'un lecteur externe ou un dossier est déconnecté ou renommé.\n\nVoulez-vous la conserver dans votre bibliothèque jusqu'à la reconnexion, ou la supprimer ?",
+      other: "{count} chansons sur {total} dans « {folder} » sont introuvables. Cela se produit habituellement lorsqu'un lecteur externe ou un dossier est déconnecté ou renommé.\n\nVoulez-vous les conserver dans votre bibliothèque jusqu'à la reconnexion, ou les supprimer ?"
+    },
+    keepSongsBtn: "Conserver les chansons",
+    confirmRemoveBtn: "Supprimer les chansons"
   }
 };

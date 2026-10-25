@@ -20,7 +20,7 @@ use std::{
     },
     time::Instant,
 };
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 
 /// How long to keep the watcher paused *after* a guard's write is done,
 /// before actually re-arming it. The OS delivers filesystem-change
@@ -605,10 +605,51 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                     // `find_missing_song_ids` — otherwise unplugging a watched USB drive
                     // mid-session would permanently wipe every song on it from the library.
                     let unreachable_roots = super::reconcile::unreachable_watched_roots(&conn);
+                    let safeguard_verdict =
+                        match super::safeguard::evaluate_watcher_removals(&conn, &still_removed) {
+                            Ok(v) => {
+                                for incident in &v.incidents {
+                                    if let Some(state) = app_clone.try_state::<crate::AppState>() {
+                                        state
+                                            .mass_removal_registry
+                                            .lock()
+                                            .register(incident.clone(), Vec::new());
+                                    }
+                                    let _ = app_clone.emit("mass-removal-detected", incident.clone());
+                                }
+                                v
+                            }
+                            Err(e) => {
+                                log::error!(
+                                    "Failed to evaluate watcher removals against safeguard: {e}"
+                                );
+                                super::safeguard::WatcherSafeguardVerdict::default()
+                            }
+                        };
 
                     for path in &still_removed {
                         let path_str = path.to_string_lossy().to_string();
                         let is_song = super::is_audio_file(path);
+
+                        if safeguard_verdict.blocked_paths.contains(path) {
+                            log::warn!(
+                                "Watcher saw '{}' disappear, but directory triggered mass-removal safeguard (unmounted drive?) — preserving database records",
+                                path_str
+                            );
+                            if is_song {
+                                processed_count += 1;
+                                let _ = app_clone.emit(
+                                    "batch-processing-progress",
+                                    BatchProgress {
+                                        batch_id,
+                                        current_count: processed_count,
+                                        total_count,
+                                        phase: BatchPhase::Removing,
+                                    },
+                                );
+                            }
+                            continue;
+                        }
 
                         if unreachable_roots.iter().any(|root| path.starts_with(root)) {
                             log::warn!(

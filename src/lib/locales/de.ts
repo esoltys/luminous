@@ -2156,5 +2156,19 @@ export const de = {
     integrationSettings: "Integrationseinstellungen",
     aboutMusicBrainz: "Über MusicBrainz",
     logout: "Abmelden"
+  },
+  safeguard: {
+    toastMessage: {
+      one: "{count} Titel in „{folder}“ konnte nicht gefunden werden. In Ihrer Bibliothek behalten.",
+      other: "{count} Titel in „{folder}“ konnten nicht gefunden werden. In Ihrer Bibliothek behalten."
+    },
+    reviewBtn: "Überprüfen",
+    dialogTitle: "Ordner oder Laufwerk fehlt?",
+    dialogMessage: {
+      one: "{count} von {total} Titel in „{folder}“ konnte nicht gefunden werden. Dies geschieht normalerweise, wenn ein externes Laufwerk oder ein Ordner getrennt oder umbenannt wurde.\n\nMöchten Sie ihn in Ihrer Bibliothek behalten, bis er wieder verbunden ist, oder entfernen?",
+      other: "{count} von {total} Titeln in „{folder}“ konnten nicht gefunden werden. Dies geschieht normalerweise, wenn ein externes Laufwerk oder ein Ordner getrennt oder umbenannt wurde.\n\nMöchten Sie sie in Ihrer Bibliothek behalten, bis sie wieder verbunden sind, oder entfernen?"
+    },
+    keepSongsBtn: "Titel behalten",
+    confirmRemoveBtn: "Titel entfernen"
   }
 };

@@ -2156,5 +2156,19 @@ export const es = {
     integrationSettings: "Configuración de integraciones",
     aboutMusicBrainz: "Acerca de MusicBrainz",
     logout: "Cerrar sesión"
+  },
+  safeguard: {
+    toastMessage: {
+      one: "No se pudo encontrar {count} canción en '{folder}'. Se conserva en tu biblioteca.",
+      other: "No se pudieron encontrar {count} canciones en '{folder}'. Se conservan en tu biblioteca."
+    },
+    reviewBtn: "Revisar",
+    dialogTitle: "¿Falta la carpeta o la unidad?",
+    dialogMessage: {
+      one: "No se pudo encontrar {count} de {total} canción en '{folder}'. Esto suele ocurrir cuando se desconecta o renombra una carpeta o unidad externa.\n\n¿Deseas conservarla en tu biblioteca hasta reconectarla, o eliminarla?",
+      other: "No se pudieron encontrar {count} de {total} canciones en '{folder}'. Esto suele ocurrir cuando se desconecta o renombra una carpeta o unidad externa.\n\n¿Deseas conservarlas en tu biblioteca hasta reconectarlas, o eliminarlas?"
+    },
+    keepSongsBtn: "Conservar canciones",
+    confirmRemoveBtn: "Eliminar canciones"
   }
 };

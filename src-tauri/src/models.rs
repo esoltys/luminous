@@ -892,12 +892,31 @@ pub struct WebDavSyncStats {
     pub errors: usize,
 }
 
+/// Metadata describing a quarantined mass-removal event (#1582).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MassRemovalIncident {
+    /// Unique identifier for this incident.
+    pub id: String,
+    /// Database ID of the watched directory root, if known.
+    pub directory_id: Option<i64>,
+    /// Path of the watched directory root, or label if orphan.
+    pub directory_path: String,
+    /// Number of tracks detected missing under this directory.
+    pub missing_count: usize,
+    /// Total number of tracks tracked in the database under this directory.
+    pub total_count: usize,
+    /// Sample missing file paths for display in confirmation UI.
+    pub sample_missing_paths: Vec<String>,
+}
+
 /// Result of pruning missing/unavailable songs from the library.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PruneResult {
     pub deleted_songs: usize,
     pub removed_folders: usize,
     pub merged_duplicates: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub blocked_incident: Option<MassRemovalIncident>,
 }
 
 /// Scan progress event payload.
