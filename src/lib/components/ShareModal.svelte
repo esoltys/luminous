@@ -301,11 +301,11 @@
     }
   });
 
-  /** Resolves a CoverStackItem (manual/automatic art, or embedded art needing a lookup) to a displayable URL. */
+  /** Resolves a CoverStackItem (manual/automatic art, or songId lookup) to a displayable URL. */
   async function resolveCoverUrl(item: CoverStackItem): Promise<string | null> {
     if (item.artManual) return resolveArtUrl(item.artManual);
     if (item.artAutomatic) return resolveArtUrl(item.artAutomatic);
-    if (item.artEmbedded && item.songId !== undefined) {
+    if (item.songId !== undefined) {
       try {
         const uri = await invoke<string | null>("get_cover_art_uri", { songId: item.songId });
         return uri ? getCoverArtUrl(uri) : null;
@@ -373,9 +373,9 @@
         const fallbackSongId = item?.sample_song_id ?? songs[0]?.id;
         const url = await resolveCoverUrl({
           songId: fallbackSongId,
-          artManual: item?.art_manual,
-          artAutomatic: item?.art_automatic,
-          artEmbedded: item?.art_embedded,
+          artManual: item?.art_manual ?? songs[0]?.art_manual,
+          artAutomatic: item?.art_automatic ?? songs[0]?.art_automatic,
+          artEmbedded: item?.art_embedded ?? songs.some((s) => s.art_embedded),
         });
         if (!cancelled) {
           coverUrl = url;

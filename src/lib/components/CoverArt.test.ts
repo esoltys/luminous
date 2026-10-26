@@ -85,3 +85,83 @@ describe("CoverArt.svelte - rescanned covers reload (#1755)", () => {
     expect(src()).toMatch(/[?&]v=1$/);
   });
 });
+
+describe("CoverArt.svelte - remote cover propagation (#1823)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    prefs.onlineEnabled = true;
+    collectionStore.songs = [
+      {
+        id: 50,
+        source: "web_dav",
+        filetype: "FLAC",
+        title: "Track 1",
+        artist: "Remote Artist",
+        album: "Remote Album",
+        art_embedded: false,
+        art_automatic: undefined,
+        art_manual: undefined,
+        art_unset: false,
+        compilation: false,
+        beginning_nanosec: 0,
+        end_nanosec: 0,
+        rating: 0,
+        playcount: 0,
+        skipcount: 0,
+        unavailable: false,
+      },
+      {
+        id: 51,
+        source: "web_dav",
+        filetype: "FLAC",
+        title: "Track 2",
+        artist: "Remote Artist",
+        album: "Remote Album",
+        art_embedded: false,
+        art_automatic: undefined,
+        art_manual: undefined,
+        art_unset: false,
+        compilation: false,
+        beginning_nanosec: 0,
+        end_nanosec: 0,
+        rating: 0,
+        playcount: 0,
+        skipcount: 0,
+        unavailable: false,
+      },
+    ];
+    collectionStore.albums = [
+      {
+        album: "Remote Album",
+        artist: "Remote Artist",
+        year: 2024,
+        track_count: 2,
+        disc_count: 1,
+        art_embedded: false,
+        art_automatic: null,
+        art_manual: null,
+        rating: -1,
+        total_duration_nanosec: 0,
+        sample_song_id: 50,
+      },
+    ];
+  });
+
+  it("propagates fetched remote cover filename to collectionStore songs and albums", async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_cover_art_uri") return null;
+      if (cmd === "fetch_remote_cover") return "album-remote-123.jpg";
+      return null;
+    });
+
+    const { container } = render(CoverArt, { props: { songId: 50 } });
+
+    await vi.waitFor(() => {
+      expect(container.querySelector("img")?.getAttribute("src")).toContain("album-remote-123.jpg");
+    });
+
+    expect(collectionStore.songs[0].art_automatic).toBe("album-remote-123.jpg");
+    expect(collectionStore.songs[1].art_automatic).toBe("album-remote-123.jpg");
+    expect(collectionStore.albums[0].art_automatic).toBe("album-remote-123.jpg");
+  });
+});

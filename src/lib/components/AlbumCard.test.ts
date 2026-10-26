@@ -109,4 +109,23 @@ describe("AlbumCard.svelte", () => {
     const row = getByTestId("album-card-genre-row");
     expect(row.className).toContain("min-h-6");
   });
+
+  it("passes sample_song_id to CoverArt when art_automatic and art_manual are null (#1823)", async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_cover_art_uri") return "luminous-art://webdav-cover.jpg";
+      return null;
+    });
+
+    const { container } = render(AlbumCard, {
+      props: { album: { ...mockAlbum, sample_song_id: 77 } },
+    });
+
+    await vi.waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("get_cover_art_uri", {
+        songId: 77,
+        fullResolution: false,
+      });
+      expect(container.querySelector("img")?.getAttribute("src")).toContain("webdav-cover.jpg");
+    });
+  });
 });

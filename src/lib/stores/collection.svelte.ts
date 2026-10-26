@@ -931,6 +931,48 @@ class CollectionStore {
     this.coverArtVersion++;
   }
 
+  /** Propagates a newly fetched automatic cover filename in memory to the
+   * target song, sibling tracks on the same album (without overwriting an
+   * existing cover), and the matching `albums` entry (#1823). */
+  applyAutomaticCover(songId: number, filename: string) {
+    const target = this.songs.find((s) => s.id === songId);
+    if (target) {
+      target.art_automatic = filename;
+      target.art_unset = false;
+      if (target.album) {
+        for (const s of this.songs) {
+          if (!s.art_automatic && !s.art_unset && sameAlbum(s.album, target.album)) {
+            s.art_automatic = filename;
+          }
+        }
+        const albumEntry = this.albums.find((a) => sameAlbum(a.album, target.album));
+        if (albumEntry) {
+          if (!albumEntry.art_automatic) albumEntry.art_automatic = filename;
+          if (albumEntry.sample_song_id == null) albumEntry.sample_song_id = songId;
+        }
+      }
+    } else {
+      const albumEntry = this.albums.find((a) => a.sample_song_id === songId);
+      if (albumEntry && !albumEntry.art_automatic) {
+        albumEntry.art_automatic = filename;
+      }
+    }
+    for (const item of playlistsStore.activePlaylistTracks) {
+      if (!item.song) continue;
+      if (item.song.id === songId) {
+        item.song.art_automatic = filename;
+        item.song.art_unset = false;
+      } else if (
+        target?.album &&
+        !item.song.art_automatic &&
+        !item.song.art_unset &&
+        sameAlbum(item.song.album, target.album)
+      ) {
+        item.song.art_automatic = filename;
+      }
+    }
+  }
+
   private async doRefreshLibrary() {
     const hydrationId = ++this.activeHydrationId;
     const INITIAL_CHUNK = 2000;

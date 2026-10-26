@@ -34,6 +34,37 @@ describe("getArtistCoverStack", () => {
   it("returns an empty array when the artist has no art anywhere", () => {
     expect(getArtistCoverStack([], [])).toEqual([]);
   });
+
+  it("falls back to albums with sample_song_id when neither albums nor songs have pre-populated art (#1823)", () => {
+    const result = getArtistCoverStack(
+      [
+        { sample_song_id: 42, art_manual: null, art_automatic: null, art_embedded: false },
+        { sample_song_id: 43, art_manual: null, art_automatic: null, art_embedded: false },
+      ],
+      [
+        { id: 42, album: "WebDAV Album 1", art_manual: null, art_automatic: null, art_embedded: false },
+      ]
+    );
+
+    expect(result).toEqual([
+      { songId: 42, artEmbedded: false, artAutomatic: null, artManual: null },
+      { songId: 43, artEmbedded: false, artAutomatic: null, artManual: null },
+    ]);
+  });
+
+  it("deduplicates coverless WebDAV songs by album in songsToCoverStack (#1823)", () => {
+    const result = songsToCoverStack([
+      { id: 1, album: "Album One", art_manual: null, art_automatic: null, art_embedded: false },
+      { id: 2, album: "album one", art_manual: null, art_automatic: null, art_embedded: false },
+      { id: 3, album: "Album Two", art_manual: null, art_automatic: null, art_embedded: false },
+      { id: 4, album: "Album Three", art_manual: null, art_automatic: null, art_embedded: false, art_unset: true },
+    ]);
+
+    expect(result).toEqual([
+      { songId: 1, artEmbedded: false, artAutomatic: null, artManual: null },
+      { songId: 3, artEmbedded: false, artAutomatic: null, artManual: null },
+    ]);
+  });
 });
 
 describe("artist image resolvers (#1276)", () => {

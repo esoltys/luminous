@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 64;
+pub const CURRENT_SCHEMA_VERSION: i32 = 65;
 
 struct Migration {
     version: i32,
@@ -562,6 +562,11 @@ const MIGRATIONS: &[Migration] = &[
         version: 64,
         description: "compound order-first index for library song sorting (#1806)",
         apply: |conn| Ok(conn.execute_batch(MIGRATION_64)?),
+    },
+    Migration {
+        version: 65,
+        description: "invalidate webdav_cache etags for coverless WebDAV tracks so embedded art self-heals on next sync (#1823)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_65)?),
     },
 ];
 
@@ -2320,6 +2325,22 @@ CREATE INDEX IF NOT EXISTS idx_songs_library_sort ON songs (
     track,
     source
 ) WHERE unavailable = 0;
+";
+
+// Migration 65: invalidate cached WebDAV etags only for coverless WebDAV tracks
+// (source = 11, SongSource::WEBDAV_ID) so the next sync re-probes their 256 KB header
+// for embedded pictures and resets art_unset (#1823).
+const MIGRATION_65: &str = "
+DELETE FROM webdav_dir_cache;
+UPDATE webdav_cache
+   SET etag = NULL, last_modified = NULL
+ WHERE song_id IN (
+     SELECT id FROM songs
+      WHERE source = 11 AND art_automatic IS NULL AND art_embedded = 0
+ );
+UPDATE songs
+   SET art_unset = 0
+ WHERE source = 11 AND art_automatic IS NULL AND art_embedded = 0 AND art_unset = 1;
 ";
 
 fn seed_artist_tag_hierarchy(conn: &rusqlite::Connection) -> Result<()> {
@@ -4175,5 +4196,84 @@ mod tests {
             !full_plan.contains("USE TEMP B-TREE"),
             "Query plan should not use temporary B-tree for ORDER BY, got: {full_plan}"
         );
+    }
+
+    #[test]
+    fn test_migration_65_invalidates_only_coverless_webdav_etags_and_resets_art_unset() {
+        assert_eq!(crate::models::SongSource::WEBDAV_ID, 11);
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_migration65_test_")
+            .tempdir()
+            .unwrap();
+        let temp_dir = temp_dir_guard.path().to_path_buf();
+        let db = Database::new(temp_dir.clone()).unwrap();
+        {
+            let conn = db.pool.get().unwrap();
+            conn.execute("DELETE FROM schema_version WHERE version >= 65", [])
+                .unwrap();
+            conn.execute(
+                "INSERT INTO webdav_servers (id, name, url) VALUES (1, 'wd', 'https://example.com')",
+                [],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO webdav_dir_cache (server_id, remote_path, etag) VALUES (1, '/Music', 'dir-etag')",
+                [],
+            )
+            .unwrap();
+            // Song 1: WebDAV (source = 11), coverless, art_unset = 1 -> should be invalidated & art_unset reset to 0
+            // Song 2: WebDAV (source = 11), already has art_automatic -> should keep its etag
+            conn.execute(
+                "INSERT INTO songs (id, path, title, source, art_automatic, art_embedded, art_unset)
+                 VALUES
+                    (1, 'webdav://1/Music/a.flac', 'A', 11, NULL, 0, 1),
+                    (2, 'webdav://1/Music/b.flac', 'B', 11, 'cached.jpg', 0, 0)",
+                [],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO webdav_cache (server_id, remote_path, etag, last_modified, song_id)
+                 VALUES
+                    (1, '/Music/a.flac', 'etag-a', 'mod-a', 1),
+                    (1, '/Music/b.flac', 'etag-b', 'mod-b', 2)",
+                [],
+            )
+            .unwrap();
+        }
+        drop(db);
+
+        let reopened = Database::new(temp_dir).unwrap();
+        assert_eq!(reopened.schema_version, CURRENT_SCHEMA_VERSION);
+        let conn = reopened.pool.get().unwrap();
+
+        let dir_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM webdav_dir_cache", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(dir_count, 0);
+
+        let (etag_a, mod_a): (Option<String>, Option<String>) = conn
+            .query_row(
+                "SELECT etag, last_modified FROM webdav_cache WHERE song_id = 1",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(etag_a, None);
+        assert_eq!(mod_a, None);
+
+        let art_unset_a: bool = conn
+            .query_row("SELECT art_unset FROM songs WHERE id = 1", [], |r| r.get(0))
+            .unwrap();
+        assert!(!art_unset_a);
+
+        let (etag_b, mod_b): (Option<String>, Option<String>) = conn
+            .query_row(
+                "SELECT etag, last_modified FROM webdav_cache WHERE song_id = 2",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(etag_b.as_deref(), Some("etag-b"));
+        assert_eq!(mod_b.as_deref(), Some("mod-b"));
     }
 }

@@ -66,6 +66,7 @@
 
   async function loadCoverArt() {
     const token = ++loadToken;
+    const id = songId;
     if (artManual) {
       imgSrc = resolveArtUrl(artManual);
       hasFailed = false;
@@ -76,9 +77,9 @@
       hasFailed = false;
       // The cache holds a downscaled copy; show it at once, then swap in the
       // original embedded picture for large views.
-      if (fullResolution && artEmbedded && songId !== undefined && artAutomatic.startsWith("album-")) {
+      if (fullResolution && artEmbedded && id !== undefined && artAutomatic.startsWith("album-")) {
         try {
-          const uri = await invoke<string | null>("get_cover_art_uri", { songId, fullResolution: true });
+          const uri = await invoke<string | null>("get_cover_art_uri", { songId: id, fullResolution: true });
           if (uri && token === loadToken) imgSrc = getCoverArtUrl(uri);
         } catch (e) {
           console.error("Failed to load full-resolution cover art URI:", e);
@@ -87,7 +88,7 @@
       return;
     }
 
-    if (songId === undefined) {
+    if (id === undefined) {
       imgSrc = null;
       hasFailed = false;
       return;
@@ -96,13 +97,13 @@
     isLoading = true;
     hasFailed = false;
     try {
-      const uri = await invoke<string | null>("get_cover_art_uri", { songId, fullResolution });
+      const uri = await invoke<string | null>("get_cover_art_uri", { songId: id, fullResolution });
       if (token !== loadToken) return;
       if (uri) {
         imgSrc = getCoverArtUrl(uri);
       } else {
         imgSrc = null;
-        triggerRemoteFetch();
+        triggerRemoteFetch(id, token);
       }
     } catch (e) {
       console.error("Failed to load cover art URI:", e);
@@ -112,19 +113,22 @@
     }
   }
 
-  async function triggerRemoteFetch() {
-    if (songId === undefined || !prefs.onlineEnabled) return;
+  async function triggerRemoteFetch(targetSongId: number | undefined = songId, token = loadToken) {
+    if (targetSongId === undefined || !prefs.onlineEnabled) return;
     try {
-      const uri = await invoke<string | null>("fetch_remote_cover", { songId });
+      const uri = await invoke<string | null>("fetch_remote_cover", { songId: targetSongId });
+      if (token !== loadToken) return;
       if (uri) {
         imgSrc = getCoverArtUrl(`luminous-art://${uri}`);
         hasFailed = false;
+        collectionStore.applyAutomaticCover(targetSongId, uri);
         return;
       }
       // iTunes has now missed too, which makes the fanart.tv cover the
       // fallback (#1277): ask once more rather than re-running
       // loadCoverArt, which would loop back here.
-      const fallback = await invoke<string | null>("get_cover_art_uri", { songId });
+      const fallback = await invoke<string | null>("get_cover_art_uri", { songId: targetSongId });
+      if (token !== loadToken) return;
       if (fallback) {
         imgSrc = getCoverArtUrl(fallback);
         hasFailed = false;
@@ -146,6 +150,9 @@
     const _online = prefs.onlineEnabled;
     const _version = collectionStore.coverArtVersion;
     loadCoverArt();
+    return () => {
+      loadToken++;
+    };
   });
 </script>
 

@@ -631,4 +631,47 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     expect(consoleErrorSpy).not.toHaveBeenCalledWith("Failed to refresh album:", expect.anything());
     consoleErrorSpy.mockRestore();
   });
+
+  it("passes representative songId to hero CoverStack so WebDAV albums resolve cover art (#1823)", async () => {
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockImplementation((cmd: string) => {
+      if (cmd === "get_songs_by_album") {
+        return Promise.resolve([
+          {
+            id: 501,
+            title: "WebDAV Track",
+            artist: "WebDAV Artist",
+            album: mockAlbumName,
+            source: "webdav",
+            art_embedded: false,
+            art_automatic: null,
+            art_manual: null,
+          },
+        ]);
+      }
+      if (cmd === "get_cover_art_uri") {
+        return Promise.resolve("luminous-art://webdav-hero.jpg");
+      }
+      if (cmd === "get_extended_artwork_for_song") {
+        return Promise.resolve({
+          count: 0,
+          primary_uri: null,
+          artist_portrait_uri: null,
+          band_logo_uri: null,
+          fanart_uri: null,
+          items: [],
+        });
+      }
+      return Promise.resolve([]);
+    });
+
+    render(AlbumDetailView, { props: { albumName: mockAlbumName } });
+
+    await vi.waitFor(() => {
+      expect(invokeMock).toHaveBeenCalledWith("get_cover_art_uri", {
+        songId: 501,
+        fullResolution: false,
+      });
+    });
+  });
 });

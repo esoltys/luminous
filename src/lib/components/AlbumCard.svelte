@@ -3,6 +3,7 @@
   import type { AlbumItem } from "../types";
   import { navigationStore } from "../stores/navigation.svelte";
   import CoverStack, { type CoverItem } from "./CoverStack.svelte";
+  import { albumToCoverItem } from "../utils/covers";
   import LinkButton from "./LinkButton.svelte";
   import SongRating from "./SongRating.svelte";
   import { i18n } from "../stores/i18n.svelte";
@@ -77,7 +78,7 @@
     class="aspect-square bg-brand-main flex items-center justify-center text-brand-accent-text relative overflow-hidden w-full"
   >
     <CoverStack
-      covers={covers && covers.length > 0 ? covers : [{ artEmbedded: album.art_embedded, artAutomatic: album.art_automatic, artManual: album.art_manual }]}
+      covers={covers && covers.length > 0 ? covers : [albumToCoverItem(album)]}
       sizeClass={covers && covers.length > 1 ? "w-24 h-24" : "w-full h-full"}
     />
     {#if currentRating === 5}

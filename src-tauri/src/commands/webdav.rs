@@ -620,12 +620,11 @@ pub async fn sync_webdav_server_inner(
             };
 
             let probed_all = run_bounded(tasks, effective_concurrency, |(dir_index, task)| {
-                let result = client.probe_song_tags(&task.probe_url, task.file_size);
+                let result = client.probe_song_tags_with_art(&task.probe_url, task.file_size);
                 (dir_index, task, result)
             });
             probe_time += probe_started.elapsed();
-            let mut probed_by_dir: Vec<Vec<(ProbeTask, anyhow::Result<crate::models::Song>)>> =
-                works.iter().map(|_| Vec::new()).collect();
+            let mut probed_by_dir: Vec<Vec<_>> = works.iter().map(|_| Vec::new()).collect();
             for (dir_index, task, result) in probed_all {
                 probed_by_dir[dir_index].push((task, result));
             }
@@ -633,17 +632,16 @@ pub async fn sync_webdav_server_inner(
             for (work, probed) in works.into_iter().zip(probed_by_dir) {
                 let DirWork { path: current_path, folder_art_item, fixups, .. } = work;
 
-                // No embedded-picture extraction over WebDAV yet, so
-                // `art_automatic` is always still unset: fall back to this
-                // directory's folder-art image, same as a local scan's
-                // `scan_folder_art` fallback (#1082 follow-up). Fetched before
-                // the write transaction opens so the network never holds the
-                // database's write lock.
+                // When any song in the directory still lacks embedded picture bytes
+                // from the tag probe (#1823), fall back to this directory's
+                // folder-art image, same as a local scan's `scan_folder_art`
+                // fallback (#1082 follow-up). Fetched before the write transaction
+                // opens so the network never holds the database's write lock.
                 let mut folder_art_bytes: Option<Vec<u8>> = None;
                 if let Some(art_item) = &folder_art_item {
-                    let needs_art = probed
-                        .iter()
-                        .any(|(_, r)| matches!(r, Ok(song) if song.art_automatic.is_none()));
+                    let needs_art = probed.iter().any(|(_, r)| {
+                        matches!(r, Ok((song, embedded)) if song.art_automatic.is_none() && embedded.is_none())
+                    });
                     if needs_art {
                         let art_started = std::time::Instant::now();
                         let art_url = client.build_url(&art_item.href);
@@ -657,7 +655,7 @@ pub async fn sync_webdav_server_inner(
                         art_time += art_started.elapsed();
                     }
                 }
-                // The folder image is shared by the directory's songs, so decode and
+                // Embedded or folder art is shared by the album's songs, so decode and
                 // cache it once per album rather than once per song.
                 let mut cached_art: HashMap<(String, String), String> = HashMap::new();
 
@@ -684,13 +682,13 @@ pub async fn sync_webdav_server_inner(
                 for (task, result) in probed {
                     let ProbeTask { item, file_size, playback_url, .. } = task;
                     match result {
-                        Ok(mut song) => {
+                        Ok((mut song, embedded_art)) => {
                             song.path = Some(playback_url.clone());
                             song.url = Some(playback_url.clone());
                             song.stream_url = Some(playback_url.clone());
 
                             if song.art_automatic.is_none() {
-                                if let Some(bytes) = &folder_art_bytes {
+                                if let Some(bytes) = embedded_art.as_ref().or(folder_art_bytes.as_ref()) {
                                     let artist = song
                                         .album_artist
                                         .clone()
@@ -716,7 +714,7 @@ pub async fn sync_webdav_server_inner(
                                                 song.art_automatic = Some(filename);
                                             }
                                             Err(e) => log::warn!(
-                                                "Failed to cache WebDAV folder art for {}: {e}",
+                                                "Failed to cache WebDAV art for {}: {e}",
                                                 item.href
                                             ),
                                         }

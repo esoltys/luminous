@@ -46,12 +46,30 @@ pub trait WebDavProbeExt {
     /// (ID3v1/APEv2, an MP4 `moov` atom, an Ogg last page) only if the head left the
     /// duration or a core tag unresolved: most files cost one request, not two.
     fn probe_song_tags(&self, url: &str, content_length: u64) -> Result<Song>;
+
+    /// Like [`WebDavProbeExt::probe_song_tags`], also returning the top-ranked
+    /// embedded picture bytes when present in the probed tag buffer (#1823).
+    fn probe_song_tags_with_art(
+        &self,
+        url: &str,
+        content_length: u64,
+    ) -> Result<(Song, Option<Vec<u8>>)>;
 }
 
 impl WebDavProbeExt for WebDavClient {
     fn probe_song_tags(&self, url: &str, content_length: u64) -> Result<Song> {
+        self.probe_song_tags_with_art(url, content_length)
+            .map(|(song, _)| song)
+    }
+
+    fn probe_song_tags_with_art(
+        &self,
+        url: &str,
+        content_length: u64,
+    ) -> Result<(Song, Option<Vec<u8>>)> {
         let (head_bytes, metadata_complete) = self.fetch_probe_head(url, content_length)?;
-        let mut song = parse_probe_buffer(&head_bytes, url, content_length);
+        let (mut song, mut embedded_art) =
+            parse_probe_buffer_with_art(&head_bytes, url, content_length);
         let head_len = head_bytes.len() as u64;
         if !metadata_complete
             && content_length > head_len
@@ -64,11 +82,17 @@ impl WebDavProbeExt for WebDavClient {
             {
                 let mut probe_buffer = head_bytes;
                 probe_buffer.extend_from_slice(&tail_bytes);
-                song = parse_probe_buffer(&probe_buffer, url, content_length);
+                let (tail_song, tail_art) =
+                    parse_probe_buffer_with_art(&probe_buffer, url, content_length);
+                song = tail_song;
+                if tail_art.is_some() {
+                    embedded_art = tail_art;
+                }
+                song.art_embedded = embedded_art.is_some();
             }
         }
         title_from_filename_if_missing(&mut song, url);
-        Ok(song)
+        Ok((song, embedded_art))
     }
 }
 /// Whether the head alone settled everything the tail could still change.
@@ -162,7 +186,17 @@ fn correct_size_dependent_properties(song: &mut Song, buffer: &[u8], content_len
 }
 
 /// Parses tags and stream properties out of a probe buffer (the head, or head + tail).
+#[cfg(test)]
 fn parse_probe_buffer(buffer: &[u8], url: &str, content_length: u64) -> Song {
+    parse_probe_buffer_with_art(buffer, url, content_length).0
+}
+
+/// Parses tags, stream properties, and any complete embedded picture out of a probe buffer (#1823).
+fn parse_probe_buffer_with_art(
+    buffer: &[u8],
+    url: &str,
+    content_length: u64,
+) -> (Song, Option<Vec<u8>>) {
     let mut cursor = Cursor::new(buffer);
     let filetype = detect_filetype_from_url(url);
 
@@ -174,6 +208,7 @@ fn parse_probe_buffer(buffer: &[u8], url: &str, content_length: u64) -> Song {
         filesize: Some(content_length as i64),
         ..Default::default()
     };
+    let mut embedded_art = None;
 
     let parsed = Probe::new(&mut cursor)
         .guess_file_type()
@@ -193,6 +228,9 @@ fn parse_probe_buffer(buffer: &[u8], url: &str, content_length: u64) -> Song {
         song.samplerate = properties.sample_rate().map(|r| r as i32);
         song.channels = properties.channels().map(|c| c as i32);
         song.bitdepth = properties.bit_depth().map(|b| b as i32);
+
+        embedded_art = crate::covermanager::CoverManager::best_embedded_picture(&tagged_file);
+        song.art_embedded = embedded_art.is_some();
 
         let mut candidate_tags = Vec::new();
         if let Some(primary) = tagged_file.primary_tag() {
@@ -236,7 +274,7 @@ fn parse_probe_buffer(buffer: &[u8], url: &str, content_length: u64) -> Song {
         }
     }
 
-    song
+    (song, embedded_art)
 }
 
 /// Falls back to the file name for a title when the tags hold none.
@@ -471,5 +509,39 @@ mod tests {
         let mut song = super::Song::default();
         super::title_from_filename_if_missing(&mut song, "https://h/a%20b/Track%20One.mp3?x=1");
         assert_eq!(song.title.as_deref(), Some("Track One"));
+    }
+
+    #[test]
+    fn parse_probe_buffer_with_art_extracts_embedded_picture() {
+        use lofty::config::WriteOptions;
+        use lofty::file::TaggedFileExt;
+        use lofty::picture::{MimeType, Picture, PictureType};
+        use lofty::probe::Probe;
+        use lofty::tag::TagExt;
+
+        let temp_dir = tempfile::tempdir().unwrap();
+        let mp3_path = temp_dir.path().join("with_art.mp3");
+        std::fs::copy(format!("{AUDIO_FIXTURES}song_alpha.mp3"), &mp3_path).unwrap();
+
+        let pic_bytes = vec![0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, b'J', b'F', b'I', b'F'];
+        let mut tagged = Probe::open(&mp3_path).unwrap().read().unwrap();
+        let tag = tagged.primary_tag_mut().unwrap();
+        tag.push_picture(
+            Picture::unchecked(pic_bytes.clone())
+                .pic_type(PictureType::CoverFront)
+                .mime_type(MimeType::Jpeg)
+                .build(),
+        );
+        tag.save_to_path(&mp3_path, WriteOptions::default())
+            .unwrap();
+
+        let bytes = std::fs::read(&mp3_path).unwrap();
+        let (song, extracted) = super::parse_probe_buffer_with_art(
+            &bytes,
+            "https://example.com/with_art.mp3",
+            bytes.len() as u64,
+        );
+        assert!(song.art_embedded);
+        assert_eq!(extracted.as_deref(), Some(pic_bytes.as_slice()));
     }
 }

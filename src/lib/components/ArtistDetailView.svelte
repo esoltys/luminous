@@ -52,6 +52,7 @@
   import type { Song, Playlist, AlbumItem, PlayContext, ArtistProfile, ExtendedArtworkResponse } from "../types";
   import { getArtistAlbums, classifyRelease } from "../utils/artist";
   import {
+    albumToCoverItem,
     songsToCoverStack,
     resolveArtistPortraitUrl,
     resolveArtistLogoUrl,
@@ -418,11 +419,7 @@
   // in `albums` to draw covers from — fall back to the songs' own art.
   let headerCovers = $derived(
     albums.length > 0
-      ? albums.map((a) => ({
-          artEmbedded: a.art_embedded,
-          artAutomatic: a.art_automatic,
-          artManual: a.art_manual,
-        }))
+      ? albums.map(albumToCoverItem)
       : songsToCoverStack(songs)
   );
 

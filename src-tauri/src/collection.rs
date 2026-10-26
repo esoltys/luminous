@@ -1950,8 +1950,20 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
                     channels=excluded.channels, bitdepth=excluded.bitdepth,
                     filesize=excluded.filesize, mtime=excluded.mtime,
                     art_embedded=excluded.art_embedded,
-                    art_automatic=excluded.art_automatic,
-                    art_unset=excluded.art_unset,
+                    art_automatic=COALESCE(
+                        excluded.art_automatic,
+                        CASE
+                            WHEN excluded.source NOT IN ({local_sources}) AND songs.art_unset = 0
+                            THEN songs.art_automatic
+                            ELSE NULL
+                        END
+                    ),
+                    art_unset=CASE
+                        WHEN excluded.art_automatic IS NOT NULL THEN 0
+                        WHEN excluded.source NOT IN ({local_sources}) AND excluded.art_unset = 0
+                        THEN songs.art_unset
+                        ELSE excluded.art_unset
+                    END,
                     cue_path=excluded.cue_path,
                     filetype=excluded.filetype, source=excluded.source,
                     replaygain_track_gain=excluded.replaygain_track_gain,
@@ -1970,7 +1982,9 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
                     catalog_number=excluded.catalog_number,
                     lyrics_source=excluded.lyrics_source,
                     unavailable=0",
-            SONG_INSERT_COLS, SONG_INSERT_PLACEHOLDERS
+            SONG_INSERT_COLS,
+            SONG_INSERT_PLACEHOLDERS,
+            local_sources = *LOCAL_SOURCES_SQL
         ),
         params![
             song.source as i32,
@@ -4353,5 +4367,87 @@ Official DR value: DR13\n",
         // read_tags should ingest SYNCEDLYRICS even when LYRICS is absent
         let song = read_tags(&flac_path).unwrap();
         assert_eq!(song.lyrics.as_deref(), Some(synced));
+    }
+
+    #[test]
+    fn test_upsert_song_preserves_remote_art_automatic_when_excluded_is_null() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let db = Database::new(temp_dir.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+
+        // 1. Insert a WebDAV song that initially has no automatic cover, then simulate
+        // fetch_remote_cover populating art_automatic in SQLite.
+        let mut webdav_song = Song {
+            source: SongSource::WebDav,
+            filetype: FileType::Flac,
+            path: Some("webdav://1/Album/01.flac".to_string()),
+            title: Some("Track 1".to_string()),
+            artist: Some("Artist".to_string()),
+            album: Some("Album".to_string()),
+            art_automatic: None,
+            art_unset: false,
+            ..Default::default()
+        };
+        upsert_song(&conn, &webdav_song).unwrap();
+        conn.execute(
+            "UPDATE songs SET art_automatic = 'itunes_cached.jpg' WHERE path = ?1",
+            params![&webdav_song.path],
+        )
+        .unwrap();
+
+        // Re-upserting the WebDAV song during a resync with art_automatic = None must preserve
+        // the previously fetched cover rather than wiping it out (#1823).
+        webdav_song.title = Some("Track 1 Remastered".to_string());
+        upsert_song(&conn, &webdav_song).unwrap();
+
+        let (art_auto, art_unset): (Option<String>, bool) = conn
+            .query_row(
+                "SELECT art_automatic, art_unset FROM songs WHERE path = ?1",
+                params![&webdav_song.path],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(art_auto.as_deref(), Some("itunes_cached.jpg"));
+        assert!(!art_unset);
+
+        // If the user explicitly unset the cover (art_unset = 1, art_automatic = NULL),
+        // a subsequent WebDAV re-upsert with art_automatic = None must preserve art_unset = 1.
+        conn.execute(
+            "UPDATE songs SET art_automatic = NULL, art_unset = 1 WHERE path = ?1",
+            params![&webdav_song.path],
+        )
+        .unwrap();
+        upsert_song(&conn, &webdav_song).unwrap();
+        let (art_auto_after_unset, art_unset_after): (Option<String>, bool) = conn
+            .query_row(
+                "SELECT art_automatic, art_unset FROM songs WHERE path = ?1",
+                params![&webdav_song.path],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(art_auto_after_unset, None);
+        assert!(art_unset_after);
+
+        // 2. By contrast, a local file whose folder cover was removed on disk re-upserts with
+        // art_automatic = None and SHOULD clear the stale art_automatic column.
+        let mut local_song = Song {
+            source: SongSource::LocalFile,
+            filetype: FileType::Flac,
+            path: Some("/music/Album/01.flac".to_string()),
+            title: Some("Local Track".to_string()),
+            art_automatic: Some("folder_cached.jpg".to_string()),
+            ..Default::default()
+        };
+        upsert_song(&conn, &local_song).unwrap();
+        local_song.art_automatic = None;
+        upsert_song(&conn, &local_song).unwrap();
+        let local_art_auto: Option<String> = conn
+            .query_row(
+                "SELECT art_automatic FROM songs WHERE path = ?1",
+                params![&local_song.path],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(local_art_auto, None);
     }
 }

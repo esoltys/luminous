@@ -1586,6 +1586,19 @@ impl CoverManager {
         Ok(pictures)
     }
 
+    /// Pick the highest-ranked embedded picture across all tags on an already-parsed
+    /// `TaggedFile` (e.g. from a WebDAV byte-range tag probe, #1823), ignoring empty
+    /// or unrecognized image buffers.
+    pub fn best_embedded_picture(tagged_file: &lofty::file::TaggedFile) -> Option<Vec<u8>> {
+        tagged_file
+            .tags()
+            .iter()
+            .flat_map(|tag| tag.pictures())
+            .filter(|pic| !pic.data().is_empty() && image::guess_format(pic.data()).is_ok())
+            .min_by_key(|pic| category_for_picture_type(pic.pic_type()))
+            .map(|pic| pic.data().to_vec())
+    }
+
     /// Look for a same-named-by-convention image file (`cover.jpg`,
     /// `folder.png`, etc.) next to `audio_path` and return its path, or
     /// `None` if the song has embedded/manual art already or no match
