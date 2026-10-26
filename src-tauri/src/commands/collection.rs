@@ -305,20 +305,51 @@ pub struct LibrarySnapshot {
     pub songs: Vec<Song>,
     pub albums: Vec<serde_json::Value>,
     pub artists: Vec<serde_json::Value>,
+    pub total_songs: i64,
 }
 
 /// The Collection view's "give me everything" read — songs, albums, and
 /// artists always get refreshed together (initial load, post-scan, on
 /// library-changed events), so callers no longer have to remember to fire
 /// all three round trips themselves.
+///
+/// Supports optional `limit` and `offset` for progressive hydration (#1811)
+/// to prevent frontend event-loop freeze on large libraries (35K+ tracks).
 #[tauri::command]
-pub async fn get_library_snapshot(state: State<'_, AppState>) -> Result<LibrarySnapshot, String> {
-    crate::collection::with_collection_scanner(state.db.clone(), |scanner| {
+pub async fn get_library_snapshot(
+    limit: Option<i64>,
+    offset: Option<i64>,
+    state: State<'_, AppState>,
+) -> Result<LibrarySnapshot, String> {
+    crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        let lim = limit.unwrap_or(-1);
+        let off = offset.unwrap_or(0);
+        let songs = scanner.get_songs(lim, off)?;
+        let total_songs = if lim >= 0 {
+            scanner.get_song_count()?
+        } else {
+            songs.len() as i64
+        };
         Ok(LibrarySnapshot {
-            songs: scanner.get_songs(-1, 0)?,
+            songs,
             albums: scanner.get_albums()?,
             artists: scanner.get_artists()?,
+            total_songs,
         })
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// Paginated read for available library songs ordered by the library index (#1811).
+#[tauri::command]
+pub async fn get_songs(
+    limit: i64,
+    offset: i64,
+    state: State<'_, AppState>,
+) -> Result<Vec<Song>, String> {
+    crate::collection::with_collection_scanner(state.db.clone(), move |scanner| {
+        scanner.get_songs(limit, offset)
     })
     .await
     .map_err(|e| e.to_string())
