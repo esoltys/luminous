@@ -211,25 +211,24 @@ async fn append_song_ids_to_queue(
 ) -> Result<(), String> {
     use tauri::Emitter;
 
-    let added = {
-        let mut playlists = state.playlists.lock().await;
-        let queue = playlists.queue().map_err(|e| e.to_string())?;
+    let sids = song_ids.to_vec();
+    let added = crate::playlist::with_playlists(&state.playlists, move |playlists| {
+        let queue = playlists.queue()?;
         let before: std::collections::HashSet<String> = playlists
-            .get_playlist_tracks(queue.id)
-            .map_err(|e| e.to_string())?
+            .get_playlist_tracks(queue.id)?
             .into_iter()
             .map(|i| i.uuid)
             .collect();
-        playlists
-            .add_songs_to_playlist(queue.id, song_ids)
-            .map_err(|e| e.to_string())?;
-        playlists
-            .get_playlist_tracks(queue.id)
-            .map_err(|e| e.to_string())?
+        playlists.add_songs_to_playlist(queue.id, &sids)?;
+        let added_items = playlists
+            .get_playlist_tracks(queue.id)?
             .into_iter()
             .filter(|i| !before.contains(&i.uuid))
-            .collect::<Vec<_>>()
-    };
+            .collect::<Vec<_>>();
+        Ok(added_items)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
 
     if !added.is_empty() {
         let mut player = state.player.lock().await;
@@ -276,9 +275,14 @@ pub async fn play_songs(
     let target = match playlist_id {
         None => None,
         Some(pid) => {
-            let playlists = state.playlists.lock().await;
-            let queue = playlists.queue().map_err(|e| e.to_string())?;
-            if pid == queue.id {
+            let is_queue = crate::playlist::with_playlists(&state.playlists, move |playlists| {
+                let queue = playlists.queue()?;
+                Ok(pid == queue.id)
+            })
+            .await
+            .map_err(|e| e.to_string())?;
+
+            if is_queue {
                 None
             } else {
                 Some(pid)
@@ -289,12 +293,12 @@ pub async fn play_songs(
     match target {
         None => replace_queue_and_play(&state, &song_ids, start_index, context).await,
         Some(pid) => {
-            let items = {
-                let playlists = state.playlists.lock().await;
-                playlists
-                    .get_playlist_tracks(pid)
-                    .map_err(|e| e.to_string())?
-            };
+            let items = crate::playlist::with_playlists(&state.playlists, move |playlists| {
+                playlists.get_playlist_tracks(pid)
+            })
+            .await
+            .map_err(|e| e.to_string())?;
+
             let mut player = state.player.lock().await;
             player
                 .play_playlist(items, start_index, pid, context)
@@ -311,12 +315,12 @@ pub async fn play_playlist_item(
     context: Option<PlayContext>,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let items = {
-        let playlists = state.playlists.lock().await;
-        playlists
-            .get_playlist_tracks(playlist_id)
-            .map_err(|e| e.to_string())?
-    };
+    let items = crate::playlist::with_playlists(&state.playlists, move |playlists| {
+        playlists.get_playlist_tracks(playlist_id)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
     let mut player = state.player.lock().await;
     player
         .play_playlist(items, item_index, playlist_id, context)
@@ -330,10 +334,24 @@ pub async fn play_playlist_item_by_uuid(
     uuid: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let playlists = state.playlists.lock().await;
     let mut player = state.player.lock().await;
+    let has_item = player.has_playlist_item(playlist_id, &uuid);
+
+    let fresh_items = if !has_item {
+        drop(player);
+        let items = crate::playlist::with_playlists(&state.playlists, move |pm| {
+            pm.get_playlist_tracks(playlist_id)
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+        player = state.player.lock().await;
+        Some(items)
+    } else {
+        None
+    };
+
     player
-        .play_item_by_uuid(playlist_id, &uuid, &playlists)
+        .play_item_by_uuid(playlist_id, &uuid, fresh_items)
         .await
         .map_err(|e| e.to_string())
 }

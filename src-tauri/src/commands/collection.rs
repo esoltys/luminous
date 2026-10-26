@@ -281,7 +281,7 @@ pub async fn finish_scan(last_scan_time: String, state: State<'_, AppState>) -> 
         log::error!("Failed to resync playback queue after scan: {e}");
     }
 
-    crate::playlist::with_playlists(&state.playlists, |pm| pm.sync_all_auto_playlists())
+    crate::playlist::sync_all_auto_playlists_cooperative(&state.playlists)
         .await
         .map_err(|e| e.to_string())
 }

@@ -4,7 +4,7 @@
 
 use super::{PlaylistManager, NO_SONG_LIMIT};
 use crate::collection::CollectionScanner;
-use crate::models::{QueuePopulationMode, LIBRARY_SOURCES_SQL};
+use crate::models::{QueuePopulationMode, Song, LIBRARY_SOURCES_SQL};
 use crate::tags::TagManager;
 use anyhow::Result;
 use chrono::Timelike;
@@ -66,6 +66,35 @@ fn daypart_bucket_and_date(
     (bucket, name, now.date_naive().to_string())
 }
 
+/// Replaces a playlist's tracks in SQLite inside a single transaction with a prepared statement,
+/// eliminating thousands of single-row autocommit transactions during auto-playlist generation (#1807).
+fn replace_playlist_items(
+    conn: &mut rusqlite::Connection,
+    playlist_id: i64,
+    songs: &[Song],
+) -> Result<()> {
+    let tx = conn.transaction()?;
+    tx.execute(
+        "DELETE FROM playlist_items WHERE playlist_id = ?1",
+        params![playlist_id],
+    )?;
+    {
+        let mut stmt = tx.prepare(
+            "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type) VALUES (?1, ?2, ?3, ?4, 0)",
+        )?;
+        for (position, song) in songs.iter().enumerate() {
+            stmt.execute(params![
+                playlist_id,
+                song.id,
+                position as i32,
+                Uuid::new_v4().to_string()
+            ])?;
+        }
+    }
+    tx.commit()?;
+    Ok(())
+}
+
 impl PlaylistManager {
     /// Runs all three auto-playlist syncs (genre, decade, BPM) in one call —
     /// the frontend used to invoke these as three separate IPC round trips
@@ -117,7 +146,7 @@ impl PlaylistManager {
             }
         }
 
-        let conn = self.db.pool.get()?;
+        let mut conn = self.db.pool.get()?;
         let now = chrono::Utc::now().timestamp();
 
         // Prune genre auto-playlists for curated tags no longer in the
@@ -198,10 +227,6 @@ impl PlaylistManager {
                         "UPDATE playlists SET updated = ?1 WHERE id = ?2",
                         params![now, id],
                     )?;
-                    conn.execute(
-                        "DELETE FROM playlist_items WHERE playlist_id = ?1",
-                        params![id],
-                    )?;
                     id
                 }
                 None => {
@@ -213,12 +238,7 @@ impl PlaylistManager {
                 }
             };
 
-            for (position, song) in songs.iter().enumerate() {
-                conn.execute(
-                    "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type) VALUES (?1, ?2, ?3, ?4, 0)",
-                    params![playlist_id, song.id, position as i32, Uuid::new_v4().to_string()],
-                )?;
-            }
+            replace_playlist_items(&mut conn, playlist_id, &songs)?;
         }
 
         Ok(())
@@ -233,7 +253,7 @@ impl PlaylistManager {
 
         let scanner = CollectionScanner::new(self.db.clone());
         let decades = scanner.get_library_decades()?;
-        let conn = self.db.pool.get()?;
+        let mut conn = self.db.pool.get()?;
         let now = chrono::Utc::now().timestamp();
 
         let mut stmt =
@@ -305,10 +325,6 @@ impl PlaylistManager {
                         "UPDATE playlists SET updated = ?1 WHERE id = ?2",
                         params![now, id],
                     )?;
-                    conn.execute(
-                        "DELETE FROM playlist_items WHERE playlist_id = ?1",
-                        params![id],
-                    )?;
                     id
                 }
                 None => {
@@ -320,12 +336,7 @@ impl PlaylistManager {
                 }
             };
 
-            for (position, song) in songs.iter().enumerate() {
-                conn.execute(
-                    "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type) VALUES (?1, ?2, ?3, ?4, 0)",
-                    params![playlist_id, song.id, position as i32, Uuid::new_v4().to_string()],
-                )?;
-            }
+            replace_playlist_items(&mut conn, playlist_id, &songs)?;
         }
 
         Ok(())
@@ -342,7 +353,7 @@ impl PlaylistManager {
         const STALE_AFTER_SECS: i64 = 24 * 60 * 60;
 
         let scanner = CollectionScanner::new(self.db.clone());
-        let conn = self.db.pool.get()?;
+        let mut conn = self.db.pool.get()?;
         let now = chrono::Utc::now().timestamp();
 
         for (name, min, max) in BPM_BUCKETS {
@@ -400,10 +411,6 @@ impl PlaylistManager {
                         "UPDATE playlists SET updated = ?1 WHERE id = ?2",
                         params![now, id],
                     )?;
-                    conn.execute(
-                        "DELETE FROM playlist_items WHERE playlist_id = ?1",
-                        params![id],
-                    )?;
                     id
                 }
                 None => {
@@ -415,12 +422,7 @@ impl PlaylistManager {
                 }
             };
 
-            for (position, song) in songs.iter().enumerate() {
-                conn.execute(
-                    "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type) VALUES (?1, ?2, ?3, ?4, 0)",
-                    params![playlist_id, song.id, position as i32, Uuid::new_v4().to_string()],
-                )?;
-            }
+            replace_playlist_items(&mut conn, playlist_id, &songs)?;
         }
 
         Ok(())
@@ -435,7 +437,7 @@ impl PlaylistManager {
 
         let scanner = CollectionScanner::new(self.db.clone());
         let tags = scanner.get_library_artist_tags()?;
-        let conn = self.db.pool.get()?;
+        let mut conn = self.db.pool.get()?;
         let now = chrono::Utc::now().timestamp();
 
         let mut stmt = conn.prepare(
@@ -513,10 +515,6 @@ impl PlaylistManager {
                         "UPDATE playlists SET name = ?1, updated = ?2 WHERE id = ?3",
                         params![display_name, now, id],
                     )?;
-                    conn.execute(
-                        "DELETE FROM playlist_items WHERE playlist_id = ?1",
-                        params![id],
-                    )?;
                     id
                 }
                 None => {
@@ -528,12 +526,7 @@ impl PlaylistManager {
                 }
             };
 
-            for (position, song) in songs.iter().enumerate() {
-                conn.execute(
-                    "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type) VALUES (?1, ?2, ?3, ?4, 0)",
-                    params![playlist_id, song.id, position as i32, Uuid::new_v4().to_string()],
-                )?;
-            }
+            replace_playlist_items(&mut conn, playlist_id, &songs)?;
         }
 
         Ok(())
@@ -556,7 +549,7 @@ impl PlaylistManager {
         const NAME: &str = "Missing Metadata";
 
         let scanner = CollectionScanner::new(self.db.clone());
-        let conn = self.db.pool.get()?;
+        let mut conn = self.db.pool.get()?;
         let now = chrono::Utc::now().timestamp();
 
         let existing_row: Option<(i64, i64, i64, String)> = conn
@@ -591,10 +584,6 @@ impl PlaylistManager {
                     "UPDATE playlists SET updated = ?1 WHERE id = ?2",
                     params![now, id],
                 )?;
-                conn.execute(
-                    "DELETE FROM playlist_items WHERE playlist_id = ?1",
-                    params![id],
-                )?;
                 id
             }
             None => {
@@ -606,12 +595,7 @@ impl PlaylistManager {
             }
         };
 
-        for (position, song) in songs.iter().enumerate() {
-            conn.execute(
-                "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type) VALUES (?1, ?2, ?3, ?4, 0)",
-                params![playlist_id, song.id, position as i32, Uuid::new_v4().to_string()],
-            )?;
-        }
+        replace_playlist_items(&mut conn, playlist_id, &songs)?;
 
         Ok(())
     }
@@ -629,7 +613,7 @@ impl PlaylistManager {
         const NAME: &str = "Missing MusicBrainz ID";
 
         let scanner = CollectionScanner::new(self.db.clone());
-        let conn = self.db.pool.get()?;
+        let mut conn = self.db.pool.get()?;
         let now = chrono::Utc::now().timestamp();
 
         let existing_row: Option<(i64, i64, i64, String)> = conn
@@ -672,10 +656,6 @@ impl PlaylistManager {
                     "UPDATE playlists SET name = ?1, updated = ?2 WHERE id = ?3",
                     params![NAME, now, id],
                 )?;
-                conn.execute(
-                    "DELETE FROM playlist_items WHERE playlist_id = ?1",
-                    params![id],
-                )?;
                 id
             }
             None => {
@@ -687,12 +667,7 @@ impl PlaylistManager {
             }
         };
 
-        for (position, song) in songs.iter().enumerate() {
-            conn.execute(
-                "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type) VALUES (?1, ?2, ?3, ?4, 0)",
-                params![playlist_id, song.id, position as i32, Uuid::new_v4().to_string()],
-            )?;
-        }
+        replace_playlist_items(&mut conn, playlist_id, &songs)?;
 
         Ok(())
     }
@@ -893,16 +868,12 @@ impl PlaylistManager {
             return Ok(());
         }
 
-        let conn = self.db.pool.get()?;
+        let mut conn = self.db.pool.get()?;
         let playlist_id = match &existing_row {
             Some((id, _, _, _)) => {
                 conn.execute(
                     "UPDATE playlists SET name = ?1, dynamic_spec = ?2, updated = ?3 WHERE id = ?4",
                     params![bucket_name, new_spec, now, id],
-                )?;
-                conn.execute(
-                    "DELETE FROM playlist_items WHERE playlist_id = ?1",
-                    params![id],
                 )?;
                 *id
             }
@@ -915,12 +886,7 @@ impl PlaylistManager {
             }
         };
 
-        for (position, song) in songs.iter().enumerate() {
-            conn.execute(
-                "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type) VALUES (?1, ?2, ?3, ?4, 0)",
-                params![playlist_id, song.id, position as i32, Uuid::new_v4().to_string()],
-            )?;
-        }
+        replace_playlist_items(&mut conn, playlist_id, &songs)?;
 
         Ok(())
     }

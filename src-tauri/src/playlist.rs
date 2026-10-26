@@ -110,6 +110,37 @@ where
     tokio::task::block_in_place(move || f(&mut pm))
 }
 
+/// Startup delay before running initial auto-playlist sync, allowing initial window
+/// setup, user navigation, and playback requests to proceed without lock contention (#1807).
+pub const STARTUP_AUTO_SYNC_DELAY: std::time::Duration = std::time::Duration::from_secs(20);
+
+/// Startup delay before running daily reconciliation, staggered after auto-sync (#1807).
+pub const STARTUP_RECONCILE_DELAY: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// Synchronizes all auto-playlists in the background cooperatively, ensuring user
+/// interactions and playback commands (`replace_queue`, `play_song`) take precedence
+/// and are never starved by background maintenance (#1807).
+pub async fn sync_all_auto_playlists_cooperative(
+    playlists: &tokio::sync::Mutex<PlaylistManager>,
+) -> Result<()> {
+    // Run each category pass in a separate lock acquisition, yielding with a short
+    // pause to ensure any pending user commands waiting on `playlists` acquire the lock next.
+    with_playlists(playlists, |pm| pm.sync_genre_auto_playlists()).await?;
+    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    with_playlists(playlists, |pm| pm.sync_decade_auto_playlists()).await?;
+    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    with_playlists(playlists, |pm| pm.sync_bpm_auto_playlists()).await?;
+    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    with_playlists(playlists, |pm| pm.sync_artist_tag_auto_playlists()).await?;
+    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    with_playlists(playlists, |pm| pm.sync_missing_metadata_auto_playlist()).await?;
+    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    with_playlists(playlists, |pm| pm.sync_missing_musicbrainz_auto_playlist()).await?;
+    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    with_playlists(playlists, |pm| pm.sync_daypart_auto_playlist()).await?;
+    Ok(())
+}
+
 impl PlaylistManager {
     pub fn new(db: Arc<Database>) -> Result<Self> {
         Ok(Self {
@@ -392,5 +423,41 @@ mod tests {
         manager.delete_playlist(pl_id).unwrap();
         let playlists = manager.get_playlists().unwrap();
         assert_eq!(playlists.len(), 0);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_sync_all_auto_playlists_cooperative_allows_concurrent_queue_replace() {
+        let (_temp_dir, db) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for i in 1..=5 {
+                conn.execute(
+                    "INSERT INTO songs (title, artist, path) VALUES (?1, 'Artist', ?2)",
+                    params![format!("Track {i}"), format!("/t{i}.mp3")],
+                )
+                .unwrap();
+            }
+        }
+
+        let manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        let playlists = std::sync::Arc::new(tokio::sync::Mutex::new(manager));
+
+        // Spawn cooperative sync
+        let playlists_clone = playlists.clone();
+        let sync_handle =
+            tokio::spawn(
+                async move { sync_all_auto_playlists_cooperative(&playlists_clone).await },
+            );
+
+        // Concurrently replace queue
+        let (queue_id, items) = with_playlists(&playlists, |pm| pm.replace_queue(&[1, 2]))
+            .await
+            .unwrap();
+        assert_eq!(items.len(), 2);
+        assert!(queue_id > 0);
+
+        let res = sync_handle.await.unwrap();
+        assert!(res.is_ok());
     }
 }

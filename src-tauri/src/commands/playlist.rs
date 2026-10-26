@@ -71,7 +71,9 @@ pub async fn get_playlists(state: State<'_, AppState>) -> Result<Vec<Playlist>, 
 /// at every call site.
 #[tauri::command]
 pub async fn sync_all_auto_playlists(state: State<'_, AppState>) -> Result<(), String> {
-    with_playlists(&state, |pm| pm.sync_all_auto_playlists()).await
+    crate::playlist::sync_all_auto_playlists_cooperative(&state.playlists)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]

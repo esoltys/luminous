@@ -344,6 +344,7 @@ fn restore_audio_output_from_db(db: &Database, audio_engine: &AudioEngine) {
 fn spawn_visualizer_loop(app_handle: tauri::AppHandle, audio: Arc<Mutex<AudioEngine>>) {
     tauri::async_runtime::spawn(async move {
         let mut interval = tokio::time::interval(std::time::Duration::from_millis(33)); // ~30 FPS
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
         let mut is_minimized_or_hidden = false;
         let mut ticks_until_visibility_check: u32 = 0;
         loop {
@@ -412,6 +413,7 @@ fn spawn_position_tick_loop(
 ) {
     tauri::async_runtime::spawn(async move {
         let mut interval = tokio::time::interval(std::time::Duration::from_millis(250));
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
         let mut tick_counter: u32 = 0;
         loop {
             interval.tick().await;
@@ -1049,15 +1051,15 @@ pub fn run() {
             let playlists = Arc::new(Mutex::new(manager));
 
             // Rebuild curated-tag ("tag:") genre auto-playlists in the background
-            // once right after migrations run (see db.rs migration 19, #548), rather
-            // than blocking window load and startup setup (#1742).
+            // once right after migrations run (see db.rs migration 19, #548), deferred
+            // so startup setup, window render, and initial playback requests proceed
+            // without lock contention (#1807).
             {
                 let playlists_clone = Arc::clone(&playlists);
                 tauri::async_runtime::spawn(async move {
-                    if let Err(e) = crate::playlist::with_playlists(&playlists_clone, |pm| {
-                        pm.sync_all_auto_playlists()
-                    })
-                    .await
+                    tokio::time::sleep(crate::playlist::STARTUP_AUTO_SYNC_DELAY).await;
+                    if let Err(e) =
+                        crate::playlist::sync_all_auto_playlists_cooperative(&playlists_clone).await
                     {
                         log::error!("Failed to sync auto-playlists at startup: {e}");
                     }

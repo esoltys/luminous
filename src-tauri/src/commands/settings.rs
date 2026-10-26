@@ -187,11 +187,10 @@ pub fn load_ui_preferences(conn: &rusqlite::Connection) -> UiPreferences {
 }
 
 #[tauri::command]
-pub fn get_ui_preferences(state: State<'_, AppState>) -> UiPreferences {
-    match state.db.pool.get() {
-        Ok(conn) => load_ui_preferences(&conn),
-        Err(_) => UiPreferences::default(),
-    }
+pub async fn get_ui_preferences(state: State<'_, AppState>) -> Result<UiPreferences, String> {
+    crate::db::run_blocking(&state.db, |conn| Ok(load_ui_preferences(conn)))
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Fire-and-forget like [`set_app_setting`] — always `Ok`. Values outside a
@@ -341,12 +340,14 @@ pub struct DbSchemaStatus {
 /// current schema" — the latter looks identical to an empty library (queries
 /// naming a since-added/removed column just fail) without this check.
 #[tauri::command]
-pub fn get_db_schema_status(state: State<'_, crate::AppState>) -> DbSchemaStatus {
-    DbSchemaStatus {
+pub async fn get_db_schema_status(
+    state: State<'_, crate::AppState>,
+) -> Result<DbSchemaStatus, String> {
+    Ok(DbSchemaStatus {
         db_version: state.db.schema_version,
         app_version: crate::db::CURRENT_SCHEMA_VERSION,
         db_newer_than_app: state.db.is_newer_than_app(),
-    }
+    })
 }
 
 /// Bounds of the numeric loudness/fade settings, which the backend clamps

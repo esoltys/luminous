@@ -412,6 +412,12 @@ impl Player {
         }
     }
 
+    /// Whether the player currently has the specified item loaded in its active playlist.
+    pub fn has_playlist_item(&self, playlist_id: i64, uuid: &str) -> bool {
+        self.current_playlist_id == Some(playlist_id)
+            && self.playlist_items.iter().any(|i| i.uuid == uuid)
+    }
+
     /// Attach the scrobbler service manager to receive scrobble notifications.
     pub fn set_scrobbler(&mut self, scrobbler: Arc<crate::scrobbler::ScrobblerManager>) {
         self.scrobbler = Some(scrobbler);
@@ -473,14 +479,15 @@ impl Player {
         &mut self,
         playlist_id: i64,
         uuid: &str,
-        db_playlists: &crate::playlist::PlaylistManager,
+        fresh_items: Option<Vec<PlaylistItem>>,
     ) -> Result<()> {
         let is_same_playlist = self.current_playlist_id == Some(playlist_id);
         let has_uuid = is_same_playlist && self.playlist_items.iter().any(|i| i.uuid == uuid);
 
         if !has_uuid {
-            let items =
-                tokio::task::block_in_place(|| db_playlists.get_playlist_tracks(playlist_id))?;
+            let items = fresh_items.ok_or_else(|| {
+                anyhow!("Playlist items needed to switch to playlist {playlist_id}")
+            })?;
             self.playlist_items = items;
             self.current_playlist_id = Some(playlist_id);
             self.current_play_context = if playlist_id > 0 && !self.is_queue_playlist(playlist_id) {
