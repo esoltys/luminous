@@ -10,6 +10,7 @@
 
 use crate::context::ContextManager;
 use crate::covermanager::detect_image_format_and_clean;
+use crate::models::ArtistProfile;
 use anyhow::{anyhow, Result};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -38,11 +39,6 @@ impl ArtistImageSource {
     pub fn parse(s: &str) -> Option<Self> {
         s.parse().ok()
     }
-
-    /// Numeric rank representing relative portrait quality tier.
-    pub fn rank(&self) -> u8 {
-        *self as u8
-    }
 }
 
 impl std::str::FromStr for ArtistImageSource {
@@ -54,6 +50,46 @@ impl std::str::FromStr for ArtistImageSource {
             "deezer" => Ok(ArtistImageSource::Deezer),
             "wikidata" => Ok(ArtistImageSource::Wikidata),
             _ => Err(()),
+        }
+    }
+}
+
+/// Resolve the fanart.tv API key from the environment (`FANART_API_KEY`) or
+/// compile-time embed (`option_env!("FANART_API_KEY")`), if present.
+pub fn resolve_fanart_env_or_compile_key() -> Option<String> {
+    std::env::var("FANART_API_KEY")
+        .ok()
+        .filter(|v| !v.trim().is_empty())
+        .or_else(|| {
+            option_env!("FANART_API_KEY")
+                .map(str::to_string)
+                .filter(|v| !v.trim().is_empty())
+        })
+}
+
+/// Checks whether an environment or build-time default fanart.tv API key is available.
+pub fn has_fanart_env_key() -> bool {
+    resolve_fanart_env_or_compile_key().is_some()
+}
+
+/// Evaluates whether an artist qualifies for an automatic portrait upgrade during
+/// background enrichment based on the highest tier currently available.
+pub fn can_upgrade_artist_photo(profile: &ArtistProfile, fanart_available: bool) -> bool {
+    let current_source = profile
+        .fetched_image_source
+        .as_deref()
+        .and_then(ArtistImageSource::parse);
+    let highest_available = if fanart_available {
+        ArtistImageSource::Fanart
+    } else {
+        ArtistImageSource::Deezer
+    };
+
+    match current_source {
+        Some(src) => src < highest_available,
+        None => {
+            !profile.image_fetched
+                || (fanart_available && !profile.logo_fetched && !profile.background_fetched)
         }
     }
 }
@@ -364,6 +400,15 @@ pub async fn download_and_cache_artist_image(
     let (cleaned, _mime, ext) = detect_image_format_and_clean(&bytes);
     let filename = format!("{filename_stem}.{ext}");
     std::fs::write(dest_dir.join(&filename), cleaned)?;
+
+    // Prune stale cache entries with other extensions for this stem.
+    for alt_ext in ["jpg", "jpeg", "png", "webp"] {
+        if alt_ext != ext {
+            let alt_path = dest_dir.join(format!("{filename_stem}.{alt_ext}"));
+            let _ = std::fs::remove_file(alt_path);
+        }
+    }
+
     Ok(filename)
 }
 
@@ -566,9 +611,48 @@ mod tests {
         // Quality tier hierarchy: Fanart > Deezer > Wikidata
         assert!(ArtistImageSource::Fanart > ArtistImageSource::Deezer);
         assert!(ArtistImageSource::Deezer > ArtistImageSource::Wikidata);
-        assert_eq!(ArtistImageSource::Fanart.rank(), 3);
-        assert_eq!(ArtistImageSource::Deezer.rank(), 2);
-        assert_eq!(ArtistImageSource::Wikidata.rank(), 1);
+    }
+
+    #[test]
+    fn test_can_upgrade_artist_photo() {
+        let make_profile = |source: Option<&str>, image_fetched: bool| ArtistProfile {
+            fetched_image_filename: source.map(|s| format!("radiohead_{s}.jpg")),
+            fetched_image_source: source.map(str::to_string),
+            image_fetched,
+            ..Default::default()
+        };
+
+        // Keyless environment (Deezer is highest available):
+        assert!(can_upgrade_artist_photo(
+            &make_profile(Some("wikidata"), true),
+            false
+        ));
+        assert!(!can_upgrade_artist_photo(
+            &make_profile(Some("deezer"), true),
+            false
+        ));
+        assert!(!can_upgrade_artist_photo(
+            &make_profile(Some("fanart"), true),
+            false
+        ));
+        assert!(can_upgrade_artist_photo(&make_profile(None, false), false));
+        assert!(!can_upgrade_artist_photo(&make_profile(None, true), false));
+
+        // Key available (Fanart is highest available):
+        assert!(can_upgrade_artist_photo(
+            &make_profile(Some("wikidata"), true),
+            true
+        ));
+        assert!(can_upgrade_artist_photo(
+            &make_profile(Some("deezer"), true),
+            true
+        ));
+        assert!(!can_upgrade_artist_photo(
+            &make_profile(Some("fanart"), true),
+            true
+        ));
+        assert!(can_upgrade_artist_photo(&make_profile(None, false), true));
+        assert!(can_upgrade_artist_photo(&make_profile(None, true), true));
     }
 
     #[test]

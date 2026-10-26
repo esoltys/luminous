@@ -42,6 +42,13 @@ vi.mock("@tauri-apps/api/core", () => ({
     if (cmd === "has_fanart_env_key") {
       return Promise.resolve(false);
     }
+    if (cmd === "get_fanart_key_status") {
+      return Promise.resolve({
+        has_env_key: false,
+        has_build_key: false,
+        has_custom_key: false,
+      });
+    }
     return Promise.resolve(null);
   }),
 }));
@@ -91,6 +98,13 @@ describe("SettingsIntegrations.svelte", () => {
     const core = await import("@tauri-apps/api/core");
     vi.mocked(core.invoke).mockImplementation((cmd: string) => {
       if (cmd === "has_fanart_env_key") return Promise.resolve(true);
+      if (cmd === "get_fanart_key_status") {
+        return Promise.resolve({
+          has_env_key: true,
+          has_build_key: false,
+          has_custom_key: false,
+        });
+      }
       if (cmd === "get_scrobbler_settings") {
         return Promise.resolve({
           listenbrainz_enabled: false,
@@ -115,6 +129,87 @@ describe("SettingsIntegrations.svelte", () => {
 
     const { findByText } = render(SettingsIntegrations);
     expect(await findByText(/found in the FANART_API_KEY environment variable/)).toBeInTheDocument();
+  });
+
+  it("shows the Luminous default key badge when has_build_key is true and no custom key is set", async () => {
+    const core = await import("@tauri-apps/api/core");
+    prefs.fanartApiKey = "";
+    vi.mocked(core.invoke).mockImplementation((cmd: string) => {
+      if (cmd === "get_fanart_key_status") {
+        return Promise.resolve({
+          has_env_key: false,
+          has_build_key: true,
+          has_custom_key: false,
+        });
+      }
+      if (cmd === "get_scrobbler_settings") {
+        return Promise.resolve({
+          listenbrainz_enabled: false,
+          listenbrainz_token: "",
+          listenbrainz_username: null,
+          scrobble_now_playing: true,
+          scrobble_ratings: true,
+          scrobble_paused: false,
+          min_duration_secs: 30,
+          discord_enabled: false,
+          discord_client_id: "1548913001715990610",
+          discord_show_album: true,
+          discord_show_time: true,
+        });
+      }
+      if (cmd === "get_scrobble_cache_status") {
+        return Promise.resolve({ pending_count: 0, last_error: null, last_attempt: null });
+      }
+      if (cmd === "get_all_app_settings") return Promise.resolve({});
+      return Promise.resolve(null);
+    });
+
+    const { findByText } = render(SettingsIntegrations);
+    expect(await findByText(/Using Luminous default fanart.tv key/)).toBeInTheDocument();
+  });
+
+  it("shows personal key badge and Revert to Default button when custom key is set", async () => {
+    const core = await import("@tauri-apps/api/core");
+    prefs.fanartApiKey = "my-custom-key";
+    vi.mocked(core.invoke).mockImplementation((cmd: string) => {
+      if (cmd === "get_fanart_key_status") {
+        return Promise.resolve({
+          has_env_key: false,
+          has_build_key: true,
+          has_custom_key: true,
+        });
+      }
+      if (cmd === "get_scrobbler_settings") {
+        return Promise.resolve({
+          listenbrainz_enabled: false,
+          listenbrainz_token: "",
+          listenbrainz_username: null,
+          scrobble_now_playing: true,
+          scrobble_ratings: true,
+          scrobble_paused: false,
+          min_duration_secs: 30,
+          discord_enabled: false,
+          discord_client_id: "1548913001715990610",
+          discord_show_album: true,
+          discord_show_time: true,
+        });
+      }
+      if (cmd === "get_scrobble_cache_status") {
+        return Promise.resolve({ pending_count: 0, last_error: null, last_attempt: null });
+      }
+      if (cmd === "get_all_app_settings") return Promise.resolve({});
+      if (cmd === "set_app_setting") return Promise.resolve();
+      return Promise.resolve(null);
+    });
+
+    const { findByText, getByRole } = render(SettingsIntegrations);
+    expect(await findByText("Using your personal API key")).toBeInTheDocument();
+
+    const revertBtn = getByRole("button", { name: "Revert to Default" });
+    expect(revertBtn).toBeInTheDocument();
+
+    await fireEvent.click(revertBtn);
+    expect(prefs.fanartApiKey).toBe("");
   });
 
   it("toggles Discord Rich Presence and shows sub-options when enabled", async () => {

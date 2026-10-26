@@ -1364,6 +1364,7 @@ pub fn run() {
             commands::collection::retrieve_album_art,
             commands::collection::sweep_artwork_to_folders,
             commands::collection::has_fanart_env_key,
+            commands::collection::get_fanart_key_status,
             commands::collection::validate_fanart_api_key,
             commands::collection::get_artist_tags_overview,
             commands::collection::set_songs_not_included,

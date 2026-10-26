@@ -8,7 +8,7 @@ use crate::{
     },
     AppState,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State};
@@ -1511,27 +1511,49 @@ pub async fn retrieve_artist_details(
     })
 }
 
-/// Resolve the fanart.tv API key from the environment (runtime `FANART_API_KEY`
-/// or compile-time `option_env!("FANART_API_KEY")`).
-pub fn resolve_fanart_env_or_compile_key() -> Option<String> {
-    if let Ok(key) = std::env::var("FANART_API_KEY") {
-        let trimmed = key.trim();
-        if !trimmed.is_empty() {
-            return Some(trimmed.to_string());
-        }
-    }
-    if let Some(opt_key) = option_env!("FANART_API_KEY") {
-        let trimmed = opt_key.trim();
-        if !trimmed.is_empty() {
-            return Some(trimmed.to_string());
-        }
-    }
-    None
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct FanartKeyStatus {
+    pub has_custom_key: bool,
+    pub has_env_key: bool,
+    pub has_build_key: bool,
+}
+
+#[tauri::command]
+pub async fn get_fanart_key_status(state: State<'_, AppState>) -> Result<FanartKeyStatus, String> {
+    let stored_custom_key = crate::db::run_blocking(&state.db, |conn| {
+        Ok(conn
+            .query_row(
+                "SELECT value FROM app_state WHERE key = 'fanart_api_key'",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .ok())
+    })
+    .await
+    .ok()
+    .flatten()
+    .filter(|k| !k.trim().is_empty())
+    .is_some();
+
+    let has_env_key = std::env::var("FANART_API_KEY")
+        .ok()
+        .filter(|v| !v.trim().is_empty())
+        .is_some();
+
+    let has_build_key = option_env!("FANART_API_KEY")
+        .filter(|v| !v.trim().is_empty())
+        .is_some();
+
+    Ok(FanartKeyStatus {
+        has_custom_key: stored_custom_key,
+        has_env_key,
+        has_build_key,
+    })
 }
 
 #[tauri::command]
 pub async fn has_fanart_env_key() -> Result<bool, String> {
-    Ok(resolve_fanart_env_or_compile_key().is_some())
+    Ok(crate::artist_image::has_fanart_env_key())
 }
 
 /// Settings > Integrations' fanart.tv "Validate & Save" button — mirrors the
@@ -1594,7 +1616,7 @@ async fn resolve_fanart_api_key(state: &State<'_, AppState>) -> Option<String> {
 
     stored
         .filter(|k| !k.trim().is_empty())
-        .or_else(resolve_fanart_env_or_compile_key)
+        .or_else(crate::artist_image::resolve_fanart_env_or_compile_key)
 }
 
 /// Downloads one fetched artist image into the covers cache and returns its
@@ -1659,26 +1681,8 @@ pub async fn retrieve_artist_image(
     let fanart_key = resolve_fanart_api_key(&state).await;
     let fanart_asked = fanart_key.is_some();
 
-    let current_source = current_profile
-        .fetched_image_source
-        .as_deref()
-        .and_then(crate::artist_image::ArtistImageSource::parse);
-
-    let highest_available_tier = if fanart_asked {
-        crate::artist_image::ArtistImageSource::Fanart
-    } else {
-        crate::artist_image::ArtistImageSource::Deezer
-    };
-
-    let can_upgrade_photo = match current_source {
-        Some(src) => src < highest_available_tier,
-        None => {
-            !current_profile.image_fetched
-                || (fanart_asked
-                    && !current_profile.logo_fetched
-                    && !current_profile.background_fetched)
-        }
-    };
+    let can_upgrade_photo =
+        crate::artist_image::can_upgrade_artist_photo(&current_profile, fanart_asked);
 
     let want_photo = !only_missing || (prefs.fanart_fetch_photo && can_upgrade_photo);
     let want_logo = !only_missing || (prefs.fanart_fetch_logo && !current_profile.logo_fetched);
@@ -1788,17 +1792,6 @@ pub async fn retrieve_artist_image(
                         Ok(filename) => {
                             result.uri = Some(format!("luminous-art://{filename}"));
                             result.source = Some(source.as_str().to_string());
-                            let alt_ext = if filename.ends_with(".jpg") {
-                                "png"
-                            } else {
-                                "jpg"
-                            };
-                            let _ = std::fs::remove_file(
-                                state
-                                    .cover_manager
-                                    .covers_dir()
-                                    .join(format!("{stem}.{alt_ext}")),
-                            );
                             profile.fetched_image_filename = Some(filename);
                             profile.fetched_image_source = Some(source.as_str().to_string());
                             profile.image_fetched = true;
@@ -3088,74 +3081,96 @@ mod tests {
 
     #[test]
     fn test_artist_photo_upgrade_qualification() {
-        use crate::artist_image::ArtistImageSource;
-
-        let eval_upgrade = |source: Option<&str>,
+        let make_profile = |source: Option<&str>,
                             image_fetched: bool,
                             logo_fetched: bool,
-                            background_fetched: bool,
-                            fanart_available: bool|
-         -> bool {
-            let current_source = source.and_then(ArtistImageSource::parse);
-            let highest_available = if fanart_available {
-                ArtistImageSource::Fanart
-            } else {
-                ArtistImageSource::Deezer
-            };
-
-            match current_source {
-                Some(src) => src < highest_available,
-                None => {
-                    !image_fetched || (fanart_available && !logo_fetched && !background_fetched)
-                }
-            }
+                            background_fetched: bool| ArtistProfile {
+            fetched_image_filename: source.map(|s| format!("radiohead_{s}.jpg")),
+            fetched_image_source: source.map(str::to_string),
+            image_fetched,
+            logo_fetched,
+            background_fetched,
+            ..Default::default()
         };
 
         // Keyless environment (Deezer is highest available):
         assert!(
-            eval_upgrade(Some("wikidata"), true, false, false, false),
+            crate::artist_image::can_upgrade_artist_photo(
+                &make_profile(Some("wikidata"), true, false, false),
+                false
+            ),
             "Wikidata photo upgrades to Deezer"
         );
         assert!(
-            !eval_upgrade(Some("deezer"), true, false, false, false),
+            !crate::artist_image::can_upgrade_artist_photo(
+                &make_profile(Some("deezer"), true, false, false),
+                false
+            ),
             "Deezer photo already at highest keyless tier"
         );
         assert!(
-            !eval_upgrade(Some("fanart"), true, true, true, false),
+            !crate::artist_image::can_upgrade_artist_photo(
+                &make_profile(Some("fanart"), true, true, true),
+                false
+            ),
             "Fanart photo already exceeds keyless tier"
         );
         assert!(
-            eval_upgrade(None, false, false, false, false),
+            crate::artist_image::can_upgrade_artist_photo(
+                &make_profile(None, false, false, false),
+                false
+            ),
             "Unfetched artist qualifies"
         );
         assert!(
-            !eval_upgrade(None, true, false, false, false),
+            !crate::artist_image::can_upgrade_artist_photo(
+                &make_profile(None, true, false, false),
+                false
+            ),
             "Keyless miss is not retried without key"
         );
 
         // Key available (Fanart is highest available):
         assert!(
-            eval_upgrade(Some("wikidata"), true, false, false, true),
+            crate::artist_image::can_upgrade_artist_photo(
+                &make_profile(Some("wikidata"), true, false, false),
+                true
+            ),
             "Wikidata photo upgrades to Fanart"
         );
         assert!(
-            eval_upgrade(Some("deezer"), true, false, false, true),
+            crate::artist_image::can_upgrade_artist_photo(
+                &make_profile(Some("deezer"), true, false, false),
+                true
+            ),
             "Deezer photo upgrades to Fanart"
         );
         assert!(
-            !eval_upgrade(Some("fanart"), true, true, true, true),
+            !crate::artist_image::can_upgrade_artist_photo(
+                &make_profile(Some("fanart"), true, true, true),
+                true
+            ),
             "Fanart photo already at top tier"
         );
         assert!(
-            eval_upgrade(None, false, false, false, true),
+            crate::artist_image::can_upgrade_artist_photo(
+                &make_profile(None, false, false, false),
+                true
+            ),
             "Unfetched artist qualifies for Fanart"
         );
         assert!(
-            eval_upgrade(None, true, false, false, true),
+            crate::artist_image::can_upgrade_artist_photo(
+                &make_profile(None, true, false, false),
+                true
+            ),
             "Previous keyless miss retries once Fanart key is added"
         );
         assert!(
-            !eval_upgrade(None, true, true, true, true),
+            !crate::artist_image::can_upgrade_artist_photo(
+                &make_profile(None, true, true, true),
+                true
+            ),
             "True Fanart miss is not retried endlessly"
         );
     }
