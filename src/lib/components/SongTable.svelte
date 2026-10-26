@@ -160,6 +160,9 @@
 
   let lastSelectedKey = $state<string | null>(null);
   let keyIndex = $derived.by(() => {
+    if (rows.length > 0 && rows[0].underlyingIndex !== undefined) {
+      return null;
+    }
     const m = new Map<string, number>();
     rows.forEach((r, i) => m.set(r.key, i));
     return m;
@@ -456,7 +459,7 @@
 {#snippet bodyCell(col: (typeof SONG_TABLE_COLUMNS)[number], song: Song, row: SongTableRow)}
   {#if col.key === "track"}
     <div class="{secondaryColor(song)} truncate pr-2 min-w-0 text-xs font-medium">
-      {formatTrackNumber(song.track, song.disc, discCount, keyIndex.get(row.key) ?? 0)}
+      {formatTrackNumber(song.track, song.disc, discCount, row.underlyingIndex ?? keyIndex?.get(row.key) ?? 0)}
     </div>
   {:else if col.key === "title"}
     <div class="font-medium truncate pr-4 flex items-center gap-2 min-w-0">
@@ -798,7 +801,7 @@
     {#key gridColsStyle}
       <VirtualList items={rows} itemHeight={41}>
         {#snippet children({ item }: { item: SongTableRow })}
-          {@render row_(item, keyIndex.get(item.key) ?? 0)}
+          {@render row_(item, item.underlyingIndex ?? keyIndex?.get(item.key) ?? 0)}
         {/snippet}
       </VirtualList>
     {/key}

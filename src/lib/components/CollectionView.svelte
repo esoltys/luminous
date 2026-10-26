@@ -177,56 +177,58 @@
   $effect(() => {
     collectionStore.search(collectionStore.searchQuery);
   });
+  function getSongSortKey(song: Song, field: keyof Song): string | number | null {
+    let val: unknown = song[field];
+    if (field === "title") {
+      val = song.titlesort?.trim() || song.title;
+    } else if (field === "artist") {
+      val = song.album_artist_sort?.trim() || song.artistsort?.trim() || song.album_artist || song.artist;
+    } else if (field === "album") {
+      val = song.albumsort?.trim() || song.album;
+    } else if (field === "composer") {
+      val = song.composersort?.trim() || song.composer;
+    } else if (field === "genre") {
+      val = song.genresort?.trim() || song.genre;
+    }
+
+    if (val == null || (typeof val === "string" && val.trim() === "")) return null;
+    if (typeof val === "string") return val;
+    if (typeof val === "number") return val;
+    return null;
+  }
 
   let filteredSongs = $derived.by(() => {
+    if (navigationStore.activeSubTab !== "songs") return [];
     let result = collectionStore.filteredSongs;
+    const field = sortField;
+    const asc = sortAsc;
 
-    return [...result].sort((a, b) => {
-      let valA: unknown = a[sortField];
-      let valB: unknown = b[sortField];
+    const wrapped = result.map((song) => ({
+      song,
+      key: getSongSortKey(song, field),
+    }));
 
-      if (sortField === "title") {
-        valA = a.titlesort?.trim() || a.title;
-        valB = b.titlesort?.trim() || b.title;
-      } else if (sortField === "artist") {
-        valA = a.album_artist_sort?.trim() || a.artistsort?.trim() || a.album_artist || a.artist;
-        valB = b.album_artist_sort?.trim() || b.artistsort?.trim() || b.album_artist || b.artist;
-      } else if (sortField === "album") {
-        valA = a.albumsort?.trim() || a.album;
-        valB = b.albumsort?.trim() || b.album;
-      } else if (sortField === "composer") {
-        valA = a.composersort?.trim() || a.composer;
-        valB = b.composersort?.trim() || b.composer;
-      } else if (sortField === "genre") {
-        valA = a.genresort?.trim() || a.genre;
-        valB = b.genresort?.trim() || b.genre;
+    wrapped.sort((a, b) => {
+      const keyA = a.key;
+      const keyB = b.key;
+
+      if (keyA === null && keyB === null) return 0;
+      if (keyA === null) return 1;
+      if (keyB === null) return -1;
+
+      if (typeof keyA === "string" && typeof keyB === "string") {
+        if (keyA === keyB) return 0;
+        return asc ? collator.compare(keyA, keyB) : collator.compare(keyB, keyA);
       }
 
-      // Missing tags come back as `null` — but some tags (composer especially)
-      // are commonly present-but-blank in files rather than absent entirely, which
-      // reads as an empty string, not null. Treat both as "no value" so they always
-      // sort to the end, regardless of direction, instead of an empty string sorting
-      // first (it's lexicographically smaller than everything) or a real `null`
-      // flipping to the top when descending.
-      const isBlank = (v: unknown) => v == null || (typeof v === "string" && v.trim() === "");
-      const blankA = isBlank(valA);
-      const blankB = isBlank(valB);
-      if (blankA && blankB) return 0;
-      if (blankA) return 1;
-      if (blankB) return -1;
-
-      if (typeof valA === "string" && typeof valB === "string") {
-        return sortAsc
-          ? collator.compare(valA, valB)
-          : collator.compare(valB, valA);
-      }
-
-      if (typeof valA === "number" && typeof valB === "number") {
-        return sortAsc ? valA - valB : valB - valA;
+      if (typeof keyA === "number" && typeof keyB === "number") {
+        return asc ? keyA - keyB : keyB - keyA;
       }
 
       return 0;
     });
+
+    return wrapped.map((w) => w.song);
   });
 
   let albumSortField = $state<"album" | "artist" | "year" | "rating" | "added">(
@@ -286,6 +288,7 @@
   const albumKey = (album: AlbumItem) => album.artist + "|" + album.album;
 
   let sortedAlbums = $derived.by(() => {
+    if (navigationStore.activeSubTab !== "albums") return [];
     const list = [...collectionStore.filteredAlbums];
     const field = albumSortField;
     const asc = albumSortAsc;
@@ -316,6 +319,7 @@
   });
 
   let sortedArtists = $derived.by(() => {
+    if (navigationStore.activeSubTab !== "artists") return [];
     const list = [...collectionStore.filteredArtists];
     const field = artistSortField;
     const asc = artistSortAsc;
@@ -389,17 +393,20 @@
     song.rating = await invoke<number>("set_song_rating", { songId: song.id, rating });
   }
 
-  function songToRow(song: Song): SongTableRow {
+  function songToRow(song: Song, index: number): SongTableRow {
     const disconnected = !song.unavailable && collectionStore.isPathOnDisconnectedDrive(song.path);
     return {
       key: String(song.id),
       song,
       disabled: song.unavailable || disconnected,
       disabledTooltip: disconnected ? i18n.t("collection.driveDisconnectedTooltip") : undefined,
+      underlyingIndex: index,
     };
   }
 
-  let tableRows = $derived(filteredSongs.map(songToRow));
+  let tableRows = $derived(
+    navigationStore.activeSubTab === "songs" ? filteredSongs.map(songToRow) : []
+  );
 </script>
 
 {#snippet songsEmptyState()}

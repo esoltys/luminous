@@ -598,6 +598,13 @@ export interface ArtistItem {
   fanart_uri?: string | null;
 }
 
+export interface LibrarySnapshot {
+  songs: Song[];
+  albums: AlbumItem[];
+  artists: ArtistItem[];
+  total_songs?: number;
+}
+
 export interface ArtistSocialLink {
   platform: string;
   handle_or_url: string;

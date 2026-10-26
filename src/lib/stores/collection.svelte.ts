@@ -21,6 +21,7 @@ import type {
   ArtistDetailsRetrievalResult,
   ArtistImageRetrievalResult,
   ExtendedArtworkResponse,
+  LibrarySnapshot,
   RecentSearchItem,
   QueuePopulationMode,
   WebDavServer,
@@ -224,6 +225,7 @@ class CollectionStore {
   private extendedArtworkFetches = new Map<string, Promise<ExtendedArtworkResponse>>();
   private refreshLibraryPromise: Promise<void> | null = null;
   private queuedRefreshLibraryPromise: Promise<void> | null = null;
+  private activeHydrationId = 0;
   searchResults = $state<Song[]>([]);
   searchQuery = $state<string>("");
   searchLoading = $state<boolean>(false);
@@ -930,13 +932,39 @@ class CollectionStore {
   }
 
   private async doRefreshLibrary() {
-    const snapshot = await invoke<{ songs: Song[]; albums: AlbumItem[]; artists: ArtistItem[] }>(
-      "get_library_snapshot"
-    );
-    this.songs = snapshot.songs;
-    this.albums = snapshot.albums;
-    this.artists = snapshot.artists;
+    const hydrationId = ++this.activeHydrationId;
+    const INITIAL_CHUNK = 2000;
+    const CHUNK_SIZE = 5000;
+
+    const snapshot = await invoke<LibrarySnapshot>("get_library_snapshot", {
+      limit: INITIAL_CHUNK,
+      offset: 0,
+    });
+    if (hydrationId !== this.activeHydrationId) return;
+
+    this.songs = snapshot.songs ?? [];
+    this.albums = snapshot.albums ?? [];
+    this.artists = snapshot.artists ?? [];
     await Promise.all([this.loadArtistProfiles(), this.loadAlbumProfiles()]);
+
+    const total = snapshot.total_songs ?? this.songs.length;
+    let offset = this.songs.length;
+
+    while (offset < total && hydrationId === this.activeHydrationId) {
+      // Yield to let webview process clicks, animations, and CDP heartbeats
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      if (hydrationId !== this.activeHydrationId) break;
+
+      const nextChunk = await invoke<Song[]>("get_songs", {
+        limit: CHUNK_SIZE,
+        offset,
+      });
+      if (hydrationId !== this.activeHydrationId) break;
+      if (!Array.isArray(nextChunk) || nextChunk.length === 0) break;
+
+      this.songs = [...this.songs, ...nextChunk];
+      offset += nextChunk.length;
+    }
   }
 
   async loadArtistProfiles() {

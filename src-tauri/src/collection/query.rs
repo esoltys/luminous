@@ -169,6 +169,17 @@ impl CollectionScanner {
         Ok(songs)
     }
 
+    /// Total count of available library songs (for paginated hydration).
+    pub fn get_song_count(&self) -> Result<i64> {
+        let conn = self.db.pool.get()?;
+        let sql = format!(
+            "SELECT COUNT(*) FROM songs WHERE source IN ({lib}) AND unavailable = 0",
+            lib = *LIBRARY_SOURCES_SQL
+        );
+        let count = conn.query_row(&sql, [], |row| row.get(0))?;
+        Ok(count)
+    }
+
     /// Every library song of the album `album` names, matched by
     /// `album_key` so any spelling of the title finds them all (#1752).
     pub fn get_songs_by_album(&self, album: &str) -> Result<Vec<Song>> {
@@ -2216,6 +2227,54 @@ mod tests {
         );
         // The common case: no wildcard characters, just wrapped in ';'.
         assert_eq!(multi_value_contains_pattern("Evergrey"), "%;Evergrey;%");
+    }
+
+    #[test]
+    fn test_get_song_count_and_paginated_get_songs() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_coll_test_")
+            .tempdir()
+            .unwrap();
+        let db = Arc::new(Database::new(temp_dir_guard.path().to_path_buf()).unwrap());
+        let scanner = CollectionScanner::new(db.clone());
+        let conn = db.pool.get().unwrap();
+
+        for i in 1..=5 {
+            let song = Song {
+                path: Some(format!("path/{i}.mp3")),
+                title: Some(format!("Track {i}")),
+                artist: Some("Test Artist".to_string()),
+                album: Some("Test Album".to_string()),
+                source: SongSource::LocalFile,
+                filetype: FileType::Mp3,
+                unavailable: false,
+                ..Default::default()
+            };
+            upsert_song(&conn, &song).unwrap();
+        }
+
+        assert_eq!(scanner.get_song_count().unwrap(), 5);
+
+        // First page
+        let page1 = scanner.get_songs(2, 0).unwrap();
+        assert_eq!(page1.len(), 2);
+        assert_eq!(page1[0].title.as_deref(), Some("Track 1"));
+        assert_eq!(page1[1].title.as_deref(), Some("Track 2"));
+
+        // Second page
+        let page2 = scanner.get_songs(2, 2).unwrap();
+        assert_eq!(page2.len(), 2);
+        assert_eq!(page2[0].title.as_deref(), Some("Track 3"));
+        assert_eq!(page2[1].title.as_deref(), Some("Track 4"));
+
+        // Third page
+        let page3 = scanner.get_songs(2, 4).unwrap();
+        assert_eq!(page3.len(), 1);
+        assert_eq!(page3[0].title.as_deref(), Some("Track 5"));
+
+        // Beyond range
+        let page4 = scanner.get_songs(2, 6).unwrap();
+        assert_eq!(page4.len(), 0);
     }
 
     #[test]

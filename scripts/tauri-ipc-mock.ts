@@ -939,13 +939,24 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
       total_filesize_bytes: library.songs.reduce((acc, s) => acc + (s.filesize || 0), 0),
     }),
 
-    get_songs: () => library.songs,
+    get_songs: (args) => {
+      const limit = (args?.limit as number) ?? -1;
+      const offset = (args?.offset as number) ?? 0;
+      if (limit < 0) return library.songs.slice(offset);
+      return library.songs.slice(offset, offset + limit);
+    },
 
-    get_library_snapshot: () => ({
-      songs: library.songs,
-      albums: library.albums,
-      artists: library.artists,
-    }),
+    get_library_snapshot: (args) => {
+      const limit = (args?.limit as number) ?? -1;
+      const offset = (args?.offset as number) ?? 0;
+      const songs = limit < 0 ? library.songs.slice(offset) : library.songs.slice(offset, offset + limit);
+      return {
+        songs,
+        albums: library.albums,
+        artists: library.artists,
+        total_songs: library.songs.length,
+      };
+    },
 
     search_songs: (args) => {
       const q = ((args.query as string) || "").toLowerCase().trim();

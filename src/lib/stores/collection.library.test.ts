@@ -131,7 +131,7 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
   it("rescanSongs with no songs only reloads the library", async () => {
     await collectionStore.rescanSongs([]);
     expect(invoke).not.toHaveBeenCalledWith("rescan_songs", expect.anything());
-    expect(invoke).toHaveBeenCalledWith("get_library_snapshot");
+    expect(invoke).toHaveBeenCalledWith("get_library_snapshot", { limit: 2000, offset: 0 });
   });
 
   it("resolves a WebDAV server as the Library badge for a song's credentialed URL (#682)", async () => {
@@ -510,5 +510,37 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
     await collectionStore.setScanOnStartup(true);
     expect(collectionStore.scanOnStartup).toBe(true);
     expect(invoke).toHaveBeenCalledWith("set_app_setting", { key: "scan_on_startup", value: "true" });
+  });
+
+  it("progressively hydrates remaining songs in chunks when total_songs exceeds initial chunk (#1811)", async () => {
+    const chunk1 = [
+      { id: 1, title: "Song 1", artist: "Artist", album: "Album", filetype: "MP3" as const },
+      { id: 2, title: "Song 2", artist: "Artist", album: "Album", filetype: "MP3" as const },
+    ];
+    const chunk2 = [
+      { id: 3, title: "Song 3", artist: "Artist", album: "Album", filetype: "MP3" as const },
+      { id: 4, title: "Song 4", artist: "Artist", album: "Album", filetype: "MP3" as const },
+    ];
+
+    vi.mocked(invoke).mockImplementation(async (cmd, args: any) => {
+      if (cmd === "get_library_snapshot") {
+        return {
+          songs: chunk1,
+          albums: [{ album: "Album", artist: "Artist", song_count: 4, year: 2020 }],
+          artists: [{ name: "Artist", album_count: 1, song_count: 4 }],
+          total_songs: 4,
+        };
+      }
+      if (cmd === "get_songs") {
+        if (args?.offset === 2) return chunk2;
+        return [];
+      }
+      if (cmd === "get_all_artist_profiles" || cmd === "get_all_album_profiles") return [];
+      return null;
+    });
+
+    await collectionStore.refreshLibrary();
+    expect(collectionStore.songs).toHaveLength(4);
+    expect(collectionStore.songs.map((s) => s.id)).toEqual([1, 2, 3, 4]);
   });
 });
