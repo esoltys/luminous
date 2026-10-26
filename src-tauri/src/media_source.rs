@@ -616,7 +616,7 @@ impl Seek for HttpRangeReader {
             let guard = self.prefetch.lock();
             guard
                 .as_ref()
-                .map_or(false, |w| w.contains(self.position, self.chunk_size))
+                .is_some_and(|w| w.contains(self.position, self.chunk_size))
         };
         if !self.in_buffer(self.position) && !in_prefetch_range {
             *self.prefetch.lock() = None;
@@ -1238,7 +1238,7 @@ mod tests {
             // Prefetch must now be active for expected_start = 16
             let is_prefetched = {
                 let guard = reader.prefetch.lock();
-                guard.as_ref().map_or(false, |w| w.expected_start == 16)
+                guard.as_ref().is_some_and(|w| w.expected_start == 16)
             };
             assert!(
                 is_prefetched,
