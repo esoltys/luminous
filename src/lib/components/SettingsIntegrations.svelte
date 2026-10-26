@@ -605,7 +605,7 @@
       {#if prefs.fanartApiKey}
         <Button
           onclick={handleClearFanartKey}
-          variant="ghost"
+          variant="secondary"
           size="sm"
         >
           {i18n.t('settings.fanartClearKeyBtn')}
