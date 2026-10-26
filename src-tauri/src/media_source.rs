@@ -7,6 +7,7 @@
 
 use crate::db::Database;
 use luminous_audio::{MediaSource, OfflineDecoder};
+use parking_lot::Mutex;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 use std::sync::{Arc, LazyLock};
@@ -149,6 +150,23 @@ fn extract_basic_auth(url: &str) -> (String, Option<String>) {
     (parsed.to_string(), Some(format!("Basic {encoded}")))
 }
 
+struct FetchedChunk {
+    data: Vec<u8>,
+    buffer_start: u64,
+    content_length: Option<u64>,
+}
+
+struct PrefetchWorker {
+    expected_start: u64,
+    rx: std::sync::mpsc::Receiver<Result<FetchedChunk, String>>,
+}
+
+impl PrefetchWorker {
+    fn contains(&self, pos: u64, chunk_size: usize) -> bool {
+        pos >= self.expected_start && pos < self.expected_start + chunk_size as u64
+    }
+}
+
 /// A seekable HTTP media source using HTTP Range requests (`Range: bytes=start-end`).
 /// Enables streaming audio from WebDAV and remote HTTP endpoints without full downloads.
 pub struct HttpRangeReader {
@@ -163,6 +181,7 @@ pub struct HttpRangeReader {
     buffer: Vec<u8>,
     buffer_start: u64,
     chunk_size: usize,
+    prefetch: Mutex<Option<PrefetchWorker>>,
 }
 
 /// True for replies that are an API error document rather than media —
@@ -280,7 +299,8 @@ impl HttpRangeReader {
             position: 0,
             buffer: Vec::new(),
             buffer_start: 0,
-            chunk_size: 512 * 1024, // 512 KB buffer chunk for streaming playback
+            chunk_size: 1024 * 1024, // 1 MB buffer chunk for streaming playback
+            prefetch: Mutex::new(None),
         };
 
         // Pre-fetch initial chunk so first read is immediate
@@ -319,91 +339,213 @@ impl HttpRangeReader {
     }
 
     fn fill_buffer(&mut self, start: u64) -> Result<(), String> {
-        let end = if self.content_length > 0 {
-            (start + self.chunk_size as u64 - 1).min(self.content_length - 1)
-        } else {
-            start + self.chunk_size as u64 - 1
+        *self.prefetch.lock() = None;
+        let chunk = fetch_range(
+            &self.client,
+            &self.url,
+            self.auth_header.as_deref(),
+            &self.label,
+            start,
+            self.chunk_size,
+            self.content_length,
+        )?;
+        self.apply_chunk(chunk);
+        Ok(())
+    }
+
+    fn apply_chunk(&mut self, chunk: FetchedChunk) {
+        if let Some(total) = chunk.content_length {
+            if self.content_length == 0 {
+                self.content_length = total;
+            }
+        }
+        self.buffer_start = chunk.buffer_start;
+        self.buffer = chunk.data;
+    }
+
+    fn in_buffer(&self, pos: u64) -> bool {
+        pos >= self.buffer_start && pos < self.buffer_start + self.buffer.len() as u64
+    }
+
+    fn fill_buffer_or_take_prefetch(&mut self, pos: u64) -> Result<(), String> {
+        let prefetched = {
+            let mut guard = self.prefetch.lock();
+            if let Some(worker) = guard.as_ref() {
+                if worker.contains(pos, self.chunk_size) {
+                    guard.take()
+                } else {
+                    *guard = None;
+                    None
+                }
+            } else {
+                None
+            }
         };
 
-        let range_header = format!("bytes={start}-{end}");
-        let mut req = self
-            .client
-            .get(&self.url)
-            .header(reqwest::header::RANGE, range_header);
-        if let Some(ref h) = self.auth_header {
-            req = req.header(reqwest::header::AUTHORIZATION, h);
-        }
-        // `without_url`: reqwest errors otherwise quote the (signed) URL.
-        let mut resp = req.send().map_err(|e| {
-            format!(
-                "Range request failed for '{}': {}",
-                self.label,
-                e.without_url()
-            )
-        })?;
-
-        if resp.status() == reqwest::StatusCode::RANGE_NOT_SATISFIABLE {
-            if self.content_length == 0 {
-                if let Some(total) = parse_content_range_total(resp.headers()) {
-                    self.content_length = total;
+        if let Some(worker) = prefetched {
+            match worker.rx.recv() {
+                Ok(res) => {
+                    let chunk = res?;
+                    self.apply_chunk(chunk);
+                    return Ok(());
+                }
+                Err(_) => {
+                    // Prefetch worker disconnected prematurely; fall back to synchronous fetch.
                 }
             }
-            self.buffer_start = start;
-            self.buffer.clear();
-            return Ok(());
         }
 
-        if !resp.status().is_success() {
-            return Err(format!(
-                "HTTP error {} when accessing '{}'",
-                resp.status(),
-                self.label
-            ));
+        self.fill_buffer(pos)
+    }
+
+    fn trigger_prefetch_if_needed(&self) {
+        if self.buffer.is_empty() {
+            return;
+        }
+        let halfway = self.buffer_start + (self.buffer.len() as u64 / 2);
+        if self.position < halfway {
+            return;
+        }
+        let next_start = self.buffer_start + self.buffer.len() as u64;
+        if self.content_length > 0 && next_start >= self.content_length {
+            return;
         }
 
-        if is_error_content_type(resp.headers()) {
-            let body = resp.text().unwrap_or_default();
-            let reason = crate::subsonic::describe_error_body(&body)
-                .unwrap_or_else(|| "the server sent an error page instead of audio".into());
-            return Err(format!("Can't play '{}': {reason}", self.label));
+        let mut guard = self.prefetch.lock();
+        if guard.is_some() {
+            return;
         }
 
-        let partial = resp.status() == reqwest::StatusCode::PARTIAL_CONTENT;
-        let content_range = if partial {
-            parse_content_range(resp.headers())
+        let client = self.client.clone();
+        let url = self.url.clone();
+        let auth_header = self.auth_header.clone();
+        let label = self.label.clone();
+        let chunk_size = self.chunk_size;
+        let content_length = self.content_length;
+
+        let (tx, rx) = std::sync::mpsc::channel();
+        let spawn_res = std::thread::Builder::new()
+            .name("luminous-media-prefetch".to_string())
+            .spawn(move || {
+                let res = fetch_range(
+                    &client,
+                    &url,
+                    auth_header.as_deref(),
+                    &label,
+                    next_start,
+                    chunk_size,
+                    content_length,
+                );
+                let _ = tx.send(res);
+            });
+
+        if spawn_res.is_ok() {
+            *guard = Some(PrefetchWorker {
+                expected_start: next_start,
+                rx,
+            });
+        }
+    }
+}
+
+fn fetch_range(
+    client: &reqwest::blocking::Client,
+    url: &str,
+    auth_header: Option<&str>,
+    label: &str,
+    start: u64,
+    chunk_size: usize,
+    content_length: u64,
+) -> Result<FetchedChunk, String> {
+    if content_length > 0 && start >= content_length {
+        return Ok(FetchedChunk {
+            data: Vec::new(),
+            buffer_start: start,
+            content_length: Some(content_length),
+        });
+    }
+
+    let end = if content_length > 0 {
+        (start + chunk_size as u64 - 1).min(content_length - 1)
+    } else {
+        start + chunk_size as u64 - 1
+    };
+
+    let range_header = format!("bytes={start}-{end}");
+    let mut req = client.get(url).header(reqwest::header::RANGE, range_header);
+    if let Some(h) = auth_header {
+        req = req.header(reqwest::header::AUTHORIZATION, h);
+    }
+    // `without_url`: reqwest errors otherwise quote the (signed) URL.
+    let mut resp = req
+        .send()
+        .map_err(|e| format!("Range request failed for '{}': {}", label, e.without_url()))?;
+
+    if resp.status() == reqwest::StatusCode::RANGE_NOT_SATISFIABLE {
+        let total = parse_content_range_total(resp.headers());
+        return Ok(FetchedChunk {
+            data: Vec::new(),
+            buffer_start: start,
+            content_length: total,
+        });
+    }
+
+    if !resp.status().is_success() {
+        return Err(format!(
+            "HTTP error {} when accessing '{}'",
+            resp.status(),
+            label
+        ));
+    }
+
+    if is_error_content_type(resp.headers()) {
+        let body = resp.text().unwrap_or_default();
+        let reason = crate::subsonic::describe_error_body(&body)
+            .unwrap_or_else(|| "the server sent an error page instead of audio".into());
+        return Err(format!("Can't play '{}': {reason}", label));
+    }
+
+    let partial = resp.status() == reqwest::StatusCode::PARTIAL_CONTENT;
+    let content_range = if partial {
+        parse_content_range(resp.headers())
+    } else {
+        None
+    };
+
+    let mut data = Vec::new();
+    resp.copy_to(&mut data)
+        .map_err(|e| format!("Failed to read stream chunk: {}", e.without_url()))?;
+
+    let (buffer_start, discovered_total) = if partial {
+        let mut total = None;
+        if let Some((_, Some(t))) = content_range {
+            total = Some(t);
+        } else if content_length == 0 {
+            // If Content-Range is omitted (e.g. Files.fm / SabreDAV), and this response
+            // delivered fewer bytes than requested, we have reached the end of the stream.
+            let expected_chunk = end.saturating_sub(start) + 1;
+            if (data.len() as u64) < expected_chunk {
+                total = Some(start + data.len() as u64);
+            }
+        }
+        let start_pos = content_range.map_or(start, |(first, _)| first);
+        (start_pos, total)
+    } else {
+        // A plain 200 ignored the Range header and sent the whole file
+        // from byte 0, whatever offset was asked for.
+        let total = if content_length == 0 {
+            Some(data.len() as u64)
         } else {
             None
         };
+        (0, total)
+    };
 
-        let mut data = Vec::new();
-        resp.copy_to(&mut data)
-            .map_err(|e| format!("Failed to read stream chunk: {}", e.without_url()))?;
-
-        if partial {
-            if let Some((_, Some(total))) = content_range {
-                if self.content_length == 0 {
-                    self.content_length = total;
-                }
-            } else if self.content_length == 0 {
-                // If Content-Range is omitted (e.g. Files.fm / SabreDAV), and this response
-                // delivered fewer bytes than requested, we have reached the end of the stream.
-                let expected_chunk = end.saturating_sub(start) + 1;
-                if (data.len() as u64) < expected_chunk {
-                    self.content_length = start + data.len() as u64;
-                }
-            }
-            self.buffer_start = content_range.map_or(start, |(first, _)| first);
-        } else {
-            // A plain 200 ignored the Range header and sent the whole file
-            // from byte 0, whatever offset was asked for.
-            if self.content_length == 0 {
-                self.content_length = data.len() as u64;
-            }
-            self.buffer_start = 0;
-        }
-        self.buffer = data;
-        Ok(())
-    }
+    Ok(FetchedChunk {
+        data,
+        buffer_start,
+        content_length: discovered_total,
+    })
 }
 
 impl Read for HttpRangeReader {
@@ -412,13 +554,10 @@ impl Read for HttpRangeReader {
             return Ok(0); // EOF
         }
 
-        let in_buffer = self.position >= self.buffer_start
-            && self.position < self.buffer_start + self.buffer.len() as u64;
+        if !self.in_buffer(self.position) {
+            self.fill_buffer_or_take_prefetch(self.position)
+                .map_err(std::io::Error::other)?;
 
-        if !in_buffer {
-            if let Err(e) = self.fill_buffer(self.position) {
-                return Err(std::io::Error::other(e));
-            }
             if self.buffer.is_empty() {
                 return Ok(0);
             }
@@ -439,6 +578,7 @@ impl Read for HttpRangeReader {
         let to_read = buf.len().min(available);
         buf[..to_read].copy_from_slice(&self.buffer[offset_in_buffer..offset_in_buffer + to_read]);
         self.position += to_read as u64;
+        self.trigger_prefetch_if_needed();
         Ok(to_read)
     }
 }
@@ -471,6 +611,17 @@ impl Seek for HttpRangeReader {
         }
 
         self.position = new_pos as u64;
+
+        let in_prefetch_range = {
+            let guard = self.prefetch.lock();
+            guard
+                .as_ref()
+                .is_some_and(|w| w.contains(self.position, self.chunk_size))
+        };
+        if !self.in_buffer(self.position) && !in_prefetch_range {
+            *self.prefetch.lock() = None;
+        }
+
         Ok(self.position)
     }
 }
@@ -1044,5 +1195,157 @@ mod tests {
             lookup_filesize(&db, "https://example.com/unknown.mp3"),
             None
         );
+    }
+
+    #[tokio::test]
+    async fn http_range_reader_prefetches_next_chunk_when_crossing_halfway_mark() {
+        use wiremock::matchers::method;
+        use wiremock::{Mock, MockServer};
+
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .respond_with(ranged_response)
+            .mount(&server)
+            .await;
+
+        let url = format!("{}/track.mp3", server.uri());
+        tokio::task::spawn_blocking(move || {
+            let mut reader = HttpRangeReader::new_with_options(
+                &url,
+                None,
+                None,
+                Some(RANGE_TEST_DATA.len() as u64),
+            )
+            .unwrap();
+            // Test data is 43 bytes long. Set chunk size to 16 and re-prime buffer.
+            reader.chunk_size = 16;
+            reader.fill_buffer(0).unwrap();
+            reader.seek(SeekFrom::Start(0)).unwrap();
+            // Initially, chunk 0..16 is loaded and position is 0. Prefetch has not triggered.
+            assert!(reader.prefetch.lock().is_none());
+
+            // Read 7 bytes (position becomes 7, which is < 8 halfway mark of 16-byte chunk)
+            let mut buf = [0u8; 7];
+            reader.read_exact(&mut buf).unwrap();
+            assert_eq!(&buf, &RANGE_TEST_DATA[..7]);
+            assert!(reader.prefetch.lock().is_none());
+
+            // Read 2 bytes (position becomes 9, crossing the halfway mark of 8)
+            let mut buf2 = [0u8; 2];
+            reader.read_exact(&mut buf2).unwrap();
+            assert_eq!(&buf2, &RANGE_TEST_DATA[7..9]);
+
+            // Prefetch must now be active for expected_start = 16
+            let is_prefetched = {
+                let guard = reader.prefetch.lock();
+                guard.as_ref().is_some_and(|w| w.expected_start == 16)
+            };
+            assert!(
+                is_prefetched,
+                "prefetch should be triggered at halfway mark"
+            );
+
+            // Read the remaining 7 bytes of the first chunk (up to position 16)
+            let mut buf3 = [0u8; 7];
+            reader.read_exact(&mut buf3).unwrap();
+            assert_eq!(&buf3, &RANGE_TEST_DATA[9..16]);
+
+            // Next read crosses the chunk boundary seamlessly without blocking
+            let mut buf4 = [0u8; 5];
+            reader.read_exact(&mut buf4).unwrap();
+            assert_eq!(&buf4, &RANGE_TEST_DATA[16..21]);
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn http_range_reader_seek_invalidates_prefetch_on_distant_seek() {
+        use wiremock::matchers::method;
+        use wiremock::{Mock, MockServer};
+
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .respond_with(ranged_response)
+            .mount(&server)
+            .await;
+
+        let url = format!("{}/track.mp3", server.uri());
+        tokio::task::spawn_blocking(move || {
+            let mut reader = HttpRangeReader::new_with_options(
+                &url,
+                None,
+                None,
+                Some(RANGE_TEST_DATA.len() as u64),
+            )
+            .unwrap();
+            reader.chunk_size = 16;
+            reader.fill_buffer(0).unwrap();
+            reader.seek(SeekFrom::Start(0)).unwrap();
+
+            // Advance past halfway mark (9 bytes) to trigger prefetch for bytes 16..32
+            let mut buf = [0u8; 9];
+            reader.read_exact(&mut buf).unwrap();
+            assert!(reader.prefetch.lock().is_some());
+
+            // Seek to a distant offset (35), outside both current buffer (0..16) and prefetch (16..32)
+            reader.seek(SeekFrom::Start(35)).unwrap();
+            assert!(
+                reader.prefetch.lock().is_none(),
+                "distant seek must invalidate obsolete in-flight prefetch"
+            );
+
+            // Reading from 35 succeeds with newly fetched range
+            let mut buf2 = [0u8; 5];
+            reader.read_exact(&mut buf2).unwrap();
+            assert_eq!(&buf2, &RANGE_TEST_DATA[35..40]);
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn http_range_reader_seek_preserves_prefetch_when_seeking_into_prefetch_range() {
+        use wiremock::matchers::method;
+        use wiremock::{Mock, MockServer};
+
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .respond_with(ranged_response)
+            .mount(&server)
+            .await;
+
+        let url = format!("{}/track.mp3", server.uri());
+        tokio::task::spawn_blocking(move || {
+            let mut reader = HttpRangeReader::new_with_options(
+                &url,
+                None,
+                None,
+                Some(RANGE_TEST_DATA.len() as u64),
+            )
+            .unwrap();
+            reader.chunk_size = 16;
+            reader.fill_buffer(0).unwrap();
+            reader.seek(SeekFrom::Start(0)).unwrap();
+
+            // Trigger prefetch for chunk starting at 16
+            let mut buf = [0u8; 9];
+            reader.read_exact(&mut buf).unwrap();
+            assert!(reader.prefetch.lock().is_some());
+
+            // Seek directly into the prefetched chunk (offset 20)
+            reader.seek(SeekFrom::Start(20)).unwrap();
+            assert!(
+                reader.prefetch.lock().is_some(),
+                "prefetch should be preserved when seeking into its range"
+            );
+
+            // Read 5 bytes at offset 20
+            let mut buf2 = [0u8; 5];
+            reader.read_exact(&mut buf2).unwrap();
+            assert_eq!(&buf2, &RANGE_TEST_DATA[20..25]);
+        })
+        .await
+        .unwrap();
     }
 }
