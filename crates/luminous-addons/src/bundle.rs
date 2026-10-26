@@ -278,28 +278,13 @@ pub(crate) async fn install(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    const DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/addons/");
-
-    fn read(name: &str) -> Vec<u8> {
-        std::fs::read(format!("{DIR}{name}")).unwrap()
-    }
-
-    fn key32(name: &str) -> [u8; 32] {
-        let text = String::from_utf8(read(name)).unwrap();
-        let text = text.trim();
-        let mut out = [0u8; 32];
-        for (i, b) in out.iter_mut().enumerate() {
-            *b = u8::from_str_radix(&text[i * 2..i * 2 + 2], 16).unwrap();
-        }
-        out
-    }
+    use crate::fixtures::{key32, read};
 
     fn open_fixture(installed: Option<&str>) -> Result<Addin, InstallError> {
         open_checked(
             "test-addin",
-            &read("valid.lumadd"),
-            &read("valid.lumadd.sig"),
+            read("valid.lumadd"),
+            read("valid.lumadd.sig"),
             &key32("test-public-key.hex"),
             &key32("test-addin-key.hex"),
             installed,
@@ -348,8 +333,8 @@ mod tests {
     fn requested_id_must_match_the_signed_id() {
         let result = open_checked(
             "other",
-            &read("valid.lumadd"),
-            &read("valid.lumadd.sig"),
+            read("valid.lumadd"),
+            read("valid.lumadd.sig"),
             &key32("test-public-key.hex"),
             &key32("test-addin-key.hex"),
             None,

@@ -14,6 +14,8 @@ mod bundle;
 #[cfg(debug_assertions)]
 pub mod devloader;
 mod entitlement;
+#[cfg(test)]
+mod fixtures;
 mod keycache;
 mod keyclient;
 mod verifier;

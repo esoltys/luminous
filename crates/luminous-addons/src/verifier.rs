@@ -258,22 +258,7 @@ fn hex_lower(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    const DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/addons/");
-
-    fn read(name: &str) -> Vec<u8> {
-        std::fs::read(format!("{DIR}{name}")).unwrap()
-    }
-
-    fn key32(name: &str) -> [u8; 32] {
-        let text = String::from_utf8(read(name)).unwrap();
-        let text = text.trim();
-        let mut out = [0u8; 32];
-        for (i, b) in out.iter_mut().enumerate() {
-            *b = u8::from_str_radix(&text[i * 2..i * 2 + 2], 16).unwrap();
-        }
-        out
-    }
+    use crate::fixtures::{key32, read};
 
     #[test]
     fn vendor_key_matches_published_hex() {
@@ -287,8 +272,8 @@ mod tests {
     #[test]
     fn opens_valid_bundle() {
         let addin = open(
-            &read("valid.lumadd"),
-            &read("valid.lumadd.sig"),
+            read("valid.lumadd"),
+            read("valid.lumadd.sig"),
             &key32("test-public-key.hex"),
             &key32("test-addin-key.hex"),
         )
@@ -299,15 +284,15 @@ mod tests {
 
     #[test]
     fn reads_bundle_id_from_header() {
-        assert_eq!(bundle_id(&read("valid.lumadd")).unwrap(), "test-addin");
+        assert_eq!(bundle_id(read("valid.lumadd")).unwrap(), "test-addin");
     }
 
     #[test]
     fn rejects_tampered_ciphertext_and_header() {
         for name in ["tampered-ciphertext.lumadd", "tampered-header.lumadd"] {
             let result = open(
-                &read(name),
-                &read("valid.lumadd.sig"),
+                read(name),
+                read("valid.lumadd.sig"),
                 &key32("test-public-key.hex"),
                 &key32("test-addin-key.hex"),
             );
@@ -318,8 +303,8 @@ mod tests {
     #[test]
     fn rejects_wrong_signer() {
         let result = open(
-            &read("wrong-signer.lumadd"),
-            &read("wrong-signer.lumadd.sig"),
+            read("wrong-signer.lumadd"),
+            read("wrong-signer.lumadd.sig"),
             &key32("test-public-key.hex"),
             &key32("test-addin-key.hex"),
         );
@@ -329,8 +314,8 @@ mod tests {
     #[test]
     fn rejects_the_vendor_key_for_test_fixtures() {
         let result = open(
-            &read("valid.lumadd"),
-            &read("valid.lumadd.sig"),
+            read("valid.lumadd"),
+            read("valid.lumadd.sig"),
             &VENDOR_PUBLIC_KEY,
             &key32("test-addin-key.hex"),
         );
@@ -342,8 +327,8 @@ mod tests {
         let mut wrong = key32("test-addin-key.hex");
         wrong[0] ^= 0xff;
         let result = open(
-            &read("valid.lumadd"),
-            &read("valid.lumadd.sig"),
+            read("valid.lumadd"),
+            read("valid.lumadd.sig"),
             &key32("test-public-key.hex"),
             &wrong,
         );
@@ -356,10 +341,10 @@ mod tests {
         let pk = key32("test-public-key.hex");
         let k = key32("test-addin-key.hex");
         let sig = read("valid.lumadd.sig");
-        assert!(open(&valid[..10], &sig, &pk, &k).is_err());
-        assert!(open(&valid[..valid.len() - 1], &sig, &pk, &k).is_err());
-        assert!(open(b"", &sig, &pk, &k).is_err());
-        assert!(open(&valid, &sig[..63], &pk, &k).is_err());
+        assert!(open(&valid[..10], sig, &pk, &k).is_err());
+        assert!(open(&valid[..valid.len() - 1], sig, &pk, &k).is_err());
+        assert!(open(b"", sig, &pk, &k).is_err());
+        assert!(open(valid, &sig[..63], &pk, &k).is_err());
     }
 
     #[test]
