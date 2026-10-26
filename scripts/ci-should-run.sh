@@ -42,7 +42,7 @@ if [[ "${GITHUB_EVENT_NAME:-}" != "pull_request" ]]; then
   emit "true"
 fi
 
-if [[ -n "${CI_CHANGED_FILES:-}" ]]; then
+if [[ -v CI_CHANGED_FILES ]]; then
   CHANGED_FILES="$CI_CHANGED_FILES"
 else
   # On a GitHub Actions pull_request checkout with fetch-depth >= 2, HEAD is the

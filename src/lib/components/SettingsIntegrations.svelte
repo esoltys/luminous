@@ -29,11 +29,29 @@
   let showListenBrainzToken = $state(false);
   let showFanartKey = $state(false);
   let hasFanartEnvKey = $state(false);
+  let fanartKeyStatus = $state<{ has_env_key: boolean; has_build_key: boolean; has_custom_key: boolean }>({
+    has_env_key: false,
+    has_build_key: false,
+    has_custom_key: false,
+  });
   let fanartKeyInput = $state("");
   let isValidatingFanartKey = $state(false);
   let fanartValidationError = $state<string | null>(null);
   let picardCustomPath = $state("");
   let isRecheckingPicard = $state(false);
+
+  async function refreshFanartKeyStatus() {
+    try {
+      fanartKeyStatus = await invoke("get_fanart_key_status");
+      hasFanartEnvKey = fanartKeyStatus.has_env_key;
+    } catch {
+      try {
+        hasFanartEnvKey = await invoke("has_fanart_env_key");
+      } catch (e) {
+        console.error("Failed to check fanart.tv env key:", e);
+      }
+    }
+  }
 
   async function handleValidateFanartKey() {
     const key = fanartKeyInput.trim();
@@ -43,11 +61,19 @@
     try {
       await invoke("validate_fanart_api_key", { apiKey: key });
       prefs.setFanartApiKey(key);
+      await refreshFanartKeyStatus();
     } catch (err) {
       fanartValidationError = typeof err === "string" ? err : i18n.t("settings.fanartValidateFailed");
     } finally {
       isValidatingFanartKey = false;
     }
+  }
+
+  async function handleClearFanartKey() {
+    fanartKeyInput = "";
+    fanartValidationError = null;
+    prefs.setFanartApiKey("");
+    await refreshFanartKeyStatus();
   }
 
   async function handlePicardCustomPathChange() {
@@ -84,11 +110,7 @@
     } catch (e) {
       console.error("Failed to load Picard custom path on mount:", e);
     }
-    try {
-      hasFanartEnvKey = await invoke("has_fanart_env_key");
-    } catch (e) {
-      console.error("Failed to check fanart.tv env key on mount:", e);
-    }
+    await refreshFanartKeyStatus();
     fanartKeyInput = prefs.fanartApiKey;
   });
 </script>
@@ -525,10 +547,20 @@
       </button>
     </div>
 
-    {#if hasFanartEnvKey}
+    {#if prefs.fanartApiKey}
+      <div class="text-xs font-medium text-brand-accent-text flex items-center gap-2">
+        <Check class="w-3.5 h-3.5" />
+        <span>{i18n.t('settings.fanartCustomKeyActive')}</span>
+      </div>
+    {:else if fanartKeyStatus.has_env_key}
       <div class="text-xs font-medium text-brand-accent-text flex items-center gap-2">
         <Check class="w-3.5 h-3.5" />
         <span>{i18n.t('settings.fanartEnvKeyFound', { env: 'FANART_API_KEY' })}</span>
+      </div>
+    {:else if fanartKeyStatus.has_build_key}
+      <div class="text-xs font-medium text-brand-accent-text flex items-center gap-2">
+        <Check class="w-3.5 h-3.5" />
+        <span>{i18n.t('settings.fanartDefaultKeyActive')}</span>
       </div>
     {/if}
 
@@ -569,6 +601,16 @@
         {/if}
         {i18n.t('settings.fanartValidateBtn')}
       </Button>
+
+      {#if prefs.fanartApiKey}
+        <Button
+          onclick={handleClearFanartKey}
+          variant="secondary"
+          size="sm"
+        >
+          {i18n.t('settings.fanartClearKeyBtn')}
+        </Button>
+      {/if}
     </div>
 
     {#if fanartValidationError}

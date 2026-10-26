@@ -479,7 +479,7 @@
                           {:then artwork}
                             {@const portraitUrl = resolveArtistPortraitUrl(artwork.artist_portrait_uri, collectionStore.getArtistProfile(artist.name)?.fetched_image_filename)}
                             {#if portraitUrl}
-                              <img src={portraitUrl} alt={artist.name} class="w-full h-full object-cover" />
+                              <img src={portraitUrl} crossorigin="anonymous" alt={artist.name} class="w-full h-full object-cover" />
                             {:else}
                               <User class="w-4 h-4 text-brand-text-secondary" />
                             {/if}
@@ -701,7 +701,7 @@
                       {@const portraitUrl = resolveArtistPortraitUrl(artwork.artist_portrait_uri, collectionStore.getArtistProfile(item.title)?.fetched_image_filename)}
                       {#if portraitUrl}
                         <div class="w-9 h-9 flex-shrink-0 overflow-hidden bg-brand-sidebar border border-brand-border">
-                          <img src={portraitUrl} alt={item.title} class="w-full h-full object-cover" />
+                          <img src={portraitUrl} crossorigin="anonymous" alt={item.title} class="w-full h-full object-cover" />
                         </div>
                       {:else if item.artUrl}
                         <CoverArt

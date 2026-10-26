@@ -115,6 +115,7 @@
       {#if artistPortraitUrl}
         <img
           src={artistPortraitUrl}
+          crossorigin="anonymous"
           alt={pin.title}
           class="w-full h-full object-cover"
         />

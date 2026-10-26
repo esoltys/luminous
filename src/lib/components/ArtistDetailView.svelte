@@ -646,7 +646,7 @@
   <div class="relative z-30 w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md table-surface-blur px-6 {windowLayoutStore.isDetailHeaderCollapsed ? 'py-3' : 'pt-6 pb-6'}">
     {#if fanartBannerUrl && !windowLayoutStore.isDetailHeaderCollapsed}
       <div class="absolute inset-0 z-0 overflow-hidden pointer-events-none" aria-hidden="true">
-        <img src={fanartBannerUrl} alt="" class="w-full h-full object-cover opacity-25" />
+        <img src={fanartBannerUrl} crossorigin="anonymous" alt="" class="w-full h-full object-cover opacity-25" />
         <div class="absolute inset-0 bg-gradient-to-t from-brand-main via-brand-main/70 to-brand-main/30"></div>
       </div>
     {/if}
@@ -714,6 +714,7 @@
           {#if bandLogoUrl}
             <img
               src={bandLogoUrl}
+              crossorigin="anonymous"
               alt=""
               class="hidden @4xl:block h-16 @5xl:h-20 @6xl:h-24 w-auto max-w-64 @5xl:max-w-80 @6xl:max-w-96 min-w-0 shrink object-contain object-right"
               style:transform="translateX({mosaicSpareWidth / 2}px)"

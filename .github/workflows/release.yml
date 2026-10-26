@@ -109,6 +109,7 @@ jobs:
     env:
       MUSICBRAINZ_CLIENT_ID: ${{ secrets.MUSICBRAINZ_CLIENT_ID }}
       MUSICBRAINZ_CLIENT_SECRET: ${{ secrets.MUSICBRAINZ_CLIENT_SECRET }}
+      FANART_API_KEY: ${{ secrets.FANART_API_KEY }}
     steps:
       # A linux_only re-run (or any run given a tag) builds that tag, not
       # the dispatching branch, so it doesn't ship newer code under an older

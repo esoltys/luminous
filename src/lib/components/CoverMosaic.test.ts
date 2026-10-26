@@ -89,7 +89,9 @@ describe("CoverMosaic.svelte", () => {
         props: { heroImageUrl: "https://example.com/portrait.jpg", heroImageAlt: "Shania Twain", covers: [] },
       });
 
-      expect(getByAltText("Shania Twain")).toHaveAttribute("src", "https://example.com/portrait.jpg");
+      const hero = getByAltText("Shania Twain");
+      expect(hero).toHaveAttribute("src", "https://example.com/portrait.jpg");
+      expect(hero).toHaveAttribute("crossorigin", "anonymous");
       expect(aspectRatio(container)).toBe("1 / 1");
     });
 
