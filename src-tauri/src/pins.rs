@@ -183,7 +183,7 @@ pub fn album_item_from_json(value: &serde_json::Value) -> AlbumItem {
             .get("genre")
             .and_then(|v| v.as_str())
             .map(String::from),
-        sample_song_id: None,
+        sample_song_id: value.get("sample_song_id").and_then(|v| v.as_i64()),
         rating: value.get("rating").and_then(|v| v.as_f64()).unwrap_or(-1.0) as f32,
         total_duration_nanosec: value
             .get("total_duration_nanosec")
@@ -576,6 +576,13 @@ mod tests {
         assert_eq!(album.track_count, 10);
         assert_eq!(album.rating, 4.5);
         assert_eq!(album.sample_song_id, None);
+
+        let with_sample = serde_json::json!({
+            "artist": "Test Artist",
+            "album": "Test Album",
+            "sample_song_id": 42,
+        });
+        assert_eq!(album_item_from_json(&with_sample).sample_song_id, Some(42));
     }
 
     #[test]

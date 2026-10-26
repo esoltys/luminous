@@ -119,6 +119,7 @@
       if (uri) {
         imgSrc = getCoverArtUrl(`luminous-art://${uri}`);
         hasFailed = false;
+        collectionStore.applyAutomaticCover(songId, uri);
         return;
       }
       // iTunes has now missed too, which makes the fanart.tv cover the

@@ -120,8 +120,7 @@
     if (navigationStore.activeSubTab !== "artists") return new Map<string, Song[]>();
     const map = new Map<string, Song[]>();
     for (const s of collectionStore.songs) {
-      const artKey = s.art_manual || s.art_automatic || s.art_embedded;
-      if (!artKey) continue;
+      if (s.art_unset && !s.art_manual && !s.art_automatic && !s.art_embedded) continue;
       const keys = new Set<string>();
       if (s.album_artist) keys.add(s.album_artist.trim().toLowerCase());
       if (s.artist) keys.add(s.artist.trim().toLowerCase());

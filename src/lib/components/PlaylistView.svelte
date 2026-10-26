@@ -49,6 +49,7 @@
   import GenreChips from "./GenreChips.svelte";
   import { parseMultiValue, joinMultiValue } from "../utils/multiValue";
   import { tagsStore } from "../stores/tags.svelte";
+  import { songsToCoverStack } from "../utils/covers";
   import CoverArt from "./CoverArt.svelte";
   import CoverStack from "./CoverStack.svelte";
   import CoverMosaic from "./CoverMosaic.svelte";
@@ -283,26 +284,9 @@
   });
 
   // Top distinct album covers sampled for hero 3D card stack
-  let topAlbums = $derived.by(() => {
-    const seen = new Set<string>();
-    const list: Array<{ songId?: number; artEmbedded?: boolean; artAutomatic?: string | null; artManual?: string | null }> = [];
-    for (const item of playlistsStore.activePlaylistTracks) {
-      if (!item.song) continue;
-      const s = item.song;
-      const key = s.art_manual || s.art_automatic || (s.art_embedded ? `embed-${s.id}` : null);
-      if (key && !seen.has(key)) {
-        seen.add(key);
-        list.push({
-          songId: s.id,
-          artEmbedded: s.art_embedded,
-          artAutomatic: s.art_automatic,
-          artManual: s.art_manual,
-        });
-        if (list.length >= 6) break;
-      }
-    }
-    return list;
-  });
+  let topAlbums = $derived(
+    songsToCoverStack(playlistsStore.activePlaylistTracks.filter((t) => !!t.song).map((t) => t.song!))
+  );
 
   let totalRuntimeLabel = $derived.by(() => {
     const totalNs = playlistsStore.activePlaylistTracks.reduce(

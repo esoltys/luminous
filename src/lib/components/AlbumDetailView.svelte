@@ -231,10 +231,12 @@
 
     async function resolve() {
       let url: string | null = null;
-      if (item?.art_manual) {
-        url = resolveArtUrl(item.art_manual);
-      } else if (item?.art_automatic) {
-        url = resolveArtUrl(item.art_automatic);
+      const manual = item?.art_manual ?? songs[0]?.art_manual;
+      const automatic = item?.art_automatic ?? songs[0]?.art_automatic;
+      if (manual) {
+        url = resolveArtUrl(manual);
+      } else if (automatic) {
+        url = resolveArtUrl(automatic);
       } else if (fallbackSongId !== undefined) {
         // Embedded art, or with none at all the fanart.tv fallback (#1277).
         try {
@@ -662,9 +664,10 @@
         <div class="absolute inset-0 overflow-hidden border border-brand-border/60 shadow-2xl">
           <CoverStack
             covers={[{
-              artEmbedded: albumItem?.art_embedded,
-              artAutomatic: albumItem?.art_automatic,
-              artManual: albumItem?.art_manual,
+              songId: albumItem?.sample_song_id ?? representativeSongId,
+              artEmbedded: albumItem?.art_embedded ?? songs.some((s) => s.art_embedded),
+              artAutomatic: albumItem?.art_automatic ?? songs[0]?.art_automatic,
+              artManual: albumItem?.art_manual ?? songs[0]?.art_manual,
             }]}
             extendedArtworkSongId={representativeSongId}
             refreshToken={artworkRefreshToken}
@@ -853,8 +856,8 @@
     initialDisc={songs[0].disc}
     initialCompilation={songs[0].compilation}
     hasEmbeddedArt={songs.some((s) => s.art_embedded)}
-    initialArtAutomatic={albumItem?.art_automatic}
-    initialArtManual={albumItem?.art_manual}
+    initialArtAutomatic={albumItem?.art_automatic ?? songs[0]?.art_automatic}
+    initialArtManual={albumItem?.art_manual ?? songs[0]?.art_manual}
     isOpen={isEditorOpen}
     onClose={() => { isEditorOpen = false; }}
     onSaved={() => handleTagEditorSaved(true)}

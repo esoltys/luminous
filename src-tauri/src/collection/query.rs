@@ -283,7 +283,11 @@ impl CollectionScanner {
                     -1
                 ) AS rating,
                 MAX(added) AS added,
-                COALESCE(SUM(length_nanosec), 0) AS total_duration_nanosec
+                COALESCE(SUM(length_nanosec), 0) AS total_duration_nanosec,
+                COALESCE(
+                    MIN(CASE WHEN art_manual IS NOT NULL OR art_automatic IS NOT NULL OR art_embedded != 0 THEN id END),
+                    MIN(id)
+                ) AS sample_song_id
              FROM songs
              WHERE source IN ({lib}) AND unavailable = 0 AND album_key IS NOT NULL AND album_key != ''
                AND album_key IN (
@@ -331,6 +335,7 @@ impl CollectionScanner {
                     "rating": row.get::<_, f32>(8)?,
                     "added": row.get::<_, Option<i64>>(9)?,
                     "total_duration_nanosec": row.get::<_, i64>(10)?,
+                    "sample_song_id": row.get::<_, Option<i64>>(11)?,
                 }))
             })?
             .filter_map(|r| r.ok())
@@ -793,7 +798,11 @@ impl CollectionScanner {
                 MAX(songs.added) AS added,
                 COALESCE(SUM(songs.length_nanosec), 0) AS total_duration_nanosec,
                 COALESCE(MAX(NULLIF(songs.album_artist_sort, '')), MAX(NULLIF(songs.artistsort, ''))) AS artist_sort,
-                MAX(NULLIF(songs.albumsort, '')) AS albumsort
+                MAX(NULLIF(songs.albumsort, '')) AS albumsort,
+                COALESCE(
+                    MIN(CASE WHEN songs.art_manual IS NOT NULL OR songs.art_automatic IS NOT NULL OR songs.art_embedded != 0 THEN songs.id END),
+                    MIN(songs.id)
+                ) AS sample_song_id
              FROM songs
              LEFT JOIN top_album_genres tag ON songs.album_key = tag.album_key
              LEFT JOIN album_ratings ar ON songs.album_key = ar.album_key
@@ -821,6 +830,7 @@ impl CollectionScanner {
                     "total_duration_nanosec": row.get::<_, i64>(11)?,
                     "artist_sort": row.get::<_, Option<String>>(12)?,
                     "albumsort": row.get::<_, Option<String>>(13)?,
+                    "sample_song_id": row.get::<_, Option<i64>>(14)?,
                 }))
             })?
             .filter_map(|r| r.ok())
@@ -4674,5 +4684,43 @@ mod tests {
             !full_plan.contains("USE TEMP B-TREE"),
             "Query plan should not use temporary B-tree for ORDER BY, got: {full_plan}"
         );
+    }
+
+    #[test]
+    fn test_get_albums_and_compilations_include_sample_song_id_preferring_artwork() {
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_albums_sample_song_id_test_")
+            .tempdir()
+            .unwrap();
+        let db = Arc::new(Database::new(temp_dir_guard.path().to_path_buf()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        // Album A (WebDAV, source = 11): no track has art yet -> falls back to MIN(id) (10)
+        // Album B (WebDAV, source = 11): second track (id 21) has art_embedded = 1 -> prefers id 21 over id 20
+        // Compilation C (WebDAV, source = 11): second track (id 31) has art_automatic -> prefers id 31 over id 30
+        conn.execute(
+            "INSERT INTO songs (id, path, title, artist, album_artist, album, album_key, disc, track, source, compilation, art_embedded, art_automatic, unavailable)
+             VALUES
+                (10, 'webdav://1/a1.flac', 'A1', 'Artist A', 'Artist A', 'Album A', 'album a', 1, 1, 11, 0, 0, NULL, 0),
+                (11, 'webdav://1/a2.flac', 'A2', 'Artist A', 'Artist A', 'Album A', 'album a', 1, 2, 11, 0, 0, NULL, 0),
+                (20, 'webdav://1/b1.flac', 'B1', 'Artist A', 'Artist A', 'Album B', 'album b', 1, 1, 11, 0, 0, NULL, 0),
+                (21, 'webdav://1/b2.flac', 'B2', 'Artist A', 'Artist A', 'Album B', 'album b', 1, 2, 11, 0, 1, NULL, 0),
+                (30, 'webdav://1/c1.flac', 'C1', 'Artist A', 'Various Artists', 'Comp C', 'comp c', 1, 1, 11, 1, 0, NULL, 0),
+                (31, 'webdav://1/c2.flac', 'C2', 'Artist B', 'Various Artists', 'Comp C', 'comp c', 1, 2, 11, 1, 0, 'cover.jpg', 0)",
+            [],
+        )
+        .unwrap();
+
+        let scanner = CollectionScanner::new(db);
+        let albums = scanner.get_albums().unwrap();
+        let album_a = albums.iter().find(|a| a["album"] == "Album A").unwrap();
+        let album_b = albums.iter().find(|a| a["album"] == "Album B").unwrap();
+        assert_eq!(album_a["sample_song_id"], 10);
+        assert_eq!(album_b["sample_song_id"], 21);
+
+        let comps = scanner.get_compilations_by_artist("Artist A").unwrap();
+        assert_eq!(comps.len(), 1);
+        assert_eq!(comps[0]["album"], "Comp C");
+        assert_eq!(comps[0]["sample_song_id"], 31);
     }
 }
