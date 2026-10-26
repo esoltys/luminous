@@ -155,11 +155,13 @@ describe("scripts/ci-should-run.sh: path-based CI scope filtering (#1824)", () =
 });
 
 describe("GitHub workflows & Cargo/Vite build optimizations (#1824)", () => {
-  it("ci.yml uses lld linker, line-tables-only debuginfo, cache-all-crates, --lib --tests, and checks all 6 engine crates", () => {
+  it("ci.yml uses lld linker, line-tables-only debuginfo, cache-workspace-crates, --lib --tests, and checks all 6 engine crates", () => {
     expect(ciWorkflow).toMatch(/CARGO_PROFILE_DEV_DEBUG:\s*line-tables-only/);
     expect(ciWorkflow).toMatch(/CARGO_PROFILE_TEST_DEBUG:\s*line-tables-only/);
     expect(ciWorkflow).toMatch(/RUSTFLAGS:\s*"-C link-arg=-fuse-ld=lld"/);
     expect(ciWorkflow).toMatch(/cache-all-crates:\s*true/);
+    expect(ciWorkflow).toMatch(/cache-workspace-crates:\s*true/);
+    expect(ciWorkflow).toMatch(/apt-get install -y --no-install-recommends lld/);
     expect(ciWorkflow).toMatch(/cargo test --workspace --lib --tests/);
     expect(ciWorkflow).toMatch(/check_boundary\s+luminous-equalizer/);
   });
@@ -168,6 +170,7 @@ describe("GitHub workflows & Cargo/Vite build optimizations (#1824)", () => {
     expect(codeqlWorkflow).toMatch(/bash scripts\/ci-should-run\.sh \$\{\{\s*matrix\.scope\s*\}\}/);
     expect(codeqlWorkflow).toMatch(/paths-ignore:\s*\n\s*-\s*target\s*\n\s*-\s*node_modules/);
     expect(codeqlWorkflow).toMatch(/cache-all-crates:\s*true/);
+    expect(codeqlWorkflow).toMatch(/cache-workspace-crates:\s*true/);
   });
 
   it("audit.yml gates cargo-deny on backend scope and lockfile check on frontend scope", () => {

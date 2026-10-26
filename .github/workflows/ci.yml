@@ -97,7 +97,7 @@ jobs:
         if: steps.scope.outputs.run == 'true'
         run: |
           sudo apt-get update
-          sudo apt-get install -y lld libasound2-dev libssl-dev pkg-config libglib2.0-dev libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev
+          sudo apt-get install -y --no-install-recommends lld libasound2-dev libssl-dev pkg-config libglib2.0-dev libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev
 
       # Caches the registry, git deps, and target dir (including workspace
       # crates) across PR builds so `cargo test` below doesn't recompile the
@@ -107,6 +107,7 @@ jobs:
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           cache-all-crates: true
+          cache-workspace-crates: true
 
       # Engine crates under `crates/` must never reach app layers (#1556,
       # epic #1762): check all six boundaries in a single step.
@@ -256,12 +257,13 @@ jobs:
       - name: Install system dependencies (Linux)
         run: |
           sudo apt-get update
-          sudo apt-get install -y lld libasound2-dev libssl-dev pkg-config libglib2.0-dev libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev
+          sudo apt-get install -y --no-install-recommends lld libasound2-dev libssl-dev pkg-config libglib2.0-dev libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           cache-all-crates: true
+          cache-workspace-crates: true
 
       # --locked fails outright if this PR's Cargo.toml bump left Cargo.lock
       # inconsistent, instead of silently re-resolving it.
