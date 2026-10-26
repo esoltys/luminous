@@ -89,6 +89,8 @@ pub async fn reconcile_and_sync(app: tauri::AppHandle) {
 /// Polls the date rather than sleeping until midnight so a suspended machine
 /// catches up on wake. Runs for the life of the app.
 pub async fn reconcile_each_day(app: tauri::AppHandle) {
+    // Stagger startup daily reconciliation to allow window initialization and initial playback (#1807).
+    tokio::time::sleep(crate::playlist::STARTUP_RECONCILE_DELAY).await;
     let mut last_reconciled = None;
     loop {
         let today = chrono::Local::now().date_naive();
@@ -119,19 +121,21 @@ async fn reconcile_pass(app: &tauri::AppHandle) {
             return;
         }
     };
-    // `with_playlists` runs the synchronous rusqlite writes via
-    // `block_in_place` (#1097) — see its doc comment in playlist.rs.
-    let deltas = match crate::playlist::with_playlists(&state.playlists, |pm| {
-        pm.apply_dynamic_matches(matches)
-    })
-    .await
-    {
-        Ok(deltas) => deltas,
-        Err(e) => {
-            log::error!("Dynamic playlist reconcile failed: {e}");
-            return;
+    // Apply dynamic matches one playlist at a time via `with_playlists`, releasing
+    // the lock and yielding between matches (#1807). This ensures user playback
+    // commands (`replace_queue`, `play_song`) never queue behind a monolithic lock hold.
+    let mut deltas = Vec::new();
+    for m in matches {
+        let delta_res =
+            crate::playlist::with_playlists(&state.playlists, move |pm| pm.apply_dynamic_match(&m))
+                .await;
+        match delta_res {
+            Ok(Some(delta)) => deltas.push(delta),
+            Ok(None) => {}
+            Err(e) => log::error!("Dynamic playlist reconcile failed: {e}"),
         }
-    };
+        tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+    }
     if deltas.is_empty() {
         return;
     }
@@ -990,6 +994,41 @@ mod tests {
             .unwrap();
 
         manager.sync_daypart_auto_playlist().unwrap();
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_apply_dynamic_match_individual_delta() {
+        let (db, temp_dir) = setup_test_db();
+        {
+            let conn = db.pool.get().unwrap();
+            for i in 1..=5 {
+                conn.execute(
+                    "INSERT INTO songs (title, artist, genre, path, source, unavailable) VALUES (?1, 'A', 'Rock', ?2, 1, 0)",
+                    params![format!("Song {i}"), format!("/s{i}.mp3")],
+                )
+                .unwrap();
+            }
+        }
+        let db_arc = std::sync::Arc::new(db);
+        let mut manager = PlaylistManager::new(db_arc).unwrap();
+        let pl = manager.create_playlist("Dynamic Rock").unwrap();
+        manager
+            .set_playlist_dynamic_spec(pl.id, "genre:Rock")
+            .unwrap();
+
+        let dynamic_match = DynamicPlaylistMatch {
+            playlist_id: pl.id,
+            spec: "genre:Rock".to_string(),
+            song_ids: vec![1, 2, 3],
+        };
+
+        let delta = manager.apply_dynamic_match(&dynamic_match).unwrap();
+        assert!(delta.is_some());
+        let delta = delta.unwrap();
+        assert_eq!(delta.playlist_id, pl.id);
+        assert_eq!(delta.removed_uuids.len(), 2);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

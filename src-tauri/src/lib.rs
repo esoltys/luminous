@@ -1049,15 +1049,15 @@ pub fn run() {
             let playlists = Arc::new(Mutex::new(manager));
 
             // Rebuild curated-tag ("tag:") genre auto-playlists in the background
-            // once right after migrations run (see db.rs migration 19, #548), rather
-            // than blocking window load and startup setup (#1742).
+            // once right after migrations run (see db.rs migration 19, #548), deferred
+            // so startup setup, window render, and initial playback requests proceed
+            // without lock contention (#1807).
             {
                 let playlists_clone = Arc::clone(&playlists);
                 tauri::async_runtime::spawn(async move {
-                    if let Err(e) = crate::playlist::with_playlists(&playlists_clone, |pm| {
-                        pm.sync_all_auto_playlists()
-                    })
-                    .await
+                    tokio::time::sleep(crate::playlist::STARTUP_AUTO_SYNC_DELAY).await;
+                    if let Err(e) =
+                        crate::playlist::sync_all_auto_playlists_cooperative(&playlists_clone).await
                     {
                         log::error!("Failed to sync auto-playlists at startup: {e}");
                     }
