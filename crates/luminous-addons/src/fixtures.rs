@@ -4,6 +4,10 @@
 //! completely hermetic and independent of filesystem layout, worktree location,
 //! or runtime working directories (#1817).
 
+/// Returns the raw static bytes of an embedded add-on test fixture.
+///
+/// # Panics
+/// Panics if `name` is not a recognized fixture file.
 pub(crate) fn read(name: &str) -> &'static [u8] {
     match name {
         "valid.lumadd" => include_bytes!("../tests/fixtures/addons/valid.lumadd"),
@@ -24,6 +28,10 @@ pub(crate) fn read(name: &str) -> &'static [u8] {
     }
 }
 
+/// Parses a 64-character hexadecimal key fixture into a 32-byte array.
+///
+/// # Panics
+/// Panics if the fixture is unrecognized, invalid UTF-8, or contains non-hex characters.
 pub(crate) fn key32(name: &str) -> [u8; 32] {
     let text = std::str::from_utf8(read(name))
         .expect("hex key fixture is valid utf-8")
