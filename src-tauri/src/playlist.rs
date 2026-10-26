@@ -117,12 +117,14 @@ pub const STARTUP_AUTO_SYNC_DELAY: std::time::Duration = std::time::Duration::fr
 /// Startup delay before running daily reconciliation, staggered after auto-sync (#1807).
 pub const STARTUP_RECONCILE_DELAY: std::time::Duration = std::time::Duration::from_secs(30);
 
-/// Runs all auto-playlist sync passes cooperatively, releasing the `playlists` lock
-/// and yielding Tokio execution between each category pass so that user playback
-/// commands (`replace_queue`, `play_song`) are never starved (#1807).
+/// Synchronizes all auto-playlists in the background cooperatively, ensuring user
+/// interactions and playback commands (`replace_queue`, `play_song`) take precedence
+/// and are never starved by background maintenance (#1807).
 pub async fn sync_all_auto_playlists_cooperative(
     playlists: &tokio::sync::Mutex<PlaylistManager>,
 ) -> Result<()> {
+    // Run each category pass in a separate lock acquisition, yielding with a short
+    // pause to ensure any pending user commands waiting on `playlists` acquire the lock next.
     with_playlists(playlists, |pm| pm.sync_genre_auto_playlists()).await?;
     tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     with_playlists(playlists, |pm| pm.sync_decade_auto_playlists()).await?;
