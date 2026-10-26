@@ -38,40 +38,81 @@ export class CdpClient {
     number,
     { resolve: (val: any) => void; reject: (err: any) => void }
   >();
+  private targetId: string | null = null;
 
   async connect(port = 9222): Promise<string> {
-    const endpoint = `http://127.0.0.1:${port}/json`;
-    let targets: CdpTarget[];
+    const jsonEndpoint = `http://127.0.0.1:${port}/json`;
+    let wsUrl: string | undefined;
+    let pageTitle = "Luminous";
+
     try {
-      const res = await fetch(endpoint);
-      targets = (await res.json()) as CdpTarget[];
-    } catch (e) {
+      const res = await fetch(jsonEndpoint);
+      if (res.ok) {
+        const targets = (await res.json()) as CdpTarget[];
+        const target =
+          targets.find(
+            (t) =>
+              t.type === "page" &&
+              (t.title.includes("Luminous") || t.url.includes("localhost:1420"))
+          ) ?? targets.find((t) => t.type === "page");
+        if (target && target.webSocketDebuggerUrl) {
+          wsUrl = target.webSocketDebuggerUrl;
+          pageTitle = target.title;
+        }
+      }
+    } catch {
+      // Fall through to try Linux WebKitGTK inspector endpoint
+    }
+
+    if (!wsUrl) {
+      try {
+        const rootRes = await fetch(`http://127.0.0.1:${port}/`);
+        if (rootRes.ok) {
+          const html = await rootRes.text();
+          const wsMatch = html.match(/\/socket\/[^\s'"]+/);
+          if (wsMatch) {
+            wsUrl = `ws://127.0.0.1:${port}${wsMatch[0]}`;
+            const titleMatch = html.match(/class="targetname">([^<]+)<\/div>/);
+            if (titleMatch && titleMatch[1].trim()) {
+              pageTitle = titleMatch[1].trim();
+            }
+          }
+        }
+      } catch {
+        // Fall through to throw
+      }
+    }
+
+    if (!wsUrl) {
       throw new Error(
-        `Failed to connect to CDP endpoint at ${endpoint}.\n` +
+        `Failed to connect to CDP endpoint at http://127.0.0.1:${port}.\n` +
           `Is Luminous running in dev mode?\n` +
           `  bun run tauri dev`
       );
     }
 
-    const target =
-      targets.find(
-        (t) =>
-          t.type === "page" &&
-          (t.title.includes("Luminous") || t.url.includes("localhost:1420"))
-      ) ?? targets.find((t) => t.type === "page");
-
-    if (!target || !target.webSocketDebuggerUrl) {
-      throw new Error(
-        `Found CDP endpoint, but no active page target. Available targets:\n` +
-          JSON.stringify(targets, null, 2)
-      );
-    }
-
-    this.ws = new WebSocket(target.webSocketDebuggerUrl);
+    this.ws = new WebSocket(wsUrl);
 
     this.ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(String(event.data));
+        if (msg.method === "Target.targetCreated" && msg.params?.targetInfo?.targetId) {
+          this.targetId = msg.params.targetInfo.targetId;
+          return;
+        }
+        if (msg.method === "Target.dispatchMessageFromTarget" && msg.params?.message) {
+          const innerMsg = JSON.parse(msg.params.message);
+          if (innerMsg.id && this.pending.has(innerMsg.id)) {
+            const handler = this.pending.get(innerMsg.id)!;
+            this.pending.delete(innerMsg.id);
+            if (innerMsg.error) {
+              handler.reject(innerMsg.error);
+            } else {
+              handler.resolve(innerMsg.result);
+            }
+          }
+          return;
+        }
         if (msg.id && this.pending.has(msg.id)) {
           const handler = this.pending.get(msg.id)!;
           this.pending.delete(msg.id);
@@ -92,11 +133,34 @@ export class CdpClient {
 
     await new Promise<void>((resolve, reject) => {
       if (!this.ws) return reject(new Error("WebSocket not created"));
-      this.ws.onopen = () => resolve();
-      this.ws.onerror = (e) => reject(e);
+      const isWebKit = wsUrl.includes("/socket/");
+      const timer = setTimeout(() => {
+        if (!isWebKit || this.targetId) resolve();
+        else reject(new Error("Timed out waiting for WebKit targetCreated"));
+      }, 3000);
+
+      const checkReady = () => {
+        if (!isWebKit || this.targetId) {
+          clearTimeout(timer);
+          resolve();
+        }
+      };
+
+      this.ws.onopen = () => checkReady();
+      this.ws.onerror = (e) => {
+        clearTimeout(timer);
+        reject(e);
+      };
+
+      // Wrap onmessage to trigger checkReady when targetId arrives
+      const origHandler = this.ws.onmessage;
+      this.ws.onmessage = (ev) => {
+        origHandler?.call(this.ws, ev);
+        checkReady();
+      };
     });
 
-    return target.title;
+    return pageTitle;
   }
 
   send(method: string, params: Record<string, any> = {}): Promise<any> {
@@ -106,7 +170,20 @@ export class CdpClient {
     return new Promise((resolve, reject) => {
       const id = this.nextId++;
       this.pending.set(id, { resolve, reject });
-      this.ws!.send(JSON.stringify({ id, method, params }));
+      if (this.targetId) {
+        this.ws!.send(
+          JSON.stringify({
+            id: this.nextId++,
+            method: "Target.sendMessageToTarget",
+            params: {
+              targetId: this.targetId,
+              message: JSON.stringify({ id, method, params }),
+            },
+          })
+        );
+      } else {
+        this.ws!.send(JSON.stringify({ id, method, params }));
+      }
     });
   }
 

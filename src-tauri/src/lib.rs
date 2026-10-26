@@ -344,6 +344,7 @@ fn restore_audio_output_from_db(db: &Database, audio_engine: &AudioEngine) {
 fn spawn_visualizer_loop(app_handle: tauri::AppHandle, audio: Arc<Mutex<AudioEngine>>) {
     tauri::async_runtime::spawn(async move {
         let mut interval = tokio::time::interval(std::time::Duration::from_millis(33)); // ~30 FPS
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
         let mut is_minimized_or_hidden = false;
         let mut ticks_until_visibility_check: u32 = 0;
         loop {
@@ -412,6 +413,7 @@ fn spawn_position_tick_loop(
 ) {
     tauri::async_runtime::spawn(async move {
         let mut interval = tokio::time::interval(std::time::Duration::from_millis(250));
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
         let mut tick_counter: u32 = 0;
         loop {
             interval.tick().await;
