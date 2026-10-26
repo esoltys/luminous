@@ -12,25 +12,48 @@ use crate::context::ContextManager;
 use crate::covermanager::detect_image_format_and_clean;
 use anyhow::{anyhow, Result};
 use reqwest::Client;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::time::Duration;
 
-/// Which source a fetched artist image came from — persisted alongside the
-/// cached filename (`artist_profiles.fetched_image_source`) so the UI can
-/// label a Wikidata fallback image as such (often lower quality/relevance
-/// than a curated fanart.tv pick).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Which source a fetched artist image came from, ordered by quality tier.
+/// Persisted alongside the cached filename (`artist_profiles.fetched_image_source`)
+/// and used to determine upgrade eligibility.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum ArtistImageSource {
-    Fanart,
-    Wikidata,
+    Wikidata = 1,
+    Deezer = 2,
+    Fanart = 3,
 }
 
 impl ArtistImageSource {
     pub fn as_str(&self) -> &'static str {
         match self {
-            ArtistImageSource::Fanart => "fanart",
             ArtistImageSource::Wikidata => "wikidata",
+            ArtistImageSource::Deezer => "deezer",
+            ArtistImageSource::Fanart => "fanart",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<Self> {
+        s.parse().ok()
+    }
+
+    /// Numeric rank representing relative portrait quality tier.
+    pub fn rank(&self) -> u8 {
+        *self as u8
+    }
+}
+
+impl std::str::FromStr for ArtistImageSource {
+    type Err = ();
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s.to_ascii_lowercase().as_str() {
+            "fanart" => Ok(ArtistImageSource::Fanart),
+            "deezer" => Ok(ArtistImageSource::Deezer),
+            "wikidata" => Ok(ArtistImageSource::Wikidata),
+            _ => Err(()),
         }
     }
 }
@@ -223,6 +246,80 @@ pub async fn validate_fanart_api_key(client: &Client, api_key: &str) -> Result<(
     classify_validation_status(response.status())
 }
 
+#[derive(Deserialize, Debug, Default)]
+struct DeezerSearchResponse {
+    #[serde(default)]
+    data: Vec<DeezerArtistItem>,
+}
+
+#[derive(Deserialize, Debug, Default)]
+struct DeezerArtistItem {
+    #[serde(default)]
+    name: String,
+    picture_xl: Option<String>,
+    picture_big: Option<String>,
+}
+
+fn strip_leading_the(s: &str) -> &str {
+    if s.len() > 4 && s[..4].eq_ignore_ascii_case("the ") {
+        &s[4..]
+    } else {
+        s
+    }
+}
+
+/// Check if candidate artist name from Deezer matches the target artist name,
+/// allowing for case-insensitivity, optional leading "The ", and minor punctuation differences.
+pub fn matches_artist_name(candidate: &str, target: &str) -> bool {
+    let c = candidate.trim();
+    let t = target.trim();
+    if c.eq_ignore_ascii_case(t) {
+        return true;
+    }
+    let c_sub = strip_leading_the(c).trim();
+    let t_sub = strip_leading_the(t).trim();
+    if c_sub.eq_ignore_ascii_case(t_sub) {
+        return true;
+    }
+    let norm = |s: &str| -> String {
+        s.chars()
+            .filter(|ch| ch.is_alphanumeric())
+            .flat_map(|ch| ch.to_lowercase())
+            .collect()
+    };
+    let c_norm = norm(c_sub);
+    let t_norm = norm(t_sub);
+    !c_norm.is_empty() && c_norm == t_norm
+}
+
+/// Query Deezer's unauthenticated artist search API to find a high-resolution
+/// (1000x1000 square) artist portrait (`picture_xl`), verified against the artist name.
+pub async fn fetch_deezer_artist_image_url(
+    client: &Client,
+    artist_name: &str,
+) -> Result<Option<String>> {
+    let url = format!(
+        "https://api.deezer.com/search/artist?q={}&limit=5",
+        percent_encoding::utf8_percent_encode(artist_name, percent_encoding::NON_ALPHANUMERIC)
+    );
+    let response = client.get(&url).send().await?;
+    if !response.status().is_success() {
+        return Ok(None);
+    }
+    let parsed: DeezerSearchResponse = response.json().await?;
+    for item in parsed.data {
+        if matches_artist_name(&item.name, artist_name) {
+            if let Some(pic_url) = item.picture_xl.or(item.picture_big) {
+                let trimmed = pic_url.trim();
+                if !trimmed.is_empty() && !trimmed.contains("/images/artist//") {
+                    return Ok(Some(trimmed.to_string()));
+                }
+            }
+        }
+    }
+    Ok(None)
+}
+
 /// Wikidata `P18` fallback — reuses the same MBID -> Wikidata QID chain
 /// `ContextManager::fetch_wikipedia_bio_for_artist` uses to resolve an
 /// artist's bio, but stopping at the QID's image claim instead of its
@@ -249,7 +346,8 @@ pub async fn fetch_wikidata_artist_image_url(
 
 /// Downloads `image_url` and writes it into `dest_dir` as
 /// `{filename_stem}.{ext}` — same format-sniffing convention `CoverManager`
-/// uses to cache cover art — returning the cache filename.
+/// uses to cache cover art — returning the cache filename. Rejects payloads
+/// under 2 KB to prevent caching generic silhouette placeholders.
 pub async fn download_and_cache_artist_image(
     client: &Client,
     image_url: &str,
@@ -257,6 +355,12 @@ pub async fn download_and_cache_artist_image(
     filename_stem: &str,
 ) -> Result<String> {
     let bytes = client.get(image_url).send().await?.bytes().await?;
+    if bytes.len() < 2048 {
+        return Err(anyhow!(
+            "Downloaded image is too small or placeholder ({} bytes)",
+            bytes.len()
+        ));
+    }
     let (cleaned, _mime, ext) = detect_image_format_and_clean(&bytes);
     let filename = format!("{filename_stem}.{ext}");
     std::fs::write(dest_dir.join(&filename), cleaned)?;
@@ -434,9 +538,75 @@ mod tests {
     }
 
     #[test]
-    fn test_artist_image_source_as_str() {
+    fn test_artist_image_source_properties() {
+        use std::str::FromStr;
+
         assert_eq!(ArtistImageSource::Fanart.as_str(), "fanart");
+        assert_eq!(ArtistImageSource::Deezer.as_str(), "deezer");
         assert_eq!(ArtistImageSource::Wikidata.as_str(), "wikidata");
+
+        assert_eq!(
+            ArtistImageSource::parse("fanart"),
+            Some(ArtistImageSource::Fanart)
+        );
+        assert_eq!(
+            ArtistImageSource::parse("Deezer"),
+            Some(ArtistImageSource::Deezer)
+        );
+        assert_eq!(
+            ArtistImageSource::parse("WIKIDATA"),
+            Some(ArtistImageSource::Wikidata)
+        );
+        assert_eq!(ArtistImageSource::parse("unknown"), None);
+        assert_eq!(
+            ArtistImageSource::from_str("fanart"),
+            Ok(ArtistImageSource::Fanart)
+        );
+
+        // Quality tier hierarchy: Fanart > Deezer > Wikidata
+        assert!(ArtistImageSource::Fanart > ArtistImageSource::Deezer);
+        assert!(ArtistImageSource::Deezer > ArtistImageSource::Wikidata);
+        assert_eq!(ArtistImageSource::Fanart.rank(), 3);
+        assert_eq!(ArtistImageSource::Deezer.rank(), 2);
+        assert_eq!(ArtistImageSource::Wikidata.rank(), 1);
+    }
+
+    #[test]
+    fn test_matches_artist_name() {
+        assert!(matches_artist_name("Radiohead", "Radiohead"));
+        assert!(matches_artist_name("radiohead", "Radiohead"));
+        assert!(matches_artist_name("The Beatles", "Beatles"));
+        assert!(matches_artist_name("Beatles", "The Beatles"));
+        assert!(matches_artist_name("AC/DC", "AC DC"));
+        assert!(matches_artist_name("Guns N' Roses", "Guns N Roses"));
+        assert!(matches_artist_name("  Daft Punk  ", "Daft Punk"));
+
+        // Distinguishable artists should not match
+        assert!(!matches_artist_name("John Doe", "John Doee"));
+        assert!(!matches_artist_name("Nirvana", "Nirvana (UK)"));
+        assert!(!matches_artist_name("Coldplay", "Cold"));
+    }
+
+    #[test]
+    fn test_deezer_search_response_deserialization() {
+        let json = r#"{
+            "data": [
+                {
+                    "id": 399,
+                    "name": "Radiohead",
+                    "picture_xl": "https://cdn-images.dzcdn.net/images/artist/123/1000x1000-000000-80-0-0.jpg",
+                    "picture_big": "https://cdn-images.dzcdn.net/images/artist/123/500x500-000000-80-0-0.jpg"
+                }
+            ],
+            "total": 1
+        }"#;
+        let parsed: DeezerSearchResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(parsed.data.len(), 1);
+        assert_eq!(parsed.data[0].name, "Radiohead");
+        assert_eq!(
+            parsed.data[0].picture_xl.as_deref(),
+            Some("https://cdn-images.dzcdn.net/images/artist/123/1000x1000-000000-80-0-0.jpg")
+        );
     }
 
     #[test]
