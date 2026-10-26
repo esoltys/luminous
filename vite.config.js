@@ -67,6 +67,58 @@ function safeTailwindcss() {
 }
 
 /**
+ * Rewrites named barrel imports from `phosphor-svelte` into direct per-icon
+ * component imports (`phosphor-svelte/lib/<Icon>.svelte`) so Vite and Vitest
+ * never evaluate the 3,025-icon barrel index (`phosphor-svelte/lib/index.js`).
+ */
+function phosphorBarrelOptimizer() {
+  const phosphorLibDir = path.resolve(projectRoot, "node_modules/phosphor-svelte/lib");
+  const IMPORT_RE = /import\s*\{([^}]+)\}\s*from\s*["']phosphor-svelte["']\s*;?/g;
+
+  return {
+    name: "phosphor-barrel-optimizer",
+    enforce: "pre",
+    resolveId(source) {
+      if (source.startsWith("phosphor-svelte/lib/")) {
+        const iconName = source.slice("phosphor-svelte/lib/".length).replace(/\.svelte$/, "");
+        return path.join(phosphorLibDir, `${iconName}.svelte`);
+      }
+      return null;
+    },
+    transform(code, id) {
+      const [filepath, query = ""] = id.split("?", 2);
+      if (
+        filepath.includes("node_modules") ||
+        query.includes("raw") ||
+        query.includes("url") ||
+        query.includes("type=style") ||
+        !code.includes("phosphor-svelte")
+      ) {
+        return null;
+      }
+      let mutated = false;
+      const rewritten = code.replace(IMPORT_RE, (_match, specifiersBlock) => {
+        const lines = [];
+        for (const raw of specifiersBlock.split(",")) {
+          const spec = raw.trim();
+          if (!spec || spec.startsWith("type ")) continue;
+          const asMatch = spec.match(/^(\w+)\s+as\s+(\w+)$/);
+          const imported = asMatch ? asMatch[1] : spec;
+          const local = asMatch ? asMatch[2] : spec;
+          if (!/^\w+$/.test(imported) || !/^\w+$/.test(local)) {
+            return _match;
+          }
+          lines.push(`import ${local} from "phosphor-svelte/lib/${imported}.svelte";`);
+        }
+        mutated = true;
+        return lines.join("\n");
+      });
+      return mutated ? { code: rewritten, map: null } : null;
+    },
+  };
+}
+
+/**
  * Guard against HMR race conditions where Vite requests a component's virtual
  * CSS module (`?svelte&type=style&lang.css`) before vite-plugin-svelte has
  * compiled the component. Without this, an unhandled virtual module request
@@ -136,7 +188,13 @@ export default defineConfig(async () => ({
   define: {
     "import.meta.env.VITE_COMMIT_HASH": JSON.stringify(commitHash),
   },
-  plugins: [...resolveSveltePlugins(), safeTailwindcss(), svelteVirtualStyleGuard(), tauriIpcMockPlugin()],
+  plugins: [
+    phosphorBarrelOptimizer(),
+    ...resolveSveltePlugins(),
+    safeTailwindcss(),
+    svelteVirtualStyleGuard(),
+    tauriIpcMockPlugin(),
+  ],
 
   // These are only reachable once specific views actually render (icons,
   // Tauri API shims, the virtualized song list), not from the initial

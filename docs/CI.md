@@ -14,24 +14,34 @@ separate private repo `esoltys/luminous-store`, triggered manually against a pub
 
 ## What runs on pull requests (and pushes to `main`)
 
+On `pull_request` events, each job in `ci.yml`, `audit.yml`, and `codeql.yml` first runs
+`scripts/ci-should-run.sh <frontend|backend|lean|actions>` to check whether the PR modified
+any files relevant to that scope (#1824). When a scope is untouched (e.g. a frontend-only PR
+for `backend`, or a non-Lean PR for `lean`), the heavy steps in that job are skipped and the
+job finishes with `success` in seconds. On `push` to `main`, `schedule`, or `workflow_dispatch`,
+`scripts/ci-should-run.sh` always returns `true` so every check runs unconditionally.
+
 - **`ci.yml` — CI**
-  - `frontend_check` job: `bun run check` (svelte-check + TypeScript, `--fail-on-warnings`)
-    and `knip` (unused code/dependency detection).
-  - `frontend_test` job: `bun run test:run` (Vitest).
-  - `backend_test` job:
+  - `frontend_check` job (`frontend` + `backend` scopes, since `lint:ast` covers both TS/Svelte and Rust AST rules): `bun run check` (svelte-check + TypeScript, `--fail-on-warnings`),
+    `knip` (unused code/dependency detection), and `bun run lint:ast` (ast-grep invariants).
+  - `frontend_test` job (`frontend` scope): `bun run test:run` (Vitest) plus script tests.
+  - `backend_test` job (`backend` scope; uses `lld`, `line-tables-only` debuginfo, and `Swatinem/rust-cache` with `cache-all-crates: true`):
     - **Architectural Dependency Boundary Checks** (`cargo tree -p <crate> -e normal`): enforces that engine crates in `crates/` never import forbidden application or system dependencies (#1553, #1762):
       - `luminous-audio`: no `tauri`, `rusqlite`, `reqwest`, or `tokio` (must never block or touch UI/DB state on playback paths).
       - `luminous-addons`: no `tauri` or `rusqlite` (security boundary: crypto and package verification cannot manipulate app state).
       - `luminous-analysis`: no `tauri`, `rusqlite`, `reqwest`, or `tokio` (offline DSP analysis cannot reach app state or network).
+      - `luminous-equalizer`: no `tauri`, `rusqlite`, `reqwest`, or `tokio` (biquad DSP filters and APO parser cannot reach app state or network).
       - `luminous-metadata`: no `tauri`, `rusqlite`, `reqwest`, or `tokio` (local tag and sidecar parsing cannot reach app state or network).
       - `luminous-remote`: no `tauri` or `rusqlite` (wire-protocol clients cannot access SQLite or Tauri events directly).
-    - `cargo test --workspace`: runs unit, integration, and doc-tests across all workspace crates and `src-tauri`.
+    - `cargo test --workspace --lib --tests`: runs unit and integration/BDD tests across all workspace crates and `src-tauri`.
     - `cargo clippy --workspace --all-targets -- -D warnings`: fails on any clippy warning across the workspace.
-  - `rust_fmt` job: `cargo fmt --all --check`. The pre-commit hook is opt-in
+  - `rust_fmt` job (`backend` scope): `cargo fmt --all --check`. The pre-commit hook is opt-in
     per clone, so this is what stops formatting drift reaching `main`. No build needed.
+  - `lean_proofs` job (`lean` scope): builds and verifies the machine-checked Lean 4 proofs in
+    `verification/lean/` with `lake build --wfail`.
   - `dependabot_regression_gate` job (Dependabot PRs only, `if: github.actor ==
     'dependabot[bot]'`): a real production build (`bun run build`), the Vitest suite
-    against it, and `cargo test --locked` to catch a version bump that left `Cargo.lock`
+    against it, and `cargo test --workspace --lib --tests --locked` to catch a version bump that left `Cargo.lock`
     inconsistent — regressions `frontend_test`/`backend_test` don't reproduce on their own.
     Clippy isn't duplicated here since `backend_test` already covers every PR, Dependabot's
     included.
@@ -40,7 +50,7 @@ separate private repo `esoltys/luminous-store`, triggered manually against a pub
 plus a weekly `schedule`:
 
 - **`audit.yml` — Security & Licence Audit**
-  - `security_audit` job: runs `EmbarkStudios/cargo-deny-action` (`cargo deny check`) against
+  - `security_audit` job (`backend` scope): runs `EmbarkStudios/cargo-deny-action` (`cargo deny check`) against
     `deny.toml` at the repository root. This validates four distinct checks across all workspace
     crates in `Cargo.lock`:
     - **Licences**: enforces that every crate uses an explicitly allowlisted permissive licence
@@ -53,15 +63,16 @@ plus a weekly `schedule`:
       with documented reasons.
     - **Sources**: denies crates from unknown git repositories or non-crates.io registries.
     - **Bans**: warns on duplicate crate versions (`multiple-versions = "warn"`).
-  - `lockfile_check` job: runs `bun install --frozen-lockfile` to fail if `bun.lock` has
+  - `lockfile_check` job (`frontend` scope): runs `bun install --frozen-lockfile` to fail if `bun.lock` has
     drifted from `package.json` (i.e. someone changed a dependency range without
     regenerating the lockfile), and runs `scripts/check-tauri-versions.ts` to ensure
     `@tauri-apps/*` npm packages and matching Rust crates in `Cargo.lock` have not drifted (#1208).
 - **`codeql.yml` — CodeQL Advanced**
-  - Runs GitHub's CodeQL static analysis across three language matrix legs: `actions`,
-    `javascript-typescript`, and `rust` (all `build-mode: none`, i.e. CodeQL's own
-    extraction rather than a real build — except Rust still runs `cargo check` first to
-    generate code CodeQL can analyze).
+  - Runs GitHub's CodeQL static analysis across three language matrix legs: `actions` (`actions` scope),
+    `javascript-typescript` (`frontend` scope), and `rust` (`backend` scope) — all `build-mode: none`, i.e. CodeQL's own
+    extraction rather than a real build, except Rust still runs `cargo check` first to
+    generate `OUT_DIR` assets for macro expansion while excluding `target/` and `node_modules/`
+    via `paths-ignore` so third-party generated FFI bindings are not indexed as project source.
   - Findings are uploaded to the repo's Security tab (`security-events: write`).
 
 Both are also on a `schedule` (audit: weekly Sunday midnight; CodeQL: weekly Saturday
