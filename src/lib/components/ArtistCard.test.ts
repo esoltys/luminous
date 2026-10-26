@@ -146,5 +146,6 @@ describe("ArtistCard.svelte", () => {
     const portrait = await findByAltText("Dave Hawkins");
     expect(portrait.tagName).toBe("IMG");
     expect(portrait.getAttribute("src")).toBe("luminous-art://local/C:/Music/Dave Hawkins/artist.jpg");
+    expect(portrait).toHaveAttribute("crossorigin", "anonymous");
   });
 });

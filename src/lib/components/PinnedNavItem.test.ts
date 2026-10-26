@@ -76,4 +76,26 @@ describe("PinnedNavItem.svelte", () => {
     expect(svg?.getAttribute("class")).toContain("text-[#4ADE80]");
     expect(svg?.getAttribute("class")).not.toContain("text-brand-accent-text");
   });
+
+  it("renders artist portrait with crossorigin anonymous", async () => {
+    const { collectionStore } = await import("../stores/collection.svelte");
+    collectionStore.artistProfiles["radiohead"] = {
+      artist_key: "radiohead",
+      fetched_image_filename: "radiohead.jpg",
+      fetched_image_source: "fanart",
+      image_fetched: true,
+    } as any;
+
+    const pin: NavigablePin = {
+      ...mockPin,
+      id: "artist:radiohead",
+      type: "artist",
+      title: "Radiohead",
+      artist: { name: "Radiohead" } as any,
+    };
+
+    const { findByAltText } = render(PinnedNavItem, { props: { pin, collapsed: false } });
+    const img = await findByAltText("Radiohead");
+    expect(img).toHaveAttribute("crossorigin", "anonymous");
+  });
 });

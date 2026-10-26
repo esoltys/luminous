@@ -163,7 +163,7 @@
 {#snippet bigTile()}
   {#if hasHero}
     <div class="{tileClass} relative overflow-hidden bg-brand-sidebar border border-brand-border flex items-center justify-center text-brand-text-secondary shrink-0">
-      <img src={heroImageUrl} alt={heroImageAlt || i18n.t('common.albumArtAlt')} loading="lazy" class="w-full h-full object-cover object-top" />
+      <img src={heroImageUrl} crossorigin="anonymous" alt={heroImageAlt || i18n.t('common.albumArtAlt')} loading="lazy" class="w-full h-full object-cover object-top" />
     </div>
   {:else if bigCover}
     <CoverArt

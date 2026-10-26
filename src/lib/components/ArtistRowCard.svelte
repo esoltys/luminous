@@ -86,6 +86,7 @@
       <div class="w-11 h-11 relative overflow-hidden bg-brand-sidebar border border-brand-border shrink-0">
         <img
           src={artistPortraitUrl}
+          crossorigin="anonymous"
           alt={artist.name || i18n.t('collection.unknownArtist')}
           class="w-full h-full object-cover"
         />
