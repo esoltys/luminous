@@ -167,10 +167,10 @@
     </div>
   {:else if bigCover}
     <CoverArt
-      songId={bigCover.songId}
-      artEmbedded={bigCover.artEmbedded}
-      artAutomatic={bigCover.artAutomatic}
-      artManual={bigCover.artManual}
+      songId={bigCover?.songId}
+      artEmbedded={bigCover?.artEmbedded}
+      artAutomatic={bigCover?.artAutomatic}
+      artManual={bigCover?.artManual}
       sizeClass={tileClass}
     />
   {/if}

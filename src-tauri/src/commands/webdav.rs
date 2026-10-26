@@ -624,12 +624,7 @@ pub async fn sync_webdav_server_inner(
                 (dir_index, task, result)
             });
             probe_time += probe_started.elapsed();
-            let mut probed_by_dir: Vec<
-                Vec<(
-                    ProbeTask,
-                    anyhow::Result<(crate::models::Song, Option<Vec<u8>>)>,
-                )>,
-            > = works.iter().map(|_| Vec::new()).collect();
+            let mut probed_by_dir: Vec<Vec<_>> = works.iter().map(|_| Vec::new()).collect();
             for (dir_index, task, result) in probed_all {
                 probed_by_dir[dir_index].push((task, result));
             }
