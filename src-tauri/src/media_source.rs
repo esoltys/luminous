@@ -161,6 +161,12 @@ struct PrefetchWorker {
     rx: std::sync::mpsc::Receiver<Result<FetchedChunk, String>>,
 }
 
+impl PrefetchWorker {
+    fn contains(&self, pos: u64, chunk_size: usize) -> bool {
+        pos >= self.expected_start && pos < self.expected_start + chunk_size as u64
+    }
+}
+
 /// A seekable HTTP media source using HTTP Range requests (`Range: bytes=start-end`).
 /// Enables streaming audio from WebDAV and remote HTTP endpoints without full downloads.
 pub struct HttpRangeReader {
@@ -357,6 +363,41 @@ impl HttpRangeReader {
         self.buffer = chunk.data;
     }
 
+    fn in_buffer(&self, pos: u64) -> bool {
+        pos >= self.buffer_start && pos < self.buffer_start + self.buffer.len() as u64
+    }
+
+    fn fill_buffer_or_take_prefetch(&mut self, pos: u64) -> Result<(), String> {
+        let prefetched = {
+            let mut guard = self.prefetch.lock();
+            if let Some(worker) = guard.as_ref() {
+                if worker.contains(pos, self.chunk_size) {
+                    guard.take()
+                } else {
+                    *guard = None;
+                    None
+                }
+            } else {
+                None
+            }
+        };
+
+        if let Some(worker) = prefetched {
+            match worker.rx.recv() {
+                Ok(res) => {
+                    let chunk = res?;
+                    self.apply_chunk(chunk);
+                    return Ok(());
+                }
+                Err(_) => {
+                    // Prefetch worker disconnected prematurely; fall back to synchronous fetch.
+                }
+            }
+        }
+
+        self.fill_buffer(pos)
+    }
+
     fn trigger_prefetch_if_needed(&self) {
         if self.buffer.is_empty() {
             return;
@@ -513,43 +554,9 @@ impl Read for HttpRangeReader {
             return Ok(0); // EOF
         }
 
-        let in_buffer = self.position >= self.buffer_start
-            && self.position < self.buffer_start + self.buffer.len() as u64;
-
-        if !in_buffer {
-            let prefetched_worker = {
-                let mut guard = self.prefetch.lock();
-                if let Some(worker) = guard.as_ref() {
-                    let covers_pos = self.position >= worker.expected_start
-                        && self.position < worker.expected_start + self.chunk_size as u64;
-                    if covers_pos {
-                        guard.take()
-                    } else {
-                        *guard = None;
-                        None
-                    }
-                } else {
-                    None
-                }
-            };
-
-            if let Some(worker) = prefetched_worker {
-                match worker.rx.recv() {
-                    Ok(Ok(chunk)) => {
-                        self.apply_chunk(chunk);
-                    }
-                    Ok(Err(e)) => {
-                        return Err(std::io::Error::other(e));
-                    }
-                    Err(_) => {
-                        self.fill_buffer(self.position)
-                            .map_err(std::io::Error::other)?;
-                    }
-                }
-            } else {
-                self.fill_buffer(self.position)
-                    .map_err(std::io::Error::other)?;
-            }
+        if !self.in_buffer(self.position) {
+            self.fill_buffer_or_take_prefetch(self.position)
+                .map_err(std::io::Error::other)?;
 
             if self.buffer.is_empty() {
                 return Ok(0);
@@ -605,16 +612,13 @@ impl Seek for HttpRangeReader {
 
         self.position = new_pos as u64;
 
-        let in_current_buffer = self.position >= self.buffer_start
-            && self.position < self.buffer_start + self.buffer.len() as u64;
         let in_prefetch_range = {
             let guard = self.prefetch.lock();
-            guard.as_ref().map_or(false, |w| {
-                self.position >= w.expected_start
-                    && self.position < w.expected_start + self.chunk_size as u64
-            })
+            guard
+                .as_ref()
+                .map_or(false, |w| w.contains(self.position, self.chunk_size))
         };
-        if !in_current_buffer && !in_prefetch_range {
+        if !self.in_buffer(self.position) && !in_prefetch_range {
             *self.prefetch.lock() = None;
         }
 
