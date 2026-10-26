@@ -23,9 +23,9 @@ jobs:
         with:
           fetch-depth: 2
 
-      - name: Check if frontend checks should run
+      - name: Check if frontend or AST checks should run
         id: scope
-        run: bash scripts/ci-should-run.sh frontend
+        run: bash scripts/ci-should-run.sh frontend backend
 
       - name: Setup Bun
         if: steps.scope.outputs.run == 'true'
@@ -109,7 +109,7 @@ jobs:
           cache-all-crates: true
 
       # Engine crates under `crates/` must never reach app layers (#1556,
-      # epic #1762): check all five boundaries in a single step.
+      # epic #1762): check all six boundaries in a single step.
       - name: Check engine crate dependency boundaries
         if: steps.scope.outputs.run == 'true'
         run: |
@@ -125,11 +125,12 @@ jobs:
               exit 1
             fi
           }
-          check_boundary luminous-audio    '^(tauri|rusqlite|reqwest|tokio)[ -]'
-          check_boundary luminous-addons   '^(tauri|rusqlite)[ -]'
-          check_boundary luminous-analysis '^(tauri|rusqlite|reqwest|tokio)[ -]'
-          check_boundary luminous-metadata '^(tauri|rusqlite|reqwest|tokio)[ -]'
-          check_boundary luminous-remote   '^(tauri|rusqlite)[ -]'
+          check_boundary luminous-audio     '^(tauri|rusqlite|reqwest|tokio)[ -]'
+          check_boundary luminous-addons    '^(tauri|rusqlite)[ -]'
+          check_boundary luminous-analysis  '^(tauri|rusqlite|reqwest|tokio)[ -]'
+          check_boundary luminous-equalizer '^(tauri|rusqlite|reqwest|tokio)[ -]'
+          check_boundary luminous-metadata  '^(tauri|rusqlite|reqwest|tokio)[ -]'
+          check_boundary luminous-remote    '^(tauri|rusqlite)[ -]'
 
       # From the repo root with --workspace --lib --tests, so every crate under
       # crates/ and src-tauri is unit- and integration-tested (#1554) without

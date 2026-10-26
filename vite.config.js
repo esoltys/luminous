@@ -108,7 +108,7 @@ function phosphorBarrelOptimizer() {
           if (!/^\w+$/.test(imported) || !/^\w+$/.test(local)) {
             return _match;
           }
-          lines.push(`import ${local} from "phosphor-svelte/lib/${imported}";`);
+          lines.push(`import ${local} from "phosphor-svelte/lib/${imported}.svelte";`);
         }
         mutated = true;
         return lines.join("\n");

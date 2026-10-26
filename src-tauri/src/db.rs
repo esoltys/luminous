@@ -18,6 +18,17 @@ struct Migration {
     apply: fn(&rusqlite::Connection) -> Result<()>,
 }
 
+impl Migration {
+    /// True when `apply` must enter in SQLite autocommit mode rather than inside
+    /// `run_migrations`'s batched `BEGIN IMMEDIATE` transaction. SQLite's 12-step
+    /// table-rebuild procedure (used by migrations 34 and 50) toggles
+    /// `PRAGMA foreign_keys = OFF`, which SQLite silently ignores inside an
+    /// active transaction, and then opens its own `BEGIN IMMEDIATE`.
+    fn requires_autocommit(&self) -> bool {
+        matches!(self.version, 34 | 50)
+    }
+}
+
 /// Every migration this build knows how to run, in ascending version order.
 /// `run_migrations` applies each entry whose `version` is newer than what's
 /// on disk, in this array's order, then records it in `schema_version` —
@@ -580,16 +591,15 @@ fn migrate_album_keys(conn: &rusqlite::Connection) -> Result<()> {
     use crate::album_key::album_key;
     use std::collections::HashMap;
 
-    let tx = conn.unchecked_transaction()?;
-    let has_column: bool = tx
+    let has_column: bool = conn
         .prepare("SELECT 1 FROM pragma_table_info('songs') WHERE name = 'album_key'")?
         .exists([])?;
     if !has_column {
-        tx.execute_batch("ALTER TABLE songs ADD COLUMN album_key TEXT;")?;
+        conn.execute_batch("ALTER TABLE songs ADD COLUMN album_key TEXT;")?;
     }
 
-    crate::album_key::backfill_song_keys(&tx)?;
-    tx.execute_batch(
+    crate::album_key::backfill_song_keys(conn)?;
+    conn.execute_batch(
         "CREATE INDEX IF NOT EXISTS idx_songs_album_key ON songs(album_key);
 
          -- Writers that don't know about album_key (luminous-mcp edits
@@ -608,13 +618,13 @@ fn migrate_album_keys(conn: &rusqlite::Connection) -> Result<()> {
 
     // album_ratings: (album_key, rating).
     let ratings: Vec<(String, f64)> = {
-        let mut stmt = tx.prepare("SELECT album_key, rating FROM album_ratings")?;
+        let mut stmt = conn.prepare("SELECT album_key, rating FROM album_ratings")?;
         let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
         rows.collect::<rusqlite::Result<_>>()?
     };
     let mut best_rating: HashMap<String, (i64, f64)> = HashMap::new();
     for (raw, rating) in ratings {
-        let rank = (crate::album_key::songs_spelled(&tx, &raw)?, rating);
+        let rank = (crate::album_key::songs_spelled(conn, &raw)?, rating);
         best_rating
             .entry(album_key(&raw))
             .and_modify(|best| {
@@ -624,39 +634,39 @@ fn migrate_album_keys(conn: &rusqlite::Connection) -> Result<()> {
             })
             .or_insert(rank);
     }
-    tx.execute("DELETE FROM album_ratings", [])?;
+    conn.execute("DELETE FROM album_ratings", [])?;
     for (key, (_, rating)) in &best_rating {
-        tx.execute(
+        conn.execute(
             "INSERT INTO album_ratings (album_key, rating) VALUES (?1, ?2)",
             params![key, rating],
         )?;
     }
 
-    crate::album_key::rekey_album_profiles(&tx)?;
+    crate::album_key::rekey_album_profiles(conn)?;
 
     // stats_exclusions (album rows): PRIMARY KEY (entity_type, entity_key).
-    let excluded_albums: Vec<String> = tx
+    let excluded_albums: Vec<String> = conn
         .prepare("SELECT entity_key FROM stats_exclusions WHERE entity_type = 'album'")?
         .query_map([], |r| r.get(0))?
         .collect::<rusqlite::Result<_>>()?;
-    tx.execute(
+    conn.execute(
         "DELETE FROM stats_exclusions WHERE entity_type = 'album'",
         [],
     )?;
     for raw in excluded_albums {
-        tx.execute(
+        conn.execute(
             "INSERT OR IGNORE INTO stats_exclusions (entity_type, entity_key) VALUES ('album', ?1)",
             params![album_key(&raw)],
         )?;
     }
 
     // subsonic_album_cache.album_key is not unique, so rekey in place.
-    let cached: Vec<(i64, String)> = tx
+    let cached: Vec<(i64, String)> = conn
         .prepare("SELECT id, album_key FROM subsonic_album_cache")?
         .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
         .collect::<rusqlite::Result<_>>()?;
     for (id, raw) in cached {
-        tx.execute(
+        conn.execute(
             "UPDATE subsonic_album_cache SET album_key = ?1 WHERE id = ?2",
             params![album_key(&raw), id],
         )?;
@@ -664,11 +674,10 @@ fn migrate_album_keys(conn: &rusqlite::Connection) -> Result<()> {
 
     // Chart history: cleared, and its build key with it, so the next chart
     // read rebuilds every week from play_history under the folded grouping.
-    tx.execute_batch(
+    conn.execute_batch(
         "DELETE FROM album_chart_history;
          DELETE FROM app_state WHERE key = 'album_chart_history_week_start';",
     )?;
-    tx.commit()?;
     Ok(())
 }
 
@@ -989,18 +998,18 @@ impl Database {
 
         // Batch contiguous migrations into a single transaction so initializing
         // a database does not pay 120+ separate auto-commit WAL flushes.
-        // Migrations 34, 50, and 62 manage their own top-level transactions
-        // (34 and 50 toggle `PRAGMA foreign_keys=OFF`, which SQLite ignores
-        // inside an active transaction), so commit any open batch before them.
+        // Table-rebuild migrations (see `Migration::requires_autocommit`) toggle
+        // `PRAGMA foreign_keys = OFF`, which SQLite ignores inside an active
+        // transaction, so commit any open batch before them.
         let mut in_batch_tx = false;
         let run_result = (|| -> Result<()> {
             for migration in MIGRATIONS {
                 if !applied_versions.contains(&migration.version) {
-                    let self_managed_tx = matches!(migration.version, 34 | 50 | 62);
-                    if self_managed_tx && in_batch_tx {
+                    let requires_autocommit = migration.requires_autocommit();
+                    if requires_autocommit && in_batch_tx {
                         conn.execute_batch("COMMIT;")?;
                         in_batch_tx = false;
-                    } else if !self_managed_tx && !in_batch_tx {
+                    } else if !requires_autocommit && !in_batch_tx {
                         conn.execute_batch("BEGIN IMMEDIATE;")?;
                         in_batch_tx = true;
                     }

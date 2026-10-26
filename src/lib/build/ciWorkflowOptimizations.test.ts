@@ -28,17 +28,20 @@ const tauriCargoToml = fs.readFileSync(path.join(root, "src-tauri/Cargo.toml"), 
 const viteConfig = fs.readFileSync(path.join(root, "vite.config.js"), "utf-8");
 const scriptPath = path.join(root, "scripts/ci-should-run.sh");
 
+type Scope = "frontend" | "backend" | "lean" | "actions";
+
 function runScopeCheck(
-  scope: "frontend" | "backend" | "lean" | "actions",
+  scopes: Scope | Scope[],
   envOverrides: Record<string, string>
 ): { stdout: string; githubOutput: string } {
+  const scopeArgs = Array.isArray(scopes) ? scopes : [scopes];
   const tmpFile = path.join(
     os.tmpdir(),
     `ci-should-run-test-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`
   );
   fs.writeFileSync(tmpFile, "");
   try {
-    const stdout = execFileSync("bash", [scriptPath, scope], {
+    const stdout = execFileSync("bash", [scriptPath, ...scopeArgs], {
       cwd: root,
       encoding: "utf-8",
       env: {
@@ -126,18 +129,39 @@ describe("scripts/ci-should-run.sh: path-based CI scope filtering (#1824)", () =
     };
     expect(runScopeCheck("frontend", env).stdout).toBe("false");
     expect(runScopeCheck("backend", env).stdout).toBe("false");
+    expect(runScopeCheck(["frontend", "backend"], env).stdout).toBe("false");
     expect(runScopeCheck("lean", env).stdout).toBe("false");
     expect(runScopeCheck("actions", env).stdout).toBe("false");
+  });
+
+  it("supports multi-scope checks (e.g. frontend + backend for AST invariant lints)", () => {
+    const rustOnlyEnv = {
+      GITHUB_EVENT_NAME: "pull_request",
+      CI_CHANGED_FILES: "crates/luminous-audio/src/renderer.rs",
+    };
+    expect(runScopeCheck(["frontend", "backend"], rustOnlyEnv).stdout).toBe("true");
+    expect(runScopeCheck("frontend", rustOnlyEnv).stdout).toBe("false");
+  });
+
+  it("rejects unknown scope names upfront even on non-PR events", () => {
+    expect(() =>
+      execFileSync("bash", [scriptPath, "invalid-scope"], {
+        cwd: root,
+        env: { ...process.env, GITHUB_EVENT_NAME: "push" },
+        stdio: "pipe",
+      })
+    ).toThrow();
   });
 });
 
 describe("GitHub workflows & Cargo/Vite build optimizations (#1824)", () => {
-  it("ci.yml uses lld linker, line-tables-only debuginfo, cache-all-crates, and --lib --tests", () => {
+  it("ci.yml uses lld linker, line-tables-only debuginfo, cache-all-crates, --lib --tests, and checks all 6 engine crates", () => {
     expect(ciWorkflow).toMatch(/CARGO_PROFILE_DEV_DEBUG:\s*line-tables-only/);
     expect(ciWorkflow).toMatch(/CARGO_PROFILE_TEST_DEBUG:\s*line-tables-only/);
     expect(ciWorkflow).toMatch(/RUSTFLAGS:\s*"-C link-arg=-fuse-ld=lld"/);
     expect(ciWorkflow).toMatch(/cache-all-crates:\s*true/);
     expect(ciWorkflow).toMatch(/cargo test --workspace --lib --tests/);
+    expect(ciWorkflow).toMatch(/check_boundary\s+luminous-equalizer/);
   });
 
   it("codeql.yml excludes target/ and node_modules/ from CodeQL source indexing and filters by scope", () => {

@@ -1,21 +1,31 @@
 #!/usr/bin/env bash
-# Determines whether a CI scope (<frontend|backend|lean|actions>) needs to run
-# for the current commit/PR.
+# Determines whether one or more CI scopes (<frontend|backend|lean|actions>)
+# need to run for the current commit/PR.
 #
 # Contract:
 # - Prints "true" or "false" to stdout (and writes `run=<true|false>` to
 #   `$GITHUB_OUTPUT` when set).
+# - Validates scope arguments upfront on every event.
 # - Always fails open ("true") outside `pull_request` events (e.g. `push` to
 #   `main`, `schedule`, `workflow_dispatch`, or local runs) or if the changed
 #   file list cannot be determined.
 
 set -euo pipefail
 
-SCOPE="${1:-}"
-if [[ -z "$SCOPE" ]]; then
-  echo "Usage: $0 <frontend|backend|lean|actions>" >&2
+if [[ $# -eq 0 ]]; then
+  echo "Usage: $0 <frontend|backend|lean|actions> [...]" >&2
   exit 2
 fi
+
+for scope in "$@"; do
+  case "$scope" in
+    frontend|backend|lean|actions) ;;
+    *)
+      echo "Unknown scope '$scope' (expected frontend, backend, lean, or actions)" >&2
+      exit 2
+      ;;
+  esac
+done
 
 emit() {
   local val="$1"
@@ -62,7 +72,7 @@ matches_scope() {
           return 0 ;;
         package.json|bun.lock|tsconfig.json|vite.config.js|vite.perf.config.js|vitest.setup.ts|knip.json|sgconfig.yml)
           return 0 ;;
-        src-tauri/Cargo.toml|Cargo.lock|src-tauri/tauri.conf.json|src-tauri/AppxManifest.xml|src-tauri/capabilities/*)
+        src-tauri/Cargo.toml|Cargo.lock|src-tauri/tauri.conf.json|src-tauri/AppxManifest.xml|src-tauri/capabilities/*|src-tauri/gen/windows/*)
           return 0 ;;
         *)
           return 1 ;;
@@ -94,16 +104,16 @@ matches_scope() {
           return 1 ;;
       esac
       ;;
-    *)
-      return 0 ;;
   esac
 }
 
 while IFS= read -r file; do
   [[ -z "$file" ]] && continue
-  if matches_scope "$SCOPE" "$file"; then
-    emit "true"
-  fi
+  for scope in "$@"; do
+    if matches_scope "$scope" "$file"; then
+      emit "true"
+    fi
+  done
 done <<< "$CHANGED_FILES"
 
 emit "false"

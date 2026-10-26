@@ -22,7 +22,7 @@ job finishes with `success` in seconds. On `push` to `main`, `schedule`, or `wor
 `scripts/ci-should-run.sh` always returns `true` so every check runs unconditionally.
 
 - **`ci.yml` — CI**
-  - `frontend_check` job (`frontend` scope): `bun run check` (svelte-check + TypeScript, `--fail-on-warnings`),
+  - `frontend_check` job (`frontend` + `backend` scopes, since `lint:ast` covers both TS/Svelte and Rust AST rules): `bun run check` (svelte-check + TypeScript, `--fail-on-warnings`),
     `knip` (unused code/dependency detection), and `bun run lint:ast` (ast-grep invariants).
   - `frontend_test` job (`frontend` scope): `bun run test:run` (Vitest) plus script tests.
   - `backend_test` job (`backend` scope; uses `lld`, `line-tables-only` debuginfo, and `Swatinem/rust-cache` with `cache-all-crates: true`):
@@ -30,6 +30,7 @@ job finishes with `success` in seconds. On `push` to `main`, `schedule`, or `wor
       - `luminous-audio`: no `tauri`, `rusqlite`, `reqwest`, or `tokio` (must never block or touch UI/DB state on playback paths).
       - `luminous-addons`: no `tauri` or `rusqlite` (security boundary: crypto and package verification cannot manipulate app state).
       - `luminous-analysis`: no `tauri`, `rusqlite`, `reqwest`, or `tokio` (offline DSP analysis cannot reach app state or network).
+      - `luminous-equalizer`: no `tauri`, `rusqlite`, `reqwest`, or `tokio` (biquad DSP filters and APO parser cannot reach app state or network).
       - `luminous-metadata`: no `tauri`, `rusqlite`, `reqwest`, or `tokio` (local tag and sidecar parsing cannot reach app state or network).
       - `luminous-remote`: no `tauri` or `rusqlite` (wire-protocol clients cannot access SQLite or Tauri events directly).
     - `cargo test --workspace --lib --tests`: runs unit and integration/BDD tests across all workspace crates and `src-tauri`.
