@@ -36,9 +36,9 @@ pub(crate) fn key32(name: &str) -> [u8; 32] {
     let text = std::str::from_utf8(read(name))
         .expect("hex key fixture is valid utf-8")
         .trim();
-    let mut out = [0u8; 32];
-    for (i, b) in out.iter_mut().enumerate() {
-        *b = u8::from_str_radix(&text[i * 2..i * 2 + 2], 16).expect("valid hex byte");
-    }
-    out
+    let bytes: Vec<u8> = (0..text.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&text[i..i + 2], 16).expect("valid hex byte"))
+        .collect();
+    bytes.try_into().expect("key fixture is 32 bytes")
 }
