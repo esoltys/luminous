@@ -160,6 +160,8 @@
 
   let lastSelectedKey = $state<string | null>(null);
   let keyIndex = $derived.by(() => {
+    // When rows provide an explicit underlyingIndex (e.g. CollectionView),
+    // skip allocating an expensive Map on every update (#1811).
     if (rows.length > 0 && rows[0].underlyingIndex !== undefined) {
       return null;
     }
