@@ -987,21 +987,47 @@ impl Database {
             rows.collect::<rusqlite::Result<_>>()?
         };
 
-        for migration in MIGRATIONS {
-            if !applied_versions.contains(&migration.version) {
-                log::info!(
-                    "Running migration {}: {}",
-                    migration.version,
-                    migration.description
-                );
-                (migration.apply)(&conn)?;
-                conn.execute(
-                    "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
-                    params![migration.version],
-                )?;
-                applied_versions.insert(migration.version);
+        // Batch contiguous migrations into a single transaction so initializing
+        // a database does not pay 120+ separate auto-commit WAL flushes.
+        // Migrations 34, 50, and 62 manage their own top-level transactions
+        // (34 and 50 toggle `PRAGMA foreign_keys=OFF`, which SQLite ignores
+        // inside an active transaction), so commit any open batch before them.
+        let mut in_batch_tx = false;
+        let run_result = (|| -> Result<()> {
+            for migration in MIGRATIONS {
+                if !applied_versions.contains(&migration.version) {
+                    let self_managed_tx = matches!(migration.version, 34 | 50 | 62);
+                    if self_managed_tx && in_batch_tx {
+                        conn.execute_batch("COMMIT;")?;
+                        in_batch_tx = false;
+                    } else if !self_managed_tx && !in_batch_tx {
+                        conn.execute_batch("BEGIN IMMEDIATE;")?;
+                        in_batch_tx = true;
+                    }
+
+                    log::info!(
+                        "Running migration {}: {}",
+                        migration.version,
+                        migration.description
+                    );
+                    (migration.apply)(&conn)?;
+                    conn.execute(
+                        "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
+                        params![migration.version],
+                    )?;
+                    applied_versions.insert(migration.version);
+                }
             }
+            if in_batch_tx {
+                conn.execute_batch("COMMIT;")?;
+                in_batch_tx = false;
+            }
+            Ok(())
+        })();
+        if run_result.is_err() && in_batch_tx {
+            let _ = conn.execute_batch("ROLLBACK;");
         }
+        run_result?;
 
         if version > CURRENT_SCHEMA_VERSION {
             log::warn!(

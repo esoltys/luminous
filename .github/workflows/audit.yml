@@ -23,8 +23,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 2
+
+      - name: Check if Cargo audit should run
+        id: scope
+        run: bash scripts/ci-should-run.sh backend
 
       - name: Cargo Deny Check (Security, Licences, Sources)
+        if: steps.scope.outputs.run == 'true'
         uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
         with:
           command: check
@@ -35,8 +42,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 2
+
+      - name: Check if lockfile check should run
+        id: scope
+        run: bash scripts/ci-should-run.sh frontend
 
       - name: Setup Bun
+        if: steps.scope.outputs.run == 'true'
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: latest
@@ -45,10 +59,11 @@ jobs:
       # being regenerated to match — catches the drift `bun run release`
       # normally prevents (it runs `bun install` during the version bump).
       - name: Verify bun.lock is in sync with package.json
+        if: steps.scope.outputs.run == 'true'
         run: bun install --frozen-lockfile
 
       # Fails if @tauri-apps/* npm packages and matching Rust crates in
       # Cargo.lock have drifted in major/minor version (#1208).
       - name: Check Tauri npm/crate version pairing
+        if: steps.scope.outputs.run == 'true'
         run: bun run scripts/check-tauri-versions.ts
-

@@ -41,10 +41,14 @@ if (typeof window !== "undefined" && typeof (window as any).ResizeObserver === "
   (window as any).ResizeObserver = globalThis.ResizeObserver;
 }
 
+const debugTauriMock = Boolean(process.env.DEBUG_TAURI_MOCK);
+
 vi.mock("@tauri-apps/api/core", () => {
   return {
     invoke: vi.fn().mockImplementation(async (cmd, args) => {
-      console.log(`[Tauri Mock Invoke] ${cmd}`, args);
+      if (debugTauriMock) {
+        console.log(`[Tauri Mock Invoke] ${cmd}`, args);
+      }
       // Return default values for typical player/theme queries
       if (cmd === "get_playback_state") {
         return {
@@ -141,10 +145,14 @@ vi.mock("@tauri-apps/api/core", () => {
 vi.mock("@tauri-apps/api/event", () => {
   return {
     listen: vi.fn().mockImplementation(async (event, callback) => {
-      console.log(`[Tauri Mock Listen] registered for event: ${event}`);
+      if (debugTauriMock) {
+        console.log(`[Tauri Mock Listen] registered for event: ${event}`);
+      }
       // Return a mock unlisten function
       return () => {
-        console.log(`[Tauri Mock Unlisten] for event: ${event}`);
+        if (debugTauriMock) {
+          console.log(`[Tauri Mock Unlisten] for event: ${event}`);
+        }
       };
     }),
   };
