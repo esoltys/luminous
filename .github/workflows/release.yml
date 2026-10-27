@@ -190,6 +190,17 @@ jobs:
             scripts/fix-appimage-zsync.ts
           sparse-checkout-cone-mode: false
 
+      - name: Diagnose zsync (temporary, #1834)
+        if: runner.os == 'Linux'
+        run: |
+          ls -la target/release/bundle/appimage
+          command -v zsyncmake || echo "zsyncmake not on PATH"
+          A=$(ls target/release/bundle/appimage/*.AppImage | head -1)
+          readelf -S "$A" | grep -iE "upd_info|sha256_sig" || echo "no .upd_info section"
+          objcopy -O binary --only-section=.upd_info "$A" /tmp/upd_info 2>/dev/null && { echo "upd_info: $(tr -d '\0' < /tmp/upd_info)"; } || echo "could not read .upd_info"
+          find / -name '*.zsync' -not -path '/proc/*' 2>/dev/null | head -20
+          ls -la ~/.cache/tauri 2>/dev/null || true
+
       - name: Check the AppImage's glibc floor (Linux)
         if: runner.os == 'Linux'
         run: |
