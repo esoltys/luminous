@@ -4,9 +4,8 @@
 // 1. Path-aware scope classification (`scripts/ci-should-run.sh`) so single-layer
 //    PRs skip irrelevant heavy workflows while pushes to `main` and schedules
 //    always run everything unconditionally.
-// 2. CodeQL `paths-ignore` excluding Cargo's `target/` directory so `Analyze (rust)`
-//    doesn't spend 14+ minutes indexing 50 MiB of generated FFI bindings in
-//    `target/debug/build/**/out/*.rs`.
+// 2. CodeQL decoupled from PRs (running on schedule, main push, and dispatch) with
+//    recursive `paths-ignore` and dead apt/cargo pre-steps removed to unblock PR turnaround.
 // 3. Rust `luminous_lib` building only `rlib` (not unused mobile `staticlib`/`cdylib`
 //    targets that triple link/LTO time), `Swatinem/rust-cache` caching workspace
 //    crates (`cache-all-crates: true`), `lld` linking, and `line-tables-only` debuginfo.
@@ -166,11 +165,15 @@ describe("GitHub workflows & Cargo/Vite build optimizations (#1824)", () => {
     expect(ciWorkflow).toMatch(/check_boundary\s+luminous-equalizer/);
   });
 
-  it("codeql.yml excludes target/ and node_modules/ from CodeQL source indexing and filters by scope", () => {
+  it("codeql.yml triggers on schedule/main/dispatch without PR blocking, excludes target/** and node_modules/**, and avoids dead pre-build steps", () => {
+    expect(codeqlWorkflow).not.toMatch(/pull_request:/);
+    expect(codeqlWorkflow).toMatch(/push:\s*\n\s*branches:\s*\[\s*"main"\s*\]/);
+    expect(codeqlWorkflow).toMatch(/schedule:\s*\n\s*-\s*cron:/);
+    expect(codeqlWorkflow).toMatch(/workflow_dispatch:/);
     expect(codeqlWorkflow).toMatch(/bash scripts\/ci-should-run\.sh \$\{\{\s*matrix\.scope\s*\}\}/);
-    expect(codeqlWorkflow).toMatch(/paths-ignore:\s*\n\s*-\s*target\s*\n\s*-\s*node_modules/);
-    expect(codeqlWorkflow).toMatch(/cache-all-crates:\s*true/);
-    expect(codeqlWorkflow).toMatch(/cache-workspace-crates:\s*true/);
+    expect(codeqlWorkflow).toMatch(/paths-ignore:\s*\n\s*-\s*target\/\*\*\s*\n\s*-\s*node_modules\/\*\*/);
+    expect(codeqlWorkflow).not.toMatch(/apt-get install/);
+    expect(codeqlWorkflow).not.toMatch(/cargo check/);
   });
 
   it("audit.yml gates cargo-deny on backend scope and lockfile check on frontend scope", () => {
