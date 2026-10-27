@@ -190,17 +190,6 @@ jobs:
             scripts/fix-appimage-zsync.ts
           sparse-checkout-cone-mode: false
 
-      - name: Diagnose zsync (temporary, #1834)
-        if: runner.os == 'Linux'
-        run: |
-          ls -la target/release/bundle/appimage
-          command -v zsyncmake || echo "zsyncmake not on PATH"
-          A=$(ls target/release/bundle/appimage/*.AppImage | head -1)
-          readelf -S "$A" | grep -iE "upd_info|sha256_sig" || echo "no .upd_info section"
-          objcopy -O binary --only-section=.upd_info "$A" /tmp/upd_info 2>/dev/null && { echo "upd_info: $(tr -d '\0' < /tmp/upd_info)"; } || echo "could not read .upd_info"
-          find / -name '*.zsync' -not -path '/proc/*' 2>/dev/null | head -20
-          ls -la ~/.cache/tauri 2>/dev/null || true
-
       - name: Check the AppImage's glibc floor (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -209,12 +198,12 @@ jobs:
           [ ${#APPIMAGES[@]} -eq 1 ] || { echo "::error::expected one AppImage, found: ${APPIMAGES[*]}"; exit 1; }
           bash workflow-src/scripts/check-glibc-floor.sh "${APPIMAGES[0]}" 2.35
 
-      # linuxdeploy-plugin-appimage writes <AppImage>.zsync when
-      # LDAI_UPDATE_INFORMATION is set. The AppImage is built with spaces in
-      # its name, but GitHub renames spaces to dots on upload. Fix the .zsync
-      # header (Filename: / URL:) to match the dotted name and rename the file
-      # so AppImageUpdate can locate and download delta blocks (#1703).
-      - name: Fix AppImage zsync metadata and filename (Linux)
+      # LDAI_UPDATE_INFORMATION embeds the update information in the AppImage,
+      # but the .zsync appimagetool makes alongside lands in its working
+      # directory (src-tauri/), named with spaces where GitHub's asset name has
+      # dots. So generate it here from the final AppImage, under the dotted
+      # name, and check it against the AppImage's SHA-1 (#1703, #1834).
+      - name: Generate AppImage zsync (Linux)
         if: runner.os == 'Linux'
         run: bun run workflow-src/scripts/fix-appimage-zsync.ts
 

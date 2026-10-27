@@ -122,9 +122,12 @@ release was published, so the trigger was removed.)
   - Builds the AppImage with embedded update information (`LDAI_UPDATE_INFORMATION` set to
     `gh-releases-zsync|esoltys|luminous|latest|Luminous.Music.Player_*_amd64.AppImage.zsync`) so
     tools like AppImageUpdate and Gear Lever can perform delta downloads (#1703).
-  - Runs `scripts/fix-appimage-zsync.ts` to adjust the `.zsync` control file's `Filename:` and `URL:`
-    headers to match the dotted filename assigned by GitHub Releases on upload, then uploads the
-    `.zsync` file to the release assets via `softprops/action-gh-release` (preserving `draft` state).
+  - Runs `scripts/fix-appimage-zsync.ts` to generate the `.zsync` control file with `zsyncmake` from
+    the final AppImage, under the dotted filename GitHub Releases assigns on upload, and checks its
+    `SHA-1:`/`Length:` against the AppImage; then uploads it to the release assets via
+    `softprops/action-gh-release` (preserving `draft` state). The `.zsync` appimagetool makes during the
+    build can't be used: zsyncmake writes it to appimagetool's working directory (`src-tauri/` under
+    tauri-action), named with spaces (#1834).
   - Runs `tauri-apps/tauri-action@v0` (wrapped in `Wandalen/wretry.action@v3` for retry
     on transient failures) to build and sign the app, uploading artifacts into the draft
     release created above (`releaseDraft: true`).
