@@ -3,10 +3,9 @@ name: "CodeQL Advanced"
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
   schedule:
     - cron: '43 21 * * 6'
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -35,40 +34,17 @@ jobs:
           build-mode: none
           scope: backend
 
-    env:
-      CARGO_PROFILE_DEV_DEBUG: line-tables-only
-      RUSTFLAGS: "-C link-arg=-fuse-ld=lld"
-
     steps:
     - name: Checkout repository
       uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       with:
         fetch-depth: 2
 
+    # Evaluates fail-open (true) on push to main, schedule, and workflow_dispatch,
+    # ensuring all analysis legs run unconditionally across full repository scans.
     - name: Check if CodeQL analysis should run
       id: scope
       run: bash scripts/ci-should-run.sh ${{ matrix.scope }}
-
-    - name: Install system dependencies (Linux)
-      if: steps.scope.outputs.run == 'true' && matrix.language == 'rust' && runner.os == 'Linux'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y --no-install-recommends lld libasound2-dev libssl-dev pkg-config libglib2.0-dev libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev
-
-    # Caches the registry, git deps, and target dir across PR builds so
-    # `cargo check` below doesn't recompile the whole dependency graph
-    # (Symphonia, rusqlite, Tauri, etc.) from scratch on every run.
-    - name: Cache Rust dependencies
-      if: steps.scope.outputs.run == 'true' && matrix.language == 'rust'
-      uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-      with:
-        cache-all-crates: true
-        cache-workspace-crates: true
-
-    - name: Pre-build Rust dependencies & generated code
-      if: steps.scope.outputs.run == 'true' && matrix.language == 'rust'
-      run: |
-        cargo check
 
     - name: Initialize CodeQL
       if: steps.scope.outputs.run == 'true'
@@ -76,19 +52,15 @@ jobs:
       with:
         languages: ${{ matrix.language }}
         build-mode: ${{ matrix.build-mode }}
-        # Exclude Cargo's `target/` directory and third-party/static trees from
-        # source indexing: `cargo check` populates `target/debug/build/**/out/*.rs`
-        # with 50+ MiB of third-party generated FFI bindings (libsqlite3-sys,
-        # pulp, web_atoms, x11-dl) that otherwise bloat the CodeQL database to
-        # 300+ MiB and add ~12 minutes to Rust extraction and query evaluation.
+        # Exclude build output and third-party/static trees from source indexing:
         config: |
           paths-ignore:
-            - target
-            - node_modules
-            - build
-            - static
-            - verification
-            - docs
+            - target/**
+            - node_modules/**
+            - build/**
+            - static/**
+            - verification/**
+            - docs/**
 
     - name: Perform CodeQL Analysis
       if: steps.scope.outputs.run == 'true'

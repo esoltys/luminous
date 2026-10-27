@@ -46,7 +46,7 @@ job finishes with `success` in seconds. On `push` to `main`, `schedule`, or `wor
     Clippy isn't duplicated here since `backend_test` already covers every PR, Dependabot's
     included.
 
-`audit.yml` and `codeql.yml` also trigger on `pull_request` and `push` targeting `main`,
+`audit.yml` also triggers on `pull_request` and `push` targeting `main`,
 plus a weekly `schedule`:
 
 - **`audit.yml` — Security & Licence Audit**
@@ -67,16 +67,18 @@ plus a weekly `schedule`:
     drifted from `package.json` (i.e. someone changed a dependency range without
     regenerating the lockfile), and runs `scripts/check-tauri-versions.ts` to ensure
     `@tauri-apps/*` npm packages and matching Rust crates in `Cargo.lock` have not drifted (#1208).
-- **`codeql.yml` — CodeQL Advanced**
-  - Runs GitHub's CodeQL static analysis across three language matrix legs: `actions` (`actions` scope),
-    `javascript-typescript` (`frontend` scope), and `rust` (`backend` scope) — all `build-mode: none`, i.e. CodeQL's own
-    extraction rather than a real build, except Rust still runs `cargo check` first to
-    generate `OUT_DIR` assets for macro expansion while excluding `target/` and `node_modules/`
-    via `paths-ignore` so third-party generated FFI bindings are not indexed as project source.
-  - Findings are uploaded to the repo's Security tab (`security-events: write`).
 
-Both are also on a `schedule` (audit: weekly Sunday midnight; CodeQL: weekly Saturday
-21:43 UTC), so they catch newly-disclosed vulnerabilities even without new commits.
+### CodeQL static analysis
+
+- **`codeql.yml` — CodeQL Advanced**
+  - Triggers on `push` to `main`, weekly `schedule` (Saturday 21:43 UTC), and manual `workflow_dispatch`.
+    It is decoupled from `pull_request` events so PR merges are not blocked by 15–26 minute CodeQL
+    runs (#1824). Full CodeQL analysis runs continuously on every merge to `main` and on the weekly schedule.
+  - Runs GitHub's CodeQL static analysis across three language matrix legs: `actions`,
+    `javascript-typescript`, and `rust` — all using `build-mode: none` (CodeQL's standalone AST
+    extractor). Dead apt installations (`libwebkit2gtk-4.1-dev`) and pre-build cargo steps are omitted,
+    and build outputs/third-party trees are excluded via recursive `paths-ignore` (`target/**`, `node_modules/**`).
+  - Findings are uploaded to the repo's Security tab (`security-events: write`).
 
 ### Handling a failing cargo-deny check
 
@@ -193,7 +195,7 @@ flowchart TD
     PushMainNext --> Audit
     Schedule1 --> Audit
 
-    PR --> CodeQL
+    ManualDispatch1 --> CodeQL
     PushMainNext --> CodeQL
     Schedule2 --> CodeQL
 

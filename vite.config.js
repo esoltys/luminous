@@ -10,6 +10,7 @@ import { tauriIpcMockPlugin } from "./scripts/vite-mock-plugin.ts";
 import { execSync } from "child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 
 const host = process.env.TAURI_DEV_HOST;
 const projectRoot = path.dirname(fileURLToPath(import.meta.url));
@@ -72,7 +73,16 @@ function safeTailwindcss() {
  * never evaluate the 3,025-icon barrel index (`phosphor-svelte/lib/index.js`).
  */
 function phosphorBarrelOptimizer() {
-  const phosphorLibDir = path.resolve(projectRoot, "node_modules/phosphor-svelte/lib");
+  // Resolve phosphor-svelte via Node module resolution rather than
+  // path.resolve(projectRoot, "node_modules"): in git worktrees
+  // (.worktrees/ or .claude/worktrees/), node_modules lives in the parent checkout.
+  const require = createRequire(import.meta.url);
+  let phosphorLibDir;
+  try {
+    phosphorLibDir = path.resolve(path.dirname(require.resolve("phosphor-svelte/package.json")), "lib");
+  } catch {
+    phosphorLibDir = path.resolve(projectRoot, "node_modules/phosphor-svelte/lib");
+  }
   const IMPORT_RE = /import\s*\{([^}]+)\}\s*from\s*["']phosphor-svelte["']\s*;?/g;
 
   return {
