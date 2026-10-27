@@ -120,6 +120,17 @@ fn split(bundle: &[u8]) -> Result<Parts<'_>, Error> {
     })
 }
 
+/// The bytes the detached signature covers: domain tag, length-prefixed id, then the
+/// whole bundle (header and ciphertext).
+fn signed_message(p: &Parts) -> Vec<u8> {
+    let mut msg = SIG_DOMAIN.to_vec();
+    msg.push(p.id.len() as u8);
+    msg.extend_from_slice(p.id);
+    msg.extend_from_slice(p.header);
+    msg.extend_from_slice(p.ciphertext);
+    msg
+}
+
 /// Check the detached signature. The signed message includes the add-on id, so a bundle
 /// cannot be re-labelled as a different add-on.
 pub(crate) fn verify_signature(
@@ -131,12 +142,7 @@ pub(crate) fn verify_signature(
     let key =
         VerifyingKey::from_bytes(public_key).map_err(|_| Error::Malformed("bad public key"))?;
     let sig = Signature::from_slice(sig).map_err(|_| Error::BadSignature)?;
-    let mut msg = SIG_DOMAIN.to_vec();
-    msg.push(p.id.len() as u8);
-    msg.extend_from_slice(p.id);
-    msg.extend_from_slice(p.header);
-    msg.extend_from_slice(p.ciphertext);
-    key.verify_strict(&msg, &sig)
+    key.verify_strict(&signed_message(&p), &sig)
         .map_err(|_| Error::BadSignature)
 }
 
@@ -359,13 +365,9 @@ mod tests {
         bundle.extend_from_slice(&[0u8; NONCE_LEN]);
         let header_len = bundle.len();
         bundle.resize(header_len + MAX_ARCHIVE_BYTES + TAG_LEN + 1, 0);
-        let p = split(&bundle).unwrap();
-        let mut msg = SIG_DOMAIN.to_vec();
-        msg.push(id.len() as u8);
-        msg.extend_from_slice(p.id);
-        msg.extend_from_slice(p.header);
-        msg.extend_from_slice(p.ciphertext);
-        let sig = signer.sign(&msg).to_bytes();
+        let sig = signer
+            .sign(&signed_message(&split(&bundle).unwrap()))
+            .to_bytes();
         let public = signer.verifying_key().to_bytes();
         let result = open(&bundle, &sig, &public, &key32("test-addin-key.hex"));
         assert_eq!(result.err(), Some(Error::TooLarge));
