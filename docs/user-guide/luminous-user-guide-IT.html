@@ -287,6 +287,7 @@
         <div class="row"><div class="mk">•</div><div><b>Recupera di nuovo</b> cerca di nuovo i testi.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Modifica</b> corregge il testo o la sincronizzazione.</div></div>
         <div class="row"><div class="mk">•</div><div>I testi senza marcatori temporali vengono mostrati come testo semplice.</div></div>
+        <div class="row"><div class="mk">•</div><div>Un'etichetta indica la provenienza del testo: <b>Incorporato</b>, <b>File associato</b>, <b>Manuale</b>, <b>In cache</b> o il nome del servizio online. La sua icona di aiuto fornisce maggiori dettagli.</div></div>
         <div class="row"><div class="mk">•</div><div>Per un brano strumentale, scegli <b>Contrassegna come strumentale</b> così Luminous smette di cercare.</div></div>
         <div class="row"><div class="mk">•</div><div>I testi compaiono anche nel <a href="#now-playing">miniplayer</a>: usa il suo pulsante dei testi per sostituire la copertina con i testi in tempo reale.</div></div>
       </div>
@@ -469,7 +470,7 @@
         <div class="row"><div class="mk">•</div><div><b>Metti in pausa tutto lo scrobbling</b> (nel popup del profilo nella barra laterale o nell'area di notifica) interrompe l'invio senza scollegare. Gli ascolti fatti offline restano in attesa finché non fai clic su <b>Sincronizza ora</b>.</div></div>
         <div class="row"><div class="mk">•</div><div><b>MusicBrainz Picard</b>: Luminous trova Picard oppure ti permette di cercarlo, così puoi aprire i file in Picard.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Discord Rich Presence</b>: mostra su Discord quello che stai ascoltando. L'app desktop di Discord deve essere in esecuzione.</div></div>
-        <div class="row"><div class="mk">•</div><div><b>fanart.tv</b>: recupera foto degli artisti e altre immagini che Luminous non trova in locale. Aggiungi la tua chiave API e fai clic su <b>Convalida e salva</b>. Senza una chiave, Luminous usa le immagini di Wikidata.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>fanart.tv</b>: recupera foto degli artisti e altre immagini che Luminous non trova in locale. Luminous include una chiave predefinita. Per usare la tua, incollala e fai clic su <b>Convalida e salva</b>; <b>Ripristina predefinito</b> torna a quella predefinita. Senza alcuna chiave, le foto degli artisti provengono da Deezer o Wikidata.</div></div>
       </div>
       <figure class="shot mw-640 mb-28">
         <img src="assets/it/screenshots/dark/settings-integrations.webp" alt="Impostazioni delle integrazioni" width="1280" height="850" loading="lazy">
@@ -480,7 +481,7 @@
         <div class="row"><div class="mk">•</div><div><b>MusicBrainz Picard e ID MBID</b>: Luminous ottiene biografie, testi di Wikipedia e valutazioni comunitarie usando gli <b>ID MusicBrainz</b> (MBID) memorizzati nei tag dei tuoi file audio. Usa <a href="https://picard.musicbrainz.org">MusicBrainz Picard</a> per identificare e taggare i tuoi album. Fai clic destro su un album o brano e scegli <b>Apri in Picard</b>. Una volta taggati i file, Luminous individua automaticamente i dettagli sull'artista, le recensioni di CritiqueBrainz e i link.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Contribuire a MusicBrainz</b>: Se un album o artista non è presente nel database, crea un account gratuito su <a href="https://musicbrainz.org">musicbrainz.org</a> per aggiungere pubblicazioni e tracce. Dopo averlo aggiunto, tagga i tuoi file con Picard per arricchirli in Luminous e aiutare tutti gli appassionati di musica.</div></div>
         <div class="row"><div class="mk">•</div><div><b>File sidecar locali</b>: Puoi conservare biografie e testi personalizzati anche senza connessione. Inserisci un file <code>artist.md</code> nella cartella dell'artista o <code>album.md</code> nella cartella dell'album per aggiungere descrizioni in Markdown. Luminous dà sempre priorità ai tuoi testi locali rispetto a quelli online. Per i testi dei brani, posiziona un file <code>.lrc</code>, <code>.vtt</code> o <code>.srt</code> accanto al file audio.</div></div>
-        <div class="row"><div class="mk">•</div><div><b>Integrazione fanart.tv</b>: Mentre i ritratti di base provengono da Wikidata, inserire la tua chiave API personale gratuita di <a href="https://fanart.tv">fanart.tv</a> in <b>Impostazioni → Integrazioni</b> sblocca loghi trasparenti delle band, banner di sfondo e ritratti degli artisti in alta definizione.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Integrazione fanart.tv</b>: La chiave <a href="https://fanart.tv">fanart.tv</a> integrata in Luminous sblocca loghi trasparenti delle band, banner di sfondo e ritratti degli artisti in alta definizione. Se preferisci usare la tua chiave API personale gratuita, aggiungila in <b>Impostazioni → Integrazioni</b>. Senza chiave, le foto di base degli artisti provengono da Deezer o Wikidata.</div></div>
       </div>
     </section>
 
@@ -499,6 +500,7 @@
         <div class="row"><div class="mk">•</div><div><b>Bozze di schemi</b>: la modifica di uno schema diventa effettiva solo dopo aver confermato la riorganizzazione. Se l'organizzazione automatica è attiva, viene sospesa durante le modifiche per evitare di applicare schemi incompleti in background; puoi ripristinare lo schema salvato in qualsiasi momento.</div></div>
         <div class="row"><div class="mk">•</div><div>Attiva <b>Organizzazione automatica</b> in alto a destra (oppure in <b>Impostazioni → Sorgenti</b>) per rinominare e spostare automaticamente in background le nuove tracce o le modifiche ai tag. Una schermata di conferma spiega la riorganizzazione in background prima di attivarla.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Pulisci</b> rimuove i brani mancanti, le cartelle vuote e le voci duplicate.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Cartella o unità mancante</b>: se gran parte dei brani di una cartella scompare all'improvviso, ad esempio quando si scollega un'unità esterna, Luminous li mantiene nella libreria e mostra un avviso. Fai clic su <b>Esamina</b>, poi su <b>Mantieni brani</b> per attendere che l'unità torni disponibile, oppure su <b>Rimuovi brani</b> per rimuoverli. <b>Pulisci</b> pone la stessa domanda prima di rimuoverli.</div></div>
         <div class="row"><div class="mk">•</div><div>Per scrivere il tuo schema, consulta <a href="#advanced-organize">Organizzazione avanzata</a>.</div></div>
       </div>
       <figure class="shot mw-640 mb-28">

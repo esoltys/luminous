@@ -287,6 +287,7 @@
         <div class="row"><div class="mk">•</div><div><b>Erneut abrufen</b> sucht erneut nach Songtexten.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Bearbeiten</b> korrigiert Text oder Zeitangaben.</div></div>
         <div class="row"><div class="mk">•</div><div>Songtexte ohne Zeitstempel werden als reiner Text angezeigt.</div></div>
+        <div class="row"><div class="mk">•</div><div>Eine Markierung zeigt, woher der Songtext stammt: <b>Eingebettet</b>, <b>Sidecar-Datei</b>, <b>Manuell</b>, <b>Zwischengespeichert</b> oder der Name des Online-Anbieters. Das Hilfesymbol daneben erklärt mehr.</div></div>
         <div class="row"><div class="mk">•</div><div>Bei einem Instrumental <b>Als Instrumental markieren</b> wählen, damit Luminous die Suche einstellt.</div></div>
         <div class="row"><div class="mk">•</div><div>Songtexte gibt es auch im <a href="#now-playing">Miniplayer</a>: Mit seiner Songtext-Schaltfläche statt des Covers den Live-Songtext anzeigen.</div></div>
       </div>
@@ -469,7 +470,7 @@
         <div class="row"><div class="mk">•</div><div><b>Gesamtes Scrobbling pausieren</b> (im Profil-Popup der Seitenleiste oder im Infobereich) beendet das Senden, ohne die Verbindung zu trennen. Offline gehörte Titel warten, bis auf <b>Jetzt synchronisieren</b> geklickt wird.</div></div>
         <div class="row"><div class="mk">•</div><div><b>MusicBrainz Picard</b>: Luminous findet Picard oder lässt dich danach suchen, damit Dateien in Picard geöffnet werden können.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Discord Rich Presence</b>: auf Discord anzeigen, was gerade läuft. Die Discord-Desktop-App muss laufen.</div></div>
-        <div class="row"><div class="mk">•</div><div><b>fanart.tv</b>: Interpretenfotos und weitere Cover abrufen, die Luminous lokal nicht findet. Den API-Schlüssel eingeben und auf <b>Prüfen und speichern</b> klicken. Ohne Schlüssel verwendet Luminous Wikidata-Bilder.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>fanart.tv</b>: Interpretenfotos und weitere Cover abrufen, die Luminous lokal nicht findet. Luminous bringt einen Standardschlüssel mit. Für einen eigenen Schlüssel diesen eingeben und auf <b>Prüfen und speichern</b> klicken; <b>Auf Standard zurücksetzen</b> wechselt zurück. Ganz ohne Schlüssel stammen Interpretenfotos von Deezer oder Wikidata.</div></div>
       </div>
       <figure class="shot mw-640 mb-28">
         <img src="assets/de/screenshots/dark/settings-integrations.webp" alt="Integrationseinstellungen" width="1280" height="850" loading="lazy">
@@ -480,7 +481,7 @@
         <div class="row"><div class="mk">•</div><div><b>MusicBrainz Picard und MBIDs</b>: Luminous bezieht Biografien, Wikipedia-Texte und Community-Bewertungen über <b>MusicBrainz-IDs</b> (MBIDs), die direkt in den Tags deiner Audiodateien gespeichert sind. Verwende <a href="https://picard.musicbrainz.org">MusicBrainz Picard</a>, um deine Alben zuzuordnen und zu taggen. Du kannst jedes Album und jeden Titel mit der rechten Maustaste anklicken und <b>In Picard öffnen</b> wählen. Nach dem Taggen findet Luminous automatisch alle Interpretenangaben, CritiqueBrainz-Rezensionen und Links.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Zu MusicBrainz beitragen</b>: Falls ein Album oder ein Interpret in der Datenbank noch nicht existiert, erstelle ein kostenloses Konto auf <a href="https://musicbrainz.org">musicbrainz.org</a> und trage Veröffentlichungen und Titellisten ein. Sobald der Eintrag angelegt ist, tagge deine Dateien in Picard, um sie in Luminous anzureichern und die Musikgemeinschaft zu unterstützen.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Lokale Sidecar-Dateien</b>: Du kannst eigene Biografien und Songtexte auch vollständig offline pflegen. Speichere eine <code>artist.md</code>-Datei im Interpretenordner oder eine <code>album.md</code>-Datei im Albumordner für Beschreibungen in Markdown. Luminous gibt deinen persönlichen Texten stets den Vorrang vor externen Online-Quellen. Für Songtexte lege eine <code>.lrc</code>-, <code>.vtt</code>- oder <code>.srt</code>-Datei neben den Audiotitel.</div></div>
-        <div class="row"><div class="mk">•</div><div><b>fanart.tv-Integration</b>: Standardporträts stammen aus Wikidata. Trage in <b>Einstellungen → Integrationen</b> deinen persönlichen kostenlosen API-Schlüssel von <a href="https://fanart.tv">fanart.tv</a> ein, um hochauflösende freigestellte Bandlogos, Hintergrundbanner und detailreiche Interpretenporträts freizuschalten.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>fanart.tv-Integration</b>: Mit dem in Luminous integrierten <a href="https://fanart.tv">fanart.tv</a>-Schlüssel erhältst du hochauflösende freigestellte Bandlogos, Hintergrundbanner und detailreiche Interpretenporträts. Wenn du lieber deinen eigenen kostenlosen persönlichen Schlüssel verwendest, trage ihn in <b>Einstellungen → Integrationen</b> ein. Ohne Schlüssel stammen einfache Interpretenfotos von Deezer oder Wikidata.</div></div>
       </div>
     </section>
 
@@ -499,6 +500,7 @@
         <div class="row"><div class="mk">•</div><div><b>Musterentwürfe</b>: Änderungen an einem Muster werden erst nach Bestätigung der Neuorganisation wirksam. Ist das automatische Organisieren aktiv, pausiert es während der Bearbeitung, damit Entwürfe nicht ungewollt im Hintergrund angewendet werden; das gespeicherte Muster kann jederzeit wiederhergestellt werden.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Automatisch organisieren</b> oben rechts (oder in <b>Einstellungen → Quellen</b>) einschalten, um neue Titel oder Tag-Änderungen automatisch im Hintergrund umzubenennen und zu verschieben. Ein Dialog fasst die Auswirkungen zusammen, bevor der Vorgang startet.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Bereinigen</b> entfernt fehlende Titel, leere Ordner und doppelte Einträge.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Ordner oder Laufwerk fehlt</b>: Verschwindet ein großer Teil der Titel eines Ordners auf einmal, etwa weil ein externes Laufwerk abgezogen wurde, behält Luminous sie in der Mediathek und zeigt einen Hinweis. Auf <b>Überprüfen</b> klicken, dann auf <b>Titel behalten</b>, um auf das Laufwerk zu warten, oder auf <b>Titel entfernen</b>, um sie zu entfernen. <b>Bereinigen</b> stellt dieselbe Frage, bevor es sie entfernt.</div></div>
         <div class="row"><div class="mk">•</div><div>Um ein eigenes Muster zu schreiben, siehe <a href="#advanced-organize">Erweitertes Organisieren</a>.</div></div>
       </div>
       <figure class="shot mw-640 mb-28">

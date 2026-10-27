@@ -287,6 +287,7 @@
         <div class="row"><div class="mk">•</div><div><b>Volver a obtener</b> busca la letra de nuevo.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Editar</b> corrige el texto o la sincronización.</div></div>
         <div class="row"><div class="mk">•</div><div>La letra sin marcas de tiempo se muestra como texto sin formato.</div></div>
+        <div class="row"><div class="mk">•</div><div>Una etiqueta indica de dónde proviene la letra: <b>Incrustada</b>, <b>Archivo asociado</b>, <b>Manual</b>, <b>En caché</b> o el nombre del proveedor en línea. Su icono de ayuda ofrece más detalles.</div></div>
         <div class="row"><div class="mk">•</div><div>Si es una pista instrumental, elige <b>Marcar como instrumental</b> para que Luminous deje de buscar.</div></div>
         <div class="row"><div class="mk">•</div><div>Las letras también se muestran en el <a href="#now-playing">minirreproductor</a>: usa su botón de letras para cambiar la carátula por la letra en vivo.</div></div>
       </div>
@@ -469,7 +470,7 @@
         <div class="row"><div class="mk">•</div><div><b>Pausar todo el scrobbling</b> (en la ventana del perfil de la barra lateral o en el área de notificación) detiene el envío sin desconectar. Las escuchas hechas sin conexión esperan hasta que hagas clic en <b>Sincronizar ahora</b>.</div></div>
         <div class="row"><div class="mk">•</div><div><b>MusicBrainz Picard</b>: Luminous encuentra Picard o te permite buscarlo, para que puedas abrir archivos en Picard.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Discord Rich Presence</b>: muestra en Discord lo que estás reproduciendo. La aplicación de escritorio de Discord debe estar en ejecución.</div></div>
-        <div class="row"><div class="mk">•</div><div><b>fanart.tv</b>: obtiene fotos de artistas y otro material gráfico que Luminous no encuentra en local. Agrega tu clave de API y haz clic en <b>Validar y guardar</b>. Sin clave, Luminous usa imágenes de Wikidata.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>fanart.tv</b>: obtiene fotos de artistas y otro material gráfico que Luminous no encuentra en local. Luminous incluye una clave predeterminada. Para usar la tuya, pégala y haz clic en <b>Validar y guardar</b>; <b>Restablecer por defecto</b> vuelve a la predeterminada. Sin ninguna clave, las fotos de artistas proceden de Deezer o Wikidata.</div></div>
       </div>
       <figure class="shot mw-640 mb-28">
         <img src="assets/es/screenshots/dark/settings-integrations.webp" alt="Ajustes de integraciones" width="1280" height="850" loading="lazy">
@@ -480,7 +481,7 @@
         <div class="row"><div class="mk">•</div><div><b>MusicBrainz Picard e identificadores MBID</b>: Luminous consulta biografías, textos de Wikipedia y valoraciones comunitarias mediante los <b>identificadores de MusicBrainz</b> (MBID) etiquetados en tus archivos de audio. Usa <a href="https://picard.musicbrainz.org">MusicBrainz Picard</a> para identificar y etiquetar tus álbumes. Puedes hacer clic derecho en cualquier álbum o pista y elegir <b>Abrir en Picard</b>. Al etiquetarlos, Luminous detecta automáticamente los detalles del artista, las reseñas de CritiqueBrainz y los enlaces.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Contribuir a MusicBrainz</b>: Si un álbum o artista no está registrado en la base de datos, crea una cuenta gratuita en <a href="https://musicbrainz.org">musicbrainz.org</a> para añadir los lanzamientos y listas de canciones. Al agregarlos a MusicBrainz, etiqueta tus archivos con Picard para enriquecerlos en Luminous y ayudar a otros oyentes.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Archivos auxiliares locales</b>: También puedes gestionar tus propias biografías y letras sin conexión. Coloca un archivo <code>artist.md</code> en la carpeta del artista o <code>album.md</code> en la del álbum para añadir descripciones en Markdown. Luminous da prioridad a tus textos locales frente a los de internet. Para las letras, coloca un archivo <code>.lrc</code>, <code>.vtt</code> o <code>.srt</code> junto a la pista de audio.</div></div>
-        <div class="row"><div class="mk">•</div><div><b>Integración con fanart.tv</b>: Aunque las fotos básicas proceden de Wikidata, introducir tu clave de API personal gratuita de <a href="https://fanart.tv">fanart.tv</a> en <b>Configuración → Integraciones</b> desbloquea logotipos transparentes de bandas, pancartas de fondo y retratos en alta definición.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Integración con fanart.tv</b>: La clave de <a href="https://fanart.tv">fanart.tv</a> incluida en Luminous desbloquea logotipos transparentes de bandas, pancartas de fondo y retratos en alta definición. Si prefieres usar tu propia clave personal gratuita, agrégala en <b>Configuración → Integraciones</b>. Sin clave, las fotos básicas de artistas proceden de Deezer o Wikidata.</div></div>
       </div>
     </section>
 
@@ -499,6 +500,7 @@
         <div class="row"><div class="mk">•</div><div><b>Borradores de patrones</b>: modificar un patrón no surte efecto hasta confirmar la reorganización. Si la organización automática está activada, se pausa durante la edición para no aplicar borradores en segundo plano; puedes restablecer el patrón guardado en cualquier momento.</div></div>
         <div class="row"><div class="mk">•</div><div>Activa <b>Organizar automáticamente</b> en la parte superior derecha (o en <b>Configuración → Fuentes</b>) para que las pistas nuevas y las ediciones de etiquetas se renombren y muevan solas, en segundo plano. Un cuadro de confirmación explica la reorganización antes de que se active.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Limpiar</b> elimina canciones que faltan, carpetas vacías y entradas duplicadas.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Carpeta o unidad ausente</b>: si desaparece de golpe gran parte de las canciones de una carpeta, por ejemplo al desconectar una unidad externa, Luminous las conserva en tu biblioteca y muestra un aviso. Haz clic en <b>Revisar</b> y luego en <b>Conservar canciones</b> para esperar a que vuelva la unidad, o en <b>Eliminar canciones</b> para quitarlas. <b>Limpiar</b> hace la misma pregunta antes de quitarlas.</div></div>
         <div class="row"><div class="mk">•</div><div>Para escribir tu propio patrón, consulta <a href="#advanced-organize">Organización avanzada</a>.</div></div>
       </div>
       <figure class="shot mw-640 mb-28">
