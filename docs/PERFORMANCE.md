@@ -239,6 +239,32 @@ Measured on 2026-10-11 from `main` at `a0f1d5b3` (3.0 is pre-release, so `packag
 - **Scrolling the Albums grid costs about 3.9x the CPU** (3.6-4.4 CPU-seconds in every 2.0-2.6 run, 14.0-14.8 in both 3.0 runs). Wall time for the scroll is the same, 9.4s, and memory went down, so this is extra work per thumbnail, not extra time.
 - **The binary is 3.2x larger**: 179 MB against 55 MB. The release profile is unchanged. The cause is `docs/user-guide/assets`, 139 MB of user-guide screenshots across the locales that `bun run sync-docs` copies into the frontend build and Tauri embeds in the exe.
 
+### 3.2 vs. 3.1 (Windows)
+
+![Memory: 3.2.0 vs. 3.1.0](performance-3.1.0-vs-3.2.0.png)
+
+| Scenario | Private bytes Δ | Working set Δ |
+| --- | --- | --- |
+| Idle | +43.3 MB (+10.2%) | −3.7 MB (−0.7%) |
+| After full scan | −8.8 MB (−2.2%) | −103.8 MB (−19.3%) |
+| During playback (EQ + analyzer on) | −3.8 MB (−1.0%) | −100.1 MB (−18.0%) |
+| First scan (with artwork) | +5.8 MB (+1.6%) | +8.7 MB (+1.7%) |
+| Albums grid scrolled (thumbnails) | +10.1 MB (+1.4%) | +2.7 MB (+0.5%) |
+
+Measured on 2026-10-27 in scratch profiles over the same 3,616-track library, three runs per version in alternating order, playing the baseline track. 3.1.0 is the `v3.1.0` tag built in its own worktree; 3.2.0 is the release branch before the version bump. The table is the mean of the three runs.
+
+**Memory.** One regression, idle only. Idle private bytes read 411.6, 440.1 and 422.5 MB for 3.1.0 and 452.0, 459.5 and 492.6 MB for 3.2.0, so every 3.2 run is above every 3.1 run. Splitting the idle tree per process over six more launches puts all of it in WebView2's GPU process (244-260 MB → 289-295 MB); the Rust main process is slightly lower (37 → 35 MB) and the renderer is flat. It doesn't carry into the scenarios that follow in the same launch, which are flat or lower, so it isn't a leak or a new resident structure. A bisect step at `528046d8` read 264 and 299 MB in two launches of the same build, so the GPU process varies too much between launches to bisect cheaply, and the cause wasn't pursued. The working-set drops after a scan and during playback come with flat private bytes, so they're pages trimmed by Windows, not memory saved. Run-to-run noise was wider than the usual ~3% on this machine: 3.1.0's own idle readings span 7%.
+
+| Scenario | CPU, settled (% of machine) | CPU used by the work (CPU-seconds) | Time |
+| --- | --- | --- | --- |
+| Idle | 0.0 → 0.0 | | startup 0.8s → 0.8s |
+| After full scan | 0.0 → 0.0 | 14.8 → 16.0 | |
+| Playback (EQ + analyzer on) | 0.8 → 0.7 | | |
+| First scan (with artwork) | 0.0 → 0.1 | 17.8 → 15.1 | |
+| Albums grid scrolled | 0.1 → 0.0 | 16.1 → 15.9 | |
+
+**Speed.** CPU and startup are unchanged. Scan times are left out: the library is on a network drive, and the same build's scans ranged from under 2s to 228s depending on the drive's cache (3.1.0's first scan took 227.8s in one run and 1.8s in the next), so they say nothing about the code. The stall watchdog logged more warnings during the first scan, 1.0 → 6.7 per run on average, all "Tokio worker blocked … background task" with no IPC nearby. The binary grew 0.3 MB.
+
 ### Trend across versions (Windows)
 
 ![Memory by version](performance-trend.png)

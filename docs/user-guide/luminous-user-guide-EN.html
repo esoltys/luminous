@@ -287,6 +287,7 @@
         <div class="row"><div class="mk">•</div><div><b>Refetch</b> searches for lyrics again.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Edit</b> corrects the text or timing.</div></div>
         <div class="row"><div class="mk">•</div><div>Lyrics without timestamps show as plain text.</div></div>
+        <div class="row"><div class="mk">•</div><div>A badge shows where the lyrics came from: <b>Embedded</b>, <b>Sidecar</b>, <b>Manual</b>, <b>Cached</b>, or the name of the online provider. Its help icon says more.</div></div>
         <div class="row"><div class="mk">•</div><div>For an instrumental, choose <b>Mark as Instrumental</b> so Luminous stops searching.</div></div>
         <div class="row"><div class="mk">•</div><div>Lyrics also show in the <a href="#now-playing">mini player</a>: use its lyrics button to swap the cover for live lyrics.</div></div>
       </div>
@@ -469,7 +470,7 @@
         <div class="row"><div class="mk">•</div><div><b>Pause all scrobbling</b> (in the sidebar profile popup or system tray) stops sending without disconnecting. Listens made offline wait until you click <b>Sync Now</b>.</div></div>
         <div class="row"><div class="mk">•</div><div><b>MusicBrainz Picard</b>: Luminous finds Picard or lets you browse to it, so you can open files in Picard.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Discord Rich Presence</b>: show what you're playing on Discord. The Discord desktop app must be running.</div></div>
-        <div class="row"><div class="mk">•</div><div><b>fanart.tv</b>: fetch artist photos and other art Luminous can't find locally. Add your API key and click <b>Validate &amp; Save</b>. Without a key, Luminous uses Wikidata images.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>fanart.tv</b>: fetch artist photos and other art Luminous can't find locally. Luminous includes a default key. To use your own, paste it and click <b>Validate &amp; Save</b>; <b>Revert to Default</b> switches back. Without any key, artist photos come from Deezer or Wikidata.</div></div>
       </div>
       <figure class="shot mw-640 mb-28">
         <img src="assets/en-CA/screenshots/dark/settings-integrations.webp" alt="Integrations settings" width="1280" height="850" loading="lazy">
@@ -480,7 +481,7 @@
         <div class="row"><div class="mk">•</div><div><b>MusicBrainz Picard &amp; MBIDs</b>: Luminous looks up biographies, Wikipedia extracts and community ratings using <b>MusicBrainz IDs</b> (MBIDs) tagged directly on your audio files. Use <a href="https://picard.musicbrainz.org">MusicBrainz Picard</a> to identify and tag your albums. You can right-click any album or track and choose <b>Open in Picard</b>. Once tagged, Luminous automatically discovers the artist details, CritiqueBrainz reviews, and links.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Contributing to MusicBrainz</b>: If your album or artist is obscure or not yet in the database, create a free account at <a href="https://musicbrainz.org">musicbrainz.org</a> to add release information and track listings. Once added to MusicBrainz, you can tag your files in Picard to enrich them in Luminous and help other music listeners worldwide.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Local sidecar files</b>: You can also keep your own curated biographies and lyrics offline without external services. Place an <code>artist.md</code> file in the artist folder or an <code>album.md</code> file in the album folder to supply Markdown descriptions. Luminous displays these sidecars in the Information tab and prioritizes your personal curation over external extracts. For lyrics, place a <code>.lrc</code>, <code>.vtt</code>, or <code>.srt</code> file beside the audio track.</div></div>
-        <div class="row"><div class="mk">•</div><div><b>fanart.tv integration</b>: While basic artist images can be retrieved from Wikidata, connecting your free <a href="https://fanart.tv">fanart.tv</a> personal API key in <b>Settings → Integrations</b> unlocks high-resolution transparent artist logos, backdrop banners, and high-definition artist portraits.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>fanart.tv integration</b>: Luminous's built-in <a href="https://fanart.tv">fanart.tv</a> key fetches high-resolution transparent artist logos, backdrop banners and high-definition artist portraits. To use your own free personal key instead, add it in <b>Settings → Integrations</b>. Without a key, basic artist photos come from Deezer or Wikidata.</div></div>
       </div>
     </section>
 
@@ -499,6 +500,7 @@
         <div class="row"><div class="mk">•</div><div><b>Draft templates</b>: Modifying a pattern does not take effect until you confirm the reorganization. If Auto-organize is enabled, it pauses while editing drafts so unfinished patterns are never applied in the background; you can revert to your saved pattern at any time.</div></div>
         <div class="row"><div class="mk">•</div><div>Turn on <b>Auto-organize</b> in the top right (or in <b>Settings → Sources</b>) to rename and move new tracks or tag edits in the background automatically. A confirmation prompt explains the background reorganization before it starts.</div></div>
         <div class="row"><div class="mk">•</div><div><b>Clean Up</b> removes missing songs, empty folders and duplicate entries.</div></div>
+        <div class="row"><div class="mk">•</div><div><b>Missing folder or drive</b>: if a large share of a folder's songs disappear at once, as when an external drive is unplugged, Luminous keeps them in your library and shows a notice. Click <b>Review</b>, then <b>Keep Songs</b> to wait for the drive to come back, or <b>Remove Songs</b> to remove them. <b>Clean Up</b> asks the same question before removing them.</div></div>
         <div class="row"><div class="mk">•</div><div>To write your own pattern, see <a href="#advanced-organize">Advanced Organize</a>.</div></div>
       </div>
       <figure class="shot mw-640 mb-28">
