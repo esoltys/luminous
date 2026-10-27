@@ -46,10 +46,11 @@ needs updating to match. Work through it in order:
 6. **PR**: open a PR from the release branch into `main` using the repo PR template. NEVER push
    directly to `main`. If it's a version-bump-only PR, list the issues/PRs it covers in the
    description.
-7. **STOP for the user**: tag pushes are protected — Claude gets a 403. Ask the user to review and
-   merge the PR, then give them the checklist's re-tag sequence to run once merged (the local tag
-   from step 5 points at the worktree branch, not `main`'s merge commit, so it must be deleted and
-   recreated on `main` before pushing):
+7. **STOP for the user**: pushing the tag starts the signed release build, so it needs their
+   go-ahead. Ask the user to review and merge the PR (or to approve you merging it), then, once
+   they say go, run the checklist's re-tag sequence yourself, or give it to them if they'd rather
+   run it (the local tag from step 5 points at the worktree branch, not `main`'s merge commit, so
+   it must be deleted and recreated on `main` before pushing):
    ```bash
    git checkout main && git pull
    git tag -d vX.Y.Z

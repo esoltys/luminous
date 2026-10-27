@@ -8,7 +8,7 @@ The imported `AGENTS.md` above is the canonical instructions file for this repo 
 
 ## Release Process
 - If a release is being initiated from a Cloud Environment (not the user's local machine), STOP immediately and notify the user — cutting a release must be done from a local environment.
-- Tag pushes are protected on this repo: Claude cannot push `v*` tags (GitHub returns 403). When a release tag is needed, prepare everything else, then STOP and give the user the exact command to run (e.g. `git tag -a v1.0.0 -m 'Luminous v1.0.0' && git push origin v1.0.0`).
+- Pushing a `v*` tag starts the signed release build, so it needs the user's explicit go-ahead for that tag. (A cloud session can't push tags at all, GitHub returns 403, which is one more reason releases run locally.) When a release tag is needed, prepare everything else, then STOP and ask; once they say go, push it yourself, or give them the exact command if they'd rather run it (e.g. `git tag -a v1.0.0 -m 'Luminous v1.0.0' && git push origin v1.0.0`). To move an already-pushed tag, replace it in one `git push --force origin refs/tags/vX.Y.Z` rather than deleting it first, so a failed push never leaves the release without a tag.
 - Microsoft Store submission is **not** part of this repo's release pipeline — it lives in the
   separate private repo `esoltys/luminous-store` (cloned locally at `~/source/luminous-store`),
   triggered manually (`gh workflow run publish-store.yml -f tag=vX.Y.Z`) against a `luminous`
