@@ -367,7 +367,7 @@ mod tests {
         msg.extend_from_slice(p.ciphertext);
         let sig = signer.sign(&msg).to_bytes();
         let public = signer.verifying_key().to_bytes();
-        let result = open(&bundle, &sig, &public, &[0u8; 32]);
+        let result = open(&bundle, &sig, &public, &key32("test-addin-key.hex"));
         assert_eq!(result.err(), Some(Error::TooLarge));
     }
 
