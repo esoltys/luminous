@@ -73,6 +73,9 @@ function safeTailwindcss() {
  * never evaluate the 3,025-icon barrel index (`phosphor-svelte/lib/index.js`).
  */
 function phosphorBarrelOptimizer() {
+  // Resolve phosphor-svelte via Node module resolution rather than
+  // path.resolve(projectRoot, "node_modules"): in git worktrees
+  // (.worktrees/ or .claude/worktrees/), node_modules lives in the parent checkout.
   const require = createRequire(import.meta.url);
   let phosphorLibDir;
   try {

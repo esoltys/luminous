@@ -40,6 +40,8 @@ jobs:
       with:
         fetch-depth: 2
 
+    # Evaluates fail-open (true) on push to main, schedule, and workflow_dispatch,
+    # ensuring all analysis legs run unconditionally across full repository scans.
     - name: Check if CodeQL analysis should run
       id: scope
       run: bash scripts/ci-should-run.sh ${{ matrix.scope }}
