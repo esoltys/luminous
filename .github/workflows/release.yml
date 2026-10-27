@@ -198,12 +198,12 @@ jobs:
           [ ${#APPIMAGES[@]} -eq 1 ] || { echo "::error::expected one AppImage, found: ${APPIMAGES[*]}"; exit 1; }
           bash workflow-src/scripts/check-glibc-floor.sh "${APPIMAGES[0]}" 2.35
 
-      # linuxdeploy-plugin-appimage writes <AppImage>.zsync when
-      # LDAI_UPDATE_INFORMATION is set. The AppImage is built with spaces in
-      # its name, but GitHub renames spaces to dots on upload. Fix the .zsync
-      # header (Filename: / URL:) to match the dotted name and rename the file
-      # so AppImageUpdate can locate and download delta blocks (#1703).
-      - name: Fix AppImage zsync metadata and filename (Linux)
+      # LDAI_UPDATE_INFORMATION embeds the update information in the AppImage,
+      # but the .zsync appimagetool makes alongside lands in its working
+      # directory (src-tauri/), named with spaces where GitHub's asset name has
+      # dots. So generate it here from the final AppImage, under the dotted
+      # name, and check it against the AppImage's SHA-1 (#1703, #1834).
+      - name: Generate AppImage zsync (Linux)
         if: runner.os == 'Linux'
         run: bun run workflow-src/scripts/fix-appimage-zsync.ts
 

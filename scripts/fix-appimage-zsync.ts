@@ -1,20 +1,25 @@
 /**
- * Fix AppImage .zsync header metadata and companion filename for GitHub Releases.
+ * Generate the AppImage's .zsync control file for GitHub Releases (#1703, #1834).
  *
  * Background & Nonobvious Context:
- * When linuxdeploy-plugin-appimage builds an AppImage with LDAI_UPDATE_INFORMATION,
- * it runs zsyncmake against the local output binary (e.g. `Luminous Music Player_3.1.0_amd64.AppImage`).
- * This generates a companion `.zsync` file containing metadata headers (`Filename:`, optional `URL:`)
- * followed by binary rolling checksum blocks.
+ * AppImageUpdate reads the update information embedded in the AppImage
+ * (`gh-releases-zsync|…|Luminous.Music.Player_*_amd64.AppImage.zsync`, from
+ * LDAI_UPDATE_INFORMATION) and fetches the matching .zsync from the release, which
+ * names the AppImage to download delta blocks from.
  *
- * When assets are uploaded to GitHub Releases, GitHub automatically transliterates spaces
- * to dots in asset filenames (e.g. `Luminous.Music.Player_3.1.0_amd64.AppImage`).
- * Without adjusting the `.zsync` file, AppImage delta updaters (AppImageUpdate, Gear Lever)
- * look for the space-delimited filename and receive HTTP 404.
+ * appimagetool (inside linuxdeploy-plugin-appimage) does run zsyncmake, but in its
+ * own working directory, not next to the AppImage: under tauri-action that's
+ * `src-tauri/`, so the file never reached the bundle directory and v3.2.0's release
+ * build failed. It also names the AppImage with spaces, while GitHub renames spaces
+ * to dots on upload, so its Filename:/URL: headers would 404.
  *
- * This module adjusts the ASCII header to reference the dotted filename and renames the file
- * on disk, guaranteeing that the binary checksum payload remains byte-for-byte untouched.
+ * So this script ignores that byproduct and runs zsyncmake itself against the final
+ * AppImage in the bundle directory, under the dotted name the release asset will
+ * have. It then checks the result's SHA-1 and Length headers against the AppImage,
+ * the one check that proves the .zsync describes the file that ships.
  */
+import { execFileSync } from "child_process";
+import { createHash } from "crypto";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -26,136 +31,82 @@ export function toDottedFilename(filename: string): string {
   return filename.replace(/\s+/g, ".");
 }
 
-/**
- * Locates the boundary between the ASCII header and the binary block payload in a .zsync file.
- * The zsync specification mandates that headers are terminated by a double newline.
- *
- * @returns Header end offset, body start offset, and detected newline sequence, or null if invalid.
- */
-export function findHeaderEnd(
-  zsyncBuffer: Buffer
-): { headerEnd: number; bodyStart: number; lineEnding: string } | null {
-  for (let i = 0; i < zsyncBuffer.length - 1; i++) {
-    if (
-      i < zsyncBuffer.length - 3 &&
-      zsyncBuffer[i] === 0x0d &&
-      zsyncBuffer[i + 1] === 0x0a &&
-      zsyncBuffer[i + 2] === 0x0d &&
-      zsyncBuffer[i + 3] === 0x0a
-    ) {
-      return { headerEnd: i, bodyStart: i + 4, lineEnding: "\r\n" };
-    }
-    if (zsyncBuffer[i] === 0x0a && zsyncBuffer[i + 1] === 0x0a) {
-      return { headerEnd: i, bodyStart: i + 2, lineEnding: "\n" };
-    }
+/** Parses the ASCII header of a .zsync file (everything before the first blank line). */
+export function readZsyncHeaders(zsyncBuffer: Buffer): Map<string, string> {
+  const text = zsyncBuffer.toString("latin1");
+  const end = text.search(/\r?\n\r?\n/);
+  if (end < 0) throw new Error("Invalid .zsync file: no header terminator found");
+  const headers = new Map<string, string>();
+  for (const line of text.slice(0, end).split(/\r?\n/)) {
+    const colon = line.indexOf(":");
+    if (colon > 0) headers.set(line.slice(0, colon).trim(), line.slice(colon + 1).trim());
   }
-  return null;
+  return headers;
+}
+
+function sha1OfFile(filePath: string): string {
+  const hash = createHash("sha1");
+  const fd = fs.openSync(filePath, "r");
+  try {
+    const chunk = Buffer.alloc(1 << 20);
+    let read: number;
+    while ((read = fs.readSync(fd, chunk, 0, chunk.length, null)) > 0) hash.update(chunk.subarray(0, read));
+  } finally {
+    fs.closeSync(fd);
+  }
+  return hash.digest("hex");
 }
 
 /**
- * Rewrites the Filename and URL headers in a .zsync buffer while preserving the binary payload.
- *
- * @param zsyncBuffer - Raw buffer of the entire .zsync file.
- * @returns The transformed buffer along with original and rewritten filenames.
- * @throws Error if the buffer does not have a valid header terminator.
+ * Throws unless the .zsync describes `appImagePath` under `assetName`: Filename and URL
+ * name the release asset, and SHA-1 and Length match the AppImage's bytes.
  */
-export function transformZsyncBuffer(zsyncBuffer: Buffer): {
-  buffer: Buffer;
-  oldFilename?: string;
-  newFilename?: string;
-} {
-  const headerInfo = findHeaderEnd(zsyncBuffer);
-  if (!headerInfo) {
-    throw new Error("Invalid .zsync file: no header terminator found");
+export function verifyZsync(zsyncPath: string, appImagePath: string, assetName: string): void {
+  const headers = readZsyncHeaders(fs.readFileSync(zsyncPath));
+  const problems: string[] = [];
+  if (headers.get("Filename") !== assetName) problems.push(`Filename is "${headers.get("Filename")}"`);
+  if (headers.get("URL") !== assetName) problems.push(`URL is "${headers.get("URL")}"`);
+  const size = fs.statSync(appImagePath).size;
+  if (headers.get("Length") !== String(size)) problems.push(`Length is ${headers.get("Length")}, AppImage is ${size} bytes`);
+  const sha1 = sha1OfFile(appImagePath);
+  if (headers.get("SHA-1")?.toLowerCase() !== sha1) problems.push(`SHA-1 is ${headers.get("SHA-1")}, AppImage is ${sha1}`);
+  if (problems.length) {
+    throw new Error(`${path.basename(zsyncPath)} doesn't match ${assetName}: ${problems.join("; ")}`);
+  }
+}
+
+/** Runs zsyncmake; injectable so tests don't need the binary. */
+export type ZsyncmakeRunner = (args: string[]) => void;
+const runZsyncmake: ZsyncmakeRunner = (args) => {
+  execFileSync("zsyncmake", args, { stdio: "inherit" });
+};
+
+/**
+ * Writes `<dotted AppImage name>.zsync` next to every AppImage in `directory`, replacing
+ * any .zsync already there, and verifies each against its AppImage.
+ *
+ * @returns The .zsync files written.
+ * @throws If the directory holds no AppImage, or a generated .zsync doesn't verify.
+ */
+export function generateAppImageZsyncs(directory: string, run: ZsyncmakeRunner = runZsyncmake): string[] {
+  if (!fs.existsSync(directory)) throw new Error(`Directory not found: ${directory}`);
+  const appImages = fs.readdirSync(directory).filter((f) => f.endsWith(".AppImage"));
+  if (appImages.length === 0) throw new Error(`No .AppImage files found in ${directory}`);
+
+  for (const stale of fs.readdirSync(directory).filter((f) => f.endsWith(".zsync"))) {
+    fs.unlinkSync(path.join(directory, stale));
   }
 
-  const { headerEnd, bodyStart, lineEnding } = headerInfo;
-  const headerText = zsyncBuffer.subarray(0, headerEnd).toString("utf-8");
-  const headerLines = headerText.split(/\r?\n/);
-
-  let oldFilename: string | undefined;
-  let newFilename: string | undefined;
-
-  for (const line of headerLines) {
-    const match = line.match(/^Filename:\s*(.+)$/i);
-    if (match) {
-      oldFilename = match[1].trim();
-      newFilename = toDottedFilename(oldFilename);
-      break;
-    }
-  }
-
-  const transformedLines = headerLines.map((line) => {
-    if (line.match(/^Filename:\s*/i) && newFilename) {
-      return `Filename: ${newFilename}`;
-    }
-    if (line.match(/^URL:\s*/i)) {
-      const urlValue = line.replace(/^URL:\s*/i, "").trim();
-      if (oldFilename && newFilename && urlValue.includes(oldFilename)) {
-        return `URL: ${urlValue.replaceAll(oldFilename, newFilename)}`;
-      }
-      return `URL: ${toDottedFilename(urlValue)}`;
-    }
-    return line;
+  return appImages.map((appImage) => {
+    const appImagePath = path.join(directory, appImage);
+    const assetName = toDottedFilename(appImage);
+    const zsyncPath = path.join(directory, `${assetName}.zsync`);
+    // -f/-u: the Filename and URL headers; a relative URL resolves next to the .zsync
+    // in the same release. -o: write beside the AppImage, not into the working directory.
+    run(["-f", assetName, "-u", assetName, "-o", zsyncPath, appImagePath]);
+    verifyZsync(zsyncPath, appImagePath, assetName);
+    return zsyncPath;
   });
-
-  const newHeaderText = transformedLines.join(lineEnding);
-  const newHeaderBuf = Buffer.from(newHeaderText, "utf-8");
-  const separatorBuf = Buffer.from(lineEnding + lineEnding, "utf-8");
-  const bodyBuf = zsyncBuffer.subarray(bodyStart);
-
-  const resultBuf = Buffer.concat([newHeaderBuf, separatorBuf, bodyBuf]);
-  return {
-    buffer: resultBuf,
-    oldFilename,
-    newFilename,
-  };
-}
-
-/**
- * Rewrites a single .zsync file on disk, replaces its header values with dotted names,
- * and renames the file on disk to eliminate spaces.
- *
- * @param filePath - Path to the target .zsync file.
- * @returns Object recording the original and transformed file paths.
- */
-export function fixZsyncFile(filePath: string): { oldPath: string; newPath: string } {
-  const fileBuffer = fs.readFileSync(filePath);
-  const { buffer: transformedBuffer } = transformZsyncBuffer(fileBuffer);
-
-  const directory = path.dirname(filePath);
-  const originalBasename = path.basename(filePath);
-  const dottedBasename = toDottedFilename(originalBasename);
-  const newPath = path.join(directory, dottedBasename);
-
-  fs.writeFileSync(newPath, transformedBuffer);
-  if (path.resolve(filePath) !== path.resolve(newPath)) {
-    fs.unlinkSync(filePath);
-  }
-
-  return { oldPath: filePath, newPath };
-}
-
-/**
- * Scans a directory for all .zsync files and normalizes their headers and filenames.
- *
- * @param directory - Directory containing bundle artifacts (e.g. target/release/bundle/appimage).
- * @returns Array of transformed file paths.
- * @throws Error if the directory does not exist or contains no .zsync files.
- */
-export function fixAllZsyncInDir(directory: string): Array<{ oldPath: string; newPath: string }> {
-  if (!fs.existsSync(directory)) {
-    throw new Error(`Directory not found: ${directory}`);
-  }
-  const files = fs.readdirSync(directory).filter((f) => f.endsWith(".zsync"));
-  if (files.length === 0) {
-    throw new Error(`No .zsync files found in ${directory}`);
-  }
-  const results: Array<{ oldPath: string; newPath: string }> = [];
-  for (const file of files) {
-    results.push(fixZsyncFile(path.join(directory, file)));
-  }
-  return results;
 }
 
 const isMainModule =
@@ -166,9 +117,8 @@ const isMainModule =
 if (isMainModule) {
   const targetDir =
     process.argv[2] || path.resolve(process.cwd(), "target/release/bundle/appimage");
-  console.log(`Fixing .zsync files in ${targetDir}...`);
-  const fixedFiles = fixAllZsyncInDir(targetDir);
-  for (const fileResult of fixedFiles) {
-    console.log(`Fixed: ${fileResult.oldPath} -> ${fileResult.newPath}`);
+  console.log(`Generating .zsync files in ${targetDir}...`);
+  for (const zsyncPath of generateAppImageZsyncs(targetDir)) {
+    console.log(`Generated and verified: ${zsyncPath}`);
   }
 }

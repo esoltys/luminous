@@ -1,161 +1,125 @@
 // @vitest-environment node
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { createHash } from "crypto";
 import fs from "fs";
 import path from "path";
 import os from "os";
 import {
   toDottedFilename,
-  findHeaderEnd,
-  transformZsyncBuffer,
-  fixZsyncFile,
-  fixAllZsyncInDir,
+  readZsyncHeaders,
+  verifyZsync,
+  generateAppImageZsyncs,
+  type ZsyncmakeRunner,
 } from "../../../scripts/fix-appimage-zsync.js";
 
-describe("fixAppImageZsync: buffer transformation", () => {
+const APPIMAGE = "Luminous Music Player_3.2.0_amd64.AppImage";
+const ASSET = "Luminous.Music.Player_3.2.0_amd64.AppImage";
+
+/** Builds a .zsync like zsyncmake 0.6.2 does: ASCII headers, a blank line, then binary checksums. */
+function zsyncFor(appImage: Buffer, overrides: Record<string, string> = {}): Buffer {
+  const headers = {
+    "zsync": "0.6.2",
+    "Filename": ASSET,
+    "MTime": "Tue, 27 Oct 2026 17:31:00 +0000",
+    "Blocksize": "2048",
+    "Length": String(appImage.length),
+    "Hash-Lengths": "2,2,4",
+    "URL": ASSET,
+    "SHA-1": createHash("sha1").update(appImage).digest("hex"),
+    ...overrides,
+  };
+  const text = Object.entries(headers).map(([k, v]) => `${k}: ${v}`).join("\n");
+  return Buffer.concat([Buffer.from(`${text}\n\n`, "latin1"), Buffer.from([0x00, 0xff, 0x10, 0x0a, 0x0a])]);
+}
+
+/** A fake zsyncmake that honours -o and writes the given .zsync content. */
+function fakeZsyncmake(content: (appImage: Buffer) => Buffer, calls: string[][] = []): ZsyncmakeRunner {
+  return (args) => {
+    calls.push(args);
+    const out = args[args.indexOf("-o") + 1];
+    fs.writeFileSync(out, content(fs.readFileSync(args[args.length - 1])));
+  };
+}
+
+describe("fixAppImageZsync: headers", () => {
   it("converts spaces to dots in filenames", () => {
-    expect(toDottedFilename("Luminous Music Player_3.1.0_amd64.AppImage")).toBe(
-      "Luminous.Music.Player_3.1.0_amd64.AppImage"
-    );
-    expect(toDottedFilename("Already.Dotted.AppImage")).toBe("Already.Dotted.AppImage");
+    expect(toDottedFilename(APPIMAGE)).toBe(ASSET);
+    expect(toDottedFilename(ASSET)).toBe(ASSET);
   });
 
-  it("finds header end with \\n\\n", () => {
-    const buf = Buffer.from("zsync: 0.6.2\nFilename: test.AppImage\n\nBINARY_DATA");
-    const result = findHeaderEnd(buf);
-    expect(result).not.toBeNull();
-    expect(result?.lineEnding).toBe("\n");
-    expect(buf.subarray(result!.bodyStart).toString()).toBe("BINARY_DATA");
+  it("reads the header block and stops at the blank line before the binary checksums", () => {
+    const headers = readZsyncHeaders(zsyncFor(Buffer.from("app")));
+    expect(headers.get("Filename")).toBe(ASSET);
+    expect(headers.get("Length")).toBe("3");
+    expect(headers.size).toBe(8);
   });
 
-  it("finds header end with \\r\\n\\r\\n", () => {
-    const buf = Buffer.from("zsync: 0.6.2\r\nFilename: test.AppImage\r\n\r\nBINARY_DATA");
-    const result = findHeaderEnd(buf);
-    expect(result).not.toBeNull();
-    expect(result?.lineEnding).toBe("\r\n");
-    expect(buf.subarray(result!.bodyStart).toString()).toBe("BINARY_DATA");
+  it("reads CRLF headers", () => {
+    const headers = readZsyncHeaders(Buffer.from(`Filename: ${ASSET}\r\nLength: 3\r\n\r\nDATA`));
+    expect(headers.get("Length")).toBe("3");
   });
 
-  it("rewrites Filename and URL headers with spaces replaced by dots", () => {
-    const binaryBytes = Buffer.from([0x00, 0x01, 0x02, 0xff, 0xfe, 0x00, 0x10]);
-    const header = [
-      "zsync: 0.6.2",
-      "Filename: Luminous Music Player_3.1.0_amd64.AppImage",
-      "MTime: 1713511200",
-      "Blocksize: 2048",
-      "Length: 524288000",
-      "Hash-Lengths: 2,2,4",
-      "URL: Luminous Music Player_3.1.0_amd64.AppImage",
-      "SHA-1: 97edb7d0d7daa7864c45edf14add33ec23ae94f8",
-    ].join("\n");
-
-    const input = Buffer.concat([Buffer.from(header + "\n\n", "utf-8"), binaryBytes]);
-    const { buffer: output, oldFilename, newFilename } = transformZsyncBuffer(input);
-
-    expect(oldFilename).toBe("Luminous Music Player_3.1.0_amd64.AppImage");
-    expect(newFilename).toBe("Luminous.Music.Player_3.1.0_amd64.AppImage");
-
-    const headerEnd = findHeaderEnd(output)!;
-    const outputHeader = output.subarray(0, headerEnd.headerEnd).toString("utf-8");
-    const outputBinary = output.subarray(headerEnd.bodyStart);
-
-    expect(outputHeader).toContain("Filename: Luminous.Music.Player_3.1.0_amd64.AppImage");
-    expect(outputHeader).toContain("URL: Luminous.Music.Player_3.1.0_amd64.AppImage");
-    expect(outputHeader).not.toContain("Luminous Music Player");
-
-    // Binary payload must be byte-for-byte identical
-    expect(outputBinary).toEqual(binaryBytes);
-  });
-
-  it("handles zsync file without URL header", () => {
-    const binaryBytes = Buffer.from([0xaa, 0xbb, 0xcc]);
-    const header = [
-      "zsync: 0.6.2",
-      "Filename: Luminous Music Player_3.1.0_amd64.AppImage",
-      "Blocksize: 2048",
-      "Length: 100",
-    ].join("\n");
-
-    const input = Buffer.concat([Buffer.from(header + "\n\n", "utf-8"), binaryBytes]);
-    const { buffer: output } = transformZsyncBuffer(input);
-
-    const headerEnd = findHeaderEnd(output)!;
-    const outputHeader = output.subarray(0, headerEnd.headerEnd).toString("utf-8");
-    expect(outputHeader).toContain("Filename: Luminous.Music.Player_3.1.0_amd64.AppImage");
-    expect(outputHeader).not.toContain("URL:");
-    expect(output.subarray(headerEnd.bodyStart)).toEqual(binaryBytes);
-  });
-
-  it("preserves already-dotted headers (idempotency)", () => {
-    const binaryBytes = Buffer.from([0x12, 0x34]);
-    const header = [
-      "zsync: 0.6.2",
-      "Filename: Luminous.Music.Player_3.1.0_amd64.AppImage",
-      "URL: Luminous.Music.Player_3.1.0_amd64.AppImage",
-    ].join("\n");
-
-    const input = Buffer.concat([Buffer.from(header + "\n\n", "utf-8"), binaryBytes]);
-    const { buffer: output, oldFilename, newFilename } = transformZsyncBuffer(input);
-
-    expect(oldFilename).toBe("Luminous.Music.Player_3.1.0_amd64.AppImage");
-    expect(newFilename).toBe("Luminous.Music.Player_3.1.0_amd64.AppImage");
-    expect(output).toEqual(input);
-  });
-
-  it("throws on invalid file without header end", () => {
-    const invalid = Buffer.from("just plain text without empty line");
-    expect(() => transformZsyncBuffer(invalid)).toThrow(/no header terminator/);
+  it("throws on a file without a header terminator", () => {
+    expect(() => readZsyncHeaders(Buffer.from("just plain text"))).toThrow(/no header terminator/);
   });
 });
 
-describe("fixAppImageZsync: filesystem operations", () => {
+describe("fixAppImageZsync: generating and verifying", () => {
   let tmpDir: string;
+  let appImagePath: string;
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "zsync-test-"));
+    appImagePath = path.join(tmpDir, APPIMAGE);
+    fs.writeFileSync(appImagePath, Buffer.from("fake AppImage bytes"));
   });
 
   afterEach(() => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it("renames file on disk and removes old file with spaces", () => {
-    const oldFileName = "Luminous Music Player_3.1.0_amd64.AppImage.zsync";
-    const oldFilePath = path.join(tmpDir, oldFileName);
-    const content = Buffer.concat([
-      Buffer.from("zsync: 0.6.2\nFilename: Luminous Music Player_3.1.0_amd64.AppImage\n\n"),
-      Buffer.from([0x01, 0x02, 0x03]),
-    ]);
-    fs.writeFileSync(oldFilePath, content);
+  it("runs zsyncmake on the AppImage under its dotted asset name, writing beside it", () => {
+    const calls: string[][] = [];
+    const written = generateAppImageZsyncs(tmpDir, fakeZsyncmake((a) => zsyncFor(a), calls));
 
-    const result = fixZsyncFile(oldFilePath);
-    expect(result.oldPath).toBe(oldFilePath);
-    expect(path.basename(result.newPath)).toBe("Luminous.Music.Player_3.1.0_amd64.AppImage.zsync");
-
-    expect(fs.existsSync(oldFilePath)).toBe(false);
-    expect(fs.existsSync(result.newPath)).toBe(true);
-
-    const updated = fs.readFileSync(result.newPath, "utf-8");
-    expect(updated).toContain("Filename: Luminous.Music.Player_3.1.0_amd64.AppImage");
+    const zsyncPath = path.join(tmpDir, `${ASSET}.zsync`);
+    expect(written).toEqual([zsyncPath]);
+    expect(calls).toEqual([["-f", ASSET, "-u", ASSET, "-o", zsyncPath, appImagePath]]);
+    expect(fs.existsSync(zsyncPath)).toBe(true);
   });
 
-  it("processes all .zsync files in a directory", () => {
-    const file1 = path.join(tmpDir, "Luminous Music Player_3.1.0_amd64.AppImage.zsync");
-    fs.writeFileSync(
-      file1,
-      Buffer.from("zsync: 0.6.2\nFilename: Luminous Music Player_3.1.0_amd64.AppImage\n\nDATA")
-    );
+  it("replaces a .zsync already in the directory", () => {
+    const stale = path.join(tmpDir, `${APPIMAGE}.zsync`);
+    fs.writeFileSync(stale, "stale");
 
-    const results = fixAllZsyncInDir(tmpDir);
-    expect(results).toHaveLength(1);
-    expect(path.basename(results[0].newPath)).toBe("Luminous.Music.Player_3.1.0_amd64.AppImage.zsync");
-    expect(fs.existsSync(file1)).toBe(false);
+    generateAppImageZsyncs(tmpDir, fakeZsyncmake((a) => zsyncFor(a)));
+
+    expect(fs.existsSync(stale)).toBe(false);
+    expect(fs.readdirSync(tmpDir).filter((f) => f.endsWith(".zsync"))).toEqual([`${ASSET}.zsync`]);
   });
 
-  it("throws if no .zsync files are found in directory", () => {
-    expect(() => fixAllZsyncInDir(tmpDir)).toThrow(/No \.zsync files found/);
+  it("rejects a .zsync whose SHA-1 doesn't match the AppImage", () => {
+    const run = fakeZsyncmake((a) => zsyncFor(a, { "SHA-1": "0".repeat(40) }));
+    expect(() => generateAppImageZsyncs(tmpDir, run)).toThrow(/SHA-1 is 0{40}, AppImage is [0-9a-f]{40}/);
   });
 
-  it("throws if directory does not exist", () => {
-    expect(() => fixAllZsyncInDir(path.join(tmpDir, "nonexistent"))).toThrow(/Directory not found/);
+  it("rejects a .zsync whose Length doesn't match the AppImage", () => {
+    const run = fakeZsyncmake((a) => zsyncFor(a, { Length: "1" }));
+    expect(() => generateAppImageZsyncs(tmpDir, run)).toThrow(/Length is 1, AppImage is 19 bytes/);
+  });
+
+  it("rejects a .zsync that still names the AppImage with spaces", () => {
+    const zsyncPath = path.join(tmpDir, `${ASSET}.zsync`);
+    fs.writeFileSync(zsyncPath, zsyncFor(fs.readFileSync(appImagePath), { Filename: APPIMAGE, URL: APPIMAGE }));
+    expect(() => verifyZsync(zsyncPath, appImagePath, ASSET)).toThrow(/Filename is "Luminous Music Player.*URL is/);
+  });
+
+  it("throws if the directory holds no AppImage", () => {
+    fs.rmSync(appImagePath);
+    expect(() => generateAppImageZsyncs(tmpDir, fakeZsyncmake((a) => zsyncFor(a)))).toThrow(/No \.AppImage files found/);
+  });
+
+  it("throws if the directory does not exist", () => {
+    expect(() => generateAppImageZsyncs(path.join(tmpDir, "nonexistent"))).toThrow(/Directory not found/);
   });
 });
