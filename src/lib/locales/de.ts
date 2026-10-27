@@ -551,8 +551,8 @@ export const de = {
     fanartDesc1: "Luminous verwendet ",
     fanartDesc2: ", um Interpretenfotos, Bandlogos, Kopfzeilenhintergründe, Albumcover und Disc-Grafiken abzurufen, wenn lokal keine vorhanden sind. Luminous stellt einen Standardschlüssel bereit; ist kein Schlüssel konfiguriert, greift Luminous bei Interpretenfotos auf Deezer und Wikidata zurück.",
     fanartApiKeyLabel: "API-Schlüssel",
-    fanartDefaultKeyActive: "Verwendet den Standard-fanart.tv-Schlüssel von Luminous. Sie können unten einen eigenen Schlüssel eingeben, um ihn zu überschreiben.",
-    fanartCustomKeyActive: "Ihr persönlicher API-Schlüssel ist aktiv",
+    fanartDefaultKeyActive: "Verwendet den Standard-fanart.tv-Schlüssel von Luminous. Unten kannst du einen eigenen Schlüssel eingeben, der ihn ersetzt.",
+    fanartCustomKeyActive: "Dein persönlicher API-Schlüssel ist aktiv",
     fanartClearKeyBtn: "Auf Standard zurücksetzen",
     fanartEnvKeyFound: "In der Umgebungsvariable {env} wurde ein API-Schlüssel gefunden.",
     fanartPlaceholder: "Optional: Persönlichen API-Schlüssel eingeben, um den Standard zu überschreiben",
@@ -1101,7 +1101,7 @@ export const de = {
     contextReadLess: "Weniger lesen",
     contextEmptyTitle: "Bisher keine Details für dieses Lied",
     contextEmptyTitleEntity: "Bisher keine Details gefunden",
-    contextEmptyDesc: "Luminous zeigt an, was in den Tags des Liedes gespeichert ist. Füllen Sie sie aus, und sie erscheinen hier.",
+    contextEmptyDesc: "Luminous zeigt an, was in den Tags des Liedes gespeichert ist. Füll sie aus, dann erscheinen sie hier.",
     contextEditTags: "Tags bearbeiten",
     contextOpenFolderInPicard: "Ordner in Picard öffnen",
     contextGetPicard: "MusicBrainz Picard herunterladen",
@@ -1798,14 +1798,14 @@ export const de = {
     close: "Schließen",
     toastErrors: "Dateien, die nicht organisiert werden konnten: {count}",
     confirmApplyTitle: "Dateien organisieren",
-    confirmApplyMessage: "Sie sind im Begriff, {files} in {folders} zu verschieben.",
+    confirmApplyMessage: "Du bist dabei, {files} in {folders} zu verschieben.",
     confirmApplyCleanDirs: "Leere Quellordner werden gelöscht.",
     confirmApplyMoveExtra: "Begleitdateien (Cover, Songtexte und Cue-Sheets) werden ebenfalls verschoben.",
     confirmApplyAutoOrganize: "Die automatische Organisation übernimmt diese Vorlage für alle zukünftigen Titel.",
     confirmApplyCustomDest: "Zielordner: {path}",
     confirmApplyBtn: "Dateien organisieren",
     confirmAutoOrganizeTitle: "Automatische Organisation aktivieren",
-    confirmAutoOrganizeMessage: "Wenn Sie die automatische Organisation aktivieren, werden vorhandene Titel in Ihrer Bibliothek sofort gemäß der aktuellen Vorlage neu organisiert und Dateien bei Tag-Änderungen oder neuen Titeln automatisch verschoben. Möchten Sie die automatische Organisation wirklich aktivieren?",
+    confirmAutoOrganizeMessage: "Wenn du die automatische Organisation aktivierst, werden vorhandene Titel in deiner Mediathek sofort gemäß der aktuellen Vorlage neu organisiert und Dateien bei Tag-Änderungen oder neuen Titeln automatisch verschoben. Möchtest du die automatische Organisation wirklich aktivieren?",
     confirmAutoOrganizeBtn: "Automatische Organisation aktivieren",
     filesCount: {
       one: "{count} Datei",
@@ -2162,14 +2162,14 @@ export const de = {
   },
   safeguard: {
     toastMessage: {
-      one: "{count} Titel in „{folder}“ konnte nicht gefunden werden. In Ihrer Bibliothek behalten.",
-      other: "{count} Titel in „{folder}“ konnten nicht gefunden werden. In Ihrer Bibliothek behalten."
+      one: "{count} Titel in „{folder}“ konnte nicht gefunden werden. Er bleibt in deiner Mediathek.",
+      other: "{count} Titel in „{folder}“ konnten nicht gefunden werden. Sie bleiben in deiner Mediathek."
     },
     reviewBtn: "Überprüfen",
     dialogTitle: "Ordner oder Laufwerk fehlt?",
     dialogMessage: {
-      one: "{count} von {total} Titel in „{folder}“ konnte nicht gefunden werden. Dies geschieht normalerweise, wenn ein externes Laufwerk oder ein Ordner getrennt oder umbenannt wurde.\n\nMöchten Sie ihn in Ihrer Bibliothek behalten, bis er wieder verbunden ist, oder entfernen?",
-      other: "{count} von {total} Titeln in „{folder}“ konnten nicht gefunden werden. Dies geschieht normalerweise, wenn ein externes Laufwerk oder ein Ordner getrennt oder umbenannt wurde.\n\nMöchten Sie sie in Ihrer Bibliothek behalten, bis sie wieder verbunden sind, oder entfernen?"
+      one: "{count} von {total} Titel in „{folder}“ konnte nicht gefunden werden. Dies geschieht normalerweise, wenn ein externes Laufwerk oder ein Ordner getrennt oder umbenannt wurde.\n\nMöchtest du ihn in deiner Mediathek behalten, bis er wieder verbunden ist, oder entfernen?",
+      other: "{count} von {total} Titeln in „{folder}“ konnten nicht gefunden werden. Dies geschieht normalerweise, wenn ein externes Laufwerk oder ein Ordner getrennt oder umbenannt wurde.\n\nMöchtest du sie in deiner Mediathek behalten, bis sie wieder verbunden sind, oder entfernen?"
     },
     keepSongsBtn: "Titel behalten",
     confirmRemoveBtn: "Titel entfernen"
