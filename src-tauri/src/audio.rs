@@ -181,7 +181,7 @@ fn assemble_pipeline_info(
         limiter: "-1.0 dBTP True Peak limiter".to_string(),
         output_sample_rate: output.sample_rate,
         output_channels: output.channels,
-        output_format: "32-bit float PCM".to_string(),
+        output_format: output.format,
         output_device_name: output.device_name,
         output_backend: output.backend_name,
     }
@@ -197,6 +197,7 @@ mod tests {
             channels: 2,
             device_name: "Test DAC".into(),
             backend_name: "CPAL".into(),
+            format: "32-bit float PCM".into(),
         }
     }
 

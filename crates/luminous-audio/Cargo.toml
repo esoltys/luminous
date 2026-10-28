@@ -26,6 +26,17 @@ serde = { workspace = true, features = ["derive"] }
 
 [target.'cfg(windows)'.dependencies]
 azo = "0.5"
+# WASAPI exclusive-mode output (#1298); the same `windows` version cpal uses.
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_Media_Audio",
+    "Win32_Media_KernelStreaming",
+    "Win32_Security",
+    "Win32_System_Com",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_System_Threading",
+    "Win32_System_Variant",
+] }
 
 [features]
 # Exposes `write_test_pcm16_wav` to the app crate's tests.

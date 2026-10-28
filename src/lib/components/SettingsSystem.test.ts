@@ -26,6 +26,9 @@ vi.mock("@tauri-apps/api/core", () => ({
     if (cmd === "get_audio_output_devices") {
       return Promise.resolve([
         { id: "def-1", name: "Speakers (Realtek Audio)", backend: "cpal", is_default: true },
+        { id: "usb-1", name: "USB DAC", backend: "cpal", is_default: false },
+        { id: "def-1", name: "Speakers (Realtek Audio)", backend: "wasapi_exclusive", is_default: true },
+        { id: "usb-1", name: "USB DAC", backend: "wasapi_exclusive", is_default: false },
         { id: "asio-1", name: "FlexASIO", backend: "asio", is_default: false },
       ]);
     }
@@ -129,6 +132,36 @@ describe("SettingsSystem.svelte", () => {
     expect(invoke).toHaveBeenCalledWith("set_audio_output_settings", {
       settings: { backend: "asio", device_id: "asio-1" },
     });
+  });
+
+  it("keeps the chosen device when switching from shared to exclusive mode", async () => {
+    platform.isWindows = true;
+    const { findByLabelText, findByRole } = render(SettingsSystem);
+    await findByRole("option", { name: "USB DAC" });
+    prefs.audioOutputConfig = { backend: "cpal", device_id: "usb-1" };
+
+    const backendSelect = await findByLabelText("Output Mode");
+    await fireEvent.change(backendSelect, { target: { value: "wasapi_exclusive" } });
+
+    expect(invoke).toHaveBeenCalledWith("set_audio_output_settings", {
+      settings: { backend: "wasapi_exclusive", device_id: "usb-1" },
+    });
+  });
+
+  it("offers the system default device in exclusive mode", async () => {
+    platform.isWindows = true;
+    const { findByLabelText, findByRole } = render(SettingsSystem);
+    await findByRole("option", { name: "USB DAC" });
+    prefs.audioOutputConfig = { backend: "wasapi_exclusive", device_id: null };
+    flushSync();
+
+    const deviceSelect = (await findByLabelText("Output Device")) as HTMLSelectElement;
+    const labels = Array.from(deviceSelect.options).map((o) => o.textContent?.trim());
+    expect(labels).toEqual([
+      "Default Output Device",
+      "Speakers (Realtek Audio) (Default Output Device)",
+      "USB DAC",
+    ]);
   });
 
   it("opens the ASIO control panel when requested", async () => {

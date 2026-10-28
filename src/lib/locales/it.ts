@@ -323,6 +323,7 @@ export const it = {
     audioBackendHint: "Scegli tra l'audio di sistema condiviso e lo streaming diretto all'hardware.",
     audioBackendShared: "Audio condiviso (predefinito di sistema)",
     audioBackendAsio: "Hardware diretto (ASIO)",
+    audioBackendExclusive: "Modalità esclusiva (WASAPI)",
     audioDeviceLabel: "Dispositivo di uscita",
     audioDeviceHint: "Seleziona la scheda audio o il convertitore digitale-analogico (DAC) per la riproduzione.",
     audioDeviceDefault: "Dispositivo di uscita predefinito",
@@ -1113,6 +1114,11 @@ export const it = {
     contextOffline: "Offline. Attiva «Online» in Impostazioni › Integrazioni per recuperare biografie e contesto.",
     trackSkippedToast: "Impossibile riprodurre «{title}»: file non trovato. Brano saltato.",
     outputUnavailableToast: 'Uscita audio non disponibile. Collega un dispositivo e premi riproduci.',
+    outputFallbackDeviceInUse: "Impossibile avviare {mode}: un'altra app sta usando il dispositivo. Riproduzione tramite audio condiviso per ora.",
+    outputFallbackExclusiveDisabled: "Impossibile avviare {mode}: Windows non consente il controllo esclusivo di questo dispositivo. Attivalo nelle proprietà audio del dispositivo (scheda Avanzate). Riproduzione tramite audio condiviso per ora.",
+    outputFallbackFormatUnsupported: "Impossibile avviare {mode}: il dispositivo non accetta alcun formato stereo che Luminous possa inviare. Riproduzione tramite audio condiviso per ora.",
+    outputFallbackUnavailable: "Impossibile avviare {mode}. Riproduzione tramite audio condiviso per ora.",
+    outputFallbackRetry: "Riprova",
     tracksSkippedToast: {
       one: "{count} brano non disponibile saltato.",
       other: "{count} brani non disponibili saltati."

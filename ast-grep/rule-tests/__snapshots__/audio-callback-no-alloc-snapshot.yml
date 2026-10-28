@@ -1,13 +1,7 @@
 id: audio-callback-no-alloc
 snapshots:
-  ? |
-    fn setup() {
-        let stream = device.build_output_stream(&config, move |output: &mut [f32], _| {
-            let mut tmp = Vec::new();
-            tmp.push(output[0]);
-        }, err_fn, None);
-    }
-  : labels:
+  "fn setup() {\n    let stream = device.build_output_stream(&config, move |output: &mut [f32], _| {\n        let mut tmp = Vec::new();\n        tmp.push(output[0]);\n    }, err_fn, None);\n}\n":
+    labels:
     - source: Vec::new()
       style: primary
       start: 119
@@ -36,13 +30,8 @@ snapshots:
       style: secondary
       start: 66
       end: 165
-  ? |
-    fn setup() {
-        let stream = device.build_output_stream(&config, move |output: &mut [f32], _| {
-            log(format!("{}", output.len()));
-        }, err_fn, None);
-    }
-  : labels:
+  "fn setup() {\n    let stream = device.build_output_stream(&config, move |output: &mut [f32], _| {\n        log(format!(\"{}\", output.len()));\n    }, err_fn, None);\n}\n":
+    labels:
     - source: format!("{}", output.len())
       style: primary
       start: 109
@@ -68,13 +57,8 @@ snapshots:
       style: secondary
       start: 66
       end: 144
-  ? |
-    impl OutputRenderer {
-        fn render(&mut self, output: &mut [f32]) {
-            let label = format!("{}", output.len());
-        }
-    }
-  : labels:
+  "impl OutputRenderer {\n    fn render(&mut self, output: &mut [f32]) {\n        let label = format!(\"{}\", output.len());\n    }\n}\n":
+    labels:
     - source: format!("{}", output.len())
       style: primary
       start: 89
@@ -92,3 +76,22 @@ snapshots:
       style: secondary
       start: 0
       end: 125
+  "impl RenderPeriod {\n    fn fill(&mut self, frames: u32) {\n        let scratch = vec![0.0f32; frames as usize];\n    }\n}\n":
+    labels:
+    - source: vec![0.0f32; frames as usize]
+      style: primary
+      start: 80
+      end: 109
+    - source: RenderPeriod
+      style: secondary
+      start: 5
+      end: 17
+    - source: |-
+        impl RenderPeriod {
+            fn fill(&mut self, frames: u32) {
+                let scratch = vec![0.0f32; frames as usize];
+            }
+        }
+      style: secondary
+      start: 0
+      end: 118

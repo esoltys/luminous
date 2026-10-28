@@ -104,40 +104,25 @@ pub fn interleave_to_deinterleaved_f32(
     n
 }
 
+// The float → integer converters scale by 2^(bits-1), the exact inverse of
+// Symphonia's integer → float decode (`s / 32768.0` for 16-bit), so an
+// untouched sample reaches the device with the bits it had in the file. The
+// `as` casts saturate, which pins +1.0 to the type's maximum.
+
 #[inline]
 pub fn f32_to_i16(sample: f32) -> i16 {
-    let clamped = sample.clamp(-1.0, 1.0);
-    if clamped >= 1.0 {
-        i16::MAX
-    } else if clamped <= -1.0 {
-        i16::MIN
-    } else {
-        (clamped * 32767.0).round() as i16
-    }
+    (sample * 32_768.0).round() as i16
 }
 
 #[inline]
 pub fn f32_to_i32(sample: f32) -> i32 {
-    let clamped = sample.clamp(-1.0, 1.0);
-    if clamped >= 1.0 {
-        i32::MAX
-    } else if clamped <= -1.0 {
-        i32::MIN
-    } else {
-        (clamped * 2147483647.0).round() as i32
-    }
+    (sample as f64 * 2_147_483_648.0).round() as i32
 }
 
+/// A 24-bit sample, right-justified (sign-extended) in an `i32`.
 #[inline]
 pub fn f32_to_i24_in_i32(sample: f32) -> i32 {
-    let clamped = sample.clamp(-1.0, 1.0);
-    if clamped >= 1.0 {
-        8388607
-    } else if clamped <= -1.0 {
-        -8388608
-    } else {
-        (clamped * 8388607.0).round() as i32
-    }
+    ((sample * 8_388_608.0).round() as i32).clamp(-8_388_608, 8_388_607)
 }
 
 #[inline]
@@ -241,6 +226,84 @@ pub fn interleave_to_deinterleaved_f32_be(
     n
 }
 
+/// An interleaved little-endian integer PCM layout a device accepts, as
+/// negotiated with WASAPI exclusive mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PcmFormat {
+    /// 32-bit container, 32 valid bits.
+    I32,
+    /// 32-bit container, 24 valid bits left-justified (the low byte is zero).
+    I24In32,
+    /// 3-byte packed 24-bit samples.
+    I24Packed,
+    I16,
+}
+
+impl PcmFormat {
+    /// Deepest first: every candidate holds a 16- or 24-bit source losslessly,
+    /// and a wider one leaves the gain chain more resolution.
+    pub const PREFERENCE: [PcmFormat; 4] = [Self::I32, Self::I24In32, Self::I24Packed, Self::I16];
+
+    /// Bytes one sample occupies in the device buffer.
+    pub fn container_bytes(self) -> usize {
+        match self {
+            Self::I32 | Self::I24In32 => 4,
+            Self::I24Packed => 3,
+            Self::I16 => 2,
+        }
+    }
+
+    /// Significant bits per sample.
+    pub fn valid_bits(self) -> u16 {
+        match self {
+            Self::I32 => 32,
+            Self::I24In32 | Self::I24Packed => 24,
+            Self::I16 => 16,
+        }
+    }
+
+    /// The pipeline display's name for this format, e.g. "24-bit integer PCM".
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::I32 => "32-bit integer PCM",
+            Self::I24In32 | Self::I24Packed => "24-bit integer PCM",
+            Self::I16 => "16-bit integer PCM",
+        }
+    }
+}
+
+/// Converts interleaved `f32` samples into `dst` in `format`, sample for
+/// sample (channel order is kept). Writes as many whole samples as both sides
+/// hold and returns that count. Allocation-free: safe on the audio thread.
+pub fn write_interleaved(src: &[f32], format: PcmFormat, dst: &mut [u8]) -> usize {
+    let width = format.container_bytes();
+    let n = src.len().min(dst.len() / width);
+    let out = dst[..n * width].chunks_exact_mut(width);
+    match format {
+        PcmFormat::I32 => {
+            for (s, o) in src.iter().zip(out) {
+                o.copy_from_slice(&f32_to_i32(*s).to_le_bytes());
+            }
+        }
+        PcmFormat::I24In32 => {
+            for (s, o) in src.iter().zip(out) {
+                o.copy_from_slice(&(f32_to_i24_in_i32(*s) << 8).to_le_bytes());
+            }
+        }
+        PcmFormat::I24Packed => {
+            for (s, o) in src.iter().zip(out) {
+                o.copy_from_slice(&f32_to_i24_packed(*s));
+            }
+        }
+        PcmFormat::I16 => {
+            for (s, o) in src.iter().zip(out) {
+                o.copy_from_slice(&f32_to_i16(*s).to_le_bytes());
+            }
+        }
+    }
+    n
+}
+
 /// Native sample formats supported by ASIO drivers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AsioSampleFormat {
@@ -275,6 +338,19 @@ impl AsioSampleFormat {
             | Self::Float32LSB
             | Self::Float32MSB => 4,
             Self::Unknown(_) => 0,
+        }
+    }
+
+    /// The pipeline display's name for this format, e.g. "24-bit integer PCM".
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Int16LSB | Self::Int16MSB => "16-bit integer PCM",
+            Self::Int24LSB | Self::Int24MSB | Self::Int32LSB24 | Self::Int32MSB24 => {
+                "24-bit integer PCM"
+            }
+            Self::Int32LSB | Self::Int32MSB => "32-bit integer PCM",
+            Self::Float32LSB | Self::Float32MSB => "32-bit float PCM",
+            Self::Unknown(_) => "Unknown PCM",
         }
     }
 }
@@ -401,6 +477,52 @@ mod tests {
         assert_eq!(f32_to_i24_in_i32(0.0), 0);
         assert_eq!(f32_to_i24_in_i32(1.0), 8388607);
         assert_eq!(f32_to_i24_in_i32(-1.0), -8388608);
+    }
+
+    #[test]
+    fn integer_samples_survive_the_decode_round_trip_bit_for_bit() {
+        // Symphonia decodes integers to float by dividing by 2^(bits-1).
+        for s in i16::MIN..=i16::MAX {
+            assert_eq!(f32_to_i16(s as f32 / 32_768.0), s);
+        }
+        for s in [-8_388_608, -4_194_305, -1, 0, 1, 4_194_305, 8_388_607] {
+            assert_eq!(f32_to_i24_in_i32(s as f32 / 8_388_608.0), s);
+        }
+        for s in [i32::MIN, -1 << 30, -256, 0, 256, 1 << 30, i32::MAX & !0xFF] {
+            assert_eq!(f32_to_i32((s as f64 / 2_147_483_648.0) as f32), s);
+        }
+    }
+
+    #[test]
+    fn write_interleaved_lays_out_each_format_little_endian() {
+        let src = [0.5f32, -1.0];
+
+        let mut i16_out = [0u8; 4];
+        assert_eq!(write_interleaved(&src, PcmFormat::I16, &mut i16_out), 2);
+        assert_eq!(i16_out, [0x00, 0x40, 0x00, 0x80]);
+
+        let mut packed = [0u8; 6];
+        assert_eq!(
+            write_interleaved(&src, PcmFormat::I24Packed, &mut packed),
+            2
+        );
+        assert_eq!(packed, [0x00, 0x00, 0x40, 0x00, 0x00, 0x80]);
+
+        // 24 valid bits sit in the top three bytes of the 32-bit container.
+        let mut in32 = [0u8; 8];
+        assert_eq!(write_interleaved(&src, PcmFormat::I24In32, &mut in32), 2);
+        assert_eq!(in32, [0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x80]);
+
+        let mut i32_out = [0u8; 8];
+        assert_eq!(write_interleaved(&src, PcmFormat::I32, &mut i32_out), 2);
+        assert_eq!(i32_out, [0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x80]);
+    }
+
+    #[test]
+    fn write_interleaved_stops_at_the_shorter_side() {
+        let mut dst = [0xAAu8; 5];
+        assert_eq!(write_interleaved(&[0.0; 4], PcmFormat::I16, &mut dst), 2);
+        assert_eq!(dst, [0, 0, 0, 0, 0xAA]);
     }
 
     #[test]

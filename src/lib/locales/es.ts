@@ -323,6 +323,7 @@ export const es = {
     audioBackendHint: "Elige entre el audio compartido del sistema y la transmisión directa al hardware.",
     audioBackendShared: "Audio compartido (predeterminado del sistema)",
     audioBackendAsio: "Hardware directo (ASIO)",
+    audioBackendExclusive: "Modo exclusivo (WASAPI)",
     audioDeviceLabel: "Dispositivo de salida",
     audioDeviceHint: "Selecciona la tarjeta de sonido o el convertidor digital-analógico (DAC) para la reproducción.",
     audioDeviceDefault: "Dispositivo de salida predeterminado",
@@ -1113,6 +1114,11 @@ export const es = {
     contextOffline: "Sin conexión. Activa «En línea» en Ajustes › Integraciones para obtener biografías y contexto.",
     trackSkippedToast: "No se pudo reproducir «{title}»: archivo no encontrado. Se omitió.",
     outputUnavailableToast: 'Salida de audio no disponible. Conecta un dispositivo y pulsa reproducir.',
+    outputFallbackDeviceInUse: "No se pudo iniciar {mode}: otra aplicación está usando el dispositivo. Reproduciendo con audio compartido por ahora.",
+    outputFallbackExclusiveDisabled: "No se pudo iniciar {mode}: Windows no permite el control exclusivo de este dispositivo. Actívalo en las propiedades de sonido del dispositivo (pestaña Opciones avanzadas). Reproduciendo con audio compartido por ahora.",
+    outputFallbackFormatUnsupported: "No se pudo iniciar {mode}: el dispositivo no acepta ningún formato estéreo que Luminous pueda enviar. Reproduciendo con audio compartido por ahora.",
+    outputFallbackUnavailable: "No se pudo iniciar {mode}. Reproduciendo con audio compartido por ahora.",
+    outputFallbackRetry: "Reintentar",
     tracksSkippedToast: {
       one: "Se omitió {count} pista no disponible.",
       other: "Se omitieron {count} pistas no disponibles."

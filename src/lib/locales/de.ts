@@ -323,6 +323,7 @@ export const de = {
     audioBackendHint: "Zwischen Standard-Systemaudio und direktem Hardware-Streaming wählen.",
     audioBackendShared: "Geteiltes Audio (Systemstandard)",
     audioBackendAsio: "Direkte Hardware (ASIO)",
+    audioBackendExclusive: "Exklusivmodus (WASAPI)",
     audioDeviceLabel: "Ausgabegerät",
     audioDeviceHint: "Die Soundkarte oder den Digital-Analog-Wandler (DAC) für die Wiedergabe auswählen.",
     audioDeviceDefault: "Standard-Ausgabegerät",
@@ -1113,6 +1114,11 @@ export const de = {
     contextOffline: "Offline. „Online“ unter Einstellungen › Integrationen einschalten, um Biografien und Kontext abzurufen.",
     trackSkippedToast: '„{title}“ konnte nicht abgespielt werden – Datei nicht gefunden. Übersprungen.',
     outputUnavailableToast: 'Audioausgabe nicht verfügbar. Gerät verbinden und Wiedergabe drücken.',
+    outputFallbackDeviceInUse: "{mode} konnte nicht gestartet werden: Eine andere App verwendet das Gerät. Wiedergabe vorerst über geteiltes Audio.",
+    outputFallbackExclusiveDisabled: "{mode} konnte nicht gestartet werden: Windows erlaubt keine exklusive Steuerung dieses Geräts. In den Soundeigenschaften des Geräts (Registerkarte „Erweitert“) aktivieren. Wiedergabe vorerst über geteiltes Audio.",
+    outputFallbackFormatUnsupported: "{mode} konnte nicht gestartet werden: Das Gerät akzeptiert kein Stereoformat, das Luminous senden kann. Wiedergabe vorerst über geteiltes Audio.",
+    outputFallbackUnavailable: "{mode} konnte nicht gestartet werden. Wiedergabe vorerst über geteiltes Audio.",
+    outputFallbackRetry: "Erneut versuchen",
     tracksSkippedToast: {
       one: "{count} nicht verfügbarer Titel übersprungen.",
       other: "{count} nicht verfügbare Titel übersprungen."

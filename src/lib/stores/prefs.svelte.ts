@@ -298,6 +298,12 @@ class PrefsStore {
     }
   }
 
+  /** Reopen the output with the current settings, e.g. to retry exclusive
+   *  mode once the app holding the device has let it go. */
+  async reapplyAudioOutput() {
+    await this.setAudioOutput({ ...this.audioOutputConfig });
+  }
+
   async openAsioControlPanel(deviceId?: string | null) {
     try {
       await invoke("open_asio_control_panel", { deviceId: deviceId ?? null });

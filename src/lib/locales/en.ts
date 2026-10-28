@@ -323,6 +323,7 @@ export const en = {
     audioBackendHint: "Choose between standard system audio and direct hardware streaming.",
     audioBackendShared: "Shared Audio (System Default)",
     audioBackendAsio: "Direct Hardware (ASIO)",
+    audioBackendExclusive: "Exclusive Mode (WASAPI)",
     audioDeviceLabel: "Output Device",
     audioDeviceHint: "Select the sound card or digital-to-analog converter (DAC) for playback.",
     audioDeviceDefault: "Default Output Device",
@@ -1113,6 +1114,11 @@ export const en = {
     contextOffline: "Offline. Turn Online on in Settings › Integrations to fetch bios and context.",
     trackSkippedToast: 'Couldn\'t play "{title}" — file not found. Skipped.',
     outputUnavailableToast: 'Audio output unavailable. Connect a device and press play.',
+    outputFallbackDeviceInUse: "Couldn't start {mode}: another app is using the device. Playing through shared audio for now.",
+    outputFallbackExclusiveDisabled: "Couldn't start {mode}: Windows doesn't allow exclusive control of this device. Turn it on in the device's Sound properties (Advanced tab). Playing through shared audio for now.",
+    outputFallbackFormatUnsupported: "Couldn't start {mode}: the device accepts no stereo format Luminous can send. Playing through shared audio for now.",
+    outputFallbackUnavailable: "Couldn't start {mode}. Playing through shared audio for now.",
+    outputFallbackRetry: "Try Again",
     tracksSkippedToast: {
       one: "Skipped {count} unavailable track.",
       other: "Skipped {count} unavailable tracks."

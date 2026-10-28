@@ -269,7 +269,19 @@ export interface AudioPipelineInfo {
   output_backend: string;
 }
 
-export type AudioBackendKind = "cpal" | "asio";
+export type AudioBackendKind = "cpal" | "asio" | "wasapi_exclusive";
+
+/** Why a bit-perfect backend fell back to shared output (`audio-output-fallback`). */
+export type OutputFallbackReason =
+  | "device_in_use"
+  | "exclusive_mode_disabled"
+  | "format_unsupported"
+  | "unavailable";
+
+export interface OutputFallbackPayload {
+  requested: AudioBackendKind;
+  reason: OutputFallbackReason;
+}
 
 export interface AudioDeviceInfo {
   id: string;
