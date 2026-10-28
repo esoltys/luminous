@@ -175,11 +175,9 @@
         </div>
 
         <!-- Headroom / Bit-perfect note -->
-        <div class="flex items-center justify-between gap-2 pt-1 border-t border-brand-border/20 text-[11px]">
+        <div class="flex items-center justify-between gap-2">
           <span class="text-brand-text-secondary font-medium">{i18n.t('audioPipeline.headroom', {}, 'Processing Mode')}</span>
-          <span class="text-brand-text-primary font-mono font-semibold">
-            {pipeline.headroom}
-          </span>
+          <span class="font-semibold text-right text-brand-text-primary">{pipeline.headroom}</span>
         </div>
       </div>
     </div>
@@ -226,7 +224,7 @@
 
         <div class="col-span-2 flex flex-col pt-1 border-t border-brand-border/20">
           <span class="text-[10px] uppercase font-semibold text-brand-text-secondary">{i18n.t('audioPipeline.resampling', {}, 'Resampling')}</span>
-          <span class="text-brand-text-primary text-[11px] font-medium">
+          <span class="text-brand-text-primary font-semibold">
             {#if !resampled}
               {i18n.t('audioPipeline.resamplingDirect', {}, 'Direct (no resampling)')}
             {:else}
@@ -235,9 +233,9 @@
           </span>
         </div>
 
-        <div class="col-span-2 flex items-center justify-between text-[11px] pt-1 text-brand-text-primary">
-          <span class="text-brand-text-secondary font-medium">{i18n.t('audioPipeline.outputBackend', {}, 'Backend')}</span>
-          <span class="font-mono font-semibold">{pipeline.output_backend}</span>
+        <div class="col-span-2 flex flex-col">
+          <span class="text-[10px] uppercase font-semibold text-brand-text-secondary">{i18n.t('audioPipeline.outputBackend', {}, 'Backend')}</span>
+          <span class="text-brand-text-primary font-semibold">{pipeline.output_backend}</span>
         </div>
       </div>
     </div>
