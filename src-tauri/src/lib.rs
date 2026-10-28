@@ -22,6 +22,7 @@ pub mod continue_mix;
 pub mod covermanager;
 pub mod db;
 pub mod default_apps;
+pub mod devices;
 pub mod diagnostics;
 pub mod discord;
 pub mod eq_store;
@@ -113,6 +114,8 @@ pub struct AppState {
     pub remote_streaming_active: Arc<std::sync::atomic::AtomicBool>,
     /// In-memory registry for pending mass-removal incidents (#1582).
     pub mass_removal_registry: Arc<parking_lot::Mutex<collection::MassRemovalRegistry>>,
+    /// Connected portable players and removable drives (#835).
+    pub devices: Arc<devices::DeviceMonitor>,
 }
 
 /// Suppresses stock webview browser chrome — reload/find/print keybindings and
@@ -1149,6 +1152,7 @@ pub fn run() {
                 mass_removal_registry: Arc::new(parking_lot::Mutex::new(
                     collection::MassRemovalRegistry::new(),
                 )),
+                devices: Arc::new(devices::DeviceMonitor::new()),
             };
 
             crate::collection::start_watcher(app.handle().clone(), &state);
@@ -1158,6 +1162,10 @@ pub fn run() {
 
             app.manage(state);
             let managed_state = app.state::<AppState>();
+
+            managed_state
+                .devices
+                .spawn(app.handle().clone(), Arc::clone(&managed_state.db));
 
             // Start each enabled remote server's periodic auto-sync timer (WebDAV #1082, OpenSubsonic #1162).
             managed_state.remote_auto_sync.start_all_from_db(
@@ -1589,6 +1597,10 @@ pub fn run() {
             commands::webdav::test_webdav_connection,
             commands::webdav::check_webdav_connection,
             commands::webdav::sync_webdav_server,
+            // Portable device commands (#835)
+            commands::devices::get_connected_devices,
+            commands::devices::update_device_profile,
+            commands::devices::eject_device,
             // Window & Miniplayer commands
             commands::window::is_remote_devtools_enabled,
             commands::window::geometry_capture_supported,

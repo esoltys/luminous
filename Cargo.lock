@@ -3529,6 +3529,7 @@ dependencies = [
  "luminous-addons",
  "luminous-analysis",
  "luminous-audio",
+ "luminous-devices",
  "luminous-equalizer",
  "luminous-metadata",
  "luminous-remote",
@@ -3629,6 +3630,19 @@ dependencies = [
  "symphonia",
  "symphonia-adapter-libopus",
  "windows",
+]
+
+[[package]]
+name = "luminous-devices"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "log",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "windows",
+ "zbus",
 ]
 
 [[package]]

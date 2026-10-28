@@ -23,6 +23,11 @@ finish-args:
   # --filesystem=home escape hatch.
   - --filesystem=xdg-music
   - --talk-name=org.freedesktop.portal.FileChooser
+  # Portable players and USB drives (#835): see them where udisks2 mounts
+  # them, and unmount/power them off through udisks2 for Eject.
+  - --filesystem=/run/media
+  - --filesystem=/media
+  - --system-talk-name=org.freedesktop.UDisks2
   - --talk-name=org.freedesktop.portal.Notification
   # MPRIS2 media-key/session integration (src-tauri/src/media_session/linux.rs)
   # registers its own well-known name on the session bus.

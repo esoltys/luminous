@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 65;
+pub const CURRENT_SCHEMA_VERSION: i32 = 66;
 
 struct Migration {
     version: i32,
@@ -578,6 +578,11 @@ const MIGRATIONS: &[Migration] = &[
         version: 65,
         description: "invalidate webdav_cache etags for coverless WebDAV tracks so embedded art self-heals on next sync (#1823)",
         apply: |conn| Ok(conn.execute_batch(MIGRATION_65)?),
+    },
+    Migration {
+        version: 66,
+        description: "device_profiles for portable players and removable drives (#835)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_66)?),
     },
 ];
 
@@ -2376,6 +2381,28 @@ UPDATE webdav_cache
 UPDATE songs
    SET art_unset = 0
  WHERE source = 11 AND art_automatic IS NULL AND art_embedded = 0 AND art_unset = 1;
+";
+
+// Migration 66: one row per portable player or removable drive the user has
+// saved a profile for (#835). `id` is the id in the device's
+// `.luminous-device.json` marker (`vol-<serial>` until then); paths are
+// relative to the volume root; `supported_formats` is a JSON array.
+const MIGRATION_66: &str = "
+CREATE TABLE IF NOT EXISTS device_profiles (
+    id                TEXT PRIMARY KEY,
+    nickname          TEXT,
+    icon              TEXT,
+    color             TEXT,
+    music_path        TEXT NOT NULL DEFAULT '',
+    playlists_path    TEXT NOT NULL DEFAULT '',
+    reserve_bytes     INTEGER NOT NULL,
+    supported_formats TEXT NOT NULL,
+    max_sample_rate   INTEGER NOT NULL,
+    max_bit_depth     INTEGER NOT NULL,
+    created_at        INTEGER NOT NULL,
+    updated_at        INTEGER NOT NULL,
+    last_synced_at    INTEGER
+);
 ";
 
 fn seed_artist_tag_hierarchy(conn: &rusqlite::Connection) -> Result<()> {
