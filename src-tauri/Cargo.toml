@@ -60,6 +60,7 @@ luminous-addons = { path = "../crates/luminous-addons" }
 luminous-analysis = { path = "../crates/luminous-analysis" }
 luminous-metadata = { path = "../crates/luminous-metadata" }
 luminous-remote = { path = "../crates/luminous-remote" }
+luminous-devices = { path = "../crates/luminous-devices" }
 
 # --- Serialization ---
 serde.workspace = true
