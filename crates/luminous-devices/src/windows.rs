@@ -141,6 +141,8 @@ pub(crate) fn eject(volume: &Volume) -> Result<(), EjectError> {
     let device_number = {
         let volume_handle = open_volume(letter, GENERIC_READ.0 | GENERIC_WRITE.0)
             .map_err(|e| EjectError::Failed(e.to_string()))?;
+        let number =
+            device_number(&volume_handle).map_err(|e| EjectError::Failed(e.to_string()))?;
         unsafe {
             let _ = FlushFileBuffers(volume_handle.0);
         }
@@ -149,7 +151,7 @@ pub(crate) fn eject(volume: &Volume) -> Result<(), EjectError> {
         if ioctl_no_buffers(&volume_handle, FSCTL_LOCK_VOLUME) {
             ioctl_no_buffers(&volume_handle, FSCTL_DISMOUNT_VOLUME);
         }
-        device_number(&volume_handle).map_err(|e| EjectError::Failed(e.to_string()))?
+        number
         // The volume handle closes here, before the eject request: an open
         // handle of our own would veto it.
     };

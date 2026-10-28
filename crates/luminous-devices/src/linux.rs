@@ -190,3 +190,75 @@ fn space(mount: &Path) -> Option<(u64, u64)> {
     let block = stat.f_frsize as u64;
     Some((stat.f_blocks as u64 * block, stat.f_bavail as u64 * block))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn value(v: impl Into<Value<'static>>) -> OwnedValue {
+        OwnedValue::try_from(v.into()).unwrap()
+    }
+
+    fn path(p: &str) -> OwnedObjectPath {
+        OwnedObjectPath::try_from(p).unwrap()
+    }
+
+    /// One udisks2 block device with a mounted filesystem on `drive`.
+    fn objects(mount: &Path, system: bool, bus: &'static str, removable: bool) -> ManagedObjects {
+        let mut mount_bytes = mount.as_os_str().as_bytes().to_vec();
+        mount_bytes.push(0);
+        let block: Properties = HashMap::from([
+            ("HintSystem".into(), value(system)),
+            ("HintIgnore".into(), value(false)),
+            ("IdLabel".into(), value("")),
+            ("IdType".into(), value("vfat")),
+            ("IdUUID".into(), value("0088-5572")),
+            (
+                "Drive".into(),
+                value(ObjectPath::try_from("/org/freedesktop/UDisks2/drives/R1").unwrap()),
+            ),
+        ]);
+        let filesystem: Properties =
+            HashMap::from([("MountPoints".into(), value(vec![mount_bytes]))]);
+        let drive: Properties = HashMap::from([
+            ("ConnectionBus".into(), value(bus)),
+            ("Removable".into(), value(removable)),
+            ("MediaRemovable".into(), value(false)),
+            ("Vendor".into(), value("HiBy")),
+            ("Model".into(), value("R1 U-DISK")),
+        ]);
+        HashMap::from([
+            (
+                path("/org/freedesktop/UDisks2/block_devices/sdb1"),
+                HashMap::from([(BLOCK.into(), block), (FILESYSTEM.into(), filesystem)]),
+            ),
+            (
+                path("/org/freedesktop/UDisks2/drives/R1"),
+                HashMap::from([(DRIVE.into(), drive)]),
+            ),
+        ])
+    }
+
+    #[test]
+    fn lists_a_mounted_usb_volume() {
+        let mount = tempfile::tempdir().unwrap();
+        let found = volumes(&objects(mount.path(), false, "usb", false));
+        assert_eq!(found.len(), 1);
+        let v = &found[0];
+        assert_eq!(v.mount_path, mount.path());
+        assert_eq!(v.label, None);
+        assert_eq!(v.filesystem, "vfat");
+        assert_eq!(v.serial.as_deref(), Some("0088-5572"));
+        assert_eq!(v.default_name(), "HiBy R1");
+        assert_eq!(v.os_ref, "/org/freedesktop/UDisks2/block_devices/sdb1");
+        assert!(v.total_bytes > 0);
+    }
+
+    #[test]
+    fn skips_system_and_internal_volumes() {
+        let mount = tempfile::tempdir().unwrap();
+        assert!(volumes(&objects(mount.path(), true, "usb", false)).is_empty());
+        assert!(volumes(&objects(mount.path(), false, "", false)).is_empty());
+        assert_eq!(volumes(&objects(mount.path(), false, "", true)).len(), 1);
+    }
+}
