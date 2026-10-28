@@ -17,7 +17,6 @@ use luminous_devices::{DeviceKind, DeviceProfile, Marker, Volume, VolumeWatcher}
 use parking_lot::{Condvar, Mutex};
 use rusqlite::{params, OptionalExtension};
 use serde::Serialize;
-use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
@@ -73,7 +72,7 @@ impl DeviceMonitor {
     pub fn new() -> Self {
         Self {
             entries: Mutex::new(Vec::new()),
-            rebuild_requested: Mutex::new(true),
+            rebuild_requested: Mutex::new(false),
             wake: Condvar::new(),
         }
     }
@@ -194,22 +193,6 @@ impl Default for DeviceMonitor {
     }
 }
 
-/// Whether `path` is `root` or inside it. Case-insensitive on Windows.
-pub fn is_on_volume(path: &str, root: &Path) -> bool {
-    let normalize = |p: &str| {
-        let p = p.replace('\\', "/");
-        let p = p.trim_end_matches('/').to_string();
-        if cfg!(windows) {
-            p.to_lowercase()
-        } else {
-            p
-        }
-    };
-    let path = normalize(path);
-    let root = normalize(&root.to_string_lossy());
-    path == root || path.starts_with(&format!("{root}/"))
-}
-
 fn build_entries(conn: &rusqlite::Connection, volumes: &[Volume], now: i64) -> Result<Vec<Entry>> {
     let library_folders: Vec<String> = conn
         .prepare("SELECT path FROM directories")?
@@ -217,11 +200,7 @@ fn build_entries(conn: &rusqlite::Connection, volumes: &[Volume], now: i64) -> R
         .collect::<rusqlite::Result<_>>()?;
     volumes
         .iter()
-        .filter(|v| {
-            !library_folders
-                .iter()
-                .any(|folder| is_on_volume(folder, &v.mount_path))
-        })
+        .filter(|v| !library_folders.iter().any(|folder| v.contains(folder)))
         .map(|volume| {
             Ok(Entry {
                 device: resolve_device(conn, volume, now)?,
@@ -231,6 +210,9 @@ fn build_entries(conn: &rusqlite::Connection, volumes: &[Volume], now: i64) -> R
         .collect()
 }
 
+/// The device on `volume` with its effective profile. Writes once: the first
+/// time a device with a marker shows up on this computer, the marker's
+/// profile is stored, so later edits here win over the device's copy.
 fn resolve_device(
     conn: &rusqlite::Connection,
     volume: &Volume,
@@ -335,6 +317,7 @@ fn upsert_profile(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
 
     const NOW: i64 = 1_790_000_000;
 
@@ -468,22 +451,5 @@ mod tests {
 
         let entries = build_entries(&conn, &[volume(device_dir.path(), "0088-5572")], NOW).unwrap();
         assert_eq!(entries[0].device.profile.nickname.as_deref(), Some("Here"));
-    }
-
-    #[test]
-    fn is_on_volume_matches_whole_components() {
-        let root = Path::new(if cfg!(windows) { "E:\\" } else { "/media/R1" });
-        let inside = if cfg!(windows) {
-            "e:\\Music\\a.flac"
-        } else {
-            "/media/R1/Music/a.flac"
-        };
-        let sibling = if cfg!(windows) {
-            "F:\\Music"
-        } else {
-            "/media/R10/Music"
-        };
-        assert!(is_on_volume(inside, root));
-        assert!(!is_on_volume(sibling, root));
     }
 }

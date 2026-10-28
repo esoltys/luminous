@@ -118,6 +118,19 @@ mod tests {
     }
 
     #[test]
+    fn contains_matches_whole_path_components() {
+        let (root, inside, sibling) = if cfg!(windows) {
+            ("E:\\", "e:\\Music\\a.flac", "F:\\Music")
+        } else {
+            ("/media/R1", "/media/R1/Music/a.flac", "/media/R10/Music")
+        };
+        let v = volume(None, None, None, root);
+        assert!(v.contains(inside));
+        assert!(v.contains(root));
+        assert!(!v.contains(sibling));
+    }
+
+    #[test]
     fn provisional_id_comes_from_the_serial() {
         let mut v = volume(None, None, None, "E:\\");
         v.serial = Some("0088-55ab".into());

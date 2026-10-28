@@ -85,6 +85,22 @@ impl Volume {
     pub fn default_name(&self) -> String {
         naming::default_name(self)
     }
+
+    /// Whether `path` (absolute, either separator) is on this volume.
+    /// Case-insensitive on Windows; `/media/R1` does not contain `/media/R10`.
+    pub fn contains(&self, path: &str) -> bool {
+        let normalize = |p: &str| {
+            let p = p.replace('\\', "/").trim_end_matches('/').to_string();
+            if cfg!(windows) {
+                p.to_lowercase()
+            } else {
+                p
+            }
+        };
+        let path = normalize(path);
+        let root = normalize(&self.mount_path.to_string_lossy());
+        path == root || path.starts_with(&format!("{root}/"))
+    }
 }
 
 /// Why an eject did not complete.

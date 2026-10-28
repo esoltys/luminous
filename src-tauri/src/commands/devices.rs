@@ -2,7 +2,7 @@
 //! arrives through the `devices-changed` event (see `crate::devices`); these
 //! commands read it once at startup, save a profile and eject.
 
-use crate::devices::{is_on_volume, ConnectedDevice};
+use crate::devices::ConnectedDevice;
 use crate::AppState;
 use luminous_devices::{DeviceProfile, EjectError};
 use tauri::State;
@@ -46,7 +46,7 @@ pub async fn eject_device(id: String, state: State<'_, AppState>) -> Result<(), 
             .current_song
             .as_ref()
             .and_then(|song| song.path.as_deref())
-            .is_some_and(|path| is_on_volume(path, &volume.mount_path));
+            .is_some_and(|path| volume.contains(path));
         if playing_from_device {
             player.stop().await.map_err(|e| e.to_string())?;
         }

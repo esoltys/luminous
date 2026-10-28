@@ -80,13 +80,13 @@ impl DeviceProfile {
                 .map(|s| s.trim().to_string())
                 .filter(|s| !s.is_empty());
         }
+        let mut seen = std::collections::HashSet::new();
         self.supported_formats = self
             .supported_formats
             .iter()
             .map(|f| f.trim().to_ascii_lowercase())
-            .filter(|f| !f.is_empty())
+            .filter(|f| !f.is_empty() && seen.insert(f.clone()))
             .collect();
-        self.supported_formats.dedup();
         self
     }
 }
@@ -122,7 +122,13 @@ mod tests {
             color: Some(" #3b82f6 ".into()),
             music_path: "E:\\..\\Music\\./Rock/".into(),
             playlists_path: "/../../etc".into(),
-            supported_formats: vec!["MP3".into(), " ".into(), "mp3".into(), "FLAC".into()],
+            supported_formats: vec![
+                "MP3".into(),
+                " ".into(),
+                "flac".into(),
+                "mp3".into(),
+                "FLAC".into(),
+            ],
             ..DeviceProfile::default()
         }
         .normalized();
