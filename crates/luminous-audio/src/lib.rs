@@ -1500,20 +1500,14 @@ fn decode_thread(
                         r
                     }
                     Ok(AudioCommand::Cue(r)) => {
-                        match open_for_output(&shared, &output, r.track.clone(), r.start_nanosec) {
-                            Ok(mut track) => {
-                                if let Err(message) =
-                                    prepare_output(&mut output, &mut track, &shared, &event_tx)
-                                {
-                                    park_without_output(
-                                        &shared,
-                                        &event_tx,
-                                        &mut paused_req,
-                                        r,
-                                        message,
-                                    );
-                                    continue;
-                                }
+                        match start_on_output(
+                            &mut output,
+                            &shared,
+                            &event_tx,
+                            r.track.clone(),
+                            r.start_nanosec,
+                        ) {
+                            Ok(_) => {
                                 let out = output.as_mut().unwrap();
                                 let target_sample_rate = out.sample_rate;
                                 let target_channels = out.channels;
@@ -1536,8 +1530,17 @@ fn decode_thread(
                                 paused_req = Some(r);
                                 let _ = event_tx.send(AudioEvent::Paused);
                             }
-                            Err(message) => {
+                            Err(StartFailure::Track(message)) => {
                                 let _ = event_tx.send(AudioEvent::Error { message });
+                            }
+                            Err(StartFailure::NoOutput(_, message)) => {
+                                park_without_output(
+                                    &shared,
+                                    &event_tx,
+                                    &mut paused_req,
+                                    r,
+                                    message,
+                                );
                             }
                         }
                         continue;
@@ -1629,26 +1632,33 @@ fn decode_thread(
         }
 
         // Ensure the persistent output stream exists (built lazily on the
-        // first track this thread ever plays; reused for every track after).
+        // first track this thread ever plays; reused for every track after,
+        // unless a bit-perfect one must reopen at this track's rate).
         // Built on a fresh thread — `output` can already be `None` here after
         // a mid-session device-change rebuild (see `check_and_rebuild_output`),
         // and re-touching COM on `decode_thread`'s own long-lived OS thread a
         // second time risks the same RPC_E_CHANGED_MODE wedge #624 fixed.
-        let mut current = match open_for_output(&shared, &output, req.track, req.start_nanosec) {
+        let current = match start_on_output(
+            &mut output,
+            &shared,
+            &event_tx,
+            req.track,
+            req.start_nanosec,
+        ) {
             Ok(t) => t,
-            Err(message) => {
+            Err(StartFailure::Track(message)) => {
                 let _ = event_tx.send(AudioEvent::Error { message });
                 continue;
             }
+            Err(StartFailure::NoOutput(track, message)) => {
+                let req = PlayRequest {
+                    track,
+                    start_nanosec: req.start_nanosec,
+                };
+                park_without_output(&shared, &event_tx, &mut paused_req, req, message);
+                continue;
+            }
         };
-        if let Err(message) = prepare_output(&mut output, &mut current, &shared, &event_tx) {
-            let req = PlayRequest {
-                track: current.spec,
-                start_nanosec: req.start_nanosec,
-            };
-            park_without_output(&shared, &event_tx, &mut paused_req, req, message);
-            continue;
-        }
         let out = output.as_mut().unwrap();
         let target_sample_rate = out.sample_rate;
         let target_channels = out.channels;
@@ -1739,44 +1749,46 @@ fn decode_thread(
     }
 }
 
-/// Opens `track` decoding for the open output's format (the default
-/// bit-perfect format when there's none yet); `prepare_output` retargets it
-/// if the output changes.
-fn open_for_output(
-    shared: &AudioShared,
-    output: &Option<AudioOutput>,
+/// Why a track couldn't be readied to play.
+enum StartFailure {
+    /// The track itself couldn't be opened.
+    Track(String),
+    /// No output could be built for it; carries the track back so it can be
+    /// parked and retried on Resume.
+    NoOutput(Track, String),
+}
+
+/// Opens `track` at `start_nanosec` and readies the output to play it: builds
+/// one if there is none, and reopens a bit-perfect one at the track's own
+/// rate when it was opened for another (see `rate_switch`). The track comes
+/// back decoding for the format the output actually runs at. Only called
+/// where playback starts afresh, so nothing queued in the ring buffer is lost.
+fn start_on_output(
+    output: &mut Option<AudioOutput>,
+    shared: &Arc<AudioShared>,
+    event_tx: &mpsc::Sender<AudioEvent>,
     track: Track,
     start_nanosec: u64,
-) -> Result<ActiveTrack, String> {
+) -> Result<ActiveTrack, StartFailure> {
+    // The output format isn't settled until the track's rate is known, so
+    // open for the current one and retarget below.
     let (rate, channels) = output
         .as_ref()
         .map_or((crate::sink::DEFAULT_BIT_PERFECT_RATE, 2), |o| {
             (o.sample_rate, o.channels)
         });
-    ActiveTrack::open(
+    let mut active = ActiveTrack::open(
         &shared.open_source,
         track,
         start_nanosec,
         rate,
         channels as usize,
     )
-}
+    .map_err(StartFailure::Track)?;
 
-/// Readies the output for `track` before it plays: builds one if there is
-/// none, and reopens a bit-perfect one at the track's own rate when it was
-/// opened for another (see `rate_switch`). Then points the track's resampler
-/// at the rate the output actually runs at. Only called where playback starts
-/// afresh, so nothing queued in the ring buffer is lost. Errs when no output
-/// could be built.
-fn prepare_output(
-    output: &mut Option<AudioOutput>,
-    track: &mut ActiveTrack,
-    shared: &Arc<AudioShared>,
-    event_tx: &mpsc::Sender<AudioEvent>,
-) -> Result<(), String> {
     let reopen_at = match output.as_ref() {
-        None => Some(track.src_rate),
-        Some(out) => out.rate_switch_for(track.src_rate),
+        None => Some(active.src_rate),
+        Some(out) => out.rate_switch_for(active.src_rate),
     };
     if let Some(rate) = reopen_at {
         let reopening = output.is_some();
@@ -1784,7 +1796,8 @@ fn prepare_output(
             log::info!("Reopening the output at {rate} Hz for the next track");
             let _ = old_out.sink.pause();
         }
-        let new_out = build_output_on_fresh_thread(shared, Some(rate))?;
+        let new_out = build_output_on_fresh_thread(shared, Some(rate))
+            .map_err(|message| StartFailure::NoOutput(active.spec.clone(), message))?;
         new_out.publish(shared, event_tx);
         *output = Some(new_out);
         if reopening {
@@ -1792,8 +1805,41 @@ fn prepare_output(
         }
     }
     let out = output.as_ref().expect("output was just built");
-    track.retarget(out.sample_rate, out.channels);
-    Ok(())
+    active.retarget(out.sample_rate, out.channels);
+    Ok(active)
+}
+
+/// Opens the queued next track for a handover from the current one, or
+/// `None` when there can be none: it failed to open, or it needs the output
+/// at another rate (see `rate_switch`). Either way the current track then
+/// drains, the engine reports `TrackFinished`, and the player's `Play` opens
+/// the next track (at its own rate).
+fn open_preload(
+    out: &AudioOutput,
+    session: &DecodeSession,
+    shared: &AudioShared,
+    preq: PlayRequest,
+) -> Option<ActiveTrack> {
+    match ActiveTrack::open(
+        &shared.open_source,
+        preq.track,
+        preq.start_nanosec,
+        session.target_sample_rate,
+        session.target_channels as usize,
+    ) {
+        Ok(t) if out.rate_switch_for(t.src_rate).is_some() => {
+            log::debug!("Next track is at {} Hz: no seamless handover", t.src_rate);
+            None
+        }
+        Ok(t) => {
+            log::debug!("Preloaded next track {}", t.spec.id);
+            Some(t)
+        }
+        Err(e) => {
+            log::warn!("Preloading the next track failed: {e}");
+            None
+        }
+    }
 }
 
 /// Drives step 1 of one `'decode` iteration: the periodic (~500ms throttled)
@@ -2085,56 +2131,14 @@ fn handle_decode_command(
             CmdOutcome::Continue
         }
         Ok(AudioCommand::PreloadNext(preq)) => {
-            match ActiveTrack::open(
-                &shared.open_source,
-                preq.track,
-                preq.start_nanosec,
-                session.target_sample_rate,
-                session.target_channels as usize,
-            ) {
-                Ok(t) if out.rate_switch_for(t.src_rate).is_some() => {
-                    log::debug!("Next track is at {} Hz: no gapless handover", t.src_rate);
-                    session.next = None;
-                }
-                Ok(t) => {
-                    log::debug!("Preloaded next track {} for gapless", t.spec.id);
-                    session.next = Some(t);
-                    session.crossfade_secs = 0.0;
-                }
-                Err(e) => {
-                    // Fall back to the drain + TrackFinished path;
-                    // the player will issue a normal Play.
-                    log::warn!("Gapless preload failed: {e}");
-                    session.next = None;
-                }
-            }
+            session.next = open_preload(out, session, shared, preq);
+            session.crossfade_secs = 0.0;
             CmdOutcome::Continue
         }
         Ok(AudioCommand::PreloadNextCrossfade(preq, secs, gain)) => {
-            match ActiveTrack::open(
-                &shared.open_source,
-                preq.track,
-                preq.start_nanosec,
-                session.target_sample_rate,
-                session.target_channels as usize,
-            ) {
-                Ok(t) if out.rate_switch_for(t.src_rate).is_some() => {
-                    log::debug!("Next track is at {} Hz: no crossfade", t.src_rate);
-                    session.next = None;
-                    session.crossfade_secs = 0.0;
-                }
-                Ok(t) => {
-                    log::debug!("Preloaded next track {} for crossfade", t.spec.id);
-                    session.next = Some(t);
-                    session.crossfade_secs = secs;
-                    session.crossfade_incoming_gain = gain;
-                }
-                Err(e) => {
-                    log::warn!("Crossfade preload failed: {e}");
-                    session.next = None;
-                    session.crossfade_secs = 0.0;
-                }
-            }
+            session.next = open_preload(out, session, shared, preq);
+            session.crossfade_secs = if session.next.is_some() { secs } else { 0.0 };
+            session.crossfade_incoming_gain = gain;
             CmdOutcome::Continue
         }
         Ok(AudioCommand::ClearPreload) => {
