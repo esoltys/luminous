@@ -3,18 +3,15 @@
 //! Takes sole control of an endpoint and hands it integer PCM directly,
 //! bypassing the Windows mixer: no system resampling, no mixing with other
 //! apps, no Windows volume or effects. The stream opens at one negotiated
-//! rate/format for its lifetime; the decode loop resamples tracks at other
-//! rates to it.
+//! rate/format for its lifetime, as close to the requested rate as the device
+//! allows; the engine reopens it to change rate.
 //!
 //! All COM work (activation, initialisation, the event-driven render loop,
 //! teardown) happens on one render thread the sink owns, so no other thread's
 //! COM apartment history can interfere with it.
 
 use crate::pcm::PcmFormat;
-use crate::sink::OutputFallbackReason;
-
-/// The rate the stream asks for first: most music is 44.1 kHz.
-pub(crate) const PREFERRED_RATE: u32 = 44_100;
+use crate::sink::{rate_candidates, OutputFallbackReason};
 
 // HRESULTs from audioclient.h, kept here so the classifier is testable on any
 // platform.
@@ -29,19 +26,22 @@ pub(crate) struct OpenError {
     pub(crate) message: String,
 }
 
-/// Picks the first rate/format the device accepts exclusively: the preferred
-/// rate, then the device's mix rate, each across [`PcmFormat::PREFERENCE`].
-/// Stereo only. `None` when the device accepts none of them.
+/// Picks the first rate/format the device accepts exclusively: the
+/// [`rate_candidates`] for `requested_rate`, then the device's mix rate, each
+/// across [`PcmFormat::PREFERENCE`]. Stereo only. `None` when the device
+/// accepts none of them.
 pub(crate) fn negotiate_format(
-    preferred_rate: u32,
+    requested_rate: u32,
     mix_rate: u32,
     mut is_supported: impl FnMut(u32, PcmFormat) -> bool,
 ) -> Option<(u32, PcmFormat)> {
-    [preferred_rate, mix_rate]
+    let mut rates = rate_candidates(requested_rate);
+    if !rates.contains(&mix_rate) {
+        rates.push(mix_rate);
+    }
+    rates
         .into_iter()
-        .enumerate()
-        .filter(|&(i, rate)| i == 0 || rate != preferred_rate)
-        .flat_map(|(_, rate)| PcmFormat::PREFERENCE.map(|format| (rate, format)))
+        .flat_map(|rate| PcmFormat::PREFERENCE.map(|format| (rate, format)))
         .find(|&(rate, format)| is_supported(rate, format))
 }
 
@@ -183,11 +183,6 @@ mod imp {
         fn is_errored(&self) -> bool {
             self.stream_error_flag.load(Ordering::Relaxed)
         }
-
-        fn set_sample_rate(&mut self, _sample_rate: u32) -> Result<bool, String> {
-            // Rate follows the stream it was opened with (per-track switching: #1838).
-            Ok(false)
-        }
     }
 
     impl Drop for WasapiExclusiveSink {
@@ -203,9 +198,10 @@ mod imp {
     /// Opens `endpoint_id` (an `IMMDevice` id) exclusively and starts its
     /// render thread, paused. Fails with the reason to report when the
     /// device is busy, disallows exclusive mode, or takes no stereo integer
-    /// format at [`super::PREFERRED_RATE`] or its mix rate.
+    /// format near `requested_rate` (see [`super::negotiate_format`]).
     pub(crate) fn build_exclusive_sink(
         endpoint_id: String,
+        requested_rate: u32,
         device_name: Option<String>,
         shared: &Arc<AudioShared>,
         consumer: Arc<Mutex<ringbuf::HeapCons<f32>>>,
@@ -231,7 +227,8 @@ mod imp {
                 .name("luminous-wasapi-render".into())
                 .spawn(move || {
                     render_thread(
-                        &endpoint_id,
+                        // Called once the thread has joined the MTA.
+                        || unsafe { ExclusiveStream::open(&endpoint_id, requested_rate) },
                         shared,
                         consumer,
                         played_samples,
@@ -266,7 +263,7 @@ mod imp {
     }
 
     fn render_thread(
-        endpoint_id: &str,
+        open: impl FnOnce() -> Result<ExclusiveStream, OpenError>,
         shared: Arc<AudioShared>,
         consumer: Arc<Mutex<ringbuf::HeapCons<f32>>>,
         played_samples: Arc<AtomicU64>,
@@ -277,7 +274,7 @@ mod imp {
         let com = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) };
         // Scoped so every COM object is released before CoUninitialize.
         {
-            match unsafe { ExclusiveStream::open(endpoint_id) } {
+            match open() {
                 Err(e) => {
                     let _ = ready.send(Err(e));
                 }
@@ -344,7 +341,7 @@ mod imp {
     }
 
     impl ExclusiveStream {
-        unsafe fn open(endpoint_id: &str) -> Result<Self, OpenError> {
+        unsafe fn open(endpoint_id: &str, requested_rate: u32) -> Result<Self, OpenError> {
             let enumerator: IMMDeviceEnumerator =
                 CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)
                     .map_err(|e| open_error("Device enumerator", e))?;
@@ -367,7 +364,7 @@ mod imp {
             // A refusal other than "unsupported format" (device in use,
             // exclusive mode disallowed) is the better reason to report.
             let mut refusal = super::AUDCLNT_E_UNSUPPORTED_FORMAT;
-            let (rate, format) = negotiate_format(super::PREFERRED_RATE, mix_rate, |r, f| {
+            let (rate, format) = negotiate_format(requested_rate, mix_rate, |r, f| {
                 let wf = wave_format(r, f);
                 let hr = client.IsFormatSupported(AUDCLNT_SHAREMODE_EXCLUSIVE, &wf.Format, None);
                 if hr != S_OK && hr.0 != super::AUDCLNT_E_UNSUPPORTED_FORMAT {
@@ -378,8 +375,7 @@ mod imp {
             .ok_or_else(|| OpenError {
                 reason: classify_failure(refusal),
                 message: format!(
-                    "No exclusive stereo format at {} or {mix_rate} Hz",
-                    super::PREFERRED_RATE
+                    "No exclusive stereo format near {requested_rate} Hz or at {mix_rate} Hz"
                 ),
             })?;
             let wf = wave_format(rate, format);
@@ -567,6 +563,13 @@ mod tests {
         });
         assert_eq!(picked, None);
         assert_eq!(asked.len(), PcmFormat::PREFERENCE.len());
+    }
+
+    #[test]
+    fn negotiation_falls_back_to_the_closest_rate_of_the_same_family() {
+        // A 192 kHz DAC asked for 352.8 kHz opens at 176.4 kHz, not its mix rate.
+        let picked = negotiate_format(352_800, 48_000, |rate, _| rate <= 192_000);
+        assert_eq!(picked, Some((176_400, PcmFormat::I32)));
     }
 
     #[test]

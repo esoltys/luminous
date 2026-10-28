@@ -207,34 +207,6 @@ mod imp {
         fn is_errored(&self) -> bool {
             self.stream_error_flag.load(Ordering::Relaxed)
         }
-
-        fn set_sample_rate(&mut self, sample_rate: u32) -> Result<bool, String> {
-            if self.sample_rate == sample_rate {
-                return Ok(true);
-            }
-            if self.driver.can_sample_rate(sample_rate as f64).is_err() {
-                return Ok(false);
-            }
-
-            let was_playing = self.is_playing.load(Ordering::Relaxed);
-            if was_playing {
-                let _ = self.driver.stop();
-            }
-
-            if let Err(e) = self.driver.set_sample_rate(sample_rate as f64) {
-                log::warn!("ASIO driver set_sample_rate({sample_rate}) failed: {e:?}");
-                if was_playing {
-                    let _ = self.driver.start();
-                }
-                return Ok(false);
-            }
-
-            self.sample_rate = sample_rate;
-            if was_playing {
-                let _ = self.driver.start();
-            }
-            Ok(true)
-        }
     }
 
     impl Drop for AsioSink {
@@ -298,17 +270,20 @@ mod imp {
             ));
         }
 
-        // Try setting preferred sample rate, or fall back to current hardware rate
-        let active_rate = if proxy.can_sample_rate(target_sample_rate as f64).is_ok()
-            && proxy.set_sample_rate(target_sample_rate as f64).is_ok()
-        {
-            target_sample_rate
-        } else {
-            proxy
-                .get_sample_rate()
-                .map(|r| r as u32)
-                .unwrap_or(target_sample_rate)
-        };
+        // The requested rate or the closest one the driver takes, else
+        // whatever the hardware is running at.
+        let active_rate = crate::sink::rate_candidates(target_sample_rate)
+            .into_iter()
+            .find(|&rate| {
+                proxy.can_sample_rate(rate as f64).is_ok()
+                    && proxy.set_sample_rate(rate as f64).is_ok()
+            })
+            .unwrap_or_else(|| {
+                proxy
+                    .get_sample_rate()
+                    .map(|r| r as u32)
+                    .unwrap_or(target_sample_rate)
+            });
 
         let ch0 = ChannelId {
             input: false,

@@ -86,12 +86,22 @@ pub trait AudioSink: Send {
 
     /// Whether the stream has experienced an unrecoverable device error.
     fn is_errored(&self) -> bool;
+}
 
-    /// Attempts to switch the hardware sample rate dynamically.
-    /// Returns `Ok(true)` if hardware switched rate (no resampling needed),
-    /// `Ok(false)` if hardware cannot switch (resampler required),
-    /// or `Err(...)` on device failure.
-    fn set_sample_rate(&mut self, sample_rate: u32) -> Result<bool, String>;
+/// The rate a bit-perfect device is opened at before any track asks for one:
+/// most music is 44.1 kHz.
+pub(crate) const DEFAULT_BIT_PERFECT_RATE: u32 = 44_100;
+
+/// The rates to try, best first, when opening a bit-perfect device for a
+/// track at `requested` Hz: the rate itself, then each halving of it down to
+/// 44.1 kHz (an integer ratio keeps resampling simple, e.g. 352.8 kHz on a
+/// 192 kHz DAC plays at 176.4 kHz).
+#[cfg_attr(not(windows), allow(dead_code))] // ASIO and WASAPI only
+pub(crate) fn rate_candidates(requested: u32) -> Vec<u32> {
+    std::iter::successors(Some(requested), |&r| {
+        (r % 2 == 0 && r / 2 >= 44_100).then_some(r / 2)
+    })
+    .collect()
 }
 
 /// Standard cross-platform output sink backed by CPAL.
@@ -159,11 +169,6 @@ impl AudioSink for CpalSink {
     fn is_errored(&self) -> bool {
         self.stream_error_flag.load(Ordering::Relaxed)
     }
-
-    fn set_sample_rate(&mut self, _sample_rate: u32) -> Result<bool, String> {
-        // CPAL streams cannot switch sample rate dynamically without a full rebuild
-        Ok(false)
-    }
 }
 
 /// Enumerates all available audio output devices across supported backends.
@@ -220,4 +225,23 @@ pub fn enumerate_output_devices() -> Vec<AudioDeviceInfo> {
     }
 
     devices
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rate_candidates_halve_down_to_cd_rate() {
+        assert_eq!(rate_candidates(44_100), vec![44_100]);
+        assert_eq!(rate_candidates(48_000), vec![48_000]);
+        assert_eq!(rate_candidates(96_000), vec![96_000, 48_000]);
+        assert_eq!(
+            rate_candidates(352_800),
+            vec![352_800, 176_400, 88_200, 44_100]
+        );
+        // Odd rates have no exact halving.
+        assert_eq!(rate_candidates(22_050), vec![22_050]);
+        assert_eq!(rate_candidates(11_025), vec![11_025]);
+    }
 }
