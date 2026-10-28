@@ -61,12 +61,15 @@
     }
   }
 
+  // The backend sets `resample_rate` (to the output rate) exactly when the
+  // track's rate differs from the device's.
+  let resampled = $derived(!!pipeline?.resample_rate);
+
   let isBitPerfect = $derived.by(() => {
     if (!pipeline) return false;
     const noEq = !pipeline.eq_enabled;
     const noLoudness = pipeline.loudness_source === 'disabled';
-    const noResample = !pipeline.resample_rate || pipeline.resample_rate === pipeline.output_sample_rate;
-    return noEq && noLoudness && noResample;
+    return noEq && noLoudness && !resampled;
   });
 </script>
 
@@ -188,7 +191,7 @@
           <Speaker class="w-3.5 h-3.5 text-brand-text-primary" />
           <span>{i18n.t('audioPipeline.stageOutput', {}, 'Output')}</span>
         </div>
-        {#if !pipeline.resample_rate || pipeline.resample_rate === pipeline.output_sample_rate}
+        {#if !resampled}
           <span class="px-2 py-0.5 text-[10px] font-semibold tracking-wider bg-brand-accent/15 text-brand-text-primary border border-brand-accent/30 rounded-full">
             {i18n.t('audioPipeline.directRate', {}, 'Direct rate')}
           </span>
@@ -224,7 +227,7 @@
         <div class="col-span-2 flex flex-col pt-1 border-t border-brand-border/20">
           <span class="text-[10px] uppercase font-semibold text-brand-text-secondary">{i18n.t('audioPipeline.resampling', {}, 'Resampling')}</span>
           <span class="text-brand-text-primary text-[11px] font-medium">
-            {#if !pipeline.resample_rate || pipeline.resample_rate === pipeline.output_sample_rate}
+            {#if !resampled}
               {i18n.t('audioPipeline.resamplingDirect', {}, 'Direct (no resampling)')}
             {:else}
               {i18n.t('audioPipeline.resamplingTo', { rate: formatSampleRate(pipeline.output_sample_rate) }, `Resampled to ${formatSampleRate(pipeline.output_sample_rate)}`)}

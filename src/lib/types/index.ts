@@ -253,6 +253,7 @@ export interface AudioPipelineInfo {
   // Stage 2: Processing
   decoder_name: string;
   headroom: string;
+  /** The rate the track is resampled to (the output rate); absent when it plays at its own rate. */
   resample_rate?: number;
   loudness_source: LoudnessGainSource;
   loudness_gain_db?: number;
