@@ -396,7 +396,11 @@ describe("flatGlassColor (solid stand-in for glass over the flat canvas)", () =>
 
 describe("Theme change View Transitions", () => {
   let startViewTransition: ReturnType<typeof vi.fn>;
-  const fakeTransition = () => ({ finished: new Promise<void>(() => {}), skipTransition: vi.fn() });
+  const fakeTransition = () => ({
+    ready: new Promise<void>(() => {}),
+    finished: new Promise<void>(() => {}),
+    skipTransition: vi.fn()
+  });
 
   beforeEach(() => {
     startViewTransition = vi.fn((update: () => void) => {
@@ -486,7 +490,11 @@ describe("Theme change View Transitions", () => {
     store.gpuCompositing = true;
     store.applyActiveTheme();
     let finish!: () => void;
-    const transition = { finished: new Promise<void>((resolve) => (finish = resolve)), skipTransition: vi.fn() };
+    const transition = {
+      ready: new Promise<void>(() => {}),
+      finished: new Promise<void>((resolve) => (finish = resolve)),
+      skipTransition: vi.fn()
+    };
     startViewTransition.mockImplementation((update: () => void) => {
       update();
       return transition;
@@ -506,6 +514,27 @@ describe("Theme change View Transitions", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     document.documentElement.dispatchEvent(new Event("wheel", { bubbles: true }));
     expect(transition.skipTransition).toHaveBeenCalledTimes(1);
+  });
+
+  it("treats a skipped crossfade as expected, not an unhandled rejection", async () => {
+    const store = new ThemeStore();
+    store.gpuCompositing = true;
+    store.applyActiveTheme();
+    const skipped = new DOMException("Transition was skipped", "AbortError");
+    startViewTransition.mockImplementation((update: () => void) => {
+      update();
+      return { ready: Promise.reject(skipped), finished: Promise.resolve(), skipTransition: vi.fn() };
+    });
+    const unhandled = vi.fn();
+    process.on("unhandledRejection", unhandled);
+    try {
+      store.activeThemeId = "nordic-blue";
+      store.applyActiveTheme();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(unhandled).not.toHaveBeenCalled();
+    } finally {
+      process.off("unhandledRejection", unhandled);
+    }
   });
 });
 

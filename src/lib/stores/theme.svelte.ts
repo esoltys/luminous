@@ -205,6 +205,9 @@ function yieldViewTransitionToInput(transition: ViewTransition | undefined) {
   for (const type of VIEW_TRANSITION_INPUT_EVENTS) {
     window.addEventListener(type, onInput, { capture: true, passive: true });
   }
+  // A skipped transition (input above, or a newer theme change starting a
+  // new one) rejects `ready` with an AbortError; that's expected, not an error.
+  void transition.ready.catch(() => {});
   void transition.finished
     .catch(() => {})
     .finally(() => {
