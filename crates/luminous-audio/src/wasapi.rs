@@ -91,7 +91,7 @@ mod imp {
 
     use super::{aligned_period_hns, classify_failure, negotiate_format, OpenError};
     use crate::pcm::{self, PcmFormat};
-    use crate::sink::{AudioSink, OutputFallbackReason};
+    use crate::sink::{AudioBackendKind, AudioSink, OutputFallbackReason};
     use crate::{AudioShared, OutputRenderer};
 
     const CHANNELS: u16 = 2;
@@ -172,8 +172,8 @@ mod imp {
             self.device_name.clone()
         }
 
-        fn backend_name(&self) -> &'static str {
-            "WASAPI Exclusive"
+        fn backend(&self) -> AudioBackendKind {
+            AudioBackendKind::WasapiExclusive
         }
 
         fn output_format(&self) -> &'static str {

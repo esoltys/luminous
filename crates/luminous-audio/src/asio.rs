@@ -15,7 +15,7 @@ mod imp {
     use azo::sys::*;
 
     use crate::pcm::{self, AsioSampleFormat};
-    use crate::sink::AudioSink;
+    use crate::sink::{AudioBackendKind, AudioSink};
     use crate::{AudioShared, OutputRenderer};
 
     struct AsioActiveState {
@@ -196,8 +196,8 @@ mod imp {
             Some(self.device_name.clone())
         }
 
-        fn backend_name(&self) -> &'static str {
-            "ASIO"
+        fn backend(&self) -> AudioBackendKind {
+            AudioBackendKind::Asio
         }
 
         fn output_format(&self) -> &'static str {

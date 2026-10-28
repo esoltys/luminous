@@ -38,6 +38,9 @@ pub mod pcm;
 pub mod sink;
 mod source;
 mod spectrum;
+// The platform-neutral helpers here (format negotiation, failure mapping) are
+// only called by the Windows sink, but are built and tested everywhere.
+#[cfg_attr(not(windows), allow(dead_code))]
 mod wasapi;
 
 use anyhow::{anyhow, Result};
@@ -1060,35 +1063,120 @@ impl OutputRenderer {
     }
 }
 
-/// Wraps a bit-perfect sink (ASIO, WASAPI exclusive) and the ring buffer it
-/// drains into an `AudioOutput`, retuning the EQ to the sink's format.
+/// The configured backend that couldn't be opened, and why.
+type Fallback = (AudioBackendKind, OutputFallbackReason);
+
+/// Opens the configured bit-perfect backend (ASIO or WASAPI exclusive) with
+/// its ring buffer, retuning the EQ to its format. `None` when the configured
+/// backend is shared output; `Err` with the reason when it couldn't be opened.
 #[cfg(windows)]
-fn bit_perfect_output(
-    sink: Box<dyn AudioSink>,
-    ring: (ringbuf::HeapProd<f32>, Arc<Mutex<ringbuf::HeapCons<f32>>>),
-    played_samples: Arc<AtomicU64>,
-    stream_error_flag: Arc<std::sync::atomic::AtomicBool>,
-    shared: &AudioShared,
-) -> AudioOutput {
-    let (producer, consumer) = ring;
-    let sample_rate = sink.sample_rate();
-    let channels = sink.channels();
-    shared
-        .equalizer
-        .lock()
-        .update_format(sample_rate, channels as usize);
-    AudioOutput {
-        device_name: sink.device_name(),
-        backend_name: sink.backend_name().to_string(),
-        sink,
-        producer,
-        consumer,
-        played_samples,
-        sample_rate,
-        channels,
-        stream_error_flag,
-        fallback: None,
+fn open_bit_perfect(
+    shared: &Arc<AudioShared>,
+    config: &AudioOutputConfig,
+) -> Option<Result<AudioOutput, Fallback>> {
+    type Opened = (Box<dyn AudioSink>, Arc<std::sync::atomic::AtomicBool>);
+
+    let backend = config.backend;
+    if !matches!(
+        backend,
+        AudioBackendKind::Asio | AudioBackendKind::WasapiExclusive
+    ) {
+        return None;
     }
+
+    // Two seconds at the highest rate a device may negotiate.
+    let (producer, consumer) = HeapRb::<f32>::new(192_000 * 2 * 2).split();
+    let consumer = Arc::new(Mutex::new(consumer));
+    let played_samples = Arc::new(AtomicU64::new(0));
+
+    let opened: Result<Opened, OutputFallbackReason> = if backend == AudioBackendKind::Asio {
+        let preferred_rate = shared.output_sample_rate.load(Ordering::Relaxed).max(44100);
+        crate::asio::build_asio_sink(
+            config.device_id.as_deref(),
+            shared,
+            Arc::clone(&consumer),
+            Arc::clone(&played_samples),
+            preferred_rate,
+        )
+        .map(|sink| {
+            let error_flag = Arc::clone(&sink.stream_error_flag);
+            (Box::new(sink) as Box<dyn AudioSink>, error_flag)
+        })
+        .map_err(|e| {
+            log::warn!("ASIO unavailable ({e}), falling back to shared output");
+            OutputFallbackReason::Unavailable
+        })
+    } else {
+        // Exclusive mode shares the CPAL endpoint ids, so the same lookup
+        // (falling back to the default when the device is gone) applies.
+        use cpal::traits::DeviceTrait;
+        let host = cpal::default_host();
+        resolve_cpal_device(&host, config.device_id.as_deref())
+            .and_then(|(device, name)| {
+                let endpoint_id = device
+                    .id()
+                    .map(|id| id.id().to_string())
+                    .map_err(|e| format!("Output endpoint has no id: {e}"))?;
+                Ok((endpoint_id, name))
+            })
+            .map_err(|message| crate::wasapi::OpenError {
+                reason: OutputFallbackReason::Unavailable,
+                message,
+            })
+            .and_then(|(endpoint_id, name)| {
+                crate::wasapi::build_exclusive_sink(
+                    endpoint_id,
+                    name,
+                    shared,
+                    Arc::clone(&consumer),
+                    Arc::clone(&played_samples),
+                )
+            })
+            .map(|sink| {
+                let error_flag = Arc::clone(&sink.stream_error_flag);
+                (Box::new(sink) as Box<dyn AudioSink>, error_flag)
+            })
+            .map_err(|e| {
+                log::warn!(
+                    "WASAPI exclusive unavailable ({}), falling back to shared output",
+                    e.message
+                );
+                e.reason
+            })
+    };
+
+    Some(
+        opened
+            .map(|(sink, stream_error_flag)| {
+                let sample_rate = sink.sample_rate();
+                let channels = sink.channels();
+                shared
+                    .equalizer
+                    .lock()
+                    .update_format(sample_rate, channels as usize);
+                AudioOutput {
+                    device_name: sink.device_name(),
+                    backend_name: sink.backend().to_string(),
+                    sink,
+                    producer,
+                    consumer,
+                    played_samples,
+                    sample_rate,
+                    channels,
+                    stream_error_flag,
+                    fallback: None,
+                }
+            })
+            .map_err(|reason| (backend, reason)),
+    )
+}
+
+#[cfg(not(windows))]
+fn open_bit_perfect(
+    _shared: &Arc<AudioShared>,
+    _config: &AudioOutputConfig,
+) -> Option<Result<AudioOutput, Fallback>> {
+    None
 }
 
 /// Opens the configured backend. When ASIO or WASAPI exclusive can't be
@@ -1098,85 +1186,11 @@ fn build_output(shared: &Arc<AudioShared>) -> Result<AudioOutput, String> {
     use cpal::traits::{DeviceTrait, StreamTrait};
 
     let output_cfg = shared.output_config.read().clone();
-    #[allow(unused_mut)]
-    let mut fallback = None;
-
-    #[cfg(windows)]
-    if output_cfg.backend == AudioBackendKind::Asio {
-        let target_sample_rate = shared.output_sample_rate.load(Ordering::Relaxed).max(44100);
-        let buffer_capacity = target_sample_rate as usize * 2 * 2;
-        let rb = HeapRb::<f32>::new(buffer_capacity);
-        let (prod, cons) = rb.split();
-        let shared_consumer = Arc::new(Mutex::new(cons));
-        let played_samples = Arc::new(AtomicU64::new(0));
-
-        match crate::asio::build_asio_sink(
-            output_cfg.device_id.as_deref(),
-            shared,
-            Arc::clone(&shared_consumer),
-            Arc::clone(&played_samples),
-            target_sample_rate,
-        ) {
-            Ok(asio_sink) => {
-                let stream_error_flag = Arc::clone(&asio_sink.stream_error_flag);
-                return Ok(bit_perfect_output(
-                    Box::new(asio_sink),
-                    (prod, shared_consumer),
-                    played_samples,
-                    stream_error_flag,
-                    shared,
-                ));
-            }
-            Err(e) => {
-                log::warn!("Failed to initialize ASIO sink ({e}), falling back to CPAL default");
-                fallback = Some((AudioBackendKind::Asio, OutputFallbackReason::Unavailable));
-            }
-        }
-    }
-
-    #[cfg(windows)]
-    if output_cfg.backend == AudioBackendKind::WasapiExclusive {
-        // Exclusive mode shares the CPAL endpoint ids, so the same lookup
-        // (falling back to the default when the device is gone) applies.
-        let host = cpal::default_host();
-        let (device, device_name) = resolve_cpal_device(&host, output_cfg.device_id.as_deref())?;
-        let endpoint_id = device
-            .id()
-            .map(|id| id.id().to_string())
-            .map_err(|e| format!("Output endpoint has no id: {e}"))?;
-
-        // Sized for two seconds at the highest rate a device may negotiate.
-        let rb = HeapRb::<f32>::new(192_000 * 2 * 2);
-        let (prod, cons) = rb.split();
-        let shared_consumer = Arc::new(Mutex::new(cons));
-        let played_samples = Arc::new(AtomicU64::new(0));
-
-        match crate::wasapi::build_exclusive_sink(
-            endpoint_id,
-            device_name,
-            shared,
-            Arc::clone(&shared_consumer),
-            Arc::clone(&played_samples),
-        ) {
-            Ok(sink) => {
-                let stream_error_flag = Arc::clone(&sink.stream_error_flag);
-                return Ok(bit_perfect_output(
-                    Box::new(sink),
-                    (prod, shared_consumer),
-                    played_samples,
-                    stream_error_flag,
-                    shared,
-                ));
-            }
-            Err(e) => {
-                log::warn!(
-                    "WASAPI exclusive unavailable ({}), falling back to shared output",
-                    e.message
-                );
-                fallback = Some((AudioBackendKind::WasapiExclusive, e.reason));
-            }
-        }
-    }
+    let fallback = match open_bit_perfect(shared, &output_cfg) {
+        Some(Ok(output)) => return Ok(output),
+        Some(Err(fallback)) => Some(fallback),
+        None => None,
+    };
 
     let host = cpal::default_host();
     let (device, dev_name) = resolve_cpal_device(&host, output_cfg.device_id.as_deref())?;
@@ -1271,7 +1285,7 @@ fn build_output(shared: &Arc<AudioShared>) -> Result<AudioOutput, String> {
         sample_rate: target_sample_rate,
         channels: target_channels,
         device_name,
-        backend_name: "CPAL".to_string(),
+        backend_name: AudioBackendKind::Cpal.to_string(),
         stream_error_flag,
         fallback,
     })
@@ -1680,8 +1694,10 @@ fn check_and_rebuild_output(
     let output_cfg = shared.output_config.read().clone();
     // Both modes on the WASAPI endpoints follow the system default when no
     // device is chosen; an ASIO driver is never "the default".
-    let is_tracking_default =
-        output_cfg.backend != AudioBackendKind::Asio && output_cfg.device_id.is_none();
+    let is_tracking_default = matches!(
+        output_cfg.backend,
+        AudioBackendKind::Cpal | AudioBackendKind::WasapiExclusive
+    ) && output_cfg.device_id.is_none();
 
     let check_due =
         now.duration_since(session.last_device_check) >= std::time::Duration::from_millis(500);

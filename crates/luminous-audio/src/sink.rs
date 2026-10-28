@@ -77,8 +77,8 @@ pub trait AudioSink: Send {
     /// Name of the active output device or driver.
     fn device_name(&self) -> Option<String>;
 
-    /// Backend identifier ("CPAL", "ASIO" or "WASAPI Exclusive").
-    fn backend_name(&self) -> &'static str;
+    /// Which backend this sink is; its `Display` is the pipeline's name for it.
+    fn backend(&self) -> AudioBackendKind;
 
     /// The sample format the device receives, for the pipeline display
     /// (e.g. "24-bit integer PCM").
@@ -148,8 +148,8 @@ impl AudioSink for CpalSink {
         self.device_name.clone()
     }
 
-    fn backend_name(&self) -> &'static str {
-        "CPAL"
+    fn backend(&self) -> AudioBackendKind {
+        AudioBackendKind::Cpal
     }
 
     fn output_format(&self) -> &'static str {
