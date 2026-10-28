@@ -695,17 +695,21 @@ impl ActiveTrack {
 }
 
 /// The rate to reopen an output at for a track at `track_rate`, or `None` to
-/// keep it: only a bit-perfect sink follows the track's rate, and never to a
-/// rate it was already opened for (a device that couldn't do it got the
-/// closest rate it could, and keeps it). Decided on the sink actually open,
-/// so a bit-perfect backend that fell back to shared output doesn't retry on
-/// every rate change.
+/// keep it. Only a bit-perfect sink follows the track's rate, and only when it
+/// isn't already running at it (`opened_rate`) and wasn't already asked for it
+/// (`requested_rate`: a device that couldn't do it got the closest rate it
+/// could, and keeps it). Decided on the sink actually open, so a bit-perfect
+/// backend that fell back to shared output doesn't retry on every rate change.
 fn rate_switch(
     open_backend: AudioBackendKind,
     requested_rate: u32,
+    opened_rate: u32,
     track_rate: u32,
 ) -> Option<u32> {
-    (open_backend != AudioBackendKind::Cpal && requested_rate != track_rate).then_some(track_rate)
+    (open_backend != AudioBackendKind::Cpal
+        && track_rate != requested_rate
+        && track_rate != opened_rate)
+        .then_some(track_rate)
 }
 
 /// Convert an absolute track time to an interleaved-sample count at the
@@ -858,7 +862,12 @@ impl AudioOutput {
     /// The rate to reopen this output at so a track at `track_rate` plays at
     /// its own rate, or `None` to keep it as it is.
     fn rate_switch_for(&self, track_rate: u32) -> Option<u32> {
-        rate_switch(self.sink.backend(), self.requested_rate, track_rate)
+        rate_switch(
+            self.sink.backend(),
+            self.requested_rate,
+            self.sample_rate,
+            track_rate,
+        )
     }
 
     /// Make this the output `AudioEngine::output_info` describes, and report
@@ -2814,18 +2823,26 @@ mod tests {
     fn bit_perfect_outputs_reopen_only_for_a_rate_not_yet_asked_for() {
         use AudioBackendKind::*;
         for backend in [Asio, WasapiExclusive] {
-            assert_eq!(rate_switch(backend, 44_100, 96_000), Some(96_000));
+            assert_eq!(rate_switch(backend, 44_100, 44_100, 96_000), Some(96_000));
             // Same rate as the open output: reuse it (gapless stays gapless).
-            assert_eq!(rate_switch(backend, 96_000, 96_000), None);
-            // Asked for 352.8 kHz and got less: don't ask again.
-            assert_eq!(rate_switch(backend, 352_800, 352_800), None);
+            assert_eq!(rate_switch(backend, 96_000, 96_000, 96_000), None);
+            // Asked for 352.8 kHz and got 176.4: don't ask again, and a
+            // 176.4 kHz track already plays natively.
+            assert_eq!(rate_switch(backend, 352_800, 176_400, 352_800), None);
+            assert_eq!(rate_switch(backend, 352_800, 176_400, 176_400), None);
+            // A 48 kHz-only device asked for 44.1: neither rate reopens it.
+            assert_eq!(rate_switch(backend, 44_100, 48_000, 48_000), None);
+            assert_eq!(rate_switch(backend, 44_100, 48_000, 44_100), None);
         }
     }
 
     #[test]
     fn shared_output_never_follows_the_track_rate() {
         // Also the stand-in when a bit-perfect backend fell back.
-        assert_eq!(rate_switch(AudioBackendKind::Cpal, 44_100, 96_000), None);
+        assert_eq!(
+            rate_switch(AudioBackendKind::Cpal, 44_100, 48_000, 96_000),
+            None
+        );
     }
 
     #[test]
