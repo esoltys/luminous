@@ -8,6 +8,7 @@
   import { openExternalUrl } from "../utils/openExternalUrl";
   import { toastStore } from "../stores/toast.svelte";
   import { isWindows } from "../platform";
+  import type { AudioBackendKind } from "../types";
   import Toggle from "./Toggle.svelte";
   import Button from "./Button.svelte";
   import {
@@ -248,9 +249,14 @@
     return id ?? "";
   });
 
-  async function handleBackendChange(backend: "cpal" | "asio") {
+  async function handleBackendChange(backend: AudioBackendKind) {
     const devices = prefs.audioOutputDevices.filter((d) => d.backend === backend);
-    const newDeviceId = backend === "asio" && devices.length > 0 ? devices[0].id : null;
+    // Shared and exclusive list the same endpoints, so a chosen device carries
+    // over between them; ASIO has no system default, so it takes the first driver.
+    const current = prefs.audioOutputConfig.device_id;
+    const newDeviceId = current && devices.some((d) => d.id === current)
+      ? current
+      : backend === "asio" && devices.length > 0 ? devices[0].id : null;
     await prefs.setAudioOutput({ backend, device_id: newDeviceId });
   }
 
@@ -377,7 +383,7 @@
   </div>
 
   {#if isWindows}
-    <!-- Output Backend (CPAL vs ASIO) -->
+    <!-- Output Backend (shared, WASAPI exclusive or ASIO) -->
     <div class="flex items-center justify-between gap-4 py-2">
       <div class="flex flex-col gap-0.5 min-w-0">
         <label for="audio-backend-select" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.audioBackendLabel')}</label>
@@ -386,10 +392,11 @@
       <Select
         id="audio-backend-select"
         value={prefs.audioOutputConfig.backend}
-        onchange={(e) => handleBackendChange(e.currentTarget.value as 'cpal' | 'asio')}
+        onchange={(e) => handleBackendChange(e.currentTarget.value as AudioBackendKind)}
         class="shrink-0 bg-brand-main border border-brand-border hover:border-brand-accent/60 text-brand-text-primary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
       >
         <option value="cpal">{i18n.t('settings.audioBackendShared')}</option>
+        <option value="wasapi_exclusive">{i18n.t('settings.audioBackendExclusive')}</option>
         <option value="asio">{i18n.t('settings.audioBackendAsio')}</option>
       </Select>
     </div>
@@ -410,7 +417,7 @@
         onchange={(e) => handleDeviceChange(e.currentTarget.value || null)}
         class="shrink-0 max-w-[280px] bg-brand-main border border-brand-border hover:border-brand-accent/60 text-brand-text-primary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium truncate"
       >
-        {#if prefs.audioOutputConfig.backend === 'cpal'}
+        {#if prefs.audioOutputConfig.backend !== 'asio'}
           <option value="">{i18n.t('settings.audioDeviceDefault')}</option>
         {/if}
         {#each currentBackendDevices as dev}

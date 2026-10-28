@@ -15,7 +15,7 @@ mod imp {
     use azo::sys::*;
 
     use crate::pcm::{self, AsioSampleFormat};
-    use crate::sink::AudioSink;
+    use crate::sink::{AudioBackendKind, AudioSink};
     use crate::{AudioShared, OutputRenderer};
 
     struct AsioActiveState {
@@ -164,6 +164,7 @@ mod imp {
         pub sample_rate: u32,
         pub channels: u16,
         pub device_name: String,
+        pub sample_format: AsioSampleFormat,
         pub stream_error_flag: Arc<AtomicBool>,
         pub is_playing: AtomicBool,
     }
@@ -195,8 +196,12 @@ mod imp {
             Some(self.device_name.clone())
         }
 
-        fn backend_name(&self) -> &'static str {
-            "ASIO"
+        fn backend(&self) -> AudioBackendKind {
+            AudioBackendKind::Asio
+        }
+
+        fn output_format(&self) -> &'static str {
+            self.sample_format.label()
         }
 
         fn is_errored(&self) -> bool {
@@ -378,6 +383,7 @@ mod imp {
             sample_rate: active_rate,
             channels: 2,
             device_name,
+            sample_format,
             stream_error_flag,
             is_playing: AtomicBool::new(false),
         })

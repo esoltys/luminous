@@ -3628,6 +3628,7 @@ dependencies = [
  "serde_json",
  "symphonia",
  "symphonia-adapter-libopus",
+ "windows",
 ]
 
 [[package]]

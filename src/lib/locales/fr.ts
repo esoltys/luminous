@@ -329,6 +329,7 @@ export const fr: DeepStringRecord<typeof en> = {
     audioBackendHint: "Choisir entre l'audio partagé du système et la diffusion directe vers le matériel.",
     audioBackendShared: "Audio partagé (par défaut du système)",
     audioBackendAsio: "Matériel direct (ASIO)",
+    audioBackendExclusive: "Mode exclusif (WASAPI)",
     audioDeviceLabel: "Périphérique de sortie",
     audioDeviceHint: "Sélectionner la carte de son ou le convertisseur numérique-analogique (CNA) pour la lecture.",
     audioDeviceDefault: "Périphérique de sortie par défaut",
@@ -1119,6 +1120,11 @@ export const fr: DeepStringRecord<typeof en> = {
     contextOffline: "Hors ligne. Activez « En ligne » dans Paramètres › Intégrations pour récupérer les biographies et le contexte.",
     trackSkippedToast: 'Impossible de lire « {title} » — fichier introuvable. Morceau ignoré.',
     outputUnavailableToast: 'Sortie audio indisponible. Branchez un appareil et appuyez sur lecture.',
+    outputFallbackDeviceInUse: "Impossible de démarrer {mode} : une autre application utilise l'appareil. Lecture par l'audio partagé pour l'instant.",
+    outputFallbackExclusiveDisabled: "Impossible de démarrer {mode} : Windows n'autorise pas le contrôle exclusif de cet appareil. Activez-le dans les propriétés audio de l'appareil (onglet Avancé). Lecture par l'audio partagé pour l'instant.",
+    outputFallbackFormatUnsupported: "Impossible de démarrer {mode} : l'appareil n'accepte aucun format stéréo que Luminous peut lui envoyer. Lecture par l'audio partagé pour l'instant.",
+    outputFallbackUnavailable: "Impossible de démarrer {mode}. Lecture par l'audio partagé pour l'instant.",
+    outputFallbackRetry: "Réessayer",
     tracksSkippedToast: {
       one: "{count} morceau indisponible ignoré.",
       other: "{count} morceaux indisponibles ignorés."

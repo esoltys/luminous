@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { playlistsStore } from "./playlists.svelte";
 import { toastStore } from "./toast.svelte";
+import { prefs } from "./prefs.svelte";
 import { windowLayoutStore } from "./windowLayout.svelte";
 
 describe("PlayerStore", () => {
@@ -246,6 +247,40 @@ describe("PlayerStore", () => {
     } finally {
       vi.useRealTimers();
       showSpy.mockRestore();
+      if (originalListenImpl) vi.mocked(listen).mockImplementation(originalListenImpl);
+    }
+  });
+
+  it("explains an output fallback in a persistent toast with a retry", async () => {
+    const originalListenImpl = vi.mocked(listen).getMockImplementation();
+    let fallbackCallback: ((event: { payload: unknown }) => void) | undefined;
+    vi.mocked(listen).mockImplementation(async (event: string, callback: any) => {
+      if (event === "audio-output-fallback") fallbackCallback = callback;
+      return () => {};
+    });
+    const reapplySpy = vi.spyOn(prefs, "reapplyAudioOutput").mockResolvedValue();
+    vi.useFakeTimers();
+
+    try {
+      store = new PlayerStore();
+      await vi.advanceTimersByTimeAsync(50);
+
+      fallbackCallback?.({ payload: { requested: "wasapi_exclusive", reason: "device_in_use" } });
+      fallbackCallback?.({ payload: { requested: "wasapi_exclusive", reason: "device_in_use" } });
+      const toasts = toastStore.messages.filter((m) => m.text.startsWith("Couldn't start"));
+      // Replaced, not stacked, and never auto-dismissed.
+      expect(toasts).toHaveLength(1);
+      expect(toasts[0].text).toBe(
+        "Couldn't start Exclusive Mode (WASAPI): another app is using the device. Playing through shared audio for now."
+      );
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(toastStore.messages).toContainEqual(expect.objectContaining({ id: toasts[0].id }));
+
+      toasts[0].action?.onClick();
+      expect(reapplySpy).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+      reapplySpy.mockRestore();
       if (originalListenImpl) vi.mocked(listen).mockImplementation(originalListenImpl);
     }
   });

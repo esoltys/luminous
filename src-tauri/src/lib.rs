@@ -329,10 +329,9 @@ fn restore_audio_output_from_db(db: &Database, audio_engine: &AudioEngine) {
         .ok()
         .filter(|s: &String| !s.is_empty());
 
-    let backend = match backend_str.as_deref() {
-        Some("asio") => luminous_audio::AudioBackendKind::Asio,
-        _ => luminous_audio::AudioBackendKind::Cpal,
-    };
+    let backend = backend_str
+        .map(crate::commands::player::parse_audio_backend)
+        .unwrap_or_default();
 
     let config = luminous_audio::AudioOutputConfig { backend, device_id };
     let _ = audio_engine.set_output_config(config);
@@ -633,6 +632,15 @@ fn spawn_audio_event_loop(
                                 p.get_pipeline_info(&a)
                             };
                             let _ = app.emit("audio-pipeline-changed", pipeline);
+                        }
+                        // Exclusive/ASIO couldn't open; playback goes on through
+                        // shared output. The UI says why.
+                        crate::audio::AudioEvent::OutputFallback { requested, reason } => {
+                            log::warn!("Audio output fell back from {requested}: {reason:?}");
+                            let _ = app.emit(
+                                "audio-output-fallback",
+                                serde_json::json!({ "requested": requested, "reason": reason }),
+                            );
                         }
                         // The engine already parked the track paused (and sent
                         // `Paused`); this is a device problem, not a bad track,

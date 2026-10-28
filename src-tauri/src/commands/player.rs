@@ -688,7 +688,7 @@ pub async fn set_audio_output_settings(
         let _ = audio.set_output_config(settings.clone());
     }
 
-    let backend_str = settings.backend.to_string().to_lowercase();
+    let backend_str = audio_backend_key(settings.backend);
     let dev_id = settings.device_id.unwrap_or_default();
 
     let _ = crate::db::run_blocking(&state.db, move |conn| {
@@ -709,6 +709,20 @@ pub async fn set_audio_output_settings(
     .await;
 
     Ok(())
+}
+
+/// The `app_state` value an output backend is persisted as: its serialized
+/// name, so the setting, the IPC payload and the stored value agree.
+fn audio_backend_key(backend: luminous_audio::AudioBackendKind) -> String {
+    serde_json::to_value(backend)
+        .ok()
+        .and_then(|v| v.as_str().map(str::to_owned))
+        .unwrap_or_default()
+}
+
+/// Reads a persisted backend back; unknown values mean the shared default.
+pub(crate) fn parse_audio_backend(key: String) -> luminous_audio::AudioBackendKind {
+    serde_json::from_value(serde_json::Value::String(key)).unwrap_or_default()
 }
 
 /// Opens the native ASIO control panel for the active driver or specified device.
@@ -734,6 +748,18 @@ pub async fn open_asio_control_panel(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn audio_backends_round_trip_through_their_persisted_key() {
+        use luminous_audio::AudioBackendKind as K;
+        for backend in [K::Cpal, K::Asio, K::WasapiExclusive] {
+            assert_eq!(parse_audio_backend(audio_backend_key(backend)), backend);
+        }
+        // Values written before exclusive mode existed still restore.
+        assert_eq!(parse_audio_backend("asio".into()), K::Asio);
+        assert_eq!(parse_audio_backend("cpal".into()), K::Cpal);
+        assert_eq!(parse_audio_backend("bogus".into()), K::Cpal);
+    }
     use std::fs;
 
     #[test]

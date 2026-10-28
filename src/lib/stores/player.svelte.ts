@@ -1,13 +1,14 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { PlaybackState, Playlist, PlaylistItem, Song, ShuffleMode, RepeatMode, PlayState, LoudnessGainSource, PlayContext, AudioPipelineInfo, RadioSeed, RadioResult } from "../types";
+import type { PlaybackState, Playlist, PlaylistItem, Song, ShuffleMode, RepeatMode, PlayState, LoudnessGainSource, PlayContext, AudioPipelineInfo, RadioSeed, RadioResult, OutputFallbackPayload, OutputFallbackReason } from "../types";
 import { applySongStats, type SongStatsPayload } from "../utils/stats";
 import { themeStore } from "./theme.svelte";
 import { toastStore } from "./toast.svelte";
 import { playlistsStore } from "./playlists.svelte";
 import { windowLayoutStore } from "./windowLayout.svelte";
 import { i18n } from "./i18n.svelte";
+import { prefs } from "./prefs.svelte";
 import { isRemotePath, shortenQuotedUrls } from "../utils/remoteSource";
 import { shuffleArray } from "../utils/shuffle";
 
@@ -18,6 +19,14 @@ export interface CompletedSession {
   trackCount: number;
   completedAt?: number;
 }
+
+/** Toast text for each reason an output fell back to shared audio. */
+const OUTPUT_FALLBACK_KEYS: Record<OutputFallbackReason, string> = {
+  device_in_use: "outputFallbackDeviceInUse",
+  exclusive_mode_disabled: "outputFallbackExclusiveDisabled",
+  format_unsupported: "outputFallbackFormatUnsupported",
+  unavailable: "outputFallbackUnavailable",
+};
 
 export class PlayerStore {
   state = $state<PlayState>("stopped");
@@ -81,6 +90,7 @@ export class PlayerStore {
   private _playbackErrorBatch: { title: string; path: string | null; message: string }[] = [];
   private _playbackErrorTimer: ReturnType<typeof setTimeout> | null = null;
   private _outputUnavailableToastId: number | null = null;
+  private _outputFallbackToastId: number | null = null;
 
   constructor() {
     this.init();
@@ -227,6 +237,25 @@ export class PlayerStore {
         this._outputUnavailableToastId = toastStore.show(
           i18n.t("playerBar.outputUnavailableToast", undefined, "Audio output unavailable. Connect a device and press play."),
           "error"
+        );
+      });
+
+      // The chosen bit-perfect output couldn't open and playback went on through
+      // shared audio. Persistent, replaced on each fallback, with a retry for
+      // when the cause (another app holding the device) has gone away.
+      await listen<OutputFallbackPayload>("audio-output-fallback", (event) => {
+        const { requested, reason } = event.payload;
+        const mode = i18n.t(requested === "asio" ? "settings.audioBackendAsio" : "settings.audioBackendExclusive");
+        if (this._outputFallbackToastId !== null) toastStore.dismiss(this._outputFallbackToastId);
+        this._outputFallbackToastId = toastStore.show(
+          i18n.t(`playerBar.${OUTPUT_FALLBACK_KEYS[reason]}`, { mode }),
+          "warning",
+          undefined,
+          undefined,
+          {
+            label: i18n.t("playerBar.outputFallbackRetry"),
+            onClick: () => void prefs.reapplyAudioOutput().catch(() => {}),
+          }
         );
       });
 

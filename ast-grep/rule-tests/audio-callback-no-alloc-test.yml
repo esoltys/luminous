@@ -33,3 +33,9 @@ invalid:
             let label = format!("{}", output.len());
         }
     }
+  - |
+    impl RenderPeriod {
+        fn fill(&mut self, frames: u32) {
+            let scratch = vec![0.0f32; frames as usize];
+        }
+    }

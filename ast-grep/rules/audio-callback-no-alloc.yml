@@ -31,4 +31,4 @@ rule:
       - kind: impl_item
         has:
           field: type
-          regex: ^OutputRenderer$
+          regex: ^(OutputRenderer|RenderPeriod)$

@@ -1,18 +1,24 @@
 //! Audio output sink abstraction and device enumeration.
 //!
 //! Provides a deep interface decoupling the playback/decode loop from specific
-//! audio backends (CPAL shared audio vs ASIO bit-perfect output).
+//! audio backends (CPAL shared audio, WASAPI exclusive and ASIO bit-perfect
+//! output).
 
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
+/// Which output path the engine opens. The serialized names (`cpal`, `asio`,
+/// `wasapi_exclusive`) are also how the choice is persisted.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
 pub enum AudioBackendKind {
+    /// Shared system audio through CPAL (on Windows, WASAPI shared mode).
     #[default]
     Cpal,
     Asio,
+    /// WASAPI exclusive mode on the same endpoints as `Cpal` (Windows only).
+    WasapiExclusive,
 }
 
 impl std::fmt::Display for AudioBackendKind {
@@ -20,6 +26,7 @@ impl std::fmt::Display for AudioBackendKind {
         match self {
             Self::Cpal => write!(f, "CPAL"),
             Self::Asio => write!(f, "ASIO"),
+            Self::WasapiExclusive => write!(f, "WASAPI Exclusive"),
         }
     }
 }
@@ -38,7 +45,22 @@ pub struct AudioOutputConfig {
     pub device_id: Option<String>,
 }
 
-/// Deep abstraction implemented by all output sinks (CPAL, ASIO).
+/// Why a bit-perfect backend couldn't be opened, so the engine plays through
+/// shared output instead. Reported to the app in `AudioEvent::OutputFallback`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OutputFallbackReason {
+    /// Another application holds the device exclusively.
+    DeviceInUse,
+    /// The device's "Allow applications to take exclusive control" is off.
+    ExclusiveModeDisabled,
+    /// The device accepts no stereo integer format exclusively.
+    FormatUnsupported,
+    /// Anything else: the driver failed to load, initialise or start.
+    Unavailable,
+}
+
+/// Deep abstraction implemented by all output sinks (CPAL, ASIO, WASAPI exclusive).
 pub trait AudioSink: Send {
     /// Resumes or starts playback on the output device.
     fn play(&self) -> Result<(), String>;
@@ -55,8 +77,12 @@ pub trait AudioSink: Send {
     /// Name of the active output device or driver.
     fn device_name(&self) -> Option<String>;
 
-    /// Backend identifier ("CPAL" or "ASIO").
-    fn backend_name(&self) -> &'static str;
+    /// Which backend this sink is; its `Display` is the pipeline's name for it.
+    fn backend(&self) -> AudioBackendKind;
+
+    /// The sample format the device receives, for the pipeline display
+    /// (e.g. "24-bit integer PCM").
+    fn output_format(&self) -> &'static str;
 
     /// Whether the stream has experienced an unrecoverable device error.
     fn is_errored(&self) -> bool;
@@ -122,8 +148,12 @@ impl AudioSink for CpalSink {
         self.device_name.clone()
     }
 
-    fn backend_name(&self) -> &'static str {
-        "CPAL"
+    fn backend(&self) -> AudioBackendKind {
+        AudioBackendKind::Cpal
+    }
+
+    fn output_format(&self) -> &'static str {
+        "32-bit float PCM"
     }
 
     fn is_errored(&self) -> bool {
@@ -159,6 +189,15 @@ pub fn enumerate_output_devices() -> Vec<AudioDeviceInfo> {
                 .map(|i| i.to_string())
                 .unwrap_or_else(|| name.clone());
             let is_default = default_id.as_ref().is_some_and(|def| *def == id);
+            // Exclusive mode opens the same WASAPI endpoints, under the same
+            // ids, so a selection survives switching between the two modes.
+            #[cfg(windows)]
+            devices.push(AudioDeviceInfo {
+                id: id.clone(),
+                name: name.clone(),
+                backend: AudioBackendKind::WasapiExclusive,
+                is_default,
+            });
             devices.push(AudioDeviceInfo {
                 id,
                 name,

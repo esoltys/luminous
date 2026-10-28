@@ -253,6 +253,7 @@ export interface AudioPipelineInfo {
   // Stage 2: Processing
   decoder_name: string;
   headroom: string;
+  /** The rate the track is resampled to (the output rate); absent when it plays at its own rate. */
   resample_rate?: number;
   loudness_source: LoudnessGainSource;
   loudness_gain_db?: number;
@@ -269,7 +270,19 @@ export interface AudioPipelineInfo {
   output_backend: string;
 }
 
-export type AudioBackendKind = "cpal" | "asio";
+export type AudioBackendKind = "cpal" | "asio" | "wasapi_exclusive";
+
+/** Why a bit-perfect backend fell back to shared output (`audio-output-fallback`). */
+export type OutputFallbackReason =
+  | "device_in_use"
+  | "exclusive_mode_disabled"
+  | "format_unsupported"
+  | "unavailable";
+
+export interface OutputFallbackPayload {
+  requested: AudioBackendKind;
+  reason: OutputFallbackReason;
+}
 
 export interface AudioDeviceInfo {
   id: string;
