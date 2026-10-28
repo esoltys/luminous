@@ -824,6 +824,10 @@ struct AudioOutput {
     /// Set when the configured backend failed and this is the shared-output
     /// stand-in: what was asked for, and why it couldn't be had.
     fallback: Option<(AudioBackendKind, OutputFallbackReason)>,
+    /// Set when the chosen device wasn't connected and this output is on the
+    /// system default instead; `check_and_rebuild_output` switches back once
+    /// the chosen device returns.
+    stands_in: bool,
 }
 
 impl AudioOutput {
@@ -894,36 +898,57 @@ fn select_output_device(host: &cpal::Host) -> Result<cpal::Device, String> {
     Ok(default)
 }
 
+fn device_display_name(d: &cpal::Device) -> String {
+    use cpal::traits::DeviceTrait;
+    d.description()
+        .map(|desc| desc.name().to_string())
+        .unwrap_or_else(|_| d.to_string())
+}
+
+/// The connected output device whose id is `id`, with its display name.
+fn find_output_device(host: &cpal::Host, id: &str) -> Option<(cpal::Device, String)> {
+    use cpal::traits::{DeviceTrait, HostTrait};
+    host.output_devices().ok()?.find_map(|d| {
+        let name = device_display_name(&d);
+        let dev_id = d
+            .id()
+            .ok()
+            .map(|i| i.to_string())
+            .unwrap_or_else(|| name.clone());
+        (dev_id == id).then_some((d, name))
+    })
+}
+
+/// The device to open for `requested_id`.
+struct ResolvedDevice {
+    device: cpal::Device,
+    name: Option<String>,
+    /// The requested device isn't connected; this is the system default.
+    stands_in: bool,
+}
+
 fn resolve_cpal_device(
     host: &cpal::Host,
     requested_id: Option<&str>,
-) -> Result<(cpal::Device, Option<String>), String> {
-    use cpal::traits::{DeviceTrait, HostTrait};
-    let get_name = |d: &cpal::Device| -> String {
-        d.description()
-            .map(|desc| desc.name().to_string())
-            .unwrap_or_else(|_| d.to_string())
-    };
-    if let Some(req_id) = requested_id {
-        if !req_id.is_empty() {
-            if let Ok(devices) = host.output_devices() {
-                for d in devices {
-                    let name = get_name(&d);
-                    let id = d
-                        .id()
-                        .ok()
-                        .map(|i| i.to_string())
-                        .unwrap_or_else(|| name.clone());
-                    if id == req_id {
-                        return Ok((d, Some(name)));
-                    }
-                }
-            }
-        }
+) -> Result<ResolvedDevice, String> {
+    let requested_id = requested_id.filter(|id| !id.is_empty());
+    if let Some(found) = requested_id.and_then(|id| find_output_device(host, id)) {
+        let (device, name) = found;
+        return Ok(ResolvedDevice {
+            device,
+            name: Some(name),
+            stands_in: false,
+        });
     }
-    let dev = select_output_device(host)?;
-    let name = Some(get_name(&dev));
-    Ok((dev, name))
+    if let Some(id) = requested_id {
+        log::warn!("Chosen output device {id} isn't connected; using the system default");
+    }
+    let device = select_output_device(host)?;
+    Ok(ResolvedDevice {
+        name: Some(device_display_name(&device)),
+        device,
+        stands_in: requested_id.is_some(),
+    })
 }
 
 /// The output callback's state: everything it reads, plus its preallocated
@@ -1089,6 +1114,7 @@ fn open_bit_perfect(
     let consumer = Arc::new(Mutex::new(consumer));
     let played_samples = Arc::new(AtomicU64::new(0));
 
+    let mut stands_in = false;
     let opened: Result<Opened, OutputFallbackReason> = if backend == AudioBackendKind::Asio {
         let preferred_rate = shared.output_sample_rate.load(Ordering::Relaxed).max(44100);
         crate::asio::build_asio_sink(
@@ -1112,12 +1138,14 @@ fn open_bit_perfect(
         use cpal::traits::DeviceTrait;
         let host = cpal::default_host();
         resolve_cpal_device(&host, config.device_id.as_deref())
-            .and_then(|(device, name)| {
-                let endpoint_id = device
+            .and_then(|resolved| {
+                let endpoint_id = resolved
+                    .device
                     .id()
                     .map(|id| id.id().to_string())
                     .map_err(|e| format!("Output endpoint has no id: {e}"))?;
-                Ok((endpoint_id, name))
+                stands_in = resolved.stands_in;
+                Ok((endpoint_id, resolved.name))
             })
             .map_err(|message| crate::wasapi::OpenError {
                 reason: OutputFallbackReason::Unavailable,
@@ -1165,6 +1193,7 @@ fn open_bit_perfect(
                     channels,
                     stream_error_flag,
                     fallback: None,
+                    stands_in,
                 }
             })
             .map_err(|reason| (backend, reason)),
@@ -1193,8 +1222,11 @@ fn build_output(shared: &Arc<AudioShared>) -> Result<AudioOutput, String> {
     };
 
     let host = cpal::default_host();
-    let (device, dev_name) = resolve_cpal_device(&host, output_cfg.device_id.as_deref())?;
-    let device_name = dev_name;
+    let ResolvedDevice {
+        device,
+        name: device_name,
+        stands_in,
+    } = resolve_cpal_device(&host, output_cfg.device_id.as_deref())?;
     let default_config = device
         .default_output_config()
         .map_err(|e| format!("Failed to get default output config: {e}"))?;
@@ -1288,6 +1320,7 @@ fn build_output(shared: &Arc<AudioShared>) -> Result<AudioOutput, String> {
         backend_name: AudioBackendKind::Cpal.to_string(),
         stream_error_flag,
         fallback,
+        stands_in,
     })
 }
 
@@ -1714,9 +1747,18 @@ fn check_and_rebuild_output(
         false
     };
 
-    if force_rebuild || stream_errored || default_changed {
+    // Only polled while standing in, so the enumeration costs nothing in the
+    // usual case.
+    let chosen_returned = check_due
+        && output.as_ref().is_some_and(|o| o.stands_in)
+        && output_cfg
+            .device_id
+            .as_deref()
+            .is_some_and(|id| find_output_device(&cpal::default_host(), id).is_some());
+
+    if force_rebuild || stream_errored || default_changed || chosen_returned {
         log::info!(
-            "Audio output rebuild triggered (forced: {force_rebuild}, errored: {stream_errored}, default_changed: {default_changed}). Rebuilding audio stream..."
+            "Audio output rebuild triggered (forced: {force_rebuild}, errored: {stream_errored}, default_changed: {default_changed}, chosen device returned: {chosen_returned}). Rebuilding audio stream..."
         );
 
         let cur_pos = shared.position.load(Ordering::Relaxed);
