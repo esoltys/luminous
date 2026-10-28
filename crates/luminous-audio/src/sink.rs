@@ -4,6 +4,7 @@
 //! audio backends (CPAL shared audio, WASAPI exclusive and ASIO bit-perfect
 //! output).
 
+use crate::pcm::PcmFormat;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -96,12 +97,35 @@ pub(crate) const DEFAULT_BIT_PERFECT_RATE: u32 = 44_100;
 /// track at `requested` Hz: the rate itself, then each halving of it down to
 /// 44.1 kHz (an integer ratio keeps resampling simple, e.g. 352.8 kHz on a
 /// 192 kHz DAC plays at 176.4 kHz).
-#[cfg_attr(not(windows), allow(dead_code))] // ASIO and WASAPI only
+#[cfg_attr(not(any(windows, target_os = "linux")), allow(dead_code))] // bit-perfect backends only
 pub(crate) fn rate_candidates(requested: u32) -> Vec<u32> {
     std::iter::successors(Some(requested), |&r| {
         (r % 2 == 0 && r / 2 >= 44_100).then_some(r / 2)
     })
     .collect()
+}
+
+/// Picks the first rate/format a bit-perfect device accepts: the
+/// [`rate_candidates`] for `requested_rate`, then each of `fallback_rates`
+/// (e.g. the device's mix rate), each across `formats` in order. Stereo only.
+/// `None` when the device accepts none of them.
+#[cfg_attr(not(any(windows, target_os = "linux")), allow(dead_code))]
+pub(crate) fn negotiate_format(
+    requested_rate: u32,
+    fallback_rates: &[u32],
+    formats: &[PcmFormat],
+    mut is_supported: impl FnMut(u32, PcmFormat) -> bool,
+) -> Option<(u32, PcmFormat)> {
+    let mut rates = rate_candidates(requested_rate);
+    for &rate in fallback_rates {
+        if !rates.contains(&rate) {
+            rates.push(rate);
+        }
+    }
+    rates
+        .into_iter()
+        .flat_map(|rate| formats.iter().map(move |&format| (rate, format)))
+        .find(|&(rate, format)| is_supported(rate, format))
 }
 
 /// Standard cross-platform output sink backed by CPAL.
@@ -243,5 +267,56 @@ mod tests {
         // Odd rates have no exact halving.
         assert_eq!(rate_candidates(22_050), vec![22_050]);
         assert_eq!(rate_candidates(11_025), vec![11_025]);
+    }
+
+    const WASAPI: [PcmFormat; 4] = PcmFormat::PREFERENCE;
+
+    #[test]
+    fn negotiation_prefers_the_preferred_rate_at_the_deepest_format() {
+        let picked = negotiate_format(44_100, &[48_000], &WASAPI, |_, _| true);
+        assert_eq!(picked, Some((44_100, PcmFormat::I32)));
+    }
+
+    #[test]
+    fn negotiation_walks_formats_before_falling_back_to_the_mix_rate() {
+        let picked = negotiate_format(44_100, &[48_000], &WASAPI, |rate, format| {
+            (rate == 44_100 && format == PcmFormat::I16) || rate == 48_000
+        });
+        assert_eq!(picked, Some((44_100, PcmFormat::I16)));
+
+        let picked = negotiate_format(44_100, &[48_000], &WASAPI, |rate, format| {
+            rate == 48_000 && format == PcmFormat::I24Packed
+        });
+        assert_eq!(picked, Some((48_000, PcmFormat::I24Packed)));
+    }
+
+    #[test]
+    fn negotiation_asks_each_candidate_once_when_the_rates_coincide() {
+        let mut asked = Vec::new();
+        let picked = negotiate_format(48_000, &[48_000], &WASAPI, |rate, format| {
+            asked.push((rate, format));
+            false
+        });
+        assert_eq!(picked, None);
+        assert_eq!(asked.len(), WASAPI.len());
+    }
+
+    #[test]
+    fn negotiation_falls_back_to_the_closest_rate_of_the_same_family() {
+        // A 192 kHz DAC asked for 352.8 kHz opens at 176.4 kHz, not its mix rate.
+        let picked = negotiate_format(352_800, &[48_000], &WASAPI, |rate, _| rate <= 192_000);
+        assert_eq!(picked, Some((176_400, PcmFormat::I32)));
+    }
+
+    #[test]
+    fn negotiation_tries_fallback_rates_in_order() {
+        // A 48 kHz-only USB device (packed 24-bit) asked for 44.1 kHz.
+        let picked = negotiate_format(
+            44_100,
+            &[48_000, 44_100],
+            &PcmFormat::ALSA_PREFERENCE,
+            |rate, format| rate == 48_000 && format == PcmFormat::I24Packed,
+        );
+        assert_eq!(picked, Some((48_000, PcmFormat::I24Packed)));
     }
 }

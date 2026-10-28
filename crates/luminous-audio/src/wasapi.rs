@@ -10,8 +10,7 @@
 //! teardown) happens on one render thread the sink owns, so no other thread's
 //! COM apartment history can interfere with it.
 
-use crate::pcm::PcmFormat;
-use crate::sink::{rate_candidates, OutputFallbackReason};
+use crate::sink::OutputFallbackReason;
 
 // HRESULTs from audioclient.h, kept here so the classifier is testable on any
 // platform.
@@ -24,25 +23,6 @@ const AUDCLNT_E_EXCLUSIVE_MODE_NOT_ALLOWED: i32 = 0x8889_000E_u32 as i32;
 pub(crate) struct OpenError {
     pub(crate) reason: OutputFallbackReason,
     pub(crate) message: String,
-}
-
-/// Picks the first rate/format the device accepts exclusively: the
-/// [`rate_candidates`] for `requested_rate`, then the device's mix rate, each
-/// across [`PcmFormat::PREFERENCE`]. Stereo only. `None` when the device
-/// accepts none of them.
-pub(crate) fn negotiate_format(
-    requested_rate: u32,
-    mix_rate: u32,
-    mut is_supported: impl FnMut(u32, PcmFormat) -> bool,
-) -> Option<(u32, PcmFormat)> {
-    let mut rates = rate_candidates(requested_rate);
-    if !rates.contains(&mix_rate) {
-        rates.push(mix_rate);
-    }
-    rates
-        .into_iter()
-        .flat_map(|rate| PcmFormat::PREFERENCE.map(|format| (rate, format)))
-        .find(|&(rate, format)| is_supported(rate, format))
 }
 
 /// Maps a failed WASAPI call's HRESULT to the reason shown to the user.
@@ -89,9 +69,9 @@ mod imp {
         WaitForMultipleObjects,
     };
 
-    use super::{aligned_period_hns, classify_failure, negotiate_format, OpenError};
+    use super::{aligned_period_hns, classify_failure, OpenError};
     use crate::pcm::{self, PcmFormat};
-    use crate::sink::{AudioBackendKind, AudioSink, OutputFallbackReason};
+    use crate::sink::{negotiate_format, AudioBackendKind, AudioSink, OutputFallbackReason};
     use crate::{AudioShared, OutputRenderer};
 
     const CHANNELS: u16 = 2;
@@ -198,7 +178,7 @@ mod imp {
     /// Opens `endpoint_id` (an `IMMDevice` id) exclusively and starts its
     /// render thread, paused. Fails with the reason to report when the
     /// device is busy, disallows exclusive mode, or takes no stereo integer
-    /// format near `requested_rate` (see [`super::negotiate_format`]).
+    /// format near `requested_rate` (see [`negotiate_format`]).
     pub(crate) fn build_exclusive_sink(
         endpoint_id: String,
         requested_rate: u32,
@@ -364,14 +344,20 @@ mod imp {
             // A refusal other than "unsupported format" (device in use,
             // exclusive mode disallowed) is the better reason to report.
             let mut refusal = super::AUDCLNT_E_UNSUPPORTED_FORMAT;
-            let (rate, format) = negotiate_format(requested_rate, mix_rate, |r, f| {
-                let wf = wave_format(r, f);
-                let hr = client.IsFormatSupported(AUDCLNT_SHAREMODE_EXCLUSIVE, &wf.Format, None);
-                if hr != S_OK && hr.0 != super::AUDCLNT_E_UNSUPPORTED_FORMAT {
-                    refusal = hr.0;
-                }
-                hr == S_OK
-            })
+            let (rate, format) = negotiate_format(
+                requested_rate,
+                &[mix_rate],
+                &PcmFormat::PREFERENCE,
+                |r, f| {
+                    let wf = wave_format(r, f);
+                    let hr =
+                        client.IsFormatSupported(AUDCLNT_SHAREMODE_EXCLUSIVE, &wf.Format, None);
+                    if hr != S_OK && hr.0 != super::AUDCLNT_E_UNSUPPORTED_FORMAT {
+                        refusal = hr.0;
+                    }
+                    hr == S_OK
+                },
+            )
             .ok_or_else(|| OpenError {
                 reason: classify_failure(refusal),
                 message: format!(
@@ -534,43 +520,6 @@ pub(crate) use imp::*;
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn negotiation_prefers_the_preferred_rate_at_the_deepest_format() {
-        let picked = negotiate_format(44_100, 48_000, |_, _| true);
-        assert_eq!(picked, Some((44_100, PcmFormat::I32)));
-    }
-
-    #[test]
-    fn negotiation_walks_formats_before_falling_back_to_the_mix_rate() {
-        let picked = negotiate_format(44_100, 48_000, |rate, format| {
-            (rate == 44_100 && format == PcmFormat::I16) || rate == 48_000
-        });
-        assert_eq!(picked, Some((44_100, PcmFormat::I16)));
-
-        let picked = negotiate_format(44_100, 48_000, |rate, format| {
-            rate == 48_000 && format == PcmFormat::I24Packed
-        });
-        assert_eq!(picked, Some((48_000, PcmFormat::I24Packed)));
-    }
-
-    #[test]
-    fn negotiation_asks_each_candidate_once_when_the_rates_coincide() {
-        let mut asked = Vec::new();
-        let picked = negotiate_format(48_000, 48_000, |rate, format| {
-            asked.push((rate, format));
-            false
-        });
-        assert_eq!(picked, None);
-        assert_eq!(asked.len(), PcmFormat::PREFERENCE.len());
-    }
-
-    #[test]
-    fn negotiation_falls_back_to_the_closest_rate_of_the_same_family() {
-        // A 192 kHz DAC asked for 352.8 kHz opens at 176.4 kHz, not its mix rate.
-        let picked = negotiate_format(352_800, 48_000, |rate, _| rate <= 192_000);
-        assert_eq!(picked, Some((176_400, PcmFormat::I32)));
-    }
 
     #[test]
     fn failures_map_to_the_reason_shown_to_the_user() {

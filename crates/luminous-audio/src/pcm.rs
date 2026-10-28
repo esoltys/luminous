@@ -227,27 +227,35 @@ pub fn interleave_to_deinterleaved_f32_be(
 }
 
 /// An interleaved little-endian integer PCM layout a device accepts, as
-/// negotiated with WASAPI exclusive mode.
+/// negotiated with WASAPI exclusive mode or ALSA.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PcmFormat {
     /// 32-bit container, 32 valid bits.
     I32,
     /// 32-bit container, 24 valid bits left-justified (the low byte is zero).
     I24In32,
+    /// 32-bit container, 24 valid bits right-justified (sign-extended into
+    /// the top byte): ALSA's `S24_LE`.
+    I24In32Low,
     /// 3-byte packed 24-bit samples.
     I24Packed,
     I16,
 }
 
 impl PcmFormat {
-    /// Deepest first: every candidate holds a 16- or 24-bit source losslessly,
-    /// and a wider one leaves the gain chain more resolution.
+    /// WASAPI's candidates, deepest first: every one holds a 16- or 24-bit
+    /// source losslessly, and a wider one leaves the gain chain more resolution.
     pub const PREFERENCE: [PcmFormat; 4] = [Self::I32, Self::I24In32, Self::I24Packed, Self::I16];
+
+    /// ALSA's candidates in the same order (`S32_LE`, `S24_LE`, `S24_3LE`,
+    /// `S16_LE`): ALSA's 24-in-32 layout is right-justified.
+    pub const ALSA_PREFERENCE: [PcmFormat; 4] =
+        [Self::I32, Self::I24In32Low, Self::I24Packed, Self::I16];
 
     /// Bytes one sample occupies in the device buffer.
     pub fn container_bytes(self) -> usize {
         match self {
-            Self::I32 | Self::I24In32 => 4,
+            Self::I32 | Self::I24In32 | Self::I24In32Low => 4,
             Self::I24Packed => 3,
             Self::I16 => 2,
         }
@@ -257,7 +265,7 @@ impl PcmFormat {
     pub fn valid_bits(self) -> u16 {
         match self {
             Self::I32 => 32,
-            Self::I24In32 | Self::I24Packed => 24,
+            Self::I24In32 | Self::I24In32Low | Self::I24Packed => 24,
             Self::I16 => 16,
         }
     }
@@ -266,7 +274,7 @@ impl PcmFormat {
     pub fn label(self) -> &'static str {
         match self {
             Self::I32 => "32-bit integer PCM",
-            Self::I24In32 | Self::I24Packed => "24-bit integer PCM",
+            Self::I24In32 | Self::I24In32Low | Self::I24Packed => "24-bit integer PCM",
             Self::I16 => "16-bit integer PCM",
         }
     }
@@ -288,6 +296,11 @@ pub fn write_interleaved(src: &[f32], format: PcmFormat, dst: &mut [u8]) -> usiz
         PcmFormat::I24In32 => {
             for (s, o) in src.iter().zip(out) {
                 o.copy_from_slice(&(f32_to_i24_in_i32(*s) << 8).to_le_bytes());
+            }
+        }
+        PcmFormat::I24In32Low => {
+            for (s, o) in src.iter().zip(out) {
+                o.copy_from_slice(&f32_to_i24_in_i32(*s).to_le_bytes());
             }
         }
         PcmFormat::I24Packed => {
@@ -512,6 +525,14 @@ mod tests {
         let mut in32 = [0u8; 8];
         assert_eq!(write_interleaved(&src, PcmFormat::I24In32, &mut in32), 2);
         assert_eq!(in32, [0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x80]);
+
+        // ALSA's S24_LE: 24 valid bits in the low three bytes, sign-extended.
+        let mut in32_low = [0u8; 8];
+        assert_eq!(
+            write_interleaved(&src, PcmFormat::I24In32Low, &mut in32_low),
+            2
+        );
+        assert_eq!(in32_low, [0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x80, 0xFF]);
 
         let mut i32_out = [0u8; 8];
         assert_eq!(write_interleaved(&src, PcmFormat::I32, &mut i32_out), 2);
