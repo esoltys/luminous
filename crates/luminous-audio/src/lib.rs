@@ -628,6 +628,12 @@ struct ActiveTrack {
 }
 
 impl ActiveTrack {
+    /// Resample to `rate`/`channels` from here on (the track hasn't been
+    /// decoded yet, so there's no resampler state to keep).
+    fn retarget(&mut self, rate: u32, channels: u16) {
+        self.resampler = Resampler::new(self.src_rate, rate, channels as usize);
+    }
+
     fn open(
         open_source: &SourceOpener,
         spec: Track,
@@ -686,6 +692,24 @@ impl ActiveTrack {
             eof: false,
         })
     }
+}
+
+/// The rate to reopen an output at for a track at `track_rate`, or `None` to
+/// keep it. Only a bit-perfect sink follows the track's rate, and only when it
+/// isn't already running at it (`opened_rate`) and wasn't already asked for it
+/// (`requested_rate`: a device that couldn't do it got the closest rate it
+/// could, and keeps it). Decided on the sink actually open, so a bit-perfect
+/// backend that fell back to shared output doesn't retry on every rate change.
+fn rate_switch(
+    open_backend: AudioBackendKind,
+    requested_rate: u32,
+    opened_rate: u32,
+    track_rate: u32,
+) -> Option<u32> {
+    (open_backend != AudioBackendKind::Cpal
+        && track_rate != requested_rate
+        && track_rate != opened_rate)
+        .then_some(track_rate)
 }
 
 /// Convert an absolute track time to an interleaved-sample count at the
@@ -828,9 +852,24 @@ struct AudioOutput {
     /// system default instead; `check_and_rebuild_output` switches back once
     /// the chosen device returns.
     stands_in: bool,
+    /// The rate this output was opened for. A bit-perfect device may not run
+    /// at it (`sample_rate` is what it got); remembering the request keeps a
+    /// rate the device can't do from reopening it on every track.
+    requested_rate: u32,
 }
 
 impl AudioOutput {
+    /// The rate to reopen this output at so a track at `track_rate` plays at
+    /// its own rate, or `None` to keep it as it is.
+    fn rate_switch_for(&self, track_rate: u32) -> Option<u32> {
+        rate_switch(
+            self.sink.backend(),
+            self.requested_rate,
+            self.sample_rate,
+            track_rate,
+        )
+    }
+
     /// Make this the output `AudioEngine::output_info` describes, and report
     /// a backend fallback if it is one.
     fn publish(&self, shared: &AudioShared, event_tx: &mpsc::Sender<AudioEvent>) {
@@ -1098,6 +1137,7 @@ type Fallback = (AudioBackendKind, OutputFallbackReason);
 fn open_bit_perfect(
     shared: &Arc<AudioShared>,
     config: &AudioOutputConfig,
+    requested_rate: u32,
 ) -> Option<Result<AudioOutput, Fallback>> {
     type Opened = (Box<dyn AudioSink>, Arc<std::sync::atomic::AtomicBool>);
 
@@ -1109,20 +1149,21 @@ fn open_bit_perfect(
         return None;
     }
 
-    // Two seconds at the highest rate a device may negotiate.
-    let (producer, consumer) = HeapRb::<f32>::new(192_000 * 2 * 2).split();
+    // Two seconds of stereo at the highest rate the device may open at: the
+    // request, or its mix rate (at most 192 kHz on real hardware).
+    let ring_rate = requested_rate.max(192_000) as usize;
+    let (producer, consumer) = HeapRb::<f32>::new(ring_rate * 2 * 2).split();
     let consumer = Arc::new(Mutex::new(consumer));
     let played_samples = Arc::new(AtomicU64::new(0));
 
     let mut stands_in = false;
     let opened: Result<Opened, OutputFallbackReason> = if backend == AudioBackendKind::Asio {
-        let preferred_rate = shared.output_sample_rate.load(Ordering::Relaxed).max(44100);
         crate::asio::build_asio_sink(
             config.device_id.as_deref(),
             shared,
             Arc::clone(&consumer),
             Arc::clone(&played_samples),
-            preferred_rate,
+            requested_rate,
         )
         .map(|sink| {
             let error_flag = Arc::clone(&sink.stream_error_flag);
@@ -1154,6 +1195,7 @@ fn open_bit_perfect(
             .and_then(|(endpoint_id, name)| {
                 crate::wasapi::build_exclusive_sink(
                     endpoint_id,
+                    requested_rate,
                     name,
                     shared,
                     Arc::clone(&consumer),
@@ -1194,6 +1236,7 @@ fn open_bit_perfect(
                     stream_error_flag,
                     fallback: None,
                     stands_in,
+                    requested_rate,
                 }
             })
             .map_err(|reason| (backend, reason)),
@@ -1204,18 +1247,25 @@ fn open_bit_perfect(
 fn open_bit_perfect(
     _shared: &Arc<AudioShared>,
     _config: &AudioOutputConfig,
+    _requested_rate: u32,
 ) -> Option<Result<AudioOutput, Fallback>> {
     None
 }
 
-/// Opens the configured backend. When ASIO or WASAPI exclusive can't be
-/// opened, falls back to shared CPAL output (on the same endpoint where there
-/// is one) and records why in `AudioOutput::fallback`.
-fn build_output(shared: &Arc<AudioShared>) -> Result<AudioOutput, String> {
+/// Opens the configured backend. ASIO and WASAPI exclusive open at
+/// `requested_rate` or the closest rate the device takes (44.1 kHz when
+/// `None`); shared output runs at the system mix rate. When ASIO or WASAPI
+/// exclusive can't be opened, falls back to shared CPAL output (on the same
+/// endpoint where there is one) and records why in `AudioOutput::fallback`.
+fn build_output(
+    shared: &Arc<AudioShared>,
+    requested_rate: Option<u32>,
+) -> Result<AudioOutput, String> {
     use cpal::traits::{DeviceTrait, StreamTrait};
 
+    let requested_rate = requested_rate.unwrap_or(crate::sink::DEFAULT_BIT_PERFECT_RATE);
     let output_cfg = shared.output_config.read().clone();
-    let fallback = match open_bit_perfect(shared, &output_cfg) {
+    let fallback = match open_bit_perfect(shared, &output_cfg, requested_rate) {
         Some(Ok(output)) => return Ok(output),
         Some(Err(fallback)) => Some(fallback),
         None => None,
@@ -1321,6 +1371,7 @@ fn build_output(shared: &Arc<AudioShared>) -> Result<AudioOutput, String> {
         stream_error_flag,
         fallback,
         stands_in,
+        requested_rate,
     })
 }
 
@@ -1350,14 +1401,17 @@ pub(crate) fn is_fatal_cpal_error(err: &cpal::Error) -> bool {
 /// handed back to the caller. Bounded by a timeout so a wedged WASAPI call on
 /// the scratch thread can't hang `decode_thread` — see the wedge risk
 /// documented on `AudioOutput` above.
-fn build_output_on_fresh_thread(shared: &Arc<AudioShared>) -> Result<AudioOutput, String> {
+fn build_output_on_fresh_thread(
+    shared: &Arc<AudioShared>,
+    requested_rate: Option<u32>,
+) -> Result<AudioOutput, String> {
     let shared = Arc::clone(shared);
 
     let (tx, rx) = mpsc::channel();
     let spawned = std::thread::Builder::new()
         .name("luminous-audio-rebuild".into())
         .spawn(move || {
-            let result = build_output(&shared);
+            let result = build_output(&shared, requested_rate);
             let _ = tx.send(result);
         });
 
@@ -1446,36 +1500,17 @@ fn decode_thread(
                         r
                     }
                     Ok(AudioCommand::Cue(r)) => {
-                        if output.is_none() {
-                            match build_output_on_fresh_thread(&shared) {
-                                Ok(o) => {
-                                    o.publish(&shared, &event_tx);
-                                    output = Some(o);
-                                }
-                                Err(message) => {
-                                    park_without_output(
-                                        &shared,
-                                        &event_tx,
-                                        &mut paused_req,
-                                        r,
-                                        message,
-                                    );
-                                    continue;
-                                }
-                            }
-                        }
-                        let out = output.as_mut().unwrap();
-                        let target_sample_rate = out.sample_rate;
-                        let target_channels = out.channels;
-
-                        match ActiveTrack::open(
-                            &shared.open_source,
+                        match start_on_output(
+                            &mut output,
+                            &shared,
+                            &event_tx,
                             r.track.clone(),
                             r.start_nanosec,
-                            target_sample_rate,
-                            target_channels as usize,
                         ) {
                             Ok(_) => {
+                                let out = output.as_mut().unwrap();
+                                let target_sample_rate = out.sample_rate;
+                                let target_channels = out.channels;
                                 {
                                     let mut consumer = out.consumer.lock();
                                     while consumer.try_pop().is_some() {}
@@ -1495,8 +1530,17 @@ fn decode_thread(
                                 paused_req = Some(r);
                                 let _ = event_tx.send(AudioEvent::Paused);
                             }
-                            Err(message) => {
+                            Err(StartFailure::Track(message)) => {
                                 let _ = event_tx.send(AudioEvent::Error { message });
+                            }
+                            Err(StartFailure::NoOutput(_, message)) => {
+                                park_without_output(
+                                    &shared,
+                                    &event_tx,
+                                    &mut paused_req,
+                                    r,
+                                    message,
+                                );
                             }
                         }
                         continue;
@@ -1526,10 +1570,11 @@ fn decode_thread(
                         continue;
                     }
                     Ok(AudioCommand::RebuildOutput) => {
+                        let requested_rate = output.as_ref().map(|o| o.requested_rate);
                         if let Some(old_out) = output.take() {
                             let _ = old_out.sink.pause();
                         }
-                        match build_output_on_fresh_thread(&shared) {
+                        match build_output_on_fresh_thread(&shared, requested_rate) {
                             Ok(new_out) => {
                                 new_out.publish(&shared, &event_tx);
                                 output = Some(new_out);
@@ -1587,40 +1632,36 @@ fn decode_thread(
         }
 
         // Ensure the persistent output stream exists (built lazily on the
-        // first track this thread ever plays; reused for every track after).
+        // first track this thread ever plays; reused for every track after,
+        // unless a bit-perfect one must reopen at this track's rate).
         // Built on a fresh thread — `output` can already be `None` here after
         // a mid-session device-change rebuild (see `check_and_rebuild_output`),
         // and re-touching COM on `decode_thread`'s own long-lived OS thread a
         // second time risks the same RPC_E_CHANGED_MODE wedge #624 fixed.
-        if output.is_none() {
-            match build_output_on_fresh_thread(&shared) {
-                Ok(o) => {
-                    o.publish(&shared, &event_tx);
-                    output = Some(o);
-                }
-                Err(message) => {
-                    park_without_output(&shared, &event_tx, &mut paused_req, req, message);
-                    continue;
-                }
-            }
-        }
-        let out = output.as_mut().unwrap();
-        let target_sample_rate = out.sample_rate;
-        let target_channels = out.channels;
-
-        let current = match ActiveTrack::open(
-            &shared.open_source,
+        let current = match start_on_output(
+            &mut output,
+            &shared,
+            &event_tx,
             req.track,
             req.start_nanosec,
-            target_sample_rate,
-            target_channels as usize,
         ) {
             Ok(t) => t,
-            Err(message) => {
+            Err(StartFailure::Track(message)) => {
                 let _ = event_tx.send(AudioEvent::Error { message });
                 continue;
             }
+            Err(StartFailure::NoOutput(track, message)) => {
+                let req = PlayRequest {
+                    track,
+                    start_nanosec: req.start_nanosec,
+                };
+                park_without_output(&shared, &event_tx, &mut paused_req, req, message);
+                continue;
+            }
         };
+        let out = output.as_mut().unwrap();
+        let target_sample_rate = out.sample_rate;
+        let target_channels = out.channels;
         let track_id = current.spec.id;
 
         // Clear whatever was left in the buffer from the previous track and
@@ -1708,6 +1749,99 @@ fn decode_thread(
     }
 }
 
+/// Why a track couldn't be readied to play.
+enum StartFailure {
+    /// The track itself couldn't be opened.
+    Track(String),
+    /// No output could be built for it; carries the track back so it can be
+    /// parked and retried on Resume.
+    NoOutput(Track, String),
+}
+
+/// Opens `track` at `start_nanosec` and readies the output to play it: builds
+/// one if there is none, and reopens a bit-perfect one at the track's own
+/// rate when it was opened for another (see `rate_switch`). The track comes
+/// back decoding for the format the output actually runs at. Only called
+/// where playback starts afresh, so nothing queued in the ring buffer is lost.
+fn start_on_output(
+    output: &mut Option<AudioOutput>,
+    shared: &Arc<AudioShared>,
+    event_tx: &mpsc::Sender<AudioEvent>,
+    track: Track,
+    start_nanosec: u64,
+) -> Result<ActiveTrack, StartFailure> {
+    // The output format isn't settled until the track's rate is known, so
+    // open for the current one and retarget below.
+    let (rate, channels) = output
+        .as_ref()
+        .map_or((crate::sink::DEFAULT_BIT_PERFECT_RATE, 2), |o| {
+            (o.sample_rate, o.channels)
+        });
+    let mut active = ActiveTrack::open(
+        &shared.open_source,
+        track,
+        start_nanosec,
+        rate,
+        channels as usize,
+    )
+    .map_err(StartFailure::Track)?;
+
+    let reopen_at = match output.as_ref() {
+        None => Some(active.src_rate),
+        Some(out) => out.rate_switch_for(active.src_rate),
+    };
+    if let Some(rate) = reopen_at {
+        let reopening = output.is_some();
+        if let Some(old_out) = output.take() {
+            log::info!("Reopening the output at {rate} Hz for the next track");
+            let _ = old_out.sink.pause();
+        }
+        let new_out = build_output_on_fresh_thread(shared, Some(rate))
+            .map_err(|message| StartFailure::NoOutput(active.spec.clone(), message))?;
+        new_out.publish(shared, event_tx);
+        *output = Some(new_out);
+        if reopening {
+            let _ = event_tx.send(AudioEvent::PipelineChanged);
+        }
+    }
+    let out = output.as_ref().expect("output was just built");
+    active.retarget(out.sample_rate, out.channels);
+    Ok(active)
+}
+
+/// Opens the queued next track for a handover from the current one, or
+/// `None` when there can be none: it failed to open, or it needs the output
+/// at another rate (see `rate_switch`). Either way the current track then
+/// drains, the engine reports `TrackFinished`, and the player's `Play` opens
+/// the next track (at its own rate).
+fn open_preload(
+    out: &AudioOutput,
+    session: &DecodeSession,
+    shared: &AudioShared,
+    preq: PlayRequest,
+) -> Option<ActiveTrack> {
+    match ActiveTrack::open(
+        &shared.open_source,
+        preq.track,
+        preq.start_nanosec,
+        session.target_sample_rate,
+        session.target_channels as usize,
+    ) {
+        Ok(t) if out.rate_switch_for(t.src_rate).is_some() => {
+            log::debug!("Next track is at {} Hz: no seamless handover", t.src_rate);
+            None
+        }
+        Ok(t) => {
+            log::debug!("Preloaded next track {}", t.spec.id);
+            Some(t)
+        }
+        Err(e) => {
+            log::warn!("Preloading the next track failed: {e}");
+            None
+        }
+    }
+}
+
 /// Drives step 1 of one `'decode` iteration: the periodic (~500ms throttled)
 /// default-output-device change / stream-error check, rebuilding `output`
 /// and reseeking `session.current`/`session.next` onto it when needed.
@@ -1773,7 +1907,7 @@ fn check_and_rebuild_output(
         }
         *output = None;
 
-        match build_output_on_fresh_thread(shared) {
+        match build_output_on_fresh_thread(shared, Some(session.current.src_rate)) {
             Ok(new_out) => {
                 new_out.publish(shared, event_tx);
                 session.target_sample_rate = new_out.sample_rate;
@@ -1997,47 +2131,14 @@ fn handle_decode_command(
             CmdOutcome::Continue
         }
         Ok(AudioCommand::PreloadNext(preq)) => {
-            match ActiveTrack::open(
-                &shared.open_source,
-                preq.track,
-                preq.start_nanosec,
-                session.target_sample_rate,
-                session.target_channels as usize,
-            ) {
-                Ok(t) => {
-                    log::debug!("Preloaded next track {} for gapless", t.spec.id);
-                    session.next = Some(t);
-                    session.crossfade_secs = 0.0;
-                }
-                Err(e) => {
-                    // Fall back to the drain + TrackFinished path;
-                    // the player will issue a normal Play.
-                    log::warn!("Gapless preload failed: {e}");
-                    session.next = None;
-                }
-            }
+            session.next = open_preload(out, session, shared, preq);
+            session.crossfade_secs = 0.0;
             CmdOutcome::Continue
         }
         Ok(AudioCommand::PreloadNextCrossfade(preq, secs, gain)) => {
-            match ActiveTrack::open(
-                &shared.open_source,
-                preq.track,
-                preq.start_nanosec,
-                session.target_sample_rate,
-                session.target_channels as usize,
-            ) {
-                Ok(t) => {
-                    log::debug!("Preloaded next track {} for crossfade", t.spec.id);
-                    session.next = Some(t);
-                    session.crossfade_secs = secs;
-                    session.crossfade_incoming_gain = gain;
-                }
-                Err(e) => {
-                    log::warn!("Crossfade preload failed: {e}");
-                    session.next = None;
-                    session.crossfade_secs = 0.0;
-                }
-            }
+            session.next = open_preload(out, session, shared, preq);
+            session.crossfade_secs = if session.next.is_some() { secs } else { 0.0 };
+            session.crossfade_incoming_gain = gain;
             CmdOutcome::Continue
         }
         Ok(AudioCommand::ClearPreload) => {
@@ -2719,6 +2820,32 @@ mod tests {
         assert_eq!(
             crossfade_overlap_samples(8.0, Some(2 * s), minute, 48_000, 2),
             192_000
+        );
+    }
+
+    #[test]
+    fn bit_perfect_outputs_reopen_only_for_a_rate_not_yet_asked_for() {
+        use AudioBackendKind::*;
+        for backend in [Asio, WasapiExclusive] {
+            assert_eq!(rate_switch(backend, 44_100, 44_100, 96_000), Some(96_000));
+            // Same rate as the open output: reuse it (gapless stays gapless).
+            assert_eq!(rate_switch(backend, 96_000, 96_000, 96_000), None);
+            // Asked for 352.8 kHz and got 176.4: don't ask again, and a
+            // 176.4 kHz track already plays natively.
+            assert_eq!(rate_switch(backend, 352_800, 176_400, 352_800), None);
+            assert_eq!(rate_switch(backend, 352_800, 176_400, 176_400), None);
+            // A 48 kHz-only device asked for 44.1: neither rate reopens it.
+            assert_eq!(rate_switch(backend, 44_100, 48_000, 48_000), None);
+            assert_eq!(rate_switch(backend, 44_100, 48_000, 44_100), None);
+        }
+    }
+
+    #[test]
+    fn shared_output_never_follows_the_track_rate() {
+        // Also the stand-in when a bit-perfect backend fell back.
+        assert_eq!(
+            rate_switch(AudioBackendKind::Cpal, 44_100, 48_000, 96_000),
+            None
         );
     }
 
