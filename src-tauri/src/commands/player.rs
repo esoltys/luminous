@@ -752,7 +752,7 @@ mod tests {
     #[test]
     fn audio_backends_round_trip_through_their_persisted_key() {
         use luminous_audio::AudioBackendKind as K;
-        for backend in [K::Cpal, K::Asio, K::WasapiExclusive] {
+        for backend in [K::Cpal, K::Asio, K::WasapiExclusive, K::Alsa] {
             assert_eq!(parse_audio_backend(audio_backend_key(backend)), backend);
         }
         // Values written before exclusive mode existed still restore.

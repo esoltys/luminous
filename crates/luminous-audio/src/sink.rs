@@ -1,8 +1,8 @@
 //! Audio output sink abstraction and device enumeration.
 //!
 //! Provides a deep interface decoupling the playback/decode loop from specific
-//! audio backends (CPAL shared audio, WASAPI exclusive and ASIO bit-perfect
-//! output).
+//! audio backends (CPAL shared audio; WASAPI exclusive, ASIO and ALSA
+//! hardware bit-perfect output).
 
 use crate::pcm::PcmFormat;
 use serde::{Deserialize, Serialize};
@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 /// Which output path the engine opens. The serialized names (`cpal`, `asio`,
-/// `wasapi_exclusive`) are also how the choice is persisted.
+/// `wasapi_exclusive`, `alsa`) are also how the choice is persisted.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum AudioBackendKind {
@@ -20,6 +20,8 @@ pub enum AudioBackendKind {
     Asio,
     /// WASAPI exclusive mode on the same endpoints as `Cpal` (Windows only).
     WasapiExclusive,
+    /// A card's `hw:` PCM opened directly, bypassing the sound server (Linux only).
+    Alsa,
 }
 
 impl std::fmt::Display for AudioBackendKind {
@@ -28,6 +30,7 @@ impl std::fmt::Display for AudioBackendKind {
             Self::Cpal => write!(f, "CPAL"),
             Self::Asio => write!(f, "ASIO"),
             Self::WasapiExclusive => write!(f, "WASAPI Exclusive"),
+            Self::Alsa => write!(f, "ALSA Direct"),
         }
     }
 }
@@ -61,7 +64,7 @@ pub enum OutputFallbackReason {
     Unavailable,
 }
 
-/// Deep abstraction implemented by all output sinks (CPAL, ASIO, WASAPI exclusive).
+/// Deep abstraction implemented by all output sinks (CPAL, ASIO, WASAPI exclusive, ALSA).
 pub trait AudioSink: Send {
     /// Resumes or starts playback on the output device.
     fn play(&self) -> Result<(), String>;
@@ -208,6 +211,10 @@ pub fn enumerate_output_devices() -> Vec<AudioDeviceInfo> {
 
     if let Ok(cpal_devs) = host.output_devices() {
         for d in cpal_devs {
+            #[cfg(target_os = "linux")]
+            if !d.id().is_ok_and(|id| is_system_level_alsa_pcm(id.id())) {
+                continue;
+            }
             let name = d
                 .description()
                 .map(|desc| desc.name().to_string())
@@ -236,6 +243,16 @@ pub fn enumerate_output_devices() -> Vec<AudioDeviceInfo> {
         }
     }
 
+    #[cfg(target_os = "linux")]
+    for d in crate::alsa_direct::list_hw_devices() {
+        devices.push(AudioDeviceInfo {
+            id: d.id,
+            name: d.name,
+            backend: AudioBackendKind::Alsa,
+            is_default: false,
+        });
+    }
+
     #[cfg(windows)]
     {
         for (name, clsid) in crate::asio::list_asio_drivers() {
@@ -249,6 +266,16 @@ pub fn enumerate_output_devices() -> Vec<AudioDeviceInfo> {
     }
 
     devices
+}
+
+/// Whether a CPAL ALSA device is one the shared list offers: a system-level
+/// PCM (`default`, `pipewire`, `pulse`) rather than a per-card plugin
+/// (`front:CARD=…`, `sysdefault:CARD=…`, `hw:…`), which lists each card many
+/// times over and which Direct Hardware (ALSA) now covers properly. `null`
+/// discards everything, so it's no output at all.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+pub(crate) fn is_system_level_alsa_pcm(pcm_id: &str) -> bool {
+    !pcm_id.contains(':') && pcm_id != "null"
 }
 
 #[cfg(test)]
@@ -267,6 +294,24 @@ mod tests {
         // Odd rates have no exact halving.
         assert_eq!(rate_candidates(22_050), vec![22_050]);
         assert_eq!(rate_candidates(11_025), vec![11_025]);
+    }
+
+    #[test]
+    fn the_shared_alsa_list_keeps_only_system_level_pcms() {
+        for id in ["default", "pipewire", "pulse"] {
+            assert!(is_system_level_alsa_pcm(id), "{id}");
+        }
+        for id in [
+            "null",
+            "sysdefault:CARD=PCH",
+            "front:CARD=PCH,DEV=0",
+            "surround51:CARD=PCH,DEV=0",
+            "hdmi:CARD=PCH,DEV=0",
+            "hw:CARD=EarPods,DEV=0",
+            "plughw:CARD=EarPods,DEV=0",
+        ] {
+            assert!(!is_system_level_alsa_pcm(id), "{id}");
+        }
     }
 
     const WASAPI: [PcmFormat; 4] = PcmFormat::PREFERENCE;
