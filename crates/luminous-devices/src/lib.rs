@@ -48,8 +48,10 @@ pub enum DeviceKind {
 pub struct Device {
     pub kind: DeviceKind,
     /// The id a device has before a marker gives it one: `vol-<volume
-    /// serial>` for mass storage, `mtp-<device serial>` for MTP. The same on
-    /// every computer.
+    /// serial>` for mass storage, `mtp-<device serial>` for MTP, the same on
+    /// every computer. An MTP device that reports no serial gets one from
+    /// its Plug and Play id instead, which can change with the USB port or
+    /// computer until a saved profile writes its marker.
     pub provisional_id: String,
     /// Vendor and model, e.g. "HiBy R1", when the device reports them.
     pub model: Option<String>,
@@ -65,7 +67,7 @@ pub struct Device {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Storage {
     /// Stable across reconnects: the volume's provisional id, or the MTP
-    /// storage's object id.
+    /// storage's persistent unique id.
     pub id: String,
     /// The volume label, or what an MTP device calls the storage ("SD card").
     pub label: Option<String>,

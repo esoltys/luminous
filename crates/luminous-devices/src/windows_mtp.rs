@@ -166,9 +166,16 @@ impl std::fmt::Debug for Handle {
 
 impl Handle {
     pub(crate) fn storage(&self, storage_id: &str) -> MtpStorage {
+        let storage_object = self
+            .0
+            .storage_objects
+            .lock()
+            .get(storage_id)
+            .cloned()
+            .unwrap_or_else(|| storage_id.to_string());
         MtpStorage {
             connection: Arc::clone(&self.0),
-            storage_object: storage_id.to_string(),
+            storage_object,
         }
     }
 
@@ -234,8 +241,13 @@ pub(crate) struct Connection {
     ejected: AtomicBool,
     /// Object ids of folders already found, by storage and lower-case path.
     folders: Mutex<HashMap<(String, String), String>>,
-    /// Set once a rename fails: writes then go straight to the final name.
-    cannot_rename: AtomicBool,
+    /// Storage object ids by public storage id (see [`Storage::id`]).
+    storage_objects: Mutex<HashMap<String, String>>,
+    /// What `storages` last read, reused while a transfer holds `lock`.
+    last_storages: Mutex<Vec<Storage>>,
+    /// Whether renaming works on this device: unknown until the first write
+    /// tries it. When it does not, writes go straight to the final name.
+    can_rename: Mutex<Option<bool>>,
     marker: Mutex<Option<Option<Marker>>>,
     default_profile: Mutex<Option<DeviceProfile>>,
 }
@@ -310,7 +322,9 @@ impl Connection {
                 lock: Mutex::new(()),
                 ejected: AtomicBool::new(false),
                 folders: Mutex::new(HashMap::new()),
-                cannot_rename: AtomicBool::new(false),
+                storage_objects: Mutex::new(HashMap::new()),
+                last_storages: Mutex::new(Vec::new()),
+                can_rename: Mutex::new(None),
                 marker: Mutex::new(None),
                 default_profile: Mutex::new(None),
             })
@@ -321,15 +335,21 @@ impl Connection {
         self.lock.lock()
     }
 
+    /// The device's storages with their current free space. While a
+    /// transfer holds the device, returns what the last call read, so
+    /// polling never waits for a copy to finish.
     fn storages(&self) -> windows::core::Result<Vec<Storage>> {
         com();
-        let _guard = self.lock();
+        let Some(_guard) = self.lock.try_lock() else {
+            return Ok(self.last_storages.lock().clone());
+        };
         unsafe {
             let ids = self
                 .device
                 .Capabilities()?
                 .GetFunctionalObjects(&WPD_FUNCTIONAL_CATEGORY_STORAGE)?;
             let wanted = keys(&[
+                WPD_OBJECT_PERSISTENT_UNIQUE_ID,
                 WPD_STORAGE_DESCRIPTION,
                 WPD_OBJECT_NAME,
                 WPD_STORAGE_FILE_SYSTEM_TYPE,
@@ -337,10 +357,16 @@ impl Connection {
                 WPD_STORAGE_FREE_SPACE_IN_BYTES,
             ])?;
             let mut storages = Vec::new();
-            for id in variant_strings(&ids)? {
+            let mut objects = HashMap::new();
+            for object in variant_strings(&ids)? {
                 let values = self
                     .properties
-                    .GetValues(&windows::core::HSTRING::from(&id), &wanted)?;
+                    .GetValues(&windows::core::HSTRING::from(&object), &wanted)?;
+                // Object ids last one session; the persistent unique id is
+                // what WPD keeps across reconnects.
+                let id = string(&values, &WPD_OBJECT_PERSISTENT_UNIQUE_ID)
+                    .unwrap_or_else(|| object.clone());
+                objects.insert(id.clone(), object);
                 storages.push(Storage {
                     label: string(&values, &WPD_STORAGE_DESCRIPTION)
                         .or_else(|| string(&values, &WPD_OBJECT_NAME)),
@@ -355,6 +381,8 @@ impl Connection {
                     id,
                 });
             }
+            *self.storage_objects.lock() = objects;
+            *self.last_storages.lock() = storages.clone();
             Ok(storages)
         }
     }
@@ -610,6 +638,41 @@ impl Connection {
         }
     }
 
+    /// Whether objects in `folder` can be renamed. Learned once per
+    /// connection by renaming a one-byte probe file, so a device that cannot
+    /// rename is found out before any real file is replaced. Caller holds
+    /// the lock.
+    fn can_rename(&self, folder: &str) -> bool {
+        if let Some(known) = *self.can_rename.lock() {
+            return known;
+        }
+        let probe = format!(".luminous-rename-probe{PARTIAL_SUFFIX}");
+        let works = self
+            .upload(folder, &probe, &probe, &mut &b"L"[..], 1, &mut |_| {
+                std::ops::ControlFlow::Continue(())
+            })
+            .and_then(|id| {
+                let renamed_to = format!("{probe}2");
+                let renamed = self.rename(&id, &renamed_to);
+                // Some devices give a renamed object a new id, so find the
+                // probe by whichever name it ended up with.
+                for name in [&renamed_to, &probe] {
+                    if let Ok(Some((id, _))) = self.child(folder, name) {
+                        let _ = self.delete(&id);
+                    }
+                }
+                renamed
+            });
+        if let Err(e) = &works {
+            log::warn!(
+                "{} cannot rename files ({e}); writing in place instead",
+                self.default_name
+            );
+        }
+        *self.can_rename.lock() = Some(works.is_ok());
+        works.is_ok()
+    }
+
     fn rename(&self, id: &str, name: &str) -> io::Result<()> {
         unsafe {
             let values: IPortableDeviceValues =
@@ -759,7 +822,7 @@ impl DeviceBackend for MtpStorage {
                 .folder(&self.storage_object, parents, true)?
                 .ok_or_else(|| io::Error::other("a file is in the way of the folder"))?;
 
-            if c.cannot_rename.load(Ordering::Relaxed) {
+            if !c.can_rename(&parent) {
                 if let Some((old, _)) = c.child(&parent, name)? {
                     c.delete(&old)?;
                 }
@@ -777,14 +840,7 @@ impl DeviceBackend for MtpStorage {
                     let _ = c.delete(&new);
                 })?;
             }
-            c.rename(&new, name).inspect_err(|e| {
-                log::warn!(
-                    "{} cannot rename files ({e}); writing in place from now on",
-                    c.default_name
-                );
-                c.cannot_rename.store(true, Ordering::Relaxed);
-                let _ = c.delete(&new);
-            })
+            c.rename(&new, name)
         })
     }
 
