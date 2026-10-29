@@ -1178,6 +1178,9 @@ pub fn run() {
             // Start background EBU R128 loudness analyzer (#77)
             crate::loudness::spawn_background_analyzer(app.handle().clone(), Arc::clone(&state.db));
 
+            // Correct the codec of tracks scanned when it came from the extension (#1866).
+            crate::collection::spawn_codec_reprobe(app.handle().clone(), Arc::clone(&state.db));
+
             app.manage(state);
             let managed_state = app.state::<AppState>();
 
