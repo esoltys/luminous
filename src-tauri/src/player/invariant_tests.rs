@@ -29,6 +29,10 @@ enum Op {
     Remove {
         at: usize,
     },
+    /// Rotates the items by `by` and reverses them via `apply_playlist_order`.
+    Rearrange {
+        by: usize,
+    },
     Append {
         song: i64,
     },
@@ -63,6 +67,7 @@ fn op() -> impl Strategy<Value = Op> {
         1 => repeat.prop_map(Op::Repeat),
         2 => (0..16usize, 0..16usize).prop_map(|(from, to)| Op::Reorder { from, to }),
         1 => (0..16usize).prop_map(|at| Op::Remove { at }),
+        1 => (0..16usize).prop_map(|by| Op::Rearrange { by }),
         1 => (1..=SONGS).prop_map(|song| Op::Append { song }),
         1 => (1..=SONGS).prop_map(|song| Op::QueueNext { song }),
     ]
@@ -147,13 +152,23 @@ async fn apply(player: &mut Player, op: &Op, songs: &[Song]) {
         Op::Shuffle(mode) => player.set_shuffle_mode(mode),
         Op::Repeat(mode) => player.set_repeat_mode(mode),
         Op::Reorder { from, to } if len > 0 => player.reorder_playlist_items(from % len, to % len),
+        Op::Rearrange { by } if len > 0 => {
+            let mut order: Vec<String> = player
+                .playlist_items
+                .iter()
+                .map(|i| i.uuid.clone())
+                .collect();
+            order.rotate_left(by % len);
+            order.reverse();
+            player.apply_playlist_order(&order);
+        }
         Op::Remove { at } if len > 0 => {
             let uuid = player.playlist_items[at % len].uuid.clone();
             player.remove_songs_from_playlist_items(&[uuid]);
         }
         Op::Append { song } => player.append_songs_to_playlist_items(vec![item(song)]),
         Op::QueueNext { song } => player.queue.push_back(item(song)),
-        Op::Reorder { .. } | Op::Remove { .. } => {}
+        Op::Reorder { .. } | Op::Remove { .. } | Op::Rearrange { .. } => {}
     }
 }
 
@@ -209,7 +224,11 @@ fn run(unavailable: Vec<bool>, ops: Vec<Op>) -> Result<(), TestCaseError> {
                 // which songs Previous walks back through.
                 if matches!(
                     op,
-                    Op::Shuffle(_) | Op::Repeat(_) | Op::Reorder { .. } | Op::Append { .. }
+                    Op::Shuffle(_)
+                        | Op::Repeat(_)
+                        | Op::Reorder { .. }
+                        | Op::Rearrange { .. }
+                        | Op::Append { .. }
                 ) {
                     prop_assert_eq!(
                         history_uuids(&player),

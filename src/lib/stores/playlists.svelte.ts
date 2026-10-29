@@ -341,48 +341,44 @@ class PlaylistsStore {
     }
   }
 
-  async reorderItemByUuid(playlistId: number, sourceUuid: string, targetUuid: string) {
-    if (sourceUuid === targetUuid) return;
-    const fromIdx = this.activePlaylistTracks.findIndex((t) => t.uuid === sourceUuid);
-    const toIdx = this.activePlaylistTracks.findIndex((t) => t.uuid === targetUuid);
-    if (this.activePlaylistId === playlistId && fromIdx !== -1 && toIdx !== -1) {
-      const updated = [...this.activePlaylistTracks];
-      const [moved] = updated.splice(fromIdx, 1);
-      updated.splice(toIdx, 0, moved);
-      this.activePlaylistTracks = updated;
+  /** Moves `uuids` (in their current relative order) to just before
+   * `beforeUuid` in the playlist's order, or to the end with `null`. In a
+   * sorted playlist the order on screen becomes its manual order — the
+   * backend switches it to manual in the same undoable step and keeps the
+   * live player in line. Shown immediately, then refetched. */
+  async moveItems(playlistId: number, uuids: string[], beforeUuid: string | null) {
+    if (uuids.length === 0) return;
+    if (this.activePlaylistId === playlistId) {
+      const moving = new Set(uuids);
+      const rest = this.activePlaylistTracks.filter((t) => !moving.has(t.uuid));
+      const at = beforeUuid === null ? -1 : rest.findIndex((t) => t.uuid === beforeUuid);
+      rest.splice(at === -1 ? rest.length : at, 0, ...this.activePlaylistTracks.filter((t) => moving.has(t.uuid)));
+      this.activePlaylistTracks = rest;
     }
-    // The backend mirrors this into the live playback queue in the same
-    // call when playlistId is the Queue (a no-op otherwise).
-    await invoke("reorder_playlist_item_by_uuid", { playlistId, sourceUuid, targetUuid });
+    await invoke("move_playlist_items", { playlistId, uuids, beforeUuid });
+    await this.refreshPlaylists(); // the sort may have switched to manual
     if (this.activePlaylistId === playlistId) {
       await this.selectPlaylist(playlistId);
     }
   }
 
-  async reorderItem(playlistId: number, fromIndex: number, toIndex: number) {
-    if (this.activePlaylistId === playlistId && fromIndex >= 0 && toIndex >= 0 && fromIndex < this.activePlaylistTracks.length && toIndex < this.activePlaylistTracks.length) {
-      const updated = [...this.activePlaylistTracks];
-      const [moved] = updated.splice(fromIndex, 1);
-      updated.splice(toIndex, 0, moved);
-      this.activePlaylistTracks = updated;
-    }
-    // The backend mirrors this into the live playback queue in the same
-    // call when playlistId is the Queue.
-    await invoke("reorder_playlist_item", { playlistId, from: fromIndex, to: toIndex });
+  /** Sorts a playlist by a `Song` field, or back to manual order with
+   * `field: null`. Persisted, and applied by the backend to every read of
+   * the playlist (view, playback, export, device sync). Not for the Queue. */
+  async setSort(playlistId: number, field: string | null, asc: boolean) {
+    await invoke("set_playlist_sort", { playlistId, field, asc });
+    await this.refreshPlaylists();
     if (this.activePlaylistId === playlistId) {
       await this.selectPlaylist(playlistId);
     }
   }
 
-  async reorderItemsBatch(playlistId: number, fromIndices: number[], toIndex: number) {
-    if (fromIndices.length === 0) return;
-    if (fromIndices.length === 1) {
-      return this.reorderItem(playlistId, fromIndices[0], toIndex);
-    }
-    await invoke("reorder_playlist_items", { playlistId, fromIndices, toIndex });
-    if (this.activePlaylistId === playlistId) {
-      await this.selectPlaylist(playlistId);
-    }
+  /** Sets a playlist's size limit in bytes and the device it's measured
+   * for (`null`: library files as they are); a `null` limit removes both.
+   * Views showing the playlist re-measure (`PlaylistSizeLimit`). */
+  async setSizeLimit(playlistId: number, limitBytes: number | null, deviceId: string | null) {
+    await invoke("set_playlist_size_limit", { playlistId, limitBytes, deviceId });
+    await this.refreshPlaylists();
   }
 
   async deduplicatePlaylist(playlistId: number) {

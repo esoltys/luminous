@@ -13,6 +13,8 @@ use std::collections::HashSet;
 use uuid::Uuid;
 
 impl PlaylistManager {
+    /// The playlist's items in its order: manual (by position) or sorted by
+    /// its persisted sort field (see `playlist::sort`).
     pub fn get_playlist_tracks(&self, playlist_id: i64) -> Result<Vec<PlaylistItem>> {
         let conn = self.db.pool.get()?;
         Self::get_playlist_tracks_from_conn(&conn, playlist_id)
@@ -98,8 +100,10 @@ impl PlaylistManager {
                 })
             })?
             .filter_map(|r| r.ok())
-            .collect();
+            .collect::<Vec<_>>();
 
+        let mut items = items;
+        super::sort::order_items(conn, playlist_id, &mut items)?;
         Ok(items)
     }
 
@@ -482,6 +486,89 @@ impl PlaylistManager {
         Ok(())
     }
 
+    /// Moves the items `uuids` to sit, in their current relative order,
+    /// just before `before_uuid` in the playlist's order (`None`: at the
+    /// end). The playlist's order is what its view shows, so for a sorted
+    /// playlist this keeps the sorted order on screen as the new manual
+    /// order and switches the playlist to manual order; one undo step
+    /// restores both the old manual order and the sort. Unknown uuids are
+    /// ignored, and an unknown or moved `before_uuid` means "at the end".
+    pub fn move_playlist_items(
+        &mut self,
+        playlist_id: i64,
+        uuids: &[String],
+        before_uuid: Option<&str>,
+    ) -> Result<()> {
+        let conn = self.db.pool.get()?;
+        let old_manual = Self::manual_order(&conn, playlist_id)?;
+        let (old_field, old_asc) = super::sort::load_sort(&conn, playlist_id)?;
+        let shown: Vec<String> = Self::get_playlist_tracks_from_conn(&conn, playlist_id)?
+            .into_iter()
+            .map(|i| i.uuid)
+            .collect();
+
+        let moving: HashSet<&str> = uuids.iter().map(String::as_str).collect();
+        let (moved, mut rest): (Vec<String>, Vec<String>) =
+            shown.into_iter().partition(|u| moving.contains(u.as_str()));
+        if moved.is_empty() {
+            return Ok(());
+        }
+        let insert_at = before_uuid
+            .and_then(|b| rest.iter().position(|u| u == b))
+            .unwrap_or(rest.len());
+        rest.splice(insert_at..insert_at, moved);
+        let new_manual = rest;
+
+        let after = (new_manual, None, true);
+        let before = (old_manual, old_field, old_asc);
+        if after == before {
+            return Ok(());
+        }
+        Self::write_arrangement(&conn, playlist_id, &after)?;
+        self.touch_updated(&conn, playlist_id)?;
+        self.undo_stack.push(PlaylistOp::Rearrange {
+            playlist_id,
+            before,
+            after,
+        });
+        self.redo_stack.clear();
+        Ok(())
+    }
+
+    /// Item uuids by position — the manual order, ignoring any sort.
+    fn manual_order(conn: &rusqlite::Connection, playlist_id: i64) -> Result<Vec<String>> {
+        let mut stmt = conn
+            .prepare("SELECT uuid FROM playlist_items WHERE playlist_id = ?1 ORDER BY position")?;
+        let uuids = stmt
+            .query_map(params![playlist_id], |row| row.get(0))?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(uuids)
+    }
+
+    /// Writes a manual order (positions by index) and sort in one transaction.
+    fn write_arrangement(
+        conn: &rusqlite::Connection,
+        playlist_id: i64,
+        (order, field, asc): &(Vec<String>, Option<String>, bool),
+    ) -> Result<()> {
+        let tx = conn.unchecked_transaction()?;
+        {
+            let mut stmt = tx.prepare(
+                "UPDATE playlist_items SET position = ?1 WHERE uuid = ?2 AND playlist_id = ?3",
+            )?;
+            for (position, uuid) in order.iter().enumerate() {
+                stmt.execute(params![position as i32, uuid, playlist_id])?;
+            }
+        }
+        tx.execute(
+            "UPDATE playlists SET sort_field = ?1, sort_asc = ?2 WHERE id = ?3",
+            params![field, asc, playlist_id],
+        )?;
+        tx.commit()?;
+        Ok(())
+    }
+
     pub fn clear_playlist(&mut self, playlist_id: i64) -> Result<()> {
         let conn = self.db.pool.get()?;
         let mut stmt = conn.prepare(
@@ -596,6 +683,14 @@ impl PlaylistManager {
                     )?;
                 }
             }
+            PlaylistOp::Rearrange {
+                playlist_id,
+                before,
+                ..
+            } => {
+                let conn = self.db.pool.get()?;
+                Self::write_arrangement(&conn, *playlist_id, before)?;
+            }
             PlaylistOp::BatchMove { playlist_id, moves } => {
                 let conn = self.db.pool.get()?;
                 for (uuid, old_pos, _) in moves {
@@ -652,6 +747,12 @@ impl PlaylistManager {
                     "DELETE FROM playlist_items WHERE playlist_id = ?1",
                     params![playlist_id],
                 )?;
+            }
+            PlaylistOp::Rearrange {
+                playlist_id, after, ..
+            } => {
+                let conn = self.db.pool.get()?;
+                Self::write_arrangement(&conn, *playlist_id, after)?;
             }
             PlaylistOp::BatchMove { playlist_id, moves } => {
                 let conn = self.db.pool.get()?;
@@ -885,6 +986,174 @@ mod tests {
             tracks[0].song.as_ref().unwrap().added.is_some(),
             "song.added should be populated from the `songs.added` column, not left at its Default::default() of None"
         );
+    }
+
+    /// A manager over songs titled "D", "B", "C", "A" (ids 1–4) with
+    /// `filesize` 4, 3, 2, 1, all in one playlist in id order.
+    fn sortable_playlist() -> (tempfile::TempDir, PlaylistManager, i64) {
+        let (temp_dir, db) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for (id, title) in [(1, "D"), (2, "B"), (3, "C"), (4, "A")] {
+                conn.execute(
+                    "INSERT INTO songs (id, title, filesize) VALUES (?1, ?2, ?3)",
+                    params![id, title, 5 - id],
+                )
+                .unwrap();
+            }
+        }
+        let mut manager = PlaylistManager::new(db_arc).unwrap();
+        let pl = manager.create_playlist("Sortable").unwrap();
+        manager.add_songs_to_playlist(pl.id, &[1, 2, 3, 4]).unwrap();
+        (temp_dir, manager, pl.id)
+    }
+
+    fn titles(manager: &PlaylistManager, id: i64) -> Vec<String> {
+        manager
+            .get_playlist_tracks(id)
+            .unwrap()
+            .into_iter()
+            .map(|t| t.song.unwrap().title.unwrap())
+            .collect()
+    }
+
+    fn uuid_of(manager: &PlaylistManager, id: i64, title: &str) -> String {
+        manager
+            .get_playlist_tracks(id)
+            .unwrap()
+            .into_iter()
+            .find(|t| t.song.as_ref().unwrap().title.as_deref() == Some(title))
+            .unwrap()
+            .uuid
+    }
+
+    #[test]
+    fn a_persisted_sort_orders_every_read_of_the_playlist() {
+        let (_dir, manager, id) = sortable_playlist();
+        manager.set_playlist_sort(id, Some("title"), true).unwrap();
+        assert_eq!(titles(&manager, id), ["A", "B", "C", "D"]);
+        let pl = manager
+            .get_playlists()
+            .unwrap()
+            .into_iter()
+            .find(|p| p.id == id)
+            .unwrap();
+        assert_eq!(
+            (pl.sort_field.as_deref(), pl.sort_asc),
+            (Some("title"), true)
+        );
+
+        manager
+            .set_playlist_sort(id, Some("not_a_field"), true)
+            .unwrap();
+        assert_eq!(titles(&manager, id), ["D", "B", "C", "A"]);
+    }
+
+    #[test]
+    fn the_queue_cannot_be_sorted_or_limited() {
+        let (_dir, manager, _) = sortable_playlist();
+        let queue = manager.queue().unwrap();
+        manager
+            .set_playlist_sort(queue.id, Some("title"), true)
+            .unwrap();
+        manager
+            .set_playlist_size_limit(queue.id, Some(10), None)
+            .unwrap();
+        let queue = manager.queue().unwrap();
+        assert_eq!((queue.sort_field, queue.size_limit_bytes), (None, None));
+    }
+
+    #[test]
+    fn moving_in_a_sorted_playlist_keeps_the_shown_order_as_manual_order() {
+        let (_dir, mut manager, id) = sortable_playlist();
+        manager.set_playlist_sort(id, Some("title"), true).unwrap();
+        // Shown: A B C D. Drag D to just before B.
+        let d = uuid_of(&manager, id, "D");
+        let b = uuid_of(&manager, id, "B");
+        manager.move_playlist_items(id, &[d], Some(&b)).unwrap();
+        assert_eq!(titles(&manager, id), ["A", "D", "B", "C"]);
+        let pl = manager
+            .get_playlists()
+            .unwrap()
+            .into_iter()
+            .find(|p| p.id == id)
+            .unwrap();
+        assert_eq!(pl.sort_field, None);
+
+        // One undo restores both the old manual order and the sort.
+        assert!(manager.undo().unwrap());
+        assert_eq!(titles(&manager, id), ["A", "B", "C", "D"]);
+        manager.set_playlist_sort(id, None, true).unwrap();
+        assert_eq!(titles(&manager, id), ["D", "B", "C", "A"]);
+        manager.set_playlist_sort(id, Some("title"), true).unwrap();
+
+        assert!(manager.redo().unwrap());
+        assert_eq!(titles(&manager, id), ["A", "D", "B", "C"]);
+    }
+
+    #[test]
+    fn moving_several_items_to_the_end_keeps_their_relative_order() {
+        let (_dir, mut manager, id) = sortable_playlist();
+        let d = uuid_of(&manager, id, "D");
+        let c = uuid_of(&manager, id, "C");
+        manager.move_playlist_items(id, &[c, d], None).unwrap();
+        assert_eq!(titles(&manager, id), ["B", "A", "D", "C"]);
+    }
+
+    /// The fit by library file size, as the command computes it with no device.
+    fn library_fit(manager: &PlaylistManager, id: i64) -> Option<super::super::PlaylistSizeFit> {
+        manager
+            .size_limit_input(id)
+            .unwrap()
+            .map(|input| input.fit(None, |_, bytes| bytes))
+    }
+
+    #[test]
+    fn size_fit_follows_the_playlist_order() {
+        let (_dir, manager, id) = sortable_playlist();
+        assert_eq!(library_fit(&manager, id), None);
+        // Sizes in manual order: D=4 B=3 C=2 A=1.
+        manager.set_playlist_size_limit(id, Some(7), None).unwrap();
+        let fit = library_fit(&manager, id).unwrap();
+        assert_eq!(
+            (fit.fit.break_index, fit.fit.fit_bytes, fit.fit.total_bytes),
+            (2, 7, 10)
+        );
+        assert_eq!(fit.order.len(), 4);
+
+        // Smallest first: A=1 C=2 B=3 fit (6), D=4 doesn't.
+        manager
+            .set_playlist_sort(id, Some("filesize"), true)
+            .unwrap();
+        let fit = library_fit(&manager, id).unwrap();
+        assert_eq!((fit.fit.break_index, fit.fit.fit_songs), (3, 3));
+
+        manager.set_playlist_size_limit(id, None, None).unwrap();
+        assert_eq!(library_fit(&manager, id), None);
+    }
+
+    #[test]
+    fn a_limit_remembers_its_device_until_removed() {
+        let (_dir, manager, id) = sortable_playlist();
+        let stored = manager
+            .set_playlist_size_limit(id, Some(7), Some("vol-1"))
+            .unwrap();
+        assert_eq!(stored.as_deref(), Some("vol-1"));
+        let input = manager.size_limit_input(id).unwrap().unwrap();
+        assert_eq!(input.device_id.as_deref(), Some("vol-1"));
+
+        let stored = manager
+            .set_playlist_size_limit(id, None, Some("vol-1"))
+            .unwrap();
+        assert_eq!(stored, None, "no limit stores no device");
+        let pl = manager
+            .get_playlists()
+            .unwrap()
+            .into_iter()
+            .find(|p| p.id == id)
+            .unwrap();
+        assert_eq!((pl.size_limit_bytes, pl.size_limit_device), (None, None));
     }
 
     #[test]

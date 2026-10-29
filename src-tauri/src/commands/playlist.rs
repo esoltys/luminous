@@ -215,75 +215,123 @@ pub async fn deduplicate_playlist(
     Ok(removed_uuids)
 }
 
-/// Reorders a playlist row and mirrors the move into the live play queue in
-/// one call. The live-queue side is keyed by item UUID (never shared across
-/// playlists), so it's a safe no-op whenever `playlist_id` isn't the Queue
-/// or either UUID isn't currently loaded.
-#[tauri::command]
-pub async fn reorder_playlist_item_by_uuid(
+/// Brings the live player in line with `playlist_id`'s order after a sort or
+/// move, when it is the playlist being played, and broadcasts the new state.
+async fn sync_playing_order(
     playlist_id: i64,
-    source_uuid: String,
-    target_uuid: String,
-    app: tauri::AppHandle,
-    state: State<'_, AppState>,
+    app: &tauri::AppHandle,
+    state: &State<'_, AppState>,
 ) -> Result<(), String> {
     use tauri::Emitter;
 
-    with_playlists(&state, |pm| {
-        pm.reorder_playlist_item_by_uuid(playlist_id, &source_uuid, &target_uuid)
-    })
-    .await?;
-
+    if state.player.lock().await.current_playlist_id != Some(playlist_id) {
+        return Ok(());
+    }
+    let order: Vec<String> = with_playlists(state, |pm| pm.get_playlist_tracks(playlist_id))
+        .await?
+        .into_iter()
+        .map(|i| i.uuid)
+        .collect();
     let mut player = state.player.lock().await;
-    player.reorder_playlist_item_by_uuid(&source_uuid, &target_uuid);
-    let playback_state = player.get_state().await;
-    let _ = app.emit("playback-state", playback_state);
-
-    Ok(())
-}
-
-/// Reorders a playlist row and, only when `playlist_id` is the Queue, mirrors
-/// the move into the live play queue by index. Unlike the UUID-keyed reorder
-/// above, an index pair is meaningless outside the playlist it was computed
-/// against, so this check (rather than an unconditional call) is required to
-/// avoid corrupting live playback when editing an unrelated playlist.
-#[tauri::command]
-pub async fn reorder_playlist_item(
-    playlist_id: i64,
-    from: i32,
-    to: i32,
-    app: tauri::AppHandle,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
-    use tauri::Emitter;
-
-    let is_queue = with_playlists(&state, |pm| {
-        pm.reorder_playlist_item(playlist_id, from, to)?;
-        Ok(pm.queue().map(|q| q.id == playlist_id).unwrap_or(false))
-    })
-    .await?;
-
-    if is_queue {
-        let mut player = state.player.lock().await;
-        player.reorder_playlist_items(from as usize, to as usize);
+    if player.current_playlist_id == Some(playlist_id) {
+        player.apply_playlist_order(&order);
         let playback_state = player.get_state().await;
         let _ = app.emit("playback-state", playback_state);
     }
-
     Ok(())
 }
 
+/// Sorts a playlist by a `Song` field, or returns it to manual order with
+/// `field: None`. Every reader of the playlist — its view, playback, export
+/// and device sync — then sees this order. A no-op for the Queue.
 #[tauri::command]
-pub async fn reorder_playlist_items(
+pub async fn set_playlist_sort(
     playlist_id: i64,
-    from_indices: Vec<i32>,
-    to_index: i32,
+    field: Option<String>,
+    asc: bool,
+    app: tauri::AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     with_playlists(&state, |pm| {
-        pm.reorder_playlist_items_batch(playlist_id, &from_indices, to_index)
+        pm.set_playlist_sort(playlist_id, field.as_deref(), asc)
     })
-    .await
+    .await?;
+    sync_playing_order(playlist_id, &app, &state).await
+}
+
+/// Moves items, in their current relative order, to just before
+/// `before_uuid` in the playlist's order (`None`: the end). Moving within a
+/// sorted playlist keeps the sorted order as the new manual order and
+/// switches to manual order — one undo step. See
+/// `PlaylistManager::move_playlist_items`.
+#[tauri::command]
+pub async fn move_playlist_items(
+    playlist_id: i64,
+    uuids: Vec<String>,
+    before_uuid: Option<String>,
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    with_playlists(&state, |pm| {
+        pm.move_playlist_items(playlist_id, &uuids, before_uuid.as_deref())
+    })
+    .await?;
+    sync_playing_order(playlist_id, &app, &state).await
+}
+
+/// Sets a playlist's size limit in bytes and the device it's measured for
+/// (`None`: library files as they are); a `None` limit removes both. A
+/// no-op for the Queue. The device's current profile is kept on this
+/// computer so the limit can still be measured once it's unplugged.
+#[tauri::command]
+pub async fn set_playlist_size_limit(
+    playlist_id: i64,
+    limit_bytes: Option<u64>,
+    device_id: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let stored_device = with_playlists(&state, move |pm| {
+        pm.set_playlist_size_limit(playlist_id, limit_bytes, device_id.as_deref())
+    })
+    .await?;
+    if let Some(id) = stored_device {
+        let devices = state.devices.clone();
+        crate::db::run_blocking(&state.db, move |conn| {
+            devices.keep_profile_without_marker(conn, &id, chrono::Utc::now().timestamp())
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+/// Which of a playlist's songs fit its size limit, in the playlist's order,
+/// counted at their size on the limit's device (see
+/// `SizeLimitInput::measure`), or as library files when no device is set
+/// or it isn't known here. `None` when the playlist has no limit. Measured
+/// off the playlist lock, since the first fit for a device is slow.
+#[tauri::command]
+pub async fn get_playlist_size_fit(
+    playlist_id: i64,
+    state: State<'_, AppState>,
+) -> Result<Option<crate::playlist::PlaylistSizeFit>, String> {
+    let Some(input) = with_playlists(&state, |pm| pm.size_limit_input(playlist_id)).await? else {
+        return Ok(None);
+    };
+    let device = match input.device_id.clone() {
+        Some(id) => {
+            let devices = state.devices.clone();
+            crate::db::run_blocking(&state.db, move |conn| devices.sizing_profile(conn, &id))
+                .await
+                .map_err(|e| e.to_string())?
+        }
+        None => None,
+    };
+    let transcoder = state.transcoder.clone();
+    tokio::task::spawn_blocking(move || input.measure(device, &transcoder))
+        .await
+        .map(Some)
+        .map_err(|e| e.to_string())
 }
 
 /// Clears a playlist's rows and, only when `playlist_id` is the Queue, also

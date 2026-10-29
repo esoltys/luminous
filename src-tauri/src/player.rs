@@ -658,23 +658,61 @@ impl Player {
         }
     }
 
-    /// Reorder item in in-memory playlist_items targeted by item UUIDs.
-    pub fn reorder_playlist_item_by_uuid(&mut self, source_uuid: &str, target_uuid: &str) {
-        if source_uuid == target_uuid {
+    /// Rearranges the loaded playlist items into `order` (item uuids) after
+    /// a sort or move — the general permutation behind
+    /// `reorder_playlist_items`, with the same bookkeeping: the playing item
+    /// stays current, and history follows its items (shuffle off) or keeps
+    /// its play-order slots (shuffle on). Items missing from `order` keep
+    /// their relative order after the listed ones; unknown uuids are ignored.
+    pub fn apply_playlist_order(&mut self, order: &[String]) {
+        let rank: std::collections::HashMap<&str, usize> = order
+            .iter()
+            .enumerate()
+            .map(|(i, u)| (u.as_str(), i))
+            .collect();
+        let mut old_indices: Vec<usize> = (0..self.playlist_items.len()).collect();
+        old_indices.sort_by_key(|&i| {
+            rank.get(self.playlist_items[i].uuid.as_str())
+                .copied()
+                .unwrap_or(usize::MAX)
+        });
+        if old_indices.iter().enumerate().all(|(new, &old)| new == old) {
             return;
         }
-
-        let from_idx = self
-            .playlist_items
+        // new_index_of[old real index] = its real index after the rearrange.
+        let mut new_index_of = vec![0; old_indices.len()];
+        for (new, &old) in old_indices.iter().enumerate() {
+            new_index_of[old] = new;
+        }
+        let mut items: Vec<Option<PlaylistItem>> = std::mem::take(&mut self.playlist_items)
+            .into_iter()
+            .map(Some)
+            .collect();
+        self.playlist_items = old_indices
             .iter()
-            .position(|i| i.uuid == source_uuid);
-        let to_idx = self
-            .playlist_items
-            .iter()
-            .position(|i| i.uuid == target_uuid);
+            .filter_map(|&old| items[old].take())
+            .collect();
 
-        if let (Some(from), Some(to)) = (from_idx, to_idx) {
-            self.reorder_playlist_items(from, to);
+        let new_real_idx = self
+            .current_item_uuid
+            .as_ref()
+            .and_then(|u| self.playlist_items.iter().position(|i| &i.uuid == u));
+        if self.shuffle_mode == ShuffleMode::Off {
+            self.current_index = new_real_idx;
+            self.shuffle_order = (0..self.playlist_items.len()).collect();
+            for idx in &mut self.played_indices {
+                if let Some(&new) = new_index_of.get(*idx) {
+                    *idx = new;
+                }
+            }
+        } else {
+            for idx in &mut self.shuffle_order {
+                if let Some(&new) = new_index_of.get(*idx) {
+                    *idx = new;
+                }
+            }
+            self.current_index = new_real_idx
+                .and_then(|real_idx| self.shuffle_order.iter().position(|&i| i == real_idx));
         }
     }
 

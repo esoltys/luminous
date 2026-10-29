@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 68;
+pub const CURRENT_SCHEMA_VERSION: i32 = 70;
 
 struct Migration {
     version: i32,
@@ -614,6 +614,49 @@ const MIGRATIONS: &[Migration] = &[
                 conn.execute_batch(
                     "ALTER TABLE device_profiles ADD COLUMN layout_settings TEXT NOT NULL DEFAULT '{}';",
                 )?;
+            }
+            Ok(())
+        },
+    },
+    Migration {
+        version: 69,
+        description: "playlists.size_limit_bytes, sort_field and sort_asc for size-capped, sorted playlists (#344)",
+        apply: |conn| {
+            for (column, ddl) in [
+                ("size_limit_bytes", "INTEGER"),
+                ("sort_field", "TEXT"),
+                ("sort_asc", "INTEGER NOT NULL DEFAULT 1"),
+            ] {
+                let has_column: bool = conn
+                    .prepare(&format!(
+                        "SELECT 1 FROM pragma_table_info('playlists') WHERE name = '{column}'"
+                    ))?
+                    .exists([])?;
+                if !has_column {
+                    conn.execute_batch(&format!(
+                        "ALTER TABLE playlists ADD COLUMN {column} {ddl};"
+                    ))?;
+                }
+            }
+            Ok(())
+        },
+    },
+    Migration {
+        version: 70,
+        description: "playlists.size_limit_device and device_profiles.default_name: size limits measured in a device's converted sizes (#344)",
+        apply: |conn| {
+            for (table, column) in [
+                ("playlists", "size_limit_device"),
+                ("device_profiles", "default_name"),
+            ] {
+                let has_column: bool = conn
+                    .prepare(&format!(
+                        "SELECT 1 FROM pragma_table_info('{table}') WHERE name = '{column}'"
+                    ))?
+                    .exists([])?;
+                if !has_column {
+                    conn.execute_batch(&format!("ALTER TABLE {table} ADD COLUMN {column} TEXT;"))?;
+                }
             }
             Ok(())
         },

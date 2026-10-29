@@ -2158,10 +2158,10 @@ fn get_playlists_by_ids(
     }
     let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
     let sql = format!(
-        "SELECT p.id, p.name, p.dynamic_enabled, p.dynamic_spec, p.population_mode,
-                p.last_played_row, p.created, p.updated,
+        "SELECT {cols},
                 (SELECT COUNT(*) FROM playlist_items pi WHERE pi.playlist_id = p.id) as track_count
-         FROM playlists p WHERE p.id IN ({placeholders})"
+         FROM playlists p WHERE p.id IN ({placeholders})",
+        cols = crate::models::PLAYLIST_SELECT_COLS
     );
     let mut stmt = conn.prepare(&sql)?;
     let map = stmt

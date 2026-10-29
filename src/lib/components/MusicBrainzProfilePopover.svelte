@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { cubicOut } from "svelte/easing";
+  import { fade, scale } from "../utils/motion";
   import { onMount } from "svelte";
   import { portal } from "../utils/portal";
   import { i18n } from "../stores/i18n.svelte";
@@ -60,7 +62,8 @@
     coords = { left, bottom };
   }
 
-  $effect(() => {
+  // Pre-effect: position before the popover's first paint, not one frame after it.
+  $effect.pre(() => {
     if (isOpen) {
       updatePosition();
     }
@@ -130,7 +133,9 @@
     use:portal
     bind:this={popoverEl}
     style="left: {coords.left}px; bottom: {coords.bottom}px;"
-    class="fixed z-50 w-[340px] bg-brand-sidebar border border-brand-border rounded-2xl shadow-2xl p-4 text-brand-text-primary space-y-3 select-none animate-in fade-in zoom-in-95 duration-150"
+    class="fixed z-50 w-[340px] bg-brand-sidebar border border-brand-border rounded-2xl shadow-2xl p-4 text-brand-text-primary space-y-3 select-none"
+    in:scale={{ start: 0.95, duration: 150, easing: cubicOut }}
+    out:fade={{ duration: 120, easing: cubicOut }}
   >
     <!-- Header: User Identity -->
     <div class="flex items-start justify-between gap-3 pb-3 border-b border-brand-border/60">

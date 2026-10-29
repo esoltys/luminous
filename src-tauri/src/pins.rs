@@ -626,6 +626,10 @@ mod tests {
             updated: 42,
             track_count,
             is_queue: false,
+            size_limit_bytes: None,
+            size_limit_device: None,
+            sort_field: None,
+            sort_asc: true,
         }
     }
 

@@ -17,6 +17,8 @@
     underlyingIndex?: number;
     /** Label for a divider drawn above this row (e.g. where Auto Continue's songs start in the Queue). Not supported with `virtualized`, whose rows have a fixed height. */
     dividerBefore?: string;
+    /** "heading" (default) is an accent section heading; "break" is a dashed page break that marks a limit without suggesting the rows below differ. */
+    dividerVariant?: "heading" | "break";
   }
 </script>
 
@@ -718,7 +720,19 @@
 {#snippet row_(row: SongTableRow, displayIndex: number)}
   {@const song = row.song}
   {@const disabled = rowDisabled(row)}
-  {#if row.dividerBefore && !virtualized}
+  {#if row.dividerBefore && !virtualized && row.dividerVariant === "break"}
+    <div
+      data-row-divider="true"
+      data-divider-variant="break"
+      role="separator"
+      aria-label={row.dividerBefore}
+      class="flex items-center gap-3 px-4 py-2 text-[11px] font-medium text-brand-text-secondary select-none"
+    >
+      <div class="h-0 flex-1 border-t border-dashed border-brand-text-secondary/50"></div>
+      <span class="shrink-0">{row.dividerBefore}</span>
+      <div class="h-0 flex-1 border-t border-dashed border-brand-text-secondary/50"></div>
+    </div>
+  {:else if row.dividerBefore && !virtualized}
     <div
       data-row-divider="true"
       role="separator"

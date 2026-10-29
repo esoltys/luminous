@@ -71,6 +71,8 @@
   import { CONTEXT_MENU_WIDTH_PX } from "../constants";
   import { compareSongs } from "../utils/songSort";
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
+  import PlaylistSizeLimitControl from "./PlaylistSizeLimitControl.svelte";
+  import { PlaylistSizeLimit } from "../utils/sizeFit.svelte";
 
   // Default column widths (px or fr) — used when no saved width exists for a column.
   const PLAYLIST_COL_DEFAULTS: Partial<Record<keyof typeof collectionStore.visibleColumns, string>> = {
@@ -250,18 +252,30 @@
   }
 
   type PlaylistSortField = "position" | keyof Song;
-  let sortField = $state<PlaylistSortField>("position");
-  let sortAsc = $state(true);
+  // A playlist's sort is part of the playlist: it's persisted, and the
+  // backend returns the tracks already in that order, so playback, export,
+  // the size limit and device sync follow what's on screen (#344). The
+  // Queue's order is the player's playback order, so its view sorts here
+  // only and forgets the sort on leaving.
+  let queueSortField = $state<PlaylistSortField>("position");
+  let queueSortAsc = $state(true);
+  let sortField = $derived<PlaylistSortField>(
+    isQueue ? queueSortField : ((activePlaylist?.sort_field as keyof Song | null | undefined) ?? "position")
+  );
+  let sortAsc = $derived(isQueue ? queueSortAsc : (activePlaylist?.sort_asc ?? true));
 
   function toggleSort(field: string) {
     const f = field as PlaylistSortField;
-    if (sortField === f) {
-      sortAsc = !sortAsc;
-    } else {
-      sortField = f;
-      sortAsc = true;
+    const asc = sortField === f ? !sortAsc : true;
+    if (isQueue) {
+      queueSortField = f;
+      queueSortAsc = asc;
+    } else if (activePlaylist) {
+      playlistsStore.setSort(activePlaylist.id, f === "position" ? null : f, asc);
     }
   }
+
+  let isSearching = $derived(!!collectionStore.searchQuery.trim());
 
   let sortedTracks = $derived.by(() => {
     let result = playlistsStore.activePlaylistTracks;
@@ -269,6 +283,7 @@
     if (q) {
       result = result.filter((item) => matchesSongSearch(item.song, q));
     }
+    if (!isQueue) return result;
 
     if (sortField === "position") {
       return sortAsc ? result : [...result].reverse();
@@ -365,7 +380,11 @@
       disabledVariant: trueUnavailable ? "strikethrough" : "dim",
       isDuplicate: duplicateUuids.includes(item.uuid),
       underlyingIndex: playlistsStore.activePlaylistTracks.findIndex((t) => t.uuid === item.uuid),
-      dividerBefore: autoContinueStarts.has(item.uuid) ? i18n.t("playlists.autoContinue") : undefined,
+      ...(autoContinueStarts.has(item.uuid)
+        ? { dividerBefore: i18n.t("playlists.autoContinue") }
+        : item.uuid === breakBefore
+          ? { dividerBefore: sizeLimit.breakLabel() ?? undefined, dividerVariant: "break" as const }
+          : {}),
     };
   }
 
@@ -454,27 +473,27 @@
     }
   }
 
+  /** Dropping on a row below the dragged song puts it after that row; on a
+   * row above, before it. In a sorted playlist the backend keeps the sorted
+   * order as the new manual order. */
   function handleReorder(fromIndex: number, toIndex: number, selectedRowKeys: string[]) {
     if (!activePlaylist) return;
-    const targetTrack = playlistsStore.activePlaylistTracks[toIndex];
-    if (!targetTrack) return;
-
-    if (selectedRowKeys.length > 1) {
-      const selectedIndices = playlistsStore.activePlaylistTracks
-        .map((t, idx) => ({ uuid: t.uuid, idx }))
-        .filter((entry) => selectedRowKeys.includes(entry.uuid))
-        .map((entry) => entry.idx);
-
-      if (selectedIndices.length > 0) {
-        playlistsStore.reorderItemsBatch(activePlaylist.id, selectedIndices, toIndex);
-      }
-    } else {
-      const sourceTrack = playlistsStore.activePlaylistTracks[fromIndex];
-      if (sourceTrack && sourceTrack.uuid !== targetTrack.uuid) {
-        playlistsStore.reorderItemByUuid(activePlaylist.id, sourceTrack.uuid, targetTrack.uuid);
-      }
-    }
+    const tracks = playlistsStore.activePlaylistTracks;
+    const target = tracks[toIndex];
+    const moving = new Set(selectedRowKeys.filter(Boolean));
+    if (!target || moving.size === 0 || moving.has(target.uuid)) return;
+    const beforeUuid =
+      fromIndex < toIndex
+        ? (tracks.slice(toIndex + 1).find((t) => !moving.has(t.uuid))?.uuid ?? null)
+        : target.uuid;
+    playlistsStore.moveItems(activePlaylist.id, [...moving], beforeUuid);
   }
+
+  const sizeLimit = new PlaylistSizeLimit(() => ({
+    playlist: isQueue ? undefined : activePlaylist,
+    items: playlistsStore.activePlaylistTracks,
+  }));
+  let breakBefore = $derived(sizeLimit.breakBefore(sortedTracks.map((t) => t.uuid)));
 
   function playSelected() {
     if (selectedUuids.size === 0 || !activePlaylist) return;
@@ -692,6 +711,10 @@
             </span>
             <span>•</span>
             <span>{totalRuntimeLabel}</span>
+            {#if sizeLimit.status}
+              <span>•</span>
+              <span>{sizeLimit.status}</span>
+            {/if}
           </div>
           {/if}
 
@@ -744,6 +767,9 @@
                 <Pencil class="w-4 h-4" />
                 <span>{i18n.t("playlists.editSmartPlaylistBtn")}</span>
               </Button>
+            {/if}
+            {#if !isQueue && activePlaylist}
+              <PlaylistSizeLimitControl playlist={activePlaylist} deviceName={sizeLimit.deviceName} />
             {/if}
             {#if !isActive && activePlaylist && !activePlaylist.dynamic_enabled}
               <Button
@@ -849,7 +875,7 @@
           onRate={rateSong}
           onEditTags={(song) => openTagEditor(song.id)}
           onRemoveFromPlaylist={(row) => handleRemoveItem(row.key)}
-          onReorder={handleReorder}
+          onReorder={isSearching ? undefined : handleReorder}
           isRowPlaying={(row) => (!!playerStore.playlistItemUuid && playerStore.playlistItemUuid === row.key) || (!!playerStore.currentSong && !!row.song && playerStore.currentSong.id === row.song.id)}
           interactiveWhenDisabled
           disabledPlaceholder
