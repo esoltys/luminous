@@ -15,11 +15,14 @@ pub mod layout;
 pub mod sync;
 
 use crate::db::Database;
+use crate::models::{FileType, Song};
 use anyhow::{anyhow, Result};
 use luminous_devices::{Device, DeviceKind, DeviceProfile, DeviceWatcher, Marker};
+use luminous_transcode::{Assessment, KnownSource, Transcoder};
 use parking_lot::{Condvar, Mutex};
 use rusqlite::{params, OptionalExtension};
 use serde::Serialize;
+use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
@@ -407,6 +410,70 @@ fn upsert_profile(
         ],
     )?;
     Ok(())
+}
+
+/// What sync does with `song` for `profile` and its size on the device,
+/// from what the scan recorded where that can be trusted. `None` for a song
+/// with no local file, or one that can't be read when it has to be.
+///
+/// Only the preview relies on it: the worker reads each file again before
+/// writing it and fails a song whose file no longer matches the plan.
+pub fn assess_song(
+    transcoder: &Transcoder,
+    song: &Song,
+    profile: &DeviceProfile,
+) -> Option<Assessment> {
+    let path = Path::new(song.path.as_deref()?);
+    let known = known_source(song, path);
+    transcoder.assess(&known, profile).ok()
+}
+
+/// `song`'s row as the transcoder takes it, with no codec where the row
+/// can't be trusted to match a probe of the file, so the file is read.
+fn known_source<'a>(song: &Song, path: &'a Path) -> KnownSource<'a> {
+    let positive = |n: Option<i32>| n.filter(|n| *n > 0);
+    // The scan names `.m4a` AAC (it may hold ALAC) and `.ogg` Vorbis (it may
+    // hold Opus or FLAC), and a CUE track's length is not its file's.
+    let codec = match song.filetype {
+        _ if song.cue_path.is_some() || song.end_nanosec > 0 => None,
+        FileType::Mp3 => Some("mp3"),
+        FileType::Flac => Some("flac"),
+        FileType::OggOpus => Some("opus"),
+        FileType::Wav => Some("wav"),
+        FileType::Aiff => Some("aiff"),
+        FileType::WavPack => Some("wavpack"),
+        FileType::Ape => Some("ape"),
+        FileType::Mpc => Some("mpc"),
+        FileType::Aac
+            if path
+                .extension()
+                .is_some_and(|e| e.eq_ignore_ascii_case("aac")) =>
+        {
+            Some("aac")
+        }
+        _ => None,
+    };
+    let bit_depth = positive(song.bitdepth).and_then(|d| u8::try_from(d).ok());
+    let complete = positive(song.samplerate).is_some()
+        && positive(song.channels).is_some()
+        && positive(song.bitrate).is_some()
+        && song.length_nanosec.is_some_and(|n| n > 0)
+        && song.filesize.is_some_and(|n| n > 0)
+        // Lossless files always report their depth; a row without one is stale.
+        && (bit_depth.is_some() || !song.filetype.is_lossless());
+    KnownSource {
+        path,
+        size: song.filesize.unwrap_or(0).max(0) as u64,
+        codec: codec.filter(|_| complete),
+        sample_rate: positive(song.samplerate).unwrap_or(0) as u32,
+        bit_depth,
+        channels: positive(song.channels)
+            .and_then(|c| u8::try_from(c).ok())
+            .unwrap_or(0),
+        bitrate_kbps: positive(song.bitrate).map(|b| b as u32),
+        duration: Duration::from_nanos(song.length_nanosec.unwrap_or(0).max(0) as u64),
+        has_art: song.art_embedded,
+    }
 }
 
 #[cfg(test)]

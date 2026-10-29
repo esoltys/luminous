@@ -23,6 +23,8 @@ pub use capabilities::{Capabilities, ConversionTarget, FormatCapability};
 pub use luminous_devices::{ConvertMode, ConvertSettings, DeviceProfile, TargetFormat};
 pub use rule::Decision;
 
+pub use source::KnownSource;
+
 use parking_lot::Mutex;
 use source::SourceInfo;
 use std::collections::HashMap;
@@ -78,6 +80,13 @@ pub struct Prepared {
     pub size: u64,
 }
 
+/// What sync will do with a file and the size it will have on the device.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Assessment {
+    pub decision: Decision,
+    pub size: u64,
+}
+
 /// Prepares library files for devices. Cheap to share between threads; one
 /// per app.
 pub struct Transcoder {
@@ -126,15 +135,41 @@ impl Transcoder {
     /// prepared, otherwise an estimate from its duration and the target
     /// bitrate. Never encodes.
     pub fn estimated_size(&self, source: &Path, profile: &DeviceProfile) -> Result<u64, Error> {
+        Ok(self.assess_file(source, profile)?.size)
+    }
+
+    /// [`decide`](Self::decide) and [`estimated_size`](Self::estimated_size)
+    /// from what the library already knows about the file, so a preview of
+    /// thousands of songs opens none of them. Reads the file only when that
+    /// isn't enough: the codec is unknown, or the decision hangs on the
+    /// dimensions of its art. Sizes are estimates even for a file prepared
+    /// before: looking in the cache would mean reading the file's date.
+    pub fn assess(
+        &self,
+        known: &KnownSource,
+        profile: &DeviceProfile,
+    ) -> Result<Assessment, Error> {
+        if let Some(info) = SourceInfo::from_known(known) {
+            let decision = rule::decide(&info, profile, self.capabilities());
+            if !matches!(decision, Decision::ShrinkArt { .. }) {
+                let size = rule::estimate(&info, &decision);
+                return Ok(Assessment { decision, size });
+            }
+        }
+        self.assess_file(known.path, profile)
+    }
+
+    fn assess_file(&self, source: &Path, profile: &DeviceProfile) -> Result<Assessment, Error> {
         let info = self.source_info(source)?;
         let decision = rule::decide(&info, profile, self.capabilities());
-        if decision == Decision::Copy {
-            return Ok(info.stamp.size);
-        }
-        Ok(self
-            .cache
-            .size_of(&info, &decision)
-            .unwrap_or_else(|| rule::estimate(&info, &decision)))
+        let size = if decision == Decision::Copy {
+            info.stamp.size
+        } else {
+            self.cache
+                .size_of(&info, &decision)
+                .unwrap_or_else(|| rule::estimate(&info, &decision))
+        };
+        Ok(Assessment { decision, size })
     }
 
     /// The file to copy to the device for `source`: the source itself, or its

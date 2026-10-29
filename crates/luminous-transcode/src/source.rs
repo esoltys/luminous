@@ -44,6 +44,31 @@ pub(crate) struct ArtInfo {
     pub bytes: u64,
 }
 
+/// What the library's own scan recorded about a file: enough for the rule
+/// without opening the file again (see [`crate::Transcoder::assess`]).
+#[derive(Debug, Clone, PartialEq)]
+pub struct KnownSource<'a> {
+    pub path: &'a Path,
+    pub size: u64,
+    /// The codec as `DeviceProfile::supported_formats` names it; `None`
+    /// when the scan can't tell (an `.m4a` holds AAC or ALAC), and the file
+    /// is read instead.
+    pub codec: Option<&'a str>,
+    pub sample_rate: u32,
+    pub bit_depth: Option<u8>,
+    pub channels: u8,
+    /// Of the audio stream alone, as the probe reads it.
+    pub bitrate_kbps: Option<u32>,
+    pub duration: Duration,
+    pub has_art: bool,
+}
+
+/// Every codec name a probe gives, so a known source's codec is one of them.
+const CODECS: [&str; 13] = [
+    "alac", "mp3", "flac", "aac", "ogg", "opus", "wav", "aiff", "ape", "mpc", "speex", "wavpack",
+    "unknown",
+];
+
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct SourceInfo {
     pub path: PathBuf,
@@ -125,6 +150,50 @@ impl SourceInfo {
             channels: properties.channels().unwrap_or(2),
             bitrate_kbps: properties.audio_bitrate(),
             duration: properties.duration(),
+            art,
+        })
+    }
+
+    /// What a probe would read, from what the library knows; `None` when it
+    /// doesn't know enough. Embedded art is taken to be everything in the
+    /// file but the audio, at a size the profile may shrink: only its
+    /// dimensions are unknown, and they decide nothing but a
+    /// [`Decision::ShrinkArt`](crate::Decision::ShrinkArt).
+    pub fn from_known(known: &KnownSource) -> Option<Self> {
+        let codec = CODECS
+            .into_iter()
+            .find(|c| Some(*c) == known.codec && *c != "unknown")?;
+        if known.sample_rate == 0 || known.channels == 0 || known.duration.is_zero() {
+            return None;
+        }
+        let art = if known.has_art {
+            let audio = known.bitrate_kbps.map_or(known.size, |kbps| {
+                (known.duration.as_secs_f64() * f64::from(kbps) * 1000.0 / 8.0) as u64
+            });
+            ArtInfo {
+                largest_px: u32::MAX,
+                count: 1,
+                bytes: known.size.saturating_sub(audio),
+            }
+        } else {
+            ArtInfo::default()
+        };
+        Some(Self {
+            path: known.path.to_path_buf(),
+            stamp: Stamp {
+                size: known.size,
+                mtime_ns: 0,
+            },
+            codec,
+            sample_rate: if codec == "opus" {
+                48_000
+            } else {
+                known.sample_rate
+            },
+            bit_depth: known.bit_depth,
+            channels: known.channels,
+            bitrate_kbps: known.bitrate_kbps,
+            duration: known.duration,
             art,
         })
     }

@@ -266,7 +266,7 @@ pub fn resolve(
 }
 
 /// Every local, available library song with a file.
-fn local_songs(conn: &rusqlite::Connection) -> Result<Vec<Song>> {
+pub(super) fn local_songs(conn: &rusqlite::Connection) -> Result<Vec<Song>> {
     let sql = format!(
         "SELECT {SONG_SELECT_COLS} FROM songs
           WHERE source IN ({}) AND unavailable = 0 AND path IS NOT NULL

@@ -92,7 +92,7 @@ fn track_write(source: &Path, device_path: &str) -> Write {
                 size,
                 mtime: None,
             }),
-            conversion: None,
+            conversion: Some("Copy".into()),
             fingerprint: None,
             sources: Vec::new(),
             label: SongLabel {
@@ -297,6 +297,22 @@ fn a_file_that_fails_is_reported_and_the_sync_goes_on() {
     assert_eq!(summary.failures.len(), 1);
     assert_eq!(summary.failures[0].path, "Music/missing.wav");
     assert!(summary.written_bytes < summary.planned_bytes);
+}
+
+#[test]
+fn a_file_that_disagrees_with_the_plan_is_not_written() {
+    let setup = Setup::new();
+    let wav = setup.wav("a.wav");
+    // Planned from a library row saying it needs converting; the file plays.
+    let mut write = track_write(&wav, "Music/a.wav");
+    write.entry.conversion = Some("ShrinkArt { max_px: 500 }".into());
+    let job = setup.job(steps(vec![write], vec![]), Manifest::default());
+    let (summary, _) = setup.run(job, None);
+
+    assert_eq!(summary.songs_written, 0);
+    assert_eq!(summary.failures.len(), 1);
+    assert!(!setup.device_file("Music/a.wav").exists());
+    assert_eq!(setup.manifest().entries().count(), 0);
 }
 
 #[test]

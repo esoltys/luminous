@@ -447,11 +447,13 @@ impl Run<'_> {
                 return Ok(());
             }
         };
-        if !path
-            .to_lowercase()
-            .ends_with(&format!(".{}", prepared.extension.to_lowercase()))
-        {
-            self.fail(path, label, "the file changed since the preview");
+        // The plan came from what the library recorded about the file; this
+        // is the file itself. Writing anything else than what the preview
+        // showed would also leave the manifest disagreeing with every later
+        // plan.
+        let decision = format!("{:?}", prepared.decision);
+        if write.entry.conversion.as_deref() != Some(decision.as_str()) {
+            self.fail(path, label, "the file doesn't match the library; rescan it");
             return Ok(());
         }
         // A cache entry evicted since it was prepared is prepared again.
@@ -475,7 +477,6 @@ impl Run<'_> {
         if self.put(path, &mut file, prepared.size, write.estimate, &label)? {
             let mut entry = write.entry.clone();
             entry.size = prepared.size;
-            entry.conversion = Some(format!("{:?}", prepared.decision));
             self.record(entry);
             self.summary.songs_written += 1;
             self.progress.songs_done += 1;

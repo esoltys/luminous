@@ -17,7 +17,7 @@ pub mod selection;
 pub mod worker;
 
 use crate::db::Database;
-use crate::devices::DeviceMonitor;
+use crate::devices::{assess_song, DeviceMonitor};
 use crate::models::LOCAL_SOURCES_SQL;
 use anyhow::{anyhow, Result};
 use luminous_devices::{ConvertMode, ConvertSettings, DeviceBackend, DeviceProfile};
@@ -155,9 +155,7 @@ impl DeviceSync {
         let inventory = self.inventory(device_id, &storage, &profile, &*backend)?;
 
         let selection = selection::resolve(conn, &settings, |song| {
-            transcoder
-                .estimated_size(Path::new(song.path.as_deref()?), &profile)
-                .ok()
+            assess_song(transcoder, song, &profile).map(|a| a.size)
         })?;
         let save_space = (profile.convert.mode != ConvertMode::SaveSpace).then(|| DeviceProfile {
             convert: ConvertSettings {
@@ -170,14 +168,12 @@ impl DeviceSync {
         let mut unreadable = Vec::new();
         for wanted in selection.songs {
             let path = Path::new(wanted.song.path.as_deref().unwrap_or_default());
-            let decision = match transcoder.decide(path, &profile) {
-                Ok(decision) => decision,
-                Err(e) => {
-                    log::warn!("Sync can't plan {}: {e}", path.display());
-                    unreadable.push(wanted.song);
-                    continue;
-                }
+            let Some(assessment) = assess_song(transcoder, &wanted.song, &profile) else {
+                log::warn!("Sync can't plan {}: it can't be read", path.display());
+                unreadable.push(wanted.song);
+                continue;
             };
+            let decision = assessment.decision;
             let library_size = wanted.song.filesize.unwrap_or(0).max(0) as u64;
             tracks.push(TrackInput {
                 stamp: SourceStamp {
@@ -188,12 +184,11 @@ impl DeviceSync {
                 extension: decision.extension(path),
                 conversion: format!("{decision:?}"),
                 converts: matches!(decision, Decision::Convert { .. }),
-                size: transcoder
-                    .estimated_size(path, &profile)
-                    .unwrap_or(library_size),
+                size: assessment.size,
                 size_converting_all: save_space
                     .as_ref()
-                    .and_then(|p| transcoder.estimated_size(path, p).ok()),
+                    .and_then(|p| assess_song(transcoder, &wanted.song, p))
+                    .map(|a| a.size),
                 wanted,
             });
         }
@@ -887,6 +882,42 @@ mod tests {
         }
         let (plan, took) = preview(whole_library());
         report("whole library, warm", &plan, took);
+
+        // The preview plans from the library's rows; the worker writes what
+        // reading each file decides. They must agree, or songs fail to sync.
+        let profile = monitor.shown(&id).unwrap().profile;
+        let started = std::time::Instant::now();
+        let (mut mismatches, mut compared) = (Vec::new(), 0);
+        let (mut from_rows, mut from_files) = (0u64, 0u64);
+        for song in selection::local_songs(&conn).unwrap() {
+            let path = Path::new(song.path.as_deref().unwrap());
+            let (Some(row), Ok(file)) = (
+                assess_song(&transcoder, &song, &profile),
+                transcoder.decide(path, &profile),
+            ) else {
+                continue;
+            };
+            compared += 1;
+            from_rows += row.size;
+            from_files += transcoder.estimated_size(path, &profile).unwrap();
+            if row.decision != file {
+                mismatches.push(format!(
+                    "{} | rows {:?} | file {file:?}",
+                    path.display(),
+                    row.decision
+                ));
+            }
+        }
+        println!(
+            "rows vs files: {compared} songs in {:.2?}, {} disagree | estimated {:.2} GB from rows, {:.2} GB from files",
+            started.elapsed(),
+            mismatches.len(),
+            gb(from_rows),
+            gb(from_files),
+        );
+        for mismatch in mismatches.iter().take(10) {
+            println!("  {mismatch}");
+        }
 
         let only_playlist = SyncSettings {
             sources: vec![SyncSource::Playlist { id: playlist }],
