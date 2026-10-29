@@ -92,11 +92,23 @@ For automated scripts driving the real app (benchmarks, screenshots, tutorials),
 
 ### Scripting contract (`window.__LUMINOUS_SCRIPT__`)
 
-Dev builds expose the scripting API that scenes and external capture tools drive. It is a versioned contract:
+Dev builds and non-release capture builds expose the scripting API that scenes and external capture tools drive. It is a versioned contract:
 - `src/lib/scripting/types.ts` is the whole contract, with no imports, so another repo can vendor the file as is. It holds `SCRIPT_API_VERSION`.
 - Call `connect(requires, capabilities?)` once before anything else, passing the vendored `SCRIPT_API_VERSION`. It resolves `{ version, capabilities }`, where capabilities are the dotted method paths (`wait.settled`, `dialogs.welcome.show`). It rejects with one message naming the range needed (caret: same major, at least that minor), the running version and any missing capabilities.
 - Policy: adding a method bumps minor. Removing or renaming one, or changing its signature or when it resolves, bumps major.
 - `src/lib/scripting/contract-history.json` is an append-only ledger of each version's method paths. `contract.test.ts` fails when the live surface doesn't match its newest entry, or when any step recorded in the ledger removes a method without a major bump or adds one without a minor bump. When you change the surface, append an entry. Review enforces what the test can't see: editing the newest entry in place instead of appending, and signature or resolve-condition changes.
+
+### Capture build flavor (`build:capture` and Cargo feature `capture`)
+
+External capture tools and runners can drive a prebuilt non-release binary without requiring a local source checkout:
+- **Build the capture flavor locally:**
+  ```bash
+  bun run build:capture
+  cd src-tauri && cargo build --release --features capture
+  ```
+- **Automated CI artifact:** Trigger the manual workflow `Capture Build` (`.github/workflows/capture-build.yml`) via GitHub Actions `workflow_dispatch` to produce an unsigned binary artifact for Windows or Linux.
+- **Release gating:** Release, MSIX, and Flatpak builds never enable the `capture` feature or `capture` Vite mode. `src/lib/scripting/release-gating.test.ts` scans the release `build/` assets in release workflows to prove that the scripting API was dead-code eliminated and no scripting symbols leaked into published binaries.
+- **Fallback:** Running `bun run dev` in this checkout with `LUMINOUS_REMOTE_DEVTOOLS=true` and a debug exe (`cd src-tauri && cargo build`) remains the supported local development workflow.
 
 ### Scene screenshots (`bun run take-scene-screenshots`)
 

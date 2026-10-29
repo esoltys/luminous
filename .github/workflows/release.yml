@@ -176,6 +176,13 @@ jobs:
             releaseDraft: ${{ needs.create-release.outputs.draft }}
             prerelease: false
 
+      # Verifies that production release builds do not contain any scripting API
+      # symbols or backdoor capture surfaces (#1633).
+      - name: Verify release build excludes scripting surface
+        run: bun run test:run src/lib/scripting/release-gating.test.ts
+        env:
+          STRICT_RELEASE_GATING: "true"
+
       # Runs after tauri-action has uploaded (it builds and uploads in one
       # step), so on a tag push it fails the run while the release is still a
       # draft. The script comes from the workflow's own commit, since an

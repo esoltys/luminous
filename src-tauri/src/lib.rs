@@ -271,13 +271,13 @@ fn with_webview2_backgrounding_disabled(current: &str) -> String {
 const REMOTE_DEVTOOLS_PORT: u16 = 9222;
 
 /// Whether the opt-in remote-devtools channel (see `REMOTE_DEVTOOLS_PORT`)
-/// should be wired up for this run. Gated on both a debug build *and* an
-/// explicit env var so it can never ship enabled in a release build or
-/// surprise a user who didn't ask for an unauthenticated loopback inspector
-/// server — set `LUMINOUS_REMOTE_DEVTOOLS=true` before `bun run tauri dev` to
-/// turn it on.
+/// should be wired up for this run. Gated on either the non-release `capture`
+/// feature flavor, or a debug build with an explicit env var (`LUMINOUS_REMOTE_DEVTOOLS=true`),
+/// so it can never ship enabled in a release build or surprise a user who didn't ask for an
+/// unauthenticated loopback inspector server.
 pub(crate) fn remote_devtools_enabled() -> bool {
-    cfg!(debug_assertions) && std::env::var_os("LUMINOUS_REMOTE_DEVTOOLS").is_some()
+    cfg!(feature = "capture")
+        || (cfg!(debug_assertions) && std::env::var_os("LUMINOUS_REMOTE_DEVTOOLS").is_some())
 }
 
 /// Appends WebView2's Chrome DevTools Protocol remote-debugging switch to an

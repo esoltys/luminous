@@ -1,13 +1,54 @@
 import { describe, it, expect } from "vitest";
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync, existsSync } from "node:fs";
 import path from "node:path";
 
 describe("Scripting API release-build gating", () => {
-  it("proves that scripting installation is strictly guarded by import.meta.env.DEV", () => {
-    // In production builds (import.meta.env.DEV === false), the branch
-    // `if (import.meta.env.DEV)` in +layout.svelte is statically evaluated as false
-    // and Rolldown/Rollup dead-code eliminates the dynamic import and installation call.
-    expect(typeof import.meta.env.DEV).toBe("boolean");
+  it("proves that the release bundle contains no scripting API symbols", () => {
+    const buildDir = path.resolve(__dirname, "../../../build");
+    const isStrict =
+      process.env.STRICT_RELEASE_GATING === "true" ||
+      process.env.GITHUB_WORKFLOW === "Release Build";
+
+    if (!existsSync(buildDir)) {
+      if (isStrict) {
+        throw new Error(
+          `Release build directory "${buildDir}" was not found. Run "bun run build" before running this release verification.`
+        );
+      }
+      return;
+    }
+
+    function collectJsFiles(dir: string): string[] {
+      const entries = readdirSync(dir, { withFileTypes: true });
+      const files: string[] = [];
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          files.push(...collectJsFiles(fullPath));
+        } else if (entry.isFile() && entry.name.endsWith(".js")) {
+          files.push(fullPath);
+        }
+      }
+      return files;
+    }
+
+    const jsFiles = collectJsFiles(buildDir);
+    expect(jsFiles.length).toBeGreaterThan(0);
+
+    const leakingFiles: string[] = [];
+    const marker = "__LUMINOUS_SCRIPT__";
+
+    for (const file of jsFiles) {
+      const content = readFileSync(file, "utf8");
+      if (content.includes(marker)) {
+        leakingFiles.push(path.relative(buildDir, file));
+      }
+    }
+
+    expect(
+      leakingFiles,
+      `Found scripting marker "${marker}" in production release bundle chunks: ${leakingFiles.join(", ")}`
+    ).toEqual([]);
   });
 
   it("leaves window.__LUMINOUS_SCRIPT__ undefined when uninstalled", () => {

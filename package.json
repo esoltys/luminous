@@ -11,6 +11,7 @@
   "scripts": {
     "dev": "bun run sync-docs && svelte-kit sync && vite dev",
     "build": "bun run sync-docs && svelte-kit sync && vite build",
+    "build:capture": "bun run sync-docs && svelte-kit sync && vite build --mode capture",
     "sync-docs": "bun run scripts/sync-docs.ts",
     "guide-webp": "bun run scripts/guide-assets.ts",
     "preview": "vite preview",
