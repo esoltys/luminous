@@ -73,5 +73,17 @@ ffmpeg -y -loglevel error \
   -id3v2_version 4 -codec:a libmp3lame -q:a 4 \
   "$OUT_DIR/song_short.mp3"
 
+# Codec fixtures: containers whose extension doesn't name the codec, so the
+# scanner must take it from the stream (#1866). Kept out of OUT_DIR so the
+# library-scan suites' expected track counts don't change.
+CODEC_DIR="$SCRIPT_DIR/../src-tauri/tests/fixtures/codec"
+mkdir -p "$CODEC_DIR"
+
+# alac.m4a — Apple Lossless in an MP4 container (same extension as AAC).
+ffmpeg -y -loglevel error   -f lavfi -i "sine=frequency=440:duration=0.2"   -metadata title="ALAC Track" -codec:a alac   "$CODEC_DIR/alac.m4a"
+
+# opus.ogg — Opus in an Ogg container with the .ogg extension Vorbis uses.
+ffmpeg -y -loglevel error   -f lavfi -i "sine=frequency=440:duration=0.2"   -metadata title="Opus Track" -codec:a libopus -b:a 32k   -f ogg "$CODEC_DIR/opus.ogg"
+
 echo "Generated fixtures in $OUT_DIR:"
 ls -la "$OUT_DIR"

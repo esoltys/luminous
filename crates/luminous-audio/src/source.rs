@@ -157,3 +157,20 @@ impl OfflineDecoder {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Opus in a `.ogg` file — the extension Vorbis uses — must still decode,
+    /// since the library now imports these files (#1866).
+    #[test]
+    fn opus_in_ogg_decodes() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../src-tauri/tests/fixtures/codec/opus.ogg");
+        let decoder = OfflineDecoder::open_file(&path).expect("open opus .ogg");
+        let mut frames = 0;
+        decoder.decode_blocks(2, |planes| frames += planes[0].len());
+        assert!(frames > 0, "no audio decoded");
+    }
+}

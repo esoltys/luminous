@@ -1608,7 +1608,30 @@ fn find_dr_log(dir: &Path) -> Option<PathBuf> {
         })
 }
 
-fn detect_filetype(path: &Path) -> FileType {
+/// The file type a track is recorded under: the codec its stream declares
+/// when lofty could read one, otherwise a guess from the extension (for
+/// formats lofty can't parse, such as DSD). The extension alone is wrong for
+/// ALAC in `.m4a` and Opus/Speex in `.ogg` (#1866).
+fn filetype_for(path: &Path, codec: Option<luminous_metadata::AudioCodec>) -> FileType {
+    use luminous_metadata::AudioCodec;
+    match codec {
+        Some(AudioCodec::Mp3) => FileType::Mp3,
+        Some(AudioCodec::Aac) => FileType::Aac,
+        Some(AudioCodec::Alac) => FileType::Alac,
+        Some(AudioCodec::Flac) => FileType::Flac,
+        Some(AudioCodec::Vorbis) => FileType::OggVorbis,
+        Some(AudioCodec::Opus) => FileType::OggOpus,
+        Some(AudioCodec::Speex) => FileType::OggSpeex,
+        Some(AudioCodec::Wav) => FileType::Wav,
+        Some(AudioCodec::Aiff) => FileType::Aiff,
+        Some(AudioCodec::WavPack) => FileType::WavPack,
+        Some(AudioCodec::Musepack) => FileType::Mpc,
+        Some(AudioCodec::Ape) => FileType::Ape,
+        None => filetype_from_extension(path),
+    }
+}
+
+fn filetype_from_extension(path: &Path) -> FileType {
     match path
         .extension()
         .and_then(|e| e.to_str())
@@ -1650,7 +1673,7 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
     let path_str = path.to_string_lossy().to_string();
     let mtime = get_mtime(path);
     let filesize = std::fs::metadata(path).ok().map(|m| m.len() as i64);
-    let filetype = detect_filetype(path);
+    let filetype = filetype_for(path, meta.properties.codec);
 
     let mut song = Song {
         source: SongSource::LocalFile,
@@ -1718,6 +1741,93 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
     }
 
     Ok(song)
+}
+
+/// `app_state` key recording that [`reprobe_container_codecs`] has run.
+const CODEC_REPROBE_DONE_KEY: &str = "codec_reprobe_1866_done";
+
+/// One-off correction for rows scanned before the file type came from the
+/// stream (#1866): those recorded every `.m4a` as AAC and every `.m4b` as
+/// Unknown, and the scanner's mtime skip never revisits an unchanged file.
+/// Re-reads just the codec of each local `.m4a`/`.m4b`/`.ogg` row and fixes
+/// `filetype` where it differs, leaving tags and every other column alone.
+/// Runs once per library: the marker is written only after a full pass, so
+/// an interrupted pass repeats on the next launch. Returns how many rows
+/// changed.
+pub(crate) fn reprobe_container_codecs(db: &Database) -> Result<usize> {
+    let rows: Vec<(String, i64)> = {
+        let conn = db.pool.get()?;
+        let done: Option<String> = conn
+            .query_row(
+                "SELECT value FROM app_state WHERE key = ?1",
+                [CODEC_REPROBE_DONE_KEY],
+                |r| r.get(0),
+            )
+            .ok();
+        if done.is_some() {
+            return Ok(0);
+        }
+        // One row per file: CUE tracks sharing a media file share its path.
+        let mut stmt = conn.prepare(&format!(
+            "SELECT path, MIN(filetype) FROM songs
+             WHERE source IN ({lib}) AND unavailable = 0 AND path IS NOT NULL
+               AND (path LIKE '%.m4a' OR path LIKE '%.m4b' OR path LIKE '%.ogg')
+             GROUP BY path",
+            lib = *LOCAL_SOURCES_SQL
+        ))?;
+        let rows = stmt
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+            .collect::<rusqlite::Result<_>>()?;
+        rows
+    };
+
+    // Probe without holding a pooled connection: the files may sit on a slow
+    // share, and the scanner and UI need the pool meanwhile.
+    let corrections: Vec<(String, FileType)> = rows
+        .into_par_iter()
+        .filter_map(|(path, stored)| {
+            let codec = match luminous_metadata::read_codec(Path::new(&path)) {
+                Ok(codec) => codec?,
+                Err(e) => {
+                    log::debug!("Codec re-probe skipped {path}: {e:#}");
+                    return None;
+                }
+            };
+            let actual = filetype_for(Path::new(&path), Some(codec));
+            (FileType::from(stored) != actual).then_some((path, actual))
+        })
+        .collect();
+
+    let conn = db.pool.get()?;
+    let tx = conn.unchecked_transaction()?;
+    let mut changed = 0;
+    for (path, filetype) in &corrections {
+        changed += tx.execute(
+            "UPDATE songs SET filetype = ?1 WHERE path = ?2",
+            params![*filetype as i32, path],
+        )?;
+    }
+    tx.execute(
+        "INSERT OR REPLACE INTO app_state (key, value) VALUES (?1, '1')",
+        [CODEC_REPROBE_DONE_KEY],
+    )?;
+    tx.commit()?;
+    Ok(changed)
+}
+
+/// Runs [`reprobe_container_codecs`] on a background thread at startup and
+/// announces `library-changed` if it corrected anything.
+pub fn spawn_codec_reprobe(app: AppHandle, db: Arc<Database>) {
+    let _ = std::thread::Builder::new()
+        .name("luminous-codec-reprobe".into())
+        .spawn(move || match reprobe_container_codecs(&db) {
+            Ok(0) => {}
+            Ok(changed) => {
+                log::info!("Corrected the recorded codec of {changed} tracks (#1866)");
+                let _ = app.emit("library-changed", ());
+            }
+            Err(e) => log::warn!("Codec re-probe failed: {e:#}"),
+        });
 }
 
 /// Reads tags for `path`, resolves embedded/folder cover art via `cover_manager`,
@@ -2422,6 +2532,81 @@ mod tests {
 
         let song = read_tags(&path).expect("read_tags should succeed");
         assert_eq!(song.genre.as_deref(), Some("Rock; Jazz Fusion; Live"));
+    }
+
+    fn codec_fixture(name: &str) -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/codec")
+            .join(name)
+    }
+
+    /// ALAC shares `.m4a` with AAC; the recorded type must come from the
+    /// stream so the track counts as lossless (#1866).
+    #[test]
+    fn test_read_tags_records_alac_in_m4a_as_alac() {
+        let song = read_tags(&codec_fixture("alac.m4a")).expect("read_tags should succeed");
+        assert_eq!(song.filetype, FileType::Alac);
+        assert!(song.filetype.is_lossless());
+    }
+
+    #[test]
+    fn test_read_tags_records_opus_in_ogg_as_opus() {
+        let song = read_tags(&codec_fixture("opus.ogg")).expect("read_tags should succeed");
+        assert_eq!(song.filetype, FileType::OggOpus);
+    }
+
+    #[test]
+    fn test_reprobe_container_codecs_fixes_stale_rows_once() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let db = Database::new(temp_dir.path().to_path_buf()).unwrap();
+        let alac = codec_fixture("alac.m4a").to_string_lossy().to_string();
+        let gone = temp_dir
+            .path()
+            .join("gone.m4a")
+            .to_string_lossy()
+            .to_string();
+        {
+            let conn = db.pool.get().unwrap();
+            for path in [&alac, &gone] {
+                upsert_song(
+                    &conn,
+                    &Song {
+                        source: SongSource::LocalFile,
+                        filetype: FileType::Aac,
+                        path: Some(path.clone()),
+                        title: Some("t".into()),
+                        ..Default::default()
+                    },
+                )
+                .unwrap();
+            }
+            conn.execute("UPDATE songs SET unavailable = 1 WHERE path = ?1", [&gone])
+                .unwrap();
+        }
+        let filetype_of = |path: &str| -> FileType {
+            let conn = db.pool.get().unwrap();
+            conn.query_row("SELECT filetype FROM songs WHERE path = ?1", [path], |r| {
+                r.get::<_, i64>(0)
+            })
+            .map(FileType::from)
+            .unwrap()
+        };
+
+        assert_eq!(reprobe_container_codecs(&db).unwrap(), 1);
+        assert_eq!(filetype_of(&alac), FileType::Alac);
+        assert_eq!(filetype_of(&gone), FileType::Aac);
+
+        // The pass runs once: a row reverted afterwards is left for the scanner.
+        db.pool
+            .get()
+            .unwrap()
+            .execute(
+                "UPDATE songs SET filetype = ?1 WHERE path = ?2",
+                params![FileType::Aac as i32, alac],
+            )
+            .unwrap();
+        assert_eq!(reprobe_container_codecs(&db).unwrap(), 0);
+        assert_eq!(filetype_of(&alac), FileType::Aac);
     }
 
     #[tokio::test]
