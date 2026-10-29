@@ -75,9 +75,11 @@ pub(crate) struct OpenError {
 /// Deep abstraction implemented by all output sinks (CPAL, ASIO, WASAPI exclusive, ALSA).
 pub trait AudioSink: Send {
     /// Resumes or starts playback on the output device.
+    /// Idempotent: the engine calls it on an already-playing sink when a new
+    /// track starts.
     fn play(&self) -> Result<(), String>;
 
-    /// Pauses playback on the output device.
+    /// Pauses playback on the output device. Idempotent, like `play`.
     fn pause(&self) -> Result<(), String>;
 
     /// Hardware stream sample rate in Hz.

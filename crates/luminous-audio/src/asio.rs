@@ -212,15 +212,23 @@ mod imp {
     }
 
     impl AudioSink for AsioSink {
+        // The engine calls `play` on a running sink when a new track starts;
+        // drivers reject a second `start()` (FlexASIO: ASE_InvalidMode), so
+        // only the first call after a stop reaches the driver.
         fn play(&self) -> Result<(), String> {
-            self.is_playing.store(true, Ordering::Relaxed);
-            self.driver
-                .start()
-                .map_err(|e| format!("ASIO start failed: {e:?}"))
+            if self.is_playing.swap(true, Ordering::AcqRel) {
+                return Ok(());
+            }
+            self.driver.start().map_err(|e| {
+                self.is_playing.store(false, Ordering::Release);
+                format!("ASIO start failed: {e:?}")
+            })
         }
 
         fn pause(&self) -> Result<(), String> {
-            self.is_playing.store(false, Ordering::Relaxed);
+            if !self.is_playing.swap(false, Ordering::AcqRel) {
+                return Ok(());
+            }
             self.driver
                 .stop()
                 .map_err(|e| format!("ASIO stop failed: {e:?}"))
