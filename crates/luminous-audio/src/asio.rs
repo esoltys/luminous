@@ -114,13 +114,28 @@ mod imp {
         }
     }
 
+    /// Whether this host handles `selector`. Drivers ask before sending a
+    /// message (FlexASIO, for one, never sends a reset request otherwise), so
+    /// an unanswered query silently drops the driver's reset requests.
+    fn handles_message(selector: MessageSelector) -> bool {
+        matches!(
+            selector,
+            MessageSelector::ENGINE_VERSION
+                | MessageSelector::RESET_REQUEST
+                | MessageSelector::RESYNC_REQUEST
+        )
+    }
+
     unsafe extern "system" fn asio_message(
         selector: MessageSelector,
-        _value: c_long,
+        value: c_long,
         _message: *const c_void,
         _opt: *const f64,
     ) -> c_long {
         match selector {
+            MessageSelector::SELECTOR_SUPPORTED => {
+                c_long::from(handles_message(MessageSelector(value)))
+            }
             MessageSelector::ENGINE_VERSION => 2,
             MessageSelector::RESET_REQUEST => {
                 log::warn!("ASIO driver requested subsystem reset");
@@ -393,7 +408,22 @@ mod imp {
 
     #[cfg(test)]
     mod tests {
-        use super::is_external_rate_change;
+        use super::{handles_message, is_external_rate_change, MessageSelector};
+
+        #[test]
+        fn reset_and_resync_requests_are_advertised() {
+            assert!(handles_message(MessageSelector::RESET_REQUEST));
+            assert!(handles_message(MessageSelector::RESYNC_REQUEST));
+            assert!(handles_message(MessageSelector::ENGINE_VERSION));
+        }
+
+        #[test]
+        fn unhandled_messages_are_not_advertised() {
+            // Unanswered, the driver falls back to a reset request instead.
+            assert!(!handles_message(MessageSelector::BUFFER_SIZE_CHANGE));
+            assert!(!handles_message(MessageSelector::LATENCIES_CHANGED));
+            assert!(!handles_message(MessageSelector::SELECTOR_SUPPORTED));
+        }
 
         #[test]
         fn a_different_hardware_rate_is_a_change() {
