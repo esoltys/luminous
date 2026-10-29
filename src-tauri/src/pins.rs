@@ -626,6 +626,9 @@ mod tests {
             updated: 42,
             track_count,
             is_queue: false,
+            size_limit_bytes: None,
+            sort_field: None,
+            sort_asc: true,
         }
     }
 

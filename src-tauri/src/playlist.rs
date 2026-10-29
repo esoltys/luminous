@@ -2,18 +2,21 @@
 
 use crate::{
     db::Database,
-    models::{Playlist, PlaylistItem, QueuePopulationMode},
+    models::{Playlist, PlaylistItem, QueuePopulationMode, PLAYLIST_SELECT_COLS},
 };
 use anyhow::{anyhow, Result};
-use rusqlite::params;
+use rusqlite::{params, OptionalExtension};
 use std::sync::Arc;
 
 mod auto_sync;
 mod dynamic;
 mod import_export;
 mod mutation_undo;
+mod size_limit;
+mod sort;
 
 pub use dynamic::{reconcile_and_sync, reconcile_each_day, DynamicPlaylistDelta};
+pub use size_limit::{fit_to_limit, PlaylistSizeFit, SizeFit};
 
 /// SQLite treats a negative `LIMIT` as "no limit" — used when populating an
 /// auto-playlist so it includes every matching song, however large the
@@ -75,6 +78,14 @@ enum PlaylistOp {
     BatchMove {
         playlist_id: i64,
         moves: Vec<(String, i32, i32)>, // (uuid, old_pos, new_pos)
+    },
+    /// A move that may also have turned a sorted playlist's order into its
+    /// manual order: the manual order (uuids by position) and sort before
+    /// and after.
+    Rearrange {
+        playlist_id: i64,
+        before: (Vec<String>, Option<String>, bool),
+        after: (Vec<String>, Option<String>, bool),
     },
 }
 
@@ -190,6 +201,9 @@ impl PlaylistManager {
             updated: now,
             track_count: 0,
             is_queue: Playlist::is_queue_row(name, false),
+            size_limit_bytes: None,
+            sort_field: None,
+            sort_asc: true,
         })
     }
 
@@ -244,15 +258,13 @@ impl PlaylistManager {
 
     pub fn get_playlists(&self) -> Result<Vec<Playlist>> {
         let conn = self.db.pool.get()?;
-        let mut stmt = conn.prepare(
-            "SELECT p.id, p.name, p.dynamic_enabled, p.dynamic_spec, p.population_mode,
-                    p.last_played_row, p.created, p.updated,
-                    COUNT(pi.id) as track_count
-             FROM playlists p
-             LEFT JOIN playlist_items pi ON pi.playlist_id = p.id
-             GROUP BY p.id
-             ORDER BY p.created",
-        )?;
+        let mut stmt = conn.prepare(&format!(
+            "SELECT {PLAYLIST_SELECT_COLS}, COUNT(pi.id) as track_count
+                 FROM playlists p
+                 LEFT JOIN playlist_items pi ON pi.playlist_id = p.id
+                 GROUP BY p.id
+                 ORDER BY p.created"
+        ))?;
         let playlists = stmt
             .query_map([], Playlist::from_row)?
             .filter_map(|r| r.ok())
@@ -266,24 +278,38 @@ impl PlaylistManager {
     pub fn get_playlists_by_artist(&self, artist: &str) -> Result<Vec<Playlist>> {
         let conn = self.db.pool.get()?;
         let mut stmt = conn.prepare(
-            "SELECT p.id, p.name, p.dynamic_enabled, p.dynamic_spec, p.population_mode,
-                    p.last_played_row, p.created, p.updated,
-                    (SELECT COUNT(*) FROM playlist_items pi2 WHERE pi2.playlist_id = p.id) as track_count
-             FROM playlists p
-             WHERE EXISTS (
-                 SELECT 1 FROM playlist_items pi
-                 JOIN songs s ON s.id = pi.song_id
-                 WHERE pi.playlist_id = p.id
-                   AND COALESCE(NULLIF(s.album_artist, ''), s.artist, '') = ?1
-                   AND s.unavailable = 0
-             )
-             ORDER BY p.created",
+            &format!(
+                "SELECT {PLAYLIST_SELECT_COLS},
+                        (SELECT COUNT(*) FROM playlist_items pi2 WHERE pi2.playlist_id = p.id) as track_count
+                 FROM playlists p
+                 WHERE EXISTS (
+                     SELECT 1 FROM playlist_items pi
+                     JOIN songs s ON s.id = pi.song_id
+                     WHERE pi.playlist_id = p.id
+                       AND COALESCE(NULLIF(s.album_artist, ''), s.artist, '') = ?1
+                       AND s.unavailable = 0
+                 )
+                 ORDER BY p.created"
+            ),
         )?;
         let playlists = stmt
             .query_map(params![artist], Playlist::from_row)?
             .filter_map(|r| r.ok())
             .collect();
         Ok(playlists)
+    }
+
+    /// Whether `id` is the built-in Queue playlist (`false` if it doesn't exist).
+    fn is_queue_id(&self, id: i64) -> Result<bool> {
+        let conn = self.db.pool.get()?;
+        let row: Option<(String, bool)> = conn
+            .query_row(
+                "SELECT name, dynamic_enabled FROM playlists WHERE id = ?1",
+                params![id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?;
+        Ok(row.is_some_and(|(name, dynamic)| Playlist::is_queue_row(&name, dynamic)))
     }
 
     fn renumber_positions(&self, conn: &rusqlite::Connection, playlist_id: i64) -> Result<()> {

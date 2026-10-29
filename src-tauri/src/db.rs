@@ -618,6 +618,29 @@ const MIGRATIONS: &[Migration] = &[
             Ok(())
         },
     },
+    Migration {
+        version: 69,
+        description: "playlists.size_limit_bytes, sort_field and sort_asc for size-capped, sorted playlists (#344)",
+        apply: |conn| {
+            for (column, ddl) in [
+                ("size_limit_bytes", "INTEGER"),
+                ("sort_field", "TEXT"),
+                ("sort_asc", "INTEGER NOT NULL DEFAULT 1"),
+            ] {
+                let has_column: bool = conn
+                    .prepare(&format!(
+                        "SELECT 1 FROM pragma_table_info('playlists') WHERE name = '{column}'"
+                    ))?
+                    .exists([])?;
+                if !has_column {
+                    conn.execute_batch(&format!(
+                        "ALTER TABLE playlists ADD COLUMN {column} {ddl};"
+                    ))?;
+                }
+            }
+            Ok(())
+        },
+    },
 ];
 
 /// Migration 62: albums whose titles differ only in case or surrounding

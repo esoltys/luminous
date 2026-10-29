@@ -242,6 +242,95 @@ pub async fn reorder_playlist_item_by_uuid(
     Ok(())
 }
 
+/// Brings the live player in line with `playlist_id`'s order after a sort or
+/// move, when it is the playlist being played, and broadcasts the new state.
+async fn sync_playing_order(
+    playlist_id: i64,
+    app: &tauri::AppHandle,
+    state: &State<'_, AppState>,
+) -> Result<(), String> {
+    use tauri::Emitter;
+
+    if state.player.lock().await.current_playlist_id != Some(playlist_id) {
+        return Ok(());
+    }
+    let order: Vec<String> = with_playlists(state, |pm| pm.get_playlist_tracks(playlist_id))
+        .await?
+        .into_iter()
+        .map(|i| i.uuid)
+        .collect();
+    let mut player = state.player.lock().await;
+    if player.current_playlist_id == Some(playlist_id) {
+        player.apply_playlist_order(&order);
+        let playback_state = player.get_state().await;
+        let _ = app.emit("playback-state", playback_state);
+    }
+    Ok(())
+}
+
+/// Sorts a playlist by a `Song` field, or returns it to manual order with
+/// `field: None`. Every reader of the playlist — its view, playback, export
+/// and device sync — then sees this order. A no-op for the Queue.
+#[tauri::command]
+pub async fn set_playlist_sort(
+    playlist_id: i64,
+    field: Option<String>,
+    asc: bool,
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    with_playlists(&state, |pm| {
+        pm.set_playlist_sort(playlist_id, field.as_deref(), asc)
+    })
+    .await?;
+    sync_playing_order(playlist_id, &app, &state).await
+}
+
+/// Moves items, in their current relative order, to just before
+/// `before_uuid` in the playlist's order (`None`: the end). Moving within a
+/// sorted playlist keeps the sorted order as the new manual order and
+/// switches to manual order — one undo step. See
+/// `PlaylistManager::move_playlist_items`.
+#[tauri::command]
+pub async fn move_playlist_items(
+    playlist_id: i64,
+    uuids: Vec<String>,
+    before_uuid: Option<String>,
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    with_playlists(&state, |pm| {
+        pm.move_playlist_items(playlist_id, &uuids, before_uuid.as_deref())
+    })
+    .await?;
+    sync_playing_order(playlist_id, &app, &state).await
+}
+
+/// Sets a playlist's size limit in bytes; `None` removes it. A no-op for
+/// the Queue.
+#[tauri::command]
+pub async fn set_playlist_size_limit(
+    playlist_id: i64,
+    limit_bytes: Option<u64>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    with_playlists(&state, |pm| {
+        pm.set_playlist_size_limit(playlist_id, limit_bytes)
+    })
+    .await
+}
+
+/// Which of a playlist's songs fit its size limit, by library file size in
+/// the playlist's order, plus the item order the answer is for. `None`
+/// when the playlist has no limit.
+#[tauri::command]
+pub async fn get_playlist_size_fit(
+    playlist_id: i64,
+    state: State<'_, AppState>,
+) -> Result<Option<crate::playlist::PlaylistSizeFit>, String> {
+    with_playlists(&state, |pm| pm.playlist_size_fit(playlist_id)).await
+}
+
 /// Reorders a playlist row and, only when `playlist_id` is the Queue, mirrors
 /// the move into the live play queue by index. Unlike the UUID-keyed reorder
 /// above, an index pair is meaningless outside the playlist it was computed

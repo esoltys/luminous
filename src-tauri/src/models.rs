@@ -540,7 +540,27 @@ pub struct Playlist {
     /// included — branches on this flag instead of matching the name.
     #[serde(default)]
     pub is_queue: bool,
+    /// Size budget for the songs at the top of the playlist's order (e.g. a
+    /// USB stick's capacity), in bytes; `None` means no limit. See
+    /// `playlist::size_limit` for which songs fit.
+    #[serde(default)]
+    pub size_limit_bytes: Option<u64>,
+    /// The `Song` field the playlist is sorted by, or `None` for manual
+    /// (position) order. Every reader of the playlist's tracks gets this
+    /// order — see `playlist::sort`.
+    #[serde(default)]
+    pub sort_field: Option<String>,
+    #[serde(default = "default_true")]
+    pub sort_asc: bool,
 }
+
+fn default_true() -> bool {
+    true
+}
+
+/// Columns of `playlists p` that `Playlist::from_row` maps, in order. A
+/// query selects these followed by one `track_count` column.
+pub const PLAYLIST_SELECT_COLS: &str = "p.id, p.name, p.dynamic_enabled, p.dynamic_spec,      p.population_mode, p.last_played_row, p.created, p.updated,      p.size_limit_bytes, p.sort_field, p.sort_asc";
 
 impl Playlist {
     /// The single definition of what makes a row "the Queue".
@@ -548,9 +568,7 @@ impl Playlist {
         !dynamic_enabled && name.trim().eq_ignore_ascii_case("queue")
     }
 
-    /// Maps the canonical 9-column playlist SELECT: id, name,
-    /// dynamic_enabled, dynamic_spec, population_mode, last_played_row,
-    /// created, updated, track_count.
+    /// Maps a row of [`PLAYLIST_SELECT_COLS`] followed by `track_count`.
     pub fn from_row(row: &rusqlite::Row) -> rusqlite::Result<Self> {
         let name: String = row.get(1)?;
         let dynamic_enabled: bool = row.get(2)?;
@@ -568,7 +586,13 @@ impl Playlist {
             last_played_row: row.get(5)?,
             created: row.get(6)?,
             updated: row.get::<_, Option<i64>>(7)?.unwrap_or(0),
-            track_count: row.get(8)?,
+            size_limit_bytes: row
+                .get::<_, Option<i64>>(8)?
+                .and_then(|b| u64::try_from(b).ok())
+                .filter(|&b| b > 0),
+            sort_field: row.get(9)?,
+            sort_asc: row.get::<_, Option<bool>>(10)?.unwrap_or(true),
+            track_count: row.get(11)?,
             is_queue,
         })
     }
