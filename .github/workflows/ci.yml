@@ -110,7 +110,7 @@ jobs:
           cache-workspace-crates: true
 
       # Engine crates under `crates/` must never reach app layers (#1556,
-      # epic #1762): check all seven boundaries in a single step.
+      # epic #1762): check every boundary in a single step.
       - name: Check engine crate dependency boundaries
         if: steps.scope.outputs.run == 'true'
         run: |
@@ -133,6 +133,8 @@ jobs:
           check_boundary luminous-metadata  '^(tauri|rusqlite|reqwest|tokio)[ -]'
           check_boundary luminous-remote    '^(tauri|rusqlite)[ -]'
           check_boundary luminous-devices   '^(tauri|rusqlite|reqwest)[ -]'
+          # tokio arrives on Linux through luminous-devices (zbus for udisks2).
+          check_boundary luminous-transcode '^(tauri|rusqlite|reqwest)[ -]'
 
       # From the repo root with --workspace --lib --tests, so every crate under
       # crates/ and src-tauri is unit- and integration-tested (#1554) without

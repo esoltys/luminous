@@ -27,10 +27,84 @@ pub struct DeviceProfile {
     pub playlists_path: String,
     /// Bytes sync must leave free on the device.
     pub reserve_bytes: u64,
-    /// Lower-case format names the device plays (`mp3`, `aac`, `flac`...).
+    /// Lower-case codec names the device plays: `mp3`, `aac`, `alac`,
+    /// `flac`, `ogg` (Vorbis), `opus`, `wav`, `aiff`, `wma`. By codec, not
+    /// container: `aac` never implies ALAC in an `.m4a`.
     pub supported_formats: Vec<String>,
     pub max_sample_rate: u32,
     pub max_bit_depth: u8,
+    /// What sync converts on the way to the device (#838).
+    pub convert: ConvertSettings,
+}
+
+/// Which files sync converts, and to what. The format and bitrate are a
+/// request: luminous-transcode resolves them against the encoders this
+/// computer has, so a profile written on another machine never fails.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ConvertSettings {
+    pub mode: ConvertMode,
+    pub format: TargetFormat,
+    pub bitrate_kbps: u32,
+    /// Longest side, in pixels, of embedded cover art on the device. Larger
+    /// art is downscaled, also in files that are otherwise copied as-is.
+    /// `None` keeps art as it is.
+    pub max_art_px: Option<u32>,
+}
+
+impl Default for ConvertSettings {
+    fn default() -> Self {
+        Self {
+            mode: ConvertMode::Unsupported,
+            format: TargetFormat::Aac,
+            bitrate_kbps: 192,
+            max_art_px: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ConvertMode {
+    /// Convert files the device can't play: a format missing from
+    /// `supported_formats`, or a sample rate or bit depth above its maximum.
+    #[default]
+    Unsupported,
+    /// Also convert playable files that would come out smaller: lossless
+    /// files and lossy ones above the target bitrate. Lossy files at or
+    /// below it are copied, since converting them would cost quality and
+    /// save nothing.
+    SaveSpace,
+    /// Copy every file as it is.
+    Never,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum TargetFormat {
+    Aac,
+    Mp3,
+    Opus,
+}
+
+impl TargetFormat {
+    /// The name `supported_formats` uses for this format.
+    pub fn format_name(self) -> &'static str {
+        match self {
+            Self::Aac => "aac",
+            Self::Mp3 => "mp3",
+            Self::Opus => "opus",
+        }
+    }
+
+    /// Extension of a file in this format, without the dot.
+    pub fn extension(self) -> &'static str {
+        match self {
+            Self::Aac => "m4a",
+            Self::Mp3 => "mp3",
+            Self::Opus => "opus",
+        }
+    }
 }
 
 impl Default for DeviceProfile {
@@ -47,6 +121,7 @@ impl Default for DeviceProfile {
             supported_formats: vec!["mp3".into(), "aac".into()],
             max_sample_rate: 48_000,
             max_bit_depth: 16,
+            convert: ConvertSettings::default(),
         }
     }
 }
@@ -159,5 +234,15 @@ mod tests {
         let profile: DeviceProfile = serde_json::from_str(r#"{"nickname":"R1"}"#).unwrap();
         assert_eq!(profile.nickname.as_deref(), Some("R1"));
         assert_eq!(profile.max_sample_rate, 48_000);
+        assert_eq!(profile.convert, ConvertSettings::default());
+    }
+
+    #[test]
+    fn convert_settings_fill_missing_fields() {
+        let profile: DeviceProfile =
+            serde_json::from_str(r#"{"convert":{"mode":"saveSpace","format":"opus"}}"#).unwrap();
+        assert_eq!(profile.convert.mode, ConvertMode::SaveSpace);
+        assert_eq!(profile.convert.format, TargetFormat::Opus);
+        assert_eq!(profile.convert.bitrate_kbps, 192);
     }
 }

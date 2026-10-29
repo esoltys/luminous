@@ -33,6 +33,8 @@ job finishes with `success` in seconds. On `push` to `main`, `schedule`, or `wor
       - `luminous-equalizer`: no `tauri`, `rusqlite`, `reqwest`, or `tokio` (biquad DSP filters and APO parser cannot reach app state or network).
       - `luminous-metadata`: no `tauri`, `rusqlite`, `reqwest`, or `tokio` (local tag and sidecar parsing cannot reach app state or network).
       - `luminous-remote`: no `tauri` or `rusqlite` (wire-protocol clients cannot access SQLite or Tauri events directly).
+      - `luminous-devices`: no `tauri`, `rusqlite`, or `reqwest` (device detection and profiles cannot reach app state or network).
+      - `luminous-transcode`: no `tauri`, `rusqlite`, or `reqwest` (converting files for devices cannot reach app state or network). `tokio` is allowed because `luminous-devices` brings it in on Linux.
     - `cargo test --workspace --lib --tests`: runs unit and integration/BDD tests across all workspace crates and `src-tauri`.
     - `cargo clippy --workspace --all-targets -- -D warnings`: fails on any clippy warning across the workspace.
   - `rust_fmt` job (`backend` scope): `cargo fmt --all --check`. The pre-commit hook is opt-in

@@ -2,6 +2,7 @@
 //! construction, shared by playback and offline analysis.
 
 use crate::codecs::CODEC_REGISTRY;
+use std::ops::ControlFlow;
 use symphonia::core::{
     codecs::audio::{AudioDecoder, AudioDecoderOptions},
     errors::Error as SymphoniaError,
@@ -99,26 +100,59 @@ impl OfflineDecoder {
         self.track.sample_rate
     }
 
+    /// Channel count of the decoded audio, before any `max_channels` cap.
+    pub fn channels(&self) -> usize {
+        self.track.channels
+    }
+
     /// Decode to the end, handing each decoded packet to `on_block` as planar
     /// f32 channels: at most `max_channels`, all the same length. The planes
     /// are a scratch buffer reused for the next packet, so callers accumulate
     /// what they need rather than the whole file being held here. Corrupt
     /// packets are skipped; any other error ends the decode early with
     /// whatever was delivered so far.
-    pub fn decode_blocks(mut self, max_channels: usize, mut on_block: impl FnMut(&[Vec<f32>])) {
+    pub fn decode_blocks(self, max_channels: usize, mut on_block: impl FnMut(&[Vec<f32>])) {
+        let _partial_is_fine = self.try_decode_blocks(max_channels, |planes| {
+            on_block(planes);
+            ControlFlow::Continue(())
+        });
+    }
+
+    /// Like `decode_blocks`, for callers that must not mistake a truncated
+    /// decode for the whole file (transcoding): an error other than a
+    /// corrupt packet is returned instead of ending quietly. A file cut
+    /// short mid-packet ends like a whole one, as in playback. `on_block`
+    /// can stop the decode early by returning `Break`, which is not an error.
+    pub fn try_decode_blocks(
+        mut self,
+        max_channels: usize,
+        mut on_block: impl FnMut(&[Vec<f32>]) -> ControlFlow<()>,
+    ) -> Result<(), String> {
         let track = &mut self.track;
         let mut planes: Vec<Vec<f32>> = Vec::new();
-        while let Ok(Some(packet)) = track.format.next_packet() {
+        loop {
+            let packet = match track.format.next_packet() {
+                Ok(Some(packet)) => packet,
+                Ok(None) => return Ok(()),
+                Err(SymphoniaError::IoError(e))
+                    if e.kind() == std::io::ErrorKind::UnexpectedEof =>
+                {
+                    return Ok(())
+                }
+                Err(e) => return Err(e.to_string()),
+            };
             if packet.track_id != track.track_id {
                 continue;
             }
             match track.decoder.decode(&packet) {
                 Ok(decoded) => {
                     decoded.copy_to_vecs_planar(&mut planes);
-                    on_block(&planes[..planes.len().min(max_channels)]);
+                    if on_block(&planes[..planes.len().min(max_channels)]).is_break() {
+                        return Ok(());
+                    }
                 }
                 Err(SymphoniaError::DecodeError(_)) => continue,
-                Err(_) => break,
+                Err(e) => return Err(e.to_string()),
             }
         }
     }

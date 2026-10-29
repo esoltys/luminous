@@ -5,6 +5,7 @@
 use crate::devices::ConnectedDevice;
 use crate::AppState;
 use luminous_devices::{DeviceProfile, EjectError};
+use luminous_transcode::{Capabilities, ConversionTarget};
 use tauri::State;
 
 #[tauri::command]
@@ -28,6 +29,32 @@ pub async fn update_device_profile(
     })
     .await
     .map_err(|e| e.to_string())
+}
+
+/// The formats and bitrates sync can convert to on this computer (#838).
+/// The Convert picker offers only these.
+#[tauri::command]
+pub async fn get_transcode_capabilities(
+    state: State<'_, AppState>,
+) -> Result<Capabilities, String> {
+    let transcoder = state.transcoder.clone();
+    tokio::task::spawn_blocking(move || transcoder.capabilities().clone())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// What files converted for `profile` (saved or still being edited) get on
+/// this computer: a format substituted for one it can't encode, or one the
+/// device doesn't list, is flagged so the UI can warn before a sync (#838).
+#[tauri::command]
+pub async fn get_conversion_target(
+    profile: DeviceProfile,
+    state: State<'_, AppState>,
+) -> Result<ConversionTarget, String> {
+    let transcoder = state.transcoder.clone();
+    tokio::task::spawn_blocking(move || transcoder.conversion_target(&profile))
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Safely removes a device. Stops playback first when the current track is

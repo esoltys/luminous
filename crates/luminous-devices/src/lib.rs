@@ -30,7 +30,7 @@ use windows as platform;
 
 pub use backend::{DeviceBackend, DirEntry, FsBackend, Progress, Space};
 pub use marker::{Marker, MARKER_FILE_NAME};
-pub use profile::DeviceProfile;
+pub use profile::{ConvertMode, ConvertSettings, DeviceProfile, TargetFormat};
 
 use parking_lot::Mutex;
 use serde::Serialize;

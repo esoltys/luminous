@@ -263,11 +263,13 @@ fn load_profile(
 ) -> Result<Option<(DeviceProfile, Option<i64>)>> {
     conn.query_row(
         "SELECT nickname, icon, color, music_path, playlists_path, reserve_bytes,
-                supported_formats, max_sample_rate, max_bit_depth, last_synced_at
+                supported_formats, max_sample_rate, max_bit_depth, last_synced_at,
+                convert_settings
            FROM device_profiles WHERE id = ?1",
         [id],
         |row| {
             let formats: String = row.get(6)?;
+            let convert: String = row.get(10)?;
             Ok((
                 DeviceProfile {
                     nickname: row.get(0)?,
@@ -279,6 +281,7 @@ fn load_profile(
                     supported_formats: serde_json::from_str(&formats).unwrap_or_default(),
                     max_sample_rate: row.get(7)?,
                     max_bit_depth: row.get(8)?,
+                    convert: serde_json::from_str(&convert).unwrap_or_default(),
                 },
                 row.get(9)?,
             ))
@@ -296,13 +299,15 @@ fn upsert_profile(
 ) -> Result<()> {
     conn.execute(
         "INSERT INTO device_profiles (id, nickname, icon, color, music_path, playlists_path,
-             reserve_bytes, supported_formats, max_sample_rate, max_bit_depth, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?11)
+             reserve_bytes, supported_formats, max_sample_rate, max_bit_depth, convert_settings,
+             created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?12)
          ON CONFLICT(id) DO UPDATE SET
              nickname = excluded.nickname, icon = excluded.icon, color = excluded.color,
              music_path = excluded.music_path, playlists_path = excluded.playlists_path,
              reserve_bytes = excluded.reserve_bytes, supported_formats = excluded.supported_formats,
              max_sample_rate = excluded.max_sample_rate, max_bit_depth = excluded.max_bit_depth,
+             convert_settings = excluded.convert_settings,
              updated_at = excluded.updated_at",
         params![
             id,
@@ -315,6 +320,7 @@ fn upsert_profile(
             serde_json::to_string(&profile.supported_formats)?,
             profile.max_sample_rate,
             profile.max_bit_depth,
+            serde_json::to_string(&profile.convert)?,
             now,
         ],
     )?;
@@ -430,6 +436,24 @@ mod tests {
         assert_eq!(entries[0].shown.id, "vol-0088-5572");
         assert_eq!(entries[0].shown.profile.nickname.as_deref(), Some("Gym"));
         assert!(load_profile(&other, "vol-0088-5572").unwrap().is_some());
+    }
+
+    #[test]
+    fn convert_settings_round_trip_through_the_database() {
+        let (_db_dir, db) = test_db();
+        let conn = db.pool.get().unwrap();
+        let profile = DeviceProfile {
+            convert: luminous_devices::ConvertSettings {
+                mode: luminous_devices::ConvertMode::SaveSpace,
+                format: luminous_devices::TargetFormat::Opus,
+                bitrate_kbps: 160,
+                max_art_px: Some(500),
+            },
+            ..DeviceProfile::default()
+        };
+        upsert_profile(&conn, "vol-0088-5572", &profile, NOW).unwrap();
+        let (loaded, _) = load_profile(&conn, "vol-0088-5572").unwrap().unwrap();
+        assert_eq!(loaded.convert, profile.convert);
     }
 
     #[test]
