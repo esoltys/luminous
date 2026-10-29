@@ -173,7 +173,7 @@ impl DeviceLayout {
                     .collect();
                 let text = render_playlist(playlist.name, &entries, format, line_ending);
                 let content = if fold {
-                    fold_to_ascii(&text).into_bytes()
+                    fold_to_ascii(&text, |_| true).into_bytes()
                 } else {
                     text.into_bytes()
                 };
@@ -215,12 +215,14 @@ fn draft<'a>(track: &SyncedTrack<'a>, template: &str, fold: bool) -> Draft<'a> {
 }
 
 /// One file or folder name, safe on FAT and exFAT and within the length
-/// limit; in ASCII when `fold`.
+/// limit; in ASCII when `fold`. Typographic punctuation (curly quotes,
+/// dashes, ellipses) is always folded to its ASCII form: players whose
+/// fonts draw it full-width show "Don’t" as "Don' t".
 fn device_name(raw: &str, fold: bool) -> String {
     let name = if fold {
-        fold_to_ascii(raw)
+        fold_to_ascii(raw, |_| true)
     } else {
-        raw.to_string()
+        fold_to_ascii(raw, is_typographic_punctuation)
     };
     truncate_name(
         &sanitize_component(&name, false, false),
@@ -416,21 +418,28 @@ fn truncate_name(name: &str, max: usize) -> String {
     name[..end].trim_end_matches(['.', ' ']).to_string()
 }
 
-/// `text` with every non-ASCII character replaced by an ASCII look-alike
-/// ("Сплин" -> "Splin", "’" -> "'"), or `_` when there is none.
-fn fold_to_ascii(text: &str) -> String {
+/// `text` with each non-ASCII character `fold` picks replaced by an ASCII
+/// look-alike ("Сплин" -> "Splin", "’" -> "'"), dropped when it has no
+/// visible form (zero-width spaces), or `_` when it has no look-alike.
+fn fold_to_ascii(text: &str, fold: impl Fn(char) -> bool) -> String {
     let mut out = String::with_capacity(text.len());
     for c in text.chars() {
-        if c.is_ascii() {
+        if c.is_ascii() || !fold(c) {
             out.push(c);
         } else {
             match deunicode::deunicode_char(c) {
-                Some(ascii) if !ascii.is_empty() => out.push_str(ascii),
-                _ => out.push('_'),
+                Some(ascii) => out.push_str(ascii),
+                None => out.push('_'),
             }
         }
     }
     out
+}
+
+/// The General Punctuation block: curly quotes, dashes, ellipses, special
+/// spaces.
+fn is_typographic_punctuation(c: char) -> bool {
+    (' '..='⁯').contains(&c)
 }
 
 #[cfg(test)]
@@ -484,6 +493,32 @@ mod tests {
             layout.track_path(1),
             Some("Music/Insomnium/2019 - Heart Like a Grave/02 Valediction.m4a")
         );
+    }
+
+    #[test]
+    fn names_use_ascii_punctuation_but_keep_letters_and_playlist_titles() {
+        let songs = [song(
+            1,
+            "Сплин",
+            "Café",
+            1998,
+            1,
+            "Don’t Stop… “Live” – Take 2",
+        )];
+        let layout = plan(&profile(LayoutSettings::default()), &songs, "mp3");
+        assert_eq!(
+            layout.track_path(1),
+            Some("Music/Сплин/1998 - Café/01 Don't Stop... _Live_ - Take 2.mp3")
+        );
+        let files = layout.playlist_files(&[DevicePlaylist {
+            name: "Mix",
+            songs: &songs,
+        }]);
+        let text = String::from_utf8(files[0].content.clone()).unwrap();
+        assert!(text.contains(
+            "#EXTINF:321,Сплин - Don’t Stop… “Live” – Take 2
+"
+        ));
     }
 
     #[test]
