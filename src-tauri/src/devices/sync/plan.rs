@@ -13,6 +13,7 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
+use std::sync::Arc;
 
 /// What sync assumes a folder-art file takes before it is written: art is
 /// encoded only when written, so planning stays cheap.
@@ -279,8 +280,12 @@ impl SyncPlan {
 pub enum WriteSource {
     /// A library file, converted or not as the profile says.
     Track { source: PathBuf, converts: bool },
-    /// A complete small file (a playlist).
-    Bytes(Vec<u8>),
+    /// A playlist file, rendered when it is written from the songs then on
+    /// the device: a song that failed to copy is left out of it.
+    Playlist {
+        layout: Arc<DeviceLayout>,
+        playlist: WantedPlaylist,
+    },
     /// Folder art taken from this album track.
     FolderArt { album_track: PathBuf },
 }
@@ -382,6 +387,7 @@ pub fn build(input: PlanInput) -> Built {
     }
 
     let (layout, renamed_from) = place_tracks(profile, &tracks, inventory);
+    let layout = Arc::new(layout);
     let previous = previous_entries(manifest);
 
     for track in &tracks {
@@ -723,7 +729,7 @@ fn same_file(entry: &ManifestEntry, stamp: &SourceStamp) -> bool {
 }
 
 fn plan_playlists(
-    layout: &DeviceLayout,
+    layout: &Arc<DeviceLayout>,
     playlists: &[WantedPlaylist],
     on_device: &HashSet<i64>,
     inventory: &Inventory,
@@ -765,7 +771,7 @@ fn plan_playlists(
         }
         files = layout.playlist_files_avoiding(&device_playlists, &occupied);
     }
-    for file in files {
+    for ((file, playlist), songs) in files.into_iter().zip(playlists).zip(songs) {
         let fingerprint = content_fingerprint(&file.content);
         let prev = inventory.manifest.get(&file.path);
         let unchanged = prev.is_some_and(|p| {
@@ -788,7 +794,13 @@ fn plan_playlists(
                 sources: Vec::new(),
                 label: SongLabel::default(),
             },
-            source: WriteSource::Bytes(file.content),
+            source: WriteSource::Playlist {
+                layout: layout.clone(),
+                playlist: WantedPlaylist {
+                    name: playlist.name.clone(),
+                    songs,
+                },
+            },
             estimate: size,
         });
     }
@@ -890,7 +902,7 @@ pub fn tag_fingerprint(song: &Song) -> String {
     content_fingerprint(format!("{fields:?}{numbers:?}").as_bytes())
 }
 
-fn content_fingerprint(bytes: &[u8]) -> String {
+pub(super) fn content_fingerprint(bytes: &[u8]) -> String {
     Sha256::digest(bytes)[..16]
         .iter()
         .map(|b| format!("{b:02x}"))

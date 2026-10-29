@@ -801,4 +801,137 @@ mod tests {
         assert_eq!(inventory.files.len(), 1);
         assert_eq!(inventory.files.get("music/a/one.mp3"), Some(&5));
     }
+
+    /// Previews and runs a real sync against a copy of a real library: times
+    /// a whole-library preview (cold, then from the caches), then syncs one
+    /// playlist to the connected device mounted at `LUMINOUS_SYNC_DEVICE`
+    /// and previews it again, which should have nothing left to do. Uses the
+    /// device's own profile, so it converts what that device can't play.
+    /// Point `LUMINOUS_SYNC_DATA` at a copy of a profile, never the real one:
+    /// opening it migrates the database.
+    ///
+    /// ```text
+    /// LUMINOUS_SYNC_DATA=C:\Temp\profile LUMINOUS_SYNC_DEVICE=E:\ LUMINOUS_SYNC_PLAYLIST=196
+    /// cargo test -p luminous --lib sync_to_a_real_device -- --ignored --nocapture
+    /// ```
+    #[test]
+    #[ignore = "writes to the device mounted at LUMINOUS_SYNC_DEVICE"]
+    fn sync_to_a_real_device() {
+        let data = std::path::PathBuf::from(std::env::var("LUMINOUS_SYNC_DATA").unwrap());
+        let mount = std::env::var("LUMINOUS_SYNC_DEVICE").unwrap();
+        let playlist: i64 = std::env::var("LUMINOUS_SYNC_PLAYLIST")
+            .unwrap()
+            .parse()
+            .unwrap();
+        let gb = |b: u64| b as f64 / 1e9;
+
+        let db = Arc::new(Database::new(data.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+        let devices: Vec<Device> = luminous_devices::DeviceWatcher::new()
+            .poll()
+            .into_iter()
+            .filter(|d| d.contains(&mount))
+            .collect();
+        assert_eq!(devices.len(), 1, "no device at {mount}");
+        let monitor = Arc::new(DeviceMonitor::new());
+        *monitor.entries.lock() = crate::devices::build_entries(&conn, &devices, NOW).unwrap();
+        let id = monitor.devices()[0].id.clone();
+        let transcoder = Arc::new(Transcoder::new(data.join("cache").join("transcode")));
+        let sync = Arc::new(DeviceSync::new());
+        let preview = |settings: SyncSettings| {
+            let started = std::time::Instant::now();
+            let plan = sync
+                .preview(&conn, &monitor, &transcoder, &id, settings, NOW)
+                .unwrap();
+            (plan, started.elapsed())
+        };
+        let report = |label: &str, plan: &SyncPlan, took: Duration| {
+            println!(
+                "{label}: {took:.2?} | copy {} ({:.2} GB, {} converted) | update {} | remove {} | adopted {} | skipped {} | free after {:.2} GB of reserve {:.2} GB, fits {} | target {:?}",
+                plan.copy.songs,
+                gb(plan.copy.bytes),
+                plan.converted_songs,
+                plan.update.songs,
+                plan.remove.songs,
+                plan.adopted.songs,
+                plan.skipped.songs,
+                plan.storage.free_after_bytes as f64 / 1e9,
+                gb(plan.storage.reserve_bytes),
+                plan.storage.fits,
+                plan.conversion_target,
+            );
+        };
+
+        let (plan, took) = preview(whole_library());
+        report("whole library, cold", &plan, took);
+        if let Some(shortfall) = &plan.shortfall {
+            println!("  shortfall {shortfall:?}");
+        }
+        // Adopting and renaming must never be quiet: show what they would do.
+        for item in sync
+            .items(&plan.plan_id, PlanList::Adopted)
+            .unwrap()
+            .iter()
+            .take(5)
+        {
+            println!("  adopted {} ({} bytes)", item.path, item.bytes);
+        }
+        let copies = sync.items(&plan.plan_id, PlanList::Copy).unwrap();
+        let beside: Vec<_> = copies
+            .iter()
+            .filter(|i| matches!(i.reason, SyncReason::RenamedBesideExisting { .. }))
+            .collect();
+        println!("  renamed beside an existing file: {}", beside.len());
+        for item in beside.iter().take(5) {
+            println!("    {} <- {:?}", item.path, item.reason);
+        }
+        let (plan, took) = preview(whole_library());
+        report("whole library, warm", &plan, took);
+
+        let only_playlist = SyncSettings {
+            sources: vec![SyncSource::Playlist { id: playlist }],
+            ..SyncSettings::default()
+        };
+        let (plan, took) = preview(only_playlist.clone());
+        report("playlist", &plan, took);
+        for item in plan.copy.items.iter().take(3) {
+            println!("  {} <- {:?}", item.path, item.reason);
+        }
+        assert!(plan.storage.fits, "the playlist doesn't fit");
+
+        let (tx, rx) = mpsc::channel();
+        let events = Arc::new(Channel {
+            finished: Mutex::new(tx),
+            steps: Mutex::new(Vec::new()),
+        });
+        let started = std::time::Instant::now();
+        sync.start(
+            &plan.plan_id,
+            monitor.clone(),
+            transcoder.clone(),
+            db.clone(),
+            events.clone(),
+            Arc::new(worker::SystemClock),
+        )
+        .unwrap();
+        let summary = rx.recv_timeout(Duration::from_secs(1800)).unwrap();
+        println!("sync: {:.2?} | {summary:#?}", started.elapsed());
+        assert_eq!(summary.outcome, SyncOutcome::Completed);
+        assert!(summary.failures.is_empty(), "{:#?}", summary.failures);
+
+        // The monitor normally refreshes free space; the test has no thread.
+        *monitor.entries.lock() = crate::devices::build_entries(
+            &conn,
+            &luminous_devices::DeviceWatcher::new()
+                .poll()
+                .into_iter()
+                .filter(|d| d.contains(&mount))
+                .collect::<Vec<_>>(),
+            NOW,
+        )
+        .unwrap();
+        let (again, took) = preview(only_playlist);
+        report("playlist again", &again, took);
+        assert_eq!((again.copy.songs, again.update.songs), (0, 0));
+    }
 }

@@ -161,17 +161,13 @@ impl DeviceLayout {
         playlists: &[DevicePlaylist],
         occupied: &HashSet<String>,
     ) -> Vec<DeviceFile> {
-        let (format, extension) = match self.settings.playlist_format {
-            PlaylistFileFormat::M3u8 => (PlaylistFormat::M3u8, "m3u8"),
-            PlaylistFileFormat::M3uAscii => (PlaylistFormat::M3u, "m3u"),
-            PlaylistFileFormat::Pls => (PlaylistFormat::Pls, "pls"),
+        let extension = match self.settings.playlist_format {
+            PlaylistFileFormat::M3u8 => "m3u8",
+            PlaylistFileFormat::M3uAscii => "m3u",
+            PlaylistFileFormat::Pls => "pls",
             PlaylistFileFormat::None => return Vec::new(),
         };
         let ascii_only = self.settings.playlist_format.ascii_names();
-        let (separator, line_ending) = match self.settings.path_separator {
-            PathSeparator::Slash => ("/", LineEnding::Lf),
-            PathSeparator::Backslash => ("\\", LineEnding::CrLf),
-        };
         let dir: Vec<&str> = self.playlists_dir.iter().map(String::as_str).collect();
 
         let mut taken = occupied.clone();
@@ -179,30 +175,47 @@ impl DeviceLayout {
             .iter()
             .map(|playlist| {
                 let stem = device_name(playlist.name, ascii_only);
-                let path = unique_path(&dir, &stem, extension, &mut taken);
-                let entries: Vec<PlaylistEntry> = playlist
-                    .songs
-                    .iter()
-                    .filter_map(|song| {
-                        let track = self.tracks.get(&song.id)?;
-                        Some(PlaylistEntry {
-                            location: relative_location(&self.playlists_dir, track, separator),
-                            title: song.title.as_deref(),
-                            artist: song.artist.as_deref(),
-                            album: song.album.as_deref(),
-                            duration_sec: song.length_nanosec.map(|ns| ns / 1_000_000_000),
-                        })
-                    })
-                    .collect();
-                let text = render_playlist(playlist.name, &entries, format, line_ending);
-                let content = if ascii_only {
-                    fold_to_ascii(&text, |_| true).into_bytes()
-                } else {
-                    text.into_bytes()
-                };
-                DeviceFile { path, content }
+                DeviceFile {
+                    path: unique_path(&dir, &stem, extension, &mut taken),
+                    content: self.playlist_content(playlist),
+                }
             })
             .collect()
+    }
+
+    /// The bytes of `playlist`'s file, whatever path it goes at. Empty when
+    /// the profile writes no playlist files.
+    pub fn playlist_content(&self, playlist: &DevicePlaylist) -> Vec<u8> {
+        let format = match self.settings.playlist_format {
+            PlaylistFileFormat::M3u8 => PlaylistFormat::M3u8,
+            PlaylistFileFormat::M3uAscii => PlaylistFormat::M3u,
+            PlaylistFileFormat::Pls => PlaylistFormat::Pls,
+            PlaylistFileFormat::None => return Vec::new(),
+        };
+        let (separator, line_ending) = match self.settings.path_separator {
+            PathSeparator::Slash => ("/", LineEnding::Lf),
+            PathSeparator::Backslash => ("\\", LineEnding::CrLf),
+        };
+        let entries: Vec<PlaylistEntry> = playlist
+            .songs
+            .iter()
+            .filter_map(|song| {
+                let track = self.tracks.get(&song.id)?;
+                Some(PlaylistEntry {
+                    location: relative_location(&self.playlists_dir, track, separator),
+                    title: song.title.as_deref(),
+                    artist: song.artist.as_deref(),
+                    album: song.album.as_deref(),
+                    duration_sec: song.length_nanosec.map(|ns| ns / 1_000_000_000),
+                })
+            })
+            .collect();
+        let text = render_playlist(playlist.name, &entries, format, line_ending);
+        if self.settings.playlist_format.ascii_names() {
+            fold_to_ascii(&text, |_| true).into_bytes()
+        } else {
+            text.into_bytes()
+        }
     }
 
     /// The art files the profile asks for, one set per album folder. A

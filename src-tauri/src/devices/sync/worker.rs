@@ -8,8 +8,9 @@
 //! manifest, saved as the sync goes, so it stays sync's own.
 
 use super::manifest::{Manifest, ManifestEntry, SongLabel};
-use super::plan::{Steps, Write, WriteSource};
-use crate::devices::layout::folder_art_jpeg;
+use super::plan::{content_fingerprint, Steps, Write, WriteSource};
+use crate::devices::layout::{folder_art_jpeg, DevicePlaylist};
+use crate::models::Song;
 use luminous_devices::{DeviceBackend, DeviceProfile};
 use luminous_transcode::{Decision, Prepared, TargetFormat, Transcoder};
 use serde::{Deserialize, Serialize};
@@ -373,17 +374,41 @@ impl Run<'_> {
                             self.set_step(SyncStep::Copying { song: label });
                             self.write_track(write, prepared, source, transcoder, profile)?;
                         }
-                        WriteSource::Bytes(content) => {
+                        WriteSource::Playlist { layout, playlist } => {
                             self.set_step(SyncStep::WritingPlaylists);
-                            self.write_bytes(write, content)?;
-                            self.summary.playlist_files += 1;
+                            // A song whose copy failed has no entry at its
+                            // path; one whose update failed keeps its old file.
+                            let songs: Vec<Song> = playlist
+                                .songs
+                                .iter()
+                                .filter(|song| {
+                                    layout
+                                        .track_path(song.id)
+                                        .is_some_and(|path| self.manifest.get(path).is_some())
+                                })
+                                .cloned()
+                                .collect();
+                            let content = layout.playlist_content(&DevicePlaylist {
+                                name: &playlist.name,
+                                songs: &songs,
+                            });
+                            let mut entry = write.entry.clone();
+                            entry.fingerprint = Some(content_fingerprint(&content));
+                            if self.write_bytes(entry, write.estimate, &content)? {
+                                self.summary.playlist_files += 1;
+                            }
                         }
                         WriteSource::FolderArt { album_track } => {
                             self.set_step(SyncStep::WritingFolderArt);
                             match folder_art_jpeg(album_track, profile.convert.max_art_px) {
                                 Some(jpeg) => {
-                                    self.write_bytes(write, &jpeg)?;
-                                    self.summary.folder_art += 1;
+                                    if self.write_bytes(
+                                        write.entry.clone(),
+                                        write.estimate,
+                                        &jpeg,
+                                    )? {
+                                        self.summary.folder_art += 1;
+                                    }
                                 }
                                 // The album has no art after all.
                                 None => {
@@ -461,20 +486,27 @@ impl Run<'_> {
         Ok(())
     }
 
-    fn write_bytes(&mut self, write: &Write, content: &[u8]) -> Result<(), Halt> {
+    /// Writes `content` at `entry`'s path and records `entry` with its real
+    /// size. `Ok(false)` when this file failed and the sync goes on.
+    fn write_bytes(
+        &mut self,
+        mut entry: ManifestEntry,
+        estimate: u64,
+        content: &[u8],
+    ) -> Result<bool, Halt> {
         let len = content.len() as u64;
-        if self.put(
-            &write.entry.path,
+        let written = self.put(
+            &entry.path,
             &mut &content[..],
             len,
-            write.estimate,
+            estimate,
             &SongLabel::default(),
-        )? {
-            let mut entry = write.entry.clone();
+        )?;
+        if written {
             entry.size = len;
             self.record(entry);
         }
-        Ok(())
+        Ok(written)
     }
 
     /// Writes `len` bytes from `source` at `path`. `Ok(false)` when this

@@ -1,7 +1,10 @@
 use super::*;
+use crate::devices::layout::{DeviceLayout, SyncedTrack};
 use crate::devices::sync::manifest::{EntryKind, SourceStamp};
+use crate::devices::sync::selection::WantedPlaylist;
 use luminous_devices::FsBackend;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 struct Setup {
     library: tempfile::TempDir,
@@ -101,6 +104,64 @@ fn track_write(source: &Path, device_path: &str) -> Write {
     }
 }
 
+/// Writes for `sources` as songs 1, 2... laid out per `profile()`, then a
+/// playlist "Mix" of them all.
+fn with_playlist(sources: &[PathBuf]) -> Vec<Write> {
+    let songs: Vec<Song> = sources
+        .iter()
+        .enumerate()
+        .map(|(i, source)| Song {
+            id: i as i64 + 1,
+            path: Some(source.to_string_lossy().into_owned()),
+            artist: Some("Amorphis".into()),
+            album: Some("Halo".into()),
+            title: Some(format!("Song {}", i + 1)),
+            ..Song::default()
+        })
+        .collect();
+    let synced: Vec<SyncedTrack> = songs
+        .iter()
+        .map(|song| SyncedTrack {
+            song,
+            extension: "wav",
+        })
+        .collect();
+    let layout = Arc::new(DeviceLayout::plan(&profile(), &synced));
+    let mut writes: Vec<Write> = songs
+        .iter()
+        .zip(sources)
+        .map(|(song, source)| track_write(source, layout.track_path(song.id).unwrap()))
+        .collect();
+    let file = layout
+        .playlist_files(&[DevicePlaylist {
+            name: "Mix",
+            songs: &songs,
+        }])
+        .remove(0);
+    let size = file.content.len() as u64;
+    writes.push(Write {
+        source: WriteSource::Playlist {
+            layout: layout.clone(),
+            playlist: WantedPlaylist {
+                name: "Mix".into(),
+                songs,
+            },
+        },
+        entry: ManifestEntry {
+            path: file.path,
+            kind: EntryKind::Playlist,
+            size,
+            source: None,
+            conversion: None,
+            fingerprint: Some(content_fingerprint(&file.content)),
+            sources: Vec::new(),
+            label: SongLabel::default(),
+        },
+        estimate: size,
+    });
+    writes
+}
+
 fn steps(write: Vec<Write>, remove: Vec<String>) -> Steps {
     Steps {
         record: Vec::new(),
@@ -115,31 +176,9 @@ fn copies_files_and_records_them_in_the_manifest() {
     let setup = Setup::new();
     let a = setup.wav("a.wav");
     let b = setup.wav("b.wav");
-    let playlist = Write {
-        source: WriteSource::Bytes(b"#EXTM3U\n".to_vec()),
-        entry: ManifestEntry {
-            path: "Music/Mix.m3u8".into(),
-            kind: EntryKind::Playlist,
-            size: 8,
-            source: None,
-            conversion: None,
-            fingerprint: Some("f".into()),
-            sources: Vec::new(),
-            label: SongLabel::default(),
-        },
-        estimate: 8,
-    };
-    let job = setup.job(
-        steps(
-            vec![
-                track_write(&a, "Music/A/a.wav"),
-                track_write(&b, "Music/B/b.wav"),
-                playlist,
-            ],
-            vec![],
-        ),
-        Manifest::default(),
-    );
+    let writes = with_playlist(&[a.clone(), b]);
+    let (first, playlist) = (writes[0].entry.path.clone(), writes[2].entry.clone());
+    let job = setup.job(steps(writes, vec![]), Manifest::default());
     let (summary, reports) = setup.run(job, None);
 
     assert_eq!(summary.outcome, SyncOutcome::Completed);
@@ -149,12 +188,12 @@ fn copies_files_and_records_them_in_the_manifest() {
     assert_eq!(summary.written_bytes, summary.planned_bytes);
     assert_eq!(summary.finished_at, 1_790_000_000);
     assert_eq!(
-        std::fs::read(setup.device_file("Music/A/a.wav")).unwrap(),
+        std::fs::read(setup.device_file(&first)).unwrap(),
         std::fs::read(&a).unwrap()
     );
     let manifest = setup.manifest();
     assert_eq!(manifest.entries().count(), 3);
-    assert!(manifest.get("music/b/b.wav").is_some());
+    assert_eq!(manifest.get(&playlist.path), Some(&playlist));
 
     let last = reports.last().unwrap();
     assert_eq!(last.step, SyncStep::Finishing);
@@ -258,6 +297,31 @@ fn a_file_that_fails_is_reported_and_the_sync_goes_on() {
     assert_eq!(summary.failures.len(), 1);
     assert_eq!(summary.failures[0].path, "Music/missing.wav");
     assert!(summary.written_bytes < summary.planned_bytes);
+}
+
+#[test]
+fn a_song_that_fails_is_left_out_of_its_playlists() {
+    let setup = Setup::new();
+    let good = setup.wav("good.wav");
+    let mut writes = with_playlist(&[good.clone(), good]);
+    let planned = writes[2].entry.clone();
+    if let WriteSource::Track { source, .. } = &mut writes[0].source {
+        *source = setup.library.path().join("missing.wav");
+    }
+    let job = setup.job(steps(writes, vec![]), Manifest::default());
+    let (summary, _) = setup.run(job, None);
+
+    assert_eq!((summary.songs_written, summary.failures.len()), (1, 1));
+    assert_eq!(summary.playlist_files, 1);
+    let text = std::fs::read_to_string(setup.device_file(&planned.path)).unwrap();
+    assert!(
+        text.contains("Song 2") && !text.contains("Song 1"),
+        "{text}"
+    );
+    // So the next preview rewrites it once the song is copied.
+    let recorded = setup.manifest().get(&planned.path).cloned().unwrap();
+    assert_ne!(recorded.fingerprint, planned.fingerprint);
+    assert_eq!(recorded.size, text.len() as u64);
 }
 
 #[test]
