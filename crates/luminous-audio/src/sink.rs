@@ -64,6 +64,14 @@ pub enum OutputFallbackReason {
     Unavailable,
 }
 
+/// Why a bit-perfect sink couldn't be opened: the reason reported to the app,
+/// and the detail logged.
+#[derive(Debug, Clone)]
+pub(crate) struct OpenError {
+    pub(crate) reason: OutputFallbackReason,
+    pub(crate) message: String,
+}
+
 /// Deep abstraction implemented by all output sinks (CPAL, ASIO, WASAPI exclusive, ALSA).
 pub trait AudioSink: Send {
     /// Resumes or starts playback on the output device.
@@ -212,7 +220,10 @@ pub fn enumerate_output_devices() -> Vec<AudioDeviceInfo> {
     if let Ok(cpal_devs) = host.output_devices() {
         for d in cpal_devs {
             #[cfg(target_os = "linux")]
-            if !d.id().is_ok_and(|id| is_system_level_alsa_pcm(id.id())) {
+            if !d
+                .id()
+                .is_ok_and(|id| crate::alsa_direct::is_system_level_pcm(id.id()))
+            {
                 continue;
             }
             let name = d
@@ -268,16 +279,6 @@ pub fn enumerate_output_devices() -> Vec<AudioDeviceInfo> {
     devices
 }
 
-/// Whether a CPAL ALSA device is one the shared list offers: a system-level
-/// PCM (`default`, `pipewire`, `pulse`) rather than a per-card plugin
-/// (`front:CARD=…`, `sysdefault:CARD=…`, `hw:…`), which lists each card many
-/// times over and which Direct Hardware (ALSA) now covers properly. `null`
-/// discards everything, so it's no output at all.
-#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
-pub(crate) fn is_system_level_alsa_pcm(pcm_id: &str) -> bool {
-    !pcm_id.contains(':') && pcm_id != "null"
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -294,24 +295,6 @@ mod tests {
         // Odd rates have no exact halving.
         assert_eq!(rate_candidates(22_050), vec![22_050]);
         assert_eq!(rate_candidates(11_025), vec![11_025]);
-    }
-
-    #[test]
-    fn the_shared_alsa_list_keeps_only_system_level_pcms() {
-        for id in ["default", "pipewire", "pulse"] {
-            assert!(is_system_level_alsa_pcm(id), "{id}");
-        }
-        for id in [
-            "null",
-            "sysdefault:CARD=PCH",
-            "front:CARD=PCH,DEV=0",
-            "surround51:CARD=PCH,DEV=0",
-            "hdmi:CARD=PCH,DEV=0",
-            "hw:CARD=EarPods,DEV=0",
-            "plughw:CARD=EarPods,DEV=0",
-        ] {
-            assert!(!is_system_level_alsa_pcm(id), "{id}");
-        }
     }
 
     const WASAPI: [PcmFormat; 4] = PcmFormat::PREFERENCE;
@@ -359,7 +342,12 @@ mod tests {
         let picked = negotiate_format(
             44_100,
             &[48_000, 44_100],
-            &PcmFormat::ALSA_PREFERENCE,
+            &[
+                PcmFormat::I32,
+                PcmFormat::I24In32Low,
+                PcmFormat::I24Packed,
+                PcmFormat::I16,
+            ],
             |rate, format| rate == 48_000 && format == PcmFormat::I24Packed,
         );
         assert_eq!(picked, Some((48_000, PcmFormat::I24Packed)));

@@ -18,13 +18,6 @@ const AUDCLNT_E_UNSUPPORTED_FORMAT: i32 = 0x8889_0008_u32 as i32;
 const AUDCLNT_E_DEVICE_IN_USE: i32 = 0x8889_000A_u32 as i32;
 const AUDCLNT_E_EXCLUSIVE_MODE_NOT_ALLOWED: i32 = 0x8889_000E_u32 as i32;
 
-/// Why the exclusive stream couldn't be opened.
-#[derive(Debug, Clone)]
-pub(crate) struct OpenError {
-    pub(crate) reason: OutputFallbackReason,
-    pub(crate) message: String,
-}
-
 /// Maps a failed WASAPI call's HRESULT to the reason shown to the user.
 pub(crate) fn classify_failure(hresult: i32) -> OutputFallbackReason {
     match hresult {
@@ -69,9 +62,11 @@ mod imp {
         WaitForMultipleObjects,
     };
 
-    use super::{aligned_period_hns, classify_failure, OpenError};
+    use super::{aligned_period_hns, classify_failure};
     use crate::pcm::{self, PcmFormat};
-    use crate::sink::{negotiate_format, AudioBackendKind, AudioSink, OutputFallbackReason};
+    use crate::sink::{
+        negotiate_format, AudioBackendKind, AudioSink, OpenError, OutputFallbackReason,
+    };
     use crate::{AudioShared, OutputRenderer};
 
     const CHANNELS: u16 = 2;
@@ -124,7 +119,7 @@ mod imp {
         sample_rate: u32,
         format: PcmFormat,
         device_name: Option<String>,
-        pub(crate) stream_error_flag: Arc<AtomicBool>,
+        stream_error_flag: Arc<AtomicBool>,
     }
 
     impl AudioSink for WasapiExclusiveSink {

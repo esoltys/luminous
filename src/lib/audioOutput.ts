@@ -17,9 +17,20 @@ export function offeredAudioBackends(): AudioBackendKind[] {
 }
 
 /**
- * Whether a mode opens a driver or hardware device directly, with no system
- * default to follow: with nothing chosen it plays on the first one listed.
+ * The modes that open a driver or hardware device directly, with no system
+ * default to follow (with nothing chosen they play on the first device
+ * listed), and the i18n key saying none was found.
  */
+const DIRECT_HARDWARE_NO_DEVICES_KEYS: Partial<Record<AudioBackendKind, string>> = {
+  asio: "settings.audioAsioNoDevices",
+  alsa: "settings.audioAlsaNoDevices",
+};
+
 export function isDirectHardware(backend: AudioBackendKind): boolean {
-  return backend === "asio" || backend === "alsa";
+  return backend in DIRECT_HARDWARE_NO_DEVICES_KEYS;
+}
+
+/** The message shown when a direct-hardware mode finds no devices. */
+export function noDevicesKey(backend: AudioBackendKind): string | undefined {
+  return DIRECT_HARDWARE_NO_DEVICES_KEYS[backend];
 }

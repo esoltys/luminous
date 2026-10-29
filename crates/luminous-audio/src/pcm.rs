@@ -245,12 +245,8 @@ pub enum PcmFormat {
 impl PcmFormat {
     /// WASAPI's candidates, deepest first: every one holds a 16- or 24-bit
     /// source losslessly, and a wider one leaves the gain chain more resolution.
+    /// (ALSA keeps its own list, with its right-justified 24-in-32 layout.)
     pub const PREFERENCE: [PcmFormat; 4] = [Self::I32, Self::I24In32, Self::I24Packed, Self::I16];
-
-    /// ALSA's candidates in the same order (`S32_LE`, `S24_LE`, `S24_3LE`,
-    /// `S16_LE`): ALSA's 24-in-32 layout is right-justified.
-    pub const ALSA_PREFERENCE: [PcmFormat; 4] =
-        [Self::I32, Self::I24In32Low, Self::I24Packed, Self::I16];
 
     /// Bytes one sample occupies in the device buffer.
     pub fn container_bytes(self) -> usize {

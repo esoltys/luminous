@@ -8,6 +8,7 @@
 //!
 //! The PCM is opened, fed and closed on one render thread the sink owns.
 
+use crate::pcm::PcmFormat;
 use crate::sink::OutputFallbackReason;
 
 /// `EBUSY`: another process (usually the sound server) has the PCM open.
@@ -23,12 +24,16 @@ const ETIMEDOUT: i32 = 110;
 /// fixed-rate devices (USB headsets, HDMI) run at.
 pub(crate) const FALLBACK_RATES: [u32; 2] = [48_000, 44_100];
 
-/// Why the hardware stream couldn't be opened.
-#[derive(Debug, Clone)]
-pub(crate) struct OpenError {
-    pub(crate) reason: OutputFallbackReason,
-    pub(crate) message: String,
-}
+/// The formats tried, deepest first (`S32_LE`, `S24_LE`, `S24_3LE`,
+/// `S16_LE`): every one holds a 16- or 24-bit source losslessly. ALSA's
+/// 24-in-32 layout is right-justified, unlike WASAPI's.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+const FORMATS: [PcmFormat; 4] = [
+    PcmFormat::I32,
+    PcmFormat::I24In32Low,
+    PcmFormat::I24Packed,
+    PcmFormat::I16,
+];
 
 /// Maps a failed ALSA call's errno to the reason shown to the user.
 pub(crate) fn classify_failure(errno: i32) -> OutputFallbackReason {
@@ -36,6 +41,15 @@ pub(crate) fn classify_failure(errno: i32) -> OutputFallbackReason {
         EBUSY => OutputFallbackReason::DeviceInUse,
         _ => OutputFallbackReason::Unavailable,
     }
+}
+
+/// Whether a CPAL ALSA device is one the shared list offers: a system-level
+/// PCM (`default`, `pipewire`, `pulse`) rather than a per-card plugin
+/// (`front:CARD=…`, `sysdefault:CARD=…`, `hw:…`), which lists each card many
+/// times over and which Direct Hardware (ALSA) covers properly. `null`
+/// discards everything, so it's no output at all.
+pub(crate) fn is_system_level_pcm(pcm_id: &str) -> bool {
+    !pcm_id.contains(':') && pcm_id != "null"
 }
 
 /// Whether a card is a software device rather than hardware that plays sound.
@@ -72,11 +86,13 @@ mod imp {
     use parking_lot::Mutex;
 
     use super::{
-        classify_failure, device_id, device_label, is_virtual_driver, OpenError, EAGAIN, ETIMEDOUT,
-        FALLBACK_RATES,
+        classify_failure, device_id, device_label, is_virtual_driver, EAGAIN, ETIMEDOUT,
+        FALLBACK_RATES, FORMATS,
     };
     use crate::pcm::{self, PcmFormat};
-    use crate::sink::{negotiate_format, AudioBackendKind, AudioSink, OutputFallbackReason};
+    use crate::sink::{
+        negotiate_format, AudioBackendKind, AudioSink, OpenError, OutputFallbackReason,
+    };
     use crate::{AudioShared, OutputRenderer};
 
     const CHANNELS: u16 = 2;
@@ -148,7 +164,7 @@ mod imp {
         sample_rate: u32,
         format: PcmFormat,
         device_name: Option<String>,
-        pub(crate) stream_error_flag: Arc<AtomicBool>,
+        stream_error_flag: Arc<AtomicBool>,
     }
 
     impl AudioSink for AlsaSink {
@@ -332,18 +348,14 @@ mod imp {
             let pcm = PCM::new(device_id, Direction::Playback, true)
                 .map_err(|e| open_error("Open", e))?;
 
-            let (rate, format) = negotiate_format(
-                requested_rate,
-                &FALLBACK_RATES,
-                &PcmFormat::ALSA_PREFERENCE,
-                |rate, format| {
+            let (rate, format) =
+                negotiate_format(requested_rate, &FALLBACK_RATES, &FORMATS, |rate, format| {
                     alsa_format(format).is_some_and(|f| constrain(&pcm, rate, f).is_ok())
-                },
-            )
-            .ok_or_else(|| OpenError {
-                reason: OutputFallbackReason::FormatUnsupported,
-                message: format!("No stereo integer format near {requested_rate} Hz"),
-            })?;
+                })
+                .ok_or_else(|| OpenError {
+                    reason: OutputFallbackReason::FormatUnsupported,
+                    message: format!("No stereo integer format near {requested_rate} Hz"),
+                })?;
 
             let (rate, period_frames) = {
                 // `negotiate_format` only returns ALSA formats.
@@ -484,6 +496,24 @@ mod tests {
         );
         assert_eq!(device_label("Scarlett 2i2", ""), "Scarlett 2i2");
         assert_eq!(device_label("Scarlett 2i2", "Scarlett 2i2"), "Scarlett 2i2");
+    }
+
+    #[test]
+    fn the_shared_list_keeps_only_system_level_pcms() {
+        for id in ["default", "pipewire", "pulse"] {
+            assert!(is_system_level_pcm(id), "{id}");
+        }
+        for id in [
+            "null",
+            "sysdefault:CARD=PCH",
+            "front:CARD=PCH,DEV=0",
+            "surround51:CARD=PCH,DEV=0",
+            "hdmi:CARD=PCH,DEV=0",
+            "hw:CARD=EarPods,DEV=0",
+            "plughw:CARD=EarPods,DEV=0",
+        ] {
+            assert!(!is_system_level_pcm(id), "{id}");
+        }
     }
 
     #[test]

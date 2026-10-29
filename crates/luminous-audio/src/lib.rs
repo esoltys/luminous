@@ -38,8 +38,8 @@ pub mod pcm;
 pub mod sink;
 mod source;
 mod spectrum;
-// The platform-neutral helpers here (format negotiation, failure mapping) are
-// only called by the Windows sink, but are built and tested everywhere.
+// Each sink's platform-neutral helpers (failure mapping, device naming) are
+// only called on its own platform, but are built and tested everywhere.
 #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 mod alsa_direct;
 #[cfg_attr(not(windows), allow(dead_code))]
@@ -846,7 +846,6 @@ struct AudioOutput {
     channels: u16,
     device_name: Option<String>,
     backend_name: String,
-    stream_error_flag: Arc<std::sync::atomic::AtomicBool>,
     /// Set when the configured backend failed and this is the shared-output
     /// stand-in: what was asked for, and why it couldn't be had.
     fallback: Option<(AudioBackendKind, OutputFallbackReason)>,
@@ -1142,15 +1141,8 @@ fn open_bit_perfect(
     config: &AudioOutputConfig,
     requested_rate: u32,
 ) -> Option<Result<AudioOutput, Fallback>> {
-    type Opened = (Box<dyn AudioSink>, Arc<std::sync::atomic::AtomicBool>);
-
     let backend = config.backend;
-    let opens_here = match backend {
-        AudioBackendKind::Cpal => false,
-        AudioBackendKind::Asio | AudioBackendKind::WasapiExclusive => cfg!(windows),
-        AudioBackendKind::Alsa => cfg!(target_os = "linux"),
-    };
-    if !opens_here {
+    if backend == AudioBackendKind::Cpal {
         return None;
     }
 
@@ -1164,7 +1156,7 @@ fn open_bit_perfect(
     // Only WASAPI exclusive can stand in for a missing device.
     #[cfg_attr(not(windows), allow(unused_mut))]
     let mut stands_in = false;
-    let opened: Result<Opened, OutputFallbackReason> = match backend {
+    let opened: Result<Box<dyn AudioSink>, crate::sink::OpenError> = match backend {
         #[cfg(windows)]
         AudioBackendKind::Asio => crate::asio::build_asio_sink(
             config.device_id.as_deref(),
@@ -1173,13 +1165,10 @@ fn open_bit_perfect(
             Arc::clone(&played_samples),
             requested_rate,
         )
-        .map(|sink| {
-            let error_flag = Arc::clone(&sink.stream_error_flag);
-            (Box::new(sink) as Box<dyn AudioSink>, error_flag)
-        })
-        .map_err(|e| {
-            log::warn!("ASIO unavailable ({e}), falling back to shared output");
-            OutputFallbackReason::Unavailable
+        .map(|sink| Box::new(sink) as Box<dyn AudioSink>)
+        .map_err(|message| crate::sink::OpenError {
+            reason: OutputFallbackReason::Unavailable,
+            message,
         }),
         #[cfg(windows)]
         AudioBackendKind::WasapiExclusive => {
@@ -1197,7 +1186,7 @@ fn open_bit_perfect(
                     stands_in = resolved.stands_in;
                     Ok((endpoint_id, resolved.name))
                 })
-                .map_err(|message| crate::wasapi::OpenError {
+                .map_err(|message| crate::sink::OpenError {
                     reason: OutputFallbackReason::Unavailable,
                     message,
                 })
@@ -1211,17 +1200,7 @@ fn open_bit_perfect(
                         Arc::clone(&played_samples),
                     )
                 })
-                .map(|sink| {
-                    let error_flag = Arc::clone(&sink.stream_error_flag);
-                    (Box::new(sink) as Box<dyn AudioSink>, error_flag)
-                })
-                .map_err(|e| {
-                    log::warn!(
-                        "WASAPI exclusive unavailable ({}), falling back to shared output",
-                        e.message
-                    );
-                    e.reason
-                })
+                .map(|sink| Box::new(sink) as Box<dyn AudioSink>)
         }
         #[cfg(target_os = "linux")]
         AudioBackendKind::Alsa => crate::alsa_direct::build_alsa_sink(
@@ -1231,23 +1210,13 @@ fn open_bit_perfect(
             Arc::clone(&consumer),
             Arc::clone(&played_samples),
         )
-        .map(|sink| {
-            let error_flag = Arc::clone(&sink.stream_error_flag);
-            (Box::new(sink) as Box<dyn AudioSink>, error_flag)
-        })
-        .map_err(|e| {
-            log::warn!(
-                "ALSA hardware output unavailable ({}), falling back to shared output",
-                e.message
-            );
-            e.reason
-        }),
-        // Ruled out by `opens_here` above.
+        .map(|sink| Box::new(sink) as Box<dyn AudioSink>),
+        // A bit-perfect backend this platform doesn't have.
         _ => return None,
     };
     Some(
         opened
-            .map(|(sink, stream_error_flag)| {
+            .map(|sink| {
                 let sample_rate = sink.sample_rate();
                 let channels = sink.channels();
                 shared
@@ -1263,13 +1232,18 @@ fn open_bit_perfect(
                     played_samples,
                     sample_rate,
                     channels,
-                    stream_error_flag,
                     fallback: None,
                     stands_in,
                     requested_rate,
                 }
             })
-            .map_err(|reason| (backend, reason)),
+            .map_err(|e| {
+                log::warn!(
+                    "{backend} unavailable ({}), falling back to shared output",
+                    e.message
+                );
+                (backend, e.reason)
+            }),
     )
 }
 
@@ -1282,10 +1256,10 @@ fn open_bit_perfect(
     None
 }
 
-/// Opens the configured backend. ASIO and WASAPI exclusive open at
-/// `requested_rate` or the closest rate the device takes (44.1 kHz when
-/// `None`); shared output runs at the system mix rate. When ASIO or WASAPI
-/// exclusive can't be opened, falls back to shared CPAL output (on the same
+/// Opens the configured backend. The bit-perfect backends (ASIO, WASAPI
+/// exclusive, ALSA hardware) open at `requested_rate` or the closest rate the
+/// device takes (44.1 kHz when `None`); shared output runs at the system mix
+/// rate. When a bit-perfect backend can't be opened, falls back to shared CPAL output (on the same
 /// endpoint where there is one) and records why in `AudioOutput::fallback`.
 fn build_output(
     shared: &Arc<AudioShared>,
@@ -1386,7 +1360,7 @@ fn build_output(
         target_sample_rate,
         target_channels,
         device_name.clone(),
-        Arc::clone(&stream_error_flag),
+        stream_error_flag,
     );
 
     Ok(AudioOutput {
@@ -1398,7 +1372,6 @@ fn build_output(
         channels: target_channels,
         device_name,
         backend_name: AudioBackendKind::Cpal.to_string(),
-        stream_error_flag,
         fallback,
         stands_in,
         requested_rate,
@@ -1885,7 +1858,7 @@ fn check_and_rebuild_output(
     let force_rebuild = std::mem::take(&mut session.force_device_rebuild);
     let stream_errored = output
         .as_ref()
-        .map(|o| o.stream_error_flag.load(Ordering::Relaxed))
+        .map(|o| o.sink.is_errored())
         .unwrap_or(false);
 
     let output_cfg = shared.output_config.read().clone();

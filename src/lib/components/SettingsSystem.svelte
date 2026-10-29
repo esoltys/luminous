@@ -8,7 +8,7 @@
   import { openExternalUrl } from "../utils/openExternalUrl";
   import { toastStore } from "../stores/toast.svelte";
   import { isWindows } from "../platform";
-  import { AUDIO_BACKEND_LABEL_KEYS, isDirectHardware, offeredAudioBackends } from "../audioOutput";
+  import { AUDIO_BACKEND_LABEL_KEYS, isDirectHardware, noDevicesKey, offeredAudioBackends } from "../audioOutput";
   import type { AudioBackendKind } from "../types";
   import Toggle from "./Toggle.svelte";
   import Button from "./Button.svelte";
@@ -241,6 +241,7 @@
 
   const audioBackends = offeredAudioBackends();
   let directHardware = $derived(isDirectHardware(prefs.audioOutputConfig.backend));
+  let noDevicesMessageKey = $derived(noDevicesKey(prefs.audioOutputConfig.backend));
 
   let selectedDeviceId = $derived.by(() => {
     const id = prefs.audioOutputConfig.device_id;
@@ -413,8 +414,8 @@
       <label for="audio-device-select" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.audioDeviceLabel')}</label>
       <p class="text-xs text-brand-text-secondary">{i18n.t('settings.audioDeviceHint')}</p>
     </div>
-    {#if currentBackendDevices.length === 0 && directHardware}
-      <span class="text-xs text-amber-400 font-medium">{i18n.t(prefs.audioOutputConfig.backend === 'asio' ? 'settings.audioAsioNoDevices' : 'settings.audioAlsaNoDevices')}</span>
+    {#if currentBackendDevices.length === 0 && noDevicesMessageKey}
+      <span class="text-xs text-amber-400 font-medium">{i18n.t(noDevicesMessageKey)}</span>
     {:else}
       <Select
         id="audio-device-select"
