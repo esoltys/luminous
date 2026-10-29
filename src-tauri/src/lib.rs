@@ -272,6 +272,19 @@ fn with_webview2_backgrounding_disabled(current: &str) -> String {
 /// `http://127.0.0.1:9222`) rather than needing per-platform documentation.
 const REMOTE_DEVTOOLS_PORT: u16 = 9222;
 
+/// Resolves the loopback port for the remote-devtools channel.
+/// Defaults to `REMOTE_DEVTOOLS_PORT` (9222), but can be overridden via
+/// `LUMINOUS_REMOTE_DEVTOOLS_PORT` (or `CDP_PORT`) to prevent port collisions
+/// or allow external capture runners to assign dynamic ports.
+pub(crate) fn remote_devtools_port() -> u16 {
+    std::env::var("LUMINOUS_REMOTE_DEVTOOLS_PORT")
+        .or_else(|_| std::env::var("CDP_PORT"))
+        .ok()
+        .and_then(|s| s.parse::<u16>().ok())
+        .filter(|&p| p > 0)
+        .unwrap_or(REMOTE_DEVTOOLS_PORT)
+}
+
 /// Whether the opt-in remote-devtools channel (see `REMOTE_DEVTOOLS_PORT`)
 /// should be wired up for this run. Gated on either the non-release `capture`
 /// feature flavor, or a debug build with an explicit env var (`LUMINOUS_REMOTE_DEVTOOLS=true`),
@@ -848,7 +861,7 @@ pub fn run() {
     if remote_devtools_enabled() {
         std::env::set_var(
             "WEBKIT_INSPECTOR_HTTP_SERVER",
-            format!("127.0.0.1:{}", REMOTE_DEVTOOLS_PORT),
+            format!("127.0.0.1:{}", remote_devtools_port()),
         );
     }
 
@@ -864,7 +877,7 @@ pub fn run() {
         let current = with_webview2_occlusion_disabled(&current);
         let current = with_webview2_backgrounding_disabled(&current);
         let current = if remote_devtools_enabled() {
-            with_webview2_remote_debugging(&current, REMOTE_DEVTOOLS_PORT)
+            with_webview2_remote_debugging(&current, remote_devtools_port())
         } else {
             current
         };
@@ -1616,6 +1629,8 @@ pub fn run() {
             commands::window::exit_miniplayer_mode,
             commands::window::move_window_to_preset,
             commands::window::get_window_geometry,
+            commands::window::set_window_size,
+            commands::window::get_window_scale,
             commands::window::webview_gpu_compositing,
             commands::window::start_window_drag,
             commands::window::start_window_resize,
@@ -1743,6 +1758,18 @@ mod startup_rendering_workaround_tests {
         assert_eq!(
             with_webview2_remote_debugging(already_set_with_other, 9222),
             already_set_with_other
+        );
+    }
+
+    #[test]
+    fn test_webview2_remote_debugging_flag_with_custom_port() {
+        assert_eq!(
+            with_webview2_remote_debugging("", 9225),
+            "--remote-debugging-port=9225"
+        );
+        assert_eq!(
+            with_webview2_remote_debugging("--some-flag", 9225),
+            "--some-flag --remote-debugging-port=9225"
         );
     }
 }

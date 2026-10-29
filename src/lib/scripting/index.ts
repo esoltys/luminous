@@ -7,6 +7,7 @@ import { createAppearanceController } from "./appearance";
 import { createDialogsController } from "./dialogs";
 import { createViewController } from "./view";
 import { createScreensController } from "./screens";
+import { createWindowController } from "./window";
 
 export * from "./types";
 export { registerDialogHostControls, type DialogHostControls } from "./dialogs";
@@ -23,6 +24,7 @@ export function createScriptingApi(): LuminousScriptApi {
   const dialogs = createDialogsController(wait);
   const view = createViewController(wait);
   const screens = createScreensController(wait);
+  const win = createWindowController(wait);
 
   const api: LuminousScriptApi = {
     version: SCRIPT_API_VERSION,
@@ -36,6 +38,7 @@ export function createScriptingApi(): LuminousScriptApi {
     view,
     screens,
     wait,
+    window: win,
   };
   return api;
 }
