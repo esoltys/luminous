@@ -20,8 +20,7 @@ pub(crate) struct Stamp {
 
 impl Stamp {
     pub fn of(path: &Path) -> Result<Self, Error> {
-        let meta = std::fs::metadata(path)
-            .map_err(|e| Error::Failed(format!("{}: {e}", path.display())))?;
+        let meta = std::fs::metadata(path).map_err(Error::at(path))?;
         let mtime_ns = meta
             .modified()
             .ok()
@@ -64,21 +63,21 @@ pub(crate) struct SourceInfo {
 impl SourceInfo {
     pub fn probe(path: &Path, stamp: Stamp) -> Result<Self, Error> {
         let probe = Probe::open(path)
-            .map_err(crate::art::failed(path))?
+            .map_err(Error::at(path))?
             .options(ParseOptions::new().read_cover_art(true))
             .guess_file_type()
-            .map_err(crate::art::failed(path))?;
+            .map_err(Error::at(path))?;
         let file_type = probe.file_type();
 
         // The generic properties don't say whether an MP4 holds AAC or ALAC.
         let (tagged, mp4_codec) = if file_type == Some(FileType::Mp4) {
             let mut file = std::fs::File::open(path)?;
             let mp4 = Mp4File::read_from(&mut file, ParseOptions::new().read_cover_art(true))
-                .map_err(crate::art::failed(path))?;
+                .map_err(Error::at(path))?;
             let codec = mp4.properties().codec();
             (lofty::file::TaggedFile::from(mp4), codec)
         } else {
-            (probe.read().map_err(crate::art::failed(path))?, None)
+            (probe.read().map_err(Error::at(path))?, None)
         };
 
         let properties = tagged.properties();

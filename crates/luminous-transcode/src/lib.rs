@@ -51,6 +51,13 @@ impl std::fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
+impl Error {
+    /// For `map_err`: a failure reading or writing `path`.
+    pub(crate) fn at<E: std::fmt::Display>(path: &Path) -> impl Fn(E) -> Self + '_ {
+        move |e| Self::Failed(format!("{}: {e}", path.display()))
+    }
+}
+
 impl From<std::io::Error> for Error {
     fn from(e: std::io::Error) -> Self {
         Self::Failed(e.to_string())
@@ -62,8 +69,8 @@ impl From<std::io::Error> for Error {
 pub struct Prepared {
     /// The source itself for [`Decision::Copy`], otherwise a cache entry.
     /// Entries are never modified, but a later `materialize` can evict the
-    /// least recently used ones to stay under the cap, so copy it before
-    /// preparing much more: an entry is only sure to exist until then.
+    /// least recently used ones when the disk runs short of space, so copy
+    /// it before preparing more: an entry is only sure to exist until then.
     pub path: PathBuf,
     pub decision: Decision,
     /// Extension the file should have on the device, without the dot.
@@ -124,10 +131,9 @@ impl Transcoder {
         if decision == Decision::Copy {
             return Ok(info.stamp.size);
         }
-        let key = cache::key(&info, &decision);
         Ok(self
             .cache
-            .size_of(&key, &decision.extension(source))
+            .size_of(&info, &decision)
             .unwrap_or_else(|| rule::estimate(&info, &decision)))
     }
 
@@ -151,8 +157,7 @@ impl Transcoder {
                 size: info.stamp.size,
             });
         }
-        let key = cache::key(&info, &decision);
-        let path = self.cache.get_or_insert(&key, &extension, |out| {
+        let path = self.cache.get_or_insert(&info, &decision, |out| {
             pipeline::produce(&info, &decision, out, cancel)
         })?;
         let size = std::fs::metadata(&path)?.len();

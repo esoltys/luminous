@@ -32,7 +32,7 @@ pub(crate) fn produce(
             channels,
             max_art_px,
         } => {
-            let decoder = OfflineDecoder::open_file(&info.path).map_err(Error::Failed)?;
+            let decoder = OfflineDecoder::open_file(&info.path).map_err(Error::at(&info.path))?;
             let mut resampler =
                 Resample::new(decoder.sample_rate(), sample_rate, usize::from(channels))?;
             let mut encoder = encode::open(format, bitrate_kbps, sample_rate, channels, out)?;
@@ -55,7 +55,7 @@ pub(crate) fn produce(
                         }
                     }
                 })
-                .map_err(|e| Error::Failed(format!("{}: {e}", info.path.display())))?;
+                .map_err(Error::at(&info.path))?;
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }

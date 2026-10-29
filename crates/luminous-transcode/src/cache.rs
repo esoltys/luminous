@@ -47,7 +47,7 @@ const FALLBACK_CAP: u64 = 50_000_000_000;
 type DiskSpace = dyn Fn(&Path) -> Option<(u64, u64)> + Send + Sync;
 
 /// The cache key for `info` prepared per `decision`.
-pub(crate) fn key(info: &SourceInfo, decision: &Decision) -> String {
+fn key(info: &SourceInfo, decision: &Decision) -> String {
     let mut hash = Sha256::new();
     hash.update(format!(
         "{PIPELINE_VERSION}\0{}\0{}\0{}\0{decision:?}",
@@ -93,27 +93,25 @@ impl Cache {
         }
     }
 
-    fn entry(&self, key: &str, extension: &str) -> PathBuf {
-        self.dir.join(format!("{key}.{extension}"))
-    }
-
-    /// Size of the entry for `key`, if there is one.
-    pub fn size_of(&self, key: &str, extension: &str) -> Option<u64> {
-        std::fs::metadata(self.entry(key, extension))
+    /// Size of the entry for `info` prepared per `decision`, if there is one.
+    pub fn size_of(&self, info: &SourceInfo, decision: &Decision) -> Option<u64> {
+        let (key, extension) = (key(info, decision), decision.extension(&info.path));
+        std::fs::metadata(self.dir.join(format!("{key}.{extension}")))
             .ok()
             .map(|m| m.len())
     }
 
-    /// The entry for `key`, made by `produce` (which writes the file at the
-    /// path it is given) when there isn't one. A failed or cancelled
-    /// `produce` leaves nothing behind.
+    /// The entry for `info` prepared per `decision`, made by `produce`
+    /// (which writes the file at the path it is given) when there isn't one.
+    /// A failed or cancelled `produce` leaves nothing behind.
     pub fn get_or_insert(
         &self,
-        key: &str,
-        extension: &str,
+        info: &SourceInfo,
+        decision: &Decision,
         produce: impl FnOnce(&Path) -> Result<(), Error>,
     ) -> Result<PathBuf, Error> {
-        let path = self.entry(key, extension);
+        let (key, extension) = (key(info, decision), decision.extension(&info.path));
+        let path = self.dir.join(format!("{key}.{extension}"));
         if path.exists() {
             touch(&path);
             return Ok(path);
@@ -237,17 +235,41 @@ mod tests {
         })
     }
 
+    const SHRINK: Decision = Decision::ShrinkArt { max_px: 500 };
+
+    /// A source at `path`; entries made from it keep its extension.
+    fn source(path: &str) -> SourceInfo {
+        SourceInfo {
+            path: path.into(),
+            stamp: crate::source::Stamp {
+                size: 1,
+                mtime_ns: 1,
+            },
+            codec: "flac",
+            sample_rate: 44_100,
+            bit_depth: Some(16),
+            channels: 2,
+            bitrate_kbps: None,
+            duration: Duration::from_secs(1),
+            art: Default::default(),
+        }
+    }
+
     #[test]
     fn a_second_request_is_a_hit() {
         let dir = tempfile::tempdir().unwrap();
         let cache = Cache::with_disk(dir.path().join("t"), disk_with_room(1_000));
-        let first = cache.get_or_insert("k", "m4a", write(10)).unwrap();
+        let first = cache
+            .get_or_insert(&source("k.m4a"), &SHRINK, write(10))
+            .unwrap();
         let second = cache
-            .get_or_insert("k", "m4a", |_| panic!("must not produce again"))
+            .get_or_insert(&source("k.m4a"), &SHRINK, |_| {
+                panic!("must not produce again")
+            })
             .unwrap();
         assert_eq!(first, second);
-        assert_eq!(cache.size_of("k", "m4a"), Some(10));
-        assert_eq!(cache.size_of("other", "m4a"), None);
+        assert_eq!(cache.size_of(&source("k.m4a"), &SHRINK), Some(10));
+        assert_eq!(cache.size_of(&source("other.m4a"), &SHRINK), None);
     }
 
     #[test]
@@ -255,7 +277,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let cache = Cache::new(dir.path().to_path_buf());
         let err = cache
-            .get_or_insert("k", "opus", |path| {
+            .get_or_insert(&source("k.opus"), &SHRINK, |path| {
                 std::fs::write(path, b"half")?;
                 Err(Error::Cancelled)
             })
@@ -268,13 +290,21 @@ mod tests {
     fn a_disk_short_of_space_drops_least_recently_used_first() {
         let dir = tempfile::tempdir().unwrap();
         let cache = Cache::with_disk(dir.path().to_path_buf(), disk_with_room(25));
-        let a = cache.get_or_insert("a", "mp3", write(10)).unwrap();
-        let b = cache.get_or_insert("b", "mp3", write(10)).unwrap();
+        let a = cache
+            .get_or_insert(&source("a.mp3"), &SHRINK, write(10))
+            .unwrap();
+        let b = cache
+            .get_or_insert(&source("b.mp3"), &SHRINK, write(10))
+            .unwrap();
         age(&a, 2);
         age(&b, 1);
         // Using `b` makes `a` the oldest.
-        cache.get_or_insert("b", "mp3", write(10)).unwrap();
-        let c = cache.get_or_insert("c", "mp3", write(10)).unwrap();
+        cache
+            .get_or_insert(&source("b.mp3"), &SHRINK, write(10))
+            .unwrap();
+        let c = cache
+            .get_or_insert(&source("c.mp3"), &SHRINK, write(10))
+            .unwrap();
         assert!(!a.exists());
         assert!(b.exists());
         assert!(c.exists());
@@ -284,9 +314,13 @@ mod tests {
     fn the_new_entry_survives_until_the_next_write() {
         let dir = tempfile::tempdir().unwrap();
         let cache = Cache::with_disk(dir.path().to_path_buf(), disk_with_room(5));
-        let a = cache.get_or_insert("a", "mp3", write(10)).unwrap();
+        let a = cache
+            .get_or_insert(&source("a.mp3"), &SHRINK, write(10))
+            .unwrap();
         assert!(a.exists());
-        let b = cache.get_or_insert("b", "mp3", write(10)).unwrap();
+        let b = cache
+            .get_or_insert(&source("b.mp3"), &SHRINK, write(10))
+            .unwrap();
         assert!(!a.exists());
         assert!(b.exists());
     }
@@ -305,7 +339,9 @@ mod tests {
         age(&stale, 0);
 
         let cache = Cache::with_disk(dir.path().to_path_buf(), disk_with_room(1_000));
-        cache.get_or_insert("new", "mp3", write(1)).unwrap();
+        cache
+            .get_or_insert(&source("new.mp3"), &SHRINK, write(1))
+            .unwrap();
         assert!(!idle.exists());
         assert!(!stale.exists());
         assert!(recent.exists());
@@ -316,34 +352,24 @@ mod tests {
     fn without_free_space_the_fallback_cap_bounds_the_cache() {
         let dir = tempfile::tempdir().unwrap();
         let cache = Cache::with_disk(dir.path().to_path_buf(), Box::new(|_| None));
-        let a = cache.get_or_insert("a", "mp3", write(10)).unwrap();
-        let b = cache.get_or_insert("b", "mp3", write(10)).unwrap();
+        let a = cache
+            .get_or_insert(&source("a.mp3"), &SHRINK, write(10))
+            .unwrap();
+        let b = cache
+            .get_or_insert(&source("b.mp3"), &SHRINK, write(10))
+            .unwrap();
         assert!(a.exists() && b.exists(), "far below the cap");
     }
 
     #[test]
     fn keys_change_with_the_file_and_the_decision() {
-        let info = SourceInfo {
-            path: "a.flac".into(),
-            stamp: crate::source::Stamp {
-                size: 1,
-                mtime_ns: 1,
-            },
-            codec: "flac",
-            sample_rate: 44_100,
-            bit_depth: Some(16),
-            channels: 2,
-            bitrate_kbps: None,
-            duration: Duration::from_secs(1),
-            art: Default::default(),
-        };
-        let shrink = Decision::ShrinkArt { max_px: 500 };
-        let base = key(&info, &shrink);
+        let info = source("a.flac");
+        let base = key(&info, &SHRINK);
         assert_eq!(base.len(), 32);
-        assert_eq!(key(&info, &shrink), base);
+        assert_eq!(key(&info, &SHRINK), base);
         assert_ne!(key(&info, &Decision::ShrinkArt { max_px: 800 }), base);
         let mut touched = info.clone();
         touched.stamp.mtime_ns = 2;
-        assert_ne!(key(&touched, &shrink), base);
+        assert_ne!(key(&touched, &SHRINK), base);
     }
 }

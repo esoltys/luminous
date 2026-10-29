@@ -52,18 +52,14 @@ fn shrink(picture: &Picture, max_px: u32) -> Picture {
     builder.build()
 }
 
-pub(crate) fn failed<E: std::fmt::Display>(path: &Path) -> impl Fn(E) -> Error + '_ {
-    move |e| Error::Failed(format!("{}: {e}", path.display()))
-}
-
 fn read(path: &Path) -> Result<lofty::file::TaggedFile, Error> {
     Probe::open(path)
-        .map_err(failed(path))?
+        .map_err(Error::at(path))?
         .options(ParseOptions::new().read_cover_art(true))
         .guess_file_type()
-        .map_err(failed(path))?
+        .map_err(Error::at(path))?
         .read()
-        .map_err(failed(path))
+        .map_err(Error::at(path))
 }
 
 /// Write `source`'s tags and art into `converted`, a file in another format,
@@ -87,7 +83,7 @@ pub(crate) fn copy_tags(source: &Path, converted: &Path, max_px: Option<u32>) ->
     }
     to.insert_tag(tag);
     to.save_to_path(converted, WriteOptions::default())
-        .map_err(failed(converted))
+        .map_err(Error::at(converted))
 }
 
 /// Downscale every picture in `path`'s tags above `max_px`, in place. The
@@ -105,7 +101,7 @@ pub(crate) fn shrink_in_place(path: &Path, max_px: u32) -> Result<(), Error> {
         }
     }
     file.save_to_path(path, WriteOptions::default())
-        .map_err(failed(path))
+        .map_err(Error::at(path))
 }
 
 #[cfg(test)]

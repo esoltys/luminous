@@ -74,7 +74,7 @@ impl Capabilities {
 
     /// What files converted for `profile` will be on this computer, and
     /// whether that is what the profile asked for and what the device plays.
-    pub fn target(&self, profile: &DeviceProfile) -> ConversionTarget {
+    pub(crate) fn target(&self, profile: &DeviceProfile) -> ConversionTarget {
         let requested = (profile.convert.format, profile.convert.bitrate_kbps);
         let (format, bitrate_kbps) = self.resolve(requested.0, requested.1);
         ConversionTarget {
