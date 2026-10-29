@@ -142,7 +142,28 @@ export function createOverlayController(wait: ScriptWaitApi): ScriptOverlayApi {
 
     async pointTo(selector: string, options?: ScriptCursorOptions): Promise<void> {
       if (typeof document === "undefined") return;
-      const target = document.querySelector(selector);
+      let target: Element | null = null;
+      try {
+        target = document.querySelector(selector);
+      } catch {
+        // In case selector is not a valid CSS query, fall through to text/attribute search
+      }
+
+      if (!target) {
+        const query = selector.toLowerCase();
+        const candidates = Array.from(
+          document.querySelectorAll("button, [role=button], a, summary, [data-testid]")
+        );
+        target =
+          candidates.find(
+            (el) =>
+              el.textContent?.trim().toLowerCase().includes(query) ||
+              el.getAttribute("title")?.toLowerCase().includes(query) ||
+              el.getAttribute("aria-label")?.toLowerCase().includes(query) ||
+              el.getAttribute("data-testid")?.toLowerCase().includes(query)
+          ) ?? null;
+      }
+
       if (!target) {
         console.warn(`[script.overlay] Target element not found for selector: "${selector}"`);
         return;
