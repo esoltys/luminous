@@ -434,17 +434,19 @@ describe("In-app scripting API", () => {
         width: 1280,
         height: 800,
         scale: 1.0,
+        inner: undefined,
       });
     });
 
     it("allows partial dimensions and scale", async () => {
       const api = createScriptingApi();
-      await api.window.setSize({ scale: 1.5 });
+      await api.window.setSize({ scale: 1.5, inner: true });
 
       expect(invoke).toHaveBeenCalledWith("set_window_size", {
         width: undefined,
         height: undefined,
         scale: 1.5,
+        inner: true,
       });
     });
 

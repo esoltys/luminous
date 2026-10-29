@@ -11,6 +11,7 @@ export function createWindowController(wait: ScriptWaitApi): ScriptWindowApi {
         width: options.width,
         height: options.height,
         scale: options.scale,
+        inner: options.inner,
       });
       await wait.settled();
     },

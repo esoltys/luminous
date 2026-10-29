@@ -314,12 +314,16 @@ export interface ScriptScreensApi {
  * Target options for window sizing.
  */
 export interface ScriptWindowSizeOptions {
-  /** Target inner width in logical pixels. */
+  /** Target width in physical pixels. */
   width?: number;
-  /** Target inner height in logical pixels. */
+  /** Target height in physical pixels. */
   height?: number;
-  /** Target effective display/zoom scale factor (e.g. 1.0 for 100%, 2.0 for 200%). */
+  /** Target effective display/zoom scale factor (e.g. 1.0 for 100%, 1.5 for 150%). */
   scale?: number;
+  /**
+   * Whether dimensions specify the inner content area (false by default: sizes the total outer window).
+   */
+  inner?: boolean;
 }
 
 /**

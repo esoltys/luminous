@@ -234,6 +234,7 @@ pub async fn set_window_size(
     width: Option<f64>,
     height: Option<f64>,
     scale: Option<f64>,
+    inner: Option<bool>,
 ) -> Result<(), String> {
     let scale_factor = window.scale_factor().unwrap_or(1.0);
 
@@ -244,59 +245,72 @@ pub async fn set_window_size(
     }
 
     if width.is_some() || height.is_some() {
-        let current_inner = window.inner_size().unwrap_or(tauri::PhysicalSize {
+        let is_inner = inner.unwrap_or(false);
+        let current_outer = window.outer_size().unwrap_or(tauri::PhysicalSize {
             width: (FULL_PLAYER_WIDTH * scale_factor) as u32,
             height: (FULL_PLAYER_HEIGHT * scale_factor) as u32,
         });
 
-        let target_inner_w = width
+        let target_w = width
             .map(|w| w.round().max(200.0) as u32)
-            .unwrap_or(current_inner.width);
-        let target_inner_h = height
+            .unwrap_or(current_outer.width);
+        let target_h = height
             .map(|h| h.round().max(100.0) as u32)
-            .unwrap_or(current_inner.height);
+            .unwrap_or(current_outer.height);
 
-        // Derive decoration offset (title bar + borders) in physical pixels.
-        // On Wayland or platforms where outer_size is unavailable or zero, this cleanly defaults to 0.
-        let (dec_w, dec_h) = if window.is_decorated().unwrap_or(true) {
-            if let (Ok(outer), Ok(inner)) = (window.outer_size(), window.inner_size()) {
-                let dw = outer.width.saturating_sub(inner.width);
-                let dh = outer.height.saturating_sub(inner.height);
-                let dw = if dw <= 180 { dw } else { 0 };
-                let dh = if dh <= 180 { dh } else { 0 };
-                (dw, dh)
+        let (outer_w, outer_h) = if is_inner {
+            // Caller explicitly requested inner content dimensions; add decoration offsets
+            let (dec_w, dec_h) = if window.is_decorated().unwrap_or(true) {
+                if let (Ok(outer), Ok(inner_sz)) = (window.outer_size(), window.inner_size()) {
+                    let dw = outer.width.saturating_sub(inner_sz.width);
+                    let dh = outer.height.saturating_sub(inner_sz.height);
+                    let dw = if dw <= 180 { dw } else { 0 };
+                    let dh = if dh <= 180 { dh } else { 0 };
+                    (dw, dh)
+                } else {
+                    (0, 0)
+                }
             } else {
                 (0, 0)
-            }
+            };
+            (
+                target_w.saturating_add(dec_w),
+                target_h.saturating_add(dec_h),
+            )
         } else {
-            (0, 0)
+            // By default, target width and height specify the total outer window dimensions
+            (target_w, target_h)
         };
-
-        let outer_w = target_inner_w.saturating_add(dec_w);
-        let outer_h = target_inner_h.saturating_add(dec_h);
 
         let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize {
             width: outer_w,
             height: outer_h,
         }));
 
-        settle_capture_size(&window, target_inner_w, target_inner_h).await;
+        let settle_target_w = if is_inner { target_w } else { outer_w };
+        let settle_target_h = if is_inner { target_h } else { outer_h };
+        settle_capture_size(&window, settle_target_w, settle_target_h, is_inner).await;
     }
 
     Ok(())
 }
 
-async fn settle_capture_size(window: &WebviewWindow, target_w: u32, target_h: u32) {
+async fn settle_capture_size(window: &WebviewWindow, target_w: u32, target_h: u32, is_inner: bool) {
     let mut prev_size: Option<(u32, u32)> = None;
     let mut stable_hits = 0;
 
     for _ in 0..SETTLE_MAX_CHECKS {
         tokio::time::sleep(Duration::from_millis(SETTLE_CHECK_INTERVAL_MS)).await;
-        if let Ok(size) = window.inner_size() {
+        let size_res = if is_inner {
+            window.inner_size()
+        } else {
+            window.outer_size()
+        };
+        if let Ok(size) = size_res {
             let cur_w = size.width;
             let cur_h = size.height;
 
-            // If inner size matches target within 2px tolerance, settled!
+            // If measured size matches target within 2px tolerance, settled!
             if (cur_w as i32 - target_w as i32).abs() <= 2
                 && (cur_h as i32 - target_h as i32).abs() <= 2
             {
