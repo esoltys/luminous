@@ -83,8 +83,35 @@ mod imp {
         time_info
     }
 
+    /// Whether a rate the driver reports means the hardware no longer runs at
+    /// the stream's `stream_rate`. A report of the rate we set (some drivers
+    /// echo our own `set_sample_rate`) or an unusable value is not a change.
+    fn is_external_rate_change(reported: f64, stream_rate: u32) -> bool {
+        reported.is_finite() && reported > 0.0 && reported.round() as u32 != stream_rate
+    }
+
+    /// The rate was changed outside Luminous (driver control panel, another
+    /// app, the DAC re-locking its clock): samples rendered for the old rate
+    /// would now play at the wrong speed and pitch. Flag the stream errored so
+    /// the decode loop rebuilds it at the track's rate, as for a reset request.
     unsafe extern "system" fn sample_rate_did_change(rate: SampleRate) {
         log::info!("ASIO driver reported hardware sample rate change: {rate}");
+        // Not the buffer callback, so waiting briefly is fine; the timeout
+        // keeps a driver that calls this from inside `buffer_switch` from
+        // deadlocking on the lock that callback holds.
+        let Some(guard) = ACTIVE_ASIO.try_lock_for(std::time::Duration::from_millis(50)) else {
+            log::warn!("ASIO rate change not applied: stream state busy");
+            return;
+        };
+        if let Some(state) = guard.as_ref() {
+            if is_external_rate_change(rate, state.renderer.sample_rate) {
+                log::warn!(
+                    "ASIO hardware rate is now {rate} Hz, stream was opened at {} Hz; reopening",
+                    state.renderer.sample_rate
+                );
+                state.error_flag.store(true, Ordering::Relaxed);
+            }
+        }
     }
 
     unsafe extern "system" fn asio_message(
@@ -362,6 +389,30 @@ mod imp {
             stream_error_flag,
             is_playing: AtomicBool::new(false),
         })
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::is_external_rate_change;
+
+        #[test]
+        fn a_different_hardware_rate_is_a_change() {
+            assert!(is_external_rate_change(48_000.0, 44_100));
+            assert!(is_external_rate_change(96_000.0, 192_000));
+        }
+
+        #[test]
+        fn the_stream_rate_echoed_back_is_not_a_change() {
+            assert!(!is_external_rate_change(44_100.0, 44_100));
+            assert!(!is_external_rate_change(44_099.999_9, 44_100));
+        }
+
+        #[test]
+        fn an_unusable_report_is_not_a_change() {
+            assert!(!is_external_rate_change(0.0, 44_100));
+            assert!(!is_external_rate_change(-1.0, 44_100));
+            assert!(!is_external_rate_change(f64::NAN, 44_100));
+        }
     }
 }
 
