@@ -356,6 +356,35 @@ pub struct ExportTrack<'a> {
     pub duration_sec: Option<i64>,
 }
 
+/// One track in a playlist being written: `location` is written exactly as
+/// given, so the caller decides whether it is absolute or relative and which
+/// separator it uses.
+#[derive(Debug, Clone)]
+pub struct PlaylistEntry<'a> {
+    pub location: String,
+    pub title: Option<&'a str>,
+    pub artist: Option<&'a str>,
+    pub album: Option<&'a str>,
+    pub duration_sec: Option<i64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum LineEnding {
+    #[default]
+    Lf,
+    /// For players whose firmware expects DOS text files.
+    CrLf,
+}
+
+impl LineEnding {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Lf => "\n",
+            Self::CrLf => "\r\n",
+        }
+    }
+}
+
 /// Formats a playlist into string output for saving to disk.
 pub fn export_playlist(
     playlist_name: &str,
@@ -377,84 +406,103 @@ pub fn export_playlist(
         track_path.to_string_lossy().to_string()
     };
 
+    let entries: Vec<PlaylistEntry> = tracks
+        .iter()
+        .map(|track| PlaylistEntry {
+            location: format_path(track.path),
+            title: track.title,
+            artist: track.artist,
+            album: track.album,
+            duration_sec: track.duration_sec,
+        })
+        .collect();
+    Ok(render_playlist(
+        playlist_name,
+        &entries,
+        format,
+        LineEnding::Lf,
+    ))
+}
+
+/// The text of a playlist in `format`, every line ended with `line_ending`.
+/// The text is not encoded: M3U8, PLS and XSPF are UTF-8, and a caller
+/// writing an `.m3u` in a legacy code page encodes it.
+pub fn render_playlist(
+    playlist_name: &str,
+    entries: &[PlaylistEntry],
+    format: PlaylistFormat,
+    line_ending: LineEnding,
+) -> String {
+    let mut lines: Vec<String> = Vec::new();
     match format {
         PlaylistFormat::M3u | PlaylistFormat::M3u8 => {
-            let mut out = String::from("#EXTM3U\n");
-            for track in tracks {
-                let dur = track.duration_sec.unwrap_or(-1);
-                let title_display = match (track.artist, track.title) {
+            lines.push("#EXTM3U".into());
+            for entry in entries {
+                let dur = entry.duration_sec.unwrap_or(-1);
+                let title_display = match (entry.artist, entry.title) {
                     (Some(art), Some(t)) => format!("{} - {}", art, t),
                     (None, Some(t)) => t.to_string(),
                     (Some(art), None) => art.to_string(),
-                    (None, None) => track
-                        .path
+                    (None, None) => Path::new(&entry.location)
                         .file_stem()
                         .map(|s| s.to_string_lossy().to_string())
                         .unwrap_or_default(),
                 };
-                out.push_str(&format!("#EXTINF:{},{}\n", dur, title_display));
-                out.push_str(&format!("{}\n", format_path(track.path)));
+                lines.push(format!("#EXTINF:{},{}", dur, title_display));
+                lines.push(entry.location.clone());
             }
-            Ok(out)
         }
         PlaylistFormat::Pls => {
-            let mut out = String::from("[playlist]\n");
-            out.push_str(&format!("NumberOfEntries={}\n\n", tracks.len()));
-            for (idx, track) in tracks.iter().enumerate() {
+            lines.push("[playlist]".into());
+            lines.push(format!("NumberOfEntries={}", entries.len()));
+            lines.push(String::new());
+            for (idx, entry) in entries.iter().enumerate() {
                 let i = idx + 1;
-                out.push_str(&format!("File{}={}\n", i, format_path(track.path)));
-                if let Some(title) = track.title {
-                    if let Some(artist) = track.artist {
-                        out.push_str(&format!("Title{}={} - {}\n", i, artist, title));
+                lines.push(format!("File{}={}", i, entry.location));
+                if let Some(title) = entry.title {
+                    if let Some(artist) = entry.artist {
+                        lines.push(format!("Title{}={} - {}", i, artist, title));
                     } else {
-                        out.push_str(&format!("Title{}={}\n", i, title));
+                        lines.push(format!("Title{}={}", i, title));
                     }
                 }
-                if let Some(dur) = track.duration_sec {
-                    out.push_str(&format!("Length{}={}\n", i, dur));
-                } else {
-                    out.push_str(&format!("Length{}=-1\n", i));
-                }
-                out.push('\n');
+                lines.push(format!("Length{}={}", i, entry.duration_sec.unwrap_or(-1)));
+                lines.push(String::new());
             }
-            Ok(out)
         }
         PlaylistFormat::Xspf => {
-            let mut out = String::from("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-            out.push_str("<playlist version=\"1\" xmlns=\"http://xspf.org/ns/0/\">\n");
-            out.push_str(&format!("  <title>{}</title>\n", escape_xml(playlist_name)));
-            out.push_str("  <trackList>\n");
-
-            for track in tracks {
-                out.push_str("    <track>\n");
-                let path_str = format_path(track.path);
-                out.push_str(&format!(
-                    "      <location>{}</location>\n",
-                    escape_xml(&path_str)
+            lines.push("<?xml version=\"1.0\" encoding=\"UTF-8\"?>".into());
+            lines.push("<playlist version=\"1\" xmlns=\"http://xspf.org/ns/0/\">".into());
+            lines.push(format!("  <title>{}</title>", escape_xml(playlist_name)));
+            lines.push("  <trackList>".into());
+            for entry in entries {
+                lines.push("    <track>".into());
+                lines.push(format!(
+                    "      <location>{}</location>",
+                    escape_xml(&entry.location)
                 ));
-                if let Some(title) = track.title {
-                    out.push_str(&format!("      <title>{}</title>\n", escape_xml(title)));
+                if let Some(title) = entry.title {
+                    lines.push(format!("      <title>{}</title>", escape_xml(title)));
                 }
-                if let Some(artist) = track.artist {
-                    out.push_str(&format!(
-                        "      <creator>{}</creator>\n",
-                        escape_xml(artist)
-                    ));
+                if let Some(artist) = entry.artist {
+                    lines.push(format!("      <creator>{}</creator>", escape_xml(artist)));
                 }
-                if let Some(album) = track.album {
-                    out.push_str(&format!("      <album>{}</album>\n", escape_xml(album)));
+                if let Some(album) = entry.album {
+                    lines.push(format!("      <album>{}</album>", escape_xml(album)));
                 }
-                if let Some(dur) = track.duration_sec {
-                    out.push_str(&format!("      <duration>{}</duration>\n", dur * 1000));
+                if let Some(dur) = entry.duration_sec {
+                    lines.push(format!("      <duration>{}</duration>", dur * 1000));
                 }
-                out.push_str("    </track>\n");
+                lines.push("    </track>".into());
             }
-
-            out.push_str("  </trackList>\n");
-            out.push_str("</playlist>\n");
-            Ok(out)
+            lines.push("  </trackList>".into());
+            lines.push("</playlist>".into());
         }
     }
+    let eol = line_ending.as_str();
+    let mut out = lines.join(eol);
+    out.push_str(eol);
+    out
 }
 
 // Module for simple pathdiff functionality without needing pathdiff crate
@@ -612,5 +660,26 @@ Length2=150
         assert!(out.contains("#EXTM3U"));
         assert!(out.contains("#EXTINF:200,Artist 1 - Song 1"));
         assert!(out.contains("album/song1.mp3"));
+    }
+
+    #[test]
+    fn render_playlist_writes_locations_as_given_with_the_line_ending() {
+        let entries = [PlaylistEntry {
+            location: "..\\Music\\A\\01 Song.mp3".into(),
+            title: Some("Song"),
+            artist: None,
+            album: None,
+            duration_sec: None,
+        }];
+        let m3u = render_playlist("Mix", &entries, PlaylistFormat::M3u, LineEnding::CrLf);
+        assert_eq!(
+            m3u,
+            "#EXTM3U\r\n#EXTINF:-1,Song\r\n..\\Music\\A\\01 Song.mp3\r\n"
+        );
+        let pls = render_playlist("Mix", &entries, PlaylistFormat::Pls, LineEnding::Lf);
+        assert_eq!(
+            pls,
+            "[playlist]\nNumberOfEntries=1\n\nFile1=..\\Music\\A\\01 Song.mp3\nTitle1=Song\nLength1=-1\n\n"
+        );
     }
 }
