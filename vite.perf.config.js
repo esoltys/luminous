@@ -2,8 +2,7 @@ import { defineConfig } from "vitest/config";
 import viteConfig from "./vite.config.js";
 
 export default defineConfig(async (env) => {
-  const baseFn = typeof viteConfig === "function" ? viteConfig : () => viteConfig;
-  const base = await baseFn(env);
+  const base = await viteConfig(env);
   return {
     ...base,
     resolve: {
