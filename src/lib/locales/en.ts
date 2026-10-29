@@ -881,6 +881,11 @@ export const en = {
     sizeLimitSmartNote: "Refresh re-sorts this playlist, which can change which songs fit.",
     sizeLimitRemove: "Remove limit",
     sizeLimitStats: "{used} of {limit} used",
+    sizeLimitStatsDevice: "{used} of {limit} used on {device}",
+    sizeLimitMeasuring: "Measuring sizes…",
+    sizeLimitDeviceLabel: "Count sizes for",
+    sizeLimitDeviceNone: "Files as they are",
+    sizeLimitDeviceHint: "Count each song at the size it will have on this device after converting. Sizes are estimated until a song is converted.",
     sizeLimitBreak: {
       one: "{limit} limit · {count} song above fits · {below} below",
       other: "{limit} limit · {count} songs above fit · {below} below"

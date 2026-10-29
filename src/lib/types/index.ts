@@ -230,6 +230,9 @@ export interface Playlist {
   is_queue: boolean;
   /** Size budget for the songs at the top of the playlist, in bytes (#344). */
   size_limit_bytes?: number | null;
+  /** The device (a device profile id) the limit is measured for, in its
+   * converted sizes; absent/null measures the library files as they are. */
+  size_limit_device?: string | null;
   /** The `Song` field the playlist is sorted by; absent/null is manual order.
    * The backend returns tracks already in this order. */
   sort_field?: string | null;
@@ -247,6 +250,17 @@ export interface PlaylistSizeFit {
   fit_bytes: number;
   total_bytes: number;
   order: string[];
+  /** The device whose converted sizes were counted; null counts the library files. */
+  device: { id: string; name: string } | null;
+}
+
+/** A connected portable player or drive (backend `get_connected_devices`,
+ * `devices-changed`). Only the fields the UI reads so far. */
+export interface ConnectedDevice {
+  id: string;
+  /** Shown when `profile.nickname` is unset. Never blank. */
+  defaultName: string;
+  profile: { nickname?: string | null };
 }
 
 /** Queue population bias — see #120. Tab order: All, Favourites, Familiar, Discover, Deep Cuts. */

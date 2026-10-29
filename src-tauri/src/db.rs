@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 69;
+pub const CURRENT_SCHEMA_VERSION: i32 = 70;
 
 struct Migration {
     version: i32,
@@ -636,6 +636,26 @@ const MIGRATIONS: &[Migration] = &[
                     conn.execute_batch(&format!(
                         "ALTER TABLE playlists ADD COLUMN {column} {ddl};"
                     ))?;
+                }
+            }
+            Ok(())
+        },
+    },
+    Migration {
+        version: 70,
+        description: "playlists.size_limit_device and device_profiles.default_name: size limits measured in a device's converted sizes (#344)",
+        apply: |conn| {
+            for (table, column) in [
+                ("playlists", "size_limit_device"),
+                ("device_profiles", "default_name"),
+            ] {
+                let has_column: bool = conn
+                    .prepare(&format!(
+                        "SELECT 1 FROM pragma_table_info('{table}') WHERE name = '{column}'"
+                    ))?
+                    .exists([])?;
+                if !has_column {
+                    conn.execute_batch(&format!("ALTER TABLE {table} ADD COLUMN {column} TEXT;"))?;
                 }
             }
             Ok(())

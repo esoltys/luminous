@@ -30,7 +30,7 @@
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
   import ShareModal from "./ShareModal.svelte";
   import PlaylistSizeLimitControl from "./PlaylistSizeLimitControl.svelte";
-  import { fitForOrder, breakBeforeUuid, sizeLimitBreakLabel, sizeLimitStats } from "../utils/sizeFit";
+  import { fitForOrder, breakBeforeUuid, sizeLimitBreakLabel, sizeLimitStats, watchDeviceProfile } from "../utils/sizeFit";
   import {
     PlusIcon as Plus,
     FolderPlusIcon as FolderPlus,
@@ -246,19 +246,16 @@
     return formatHoursMinutes(Math.round(totalNs / 1_000_000_000 / 60));
   });
 
-  /** What the view lists: songs, plus the playlist rows and size fit when the
-   * songs are the backing playlist's own rows (`null` for the other kinds). */
-  type Loaded = { songs: Song[]; items: PlaylistItem[] | null; fit: PlaylistSizeFit | null };
+  /** What the view lists: songs, plus the playlist rows when the songs are
+   * the backing playlist's own rows (`null` for the other kinds). */
+  type Loaded = { songs: Song[]; items: PlaylistItem[] | null };
 
-  const songsOnly = (list: Song[]): Loaded => ({ songs: list, items: null, fit: null });
+  const songsOnly = (list: Song[]): Loaded => ({ songs: list, items: null });
 
   async function loadPlaylistRows(pid: number): Promise<Loaded> {
-    const [items, fit] = await Promise.all([
-      invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: pid }),
-      invoke<PlaylistSizeFit | null>("get_playlist_size_fit", { playlistId: pid }),
-    ]);
+    const items = await invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: pid });
     const withSongs = items.filter((item) => !!item.song);
-    return { songs: withSongs.map((item) => item.song as Song), items: withSongs, fit: fit ?? null };
+    return { songs: withSongs.map((item) => item.song as Song), items: withSongs };
   }
 
   async function fetchSongs(k: typeof kind, g: typeof genre, at: typeof artistTag, d: typeof decade, b: typeof bpm, pid: typeof playlistId): Promise<Loaded> {
@@ -297,7 +294,6 @@
   function applyLoaded(loaded: Loaded) {
     songs = loaded.songs;
     playlistItems = loaded.items;
-    rawSizeFit = loaded.fit;
   }
 
   function mergeSongsById(a: Song[], b: Song[]): Song[] {
@@ -364,11 +360,9 @@
   }
 
   // Track backing playlist track_count reactively so refills trigger an instant re-fetch in the UI,
-  // and its sort and size limit, which change the order and the break (#344).
+  // and its sort, which changes the order (#344).
   let backingTrackCount = $derived(backingPlaylist?.track_count ?? 0);
-  let backingLayoutKey = $derived(
-    `${backingPlaylist?.sort_field ?? ""}:${backingPlaylist?.sort_asc ?? true}:${backingPlaylist?.size_limit_bytes ?? 0}`
-  );
+  let backingLayoutKey = $derived(`${backingPlaylist?.sort_field ?? ""}:${backingPlaylist?.sort_asc ?? true}`);
 
   $effect(() => {
     const k = kind;
@@ -624,6 +618,35 @@
     return [...list].sort((a, b) => compareSongs(a, b, field, sortAsc));
   });
 
+  /** Asks the backend which rows fit the limit. Separate from loading the
+   * rows: measuring for a device can take seconds the first time. */
+  function measureFit(id: number) {
+    invoke<PlaylistSizeFit | null>("get_playlist_size_fit", { playlistId: id })
+      .then((fit) => {
+        if (listedPlaylist?.id === id) rawSizeFit = fit ?? null;
+      })
+      .catch((e) => console.error("Failed to measure the playlist's size limit:", e));
+  }
+
+  // Whenever the rows, the limit or its device change.
+  $effect(() => {
+    const pl = listedPlaylist;
+    if (!pl?.size_limit_bytes || playlistItems === null) {
+      rawSizeFit = null;
+      return;
+    }
+    void pl.size_limit_device;
+    measureFit(pl.id);
+  });
+
+  // Re-measure when the limit's device is plugged in, unplugged or re-profiled.
+  $effect(() => {
+    const id = listedPlaylist?.id;
+    const device = listedPlaylist?.size_limit_device;
+    if (id === undefined || !device) return;
+    return watchDeviceProfile(device, () => measureFit(id));
+  });
+
   let uuidBySongId = $derived(new Map((playlistItems ?? []).map((item) => [item.song!.id, item.uuid])));
   let sizeFit = $derived(
     listedPlaylist ? fitForOrder(rawSizeFit, (playlistItems ?? []).map((item) => item.uuid)) : null
@@ -689,6 +712,9 @@
           {#if sizeFit}
             <span>•</span>
             <span>{sizeLimitStats(sizeFit)}</span>
+          {:else if listedPlaylist?.size_limit_bytes}
+            <span>•</span>
+            <span>{i18n.t("playlists.sizeLimitMeasuring")}</span>
           {/if}
         </div>
 
@@ -723,7 +749,7 @@
             {#snippet icon()}<Share class="w-4 h-4" />{/snippet}
           </IconActionButton>
           {#if listedPlaylist}
-            <PlaylistSizeLimitControl playlist={listedPlaylist} />
+            <PlaylistSizeLimitControl playlist={listedPlaylist} fit={rawSizeFit} />
           {/if}
           <button
             onclick={toggleOverflowMenu}

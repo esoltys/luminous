@@ -1,7 +1,10 @@
 <script lang="ts">
   import { cubicOut } from "svelte/easing";
   import { fade, scale } from "../utils/motion";
+  import { invoke } from "@tauri-apps/api/core";
   import { portal } from "../utils/portal";
+  import { deviceName } from "../utils/sizeFit";
+  import type { ConnectedDevice } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import { formatStorageSize, STORAGE_GB, STORAGE_MB } from "../utils/formatters";
   import Button from "./Button.svelte";
@@ -14,14 +17,18 @@
     anchorEl: HTMLElement | null;
     /** The playlist's current limit in bytes, or `null` for none. */
     limitBytes: number | null;
+    /** The device the limit is measured for, or `null` for library files as they are. */
+    deviceId: string | null;
+    /** Its name as last measured, for when it isn't connected. */
+    deviceLabel: string | null;
     /** Whether Refresh can reorder this playlist (a dynamic one with no sort set), which moves the line. */
     refreshReorders: boolean;
-    /** Called with the new limit in bytes, or `null` to remove it. */
-    onApply: (bytes: number | null) => void;
+    /** Called with the new limit in bytes (`null` removes it) and the device it's measured for. */
+    onApply: (bytes: number | null, deviceId: string | null) => void;
     onClose: () => void;
   }
 
-  let { isOpen, anchorEl, limitBytes, refreshReorders, onApply, onClose }: Props = $props();
+  let { isOpen, anchorEl, limitBytes, deviceId, deviceLabel, refreshReorders, onApply, onClose }: Props = $props();
 
   /** Common USB stick / SD card capacities. */
   const PRESETS = [2 * STORAGE_GB, 4 * STORAGE_GB, 8 * STORAGE_GB, 16 * STORAGE_GB, 32 * STORAGE_GB, 64 * STORAGE_GB];
@@ -32,6 +39,17 @@
   // A number input binds a number, or "" while empty.
   let customValue = $state<number | string>("");
   let customUnit = $state<"MB" | "GB">("GB");
+  let chosenDevice = $state<string | null>(null);
+  let connected = $state<ConnectedDevice[]>([]);
+
+  /** Connected devices, plus the chosen one when it's unplugged. */
+  let deviceOptions = $derived.by(() => {
+    const options = connected.map((d) => ({ id: d.id, name: deviceName(d) }));
+    if (deviceId && !options.some((o) => o.id === deviceId)) {
+      options.push({ id: deviceId, name: deviceLabel ?? deviceId });
+    }
+    return options;
+  });
 
   let customBytes = $derived.by(() => {
     const n = customValue === "" ? NaN : Number(customValue);
@@ -50,12 +68,22 @@
     if (isOpen) {
       updatePosition();
       customValue = "";
+      chosenDevice = deviceId;
+      invoke<ConnectedDevice[]>("get_connected_devices")
+        .then((devices) => (connected = devices))
+        .catch((e) => console.error("Failed to list connected devices:", e));
     }
   });
 
   function apply(bytes: number | null) {
-    onApply(bytes);
+    onApply(bytes, chosenDevice);
     onClose();
+  }
+
+  /** With a limit already set, picking a device re-measures it straight away. */
+  function chooseDevice(id: string | null) {
+    chosenDevice = id;
+    if (limitBytes !== null) onApply(limitBytes, id);
   }
 
   function applyCustom() {
@@ -99,6 +127,23 @@
       </button>
     </div>
     <p class="text-xs text-brand-text-secondary leading-relaxed">{i18n.t("playlists.sizeLimitHint")}</p>
+
+    <label class="flex flex-col gap-1.5 text-xs font-medium text-brand-text-primary">
+      {i18n.t("playlists.sizeLimitDeviceLabel")}
+      <Select
+        value={chosenDevice ?? ""}
+        onchange={(e) => chooseDevice(e.currentTarget.value || null)}
+        class="rounded-lg border border-brand-border bg-brand-main text-brand-text-primary text-xs py-1.5 pl-2.5 pr-8"
+      >
+        <option value="">{i18n.t("playlists.sizeLimitDeviceNone")}</option>
+        {#each deviceOptions as option (option.id)}
+          <option value={option.id}>{option.name}</option>
+        {/each}
+      </Select>
+    </label>
+    {#if chosenDevice}
+      <p class="text-xs text-brand-text-secondary leading-relaxed">{i18n.t("playlists.sizeLimitDeviceHint")}</p>
+    {/if}
 
     <div class="grid grid-cols-3 gap-2">
       {#each PRESETS as bytes (bytes)}

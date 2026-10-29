@@ -1,4 +1,5 @@
-import type { PlaylistSizeFit } from "../types";
+import { listen } from "@tauri-apps/api/event";
+import type { ConnectedDevice, PlaylistSizeFit } from "../types";
 import { i18n } from "../stores/i18n.svelte";
 import { formatStorageSize } from "./formatters";
 
@@ -26,10 +27,38 @@ export function sizeLimitBreakLabel(fit: PlaylistSizeFit): string {
   });
 }
 
-/** The header stat: how much of the limit the songs above the break use. */
+/** The header stat: how much of the limit the songs above the break use,
+ * and on which device when the sizes are converted ones. */
 export function sizeLimitStats(fit: PlaylistSizeFit): string {
-  return i18n.t("playlists.sizeLimitStats", {
-    used: formatStorageSize(fit.fit_bytes),
-    limit: formatStorageSize(fit.limit_bytes),
+  const values = { used: formatStorageSize(fit.fit_bytes), limit: formatStorageSize(fit.limit_bytes) };
+  return fit.device
+    ? i18n.t("playlists.sizeLimitStatsDevice", { ...values, device: fit.device.name })
+    : i18n.t("playlists.sizeLimitStats", values);
+}
+
+export function deviceName(device: ConnectedDevice): string {
+  return device.profile.nickname || device.defaultName;
+}
+
+/** Calls `onChange` when device `deviceId` connects, disconnects or has its
+ * profile changed, which changes what its converted sizes are measured
+ * with. Free-space updates, which arrive every few seconds during a copy,
+ * don't count. Returns the unsubscribe function. */
+export function watchDeviceProfile(deviceId: string, onChange: () => void): () => void {
+  let last: string | undefined;
+  let disposed = false;
+  let unlisten: (() => void) | undefined;
+  listen<ConnectedDevice[]>("devices-changed", (event) => {
+    const device = event.payload.find((d) => d.id === deviceId);
+    const key = device ? JSON.stringify(device.profile) : "";
+    if (last !== undefined && key !== last) onChange();
+    last = key;
+  }).then((fn) => {
+    if (disposed) fn();
+    else unlisten = fn;
   });
+  return () => {
+    disposed = true;
+    unlisten?.();
+  };
 }

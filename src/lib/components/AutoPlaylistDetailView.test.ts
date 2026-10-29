@@ -65,6 +65,7 @@ const fit: PlaylistSizeFit = {
   fit_bytes: 12_400_000_000,
   total_bytes: 20_000_000_000,
   order: items.map((i) => i.uuid),
+  device: null,
 };
 
 let fitAnswer: PlaylistSizeFit | null;

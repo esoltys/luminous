@@ -285,6 +285,7 @@ describe("PlaylistView.svelte", () => {
       fit_bytes: 12_400_000_000,
       total_bytes: 20_000_000_000,
       order: ["uuid-1", "uuid-2", "uuid-3"],
+      device: null,
     };
 
     beforeEach(() => {
@@ -330,11 +331,11 @@ describe("PlaylistView.svelte", () => {
       expect(within(dialog).getByRole("button", { name: "16 GB" })).toHaveAttribute("aria-pressed", "true");
 
       await fireEvent.click(within(dialog).getByRole("button", { name: "2 GB" }));
-      expect(setLimitSpy).toHaveBeenCalledWith(1, 2_000_000_000);
+      expect(setLimitSpy).toHaveBeenCalledWith(1, 2_000_000_000, null);
 
       await fireEvent.click(getByRole("button", { name: /Limit 16 GB/ }));
       await fireEvent.click(getByRole("button", { name: "Remove limit" }));
-      expect(setLimitSpy).toHaveBeenLastCalledWith(1, null);
+      expect(setLimitSpy).toHaveBeenLastCalledWith(1, null, null);
     });
 
     it("sets a typed size in the chosen unit", async () => {
@@ -345,7 +346,32 @@ describe("PlaylistView.svelte", () => {
       await fireEvent.click(getByRole("button", { name: "Size limit" }));
       await fireEvent.input(getByPlaceholderText("Custom size"), { target: { value: "1.5" } });
       await fireEvent.click(getByRole("button", { name: "Set" }));
-      expect(setLimitSpy).toHaveBeenCalledWith(1, 1_500_000_000);
+      expect(setLimitSpy).toHaveBeenCalledWith(1, 1_500_000_000, null);
+    });
+
+    it("names the device when the sizes are converted ones", () => {
+      playlistsStore.activeSizeFit = { ...fit, device: { id: "vol-1", name: "HiBy R1" } };
+      const { getByText } = render(PlaylistView);
+      expect(getByText("12.4 GB of 16 GB used on HiBy R1")).toBeInTheDocument();
+    });
+
+    it("says the sizes are being measured until the answer arrives", () => {
+      playlistsStore.activeSizeFit = null;
+      const { getByText } = render(PlaylistView);
+      expect(getByText("Measuring sizes…")).toBeInTheDocument();
+    });
+
+    it("re-measures for a connected device picked in the popover", async () => {
+      vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+        if (cmd === "get_connected_devices") return [{ id: "vol-1", defaultName: "HiBy R1", profile: { nickname: null } }];
+        return cmd === "get_playlist_size_fit" ? null : [];
+      });
+      const setLimitSpy = vi.spyOn(playlistsStore, "setSizeLimit").mockResolvedValue();
+      const { getByRole, findByRole } = render(PlaylistView);
+      await fireEvent.click(getByRole("button", { name: /Limit 16 GB/ }));
+      await findByRole("option", { name: "HiBy R1" });
+      await fireEvent.change(getByRole("combobox", { name: "Count sizes for" }), { target: { value: "vol-1" } });
+      expect(setLimitSpy).toHaveBeenCalledWith(1, 16_000_000_000, "vol-1");
     });
 
     it("offers no limit on the Queue", () => {

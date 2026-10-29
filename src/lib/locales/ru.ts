@@ -925,6 +925,11 @@ export const ru = {
     sizeLimitSmartNote: "Обновление заново сортирует этот список, и набор помещающихся песен может измениться.",
     sizeLimitRemove: "Убрать лимит",
     sizeLimitStats: "Занято {used} из {limit}",
+    sizeLimitStatsDevice: "Занято {used} из {limit} на {device}",
+    sizeLimitMeasuring: "Подсчёт размеров…",
+    sizeLimitDeviceLabel: "Считать размеры для",
+    sizeLimitDeviceNone: "Файлы как есть",
+    sizeLimitDeviceHint: "Учитывайте каждую песню с размером, который она будет иметь на этом устройстве после конвертации. Пока песня не сконвертирована, размер оценочный.",
     sizeLimitBreak: {
       one: "Лимит {limit} · выше помещается {count} песня · ниже {below}",
       few: "Лимит {limit} · выше помещаются {count} песни · ниже {below}",

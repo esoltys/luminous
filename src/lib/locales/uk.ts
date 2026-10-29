@@ -925,6 +925,11 @@ export const uk = {
     sizeLimitSmartNote: "Оновлення заново сортує цей список, і набір пісень, що вміщаються, може змінитися.",
     sizeLimitRemove: "Прибрати ліміт",
     sizeLimitStats: "Зайнято {used} з {limit}",
+    sizeLimitStatsDevice: "Зайнято {used} з {limit} на {device}",
+    sizeLimitMeasuring: "Підрахунок розмірів…",
+    sizeLimitDeviceLabel: "Рахувати розміри для",
+    sizeLimitDeviceNone: "Файли як є",
+    sizeLimitDeviceHint: "Враховуйте кожну пісню з розміром, який вона матиме на цьому пристрої після конвертації. Доки пісню не сконвертовано, розмір орієнтовний.",
     sizeLimitBreak: {
       one: "Ліміт {limit} · вище вміщається {count} пісня · нижче {below}",
       few: "Ліміт {limit} · вище вміщаються {count} пісні · нижче {below}",

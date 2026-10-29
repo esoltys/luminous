@@ -72,7 +72,7 @@
   import { compareSongs } from "../utils/songSort";
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
   import PlaylistSizeLimitControl from "./PlaylistSizeLimitControl.svelte";
-  import { fitForOrder, breakBeforeUuid, sizeLimitBreakLabel, sizeLimitStats } from "../utils/sizeFit";
+  import { fitForOrder, breakBeforeUuid, sizeLimitBreakLabel, sizeLimitStats, watchDeviceProfile } from "../utils/sizeFit";
 
   // Default column widths (px or fr) — used when no saved width exists for a column.
   const PLAYLIST_COL_DEFAULTS: Partial<Record<keyof typeof collectionStore.visibleColumns, string>> = {
@@ -499,6 +499,16 @@
 
   let breakBefore = $derived(breakBeforeUuid(sizeFit, sortedTracks.map((t) => t.uuid)));
 
+  // Re-measure when the limit's device is plugged in, unplugged or re-profiled.
+  $effect(() => {
+    const id = activePlaylist?.id;
+    const device = activePlaylist?.size_limit_device;
+    if (id === undefined || !device) return;
+    return watchDeviceProfile(device, () => {
+      playlistsStore.refreshSizeFit(id).catch((e) => console.error("Failed to re-measure the size limit:", e));
+    });
+  });
+
   function playSelected() {
     if (selectedUuids.size === 0 || !activePlaylist) return;
     const selectedTracks = playlistsStore.activePlaylistTracks.filter(
@@ -718,6 +728,9 @@
             {#if sizeFit}
               <span>•</span>
               <span>{sizeLimitStats(sizeFit)}</span>
+            {:else if !isQueue && activePlaylist?.size_limit_bytes}
+              <span>•</span>
+              <span>{i18n.t("playlists.sizeLimitMeasuring")}</span>
             {/if}
           </div>
           {/if}
@@ -773,7 +786,7 @@
               </Button>
             {/if}
             {#if !isQueue && activePlaylist}
-              <PlaylistSizeLimitControl playlist={activePlaylist} />
+              <PlaylistSizeLimitControl playlist={activePlaylist} fit={playlistsStore.activeSizeFit} />
             {/if}
             {#if !isActive && activePlaylist && !activePlaylist.dynamic_enabled}
               <Button

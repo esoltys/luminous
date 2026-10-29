@@ -881,6 +881,11 @@ export const es = {
     sizeLimitSmartNote: "Actualizar reordena esta lista, lo que puede cambiar qué canciones caben.",
     sizeLimitRemove: "Quitar límite",
     sizeLimitStats: "{used} de {limit} ocupados",
+    sizeLimitStatsDevice: "{used} de {limit} usados en {device}",
+    sizeLimitMeasuring: "Midiendo tamaños…",
+    sizeLimitDeviceLabel: "Contar tamaños para",
+    sizeLimitDeviceNone: "Archivos tal como están",
+    sizeLimitDeviceHint: "Cuenta cada canción con el tamaño que tendrá en este dispositivo tras convertirla. Los tamaños son estimados hasta que la canción se convierte.",
     sizeLimitBreak: {
       one: "Límite de {limit} · {count} canción arriba cabe · {below} debajo",
       other: "Límite de {limit} · {count} canciones arriba caben · {below} debajo"

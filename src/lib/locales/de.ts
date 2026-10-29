@@ -881,6 +881,11 @@ export const de = {
     sizeLimitSmartNote: "Aktualisieren sortiert diese Wiedergabeliste neu und kann ändern, welche Titel passen.",
     sizeLimitRemove: "Limit entfernen",
     sizeLimitStats: "{used} von {limit} belegt",
+    sizeLimitStatsDevice: "{used} von {limit} belegt auf {device}",
+    sizeLimitMeasuring: "Größen werden ermittelt …",
+    sizeLimitDeviceLabel: "Größen zählen für",
+    sizeLimitDeviceNone: "Dateien wie sie sind",
+    sizeLimitDeviceHint: "Jeden Titel mit der Größe zählen, die er nach dem Umwandeln auf diesem Gerät hat. Bis ein Titel umgewandelt ist, sind die Größen geschätzt.",
     sizeLimitBreak: {
       one: "Limit {limit} · {count} Titel darüber passt · {below} darunter",
       other: "Limit {limit} · {count} Titel darüber passen · {below} darunter"

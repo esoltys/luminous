@@ -16,7 +16,7 @@ mod size_limit;
 mod sort;
 
 pub use dynamic::{reconcile_and_sync, reconcile_each_day, DynamicPlaylistDelta};
-pub use size_limit::{fit_to_limit, PlaylistSizeFit, SizeFit};
+pub use size_limit::{fit_to_limit, FitDevice, PlaylistSizeFit, SizeFit, SizeLimitInput};
 
 /// SQLite treats a negative `LIMIT` as "no limit" — used when populating an
 /// auto-playlist so it includes every matching song, however large the
@@ -202,6 +202,7 @@ impl PlaylistManager {
             track_count: 0,
             is_queue: Playlist::is_queue_row(name, false),
             size_limit_bytes: None,
+            size_limit_device: None,
             sort_field: None,
             sort_asc: true,
         })

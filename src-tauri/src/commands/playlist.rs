@@ -279,29 +279,78 @@ pub async fn move_playlist_items(
     sync_playing_order(playlist_id, &app, &state).await
 }
 
-/// Sets a playlist's size limit in bytes; `None` removes it. A no-op for
-/// the Queue.
+/// Sets a playlist's size limit in bytes and the device it's measured for
+/// (`None`: library files as they are); a `None` limit removes both. A
+/// no-op for the Queue. The device's current profile is kept on this
+/// computer so the limit can still be measured once it's unplugged.
 #[tauri::command]
 pub async fn set_playlist_size_limit(
     playlist_id: i64,
     limit_bytes: Option<u64>,
+    device_id: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    with_playlists(&state, |pm| {
-        pm.set_playlist_size_limit(playlist_id, limit_bytes)
+    let device_id = limit_bytes.filter(|&b| b > 0).and(device_id);
+    let for_playlist = device_id.clone();
+    with_playlists(&state, move |pm| {
+        pm.set_playlist_size_limit(playlist_id, limit_bytes, for_playlist.as_deref())
     })
-    .await
+    .await?;
+    if let Some(id) = device_id {
+        let devices = state.devices.clone();
+        crate::db::run_blocking(&state.db, move |conn| {
+            devices.remember(conn, &id, chrono::Utc::now().timestamp())
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
-/// Which of a playlist's songs fit its size limit, by library file size in
-/// the playlist's order, plus the item order the answer is for. `None`
-/// when the playlist has no limit.
+/// Which of a playlist's songs fit its size limit, in the playlist's order,
+/// plus the item order the answer is for. Sizes are the files as they'll be
+/// on the limit's device after converting (estimated until converted; the
+/// library size when a file can't be read), or the library files when no
+/// device is set or it isn't known here. `None` when the playlist has no
+/// limit. The first fit for a device reads every file's tags, so this runs
+/// off the playlist lock.
 #[tauri::command]
 pub async fn get_playlist_size_fit(
     playlist_id: i64,
     state: State<'_, AppState>,
 ) -> Result<Option<crate::playlist::PlaylistSizeFit>, String> {
-    with_playlists(&state, |pm| pm.playlist_size_fit(playlist_id)).await
+    let Some(input) = with_playlists(&state, |pm| pm.size_limit_input(playlist_id)).await? else {
+        return Ok(None);
+    };
+    let device = match input.device_id.clone() {
+        Some(id) => {
+            let devices = state.devices.clone();
+            let lookup = id.clone();
+            crate::db::run_blocking(&state.db, move |conn| devices.sizing_profile(conn, &lookup))
+                .await
+                .map_err(|e| e.to_string())?
+                .map(|(profile, name)| (crate::playlist::FitDevice { id, name }, profile))
+        }
+        None => None,
+    };
+    let transcoder = state.transcoder.clone();
+    tokio::task::spawn_blocking(move || match device {
+        Some((device, profile)) => input.fit(Some(device), |item, library_bytes| {
+            item.song
+                .as_ref()
+                .and_then(|song| song.path.as_deref())
+                .and_then(|path| {
+                    transcoder
+                        .estimated_size(std::path::Path::new(path), &profile)
+                        .ok()
+                })
+                .unwrap_or(library_bytes)
+        }),
+        None => input.fit(None, |_, library_bytes| library_bytes),
+    })
+    .await
+    .map(Some)
+    .map_err(|e| e.to_string())
 }
 
 /// Clears a playlist's rows and, only when `playlist_id` is the Queue, also

@@ -881,6 +881,11 @@ export const it = {
     sizeLimitSmartNote: "Aggiorna riordina questa playlist e può cambiare quali brani ci stanno.",
     sizeLimitRemove: "Rimuovi limite",
     sizeLimitStats: "{used} di {limit} occupati",
+    sizeLimitStatsDevice: "{used} di {limit} usati su {device}",
+    sizeLimitMeasuring: "Misurazione delle dimensioni…",
+    sizeLimitDeviceLabel: "Conta le dimensioni per",
+    sizeLimitDeviceNone: "File così come sono",
+    sizeLimitDeviceHint: "Conta ogni brano con la dimensione che avrà su questo dispositivo dopo la conversione. Le dimensioni sono stimate finché il brano non viene convertito.",
     sizeLimitBreak: {
       one: "Limite {limit} · {count} brano sopra ci sta · {below} sotto",
       other: "Limite {limit} · {count} brani sopra ci stanno · {below} sotto"

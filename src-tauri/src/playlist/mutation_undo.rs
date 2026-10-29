@@ -1057,7 +1057,9 @@ mod tests {
         manager
             .set_playlist_sort(queue.id, Some("title"), true)
             .unwrap();
-        manager.set_playlist_size_limit(queue.id, Some(10)).unwrap();
+        manager
+            .set_playlist_size_limit(queue.id, Some(10), None)
+            .unwrap();
         let queue = manager.queue().unwrap();
         assert_eq!((queue.sort_field, queue.size_limit_bytes), (None, None));
     }
@@ -1099,13 +1101,21 @@ mod tests {
         assert_eq!(titles(&manager, id), ["B", "A", "D", "C"]);
     }
 
+    /// The fit by library file size, as the command computes it with no device.
+    fn library_fit(manager: &PlaylistManager, id: i64) -> Option<super::super::PlaylistSizeFit> {
+        manager
+            .size_limit_input(id)
+            .unwrap()
+            .map(|input| input.fit(None, |_, bytes| bytes))
+    }
+
     #[test]
     fn size_fit_follows_the_playlist_order() {
         let (_dir, manager, id) = sortable_playlist();
-        assert_eq!(manager.playlist_size_fit(id).unwrap(), None);
+        assert_eq!(library_fit(&manager, id), None);
         // Sizes in manual order: D=4 B=3 C=2 A=1.
-        manager.set_playlist_size_limit(id, Some(7)).unwrap();
-        let fit = manager.playlist_size_fit(id).unwrap().unwrap();
+        manager.set_playlist_size_limit(id, Some(7), None).unwrap();
+        let fit = library_fit(&manager, id).unwrap();
         assert_eq!(
             (fit.fit.break_index, fit.fit.fit_bytes, fit.fit.total_bytes),
             (2, 7, 10)
@@ -1116,11 +1126,32 @@ mod tests {
         manager
             .set_playlist_sort(id, Some("filesize"), true)
             .unwrap();
-        let fit = manager.playlist_size_fit(id).unwrap().unwrap();
+        let fit = library_fit(&manager, id).unwrap();
         assert_eq!((fit.fit.break_index, fit.fit.fit_songs), (3, 3));
 
-        manager.set_playlist_size_limit(id, None).unwrap();
-        assert_eq!(manager.playlist_size_fit(id).unwrap(), None);
+        manager.set_playlist_size_limit(id, None, None).unwrap();
+        assert_eq!(library_fit(&manager, id), None);
+    }
+
+    #[test]
+    fn a_limit_remembers_its_device_until_removed() {
+        let (_dir, manager, id) = sortable_playlist();
+        manager
+            .set_playlist_size_limit(id, Some(7), Some("vol-1"))
+            .unwrap();
+        let input = manager.size_limit_input(id).unwrap().unwrap();
+        assert_eq!(input.device_id.as_deref(), Some("vol-1"));
+
+        manager
+            .set_playlist_size_limit(id, None, Some("vol-1"))
+            .unwrap();
+        let pl = manager
+            .get_playlists()
+            .unwrap()
+            .into_iter()
+            .find(|p| p.id == id)
+            .unwrap();
+        assert_eq!((pl.size_limit_bytes, pl.size_limit_device), (None, None));
     }
 
     #[test]

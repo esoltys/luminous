@@ -887,6 +887,11 @@ export const frFR: DeepStringRecord<typeof en> = {
     sizeLimitSmartNote: "Actualiser trie de nouveau cette liste, ce qui peut changer les chansons qui y entrent.",
     sizeLimitRemove: "Retirer la limite",
     sizeLimitStats: "{used} sur {limit} utilisés",
+    sizeLimitStatsDevice: "{used} sur {limit} utilisés sur {device}",
+    sizeLimitMeasuring: "Mesure des tailles…",
+    sizeLimitDeviceLabel: "Compter les tailles pour",
+    sizeLimitDeviceNone: "Fichiers tels quels",
+    sizeLimitDeviceHint: "Comptez chaque chanson à la taille qu’elle aura sur cet appareil après conversion. Les tailles sont estimées jusqu’à ce que la chanson soit convertie.",
     sizeLimitBreak: {
       one: "Limite de {limit} · {count} chanson au-dessus y entre · {below} en dessous",
       other: "Limite de {limit} · {count} chansons au-dessus y entrent · {below} en dessous"

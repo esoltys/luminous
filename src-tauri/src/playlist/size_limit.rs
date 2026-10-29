@@ -8,7 +8,7 @@
 use super::PlaylistManager;
 use crate::models::PlaylistItem;
 use anyhow::Result;
-use rusqlite::params;
+use rusqlite::{params, OptionalExtension};
 use serde::Serialize;
 
 /// Where a size limit falls in a sequence of songs.
@@ -49,8 +49,16 @@ pub fn fit_to_limit(sizes: &[Option<u64>], limit_bytes: u64) -> SizeFit {
     fit
 }
 
-/// The size limit applied to a playlist's library files, with the item
-/// order it was computed for so a view can tell when the answer is stale.
+/// The device a fit's sizes were estimated for.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct FitDevice {
+    pub id: String,
+    /// The device's nickname, or its default name.
+    pub name: String,
+}
+
+/// The size limit applied to a playlist, with the item order it was
+/// computed for so a view can tell when the answer is stale.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct PlaylistSizeFit {
     pub limit_bytes: u64,
@@ -58,6 +66,45 @@ pub struct PlaylistSizeFit {
     pub fit: SizeFit,
     /// Item UUIDs in the order the fit was computed over.
     pub order: Vec<String>,
+    /// The device whose converted sizes were counted; `None` counts the
+    /// library files as they are.
+    pub device: Option<FitDevice>,
+}
+
+/// What a playlist's size fit is computed from. Read in one quick query, so
+/// measuring the songs (slow when converted sizes are estimated) happens
+/// without holding the playlist lock or a database connection.
+#[derive(Debug, Clone)]
+pub struct SizeLimitInput {
+    pub limit_bytes: u64,
+    /// The device the limit is measured for, if one was chosen.
+    pub device_id: Option<String>,
+    /// The playlist's items in its order.
+    pub items: Vec<PlaylistItem>,
+}
+
+impl SizeLimitInput {
+    /// Applies the limit. `size_on_device` gets each copyable item and its
+    /// library file size and returns the size it takes where it's going;
+    /// items that can't be copied take no space. `device` names whose sizes
+    /// those are.
+    pub fn fit(
+        self,
+        device: Option<FitDevice>,
+        mut size_on_device: impl FnMut(&PlaylistItem, u64) -> u64,
+    ) -> PlaylistSizeFit {
+        let sizes: Vec<Option<u64>> = self
+            .items
+            .iter()
+            .map(|item| library_size(item).map(|bytes| size_on_device(item, bytes)))
+            .collect();
+        PlaylistSizeFit {
+            limit_bytes: self.limit_bytes,
+            fit: fit_to_limit(&sizes, self.limit_bytes),
+            order: self.items.into_iter().map(|i| i.uuid).collect(),
+            device,
+        }
+    }
 }
 
 /// An item's library file size, or `None` when it can't be copied.
@@ -69,12 +116,14 @@ fn library_size(item: &PlaylistItem) -> Option<u64> {
 }
 
 impl PlaylistManager {
-    /// Sets a playlist's size limit in bytes; `None` or 0 removes it. A
-    /// no-op for the Queue.
+    /// Sets a playlist's size limit in bytes and the device (a
+    /// `device_profiles` id) it's measured for, `None` for library files as
+    /// they are. A limit of `None` or 0 removes both. A no-op for the Queue.
     pub fn set_playlist_size_limit(
         &self,
         playlist_id: i64,
         limit_bytes: Option<u64>,
+        device_id: Option<&str>,
     ) -> Result<()> {
         if self.is_queue_id(playlist_id)? {
             return Ok(());
@@ -82,36 +131,38 @@ impl PlaylistManager {
         let limit = limit_bytes
             .filter(|&b| b > 0)
             .map(|b| i64::try_from(b).unwrap_or(i64::MAX));
+        let device = limit.and(device_id);
         let conn = self.db.pool.get()?;
         conn.execute(
-            "UPDATE playlists SET size_limit_bytes = ?1 WHERE id = ?2",
-            params![limit, playlist_id],
+            "UPDATE playlists SET size_limit_bytes = ?1, size_limit_device = ?2 WHERE id = ?3",
+            params![limit, device, playlist_id],
         )?;
         Ok(())
     }
 
-    /// Which of the playlist's songs fit its size limit, measured by their
-    /// library file sizes in the playlist's order. `None` when the playlist
-    /// has no limit (or doesn't exist).
-    pub fn playlist_size_fit(&self, playlist_id: i64) -> Result<Option<PlaylistSizeFit>> {
-        let limit: Option<i64> = {
+    /// The playlist's limit, device and items in its order, for
+    /// [`SizeLimitInput::fit`]. `None` when it has no limit (or doesn't
+    /// exist).
+    pub fn size_limit_input(&self, playlist_id: i64) -> Result<Option<SizeLimitInput>> {
+        let row: Option<(Option<i64>, Option<String>)> = {
             let conn = self.db.pool.get()?;
             conn.query_row(
-                "SELECT size_limit_bytes FROM playlists WHERE id = ?1",
+                "SELECT size_limit_bytes, size_limit_device FROM playlists WHERE id = ?1",
                 params![playlist_id],
-                |row| row.get(0),
+                |row| Ok((row.get(0)?, row.get(1)?)),
             )
-            .unwrap_or(None)
+            .optional()?
+        };
+        let Some((limit, device_id)) = row else {
+            return Ok(None);
         };
         let Some(limit_bytes) = limit.and_then(|b| u64::try_from(b).ok()).filter(|&b| b > 0) else {
             return Ok(None);
         };
-        let items = self.get_playlist_tracks(playlist_id)?;
-        let sizes: Vec<Option<u64>> = items.iter().map(library_size).collect();
-        Ok(Some(PlaylistSizeFit {
+        Ok(Some(SizeLimitInput {
             limit_bytes,
-            fit: fit_to_limit(&sizes, limit_bytes),
-            order: items.into_iter().map(|i| i.uuid).collect(),
+            device_id,
+            items: self.get_playlist_tracks(playlist_id)?,
         }))
     }
 }
@@ -154,5 +205,57 @@ mod tests {
     #[test]
     fn an_empty_playlist_fits() {
         assert_eq!(fit(&[], 10), (0, 0, 0, 0));
+    }
+
+    fn item(uuid: &str, filesize: Option<i64>, unavailable: bool) -> PlaylistItem {
+        let song = crate::models::Song {
+            filesize,
+            unavailable,
+            ..Default::default()
+        };
+        PlaylistItem {
+            uuid: uuid.into(),
+            ..PlaylistItem::new_song(1, 0, song)
+        }
+    }
+
+    #[test]
+    fn device_sizes_replace_library_sizes_but_uncopyable_songs_stay_out() {
+        let input = SizeLimitInput {
+            limit_bytes: 10,
+            device_id: Some("vol-1".into()),
+            items: vec![
+                item("a", Some(40), false),
+                item("gone", Some(40), true),
+                item("b", Some(40), false),
+                item("c", Some(40), false),
+            ],
+        };
+        let device = FitDevice {
+            id: "vol-1".into(),
+            name: "HiBy R1".into(),
+        };
+        // Converted, each song takes a tenth of its library size: 4 + 4 fit, 4 more doesn't.
+        let mut asked = Vec::new();
+        let f = input.fit(Some(device.clone()), |item, library| {
+            asked.push(item.uuid.clone());
+            library / 10
+        });
+        assert_eq!(
+            asked,
+            ["a", "b", "c"],
+            "the unavailable song is never measured"
+        );
+        assert_eq!(
+            (
+                f.fit.break_index,
+                f.fit.fit_songs,
+                f.fit.fit_bytes,
+                f.fit.total_bytes
+            ),
+            (3, 2, 8, 12)
+        );
+        assert_eq!(f.order, ["a", "gone", "b", "c"]);
+        assert_eq!(f.device, Some(device));
     }
 }

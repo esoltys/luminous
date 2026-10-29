@@ -545,6 +545,10 @@ pub struct Playlist {
     /// `playlist::size_limit` for which songs fit.
     #[serde(default)]
     pub size_limit_bytes: Option<u64>,
+    /// The device (a `device_profiles` id) whose converted file sizes the
+    /// limit is measured in; `None` measures library files as they are.
+    #[serde(default)]
+    pub size_limit_device: Option<String>,
     /// The `Song` field the playlist is sorted by, or `None` for manual
     /// (position) order. Every reader of the playlist's tracks gets this
     /// order — see `playlist::sort`.
@@ -560,7 +564,7 @@ fn default_true() -> bool {
 
 /// Columns of `playlists p` that `Playlist::from_row` maps, in order. A
 /// query selects these followed by one `track_count` column.
-pub const PLAYLIST_SELECT_COLS: &str = "p.id, p.name, p.dynamic_enabled, p.dynamic_spec,      p.population_mode, p.last_played_row, p.created, p.updated,      p.size_limit_bytes, p.sort_field, p.sort_asc";
+pub const PLAYLIST_SELECT_COLS: &str = "p.id, p.name, p.dynamic_enabled, p.dynamic_spec,      p.population_mode, p.last_played_row, p.created, p.updated,      p.size_limit_bytes, p.sort_field, p.sort_asc, p.size_limit_device";
 
 impl Playlist {
     /// The single definition of what makes a row "the Queue".
@@ -592,7 +596,8 @@ impl Playlist {
                 .filter(|&b| b > 0),
             sort_field: row.get(9)?,
             sort_asc: row.get::<_, Option<bool>>(10)?.unwrap_or(true),
-            track_count: row.get(11)?,
+            size_limit_device: row.get(11)?,
+            track_count: row.get(12)?,
             is_queue,
         })
     }

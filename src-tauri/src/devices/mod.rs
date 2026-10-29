@@ -131,7 +131,7 @@ impl DeviceMonitor {
             .device(id)
             .ok_or_else(|| anyhow!("device-not-connected"))?;
         let profile = profile.normalized();
-        upsert_profile(conn, id, &profile, now)?;
+        upsert_profile(conn, id, &profile, &device.default_name, now)?;
         let marker = Marker {
             id: id.to_string(),
             profile,
@@ -140,6 +140,60 @@ impl DeviceMonitor {
             log::warn!("Saved the profile for {id} but could not write its marker: {e}");
         }
         self.request_rebuild();
+        Ok(())
+    }
+
+    /// The profile sizes on device `id` are estimated with, and the name to
+    /// show for it: the connected device's current profile, else the one
+    /// saved on this computer. `None` for a device that is neither.
+    pub fn sizing_profile(
+        &self,
+        conn: &rusqlite::Connection,
+        id: &str,
+    ) -> Result<Option<(DeviceProfile, String)>> {
+        let connected = self
+            .entries
+            .lock()
+            .iter()
+            .find(|e| e.shown.id == id)
+            .map(|e| e.shown.clone());
+        if let Some(shown) = connected {
+            let name = shown.profile.nickname.clone().unwrap_or(shown.default_name);
+            return Ok(Some((shown.profile, name)));
+        }
+        let Some((profile, _)) = load_profile(conn, id)? else {
+            return Ok(None);
+        };
+        let default_name: Option<String> = conn.query_row(
+            "SELECT default_name FROM device_profiles WHERE id = ?1",
+            [id],
+            |row| row.get(0),
+        )?;
+        let name = profile
+            .nickname
+            .clone()
+            .or(default_name)
+            .unwrap_or_else(|| id.to_string());
+        Ok(Some((profile, name)))
+    }
+
+    /// Keeps a connected device's current profile on this computer, so sizes
+    /// can still be estimated for it once it's unplugged (a playlist's size
+    /// limit is measured for it). Stores nothing when it already has a row,
+    /// and never writes the device's marker: the user hasn't saved anything.
+    pub fn remember(&self, conn: &rusqlite::Connection, id: &str, now: i64) -> Result<()> {
+        let Some(shown) = self
+            .entries
+            .lock()
+            .iter()
+            .find(|e| e.shown.id == id)
+            .map(|e| e.shown.clone())
+        else {
+            return Ok(());
+        };
+        if load_profile(conn, id)?.is_none() {
+            upsert_profile(conn, id, &shown.profile, &shown.default_name, now)?;
+        }
         Ok(())
     }
 
@@ -229,7 +283,7 @@ fn resolve_device(
         (Some(stored), _) => stored,
         (None, Some(marker)) => {
             let profile = marker.profile.normalized();
-            upsert_profile(conn, &id, &profile, now)?;
+            upsert_profile(conn, &id, &profile, &device.default_name, now)?;
             (profile, None)
         }
         (None, None) => (device.default_profile(), None),
@@ -295,17 +349,20 @@ fn load_profile(
     .map_err(Into::into)
 }
 
+/// Stores `profile` for device `id`, with the name it reports
+/// (`Device::default_name`), shown for it while it's unplugged.
 fn upsert_profile(
     conn: &rusqlite::Connection,
     id: &str,
     profile: &DeviceProfile,
+    default_name: &str,
     now: i64,
 ) -> Result<()> {
     conn.execute(
         "INSERT INTO device_profiles (id, nickname, icon, color, music_path, playlists_path,
              reserve_bytes, supported_formats, max_sample_rate, max_bit_depth, convert_settings,
-             layout_settings, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?13)
+             layout_settings, created_at, updated_at, default_name)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?13, ?14)
          ON CONFLICT(id) DO UPDATE SET
              nickname = excluded.nickname, icon = excluded.icon, color = excluded.color,
              music_path = excluded.music_path, playlists_path = excluded.playlists_path,
@@ -313,7 +370,7 @@ fn upsert_profile(
              max_sample_rate = excluded.max_sample_rate, max_bit_depth = excluded.max_bit_depth,
              convert_settings = excluded.convert_settings,
              layout_settings = excluded.layout_settings,
-             updated_at = excluded.updated_at",
+             updated_at = excluded.updated_at, default_name = excluded.default_name",
         params![
             id,
             profile.nickname,
@@ -328,6 +385,7 @@ fn upsert_profile(
             serde_json::to_string(&profile.convert)?,
             serde_json::to_string(&profile.layout)?,
             now,
+            default_name,
         ],
     )?;
     Ok(())
@@ -445,6 +503,41 @@ mod tests {
     }
 
     #[test]
+    fn a_remembered_device_can_still_be_sized_once_unplugged() {
+        let (_db_dir, db) = test_db();
+        let conn = db.pool.get().unwrap();
+        let device_dir = tempfile::tempdir().unwrap();
+        let monitor = DeviceMonitor::new();
+        assert!(monitor
+            .sizing_profile(&conn, "vol-0088-5572")
+            .unwrap()
+            .is_none());
+
+        *monitor.entries.lock() =
+            build_entries(&conn, &[volume(device_dir.path(), "0088-5572")], NOW).unwrap();
+        let (connected, name) = monitor
+            .sizing_profile(&conn, "vol-0088-5572")
+            .unwrap()
+            .unwrap();
+        assert_eq!(name, "HiBy R1");
+
+        monitor.remember(&conn, "vol-0088-5572", NOW).unwrap();
+        assert!(
+            volume(device_dir.path(), "0088-5572")
+                .read_marker()
+                .is_none(),
+            "remembering writes no marker"
+        );
+
+        monitor.entries.lock().clear();
+        let (saved, name) = monitor
+            .sizing_profile(&conn, "vol-0088-5572")
+            .unwrap()
+            .unwrap();
+        assert_eq!((saved, name.as_str()), (connected, "HiBy R1"));
+    }
+
+    #[test]
     fn sync_settings_round_trip_through_the_database() {
         let (_db_dir, db) = test_db();
         let conn = db.pool.get().unwrap();
@@ -463,7 +556,7 @@ mod tests {
             },
             ..DeviceProfile::default()
         };
-        upsert_profile(&conn, "vol-0088-5572", &profile, NOW).unwrap();
+        upsert_profile(&conn, "vol-0088-5572", &profile, "HiBy R1", NOW).unwrap();
         let (loaded, _) = load_profile(&conn, "vol-0088-5572").unwrap().unwrap();
         assert_eq!(loaded.convert, profile.convert);
         assert_eq!(loaded.layout, profile.layout);
@@ -488,7 +581,7 @@ mod tests {
             nickname: Some("Here".into()),
             ..DeviceProfile::default()
         };
-        upsert_profile(&conn, "vol-0088-5572", &stored, NOW).unwrap();
+        upsert_profile(&conn, "vol-0088-5572", &stored, "HiBy R1", NOW).unwrap();
         volume(device_dir.path(), "0088-5572")
             .write_marker(&Marker {
                 id: "vol-0088-5572".into(),

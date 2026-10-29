@@ -211,12 +211,11 @@ class PlaylistsStore {
   async selectPlaylist(id: number) {
     if (this.activePlaylistId !== id) this.activeSizeFit = null;
     this.activePlaylistId = id;
-    const [tracks, sizeFit] = await Promise.all([
-      invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: id }),
-      invoke<PlaylistSizeFit | null>("get_playlist_size_fit", { playlistId: id }),
-    ]);
+    const tracks = await invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: id });
     this.activePlaylistTracks = tracks;
-    if (this.activePlaylistId === id) this.activeSizeFit = sizeFit ?? null;
+    // Not awaited: measuring for a device can take seconds the first time,
+    // and the songs shouldn't wait for it.
+    this.refreshSizeFit(id).catch((e) => console.error("Failed to measure the playlist's size limit:", e));
     this.notifyQueueChanged();
     await invoke("set_app_setting", { key: "active_playlist_id", value: id.toString() });
   }
@@ -383,9 +382,10 @@ class PlaylistsStore {
     }
   }
 
-  /** Sets a playlist's size limit in bytes; `null` removes it. */
-  async setSizeLimit(playlistId: number, limitBytes: number | null) {
-    await invoke("set_playlist_size_limit", { playlistId, limitBytes });
+  /** Sets a playlist's size limit in bytes and the device it's measured
+   * for (`null`: library files as they are); a `null` limit removes both. */
+  async setSizeLimit(playlistId: number, limitBytes: number | null, deviceId: string | null) {
+    await invoke("set_playlist_size_limit", { playlistId, limitBytes, deviceId });
     await this.refreshPlaylists();
     if (this.activePlaylistId === playlistId) {
       await this.refreshSizeFit(playlistId);
