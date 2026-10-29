@@ -88,7 +88,7 @@ export function createOverlayController(wait: ScriptWaitApi): ScriptOverlayApi {
       keystroke = document.createElement("div");
       keystroke.id = KEYSTROKE_ELEMENT_ID;
       keystroke.style.cssText =
-        "position: absolute; bottom: 32px; right: 32px; pointer-events: none; padding: 8px 14px; border-radius: 8px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; background: rgba(24, 24, 28, 0.9); border: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 0 6px 20px rgba(0,0,0,0.4); display: none; align-items: center; gap: 6px; z-index: 10;";
+        "position: absolute; bottom: 110px; left: 50%; transform: translateX(-50%); pointer-events: none; padding: 10px 18px; border-radius: 10px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; background: rgba(18, 18, 22, 0.92); border: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); display: none; align-items: center; gap: 8px; z-index: 30;";
       host.appendChild(keystroke);
     }
     return keystroke;
@@ -248,9 +248,9 @@ export function createOverlayController(wait: ScriptWaitApi): ScriptOverlayApi {
       const badges = parts
         .map(
           (part) =>
-            `<kbd style="background: rgba(255, 255, 255, 0.12); padding: 3px 8px; border-radius: 4px; font-size: 13px; font-weight: 600; color: #fff; box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.2);">${escapeHtml(part)}</kbd>`
+            `<kbd style="background: rgba(255, 255, 255, 0.16); padding: 5px 12px; border-radius: 6px; font-size: 15px; font-weight: 700; color: #ffffff; box-shadow: 0 2px 0 rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2); border: 1px solid rgba(255, 255, 255, 0.25); letter-spacing: 0.02em;">${escapeHtml(part)}</kbd>`
         )
-        .join('<span style="color: rgba(255, 255, 255, 0.5); font-size: 12px; font-weight: 600;">+</span>');
+        .join('<span style="color: rgba(255, 255, 255, 0.6); font-size: 14px; font-weight: 700;">+</span>');
 
       el.innerHTML = badges;
       el.style.display = "flex";
