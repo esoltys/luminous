@@ -105,28 +105,7 @@ fn strip_root_prefix(path: &Path, root: &Path) -> Option<PathBuf> {
 /// Whether two paths represent the same location across separators, trailing slashes,
 /// and case (on Windows).
 fn paths_match(a: &Path, b: &Path) -> bool {
-    let mut ca = a.components();
-    let mut cb = b.components();
-    loop {
-        match (ca.next(), cb.next()) {
-            (None, None) => return true,
-            (Some(c1), Some(c2)) => {
-                #[cfg(windows)]
-                {
-                    if !components_equal_windows(&c1, &c2) {
-                        return false;
-                    }
-                }
-                #[cfg(not(windows))]
-                {
-                    if c1 != c2 {
-                        return false;
-                    }
-                }
-            }
-            _ => return false,
-        }
-    }
+    strip_root_prefix(a, b).is_some_and(|r| r.as_os_str().is_empty())
 }
 
 /// `path` re-rooted from `old_root` to `new_root`, or `None` if it isn't
