@@ -142,12 +142,14 @@ pub fn resolve(
     settings: &SyncSettings,
     mut size_on_device: impl FnMut(&Song) -> Option<u64>,
 ) -> Result<Selection> {
-    let mut library: Option<Vec<Song>> = None;
-    let mut library_songs = |conn: &rusqlite::Connection| -> Result<Vec<Song>> {
-        if library.is_none() {
-            library = Some(local_songs(conn)?);
-        }
-        Ok(library.clone().unwrap_or_default())
+    let needs_library = settings
+        .sources
+        .iter()
+        .any(|s| !matches!(s, SyncSource::Playlist { .. }));
+    let library = if needs_library {
+        local_songs(conn)?
+    } else {
+        Vec::new()
     };
 
     let mut selection = Selection::default();
@@ -175,36 +177,37 @@ pub fn resolve(
     };
 
     for source in &settings.sources {
-        let (source_ref, songs) = match source {
+        let (source_ref, songs): (SourceRef, Vec<&Song>) = match source {
             SyncSource::Library => (
                 SourceRef {
                     kind: SourceKind::Library,
                     key: String::new(),
                     name: String::new(),
                 },
-                library_songs(conn)?,
+                library.iter().collect(),
             ),
             SyncSource::Playlist { id } => {
                 let Some((name, songs)) = playlist_songs(conn, *id, &mut size_on_device)? else {
                     continue;
                 };
-                selection.playlists.push(WantedPlaylist {
+                let source_ref = SourceRef {
+                    kind: SourceKind::Playlist,
+                    key: id.to_string(),
                     name: name.clone(),
-                    songs: songs.clone(),
-                });
-                (
-                    SourceRef {
-                        kind: SourceKind::Playlist,
-                        key: id.to_string(),
-                        name,
-                    },
-                    songs,
-                )
+                };
+                if seen_sources.insert(source_ref.clone()) {
+                    for song in &songs {
+                        add(&mut selection, song, &source_ref);
+                    }
+                    selection.sources.push(source_ref);
+                    selection.playlists.push(WantedPlaylist { name, songs });
+                }
+                continue;
             }
             SyncSource::Artist { name } => {
                 let key = album_key(name);
-                let songs = library_songs(conn)?
-                    .into_iter()
+                let songs = library
+                    .iter()
                     .filter(|s| {
                         [s.artist.as_deref(), s.album_artist.as_deref()]
                             .into_iter()
@@ -223,8 +226,8 @@ pub fn resolve(
             }
             SyncSource::Album { album, artist } => {
                 let wanted = (album_key(album), album_key(artist));
-                let songs = library_songs(conn)?
-                    .into_iter()
+                let songs = library
+                    .iter()
                     .filter(|s| album_of(s).as_ref() == Some(&wanted))
                     .collect();
                 (
@@ -237,8 +240,8 @@ pub fn resolve(
                 )
             }
             SyncSource::Folder { path } => {
-                let songs = library_songs(conn)?
-                    .into_iter()
+                let songs = library
+                    .iter()
                     .filter(|s| s.path.as_deref().is_some_and(|p| is_under(p, path)))
                     .collect();
                 (
@@ -254,7 +257,7 @@ pub fn resolve(
         if !seen_sources.insert(source_ref.clone()) {
             continue;
         }
-        for song in &songs {
+        for song in songs {
             add(&mut selection, song, &source_ref);
         }
         selection.sources.push(source_ref);

@@ -197,7 +197,6 @@ impl DeviceSync {
                 wanted,
             });
         }
-        let target = transcoder.conversion_target(&profile);
         let library = library_files(conn)?;
         let built = plan::build(PlanInput {
             profile: &profile,
@@ -208,7 +207,7 @@ impl DeviceSync {
             sources: &selection.sources,
             inventory: &inventory.inventory,
             library: &library,
-            flagged_target: (target.substituted || !target.device_plays).then_some(target),
+            conversion_target: transcoder.conversion_target(&profile),
         });
 
         let mut plan = built.plan;
@@ -430,18 +429,29 @@ fn sync_roots(profile: &DeviceProfile) -> Vec<String> {
 }
 
 /// Lists every file under `roots` and reads the manifest and free space.
+/// A root that can't be listed is an error; a folder inside one that can't
+/// (`System Volume Information`, a folder an MTP device refuses) is
+/// skipped, since sync never writes there.
 fn read_inventory(backend: &dyn DeviceBackend, roots: &[String]) -> Result<Inventory> {
     let mut files = HashMap::new();
-    let mut pending: Vec<String> = roots.to_vec();
-    while let Some(dir) = pending.pop() {
-        for entry in backend.list(&dir)? {
+    let mut pending: Vec<(String, bool)> = roots.iter().map(|r| (r.clone(), true)).collect();
+    while let Some((dir, is_root)) = pending.pop() {
+        let entries = match backend.list(&dir) {
+            Ok(entries) => entries,
+            Err(e) if !is_root => {
+                log::warn!("Sync skips {dir}, which can't be listed: {e}");
+                continue;
+            }
+            Err(e) => return Err(e.into()),
+        };
+        for entry in entries {
             let path = if dir.is_empty() {
                 entry.name.clone()
             } else {
                 format!("{dir}/{}", entry.name)
             };
             if entry.is_dir {
-                pending.push(path);
+                pending.push((path, false));
             } else if !entry.name.starts_with(".luminous-") && entry.name != MANIFEST_FILE_NAME {
                 files.insert(path.to_lowercase(), entry.size);
             }
@@ -500,23 +510,17 @@ mod tests {
 
     const NOW: i64 = 1_790_000_000;
 
-    struct FixedClock;
-
-    impl Clock for FixedClock {
-        fn now(&self) -> std::time::Instant {
-            std::time::Instant::now()
-        }
-        fn unix_now(&self) -> i64 {
-            NOW
-        }
+    struct Channel {
+        finished: Mutex<mpsc::Sender<SyncSummary>>,
+        steps: Mutex<Vec<worker::SyncStep>>,
     }
 
-    struct Channel(Mutex<mpsc::Sender<SyncSummary>>);
-
     impl SyncEvents for Channel {
-        fn progress(&self, _: &SyncProgress) {}
+        fn progress(&self, progress: &SyncProgress) {
+            self.steps.lock().push(progress.step.clone());
+        }
         fn finished(&self, summary: &SyncSummary) {
-            let _ = self.0.lock().send(summary.clone());
+            let _ = self.finished.lock().send(summary.clone());
         }
     }
 
@@ -530,7 +534,8 @@ mod tests {
     }
 
     /// A library of two WAV songs and a connected FAT volume on temp dirs.
-    fn world() -> World {
+    /// The device plays `format`; WAV is converted to Opus when it doesn't.
+    fn world(format: &str) -> World {
         let (db_dir, library, device, cache) = (
             tempfile::tempdir().unwrap(),
             tempfile::tempdir().unwrap(),
@@ -571,7 +576,8 @@ mod tests {
         });
         *monitor.entries.lock() = crate::devices::build_entries(&conn, &[volume], NOW).unwrap();
         let mut profile = monitor.shown("vol-0088-5572").unwrap().profile;
-        profile.supported_formats = vec!["wav".into()];
+        profile.supported_formats = vec![format.into()];
+        profile.convert.format = luminous_devices::TargetFormat::Opus;
         profile.max_sample_rate = 192_000;
         profile.max_bit_depth = 24;
         profile.layout.playlist_format = luminous_devices::PlaylistFileFormat::None;
@@ -600,17 +606,24 @@ mod tests {
             )
         }
 
-        fn start(&self, plan_id: &str) -> Result<SyncSummary> {
+        /// Runs the plan; its summary and the steps it reported.
+        fn start(&self, plan_id: &str) -> Result<(SyncSummary, Vec<worker::SyncStep>)> {
             let (tx, rx) = mpsc::channel();
+            let events = Arc::new(Channel {
+                finished: Mutex::new(tx),
+                steps: Mutex::new(Vec::new()),
+            });
             self.sync.start(
                 plan_id,
                 self.monitor.clone(),
                 self.transcoder.clone(),
                 self.db.clone(),
-                Arc::new(Channel(Mutex::new(tx))),
-                Arc::new(FixedClock),
+                events.clone(),
+                Arc::new(worker::TickClock::new(NOW)),
             )?;
-            Ok(rx.recv_timeout(Duration::from_secs(30)).unwrap())
+            let summary = rx.recv_timeout(Duration::from_secs(60)).unwrap();
+            let steps = std::mem::take(&mut *events.steps.lock());
+            Ok((summary, steps))
         }
     }
 
@@ -623,12 +636,13 @@ mod tests {
 
     #[test]
     fn a_previewed_sync_runs_and_the_next_preview_has_nothing_to_do() {
-        let world = world();
+        let world = world("wav");
         let plan = world.preview(whole_library()).unwrap();
         assert_eq!(plan.copy.songs, 2);
         assert!(plan.storage.fits);
+        assert_eq!(plan.conversion_target, None, "nothing is converted");
 
-        let summary = world.start(&plan.plan_id).unwrap();
+        let (summary, _) = world.start(&plan.plan_id).unwrap();
         assert_eq!(summary.outcome, SyncOutcome::Completed);
         assert_eq!(summary.songs_written, 2);
         for item in &plan.copy.items {
@@ -666,8 +680,86 @@ mod tests {
     }
 
     #[test]
+    fn converted_songs_sync_once_and_then_stay() {
+        let world = world("opus");
+        let plan = world.preview(whole_library()).unwrap();
+        assert_eq!(plan.converted_songs, 2);
+        let target = plan.conversion_target.unwrap();
+        assert_eq!(target.format, luminous_devices::TargetFormat::Opus);
+        assert!(target.device_plays);
+        assert!(plan.copy.items.iter().all(|i| i.path.ends_with(".opus")));
+
+        let (summary, steps) = world.start(&plan.plan_id).unwrap();
+        assert_eq!(summary.outcome, SyncOutcome::Completed);
+        assert_eq!(summary.converted, 2);
+        assert!(steps.iter().any(|s| matches!(
+            s,
+            worker::SyncStep::Converting {
+                format: luminous_devices::TargetFormat::Opus,
+                ..
+            }
+        )));
+        for item in &plan.copy.items {
+            assert!(world.device_root.join(&item.path).exists(), "{}", item.path);
+        }
+
+        // The worker records conversions the way the planner compares them,
+        // so nothing is converted again.
+        let again = world.preview(whole_library()).unwrap();
+        assert_eq!((again.copy.songs, again.update.songs), (0, 0));
+        assert_eq!(again.storage.stays_bytes, summary.written_bytes);
+    }
+
+    #[test]
+    fn previews_reuse_what_was_read_from_the_device() {
+        let world = world("wav");
+        world.preview(whole_library()).unwrap();
+        let first = world.sync.inventories.lock()["vol-0088-5572"].clone();
+        world.preview(SyncSettings::default()).unwrap();
+        let second = world.sync.inventories.lock()["vol-0088-5572"].clone();
+        assert!(Arc::ptr_eq(&first, &second));
+    }
+
+    #[test]
+    fn a_folder_that_cant_be_listed_inside_a_root_is_skipped() {
+        struct Refusing(FsBackend);
+        impl DeviceBackend for Refusing {
+            fn list(&self, dir: &str) -> std::io::Result<Vec<luminous_devices::DirEntry>> {
+                if dir.ends_with("System Volume Information") {
+                    return Err(std::io::ErrorKind::PermissionDenied.into());
+                }
+                self.0.list(dir)
+            }
+            fn read(&self, path: &str) -> std::io::Result<Option<Vec<u8>>> {
+                self.0.read(path)
+            }
+            fn write(
+                &self,
+                path: &str,
+                source: &mut dyn std::io::Read,
+                len: u64,
+                progress: luminous_devices::Progress<'_>,
+            ) -> std::io::Result<()> {
+                self.0.write(path, source, len, progress)
+            }
+            fn remove(&self, path: &str) -> std::io::Result<()> {
+                self.0.remove(path)
+            }
+            fn space(&self) -> std::io::Result<luminous_devices::Space> {
+                self.0.space()
+            }
+        }
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("System Volume Information")).unwrap();
+        std::fs::write(dir.path().join("song.mp3"), b"1").unwrap();
+        let inventory =
+            read_inventory(&Refusing(FsBackend::new(dir.path())), &[String::new()]).unwrap();
+        assert_eq!(inventory.files.len(), 1);
+    }
+
+    #[test]
     fn only_the_latest_unchanged_plan_can_start() {
-        let world = world();
+        let world = world("wav");
         let first = world.preview(whole_library()).unwrap();
         let second = world.preview(whole_library()).unwrap();
         let err = world.start(&first.plan_id).unwrap_err();

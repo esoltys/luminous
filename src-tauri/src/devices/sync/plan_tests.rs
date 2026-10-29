@@ -150,12 +150,12 @@ impl Case {
             sources: &self.sources,
             inventory: &self.inventory,
             library: &self.library,
-            flagged_target: Some(ConversionTarget {
+            conversion_target: ConversionTarget {
                 format: TargetFormat::Opus,
                 bitrate_kbps: 160,
                 substituted: true,
                 device_plays: false,
-            }),
+            },
         })
     }
 }
@@ -460,4 +460,22 @@ fn previews_carry_only_the_first_items() {
     let preview = plan.preview();
     assert_eq!(preview.copy.items.len(), PREVIEW_ITEMS);
     assert_eq!(preview.copy.songs, 60);
+}
+
+#[test]
+fn leave_on_device_still_moves_a_song_rather_than_duplicating_it() {
+    let t = track(1, "Halo");
+    let old = "Music/Old Layout/Halo.mp3";
+    let mut case = Case::new(
+        vec![t.clone()],
+        inventory(&[(old, 1_000)], vec![synced(&t, old)]),
+    );
+    case.unselected = UnselectedSongs::Leave;
+    let built = case.build();
+    assert_eq!(
+        reasons(&built.plan.update),
+        [&SyncReason::Moved { from: old.into() }]
+    );
+    assert_eq!(built.steps.remove, [old]);
+    assert_eq!(built.plan.remove.songs, 0);
 }

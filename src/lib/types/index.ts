@@ -353,7 +353,8 @@ export interface SyncPlan {
   playlistFilesWritten: number;
   playlistFilesRemoved: number;
   folderArtWritten: number;
-  /** Set when conversions use a substitute format or one the device may not play. */
+  /** What conversions use ("AAC 256"): set when any copy is converted or converting
+   * everything is the suggested fix. Warn when `substituted` or not `devicePlays`. */
   conversionTarget: {
     format: "aac" | "mp3" | "opus";
     bitrateKbps: number;

@@ -1,34 +1,7 @@
 use super::*;
 use crate::devices::sync::manifest::{EntryKind, SourceStamp};
 use luminous_devices::FsBackend;
-use parking_lot::Mutex;
 use std::path::{Path, PathBuf};
-
-/// A clock that moves 100 ms each time it is read.
-struct TickClock {
-    start: Instant,
-    ticks: Mutex<u32>,
-}
-
-impl TickClock {
-    fn new() -> Self {
-        Self {
-            start: Instant::now(),
-            ticks: Mutex::new(0),
-        }
-    }
-}
-
-impl Clock for TickClock {
-    fn now(&self) -> Instant {
-        let mut ticks = self.ticks.lock();
-        *ticks += 1;
-        self.start + Duration::from_millis(100) * *ticks
-    }
-    fn unix_now(&self) -> i64 {
-        1_790_000_000
-    }
-}
 
 struct Setup {
     library: tempfile::TempDir,
@@ -70,12 +43,18 @@ impl Setup {
         let transcoder = Transcoder::new(self.cache.path().to_path_buf());
         let cancel = AtomicBool::new(false);
         let mut reports = Vec::new();
-        let summary = run(job, &transcoder, &cancel, &TickClock::new(), &mut |p| {
-            if cancel_after_songs.is_some_and(|n| p.songs_done >= n) {
-                cancel.store(true, Ordering::Relaxed);
-            }
-            reports.push(p.clone());
-        });
+        let summary = run(
+            job,
+            &transcoder,
+            &cancel,
+            &TickClock::new(1_790_000_000),
+            &mut |p| {
+                if cancel_after_songs.is_some_and(|n| p.songs_done >= n) {
+                    cancel.store(true, Ordering::Relaxed);
+                }
+                reports.push(p.clone());
+            },
+        );
         (summary, reports)
     }
 

@@ -48,6 +48,38 @@ impl Clock for SystemClock {
     }
 }
 
+/// A clock for tests that moves 100 ms each time it is read, from an
+/// arbitrary start, and always says it is `unix` seconds.
+#[cfg(test)]
+pub(crate) struct TickClock {
+    start: Instant,
+    ticks: parking_lot::Mutex<u32>,
+    unix: i64,
+}
+
+#[cfg(test)]
+impl TickClock {
+    pub(crate) fn new(unix: i64) -> Self {
+        Self {
+            start: Instant::now(),
+            ticks: parking_lot::Mutex::new(0),
+            unix,
+        }
+    }
+}
+
+#[cfg(test)]
+impl Clock for TickClock {
+    fn now(&self) -> Instant {
+        let mut ticks = self.ticks.lock();
+        *ticks += 1;
+        self.start + Duration::from_millis(100) * *ticks
+    }
+    fn unix_now(&self) -> i64 {
+        self.unix
+    }
+}
+
 /// What the sync is doing right now.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(

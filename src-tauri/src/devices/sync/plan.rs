@@ -98,8 +98,8 @@ pub struct PlanInput<'a> {
     pub inventory: &'a Inventory,
     /// Every local library file by path.
     pub library: &'a HashMap<String, LibraryFile>,
-    /// Shown when a conversion is substituted or the device doesn't list it.
-    pub flagged_target: Option<ConversionTarget>,
+    /// The format and bitrate conversions use on this computer.
+    pub conversion_target: ConversionTarget,
 }
 
 // --- The plan the UI shows -------------------------------------------------
@@ -242,9 +242,10 @@ pub struct SyncPlan {
     pub playlist_files_written: usize,
     pub playlist_files_removed: usize,
     pub folder_art_written: usize,
-    /// The format and bitrate conversions use when they aren't what the
-    /// profile asked for or the device may not play them. Shown before
-    /// Start sync; the sync converts with exactly this.
+    /// The format and bitrate conversions use ("AAC 256"), whenever any
+    /// copy is converted or converting everything is offered as the fix.
+    /// When `substituted` is set or `device_plays` isn't, the preview warns
+    /// before Start sync; the sync converts with exactly this.
     pub conversion_target: Option<ConversionTarget>,
     pub sources: Vec<SourceSize>,
     pub shortfall: Option<Shortfall>,
@@ -333,7 +334,7 @@ pub fn build(input: PlanInput) -> Built {
         sources,
         inventory,
         library,
-        flagged_target,
+        conversion_target,
     } = input;
     let manifest = &inventory.manifest;
     let mut plan = SyncPlan {
@@ -627,8 +628,12 @@ pub fn build(input: PlanInput) -> Built {
             convert_all_saving_bytes: (convert_all_saving > 0).then_some(convert_all_saving),
         });
     }
-    if plan.converted_songs > 0 {
-        plan.conversion_target = flagged_target;
+    let convert_all_offered = plan
+        .shortfall
+        .as_ref()
+        .is_some_and(|s| s.convert_all_saving_bytes.is_some());
+    if plan.converted_songs > 0 || convert_all_offered {
+        plan.conversion_target = Some(conversion_target);
     }
 
     steps.write = writes;
