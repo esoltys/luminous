@@ -228,6 +228,25 @@ export interface Playlist {
   /** True for the app's single built-in Queue playlist (backend-computed —
    * never derive this from the playlist name). */
   is_queue: boolean;
+  /** Size budget for the songs at the top of the playlist, in bytes (#344). */
+  size_limit_bytes?: number | null;
+  /** The `Song` field the playlist is sorted by; absent/null is manual order.
+   * The backend returns tracks already in this order. */
+  sort_field?: string | null;
+  sort_asc?: boolean;
+}
+
+/** Which songs fit a playlist's size limit (backend `get_playlist_size_fit`).
+ * `order` is the item uuid sequence the answer was computed over — the
+ * answer only applies while the shown order matches it. */
+export interface PlaylistSizeFit {
+  limit_bytes: number;
+  /** Number of items above the break (the index of the first that doesn't fit). */
+  break_index: number;
+  fit_songs: number;
+  fit_bytes: number;
+  total_bytes: number;
+  order: string[];
 }
 
 /** Queue population bias — see #120. Tab order: All, Favourites, Familiar, Discover, Deep Cuts. */

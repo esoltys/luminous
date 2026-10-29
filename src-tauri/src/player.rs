@@ -658,26 +658,6 @@ impl Player {
         }
     }
 
-    /// Reorder item in in-memory playlist_items targeted by item UUIDs.
-    pub fn reorder_playlist_item_by_uuid(&mut self, source_uuid: &str, target_uuid: &str) {
-        if source_uuid == target_uuid {
-            return;
-        }
-
-        let from_idx = self
-            .playlist_items
-            .iter()
-            .position(|i| i.uuid == source_uuid);
-        let to_idx = self
-            .playlist_items
-            .iter()
-            .position(|i| i.uuid == target_uuid);
-
-        if let (Some(from), Some(to)) = (from_idx, to_idx) {
-            self.reorder_playlist_items(from, to);
-        }
-    }
-
     /// Rearranges the loaded playlist items into `order` (item uuids) after
     /// a sort or move — the general permutation behind
     /// `reorder_playlist_items`, with the same bookkeeping: the playing item

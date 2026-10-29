@@ -36,6 +36,18 @@ export function formatFileSize(bytes?: number): string {
   return `${formatNumber(bytes / 1048576, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} MB`;
 }
 
+/** Bytes in the decimal storage units that USB sticks, SD cards and players
+ * are sold and labelled in (1 GB = 10⁹ bytes), so a "16 GB" size limit
+ * means the 16 GB printed on the stick. Whole values drop the decimal
+ * ("16 GB", "12.4 GB"). */
+export const STORAGE_MB = 1_000_000;
+export const STORAGE_GB = 1_000_000_000;
+
+export function formatStorageSize(bytes: number): string {
+  const [value, unit] = bytes >= STORAGE_GB ? [bytes / STORAGE_GB, "GB"] : [bytes / STORAGE_MB, "MB"];
+  return `${formatNumber(value, { maximumFractionDigits: 1 })} ${unit}`;
+}
+
 export function formatSampleRate(hz?: number): string {
   if (!hz) return "—";
   return `${formatNumber(hz / 1000, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} ${i18n.t("units.khz", {}, "kHz")}`;

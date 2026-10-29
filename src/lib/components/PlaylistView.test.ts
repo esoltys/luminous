@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, fireEvent } from "@testing-library/svelte";
+import { render, fireEvent, within } from "@testing-library/svelte";
 import PlaylistView from "./PlaylistView.svelte";
 import { playlistsStore } from "../stores/playlists.svelte";
 import { collectionStore } from "../stores/collection.svelte";
@@ -10,7 +10,8 @@ import { invoke } from "@tauri-apps/api/core";
 import type { Playlist, PlaylistItem } from "../types";
 
 vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn().mockResolvedValue([]),
+  // Lists for every command except the size-limit answer, which is an object or null.
+  invoke: vi.fn().mockImplementation(async (cmd: string) => (cmd === "get_playlist_size_fit" ? null : [])),
 }));
 
 describe("PlaylistView.svelte", () => {
@@ -126,6 +127,7 @@ describe("PlaylistView.svelte", () => {
     playlistsStore.playlists = [mockPlaylist];
     playlistsStore.activePlaylistId = 1;
     playlistsStore.activePlaylistTracks = [...mockTracks];
+    playlistsStore.activeSizeFit = null;
   });
 
   it("renders playlist tracks", () => {
@@ -204,7 +206,7 @@ describe("PlaylistView.svelte", () => {
   it("handles pointer-based drag reordering of playlist items", async () => {
     // Tauri's dragDropEnabled window option blocks native HTML5 drag events, so reordering
     // is implemented with pointer events instead (see SongTable.svelte handleRowPointerDown).
-    const reorderSpy = vi.spyOn(playlistsStore, "reorderItemByUuid");
+    const reorderSpy = vi.spyOn(playlistsStore, "moveItems").mockResolvedValue();
     const { getByText } = render(PlaylistView);
 
     const rowOne = getByText("Track One").closest("[data-song-row]")! as HTMLElement;
@@ -217,11 +219,144 @@ describe("PlaylistView.svelte", () => {
     await fireEvent.pointerMove(window, { clientX: 0, clientY: 20 });
     await fireEvent.pointerUp(window);
 
-    expect(reorderSpy).toHaveBeenCalledWith(1, "uuid-1", "uuid-3");
+    // Dropped on a row below it, so it lands after Track Three: at the end.
+    expect(reorderSpy).toHaveBeenCalledWith(1, ["uuid-1"], null);
+  });
+
+  it("drops a song dragged upward in front of the row it lands on", async () => {
+    const moveSpy = vi.spyOn(playlistsStore, "moveItems").mockResolvedValue();
+    const { getByText } = render(PlaylistView);
+    const rowThree = getByText("Track Three").closest("[data-song-row]")! as HTMLElement;
+    const rowTwo = getByText("Track Two").closest("[data-song-row]")! as HTMLElement;
+    document.elementFromPoint = vi.fn().mockReturnValue(rowTwo);
+
+    await fireEvent.pointerDown(rowThree, { button: 0, clientX: 0, clientY: 20 });
+    await fireEvent.pointerMove(window, { clientX: 0, clientY: 0 });
+    await fireEvent.pointerUp(window);
+
+    expect(moveSpy).toHaveBeenCalledWith(1, ["uuid-3"], "uuid-2");
+  });
+
+  it("doesn't drag rows while searching, since hidden songs have no drop position", async () => {
+    collectionStore.searchQuery = "Track";
+    const moveSpy = vi.spyOn(playlistsStore, "moveItems").mockResolvedValue();
+    const { getByText } = render(PlaylistView);
+    const rowOne = getByText("Track One").closest("[data-song-row]")! as HTMLElement;
+    document.elementFromPoint = vi.fn().mockReturnValue(getByText("Track Three").closest("[data-song-row]"));
+
+    await fireEvent.pointerDown(rowOne, { button: 0, clientX: 0, clientY: 0 });
+    await fireEvent.pointerMove(window, { clientX: 0, clientY: 20 });
+    await fireEvent.pointerUp(window);
+
+    expect(moveSpy).not.toHaveBeenCalled();
+  });
+
+  describe("sorting a playlist (#344)", () => {
+    it("asks the backend to sort and shows its order as given", async () => {
+      const setSortSpy = vi.spyOn(playlistsStore, "setSort").mockResolvedValue();
+      const { getByText, getAllByRole } = render(PlaylistView);
+      await fireEvent.click(getByText("Title").closest("button")!);
+      expect(setSortSpy).toHaveBeenCalledWith(1, "title", true);
+
+      // A playlist sorted by rating, descending: the rows keep the backend's order.
+      playlistsStore.playlists = [{ ...mockPlaylist, sort_field: "rating", sort_asc: false }];
+      playlistsStore.activePlaylistTracks = [mockTracks[2], mockTracks[0], mockTracks[1]];
+      await Promise.resolve();
+      const titles = getAllByRole("row").slice(1).map((r) => r.textContent);
+      expect(titles[0]).toContain("Track Three");
+      expect(titles[2]).toContain("Track Two");
+    });
+
+    it("returns a sorted playlist to manual order from the # header", async () => {
+      playlistsStore.playlists = [{ ...mockPlaylist, sort_field: "title", sort_asc: true }];
+      const setSortSpy = vi.spyOn(playlistsStore, "setSort").mockResolvedValue();
+      const { getAllByRole } = render(PlaylistView);
+      const header = getAllByRole("row")[0];
+      await fireEvent.click(header.querySelector("button")!);
+      expect(setSortSpy).toHaveBeenCalledWith(1, null, true);
+    });
+  });
+
+  describe("size limit (#344)", () => {
+    const fit = {
+      limit_bytes: 16_000_000_000,
+      break_index: 2,
+      fit_songs: 2,
+      fit_bytes: 12_400_000_000,
+      total_bytes: 20_000_000_000,
+      order: ["uuid-1", "uuid-2", "uuid-3"],
+    };
+
+    beforeEach(() => {
+      playlistsStore.playlists = [{ ...mockPlaylist, size_limit_bytes: fit.limit_bytes }];
+      playlistsStore.activeSizeFit = fit;
+    });
+
+    it("draws a page break above the first song that doesn't fit, and dims nothing", () => {
+      const { getByRole, getByText } = render(PlaylistView);
+      const brk = getByRole("separator", { name: "16 GB limit · 2 songs above fit · 7.6 GB below" });
+      expect(brk).toHaveAttribute("data-divider-variant", "break");
+      expect(brk.nextElementSibling).toHaveTextContent("Track Three");
+      expect(getByText("Track Three").closest("[data-song-row]")!.className).not.toContain("opacity-50");
+      expect(getByText("12.4 GB of 16 GB used")).toBeInTheDocument();
+      expect(getByRole("button", { name: /Limit 16 GB/ })).toBeInTheDocument();
+    });
+
+    it("keeps the break between the visible rows while searching", () => {
+      collectionStore.searchQuery = "Track T";
+      const { getByRole } = render(PlaylistView);
+      const brk = getByRole("separator", { name: /16 GB limit/ });
+      expect(brk.nextElementSibling).toHaveTextContent("Track Three");
+    });
+
+    it("hides the break while the shown order isn't the one the fit was computed for", () => {
+      playlistsStore.activePlaylistTracks = [mockTracks[1], mockTracks[0], mockTracks[2]];
+      const { queryByRole, queryByText } = render(PlaylistView);
+      expect(queryByRole("separator", { name: /16 GB limit/ })).toBeNull();
+      expect(queryByText("12.4 GB of 16 GB used")).toBeNull();
+    });
+
+    it("draws no break when every song fits", () => {
+      playlistsStore.activeSizeFit = { ...fit, break_index: 3, fit_songs: 3 };
+      const { queryByRole } = render(PlaylistView);
+      expect(queryByRole("separator", { name: /16 GB limit/ })).toBeNull();
+    });
+
+    it("sets and removes the limit from the popover", async () => {
+      const setLimitSpy = vi.spyOn(playlistsStore, "setSizeLimit").mockResolvedValue();
+      const { getByRole } = render(PlaylistView);
+      await fireEvent.click(getByRole("button", { name: /Limit 16 GB/ }));
+      const dialog = getByRole("dialog", { name: "Size limit" });
+      expect(within(dialog).getByRole("button", { name: "16 GB" })).toHaveAttribute("aria-pressed", "true");
+
+      await fireEvent.click(within(dialog).getByRole("button", { name: "700 MB" }));
+      expect(setLimitSpy).toHaveBeenCalledWith(1, 700_000_000);
+
+      await fireEvent.click(getByRole("button", { name: /Limit 16 GB/ }));
+      await fireEvent.click(getByRole("button", { name: "Remove limit" }));
+      expect(setLimitSpy).toHaveBeenLastCalledWith(1, null);
+    });
+
+    it("sets a typed size in the chosen unit", async () => {
+      playlistsStore.playlists = [mockPlaylist];
+      playlistsStore.activeSizeFit = null;
+      const setLimitSpy = vi.spyOn(playlistsStore, "setSizeLimit").mockResolvedValue();
+      const { getByRole, getByPlaceholderText } = render(PlaylistView);
+      await fireEvent.click(getByRole("button", { name: "Size limit" }));
+      await fireEvent.input(getByPlaceholderText("Custom size"), { target: { value: "1.5" } });
+      await fireEvent.click(getByRole("button", { name: "Set" }));
+      expect(setLimitSpy).toHaveBeenCalledWith(1, 1_500_000_000);
+    });
+
+    it("offers no limit on the Queue", () => {
+      playlistsStore.playlists = [{ ...mockPlaylist, name: "Queue", is_queue: true }];
+      const { queryByRole } = render(PlaylistView);
+      expect(queryByRole("button", { name: "Size limit" })).toBeNull();
+    });
   });
 
   it("does not reorder when pointer movement stays below the drag threshold", async () => {
-    const reorderSpy = vi.spyOn(playlistsStore, "reorderItemByUuid");
+    const reorderSpy = vi.spyOn(playlistsStore, "moveItems").mockResolvedValue();
     const { getByText } = render(PlaylistView);
 
     const rowOne = getByText("Track One").closest("[data-song-row]")! as HTMLElement;
@@ -249,7 +384,7 @@ describe("PlaylistView.svelte", () => {
     HTMLElement.prototype.setPointerCapture = setPointerCaptureSpy;
     try {
       const viewArtistSpy = vi.spyOn(navigationStore, "viewArtist");
-      const reorderSpy = vi.spyOn(playlistsStore, "reorderItemByUuid");
+      const reorderSpy = vi.spyOn(playlistsStore, "moveItems").mockResolvedValue();
       const { getByText } = render(PlaylistView);
 
       const artistLink = getByText("Artist A").closest("button")!;
@@ -351,7 +486,10 @@ describe("PlaylistView.svelte", () => {
     expect(getByText("Remove from Playlist")).toBeInTheDocument();
   });
 
-  it("sorts tracks by column header clicks and toggles direction", async () => {
+  it("sorts the Queue on the frontend by column header clicks and toggles direction", async () => {
+    // The Queue's order is the playback order, so only its view sorts locally;
+    // other playlists persist their sort in the backend (see "sorting a playlist").
+    playlistsStore.playlists = [{ ...mockPlaylist, name: "Queue", is_queue: true }];
     const { getByText, getAllByRole } = render(PlaylistView);
 
     // Initial order: Track One, Track Two, Track Three

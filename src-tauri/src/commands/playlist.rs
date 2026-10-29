@@ -215,33 +215,6 @@ pub async fn deduplicate_playlist(
     Ok(removed_uuids)
 }
 
-/// Reorders a playlist row and mirrors the move into the live play queue in
-/// one call. The live-queue side is keyed by item UUID (never shared across
-/// playlists), so it's a safe no-op whenever `playlist_id` isn't the Queue
-/// or either UUID isn't currently loaded.
-#[tauri::command]
-pub async fn reorder_playlist_item_by_uuid(
-    playlist_id: i64,
-    source_uuid: String,
-    target_uuid: String,
-    app: tauri::AppHandle,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
-    use tauri::Emitter;
-
-    with_playlists(&state, |pm| {
-        pm.reorder_playlist_item_by_uuid(playlist_id, &source_uuid, &target_uuid)
-    })
-    .await?;
-
-    let mut player = state.player.lock().await;
-    player.reorder_playlist_item_by_uuid(&source_uuid, &target_uuid);
-    let playback_state = player.get_state().await;
-    let _ = app.emit("playback-state", playback_state);
-
-    Ok(())
-}
-
 /// Brings the live player in line with `playlist_id`'s order after a sort or
 /// move, when it is the playlist being played, and broadcasts the new state.
 async fn sync_playing_order(
@@ -329,50 +302,6 @@ pub async fn get_playlist_size_fit(
     state: State<'_, AppState>,
 ) -> Result<Option<crate::playlist::PlaylistSizeFit>, String> {
     with_playlists(&state, |pm| pm.playlist_size_fit(playlist_id)).await
-}
-
-/// Reorders a playlist row and, only when `playlist_id` is the Queue, mirrors
-/// the move into the live play queue by index. Unlike the UUID-keyed reorder
-/// above, an index pair is meaningless outside the playlist it was computed
-/// against, so this check (rather than an unconditional call) is required to
-/// avoid corrupting live playback when editing an unrelated playlist.
-#[tauri::command]
-pub async fn reorder_playlist_item(
-    playlist_id: i64,
-    from: i32,
-    to: i32,
-    app: tauri::AppHandle,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
-    use tauri::Emitter;
-
-    let is_queue = with_playlists(&state, |pm| {
-        pm.reorder_playlist_item(playlist_id, from, to)?;
-        Ok(pm.queue().map(|q| q.id == playlist_id).unwrap_or(false))
-    })
-    .await?;
-
-    if is_queue {
-        let mut player = state.player.lock().await;
-        player.reorder_playlist_items(from as usize, to as usize);
-        let playback_state = player.get_state().await;
-        let _ = app.emit("playback-state", playback_state);
-    }
-
-    Ok(())
-}
-
-#[tauri::command]
-pub async fn reorder_playlist_items(
-    playlist_id: i64,
-    from_indices: Vec<i32>,
-    to_index: i32,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
-    with_playlists(&state, |pm| {
-        pm.reorder_playlist_items_batch(playlist_id, &from_indices, to_index)
-    })
-    .await
 }
 
 /// Clears a playlist's rows and, only when `playlist_id` is the Queue, also

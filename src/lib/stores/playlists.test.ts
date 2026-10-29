@@ -166,9 +166,25 @@ describe("PlaylistsStore", () => {
 
     await playlistsStore.removeItemsFromPlaylist(101, ["item-1"]);
     expect(invoke).toHaveBeenCalledWith("remove_from_playlist", { playlistId: 101, uuids: ["item-1"] });
+  });
 
-    await playlistsStore.reorderItem(101, 0, 1);
-    expect(invoke).toHaveBeenCalledWith("reorder_playlist_item", { playlistId: 101, from: 0, to: 1 });
+  it("moves items in front of a row, showing the new order before the backend answers", async () => {
+    playlistsStore.activePlaylistId = 101;
+    const third = { ...mockTracks[0], uuid: "item-3" };
+    playlistsStore.activePlaylistTracks = [mockTracks[0], mockTracks[1], third];
+    let shownWhileMoving: string[] = [];
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "move_playlist_items") {
+        shownWhileMoving = playlistsStore.activePlaylistTracks.map((t) => t.uuid);
+      }
+      return cmd === "get_playlists" ? mockPlaylists : [];
+    });
+
+    await playlistsStore.moveItems(101, ["item-3"], "item-1");
+
+    expect(invoke).toHaveBeenCalledWith("move_playlist_items", { playlistId: 101, uuids: ["item-3"], beforeUuid: "item-1" });
+    expect(shownWhileMoving).toEqual(["item-3", "item-1", "item-2"]);
+    expect(invoke).toHaveBeenCalledWith("get_playlist_tracks", { playlistId: 101 });
   });
 
   it("clears playlist tracks", async () => {
@@ -213,10 +229,25 @@ describe("PlaylistsStore", () => {
     expect(invoke).toHaveBeenCalledWith("export_playlist", { playlistId: 101, exportPath: "/path/to/exported.m3u8", relative: true });
   });
 
-  it("handles batch reordering of playlist items", async () => {
+  it("persists a playlist's sort and refetches its tracks in the new order", async () => {
     playlistsStore.activePlaylistId = 101;
-    await playlistsStore.reorderItemsBatch(101, [0, 1], 2);
-    expect(invoke).toHaveBeenCalledWith("reorder_playlist_items", { playlistId: 101, fromIndices: [0, 1], toIndex: 2 });
+    await playlistsStore.setSort(101, "title", false);
+    expect(invoke).toHaveBeenCalledWith("set_playlist_sort", { playlistId: 101, field: "title", asc: false });
+    expect(invoke).toHaveBeenCalledWith("get_playlist_tracks", { playlistId: 101 });
+  });
+
+  it("sets a size limit and re-asks which songs fit", async () => {
+    playlistsStore.activePlaylistId = 101;
+    const fit = { limit_bytes: 10, break_index: 1, fit_songs: 1, fit_bytes: 6, total_bytes: 12, order: ["item-1", "item-2"] };
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_playlist_size_fit") return fit;
+      return cmd === "get_playlists" ? mockPlaylists : null;
+    });
+
+    await playlistsStore.setSizeLimit(101, 10);
+
+    expect(invoke).toHaveBeenCalledWith("set_playlist_size_limit", { playlistId: 101, limitBytes: 10 });
+    expect(playlistsStore.activeSizeFit).toEqual(fit);
   });
 
   it("deduplicates playlist items by removing duplicate track entries", async () => {
