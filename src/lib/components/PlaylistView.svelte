@@ -798,18 +798,24 @@
               </Button>
             {/if}
             {#if !isQueue && activePlaylist}
+              <!-- Icon-only until a limit is set, so the header row doesn't wrap for a control most playlists never use. -->
               <span bind:this={sizeLimitAnchorEl} class="inline-flex">
-                <Button
-                  onclick={() => (showSizeLimitPopover = !showSizeLimitPopover)}
-                  variant={activePlaylist.size_limit_bytes ? "accent-soft" : "secondary"}
-                >
-                  <Usb class="w-4 h-4" />
-                  <span>
-                    {activePlaylist.size_limit_bytes
-                      ? i18n.t("playlists.sizeLimitSetBtn", { limit: formatStorageSize(activePlaylist.size_limit_bytes) })
-                      : i18n.t("playlists.sizeLimitBtn")}
-                  </span>
-                </Button>
+                {#if activePlaylist.size_limit_bytes}
+                  <Button onclick={() => (showSizeLimitPopover = !showSizeLimitPopover)} variant="accent-soft">
+                    <Usb class="w-4 h-4" />
+                    <span>
+                      {i18n.t("playlists.sizeLimitSetBtn", { limit: formatStorageSize(activePlaylist.size_limit_bytes) })}
+                    </span>
+                  </Button>
+                {:else}
+                  <IconActionButton
+                    onclick={() => (showSizeLimitPopover = !showSizeLimitPopover)}
+                    title={i18n.t("playlists.sizeLimitBtn")}
+                    class="shrink-0"
+                  >
+                    {#snippet icon()}<Usb class="w-4 h-4" />{/snippet}
+                  </IconActionButton>
+                {/if}
               </span>
               <PlaylistSizeLimitPopover
                 isOpen={showSizeLimitPopover}
