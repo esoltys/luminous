@@ -49,6 +49,19 @@ pub struct AudioOutputConfig {
     pub device_id: Option<String>,
 }
 
+impl AudioOutputConfig {
+    /// The device shared (CPAL) output should use: the chosen one, which is
+    /// the same endpoint when a bit-perfect backend falls back, except for
+    /// ASIO, whose id is a driver CLSID no shared device has, so shared
+    /// output uses the system default.
+    pub(crate) fn shared_device_id(&self) -> Option<&str> {
+        match self.backend {
+            AudioBackendKind::Asio => None,
+            _ => self.device_id.as_deref(),
+        }
+    }
+}
+
 /// Why a bit-perfect backend couldn't be opened, so the engine plays through
 /// shared output instead. Reported to the app in `AudioEvent::OutputFallback`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -284,6 +297,33 @@ pub fn enumerate_output_devices() -> Vec<AudioDeviceInfo> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn config(backend: AudioBackendKind, device_id: &str) -> AudioOutputConfig {
+        AudioOutputConfig {
+            backend,
+            device_id: Some(device_id.to_string()),
+        }
+    }
+
+    #[test]
+    fn an_asio_fallback_uses_the_system_default_device() {
+        let asio = config(
+            AudioBackendKind::Asio,
+            "462F2ABF-5278-436A-95B6-72CBF65482AE",
+        );
+        assert_eq!(asio.shared_device_id(), None);
+    }
+
+    #[test]
+    fn other_backends_fall_back_on_the_chosen_endpoint() {
+        for backend in [
+            AudioBackendKind::Cpal,
+            AudioBackendKind::WasapiExclusive,
+            AudioBackendKind::Alsa,
+        ] {
+            assert_eq!(config(backend, "dev").shared_device_id(), Some("dev"));
+        }
+    }
 
     #[test]
     fn rate_candidates_halve_down_to_cd_rate() {

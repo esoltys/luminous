@@ -1280,7 +1280,7 @@ fn build_output(
         device,
         name: device_name,
         stands_in,
-    } = resolve_cpal_device(&host, output_cfg.device_id.as_deref())?;
+    } = resolve_cpal_device(&host, output_cfg.shared_device_id())?;
     let default_config = device
         .default_output_config()
         .map_err(|e| format!("Failed to get default output config: {e}"))?;
@@ -1889,8 +1889,7 @@ fn check_and_rebuild_output(
     let chosen_returned = check_due
         && output.as_ref().is_some_and(|o| o.stands_in)
         && output_cfg
-            .device_id
-            .as_deref()
+            .shared_device_id()
             .is_some_and(|id| find_output_device(&cpal::default_host(), id).is_some());
 
     if force_rebuild || stream_errored || default_changed || chosen_returned {
