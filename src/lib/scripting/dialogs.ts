@@ -3,6 +3,7 @@ import { closeSearchIfOpen } from "./screens";
 import { toastStore } from "../stores/toast.svelte";
 import { welcomeStore } from "../stores/welcome.svelte";
 import { walkthroughStore } from "../stores/walkthrough.svelte";
+import { clearActiveOverlays } from "./overlay";
 import type { ScriptDialogsApi, ScriptWaitApi } from "./types";
 
 export interface DialogHostControls {
@@ -51,6 +52,7 @@ export function createDialogsController(wait: ScriptWaitApi): ScriptDialogsApi {
       if (walkthroughStore.isActive) {
         walkthroughStore.finish();
       }
+      clearActiveOverlays();
       await wait.settled();
     },
 

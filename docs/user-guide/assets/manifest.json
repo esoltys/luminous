@@ -1,0 +1,1265 @@
+{
+  "version": 1,
+  "languages": {
+    "DE": {
+      "locale": "de",
+      "guide": "luminous-user-guide-DE.html",
+      "images": [
+        {
+          "src": "assets/de/screenshots/dark/home-welcome.webp",
+          "name": "home-welcome",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/de/screenshots/dark/home.webp",
+          "name": "home",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/de/screenshots/dark/walkthrough.webp",
+          "name": "walkthrough",
+          "width": 1640,
+          "height": 1090
+        },
+        {
+          "src": "assets/de/screenshots/dark/albums.webp",
+          "name": "albums",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/de/screenshots/dark/songs.webp",
+          "name": "songs",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/de/screenshots/dark/genres.webp",
+          "name": "genres",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/de/screenshots/dark/album-detail.webp",
+          "name": "album-detail",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/de/screenshots/dark/song-tag-editor.webp",
+          "name": "song-tag-editor",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/de/screenshots/dark/artist-detail.webp",
+          "name": "artist-detail",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/de/screenshots/dark/searchbar.webp",
+          "name": "searchbar",
+          "width": 1200,
+          "height": 80
+        },
+        {
+          "src": "assets/de/screenshots/dark/search.webp",
+          "name": "search",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/de/screenshots/dark/playbar.webp",
+          "name": "playbar",
+          "width": 1200,
+          "height": 80
+        },
+        {
+          "src": "assets/de/screenshots/dark/now-playing.webp",
+          "name": "now-playing",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/de/screenshots/dark/miniplayer.webp",
+          "name": "miniplayer",
+          "width": 340,
+          "height": 420
+        },
+        {
+          "src": "assets/de/screenshots/dark/miniplayer-hover.webp",
+          "name": "miniplayer-hover",
+          "width": 340,
+          "height": 420
+        },
+        {
+          "src": "assets/de/screenshots/dark/playlist-auto.webp",
+          "name": "playlist-auto",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/de/screenshots/dark/playlist-smart-edit.webp",
+          "name": "playlist-smart-edit",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/de/screenshots/dark/stats.webp",
+          "name": "stats",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/de/screenshots/dark/lyrics.webp",
+          "name": "lyrics",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/de/screenshots/dark/advanced-search.webp",
+          "name": "advanced-search",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/de/screenshots/dark/settings-general.webp",
+          "name": "settings-general",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/de/screenshots/dark/settings-system.webp",
+          "name": "settings-system",
+          "width": 1440,
+          "height": 1100
+        },
+        {
+          "src": "assets/de/screenshots/dark/settings-folders.webp",
+          "name": "settings-folders",
+          "width": 1440,
+          "height": 1100
+        },
+        {
+          "src": "assets/de/screenshots/dark/settings-integrations.webp",
+          "name": "settings-integrations",
+          "width": 1440,
+          "height": 1250
+        },
+        {
+          "src": "assets/de/screenshots/dark/organize.webp",
+          "name": "organize",
+          "width": 1440,
+          "height": 1600
+        },
+        {
+          "src": "assets/de/screenshots/dark/equalizer.webp",
+          "name": "equalizer",
+          "width": 1440,
+          "height": 1500
+        },
+        {
+          "src": "assets/de/screenshots/dark/equalizer-parametric.webp",
+          "name": "equalizer-parametric",
+          "width": 1440,
+          "height": 1600
+        },
+        {
+          "src": "assets/de/screenshots/dark/themes.webp",
+          "name": "themes",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/de/screenshots/dark/settings-about.webp",
+          "name": "settings-about",
+          "width": 1440,
+          "height": 950
+        }
+      ]
+    },
+    "EN": {
+      "locale": "en-CA",
+      "guide": "luminous-user-guide-EN.html",
+      "images": [
+        {
+          "src": "assets/en-CA/screenshots/dark/home-welcome.webp",
+          "name": "home-welcome",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/en-CA/screenshots/dark/home.webp",
+          "name": "home",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/en-CA/screenshots/dark/walkthrough.webp",
+          "name": "walkthrough",
+          "width": 1640,
+          "height": 1090
+        },
+        {
+          "src": "assets/en-CA/screenshots/dark/albums.webp",
+          "name": "albums",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/en-CA/screenshots/dark/songs.webp",
+          "name": "songs",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/en-CA/screenshots/dark/genres.webp",
+          "name": "genres",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/en-CA/screenshots/dark/album-detail.webp",
+          "name": "album-detail",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/en-CA/screenshots/dark/song-tag-editor.webp",
+          "name": "song-tag-editor",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/en-CA/screenshots/dark/artist-detail.webp",
+          "name": "artist-detail",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/en-CA/screenshots/dark/searchbar.webp",
+          "name": "searchbar",
+          "width": 1200,
+          "height": 80
+        },
+        {
+          "src": "assets/en-CA/screenshots/dark/search.webp",
+          "name": "search",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/en-CA/screenshots/dark/playbar.webp",
+          "name": "playbar",
+          "width": 1200,
+          "height": 80
+        },
+        {
+          "src": "assets/en-CA/screenshots/dark/now-playing.webp",
+          "name": "now-playing",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/en-CA/screenshots/dark/miniplayer.webp",
+          "name": "miniplayer",
+          "width": 340,
+          "height": 420
+        },
+        {
+          "src": "assets/en-CA/screenshots/dark/miniplayer-hover.webp",
+          "name": "miniplayer-hover",
+          "width": 340,
+          "height": 420
+        },
+        {
+          "src": "assets/en-CA/screenshots/dark/playlist-auto.webp",
+          "name": "playlist-auto",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/en-CA/screenshots/dark/playlist-smart-edit.webp",
+          "name": "playlist-smart-edit",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/en-CA/screenshots/dark/stats.webp",
+          "name": "stats",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/en-CA/screenshots/dark/lyrics.webp",
+          "name": "lyrics",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/en-CA/screenshots/dark/advanced-search.webp",
+          "name": "advanced-search",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/en-CA/screenshots/dark/settings-general.webp",
+          "name": "settings-general",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/en-CA/screenshots/dark/settings-system.webp",
+          "name": "settings-system",
+          "width": 1440,
+          "height": 1100
+        },
+        {
+          "src": "assets/en-CA/screenshots/dark/settings-folders.webp",
+          "name": "settings-folders",
+          "width": 1440,
+          "height": 1100
+        },
+        {
+          "src": "assets/en-CA/screenshots/dark/settings-integrations.webp",
+          "name": "settings-integrations",
+          "width": 1440,
+          "height": 1250
+        },
+        {
+          "src": "assets/en-CA/screenshots/dark/organize.webp",
+          "name": "organize",
+          "width": 1440,
+          "height": 1600
+        },
+        {
+          "src": "assets/en-CA/screenshots/dark/equalizer.webp",
+          "name": "equalizer",
+          "width": 1440,
+          "height": 1500
+        },
+        {
+          "src": "assets/en-CA/screenshots/dark/equalizer-parametric.webp",
+          "name": "equalizer-parametric",
+          "width": 1440,
+          "height": 1600
+        },
+        {
+          "src": "assets/en-CA/screenshots/dark/themes.webp",
+          "name": "themes",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/en-CA/screenshots/dark/settings-about.webp",
+          "name": "settings-about",
+          "width": 1440,
+          "height": 950
+        }
+      ]
+    },
+    "ES": {
+      "locale": "es",
+      "guide": "luminous-user-guide-ES.html",
+      "images": [
+        {
+          "src": "assets/es/screenshots/dark/home-welcome.webp",
+          "name": "home-welcome",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/es/screenshots/dark/home.webp",
+          "name": "home",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/es/screenshots/dark/walkthrough.webp",
+          "name": "walkthrough",
+          "width": 1640,
+          "height": 1090
+        },
+        {
+          "src": "assets/es/screenshots/dark/albums.webp",
+          "name": "albums",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/es/screenshots/dark/songs.webp",
+          "name": "songs",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/es/screenshots/dark/genres.webp",
+          "name": "genres",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/es/screenshots/dark/album-detail.webp",
+          "name": "album-detail",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/es/screenshots/dark/song-tag-editor.webp",
+          "name": "song-tag-editor",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/es/screenshots/dark/artist-detail.webp",
+          "name": "artist-detail",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/es/screenshots/dark/searchbar.webp",
+          "name": "searchbar",
+          "width": 1200,
+          "height": 80
+        },
+        {
+          "src": "assets/es/screenshots/dark/search.webp",
+          "name": "search",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/es/screenshots/dark/playbar.webp",
+          "name": "playbar",
+          "width": 1200,
+          "height": 80
+        },
+        {
+          "src": "assets/es/screenshots/dark/now-playing.webp",
+          "name": "now-playing",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/es/screenshots/dark/miniplayer.webp",
+          "name": "miniplayer",
+          "width": 340,
+          "height": 420
+        },
+        {
+          "src": "assets/es/screenshots/dark/miniplayer-hover.webp",
+          "name": "miniplayer-hover",
+          "width": 340,
+          "height": 420
+        },
+        {
+          "src": "assets/es/screenshots/dark/playlist-auto.webp",
+          "name": "playlist-auto",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/es/screenshots/dark/playlist-smart-edit.webp",
+          "name": "playlist-smart-edit",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/es/screenshots/dark/stats.webp",
+          "name": "stats",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/es/screenshots/dark/lyrics.webp",
+          "name": "lyrics",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/es/screenshots/dark/advanced-search.webp",
+          "name": "advanced-search",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/es/screenshots/dark/settings-general.webp",
+          "name": "settings-general",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/es/screenshots/dark/settings-system.webp",
+          "name": "settings-system",
+          "width": 1440,
+          "height": 1100
+        },
+        {
+          "src": "assets/es/screenshots/dark/settings-folders.webp",
+          "name": "settings-folders",
+          "width": 1440,
+          "height": 1100
+        },
+        {
+          "src": "assets/es/screenshots/dark/settings-integrations.webp",
+          "name": "settings-integrations",
+          "width": 1440,
+          "height": 1250
+        },
+        {
+          "src": "assets/es/screenshots/dark/organize.webp",
+          "name": "organize",
+          "width": 1440,
+          "height": 1600
+        },
+        {
+          "src": "assets/es/screenshots/dark/equalizer.webp",
+          "name": "equalizer",
+          "width": 1440,
+          "height": 1500
+        },
+        {
+          "src": "assets/es/screenshots/dark/equalizer-parametric.webp",
+          "name": "equalizer-parametric",
+          "width": 1440,
+          "height": 1600
+        },
+        {
+          "src": "assets/es/screenshots/dark/themes.webp",
+          "name": "themes",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/es/screenshots/dark/settings-about.webp",
+          "name": "settings-about",
+          "width": 1440,
+          "height": 950
+        }
+      ]
+    },
+    "FR": {
+      "locale": "fr-CA",
+      "guide": "luminous-user-guide-FR.html",
+      "images": [
+        {
+          "src": "assets/fr-CA/screenshots/dark/home-welcome.webp",
+          "name": "home-welcome",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/fr-CA/screenshots/dark/home.webp",
+          "name": "home",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/fr-CA/screenshots/dark/walkthrough.webp",
+          "name": "walkthrough",
+          "width": 1640,
+          "height": 1090
+        },
+        {
+          "src": "assets/fr-CA/screenshots/dark/albums.webp",
+          "name": "albums",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/fr-CA/screenshots/dark/songs.webp",
+          "name": "songs",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/fr-CA/screenshots/dark/genres.webp",
+          "name": "genres",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/fr-CA/screenshots/dark/album-detail.webp",
+          "name": "album-detail",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/fr-CA/screenshots/dark/song-tag-editor.webp",
+          "name": "song-tag-editor",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/fr-CA/screenshots/dark/artist-detail.webp",
+          "name": "artist-detail",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/fr-CA/screenshots/dark/searchbar.webp",
+          "name": "searchbar",
+          "width": 1200,
+          "height": 80
+        },
+        {
+          "src": "assets/fr-CA/screenshots/dark/search.webp",
+          "name": "search",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/fr-CA/screenshots/dark/playbar.webp",
+          "name": "playbar",
+          "width": 1200,
+          "height": 80
+        },
+        {
+          "src": "assets/fr-CA/screenshots/dark/now-playing.webp",
+          "name": "now-playing",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/fr-CA/screenshots/dark/miniplayer.webp",
+          "name": "miniplayer",
+          "width": 340,
+          "height": 420
+        },
+        {
+          "src": "assets/fr-CA/screenshots/dark/miniplayer-hover.webp",
+          "name": "miniplayer-hover",
+          "width": 340,
+          "height": 420
+        },
+        {
+          "src": "assets/fr-CA/screenshots/dark/playlist-auto.webp",
+          "name": "playlist-auto",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/fr-CA/screenshots/dark/playlist-smart-edit.webp",
+          "name": "playlist-smart-edit",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/fr-CA/screenshots/dark/stats.webp",
+          "name": "stats",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/fr-CA/screenshots/dark/lyrics.webp",
+          "name": "lyrics",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/fr-CA/screenshots/dark/advanced-search.webp",
+          "name": "advanced-search",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/fr-CA/screenshots/dark/settings-general.webp",
+          "name": "settings-general",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/fr-CA/screenshots/dark/settings-system.webp",
+          "name": "settings-system",
+          "width": 1440,
+          "height": 1100
+        },
+        {
+          "src": "assets/fr-CA/screenshots/dark/settings-folders.webp",
+          "name": "settings-folders",
+          "width": 1440,
+          "height": 1100
+        },
+        {
+          "src": "assets/fr-CA/screenshots/dark/settings-integrations.webp",
+          "name": "settings-integrations",
+          "width": 1440,
+          "height": 1250
+        },
+        {
+          "src": "assets/fr-CA/screenshots/dark/organize.webp",
+          "name": "organize",
+          "width": 1440,
+          "height": 1600
+        },
+        {
+          "src": "assets/fr-CA/screenshots/dark/equalizer.webp",
+          "name": "equalizer",
+          "width": 1440,
+          "height": 1500
+        },
+        {
+          "src": "assets/fr-CA/screenshots/dark/equalizer-parametric.webp",
+          "name": "equalizer-parametric",
+          "width": 1440,
+          "height": 1600
+        },
+        {
+          "src": "assets/fr-CA/screenshots/dark/themes.webp",
+          "name": "themes",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/fr-CA/screenshots/dark/settings-about.webp",
+          "name": "settings-about",
+          "width": 1440,
+          "height": 950
+        }
+      ]
+    },
+    "IT": {
+      "locale": "it",
+      "guide": "luminous-user-guide-IT.html",
+      "images": [
+        {
+          "src": "assets/it/screenshots/dark/home-welcome.webp",
+          "name": "home-welcome",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/it/screenshots/dark/home.webp",
+          "name": "home",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/it/screenshots/dark/walkthrough.webp",
+          "name": "walkthrough",
+          "width": 1640,
+          "height": 1090
+        },
+        {
+          "src": "assets/it/screenshots/dark/albums.webp",
+          "name": "albums",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/it/screenshots/dark/songs.webp",
+          "name": "songs",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/it/screenshots/dark/genres.webp",
+          "name": "genres",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/it/screenshots/dark/album-detail.webp",
+          "name": "album-detail",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/it/screenshots/dark/song-tag-editor.webp",
+          "name": "song-tag-editor",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/it/screenshots/dark/artist-detail.webp",
+          "name": "artist-detail",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/it/screenshots/dark/searchbar.webp",
+          "name": "searchbar",
+          "width": 1200,
+          "height": 80
+        },
+        {
+          "src": "assets/it/screenshots/dark/search.webp",
+          "name": "search",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/it/screenshots/dark/playbar.webp",
+          "name": "playbar",
+          "width": 1200,
+          "height": 80
+        },
+        {
+          "src": "assets/it/screenshots/dark/now-playing.webp",
+          "name": "now-playing",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/it/screenshots/dark/miniplayer.webp",
+          "name": "miniplayer",
+          "width": 340,
+          "height": 420
+        },
+        {
+          "src": "assets/it/screenshots/dark/miniplayer-hover.webp",
+          "name": "miniplayer-hover",
+          "width": 340,
+          "height": 420
+        },
+        {
+          "src": "assets/it/screenshots/dark/playlist-auto.webp",
+          "name": "playlist-auto",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/it/screenshots/dark/playlist-smart-edit.webp",
+          "name": "playlist-smart-edit",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/it/screenshots/dark/stats.webp",
+          "name": "stats",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/it/screenshots/dark/lyrics.webp",
+          "name": "lyrics",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/it/screenshots/dark/advanced-search.webp",
+          "name": "advanced-search",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/it/screenshots/dark/settings-general.webp",
+          "name": "settings-general",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/it/screenshots/dark/settings-system.webp",
+          "name": "settings-system",
+          "width": 1440,
+          "height": 1100
+        },
+        {
+          "src": "assets/it/screenshots/dark/settings-folders.webp",
+          "name": "settings-folders",
+          "width": 1440,
+          "height": 1100
+        },
+        {
+          "src": "assets/it/screenshots/dark/settings-integrations.webp",
+          "name": "settings-integrations",
+          "width": 1440,
+          "height": 1250
+        },
+        {
+          "src": "assets/it/screenshots/dark/organize.webp",
+          "name": "organize",
+          "width": 1440,
+          "height": 1600
+        },
+        {
+          "src": "assets/it/screenshots/dark/equalizer.webp",
+          "name": "equalizer",
+          "width": 1440,
+          "height": 1500
+        },
+        {
+          "src": "assets/it/screenshots/dark/equalizer-parametric.webp",
+          "name": "equalizer-parametric",
+          "width": 1440,
+          "height": 1600
+        },
+        {
+          "src": "assets/it/screenshots/dark/themes.webp",
+          "name": "themes",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/it/screenshots/dark/settings-about.webp",
+          "name": "settings-about",
+          "width": 1440,
+          "height": 950
+        }
+      ]
+    },
+    "RU": {
+      "locale": "ru",
+      "guide": "luminous-user-guide-RU.html",
+      "images": [
+        {
+          "src": "assets/ru/screenshots/dark/home-welcome.webp",
+          "name": "home-welcome",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/ru/screenshots/dark/home.webp",
+          "name": "home",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/ru/screenshots/dark/walkthrough.webp",
+          "name": "walkthrough",
+          "width": 1640,
+          "height": 1090
+        },
+        {
+          "src": "assets/ru/screenshots/dark/albums.webp",
+          "name": "albums",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/ru/screenshots/dark/songs.webp",
+          "name": "songs",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/ru/screenshots/dark/genres.webp",
+          "name": "genres",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/ru/screenshots/dark/album-detail.webp",
+          "name": "album-detail",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/ru/screenshots/dark/song-tag-editor.webp",
+          "name": "song-tag-editor",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/ru/screenshots/dark/artist-detail.webp",
+          "name": "artist-detail",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/ru/screenshots/dark/searchbar.webp",
+          "name": "searchbar",
+          "width": 1200,
+          "height": 80
+        },
+        {
+          "src": "assets/ru/screenshots/dark/search.webp",
+          "name": "search",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/ru/screenshots/dark/playbar.webp",
+          "name": "playbar",
+          "width": 1200,
+          "height": 80
+        },
+        {
+          "src": "assets/ru/screenshots/dark/now-playing.webp",
+          "name": "now-playing",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/ru/screenshots/dark/miniplayer.webp",
+          "name": "miniplayer",
+          "width": 340,
+          "height": 420
+        },
+        {
+          "src": "assets/ru/screenshots/dark/miniplayer-hover.webp",
+          "name": "miniplayer-hover",
+          "width": 340,
+          "height": 420
+        },
+        {
+          "src": "assets/ru/screenshots/dark/playlist-auto.webp",
+          "name": "playlist-auto",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/ru/screenshots/dark/playlist-smart-edit.webp",
+          "name": "playlist-smart-edit",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/ru/screenshots/dark/stats.webp",
+          "name": "stats",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/ru/screenshots/dark/lyrics.webp",
+          "name": "lyrics",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/ru/screenshots/dark/advanced-search.webp",
+          "name": "advanced-search",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/ru/screenshots/dark/settings-general.webp",
+          "name": "settings-general",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/ru/screenshots/dark/settings-system.webp",
+          "name": "settings-system",
+          "width": 1440,
+          "height": 1100
+        },
+        {
+          "src": "assets/ru/screenshots/dark/settings-folders.webp",
+          "name": "settings-folders",
+          "width": 1440,
+          "height": 1100
+        },
+        {
+          "src": "assets/ru/screenshots/dark/settings-integrations.webp",
+          "name": "settings-integrations",
+          "width": 1440,
+          "height": 1250
+        },
+        {
+          "src": "assets/ru/screenshots/dark/organize.webp",
+          "name": "organize",
+          "width": 1440,
+          "height": 1600
+        },
+        {
+          "src": "assets/ru/screenshots/dark/equalizer.webp",
+          "name": "equalizer",
+          "width": 1440,
+          "height": 1500
+        },
+        {
+          "src": "assets/ru/screenshots/dark/equalizer-parametric.webp",
+          "name": "equalizer-parametric",
+          "width": 1440,
+          "height": 1600
+        },
+        {
+          "src": "assets/ru/screenshots/dark/themes.webp",
+          "name": "themes",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/ru/screenshots/dark/settings-about.webp",
+          "name": "settings-about",
+          "width": 1440,
+          "height": 950
+        }
+      ]
+    },
+    "UK": {
+      "locale": "uk",
+      "guide": "luminous-user-guide-UK.html",
+      "images": [
+        {
+          "src": "assets/uk/screenshots/dark/home-welcome.webp",
+          "name": "home-welcome",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/uk/screenshots/dark/home.webp",
+          "name": "home",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/uk/screenshots/dark/walkthrough.webp",
+          "name": "walkthrough",
+          "width": 1640,
+          "height": 1090
+        },
+        {
+          "src": "assets/uk/screenshots/dark/albums.webp",
+          "name": "albums",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/uk/screenshots/dark/songs.webp",
+          "name": "songs",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/uk/screenshots/dark/genres.webp",
+          "name": "genres",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/uk/screenshots/dark/album-detail.webp",
+          "name": "album-detail",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/uk/screenshots/dark/song-tag-editor.webp",
+          "name": "song-tag-editor",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/uk/screenshots/dark/artist-detail.webp",
+          "name": "artist-detail",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/uk/screenshots/dark/searchbar.webp",
+          "name": "searchbar",
+          "width": 1200,
+          "height": 80
+        },
+        {
+          "src": "assets/uk/screenshots/dark/search.webp",
+          "name": "search",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/uk/screenshots/dark/playbar.webp",
+          "name": "playbar",
+          "width": 1200,
+          "height": 80
+        },
+        {
+          "src": "assets/uk/screenshots/dark/now-playing.webp",
+          "name": "now-playing",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/uk/screenshots/dark/miniplayer.webp",
+          "name": "miniplayer",
+          "width": 340,
+          "height": 420
+        },
+        {
+          "src": "assets/uk/screenshots/dark/miniplayer-hover.webp",
+          "name": "miniplayer-hover",
+          "width": 340,
+          "height": 420
+        },
+        {
+          "src": "assets/uk/screenshots/dark/playlist-auto.webp",
+          "name": "playlist-auto",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/uk/screenshots/dark/playlist-smart-edit.webp",
+          "name": "playlist-smart-edit",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/uk/screenshots/dark/stats.webp",
+          "name": "stats",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/uk/screenshots/dark/lyrics.webp",
+          "name": "lyrics",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/uk/screenshots/dark/advanced-search.webp",
+          "name": "advanced-search",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/uk/screenshots/dark/settings-general.webp",
+          "name": "settings-general",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/uk/screenshots/dark/settings-system.webp",
+          "name": "settings-system",
+          "width": 1440,
+          "height": 1100
+        },
+        {
+          "src": "assets/uk/screenshots/dark/settings-folders.webp",
+          "name": "settings-folders",
+          "width": 1440,
+          "height": 1100
+        },
+        {
+          "src": "assets/uk/screenshots/dark/settings-integrations.webp",
+          "name": "settings-integrations",
+          "width": 1440,
+          "height": 1250
+        },
+        {
+          "src": "assets/uk/screenshots/dark/organize.webp",
+          "name": "organize",
+          "width": 1440,
+          "height": 1600
+        },
+        {
+          "src": "assets/uk/screenshots/dark/equalizer.webp",
+          "name": "equalizer",
+          "width": 1440,
+          "height": 1500
+        },
+        {
+          "src": "assets/uk/screenshots/dark/equalizer-parametric.webp",
+          "name": "equalizer-parametric",
+          "width": 1440,
+          "height": 1600
+        },
+        {
+          "src": "assets/uk/screenshots/dark/themes.webp",
+          "name": "themes",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "src": "assets/uk/screenshots/dark/settings-about.webp",
+          "name": "settings-about",
+          "width": 1440,
+          "height": 950
+        }
+      ]
+    }
+  }
+}
