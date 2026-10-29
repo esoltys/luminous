@@ -528,4 +528,140 @@ describe("In-app scripting API", () => {
       document.body.removeChild(img);
     });
   });
+
+  describe("Overlay controller (cursor, caption, keystroke, clear)", () => {
+    let api: ReturnType<typeof createScriptingApi>;
+
+    beforeEach(() => {
+      api = createScriptingApi();
+    });
+
+    afterEach(async () => {
+      await api.overlay.clear();
+    });
+
+    it("shows and hides simulated cursor", async () => {
+      await api.overlay.cursor.show({ x: 200, y: 300 });
+
+      const host = document.getElementById("luminous-capture-overlays");
+      expect(host).not.toBeNull();
+
+      const cursor = document.getElementById("luminous-capture-cursor");
+      expect(cursor).not.toBeNull();
+      expect(cursor?.style.display).toBe("block");
+      expect(cursor?.style.transform).toContain("translate3d(195px, 297px, 0)");
+
+      await api.overlay.cursor.hide();
+      expect(cursor?.style.display).toBe("none");
+    });
+
+    it("clamps cursor coordinates to viewport boundaries", async () => {
+      await api.overlay.cursor.moveTo(-100, -50);
+      const cursor = document.getElementById("luminous-capture-cursor");
+      expect(cursor?.style.transform).toContain("translate3d(-5px, -3px, 0)");
+
+      await api.overlay.cursor.moveTo(999999, 999999);
+      const expectedX = window.innerWidth - 5;
+      const expectedY = window.innerHeight - 3;
+      expect(cursor?.style.transform).toContain(`translate3d(${expectedX}px, ${expectedY}px, 0)`);
+    });
+
+    it("moves cursor smoothly with durationMs", async () => {
+      await api.overlay.cursor.show();
+      await api.overlay.cursor.moveTo(350, 450, { durationMs: 20 });
+      const cursor = document.getElementById("luminous-capture-cursor");
+      expect(cursor?.style.transform).toContain("translate3d(345px, 447px, 0)");
+    });
+
+    it("points cursor to an element center via pointTo", async () => {
+      const button = document.createElement("button");
+      button.id = "test-target-button";
+      button.getBoundingClientRect = vi.fn().mockReturnValue({
+        left: 100,
+        top: 200,
+        width: 80,
+        height: 40,
+        right: 180,
+        bottom: 240,
+      });
+      document.body.appendChild(button);
+
+      await api.overlay.cursor.show();
+      await api.overlay.cursor.pointTo("#test-target-button");
+
+      const cursor = document.getElementById("luminous-capture-cursor");
+      // center is left 100 + 40 = 140, top 200 + 20 = 220
+      // hotspot offset is (140 - 5, 220 - 3) = (135, 217)
+      expect(cursor?.style.transform).toContain("translate3d(135px, 217px, 0)");
+
+      document.body.removeChild(button);
+    });
+
+    it("gracefully ignores non-existent selector without throwing", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      await expect(api.overlay.cursor.pointTo("#does-not-exist")).resolves.not.toThrow();
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Target element not found for selector: "#does-not-exist"')
+      );
+      warnSpy.mockRestore();
+    });
+
+    it("triggers visual click animation and ripple", async () => {
+      await api.overlay.cursor.show({ x: 250, y: 350 });
+      await api.overlay.cursor.click();
+
+      const host = document.getElementById("luminous-capture-overlays");
+      const ripples = host?.getElementsByClassName("luminous-capture-ripple");
+      expect(ripples?.length).toBeGreaterThan(0);
+    });
+
+    it("displays, updates, and hides tutorial captions", async () => {
+      await api.overlay.caption.show("Step 1: Explore your music library", {
+        title: "Tutorial",
+        position: "top",
+      });
+
+      const caption = document.getElementById("luminous-capture-caption");
+      expect(caption).not.toBeNull();
+      expect(caption?.style.display).toBe("block");
+      expect(caption?.style.top).toBe("32px");
+      expect(caption?.innerHTML).toContain("Tutorial");
+      expect(caption?.innerHTML).toContain("Step 1: Explore your music library");
+
+      // Updates in place without creating extra nodes
+      await api.overlay.caption.show("Step 2: Start playback", { position: "bottom" });
+      expect(caption?.style.bottom).toBe("48px");
+      expect(caption?.innerHTML).toContain("Step 2: Start playback");
+      expect(caption?.innerHTML).not.toContain("Tutorial");
+
+      await api.overlay.caption.hide();
+      expect(caption?.style.display).toBe("none");
+    });
+
+    it("displays and hides keystroke shortcut badges", async () => {
+      await api.overlay.keystroke.show("Ctrl + Shift + P");
+
+      const keystroke = document.getElementById("luminous-capture-keystroke");
+      expect(keystroke).not.toBeNull();
+      expect(keystroke?.style.display).toBe("flex");
+      expect(keystroke?.innerHTML).toContain("Ctrl");
+      expect(keystroke?.innerHTML).toContain("Shift");
+      expect(keystroke?.innerHTML).toContain("P");
+      expect(keystroke?.getElementsByTagName("kbd").length).toBe(3);
+
+      await api.overlay.keystroke.hide();
+      expect(keystroke?.style.display).toBe("none");
+    });
+
+    it("clears all overlays and detaches host element via clear()", async () => {
+      await api.overlay.cursor.show({ x: 100, y: 100 });
+      await api.overlay.caption.show("Testing clear");
+      await api.overlay.keystroke.show("Alt + Enter");
+
+      expect(document.getElementById("luminous-capture-overlays")).not.toBeNull();
+
+      await api.overlay.clear();
+      expect(document.getElementById("luminous-capture-overlays")).toBeNull();
+    });
+  });
 });

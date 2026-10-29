@@ -7,7 +7,7 @@
 // Signature and resolve-condition changes are only caught in review.
 
 /** Version of this contract. Callers pass their vendored copy to `connect()`. */
-export const SCRIPT_API_VERSION = "1.2.0";
+export const SCRIPT_API_VERSION = "1.3.0";
 
 /** What `connect()` resolves with: the running app's version and every method it offers. */
 export interface ScriptContract {
@@ -349,6 +349,104 @@ export interface ScriptWindowApi {
 }
 
 /**
+ * Cursor movement and animation options.
+ */
+export interface ScriptCursorOptions {
+  /** Optional transition duration in milliseconds (default: 0 for instant jump). */
+  durationMs?: number;
+}
+
+/**
+ * Overlay cursor controller surface.
+ */
+export interface ScriptCursorApi {
+  /**
+   * Shows the simulated cursor pointer, optionally setting its initial position.
+   */
+  show(position?: { x: number; y: number }): Promise<void>;
+
+  /**
+   * Hides the simulated cursor pointer.
+   */
+  hide(): Promise<void>;
+
+  /**
+   * Moves the cursor to explicit viewport coordinates, optionally animating smoothly.
+   */
+  moveTo(x: number, y: number, options?: ScriptCursorOptions): Promise<void>;
+
+  /**
+   * Resolves the bounding box of the matching DOM element and animates the cursor
+   * to its optical center.
+   *
+   * @param selector DOM selector or element query.
+   * @param options Animation options including duration in ms.
+   */
+  pointTo(selector: string, options?: ScriptCursorOptions): Promise<void>;
+
+  /**
+   * Triggers a visual click animation (expansion ripple and press effect)
+   * at the current or specified cursor position.
+   */
+  click(position?: { x: number; y: number }): Promise<void>;
+}
+
+/**
+ * Caption display options.
+ */
+export interface ScriptCaptionOptions {
+  /** Vertical placement relative to the viewport (default: "bottom"). */
+  position?: "top" | "bottom";
+  /** Optional header title above the caption text. */
+  title?: string;
+}
+
+/**
+ * Tutorial caption and subtitle overlay controller surface.
+ */
+export interface ScriptCaptionApi {
+  /**
+   * Displays a prominent tutorial caption banner on screen.
+   */
+  show(text: string, options?: ScriptCaptionOptions): Promise<void>;
+
+  /**
+   * Hides active caption overlay.
+   */
+  hide(): Promise<void>;
+}
+
+/**
+ * Keystroke demonstration overlay controller surface.
+ */
+export interface ScriptKeystrokeApi {
+  /**
+   * Displays a visual keyboard shortcut pill (e.g. "Ctrl + K", "Space", "Alt + Enter").
+   */
+  show(keys: string): Promise<void>;
+
+  /**
+   * Hides active keystroke indicator.
+   */
+  hide(): Promise<void>;
+}
+
+/**
+ * In-app capture overlay controller surface for tutorials and motion graphics.
+ */
+export interface ScriptOverlayApi {
+  readonly cursor: ScriptCursorApi;
+  readonly caption: ScriptCaptionApi;
+  readonly keystroke: ScriptKeystrokeApi;
+
+  /**
+   * Clears and resets all active overlays (cursor, captions, keystrokes)
+   * and detaches temporary DOM elements.
+   */
+  clear(): Promise<void>;
+}
+
+/**
  * Primary scripting API exposed on window.__LUMINOUS_SCRIPT__.
  */
 export interface LuminousScriptApi {
@@ -368,6 +466,7 @@ export interface LuminousScriptApi {
   readonly screens: ScriptScreensApi;
   readonly wait: ScriptWaitApi;
   readonly window: ScriptWindowApi;
+  readonly overlay: ScriptOverlayApi;
 }
 
 declare global {
