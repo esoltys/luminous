@@ -11,6 +11,7 @@ import { i18n } from "./i18n.svelte";
 import { prefs } from "./prefs.svelte";
 import { isRemotePath, shortenQuotedUrls } from "../utils/remoteSource";
 import { shuffleArray } from "../utils/shuffle";
+import { AUDIO_BACKEND_LABEL_KEYS } from "../audioOutput";
 
 export interface CompletedSession {
   contextName: string;
@@ -245,7 +246,7 @@ export class PlayerStore {
       // when the cause (another app holding the device) has gone away.
       await listen<OutputFallbackPayload>("audio-output-fallback", (event) => {
         const { requested, reason } = event.payload;
-        const mode = i18n.t(requested === "asio" ? "settings.audioBackendAsio" : "settings.audioBackendExclusive");
+        const mode = i18n.t(AUDIO_BACKEND_LABEL_KEYS[requested]);
         if (this._outputFallbackToastId !== null) toastStore.dismiss(this._outputFallbackToastId);
         this._outputFallbackToastId = toastStore.show(
           i18n.t(`playerBar.${OUTPUT_FALLBACK_KEYS[reason]}`, { mode }),

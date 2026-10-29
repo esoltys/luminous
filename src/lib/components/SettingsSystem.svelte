@@ -8,6 +8,7 @@
   import { openExternalUrl } from "../utils/openExternalUrl";
   import { toastStore } from "../stores/toast.svelte";
   import { isWindows } from "../platform";
+  import { AUDIO_BACKEND_LABEL_KEYS, isDirectHardware, offeredAudioBackends } from "../audioOutput";
   import type { AudioBackendKind } from "../types";
   import Toggle from "./Toggle.svelte";
   import Button from "./Button.svelte";
@@ -238,9 +239,12 @@
     prefs.audioOutputDevices.filter((d) => d.backend === prefs.audioOutputConfig.backend)
   );
 
+  const audioBackends = offeredAudioBackends();
+  let directHardware = $derived(isDirectHardware(prefs.audioOutputConfig.backend));
+
   let selectedDeviceId = $derived.by(() => {
     const id = prefs.audioOutputConfig.device_id;
-    if (prefs.audioOutputConfig.backend === "asio") {
+    if (directHardware) {
       if (id && currentBackendDevices.some((d) => d.id === id)) {
         return id;
       }
@@ -252,11 +256,12 @@
   async function handleBackendChange(backend: AudioBackendKind) {
     const devices = prefs.audioOutputDevices.filter((d) => d.backend === backend);
     // Shared and exclusive list the same endpoints, so a chosen device carries
-    // over between them; ASIO has no system default, so it takes the first driver.
+    // over between them; ASIO and ALSA hardware have no system default, so
+    // they take the first device.
     const current = prefs.audioOutputConfig.device_id;
     const newDeviceId = current && devices.some((d) => d.id === current)
       ? current
-      : backend === "asio" && devices.length > 0 ? devices[0].id : null;
+      : isDirectHardware(backend) && devices.length > 0 ? devices[0].id : null;
     await prefs.setAudioOutput({ backend, device_id: newDeviceId });
   }
 
@@ -382,8 +387,8 @@
     </Button>
   </div>
 
-  {#if isWindows}
-    <!-- Output Backend (shared, WASAPI exclusive or ASIO) -->
+  {#if audioBackends.length > 0}
+    <!-- Output Backend: shared, or the platform's bit-perfect modes -->
     <div class="flex items-center justify-between gap-4 py-2">
       <div class="flex flex-col gap-0.5 min-w-0">
         <label for="audio-backend-select" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.audioBackendLabel')}</label>
@@ -395,9 +400,9 @@
         onchange={(e) => handleBackendChange(e.currentTarget.value as AudioBackendKind)}
         class="shrink-0 bg-brand-main border border-brand-border hover:border-brand-accent/60 text-brand-text-primary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
       >
-        <option value="cpal">{i18n.t('settings.audioBackendShared')}</option>
-        <option value="wasapi_exclusive">{i18n.t('settings.audioBackendExclusive')}</option>
-        <option value="asio">{i18n.t('settings.audioBackendAsio')}</option>
+        {#each audioBackends as backend}
+          <option value={backend}>{i18n.t(AUDIO_BACKEND_LABEL_KEYS[backend])}</option>
+        {/each}
       </Select>
     </div>
   {/if}
@@ -408,8 +413,8 @@
       <label for="audio-device-select" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.audioDeviceLabel')}</label>
       <p class="text-xs text-brand-text-secondary">{i18n.t('settings.audioDeviceHint')}</p>
     </div>
-    {#if currentBackendDevices.length === 0 && prefs.audioOutputConfig.backend === 'asio'}
-      <span class="text-xs text-amber-400 font-medium">{i18n.t('settings.audioAsioNoDevices')}</span>
+    {#if currentBackendDevices.length === 0 && directHardware}
+      <span class="text-xs text-amber-400 font-medium">{i18n.t(prefs.audioOutputConfig.backend === 'asio' ? 'settings.audioAsioNoDevices' : 'settings.audioAlsaNoDevices')}</span>
     {:else}
       <Select
         id="audio-device-select"
@@ -417,7 +422,7 @@
         onchange={(e) => handleDeviceChange(e.currentTarget.value || null)}
         class="shrink-0 max-w-[280px] bg-brand-main border border-brand-border hover:border-brand-accent/60 text-brand-text-primary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium truncate"
       >
-        {#if prefs.audioOutputConfig.backend !== 'asio'}
+        {#if !directHardware}
           <option value="">{i18n.t('settings.audioDeviceDefault')}</option>
         {/if}
         {#each currentBackendDevices as dev}

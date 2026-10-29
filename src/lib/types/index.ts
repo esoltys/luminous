@@ -270,7 +270,7 @@ export interface AudioPipelineInfo {
   output_backend: string;
 }
 
-export type AudioBackendKind = "cpal" | "asio" | "wasapi_exclusive";
+export type AudioBackendKind = "cpal" | "asio" | "wasapi_exclusive" | "alsa";
 
 /** Why a bit-perfect backend fell back to shared output (`audio-output-fallback`). */
 export type OutputFallbackReason =

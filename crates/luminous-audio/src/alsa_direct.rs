@@ -15,6 +15,9 @@ const EBUSY: i32 = 16;
 /// `EAGAIN`: a non-blocking write found the hardware buffer full.
 #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 const EAGAIN: i32 = 11;
+/// `ETIMEDOUT`: a running stream stopped taking audio.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+const ETIMEDOUT: i32 = 110;
 
 /// Rates to try after the requested rate's own family, in order: what most
 /// fixed-rate devices (USB headsets, HDMI) run at.
@@ -69,7 +72,7 @@ mod imp {
     use parking_lot::Mutex;
 
     use super::{
-        classify_failure, device_id, device_label, is_virtual_driver, OpenError, EAGAIN,
+        classify_failure, device_id, device_label, is_virtual_driver, OpenError, EAGAIN, ETIMEDOUT,
         FALLBACK_RATES,
     };
     use crate::pcm::{self, PcmFormat};
@@ -307,6 +310,9 @@ mod imp {
         hwp.set_rate_resample(false)?;
         hwp.set_channels(CHANNELS as u32)?;
         hwp.set_format(format)?;
+        // `set_rate` takes the nearest rate the device has; test first so a
+        // rate it lacks fails instead of quietly becoming another.
+        hwp.test_rate(rate)?;
         hwp.set_rate(rate, ValueOr::Nearest)?;
         Ok(hwp)
     }
@@ -339,7 +345,7 @@ mod imp {
                 message: format!("No stereo integer format near {requested_rate} Hz"),
             })?;
 
-            let period_frames = {
+            let (rate, period_frames) = {
                 // `negotiate_format` only returns ALSA formats.
                 let hwp = constrain(&pcm, rate, alsa_format(format).unwrap_or(Format::S16LE))
                     .map_err(|e| open_error("Hardware parameters", e))?;
@@ -352,9 +358,12 @@ mod imp {
                 let current = pcm
                     .hw_params_current()
                     .map_err(|e| open_error("Read hardware parameters", e))?;
-                current
+                // Report the rate the hardware runs at, whatever was asked.
+                let rate = current.get_rate().map_err(|e| open_error("Read rate", e))?;
+                let period_frames = current
                     .get_period_size()
-                    .map_err(|e| open_error("Period size", e))? as usize
+                    .map_err(|e| open_error("Period size", e))?;
+                (rate, period_frames as usize)
             };
 
             log::info!(
@@ -418,8 +427,9 @@ mod imp {
         /// Renders one period and writes all of it, waiting for room in the
         /// hardware buffer as needed. Stops early (dropping the rest) when
         /// asked to pause or quit. Recovers from underruns; anything else,
-        /// including the device disappearing, is returned.
-        fn write(&mut self, pcm: &PCM, control: &Control) -> Result<(), String> {
+        /// including the device disappearing or a stall (`ETIMEDOUT`), is
+        /// returned.
+        fn write(&mut self, pcm: &PCM, control: &Control) -> ::alsa::Result<()> {
             self.renderer.render(&mut self.scratch);
             let len = pcm::write_interleaved(&self.scratch, self.format, &mut self.bytes)
                 * self.format.container_bytes();
@@ -435,10 +445,10 @@ mod imp {
                     Ok(frames) => offset += frames * frame_bytes,
                     Err(e) if e.errno() == EAGAIN => match pcm.wait(Some(STALL_TIMEOUT_MS)) {
                         Ok(true) => {}
-                        Ok(false) => return Err("Hardware stream stopped taking audio".into()),
-                        Err(e) => pcm.try_recover(e, true).map_err(|e| e.to_string())?,
+                        Ok(false) => return Err(::alsa::Error::new("snd_pcm_wait", ETIMEDOUT)),
+                        Err(e) => pcm.try_recover(e, true)?,
                     },
-                    Err(e) => pcm.try_recover(e, true).map_err(|e| e.to_string())?,
+                    Err(e) => pcm.try_recover(e, true)?,
                 }
             }
             Ok(())
