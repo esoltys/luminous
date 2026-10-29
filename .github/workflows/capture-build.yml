@@ -61,8 +61,9 @@ jobs:
       - name: Build backend with capture feature
         shell: bash
         run: |
-          # Build binary without generating signed bundle installers
-          bun run tauri build --no-bundle --features capture
+          # Build release binary directly with capture feature, embedding the capture frontendDist
+          cd src-tauri
+          cargo build --release --features capture
 
       - name: Prepare capture binary artifact
         shell: bash
