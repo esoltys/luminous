@@ -663,6 +663,38 @@ Length2=150
     }
 
     #[test]
+    fn export_playlist_output_is_unchanged() {
+        let tracks = [
+            ExportTrack {
+                path: Path::new("/music/album/song1.mp3"),
+                title: Some("Song 1"),
+                artist: Some("Artist 1"),
+                album: None,
+                duration_sec: Some(200),
+            },
+            ExportTrack {
+                path: Path::new("/music/loose.mp3"),
+                title: None,
+                artist: None,
+                album: None,
+                duration_sec: None,
+            },
+        ];
+        let export =
+            |format| export_playlist("Test", &tracks, format, Path::new("/music/x"), true).unwrap();
+        assert_eq!(
+            export(PlaylistFormat::M3u8),
+            "#EXTM3U\n#EXTINF:200,Artist 1 - Song 1\nalbum/song1.mp3\n#EXTINF:-1,loose\nloose.mp3\n"
+        );
+        assert_eq!(
+            export(PlaylistFormat::Pls),
+            "[playlist]\nNumberOfEntries=2\n\n\
+             File1=album/song1.mp3\nTitle1=Artist 1 - Song 1\nLength1=200\n\n\
+             File2=loose.mp3\nLength2=-1\n\n"
+        );
+    }
+
+    #[test]
     fn render_playlist_writes_locations_as_given_with_the_line_ending() {
         let entries = [PlaylistEntry {
             location: "..\\Music\\A\\01 Song.mp3".into(),
