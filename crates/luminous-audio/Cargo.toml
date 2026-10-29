@@ -24,6 +24,10 @@ log.workspace = true
 anyhow.workspace = true
 serde = { workspace = true, features = ["derive"] }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+# Direct hardware output (#1727); the same `alsa` version cpal uses.
+alsa = "0.11"
+
 [target.'cfg(windows)'.dependencies]
 azo = "0.5"
 # WASAPI exclusive-mode output (#1298); the same `windows` version cpal uses.

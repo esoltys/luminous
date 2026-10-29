@@ -8,10 +8,13 @@ import { i18n } from "../stores/i18n.svelte";
 import { updaterStore } from "../stores/updater.svelte";
 import { flushSync } from "svelte";
 
-const platform = vi.hoisted(() => ({ isWindows: false }));
+const platform = vi.hoisted(() => ({ isWindows: false, isLinux: false }));
 vi.mock("../platform", () => ({
   get isWindows() {
     return platform.isWindows;
+  },
+  get isLinux() {
+    return platform.isLinux;
   },
 }));
 
@@ -30,6 +33,8 @@ vi.mock("@tauri-apps/api/core", () => ({
         { id: "def-1", name: "Speakers (Realtek Audio)", backend: "wasapi_exclusive", is_default: true },
         { id: "usb-1", name: "USB DAC", backend: "wasapi_exclusive", is_default: false },
         { id: "asio-1", name: "FlexASIO", backend: "asio", is_default: false },
+        { id: "hw:CARD=PCH,DEV=0", name: "HDA Intel PCH — ALC289 Analog", backend: "alsa", is_default: false },
+        { id: "hw:CARD=EarPods,DEV=0", name: "EarPods — USB Audio", backend: "alsa", is_default: false },
       ]);
     }
     if (cmd === "get_audio_output_settings") {
@@ -50,6 +55,8 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 describe("SettingsSystem.svelte", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    platform.isWindows = false;
+    platform.isLinux = false;
     i18n.currentLocale = "en-CA";
   });
 
@@ -176,5 +183,62 @@ describe("SettingsSystem.svelte", () => {
     await fireEvent.click(btn);
 
     expect(invoke).toHaveBeenCalledWith("open_asio_control_panel", { deviceId: "asio-1" });
+  });
+
+  it("offers shared and direct ALSA output modes on Linux", async () => {
+    platform.isLinux = true;
+    prefs.audioOutputConfig = { backend: "cpal", device_id: null };
+    const { findByLabelText } = render(SettingsSystem);
+
+    const backendSelect = (await findByLabelText("Output Mode")) as HTMLSelectElement;
+    const modes = Array.from(backendSelect.options).map((o) => o.textContent?.trim());
+    expect(modes).toEqual(["Shared Audio (System Default)", "Direct Hardware (ALSA)"]);
+  });
+
+  it("takes the first hardware device when switching to direct ALSA output", async () => {
+    platform.isLinux = true;
+    prefs.audioOutputConfig = { backend: "cpal", device_id: null };
+    const { findByLabelText, findByRole } = render(SettingsSystem);
+    await findByRole("option", { name: "Speakers (Realtek Audio) (Default Output Device)" });
+
+    await fireEvent.change(await findByLabelText("Output Mode"), { target: { value: "alsa" } });
+
+    expect(invoke).toHaveBeenCalledWith("set_audio_output_settings", {
+      settings: { backend: "alsa", device_id: "hw:CARD=PCH,DEV=0" },
+    });
+  });
+
+  it("lists hardware devices without a default entry in direct ALSA mode", async () => {
+    platform.isLinux = true;
+    const { findByLabelText, findByRole } = render(SettingsSystem);
+    await findByRole("option", { name: "Speakers (Realtek Audio) (Default Output Device)" });
+    prefs.audioOutputConfig = { backend: "alsa", device_id: "hw:CARD=EarPods,DEV=0" };
+    flushSync();
+
+    const deviceSelect = (await findByLabelText("Output Device")) as HTMLSelectElement;
+    const labels = Array.from(deviceSelect.options).map((o) => o.textContent?.trim());
+    expect(labels).toEqual(["HDA Intel PCH — ALC289 Analog", "EarPods — USB Audio"]);
+    expect(deviceSelect.value).toBe("hw:CARD=EarPods,DEV=0");
+  });
+
+  it("says so when no hardware devices are found in direct ALSA mode", async () => {
+    platform.isLinux = true;
+    prefs.audioOutputConfig = { backend: "alsa", device_id: null };
+    prefs.audioOutputDevices = [];
+    const devicesAndSettings = vi.mocked(invoke).getMockImplementation();
+    vi.mocked(invoke).mockImplementation((cmd: string) =>
+      Promise.resolve(cmd === "get_audio_output_settings" ? { backend: "alsa", device_id: null } : [])
+    );
+    const { findByText } = render(SettingsSystem);
+
+    expect(await findByText("No hardware audio devices found.")).toBeInTheDocument();
+    vi.mocked(invoke).mockImplementation(devicesAndSettings!);
+  });
+
+  it("offers no output mode choice where there are no bit-perfect modes", async () => {
+    const { findByText, queryByLabelText } = render(SettingsSystem);
+    await findByText("Audio Output");
+
+    expect(queryByLabelText("Output Mode")).not.toBeInTheDocument();
   });
 });

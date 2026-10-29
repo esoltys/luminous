@@ -16,6 +16,9 @@ finish-args:
   - --device=dri
   # Audio playback (CPAL -> PulseAudio/PipeWire)
   - --socket=pulseaudio
+  # Direct Hardware (ALSA) output opens the card's /dev/snd PCM itself (#1727);
+  # there is no narrower device permission that exposes /dev/snd.
+  - --device=all
   # Lyrics (LRCLIB, Lyrics.ovh), cover art (iTunes) and MusicBrainz lookups
   - --share=network
   # Library folders are chosen via the portal file/folder picker (Tauri dialog
