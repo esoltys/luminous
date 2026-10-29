@@ -1,8 +1,10 @@
 //! Windows: MTP players and phones through Windows Portable Devices (#840).
 //!
-//! WPD also lists every mounted volume (the `WUDFWpdFs` driver), and PTP
-//! cameras and iPhones. Only devices that speak MTP become devices here;
-//! volumes come from the drive-letter watcher instead.
+//! WPD also lists every mounted volume (the `WUDFWpdFs` driver), which the
+//! drive-letter watcher already reports, and cameras. A device becomes a
+//! device here only if it speaks MTP and has a storage Luminous can write
+//! to: an iPhone reports MTP too, but its one storage is a read-only camera
+//! roll, so it is left out.
 //!
 //! Threading: every WPD object is created through `PortableDeviceFTM` (or
 //! is reached from one that was), so it is free-threaded and any thread that
@@ -103,7 +105,9 @@ impl Watcher {
                 continue;
             }
             match handle.device() {
-                Ok(device) => devices.push(device),
+                Ok(Some(device)) => devices.push(device),
+                // Kept open: a phone shows its storages once it is unlocked.
+                Ok(None) => {}
                 Err(e) => {
                     // Probably unplugged mid-poll; reopen if it is still there.
                     log::info!("Lost portable device {id}: {e}");
@@ -146,6 +150,12 @@ fn is_volume_shim(pnp_id: &str) -> bool {
 /// "MSC:") is MTP.
 fn is_mtp_protocol(protocol: &str) -> bool {
     protocol.trim().to_ascii_uppercase().starts_with("MTP")
+}
+
+/// Whether a storage's `WPD_STORAGE_ACCESS_CAPABILITY` lets Luminous write
+/// to it. A storage that does not say is assumed writable.
+fn is_writable(access: Option<u32>) -> bool {
+    access.is_none_or(|a| a == WPD_STORAGE_ACCESS_CAPABILITY_READWRITE.0 as u32)
 }
 
 /// A shared connection to one device. Equal when it is the same device.
@@ -205,25 +215,22 @@ impl Handle {
         }
     }
 
-    /// The device as it is now: fresh storage capacities on each call.
-    fn device(&self) -> windows::core::Result<crate::Device> {
+    /// The device as it is now, with fresh storage capacities, or `None`
+    /// while it has no storage Luminous can write to (a read-only camera
+    /// roll, or a phone that is locked or not set to file transfer).
+    fn device(&self) -> windows::core::Result<Option<crate::Device>> {
         let storages = self.0.storages()?;
         if storages.is_empty() {
-            // A locked phone shows no storages until it is unlocked and set
-            // to file transfer.
-            return Err(windows::core::Error::new(
-                windows::Win32::Foundation::E_FAIL,
-                "no storages yet",
-            ));
+            return Ok(None);
         }
-        Ok(crate::Device {
+        Ok(Some(crate::Device {
             kind: DeviceKind::Mtp,
             provisional_id: self.0.provisional_id.clone(),
             model: self.0.model.clone(),
             default_name: self.0.default_name.clone(),
             storages,
             access: crate::Access::Mtp(self.clone()),
-        })
+        }))
     }
 }
 
@@ -335,8 +342,8 @@ impl Connection {
         self.lock.lock()
     }
 
-    /// The device's storages with their current free space. While a
-    /// transfer holds the device, returns what the last call read, so
+    /// The device's writable storages with their current free space. While
+    /// a transfer holds the device, returns what the last call read, so
     /// polling never waits for a copy to finish.
     fn storages(&self) -> windows::core::Result<Vec<Storage>> {
         com();
@@ -355,6 +362,7 @@ impl Connection {
                 WPD_STORAGE_FILE_SYSTEM_TYPE,
                 WPD_STORAGE_CAPACITY,
                 WPD_STORAGE_FREE_SPACE_IN_BYTES,
+                WPD_STORAGE_ACCESS_CAPABILITY,
             ])?;
             let mut storages = Vec::new();
             let mut objects = HashMap::new();
@@ -362,6 +370,13 @@ impl Connection {
                 let values = self
                     .properties
                     .GetValues(&windows::core::HSTRING::from(&object), &wanted)?;
+                if !is_writable(
+                    values
+                        .GetUnsignedIntegerValue(&WPD_STORAGE_ACCESS_CAPABILITY)
+                        .ok(),
+                ) {
+                    continue;
+                }
                 // Object ids last one session; the persistent unique id is
                 // what WPD keeps across reconnects.
                 let id = string(&values, &WPD_OBJECT_PERSISTENT_UNIQUE_ID)
@@ -1070,6 +1085,15 @@ mod tests {
     }
 
     #[test]
+    fn read_only_storages_are_not_sync_targets() {
+        assert!(is_writable(Some(0)));
+        assert!(is_writable(None));
+        // An iPhone's camera roll reports 1, read-only without deletion.
+        assert!(!is_writable(Some(1)));
+        assert!(!is_writable(Some(2)));
+    }
+
+    #[test]
     fn provisional_id_prefers_the_serial() {
         assert_eq!(provisional_id(Some(" 5a2b6c1d "), "x"), "mtp-5A2B6C1D");
         assert_eq!(
@@ -1101,6 +1125,86 @@ mod tests {
         );
     }
 
+    /// Prints every portable device Windows lists, its protocol, and what a
+    /// poll makes of them, for checking a real phone or player by eye:
+    /// `cargo test -p luminous-devices -- --ignored wpd_poll --nocapture`.
+    #[test]
+    #[ignore = "reports on connected devices; see the doc comment"]
+    fn wpd_poll_report() {
+        com();
+        let mut watcher = Watcher::new();
+        for id in watcher.device_ids().unwrap() {
+            println!("{id}\n  volume shim {}", is_volume_shim(&id));
+            if is_volume_shim(&id) {
+                continue;
+            }
+            let c = Connection::open(&id, false).unwrap();
+            unsafe {
+                let values = c
+                    .properties
+                    .GetValues(WPD_DEVICE_OBJECT_ID, &keys(&[WPD_DEVICE_PROTOCOL]).unwrap())
+                    .unwrap();
+                println!("  protocol {:?}", string(&values, &WPD_DEVICE_PROTOCOL));
+                let storages = c
+                    .device
+                    .Capabilities()
+                    .unwrap()
+                    .GetFunctionalObjects(&WPD_FUNCTIONAL_CATEGORY_STORAGE)
+                    .unwrap();
+                for storage in variant_strings(&storages).unwrap() {
+                    let values = c
+                        .properties
+                        .GetValues(
+                            &windows::core::HSTRING::from(&storage),
+                            &keys(&[WPD_STORAGE_ACCESS_CAPABILITY, WPD_STORAGE_FILE_SYSTEM_TYPE])
+                                .unwrap(),
+                        )
+                        .unwrap();
+                    println!(
+                        "  storage {storage}: access {:?}, filesystem {:?}",
+                        values.GetUnsignedIntegerValue(&WPD_STORAGE_ACCESS_CAPABILITY),
+                        string(&values, &WPD_STORAGE_FILE_SYSTEM_TYPE),
+                    );
+                    // Two levels, with file counts by extension below that.
+                    for (folder_id, folder) in c.children(&storage).unwrap() {
+                        println!(
+                            "    {}{}",
+                            folder.name,
+                            if folder.is_dir { "/" } else { "" }
+                        );
+                        if !folder.is_dir {
+                            continue;
+                        }
+                        let mut extensions: HashMap<String, usize> = HashMap::new();
+                        let children = c.children(&folder_id).unwrap();
+                        for (child_id, child) in &children {
+                            let entries = if child.is_dir {
+                                c.children(child_id).unwrap()
+                            } else {
+                                vec![(child_id.clone(), child.clone())]
+                            };
+                            for (_, entry) in entries.iter().filter(|(_, e)| !e.is_dir) {
+                                let ext = entry
+                                    .name
+                                    .rsplit_once('.')
+                                    .map(|(_, e)| e.to_ascii_lowercase())
+                                    .unwrap_or_default();
+                                *extensions.entry(ext).or_default() += 1;
+                            }
+                        }
+                        println!(
+                            "      {} entries, files by type {extensions:?}",
+                            children.len()
+                        );
+                    }
+                }
+            }
+        }
+        for device in watcher.poll() {
+            println!("polled: {} ({:?})", device.default_name, device.model);
+        }
+    }
+
     /// Exercises the WPD backend on real hardware. WPD's view of a mounted
     /// volume behaves like a device here, so set
     /// `LUMINOUS_WPD_TEST_DEVICE` to part of its PnP id (e.g. `hiby`) and run
@@ -1121,7 +1225,7 @@ mod tests {
             .find(|id| id.to_ascii_lowercase().contains(&needle))
             .expect("no portable device matches LUMINOUS_WPD_TEST_DEVICE");
         let handle = Handle(Arc::new(Connection::open(&pnp_id, false).unwrap()));
-        let device = handle.device().unwrap();
+        let device = handle.device().unwrap().expect("a writable storage");
         println!("{device:#?} formats {:?}", handle.0.formats);
         let storage = handle.storage(&device.storages[0].id);
         let space = storage.space().unwrap();

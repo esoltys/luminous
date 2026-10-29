@@ -13,12 +13,15 @@ const GENERIC_WORDS: &[&str] = &[
 pub(crate) fn model_name(vendor: Option<&str>, model: Option<&str>) -> Option<String> {
     let vendor = vendor.map(str::trim).unwrap_or("");
     let model = model.map(str::trim).unwrap_or("");
-    // Models often repeat the vendor ("SanDisk Cruzer"); don't say it twice.
-    let full = if !vendor.is_empty()
-        && !model
-            .to_ascii_lowercase()
-            .starts_with(&vendor.to_ascii_lowercase())
-    {
+    // Models often repeat the vendor ("SanDisk Cruzer"), and MTP devices
+    // give the company's full name ("Apple Inc." + "Apple iPhone"); don't
+    // say the brand twice.
+    let brand = vendor
+        .split(|c: char| c.is_whitespace() || c == ',')
+        .next()
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    let full = if !vendor.is_empty() && !model.to_ascii_lowercase().starts_with(&brand) {
         format!("{vendor} {model}")
     } else {
         model.to_string()
@@ -99,6 +102,18 @@ mod tests {
         assert_eq!(
             model_name(Some("SanDisk"), Some("SanDisk Cruzer Blade")).as_deref(),
             Some("SanDisk Cruzer Blade")
+        );
+        assert_eq!(
+            model_name(Some("Apple Inc."), Some("Apple iPhone")).as_deref(),
+            Some("Apple iPhone")
+        );
+        assert_eq!(
+            model_name(
+                Some("SAMSUNG Electronics Co., Ltd."),
+                Some("SAMSUNG_Android")
+            )
+            .as_deref(),
+            Some("SAMSUNG Android")
         );
     }
 
