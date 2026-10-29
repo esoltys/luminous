@@ -1,5 +1,16 @@
 import "@testing-library/jest-dom";
+import type { TestingLibraryMatchers } from "@testing-library/jest-dom/matchers";
 import { vi } from "vitest";
+
+// jest-dom 7.0.1 augments Vitest's pre-5 `Assertion<T>`, which no longer merges with
+// Vitest 5's `Assertion<R, T>`, so its matchers vanish from the types (they still work at
+// runtime). Re-attach them through `Matchers<R, T>`, which also reaches
+// `AsymmetricMatchersContaining`. Delete this once jest-dom ships Vitest 5 types
+// (testing-library/jest-dom#738, #742).
+declare module "vitest" {
+  // The parameter list must repeat Vitest's own declaration, `T` included, or it won't merge.
+  interface Matchers<R, T> extends TestingLibraryMatchers<unknown, R> {}
+}
 
 // Mock localStorage for jsdom/happy-dom
 const localStorageMock = (() => {

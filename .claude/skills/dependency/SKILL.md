@@ -35,13 +35,12 @@ left out.
    - `cd src-tauri && cargo test` and `cargo clippy --all-targets -- -D warnings`
 6. **Drop bumps that can't land**: if a bump breaks a check and the fix isn't a small call-site
    update, revert just that package (restore its range, `bun install` / `cargo update -p`), re-run
-   the checks, and record why it was excluded. Known blocker: **vitest 5** breaks
-   `@testing-library/jest-dom@7.0.1`'s type augmentation (`toBeInTheDocument` missing on
-   `Assertion`, ~470 `bun run check` errors). Check for a newer jest-dom every run
-   (`bun pm view @testing-library/jest-dom versions`), even when no vitest PR is open. The held-back
-   Dependabot PR is closed, so Dependabot only offers the *next* vitest release. If jest-dom has
-   a new release, add `bun add -d vitest@^5 @testing-library/jest-dom@latest` to this batch by
-   hand and verify. If it passes, remove this blocker note from the skill in the same PR.
+   the checks, and record why it was excluded. Known shim: `@testing-library/jest-dom@7.0.1`
+   still augments Vitest's pre-5 `Assertion<T>`, so `vitest.setup.ts` re-attaches its matchers
+   through `Matchers<R, T>` (testing-library/jest-dom#738). Check for a newer jest-dom every run
+   (`bun pm view @testing-library/jest-dom versions`). When one ships Vitest 5 types (#742), bump
+   it, delete the shim in the same commit (both augmentations together can conflict), verify, and
+   remove this note.
 7. **Commit** one `chore(deps): consolidate dependabot bumps` commit. The body lists what was
    bumped (with the Dependabot PR numbers), any code changes a breaking bump required, and any
    excluded PR with the reason.
