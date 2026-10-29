@@ -168,7 +168,11 @@
       })
       .catch(() => {});
 
-    if (import.meta.env.DEV) {
+    // Scripting surface is installed in dev servers or the non-release capture flavor.
+    // In production release builds (MODE === 'production'), this branch statically folds to false
+    // and Rolldown dead-code eliminates the dynamic import and the entire scripting module.
+    const isScriptingEnabled = import.meta.env.DEV || import.meta.env.MODE === 'capture';
+    if (isScriptingEnabled) {
       import('../lib/scripting').then(({ installScriptingApi, registerDialogHostControls }) => {
         installScriptingApi();
         registerDialogHostControls({

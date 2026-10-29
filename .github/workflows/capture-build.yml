@@ -1,0 +1,78 @@
+name: "Capture Build"
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Git ref (branch, tag, or commit SHA) to build'
+        type: string
+        default: ''
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  capture-build:
+    name: Build Capture Flavor (${{ matrix.platform }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            os_name: windows
+            artifact_name: luminous-capture-windows
+            binary_src: target/release/LuminousMusicPlayer.exe
+            binary_dst: target/capture/LuminousMusicPlayer-capture-windows.exe
+          - platform: ubuntu-24.04
+            os_name: linux
+            artifact_name: luminous-capture-linux
+            binary_src: target/release/LuminousMusicPlayer
+            binary_dst: target/capture/LuminousMusicPlayer-capture-linux
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.platform }}-capture
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libasound2-dev libssl-dev pkg-config libayatana-appindicator3-dev
+
+      - name: Build frontend in capture mode
+        run: bun run build:capture
+
+      - name: Build backend with capture feature
+        shell: bash
+        run: |
+          # Build binary without generating signed bundle installers
+          bun run tauri build --no-bundle --features capture
+
+      - name: Prepare capture binary artifact
+        shell: bash
+        run: |
+          mkdir -p target/capture
+          cp "${{ matrix.binary_src }}" "${{ matrix.binary_dst }}"
+
+      - name: Upload capture binary artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.binary_dst }}
+          if-no-files-found: error

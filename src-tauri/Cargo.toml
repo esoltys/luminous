@@ -124,6 +124,11 @@ sha2 = "0.11"
 # only — never enable this for a release build.
 tokio-console = ["dep:console-subscriber"]
 
+# Non-release capture build flavor: enables the remote devtools CDP port (9222)
+# and exposes the in-app scripting surface for prebuilt automated capture tools (#1633).
+# Never enabled for standard release, MSIX or Flatpak builds.
+capture = []
+
 # WebView2-only settings for tauri-plugin-prevent-default (zoom control,
 # browser accelerator keys) — the feature links webview2-com/windows, so it's
 # gated to the Windows target only.
