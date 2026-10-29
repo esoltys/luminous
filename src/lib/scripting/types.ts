@@ -354,6 +354,8 @@ export interface ScriptWindowApi {
 export interface ScriptCursorOptions {
   /** Optional transition duration in milliseconds (default: 0 for instant jump). */
   durationMs?: number;
+  /** Optional cursor scale multiplier (default: 1.0, e.g. 1.5 or 2.0 for high visibility). */
+  scale?: number;
 }
 
 /**
@@ -361,9 +363,9 @@ export interface ScriptCursorOptions {
  */
 export interface ScriptCursorApi {
   /**
-   * Shows the simulated cursor pointer, optionally setting its initial position.
+   * Shows the simulated cursor pointer, optionally setting its initial position and scale.
    */
-  show(position?: { x: number; y: number }): Promise<void>;
+  show(position?: { x: number; y: number; scale?: number }): Promise<void>;
 
   /**
    * Hides the simulated cursor pointer.
@@ -380,7 +382,7 @@ export interface ScriptCursorApi {
    * to its optical center.
    *
    * @param selector DOM selector or element query.
-   * @param options Animation options including duration in ms.
+   * @param options Animation options including duration in ms and scale.
    */
   pointTo(selector: string, options?: ScriptCursorOptions): Promise<void>;
 
@@ -389,6 +391,17 @@ export interface ScriptCursorApi {
    * at the current or specified cursor position.
    */
   click(position?: { x: number; y: number }): Promise<void>;
+
+  /**
+   * Sets the cursor scale multiplier (e.g. 1.5 or 2.0 for oversized high-visibility tutorial mode).
+   */
+  setScale(scale: number): Promise<void>;
+
+  /**
+   * Toggles the spotlight focus effect, dimming surrounding content with a soft radial beam
+   * centered on the cursor.
+   */
+  setSpotlight(enabled: boolean, options?: { radius?: number; opacity?: number }): Promise<void>;
 }
 
 /**

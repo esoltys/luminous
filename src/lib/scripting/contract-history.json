@@ -148,6 +148,8 @@
     "overlay.cursor.hide",
     "overlay.cursor.moveTo",
     "overlay.cursor.pointTo",
+    "overlay.cursor.setScale",
+    "overlay.cursor.setSpotlight",
     "overlay.cursor.show",
     "overlay.keystroke.hide",
     "overlay.keystroke.show",

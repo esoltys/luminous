@@ -615,6 +615,34 @@ describe("In-app scripting API", () => {
       expect(ripples?.length).toBeGreaterThan(0);
     });
 
+    it("scales cursor size via setScale and options", async () => {
+      await api.overlay.cursor.show({ x: 100, y: 100, scale: 2 });
+      const inner = document.getElementById("luminous-capture-cursor-inner");
+      expect(inner?.style.transform).toBe("scale(2)");
+
+      await api.overlay.cursor.setScale(1.5);
+      expect(inner?.style.transform).toBe("scale(1.5)");
+
+      await api.overlay.cursor.setScale(1);
+      expect(inner?.style.transform).toBe("none");
+    });
+
+    it("activates, updates, and dismisses spotlight focus effect", async () => {
+      await api.overlay.cursor.show({ x: 200, y: 300 });
+      await api.overlay.cursor.setSpotlight(true, { radius: 180, opacity: 0.7 });
+
+      const spotlight = document.getElementById("luminous-capture-spotlight");
+      expect(spotlight).not.toBeNull();
+      expect(spotlight?.style.background).toContain("circle 180px at 200px 300px");
+
+      await api.overlay.cursor.moveTo(250, 350);
+      expect(spotlight?.style.background).toContain("circle 180px at 250px 350px");
+
+      await api.overlay.cursor.setSpotlight(false);
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      expect(document.getElementById("luminous-capture-spotlight")).toBeNull();
+    });
+
     it("displays, updates, and hides tutorial captions", async () => {
       await api.overlay.caption.show("Step 1: Explore your music library", {
         title: "Tutorial",

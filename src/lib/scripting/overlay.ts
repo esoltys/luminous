@@ -9,6 +9,7 @@ export const OVERLAY_HOST_ID = "luminous-capture-overlays";
 export const CURSOR_ELEMENT_ID = "luminous-capture-cursor";
 export const CAPTION_ELEMENT_ID = "luminous-capture-caption";
 export const KEYSTROKE_ELEMENT_ID = "luminous-capture-keystroke";
+const SPOTLIGHT_ELEMENT_ID = "luminous-capture-spotlight";
 
 /**
  * Removes and tears down the capture overlay host element from the document if present.
@@ -49,6 +50,42 @@ function clampY(y: number): number {
 export function createOverlayController(wait: ScriptWaitApi): ScriptOverlayApi {
   let cursorX = 0;
   let cursorY = 0;
+  let currentScale = 1;
+  let isSpotlightActive = false;
+  let spotlightRadius = 160;
+  let spotlightOpacity = 0.65;
+
+  function updateCursorScale(): void {
+    if (typeof document === "undefined") return;
+    const inner = document.getElementById("luminous-capture-cursor-inner");
+    if (inner) {
+      inner.style.transform = currentScale === 1 ? "none" : `scale(${currentScale})`;
+    }
+  }
+
+  function updateSpotlight(durationMs = 0): void {
+    if (typeof document === "undefined" || !isSpotlightActive) return;
+    const host = getOrCreateHost();
+    if (!host) return;
+    let spot = document.getElementById(SPOTLIGHT_ELEMENT_ID);
+    if (!spot) {
+      spot = document.createElement("div");
+      spot.id = SPOTLIGHT_ELEMENT_ID;
+      spot.style.cssText =
+        "position: absolute; inset: 0; pointer-events: none; z-index: 10; opacity: 0; transition: opacity 300ms ease;";
+      host.insertBefore(spot, host.firstChild);
+      requestAnimationFrame(() => {
+        if (spot) spot.style.opacity = "1";
+      });
+    }
+
+    if (durationMs > 0) {
+      spot.style.transition = `background ${durationMs}ms cubic-bezier(0.2, 0, 0, 1), opacity 300ms ease`;
+    } else {
+      spot.style.transition = "opacity 300ms ease";
+    }
+    spot.style.background = `radial-gradient(circle ${spotlightRadius}px at ${cursorX}px ${cursorY}px, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, ${spotlightOpacity}) 100%)`;
+  }
 
   function getOrCreateHost(): HTMLElement | null {
     if (typeof document === "undefined") return null;
@@ -107,7 +144,7 @@ export function createOverlayController(wait: ScriptWaitApi): ScriptOverlayApi {
   }
 
   const cursor = {
-    async show(position?: { x: number; y: number }): Promise<void> {
+    async show(position?: { x: number; y: number; scale?: number }): Promise<void> {
       const host = getOrCreateHost();
       if (!host) return;
       const el = getOrCreateCursor(host);
@@ -115,9 +152,14 @@ export function createOverlayController(wait: ScriptWaitApi): ScriptOverlayApi {
       if (position) {
         cursorX = clampX(position.x);
         cursorY = clampY(position.y);
+        if (position.scale !== undefined) {
+          currentScale = position.scale;
+        }
       }
       el.style.transform = `translate3d(${cursorX - 1}px, ${cursorY - 1}px, 0)`;
+      updateCursorScale();
       el.style.display = "block";
+      updateSpotlight();
       await wait.settled();
     },
 
@@ -137,16 +179,22 @@ export function createOverlayController(wait: ScriptWaitApi): ScriptOverlayApi {
 
       cursorX = clampX(x);
       cursorY = clampY(y);
+      if (options?.scale !== undefined) {
+        currentScale = options.scale;
+        updateCursorScale();
+      }
       const durationMs = options?.durationMs ?? 0;
 
       if (durationMs > 0) {
         el.style.transition = `transform ${durationMs}ms cubic-bezier(0.2, 0, 0, 1)`;
         el.style.transform = `translate3d(${cursorX - 1}px, ${cursorY - 1}px, 0)`;
+        updateSpotlight(durationMs);
         await new Promise((resolve) => setTimeout(resolve, durationMs));
         el.style.transition = "none";
       } else {
         el.style.transition = "none";
         el.style.transform = `translate3d(${cursorX - 1}px, ${cursorY - 1}px, 0)`;
+        updateSpotlight();
       }
 
       await wait.settled();
@@ -201,9 +249,9 @@ export function createOverlayController(wait: ScriptWaitApi): ScriptOverlayApi {
       if (inner && typeof inner.animate === "function") {
         inner.animate(
           [
-            { transform: "scale(1)" },
-            { transform: "scale(0.82)" },
-            { transform: "scale(1)" },
+            { transform: currentScale === 1 ? "scale(1)" : `scale(${currentScale})` },
+            { transform: `scale(${currentScale * 0.82})` },
+            { transform: currentScale === 1 ? "scale(1)" : `scale(${currentScale})` },
           ],
           { duration: 180, easing: "ease-out" }
         );
@@ -228,6 +276,32 @@ export function createOverlayController(wait: ScriptWaitApi): ScriptOverlayApi {
         setTimeout(() => ripple.remove(), 320);
       }
 
+      await wait.settled();
+    },
+
+    async setScale(scale: number): Promise<void> {
+      currentScale = scale;
+      updateCursorScale();
+      await wait.settled();
+    },
+
+    async setSpotlight(
+      enabled: boolean,
+      options?: { radius?: number; opacity?: number }
+    ): Promise<void> {
+      isSpotlightActive = enabled;
+      if (options?.radius !== undefined) spotlightRadius = options.radius;
+      if (options?.opacity !== undefined) spotlightOpacity = options.opacity;
+
+      if (typeof document !== "undefined") {
+        const spot = document.getElementById(SPOTLIGHT_ELEMENT_ID);
+        if (enabled) {
+          updateSpotlight();
+        } else if (spot) {
+          spot.style.opacity = "0";
+          setTimeout(() => spot.remove(), 300);
+        }
+      }
       await wait.settled();
     },
   };
