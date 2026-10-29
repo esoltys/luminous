@@ -57,11 +57,13 @@ export function createOverlayController(wait: ScriptWaitApi): ScriptOverlayApi {
       cursor = document.createElement("div");
       cursor.id = CURSOR_ELEMENT_ID;
       cursor.style.cssText =
-        "position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform; transform-origin: 5px 3px; display: none; z-index: 20;";
+        "position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform; display: none; z-index: 20;";
       cursor.innerHTML = `
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));">
-          <path d="M5.5 3.5L18.5 13.5L12.5 14.5L10 20.5L7.5 19.5L10 13.5L5.5 3.5Z" fill="#ffffff" stroke="#111111" stroke-width="1.5" stroke-linejoin="round" />
-        </svg>
+        <div id="luminous-capture-cursor-inner" style="transform-origin: 1px 1px; will-change: transform;">
+          <svg width="22" height="26" viewBox="0 0 22 26" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 2px 5px rgba(0,0,0,0.45));">
+            <path d="M1 1 L1 17.5 L5.5 13.5 L8.8 20.8 L11.8 19.5 L8.5 12.2 L14 12.2 Z" fill="#ffffff" stroke="#111827" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" />
+          </svg>
+        </div>
       `;
       host.appendChild(cursor);
     }
@@ -102,7 +104,7 @@ export function createOverlayController(wait: ScriptWaitApi): ScriptOverlayApi {
         cursorX = clampX(position.x);
         cursorY = clampY(position.y);
       }
-      el.style.transform = `translate3d(${cursorX - 5}px, ${cursorY - 3}px, 0)`;
+      el.style.transform = `translate3d(${cursorX - 1}px, ${cursorY - 1}px, 0)`;
       el.style.display = "block";
       await wait.settled();
     },
@@ -127,12 +129,12 @@ export function createOverlayController(wait: ScriptWaitApi): ScriptOverlayApi {
 
       if (durationMs > 0) {
         el.style.transition = `transform ${durationMs}ms cubic-bezier(0.2, 0, 0, 1)`;
-        el.style.transform = `translate3d(${cursorX - 5}px, ${cursorY - 3}px, 0)`;
+        el.style.transform = `translate3d(${cursorX - 1}px, ${cursorY - 1}px, 0)`;
         await new Promise((resolve) => setTimeout(resolve, durationMs));
         el.style.transition = "none";
       } else {
         el.style.transition = "none";
-        el.style.transform = `translate3d(${cursorX - 5}px, ${cursorY - 3}px, 0)`;
+        el.style.transform = `translate3d(${cursorX - 1}px, ${cursorY - 1}px, 0)`;
       }
 
       await wait.settled();
@@ -155,19 +157,20 @@ export function createOverlayController(wait: ScriptWaitApi): ScriptOverlayApi {
     async click(position?: { x: number; y: number }): Promise<void> {
       const host = getOrCreateHost();
       if (!host) return;
-      const el = getOrCreateCursor(host);
+      getOrCreateCursor(host);
 
       if (position) {
         await this.moveTo(position.x, position.y);
       }
 
-      // Visual press effect on cursor
-      if (typeof el.animate === "function") {
-        el.animate(
+      // Visual press effect on cursor icon
+      const inner = document.getElementById("luminous-capture-cursor-inner");
+      if (inner && typeof inner.animate === "function") {
+        inner.animate(
           [
-            { transform: el.style.transform + " scale(1)" },
-            { transform: el.style.transform + " scale(0.82)" },
-            { transform: el.style.transform + " scale(1)" },
+            { transform: "scale(1)" },
+            { transform: "scale(0.82)" },
+            { transform: "scale(1)" },
           ],
           { duration: 180, easing: "ease-out" }
         );
@@ -176,20 +179,20 @@ export function createOverlayController(wait: ScriptWaitApi): ScriptOverlayApi {
       // Visual expanding ripple effect at the cursor pointer tip
       const ripple = document.createElement("div");
       ripple.className = "luminous-capture-ripple";
-      ripple.style.cssText = `position: absolute; left: ${cursorX}px; top: ${cursorY}px; width: 0px; height: 0px; border-radius: 50%; pointer-events: none; border: 2px solid var(--color-accent, #6366f1); transform: translate(-50%, -50%); opacity: 0.9; z-index: 15;`;
+      ripple.style.cssText = `position: absolute; left: ${cursorX}px; top: ${cursorY}px; width: 0px; height: 0px; border-radius: 50%; pointer-events: none; border: 2.5px solid var(--color-accent, #6366f1); transform: translate(-50%, -50%); opacity: 0.9; z-index: 15;`;
       host.appendChild(ripple);
 
       if (typeof ripple.animate === "function") {
         const anim = ripple.animate(
           [
             { width: "0px", height: "0px", opacity: 0.9 },
-            { width: "48px", height: "48px", opacity: 0 },
+            { width: "42px", height: "42px", opacity: 0 },
           ],
-          { duration: 350, easing: "cubic-bezier(0, 0, 0.2, 1)" }
+          { duration: 320, easing: "cubic-bezier(0, 0, 0.2, 1)" }
         );
         anim.onfinish = () => ripple.remove();
       } else {
-        setTimeout(() => ripple.remove(), 350);
+        setTimeout(() => ripple.remove(), 320);
       }
 
       await wait.settled();

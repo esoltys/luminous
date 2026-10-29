@@ -549,7 +549,7 @@ describe("In-app scripting API", () => {
       const cursor = document.getElementById("luminous-capture-cursor");
       expect(cursor).not.toBeNull();
       expect(cursor?.style.display).toBe("block");
-      expect(cursor?.style.transform).toContain("translate3d(195px, 297px, 0)");
+      expect(cursor?.style.transform).toContain("translate3d(199px, 299px, 0)");
 
       await api.overlay.cursor.hide();
       expect(cursor?.style.display).toBe("none");
@@ -558,11 +558,11 @@ describe("In-app scripting API", () => {
     it("clamps cursor coordinates to viewport boundaries", async () => {
       await api.overlay.cursor.moveTo(-100, -50);
       const cursor = document.getElementById("luminous-capture-cursor");
-      expect(cursor?.style.transform).toContain("translate3d(-5px, -3px, 0)");
+      expect(cursor?.style.transform).toContain("translate3d(-1px, -1px, 0)");
 
       await api.overlay.cursor.moveTo(999999, 999999);
-      const expectedX = window.innerWidth - 5;
-      const expectedY = window.innerHeight - 3;
+      const expectedX = window.innerWidth - 1;
+      const expectedY = window.innerHeight - 1;
       expect(cursor?.style.transform).toContain(`translate3d(${expectedX}px, ${expectedY}px, 0)`);
     });
 
@@ -570,7 +570,7 @@ describe("In-app scripting API", () => {
       await api.overlay.cursor.show();
       await api.overlay.cursor.moveTo(350, 450, { durationMs: 20 });
       const cursor = document.getElementById("luminous-capture-cursor");
-      expect(cursor?.style.transform).toContain("translate3d(345px, 447px, 0)");
+      expect(cursor?.style.transform).toContain("translate3d(349px, 449px, 0)");
     });
 
     it("points cursor to an element center via pointTo", async () => {
@@ -591,8 +591,8 @@ describe("In-app scripting API", () => {
 
       const cursor = document.getElementById("luminous-capture-cursor");
       // center is left 100 + 40 = 140, top 200 + 20 = 220
-      // hotspot offset is (140 - 5, 220 - 3) = (135, 217)
-      expect(cursor?.style.transform).toContain("translate3d(135px, 217px, 0)");
+      // hotspot offset is (140 - 1, 220 - 1) = (139, 219)
+      expect(cursor?.style.transform).toContain("translate3d(139px, 219px, 0)");
 
       document.body.removeChild(button);
     });
