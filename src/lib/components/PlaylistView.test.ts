@@ -7,12 +7,17 @@ import { collectionStore } from "../stores/collection.svelte";
 import { navigationStore } from "../stores/navigation.svelte";
 import { playerStore } from "../stores/player.svelte";
 import { invoke } from "@tauri-apps/api/core";
-import type { Playlist, PlaylistItem } from "../types";
+import type { Playlist, PlaylistItem, PlaylistSizeFit } from "../types";
 
 vi.mock("@tauri-apps/api/core", () => ({
   // Lists for every command except the size-limit answer, which is an object or null.
   invoke: vi.fn().mockImplementation(async (cmd: string) => (cmd === "get_playlist_size_fit" ? null : [])),
 }));
+vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn().mockResolvedValue(() => {}) }));
+
+/** What `get_playlist_size_fit` answers; every other command answers a list. */
+let fitAnswer: PlaylistSizeFit | null = null;
+const answerCommands = async (cmd: string) => (cmd === "get_playlist_size_fit" ? fitAnswer : []);
 
 describe("PlaylistView.svelte", () => {
   const mockPlaylist: Playlist = {
@@ -127,7 +132,8 @@ describe("PlaylistView.svelte", () => {
     playlistsStore.playlists = [mockPlaylist];
     playlistsStore.activePlaylistId = 1;
     playlistsStore.activePlaylistTracks = [...mockTracks];
-    playlistsStore.activeSizeFit = null;
+    fitAnswer = null;
+    vi.mocked(invoke).mockImplementation(answerCommands);
   });
 
   it("renders playlist tracks", () => {
@@ -278,24 +284,25 @@ describe("PlaylistView.svelte", () => {
   });
 
   describe("size limit (#344)", () => {
-    const fit = {
+    const fit: PlaylistSizeFit = {
       limit_bytes: 16_000_000_000,
       break_index: 2,
       fit_songs: 2,
       fit_bytes: 12_400_000_000,
       total_bytes: 20_000_000_000,
       order: ["uuid-1", "uuid-2", "uuid-3"],
-      device: null,
+      device_id: null,
+      device_name: null,
     };
 
     beforeEach(() => {
       playlistsStore.playlists = [{ ...mockPlaylist, size_limit_bytes: fit.limit_bytes }];
-      playlistsStore.activeSizeFit = fit;
+      fitAnswer = fit;
     });
 
-    it("draws a page break above the first song that doesn't fit, and dims nothing", () => {
-      const { getByRole, getByText } = render(PlaylistView);
-      const brk = getByRole("separator", { name: "16 GB limit · 2 songs above fit · 7.6 GB below" });
+    it("draws a page break above the first song that doesn't fit, and dims nothing", async () => {
+      const { findByRole, getByRole, getByText } = render(PlaylistView);
+      const brk = await findByRole("separator", { name: "16 GB limit · 2 songs above fit · 7.6 GB below" });
       expect(brk).toHaveAttribute("data-divider-variant", "break");
       expect(brk.nextElementSibling).toHaveTextContent("Track Three");
       expect(getByText("Track Three").closest("[data-song-row]")!.className).not.toContain("opacity-50");
@@ -303,23 +310,24 @@ describe("PlaylistView.svelte", () => {
       expect(getByRole("button", { name: /Limit 16 GB/ })).toBeInTheDocument();
     });
 
-    it("keeps the break between the visible rows while searching", () => {
+    it("keeps the break between the visible rows while searching", async () => {
       collectionStore.searchQuery = "Track T";
-      const { getByRole } = render(PlaylistView);
-      const brk = getByRole("separator", { name: /16 GB limit/ });
+      const { findByRole } = render(PlaylistView);
+      const brk = await findByRole("separator", { name: /16 GB limit/ });
       expect(brk.nextElementSibling).toHaveTextContent("Track Three");
     });
 
-    it("hides the break while the shown order isn't the one the fit was computed for", () => {
+    it("hides the break while the shown order isn't the one the fit was computed for", async () => {
       playlistsStore.activePlaylistTracks = [mockTracks[1], mockTracks[0], mockTracks[2]];
-      const { queryByRole, queryByText } = render(PlaylistView);
+      const { findByText, queryByRole } = render(PlaylistView);
+      await findByText("Measuring sizes…");
       expect(queryByRole("separator", { name: /16 GB limit/ })).toBeNull();
-      expect(queryByText("12.4 GB of 16 GB used")).toBeNull();
     });
 
-    it("draws no break when every song fits", () => {
-      playlistsStore.activeSizeFit = { ...fit, break_index: 3, fit_songs: 3 };
-      const { queryByRole } = render(PlaylistView);
+    it("draws no break when every song fits", async () => {
+      fitAnswer = { ...fit, break_index: 3, fit_songs: 3 };
+      const { findByText, queryByRole } = render(PlaylistView);
+      await findByText("12.4 GB of 16 GB used");
       expect(queryByRole("separator", { name: /16 GB limit/ })).toBeNull();
     });
 
@@ -340,7 +348,6 @@ describe("PlaylistView.svelte", () => {
 
     it("sets a typed size in the chosen unit", async () => {
       playlistsStore.playlists = [mockPlaylist];
-      playlistsStore.activeSizeFit = null;
       const setLimitSpy = vi.spyOn(playlistsStore, "setSizeLimit").mockResolvedValue();
       const { getByRole, getByPlaceholderText } = render(PlaylistView);
       await fireEvent.click(getByRole("button", { name: "Size limit" }));
@@ -349,22 +356,32 @@ describe("PlaylistView.svelte", () => {
       expect(setLimitSpy).toHaveBeenCalledWith(1, 1_500_000_000, null);
     });
 
-    it("names the device when the sizes are converted ones", () => {
-      playlistsStore.activeSizeFit = { ...fit, device: { id: "vol-1", name: "HiBy R1" } };
-      const { getByText } = render(PlaylistView);
-      expect(getByText("12.4 GB of 16 GB used on HiBy R1")).toBeInTheDocument();
+    it("names the device when the sizes are converted ones", async () => {
+      playlistsStore.playlists = [{ ...mockPlaylist, size_limit_bytes: fit.limit_bytes, size_limit_device: "vol-1" }];
+      fitAnswer = { ...fit, device_id: "vol-1", device_name: "HiBy R1" };
+      const { findByText } = render(PlaylistView);
+      expect(await findByText("12.4 GB of 16 GB used on HiBy R1")).toBeInTheDocument();
     });
 
     it("says the sizes are being measured until the answer arrives", () => {
-      playlistsStore.activeSizeFit = null;
+      vi.mocked(invoke).mockImplementation(async (cmd: string) =>
+        cmd === "get_playlist_size_fit" ? new Promise(() => {}) : []
+      );
       const { getByText } = render(PlaylistView);
       expect(getByText("Measuring sizes…")).toBeInTheDocument();
+    });
+
+    it("shows no answer for another limit than the one set", async () => {
+      fitAnswer = { ...fit, limit_bytes: 8_000_000_000 };
+      const { findByText, queryByRole } = render(PlaylistView);
+      await findByText("Measuring sizes…");
+      expect(queryByRole("separator", { name: /limit/ })).toBeNull();
     });
 
     it("re-measures for a connected device picked in the popover", async () => {
       vi.mocked(invoke).mockImplementation(async (cmd: string) => {
         if (cmd === "get_connected_devices") return [{ id: "vol-1", defaultName: "HiBy R1", profile: { nickname: null } }];
-        return cmd === "get_playlist_size_fit" ? null : [];
+        return answerCommands(cmd);
       });
       const setLimitSpy = vi.spyOn(playlistsStore, "setSizeLimit").mockResolvedValue();
       const { getByRole, findByRole } = render(PlaylistView);

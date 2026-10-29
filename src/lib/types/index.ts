@@ -250,8 +250,10 @@ export interface PlaylistSizeFit {
   fit_bytes: number;
   total_bytes: number;
   order: string[];
-  /** The device whose converted sizes were counted; null counts the library files. */
-  device: { id: string; name: string } | null;
+  /** The device the limit is measured for (the playlist's `size_limit_device`); null for the library files. */
+  device_id: string | null;
+  /** That device's name when its converted sizes were counted; null when the library files were. */
+  device_name: string | null;
 }
 
 /** A connected portable player or drive (backend `get_connected_devices`,

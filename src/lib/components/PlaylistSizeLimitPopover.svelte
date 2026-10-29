@@ -3,7 +3,7 @@
   import { fade, scale } from "../utils/motion";
   import { invoke } from "@tauri-apps/api/core";
   import { portal } from "../utils/portal";
-  import { deviceName } from "../utils/sizeFit";
+  import { deviceName } from "../utils/devices";
   import type { ConnectedDevice } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import { formatStorageSize, STORAGE_GB, STORAGE_MB } from "../utils/formatters";

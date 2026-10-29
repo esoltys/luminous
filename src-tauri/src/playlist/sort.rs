@@ -321,6 +321,44 @@ mod tests {
     }
 
     #[test]
+    fn every_sortable_field_has_a_key() {
+        let text = || Some("x".to_string());
+        let song = Song {
+            track: Some(1),
+            title: text(),
+            artist: text(),
+            album: text(),
+            composer: text(),
+            album_artist: text(),
+            year: Some(1),
+            originalyear: Some(1),
+            genre: text(),
+            grouping: text(),
+            bpm: Some(1.0),
+            initial_key: text(),
+            musicbrainz_track_id: text(),
+            bitrate: Some(1),
+            samplerate: Some(1),
+            bitdepth: Some(1),
+            channels: Some(1),
+            filesize: Some(1),
+            lastplayed: Some(1),
+            added: Some(1),
+            length_nanosec: Some(1),
+            path: text(),
+            ..Default::default()
+        };
+        let tags = HashMap::from([("x".to_string(), "Folk".to_string())]);
+        for field in SORT_FIELDS {
+            assert_ne!(
+                sort_key(&song, field, &tags),
+                SortKey::Missing,
+                "{field} is in SORT_FIELDS but has no sort_key arm"
+            );
+        }
+    }
+
+    #[test]
     fn text_order_is_numeric_and_ignores_case_and_accents() {
         assert_eq!(compare_text("Track 2", "Track 10"), Ordering::Less);
         assert_eq!(compare_text("élan", "Elan"), Ordering::Equal);

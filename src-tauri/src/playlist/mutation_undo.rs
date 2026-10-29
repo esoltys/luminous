@@ -1136,15 +1136,17 @@ mod tests {
     #[test]
     fn a_limit_remembers_its_device_until_removed() {
         let (_dir, manager, id) = sortable_playlist();
-        manager
+        let stored = manager
             .set_playlist_size_limit(id, Some(7), Some("vol-1"))
             .unwrap();
+        assert_eq!(stored.as_deref(), Some("vol-1"));
         let input = manager.size_limit_input(id).unwrap().unwrap();
         assert_eq!(input.device_id.as_deref(), Some("vol-1"));
 
-        manager
+        let stored = manager
             .set_playlist_size_limit(id, None, Some("vol-1"))
             .unwrap();
+        assert_eq!(stored, None, "no limit stores no device");
         let pl = manager
             .get_playlists()
             .unwrap()

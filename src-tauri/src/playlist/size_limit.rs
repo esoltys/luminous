@@ -8,6 +8,8 @@
 use super::PlaylistManager;
 use crate::models::PlaylistItem;
 use anyhow::Result;
+use luminous_devices::DeviceProfile;
+use luminous_transcode::Transcoder;
 use rusqlite::{params, OptionalExtension};
 use serde::Serialize;
 
@@ -49,16 +51,8 @@ pub fn fit_to_limit(sizes: &[Option<u64>], limit_bytes: u64) -> SizeFit {
     fit
 }
 
-/// The device a fit's sizes were estimated for.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct FitDevice {
-    pub id: String,
-    /// The device's nickname, or its default name.
-    pub name: String,
-}
-
-/// The size limit applied to a playlist, with the item order it was
-/// computed for so a view can tell when the answer is stale.
+/// The size limit applied to a playlist. It carries the inputs it answered
+/// (limit, device, item order) so a view can tell when it is stale.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct PlaylistSizeFit {
     pub limit_bytes: u64,
@@ -66,9 +60,13 @@ pub struct PlaylistSizeFit {
     pub fit: SizeFit,
     /// Item UUIDs in the order the fit was computed over.
     pub order: Vec<String>,
-    /// The device whose converted sizes were counted; `None` counts the
-    /// library files as they are.
-    pub device: Option<FitDevice>,
+    /// The device the limit is measured for (the playlist's
+    /// `size_limit_device`), `None` for the library files as they are.
+    pub device_id: Option<String>,
+    /// That device's name when its converted sizes were counted. `None` when
+    /// the library files were counted, including for a device this computer
+    /// doesn't know.
+    pub device_name: Option<String>,
 }
 
 /// What a playlist's size fit is computed from. Read in one quick query, so
@@ -84,13 +82,39 @@ pub struct SizeLimitInput {
 }
 
 impl SizeLimitInput {
-    /// Applies the limit. `size_on_device` gets each copyable item and its
-    /// library file size and returns the size it takes where it's going;
-    /// items that can't be copied take no space. `device` names whose sizes
-    /// those are.
-    pub fn fit(
+    /// Applies the limit. With `device` (its profile and name), each song
+    /// counts at the size it will have there after converting: exact once
+    /// converted, otherwise estimated, and the library size when the file
+    /// can't be read. Without one, the library files count as they are.
+    /// Reads every file's tags the first time a device is measured, so run
+    /// it on a blocking thread.
+    pub fn measure(
         self,
-        device: Option<FitDevice>,
+        device: Option<(DeviceProfile, String)>,
+        transcoder: &Transcoder,
+    ) -> PlaylistSizeFit {
+        let Some((profile, name)) = device else {
+            return self.fit(None, |_, library_bytes| library_bytes);
+        };
+        self.fit(Some(name), |item, library_bytes| {
+            item.song
+                .as_ref()
+                .and_then(|song| song.path.as_deref())
+                .and_then(|path| {
+                    transcoder
+                        .estimated_size(std::path::Path::new(path), &profile)
+                        .ok()
+                })
+                .unwrap_or(library_bytes)
+        })
+    }
+
+    /// Applies the limit with `size_on_device` giving each copyable item's
+    /// size from its library file size; items that can't be copied take no
+    /// space. `device_name` names whose sizes those are.
+    pub(super) fn fit(
+        self,
+        device_name: Option<String>,
         mut size_on_device: impl FnMut(&PlaylistItem, u64) -> u64,
     ) -> PlaylistSizeFit {
         let sizes: Vec<Option<u64>> = self
@@ -102,7 +126,8 @@ impl SizeLimitInput {
             limit_bytes: self.limit_bytes,
             fit: fit_to_limit(&sizes, self.limit_bytes),
             order: self.items.into_iter().map(|i| i.uuid).collect(),
-            device,
+            device_id: self.device_id,
+            device_name,
         }
     }
 }
@@ -118,15 +143,16 @@ fn library_size(item: &PlaylistItem) -> Option<u64> {
 impl PlaylistManager {
     /// Sets a playlist's size limit in bytes and the device (a
     /// `device_profiles` id) it's measured for, `None` for library files as
-    /// they are. A limit of `None` or 0 removes both. A no-op for the Queue.
+    /// they are. A limit of `None` or 0 removes both. Returns the device now
+    /// stored. A no-op for the Queue.
     pub fn set_playlist_size_limit(
         &self,
         playlist_id: i64,
         limit_bytes: Option<u64>,
         device_id: Option<&str>,
-    ) -> Result<()> {
+    ) -> Result<Option<String>> {
         if self.is_queue_id(playlist_id)? {
-            return Ok(());
+            return Ok(None);
         }
         let limit = limit_bytes
             .filter(|&b| b > 0)
@@ -137,11 +163,11 @@ impl PlaylistManager {
             "UPDATE playlists SET size_limit_bytes = ?1, size_limit_device = ?2 WHERE id = ?3",
             params![limit, device, playlist_id],
         )?;
-        Ok(())
+        Ok(device.map(str::to_string))
     }
 
     /// The playlist's limit, device and items in its order, for
-    /// [`SizeLimitInput::fit`]. `None` when it has no limit (or doesn't
+    /// [`SizeLimitInput::measure`]. `None` when it has no limit (or doesn't
     /// exist).
     pub fn size_limit_input(&self, playlist_id: i64) -> Result<Option<SizeLimitInput>> {
         let row: Option<(Option<i64>, Option<String>)> = {
@@ -231,13 +257,9 @@ mod tests {
                 item("c", Some(40), false),
             ],
         };
-        let device = FitDevice {
-            id: "vol-1".into(),
-            name: "HiBy R1".into(),
-        };
         // Converted, each song takes a tenth of its library size: 4 + 4 fit, 4 more doesn't.
         let mut asked = Vec::new();
-        let f = input.fit(Some(device.clone()), |item, library| {
+        let f = input.fit(Some("HiBy R1".into()), |item, library| {
             asked.push(item.uuid.clone());
             library / 10
         });
@@ -256,6 +278,9 @@ mod tests {
             (3, 2, 8, 12)
         );
         assert_eq!(f.order, ["a", "gone", "b", "c"]);
-        assert_eq!(f.device, Some(device));
+        assert_eq!(
+            (f.device_id.as_deref(), f.device_name.as_deref()),
+            (Some("vol-1"), Some("HiBy R1"))
+        );
     }
 }

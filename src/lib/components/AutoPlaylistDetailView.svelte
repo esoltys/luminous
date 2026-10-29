@@ -30,7 +30,7 @@
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
   import ShareModal from "./ShareModal.svelte";
   import PlaylistSizeLimitControl from "./PlaylistSizeLimitControl.svelte";
-  import { fitForOrder, breakBeforeUuid, sizeLimitBreakLabel, sizeLimitStats, watchDeviceProfile } from "../utils/sizeFit";
+  import { PlaylistSizeLimit } from "../utils/sizeFit.svelte";
   import {
     PlusIcon as Plus,
     FolderPlusIcon as FolderPlus,
@@ -48,7 +48,7 @@
     ShareNetworkIcon as Share
   } from "phosphor-svelte";
   import { shuffleArray } from "../utils/shuffle";
-  import type { PlaylistItem, PlaylistSizeFit, QueuePopulationMode, Song } from "../types";
+  import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { getPopulationModeSuffix, getBpmBucketLabel, getDaypartMixLabel, getDaypartMixSourceLabel } from "../utils/playlist";
@@ -113,10 +113,9 @@
   let pinRefKey = $derived(autoPlaylistRefKeyFor(view));
 
   let songs = $state<Song[]>([]);
-  // When the list is the backing playlist's own rows: those rows, and the
-  // backend's size-limit answer for their order (#344). `null` otherwise.
+  // When the list is the backing playlist's own rows: those rows (#344).
+  // `null` otherwise.
   let playlistItems = $state<PlaylistItem[] | null>(null);
-  let rawSizeFit = $state<PlaylistSizeFit | null>(null);
   let loading = $state(true);
   let editingSongId = $state<number | null>(null);
   let editingAlbumSongs = $state<Song[] | null>(null);
@@ -312,19 +311,10 @@
    * artist tag (curated, DB-only) at once -- e.g. "Folk" tagged on Danheim
    * the artist and also present as a track's own genre elsewhere. Browsing
    * either one should surface the union of both, not just whichever system
-   * you clicked through from (#962/#956 follow-up). */
+   * you clicked through from (#962/#956 follow-up). The other system's
+   * matches go after `primary`, so they never sit among a playlist's own
+   * rows (and its size-limit break). */
   async function unionWithOtherSystem(
-    k: typeof kind,
-    g: typeof genre,
-    at: typeof artistTag,
-    loaded: Loaded
-  ): Promise<Loaded> {
-    return { ...loaded, songs: await unionSongs(k, g, at, loaded.songs) };
-  }
-
-  /** Appends the other system's matches after `primary`, so they never sit
-   * among a playlist's own rows (and its size-limit break). */
-  async function unionSongs(
     k: typeof kind,
     g: typeof genre,
     at: typeof artistTag,
@@ -375,7 +365,7 @@
     const layout = backingLayoutKey;
     loading = true;
     fetchSongs(k, g, at, d, b, pid)
-      .then((loaded) => unionWithOtherSystem(k, g, at, loaded))
+      .then(async (loaded) => ({ ...loaded, songs: await unionWithOtherSystem(k, g, at, loaded.songs) }))
       .then((loaded) => {
         if (kind !== k || genre !== g || artistTag !== at || decade !== d || bpm !== b || playlistId !== pid) return;
         applyLoaded(loaded);
@@ -618,40 +608,9 @@
     return [...list].sort((a, b) => compareSongs(a, b, field, sortAsc));
   });
 
-  /** Asks the backend which rows fit the limit. Separate from loading the
-   * rows: measuring for a device can take seconds the first time. */
-  function measureFit(id: number) {
-    invoke<PlaylistSizeFit | null>("get_playlist_size_fit", { playlistId: id })
-      .then((fit) => {
-        if (listedPlaylist?.id === id) rawSizeFit = fit ?? null;
-      })
-      .catch((e) => console.error("Failed to measure the playlist's size limit:", e));
-  }
-
-  // Whenever the rows, the limit or its device change.
-  $effect(() => {
-    const pl = listedPlaylist;
-    if (!pl?.size_limit_bytes || playlistItems === null) {
-      rawSizeFit = null;
-      return;
-    }
-    void pl.size_limit_device;
-    measureFit(pl.id);
-  });
-
-  // Re-measure when the limit's device is plugged in, unplugged or re-profiled.
-  $effect(() => {
-    const id = listedPlaylist?.id;
-    const device = listedPlaylist?.size_limit_device;
-    if (id === undefined || !device) return;
-    return watchDeviceProfile(device, () => measureFit(id));
-  });
-
+  const sizeLimit = new PlaylistSizeLimit(() => ({ playlist: listedPlaylist, items: playlistItems }));
   let uuidBySongId = $derived(new Map((playlistItems ?? []).map((item) => [item.song!.id, item.uuid])));
-  let sizeFit = $derived(
-    listedPlaylist ? fitForOrder(rawSizeFit, (playlistItems ?? []).map((item) => item.uuid)) : null
-  );
-  let breakBefore = $derived(breakBeforeUuid(sizeFit, sortedSongs.flatMap((s) => uuidBySongId.get(s.id) ?? [])));
+  let breakBefore = $derived(sizeLimit.breakBefore(sortedSongs.flatMap((s) => uuidBySongId.get(s.id) ?? [])));
 
   function songToRow(song: Song): SongTableRow {
     const disconnected = !song.unavailable && collectionStore.isPathOnDisconnectedDrive(song.path);
@@ -660,8 +619,8 @@
       song,
       disabled: song.unavailable || disconnected,
       disabledTooltip: disconnected ? i18n.t("collection.driveDisconnectedTooltip") : undefined,
-      ...(sizeFit && uuidBySongId.get(song.id) === breakBefore
-        ? { dividerBefore: sizeLimitBreakLabel(sizeFit), dividerVariant: "break" as const }
+      ...(breakBefore !== null && uuidBySongId.get(song.id) === breakBefore
+        ? { dividerBefore: sizeLimit.breakLabel() ?? undefined, dividerVariant: "break" as const }
         : {}),
     };
   }
@@ -709,12 +668,9 @@
             <span>•</span>
             <span>{i18n.t('playlists.updatedOn', { date: updatedLabel })}</span>
           {/if}
-          {#if sizeFit}
+          {#if sizeLimit.status}
             <span>•</span>
-            <span>{sizeLimitStats(sizeFit)}</span>
-          {:else if listedPlaylist?.size_limit_bytes}
-            <span>•</span>
-            <span>{i18n.t("playlists.sizeLimitMeasuring")}</span>
+            <span>{sizeLimit.status}</span>
           {/if}
         </div>
 
@@ -749,7 +705,7 @@
             {#snippet icon()}<Share class="w-4 h-4" />{/snippet}
           </IconActionButton>
           {#if listedPlaylist}
-            <PlaylistSizeLimitControl playlist={listedPlaylist} fit={rawSizeFit} />
+            <PlaylistSizeLimitControl playlist={listedPlaylist} deviceName={sizeLimit.deviceName} />
           {/if}
           <button
             onclick={toggleOverflowMenu}

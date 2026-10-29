@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Playlist, PlaylistSizeFit } from "../types";
+  import type { Playlist } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { formatStorageSize } from "../utils/formatters";
@@ -8,9 +8,9 @@
   import PlaylistSizeLimitPopover from "./PlaylistSizeLimitPopover.svelte";
   import { UsbIcon as Usb } from "phosphor-svelte";
 
-  /** The playlist header's size-limit button and its popover. `fit` is the
-   * latest answer for the playlist, which names its device when unplugged. */
-  let { playlist, fit = null }: { playlist: Playlist; fit?: PlaylistSizeFit | null } = $props();
+  /** The playlist header's size-limit button and its popover. `deviceName`
+   * names the limit's device while it's unplugged (`PlaylistSizeLimit`). */
+  let { playlist, deviceName = null }: { playlist: Playlist; deviceName?: string | null } = $props();
 
   let isOpen = $state(false);
   let anchorEl = $state<HTMLElement | null>(null);
@@ -34,7 +34,7 @@
   {anchorEl}
   limitBytes={playlist.size_limit_bytes ?? null}
   deviceId={playlist.size_limit_device ?? null}
-  deviceLabel={fit?.device?.name ?? null}
+  deviceLabel={deviceName}
   refreshReorders={playlist.dynamic_enabled && !playlist.sort_field}
   onApply={(bytes, deviceId) => playlistsStore.setSizeLimit(playlist.id, bytes, deviceId)}
   onClose={() => (isOpen = false)}

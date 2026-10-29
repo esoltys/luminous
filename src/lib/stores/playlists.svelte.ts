@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { Playlist, PlaylistItem, PlaylistSizeFit, QueuePopulationMode, Song } from "../types";
+import type { Playlist, PlaylistItem, QueuePopulationMode, Song } from "../types";
 import { applySongStats, type SongStatsPayload } from "../utils/stats";
 import { toastStore } from "./toast.svelte";
 import { i18n } from "./i18n.svelte";
@@ -17,10 +17,6 @@ class PlaylistsStore {
   playlists = $state<Playlist[]>([]);
   activePlaylistId = $state<number | null>(null);
   activePlaylistTracks = $state<PlaylistItem[]>([]);
-  /** Which of the active playlist's songs fit its size limit (`null`: no
-   * limit). Applies only while `activePlaylistTracks` is in `order` — see
-   * `PlaylistSizeFit`. */
-  activeSizeFit = $state<PlaylistSizeFit | null>(null);
 
   /** The playlist explicitly pinned via "Make Active" as the quick-add target
    * used across the app ("Add to {name}"). Distinct from `activePlaylistId`
@@ -209,13 +205,8 @@ class PlaylistsStore {
   }
 
   async selectPlaylist(id: number) {
-    if (this.activePlaylistId !== id) this.activeSizeFit = null;
     this.activePlaylistId = id;
-    const tracks = await invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: id });
-    this.activePlaylistTracks = tracks;
-    // Not awaited: measuring for a device can take seconds the first time,
-    // and the songs shouldn't wait for it.
-    this.refreshSizeFit(id).catch((e) => console.error("Failed to measure the playlist's size limit:", e));
+    this.activePlaylistTracks = await invoke("get_playlist_tracks", { playlistId: id });
     this.notifyQueueChanged();
     await invoke("set_app_setting", { key: "active_playlist_id", value: id.toString() });
   }
@@ -383,21 +374,11 @@ class PlaylistsStore {
   }
 
   /** Sets a playlist's size limit in bytes and the device it's measured
-   * for (`null`: library files as they are); a `null` limit removes both. */
+   * for (`null`: library files as they are); a `null` limit removes both.
+   * Views showing the playlist re-measure (`PlaylistSizeLimit`). */
   async setSizeLimit(playlistId: number, limitBytes: number | null, deviceId: string | null) {
     await invoke("set_playlist_size_limit", { playlistId, limitBytes, deviceId });
     await this.refreshPlaylists();
-    if (this.activePlaylistId === playlistId) {
-      await this.refreshSizeFit(playlistId);
-    }
-  }
-
-  /** Re-asks the backend which songs of the active playlist fit its limit. */
-  async refreshSizeFit(playlistId: number) {
-    const fit = await invoke<PlaylistSizeFit | null>("get_playlist_size_fit", { playlistId });
-    if (this.activePlaylistId === playlistId) {
-      this.activeSizeFit = fit ?? null;
-    }
   }
 
   async deduplicatePlaylist(playlistId: number) {

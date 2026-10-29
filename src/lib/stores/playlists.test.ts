@@ -236,31 +236,13 @@ describe("PlaylistsStore", () => {
     expect(invoke).toHaveBeenCalledWith("get_playlist_tracks", { playlistId: 101 });
   });
 
-  it("sets a size limit and re-asks which songs fit", async () => {
-    playlistsStore.activePlaylistId = 101;
-    const fit = { limit_bytes: 10, break_index: 1, fit_songs: 1, fit_bytes: 6, total_bytes: 12, order: ["item-1", "item-2"], device: null };
-    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
-      if (cmd === "get_playlist_size_fit") return fit;
-      return cmd === "get_playlists" ? mockPlaylists : null;
-    });
+  it("sets a size limit and reloads the playlists, so views showing it re-measure", async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => (cmd === "get_playlists" ? mockPlaylists : null));
 
     await playlistsStore.setSizeLimit(101, 10, "vol-1");
 
     expect(invoke).toHaveBeenCalledWith("set_playlist_size_limit", { playlistId: 101, limitBytes: 10, deviceId: "vol-1" });
-    expect(playlistsStore.activeSizeFit).toEqual(fit);
-  });
-
-  it("shows a playlist's songs without waiting for its size limit to be measured", async () => {
-    let answerFit: (fit: null) => void = () => {};
-    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
-      if (cmd === "get_playlist_size_fit") return new Promise((resolve) => (answerFit = resolve));
-      return cmd === "get_playlist_tracks" ? mockTracks : null;
-    });
-
-    await playlistsStore.selectPlaylist(101);
-
-    expect(playlistsStore.activePlaylistTracks).toHaveLength(2);
-    answerFit(null);
+    expect(invoke).toHaveBeenCalledWith("get_playlists");
   });
 
   it("deduplicates playlist items by removing duplicate track entries", async () => {

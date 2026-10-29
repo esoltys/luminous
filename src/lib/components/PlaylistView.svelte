@@ -72,7 +72,7 @@
   import { compareSongs } from "../utils/songSort";
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
   import PlaylistSizeLimitControl from "./PlaylistSizeLimitControl.svelte";
-  import { fitForOrder, breakBeforeUuid, sizeLimitBreakLabel, sizeLimitStats, watchDeviceProfile } from "../utils/sizeFit";
+  import { PlaylistSizeLimit } from "../utils/sizeFit.svelte";
 
   // Default column widths (px or fr) — used when no saved width exists for a column.
   const PLAYLIST_COL_DEFAULTS: Partial<Record<keyof typeof collectionStore.visibleColumns, string>> = {
@@ -99,7 +99,6 @@
   let showOverflowMenu = $state(false);
   let overflowMenuPos = $state<{ x: number; y: number } | null>(null);
   let overflowButtonEl = $state<HTMLButtonElement | undefined>(undefined);
-
 
   let showSaveQueueModal = $state(false);
   let saveQueueName = $state(i18n.t("playlists.queuePlaylistDefaultName"));
@@ -383,8 +382,8 @@
       underlyingIndex: playlistsStore.activePlaylistTracks.findIndex((t) => t.uuid === item.uuid),
       ...(autoContinueStarts.has(item.uuid)
         ? { dividerBefore: i18n.t("playlists.autoContinue") }
-        : sizeFit && item.uuid === breakBefore
-          ? { dividerBefore: sizeLimitBreakLabel(sizeFit), dividerVariant: "break" as const }
+        : item.uuid === breakBefore
+          ? { dividerBefore: sizeLimit.breakLabel() ?? undefined, dividerVariant: "break" as const }
           : {}),
     };
   }
@@ -490,24 +489,11 @@
     playlistsStore.moveItems(activePlaylist.id, [...moving], beforeUuid);
   }
 
-  /** The size-limit answer, only while the shown order is the one it was
-   * computed for (e.g. not during an optimistic drag, or while a shuffled
-   * playlist shows its playback order). */
-  let sizeFit = $derived(
-    isQueue ? null : fitForOrder(playlistsStore.activeSizeFit, playlistsStore.activePlaylistTracks.map((t) => t.uuid))
-  );
-
-  let breakBefore = $derived(breakBeforeUuid(sizeFit, sortedTracks.map((t) => t.uuid)));
-
-  // Re-measure when the limit's device is plugged in, unplugged or re-profiled.
-  $effect(() => {
-    const id = activePlaylist?.id;
-    const device = activePlaylist?.size_limit_device;
-    if (id === undefined || !device) return;
-    return watchDeviceProfile(device, () => {
-      playlistsStore.refreshSizeFit(id).catch((e) => console.error("Failed to re-measure the size limit:", e));
-    });
-  });
+  const sizeLimit = new PlaylistSizeLimit(() => ({
+    playlist: isQueue ? undefined : activePlaylist,
+    items: playlistsStore.activePlaylistTracks,
+  }));
+  let breakBefore = $derived(sizeLimit.breakBefore(sortedTracks.map((t) => t.uuid)));
 
   function playSelected() {
     if (selectedUuids.size === 0 || !activePlaylist) return;
@@ -725,12 +711,9 @@
             </span>
             <span>•</span>
             <span>{totalRuntimeLabel}</span>
-            {#if sizeFit}
+            {#if sizeLimit.status}
               <span>•</span>
-              <span>{sizeLimitStats(sizeFit)}</span>
-            {:else if !isQueue && activePlaylist?.size_limit_bytes}
-              <span>•</span>
-              <span>{i18n.t("playlists.sizeLimitMeasuring")}</span>
+              <span>{sizeLimit.status}</span>
             {/if}
           </div>
           {/if}
@@ -786,7 +769,7 @@
               </Button>
             {/if}
             {#if !isQueue && activePlaylist}
-              <PlaylistSizeLimitControl playlist={activePlaylist} fit={playlistsStore.activeSizeFit} />
+              <PlaylistSizeLimitControl playlist={activePlaylist} deviceName={sizeLimit.deviceName} />
             {/if}
             {#if !isActive && activePlaylist && !activePlaylist.dynamic_enabled}
               <Button
