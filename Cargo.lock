@@ -3561,7 +3561,6 @@ dependencies = [
  "console-subscriber",
  "cucumber",
  "deunicode",
- "encoding_rs",
  "env_logger",
  "image",
  "libc",

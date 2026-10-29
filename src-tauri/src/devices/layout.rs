@@ -16,7 +16,6 @@ use crate::organizer::{
     apply_dir_casing_map, build_dir_casing_map, expand_template, sanitize_component,
 };
 use anyhow::Result;
-use encoding_rs::WINDOWS_1252;
 use luminous_devices::{DeviceProfile, LayoutSettings, PathSeparator, PlaylistFileFormat};
 use luminous_metadata::playlist::{render_playlist, LineEnding, PlaylistEntry, PlaylistFormat};
 use rusqlite::OptionalExtension;
@@ -84,14 +83,14 @@ struct Draft<'a> {
 
 impl DeviceLayout {
     /// Places `tracks` on a device with `profile`: under `music_path`,
-    /// following the folder template, each name FAT-safe (and, for
-    /// Windows-1252 playlists, made of characters that encoding has).
+    /// following the folder template, each name FAT-safe (and ASCII for
+    /// ASCII playlists).
     /// Folders whose names differ only in case get one spelling, and tracks
     /// that would land on the same file get " (2)", " (3)"... in song-id
     /// order, so the same songs get the same paths on every sync.
     pub fn plan(profile: &DeviceProfile, tracks: &[SyncedTrack]) -> Self {
         let settings = profile.layout.clone();
-        let fold = settings.playlist_format == PlaylistFileFormat::M3uWindows1252;
+        let fold = settings.playlist_format == PlaylistFileFormat::M3uAscii;
         let music_dir = path_parts(&profile.music_path);
 
         let mut ordered: Vec<&SyncedTrack> = tracks.iter().collect();
@@ -141,11 +140,11 @@ impl DeviceLayout {
     pub fn playlist_files(&self, playlists: &[DevicePlaylist]) -> Vec<DeviceFile> {
         let (format, extension) = match self.settings.playlist_format {
             PlaylistFileFormat::M3u8 => (PlaylistFormat::M3u8, "m3u8"),
-            PlaylistFileFormat::M3uWindows1252 => (PlaylistFormat::M3u, "m3u"),
+            PlaylistFileFormat::M3uAscii => (PlaylistFormat::M3u, "m3u"),
             PlaylistFileFormat::Pls => (PlaylistFormat::Pls, "pls"),
             PlaylistFileFormat::None => return Vec::new(),
         };
-        let fold = self.settings.playlist_format == PlaylistFileFormat::M3uWindows1252;
+        let fold = self.settings.playlist_format == PlaylistFileFormat::M3uAscii;
         let (separator, line_ending) = match self.settings.path_separator {
             PathSeparator::Slash => ("/", LineEnding::Lf),
             PathSeparator::Backslash => ("\\", LineEnding::CrLf),
@@ -174,7 +173,7 @@ impl DeviceLayout {
                     .collect();
                 let text = render_playlist(playlist.name, &entries, format, line_ending);
                 let content = if fold {
-                    encode_windows_1252(&text)
+                    fold_to_ascii(&text).into_bytes()
                 } else {
                     text.into_bytes()
                 };
@@ -216,10 +215,10 @@ fn draft<'a>(track: &SyncedTrack<'a>, template: &str, fold: bool) -> Draft<'a> {
 }
 
 /// One file or folder name, safe on FAT and exFAT and within the length
-/// limit; in Windows-1252 characters when `fold`.
+/// limit; in ASCII when `fold`.
 fn device_name(raw: &str, fold: bool) -> String {
     let name = if fold {
-        fold_to_windows_1252(raw)
+        fold_to_ascii(raw)
     } else {
         raw.to_string()
     };
@@ -417,18 +416,12 @@ fn truncate_name(name: &str, max: usize) -> String {
     name[..end].trim_end_matches(['.', ' ']).to_string()
 }
 
-fn in_windows_1252(c: char) -> bool {
-    let mut buf = [0u8; 4];
-    let (_, _, unmappable) = WINDOWS_1252.encode(c.encode_utf8(&mut buf));
-    !unmappable
-}
-
-/// `text` with every character Windows-1252 lacks replaced by an ASCII
-/// look-alike ("Сплин" -> "Splin"), or `_` when there is none.
-fn fold_to_windows_1252(text: &str) -> String {
+/// `text` with every non-ASCII character replaced by an ASCII look-alike
+/// ("Сплин" -> "Splin", "’" -> "'"), or `_` when there is none.
+fn fold_to_ascii(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     for c in text.chars() {
-        if in_windows_1252(c) {
+        if c.is_ascii() {
             out.push(c);
         } else {
             match deunicode::deunicode_char(c) {
@@ -438,16 +431,6 @@ fn fold_to_windows_1252(text: &str) -> String {
         }
     }
     out
-}
-
-/// `text` in Windows-1252, without a BOM. Characters it lacks are folded
-/// first, so nothing is turned into the `&#...;` references the encoder
-/// otherwise writes.
-fn encode_windows_1252(text: &str) -> Vec<u8> {
-    let folded = fold_to_windows_1252(text);
-    let (bytes, _, unmappable) = WINDOWS_1252.encode(&folded);
-    debug_assert!(!unmappable, "folded text is all Windows-1252");
-    bytes.into_owned()
 }
 
 #[cfg(test)]
@@ -638,31 +621,47 @@ mod tests {
     }
 
     #[test]
-    fn windows_1252_playlists_point_at_names_it_can_encode() {
-        let songs = [song(1, "Сплин", "Гранатовый альбом", 1998, 1, "Café №1")];
+    fn ascii_playlists_point_at_ascii_names() {
+        let songs = [song(
+            1,
+            "Сплин",
+            "Гранатовый альбом",
+            1998,
+            1,
+            "Don’t Café №1",
+        )];
         let layout = plan(
             &profile(LayoutSettings {
-                playlist_format: PlaylistFileFormat::M3uWindows1252,
+                playlist_format: PlaylistFileFormat::M3uAscii,
                 ..LayoutSettings::default()
             }),
             &songs,
             "mp3",
         );
         let path = layout.track_path(1).unwrap();
-        assert_eq!(path, "Music/Splin/1998 - Granatovyi al'bom/01 Café No1.mp3");
+        assert_eq!(
+            path,
+            "Music/Splin/1998 - Granatovyi al'bom/01 Don't Cafe No1.mp3"
+        );
 
         let files = layout.playlist_files(&[DevicePlaylist {
             name: "Русский рок",
             songs: &songs,
         }]);
         assert_eq!(files[0].path, "Playlists/Russkii rok.m3u");
-        let bytes = &files[0].content;
-        assert!(!bytes.starts_with(&[0xEF, 0xBB, 0xBF]), "no UTF-8 BOM");
-        let (text, _, malformed) = WINDOWS_1252.decode(bytes);
-        assert!(!malformed);
-        assert!(text.contains("#EXTINF:321,Splin - Café No1\n"));
-        assert!(text.contains(&format!("\n../{path}\n")));
-        assert!(!text.contains("&#"));
+        // Every byte is ASCII, so the line reads the same whatever code page
+        // the firmware decodes it with.
+        let text = String::from_utf8(files[0].content.clone()).unwrap();
+        assert!(text.is_ascii());
+        assert!(text.contains(
+            "#EXTINF:321,Splin - Don't Cafe No1
+"
+        ));
+        assert!(text.contains(&format!(
+            "
+../{path}
+"
+        )));
     }
 
     #[test]
@@ -835,7 +834,7 @@ mod tests {
         let device = std::env::var("LUMINOUS_LAYOUT_DEVICE").expect("LUMINOUS_LAYOUT_DEVICE");
         let source = std::env::var("LUMINOUS_LAYOUT_SOURCE").expect("LUMINOUS_LAYOUT_SOURCE");
         let playlist_format = match std::env::var("LUMINOUS_LAYOUT_FORMAT").as_deref() {
-            Ok("m3u") => PlaylistFileFormat::M3uWindows1252,
+            Ok("m3u") => PlaylistFileFormat::M3uAscii,
             Ok("pls") => PlaylistFileFormat::Pls,
             _ => PlaylistFileFormat::M3u8,
         };

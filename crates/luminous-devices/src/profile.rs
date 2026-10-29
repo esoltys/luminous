@@ -77,10 +77,12 @@ pub enum PlaylistFileFormat {
     /// `.m3u8`, UTF-8 without a BOM.
     #[default]
     M3u8,
-    /// `.m3u` in Windows-1252, for players that fail on UTF-8. File and
-    /// folder names on the device are kept to characters it can encode, so
-    /// every line still points at its file.
-    M3uWindows1252,
+    /// `.m3u` in plain ASCII, for players that fail on UTF-8. Such firmware
+    /// reads its own code page (Windows-1252, Shift-JIS, GBK...), and only
+    /// ASCII reads the same in all of them. File and folder names on the
+    /// device are folded to ASCII too, so every line still points at its
+    /// file.
+    M3uAscii,
     /// `.pls`, UTF-8.
     Pls,
     /// No playlist files.
@@ -330,13 +332,10 @@ mod tests {
     #[test]
     fn layout_settings_fill_missing_fields_and_a_blank_template() {
         let profile: DeviceProfile = serde_json::from_str(
-            r#"{"layout":{"playlistFormat":"m3uWindows1252","folderTemplate":"  "}}"#,
+            r#"{"layout":{"playlistFormat":"m3uAscii","folderTemplate":"  "}}"#,
         )
         .unwrap();
-        assert_eq!(
-            profile.layout.playlist_format,
-            PlaylistFileFormat::M3uWindows1252
-        );
+        assert_eq!(profile.layout.playlist_format, PlaylistFileFormat::M3uAscii);
         assert_eq!(profile.layout.path_separator, PathSeparator::Slash);
         assert_eq!(
             profile.normalized().layout.folder_template,
