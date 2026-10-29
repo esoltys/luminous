@@ -32,8 +32,10 @@ pub use backend::{DeviceBackend, DirEntry, FsBackend, Progress, Space};
 pub use marker::{Marker, MARKER_FILE_NAME};
 pub use profile::DeviceProfile;
 
+use parking_lot::Mutex;
 use serde::Serialize;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 /// How a device is reached.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -60,6 +62,31 @@ pub struct Device {
     /// At least one. The first holds the device's marker.
     pub storages: Vec<Storage>,
     access: Access,
+    /// Lower-case audio format names the device says it plays; empty when
+    /// it doesn't say (mass storage).
+    reported_formats: Vec<String>,
+    cache: Arc<DeviceCache>,
+}
+
+/// What a device's marker and default profile were read as, so devices that
+/// are slow to read (MTP) are read once per connection. Not part of a
+/// device's identity: two `Device`s compare equal whatever is cached.
+#[derive(Default)]
+pub(crate) struct DeviceCache {
+    marker: Mutex<Option<Option<Marker>>>,
+    default_profile: Mutex<Option<DeviceProfile>>,
+}
+
+impl PartialEq for DeviceCache {
+    fn eq(&self, _: &Self) -> bool {
+        true
+    }
+}
+
+impl std::fmt::Debug for DeviceCache {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("DeviceCache")
+    }
 }
 
 /// One storage of a device: the volume of a mass-storage device, or one of
@@ -103,6 +130,9 @@ impl Device {
                 free_bytes: volume.free_bytes,
             }],
             access: Access::Volume(volume),
+            reported_formats: Vec::new(),
+            // Rebuilt on every poll, so a volume's marker is always read fresh.
+            cache: Arc::default(),
         }
     }
 
@@ -130,22 +160,17 @@ impl Device {
     /// The device's marker, `None` if it has none. Read once per MTP
     /// connection, since listing over MTP is slow.
     pub fn read_marker(&self) -> Option<Marker> {
-        match &self.access {
-            Access::Volume(_) => marker::read_marker(&*self.primary_storage()),
-            #[cfg(windows)]
-            Access::Mtp(handle) => {
-                handle.cached_marker(|| marker::read_marker(&*self.primary_storage()))
-            }
-        }
+        self.cache
+            .marker
+            .lock()
+            .get_or_insert_with(|| marker::read_marker(&*self.primary_storage()))
+            .clone()
     }
 
     /// Writes the device's marker to its first storage.
     pub fn write_marker(&self, marker: &Marker) -> std::io::Result<()> {
         marker::write_marker(&*self.primary_storage(), marker)?;
-        #[cfg(windows)]
-        if let Access::Mtp(handle) = &self.access {
-            handle.set_cached_marker(marker.clone());
-        }
+        *self.cache.marker.lock() = Some(Some(marker.clone()));
         Ok(())
     }
 
@@ -153,13 +178,13 @@ impl Device {
     /// in its top-level `Music` folder if it has one, playing the formats it
     /// reports (MTP) or a conservative default.
     pub fn default_profile(&self) -> DeviceProfile {
-        match &self.access {
-            Access::Volume(_) => DeviceProfile::defaults_for(&*self.primary_storage(), &[]),
-            #[cfg(windows)]
-            Access::Mtp(handle) => handle.cached_default_profile(|formats| {
-                DeviceProfile::defaults_for(&*self.primary_storage(), formats)
-            }),
-        }
+        self.cache
+            .default_profile
+            .lock()
+            .get_or_insert_with(|| {
+                DeviceProfile::defaults_for(&*self.primary_storage(), &self.reported_formats)
+            })
+            .clone()
     }
 
     /// Whether `path` (absolute, either separator) is a file on this device.

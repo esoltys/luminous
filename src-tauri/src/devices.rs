@@ -59,8 +59,9 @@ pub struct DeviceStorage {
 }
 
 struct Entry {
-    device: ConnectedDevice,
-    connection: Device,
+    /// What the UI is sent.
+    shown: ConnectedDevice,
+    device: Device,
 }
 
 /// The current device list and the thread that keeps it current.
@@ -94,7 +95,7 @@ impl DeviceMonitor {
         self.entries
             .lock()
             .iter()
-            .map(|e| e.device.clone())
+            .map(|e| e.shown.clone())
             .collect()
     }
 
@@ -103,8 +104,8 @@ impl DeviceMonitor {
         self.entries
             .lock()
             .iter()
-            .find(|e| e.device.id == id)
-            .map(|e| e.connection.clone())
+            .find(|e| e.shown.id == id)
+            .map(|e| e.device.clone())
     }
 
     /// Asks the polling thread to rebuild and emit now rather than at its
@@ -174,10 +175,10 @@ impl DeviceMonitor {
     }
 
     fn replace(&self, app: &AppHandle, entries: Vec<Entry>) {
-        let devices: Vec<ConnectedDevice> = entries.iter().map(|e| e.device.clone()).collect();
+        let devices: Vec<ConnectedDevice> = entries.iter().map(|e| e.shown.clone()).collect();
         {
             let mut current = self.entries.lock();
-            if current.iter().map(|e| &e.device).eq(devices.iter()) {
+            if current.iter().map(|e| &e.shown).eq(devices.iter()) {
                 return;
             }
             *current = entries;
@@ -202,8 +203,8 @@ fn build_entries(conn: &rusqlite::Connection, devices: &[Device], now: i64) -> R
         .filter(|d| !library_folders.iter().any(|folder| d.contains(folder)))
         .map(|device| {
             Ok(Entry {
-                device: resolve_device(conn, device, now)?,
-                connection: device.clone(),
+                shown: resolve_device(conn, device, now)?,
+                device: device.clone(),
             })
         })
         .collect()
@@ -356,7 +357,7 @@ mod tests {
         std::fs::create_dir(device_dir.path().join("Music")).unwrap();
 
         let entries = build_entries(&conn, &[volume(device_dir.path(), "0088-5572")], NOW).unwrap();
-        let device = &entries[0].device;
+        let device = &entries[0].shown;
         assert_eq!(device.id, "vol-0088-5572");
         assert_eq!(device.kind, DeviceKind::MassStorage);
         assert_eq!(device.default_name, "HiBy R1");
@@ -426,8 +427,8 @@ mod tests {
         let other = other_db.pool.get().unwrap();
         let entries =
             build_entries(&other, &[volume(device_dir.path(), "FFFF-0000")], NOW).unwrap();
-        assert_eq!(entries[0].device.id, "vol-0088-5572");
-        assert_eq!(entries[0].device.profile.nickname.as_deref(), Some("Gym"));
+        assert_eq!(entries[0].shown.id, "vol-0088-5572");
+        assert_eq!(entries[0].shown.profile.nickname.as_deref(), Some("Gym"));
         assert!(load_profile(&other, "vol-0088-5572").unwrap().is_some());
     }
 
@@ -462,6 +463,6 @@ mod tests {
             .unwrap();
 
         let entries = build_entries(&conn, &[volume(device_dir.path(), "0088-5572")], NOW).unwrap();
-        assert_eq!(entries[0].device.profile.nickname.as_deref(), Some("Here"));
+        assert_eq!(entries[0].shown.profile.nickname.as_deref(), Some("Here"));
     }
 }

@@ -13,10 +13,8 @@
 //! serializes calls, since MTP handles one operation at a time anyway.
 
 use crate::backend::{cancelled, components, PARTIAL_SUFFIX};
-use crate::{
-    naming, DeviceBackend, DeviceKind, DeviceProfile, DirEntry, Marker, Progress, Space, Storage,
-};
-use parking_lot::{Mutex, MutexGuard};
+use crate::{naming, DeviceBackend, DeviceCache, DeviceKind, DirEntry, Progress, Space, Storage};
+use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::io::{self, Read};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -176,6 +174,8 @@ impl std::fmt::Debug for Handle {
 
 impl Handle {
     pub(crate) fn storage(&self, storage_id: &str) -> MtpStorage {
+        // A storage that has since gone (an SD card taken out) keeps its
+        // public id as its object id, so every call on it fails.
         let storage_object = self
             .0
             .storage_objects
@@ -189,27 +189,10 @@ impl Handle {
         }
     }
 
-    pub(crate) fn cached_marker(&self, read: impl FnOnce() -> Option<Marker>) -> Option<Marker> {
-        let mut cached = self.0.marker.lock();
-        cached.get_or_insert_with(read).clone()
-    }
-
-    pub(crate) fn set_cached_marker(&self, marker: Marker) {
-        *self.0.marker.lock() = Some(Some(marker));
-    }
-
-    pub(crate) fn cached_default_profile(
-        &self,
-        build: impl FnOnce(&[String]) -> DeviceProfile,
-    ) -> DeviceProfile {
-        let mut cached = self.0.default_profile.lock();
-        cached.get_or_insert_with(|| build(&self.0.formats)).clone()
-    }
-
     pub(crate) fn eject(&self) {
         com();
         self.0.ejected.store(true, Ordering::Relaxed);
-        let _guard = self.0.lock();
+        let _guard = self.0.lock.lock();
         unsafe {
             let _ = self.0.device.Close();
         }
@@ -230,6 +213,8 @@ impl Handle {
             default_name: self.0.default_name.clone(),
             storages,
             access: crate::Access::Mtp(self.clone()),
+            reported_formats: self.0.formats.clone(),
+            cache: Arc::clone(&self.0.cache),
         }))
     }
 }
@@ -255,8 +240,9 @@ pub(crate) struct Connection {
     /// Whether renaming works on this device: unknown until the first write
     /// tries it. When it does not, writes go straight to the final name.
     can_rename: Mutex<Option<bool>>,
-    marker: Mutex<Option<Option<Marker>>>,
-    default_profile: Mutex<Option<DeviceProfile>>,
+    /// Shared with every `Device` built from this connection, so the marker
+    /// and default profile are read once per connection.
+    cache: Arc<DeviceCache>,
 }
 
 // SAFETY: see the module comment. The interfaces come from
@@ -332,14 +318,9 @@ impl Connection {
                 storage_objects: Mutex::new(HashMap::new()),
                 last_storages: Mutex::new(Vec::new()),
                 can_rename: Mutex::new(None),
-                marker: Mutex::new(None),
-                default_profile: Mutex::new(None),
+                cache: Arc::default(),
             })
         }
-    }
-
-    fn lock(&self) -> MutexGuard<'_, ()> {
-        self.lock.lock()
     }
 
     /// The device's writable storages with their current free space. While
@@ -498,7 +479,7 @@ impl Connection {
             }
             path.push_str(&part.to_lowercase());
             let key = (storage.to_string(), path.clone());
-            if let Some(id) = self.folders().get(&key) {
+            if let Some(id) = self.folders.lock().get(&key) {
                 current = id.clone();
                 continue;
             }
@@ -508,37 +489,20 @@ impl Connection {
                 None if create => self.create_folder(&current, part)?,
                 None => return Ok(None),
             };
-            self.folders().insert(key, current.clone());
+            self.folders.lock().insert(key, current.clone());
         }
         Ok(Some(current))
-    }
-
-    fn folders(&self) -> MutexGuard<'_, HashMap<(String, String), String>> {
-        self.folders.lock()
     }
 
     /// Forgets cached folder ids, after a failure that may mean they are
     /// stale (the folder was removed on the device itself).
     fn forget_folders(&self) {
-        self.folders().clear();
+        self.folders.lock().clear();
     }
 
     fn create_folder(&self, parent: &str, name: &str) -> io::Result<String> {
         unsafe {
-            let values: IPortableDeviceValues =
-                CoCreateInstance(&PortableDeviceValues, None, CLSCTX_INPROC_SERVER)
-                    .map_err(io_error)?;
-            let parent = windows::core::HSTRING::from(parent);
-            let name = windows::core::HSTRING::from(name);
-            values
-                .SetStringValue(&WPD_OBJECT_PARENT_ID, &parent)
-                .map_err(io_error)?;
-            values
-                .SetStringValue(&WPD_OBJECT_NAME, &name)
-                .map_err(io_error)?;
-            values
-                .SetStringValue(&WPD_OBJECT_ORIGINAL_FILE_NAME, &name)
-                .map_err(io_error)?;
+            let values = new_object_values(parent, name)?;
             values
                 .SetGuidValue(&WPD_OBJECT_CONTENT_TYPE, &WPD_CONTENT_TYPE_FOLDER)
                 .map_err(io_error)?;
@@ -554,33 +518,21 @@ impl Connection {
     }
 
     /// Sends `len` bytes as a new object called `name` in `parent`; returns
-    /// its id. An uncommitted object is discarded by the device. Caller
-    /// holds the lock.
+    /// its id. The object's type comes from `final_name`, the name it will
+    /// have once renamed. An uncommitted object is discarded by the device.
+    /// Caller holds the lock.
     fn upload(
         &self,
         parent: &str,
         name: &str,
-        kind_from: &str,
+        final_name: &str,
         source: &mut dyn Read,
         len: u64,
         progress: Progress<'_>,
     ) -> io::Result<String> {
-        let (content_type, format) = object_kind(kind_from);
+        let (content_type, format) = object_kind(final_name);
         unsafe {
-            let values: IPortableDeviceValues =
-                CoCreateInstance(&PortableDeviceValues, None, CLSCTX_INPROC_SERVER)
-                    .map_err(io_error)?;
-            let parent = windows::core::HSTRING::from(parent);
-            let name = windows::core::HSTRING::from(name);
-            values
-                .SetStringValue(&WPD_OBJECT_PARENT_ID, &parent)
-                .map_err(io_error)?;
-            values
-                .SetStringValue(&WPD_OBJECT_NAME, &name)
-                .map_err(io_error)?;
-            values
-                .SetStringValue(&WPD_OBJECT_ORIGINAL_FILE_NAME, &name)
-                .map_err(io_error)?;
+            let values = new_object_values(parent, name)?;
             values
                 .SetUnsignedLargeIntegerValue(&WPD_OBJECT_SIZE, len)
                 .map_err(io_error)?;
@@ -771,7 +723,8 @@ impl Connection {
 /// [`DeviceBackend`] for one storage of an MTP device.
 pub(crate) struct MtpStorage {
     connection: Arc<Connection>,
-    /// The storage's object id, which is also its public id.
+    /// The storage's object id for this connection (its public id is the
+    /// persistent one; see [`Storage::id`]).
     storage_object: String,
 }
 
@@ -787,7 +740,7 @@ impl MtpStorage {
                 "device ejected",
             ));
         }
-        let _guard = connection.lock();
+        let _guard = connection.lock.lock();
         op(connection).inspect_err(|_| connection.forget_folders())
     }
 
@@ -964,6 +917,24 @@ fn object_kind(name: &str) -> (GUID, GUID) {
         "wma" => audio(WPD_OBJECT_FORMAT_WMA),
         _ => (WPD_CONTENT_TYPE_GENERIC_FILE, WPD_OBJECT_FORMAT_UNSPECIFIED),
     }
+}
+
+/// Properties for a new object called `name` in `parent`.
+unsafe fn new_object_values(parent: &str, name: &str) -> io::Result<IPortableDeviceValues> {
+    let values: IPortableDeviceValues =
+        CoCreateInstance(&PortableDeviceValues, None, CLSCTX_INPROC_SERVER).map_err(io_error)?;
+    let parent = windows::core::HSTRING::from(parent);
+    let name = windows::core::HSTRING::from(name);
+    values
+        .SetStringValue(&WPD_OBJECT_PARENT_ID, &parent)
+        .map_err(io_error)?;
+    values
+        .SetStringValue(&WPD_OBJECT_NAME, &name)
+        .map_err(io_error)?;
+    values
+        .SetStringValue(&WPD_OBJECT_ORIGINAL_FILE_NAME, &name)
+        .map_err(io_error)?;
+    Ok(values)
 }
 
 unsafe fn keys(list: &[PROPERTYKEY]) -> windows::core::Result<IPortableDeviceKeyCollection> {
