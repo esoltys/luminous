@@ -1,6 +1,6 @@
-//! Connected portable players and removable drives (#835, epic #834).
+//! Connected portable players and removable drives (#835, #840, epic #834).
 //!
-//! A background thread polls `luminous_devices::VolumeWatcher` every couple
+//! A background thread polls `luminous_devices::DeviceWatcher` every couple
 //! of seconds and, whenever a device connects, disconnects, its free space
 //! changes or a profile is saved, emits `devices-changed` with the full list.
 //! Volumes holding a watched music folder are library storage, not devices,
@@ -13,7 +13,7 @@
 
 use crate::db::Database;
 use anyhow::{anyhow, Result};
-use luminous_devices::{DeviceKind, DeviceProfile, Marker, Volume, VolumeWatcher};
+use luminous_devices::{Device, DeviceKind, DeviceProfile, DeviceWatcher, Marker};
 use parking_lot::{Condvar, Mutex};
 use rusqlite::{params, OptionalExtension};
 use serde::Serialize;
@@ -24,7 +24,7 @@ use tauri::{AppHandle, Emitter};
 pub const DEVICES_CHANGED_EVENT: &str = "devices-changed";
 
 const POLL_INTERVAL: Duration = Duration::from_secs(2);
-/// Rebuild at least this often even when no volume changed, so a newly
+/// Rebuild at least this often even when no device changed, so a newly
 /// watched music folder on a device, or a marker edited elsewhere, shows up.
 const REBUILD_EVERY_POLLS: u32 = 15;
 
@@ -38,7 +38,8 @@ pub struct ConnectedDevice {
     pub model: Option<String>,
     /// Shown when `profile.nickname` is `None`. Never blank.
     pub default_name: String,
-    /// One entry for a mass-storage device; MTP players can have several (#840).
+    /// One entry for a mass-storage device; MTP players can have several
+    /// (internal storage, SD card).
     pub storages: Vec<DeviceStorage>,
     pub profile: DeviceProfile,
     /// Unix seconds of the last completed sync (#836).
@@ -50,15 +51,17 @@ pub struct ConnectedDevice {
 pub struct DeviceStorage {
     pub id: String,
     pub label: Option<String>,
-    pub mount_path: String,
+    /// `None` for an MTP storage, which has no path on this computer.
+    pub mount_path: Option<String>,
     pub filesystem: String,
     pub total_bytes: u64,
     pub free_bytes: u64,
 }
 
 struct Entry {
-    device: ConnectedDevice,
-    volume: Volume,
+    /// What the UI is sent.
+    shown: ConnectedDevice,
+    device: Device,
 }
 
 /// The current device list and the thread that keeps it current.
@@ -92,17 +95,17 @@ impl DeviceMonitor {
         self.entries
             .lock()
             .iter()
-            .map(|e| e.device.clone())
+            .map(|e| e.shown.clone())
             .collect()
     }
 
-    /// The volume of a connected device, `None` once it is gone.
-    pub fn volume(&self, id: &str) -> Option<Volume> {
+    /// A connected device, `None` once it is gone.
+    pub fn device(&self, id: &str) -> Option<Device> {
         self.entries
             .lock()
             .iter()
-            .find(|e| e.device.id == id)
-            .map(|e| e.volume.clone())
+            .find(|e| e.shown.id == id)
+            .map(|e| e.device.clone())
     }
 
     /// Asks the polling thread to rebuild and emit now rather than at its
@@ -122,8 +125,8 @@ impl DeviceMonitor {
         profile: DeviceProfile,
         now: i64,
     ) -> Result<()> {
-        let volume = self
-            .volume(id)
+        let device = self
+            .device(id)
             .ok_or_else(|| anyhow!("device-not-connected"))?;
         let profile = profile.normalized();
         upsert_profile(conn, id, &profile, now)?;
@@ -131,37 +134,34 @@ impl DeviceMonitor {
             id: id.to_string(),
             profile,
         };
-        if let Err(e) = luminous_devices::write_marker(&volume.mount_path, &marker) {
-            log::warn!(
-                "Saved the profile for {id} but could not write its marker to {}: {e}",
-                volume.mount_path.display()
-            );
+        if let Err(e) = device.write_marker(&marker) {
+            log::warn!("Saved the profile for {id} but could not write its marker: {e}");
         }
         self.request_rebuild();
         Ok(())
     }
 
     fn run(&self, app: &AppHandle, db: &Database) {
-        let mut watcher = VolumeWatcher::new();
-        let mut last_volumes: Option<Vec<Volume>> = None;
+        let mut watcher = DeviceWatcher::new();
+        let mut last_devices: Option<Vec<Device>> = None;
         let mut polls_since_rebuild = 0u32;
         loop {
-            let volumes = watcher.poll();
+            let devices = watcher.poll();
             let requested = std::mem::take(&mut *self.rebuild_requested.lock());
             if requested
-                || last_volumes.as_ref() != Some(&volumes)
+                || last_devices.as_ref() != Some(&devices)
                 || polls_since_rebuild >= REBUILD_EVERY_POLLS
             {
                 match db
                     .pool
                     .get()
                     .map_err(anyhow::Error::from)
-                    .and_then(|conn| build_entries(&conn, &volumes, chrono::Utc::now().timestamp()))
+                    .and_then(|conn| build_entries(&conn, &devices, chrono::Utc::now().timestamp()))
                 {
                     Ok(entries) => self.replace(app, entries),
                     Err(e) => log::warn!("Could not refresh connected devices: {e}"),
                 }
-                last_volumes = Some(volumes);
+                last_devices = Some(devices);
                 polls_since_rebuild = 0;
             } else {
                 polls_since_rebuild += 1;
@@ -175,10 +175,10 @@ impl DeviceMonitor {
     }
 
     fn replace(&self, app: &AppHandle, entries: Vec<Entry>) {
-        let devices: Vec<ConnectedDevice> = entries.iter().map(|e| e.device.clone()).collect();
+        let devices: Vec<ConnectedDevice> = entries.iter().map(|e| e.shown.clone()).collect();
         {
             let mut current = self.entries.lock();
-            if current.iter().map(|e| &e.device).eq(devices.iter()) {
+            if current.iter().map(|e| &e.shown).eq(devices.iter()) {
                 return;
             }
             *current = entries;
@@ -193,36 +193,36 @@ impl Default for DeviceMonitor {
     }
 }
 
-fn build_entries(conn: &rusqlite::Connection, volumes: &[Volume], now: i64) -> Result<Vec<Entry>> {
+fn build_entries(conn: &rusqlite::Connection, devices: &[Device], now: i64) -> Result<Vec<Entry>> {
     let library_folders: Vec<String> = conn
         .prepare("SELECT path FROM directories")?
         .query_map([], |row| row.get(0))?
         .collect::<rusqlite::Result<_>>()?;
-    volumes
+    devices
         .iter()
-        .filter(|v| !library_folders.iter().any(|folder| v.contains(folder)))
-        .map(|volume| {
+        .filter(|d| !library_folders.iter().any(|folder| d.contains(folder)))
+        .map(|device| {
             Ok(Entry {
-                device: resolve_device(conn, volume, now)?,
-                volume: volume.clone(),
+                shown: resolve_device(conn, device, now)?,
+                device: device.clone(),
             })
         })
         .collect()
 }
 
-/// The device on `volume` with its effective profile. Writes once: the first
-/// time a device with a marker shows up on this computer, the marker's
-/// profile is stored, so later edits here win over the device's copy.
+/// `device` with its effective profile. Writes once: the first time a device
+/// with a marker shows up on this computer, the marker's profile is stored,
+/// so later edits here win over the device's copy.
 fn resolve_device(
     conn: &rusqlite::Connection,
-    volume: &Volume,
+    device: &Device,
     now: i64,
 ) -> Result<ConnectedDevice> {
-    let marker = luminous_devices::read_marker(&volume.mount_path);
+    let marker = device.read_marker();
     let id = marker
         .as_ref()
         .map(|m| m.id.clone())
-        .unwrap_or_else(|| volume.provisional_id());
+        .unwrap_or_else(|| device.provisional_id.clone());
     let (profile, last_synced_at) = match (load_profile(conn, &id)?, marker) {
         (Some(stored), _) => stored,
         (None, Some(marker)) => {
@@ -230,21 +230,28 @@ fn resolve_device(
             upsert_profile(conn, &id, &profile, now)?;
             (profile, None)
         }
-        (None, None) => (DeviceProfile::defaults_for(&volume.mount_path), None),
+        (None, None) => (device.default_profile(), None),
     };
     Ok(ConnectedDevice {
-        id: id.clone(),
-        kind: DeviceKind::MassStorage,
-        model: volume.model_name(),
-        default_name: volume.default_name(),
-        storages: vec![DeviceStorage {
-            id: volume.provisional_id(),
-            label: volume.label.clone(),
-            mount_path: volume.mount_path.to_string_lossy().into_owned(),
-            filesystem: volume.filesystem.clone(),
-            total_bytes: volume.total_bytes,
-            free_bytes: volume.free_bytes,
-        }],
+        id,
+        kind: device.kind,
+        model: device.model.clone(),
+        default_name: device.default_name.clone(),
+        storages: device
+            .storages
+            .iter()
+            .map(|s| DeviceStorage {
+                id: s.id.clone(),
+                label: s.label.clone(),
+                mount_path: s
+                    .mount_path
+                    .as_ref()
+                    .map(|p| p.to_string_lossy().into_owned()),
+                filesystem: s.filesystem.clone(),
+                total_bytes: s.total_bytes,
+                free_bytes: s.free_bytes,
+            })
+            .collect(),
         profile,
         last_synced_at,
     })
@@ -317,6 +324,7 @@ fn upsert_profile(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use luminous_devices::Volume;
     use std::path::Path;
 
     const NOW: i64 = 1_790_000_000;
@@ -327,8 +335,8 @@ mod tests {
         (dir, db)
     }
 
-    fn volume(root: &Path, serial: &str) -> Volume {
-        Volume {
+    fn volume(root: &Path, serial: &str) -> Device {
+        Device::from_volume(Volume {
             mount_path: root.to_path_buf(),
             label: None,
             filesystem: "FAT32".into(),
@@ -338,7 +346,7 @@ mod tests {
             total_bytes: 31_251_120_128,
             free_bytes: 3_002_875_904,
             os_ref: "E".into(),
-        }
+        })
     }
 
     #[test]
@@ -349,11 +357,16 @@ mod tests {
         std::fs::create_dir(device_dir.path().join("Music")).unwrap();
 
         let entries = build_entries(&conn, &[volume(device_dir.path(), "0088-5572")], NOW).unwrap();
-        let device = &entries[0].device;
+        let device = &entries[0].shown;
         assert_eq!(device.id, "vol-0088-5572");
+        assert_eq!(device.kind, DeviceKind::MassStorage);
         assert_eq!(device.default_name, "HiBy R1");
         assert_eq!(device.profile.music_path, "Music");
         assert_eq!(device.storages[0].free_bytes, 3_002_875_904);
+        assert_eq!(
+            device.storages[0].mount_path.as_deref(),
+            Some(&*device_dir.path().to_string_lossy())
+        );
 
         let written: Vec<_> = std::fs::read_dir(device_dir.path()).unwrap().collect();
         assert_eq!(
@@ -402,7 +415,9 @@ mod tests {
             .save_profile(&conn, "vol-0088-5572", profile, NOW)
             .unwrap();
 
-        let marker = luminous_devices::read_marker(device_dir.path()).unwrap();
+        let marker = volume(device_dir.path(), "0088-5572")
+            .read_marker()
+            .unwrap();
         assert_eq!(marker.id, "vol-0088-5572");
         assert_eq!(marker.profile.nickname.as_deref(), Some("Gym"));
         assert_eq!(marker.profile.music_path, "Music");
@@ -412,8 +427,8 @@ mod tests {
         let other = other_db.pool.get().unwrap();
         let entries =
             build_entries(&other, &[volume(device_dir.path(), "FFFF-0000")], NOW).unwrap();
-        assert_eq!(entries[0].device.id, "vol-0088-5572");
-        assert_eq!(entries[0].device.profile.nickname.as_deref(), Some("Gym"));
+        assert_eq!(entries[0].shown.id, "vol-0088-5572");
+        assert_eq!(entries[0].shown.profile.nickname.as_deref(), Some("Gym"));
         assert!(load_profile(&other, "vol-0088-5572").unwrap().is_some());
     }
 
@@ -437,19 +452,17 @@ mod tests {
             ..DeviceProfile::default()
         };
         upsert_profile(&conn, "vol-0088-5572", &stored, NOW).unwrap();
-        luminous_devices::write_marker(
-            device_dir.path(),
-            &Marker {
+        volume(device_dir.path(), "0088-5572")
+            .write_marker(&Marker {
                 id: "vol-0088-5572".into(),
                 profile: DeviceProfile {
                     nickname: Some("Elsewhere".into()),
                     ..DeviceProfile::default()
                 },
-            },
-        )
-        .unwrap();
+            })
+            .unwrap();
 
         let entries = build_entries(&conn, &[volume(device_dir.path(), "0088-5572")], NOW).unwrap();
-        assert_eq!(entries[0].device.profile.nickname.as_deref(), Some("Here"));
+        assert_eq!(entries[0].shown.profile.nickname.as_deref(), Some("Here"));
     }
 }

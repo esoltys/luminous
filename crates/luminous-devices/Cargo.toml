@@ -11,6 +11,7 @@ license.workspace = true
 [dependencies]
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
+parking_lot.workspace = true
 log.workspace = true
 
 [target.'cfg(windows)'.dependencies]
@@ -23,6 +24,12 @@ windows = { version = "0.62", features = [
     "Win32_System_Diagnostics_Debug",
     "Win32_System_SystemInformation",
     "Win32_Devices_DeviceAndDriverInstallation",
+    # MTP players through Windows Portable Devices (#840)
+    "Win32_Devices_PortableDevices",
+    "Win32_Devices_Properties",
+    "Win32_System_Com",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_System_Variant",
 ] }
 
 [target.'cfg(target_os = "linux")'.dependencies]

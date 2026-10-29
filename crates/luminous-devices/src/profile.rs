@@ -1,7 +1,8 @@
 //! What a user keeps about each device.
 
+use crate::backend::components;
+use crate::DeviceBackend;
 use serde::{Deserialize, Serialize};
-use std::path::Path;
 
 /// Space kept free for the device's own use (databases, settings), shown in
 /// the UI as "Kept free for the device".
@@ -52,19 +53,26 @@ impl Default for DeviceProfile {
 
 impl DeviceProfile {
     /// The profile a device starts with: the defaults, with music (and
-    /// playlists) in a top-level `Music` folder if the device has one.
-    pub fn defaults_for(root: &Path) -> Self {
-        let music_dir = std::fs::read_dir(root).ok().and_then(|entries| {
-            entries.flatten().find_map(|e| {
-                let name = e.file_name().to_string_lossy().into_owned();
-                (name.eq_ignore_ascii_case("music") && e.path().is_dir()).then_some(name)
-            })
+    /// playlists) in a top-level `Music` folder if `storage` has one, and
+    /// the formats the device reports it plays when it reports any.
+    pub(crate) fn defaults_for(storage: &dyn DeviceBackend, reported_formats: &[String]) -> Self {
+        let music_dir = storage.list("").ok().and_then(|entries| {
+            entries
+                .into_iter()
+                .find(|e| e.is_dir && e.name.eq_ignore_ascii_case("music"))
+                .map(|e| e.name)
         });
         let music_path = music_dir.unwrap_or_default();
+        let defaults = Self::default();
         Self {
             playlists_path: music_path.clone(),
             music_path,
-            ..Self::default()
+            supported_formats: if reported_formats.is_empty() {
+                defaults.supported_formats.clone()
+            } else {
+                reported_formats.to_vec()
+            },
+            ..defaults
         }
     }
 
@@ -92,27 +100,34 @@ impl DeviceProfile {
 }
 
 fn relative_path(path: &str) -> String {
-    path.split(['/', '\\'])
-        .map(str::trim)
-        .filter(|part| !part.is_empty() && *part != "." && *part != ".." && !part.ends_with(':'))
-        .collect::<Vec<_>>()
-        .join("/")
+    components(path).join("/")
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::FsBackend;
 
     #[test]
     fn defaults_for_uses_an_existing_music_folder() {
         let dir = tempfile::tempdir().unwrap();
-        assert_eq!(DeviceProfile::defaults_for(dir.path()).music_path, "");
+        let storage = FsBackend::new(dir.path());
+        assert_eq!(DeviceProfile::defaults_for(&storage, &[]).music_path, "");
 
         std::fs::create_dir(dir.path().join("MUSIC")).unwrap();
-        let profile = DeviceProfile::defaults_for(dir.path());
+        let profile = DeviceProfile::defaults_for(&storage, &[]);
         assert_eq!(profile.music_path, "MUSIC");
         assert_eq!(profile.playlists_path, "MUSIC");
         assert_eq!(profile.reserve_bytes, DEFAULT_RESERVE_BYTES);
+        assert_eq!(profile.supported_formats, vec!["mp3", "aac"]);
+    }
+
+    #[test]
+    fn defaults_for_takes_the_formats_a_device_reports() {
+        let dir = tempfile::tempdir().unwrap();
+        let reported = vec!["mp3".to_string(), "flac".to_string()];
+        let profile = DeviceProfile::defaults_for(&FsBackend::new(dir.path()), &reported);
+        assert_eq!(profile.supported_formats, reported);
     }
 
     #[test]
