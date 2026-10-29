@@ -30,10 +30,88 @@ pub struct RelocateResult {
     pub default_library: Option<String>,
 }
 
+/// Compares two path components for semantic equality on Windows (case-insensitive for
+/// disk letters, UNC shares, and normal segment names).
+#[cfg(windows)]
+fn components_equal_windows(a: &std::path::Component, b: &std::path::Component) -> bool {
+    use std::path::{Component, Prefix};
+    match (a, b) {
+        (Component::Prefix(pa), Component::Prefix(pb)) => match (pa.kind(), pb.kind()) {
+            (
+                Prefix::Disk(c1) | Prefix::VerbatimDisk(c1),
+                Prefix::Disk(c2) | Prefix::VerbatimDisk(c2),
+            ) => c1.eq_ignore_ascii_case(&c2),
+            (
+                Prefix::UNC(s1, sh1) | Prefix::VerbatimUNC(s1, sh1),
+                Prefix::UNC(s2, sh2) | Prefix::VerbatimUNC(s2, sh2),
+            ) => {
+                s1.to_string_lossy()
+                    .eq_ignore_ascii_case(&s2.to_string_lossy())
+                    && sh1
+                        .to_string_lossy()
+                        .eq_ignore_ascii_case(&sh2.to_string_lossy())
+            }
+            (Prefix::Verbatim(v1), Prefix::Verbatim(v2))
+            | (Prefix::DeviceNS(v1), Prefix::DeviceNS(v2)) => v1
+                .to_string_lossy()
+                .eq_ignore_ascii_case(&v2.to_string_lossy()),
+            _ => false,
+        },
+        (Component::RootDir, Component::RootDir) => true,
+        (Component::CurDir, Component::CurDir) => true,
+        (Component::ParentDir, Component::ParentDir) => true,
+        (Component::Normal(na), Component::Normal(nb)) => na
+            .to_string_lossy()
+            .eq_ignore_ascii_case(&nb.to_string_lossy()),
+        _ => false,
+    }
+}
+
+/// Strips `root` from `path` across path components, handling Windows case-insensitivity,
+/// mixed forward/backward separators, and trailing slashes.
+fn strip_root_prefix(path: &Path, root: &Path) -> Option<PathBuf> {
+    let mut path_comps = path.components();
+    let mut root_comps = root.components();
+
+    loop {
+        match (root_comps.next(), path_comps.next()) {
+            (None, None) => return Some(PathBuf::new()),
+            (None, Some(first_rest)) => {
+                let mut rest = PathBuf::from(first_rest.as_os_str());
+                for comp in path_comps {
+                    rest.push(comp.as_os_str());
+                }
+                return Some(rest);
+            }
+            (Some(r), Some(p)) => {
+                #[cfg(windows)]
+                {
+                    if !components_equal_windows(&r, &p) {
+                        return None;
+                    }
+                }
+                #[cfg(not(windows))]
+                {
+                    if r != p {
+                        return None;
+                    }
+                }
+            }
+            (Some(_), None) => return None,
+        }
+    }
+}
+
+/// Whether two paths represent the same location across separators, trailing slashes,
+/// and case (on Windows).
+fn paths_match(a: &Path, b: &Path) -> bool {
+    strip_root_prefix(a, b).is_some_and(|r| r.as_os_str().is_empty())
+}
+
 /// `path` re-rooted from `old_root` to `new_root`, or `None` if it isn't
 /// `old_root` itself or inside it.
 fn rebase(path: &str, old_root: &Path, new_root: &Path) -> Option<String> {
-    let rest = Path::new(path).strip_prefix(old_root).ok()?;
+    let rest = strip_root_prefix(Path::new(path), old_root)?;
     let rebased = if rest.as_os_str().is_empty() {
         new_root.to_path_buf()
     } else {
@@ -51,17 +129,31 @@ fn replace_path_prefix(text: &str, old: &str, new: &str) -> String {
     }
     let mut out = String::with_capacity(text.len());
     let mut rest = text;
-    while let Some(i) = rest.find(old) {
+    #[cfg(windows)]
+    let old_lower = old.to_lowercase();
+    loop {
+        #[cfg(windows)]
+        let match_idx = rest.to_lowercase().find(&old_lower);
+        #[cfg(not(windows))]
+        let match_idx = rest.find(old);
+
+        let Some(i) = match_idx else {
+            out.push_str(rest);
+            break;
+        };
         let after = &rest[i + old.len()..];
         let at_boundary = after
             .chars()
             .next()
             .is_none_or(|c| matches!(c, '\\' | '/' | '"' | ')') || c.is_whitespace());
         out.push_str(&rest[..i]);
-        out.push_str(if at_boundary { new } else { old });
+        out.push_str(if at_boundary {
+            new
+        } else {
+            &rest[i..i + old.len()]
+        });
         rest = after;
     }
-    out.push_str(rest);
     out
 }
 
@@ -100,7 +192,7 @@ pub fn relocate_root(
 ) -> Result<RelocateResult> {
     let old_str = old_root.to_string_lossy().to_string();
     let new_str = new_root.to_string_lossy().to_string();
-    if old_root == new_root {
+    if paths_match(old_root, new_root) {
         return Err(anyhow!("{new_str} is already this folder's location"));
     }
     if !new_root.is_dir() {
@@ -109,24 +201,29 @@ pub fn relocate_root(
 
     let tx = conn.unchecked_transaction()?;
 
-    type DirRow = (i64, Option<String>, Option<String>, Option<String>);
-    let old_dir: Option<DirRow> = tx
-        .query_row(
-            "SELECT id, nickname, icon, color FROM directories WHERE path = ?1",
-            params![old_str],
-            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
-        )
-        .optional()?;
-    let Some((old_id, nickname, icon, color)) = old_dir else {
+    type DirRow = (i64, String, Option<String>, Option<String>, Option<String>);
+    let dirs: Vec<DirRow> = {
+        let mut stmt = tx.prepare("SELECT id, path, nickname, icon, color FROM directories")?;
+        let rows = stmt.query_map([], |r| {
+            Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?))
+        })?;
+        rows.collect::<rusqlite::Result<_>>()?
+    };
+
+    let old_dir = dirs
+        .iter()
+        .find(|(_, dir_path, ..)| paths_match(Path::new(dir_path), old_root))
+        .cloned();
+
+    let Some((old_id, _old_db_path, nickname, icon, color)) = old_dir else {
         return Err(anyhow!("{old_str} is not a watched folder"));
     };
-    let existing_new_id: Option<i64> = tx
-        .query_row(
-            "SELECT id FROM directories WHERE path = ?1",
-            params![new_str],
-            |r| r.get(0),
-        )
-        .optional()?;
+
+    let existing_new_id: Option<i64> = dirs
+        .iter()
+        .find(|(id, dir_path, ..)| *id != old_id && paths_match(Path::new(dir_path), new_root))
+        .map(|(id, ..)| *id);
+
     match existing_new_id {
         Some(new_id) => {
             tx.execute(
@@ -666,5 +763,140 @@ mod tests {
             volume_root(Path::new(r"\\nas\share\Luminous")),
             Some(PathBuf::from(r"\\nas\share\"))
         );
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn test_rebase_and_relocate_onedrive_to_network_drive_preserves_playlists() {
+        let old_str = r"G:\OneDrive\Shared with Nicole\Music\Music Library";
+        let new_str = r"Z:\Music Library";
+        let song_str_lower = r"g:\onedrive\shared with nicole\music\music library\Rock\Song.mp3";
+        let song_str_forward = "G:/OneDrive/Shared with Nicole/Music/Music Library/Rock/Song.mp3";
+        let old_trailing = format!(r"{old_str}\");
+
+        // 1. Rebase succeeds despite case mismatches on Windows
+        let rebase_case = rebase(song_str_lower, Path::new(old_str), Path::new(new_str));
+        #[cfg(windows)]
+        assert_eq!(
+            rebase_case,
+            Some(r"Z:\Music Library\Rock\Song.mp3".to_string()),
+            "rebase must handle Windows case differences"
+        );
+
+        // 2. Rebase succeeds despite forward slashes or trailing slash on root
+        let rebase_trailing = rebase(song_str_lower, Path::new(&old_trailing), Path::new(new_str));
+        #[cfg(windows)]
+        assert_eq!(
+            rebase_trailing,
+            Some(r"Z:\Music Library\Rock\Song.mp3".to_string()),
+            "rebase must handle trailing slash on root"
+        );
+
+        let rebase_forward = rebase(song_str_forward, Path::new(old_str), Path::new(new_str));
+        #[cfg(windows)]
+        assert_eq!(
+            rebase_forward,
+            Some(r"Z:\Music Library\Rock\Song.mp3".to_string()),
+            "rebase must handle forward slashes in path"
+        );
+
+        // 3. End-to-end: relocate_root relocates the songs and preserves custom playlists
+        let f = fixture();
+        let conn = f.db.pool.get().unwrap();
+        let new_root_dir = f.root.join("Z_Music_Library");
+        std::fs::create_dir_all(&new_root_dir.join("Rock")).unwrap();
+        std::fs::write(new_root_dir.join("Rock").join("Song.mp3"), b"pretend-audio").unwrap();
+
+        // Database has directory recorded with exact path
+        watch(&conn, Path::new(old_str));
+
+        // Song in DB has lowercased drive letter (common on Windows / OneDrive)
+        let song_id = add_song(&conn, Path::new(song_str_lower));
+
+        // Custom playlist references this song
+        conn.execute(
+            "INSERT INTO playlists (name, dynamic_enabled) VALUES ('Rock Classics', 0)",
+            [],
+        )
+        .unwrap();
+        let playlist_id = conn.last_insert_rowid();
+        conn.execute(
+            "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type) VALUES (?1, ?2, 0, 'uuid-rock-1', 0)",
+            params![playlist_id, song_id],
+        ).unwrap();
+
+        // When relocating (even if old_root has a trailing slash from the picker)
+        let old_root_picker = PathBuf::from(format!(r"{old_str}\"));
+        let result = relocate_root(&conn, &old_root_picker, &new_root_dir).unwrap();
+        println!(
+            "Relocate result: songs_relocated={}, songs_merged={}",
+            result.songs_relocated, result.songs_merged
+        );
+        assert_eq!(
+            result.songs_relocated, 1,
+            "Song must be successfully relocated"
+        );
+
+        // The song in the database was repointed to the new location!
+        let (path_after, unavailable, _) = song_row(&conn, song_id);
+        let expected_path = new_root_dir
+            .join("Rock")
+            .join("Song.mp3")
+            .to_string_lossy()
+            .to_string();
+        assert_eq!(
+            path_after, expected_path,
+            "Song path must be updated to new location"
+        );
+        assert!(!unavailable, "Song must be available at the new location");
+
+        // The custom playlist still contains the track and its song is available!
+        let playlist_item_song_id: Option<i64> = conn
+            .query_row(
+                "SELECT song_id FROM playlist_items WHERE playlist_id = ?1",
+                params![playlist_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            playlist_item_song_id,
+            Some(song_id),
+            "Playlist item must remain bound to song"
+        );
+
+        // And directory in DB was updated to the new path
+        let dir_in_db: String = conn
+            .query_row("SELECT path FROM directories", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(dir_in_db, new_root_dir.to_string_lossy());
+    }
+
+    #[test]
+    fn test_relocate_root_matches_directory_with_trailing_slash() {
+        let f = fixture();
+        let conn = f.db.pool.get().unwrap();
+        let old_root = f.root.join("Old");
+        let new_root = f.root.join("New");
+        std::fs::create_dir_all(old_root.join("Album")).unwrap();
+        std::fs::create_dir_all(new_root.join("Album")).unwrap();
+        std::fs::write(new_root.join("Album").join("track.mp3"), b"pretend-audio").unwrap();
+
+        // Directory in DB without trailing slash
+        watch(&conn, &old_root);
+        let id = add_song(&conn, &old_root.join("Album").join("track.mp3"));
+
+        // Caller passes old_root with trailing separator (common from file dialogs)
+        let sep = std::path::MAIN_SEPARATOR;
+        let old_root_with_trailing =
+            PathBuf::from(format!("{}{}", old_root.to_string_lossy(), sep));
+        let result = relocate_root(&conn, &old_root_with_trailing, &new_root).unwrap();
+
+        assert_eq!(result.songs_relocated, 1);
+        let (path, unavailable, _) = song_row(&conn, id);
+        assert_eq!(
+            path,
+            new_root.join("Album").join("track.mp3").to_string_lossy()
+        );
+        assert!(!unavailable);
     }
 }
