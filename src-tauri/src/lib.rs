@@ -1608,6 +1608,7 @@ pub fn run() {
             commands::devices::eject_device,
             commands::devices::get_transcode_capabilities,
             commands::devices::get_conversion_target,
+            commands::devices::preview_device_path,
             // Window & Miniplayer commands
             commands::window::is_remote_devtools_enabled,
             commands::window::geometry_capture_supported,

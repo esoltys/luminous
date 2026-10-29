@@ -111,6 +111,7 @@ pub fn sanitize_component(segment: &str, replace_spaces: bool, ascii_only: bool)
             ' ' if replace_spaces => {
                 result.push('_');
             }
+            c if c.is_control() => {}
             c if ascii_only && !c.is_ascii() => {
                 let ascii_char = match c {
                     'à' | 'á' | 'â' | 'ã' | 'ä' | 'å' => 'a',
@@ -135,10 +136,25 @@ pub fn sanitize_component(segment: &str, replace_spaces: bool, ascii_only: bool)
     }
     let trimmed = result.trim_matches(['.', ' ']).to_string();
     if trimmed.is_empty() {
-        "Unknown".to_string()
-    } else {
-        trimmed
+        return "Unknown".to_string();
     }
+    // Windows and FAT refuse device names as a file or folder name, with any
+    // extension: "CON", "nul.mp3".
+    let stem_len = trimmed.find('.').unwrap_or(trimmed.len());
+    if is_reserved_device_name(&trimmed[..stem_len]) {
+        let mut escaped = trimmed;
+        escaped.insert(stem_len, '_');
+        return escaped;
+    }
+    trimmed
+}
+
+fn is_reserved_device_name(stem: &str) -> bool {
+    let upper = stem.trim_end().to_ascii_uppercase();
+    matches!(upper.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+        || ((upper.starts_with("COM") || upper.starts_with("LPT"))
+            && upper.len() == 4
+            && matches!(upper.as_bytes()[3], b'1'..=b'9'))
 }
 
 /// Replace placeholders in template with song metadata.
@@ -366,7 +382,7 @@ pub fn build_target_path(
 
 /// A hierarchical (parent-path, lowercased segment) -> canonical-cased-segment map,
 /// built by `build_dir_casing_map` and consumed by `apply_dir_casing_map`.
-type DirCasingMap = HashMap<(String, String), String>;
+pub(crate) type DirCasingMap = HashMap<(String, String), String>;
 
 /// Builds a casing map from a set of songs' target directory-segment sequences
 /// (as produced by `build_target_path_parts`), so any song's target directory can
@@ -384,7 +400,7 @@ type DirCasingMap = HashMap<(String, String), String>;
 /// each compute their own differently-cased target folder, and Apply just flips
 /// the real folder's on-disk casing back and forth depending on processing order
 /// without ever converging — issue #295.
-fn build_dir_casing_map(entries: &[Vec<String>]) -> DirCasingMap {
+pub(crate) fn build_dir_casing_map(entries: &[Vec<String>]) -> DirCasingMap {
     let max_depth = entries.iter().map(|e| e.len()).max().unwrap_or(0);
     let mut map = DirCasingMap::new();
     let mut parent_keys: Vec<String> = vec![String::new(); entries.len()];
@@ -432,7 +448,7 @@ fn build_dir_casing_map(entries: &[Vec<String>]) -> DirCasingMap {
 /// place to their canonical casing per `map`, walking depth-by-depth so each
 /// level's lookup is scoped to its already-canonicalized ancestor chain. See
 /// `build_dir_casing_map`.
-fn apply_dir_casing_map(parts: &mut [String], map: &DirCasingMap) {
+pub(crate) fn apply_dir_casing_map(parts: &mut [String], map: &DirCasingMap) {
     let mut parent_key = String::new();
     for part in parts.iter_mut() {
         let lower = part.to_lowercase();
@@ -2188,6 +2204,19 @@ mod tests {
         assert_eq!(
             sanitize_component(unicode_name, false, true),
             "Celine Dion _ Cafe"
+        );
+    }
+
+    #[test]
+    fn sanitization_escapes_device_names_and_drops_control_characters() {
+        assert_eq!(sanitize_component("CON", false, false), "CON_");
+        assert_eq!(sanitize_component("nul.live", false, false), "nul_.live");
+        assert_eq!(sanitize_component("Com1", false, false), "Com1_");
+        assert_eq!(sanitize_component("COM0", false, false), "COM0");
+        assert_eq!(sanitize_component("Console", false, false), "Console");
+        assert_eq!(
+            sanitize_component("Tab\there\u{7}", false, false),
+            "Tabhere"
         );
     }
 

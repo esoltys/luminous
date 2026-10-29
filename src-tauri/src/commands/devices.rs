@@ -57,6 +57,28 @@ pub async fn get_conversion_target(
         .map_err(|e| e.to_string())
 }
 
+/// The example path under the "Folders on the device" template for
+/// `profile`, saved or still being edited (#837); see
+/// `layout::preview_track_path`.
+#[tauri::command]
+pub async fn preview_device_path(
+    profile: DeviceProfile,
+    song_id: Option<i64>,
+    state: State<'_, AppState>,
+) -> Result<Option<String>, String> {
+    let transcoder = state.transcoder.clone();
+    crate::db::run_blocking(&state.db, move |conn| {
+        crate::devices::layout::preview_track_path(
+            conn,
+            &transcoder,
+            &profile.normalized(),
+            song_id,
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
 /// Safely removes a device. Stops playback first when the current track is
 /// on it, so Luminous never blocks its own eject. Resolves when the device
 /// can be unplugged (or was already gone; an MTP device always can be);

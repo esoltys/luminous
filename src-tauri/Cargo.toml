@@ -23,6 +23,9 @@ tauri-build = { version = "2", features = [] }
 # Already pulled in transitively by Tauri's "image-png" feature (see
 # Cargo.lock) — added directly since both call into it themselves.
 image = "0.25"
+# ASCII device playlists (#837): folds names and titles to ASCII look-alikes
+# ("Сплин" -> "Splin").
+deunicode = "1.6"
 # --- Tauri ---
 # "unstable" gates `Manager::get_window`, needed to reach the lower-level
 # `Window::start_resize_dragging` from a `WebviewWindow` command handler.
