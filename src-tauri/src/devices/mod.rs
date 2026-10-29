@@ -432,25 +432,22 @@ pub fn assess_song(
 /// can't be trusted to match a probe of the file, so the file is read.
 fn known_source<'a>(song: &Song, path: &'a Path) -> KnownSource<'a> {
     let positive = |n: Option<i32>| n.filter(|n| *n > 0);
-    // The scan names `.m4a` AAC (it may hold ALAC) and `.ogg` Vorbis (it may
-    // hold Opus or FLAC), and a CUE track's length is not its file's.
+    // The scan records the codec the stream declares (#1866), so `.m4a` and
+    // `.ogg` rows say what they hold. A CUE track's length is not its file's.
     let codec = match song.filetype {
         _ if song.cue_path.is_some() || song.end_nanosec > 0 => None,
         FileType::Mp3 => Some("mp3"),
+        FileType::Aac => Some("aac"),
+        FileType::Alac => Some("alac"),
         FileType::Flac => Some("flac"),
+        FileType::OggVorbis => Some("ogg"),
         FileType::OggOpus => Some("opus"),
+        FileType::OggSpeex => Some("speex"),
         FileType::Wav => Some("wav"),
         FileType::Aiff => Some("aiff"),
         FileType::WavPack => Some("wavpack"),
         FileType::Ape => Some("ape"),
         FileType::Mpc => Some("mpc"),
-        FileType::Aac
-            if path
-                .extension()
-                .is_some_and(|e| e.eq_ignore_ascii_case("aac")) =>
-        {
-            Some("aac")
-        }
         _ => None,
     };
     let bit_depth = positive(song.bitdepth).and_then(|d| u8::try_from(d).ok());
@@ -681,5 +678,36 @@ mod tests {
 
         let entries = build_entries(&conn, &[volume(device_dir.path(), "0088-5572")], NOW).unwrap();
         assert_eq!(entries[0].shown.profile.nickname.as_deref(), Some("Here"));
+    }
+
+    #[test]
+    fn a_row_gives_the_codec_its_stream_declared_not_its_extension() {
+        let row = |path: &str, filetype| Song {
+            path: Some(path.into()),
+            filetype,
+            samplerate: Some(44_100),
+            channels: Some(2),
+            bitdepth: Some(16),
+            bitrate: Some(900),
+            length_nanosec: Some(200_000_000_000),
+            filesize: Some(22_000_000),
+            ..Default::default()
+        };
+        let codec = |song: &Song| known_source(song, Path::new("x")).codec;
+
+        assert_eq!(codec(&row("a.m4a", FileType::Alac)), Some("alac"));
+        assert_eq!(codec(&row("a.m4a", FileType::Aac)), Some("aac"));
+        assert_eq!(codec(&row("a.ogg", FileType::OggOpus)), Some("opus"));
+        assert_eq!(codec(&row("a.ogg", FileType::OggVorbis)), Some("ogg"));
+        let cue_track = Song {
+            cue_path: Some("a.cue".into()),
+            ..row("a.flac", FileType::Flac)
+        };
+        assert_eq!(codec(&cue_track), None);
+        let no_depth = Song {
+            bitdepth: None,
+            ..row("a.m4a", FileType::Alac)
+        };
+        assert_eq!(codec(&no_depth), None);
     }
 }
