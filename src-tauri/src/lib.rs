@@ -116,6 +116,8 @@ pub struct AppState {
     pub mass_removal_registry: Arc<parking_lot::Mutex<collection::MassRemovalRegistry>>,
     /// Connected portable players and removable drives (#835).
     pub devices: Arc<devices::DeviceMonitor>,
+    /// Converts files for devices and keeps the transcode cache (#838).
+    pub transcoder: Arc<luminous_transcode::Transcoder>,
 }
 
 /// Suppresses stock webview browser chrome — reload/find/print keybindings and
@@ -1153,6 +1155,10 @@ pub fn run() {
                     collection::MassRemovalRegistry::new(),
                 )),
                 devices: Arc::new(devices::DeviceMonitor::new()),
+                transcoder: Arc::new(luminous_transcode::Transcoder::new(
+                    crate::paths::resolve_cache_dir(app).join("transcode"),
+                    devices::TRANSCODE_CACHE_CAP_BYTES,
+                )),
             };
 
             crate::collection::start_watcher(app.handle().clone(), &state);
@@ -1601,6 +1607,7 @@ pub fn run() {
             commands::devices::get_connected_devices,
             commands::devices::update_device_profile,
             commands::devices::eject_device,
+            commands::devices::get_transcode_capabilities,
             // Window & Miniplayer commands
             commands::window::is_remote_devtools_enabled,
             commands::window::geometry_capture_supported,

@@ -116,6 +116,20 @@ pub fn resolve_app_data_dir<R: Runtime>(app: &impl Manager<R>) -> PathBuf {
     resolve_app_data_dir_info(app).path
 }
 
+/// Where regenerable data goes (the transcode cache, #838): the OS cache
+/// directory, which is local rather than roaming and fair game for disk
+/// cleanup, or `cache` inside the data folder for portable and isolated
+/// (`LUMINOUS_DATA_DIR`) runs.
+pub fn resolve_cache_dir<R: Runtime>(app: &impl Manager<R>) -> PathBuf {
+    let info = resolve_app_data_dir_info(app);
+    if info.is_portable || std::env::var_os("LUMINOUS_DATA_DIR").is_some() {
+        return info.path.join("cache");
+    }
+    app.path()
+        .app_cache_dir()
+        .unwrap_or_else(|_| info.path.join("cache"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

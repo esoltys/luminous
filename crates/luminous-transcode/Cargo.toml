@@ -1,0 +1,37 @@
+[package]
+name = "luminous-transcode"
+version = "0.1.0"
+description = "Converts library files for portable players: the can't-play rule, decode/resample/encode, art downscaling and the transcode cache"
+edition = "2021"
+publish = false
+license.workspace = true
+
+# Must never depend on tauri, rusqlite, reqwest or tokio: CI checks
+# `cargo tree -p luminous-transcode -e normal` for them (#838, epic #834).
+[dependencies]
+luminous-audio = { path = "../luminous-audio" }
+luminous-devices = { path = "../luminous-devices" }
+# Encodes Opus (#838); the same libopus binding, vendored and statically
+# linked, that luminous-audio's Opus decoder already pulls in.
+opusic-sys = "0.7"
+ogg = "0.9"
+rubato = "5"
+lofty = "0.25"
+image = "0.25"
+sha2 = "0.11"
+serde = { workspace = true, features = ["derive"] }
+parking_lot.workspace = true
+log.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+# AAC and MP3 through the operating system's Media Foundation encoders; the
+# same `windows` version the other crates use.
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_Media_MediaFoundation",
+    "Win32_System_Com",
+] }
+
+[dev-dependencies]
+luminous-audio = { path = "../luminous-audio", features = ["test-util"] }
+tempfile = "3"
