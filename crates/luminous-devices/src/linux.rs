@@ -181,7 +181,7 @@ fn mount_points(filesystem: &Properties) -> Vec<PathBuf> {
 
 /// Total and available bytes, or `None` if the mount point can't be read
 /// (outside the Flatpak sandbox's view, or unmounted mid-poll).
-fn space(mount: &Path) -> Option<(u64, u64)> {
+pub(crate) fn space(mount: &Path) -> Option<(u64, u64)> {
     let path = CString::new(mount.as_os_str().as_bytes()).ok()?;
     let mut stat: libc::statvfs = unsafe { std::mem::zeroed() };
     if unsafe { libc::statvfs(path.as_ptr(), &mut stat) } != 0 {

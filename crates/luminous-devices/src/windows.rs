@@ -2,7 +2,7 @@
 
 use crate::{EjectError, Volume};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use windows::core::PCWSTR;
 use windows::Win32::Devices::DeviceAndDriverInstallation::{
     CM_Get_Parent, CM_Request_Device_EjectW, PNP_VetoTypeUnknown, SetupDiDestroyDeviceInfoList,
@@ -107,16 +107,7 @@ impl Watcher {
             return None;
         }
 
-        let (mut free, mut total) = (0u64, 0u64);
-        unsafe {
-            GetDiskFreeSpaceExW(
-                PCWSTR(root.as_ptr()),
-                Some(&mut free),
-                Some(&mut total),
-                None,
-            )
-        }
-        .ok()?;
+        let (total, free) = space(Path::new(&format!("{letter}:\\")))?;
 
         Some(Volume {
             mount_path: PathBuf::from(format!("{letter}:\\")),
@@ -130,6 +121,22 @@ impl Watcher {
             os_ref: letter.to_string(),
         })
     }
+}
+
+/// Total and available bytes of the volume holding `path`.
+pub(crate) fn space(path: &Path) -> Option<(u64, u64)> {
+    let path = wide(&path.to_string_lossy());
+    let (mut free, mut total) = (0u64, 0u64);
+    unsafe {
+        GetDiskFreeSpaceExW(
+            PCWSTR(path.as_ptr()),
+            Some(&mut free),
+            Some(&mut total),
+            None,
+        )
+    }
+    .ok()?;
+    Some((total, free))
 }
 
 pub(crate) fn eject(volume: &Volume) -> Result<(), EjectError> {

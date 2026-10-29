@@ -32,11 +32,12 @@ pub async fn update_device_profile(
 
 /// Safely removes a device. Stops playback first when the current track is
 /// on it, so Luminous never blocks its own eject. Resolves when the device
-/// can be unplugged (or was already gone); rejects with `device-in-use` when
-/// another program holds files open on it, else `device-eject-failed`.
+/// can be unplugged (or was already gone; an MTP device always can be);
+/// rejects with `device-in-use` when another program holds files open on
+/// it, else `device-eject-failed`.
 #[tauri::command]
 pub async fn eject_device(id: String, state: State<'_, AppState>) -> Result<(), String> {
-    let Some(volume) = state.devices.volume(&id) else {
+    let Some(device) = state.devices.device(&id) else {
         return Ok(());
     };
 
@@ -46,13 +47,13 @@ pub async fn eject_device(id: String, state: State<'_, AppState>) -> Result<(), 
             .current_song
             .as_ref()
             .and_then(|song| song.path.as_deref())
-            .is_some_and(|path| volume.contains(path));
+            .is_some_and(|path| device.contains(path));
         if playing_from_device {
             player.stop().await.map_err(|e| e.to_string())?;
         }
     }
 
-    let result = tokio::task::spawn_blocking(move || luminous_devices::eject(&volume))
+    let result = tokio::task::spawn_blocking(move || device.eject())
         .await
         .map_err(|e| e.to_string())?;
     state.devices.request_rebuild();
