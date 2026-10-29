@@ -39,8 +39,9 @@ pub struct DeviceProfile {
     pub layout: LayoutSettings,
 }
 
-/// The template a new device's music folders follow: the Organize view's
-/// default, e.g. `Insomnium/2019 - Heart Like a Grave/02 Valediction`.
+/// The template a new device's music folders follow: album artist, then
+/// year and album, then disc, track and title, e.g.
+/// `Insomnium/2019 - Heart Like a Grave/02 Valediction`.
 pub const DEFAULT_FOLDER_TEMPLATE: &str = "%albumartist/{%year - }{%album/}{%disc-}{%track }%title";
 
 /// Where synced files go on the device and how playlist files are written.
@@ -87,6 +88,14 @@ pub enum PlaylistFileFormat {
     Pls,
     /// No playlist files.
     None,
+}
+
+impl PlaylistFileFormat {
+    /// Whether file and folder names on the device must be ASCII so this
+    /// format's playlist lines can spell them.
+    pub fn ascii_names(self) -> bool {
+        self == Self::M3uAscii
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]

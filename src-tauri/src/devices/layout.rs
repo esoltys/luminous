@@ -18,6 +18,7 @@ use crate::organizer::{
 use anyhow::Result;
 use luminous_devices::{DeviceProfile, LayoutSettings, PathSeparator, PlaylistFileFormat};
 use luminous_metadata::playlist::{render_playlist, LineEnding, PlaylistEntry, PlaylistFormat};
+use luminous_transcode::Transcoder;
 use rusqlite::OptionalExtension;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -90,7 +91,7 @@ impl DeviceLayout {
     /// order, so the same songs get the same paths on every sync.
     pub fn plan(profile: &DeviceProfile, tracks: &[SyncedTrack]) -> Self {
         let settings = profile.layout.clone();
-        let fold = settings.playlist_format == PlaylistFileFormat::M3uAscii;
+        let ascii_only = settings.playlist_format.ascii_names();
         let music_dir = path_parts(&profile.music_path);
 
         let mut ordered: Vec<&SyncedTrack> = tracks.iter().collect();
@@ -99,7 +100,7 @@ impl DeviceLayout {
 
         let mut drafts: Vec<Draft> = ordered
             .iter()
-            .map(|t| draft(t, &settings.folder_template, fold))
+            .map(|t| draft(t, &settings.folder_template, ascii_only))
             .collect();
         let all_dirs: Vec<Vec<String>> = drafts.iter().map(|d| d.dirs.clone()).collect();
         let casing = build_dir_casing_map(&all_dirs);
@@ -115,7 +116,7 @@ impl DeviceLayout {
                 .map(String::as_str)
                 .chain(d.dirs.iter().map(String::as_str))
                 .collect();
-            let path = unique_path(&dir, &d.stem, Some(&d.extension), &mut taken);
+            let path = unique_path(&dir, &d.stem, &d.extension, &mut taken);
             tracks.insert(d.song.id, path);
         }
 
@@ -144,7 +145,7 @@ impl DeviceLayout {
             PlaylistFileFormat::Pls => (PlaylistFormat::Pls, "pls"),
             PlaylistFileFormat::None => return Vec::new(),
         };
-        let fold = self.settings.playlist_format == PlaylistFileFormat::M3uAscii;
+        let ascii_only = self.settings.playlist_format.ascii_names();
         let (separator, line_ending) = match self.settings.path_separator {
             PathSeparator::Slash => ("/", LineEnding::Lf),
             PathSeparator::Backslash => ("\\", LineEnding::CrLf),
@@ -155,8 +156,8 @@ impl DeviceLayout {
         playlists
             .iter()
             .map(|playlist| {
-                let stem = device_name(playlist.name, fold);
-                let path = unique_path(&dir, &stem, Some(extension), &mut taken);
+                let stem = device_name(playlist.name, ascii_only);
+                let path = unique_path(&dir, &stem, extension, &mut taken);
                 let entries: Vec<PlaylistEntry> = playlist
                     .songs
                     .iter()
@@ -172,7 +173,7 @@ impl DeviceLayout {
                     })
                     .collect();
                 let text = render_playlist(playlist.name, &entries, format, line_ending);
-                let content = if fold {
+                let content = if ascii_only {
                     fold_to_ascii(&text, |_| true).into_bytes()
                 } else {
                     text.into_bytes()
@@ -190,13 +191,13 @@ impl DeviceLayout {
     }
 }
 
-fn draft<'a>(track: &SyncedTrack<'a>, template: &str, fold: bool) -> Draft<'a> {
+fn draft<'a>(track: &SyncedTrack<'a>, template: &str, ascii_only: bool) -> Draft<'a> {
     let extension = track.extension.trim_start_matches('.').to_ascii_lowercase();
     let expanded = expand_template(template, track.song, &extension);
     let mut parts: Vec<String> = expanded
         .split(['/', '\\'])
         .filter(|p| !p.trim().is_empty())
-        .map(|p| device_name(p, fold))
+        .map(|p| device_name(p, ascii_only))
         .collect();
     let mut stem = parts.pop().unwrap_or_else(|| "Unknown".into());
     // A template ending in `.%extension` already names the extension.
@@ -215,11 +216,11 @@ fn draft<'a>(track: &SyncedTrack<'a>, template: &str, fold: bool) -> Draft<'a> {
 }
 
 /// One file or folder name, safe on FAT and exFAT and within the length
-/// limit; in ASCII when `fold`. Typographic punctuation (curly quotes,
+/// limit; in ASCII when `ascii_only`. Typographic punctuation (curly quotes,
 /// dashes, ellipses) is always folded to its ASCII form: players whose
 /// fonts draw it full-width show "Don’t" as "Don' t".
-fn device_name(raw: &str, fold: bool) -> String {
-    let name = if fold {
+fn device_name(raw: &str, ascii_only: bool) -> String {
+    let name = if ascii_only {
         fold_to_ascii(raw, |_| true)
     } else {
         fold_to_ascii(raw, is_typographic_punctuation)
@@ -230,20 +231,12 @@ fn device_name(raw: &str, fold: bool) -> String {
     )
 }
 
-/// `dir/stem.extension` (or `dir/stem` without one), with " (n)" added to
+/// `dir/stem.extension`, with " (n)" added to
 /// the stem until no path in `taken` matches it ignoring case, as FAT and
 /// MTP do. Records the result in `taken`.
-fn unique_path(
-    dir: &[&str],
-    stem: &str,
-    extension: Option<&str>,
-    taken: &mut HashSet<String>,
-) -> String {
+fn unique_path(dir: &[&str], stem: &str, extension: &str, taken: &mut HashSet<String>) -> String {
     let join = |name: &str| {
-        let file = match extension {
-            Some(ext) => format!("{name}.{ext}"),
-            None => name.to_string(),
-        };
+        let file = format!("{name}.{extension}");
         dir.iter()
             .copied()
             .chain(std::iter::once(file.as_str()))
@@ -276,6 +269,8 @@ fn plan_folder_art(
     }
     let mut folders: Vec<Folder> = Vec::new();
     let mut index: HashMap<String, usize> = HashMap::new();
+    // Only folders the template makes hold an album; tracks laid out flat
+    // in the music folder itself get no art.
     for d in drafts.iter().filter(|d| !d.dirs.is_empty()) {
         let Some(track_path) = tracks.get(&d.song.id) else {
             continue;
@@ -356,10 +351,41 @@ pub fn folder_art_jpeg(album_track: &Path, max_px: Option<u32>) -> Option<Vec<u8
     Some(jpeg)
 }
 
+/// Where a library song would go on a device with `profile`, relative to
+/// the storage root and with the extension it gets there: the example
+/// under the "Folders on the device" template. Uses `song_id` when it is a
+/// local library song, else a well-tagged one; `None` when the library has
+/// no local songs. Blocks: reads the song's file to decide its conversion.
+pub fn preview_track_path(
+    conn: &rusqlite::Connection,
+    transcoder: &Transcoder,
+    profile: &DeviceProfile,
+    song_id: Option<i64>,
+) -> Result<Option<String>> {
+    let Some(song) = example_song(conn, song_id)? else {
+        return Ok(None);
+    };
+    let source = Path::new(song.path.as_deref().unwrap_or_default());
+    // A file that can't be read right now keeps its own extension.
+    let extension = match transcoder.decide(source, profile) {
+        Ok(decision) => decision.extension(source),
+        Err(_) => source
+            .extension()
+            .map(|e| e.to_string_lossy().into_owned())
+            .unwrap_or_default(),
+    };
+    let track = SyncedTrack {
+        song: &song,
+        extension: &extension,
+    };
+    Ok(DeviceLayout::plan(profile, &[track])
+        .track_path(song.id)
+        .map(str::to_string))
+}
+
 /// `song_id` when it is a local library song, else the most recently added
-/// one with an album, title and track number (a year too when any has one):
-/// the song a template example is shown with.
-pub fn example_song(conn: &rusqlite::Connection, song_id: Option<i64>) -> Result<Option<Song>> {
+/// one with an album, title and track number (a year too when any has one).
+fn example_song(conn: &rusqlite::Connection, song_id: Option<i64>) -> Result<Option<Song>> {
     let local = format!(
         "source IN ({}) AND unavailable = 0 AND path IS NOT NULL",
         *LOCAL_SOURCES_SQL
@@ -825,6 +851,28 @@ mod tests {
         assert_eq!(asked.id, bare_id);
         let missing = example_song(&conn, Some(9999)).unwrap().unwrap();
         assert_eq!(missing.title.as_deref(), Some("Valediction"));
+    }
+
+    #[test]
+    fn preview_shows_a_library_song_on_the_device() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = crate::db::Database::new(dir.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+        let transcoder = Transcoder::new(dir.path().join("transcode"));
+        let device = profile(LayoutSettings::default());
+        assert_eq!(
+            preview_track_path(&conn, &transcoder, &device, None).unwrap(),
+            None
+        );
+
+        crate::collection::upsert_song(&conn, &valediction()).unwrap();
+        // The file isn't on disk, so it keeps its own extension.
+        assert_eq!(
+            preview_track_path(&conn, &transcoder, &device, None)
+                .unwrap()
+                .as_deref(),
+            Some("Music/Insomnium/2019 - Heart Like a Grave/02 Valediction.flac")
+        );
     }
 
     #[test]
