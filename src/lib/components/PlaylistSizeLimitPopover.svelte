@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { cubicOut } from "svelte/easing";
+  import { fade, scale } from "../utils/motion";
   import { portal } from "../utils/portal";
   import { i18n } from "../stores/i18n.svelte";
   import { formatStorageSize, STORAGE_GB, STORAGE_MB } from "../utils/formatters";
@@ -43,7 +45,8 @@
     coords = { left, top: rect.bottom + 8 };
   }
 
-  $effect(() => {
+  // Pre-effect: position before the popover's first paint, not one frame after it.
+  $effect.pre(() => {
     if (isOpen) {
       updatePosition();
       customValue = "";
@@ -81,7 +84,9 @@
     role="dialog"
     aria-label={i18n.t("playlists.sizeLimitTitle")}
     style="left: {coords.left}px; top: {coords.top}px; width: {WIDTH_PX}px;"
-    class="fixed z-50 bg-brand-sidebar border border-brand-border rounded-2xl shadow-2xl p-4 text-brand-text-primary space-y-3 select-none animate-in fade-in zoom-in-95 duration-150"
+    class="fixed z-50 bg-brand-sidebar border border-brand-border rounded-2xl shadow-2xl p-4 text-brand-text-primary space-y-3 select-none"
+    in:scale={{ start: 0.95, duration: 150, easing: cubicOut }}
+    out:fade={{ duration: 120, easing: cubicOut }}
   >
     <div class="flex items-start justify-between gap-3">
       <h2 class="text-sm font-semibold">{i18n.t("playlists.sizeLimitTitle")}</h2>
