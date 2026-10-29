@@ -766,6 +766,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(windows)]
     fn test_rebase_and_relocate_onedrive_to_network_drive_preserves_playlists() {
         let old_str = r"G:\OneDrive\Shared with Nicole\Music\Music Library";
         let new_str = r"Z:\Music Library";
@@ -868,5 +869,34 @@ mod tests {
             .query_row("SELECT path FROM directories", [], |r| r.get(0))
             .unwrap();
         assert_eq!(dir_in_db, new_root_dir.to_string_lossy());
+    }
+
+    #[test]
+    fn test_relocate_root_matches_directory_with_trailing_slash() {
+        let f = fixture();
+        let conn = f.db.pool.get().unwrap();
+        let old_root = f.root.join("Old");
+        let new_root = f.root.join("New");
+        std::fs::create_dir_all(old_root.join("Album")).unwrap();
+        std::fs::create_dir_all(new_root.join("Album")).unwrap();
+        std::fs::write(new_root.join("Album").join("track.mp3"), b"pretend-audio").unwrap();
+
+        // Directory in DB without trailing slash
+        watch(&conn, &old_root);
+        let id = add_song(&conn, &old_root.join("Album").join("track.mp3"));
+
+        // Caller passes old_root with trailing separator (common from file dialogs)
+        let sep = std::path::MAIN_SEPARATOR;
+        let old_root_with_trailing =
+            PathBuf::from(format!("{}{}", old_root.to_string_lossy(), sep));
+        let result = relocate_root(&conn, &old_root_with_trailing, &new_root).unwrap();
+
+        assert_eq!(result.songs_relocated, 1);
+        let (path, unavailable, _) = song_row(&conn, id);
+        assert_eq!(
+            path,
+            new_root.join("Album").join("track.mp3").to_string_lossy()
+        );
+        assert!(!unavailable);
     }
 }
