@@ -12,17 +12,17 @@
     anchorEl: HTMLElement | null;
     /** The playlist's current limit in bytes, or `null` for none. */
     limitBytes: number | null;
-    /** Smart playlists get a note that Refresh re-sorts them. */
-    isSmart: boolean;
+    /** Whether Refresh can reorder this playlist (a dynamic one with no sort set), which moves the line. */
+    refreshReorders: boolean;
     /** Called with the new limit in bytes, or `null` to remove it. */
     onApply: (bytes: number | null) => void;
     onClose: () => void;
   }
 
-  let { isOpen, anchorEl, limitBytes, isSmart, onApply, onClose }: Props = $props();
+  let { isOpen, anchorEl, limitBytes, refreshReorders, onApply, onClose }: Props = $props();
 
-  /** Common capacities: a CD, then USB stick / SD card sizes. */
-  const PRESETS = [700 * STORAGE_MB, 4 * STORAGE_GB, 8 * STORAGE_GB, 16 * STORAGE_GB, 32 * STORAGE_GB, 64 * STORAGE_GB];
+  /** Common USB stick / SD card capacities. */
+  const PRESETS = [2 * STORAGE_GB, 4 * STORAGE_GB, 8 * STORAGE_GB, 16 * STORAGE_GB, 32 * STORAGE_GB, 64 * STORAGE_GB];
   const WIDTH_PX = 320;
 
   let popoverEl = $state<HTMLDivElement | null>(null);
@@ -134,7 +134,7 @@
       </Button>
     </div>
 
-    {#if isSmart}
+    {#if refreshReorders}
       <p class="text-xs text-brand-text-secondary leading-relaxed">{i18n.t("playlists.sizeLimitSmartNote")}</p>
     {/if}
 

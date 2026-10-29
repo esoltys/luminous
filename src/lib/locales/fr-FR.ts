@@ -884,7 +884,7 @@ export const frFR: DeepStringRecord<typeof en> = {
     sizeLimitHint: "Choisissez l’espace que peuvent occuper les chansons en haut de cette liste de lecture, comme la capacité d’une clé USB. Une ligne pointillée indique où elles cessent d’y entrer.",
     sizeLimitCustomPlaceholder: "Taille personnalisée",
     sizeLimitSetCustom: "Définir",
-    sizeLimitSmartNote: "Actualiser trie de nouveau cette liste intelligente, ce qui peut changer les chansons qui y entrent.",
+    sizeLimitSmartNote: "Actualiser trie de nouveau cette liste, ce qui peut changer les chansons qui y entrent.",
     sizeLimitRemove: "Retirer la limite",
     sizeLimitStats: "{used} sur {limit} utilisés",
     sizeLimitBreak: {

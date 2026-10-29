@@ -33,8 +33,7 @@
     PushPinIcon as Pin,
     PushPinSlashIcon as PinOff,
     ShareNetworkIcon as Share,
-    InfinityIcon as Infinity,
-    UsbIcon as Usb
+    InfinityIcon as Infinity
   } from "phosphor-svelte";
   import { resolveArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
@@ -67,12 +66,13 @@
   import SearchEmptyState from "./SearchEmptyState.svelte";
   import { matchesSongSearch } from "../utils/songSearch";
   import { portal } from "../utils/portal";
-  import { formatSampleRate, formatBitDepth, formatChannels, formatFileSize, formatDuration, formatHoursMinutes, formatStorageSize } from "../utils/formatters";
+  import { formatSampleRate, formatBitDepth, formatChannels, formatFileSize, formatDuration, formatHoursMinutes } from "../utils/formatters";
   import { formatDateAdded } from "../utils/date";
   import { CONTEXT_MENU_WIDTH_PX } from "../constants";
   import { compareSongs } from "../utils/songSort";
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
-  import PlaylistSizeLimitPopover from "./PlaylistSizeLimitPopover.svelte";
+  import PlaylistSizeLimitControl from "./PlaylistSizeLimitControl.svelte";
+  import { fitForOrder, breakBeforeUuid, sizeLimitBreakLabel, sizeLimitStats } from "../utils/sizeFit";
 
   // Default column widths (px or fr) — used when no saved width exists for a column.
   const PLAYLIST_COL_DEFAULTS: Partial<Record<keyof typeof collectionStore.visibleColumns, string>> = {
@@ -100,8 +100,6 @@
   let overflowMenuPos = $state<{ x: number; y: number } | null>(null);
   let overflowButtonEl = $state<HTMLButtonElement | undefined>(undefined);
 
-  let showSizeLimitPopover = $state(false);
-  let sizeLimitAnchorEl = $state<HTMLElement | null>(null);
 
   let showSaveQueueModal = $state(false);
   let saveQueueName = $state(i18n.t("playlists.queuePlaylistDefaultName"));
@@ -385,8 +383,8 @@
       underlyingIndex: playlistsStore.activePlaylistTracks.findIndex((t) => t.uuid === item.uuid),
       ...(autoContinueStarts.has(item.uuid)
         ? { dividerBefore: i18n.t("playlists.autoContinue") }
-        : item.uuid === breakBeforeUuid
-          ? { dividerBefore: sizeLimitBreakLabel, dividerVariant: "break" as const }
+        : sizeFit && item.uuid === breakBefore
+          ? { dividerBefore: sizeLimitBreakLabel(sizeFit), dividerVariant: "break" as const }
           : {}),
     };
   }
@@ -495,29 +493,11 @@
   /** The size-limit answer, only while the shown order is the one it was
    * computed for (e.g. not during an optimistic drag, or while a shuffled
    * playlist shows its playback order). */
-  let sizeFit = $derived.by(() => {
-    const fit = playlistsStore.activeSizeFit;
-    const tracks = playlistsStore.activePlaylistTracks;
-    if (!fit || isQueue || fit.order.length !== tracks.length) return null;
-    return tracks.every((t, i) => t.uuid === fit.order[i]) ? fit : null;
-  });
-
-  /** The row the size-limit break sits above: the first shown row past the
-   * limit. Searching hides rows, not the break. */
-  let breakBeforeUuid = $derived.by(() => {
-    if (!sizeFit || sizeFit.break_index >= sizeFit.order.length) return null;
-    const below = new Set(sizeFit.order.slice(sizeFit.break_index));
-    return sortedTracks.find((t) => below.has(t.uuid))?.uuid ?? null;
-  });
-
-  let sizeLimitBreakLabel = $derived(
-    sizeFit
-      ? i18n.plural("playlists.sizeLimitBreak", sizeFit.fit_songs, {
-          limit: formatStorageSize(sizeFit.limit_bytes),
-          below: formatStorageSize(sizeFit.total_bytes - sizeFit.fit_bytes),
-        })
-      : ""
+  let sizeFit = $derived(
+    isQueue ? null : fitForOrder(playlistsStore.activeSizeFit, playlistsStore.activePlaylistTracks.map((t) => t.uuid))
   );
+
+  let breakBefore = $derived(breakBeforeUuid(sizeFit, sortedTracks.map((t) => t.uuid)));
 
   function playSelected() {
     if (selectedUuids.size === 0 || !activePlaylist) return;
@@ -737,12 +717,7 @@
             <span>{totalRuntimeLabel}</span>
             {#if sizeFit}
               <span>•</span>
-              <span>
-                {i18n.t("playlists.sizeLimitStats", {
-                  used: formatStorageSize(sizeFit.fit_bytes),
-                  limit: formatStorageSize(sizeFit.limit_bytes),
-                })}
-              </span>
+              <span>{sizeLimitStats(sizeFit)}</span>
             {/if}
           </div>
           {/if}
@@ -798,33 +773,7 @@
               </Button>
             {/if}
             {#if !isQueue && activePlaylist}
-              <!-- Icon-only until a limit is set, so the header row doesn't wrap for a control most playlists never use. -->
-              <span bind:this={sizeLimitAnchorEl} class="inline-flex">
-                {#if activePlaylist.size_limit_bytes}
-                  <Button onclick={() => (showSizeLimitPopover = !showSizeLimitPopover)} variant="accent-soft">
-                    <Usb class="w-4 h-4" />
-                    <span>
-                      {i18n.t("playlists.sizeLimitSetBtn", { limit: formatStorageSize(activePlaylist.size_limit_bytes) })}
-                    </span>
-                  </Button>
-                {:else}
-                  <IconActionButton
-                    onclick={() => (showSizeLimitPopover = !showSizeLimitPopover)}
-                    title={i18n.t("playlists.sizeLimitBtn")}
-                    class="shrink-0"
-                  >
-                    {#snippet icon()}<Usb class="w-4 h-4" />{/snippet}
-                  </IconActionButton>
-                {/if}
-              </span>
-              <PlaylistSizeLimitPopover
-                isOpen={showSizeLimitPopover}
-                anchorEl={sizeLimitAnchorEl}
-                limitBytes={activePlaylist.size_limit_bytes ?? null}
-                isSmart={activePlaylist.dynamic_enabled}
-                onApply={(bytes) => playlistsStore.setSizeLimit(activePlaylist!.id, bytes)}
-                onClose={() => (showSizeLimitPopover = false)}
-              />
+              <PlaylistSizeLimitControl playlist={activePlaylist} />
             {/if}
             {#if !isActive && activePlaylist && !activePlaylist.dynamic_enabled}
               <Button

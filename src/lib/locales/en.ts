@@ -878,7 +878,7 @@ export const en = {
     sizeLimitHint: "Choose how much space the songs at the top of this playlist can take, such as a USB stick's capacity. A dashed line marks where they stop fitting.",
     sizeLimitCustomPlaceholder: "Custom size",
     sizeLimitSetCustom: "Set",
-    sizeLimitSmartNote: "Refresh re-sorts this smart playlist, which can change which songs fit.",
+    sizeLimitSmartNote: "Refresh re-sorts this playlist, which can change which songs fit.",
     sizeLimitRemove: "Remove limit",
     sizeLimitStats: "{used} of {limit} used",
     sizeLimitBreak: {

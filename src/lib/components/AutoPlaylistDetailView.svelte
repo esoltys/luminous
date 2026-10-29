@@ -29,6 +29,8 @@
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
   import ShareModal from "./ShareModal.svelte";
+  import PlaylistSizeLimitControl from "./PlaylistSizeLimitControl.svelte";
+  import { fitForOrder, breakBeforeUuid, sizeLimitBreakLabel, sizeLimitStats } from "../utils/sizeFit";
   import {
     PlusIcon as Plus,
     FolderPlusIcon as FolderPlus,
@@ -46,7 +48,7 @@
     ShareNetworkIcon as Share
   } from "phosphor-svelte";
   import { shuffleArray } from "../utils/shuffle";
-  import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
+  import type { PlaylistItem, PlaylistSizeFit, QueuePopulationMode, Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { getPopulationModeSuffix, getBpmBucketLabel, getDaypartMixLabel, getDaypartMixSourceLabel } from "../utils/playlist";
@@ -111,6 +113,10 @@
   let pinRefKey = $derived(autoPlaylistRefKeyFor(view));
 
   let songs = $state<Song[]>([]);
+  // When the list is the backing playlist's own rows: those rows, and the
+  // backend's size-limit answer for their order (#344). `null` otherwise.
+  let playlistItems = $state<PlaylistItem[] | null>(null);
+  let rawSizeFit = $state<PlaylistSizeFit | null>(null);
   let loading = $state(true);
   let editingSongId = $state<number | null>(null);
   let editingAlbumSongs = $state<Song[] | null>(null);
@@ -240,40 +246,58 @@
     return formatHoursMinutes(Math.round(totalNs / 1_000_000_000 / 60));
   });
 
-  async function fetchSongs(k: typeof kind, g: typeof genre, at: typeof artistTag, d: typeof decade, b: typeof bpm, pid: typeof playlistId): Promise<Song[]> {
+  /** What the view lists: songs, plus the playlist rows and size fit when the
+   * songs are the backing playlist's own rows (`null` for the other kinds). */
+  type Loaded = { songs: Song[]; items: PlaylistItem[] | null; fit: PlaylistSizeFit | null };
+
+  const songsOnly = (list: Song[]): Loaded => ({ songs: list, items: null, fit: null });
+
+  async function loadPlaylistRows(pid: number): Promise<Loaded> {
+    const [items, fit] = await Promise.all([
+      invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: pid }),
+      invoke<PlaylistSizeFit | null>("get_playlist_size_fit", { playlistId: pid }),
+    ]);
+    const withSongs = items.filter((item) => !!item.song);
+    return { songs: withSongs.map((item) => item.song as Song), items: withSongs, fit: fit ?? null };
+  }
+
+  async function fetchSongs(k: typeof kind, g: typeof genre, at: typeof artistTag, d: typeof decade, b: typeof bpm, pid: typeof playlistId): Promise<Loaded> {
     if ((k === "genre" || k === "decade" || k === "bpm" || k === "artist_tag" || k === "daypart") && pid !== undefined) {
-      const items = await invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: pid });
-      return items.filter((item) => !!item.song).map((item) => item.song as Song);
+      return loadPlaylistRows(pid);
     }
     if (k === "missing_musicbrainz") {
       if (pid !== undefined) {
-        const items = await invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: pid });
-        const songs = items.filter((item) => !!item.song).map((item) => item.song as Song);
-        if (songs.length > 0) return songs;
+        const loaded = await loadPlaylistRows(pid);
+        if (loaded.songs.length > 0) return loaded;
       }
-      return invoke<Song[]>("get_songs_missing_musicbrainz_id");
+      return songsOnly(await invoke<Song[]>("get_songs_missing_musicbrainz_id"));
     }
     if (k === "missing_metadata") {
       if (pid !== undefined) {
-        const items = await invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: pid });
-        const songs = items.filter((item) => !!item.song).map((item) => item.song as Song);
-        if (songs.length > 0) return songs;
+        const loaded = await loadPlaylistRows(pid);
+        if (loaded.songs.length > 0) return loaded;
       }
-      return invoke<Song[]>("get_songs_missing_metadata");
+      return songsOnly(await invoke<Song[]>("get_songs_missing_metadata"));
     }
-    if (k === "daypart") return [];
-    if (k === "favourites") return invoke<Song[]>("get_favourite_songs");
-    if (k === "recently_added") return invoke<Song[]>("get_recently_added_songs", { limit: 50 });
-    if (k === "most_played") return invoke<Song[]>("get_most_played_songs", { limit: 50 });
-    if (k === "history") return invoke<Song[]>("get_recently_played_songs", { limit: 100 });
-    if (k === "decade") return invoke<Song[]>("get_songs_by_decade", { decade: d ?? "", limit: 50 });
-    if (k === "bpm") return invoke<Song[]>("get_songs_by_bpm", { spec: b ?? "", limit: 50 });
-    if (k === "artist_tag") return invoke<Song[]>("get_songs_by_artist_tag", { tag: at ?? "", limit: 500 });
-    if (k === "no_genre") return invoke<Song[]>("get_songs_without_genre", { limit: 500 });
+    if (k === "daypart") return songsOnly([]);
+    if (k === "favourites") return songsOnly(await invoke<Song[]>("get_favourite_songs"));
+    if (k === "recently_added") return songsOnly(await invoke<Song[]>("get_recently_added_songs", { limit: 50 }));
+    if (k === "most_played") return songsOnly(await invoke<Song[]>("get_most_played_songs", { limit: 50 }));
+    if (k === "history") return songsOnly(await invoke<Song[]>("get_recently_played_songs", { limit: 100 }));
+    if (k === "decade") return songsOnly(await invoke<Song[]>("get_songs_by_decade", { decade: d ?? "", limit: 50 }));
+    if (k === "bpm") return songsOnly(await invoke<Song[]>("get_songs_by_bpm", { spec: b ?? "", limit: 50 }));
+    if (k === "artist_tag") return songsOnly(await invoke<Song[]>("get_songs_by_artist_tag", { tag: at ?? "", limit: 500 }));
+    if (k === "no_genre") return songsOnly(await invoke<Song[]>("get_songs_without_genre", { limit: 500 }));
     // Sub-threshold fallback (no backing playlist row yet) — direct
     // curated-hierarchy query (#548), same matching a materialized genre
     // auto-playlist's own population uses.
-    return invoke<Song[]>("get_songs_by_curated_tag", { tagName: g ?? "", limit: 500 });
+    return songsOnly(await invoke<Song[]>("get_songs_by_curated_tag", { tagName: g ?? "", limit: 500 }));
+  }
+
+  function applyLoaded(loaded: Loaded) {
+    songs = loaded.songs;
+    playlistItems = loaded.items;
+    rawSizeFit = loaded.fit;
   }
 
   function mergeSongsById(a: Song[], b: Song[]): Song[] {
@@ -294,6 +318,17 @@
    * either one should surface the union of both, not just whichever system
    * you clicked through from (#962/#956 follow-up). */
   async function unionWithOtherSystem(
+    k: typeof kind,
+    g: typeof genre,
+    at: typeof artistTag,
+    loaded: Loaded
+  ): Promise<Loaded> {
+    return { ...loaded, songs: await unionSongs(k, g, at, loaded.songs) };
+  }
+
+  /** Appends the other system's matches after `primary`, so they never sit
+   * among a playlist's own rows (and its size-limit break). */
+  async function unionSongs(
     k: typeof kind,
     g: typeof genre,
     at: typeof artistTag,
@@ -328,8 +363,12 @@
     return primary;
   }
 
-  // Track backing playlist track_count reactively so refills trigger an instant re-fetch in the UI
+  // Track backing playlist track_count reactively so refills trigger an instant re-fetch in the UI,
+  // and its sort and size limit, which change the order and the break (#344).
   let backingTrackCount = $derived(backingPlaylist?.track_count ?? 0);
+  let backingLayoutKey = $derived(
+    `${backingPlaylist?.sort_field ?? ""}:${backingPlaylist?.sort_asc ?? true}:${backingPlaylist?.size_limit_bytes ?? 0}`
+  );
 
   $effect(() => {
     const k = kind;
@@ -339,12 +378,13 @@
     const b = bpm;
     const pid = playlistId;
     const count = backingTrackCount;
+    const layout = backingLayoutKey;
     loading = true;
     fetchSongs(k, g, at, d, b, pid)
-      .then((fetchedSongs) => unionWithOtherSystem(k, g, at, fetchedSongs))
-      .then((fetchedSongs) => {
+      .then((loaded) => unionWithOtherSystem(k, g, at, loaded))
+      .then((loaded) => {
         if (kind !== k || genre !== g || artistTag !== at || decade !== d || bpm !== b || playlistId !== pid) return;
-        songs = fetchedSongs;
+        applyLoaded(loaded);
       })
       .catch((err) => {
         console.error("Failed to load auto-playlist detail:", err);
@@ -454,7 +494,7 @@
     isChangingMode = true;
     try {
       await playlistsStore.setPlaylistPopulationMode(playlistId, newMode);
-      songs = await fetchSongs(kind, genre, artistTag, decade, bpm, playlistId);
+      applyLoaded(await fetchSongs(kind, genre, artistTag, decade, bpm, playlistId));
     } catch (err) {
       console.error("Failed to change queue population mode:", err);
     } finally {
@@ -469,7 +509,7 @@
     isRefreshing = true;
     try {
       await playlistsStore.refreshAutoPlaylist(playlistId);
-      songs = await fetchSongs(kind, genre, artistTag, decade, bpm, playlistId);
+      applyLoaded(await fetchSongs(kind, genre, artistTag, decade, bpm, playlistId));
     } catch (err) {
       console.error("Failed to refresh auto-playlist:", err);
     } finally {
@@ -486,9 +526,7 @@
     tagsStore.load();
     loading = true;
     fetchSongs(kind, genre, artistTag, decade, bpm, playlistId)
-      .then((fetchedSongs) => {
-        songs = fetchedSongs;
-      })
+      .then(applyLoaded)
       .catch((err) => console.error(err))
       .finally(() => (loading = false));
   }
@@ -509,7 +547,7 @@
       }
       if (kind === "history" || kind === "favourites" || kind === "recently_added" || kind === "most_played") {
         try {
-          songs = await fetchSongs(kind, genre, artistTag, decade, bpm, playlistId);
+          applyLoaded(await fetchSongs(kind, genre, artistTag, decade, bpm, playlistId));
         } catch (err) {
           console.error("Failed to re-fetch songs on stats change:", err);
         }
@@ -524,18 +562,28 @@
     };
   });
 
+  /** The playlist whose own rows this view lists, if any: its sort is
+   * persisted and applied by the backend, and it can take a size limit. */
+  let listedPlaylist = $derived(playlistItems !== null ? backingPlaylist : undefined);
+
   type AutoPlaylistSortField = "default" | keyof Song;
-  let sortField = $state<AutoPlaylistSortField>("default");
-  let sortAsc = $state(true);
+  // Kinds with no backing rows (Favourites, History, ...) sort locally.
+  let localSortField = $state<AutoPlaylistSortField>("default");
+  let localSortAsc = $state(true);
+  let sortField = $derived<AutoPlaylistSortField>(
+    listedPlaylist ? ((listedPlaylist.sort_field as AutoPlaylistSortField | null) ?? "default") : localSortField
+  );
+  let sortAsc = $derived(listedPlaylist ? (listedPlaylist.sort_asc ?? true) : localSortAsc);
 
   function toggleSort(field: string) {
     const f = field as AutoPlaylistSortField;
-    if (sortField === f) {
-      sortAsc = !sortAsc;
-    } else {
-      sortField = f;
-      sortAsc = true;
+    const asc = sortField === f ? !sortAsc : true;
+    if (listedPlaylist) {
+      playlistsStore.setSort(listedPlaylist.id, f === "default" ? null : f, asc);
+      return;
     }
+    localSortField = f;
+    localSortAsc = asc;
   }
 
   let overflowMenuPos = $state<{ x: number; y: number } | null>(null);
@@ -567,12 +615,20 @@
     if (q) {
       list = list.filter((s) => matchesSongSearch(s, q));
     }
+    // The backend already returned the playlist's rows in its persisted order.
+    if (listedPlaylist) return list;
     if (sortField === "default") {
       return sortAsc ? list : [...list].reverse();
     }
     const field = sortField as keyof Song;
     return [...list].sort((a, b) => compareSongs(a, b, field, sortAsc));
   });
+
+  let uuidBySongId = $derived(new Map((playlistItems ?? []).map((item) => [item.song!.id, item.uuid])));
+  let sizeFit = $derived(
+    listedPlaylist ? fitForOrder(rawSizeFit, (playlistItems ?? []).map((item) => item.uuid)) : null
+  );
+  let breakBefore = $derived(breakBeforeUuid(sizeFit, sortedSongs.flatMap((s) => uuidBySongId.get(s.id) ?? [])));
 
   function songToRow(song: Song): SongTableRow {
     const disconnected = !song.unavailable && collectionStore.isPathOnDisconnectedDrive(song.path);
@@ -581,6 +637,9 @@
       song,
       disabled: song.unavailable || disconnected,
       disabledTooltip: disconnected ? i18n.t("collection.driveDisconnectedTooltip") : undefined,
+      ...(sizeFit && uuidBySongId.get(song.id) === breakBefore
+        ? { dividerBefore: sizeLimitBreakLabel(sizeFit), dividerVariant: "break" as const }
+        : {}),
     };
   }
 
@@ -627,6 +686,10 @@
             <span>•</span>
             <span>{i18n.t('playlists.updatedOn', { date: updatedLabel })}</span>
           {/if}
+          {#if sizeFit}
+            <span>•</span>
+            <span>{sizeLimitStats(sizeFit)}</span>
+          {/if}
         </div>
 
         <div class="flex flex-wrap items-center gap-3 mt-3 select-none">
@@ -659,6 +722,9 @@
           >
             {#snippet icon()}<Share class="w-4 h-4" />{/snippet}
           </IconActionButton>
+          {#if listedPlaylist}
+            <PlaylistSizeLimitControl playlist={listedPlaylist} />
+          {/if}
           <button
             onclick={toggleOverflowMenu}
             title={i18n.t("playlists.moreActionsTooltip")}

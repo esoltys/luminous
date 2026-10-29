@@ -878,7 +878,7 @@ export const de = {
     sizeLimitHint: "Lege fest, wie viel Platz die Titel oben in dieser Wiedergabeliste belegen dürfen, etwa die Kapazität eines USB-Sticks. Eine gestrichelte Linie zeigt, wo sie nicht mehr passen.",
     sizeLimitCustomPlaceholder: "Eigene Größe",
     sizeLimitSetCustom: "Festlegen",
-    sizeLimitSmartNote: "Aktualisieren sortiert diese regelbasierte Wiedergabeliste neu und kann ändern, welche Titel passen.",
+    sizeLimitSmartNote: "Aktualisieren sortiert diese Wiedergabeliste neu und kann ändern, welche Titel passen.",
     sizeLimitRemove: "Limit entfernen",
     sizeLimitStats: "{used} von {limit} belegt",
     sizeLimitBreak: {

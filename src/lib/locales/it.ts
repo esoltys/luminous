@@ -878,7 +878,7 @@ export const it = {
     sizeLimitHint: "Scegli quanto spazio possono occupare i brani in cima a questa playlist, come la capacità di una chiavetta USB. Una linea tratteggiata indica dove smettono di starci.",
     sizeLimitCustomPlaceholder: "Dimensione personalizzata",
     sizeLimitSetCustom: "Imposta",
-    sizeLimitSmartNote: "Aggiorna riordina questa playlist intelligente e può cambiare quali brani ci stanno.",
+    sizeLimitSmartNote: "Aggiorna riordina questa playlist e può cambiare quali brani ci stanno.",
     sizeLimitRemove: "Rimuovi limite",
     sizeLimitStats: "{used} di {limit} occupati",
     sizeLimitBreak: {

@@ -878,7 +878,7 @@ export const es = {
     sizeLimitHint: "Elige cuánto espacio pueden ocupar las canciones al principio de esta lista de reproducción, como la capacidad de una memoria USB. Una línea discontinua marca dónde dejan de caber.",
     sizeLimitCustomPlaceholder: "Tamaño personalizado",
     sizeLimitSetCustom: "Aplicar",
-    sizeLimitSmartNote: "Actualizar reordena esta lista inteligente, lo que puede cambiar qué canciones caben.",
+    sizeLimitSmartNote: "Actualizar reordena esta lista, lo que puede cambiar qué canciones caben.",
     sizeLimitRemove: "Quitar límite",
     sizeLimitStats: "{used} de {limit} ocupados",
     sizeLimitBreak: {

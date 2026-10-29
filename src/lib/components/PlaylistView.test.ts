@@ -329,8 +329,8 @@ describe("PlaylistView.svelte", () => {
       const dialog = getByRole("dialog", { name: "Size limit" });
       expect(within(dialog).getByRole("button", { name: "16 GB" })).toHaveAttribute("aria-pressed", "true");
 
-      await fireEvent.click(within(dialog).getByRole("button", { name: "700 MB" }));
-      expect(setLimitSpy).toHaveBeenCalledWith(1, 700_000_000);
+      await fireEvent.click(within(dialog).getByRole("button", { name: "2 GB" }));
+      expect(setLimitSpy).toHaveBeenCalledWith(1, 2_000_000_000);
 
       await fireEvent.click(getByRole("button", { name: /Limit 16 GB/ }));
       await fireEvent.click(getByRole("button", { name: "Remove limit" }));
