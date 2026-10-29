@@ -320,7 +320,7 @@ export const en = {
     audioOutputTitle: "Audio Output",
     audioOutputSubtitle: "Configure output device, driver backend, and hardware settings.",
     audioBackendLabel: "Output Mode",
-    audioBackendHint: "Choose between standard system audio and direct hardware streaming.",
+    audioBackendHint: "Choose between standard system audio and direct hardware streaming. Direct hardware ignores the system volume, so playback pauses when switching to it.",
     audioBackendShared: "Shared Audio (System Default)",
     audioBackendAsio: "Direct Hardware (ASIO)",
     audioBackendExclusive: "Exclusive Mode (WASAPI)",

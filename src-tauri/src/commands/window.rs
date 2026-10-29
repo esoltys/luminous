@@ -214,6 +214,127 @@ pub async fn move_window_to_preset(window: WebviewWindow, position: String) -> R
     window.move_window(pos).map_err(|e| e.to_string())
 }
 
+/// Queries the unscaled display DPI scale factor for the monitor hosting the main window.
+#[tauri::command]
+pub async fn get_window_scale(window: WebviewWindow) -> Result<f64, String> {
+    window.scale_factor().map_err(|e| e.to_string())
+}
+
+/// Resizes the window to the requested dimensions (width, height) in physical pixels.
+/// By default, width and height specify the total outer window dimensions for accurate
+/// screenshot matching. If `inner` is true, decoration offsets are added so the inner
+/// webview client area receives the target dimensions.
+///
+/// Designed for automated capture scenes and screenshots where consistent pixel dimensions
+/// independent of host display scaling are required. Retries settle gently to avoid oscillation
+/// if the OS window manager asynchronously recalculates frame extents.
+/// If `scale` is omitted, it defaults to the host monitor's native scale factor (zoom = 1.0).
+#[tauri::command]
+pub async fn set_window_size(
+    window: WebviewWindow,
+    width: Option<f64>,
+    height: Option<f64>,
+    scale: Option<f64>,
+    inner: Option<bool>,
+) -> Result<(), String> {
+    let scale_factor = window.scale_factor().unwrap_or(1.0);
+
+    let target_scale = scale.unwrap_or(scale_factor);
+    if target_scale > 0.0 {
+        let zoom = target_scale / scale_factor;
+        let _ = window.set_zoom(zoom);
+    }
+
+    if width.is_some() || height.is_some() {
+        let is_inner = inner.unwrap_or(false);
+        let current_outer = window.outer_size().unwrap_or(tauri::PhysicalSize {
+            width: (FULL_PLAYER_WIDTH * scale_factor) as u32,
+            height: (FULL_PLAYER_HEIGHT * scale_factor) as u32,
+        });
+
+        let target_w = width
+            .map(|w| w.round().max(200.0) as u32)
+            .unwrap_or(current_outer.width);
+        let target_h = height
+            .map(|h| h.round().max(100.0) as u32)
+            .unwrap_or(current_outer.height);
+
+        let (outer_w, outer_h) = if is_inner {
+            // Caller explicitly requested inner content dimensions; add decoration offsets
+            let (dec_w, dec_h) = if window.is_decorated().unwrap_or(true) {
+                if let (Ok(outer), Ok(inner_sz)) = (window.outer_size(), window.inner_size()) {
+                    let dw = outer.width.saturating_sub(inner_sz.width);
+                    let dh = outer.height.saturating_sub(inner_sz.height);
+                    let dw = if dw <= 180 { dw } else { 0 };
+                    let dh = if dh <= 180 { dh } else { 0 };
+                    (dw, dh)
+                } else {
+                    (0, 0)
+                }
+            } else {
+                (0, 0)
+            };
+            (
+                target_w.saturating_add(dec_w),
+                target_h.saturating_add(dec_h),
+            )
+        } else {
+            // By default, target width and height specify the total outer window dimensions
+            (target_w, target_h)
+        };
+
+        let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize {
+            width: outer_w,
+            height: outer_h,
+        }));
+
+        let settle_target_w = if is_inner { target_w } else { outer_w };
+        let settle_target_h = if is_inner { target_h } else { outer_h };
+        settle_capture_size(&window, settle_target_w, settle_target_h, is_inner).await;
+    }
+
+    Ok(())
+}
+
+async fn settle_capture_size(window: &WebviewWindow, target_w: u32, target_h: u32, is_inner: bool) {
+    let mut prev_size: Option<(u32, u32)> = None;
+    let mut stable_hits = 0;
+
+    for _ in 0..SETTLE_MAX_CHECKS {
+        tokio::time::sleep(Duration::from_millis(SETTLE_CHECK_INTERVAL_MS)).await;
+        let size_res = if is_inner {
+            window.inner_size()
+        } else {
+            window.outer_size()
+        };
+        if let Ok(size) = size_res {
+            let cur_w = size.width;
+            let cur_h = size.height;
+
+            // If measured size matches target within 2px tolerance, settled!
+            if (cur_w as i32 - target_w as i32).abs() <= 2
+                && (cur_h as i32 - target_h as i32).abs() <= 2
+            {
+                break;
+            }
+
+            // If the size is no longer changing (e.g. OS WM clamped or fixed decoration delta),
+            // stop polling after 2 stable readings rather than fighting the window manager.
+            if let Some((pw, ph)) = prev_size {
+                if (cur_w as i32 - pw as i32).abs() <= 1 && (cur_h as i32 - ph as i32).abs() <= 1 {
+                    stable_hits += 1;
+                    if stable_hits >= SETTLE_REQUIRED_STABLE_HITS {
+                        break;
+                    }
+                } else {
+                    stable_hits = 0;
+                }
+            }
+            prev_size = Some((cur_w, cur_h));
+        }
+    }
+}
+
 /// True if `(width, height, x, y)` looks like a minimized-window placeholder
 /// rather than real geometry — either a 0x0 size, or Win32's offscreen
 /// minimized coordinates (around -32000). A pure function of the already-

@@ -320,7 +320,7 @@ export const de = {
     audioOutputTitle: "Audioausgabe",
     audioOutputSubtitle: "Ausgabegerät, Treiber-Backend und Hardware-Einstellungen konfigurieren.",
     audioBackendLabel: "Ausgabemodus",
-    audioBackendHint: "Zwischen Standard-Systemaudio und direktem Hardware-Streaming wählen.",
+    audioBackendHint: "Zwischen Standard-Systemaudio und direktem Hardware-Streaming wählen. Direkte Hardware umgeht die Systemlautstärke, daher pausiert die Wiedergabe beim Wechsel dorthin.",
     audioBackendShared: "Geteiltes Audio (Systemstandard)",
     audioBackendAsio: "Direkte Hardware (ASIO)",
     audioBackendExclusive: "Exklusivmodus (WASAPI)",

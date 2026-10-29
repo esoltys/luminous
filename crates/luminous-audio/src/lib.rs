@@ -1280,7 +1280,7 @@ fn build_output(
         device,
         name: device_name,
         stands_in,
-    } = resolve_cpal_device(&host, output_cfg.device_id.as_deref())?;
+    } = resolve_cpal_device(&host, output_cfg.shared_device_id())?;
     let default_config = device
         .default_output_config()
         .map_err(|e| format!("Failed to get default output config: {e}"))?;
@@ -1460,6 +1460,17 @@ enum DeviceCheckOutcome {
     /// The output couldn't be rebuilt; park this request (the interrupted
     /// track at its current position) via `park_without_output`.
     OutputLost(PlayRequest, String),
+    /// The rebuilt output skips the system volume the old one went through
+    /// (see `bypasses_system_volume`): pause on it with this request, so
+    /// the jump in level waits for the user to press play.
+    PauseOnLouder(PlayRequest),
+}
+
+/// Whether moving playback from `old` to `new` drops the system volume out
+/// of the path: shared output goes through the OS mixer's volume, the
+/// bit-perfect backends don't, so the same signal can come out far louder.
+fn bypasses_system_volume(old: AudioBackendKind, new: AudioBackendKind) -> bool {
+    old == AudioBackendKind::Cpal && new != AudioBackendKind::Cpal
 }
 
 enum CmdOutcome {
@@ -1713,6 +1724,13 @@ fn decode_thread(
                     park_without_output(&shared, &event_tx, &mut paused_req, lost_req, message);
                     break 'decode;
                 }
+                DeviceCheckOutcome::PauseOnLouder(req) => {
+                    shared.position.store(req.start_nanosec, Ordering::Relaxed);
+                    *shared.play_state.lock() = EngineState::Paused;
+                    paused_req = Some(req);
+                    let _ = event_tx.send(AudioEvent::Paused);
+                    break 'decode;
+                }
             }
 
             let out = output.as_mut().unwrap();
@@ -1889,8 +1907,7 @@ fn check_and_rebuild_output(
     let chosen_returned = check_due
         && output.as_ref().is_some_and(|o| o.stands_in)
         && output_cfg
-            .device_id
-            .as_deref()
+            .shared_device_id()
             .is_some_and(|id| find_output_device(&cpal::default_host(), id).is_some());
 
     if force_rebuild || stream_errored || default_changed || chosen_returned {
@@ -1905,12 +1922,29 @@ fn check_and_rebuild_output(
             Some(t) => t.finished.clone(),
             None => session.current.spec.clone(),
         };
+        let old_backend = output.as_ref().map(|o| o.sink.backend());
         if let Some(old_out) = output.as_ref() {
             let _ = old_out.sink.pause();
         }
         *output = None;
 
         match build_output_on_fresh_thread(shared, Some(session.current.src_rate)) {
+            Ok(new_out)
+                if old_backend
+                    .is_some_and(|old| bypasses_system_volume(old, new_out.sink.backend())) =>
+            {
+                log::info!(
+                    "Output moved to {} (no system volume): pausing until playback resumes",
+                    new_out.sink.backend()
+                );
+                new_out.publish(shared, event_tx);
+                *output = Some(new_out);
+                let _ = event_tx.send(AudioEvent::PipelineChanged);
+                return DeviceCheckOutcome::PauseOnLouder(PlayRequest {
+                    track: track_if_lost,
+                    start_nanosec: cur_pos,
+                });
+            }
             Ok(new_out) => {
                 new_out.publish(shared, event_tx);
                 session.target_sample_rate = new_out.sample_rate;
@@ -2645,6 +2679,32 @@ pub fn write_test_pcm16_wav(path: &Path, sample_rate: u32, channels: &[Vec<i16>]
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn moving_from_shared_to_bit_perfect_output_bypasses_system_volume() {
+        for new in [
+            AudioBackendKind::Asio,
+            AudioBackendKind::WasapiExclusive,
+            AudioBackendKind::Alsa,
+        ] {
+            assert!(bypasses_system_volume(AudioBackendKind::Cpal, new));
+        }
+    }
+
+    #[test]
+    fn other_output_moves_keep_the_level() {
+        use AudioBackendKind::*;
+        // Rebuilding the same kind, or falling back to shared output (quieter
+        // at worst), never jumps up in level.
+        for (old, new) in [
+            (Cpal, Cpal),
+            (Asio, Asio),
+            (Asio, Cpal),
+            (WasapiExclusive, Cpal),
+        ] {
+            assert!(!bypasses_system_volume(old, new), "{old} -> {new}");
+        }
+    }
 
     fn test_shared() -> AudioShared {
         AudioShared {

@@ -326,7 +326,7 @@ export const fr: DeepStringRecord<typeof en> = {
     audioOutputTitle: "Sortie audio",
     audioOutputSubtitle: "Configurer le périphérique de sortie, le pilote et les paramètres matériels.",
     audioBackendLabel: "Mode de sortie",
-    audioBackendHint: "Choisir entre l'audio partagé du système et la diffusion directe vers le matériel.",
+    audioBackendHint: "Choisir entre l'audio partagé du système et la diffusion directe vers le matériel. Le mode matériel direct ignore le volume du système : la lecture se met en pause au passage à ce mode.",
     audioBackendShared: "Audio partagé (par défaut du système)",
     audioBackendAsio: "Matériel direct (ASIO)",
     audioBackendExclusive: "Mode exclusif (WASAPI)",

@@ -320,7 +320,7 @@ export const es = {
     audioOutputTitle: "Salida de audio",
     audioOutputSubtitle: "Configura el dispositivo de salida, el controlador y los ajustes de hardware.",
     audioBackendLabel: "Modo de salida",
-    audioBackendHint: "Elige entre el audio compartido del sistema y la transmisión directa al hardware.",
+    audioBackendHint: "Elige entre el audio compartido del sistema y la transmisión directa al hardware. El hardware directo ignora el volumen del sistema, así que la reproducción se pausa al cambiar a él.",
     audioBackendShared: "Audio compartido (predeterminado del sistema)",
     audioBackendAsio: "Hardware directo (ASIO)",
     audioBackendExclusive: "Modo exclusivo (WASAPI)",

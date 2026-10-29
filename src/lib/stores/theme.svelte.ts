@@ -617,6 +617,7 @@ export class ThemeStore {
   activeThemeId = $state<string>("system");
   customThemes = $state<Theme[]>([]);
   artworkColors = $state<ExtractedColors | null>(null);
+  isExtractingArtworkColors = $state<boolean>(false);
   systemColorScheme = $state<"light" | "dark">("dark");
   /**
    * Sub-setting of the System theme (#692): "system" keeps following the OS
@@ -879,33 +880,38 @@ export class ThemeStore {
       return;
     }
 
-    let url: string | null = null;
-    if (song.art_manual) {
-      url = resolveArtUrl(song.art_manual);
-    } else if (song.art_automatic) {
-      url = resolveArtUrl(song.art_automatic);
-    } else if (song.art_embedded) {
-      try {
-        const uri = await invoke<string | null>("get_cover_art_uri", { songId: song.id });
-        if (uri) {
-          url = getCoverArtUrl(uri);
-        }
-      } catch (e) {
-        console.error("Failed to query cover art URI in themeStore:", e);
-      }
-    }
-
-    if (!url) {
-      this.resetArtworkColors();
-      return;
-    }
-
+    this.isExtractingArtworkColors = true;
     try {
-      const colors = await extractColorsFromImage(url);
-      this.applyArtworkColors(colors);
-    } catch (e) {
-      console.error("Failed to extract artwork colors:", e);
-      this.resetArtworkColors();
+      let url: string | null = null;
+      if (song.art_manual) {
+        url = resolveArtUrl(song.art_manual);
+      } else if (song.art_automatic) {
+        url = resolveArtUrl(song.art_automatic);
+      } else if (song.art_embedded) {
+        try {
+          const uri = await invoke<string | null>("get_cover_art_uri", { songId: song.id });
+          if (uri) {
+            url = getCoverArtUrl(uri);
+          }
+        } catch (e) {
+          console.error("Failed to query cover art URI in themeStore:", e);
+        }
+      }
+
+      if (!url) {
+        this.resetArtworkColors();
+        return;
+      }
+
+      try {
+        const colors = await extractColorsFromImage(url);
+        this.applyArtworkColors(colors);
+      } catch (e) {
+        console.error("Failed to extract artwork colors:", e);
+        this.resetArtworkColors();
+      }
+    } finally {
+      this.isExtractingArtworkColors = false;
     }
   }
 

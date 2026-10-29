@@ -424,4 +424,108 @@ describe("In-app scripting API", () => {
       await expect(api.screens.openAlbumEditor()).rejects.toThrow(/navigate\.album first/);
     });
   });
+
+  describe("Window controller", () => {
+    it("invokes set_window_size with target dimensions and scale", async () => {
+      const api = createScriptingApi();
+      await api.window.setSize({ width: 1280, height: 800, scale: 1.0 });
+
+      expect(invoke).toHaveBeenCalledWith("set_window_size", {
+        width: 1280,
+        height: 800,
+        scale: 1.0,
+        inner: undefined,
+      });
+    });
+
+    it("allows partial dimensions and scale", async () => {
+      const api = createScriptingApi();
+      await api.window.setSize({ scale: 1.5, inner: true });
+
+      expect(invoke).toHaveBeenCalledWith("set_window_size", {
+        width: undefined,
+        height: undefined,
+        scale: 1.5,
+        inner: true,
+      });
+    });
+
+    it("invokes get_window_scale to retrieve host DPI scale", async () => {
+      const api = createScriptingApi();
+      vi.mocked(invoke).mockResolvedValueOnce(1.5);
+      const scale = await api.window.getScale();
+      expect(invoke).toHaveBeenCalledWith("get_window_scale");
+      expect(scale).toBe(1.5);
+    });
+  });
+
+  describe("Wait controller - visualsSettled", () => {
+    it("resolves cleanly when no track is loaded and no media elements exist", async () => {
+      const api = createScriptingApi();
+      playerStore.currentSong = undefined;
+      themeStore.activeThemeId = "system";
+
+      await expect(api.wait.visualsSettled(1000)).resolves.toBeUndefined();
+    });
+
+    it("waits for dynamic artwork color extraction if dynamic-artwork theme is active", async () => {
+      const api = createScriptingApi();
+      playerStore.currentSong = { id: 1, title: "Test Song" } as any;
+      themeStore.activeThemeId = "dynamic-artwork";
+      themeStore.isExtractingArtworkColors = true;
+
+      let settled = false;
+      const promise = api.wait.visualsSettled(2000).then(() => {
+        settled = true;
+      });
+
+      expect(settled).toBe(false);
+      themeStore.isExtractingArtworkColors = false;
+
+      await promise;
+      expect(settled).toBe(true);
+    });
+
+    it("waits for seekbar waveform loading to complete", async () => {
+      const api = createScriptingApi();
+      playerStore.currentSong = { id: 1, title: "Test Song" } as any;
+      themeStore.activeThemeId = "system";
+
+      const seekbarEl = document.createElement("div");
+      seekbarEl.setAttribute("data-waveform-container", "");
+      seekbarEl.setAttribute("data-waveform-loading", "true");
+      document.body.appendChild(seekbarEl);
+
+      let settled = false;
+      const promise = api.wait.visualsSettled(2000).then(() => {
+        settled = true;
+      });
+
+      expect(settled).toBe(false);
+      seekbarEl.setAttribute("data-waveform-loading", "false");
+
+      await promise;
+      expect(settled).toBe(true);
+      document.body.removeChild(seekbarEl);
+    });
+
+    it("awaits HTMLImageElement decoding", async () => {
+      const api = createScriptingApi();
+      playerStore.currentSong = undefined;
+      themeStore.activeThemeId = "system";
+
+      const img = document.createElement("img");
+      let decoded = false;
+      Object.defineProperty(img, "complete", { value: true, configurable: true });
+      Object.defineProperty(img, "naturalWidth", { value: 300, configurable: true });
+      img.decode = vi.fn().mockImplementation(async () => {
+        decoded = true;
+      });
+      document.body.appendChild(img);
+
+      await api.wait.visualsSettled(1000);
+      expect(decoded).toBe(true);
+      document.body.removeChild(img);
+    });
+  });
 });
