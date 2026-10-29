@@ -121,6 +121,19 @@ Docs and Store screenshots are scenes in `scripts/scenes/` run against the real 
 - Scenes named `store-*` (`scripts/scenes/store.ts`) exist only for the Microsoft Store listing, which takes them with the guide's dark captures; the guides don't reference them. The private `luminous-store` repo composites the listing images from them with `New-StoreScreenshots.ps1` (see `docs/RELEASE_CHECKLIST.md`).
 - The viewport is set by CDP device-metrics override, not by resizing the real window, so output is the exact requested size. A screen recording of the real window needs a real resize.
 
+### User guide image manifest & validation contract
+
+External screenshot capture tools consume `docs/user-guide/assets/manifest.json` as their declarative contract. The manifest lists every image referenced by the user guides per manual language (`EN`, `FR`, `DE`, `ES`, `IT`, `RU`, `UK`), mapping each language to its corresponding locale asset directory (`en-CA`, `fr-CA`, `de`, `es`, `it`, `ru`, `uk`), guide file, and required screenshots with exact intrinsic pixel dimensions (`width`, `height`).
+
+- **Validation Engine:** `scripts/guide-manifest.ts` defines `validateGuideAssets()`, providing a zero-dependency dimension parser for PNG and WebP files. It validates:
+  1. Every image referenced in `luminous-user-guide-*.html` is declared in `manifest.json`.
+  2. HTML `width` and `height` attributes match manifest dimensions.
+  3. No obsolete or unreferenced images are declared in the manifest.
+  4. All referenced images exist on disk across schemes (`dark` and `light`) and formats (WebP and PNG masters).
+  5. The actual pixel dimensions of the files on disk match the expected dimensions.
+- **Build Enforcement:** `bun run sync-docs` runs `validateGuideAssets()` before syncing assets to `static/` and exits with code 1 on any mismatch, preventing broken or distorted images from reaching development or production builds.
+- **Automated Tests:** `src/lib/locales/guide-manifest.test.ts` validates the manifest and assets in CI during `bun run test:run`.
+
 ## Testing against a local WebDAV server
 
 To exercise WebDAV sync and playback without a real NAS, serve a folder of the repo's short audio
