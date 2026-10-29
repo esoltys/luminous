@@ -11,8 +11,8 @@ pub mod values;
 
 pub use audio::{
     clear_embedded_art, detect_mp3_vbr, format_error_chain, is_synced_lrc, parse_replaygain_db,
-    read_embedded_lyrics, read_embedded_lyrics_from_path, read_tags, AudioFileMetadata,
-    AudioFileProperties, TagWriteRequest,
+    read_codec, read_embedded_lyrics, read_embedded_lyrics_from_path, read_tags, AudioCodec,
+    AudioFileMetadata, AudioFileProperties, TagWriteRequest,
 };
 pub use cue::{parse_single_file_cue, CueSheet, CueTrack};
 pub use dr::{match_tracks, parse as parse_dr_log, DrLog, DrTrackEntry, SongCandidate};

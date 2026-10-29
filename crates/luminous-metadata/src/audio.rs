@@ -5,8 +5,9 @@
 //! language sanitization, and multi-value mapping.
 
 use anyhow::{anyhow, Context, Result};
-use lofty::config::WriteOptions;
-use lofty::file::{AudioFile, TaggedFileExt};
+use lofty::config::{ParseOptions, WriteOptions};
+use lofty::file::{AudioFile, TaggedFile, TaggedFileExt};
+use lofty::mp4::{Mp4Codec, Mp4File};
 use lofty::probe::Probe;
 use lofty::tag::{Accessor, ItemKey, Tag, TagItem};
 use std::collections::HashSet;
@@ -25,6 +26,82 @@ pub struct AudioFileProperties {
     pub channels: Option<i32>,
     pub bitdepth: Option<i32>,
     pub is_vbr: Option<bool>,
+    /// The codec of the audio stream, read from its headers. `None` when the
+    /// container doesn't say, so callers fall back to the file extension.
+    pub codec: Option<AudioCodec>,
+}
+
+/// The codec of an audio stream, as its headers declare it. Several
+/// containers carry more than one codec under the same extension (`.m4a` is
+/// AAC or ALAC, `.ogg` is Vorbis, Opus or Speex), so the extension alone
+/// can't name it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AudioCodec {
+    Mp3,
+    Aac,
+    Alac,
+    Flac,
+    Vorbis,
+    Opus,
+    Speex,
+    Wav,
+    Aiff,
+    WavPack,
+    Musepack,
+    Ape,
+}
+
+/// Opens `path` for lofty, choosing the parser from the file's leading bytes
+/// and falling back to its extension only when they match nothing. Every
+/// read and write in this module goes through here: `Probe::open` alone
+/// trusts the extension, so an Opus stream in a `.ogg` file would be parsed
+/// as Vorbis and fail.
+///
+/// Also returns the stream's codec. For MP4 that needs the parsed
+/// `Mp4File`, since `TaggedFile` doesn't expose `Mp4Properties::codec`.
+fn open_tagged(path: &Path, options: ParseOptions) -> Result<(TaggedFile, Option<AudioCodec>)> {
+    let probe = Probe::open(path)
+        .context("lofty: cannot open file")?
+        .guess_file_type()
+        .context("lofty: cannot read file header")?
+        .options(options);
+
+    if probe.file_type() == Some(lofty::file::FileType::Mp4) {
+        let mp4 = Mp4File::read_from(&mut probe.into_inner(), options)
+            .context("lofty: cannot read file")?;
+        let codec = match mp4.properties().codec() {
+            Some(Mp4Codec::AAC) => Some(AudioCodec::Aac),
+            Some(Mp4Codec::ALAC) => Some(AudioCodec::Alac),
+            Some(Mp4Codec::MP3) => Some(AudioCodec::Mp3),
+            Some(Mp4Codec::FLAC) => Some(AudioCodec::Flac),
+            _ => None,
+        };
+        return Ok((mp4.into(), codec));
+    }
+
+    let tagged_file = probe.read().context("lofty: cannot read file")?;
+    let codec = match tagged_file.file_type() {
+        lofty::file::FileType::Mpeg => Some(AudioCodec::Mp3),
+        lofty::file::FileType::Aac => Some(AudioCodec::Aac),
+        lofty::file::FileType::Flac => Some(AudioCodec::Flac),
+        lofty::file::FileType::Vorbis => Some(AudioCodec::Vorbis),
+        lofty::file::FileType::Opus => Some(AudioCodec::Opus),
+        lofty::file::FileType::Speex => Some(AudioCodec::Speex),
+        lofty::file::FileType::Wav => Some(AudioCodec::Wav),
+        lofty::file::FileType::Aiff => Some(AudioCodec::Aiff),
+        lofty::file::FileType::WavPack => Some(AudioCodec::WavPack),
+        lofty::file::FileType::Mpc => Some(AudioCodec::Musepack),
+        lofty::file::FileType::Ape => Some(AudioCodec::Ape),
+        _ => None,
+    };
+    Ok((tagged_file, codec))
+}
+
+/// Reads only the codec of `path`'s audio stream, skipping tags and cover
+/// art. For correcting a stored format without re-reading the whole file.
+pub fn read_codec(path: &Path) -> Result<Option<AudioCodec>> {
+    let options = ParseOptions::new().read_tags(false).read_cover_art(false);
+    open_tagged(path, options).map(|(_, codec)| codec)
 }
 
 /// Structured track metadata read from on-disk audio tags.
@@ -103,10 +180,7 @@ pub struct TagWriteRequest<'a> {
 
 /// Reads technical audio properties and tag metadata from an audio file on disk.
 pub fn read_tags(path: &Path) -> Result<AudioFileMetadata> {
-    let tagged_file = Probe::open(path)
-        .context("lofty: cannot open file")?
-        .read()
-        .context("lofty: cannot read file")?;
+    let (tagged_file, codec) = open_tagged(path, ParseOptions::new())?;
 
     let properties = tagged_file.properties();
 
@@ -132,6 +206,7 @@ pub fn read_tags(path: &Path) -> Result<AudioFileMetadata> {
         channels,
         bitdepth,
         is_vbr,
+        codec,
     };
 
     let mut meta = AudioFileMetadata {
@@ -403,7 +478,7 @@ pub fn is_synced_lrc(text: &str) -> bool {
 /// Reads embedded lyrics directly from an audio file on disk, inspecting both native
 /// Vorbis comments (for Vorbis-based containers) and candidate ID3/generic tags.
 pub fn read_embedded_lyrics_from_path(path: &Path) -> Option<String> {
-    let tagged_file = Probe::open(path).ok()?.read().ok()?;
+    let (tagged_file, _) = open_tagged(path, ParseOptions::new()).ok()?;
     let mut candidate_tags: Vec<&Tag> = Vec::new();
     if let Some(primary) = tagged_file.primary_tag() {
         candidate_tags.push(primary);
@@ -569,10 +644,8 @@ pub fn write_tags(path: &Path, req: &TagWriteRequest) -> Result<()> {
         compilation,
     } = *req;
 
-    let mut tagged_file = Probe::open(path)
-        .context("failed to open audio file for tag writing")?
-        .read()
-        .context("failed to parse audio tags")?;
+    let (mut tagged_file, _) = open_tagged(path, ParseOptions::new())
+        .context("failed to open audio file for tag writing")?;
 
     let tag = match tagged_file.primary_tag_mut() {
         Some(t) => t,
@@ -776,10 +849,8 @@ fn save_tagged_file_with_retry(
 /// leaving all other tag fields untouched (#386). A no-op if the file has no
 /// tag, or its tag has no pictures.
 pub fn clear_embedded_art(path: &Path) -> Result<()> {
-    let mut tagged_file = Probe::open(path)
-        .context("failed to open audio file for cover art clearing")?
-        .read()
-        .context("failed to parse audio tags")?;
+    let (mut tagged_file, _) = open_tagged(path, ParseOptions::new())
+        .context("failed to open audio file for cover art clearing")?;
 
     let tag = match tagged_file.primary_tag_mut() {
         Some(t) => t,
@@ -831,6 +902,44 @@ mod tests {
         wav.extend_from_slice(&data);
 
         std::fs::write(path, wav).expect("failed to write test wav fixture");
+    }
+
+    fn fixture(dir: &str, name: &str) -> std::path::PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../src-tauri/tests/fixtures")
+            .join(dir)
+            .join(name)
+    }
+
+    /// `.m4a` and `.ogg` each hold more than one codec, so the codec comes
+    /// from the stream, not the extension (#1866).
+    #[test]
+    fn test_read_tags_reports_codec_from_stream_not_extension() {
+        let cases = [
+            (fixture("codec", "alac.m4a"), AudioCodec::Alac),
+            (fixture("audio", "song_epsilon.m4a"), AudioCodec::Aac),
+            (fixture("codec", "opus.ogg"), AudioCodec::Opus),
+            (fixture("audio", "song_delta.ogg"), AudioCodec::Vorbis),
+            (fixture("audio", "song_alpha.mp3"), AudioCodec::Mp3),
+        ];
+        for (path, expected) in cases {
+            let meta = read_tags(&path).unwrap_or_else(|e| panic!("{}: {e:#}", path.display()));
+            assert_eq!(meta.properties.codec, Some(expected), "{}", path.display());
+            assert_eq!(
+                read_codec(&path).unwrap(),
+                Some(expected),
+                "{}",
+                path.display()
+            );
+        }
+    }
+
+    /// An Opus stream in a `.ogg` file used to be parsed as Vorbis and fail,
+    /// so the scanner never imported it.
+    #[test]
+    fn test_read_tags_reads_opus_in_ogg_tags() {
+        let meta = read_tags(&fixture("codec", "opus.ogg")).expect("opus .ogg should read");
+        assert_eq!(meta.title.as_deref(), Some("Opus Track"));
     }
 
     #[test]
