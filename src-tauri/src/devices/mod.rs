@@ -12,6 +12,7 @@
 //! first time (another computer, a fresh install).
 
 pub mod layout;
+pub mod sync;
 
 use crate::db::Database;
 use anyhow::{anyhow, Result};
@@ -107,7 +108,7 @@ impl DeviceMonitor {
     }
 
     /// What the UI is shown for a connected device, `None` once it is gone.
-    fn shown(&self, id: &str) -> Option<ConnectedDevice> {
+    pub fn shown(&self, id: &str) -> Option<ConnectedDevice> {
         self.with_entry(id, |e| e.shown.clone())
     }
 
@@ -192,6 +193,19 @@ impl DeviceMonitor {
         if load_profile(conn, id)?.is_none() {
             upsert_profile(conn, id, &shown.profile, &shown.default_name, now)?;
         }
+        Ok(())
+    }
+
+    /// Records a completed sync of device `id` at `now` (Unix seconds),
+    /// keeping its profile on this computer if it had none, and emits the
+    /// updated list.
+    pub fn record_sync(&self, conn: &rusqlite::Connection, id: &str, now: i64) -> Result<()> {
+        self.keep_profile_without_marker(conn, id, now)?;
+        conn.execute(
+            "UPDATE device_profiles SET last_synced_at = ?1 WHERE id = ?2",
+            params![now, id],
+        )?;
+        self.request_rebuild();
         Ok(())
     }
 

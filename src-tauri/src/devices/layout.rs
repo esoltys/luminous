@@ -90,6 +90,18 @@ impl DeviceLayout {
     /// that would land on the same file get " (2)", " (3)"... in song-id
     /// order, so the same songs get the same paths on every sync.
     pub fn plan(profile: &DeviceProfile, tracks: &[SyncedTrack]) -> Self {
+        Self::plan_avoiding(profile, tracks, &HashSet::new())
+    }
+
+    /// [`plan`](Self::plan), with no track placed at a path in `occupied`
+    /// (lower-case, relative to the storage root): a track that would land on
+    /// one gets the next free " (n)" name instead. Sync passes the files it
+    /// must not overwrite.
+    pub fn plan_avoiding(
+        profile: &DeviceProfile,
+        tracks: &[SyncedTrack],
+        occupied: &HashSet<String>,
+    ) -> Self {
         let settings = profile.layout.clone();
         let ascii_only = settings.playlist_format.ascii_names();
         let music_dir = path_parts(&profile.music_path);
@@ -108,7 +120,7 @@ impl DeviceLayout {
             apply_dir_casing_map(&mut d.dirs, &casing);
         }
 
-        let mut taken: HashSet<String> = HashSet::new();
+        let mut taken: HashSet<String> = occupied.clone();
         let mut tracks = HashMap::with_capacity(drafts.len());
         for d in &drafts {
             let dir: Vec<&str> = music_dir
@@ -139,6 +151,16 @@ impl DeviceLayout {
     /// profile writes no playlist files. Playlists whose names clash on the
     /// device get " (2)", " (3)"... in the order given.
     pub fn playlist_files(&self, playlists: &[DevicePlaylist]) -> Vec<DeviceFile> {
+        self.playlist_files_avoiding(playlists, &HashSet::new())
+    }
+
+    /// [`playlist_files`](Self::playlist_files), with no file at a path in
+    /// `occupied` (lower-case, relative to the storage root).
+    pub fn playlist_files_avoiding(
+        &self,
+        playlists: &[DevicePlaylist],
+        occupied: &HashSet<String>,
+    ) -> Vec<DeviceFile> {
         let (format, extension) = match self.settings.playlist_format {
             PlaylistFileFormat::M3u8 => (PlaylistFormat::M3u8, "m3u8"),
             PlaylistFileFormat::M3uAscii => (PlaylistFormat::M3u, "m3u"),
@@ -152,7 +174,7 @@ impl DeviceLayout {
         };
         let dir: Vec<&str> = self.playlists_dir.iter().map(String::as_str).collect();
 
-        let mut taken = HashSet::new();
+        let mut taken = occupied.clone();
         playlists
             .iter()
             .map(|playlist| {

@@ -118,6 +118,8 @@ pub struct AppState {
     pub devices: Arc<devices::DeviceMonitor>,
     /// Converts files for devices and keeps the transcode cache (#838).
     pub transcoder: Arc<luminous_transcode::Transcoder>,
+    /// Plans and runs syncs to devices (#836).
+    pub device_sync: Arc<devices::sync::DeviceSync>,
 }
 
 /// Suppresses stock webview browser chrome — reload/find/print keybindings and
@@ -1171,6 +1173,7 @@ pub fn run() {
                 transcoder: Arc::new(luminous_transcode::Transcoder::new(
                     crate::paths::resolve_cache_dir(app).join("transcode"),
                 )),
+                device_sync: Arc::new(devices::sync::DeviceSync::new()),
             };
 
             crate::collection::start_watcher(app.handle().clone(), &state);
@@ -1623,6 +1626,11 @@ pub fn run() {
             commands::devices::get_transcode_capabilities,
             commands::devices::get_conversion_target,
             commands::devices::preview_device_path,
+            commands::devices::get_device_sync_state,
+            commands::devices::preview_device_sync,
+            commands::devices::get_device_sync_items,
+            commands::devices::start_device_sync,
+            commands::devices::cancel_device_sync,
             // Window & Miniplayer commands
             commands::window::is_remote_devtools_enabled,
             commands::window::geometry_capture_supported,

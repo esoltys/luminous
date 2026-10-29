@@ -1,12 +1,25 @@
 //! Portable players and removable drives (#835). The device list itself
 //! arrives through the `devices-changed` event (see `crate::devices`); these
-//! commands read it once at startup, save a profile and eject.
+//! commands read it once at startup, save a profile and eject. Sync (#836)
+//! is previewed, started and stopped here; its progress and outcome arrive
+//! as `device-sync-progress` and `device-sync-finished` events.
 
+use crate::devices::sync::plan::{SyncItem, SyncPlan};
+use crate::devices::sync::selection::SyncSettings;
+use crate::devices::sync::worker::{SyncProgress, SyncSummary, SystemClock};
+use crate::devices::sync::{
+    DeviceSyncState, PlanList, SyncEvents, SYNC_FINISHED_EVENT, SYNC_PROGRESS_EVENT,
+};
 use crate::devices::ConnectedDevice;
 use crate::AppState;
 use luminous_devices::{DeviceProfile, EjectError};
 use luminous_transcode::{Capabilities, ConversionTarget};
-use tauri::State;
+use std::sync::Arc;
+use std::time::Duration;
+use tauri::{AppHandle, Emitter, State};
+
+/// Longest an eject waits for a running sync to stop.
+const SYNC_STOP_TIMEOUT: Duration = Duration::from_secs(15);
 
 #[tauri::command]
 pub async fn get_connected_devices(
@@ -90,6 +103,12 @@ pub async fn eject_device(id: String, state: State<'_, AppState>) -> Result<(), 
         return Ok(());
     };
 
+    let sync = state.device_sync.clone();
+    let sync_id = id.clone();
+    tokio::task::spawn_blocking(move || sync.stop(&sync_id, SYNC_STOP_TIMEOUT))
+        .await
+        .map_err(|e| e.to_string())?;
+
     {
         let mut player = state.player.lock().await;
         let playing_from_device = player
@@ -113,4 +132,103 @@ pub async fn eject_device(id: String, state: State<'_, AppState>) -> Result<(), 
             EjectError::Failed(_) => "device-eject-failed".to_string(),
         }
     })
+}
+
+/// The device's saved sync selection, the summary of its last sync and
+/// whether one is running.
+#[tauri::command]
+pub async fn get_device_sync_state(
+    device_id: String,
+    state: State<'_, AppState>,
+) -> Result<DeviceSyncState, String> {
+    let sync = state.device_sync.clone();
+    crate::db::run_blocking(&state.db, move |conn| sync.state(conn, &device_id))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Saves `settings` for the device and plans the sync they describe: what
+/// is copied, converted, updated and removed, and whether it fits. Cheap to
+/// call as the selection changes. Rejects with `device-not-connected`.
+#[tauri::command]
+pub async fn preview_device_sync(
+    device_id: String,
+    settings: SyncSettings,
+    state: State<'_, AppState>,
+) -> Result<SyncPlan, String> {
+    let (sync, monitor, transcoder) = (
+        state.device_sync.clone(),
+        state.devices.clone(),
+        state.transcoder.clone(),
+    );
+    crate::db::run_blocking(&state.db, move |conn| {
+        sync.preview(
+            conn,
+            &monitor,
+            &transcoder,
+            &device_id,
+            settings,
+            chrono::Utc::now().timestamp(),
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// Every item of one of a previewed plan's lists ("Show all"). Rejects with
+/// `sync-plan-stale` once the plan was replaced or started.
+#[tauri::command]
+pub async fn get_device_sync_items(
+    plan_id: String,
+    list: PlanList,
+    state: State<'_, AppState>,
+) -> Result<Vec<SyncItem>, String> {
+    state
+        .device_sync
+        .items(&plan_id, list)
+        .ok_or_else(|| "sync-plan-stale".to_string())
+}
+
+/// Runs the previewed plan in the background. Rejects with
+/// `sync-plan-stale`, `sync-does-not-fit` or `sync-in-progress`.
+#[tauri::command]
+pub async fn start_device_sync(
+    plan_id: String,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state
+        .device_sync
+        .start(
+            &plan_id,
+            state.devices.clone(),
+            state.transcoder.clone(),
+            state.db.clone(),
+            Arc::new(AppEvents(app)),
+            Arc::new(SystemClock),
+        )
+        .map_err(|e| e.to_string())
+}
+
+/// Stops the device's running sync, keeping every file completed so far.
+/// Resolves at once; `device-sync-finished` follows when it has stopped.
+#[tauri::command]
+pub async fn cancel_device_sync(
+    device_id: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state.device_sync.cancel(&device_id);
+    Ok(())
+}
+
+struct AppEvents(AppHandle);
+
+impl SyncEvents for AppEvents {
+    fn progress(&self, progress: &SyncProgress) {
+        let _ = self.0.emit(SYNC_PROGRESS_EVENT, progress);
+    }
+
+    fn finished(&self, summary: &SyncSummary) {
+        let _ = self.0.emit(SYNC_FINISHED_EVENT, summary);
+    }
 }

@@ -265,6 +265,158 @@ export interface ConnectedDevice {
   profile: { nickname?: string | null };
 }
 
+/** One thing checked to go on a device (backend `SyncSource`, #836). */
+export type SyncSource =
+  | { kind: "library" }
+  | { kind: "playlist"; id: number }
+  | { kind: "artist"; name: string }
+  | { kind: "album"; album: string; artist: string }
+  | { kind: "folder"; path: string };
+
+/** A device's sync selection (`get_device_sync_state`, `preview_device_sync`).
+ * `unselected` is "Songs you unselect: Remove from device | Leave on device". */
+export interface SyncSettings {
+  /** The storage synced to; null is the device's first. */
+  storageId: string | null;
+  sources: SyncSource[];
+  unselected: "remove" | "leave";
+}
+
+export interface SyncSourceRef {
+  kind: "library" | "playlist" | "artist" | "album" | "folder";
+  key: string;
+  /** Playlist, artist or album name, or folder path; empty for the library. */
+  name: string;
+}
+
+/** Why a song is in a sync plan's list. Word it in the UI; never show the code. */
+export type SyncReason =
+  | { code: "selected"; source: SyncSourceRef }
+  | { code: "renamedBesideExisting"; source: SyncSourceRef; existingPath: string }
+  | { code: "adopted" }
+  | { code: "leftSource"; source: SyncSourceRef }
+  | { code: "unselected"; source: SyncSourceRef | null }
+  | { code: "deletedFromLibrary" }
+  | { code: "tagsChanged" }
+  | { code: "fileChanged" }
+  | { code: "convertChanged" }
+  | { code: "moved"; from: string }
+  | { code: "unreadable" };
+
+export interface SyncItem {
+  artist: string | null;
+  album: string | null;
+  title: string | null;
+  /** On the device, relative to the storage root. */
+  path: string;
+  bytes: number;
+  reason: SyncReason;
+}
+
+/** `items` holds the first few in a preview; `get_device_sync_items` has them all. */
+export interface SyncChangeList {
+  songs: number;
+  bytes: number;
+  items: SyncItem[];
+}
+
+export interface SyncSourceSize {
+  source: SyncSourceRef;
+  songs: number;
+  bytes: number;
+}
+
+/** What a sync will do (`preview_device_sync`). Show these values; never
+ * recompute them. Now = stays + removed + other; After = stays + copied + other. */
+export interface SyncPlan {
+  planId: string;
+  deviceId: string;
+  storageId: string;
+  storage: {
+    capacityBytes: number;
+    reserveBytes: number;
+    otherBytes: number;
+    staysBytes: number;
+    removedBytes: number;
+    copiedBytes: number;
+    freeBytes: number;
+    /** Negative when the selection runs past the capacity. */
+    freeAfterBytes: number;
+    fits: boolean;
+  };
+  copy: SyncChangeList;
+  remove: SyncChangeList;
+  update: SyncChangeList;
+  adopted: SyncChangeList;
+  skipped: SyncChangeList;
+  convertedSongs: number;
+  playlistFilesWritten: number;
+  playlistFilesRemoved: number;
+  folderArtWritten: number;
+  /** Set when conversions use a substitute format or one the device may not play. */
+  conversionTarget: {
+    format: "aac" | "mp3" | "opus";
+    bitrateKbps: number;
+    substituted: boolean;
+    devicePlays: boolean;
+  } | null;
+  sources: SyncSourceSize[];
+  shortfall: {
+    bytes: number;
+    largestSource: SyncSourceSize | null;
+    convertAllSavingBytes: number | null;
+  } | null;
+}
+
+interface SyncSongLabel {
+  artist: string | null;
+  album: string | null;
+  title: string | null;
+}
+
+/** `device-sync-progress`. */
+export interface SyncProgress {
+  deviceId: string;
+  step:
+    | { kind: "removing" }
+    | { kind: "converting"; song: SyncSongLabel; format: "aac" | "mp3" | "opus"; bitrateKbps: number }
+    | { kind: "copying"; song: SyncSongLabel }
+    | { kind: "writingPlaylists" }
+    | { kind: "writingFolderArt" }
+    | { kind: "finishing" };
+  songsDone: number;
+  songsTotal: number;
+  bytesDone: number;
+  bytesTotal: number;
+  bytesPerSec: number | null;
+  etaSecs: number | null;
+}
+
+/** `device-sync-finished`: what the sync did next to what its plan estimated. */
+export interface SyncSummary {
+  deviceId: string;
+  outcome: { kind: "completed" } | { kind: "stopped" } | { kind: "failed"; message: string };
+  finishedAt: number;
+  songsWritten: number;
+  songsPlanned: number;
+  converted: number;
+  removed: number;
+  playlistFiles: number;
+  folderArt: number;
+  failures: { path: string; song: SyncSongLabel; message: string }[];
+  plannedBytes: number;
+  writtenBytes: number;
+  plannedFreeAfterBytes: number;
+  freeAfterBytes: number | null;
+}
+
+/** `get_device_sync_state`. */
+export interface DeviceSyncState {
+  settings: SyncSettings;
+  lastSummary: SyncSummary | null;
+  running: boolean;
+}
+
 /** Queue population bias — see #120. Tab order: All, Favourites, Familiar, Discover, Deep Cuts. */
 export type QueuePopulationMode = "all" | "favourites" | "familiar" | "discover" | "deep_cuts";
 
