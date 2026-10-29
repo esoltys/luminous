@@ -332,9 +332,16 @@ export interface ScriptWindowApi {
    * adjusts the webview zoom scale factor.
    *
    * Calling setSize allows captures to guarantee identical rendered pixel dimensions
-   * independent of host display scaling.
+   * independent of host display scaling. If scale is omitted, it defaults to the host monitor's
+   * native scale factor (zoom = 1.0).
    */
   setSize(options: ScriptWindowSizeOptions): Promise<void>;
+
+  /**
+   * Queries the unscaled display DPI scale factor for the monitor hosting the main window
+   * (e.g. 1.0 for 100%, 1.5 for 150%, 2.0 for 200%).
+   */
+  getScale(): Promise<number>;
 }
 
 /**

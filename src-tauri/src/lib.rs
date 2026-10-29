@@ -1630,6 +1630,7 @@ pub fn run() {
             commands::window::move_window_to_preset,
             commands::window::get_window_geometry,
             commands::window::set_window_size,
+            commands::window::get_window_scale,
             commands::window::webview_gpu_compositing,
             commands::window::start_window_drag,
             commands::window::start_window_resize,

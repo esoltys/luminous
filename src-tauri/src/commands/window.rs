@@ -214,6 +214,12 @@ pub async fn move_window_to_preset(window: WebviewWindow, position: String) -> R
     window.move_window(pos).map_err(|e| e.to_string())
 }
 
+/// Queries the unscaled display DPI scale factor for the monitor hosting the main window.
+#[tauri::command]
+pub async fn get_window_scale(window: WebviewWindow) -> Result<f64, String> {
+    window.scale_factor().map_err(|e| e.to_string())
+}
+
 /// Resizes the window to the requested inner dimensions (width, height) in logical pixels,
 /// accounting for OS window decoration offsets where available, and optionally adjusts the
 /// webview zoom scale factor.
@@ -221,6 +227,7 @@ pub async fn move_window_to_preset(window: WebviewWindow, position: String) -> R
 /// Designed for automated capture scenes and screenshots where consistent pixel dimensions
 /// independent of host display scaling are required. Retries settle gently to avoid oscillation
 /// if the OS window manager asynchronously recalculates frame extents.
+/// If `scale` is omitted, it defaults to the host monitor's native scale factor (zoom = 1.0).
 #[tauri::command]
 pub async fn set_window_size(
     window: WebviewWindow,
@@ -230,11 +237,10 @@ pub async fn set_window_size(
 ) -> Result<(), String> {
     let scale_factor = window.scale_factor().unwrap_or(1.0);
 
-    if let Some(target_scale) = scale {
-        if target_scale > 0.0 {
-            let zoom = target_scale / scale_factor;
-            let _ = window.set_zoom(zoom);
-        }
+    let target_scale = scale.unwrap_or(scale_factor);
+    if target_scale > 0.0 {
+        let zoom = target_scale / scale_factor;
+        let _ = window.set_zoom(zoom);
     }
 
     if width.is_some() || height.is_some() {
@@ -244,34 +250,32 @@ pub async fn set_window_size(
         });
 
         let target_inner_w = width
-            .unwrap_or(current_inner.width as f64 / scale_factor)
-            .round()
-            .max(200.0);
+            .map(|w| w.round().max(200.0) as u32)
+            .unwrap_or(current_inner.width);
         let target_inner_h = height
-            .unwrap_or(current_inner.height as f64 / scale_factor)
-            .round()
-            .max(100.0);
+            .map(|h| h.round().max(100.0) as u32)
+            .unwrap_or(current_inner.height);
 
-        // Derive decoration offset (title bar + borders) from difference between outer and inner size.
+        // Derive decoration offset (title bar + borders) in physical pixels.
         // On Wayland or platforms where outer_size is unavailable or zero, this cleanly defaults to 0.
         let (dec_w, dec_h) = if window.is_decorated().unwrap_or(true) {
             if let (Ok(outer), Ok(inner)) = (window.outer_size(), window.inner_size()) {
-                let dw = (outer.width.saturating_sub(inner.width)) as f64 / scale_factor;
-                let dh = (outer.height.saturating_sub(inner.height)) as f64 / scale_factor;
-                let dw = if (0.0..=120.0).contains(&dw) { dw } else { 0.0 };
-                let dh = if (0.0..=120.0).contains(&dh) { dh } else { 0.0 };
+                let dw = outer.width.saturating_sub(inner.width);
+                let dh = outer.height.saturating_sub(inner.height);
+                let dw = if dw <= 180 { dw } else { 0 };
+                let dh = if dh <= 180 { dh } else { 0 };
                 (dw, dh)
             } else {
-                (0.0, 0.0)
+                (0, 0)
             }
         } else {
-            (0.0, 0.0)
+            (0, 0)
         };
 
-        let outer_w = target_inner_w + dec_w;
-        let outer_h = target_inner_h + dec_h;
+        let outer_w = target_inner_w.saturating_add(dec_w);
+        let outer_h = target_inner_h.saturating_add(dec_h);
 
-        let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize {
+        let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize {
             width: outer_w,
             height: outer_h,
         }));
@@ -282,26 +286,27 @@ pub async fn set_window_size(
     Ok(())
 }
 
-async fn settle_capture_size(window: &WebviewWindow, target_w: f64, target_h: f64) {
-    let mut prev_size: Option<(f64, f64)> = None;
+async fn settle_capture_size(window: &WebviewWindow, target_w: u32, target_h: u32) {
+    let mut prev_size: Option<(u32, u32)> = None;
     let mut stable_hits = 0;
 
     for _ in 0..SETTLE_MAX_CHECKS {
         tokio::time::sleep(Duration::from_millis(SETTLE_CHECK_INTERVAL_MS)).await;
-        let scale = window.scale_factor().unwrap_or(1.0);
         if let Ok(size) = window.inner_size() {
-            let cur_w = (size.width as f64 / scale).round();
-            let cur_h = (size.height as f64 / scale).round();
+            let cur_w = size.width;
+            let cur_h = size.height;
 
-            // If inner size matches target within 1px tolerance, settled!
-            if (cur_w - target_w).abs() <= 1.0 && (cur_h - target_h).abs() <= 1.0 {
+            // If inner size matches target within 2px tolerance, settled!
+            if (cur_w as i32 - target_w as i32).abs() <= 2
+                && (cur_h as i32 - target_h as i32).abs() <= 2
+            {
                 break;
             }
 
             // If the size is no longer changing (e.g. OS WM clamped or fixed decoration delta),
             // stop polling after 2 stable readings rather than fighting the window manager.
             if let Some((pw, ph)) = prev_size {
-                if (cur_w - pw).abs() < 1.0 && (cur_h - ph).abs() < 1.0 {
+                if (cur_w as i32 - pw as i32).abs() <= 1 && (cur_h as i32 - ph as i32).abs() <= 1 {
                     stable_hits += 1;
                     if stable_hits >= SETTLE_REQUIRED_STABLE_HITS {
                         break;

@@ -447,6 +447,14 @@ describe("In-app scripting API", () => {
         scale: 1.5,
       });
     });
+
+    it("invokes get_window_scale to retrieve host DPI scale", async () => {
+      const api = createScriptingApi();
+      vi.mocked(invoke).mockResolvedValueOnce(1.5);
+      const scale = await api.window.getScale();
+      expect(invoke).toHaveBeenCalledWith("get_window_scale");
+      expect(scale).toBe(1.5);
+    });
   });
 
   describe("Wait controller - visualsSettled", () => {

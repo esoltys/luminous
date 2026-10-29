@@ -118,6 +118,7 @@
     "wait.forState",
     "wait.settled",
     "wait.visualsSettled",
+    "window.getScale",
     "window.setSize"
   ]
 }

@@ -14,5 +14,8 @@ export function createWindowController(wait: ScriptWaitApi): ScriptWindowApi {
       });
       await wait.settled();
     },
+    async getScale(): Promise<number> {
+      return await invoke<number>("get_window_scale");
+    },
   };
 }
