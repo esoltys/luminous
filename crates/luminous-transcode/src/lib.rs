@@ -61,8 +61,9 @@ impl From<std::io::Error> for Error {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Prepared {
     /// The source itself for [`Decision::Copy`], otherwise a cache entry.
-    /// Cache entries are never modified, and only evicted when they haven't
-    /// been used for a while, so the path stays readable for the copy.
+    /// Entries are never modified, but a later `materialize` can evict the
+    /// least recently used ones to stay under the cap, so copy it before
+    /// preparing much more: an entry is only sure to exist until then.
     pub path: PathBuf,
     pub decision: Decision,
     /// Extension the file should have on the device, without the dot.

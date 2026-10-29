@@ -120,8 +120,9 @@ impl OfflineDecoder {
 
     /// Like `decode_blocks`, for callers that must not mistake a truncated
     /// decode for the whole file (transcoding): an error other than a
-    /// corrupt packet is returned instead of ending quietly. `on_block` can
-    /// stop the decode early by returning `Break`, which is not an error.
+    /// corrupt packet is returned instead of ending quietly. A file cut
+    /// short mid-packet ends like a whole one, as in playback. `on_block`
+    /// can stop the decode early by returning `Break`, which is not an error.
     pub fn try_decode_blocks(
         mut self,
         max_channels: usize,
@@ -133,6 +134,11 @@ impl OfflineDecoder {
             let packet = match track.format.next_packet() {
                 Ok(Some(packet)) => packet,
                 Ok(None) => return Ok(()),
+                Err(SymphoniaError::IoError(e))
+                    if e.kind() == std::io::ErrorKind::UnexpectedEof =>
+                {
+                    return Ok(())
+                }
                 Err(e) => return Err(e.to_string()),
             };
             if packet.track_id != track.track_id {
