@@ -111,12 +111,14 @@ function readDimensionsFromBuffer(buf: Buffer): { width: number; height: number 
   ) {
     const chunk = buf.toString("ascii", 12, 16);
     if (chunk === "VP8 ") {
+      // Lossy VP8: 14-bit width and height at bytes 26-29
       return {
         width: buf.readUInt16LE(26) & 0x3fff,
         height: buf.readUInt16LE(28) & 0x3fff,
       };
     }
     if (chunk === "VP8L") {
+      // Lossless VP8L: 14-bit width and height packed across bytes 21-24
       const b0 = buf[21];
       const b1 = buf[22];
       const b2 = buf[23];
@@ -127,6 +129,7 @@ function readDimensionsFromBuffer(buf: Buffer): { width: number; height: number 
       };
     }
     if (chunk === "VP8X") {
+      // Extended VP8X: 24-bit canvas width and height - 1 at bytes 24-29
       return {
         width: 1 + buf.readUIntLE(24, 3),
         height: 1 + buf.readUIntLE(27, 3),
@@ -406,3 +409,22 @@ export function validateGuideAssets(options: ValidationOptions = {}): Validation
     issues,
   };
 }
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const args = process.argv.slice(2);
+  if (args.includes("--generate")) {
+    const manifest = generateManifest();
+    writeManifest(manifest);
+    console.log(`[guide-manifest] Generated ${DEFAULT_MANIFEST_PATH}`);
+  } else {
+    const report = validateGuideAssets();
+    if (!report.valid) {
+      for (const issue of report.issues) {
+        console.error(`[guide-manifest] Error [${issue.code}]: ${issue.message}`);
+      }
+      process.exit(1);
+    }
+    console.log("[guide-manifest] All guide assets and manifest verified successfully.");
+  }
+}
+
