@@ -1157,7 +1157,6 @@ pub fn run() {
                 devices: Arc::new(devices::DeviceMonitor::new()),
                 transcoder: Arc::new(luminous_transcode::Transcoder::new(
                     crate::paths::resolve_cache_dir(app).join("transcode"),
-                    devices::TRANSCODE_CACHE_CAP_BYTES,
                 )),
             };
 
@@ -1608,6 +1607,7 @@ pub fn run() {
             commands::devices::update_device_profile,
             commands::devices::eject_device,
             commands::devices::get_transcode_capabilities,
+            commands::devices::get_conversion_target,
             // Window & Miniplayer commands
             commands::window::is_remote_devtools_enabled,
             commands::window::geometry_capture_supported,

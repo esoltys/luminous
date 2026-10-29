@@ -1,6 +1,6 @@
 //! Which target formats and bitrates this computer can encode.
 
-use luminous_devices::TargetFormat;
+use luminous_devices::{DeviceProfile, TargetFormat};
 use serde::Serialize;
 
 /// One format conversions can produce here, and the bitrates it offers.
@@ -18,6 +18,22 @@ pub struct FormatCapability {
 #[serde(rename_all = "camelCase")]
 pub struct Capabilities {
     pub formats: Vec<FormatCapability>,
+}
+
+/// The format and bitrate conversions for a device actually use here. Sync
+/// shows this before it converts anything, so a substitute the device can't
+/// play is the user's call, never a surprise on the device.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConversionTarget {
+    pub format: TargetFormat,
+    pub bitrate_kbps: u32,
+    /// The profile asked for a format or bitrate this computer can't
+    /// encode, and this one stands in for it.
+    pub substituted: bool,
+    /// `format` is in the device's plays list. When false, converted files
+    /// may not play on the device.
+    pub device_plays: bool,
 }
 
 /// Bitrates offered for Opus; libopus encodes all of them.
@@ -38,7 +54,7 @@ impl Capabilities {
     /// The format and bitrate actually used for a request: the requested
     /// format when it is available, otherwise Opus; the highest offered
     /// bitrate not above the requested one, otherwise the lowest offered.
-    pub fn resolve(&self, format: TargetFormat, bitrate_kbps: u32) -> (TargetFormat, u32) {
+    pub(crate) fn resolve(&self, format: TargetFormat, bitrate_kbps: u32) -> (TargetFormat, u32) {
         let capability = self
             .formats
             .iter()
@@ -54,6 +70,22 @@ impl Capabilities {
             .copied()
             .expect("bitrates are never empty");
         (capability.format, bitrate)
+    }
+
+    /// What files converted for `profile` will be on this computer, and
+    /// whether that is what the profile asked for and what the device plays.
+    pub fn target(&self, profile: &DeviceProfile) -> ConversionTarget {
+        let requested = (profile.convert.format, profile.convert.bitrate_kbps);
+        let (format, bitrate_kbps) = self.resolve(requested.0, requested.1);
+        ConversionTarget {
+            format,
+            bitrate_kbps,
+            substituted: (format, bitrate_kbps) != requested,
+            device_plays: profile
+                .supported_formats
+                .iter()
+                .any(|f| f == format.format_name()),
+        }
     }
 
     #[cfg(test)]
@@ -109,6 +141,29 @@ mod tests {
         assert_eq!(
             Capabilities::opus_only().resolve(TargetFormat::Aac, 320),
             (TargetFormat::Opus, 256)
+        );
+    }
+
+    #[test]
+    fn target_reports_a_substitute_the_device_cannot_play() {
+        let profile = DeviceProfile::default(); // plays MP3 and AAC; asks AAC 192
+        assert_eq!(
+            Capabilities::all().target(&profile),
+            ConversionTarget {
+                format: TargetFormat::Aac,
+                bitrate_kbps: 192,
+                substituted: false,
+                device_plays: true,
+            }
+        );
+        assert_eq!(
+            Capabilities::opus_only().target(&profile),
+            ConversionTarget {
+                format: TargetFormat::Opus,
+                bitrate_kbps: 192,
+                substituted: true,
+                device_plays: false,
+            }
         );
     }
 

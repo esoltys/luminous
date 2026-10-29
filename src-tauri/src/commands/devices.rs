@@ -5,7 +5,7 @@
 use crate::devices::ConnectedDevice;
 use crate::AppState;
 use luminous_devices::{DeviceProfile, EjectError};
-use luminous_transcode::Capabilities;
+use luminous_transcode::{Capabilities, ConversionTarget};
 use tauri::State;
 
 #[tauri::command]
@@ -39,6 +39,20 @@ pub async fn get_transcode_capabilities(
 ) -> Result<Capabilities, String> {
     let transcoder = state.transcoder.clone();
     tokio::task::spawn_blocking(move || transcoder.capabilities().clone())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// What files converted for `profile` (saved or still being edited) get on
+/// this computer: a format substituted for one it can't encode, or one the
+/// device doesn't list, is flagged so the UI can warn before a sync (#838).
+#[tauri::command]
+pub async fn get_conversion_target(
+    profile: DeviceProfile,
+    state: State<'_, AppState>,
+) -> Result<ConversionTarget, String> {
+    let transcoder = state.transcoder.clone();
+    tokio::task::spawn_blocking(move || transcoder.conversion_target(&profile))
         .await
         .map_err(|e| e.to_string())
 }

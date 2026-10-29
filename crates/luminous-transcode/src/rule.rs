@@ -1,6 +1,6 @@
 //! The "can't play" rule: what sync does with a file for a given device.
 
-use crate::capabilities::Capabilities;
+use crate::capabilities::{Capabilities, ConversionTarget};
 use crate::source::SourceInfo;
 use luminous_devices::{ConvertMode, DeviceProfile, TargetFormat};
 use serde::Serialize;
@@ -52,14 +52,18 @@ pub(crate) fn decide(info: &SourceInfo, profile: &DeviceProfile, caps: &Capabili
     if settings.mode == ConvertMode::Never {
         return Decision::Copy;
     }
-    let (format, bitrate_kbps) = caps.resolve(settings.format, settings.bitrate_kbps);
+    let ConversionTarget {
+        format,
+        bitrate_kbps,
+        ..
+    } = caps.target(profile);
 
     let playable = profile.supported_formats.iter().any(|f| f == info.codec);
     let within_limits = info.sample_rate <= profile.max_sample_rate
         && info
             .bit_depth
             .is_none_or(|depth| depth <= profile.max_bit_depth);
-    let worth_shrinking = settings.mode == ConvertMode::All
+    let worth_shrinking = settings.mode == ConvertMode::SaveSpace
         && (info.is_lossless()
             || info
                 .bitrate_kbps
@@ -241,9 +245,9 @@ mod tests {
     }
 
     #[test]
-    fn everything_mode_shrinks_lossless_and_larger_lossy_files_only() {
+    fn save_space_mode_shrinks_lossless_and_larger_lossy_files_only() {
         let caps = Capabilities::all();
-        let profile = walkman(ConvertMode::All);
+        let profile = walkman(ConvertMode::SaveSpace);
         let to_aac = convert_to(TargetFormat::Aac, 192, 44_100);
         assert_eq!(decide(&flac(44_100, 16), &profile, &caps), to_aac);
         assert_eq!(decide(&lossy("mp3", 320), &profile, &caps), to_aac);

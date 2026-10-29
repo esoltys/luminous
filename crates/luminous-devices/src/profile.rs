@@ -70,9 +70,11 @@ pub enum ConvertMode {
     /// `supported_formats`, or a sample rate or bit depth above its maximum.
     #[default]
     Unsupported,
-    /// Also convert playable files whose bitrate is above the target's, to
-    /// fit more on the device.
-    All,
+    /// Also convert playable files that would come out smaller: lossless
+    /// files and lossy ones above the target bitrate. Lossy files at or
+    /// below it are copied, since converting them would cost quality and
+    /// save nothing.
+    SaveSpace,
     /// Copy every file as it is.
     Never,
 }
@@ -238,8 +240,8 @@ mod tests {
     #[test]
     fn convert_settings_fill_missing_fields() {
         let profile: DeviceProfile =
-            serde_json::from_str(r#"{"convert":{"mode":"all","format":"opus"}}"#).unwrap();
-        assert_eq!(profile.convert.mode, ConvertMode::All);
+            serde_json::from_str(r#"{"convert":{"mode":"saveSpace","format":"opus"}}"#).unwrap();
+        assert_eq!(profile.convert.mode, ConvertMode::SaveSpace);
         assert_eq!(profile.convert.format, TargetFormat::Opus);
         assert_eq!(profile.convert.bitrate_kbps, 192);
     }

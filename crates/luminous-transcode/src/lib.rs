@@ -19,7 +19,7 @@ mod pipeline;
 mod rule;
 mod source;
 
-pub use capabilities::{Capabilities, FormatCapability};
+pub use capabilities::{Capabilities, ConversionTarget, FormatCapability};
 pub use luminous_devices::{ConvertMode, ConvertSettings, DeviceProfile, TargetFormat};
 pub use rule::Decision;
 
@@ -83,12 +83,13 @@ pub struct Transcoder {
 }
 
 impl Transcoder {
-    /// A transcoder caching into `cache_dir` (created when first needed),
-    /// keeping at most `cache_cap_bytes` there. Cheap: nothing is read or
-    /// probed until first used.
-    pub fn new(cache_dir: PathBuf, cache_cap_bytes: u64) -> Self {
+    /// A transcoder caching into `cache_dir` (created when first needed).
+    /// The cache sizes itself: it keeps what syncs keep using and gives
+    /// space back when entries go unused or the disk runs short. Cheap:
+    /// nothing is read or probed until first used.
+    pub fn new(cache_dir: PathBuf) -> Self {
         Self {
-            cache: cache::Cache::new(cache_dir, cache_cap_bytes),
+            cache: cache::Cache::new(cache_dir),
             capabilities: OnceLock::new(),
             sources: Mutex::new(HashMap::new()),
         }
@@ -100,10 +101,11 @@ impl Transcoder {
         self.capabilities.get_or_init(Capabilities::detect)
     }
 
-    /// Change the cache's size cap, evicting least-recently-used entries
-    /// now if it is over.
-    pub fn set_cache_cap(&self, bytes: u64) {
-        self.cache.set_cap(bytes);
+    /// The format and bitrate files converted for `profile` get here, and
+    /// whether that stands in for what the profile asked for or is a format
+    /// the device doesn't list. Sync shows it before converting anything.
+    pub fn conversion_target(&self, profile: &DeviceProfile) -> ConversionTarget {
+        self.capabilities().target(profile)
     }
 
     /// What sync does with `source` for a device with `profile`. Reads the

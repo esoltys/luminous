@@ -133,3 +133,60 @@ impl Drop for FfmpegEncoder {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Encodes a second of stereo through ffmpeg for each format it offers,
+    /// then carries tags over the way the pipeline does. Runs wherever
+    /// ffmpeg is on `PATH` (Linux CI, or Windows with it added), whichever
+    /// backend the platform uses for real.
+    #[test]
+    fn encodes_and_takes_tags_where_ffmpeg_is_installed() {
+        let formats = formats();
+        if formats.is_empty() {
+            eprintln!("ffmpeg isn't on PATH; skipped");
+            return;
+        }
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir.path().join("source.wav");
+        let tone: Vec<i16> = (0..44_100).map(|i| ((i % 100) * 100) as i16).collect();
+        luminous_audio::write_test_pcm16_wav(&source, 44_100, &[tone.clone(), tone]);
+        let mut file = lofty::probe::Probe::open(&source).unwrap().read().unwrap();
+        let mut tag = lofty::tag::Tag::new(lofty::tag::TagType::Id3v2);
+        lofty::tag::Accessor::set_title(&mut tag, "Valediction".into());
+        lofty::file::TaggedFileExt::insert_tag(&mut file, tag);
+        lofty::file::AudioFile::save_to_path(&file, &source, Default::default()).unwrap();
+
+        for capability in formats {
+            let format = capability.format;
+            let out = dir
+                .path()
+                .join(format!("out.partial.{}", format.extension()));
+            let left: Vec<f32> = (0..44_100).map(|i| (i as f32 * 0.05).sin() * 0.5).collect();
+            let mut encoder = Box::new(
+                FfmpegEncoder::spawn(format, capability.bitrates_kbps[0], 44_100, 2, &out).unwrap(),
+            );
+            for (l, r) in left.chunks(4096).zip(left.chunks(4096)) {
+                encoder.write(&[l, r]).unwrap();
+            }
+            encoder.finish().unwrap();
+            crate::art::copy_tags(&source, &out, None).unwrap();
+
+            let decoder = luminous_audio::OfflineDecoder::open_file(&out).unwrap();
+            let rate = decoder.sample_rate();
+            let mut frames = 0;
+            decoder.decode_blocks(1, |planes| frames += planes[0].len());
+            let seconds = frames as f64 / f64::from(rate);
+            assert!((seconds - 1.0).abs() < 0.1, "{format:?}: {seconds} s");
+            let tagged = lofty::probe::Probe::open(&out).unwrap().read().unwrap();
+            let tag = lofty::file::TaggedFileExt::primary_tag(&tagged).unwrap();
+            assert_eq!(
+                lofty::tag::Accessor::title(tag).as_deref(),
+                Some("Valediction"),
+                "{format:?}"
+            );
+        }
+    }
+}

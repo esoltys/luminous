@@ -23,10 +23,6 @@ use tauri::{AppHandle, Emitter};
 
 pub const DEVICES_CHANGED_EVENT: &str = "devices-changed";
 
-/// How much disk the transcode cache may use before the least recently
-/// used conversions are dropped (#838).
-pub const TRANSCODE_CACHE_CAP_BYTES: u64 = 20_000_000_000;
-
 const POLL_INTERVAL: Duration = Duration::from_secs(2);
 /// Rebuild at least this often even when no device changed, so a newly
 /// watched music folder on a device, or a marker edited elsewhere, shows up.
@@ -448,7 +444,7 @@ mod tests {
         let conn = db.pool.get().unwrap();
         let profile = DeviceProfile {
             convert: luminous_devices::ConvertSettings {
-                mode: luminous_devices::ConvertMode::All,
+                mode: luminous_devices::ConvertMode::SaveSpace,
                 format: luminous_devices::TargetFormat::Opus,
                 bitrate_kbps: 160,
                 max_art_px: Some(500),

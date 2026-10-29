@@ -87,14 +87,14 @@ fn inspect(path: &Path) -> (Option<String>, u32, u32, usize) {
 fn convert_and_check(format: TargetFormat) {
     let dir = tempfile::tempdir().unwrap();
     let source = library_file(dir.path(), 1200);
-    let transcoder = Transcoder::new(dir.path().join("cache"), 1 << 30);
-    let profile = profile(ConvertMode::All, format, Some(500));
+    let transcoder = Transcoder::new(dir.path().join("cache"));
+    let profile = profile(ConvertMode::SaveSpace, format, Some(500));
 
     let estimate = transcoder.estimated_size(&source, &profile).unwrap();
     let prepared = transcoder
         .materialize(&source, &profile, &AtomicBool::new(false))
         .unwrap();
-    let (resolved, _) = transcoder.capabilities().resolve(format, 192);
+    let resolved = transcoder.conversion_target(&profile).format;
     assert!(matches!(
         prepared.decision,
         Decision::Convert { format: f, .. } if f == resolved
@@ -132,7 +132,7 @@ fn converts_to_opus() {
 
 #[test]
 fn converts_to_aac_and_mp3_where_available() {
-    let caps = Transcoder::new(PathBuf::new(), 0).capabilities().clone();
+    let caps = Transcoder::new(PathBuf::new()).capabilities().clone();
     for format in [TargetFormat::Aac, TargetFormat::Mp3] {
         if caps.formats.iter().any(|c| c.format == format) {
             convert_and_check(format);
@@ -146,7 +146,7 @@ fn converts_to_aac_and_mp3_where_available() {
 fn playable_files_are_copied_or_only_have_their_art_shrunk() {
     let dir = tempfile::tempdir().unwrap();
     let source = library_file(dir.path(), 1200);
-    let transcoder = Transcoder::new(dir.path().join("cache"), 1 << 30);
+    let transcoder = Transcoder::new(dir.path().join("cache"));
     let stop = AtomicBool::new(false);
 
     let copied = transcoder
@@ -181,11 +181,11 @@ fn a_cancelled_conversion_caches_nothing() {
     let dir = tempfile::tempdir().unwrap();
     let source = library_file(dir.path(), 100);
     let cache = dir.path().join("cache");
-    let transcoder = Transcoder::new(cache.clone(), 1 << 30);
+    let transcoder = Transcoder::new(cache.clone());
     let err = transcoder
         .materialize(
             &source,
-            &profile(ConvertMode::All, TargetFormat::Opus, None),
+            &profile(ConvertMode::SaveSpace, TargetFormat::Opus, None),
             &AtomicBool::new(true),
         )
         .unwrap_err();
@@ -197,8 +197,8 @@ fn a_cancelled_conversion_caches_nothing() {
 fn a_changed_source_is_converted_again() {
     let dir = tempfile::tempdir().unwrap();
     let source = library_file(dir.path(), 100);
-    let transcoder = Transcoder::new(dir.path().join("cache"), 1 << 30);
-    let profile = profile(ConvertMode::All, TargetFormat::Opus, None);
+    let transcoder = Transcoder::new(dir.path().join("cache"));
+    let profile = profile(ConvertMode::SaveSpace, TargetFormat::Opus, None);
     let stop = AtomicBool::new(false);
     let first = transcoder.materialize(&source, &profile, &stop).unwrap();
 
@@ -221,7 +221,7 @@ fn mono_sources_convert_to_every_available_format() {
     let dir = tempfile::tempdir().unwrap();
     let source = dir.path().join("mono.wav");
     luminous_audio::write_test_pcm16_wav(&source, 44_100, &[vec![1000; 44_100]]);
-    let transcoder = Transcoder::new(dir.path().join("cache"), 1 << 30);
+    let transcoder = Transcoder::new(dir.path().join("cache"));
     let formats: Vec<_> = transcoder
         .capabilities()
         .formats
@@ -232,7 +232,7 @@ fn mono_sources_convert_to_every_available_format() {
         let prepared = transcoder
             .materialize(
                 &source,
-                &profile(ConvertMode::All, format, None),
+                &profile(ConvertMode::SaveSpace, format, None),
                 &AtomicBool::new(false),
             )
             .unwrap_or_else(|e| panic!("{format:?}: {e}"));
