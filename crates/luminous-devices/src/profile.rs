@@ -35,6 +35,89 @@ pub struct DeviceProfile {
     pub max_bit_depth: u8,
     /// What sync converts on the way to the device (#838).
     pub convert: ConvertSettings,
+    /// How synced files and playlists are laid out on the device (#837).
+    pub layout: LayoutSettings,
+}
+
+/// The template a new device's music folders follow: the Organize view's
+/// default, e.g. `Insomnium/2019 - Heart Like a Grave/02 Valediction`.
+pub const DEFAULT_FOLDER_TEMPLATE: &str = "%albumartist/{%year - }{%album/}{%disc-}{%track }%title";
+
+/// Where synced files go on the device and how playlist files are written.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct LayoutSettings {
+    /// Path of each track under `music_path`, in the Organize view's
+    /// template syntax (`%albumartist`, `{%year - }`, ...). The extension
+    /// is added: the one the file has on the device.
+    pub folder_template: String,
+    pub playlist_format: PlaylistFileFormat,
+    /// Separator inside playlist files. Backslash playlists also end lines
+    /// with CRLF, as the DOS-era firmware that wants one expects the other.
+    pub path_separator: PathSeparator,
+    /// Album art written beside the tracks of each album, for players that
+    /// don't read embedded art.
+    pub folder_art: FolderArt,
+}
+
+impl Default for LayoutSettings {
+    fn default() -> Self {
+        Self {
+            folder_template: DEFAULT_FOLDER_TEMPLATE.into(),
+            playlist_format: PlaylistFileFormat::M3u8,
+            path_separator: PathSeparator::Slash,
+            folder_art: FolderArt::None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum PlaylistFileFormat {
+    /// `.m3u8`, UTF-8 without a BOM.
+    #[default]
+    M3u8,
+    /// `.m3u` in Windows-1252, for players that fail on UTF-8. File and
+    /// folder names on the device are kept to characters it can encode, so
+    /// every line still points at its file.
+    M3uWindows1252,
+    /// `.pls`, UTF-8.
+    Pls,
+    /// No playlist files.
+    None,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum PathSeparator {
+    #[default]
+    Slash,
+    Backslash,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum FolderArt {
+    #[default]
+    None,
+    /// `cover.jpg`
+    Cover,
+    /// `folder.jpg`
+    Folder,
+    /// Both `cover.jpg` and `folder.jpg`.
+    Both,
+}
+
+impl FolderArt {
+    /// The art file names to write in each album folder.
+    pub fn file_names(self) -> &'static [&'static str] {
+        match self {
+            Self::None => &[],
+            Self::Cover => &["cover.jpg"],
+            Self::Folder => &["folder.jpg"],
+            Self::Both => &["cover.jpg", "folder.jpg"],
+        }
+    }
 }
 
 /// Which files sync converts, and to what. The format and bitrate are a
@@ -122,6 +205,7 @@ impl Default for DeviceProfile {
             max_sample_rate: 48_000,
             max_bit_depth: 16,
             convert: ConvertSettings::default(),
+            layout: LayoutSettings::default(),
         }
     }
 }
@@ -157,6 +241,12 @@ impl DeviceProfile {
     pub fn normalized(mut self) -> Self {
         self.music_path = relative_path(&self.music_path);
         self.playlists_path = relative_path(&self.playlists_path);
+        let template = self.layout.folder_template.trim();
+        self.layout.folder_template = if template.is_empty() {
+            DEFAULT_FOLDER_TEMPLATE.into()
+        } else {
+            template.into()
+        };
         for field in [&mut self.nickname, &mut self.icon, &mut self.color] {
             *field = field
                 .take()
@@ -235,6 +325,23 @@ mod tests {
         assert_eq!(profile.nickname.as_deref(), Some("R1"));
         assert_eq!(profile.max_sample_rate, 48_000);
         assert_eq!(profile.convert, ConvertSettings::default());
+    }
+
+    #[test]
+    fn layout_settings_fill_missing_fields_and_a_blank_template() {
+        let profile: DeviceProfile = serde_json::from_str(
+            r#"{"layout":{"playlistFormat":"m3uWindows1252","folderTemplate":"  "}}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            profile.layout.playlist_format,
+            PlaylistFileFormat::M3uWindows1252
+        );
+        assert_eq!(profile.layout.path_separator, PathSeparator::Slash);
+        assert_eq!(
+            profile.normalized().layout.folder_template,
+            DEFAULT_FOLDER_TEMPLATE
+        );
     }
 
     #[test]

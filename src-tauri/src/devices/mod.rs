@@ -11,6 +11,8 @@
 //! profile, and only seeds a new row when the device shows up here for the
 //! first time (another computer, a fresh install).
 
+pub mod layout;
+
 use crate::db::Database;
 use anyhow::{anyhow, Result};
 use luminous_devices::{Device, DeviceKind, DeviceProfile, DeviceWatcher, Marker};
@@ -264,12 +266,13 @@ fn load_profile(
     conn.query_row(
         "SELECT nickname, icon, color, music_path, playlists_path, reserve_bytes,
                 supported_formats, max_sample_rate, max_bit_depth, last_synced_at,
-                convert_settings
+                convert_settings, layout_settings
            FROM device_profiles WHERE id = ?1",
         [id],
         |row| {
             let formats: String = row.get(6)?;
             let convert: String = row.get(10)?;
+            let layout: String = row.get(11)?;
             Ok((
                 DeviceProfile {
                     nickname: row.get(0)?,
@@ -282,6 +285,7 @@ fn load_profile(
                     max_sample_rate: row.get(7)?,
                     max_bit_depth: row.get(8)?,
                     convert: serde_json::from_str(&convert).unwrap_or_default(),
+                    layout: serde_json::from_str(&layout).unwrap_or_default(),
                 },
                 row.get(9)?,
             ))
@@ -300,14 +304,15 @@ fn upsert_profile(
     conn.execute(
         "INSERT INTO device_profiles (id, nickname, icon, color, music_path, playlists_path,
              reserve_bytes, supported_formats, max_sample_rate, max_bit_depth, convert_settings,
-             created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?12)
+             layout_settings, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?13)
          ON CONFLICT(id) DO UPDATE SET
              nickname = excluded.nickname, icon = excluded.icon, color = excluded.color,
              music_path = excluded.music_path, playlists_path = excluded.playlists_path,
              reserve_bytes = excluded.reserve_bytes, supported_formats = excluded.supported_formats,
              max_sample_rate = excluded.max_sample_rate, max_bit_depth = excluded.max_bit_depth,
              convert_settings = excluded.convert_settings,
+             layout_settings = excluded.layout_settings,
              updated_at = excluded.updated_at",
         params![
             id,
@@ -321,6 +326,7 @@ fn upsert_profile(
             profile.max_sample_rate,
             profile.max_bit_depth,
             serde_json::to_string(&profile.convert)?,
+            serde_json::to_string(&profile.layout)?,
             now,
         ],
     )?;
@@ -439,7 +445,7 @@ mod tests {
     }
 
     #[test]
-    fn convert_settings_round_trip_through_the_database() {
+    fn sync_settings_round_trip_through_the_database() {
         let (_db_dir, db) = test_db();
         let conn = db.pool.get().unwrap();
         let profile = DeviceProfile {
@@ -449,11 +455,18 @@ mod tests {
                 bitrate_kbps: 160,
                 max_art_px: Some(500),
             },
+            layout: luminous_devices::LayoutSettings {
+                folder_template: "%artist/%title".into(),
+                playlist_format: luminous_devices::PlaylistFileFormat::Pls,
+                path_separator: luminous_devices::PathSeparator::Backslash,
+                folder_art: luminous_devices::FolderArt::Both,
+            },
             ..DeviceProfile::default()
         };
         upsert_profile(&conn, "vol-0088-5572", &profile, NOW).unwrap();
         let (loaded, _) = load_profile(&conn, "vol-0088-5572").unwrap().unwrap();
         assert_eq!(loaded.convert, profile.convert);
+        assert_eq!(loaded.layout, profile.layout);
     }
 
     #[test]

@@ -2,6 +2,7 @@
 //! arrives through the `devices-changed` event (see `crate::devices`); these
 //! commands read it once at startup, save a profile and eject.
 
+use crate::devices::layout::{DeviceLayout, SyncedTrack};
 use crate::devices::ConnectedDevice;
 use crate::AppState;
 use luminous_devices::{DeviceProfile, EjectError};
@@ -55,6 +56,49 @@ pub async fn get_conversion_target(
     tokio::task::spawn_blocking(move || transcoder.conversion_target(&profile))
         .await
         .map_err(|e| e.to_string())
+}
+
+/// Where a library song would go on a device with `profile` (saved or still
+/// being edited), relative to the storage root, extension included: the
+/// example under the "Folders on the device" template (#837). Uses
+/// `song_id`, else a well-tagged song from the library; `None` when the
+/// library has no local songs.
+#[tauri::command]
+pub async fn preview_device_path(
+    profile: DeviceProfile,
+    song_id: Option<i64>,
+    state: State<'_, AppState>,
+) -> Result<Option<String>, String> {
+    let Some(song) = crate::db::run_blocking(&state.db, move |conn| {
+        crate::devices::layout::example_song(conn, song_id)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    else {
+        return Ok(None);
+    };
+    let transcoder = state.transcoder.clone();
+    tokio::task::spawn_blocking(move || {
+        let profile = profile.normalized();
+        let source = std::path::Path::new(song.path.as_deref().unwrap_or_default());
+        // A file that can't be read right now keeps its own extension.
+        let extension = match transcoder.decide(source, &profile) {
+            Ok(decision) => decision.extension(source),
+            Err(_) => source
+                .extension()
+                .map(|e| e.to_string_lossy().into_owned())
+                .unwrap_or_default(),
+        };
+        let track = SyncedTrack {
+            song: &song,
+            extension: &extension,
+        };
+        DeviceLayout::plan(&profile, &[track])
+            .track_path(song.id)
+            .map(str::to_string)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 /// Safely removes a device. Stops playback first when the current track is

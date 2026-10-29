@@ -30,7 +30,10 @@ use windows as platform;
 
 pub use backend::{DeviceBackend, DirEntry, FsBackend, Progress, Space};
 pub use marker::{Marker, MARKER_FILE_NAME};
-pub use profile::{ConvertMode, ConvertSettings, DeviceProfile, TargetFormat};
+pub use profile::{
+    ConvertMode, ConvertSettings, DeviceProfile, FolderArt, LayoutSettings, PathSeparator,
+    PlaylistFileFormat, TargetFormat, DEFAULT_FOLDER_TEMPLATE,
+};
 
 use parking_lot::Mutex;
 use serde::Serialize;

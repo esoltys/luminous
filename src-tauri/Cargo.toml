@@ -23,6 +23,10 @@ tauri-build = { version = "2", features = [] }
 # Already pulled in transitively by Tauri's "image-png" feature (see
 # Cargo.lock) — added directly since both call into it themselves.
 image = "0.25"
+# Device playlists in Windows-1252 (#837): encoding the text, and folding
+# names it can't hold to ASCII look-alikes ("Сплин" -> "Splin").
+encoding_rs = "0.8"
+deunicode = "1.6"
 # --- Tauri ---
 # "unstable" gates `Manager::get_window`, needed to reach the lower-level
 # `Window::start_resize_dragging` from a `WebviewWindow` command handler.
