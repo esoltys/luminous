@@ -129,7 +129,9 @@ export function createWaitController(): ScriptWaitApi {
                 : Promise.resolve();
             }
             return new Promise<void>((resolve) => {
+              let timer: ReturnType<typeof setTimeout> | null = null;
               const finish = () => {
+                if (timer) clearTimeout(timer);
                 img.removeEventListener("load", finish);
                 img.removeEventListener("error", finish);
                 if (typeof img.decode === "function") {
@@ -140,7 +142,7 @@ export function createWaitController(): ScriptWaitApi {
               };
               img.addEventListener("load", finish, { once: true });
               img.addEventListener("error", finish, { once: true });
-              setTimeout(finish, Math.min(2000, remainingTime()));
+              timer = setTimeout(finish, Math.min(2000, remainingTime()));
             });
           })
         );
