@@ -8,10 +8,18 @@ import { createDialogsController } from "./dialogs";
 import { createViewController } from "./view";
 import { createScreensController } from "./screens";
 import { createWindowController } from "./window";
+import { createOverlayController } from "./overlay";
 
 export * from "./types";
 export { registerDialogHostControls, type DialogHostControls } from "./dialogs";
 export { registerScreenHook, type ScreenHooks } from "./screens";
+export {
+  OVERLAY_HOST_ID,
+  CURSOR_ELEMENT_ID,
+  CAPTION_ELEMENT_ID,
+  KEYSTROKE_ELEMENT_ID,
+  clearActiveOverlays,
+} from "./overlay";
 
 /**
  * Builds the Luminous in-app scripting API facade.
@@ -25,6 +33,7 @@ export function createScriptingApi(): LuminousScriptApi {
   const view = createViewController(wait);
   const screens = createScreensController(wait);
   const win = createWindowController(wait);
+  const overlay = createOverlayController(wait);
 
   const api: LuminousScriptApi = {
     version: SCRIPT_API_VERSION,
@@ -39,6 +48,7 @@ export function createScriptingApi(): LuminousScriptApi {
     screens,
     wait,
     window: win,
+    overlay,
   };
   return api;
 }
