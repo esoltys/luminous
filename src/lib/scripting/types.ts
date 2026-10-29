@@ -7,7 +7,7 @@
 // Signature and resolve-condition changes are only caught in review.
 
 /** Version of this contract. Callers pass their vendored copy to `connect()`. */
-export const SCRIPT_API_VERSION = "1.1.0";
+export const SCRIPT_API_VERSION = "1.2.0";
 
 /** What `connect()` resolves with: the running app's version and every method it offers. */
 export interface ScriptContract {
@@ -260,6 +260,18 @@ export interface ScriptWaitApi {
    * Waits for Svelte microtasks, ticks, and layout renders to settle.
    */
   settled(): Promise<void>;
+
+  /**
+   * Resolves only once all visual inputs for the current view have settled:
+   * 1. In-flight navigation and Svelte DOM renders have flushed
+   * 2. Waveform or frequency band data for the current track is loaded and drawn
+   * 3. Dynamic Artwork colors are extracted and CSS variables applied
+   * 4. All visible artwork and avatar <img> elements are loaded and decoded
+   * 5. Double animation frames have painted to the compositor
+   *
+   * @param timeoutMs Maximum time to wait before rejecting (default: 10000ms).
+   */
+  visualsSettled(timeoutMs?: number): Promise<void>;
 }
 
 /** A grid that can show its items as cards or rows. */
@@ -299,6 +311,33 @@ export interface ScriptScreensApi {
 }
 
 /**
+ * Target options for window sizing.
+ */
+export interface ScriptWindowSizeOptions {
+  /** Target inner width in logical pixels. */
+  width?: number;
+  /** Target inner height in logical pixels. */
+  height?: number;
+  /** Target effective display/zoom scale factor (e.g. 1.0 for 100%, 2.0 for 200%). */
+  scale?: number;
+}
+
+/**
+ * Window geometry and display scale controller surface.
+ */
+export interface ScriptWindowApi {
+  /**
+   * Resizes the window to the requested inner dimensions in logical pixels,
+   * accounting for OS window decoration offsets where supported, and optionally
+   * adjusts the webview zoom scale factor.
+   *
+   * Calling setSize allows captures to guarantee identical rendered pixel dimensions
+   * independent of host display scaling.
+   */
+  setSize(options: ScriptWindowSizeOptions): Promise<void>;
+}
+
+/**
  * Primary scripting API exposed on window.__LUMINOUS_SCRIPT__.
  */
 export interface LuminousScriptApi {
@@ -317,6 +356,7 @@ export interface LuminousScriptApi {
   readonly view: ScriptViewApi;
   readonly screens: ScriptScreensApi;
   readonly wait: ScriptWaitApi;
+  readonly window: ScriptWindowApi;
 }
 
 declare global {

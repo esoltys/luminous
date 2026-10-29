@@ -1,5 +1,7 @@
 import { tick } from "svelte";
 import { listen } from "@tauri-apps/api/event";
+import { themeStore } from "../stores/theme.svelte";
+import { playerStore } from "../stores/player.svelte";
 import type { ScriptWaitApi } from "./types";
 
 /**
@@ -93,6 +95,59 @@ export function createWaitController(): ScriptWaitApi {
         }
       });
       await tick();
+    },
+
+    async visualsSettled(timeoutMs = 10000): Promise<void> {
+      const startTime = Date.now();
+      const remainingTime = () => Math.max(100, timeoutMs - (Date.now() - startTime));
+
+      // 1. Initial microtasks and DOM layout settlement
+      await this.settled();
+
+      // 2. Dynamic artwork palette wait
+      if (themeStore.activeThemeId === "dynamic-artwork" && playerStore.currentSong) {
+        await this.forState(() => !themeStore.isExtractingArtworkColors, remainingTime());
+      }
+
+      // 3. Waveform / band seekbar loading wait
+      if (playerStore.currentSong) {
+        await this.forState(() => {
+          if (typeof document === "undefined") return true;
+          const loadingEls = document.querySelectorAll('[data-waveform-loading="true"]');
+          return loadingEls.length === 0;
+        }, remainingTime());
+      }
+
+      // 4. Artwork decode wait: all <img> elements
+      if (typeof document !== "undefined") {
+        const images = Array.from(document.querySelectorAll("img"));
+        await Promise.all(
+          images.map((img) => {
+            if (img.complete) {
+              return img.naturalWidth > 0 && typeof img.decode === "function"
+                ? img.decode().catch(() => {})
+                : Promise.resolve();
+            }
+            return new Promise<void>((resolve) => {
+              const finish = () => {
+                img.removeEventListener("load", finish);
+                img.removeEventListener("error", finish);
+                if (typeof img.decode === "function") {
+                  img.decode().catch(() => {}).finally(() => resolve());
+                } else {
+                  resolve();
+                }
+              };
+              img.addEventListener("load", finish, { once: true });
+              img.addEventListener("error", finish, { once: true });
+              setTimeout(finish, Math.min(2000, remainingTime()));
+            });
+          })
+        );
+      }
+
+      // 5. Final render and frame paint flush
+      await this.settled();
     },
   };
 }

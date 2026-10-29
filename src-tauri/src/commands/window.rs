@@ -214,6 +214,107 @@ pub async fn move_window_to_preset(window: WebviewWindow, position: String) -> R
     window.move_window(pos).map_err(|e| e.to_string())
 }
 
+/// Resizes the window to the requested inner dimensions (width, height) in logical pixels,
+/// accounting for OS window decoration offsets where available, and optionally adjusts the
+/// webview zoom scale factor.
+///
+/// Designed for automated capture scenes and screenshots where consistent pixel dimensions
+/// independent of host display scaling are required. Retries settle gently to avoid oscillation
+/// if the OS window manager asynchronously recalculates frame extents.
+#[tauri::command]
+pub async fn set_window_size(
+    window: WebviewWindow,
+    width: Option<f64>,
+    height: Option<f64>,
+    scale: Option<f64>,
+) -> Result<(), String> {
+    let scale_factor = window.scale_factor().unwrap_or(1.0);
+
+    if let Some(target_scale) = scale {
+        if target_scale > 0.0 {
+            let zoom = target_scale / scale_factor;
+            let _ = window.set_zoom(zoom);
+        }
+    }
+
+    if width.is_some() || height.is_some() {
+        let current_inner = window.inner_size().unwrap_or(tauri::PhysicalSize {
+            width: (FULL_PLAYER_WIDTH * scale_factor) as u32,
+            height: (FULL_PLAYER_HEIGHT * scale_factor) as u32,
+        });
+
+        let target_inner_w = width
+            .unwrap_or(current_inner.width as f64 / scale_factor)
+            .round()
+            .max(200.0);
+        let target_inner_h = height
+            .unwrap_or(current_inner.height as f64 / scale_factor)
+            .round()
+            .max(100.0);
+
+        // Derive decoration offset (title bar + borders) from difference between outer and inner size.
+        // On Wayland or platforms where outer_size is unavailable or zero, this cleanly defaults to 0.
+        let (dec_w, dec_h) = if window.is_decorated().unwrap_or(true) {
+            if let (Ok(outer), Ok(inner)) = (window.outer_size(), window.inner_size()) {
+                let dw = (outer.width.saturating_sub(inner.width)) as f64 / scale_factor;
+                let dh = (outer.height.saturating_sub(inner.height)) as f64 / scale_factor;
+                let dw = if (0.0..=120.0).contains(&dw) { dw } else { 0.0 };
+                let dh = if (0.0..=120.0).contains(&dh) { dh } else { 0.0 };
+                (dw, dh)
+            } else {
+                (0.0, 0.0)
+            }
+        } else {
+            (0.0, 0.0)
+        };
+
+        let outer_w = target_inner_w + dec_w;
+        let outer_h = target_inner_h + dec_h;
+
+        let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize {
+            width: outer_w,
+            height: outer_h,
+        }));
+
+        settle_capture_size(&window, target_inner_w, target_inner_h).await;
+    }
+
+    Ok(())
+}
+
+async fn settle_capture_size(window: &WebviewWindow, target_w: f64, target_h: f64) {
+    let mut prev_size: Option<(f64, f64)> = None;
+    let mut stable_hits = 0;
+
+    for _ in 0..SETTLE_MAX_CHECKS {
+        tokio::time::sleep(Duration::from_millis(SETTLE_CHECK_INTERVAL_MS)).await;
+        let scale = window.scale_factor().unwrap_or(1.0);
+        if let Ok(size) = window.inner_size() {
+            let cur_w = (size.width as f64 / scale).round();
+            let cur_h = (size.height as f64 / scale).round();
+
+            // If inner size matches target within 1px tolerance, settled!
+            if (cur_w - target_w).abs() <= 1.0 && (cur_h - target_h).abs() <= 1.0 {
+                break;
+            }
+
+            // If the size is no longer changing (e.g. OS WM clamped or fixed decoration delta),
+            // stop polling after 2 stable readings rather than fighting the window manager.
+            if let Some((pw, ph)) = prev_size {
+                if (cur_w - pw).abs() < 1.0 && (cur_h - ph).abs() < 1.0 {
+                    stable_hits += 1;
+                    if stable_hits >= SETTLE_REQUIRED_STABLE_HITS {
+                        break;
+                    }
+                } else {
+                    stable_hits = 0;
+                }
+            }
+            prev_size = Some((cur_w, cur_h));
+        }
+    }
+}
+
 /// True if `(width, height, x, y)` looks like a minimized-window placeholder
 /// rather than real geometry — either a 0x0 size, or Win32's offscreen
 /// minimized coordinates (around -32000). A pure function of the already-

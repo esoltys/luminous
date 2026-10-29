@@ -279,7 +279,13 @@ export class AppProfile {
     mkdirSync(this.webviewDir, { recursive: true });
 
     this.exe = options?.exe ?? path.join(REPO_ROOT, "target", "release", "LuminousMusicPlayer.exe");
-    this.port = options?.port ?? CDP_PORT;
+    this.port =
+      options?.port ??
+      (process.env.LUMINOUS_REMOTE_DEVTOOLS_PORT
+        ? Number(process.env.LUMINOUS_REMOTE_DEVTOOLS_PORT)
+        : process.env.CDP_PORT
+          ? Number(process.env.CDP_PORT)
+          : CDP_PORT);
     this.defaultWindow = options?.window;
 
     // A clone keeps its own library choice; everything else gets the downward defaults.
@@ -325,6 +331,7 @@ export class AppProfile {
       env: {
         ...process.env,
         LUMINOUS_DATA_DIR: this.dataDir,
+        LUMINOUS_REMOTE_DEVTOOLS_PORT: String(this.port),
         WEBVIEW2_USER_DATA_FOLDER: this.webviewDir,
         WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `${existing} --remote-debugging-port=${this.port}`.trim(),
       },
