@@ -36,7 +36,8 @@ manual.
   the run fails. `bun run take-screenshots` (mocked IPC, `scripts/screenshot-scenes.json`)
   covers views that only exist there. After replacing a PNG by hand, run
   `bun run guide-webp`; `scripts/guide-assets.test.ts` fails if the embedded set exceeds
-  its size budget. Read the resulting PNGs before committing — at least en-CA, en-US and
+  its size budget, and `bun scripts/guide-manifest.ts` (or `bun run sync-docs`) verifies
+  all assets match the `docs/user-guide/assets/manifest.json` contract. Read the resulting PNGs before committing — at least en-CA, en-US and
   one Cyrillic locale (ru or uk).
 - [ ] Write `docs/release-notes/vX.Y.Z.md` for the new version. Chores do not need to be listed in the release notes.
 - [ ] Prepare the Microsoft Store listing in `esoltys/luminous-store` (its own PR there):
