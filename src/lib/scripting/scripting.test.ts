@@ -663,5 +663,14 @@ describe("In-app scripting API", () => {
       await api.overlay.clear();
       expect(document.getElementById("luminous-capture-overlays")).toBeNull();
     });
+
+    it("cleans up active overlays when dialogs.closeAll() is called", async () => {
+      await api.overlay.cursor.show({ x: 120, y: 120 });
+      await api.overlay.caption.show("Active caption");
+      expect(document.getElementById("luminous-capture-overlays")).not.toBeNull();
+
+      await api.dialogs.closeAll();
+      expect(document.getElementById("luminous-capture-overlays")).toBeNull();
+    });
   });
 });

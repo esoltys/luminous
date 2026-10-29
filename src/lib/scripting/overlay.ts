@@ -10,6 +10,18 @@ export const CURSOR_ELEMENT_ID = "luminous-capture-cursor";
 export const CAPTION_ELEMENT_ID = "luminous-capture-caption";
 export const KEYSTROKE_ELEMENT_ID = "luminous-capture-keystroke";
 
+/**
+ * Removes and tears down the capture overlay host element from the document if present.
+ */
+export function clearActiveOverlays(): void {
+  if (typeof document !== "undefined") {
+    const host = document.getElementById(OVERLAY_HOST_ID);
+    if (host) {
+      host.remove();
+    }
+  }
+}
+
 function escapeHtml(str: string): string {
   return str
     .replace(/&/g, "&amp;")

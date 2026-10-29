@@ -18,6 +18,7 @@ export {
   CURSOR_ELEMENT_ID,
   CAPTION_ELEMENT_ID,
   KEYSTROKE_ELEMENT_ID,
+  clearActiveOverlays,
 } from "./overlay";
 
 /**
