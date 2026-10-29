@@ -331,9 +331,9 @@ export interface ScriptWindowSizeOptions {
  */
 export interface ScriptWindowApi {
   /**
-   * Resizes the window to the requested inner dimensions in logical pixels,
-   * accounting for OS window decoration offsets where supported, and optionally
-   * adjusts the webview zoom scale factor.
+   * Resizes the window to the requested dimensions in physical pixels (total outer
+   * window by default, or inner client area when `inner: true` is specified), and
+   * optionally adjusts the webview zoom scale factor.
    *
    * Calling setSize allows captures to guarantee identical rendered pixel dimensions
    * independent of host display scaling. If scale is omitted, it defaults to the host monitor's

@@ -220,9 +220,10 @@ pub async fn get_window_scale(window: WebviewWindow) -> Result<f64, String> {
     window.scale_factor().map_err(|e| e.to_string())
 }
 
-/// Resizes the window to the requested inner dimensions (width, height) in logical pixels,
-/// accounting for OS window decoration offsets where available, and optionally adjusts the
-/// webview zoom scale factor.
+/// Resizes the window to the requested dimensions (width, height) in physical pixels.
+/// By default, width and height specify the total outer window dimensions for accurate
+/// screenshot matching. If `inner` is true, decoration offsets are added so the inner
+/// webview client area receives the target dimensions.
 ///
 /// Designed for automated capture scenes and screenshots where consistent pixel dimensions
 /// independent of host display scaling are required. Retries settle gently to avoid oscillation
