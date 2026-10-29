@@ -8,11 +8,11 @@ use super::selection::{SourceRef, UnselectedSongs, WantedPlaylist, WantedSong};
 use crate::devices::layout::{DeviceLayout, DevicePlaylist, SyncedTrack};
 use crate::models::Song;
 use luminous_devices::{DeviceProfile, Space};
-use luminous_transcode::ConversionTarget;
+use luminous_transcode::{ConversionTarget, Decision};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 /// What sync assumes a folder-art file takes before it is written: art is
@@ -29,9 +29,10 @@ const MAX_LAYOUT_PASSES: usize = 8;
 pub struct Inventory {
     /// Lower-case path relative to the storage root to size in bytes.
     pub files: HashMap<String, u64>,
-    /// Lower-case folders that were listed, `""` for the whole storage.
-    /// Files outside them are not known and assumed present.
-    pub listed: Vec<String>,
+    /// The folders sync writes into, `/`-separated, `""` for the whole
+    /// storage. Everything under them was listed; files outside them are not
+    /// known and assumed present. Never pruned when they empty.
+    pub roots: Vec<String>,
     pub manifest: Manifest,
     pub space: Space,
 }
@@ -56,9 +57,9 @@ impl Inventory {
 
     fn is_listed(&self, path: &str) -> bool {
         let lower = path.to_lowercase();
-        self.listed
+        self.roots
             .iter()
-            .any(|dir| dir.is_empty() || lower.starts_with(&format!("{dir}/")))
+            .any(|dir| dir.is_empty() || lower.starts_with(&format!("{}/", dir.to_lowercase())))
     }
 }
 
@@ -67,16 +68,24 @@ impl Inventory {
 pub struct TrackInput {
     pub wanted: WantedSong,
     pub stamp: SourceStamp,
-    /// Extension on the device, without the dot.
-    pub extension: String,
-    /// How it is prepared (`luminous_transcode::Decision`, formatted).
-    pub conversion: String,
-    pub converts: bool,
+    /// How it is prepared for the device.
+    pub decision: Decision,
     /// Bytes on the device: exact once prepared, else estimated.
     pub size: u64,
     /// Bytes if everything that can be were converted to save space; `None`
     /// when that is already the Convert setting.
     pub size_converting_all: Option<u64>,
+}
+
+impl TrackInput {
+    /// Extension on the device, without the dot.
+    fn extension(&self) -> String {
+        self.decision.extension(Path::new(&self.stamp.path))
+    }
+
+    fn converts(&self) -> bool {
+        matches!(self.decision, Decision::Convert { .. })
+    }
 }
 
 /// Library files a manifest entry may refer to.
@@ -309,7 +318,7 @@ pub struct Steps {
     pub remove: Vec<String>,
     /// Song writes (updates, then copies), then playlist files and art.
     pub write: Vec<Write>,
-    /// Folders sync syncs into, never pruned when they empty.
+    /// [`Inventory::roots`], never pruned when they empty.
     pub roots: Vec<String>,
 }
 
@@ -361,10 +370,7 @@ pub fn build(input: PlanInput) -> Built {
         shortfall: None,
     };
     let mut steps = Steps {
-        roots: [&profile.music_path, &profile.playlists_path]
-            .into_iter()
-            .map(|p| p.trim_matches('/').to_string())
-            .collect(),
+        roots: inventory.roots.clone(),
         ..Steps::default()
     };
     let mut song_updates = Vec::new();
@@ -401,7 +407,7 @@ pub fn build(input: PlanInput) -> Built {
             kind: EntryKind::Track,
             size: track.size,
             source: Some(track.stamp.clone()),
-            conversion: Some(track.conversion.clone()),
+            conversion: Some(track.decision),
             fingerprint: Some(tag_fingerprint(song)),
             sources: track.wanted.sources.clone(),
             label: label(song),
@@ -409,7 +415,7 @@ pub fn build(input: PlanInput) -> Built {
         let write = Write {
             source: WriteSource::Track {
                 source: PathBuf::from(&track.stamp.path),
-                converts: track.converts,
+                converts: track.converts(),
             },
             entry: entry.clone(),
             estimate: track.size,
@@ -438,7 +444,7 @@ pub fn build(input: PlanInput) -> Built {
                 if prev.sources != entry.sources || prev.label != entry.label {
                     steps.record.push(ManifestEntry {
                         size: prev.size,
-                        conversion: prev.conversion.clone(),
+                        conversion: prev.conversion,
                         ..entry
                     });
                 }
@@ -506,7 +512,7 @@ pub fn build(input: PlanInput) -> Built {
             song_copies.push(write);
         }
         // Reached only for songs that are written.
-        if track.converts {
+        if track.converts() {
             plan.converted_songs += 1;
         }
         if let Some(converted) = track.size_converting_all {
@@ -654,11 +660,13 @@ fn place_tracks(
     tracks: &[TrackInput],
     inventory: &Inventory,
 ) -> (DeviceLayout, HashMap<i64, String>) {
+    let extensions: Vec<String> = tracks.iter().map(TrackInput::extension).collect();
     let synced: Vec<SyncedTrack> = tracks
         .iter()
-        .map(|t| SyncedTrack {
+        .zip(&extensions)
+        .map(|(t, extension)| SyncedTrack {
             song: &t.wanted.song,
-            extension: &t.extension,
+            extension,
         })
         .collect();
     let first = DeviceLayout::plan(profile, &synced);
@@ -704,7 +712,7 @@ fn place_tracks(
 /// Whether a file of `size` bytes the user put at a track's path is that
 /// song as sync would write it: only an unconverted copy can be told by size.
 fn is_same_song(track: &TrackInput, size: u64) -> bool {
-    !track.converts && size == track.size
+    !track.converts() && size == track.size
 }
 
 /// Manifest tracks by the library file they came from.

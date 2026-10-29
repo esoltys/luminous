@@ -1,5 +1,5 @@
-//! What the user chose to put on a device, saved per device on this
-//! computer, and the library songs that choice stands for.
+//! What the user chose to put on a device (saved per device on this
+//! computer by [`super::store`]), and the library songs it stands for.
 
 use crate::album_key::album_key;
 use crate::collection::{row_to_song, SONG_SELECT_COLS};
@@ -103,35 +103,6 @@ pub struct Selection {
     pub playlists: Vec<WantedPlaylist>,
     /// Every selected source that still exists, in selection order.
     pub sources: Vec<SourceRef>,
-}
-
-/// The saved selection for `device_id`, defaults when there is none.
-pub fn load_settings(conn: &rusqlite::Connection, device_id: &str) -> Result<SyncSettings> {
-    let json: Option<String> = conn
-        .query_row(
-            "SELECT settings FROM device_sync_settings WHERE device_id = ?1",
-            [device_id],
-            |row| row.get(0),
-        )
-        .optional()?;
-    Ok(json
-        .and_then(|j| serde_json::from_str(&j).ok())
-        .unwrap_or_default())
-}
-
-pub fn save_settings(
-    conn: &rusqlite::Connection,
-    device_id: &str,
-    settings: &SyncSettings,
-    now: i64,
-) -> Result<()> {
-    conn.execute(
-        "INSERT INTO device_sync_settings (device_id, settings, updated_at) VALUES (?1, ?2, ?3)
-         ON CONFLICT(device_id) DO UPDATE SET settings = excluded.settings,
-             updated_at = excluded.updated_at",
-        params![device_id, serde_json::to_string(settings)?, now],
-    )?;
-    Ok(())
 }
 
 /// The library songs and playlists `settings` selects. `size_on_device`

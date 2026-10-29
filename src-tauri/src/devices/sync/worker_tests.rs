@@ -92,7 +92,7 @@ fn track_write(source: &Path, device_path: &str) -> Write {
                 size,
                 mtime: None,
             }),
-            conversion: Some("Copy".into()),
+            conversion: Some(Decision::Copy),
             fingerprint: None,
             sources: Vec::new(),
             label: SongLabel {
@@ -305,7 +305,7 @@ fn a_file_that_disagrees_with_the_plan_is_not_written() {
     let wav = setup.wav("a.wav");
     // Planned from a library row saying it needs converting; the file plays.
     let mut write = track_write(&wav, "Music/a.wav");
-    write.entry.conversion = Some("ShrinkArt { max_px: 500 }".into());
+    write.entry.conversion = Some(Decision::ShrinkArt { max_px: 500 });
     let job = setup.job(steps(vec![write], vec![]), Manifest::default());
     let (summary, _) = setup.run(job, None);
 

@@ -293,30 +293,21 @@ impl Run<'_> {
     }
 
     /// Removes the folders removals left empty, deepest first, and their
-    /// parents as they empty in turn. A folder is removed only when listing
-    /// shows nothing in it: removing a folder removes everything in it,
-    /// including files the user put there.
+    /// parents as they empty in turn. The storage refuses a folder with
+    /// anything in it, so files the user put there stay.
     fn prune(&mut self, mut dirs: BTreeSet<(usize, String)>, roots: &[String]) -> Result<(), Halt> {
         while let Some((_, dir)) = dirs.pop_last() {
             if dir.is_empty() || roots.iter().any(|r| r.eq_ignore_ascii_case(&dir)) {
                 continue;
             }
-            let entries = match self.storage.list(&dir) {
-                Ok(entries) => entries,
-                Err(e) => {
-                    self.check_device(&e)?;
-                    continue;
+            match self.storage.remove_empty_folder(&dir) {
+                Ok(true) => {
+                    if let Some(up) = parent(&dir) {
+                        dirs.insert((depth(up), up.to_string()));
+                    }
                 }
-            };
-            if !entries.is_empty() {
-                continue;
-            }
-            if let Err(e) = self.storage.remove(&dir) {
-                self.check_device(&e)?;
-                continue;
-            }
-            if let Some(up) = parent(&dir) {
-                dirs.insert((depth(up), up.to_string()));
+                Ok(false) => {}
+                Err(e) => self.check_device(&e)?,
             }
         }
         Ok(())
@@ -451,8 +442,7 @@ impl Run<'_> {
         // is the file itself. Writing anything else than what the preview
         // showed would also leave the manifest disagreeing with every later
         // plan.
-        let decision = format!("{:?}", prepared.decision);
-        if write.entry.conversion.as_deref() != Some(decision.as_str()) {
+        if write.entry.conversion != Some(prepared.decision) {
             self.fail(path, label, "the file doesn't match the library; rescan it");
             return Ok(());
         }

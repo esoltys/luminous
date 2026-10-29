@@ -5,6 +5,16 @@ use luminous_transcode::TargetFormat;
 
 const GB: u64 = 1_000_000_000;
 
+fn converting() -> Decision {
+    Decision::Convert {
+        format: TargetFormat::Aac,
+        bitrate_kbps: 256,
+        sample_rate: 44_100,
+        channels: 2,
+        max_art_px: None,
+    }
+}
+
 fn song(id: i64, title: &str) -> Song {
     Song {
         id,
@@ -45,9 +55,7 @@ fn track_from(song: Song, source: SourceRef) -> TrackInput {
             size: 1_000,
             mtime: Some(100),
         },
-        extension: "mp3".into(),
-        conversion: "Copy".into(),
-        converts: false,
+        decision: Decision::Copy,
         size: 1_000,
         size_converting_all: None,
         wanted: WantedSong {
@@ -77,7 +85,7 @@ fn profile() -> DeviceProfile {
 fn device_path(track: &TrackInput) -> String {
     let synced = [SyncedTrack {
         song: &track.wanted.song,
-        extension: &track.extension,
+        extension: &track.extension(),
     }];
     DeviceLayout::plan(&profile(), &synced)
         .track_path(track.wanted.song.id)
@@ -92,7 +100,7 @@ fn synced(track: &TrackInput, path: &str) -> ManifestEntry {
         kind: EntryKind::Track,
         size: track.size,
         source: Some(track.stamp.clone()),
-        conversion: Some(track.conversion.clone()),
+        conversion: Some(track.decision),
         fingerprint: Some(tag_fingerprint(&track.wanted.song)),
         sources: track.wanted.sources.clone(),
         label: label(&track.wanted.song),
@@ -102,7 +110,7 @@ fn synced(track: &TrackInput, path: &str) -> ManifestEntry {
 fn inventory(files: &[(&str, u64)], manifest: Vec<ManifestEntry>) -> Inventory {
     Inventory {
         files: files.iter().map(|(p, s)| (p.to_lowercase(), *s)).collect(),
-        listed: vec!["music".into(), "playlists".into()],
+        roots: vec!["Music".into(), "Playlists".into()],
         manifest: manifest.into_iter().collect(),
         space: Space {
             total_bytes: 32 * GB,
@@ -228,7 +236,7 @@ fn changes_are_updates_with_their_reason() {
     assert_eq!(reasons(&built.plan.update), [&SyncReason::TagsChanged]);
 
     let mut converted = synced(&t, &path);
-    converted.conversion = Some("Convert { .. }".into());
+    converted.conversion = Some(converting());
     let built = Case::new(vec![t], inventory(&files, vec![converted])).build();
     assert_eq!(reasons(&built.plan.update), [&SyncReason::ConvertChanged]);
     assert_eq!(
@@ -396,7 +404,7 @@ fn a_selection_too_big_says_by_how_much_and_what_helps() {
     let mut a = track_from(song(1, "Halo"), big.clone());
     let mut b = track(2, "Northbound");
     a.size = 7 * GB;
-    a.converts = true;
+    a.decision = converting();
     a.size_converting_all = Some(2 * GB);
     b.size = 4 * GB;
     b.size_converting_all = Some(4 * GB);

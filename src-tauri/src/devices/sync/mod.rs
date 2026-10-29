@@ -14,18 +14,20 @@
 pub mod manifest;
 pub mod plan;
 pub mod selection;
+mod store;
 pub mod worker;
 
 use crate::db::Database;
 use crate::devices::{assess_song, DeviceMonitor};
 use crate::models::LOCAL_SOURCES_SQL;
 use anyhow::{anyhow, Result};
-use luminous_devices::{ConvertMode, ConvertSettings, DeviceBackend, DeviceProfile};
-use luminous_transcode::{Decision, Transcoder};
+use luminous_devices::{
+    is_partial_file, ConvertMode, ConvertSettings, DeviceBackend, DeviceProfile, MARKER_FILE_NAME,
+};
+use luminous_transcode::Transcoder;
 use manifest::{Manifest, SourceStamp, MANIFEST_FILE_NAME};
 use parking_lot::{Condvar, Mutex};
 use plan::{Inventory, LibraryFile, PlanInput, Steps, SyncItem, SyncPlan, TrackInput};
-use rusqlite::{params, OptionalExtension};
 use selection::SyncSettings;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -84,6 +86,11 @@ struct CachedInventory {
 
 /// Plans and runs device syncs. One per app.
 pub struct DeviceSync {
+    monitor: Arc<DeviceMonitor>,
+    transcoder: Arc<Transcoder>,
+    db: Arc<Database>,
+    events: Arc<dyn SyncEvents>,
+    clock: Arc<dyn Clock>,
     /// The latest plan per device id.
     plans: Mutex<HashMap<String, Arc<StoredPlan>>>,
     /// Cancel flags of running syncs by device id.
@@ -92,15 +99,22 @@ pub struct DeviceSync {
     inventories: Mutex<HashMap<String, Arc<CachedInventory>>>,
 }
 
-impl Default for DeviceSync {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl DeviceSync {
-    pub fn new() -> Self {
+    /// Syncs to the devices `monitor` shows, converting with `transcoder`,
+    /// and reports running syncs to `events`.
+    pub fn new(
+        monitor: Arc<DeviceMonitor>,
+        transcoder: Arc<Transcoder>,
+        db: Arc<Database>,
+        events: Arc<dyn SyncEvents>,
+        clock: Arc<dyn Clock>,
+    ) -> Self {
         Self {
+            monitor,
+            transcoder,
+            db,
+            events,
+            clock,
             plans: Mutex::new(HashMap::new()),
             running: Mutex::new(HashMap::new()),
             sync_ended: Condvar::new(),
@@ -109,17 +123,9 @@ impl DeviceSync {
     }
 
     pub fn state(&self, conn: &rusqlite::Connection, device_id: &str) -> Result<DeviceSyncState> {
-        let last_summary: Option<String> = conn
-            .query_row(
-                "SELECT last_summary FROM device_sync_settings WHERE device_id = ?1",
-                [device_id],
-                |row| row.get(0),
-            )
-            .optional()?
-            .flatten();
         Ok(DeviceSyncState {
-            settings: selection::load_settings(conn, device_id)?,
-            last_summary: last_summary.and_then(|j| serde_json::from_str(&j).ok()),
+            settings: store::load_settings(conn, device_id)?,
+            last_summary: store::last_summary(conn, device_id)?,
             running: self.running.lock().contains_key(device_id),
         })
     }
@@ -132,12 +138,11 @@ impl DeviceSync {
     pub fn preview(
         &self,
         conn: &rusqlite::Connection,
-        monitor: &DeviceMonitor,
-        transcoder: &Transcoder,
         device_id: &str,
         settings: SyncSettings,
-        now: i64,
     ) -> Result<SyncPlan> {
+        let (monitor, transcoder) = (&*self.monitor, &*self.transcoder);
+        let now = self.clock.unix_now();
         let not_connected = || anyhow!("device-not-connected");
         let shown = monitor.shown(device_id).ok_or_else(not_connected)?;
         let device = monitor.device(device_id).ok_or_else(not_connected)?;
@@ -148,7 +153,7 @@ impl DeviceSync {
             .or_else(|| shown.storages.first())
             .ok_or_else(not_connected)?
             .clone();
-        selection::save_settings(conn, device_id, &settings, now)?;
+        store::save_settings(conn, device_id, &settings, now)?;
 
         let profile = shown.profile.clone();
         let backend = device.storage(&storage.id).ok_or_else(not_connected)?;
@@ -173,7 +178,6 @@ impl DeviceSync {
                 unreadable.push(wanted.song);
                 continue;
             };
-            let decision = assessment.decision;
             let library_size = wanted.song.filesize.unwrap_or(0).max(0) as u64;
             tracks.push(TrackInput {
                 stamp: SourceStamp {
@@ -181,9 +185,7 @@ impl DeviceSync {
                     size: library_size,
                     mtime: wanted.song.mtime,
                 },
-                extension: decision.extension(path),
-                conversion: format!("{decision:?}"),
-                converts: matches!(decision, Decision::Convert { .. }),
+                decision: assessment.decision,
                 size: assessment.size,
                 size_converting_all: save_space
                     .as_ref()
@@ -240,15 +242,8 @@ impl DeviceSync {
     /// with `sync-plan-stale` when the plan is gone or the device, its
     /// profile or its contents changed since the preview,
     /// `sync-does-not-fit`, or `sync-in-progress`.
-    pub fn start(
-        self: &Arc<Self>,
-        plan_id: &str,
-        monitor: Arc<DeviceMonitor>,
-        transcoder: Arc<Transcoder>,
-        db: Arc<Database>,
-        events: Arc<dyn SyncEvents>,
-        clock: Arc<dyn Clock>,
-    ) -> Result<()> {
+    pub fn start(self: &Arc<Self>, plan_id: &str) -> Result<()> {
+        let monitor = &self.monitor;
         let stale = || anyhow!("sync-plan-stale");
         let stored = self.plan(plan_id).ok_or_else(stale)?;
         let device_id = stored.plan.device_id.clone();
@@ -289,11 +284,11 @@ impl DeviceSync {
         let spawned = std::thread::Builder::new()
             .name("device-sync".into())
             .spawn(move || {
-                let summary = worker::run(job, &transcoder, &cancel, &*clock, &mut |p| {
-                    events.progress(p)
+                let summary = worker::run(job, &sync.transcoder, &cancel, &*sync.clock, &mut |p| {
+                    sync.events.progress(p)
                 });
-                sync.finish(&summary, &monitor, &db);
-                events.finished(&summary);
+                sync.finish(&summary);
+                sync.events.finished(&summary);
             });
         if let Err(e) = spawned {
             self.running.lock().remove(&device_id);
@@ -331,21 +326,13 @@ impl DeviceSync {
         }
     }
 
-    fn finish(&self, summary: &SyncSummary, monitor: &DeviceMonitor, db: &Database) {
+    fn finish(&self, summary: &SyncSummary) {
+        let (monitor, db) = (&self.monitor, &self.db);
         let device_id = &summary.device_id;
         // The device changed: the next preview reads it again.
         self.inventories.lock().remove(device_id);
         let stored = db.pool.get().map_err(anyhow::Error::from).and_then(|conn| {
-            conn.execute(
-                "INSERT INTO device_sync_settings (device_id, last_summary, updated_at)
-                 VALUES (?1, ?2, ?3)
-                 ON CONFLICT(device_id) DO UPDATE SET last_summary = excluded.last_summary",
-                params![
-                    device_id,
-                    serde_json::to_string(summary)?,
-                    summary.finished_at
-                ],
-            )?;
+            store::save_summary(&conn, summary)?;
             if summary.outcome == SyncOutcome::Completed {
                 monitor.record_sync(&conn, device_id, summary.finished_at)?;
             } else {
@@ -400,8 +387,8 @@ impl DeviceSync {
     }
 }
 
-/// The folders sync writes into, `/`-separated, without one that is inside
-/// another (ignoring case); `""` is the whole storage.
+/// The folders sync writes into ([`Inventory::roots`]): the profile's music
+/// and playlist folders, `/`-separated, once each ignoring case.
 fn sync_roots(profile: &DeviceProfile) -> Vec<String> {
     let mut roots: Vec<String> = [&profile.music_path, &profile.playlists_path]
         .into_iter()
@@ -414,22 +401,33 @@ fn sync_roots(profile: &DeviceProfile) -> Vec<String> {
         .collect();
     roots.sort_by_key(|r| r.to_lowercase());
     roots.dedup_by_key(|r| r.to_lowercase());
-    let all: Vec<String> = roots.iter().map(|r| r.to_lowercase()).collect();
-    roots.retain(|r| {
-        let r = r.to_lowercase();
-        !all.iter()
-            .any(|other| *other != r && (other.is_empty() || r.starts_with(&format!("{other}/"))))
-    });
     roots
+}
+
+/// `roots` without those inside another (ignoring case), so each folder is
+/// listed once.
+fn outermost(roots: &[String]) -> Vec<String> {
+    let all: Vec<String> = roots.iter().map(|r| r.to_lowercase()).collect();
+    roots
+        .iter()
+        .filter(|r| {
+            let r = r.to_lowercase();
+            !all.iter().any(|other| {
+                *other != r && (other.is_empty() || r.starts_with(&format!("{other}/")))
+            })
+        })
+        .cloned()
+        .collect()
 }
 
 /// Lists every file under `roots` and reads the manifest and free space.
 /// A root that can't be listed is an error; a folder inside one that can't
 /// (`System Volume Information`, a folder an MTP device refuses) is
-/// skipped, since sync never writes there.
+/// skipped, since sync never writes there. Sync's own files are left out.
 fn read_inventory(backend: &dyn DeviceBackend, roots: &[String]) -> Result<Inventory> {
     let mut files = HashMap::new();
-    let mut pending: Vec<(String, bool)> = roots.iter().map(|r| (r.clone(), true)).collect();
+    let mut pending: Vec<(String, bool)> =
+        outermost(roots).into_iter().map(|r| (r, true)).collect();
     while let Some((dir, is_root)) = pending.pop() {
         let entries = match backend.list(&dir) {
             Ok(entries) => entries,
@@ -447,14 +445,17 @@ fn read_inventory(backend: &dyn DeviceBackend, roots: &[String]) -> Result<Inven
             };
             if entry.is_dir {
                 pending.push((path, false));
-            } else if !entry.name.starts_with(".luminous-") && entry.name != MANIFEST_FILE_NAME {
+            } else if !is_partial_file(&entry.name)
+                && entry.name != MANIFEST_FILE_NAME
+                && entry.name != MARKER_FILE_NAME
+            {
                 files.insert(path.to_lowercase(), entry.size);
             }
         }
     }
     Ok(Inventory {
         files,
-        listed: roots.iter().map(|r| r.to_lowercase()).collect(),
+        roots: roots.to_vec(),
         manifest: Manifest::read(backend)?,
         space: backend.space()?,
     })
@@ -501,6 +502,7 @@ mod tests {
     use crate::devices::sync::selection::SyncSource;
     use crate::models::SongSource;
     use luminous_devices::{Device, FsBackend, Volume};
+    use rusqlite::params;
     use std::sync::mpsc;
 
     const NOW: i64 = 1_790_000_000;
@@ -524,8 +526,19 @@ mod tests {
         device_root: std::path::PathBuf,
         db: Arc<Database>,
         monitor: Arc<DeviceMonitor>,
-        transcoder: Arc<Transcoder>,
+        events: Arc<Channel>,
+        finished: Mutex<mpsc::Receiver<SyncSummary>>,
         sync: Arc<DeviceSync>,
+    }
+
+    /// Events into a channel, and where its summaries arrive.
+    fn channel() -> (Arc<Channel>, mpsc::Receiver<SyncSummary>) {
+        let (tx, rx) = mpsc::channel();
+        let events = Arc::new(Channel {
+            finished: Mutex::new(tx),
+            steps: Mutex::new(Vec::new()),
+        });
+        (events, rx)
     }
 
     /// A library of two WAV songs and a connected FAT volume on temp dirs.
@@ -578,46 +591,40 @@ mod tests {
         profile.layout.playlist_format = luminous_devices::PlaylistFileFormat::None;
         monitor.entries.lock()[0].shown.profile = profile;
         drop(conn);
+        let (events, finished) = channel();
+        let sync = Arc::new(DeviceSync::new(
+            monitor.clone(),
+            Arc::new(Transcoder::new(cache.path().to_path_buf())),
+            db.clone(),
+            events.clone(),
+            Arc::new(worker::TickClock::new(NOW)),
+        ));
         World {
             device_root: device.path().to_path_buf(),
-            transcoder: Arc::new(Transcoder::new(cache.path().to_path_buf())),
             _dirs: vec![db_dir, library, device, cache],
             db,
             monitor,
-            sync: Arc::new(DeviceSync::new()),
+            events,
+            finished: Mutex::new(finished),
+            sync,
         }
     }
 
     impl World {
         fn preview(&self, settings: SyncSettings) -> Result<SyncPlan> {
             let conn = self.db.pool.get().unwrap();
-            self.sync.preview(
-                &conn,
-                &self.monitor,
-                &self.transcoder,
-                "vol-0088-5572",
-                settings,
-                NOW,
-            )
+            self.sync.preview(&conn, "vol-0088-5572", settings)
         }
 
         /// Runs the plan; its summary and the steps it reported.
         fn start(&self, plan_id: &str) -> Result<(SyncSummary, Vec<worker::SyncStep>)> {
-            let (tx, rx) = mpsc::channel();
-            let events = Arc::new(Channel {
-                finished: Mutex::new(tx),
-                steps: Mutex::new(Vec::new()),
-            });
-            self.sync.start(
-                plan_id,
-                self.monitor.clone(),
-                self.transcoder.clone(),
-                self.db.clone(),
-                events.clone(),
-                Arc::new(worker::TickClock::new(NOW)),
-            )?;
-            let summary = rx.recv_timeout(Duration::from_secs(60)).unwrap();
-            let steps = std::mem::take(&mut *events.steps.lock());
+            self.sync.start(plan_id)?;
+            let summary = self
+                .finished
+                .lock()
+                .recv_timeout(Duration::from_secs(60))
+                .unwrap();
+            let steps = std::mem::take(&mut *self.events.steps.lock());
             Ok((summary, steps))
         }
     }
@@ -740,6 +747,9 @@ mod tests {
             fn remove(&self, path: &str) -> std::io::Result<()> {
                 self.0.remove(path)
             }
+            fn remove_empty_folder(&self, path: &str) -> std::io::Result<bool> {
+                self.0.remove_empty_folder(path)
+            }
             fn space(&self) -> std::io::Result<luminous_devices::Space> {
                 self.0.space()
             }
@@ -774,12 +784,16 @@ mod tests {
             playlists_path: playlists.into(),
             ..DeviceProfile::default()
         };
-        assert_eq!(sync_roots(&profile("Music", "music/Playlists")), ["Music"]);
+        let roots = sync_roots(&profile("Music/", "music\\Playlists"));
+        assert_eq!(roots, ["Music", "music/Playlists"]);
+        assert_eq!(outermost(&roots), ["Music"]);
+        assert_eq!(sync_roots(&profile("music", "Music")), ["music"]);
+        let roots = sync_roots(&profile("", "Playlists"));
+        assert_eq!(outermost(&roots), [""]);
         assert_eq!(
-            sync_roots(&profile("Music", "Playlists")),
+            outermost(&sync_roots(&profile("Music", "Playlists"))),
             ["Music", "Playlists"]
         );
-        assert_eq!(sync_roots(&profile("", "Playlists")), [""]);
     }
 
     #[test]
@@ -791,6 +805,7 @@ mod tests {
         std::fs::write(root.join("Music/A/One.mp3"), b"12345").unwrap();
         std::fs::write(root.join("DCIM/photo.jpg"), b"1").unwrap();
         std::fs::write(root.join(MANIFEST_FILE_NAME), b"{}").unwrap();
+        std::fs::write(root.join("Music/A/Two.mp3.luminous-partial"), b"1").unwrap();
 
         let inventory = read_inventory(&FsBackend::new(root), &["Music".into()]).unwrap();
         assert_eq!(inventory.files.len(), 1);
@@ -832,12 +847,17 @@ mod tests {
         *monitor.entries.lock() = crate::devices::build_entries(&conn, &devices, NOW).unwrap();
         let id = monitor.devices()[0].id.clone();
         let transcoder = Arc::new(Transcoder::new(data.join("cache").join("transcode")));
-        let sync = Arc::new(DeviceSync::new());
+        let (events, finished) = channel();
+        let sync = Arc::new(DeviceSync::new(
+            monitor.clone(),
+            transcoder.clone(),
+            db.clone(),
+            events,
+            Arc::new(worker::SystemClock),
+        ));
         let preview = |settings: SyncSettings| {
             let started = std::time::Instant::now();
-            let plan = sync
-                .preview(&conn, &monitor, &transcoder, &id, settings, NOW)
-                .unwrap();
+            let plan = sync.preview(&conn, &id, settings).unwrap();
             (plan, started.elapsed())
         };
         let report = |label: &str, plan: &SyncPlan, took: Duration| {
@@ -930,22 +950,9 @@ mod tests {
         }
         assert!(plan.storage.fits, "the playlist doesn't fit");
 
-        let (tx, rx) = mpsc::channel();
-        let events = Arc::new(Channel {
-            finished: Mutex::new(tx),
-            steps: Mutex::new(Vec::new()),
-        });
         let started = std::time::Instant::now();
-        sync.start(
-            &plan.plan_id,
-            monitor.clone(),
-            transcoder.clone(),
-            db.clone(),
-            events.clone(),
-            Arc::new(worker::SystemClock),
-        )
-        .unwrap();
-        let summary = rx.recv_timeout(Duration::from_secs(1800)).unwrap();
+        sync.start(&plan.plan_id).unwrap();
+        let summary = finished.recv_timeout(Duration::from_secs(1800)).unwrap();
         println!("sync: {:.2?} | {summary:#?}", started.elapsed());
         assert_eq!(summary.outcome, SyncOutcome::Completed);
         assert!(summary.failures.is_empty(), "{:#?}", summary.failures);

@@ -9,7 +9,8 @@
 
 use super::selection::SourceRef;
 use luminous_devices::DeviceBackend;
-use serde::{Deserialize, Serialize};
+use luminous_transcode::Decision;
+use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::BTreeMap;
 use std::ops::ControlFlow;
 
@@ -58,10 +59,10 @@ pub struct ManifestEntry {
     /// the art was taken from for folder art; `None` for playlist files.
     #[serde(default)]
     pub source: Option<SourceStamp>,
-    /// How a track was prepared (`luminous_transcode::Decision`), so a
-    /// changed Convert setting refreshes it.
-    #[serde(default)]
-    pub conversion: Option<String>,
+    /// How a track was prepared, so a changed Convert setting refreshes it.
+    /// One this version can't read counts as none, and is prepared again.
+    #[serde(default, deserialize_with = "decision_or_none")]
+    pub conversion: Option<Decision>,
     /// Fingerprint of a track's tags, telling "tags changed" from other
     /// changes to the file; of a playlist file's content.
     #[serde(default)]
@@ -71,6 +72,11 @@ pub struct ManifestEntry {
     pub sources: Vec<SourceRef>,
     #[serde(default)]
     pub label: SongLabel,
+}
+
+fn decision_or_none<'de, D: Deserializer<'de>>(d: D) -> Result<Option<Decision>, D::Error> {
+    let value = serde_json::Value::deserialize(d)?;
+    Ok(serde_json::from_value(value).ok())
 }
 
 /// The files sync wrote to one storage, keyed by path ignoring case (as FAT
@@ -186,6 +192,23 @@ mod tests {
         assert!(manifest.get("music/a/B.MP3").is_some());
         manifest.remove("MUSIC/a/b.mp3");
         assert_eq!(manifest.entries().count(), 0);
+    }
+
+    #[test]
+    fn a_conversion_this_version_cant_read_counts_as_none() {
+        let mut converted = entry("Music/c.m4a");
+        converted.conversion = Some(Decision::ShrinkArt { max_px: 500 });
+        let json = serde_json::to_value(&converted).unwrap();
+        assert_eq!(json["conversion"]["kind"], "shrinkArt");
+        assert_eq!(
+            serde_json::from_value::<ManifestEntry>(json).unwrap(),
+            converted
+        );
+
+        let mut json = serde_json::to_value(entry("Music/c.m4a")).unwrap();
+        json["conversion"] = "Copy".into();
+        let read: ManifestEntry = serde_json::from_value(json).unwrap();
+        assert_eq!(read.conversion, None);
     }
 
     #[test]

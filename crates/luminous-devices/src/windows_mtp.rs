@@ -664,6 +664,15 @@ impl Connection {
     }
 
     fn delete(&self, id: &str) -> io::Result<()> {
+        self.delete_with(id, PORTABLE_DEVICE_DELETE_WITH_RECURSION)
+    }
+
+    /// Deletes `id`, failing if it has anything in it: the device checks.
+    fn delete_if_empty(&self, id: &str) -> io::Result<()> {
+        self.delete_with(id, PORTABLE_DEVICE_DELETE_NO_RECURSION)
+    }
+
+    fn delete_with(&self, id: &str, options: DELETE_OBJECT_OPTIONS) -> io::Result<()> {
         unsafe {
             let ids: IPortableDevicePropVariantCollection = CoCreateInstance(
                 &PortableDevicePropVariantCollection,
@@ -676,11 +685,7 @@ impl Connection {
             let _ = PropVariantClear(&mut variant);
             added.map_err(io_error)?;
             self.content
-                .Delete(
-                    PORTABLE_DEVICE_DELETE_WITH_RECURSION.0 as u32,
-                    &ids,
-                    std::ptr::null_mut(),
-                )
+                .Delete(options.0 as u32, &ids, std::ptr::null_mut())
                 .map_err(io_error)
         }
     }
@@ -826,6 +831,28 @@ impl DeviceBackend for MtpStorage {
             // The folder may have been cached, along with everything in it.
             c.forget_folders();
             Ok(())
+        })
+    }
+
+    fn remove_empty_folder(&self, path: &str) -> io::Result<bool> {
+        if components(path).is_empty() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "cannot remove the root",
+            ));
+        }
+        self.locked(|c| {
+            let Some((id, entry)) = self.find(c, path)? else {
+                return Ok(false);
+            };
+            // Saves a refused delete in the common case; the device's own
+            // refusal is what guarantees nothing in it is removed.
+            if !entry.is_dir || !c.children(&id)?.is_empty() {
+                return Ok(false);
+            }
+            c.delete_if_empty(&id)?;
+            c.forget_folders();
+            Ok(true)
         })
     }
 

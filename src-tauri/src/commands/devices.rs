@@ -6,7 +6,7 @@
 
 use crate::devices::sync::plan::{SyncItem, SyncPlan};
 use crate::devices::sync::selection::SyncSettings;
-use crate::devices::sync::worker::{SyncProgress, SyncSummary, SystemClock};
+use crate::devices::sync::worker::{SyncProgress, SyncSummary};
 use crate::devices::sync::{
     DeviceSyncState, PlanList, SyncEvents, SYNC_FINISHED_EVENT, SYNC_PROGRESS_EVENT,
 };
@@ -14,7 +14,6 @@ use crate::devices::ConnectedDevice;
 use crate::AppState;
 use luminous_devices::{DeviceProfile, EjectError};
 use luminous_transcode::{Capabilities, ConversionTarget};
-use std::sync::Arc;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, State};
 
@@ -156,20 +155,9 @@ pub async fn preview_device_sync(
     settings: SyncSettings,
     state: State<'_, AppState>,
 ) -> Result<SyncPlan, String> {
-    let (sync, monitor, transcoder) = (
-        state.device_sync.clone(),
-        state.devices.clone(),
-        state.transcoder.clone(),
-    );
+    let sync = state.device_sync.clone();
     crate::db::run_blocking(&state.db, move |conn| {
-        sync.preview(
-            conn,
-            &monitor,
-            &transcoder,
-            &device_id,
-            settings,
-            chrono::Utc::now().timestamp(),
-        )
+        sync.preview(conn, &device_id, settings)
     })
     .await
     .map_err(|e| e.to_string())
@@ -192,22 +180,8 @@ pub async fn get_device_sync_items(
 /// Runs the previewed plan in the background. Rejects with
 /// `sync-plan-stale`, `sync-does-not-fit` or `sync-in-progress`.
 #[tauri::command]
-pub async fn start_device_sync(
-    plan_id: String,
-    app: AppHandle,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
-    state
-        .device_sync
-        .start(
-            &plan_id,
-            state.devices.clone(),
-            state.transcoder.clone(),
-            state.db.clone(),
-            Arc::new(AppEvents(app)),
-            Arc::new(SystemClock),
-        )
-        .map_err(|e| e.to_string())
+pub async fn start_device_sync(plan_id: String, state: State<'_, AppState>) -> Result<(), String> {
+    state.device_sync.start(&plan_id).map_err(|e| e.to_string())
 }
 
 /// Stops the device's running sync, keeping every file completed so far.
@@ -221,7 +195,8 @@ pub async fn cancel_device_sync(
     Ok(())
 }
 
-struct AppEvents(AppHandle);
+/// Sync events as the app's `device-sync-*` events.
+pub(crate) struct AppEvents(pub AppHandle);
 
 impl SyncEvents for AppEvents {
     fn progress(&self, progress: &SyncProgress) {
