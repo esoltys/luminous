@@ -27,10 +27,12 @@ pub async fn list_source_dir(
     state: State<'_, AppState>,
 ) -> Result<DirListing, String> {
     let devices = state.devices.clone();
-    crate::db::run_blocking(&state.db, move |conn| {
-        files::list_dir(conn, &source, &path, |id| devices.device(id))
+    let db = state.db.clone();
+    tokio::task::spawn_blocking(move || {
+        files::list_dir(&db, &source, &path, |id| devices.device(id))
     })
     .await
+    .map_err(|e| e.to_string())?
     .map_err(|e| {
         // `{e}` is the outermost message, the error code; `{e:#}` adds the
         // cause (e.g. the HTTP failure) for the log.

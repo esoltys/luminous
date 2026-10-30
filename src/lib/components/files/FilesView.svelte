@@ -6,14 +6,12 @@
     DeviceMobileSpeakerIcon,
     ArrowSquareOutIcon,
     GearIcon,
-    FolderIcon,
-    HardDrivesIcon,
-    CloudIcon,
     PlusIcon,
     CaretRightIcon,
   } from "phosphor-svelte";
   import { navigationStore } from "../../stores/navigation.svelte";
-  import { filesStore } from "../../stores/files.svelte";
+  import { filesStore, sourceKey } from "../../stores/files.svelte";
+  import { sourceIcon } from "./sourceIcon";
   import { collectionStore } from "../../stores/collection.svelte";
   import { playerStore } from "../../stores/player.svelte";
   import { toastStore } from "../../stores/toast.svelte";
@@ -21,7 +19,7 @@
   import { formatFileSize } from "../../utils/formatters";
   import { deviceName } from "../../utils/devices";
   import { isWindows, isLinux } from "../../platform";
-  import type { ConnectedDevice, DeviceSyncState, DirListing, FileEntry, FileSource, Song } from "../../types";
+  import type { ConnectedDevice, DeviceSyncState, DirListing, FileEntry, Song } from "../../types";
   import Button from "../Button.svelte";
   import FileBrowser from "./FileBrowser.svelte";
 
@@ -147,10 +145,6 @@
         : i18n.plural("files.summaryFiles", l.fileCount, { size: formatFileSize(l.totalBytes) });
     return `${files} ${i18n.plural("files.summaryInLibrary", l.inLibraryCount)}`;
   }
-
-  function sourceIcon(source: FileSource) {
-    return source.kind === "subsonic" ? HardDrivesIcon : source.kind === "webdav" ? CloudIcon : FolderIcon;
-  }
 </script>
 
 <svelte:window onclick={() => (devicePickerOpen = false)} />
@@ -262,7 +256,7 @@
         <p class="text-sm text-brand-text-secondary">{i18n.t("files.noSources")}</p>
       {:else}
         <ul class="flex flex-col gap-1 max-w-3xl">
-          {#each filesStore.sources as entry (`${entry.source.kind}:${entry.source.id}`)}
+          {#each filesStore.sources as entry (sourceKey(entry.source))}
             {@const Icon = sourceIcon(entry.source)}
             <li>
               <button

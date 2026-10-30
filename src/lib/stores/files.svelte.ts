@@ -10,6 +10,11 @@ export function sameSource(a: FileSource, b: FileSource): boolean {
   return a.kind === b.kind && a.id === b.id;
 }
 
+/** A key unique to `source`, for keyed lists. */
+export function sourceKey(source: FileSource): string {
+  return `${source.kind}:${source.id}`;
+}
+
 /**
  * The sources the Files view browses (#1841): watched folders and media
  * servers with their song counts, plus the connected devices. Kept current

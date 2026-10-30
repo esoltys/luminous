@@ -1,16 +1,3 @@
-<script lang="ts" module>
-  import type { FileEntryStatus } from "../../types";
-
-  /** The words for a status; the backend decides which one a file has. */
-  export const STATUS_LABEL_KEYS: Record<FileEntryStatus, string> = {
-    inLibrary: "files.status.inLibrary",
-    notScanned: "files.status.notScanned",
-    albumArt: "files.status.albumArt",
-    notAudio: "files.status.notAudio",
-    excluded: "files.status.excluded",
-  };
-</script>
-
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { tick, type Snippet } from "svelte";
@@ -18,7 +5,7 @@
   import { FolderIcon, FileIcon, MusicNoteIcon, ImageIcon, CaretRightIcon, ArrowClockwiseIcon } from "phosphor-svelte";
   import { i18n } from "../../stores/i18n.svelte";
   import { formatFileSize } from "../../utils/formatters";
-  import type { DirListing, FileEntry, FileSource } from "../../types";
+  import type { DirListing, FileEntry, FileEntryStatus, FileSource } from "../../types";
   import Button from "../Button.svelte";
 
   /**
@@ -55,6 +42,15 @@
     unreachableLabel: string;
     footer?: Snippet;
   } = $props();
+
+  /** The words for a status; the backend decides which one a file has. */
+  const STATUS_LABEL_KEYS: Record<FileEntryStatus, string> = {
+    inLibrary: "files.status.inLibrary",
+    notScanned: "files.status.notScanned",
+    albumArt: "files.status.albumArt",
+    notAudio: "files.status.notAudio",
+    excluded: "files.status.excluded",
+  };
 
   const ROW_HEIGHT_PX = 31;
   /** Folder columns shown before the current folder's table. */

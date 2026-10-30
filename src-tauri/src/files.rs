@@ -92,6 +92,20 @@ pub struct FileEntry {
     pub song_id: Option<i64>,
 }
 
+impl FileEntry {
+    fn folder(name: String) -> Self {
+        FileEntry {
+            name,
+            is_dir: true,
+            size: None,
+            modified: None,
+            file_type: None,
+            status: None,
+            song_id: None,
+        }
+    }
+}
+
 /// One folder of a source: folders first, then files, each by name.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -116,19 +130,13 @@ pub fn list_sources(conn: &Connection, db: &Arc<Database>) -> Result<Vec<SourceS
     let mut sources = Vec::new();
     for dir in CollectionScanner::new(Arc::clone(db)).get_directories()? {
         sources.push(SourceSummary {
-            song_count: count_local_songs_under(conn, Path::new(&dir.path))?,
+            song_count: local_songs_under(conn, Path::new(&dir.path))?.len() as u64,
             name: directory_display_name(&dir),
             available: dir.is_available,
             source: FileSource::Folder { id: dir.id },
         });
     }
-    let mut stmt = conn.prepare(
-        "SELECT id, COALESCE(NULLIF(TRIM(nickname), ''), name), enabled FROM subsonic_servers ORDER BY id",
-    )?;
-    let servers: Vec<(i64, String, bool)> = stmt
-        .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
-        .collect::<rusqlite::Result<_>>()?;
-    for (id, name, enabled) in servers {
+    for (id, name, enabled) in servers(conn, "subsonic_servers")? {
         let song_count: u64 = conn.query_row(
             "SELECT COUNT(*) FROM songs WHERE source = ?1 AND unavailable = 0 AND path LIKE ?2",
             params![SongSource::Subsonic as i32, format!("subsonic://{id}/%")],
@@ -141,13 +149,7 @@ pub fn list_sources(conn: &Connection, db: &Arc<Database>) -> Result<Vec<SourceS
             available: enabled,
         });
     }
-    let mut stmt = conn.prepare(
-        "SELECT id, COALESCE(NULLIF(TRIM(nickname), ''), name), enabled FROM webdav_servers ORDER BY id",
-    )?;
-    let servers: Vec<(i64, String, bool)> = stmt
-        .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
-        .collect::<rusqlite::Result<_>>()?;
-    for (id, name, enabled) in servers {
+    for (id, name, enabled) in servers(conn, "webdav_servers")? {
         let song_count: u64 = conn.query_row(
             "SELECT COUNT(*) FROM webdav_cache c JOIN songs s ON s.id = c.song_id
              WHERE c.server_id = ?1 AND s.unavailable = 0",
@@ -164,31 +166,45 @@ pub fn list_sources(conn: &Connection, db: &Arc<Database>) -> Result<Vec<SourceS
     Ok(sources)
 }
 
+/// Every server in `table` (`subsonic_servers` or `webdav_servers`), as its
+/// id, shown name and whether it is enabled.
+fn servers(conn: &Connection, table: &str) -> Result<Vec<(i64, String, bool)>> {
+    let mut stmt = conn.prepare(&format!(
+        "SELECT id, COALESCE(NULLIF(TRIM(nickname), ''), name), enabled FROM {table} ORDER BY id"
+    ))?;
+    let servers = stmt
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
+        .collect::<rusqlite::Result<_>>()?;
+    Ok(servers)
+}
+
 /// The folder at `path` in `source`. A folder that isn't there lists as
 /// empty; `path` can't leave the source (`..` and empty names are dropped).
 /// Fails when the source itself is gone (`source-not-found`) or a server
-/// can't be reached. Lists WebDAV over the network, so call it off the
-/// async runtime.
+/// can't be reached. Blocks on the disk or the network, so call it off the
+/// async runtime; it takes a database connection only around its queries,
+/// never while waiting on a slow drive or server.
 pub fn list_dir(
-    conn: &Connection,
+    db: &Database,
     source: &FileSource,
     path: &[String],
     device: impl FnOnce(&str) -> Option<Device>,
 ) -> Result<DirListing> {
     let path = clean_path(path);
-    let listing = match source {
-        FileSource::Folder { id } => list_folder(conn, &folder_root(conn, *id)?, &path)?,
-        FileSource::Subsonic { id } => list_subsonic(conn, *id, &path)?,
-        FileSource::Webdav { id } => list_webdav(conn, *id, &path)?,
+    match source {
+        FileSource::Folder { id } => list_folder(db, *id, &path),
+        FileSource::Subsonic { id } => list_subsonic(&*db.pool.get()?, *id, &path),
+        FileSource::Webdav { id } => list_webdav(db, *id, &path),
         FileSource::Device { id } => {
             let device = device(id).ok_or_else(|| anyhow!("source-not-found"))?;
             let storage = device
-                .storage(&device.storages[0].id)
+                .storages
+                .first()
+                .and_then(|s| device.storage(&s.id))
                 .ok_or_else(|| anyhow!("source-not-found"))?;
-            list_device(storage.as_ref(), &path)?
+            list_device(storage.as_ref(), &path)
         }
-    };
-    Ok(listing)
+    }
 }
 
 /// The library songs at `path` in `source` and in every folder below it,
@@ -242,7 +258,8 @@ pub fn songs_under(conn: &Connection, source: &FileSource, path: &[String]) -> R
                 .query_map(params![id], |r| {
                     Ok((r.get::<_, String>(0)?, row_to_song_at(r, 1)?))
                 })?
-                .filter_map(|r| r.ok())
+                .collect::<rusqlite::Result<Vec<_>>>()?
+                .into_iter()
                 .filter(|(href, _)| href.starts_with(&dir))
                 .collect();
             songs.sort_by(|a, b| a.0.cmp(&b.0));
@@ -310,7 +327,8 @@ fn local_songs_under(conn: &Connection, folder: &Path) -> Result<Vec<Song>> {
     ))?;
     let songs = stmt
         .query_map(params![pattern], row_to_song)?
-        .filter_map(|r| r.ok())
+        .collect::<rusqlite::Result<Vec<_>>>()?
+        .into_iter()
         .filter(|s| {
             [s.path.as_deref(), s.cue_path.as_deref()]
                 .into_iter()
@@ -319,25 +337,6 @@ fn local_songs_under(conn: &Connection, folder: &Path) -> Result<Vec<Song>> {
         })
         .collect();
     Ok(songs)
-}
-
-/// How many available local library songs are under `folder`, without
-/// loading them.
-fn count_local_songs_under(conn: &Connection, folder: &Path) -> Result<u64> {
-    let folder_key = library_paths::key(&folder.to_string_lossy());
-    let pattern = format!("{}/%", escape_like(&folder_key.to_lowercase()));
-    let mut stmt = conn.prepare(&format!(
-        "SELECT path FROM songs
-         WHERE source IN ({lib}) AND unavailable = 0
-           AND REPLACE(path, '\\', '/') LIKE ?1 ESCAPE '!'",
-        lib = *LOCAL_SOURCES_SQL
-    ))?;
-    let count = stmt
-        .query_map(params![pattern], |r| r.get::<_, String>(0))?
-        .filter_map(|r| r.ok())
-        .filter(|p| library_paths::is_under_key(&library_paths::key(p), &folder_key))
-        .count();
-    Ok(count as u64)
 }
 
 fn escape_like(s: &str) -> String {
@@ -367,9 +366,13 @@ fn file_type(name: &str) -> Option<String> {
     extension(name).map(|e| e.to_uppercase())
 }
 
-fn list_folder(conn: &Connection, root: &Path, path: &[String]) -> Result<DirListing> {
-    let dir = join_local(root, path);
-    let raw = FsBackend::new(root).list(&path.join("/"))?;
+fn list_folder(db: &Database, id: i64, path: &[String]) -> Result<DirListing> {
+    let root = folder_root(&*db.pool.get()?, id)?;
+    let dir = join_local(&root, path);
+    // A music folder can be on a network drive: read it with no connection held.
+    let raw = FsBackend::new(&root).list(&path.join("/"))?;
+    let conn = db.pool.get()?;
+    let conn = &*conn;
     let in_reserved = path.iter().any(|p| is_reserved_dir_name(p.as_ref()));
 
     // Library songs and CUE sheets directly in this folder, by file key.
@@ -396,12 +399,8 @@ fn list_folder(conn: &Connection, root: &Path, path: &[String]) -> Result<DirLis
                 let excluded = in_reserved || is_reserved_dir_name(e.name.as_ref());
                 return FileEntry {
                     status: excluded.then_some(EntryStatus::Excluded),
-                    size: None,
-                    file_type: None,
-                    song_id: None,
-                    name: e.name,
-                    is_dir: true,
                     modified: e.modified,
+                    ..FileEntry::folder(e.name)
                 };
             }
             let key = library_paths::key(&dir.join(&e.name).to_string_lossy());
@@ -452,9 +451,14 @@ fn list_device(storage: &dyn DeviceBackend, path: &[String]) -> Result<DirListin
     Ok(finish(None, entries))
 }
 
-/// Sorts `entries` and totals the files.
+/// Sorts `entries` (folders, then files, by name) and totals the files.
 fn finish(location: Option<String>, mut entries: Vec<FileEntry>) -> DirListing {
     entries.sort_by_cached_key(|e| (!e.is_dir, e.name.to_lowercase()));
+    listing(location, entries)
+}
+
+/// Totals the files of `entries`, keeping their order.
+fn listing(location: Option<String>, entries: Vec<FileEntry>) -> DirListing {
     let files = entries.iter().filter(|e| !e.is_dir);
     let total_bytes = files
         .clone()
@@ -493,8 +497,7 @@ fn subsonic_songs(conn: &Connection, id: i64) -> Result<Vec<Song>> {
             params![SongSource::Subsonic as i32, format!("subsonic://{id}/%")],
             row_to_song,
         )?
-        .filter_map(|r| r.ok())
-        .collect();
+        .collect::<rusqlite::Result<_>>()?;
     Ok(songs)
 }
 
@@ -516,15 +519,7 @@ fn subsonic_place(song: &Song) -> (String, String) {
 /// albums, then tracks. Sizes aren't shown and there's nothing but audio.
 fn list_subsonic(conn: &Connection, id: i64, path: &[String]) -> Result<DirListing> {
     let songs = subsonic_songs(conn, id)?;
-    let folder = |name: String| FileEntry {
-        name,
-        is_dir: true,
-        size: None,
-        modified: None,
-        file_type: None,
-        status: None,
-        song_id: None,
-    };
+    let folder = FileEntry::folder;
     let entries = match path {
         [] => songs
             .iter()
@@ -574,15 +569,7 @@ fn list_subsonic(conn: &Connection, id: i64, path: &[String]) -> Result<DirListi
                 })
                 .collect();
             // Already in disc and track order, which name order would break.
-            let in_library_count = entries.len();
-            return Ok(DirListing {
-                location: None,
-                file_count: entries.len(),
-                total_bytes: None,
-                in_library_count,
-                entries,
-                excluded: false,
-            });
+            return Ok(listing(None, entries));
         }
     };
     Ok(finish(None, entries))
@@ -641,21 +628,25 @@ fn webdav_dir_href(remote_path: &str, path: &[String]) -> String {
     href
 }
 
-fn list_webdav(conn: &Connection, id: i64, path: &[String]) -> Result<DirListing> {
-    let server = webdav_server(conn, id)?;
+fn list_webdav(db: &Database, id: i64, path: &[String]) -> Result<DirListing> {
+    // Everything the database knows first; the connection goes back to the
+    // pool before the server is asked, which can take until it times out.
+    let (server, songs) = {
+        let conn = db.pool.get()?;
+        let server = webdav_server(&conn, id)?;
+        let mut stmt = conn.prepare(
+            "SELECT c.remote_path, s.id, s.not_included FROM webdav_cache c
+             JOIN songs s ON s.id = c.song_id
+             WHERE c.server_id = ?1 AND s.unavailable = 0",
+        )?;
+        let songs: HashMap<String, (i64, bool)> = stmt
+            .query_map(params![id], |r| Ok((r.get(0)?, (r.get(1)?, r.get(2)?))))?
+            .collect::<rusqlite::Result<_>>()?;
+        (server, songs)
+    };
     let dir = webdav_dir_href(&server.remote_path, path);
     let client = crate::webdav::WebDavClient::new(server.url, server.username, server.password)?;
     let items = client.list_directory(&dir).context("server-unreachable")?;
-
-    let mut stmt = conn.prepare(
-        "SELECT c.remote_path, s.id, s.not_included FROM webdav_cache c
-         JOIN songs s ON s.id = c.song_id
-         WHERE c.server_id = ?1 AND s.unavailable = 0",
-    )?;
-    let songs: HashMap<String, (i64, bool)> = stmt
-        .query_map(params![id], |r| Ok((r.get(0)?, (r.get(1)?, r.get(2)?))))?
-        .filter_map(|r| r.ok())
-        .collect();
 
     let entries = items
         .into_iter()
@@ -664,15 +655,7 @@ fn list_webdav(conn: &Connection, id: i64, path: &[String]) -> Result<DirListing
             let encoded = item.href.trim_end_matches('/').rsplit('/').next()?;
             let name = percent_decode_str(encoded).decode_utf8_lossy().into_owned();
             if item.is_directory {
-                return Some(FileEntry {
-                    name,
-                    is_dir: true,
-                    size: None,
-                    modified: None,
-                    file_type: None,
-                    status: None,
-                    song_id: None,
-                });
+                return Some(FileEntry::folder(name));
             }
             let song = songs.get(&item.href);
             let status = match song {
@@ -750,9 +733,8 @@ mod tests {
     }
 
     fn list(f: &Fixture, path: &[&str]) -> DirListing {
-        let conn = f.db.pool.get().unwrap();
         let path: Vec<String> = path.iter().map(|p| p.to_string()).collect();
-        list_dir(&conn, &FileSource::Folder { id: 1 }, &path, |_| None).unwrap()
+        list_dir(&f.db, &FileSource::Folder { id: 1 }, &path, |_| None).unwrap()
     }
 
     fn status_of(listing: &DirListing, name: &str) -> Option<EntryStatus> {
@@ -884,8 +866,7 @@ mod tests {
     #[test]
     fn a_removed_source_is_not_found() {
         let f = fixture(&[], &[]);
-        let conn = f.db.pool.get().unwrap();
-        let err = list_dir(&conn, &FileSource::Folder { id: 9 }, &[], |_| None).unwrap_err();
+        let err = list_dir(&f.db, &FileSource::Folder { id: 9 }, &[], |_| None).unwrap_err();
         assert_eq!(err.to_string(), "source-not-found");
     }
 
@@ -939,7 +920,7 @@ mod tests {
         let source = FileSource::Subsonic { id: 3 };
         let names = |path: &[&str]| -> Vec<String> {
             let path: Vec<String> = path.iter().map(|p| p.to_string()).collect();
-            list_dir(&conn, &source, &path, |_| None)
+            list_dir(&f.db, &source, &path, |_| None)
                 .unwrap()
                 .entries
                 .into_iter()

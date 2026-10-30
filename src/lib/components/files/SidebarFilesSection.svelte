@@ -1,8 +1,9 @@
 <script lang="ts">
   import { open } from "@tauri-apps/plugin-dialog";
-  import { FoldersIcon, FolderIcon, HardDrivesIcon, CloudIcon, PlusIcon } from "phosphor-svelte";
+  import { FoldersIcon, PlusIcon } from "phosphor-svelte";
   import { navigationStore } from "../../stores/navigation.svelte";
-  import { filesStore, sameSource } from "../../stores/files.svelte";
+  import { filesStore, sameSource, sourceKey } from "../../stores/files.svelte";
+  import { sourceIcon } from "./sourceIcon";
   import { collectionStore } from "../../stores/collection.svelte";
   import { i18n, formatNumber } from "../../stores/i18n.svelte";
   import type { FileSource } from "../../types";
@@ -70,19 +71,14 @@
           <span class="truncate">{i18n.t("files.addMusicFolder")}</span>
         </button>
       {/if}
-      {#each filesStore.sources as entry (`${entry.source.kind}:${entry.source.id}`)}
+      {#each filesStore.sources as entry (sourceKey(entry.source))}
+        {@const Icon = sourceIcon(entry.source)}
         <button
           onclick={() => navigationStore.viewFiles(entry.source)}
           class="w-full flex items-center justify-between px-2.5 py-1 rounded-md text-xs transition-colors {isOpen(entry.source) ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'} {entry.available ? '' : 'opacity-60'}"
         >
           <div class="flex items-center gap-2 truncate">
-            {#if entry.source.kind === "subsonic"}
-              <HardDrivesIcon class="w-3.5 h-3.5 icon-align shrink-0" />
-            {:else if entry.source.kind === "webdav"}
-              <CloudIcon class="w-3.5 h-3.5 icon-align shrink-0" />
-            {:else}
-              <FolderIcon class="w-3.5 h-3.5 icon-align shrink-0" />
-            {/if}
+            <Icon class="w-3.5 h-3.5 icon-align shrink-0" />
             <span class="truncate">{entry.name}</span>
           </div>
           <span class="text-[10px] text-brand-text-secondary/60 ml-1">({formatNumber(entry.songCount)})</span>
