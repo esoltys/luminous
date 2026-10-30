@@ -1203,7 +1203,7 @@ export const de = {
     outputFallbackFormatUnsupported: "{mode} konnte nicht gestartet werden: Das Gerät akzeptiert kein Stereoformat, das Luminous senden kann. Wiedergabe vorerst über geteiltes Audio.",
     outputFallbackUnavailable: "{mode} konnte nicht gestartet werden. Wiedergabe vorerst über geteiltes Audio.",
     outputFallbackRetry: "Erneut versuchen",
-    outputRestored: "{mode} funktioniert wieder. Die Wiedergabe ist pausiert, weil die Lautstärke von geteiltem Audio abweichen kann: Prüfen Sie die Lautstärke und drücken Sie dann Wiedergabe.",
+    outputRestored: "{mode} funktioniert wieder. Prüfen Sie die Lautstärke und drücken Sie dann Wiedergabe.",
     tracksSkippedToast: {
       one: "{count} nicht verfügbarer Titel übersprungen.",
       other: "{count} nicht verfügbare Titel übersprungen."

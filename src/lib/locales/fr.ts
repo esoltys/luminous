@@ -1209,7 +1209,7 @@ export const fr: DeepStringRecord<typeof en> = {
     outputFallbackFormatUnsupported: "Impossible de démarrer {mode} : l'appareil n'accepte aucun format stéréo que Luminous peut lui envoyer. Lecture par l'audio partagé pour l'instant.",
     outputFallbackUnavailable: "Impossible de démarrer {mode}. Lecture par l'audio partagé pour l'instant.",
     outputFallbackRetry: "Réessayer",
-    outputRestored: "{mode} fonctionne de nouveau. La lecture est en pause, car son volume peut différer de l'audio partagé : vérifiez le volume, puis appuyez sur Lecture.",
+    outputRestored: "{mode} fonctionne de nouveau. Vérifiez le volume, puis appuyez sur Lire pour reprendre.",
     tracksSkippedToast: {
       one: "{count} morceau indisponible ignoré.",
       other: "{count} morceaux indisponibles ignorés."

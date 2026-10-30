@@ -1203,7 +1203,7 @@ export const en = {
     outputFallbackFormatUnsupported: "Couldn't start {mode}: the device accepts no stereo format Luminous can send. Playing through shared audio for now.",
     outputFallbackUnavailable: "Couldn't start {mode}. Playing through shared audio for now.",
     outputFallbackRetry: "Try Again",
-    outputRestored: "{mode} is working again. Playback is paused because its volume can differ from shared audio: check your volume, then press Play.",
+    outputRestored: "{mode} is back. Check your volume, then press Play to resume.",
     tracksSkippedToast: {
       one: "Skipped {count} unavailable track.",
       other: "Skipped {count} unavailable tracks."

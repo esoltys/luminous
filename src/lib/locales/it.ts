@@ -1203,7 +1203,7 @@ export const it = {
     outputFallbackFormatUnsupported: "Impossibile avviare {mode}: il dispositivo non accetta alcun formato stereo che Luminous possa inviare. Riproduzione tramite audio condiviso per ora.",
     outputFallbackUnavailable: "Impossibile avviare {mode}. Riproduzione tramite audio condiviso per ora.",
     outputFallbackRetry: "Riprova",
-    outputRestored: "{mode} funziona di nuovo. La riproduzione è in pausa perché il volume può essere diverso dall'audio condiviso: controlla il volume, poi premi Riproduci.",
+    outputRestored: "{mode} funziona di nuovo. Controlla il volume, poi premi Riproduci per continuare.",
     tracksSkippedToast: {
       one: "{count} brano non disponibile saltato.",
       other: "{count} brani non disponibili saltati."

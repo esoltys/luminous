@@ -1203,7 +1203,7 @@ export const es = {
     outputFallbackFormatUnsupported: "No se pudo iniciar {mode}: el dispositivo no acepta ningún formato estéreo que Luminous pueda enviar. Reproduciendo con audio compartido por ahora.",
     outputFallbackUnavailable: "No se pudo iniciar {mode}. Reproduciendo con audio compartido por ahora.",
     outputFallbackRetry: "Reintentar",
-    outputRestored: "{mode} vuelve a funcionar. La reproducción está en pausa porque su volumen puede diferir del audio compartido: compruebe el volumen y luego pulse Reproducir.",
+    outputRestored: "{mode} vuelve a funcionar. Compruebe el volumen y pulse Reproducir para continuar.",
     tracksSkippedToast: {
       one: "Se omitió {count} pista no disponible.",
       other: "Se omitieron {count} pistas no disponibles."

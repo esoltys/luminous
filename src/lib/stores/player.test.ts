@@ -299,7 +299,7 @@ describe("PlayerStore", () => {
       payload: { output_bypasses_mixer: bypasses, output_fell_back: fellBack },
     });
     const fallbackToasts = () => toastStore.messages.filter((m) => m.text.startsWith("Couldn't start"));
-    const restoredToasts = () => toastStore.messages.filter((m) => m.text.includes("is working again"));
+    const restoredToasts = () => toastStore.messages.filter((m) => m.text.includes("is back"));
 
     toastStore.messages = [];
 
@@ -316,7 +316,7 @@ describe("PlayerStore", () => {
       pipelineCallback?.(output(true, false));
       expect(fallbackToasts()).toHaveLength(0);
       expect(restoredToasts()).toHaveLength(1);
-      expect(restoredToasts()[0].text).toContain("Playback is paused");
+      expect(restoredToasts()[0].text).toBe("Direct Hardware (ALSA) is back. Check your volume, then press Play to resume.");
 
       // Later pipeline changes (a rate switch) don't announce it again.
       pipelineCallback?.(output(true, false));
