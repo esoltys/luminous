@@ -210,6 +210,7 @@ export const de = {
     columnAdded: "Hinzugefügt am",
     columnPath: "Dateipfad",
     columnLibrary: "Mediathek",
+    notInLibrary: "Nicht in der Mediathek",
     columnLastPlayed: "Zuletzt gespielt",
     columnActions: "Aktionen",
     columnTrack: "Titel-Nr.",

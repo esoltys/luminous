@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 71;
+pub const CURRENT_SCHEMA_VERSION: i32 = 72;
 
 struct Migration {
     version: i32,
@@ -666,6 +666,11 @@ const MIGRATIONS: &[Migration] = &[
         description: "device_sync_settings: each device's sync selection and last sync summary (#836)",
         apply: |conn| Ok(conn.execute_batch(MIGRATION_71)?),
     },
+    Migration {
+        version: 72,
+        description: "songs: reclassify files opened from outside every watched folder as OpenedFile (#1842)",
+        apply: migrate_reclassify_opened_files,
+    },
 ];
 
 /// Migration 62: albums whose titles differ only in case or surrounding
@@ -770,6 +775,28 @@ fn migrate_album_keys(conn: &rusqlite::Connection) -> Result<()> {
         "DELETE FROM album_chart_history;
          DELETE FROM app_state WHERE key = 'album_chart_history_week_start';",
     )?;
+    Ok(())
+}
+
+/// Migration 72: opening a file from outside the library used to insert it as
+/// an ordinary `LocalFile` row, so it showed up in every library view (#1842).
+/// Reclassify every `LocalFile` row whose path isn't inside a watched folder as
+/// `OpenedFile`. The missing-file check already treats exactly these rows as
+/// orphans, so nothing that was really in the library changes.
+fn migrate_reclassify_opened_files(conn: &rusqlite::Connection) -> Result<()> {
+    use crate::models::SongSource;
+    let rows: Vec<(i64, String)> = conn
+        .prepare("SELECT id, path FROM songs WHERE source = ?1 AND path IS NOT NULL")?
+        .query_map([SongSource::LOCAL_FILE_ID], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .collect::<rusqlite::Result<_>>()?;
+    for (id, path) in rows {
+        if !crate::collection::is_in_watched_folder(conn, std::path::Path::new(&path))? {
+            conn.execute(
+                "UPDATE songs SET source = ?1 WHERE id = ?2",
+                params![SongSource::OPENED_FILE_ID, id],
+            )?;
+        }
+    }
     Ok(())
 }
 
@@ -4194,6 +4221,77 @@ mod tests {
         assert_eq!(row(&plain), Some((plain.clone(), plain)));
         assert!(row(embedded).is_none());
         assert!(row("http://u:p@radio/stream").is_some());
+    }
+
+    /// Migration 72 (#1842): local rows outside every watched folder were
+    /// opened, not scanned — they become `OpenedFile`; rows inside a watched
+    /// folder (matched case- and separator-insensitively on Windows) and
+    /// non-local rows keep their source.
+    #[test]
+    fn migration_72_reclassifies_local_rows_outside_watched_folders() {
+        use crate::models::SongSource;
+        let temp_dir_guard = tempfile::Builder::new()
+            .prefix("luminous_migration72_test_")
+            .tempdir()
+            .unwrap();
+        let db = Database::new(temp_dir_guard.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+        let music = temp_dir_guard.path().join("Music");
+        conn.execute(
+            "INSERT INTO directories (path) VALUES (?1)",
+            params![music.to_string_lossy()],
+        )
+        .unwrap();
+
+        let in_library = music.join("Album").join("a.flac");
+        let opened = temp_dir_guard.path().join("Device").join("a.flac");
+        let rows = [
+            (
+                in_library.to_string_lossy().to_string(),
+                SongSource::LOCAL_FILE_ID,
+            ),
+            (
+                opened.to_string_lossy().to_string(),
+                SongSource::LOCAL_FILE_ID,
+            ),
+            ("http://nas/dav/a.flac".to_string(), SongSource::WEBDAV_ID),
+        ];
+        for (path, source) in &rows {
+            conn.execute(
+                "INSERT INTO songs (path, source) VALUES (?1, ?2)",
+                params![path, source],
+            )
+            .unwrap();
+        }
+        #[cfg(windows)]
+        let differently_cased = {
+            let p = in_library
+                .to_string_lossy()
+                .to_uppercase()
+                .replace('\\', "/");
+            conn.execute(
+                "INSERT INTO songs (path, source) VALUES (?1, ?2)",
+                params![p, SongSource::LOCAL_FILE_ID],
+            )
+            .unwrap();
+            p
+        };
+
+        migrate_reclassify_opened_files(&conn).unwrap();
+
+        let source_of = |path: &str| -> i32 {
+            conn.query_row(
+                "SELECT source FROM songs WHERE path = ?1",
+                params![path],
+                |r| r.get(0),
+            )
+            .unwrap()
+        };
+        assert_eq!(source_of(&rows[0].0), SongSource::LOCAL_FILE_ID);
+        assert_eq!(source_of(&rows[1].0), SongSource::OPENED_FILE_ID);
+        assert_eq!(source_of(&rows[2].0), SongSource::WEBDAV_ID);
+        #[cfg(windows)]
+        assert_eq!(source_of(&differently_cased), SongSource::LOCAL_FILE_ID);
     }
 
     /// Migration 62 (#1752): a database from before album keys gets every

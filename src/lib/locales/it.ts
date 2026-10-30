@@ -210,6 +210,7 @@ export const it = {
     columnAdded: "Data di aggiunta",
     columnPath: "Percorso del file",
     columnLibrary: "Libreria",
+    notInLibrary: "Non in libreria",
     columnLastPlayed: "Ultima riproduzione",
     columnActions: "Azioni",
     columnTrack: "N. traccia",

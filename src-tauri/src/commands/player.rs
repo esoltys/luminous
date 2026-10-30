@@ -130,12 +130,12 @@ fn resolve_dropped_paths(paths: Vec<String>) -> (Vec<PathBuf>, usize) {
 }
 
 /// Resolves already-expanded file paths into `Song` rows: matches existing
-/// library entries by path (normalizing slashes/case), or reads tags and
-/// upserts a fresh row for anything not yet in the library. Shared by every
+/// rows by path (normalizing slashes/case), or reads tags and upserts a fresh
+/// `OpenedFile` row — outside the library — for anything unknown. Shared by every
 /// command that turns raw filesystem paths into Queue entries, so an
 /// unmanaged file dropped or opened from outside the library is always
 /// treated identically.
-fn resolve_songs_from_paths(
+pub(crate) fn resolve_songs_from_paths(
     conn: &rusqlite::Connection,
     cover_manager: &CoverManager,
     resolved_paths: Vec<PathBuf>,
@@ -175,7 +175,18 @@ fn resolve_songs_from_paths(
             continue;
         }
 
-        if let Err(e) = crate::collection::read_and_upsert_song(conn, cover_manager, &item_path) {
+        // Unknown file. Inside a watched folder it's a library song the scan
+        // hasn't reached yet; anywhere else it's an opened file, queued,
+        // played and counted in history without joining the library (#1842).
+        let prepared =
+            crate::collection::is_in_watched_folder(conn, &item_path).and_then(|in_library| {
+                let mut song = crate::collection::read_and_prepare_song(cover_manager, &item_path)?;
+                if !in_library {
+                    song.source = crate::models::SongSource::OpenedFile;
+                }
+                crate::collection::upsert_song(conn, &song)
+            });
+        if let Err(e) = prepared {
             log::warn!("Failed to read tags for '{}': {}", item_path_str, e);
             continue;
         }

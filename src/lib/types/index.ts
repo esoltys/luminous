@@ -14,7 +14,8 @@ export type SongSource =
   | "radio_paradise"
   | "spotify"
   | "radio_browser"
-  | "web_dav";
+  | "web_dav"
+  | "opened_file";
 
 export type FileType =
   | "UNKNOWN"

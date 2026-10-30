@@ -5,9 +5,12 @@
 //! table, #662) — that table only tracks the top 10 albums per week, so
 //! summing across weeks would silently undercount anything that never
 //! cracked a weekly top 10. See issue #130's comment thread.
+//!
+//! Counts everything listened to, including files opened from outside the
+//! library (`LISTENED_SOURCES_SQL`, #1842).
 
 use crate::models::{
-    parse_multi_value, ListenEvent, StatsSummary, StatsTopItem, LIBRARY_SOURCES_SQL,
+    parse_multi_value, ListenEvent, StatsSummary, StatsTopItem, LISTENED_SOURCES_SQL,
 };
 use anyhow::Result;
 use rusqlite::{params, Connection};
@@ -108,7 +111,7 @@ pub fn top_songs_with_limit(
          GROUP BY s.id
          ORDER BY total_secs DESC, play_count DESC, s.title COLLATE NOCASE ASC
          LIMIT ?2",
-        lib = *LIBRARY_SOURCES_SQL
+        lib = *LISTENED_SOURCES_SQL
     );
     let mut stmt = conn.prepare(&sql)?;
     let rows = stmt
@@ -206,7 +209,7 @@ pub fn top_albums_with_limit(
          GROUP BY s.album_key
          ORDER BY total_secs DESC, play_count DESC, s.album_key ASC
          LIMIT ?2",
-        lib = *LIBRARY_SOURCES_SQL,
+        lib = *LISTENED_SOURCES_SQL,
         display = crate::album_key::album_display_sql("s.album_key"),
     );
     let mut stmt = conn.prepare(&sql)?;
@@ -261,7 +264,7 @@ fn top_artists(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>>
          GROUP BY effective_artist COLLATE NOCASE
          ORDER BY total_secs DESC, play_count DESC, effective_artist COLLATE NOCASE ASC
          LIMIT ?2",
-        lib = *LIBRARY_SOURCES_SQL
+        lib = *LISTENED_SOURCES_SQL
     );
     let mut stmt = conn.prepare(&sql)?;
     let rows = stmt
@@ -295,7 +298,7 @@ fn top_genres(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>> 
            AND s.source IN ({lib}) AND s.unavailable = 0
            AND s.genre IS NOT NULL AND s.genre != ''
            AND {SONG_EXCLUSION_FILTER}",
-        lib = *LIBRARY_SOURCES_SQL
+        lib = *LISTENED_SOURCES_SQL
     );
     let mut stmt = conn.prepare(&sql)?;
     let genre_rows: Vec<(String, i64)> = stmt
@@ -378,7 +381,7 @@ fn play_timestamps(conn: &Connection, range_start: i64) -> Result<Vec<i64>> {
          WHERE ph.played_at >= ?1
            AND s.source IN ({lib}) AND s.unavailable = 0
            AND {SONG_EXCLUSION_FILTER}",
-        lib = *LIBRARY_SOURCES_SQL
+        lib = *LISTENED_SOURCES_SQL
     );
     let mut stmt = conn.prepare(&sql)?;
     let rows = stmt
@@ -399,7 +402,7 @@ fn total_minutes(conn: &Connection, range_start: i64) -> Result<i64> {
          WHERE ph.played_at >= ?1
            AND s.source IN ({lib}) AND s.unavailable = 0
            AND {SONG_EXCLUSION_FILTER}",
-        lib = *LIBRARY_SOURCES_SQL
+        lib = *LISTENED_SOURCES_SQL
     );
     let total_secs: i64 = conn.query_row(&sql, params![range_start], |row| row.get(0))?;
     Ok(total_secs / 60)
@@ -417,7 +420,7 @@ pub fn listening_activity(conn: &Connection, since_unix: i64) -> Result<Vec<List
          WHERE ph.played_at >= ?1
            AND s.source IN ({lib}) AND s.unavailable = 0
            AND {SONG_EXCLUSION_FILTER}",
-        lib = *LIBRARY_SOURCES_SQL
+        lib = *LISTENED_SOURCES_SQL
     );
     let mut stmt = conn.prepare(&sql)?;
     let rows = stmt

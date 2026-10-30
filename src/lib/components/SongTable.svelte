@@ -642,6 +642,8 @@
     <div class="truncate pr-2 min-w-0 flex items-center">
       {#if dir}
         <LibraryBadge directory={dir} size="xs" />
+      {:else if song.source === "opened_file"}
+        <span class="{secondaryColor(song)} truncate text-xs font-medium italic">{i18n.t("collection.notInLibrary")}</span>
       {:else}
         <span class="{secondaryColor(song)} text-xs font-medium">—</span>
       {/if}

@@ -30,10 +30,18 @@ pub enum SongSource {
     Spotify = 9,
     RadioBrowser = 10,
     WebDav = 11,
+    /// A local file the user opened ("Open with", file association, CLI,
+    /// drag-and-drop) from outside every watched folder (#1842). Playable,
+    /// queueable and scrobbled like any local file, and counted in listening
+    /// history, but never part of the library: it's left out of
+    /// `LIBRARY_SOURCES_SQL` and `LOCAL_SOURCES_SQL`. A scan that later finds
+    /// the same path in a watched folder upgrades the row to `LocalFile`.
+    OpenedFile = 12,
 }
 
 impl SongSource {
     pub const LOCAL_FILE_ID: i32 = Self::LocalFile as i32;
+    pub const OPENED_FILE_ID: i32 = Self::OpenedFile as i32;
     pub const COLLECTION_ID: i32 = Self::Collection as i32;
     pub const WEBDAV_ID: i32 = Self::WebDav as i32;
     pub const SUBSONIC_ID: i32 = Self::Subsonic as i32;
@@ -82,6 +90,7 @@ impl From<i64> for SongSource {
             9 => Self::Spotify,
             10 => Self::RadioBrowser,
             11 => Self::WebDav,
+            12 => Self::OpenedFile,
             _ => Self::Unknown,
         }
     }
@@ -102,11 +111,33 @@ pub(crate) static LIBRARY_SOURCES_SQL: LazyLock<String> = LazyLock::new(|| {
     )
 });
 
-/// SQL `IN (...)` fragment listing the source IDs backed by a local
+/// SQL `IN (...)` fragment for listening-history views (Home Recently Played,
+/// the Recently Played auto-playlist, Stats): the library plus files the user
+/// opened from outside it (`OpenedFile`, #1842). What was played counts even
+/// when it was never added to the library; browsing views use
+/// `LIBRARY_SOURCES_SQL` instead.
+pub(crate) static LISTENED_SOURCES_SQL: LazyLock<String> = LazyLock::new(|| {
+    format!(
+        "{}, {}",
+        *LIBRARY_SOURCES_SQL,
+        SongSource::OpenedFile as i32,
+    )
+});
+
+/// SQL `IN (...)` fragment for every source whose `path` is a file on this
+/// machine — library local files plus opened files (`OpenedFile`, #1842). For
+/// questions about the file itself (its embedded or folder art), not about
+/// library membership: library-wide operations use `LOCAL_SOURCES_SQL`.
+pub(crate) static FILE_SOURCES_SQL: LazyLock<String> =
+    LazyLock::new(|| format!("{}, {}", *LOCAL_SOURCES_SQL, SongSource::OpenedFile as i32,));
+
+/// SQL `IN (...)` fragment listing the library source IDs backed by a local
 /// filesystem path (local files and managed collection folders). Excludes
 /// remote sources — remote files can't be moved/renamed by filesystem operations
-/// like the Organize feature. Derived from `SongSource` discriminants so it
-/// can't silently drift from the enum.
+/// like the Organize feature — and opened files outside the library
+/// (`OpenedFile`), which library-wide operations (organize, device sync,
+/// relocate, analysis sweeps) must not touch. Derived from `SongSource`
+/// discriminants so it can't silently drift from the enum.
 pub(crate) static LOCAL_SOURCES_SQL: LazyLock<String> = LazyLock::new(|| {
     format!(
         "{}, {}",
@@ -1519,6 +1550,37 @@ mod tests {
         let subsonic = SongSource::SUBSONIC_ID.to_string();
         assert!(lib.contains(&subsonic.as_str()));
         assert!(!local.contains(&subsonic.as_str()));
+    }
+
+    #[test]
+    fn test_opened_files_count_as_listened_but_not_library() {
+        let opened = SongSource::OPENED_FILE_ID.to_string();
+        let lib: Vec<&str> = LIBRARY_SOURCES_SQL.split(", ").collect();
+        let local: Vec<&str> = LOCAL_SOURCES_SQL.split(", ").collect();
+        let listened: Vec<&str> = LISTENED_SOURCES_SQL.split(", ").collect();
+        let files: Vec<&str> = FILE_SOURCES_SQL.split(", ").collect();
+        assert!(!lib.contains(&opened.as_str()));
+        assert!(!local.contains(&opened.as_str()));
+        assert!(listened.contains(&opened.as_str()));
+        assert!(files.contains(&opened.as_str()));
+        for id in &local {
+            assert!(
+                files.contains(id),
+                "file sources must include local source {id}"
+            );
+        }
+        for id in &lib {
+            assert!(
+                listened.contains(id),
+                "listened sources must include library source {id}"
+            );
+        }
+        assert_eq!(SongSource::from(12), SongSource::OpenedFile);
+        assert!(!SongSource::OpenedFile.is_remote());
+        assert_eq!(
+            serde_json::to_string(&SongSource::OpenedFile).unwrap(),
+            "\"opened_file\""
+        );
     }
 
     #[test]

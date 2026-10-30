@@ -156,6 +156,50 @@ describe("SongTable.svelte — Last Played column", () => {
   });
 });
 
+describe("SongTable.svelte — Library column (#1842)", () => {
+  const song = (id: number, source: Song["source"], path: string) =>
+    ({ id, title: `Song ${id}`, source, filetype: "MP3", path }) as Song;
+
+  beforeEach(() => {
+    collectionStore.visibleColumns.album = false;
+    collectionStore.visibleColumns.lastplayed = false;
+    collectionStore.visibleColumns.library = true;
+    collectionStore.directories = [];
+    collectionStore.webdavServers = [];
+  });
+  afterEach(() => {
+    collectionStore.visibleColumns.library = false;
+  });
+
+  function renderTable(rows: SongTableRow[]) {
+    return render(SongTable, {
+      props: {
+        rows,
+        mode: "track",
+        leadingColumnWidth: "3rem",
+        colDefaults: {},
+        sortField: "title",
+        sortAsc: true,
+        onToggleSort: () => {},
+        onRowDoubleClick: () => {},
+        onRowContextMenu: () => {},
+        onRate: () => {},
+        onEditTags: () => {},
+      },
+    });
+  }
+
+  it("labels a file opened from outside the library", () => {
+    const { getByText } = renderTable([{ key: "1", song: song(1, "opened_file", "E:/Lorde/a.flac") }]);
+    expect(getByText("Not in library")).toBeInTheDocument();
+  });
+
+  it("doesn't label a library song outside any known folder", () => {
+    const { queryByText } = renderTable([{ key: "1", song: song(1, "local_file", "/elsewhere/a.flac") }]);
+    expect(queryByText("Not in library")).not.toBeInTheDocument();
+  });
+});
+
 describe("SongTable.svelte — info sidebar selection", () => {
   const song = (id: number) => ({ id, title: `Song ${id}`, source: "local_file", filetype: "MP3" }) as Song;
 

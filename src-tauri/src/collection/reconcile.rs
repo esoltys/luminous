@@ -110,9 +110,13 @@ pub(crate) fn reconcile_moved_songs(
         return Ok(0);
     }
 
-    let mut stmt =
-        conn.prepare("SELECT id, path, filesize, art_automatic FROM songs WHERE path IS NOT NULL")?;
-    let rows = stmt.query_map([], |row| {
+    // Opened files outside the library are never orphans of a move: a device
+    // copy repathed onto a newly scanned library file would leave that file
+    // hidden as an opened file (#1842).
+    let mut stmt = conn.prepare(
+        "SELECT id, path, filesize, art_automatic FROM songs WHERE path IS NOT NULL AND source != ?1",
+    )?;
+    let rows = stmt.query_map([crate::models::SongSource::OPENED_FILE_ID], |row| {
         Ok((
             row.get::<_, i64>(0)?,
             row.get::<_, String>(1)?,

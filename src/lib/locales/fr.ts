@@ -216,6 +216,7 @@ export const fr: DeepStringRecord<typeof en> = {
     columnAdded: "Date d'ajout",
     columnPath: "Chemin du fichier",
     columnLibrary: "Bibliothèque",
+    notInLibrary: "Hors de la bibliothèque",
     columnLastPlayed: "Dernière lecture",
     columnActions: "Actions",
     columnTrack: "N° piste",

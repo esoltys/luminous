@@ -1195,7 +1195,7 @@ impl CoverManager {
             "SELECT album, path FROM songs
              WHERE (path LIKE ?1 OR path LIKE ?2)
                AND (source IN ({}) OR source IS NULL)",
-            *crate::models::LOCAL_SOURCES_SQL
+            *crate::models::FILE_SOURCES_SQL
         );
         let Ok(mut stmt) = conn.prepare(&sql) else {
             return false;
@@ -1272,7 +1272,7 @@ impl CoverManager {
             "SELECT COALESCE(NULLIF(album_artist, ''), artist), path FROM songs
              WHERE (path LIKE ?1 OR path LIKE ?2)
                AND (source IN ({}) OR source IS NULL)",
-            *crate::models::LOCAL_SOURCES_SQL
+            *crate::models::FILE_SOURCES_SQL
         );
         let Ok(mut stmt) = conn.prepare(&sql) else {
             return false;
@@ -2002,7 +2002,7 @@ impl CoverManager {
             "SELECT art_embedded, art_automatic, art_manual, art_unset, path,
                     source IN ({lib})
              FROM songs WHERE id = ?1",
-            lib = *crate::models::LOCAL_SOURCES_SQL
+            lib = *crate::models::FILE_SOURCES_SQL
         );
         let (art_embedded, art_automatic, art_manual, art_unset, path, is_local) =
             conn.query_row(&sql, params![song_id], |row| {
@@ -2923,6 +2923,17 @@ mod tests {
         assert_eq!(
             manager.get_full_resolution_cover_art_uri(embedded).unwrap(),
             Some(embedded_art_uri("album-1.jpg", "C:\\Music\\a.flac"))
+        );
+        // A file opened from outside the library is still a file on disk (#1842).
+        let opened = insert(
+            "E:\\Device\\a.flac",
+            true,
+            None,
+            crate::models::SongSource::OPENED_FILE_ID,
+        );
+        assert_eq!(
+            manager.get_full_resolution_cover_art_uri(opened).unwrap(),
+            Some(embedded_art_uri("album-1.jpg", "E:\\Device\\a.flac"))
         );
 
         for id in [

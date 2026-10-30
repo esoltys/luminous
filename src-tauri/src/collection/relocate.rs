@@ -102,6 +102,12 @@ fn strip_root_prefix(path: &Path, root: &Path) -> Option<PathBuf> {
     }
 }
 
+/// Whether `path` is `root` itself or inside it, across separators, trailing
+/// slashes, and case (on Windows).
+pub(crate) fn is_under_root(path: &Path, root: &Path) -> bool {
+    strip_root_prefix(path, root).is_some()
+}
+
 /// Whether two paths represent the same location across separators, trailing slashes,
 /// and case (on Windows).
 fn paths_match(a: &Path, b: &Path) -> bool {
@@ -804,7 +810,7 @@ mod tests {
         let f = fixture();
         let conn = f.db.pool.get().unwrap();
         let new_root_dir = f.root.join("Z_Music_Library");
-        std::fs::create_dir_all(&new_root_dir.join("Rock")).unwrap();
+        std::fs::create_dir_all(new_root_dir.join("Rock")).unwrap();
         std::fs::write(new_root_dir.join("Rock").join("Song.mp3"), b"pretend-audio").unwrap();
 
         // Database has directory recorded with exact path
