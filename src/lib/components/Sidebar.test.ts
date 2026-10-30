@@ -9,6 +9,7 @@ import { pinnedStore } from "../stores/pinned.svelte";
 import { i18n } from "../stores/i18n.svelte";
 import { musicbrainzStore } from "../stores/musicbrainz.svelte";
 import { scrobblerStore } from "../stores/scrobbler.svelte";
+import { filesStore } from "../stores/files.svelte";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockResolvedValue([]),
@@ -171,3 +172,37 @@ describe("Sidebar.svelte", () => {
   });
 });
 
+
+describe("Sidebar.svelte - Files section", () => {
+  const music = { kind: "folder", id: 1 } as const;
+
+  beforeEach(() => {
+    i18n.currentLocale = "en-CA";
+    navigationStore.activeTab = "collection";
+    navigationStore.filesLocation = null;
+    filesStore.loaded = true;
+    filesStore.sources = [];
+  });
+
+  it("offers to add a music folder while the library is empty", () => {
+    collectionStore.stats = { ...collectionStore.stats!, total_songs: 0 };
+    const { getByRole, queryByRole } = render(Sidebar, { props: { width: 256 } });
+
+    expect(getByRole("button", { name: "Files" })).toBeInTheDocument();
+    expect(getByRole("button", { name: /add a music folder/i })).toBeInTheDocument();
+    expect(queryByRole("button", { name: /artists/i })).toBeNull();
+  });
+
+  it("lists each source with its song count and opens it in the Files view", async () => {
+    filesStore.sources = [{ source: music, name: "Music", songCount: 1234, available: true }];
+    const { getByRole, queryByRole } = render(Sidebar, { props: { width: 256 } });
+
+    expect(queryByRole("button", { name: /add a music folder/i })).toBeNull();
+    await fireEvent.click(getByRole("button", { name: /Music \(1,234\)/ }));
+    expect(navigationStore.activeTab).toBe("files");
+    expect(navigationStore.filesLocation).toEqual({ source: music, path: [] });
+
+    await fireEvent.click(getByRole("button", { name: "Files" }));
+    expect(navigationStore.filesLocation).toBeNull();
+  });
+});

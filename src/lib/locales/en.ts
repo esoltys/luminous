@@ -22,7 +22,68 @@ export const en = {
     musicbrainzLogin: "Log In to MusicBrainz",
     musicbrainzProfile: "MusicBrainz Profile",
     scrobblingPaused: "Scrobbling paused",
-    pinned: "Pinned"
+    pinned: "Pinned",
+    files: "Files"
+  },
+  files: {
+    addSource: "Add a folder or server",
+    addMusicFolder: "Add a music folder",
+    noSources: "Add a music folder or a media server to browse its files here.",
+    folders: "Folders",
+    breadcrumb: "Folder path",
+    columnName: "Name",
+    columnType: "Type",
+    columnSize: "Size",
+    columnInLibrary: "In library",
+    status: {
+      inLibrary: "Yes",
+      notScanned: "No, added since last scan",
+      albumArt: "Album art",
+      notAudio: "Not audio",
+      excluded: "Excluded"
+    },
+    emptyFolder: "This folder is empty.",
+    sourceGone: "This source is no longer available.",
+    unreachable: "Can't reach {name}.",
+    retry: "Retry",
+    playFolder: "Play folder",
+    addToDeviceSync: "Add to device sync",
+    revealWindows: "Show in File Explorer",
+    revealMac: "Show in Finder",
+    revealLinux: "Show in file manager",
+    folderSettings: "Folder settings",
+    scanFolder: "Scan this folder",
+    scanning: "Scanning…",
+    summaryFiles: {
+      one: "{count} file, {size}.",
+      other: "{count} files, {size}."
+    },
+    summaryFilesNoSize: {
+      one: "{count} file.",
+      other: "{count} files."
+    },
+    summaryInLibrary: {
+      one: "{count} is in your library.",
+      other: "{count} are in your library."
+    },
+    songCount: {
+      one: "{count} song",
+      other: "{count} songs"
+    },
+    kind: {
+      folder: "Music folder",
+      subsonic: "Media server",
+      webdav: "WebDAV server",
+      device: "Device"
+    },
+    nothingToPlay: "Nothing in this folder is in your library yet.",
+    playFailed: "Couldn't play this folder.",
+    notInLibrary: "This file isn't in your library.",
+    notInLibraryScan: "This file isn't in your library yet. Scan this folder to add it.",
+    alreadySyncing: "{folder} is already in {device}'s sync.",
+    addedToSync: "Added {folder} to {device}'s sync.",
+    addToSyncFailed: "Couldn't add this folder to {device}'s sync.",
+    scanFailed: "Couldn't scan this folder."
   },
   topNav: {
     filterExample: "e.g. rating:>=4 year:<2000 genre:jazz \"miles davis\"",
@@ -2061,7 +2122,7 @@ export const en = {
     steps: {
       sidebar: {
         title: "Navigate your library",
-        description: "Jump between Home, your Collection, Playlists, Stats, Settings, and Help from here."
+        description: "Jump between Home, your Collection, Playlists, Files, Stats, Settings, and Help from here."
       },
       topNavigation: {
         title: "Find and open music",

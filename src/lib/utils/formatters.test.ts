@@ -46,6 +46,8 @@ describe("formatters", () => {
     i18n.currentLocale = "en-CA";
     expect(formatFileSize(1_342_177_280)).toBe("1.3 GB"); // 1.25 GB rounds to 1.3 with 1 fraction digit
     expect(formatFileSize(52_428_800)).toBe("50.0 MB");
+    expect(formatFileSize(6_200)).toBe("6 KB");
+    expect(formatFileSize(10)).toBe("1 KB");
 
     i18n.currentLocale = "fr-CA";
     expect(formatFileSize(1_342_177_280)).toBe("1,3 GB");

@@ -22,7 +22,68 @@ export const es = {
     musicbrainzLogin: "Iniciar sesión en MusicBrainz",
     musicbrainzProfile: "Perfil de MusicBrainz",
     scrobblingPaused: "Scrobbling en pausa",
-    pinned: "Anclados"
+    pinned: "Anclados",
+    files: "Archivos"
+  },
+  files: {
+    addSource: "Agregar una carpeta o un servidor",
+    addMusicFolder: "Agregar una carpeta de música",
+    noSources: "Agrega una carpeta de música o un servidor multimedia para explorar sus archivos aquí.",
+    folders: "Carpetas",
+    breadcrumb: "Ruta de la carpeta",
+    columnName: "Nombre",
+    columnType: "Tipo",
+    columnSize: "Tamaño",
+    columnInLibrary: "En la biblioteca",
+    status: {
+      inLibrary: "Sí",
+      notScanned: "No, se agregó después del último análisis",
+      albumArt: "Carátula",
+      notAudio: "No es audio",
+      excluded: "Excluido"
+    },
+    emptyFolder: "Esta carpeta está vacía.",
+    sourceGone: "Esta fuente ya no está disponible.",
+    unreachable: "No se puede conectar con {name}.",
+    retry: "Reintentar",
+    playFolder: "Reproducir carpeta",
+    addToDeviceSync: "Agregar a la sincronización",
+    revealWindows: "Mostrar en el Explorador de archivos",
+    revealMac: "Mostrar en Finder",
+    revealLinux: "Mostrar en el administrador de archivos",
+    folderSettings: "Configuración de la carpeta",
+    scanFolder: "Analizar esta carpeta",
+    scanning: "Analizando…",
+    summaryFiles: {
+      one: "{count} archivo, {size}.",
+      other: "{count} archivos, {size}."
+    },
+    summaryFilesNoSize: {
+      one: "{count} archivo.",
+      other: "{count} archivos."
+    },
+    summaryInLibrary: {
+      one: "{count} está en tu biblioteca.",
+      other: "{count} están en tu biblioteca."
+    },
+    songCount: {
+      one: "{count} canción",
+      other: "{count} canciones"
+    },
+    kind: {
+      folder: "Carpeta de música",
+      subsonic: "Servidor multimedia",
+      webdav: "Servidor WebDAV",
+      device: "Dispositivo"
+    },
+    nothingToPlay: "Nada de esta carpeta está todavía en tu biblioteca.",
+    playFailed: "No se pudo reproducir esta carpeta.",
+    notInLibrary: "Este archivo no está en tu biblioteca.",
+    notInLibraryScan: "Este archivo todavía no está en tu biblioteca. Analiza esta carpeta para agregarlo.",
+    alreadySyncing: "{folder} ya está en la sincronización de {device}.",
+    addedToSync: "Se agregó {folder} a la sincronización de {device}.",
+    addToSyncFailed: "No se pudo agregar esta carpeta a la sincronización de {device}.",
+    scanFailed: "No se pudo analizar esta carpeta."
   },
   topNav: {
     filterExample: "p. ej. rating:>=4 year:<2000 genre:jazz \"miles davis\"",
@@ -2061,7 +2122,7 @@ export const es = {
     steps: {
       sidebar: {
         title: "Navega por tu biblioteca",
-        description: "Desde aquí puedes ir a Inicio, tu Colección, Listas de reproducción, Estadísticas, Configuración y Ayuda."
+        description: "Desde aquí puedes ir a Inicio, tu Colección, Listas de reproducción, Archivos, Estadísticas, Configuración y Ayuda."
       },
       topNavigation: {
         title: "Busca y abre música",

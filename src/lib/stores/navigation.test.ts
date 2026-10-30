@@ -233,3 +233,36 @@ describe("navigationStore - help view navigation", () => {
   });
 });
 
+describe("navigationStore - Files location", () => {
+  const music = { kind: "folder", id: 1 } as const;
+
+  beforeEach(() => {
+    navigationStore.activeTab = "collection";
+    navigationStore.filesLocation = null;
+  });
+
+  it("opens the overview, or a folder of a source, and saves where it is", () => {
+    navigationStore.viewFiles();
+    expect(navigationStore.activeTab).toBe("files");
+    expect(navigationStore.filesLocation).toBeNull();
+    expect(localStorage.getItem("navigation_filesLocation")).toBeNull();
+
+    navigationStore.viewFiles(music, ["Rock", "Live"]);
+    expect(navigationStore.filesLocation).toEqual({ source: music, path: ["Rock", "Live"] });
+    expect(JSON.parse(localStorage.getItem("navigation_filesLocation")!)).toEqual({
+      source: music,
+      path: ["Rock", "Live"],
+    });
+  });
+
+  it("goes back to the previous folder", async () => {
+    navigationStore.viewFiles(music, ["Rock"]);
+    await Promise.resolve();
+    navigationStore.viewFiles(music, ["Rock", "Live"]);
+    await Promise.resolve();
+
+    navigationStore.goBack();
+    expect(navigationStore.activeTab).toBe("files");
+    expect(navigationStore.filesLocation).toEqual({ source: music, path: ["Rock"] });
+  });
+});

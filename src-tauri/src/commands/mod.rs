@@ -5,6 +5,7 @@ pub mod cover;
 pub mod devices;
 pub mod diagnostics;
 pub mod equalizer;
+pub mod files;
 pub mod loudness;
 pub mod lyrics;
 pub mod musicbrainz;

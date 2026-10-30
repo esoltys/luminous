@@ -7,7 +7,7 @@
 // Signature and resolve-condition changes are only caught in review.
 
 /** Version of this contract. Callers pass their vendored copy to `connect()`. */
-export const SCRIPT_API_VERSION = "1.3.0";
+export const SCRIPT_API_VERSION = "1.4.0";
 
 /** What `connect()` resolves with: the running app's version and every method it offers. */
 export interface ScriptContract {
@@ -17,7 +17,7 @@ export interface ScriptContract {
 }
 
 // Copies of app types, checked against the originals in contract.test.ts.
-export type ScriptTab = "home" | "collection" | "playlists" | "settings" | "lyrics" | "stats" | "organize" | "help";
+export type ScriptTab = "home" | "collection" | "playlists" | "files" | "settings" | "lyrics" | "stats" | "organize" | "help";
 export type ScriptSubTab = "songs" | "albums" | "artists" | "genres";
 export type ScriptSettingsTab = "general" | "system" | "sources" | "integrations" | "themes" | "equalizer" | "about";
 export type ScriptAutoPlaylistKind =

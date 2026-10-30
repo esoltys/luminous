@@ -33,6 +33,9 @@ export function formatFileSize(bytes?: number): string {
   if (bytes >= 1073741824) {
     return `${formatNumber(bytes / 1073741824, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} GB`;
   }
+  if (bytes < 1048576) {
+    return `${formatNumber(Math.max(1, Math.round(bytes / 1024)))} KB`;
+  }
   return `${formatNumber(bytes / 1048576, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} MB`;
 }
 

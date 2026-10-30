@@ -22,7 +22,76 @@ export const ru = {
     musicbrainzLogin: "Войти в MusicBrainz",
     musicbrainzProfile: "Профиль MusicBrainz",
     scrobblingPaused: "Скробблинг приостановлен",
-    pinned: "Закреплённые"
+    pinned: "Закреплённые",
+    files: "Файлы"
+  },
+  files: {
+    addSource: "Добавить папку или сервер",
+    addMusicFolder: "Добавить папку с музыкой",
+    noSources: "Добавьте папку с музыкой или медиасервер, чтобы просматривать его файлы здесь.",
+    folders: "Папки",
+    breadcrumb: "Путь к папке",
+    columnName: "Имя",
+    columnType: "Тип",
+    columnSize: "Размер",
+    columnInLibrary: "В библиотеке",
+    status: {
+      inLibrary: "Да",
+      notScanned: "Нет, добавлен после последнего сканирования",
+      albumArt: "Обложка",
+      notAudio: "Не аудио",
+      excluded: "Исключено"
+    },
+    emptyFolder: "Эта папка пуста.",
+    sourceGone: "Этот источник больше недоступен.",
+    unreachable: "Не удаётся подключиться к {name}.",
+    retry: "Повторить",
+    playFolder: "Воспроизвести папку",
+    addToDeviceSync: "Добавить в синхронизацию",
+    revealWindows: "Показать в проводнике",
+    revealMac: "Показать в Finder",
+    revealLinux: "Показать в файловом менеджере",
+    folderSettings: "Параметры папки",
+    scanFolder: "Сканировать эту папку",
+    scanning: "Сканирование…",
+    summaryFiles: {
+      one: "{count} файл, {size}.",
+      few: "{count} файла, {size}.",
+      many: "{count} файлов, {size}.",
+      other: "{count} файла, {size}."
+    },
+    summaryFilesNoSize: {
+      one: "{count} файл.",
+      few: "{count} файла.",
+      many: "{count} файлов.",
+      other: "{count} файла."
+    },
+    summaryInLibrary: {
+      one: "В библиотеке: {count}.",
+      few: "В библиотеке: {count}.",
+      many: "В библиотеке: {count}.",
+      other: "В библиотеке: {count}."
+    },
+    songCount: {
+      one: "{count} песня",
+      few: "{count} песни",
+      many: "{count} песен",
+      other: "{count} песни"
+    },
+    kind: {
+      folder: "Папка с музыкой",
+      subsonic: "Медиасервер",
+      webdav: "Сервер WebDAV",
+      device: "Устройство"
+    },
+    nothingToPlay: "Из этой папки в библиотеке пока ничего нет.",
+    playFailed: "Не удалось воспроизвести эту папку.",
+    notInLibrary: "Этого файла нет в библиотеке.",
+    notInLibraryScan: "Этого файла пока нет в библиотеке. Отсканируйте эту папку, чтобы добавить его.",
+    alreadySyncing: "Папка «{folder}» уже синхронизируется с «{device}».",
+    addedToSync: "Папка «{folder}» добавлена в синхронизацию с «{device}».",
+    addToSyncFailed: "Не удалось добавить эту папку в синхронизацию с «{device}».",
+    scanFailed: "Не удалось отсканировать эту папку."
   },
   topNav: {
     filterExample: "напр. rating:>=4 year:<2000 genre:jazz \"miles davis\"",
@@ -2179,7 +2248,7 @@ export const ru = {
     steps: {
       sidebar: {
         title: "Навигация по библиотеке",
-        description: "Отсюда можно перейти на главную, в коллекцию, списки воспроизведения, статистику, параметры и справку."
+        description: "Отсюда можно перейти на главную, в коллекцию, списки воспроизведения, файлы, статистику, параметры и справку."
       },
       topNavigation: {
         title: "Поиск и открытие музыки",

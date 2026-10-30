@@ -27,9 +27,11 @@ pub mod diagnostics;
 pub mod discord;
 pub mod eq_store;
 pub mod fade;
+pub mod files;
 pub mod filter_parser;
 pub mod hierarchy_sidecar;
 pub mod install_format;
+pub mod library_paths;
 pub mod loudness;
 pub mod lyrics;
 pub mod media_session;
@@ -1633,6 +1635,10 @@ pub fn run() {
             commands::webdav::sync_webdav_server,
             // Portable device commands (#835)
             commands::devices::get_connected_devices,
+            commands::files::list_file_sources,
+            commands::files::list_source_dir,
+            commands::files::get_source_songs,
+            commands::files::scan_source_folder,
             commands::devices::update_device_profile,
             commands::devices::eject_device,
             commands::devices::get_transcode_capabilities,

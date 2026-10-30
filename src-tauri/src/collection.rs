@@ -3,6 +3,7 @@
 use crate::{
     covermanager::CoverManager,
     db::Database,
+    library_paths,
     models::{
         FileType, MusicDirectory, PruneResult, QueuePopulationMode, ScanPhase, ScanProgress, Song,
         SongSource, LOCAL_SOURCES_SQL,
@@ -77,6 +78,8 @@ pub enum ScanTrigger {
     WatcherOverflow,
     /// The file watcher saw a directory added or changed.
     WatcherDirectoryChange,
+    /// "Scan this folder" in the Files view (#1841).
+    Folder,
 }
 
 impl ScanTrigger {
@@ -88,6 +91,7 @@ impl ScanTrigger {
             Some("folder_added") => Self::FolderAdded,
             Some("folder_removed") => Self::FolderRemoved,
             Some("folder_relocated") => Self::FolderRelocated,
+            Some("folder") => Self::Folder,
             _ => Self::Requested,
         }
     }
@@ -102,6 +106,7 @@ impl ScanTrigger {
             Self::FolderRelocated => "folder relocated",
             Self::WatcherOverflow => "watcher overflow",
             Self::WatcherDirectoryChange => "watcher directory change",
+            Self::Folder => "folder",
         }
     }
 }
@@ -165,6 +170,9 @@ impl ScanReport {
 #[derive(Debug)]
 pub struct CollectionScanner {
     db: Arc<Database>,
+    /// When set, a scan only looks for new and changed files inside this
+    /// folder (see [`CollectionScanner::scoped_to`]).
+    scope: Option<PathBuf>,
 }
 
 /// Runs a synchronous `CollectionScanner` operation (any of its non-`async`
@@ -355,7 +363,18 @@ pub fn resolve_path_directory(
 
 impl CollectionScanner {
     pub fn new(db: Arc<Database>) -> Self {
-        Self { db }
+        Self { db, scope: None }
+    }
+
+    /// A scanner whose scans look for new and changed files only inside
+    /// `folder`, which must be a watched folder or inside one (anywhere else,
+    /// or inside a reserved folder, they find nothing). The missing-file check
+    /// still covers the whole library: it asks whether each song's own file
+    /// exists, never whether the scan found it, so songs outside `folder` are
+    /// never taken for deleted.
+    pub fn scoped_to(mut self, folder: PathBuf) -> Self {
+        self.scope = Some(folder);
+        self
     }
 
     /// Register `path` as a watched music directory. Silently a no-op (not
@@ -443,6 +462,31 @@ impl CollectionScanner {
             .filter_map(|r| r.ok())
             .collect();
         Ok(dirs)
+    }
+
+    /// The folders a scan walks, each with the watched folder it belongs to:
+    /// every watched folder, or for a scoped scan only the scope, under the
+    /// innermost watched folder holding it. A scope that is in no watched
+    /// folder, or inside a reserved one, walks nothing.
+    fn walk_roots<'a>(&self, dirs: &'a [MusicDirectory]) -> Vec<(&'a MusicDirectory, PathBuf)> {
+        let Some(scope) = &self.scope else {
+            return dirs.iter().map(|d| (d, PathBuf::from(&d.path))).collect();
+        };
+        let scope_str = scope.to_string_lossy();
+        let Some(dir) = dirs
+            .iter()
+            .filter(|d| {
+                library_paths::same(scope, Path::new(&d.path))
+                    || library_paths::is_under(&scope_str, &d.path)
+            })
+            .max_by_key(|d| d.path.len())
+        else {
+            return Vec::new();
+        };
+        if is_in_reserved_folder(scope, Path::new(&dir.path)) {
+            return Vec::new();
+        }
+        vec![(dir, scope.clone())]
     }
 
     /// Update metadata (nickname, icon, color) for a watched directory.
@@ -1085,7 +1129,7 @@ impl CollectionScanner {
         let discovery_started = Instant::now();
         let mut all_paths: Vec<PathBuf> = Vec::new();
         let mut cue_paths: Vec<PathBuf> = Vec::new();
-        for dir in &dirs {
+        for (dir, walk_root) in self.walk_roots(&dirs) {
             let dir_name = directory_display_name(dir);
             on_progress(ScanProgress {
                 phase: ScanPhase::Discovering,
@@ -1096,10 +1140,10 @@ impl CollectionScanner {
                 directory_name: Some(dir_name),
                 directory_id: Some(dir.id),
             });
-            let walker = WalkDir::new(&dir.path)
+            let walker = WalkDir::new(&walk_root)
                 .follow_links(true)
                 .into_iter()
-                .filter_entry(|e| e.file_name() != "Duplicates");
+                .filter_entry(|e| e.depth() == 0 || !is_reserved_dir_name(e.file_name()));
             for entry in walker.filter_map(|e| e.ok()) {
                 let path = entry.path().to_path_buf();
                 if !path.is_file() {
@@ -1564,6 +1608,23 @@ impl CollectionScanner {
 // ---------------------------------------------------------------------------
 // Audio file detection
 // ---------------------------------------------------------------------------
+
+/// Whether a folder with this name is one the scanner never looks inside:
+/// the organizer's `Duplicates` folder, where it sets aside files that
+/// collide with one already in the library. The Files view shows these
+/// folders as excluded.
+pub(crate) fn is_reserved_dir_name(name: &std::ffi::OsStr) -> bool {
+    name == "Duplicates"
+}
+
+/// Whether `path` is a reserved folder of the watched folder `root`, or lies
+/// inside one. `root` itself never counts, so a watched folder that happens
+/// to be named `Duplicates` is scanned as usual.
+pub(crate) fn is_in_reserved_folder(path: &Path, root: &Path) -> bool {
+    path.components()
+        .skip(root.components().count())
+        .any(|c| is_reserved_dir_name(c.as_os_str()))
+}
 
 pub(crate) const AUDIO_EXTENSIONS: &[&str] = &[
     "mp3", "flac", "ogg", "opus", "m4a", "aac", "alac", "wav", "aiff", "aif", "wv", "mpc", "ape",

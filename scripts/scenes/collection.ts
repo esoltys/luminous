@@ -1,4 +1,5 @@
 import { defineScene } from "./types";
+import type { DirListing, FileSourceSummary } from "../../src/lib/types";
 import { featuredSongId, restorePins, trimPinsToOneRow } from "./helpers";
 
 const WIDE_SIDEBAR = { sidebarWidth: 220 };
@@ -16,6 +17,29 @@ export const collectionScenes = [
   defineScene({ name: "artists", file: "artists.png", view: { tab: "collection", subTab: "artists" }, layout: WIDE_SIDEBAR }),
   defineScene({ name: "songs", file: "songs.png", view: { tab: "collection", subTab: "songs" }, layout: WIDE_SIDEBAR }),
   defineScene({ name: "genres", file: "genres.png", view: { tab: "collection", subTab: "genres" }, layout: WIDE_SIDEBAR }),
+  defineScene({
+    name: "files",
+    file: "files.png",
+    view: { tab: "files" },
+    layout: WIDE_SIDEBAR,
+    // Two folders down the first music folder, so the parent columns show beside the table.
+    run: async ({ driver }) => {
+      const sources = await driver.invoke<FileSourceSummary[]>("list_file_sources");
+      const folder = sources.find((s) => s.source.kind === "folder");
+      if (!folder) return;
+      const path: string[] = [];
+      for (let depth = 0; depth < 2; depth++) {
+        const listing = await driver.invoke<DirListing>("list_source_dir", { source: folder.source, path });
+        const next = listing.entries.find((e) => e.isDir && e.status !== "excluded");
+        if (!next) break;
+        path.push(next.name);
+      }
+      await driver.evaluate(`(async () => {
+        const { navigationStore } = await import("/src/lib/stores/navigation.svelte.ts");
+        navigationStore.viewFiles(${JSON.stringify(folder.source)}, ${JSON.stringify(path)});
+      })()`);
+    },
+  }),
   defineScene({
     name: "artist-detail",
     file: "artist-detail.png",

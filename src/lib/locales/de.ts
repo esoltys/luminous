@@ -22,7 +22,68 @@ export const de = {
     musicbrainzLogin: "Bei MusicBrainz anmelden",
     musicbrainzProfile: "MusicBrainz-Profil",
     scrobblingPaused: "Scrobbling pausiert",
-    pinned: "Angeheftet"
+    pinned: "Angeheftet",
+    files: "Dateien"
+  },
+  files: {
+    addSource: "Ordner oder Server hinzufügen",
+    addMusicFolder: "Musikordner hinzufügen",
+    noSources: "Einen Musikordner oder Medienserver hinzufügen, um hier seine Dateien zu durchsuchen.",
+    folders: "Ordner",
+    breadcrumb: "Ordnerpfad",
+    columnName: "Dateiname",
+    columnType: "Format",
+    columnSize: "Größe",
+    columnInLibrary: "In der Mediathek",
+    status: {
+      inLibrary: "Ja",
+      notScanned: "Nein, seit der letzten Suche hinzugekommen",
+      albumArt: "Albumcover",
+      notAudio: "Keine Audiodatei",
+      excluded: "Ausgeschlossen"
+    },
+    emptyFolder: "Dieser Ordner ist leer.",
+    sourceGone: "Diese Quelle ist nicht mehr verfügbar.",
+    unreachable: "{name} ist nicht erreichbar.",
+    retry: "Erneut versuchen",
+    playFolder: "Ordner abspielen",
+    addToDeviceSync: "Zur Gerätesynchronisierung hinzufügen",
+    revealWindows: "Im Explorer anzeigen",
+    revealMac: "Im Finder anzeigen",
+    revealLinux: "Im Dateimanager anzeigen",
+    folderSettings: "Ordnereinstellungen",
+    scanFolder: "Diesen Ordner durchsuchen",
+    scanning: "Wird durchsucht…",
+    summaryFiles: {
+      one: "{count} Datei, {size}.",
+      other: "{count} Dateien, {size}."
+    },
+    summaryFilesNoSize: {
+      one: "{count} Datei.",
+      other: "{count} Dateien."
+    },
+    summaryInLibrary: {
+      one: "{count} davon ist in deiner Mediathek.",
+      other: "{count} davon sind in deiner Mediathek."
+    },
+    songCount: {
+      one: "{count} Titel",
+      other: "{count} Titel"
+    },
+    kind: {
+      folder: "Musikordner",
+      subsonic: "Medienserver",
+      webdav: "WebDAV-Server",
+      device: "Gerät"
+    },
+    nothingToPlay: "Aus diesem Ordner ist noch nichts in deiner Mediathek.",
+    playFailed: "Dieser Ordner konnte nicht abgespielt werden.",
+    notInLibrary: "Diese Datei ist nicht in deiner Mediathek.",
+    notInLibraryScan: "Diese Datei ist noch nicht in deiner Mediathek. Durchsuche diesen Ordner, um sie hinzuzufügen.",
+    alreadySyncing: "{folder} wird bereits mit {device} synchronisiert.",
+    addedToSync: "{folder} wird jetzt mit {device} synchronisiert.",
+    addToSyncFailed: "Dieser Ordner konnte nicht zur Synchronisierung mit {device} hinzugefügt werden.",
+    scanFailed: "Dieser Ordner konnte nicht durchsucht werden."
   },
   topNav: {
     filterExample: "z. B. rating:>=4 year:<2000 genre:jazz \"miles davis\"",
@@ -2061,7 +2122,7 @@ export const de = {
     steps: {
       sidebar: {
         title: "In der Mediathek navigieren",
-        description: "Von hier aus wechselst du zwischen Start, Sammlung, Wiedergabelisten, Statistik, Einstellungen und Hilfe."
+        description: "Von hier aus wechselst du zwischen Start, Sammlung, Wiedergabelisten, Dateien, Statistik, Einstellungen und Hilfe."
       },
       topNavigation: {
         title: "Musik finden und öffnen",
