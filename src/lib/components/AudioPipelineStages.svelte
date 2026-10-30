@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { AudioPipelineInfo, LoudnessGainSource } from '../types';
   import { i18n, formatNumber } from '../stores/i18n.svelte';
+  import { playerStore } from '../stores/player.svelte';
   import {
     CpuIcon as Cpu,
     SlidersIcon as Sliders,
@@ -69,8 +70,12 @@
   let unprocessed = $derived(
     !!pipeline && !pipeline.eq_enabled && pipeline.loudness_source === 'disabled' && !resampled
   );
-  // Bit-perfect also needs an output with no system mixer after Luminous.
-  let isBitPerfect = $derived(unprocessed && !!pipeline?.output_bypasses_mixer);
+  // Volume is neutral if handled in device hardware or set to 100% in software.
+  let volumeNeutral = $derived(
+    !!pipeline?.output_hardware_volume || Math.abs((playerStore.volume ?? 1) - 1.0) < 0.001
+  );
+  // Bit-perfect also needs an output with no system mixer after Luminous, and no software gain.
+  let isBitPerfect = $derived(unprocessed && !!pipeline?.output_bypasses_mixer && volumeNeutral);
   let sharedMixer = $derived(!pipeline?.output_bypasses_mixer);
 </script>
 
@@ -139,7 +144,7 @@
             <Sparkles class="w-2.5 h-2.5 text-brand-text-primary" />
             {i18n.t('audioPipeline.bitPerfect', {}, 'Bit-perfect')}
           </span>
-        {:else if !unprocessed}
+        {:else if !unprocessed || !volumeNeutral}
           <span class="px-2 py-0.5 text-[10px] font-semibold tracking-wider bg-brand-accent/15 text-brand-text-primary border border-brand-accent/30 rounded-full">
             {i18n.t('audioPipeline.processed', {}, 'Processed')}
           </span>
@@ -243,6 +248,17 @@
         <div class="col-span-2 flex flex-col">
           <span class="text-[10px] uppercase font-semibold text-brand-text-secondary">{i18n.t('audioPipeline.outputBackend', {}, 'Backend')}</span>
           <span class="text-brand-text-primary font-semibold">{pipeline.output_backend}</span>
+        </div>
+
+        <div class="col-span-2 flex flex-col">
+          <span class="text-[10px] uppercase font-semibold text-brand-text-secondary">{i18n.t('audioPipeline.volumeMode', {}, 'Volume Control')}</span>
+          <span class="text-brand-text-primary font-semibold">
+            {#if pipeline.output_hardware_volume}
+              {i18n.t('audioPipeline.volumeHardware', {}, 'Hardware (bit-perfect)')}
+            {:else}
+              {i18n.t('audioPipeline.volumeSoftware', {}, 'Software')}
+            {/if}
+          </span>
         </div>
       </div>
     </div>

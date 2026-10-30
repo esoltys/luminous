@@ -505,6 +505,8 @@ export interface AudioPipelineInfo {
   output_bypasses_mixer: boolean;
   /** The configured bit-perfect output couldn't open; this is shared output standing in for it. */
   output_fell_back: boolean;
+  /** Whether volume control occurs in device hardware (keeping software gain at unity). */
+  output_hardware_volume: boolean;
 }
 
 export type AudioBackendKind = "cpal" | "asio" | "wasapi_exclusive" | "alsa";

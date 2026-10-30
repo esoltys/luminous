@@ -2358,6 +2358,9 @@ export const uk = {
     directRate: "Пряма частота",
     systemMixer: "Системний мікшер",
     resampled: "Ресемплінг виконано",
+    volumeMode: "Керування гучністю",
+    volumeHardware: "Апаратне (біт-у-біт)",
+    volumeSoftware: "Програмне",
   },
   auth: {
     modalTitle: "Вхід у MusicBrainz",

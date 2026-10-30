@@ -281,6 +281,8 @@ const IDENTICAL_OK_IT = new Set<string>([
   "audioPipeline.normalizationGain", // "{gain} dB ({source})"
   "audioPipeline.outputBackend", // "Backend"
   "audioPipeline.bitPerfect", // "Bit-perfect"
+  "audioPipeline.volumeHardware", // "Hardware (bit-perfect)"
+  "audioPipeline.volumeSoftware", // "Software"
   "auth.scrobbling", // "Scrobbling"
 ]);
 
@@ -343,6 +345,7 @@ const IDENTICAL_OK_ES = new Set<string>([
   "smartPlaylistBuilder.opLt", // "<"
   "audioPipeline.normalizationGain", // "{gain} dB ({source})"
   "audioPipeline.bitPerfect", // "Bit-perfect, a term of art"
+  "audioPipeline.volumeSoftware", // "Software"
   "auth.scrobbling", // "Scrobbling"
 ]);
 
@@ -472,6 +475,7 @@ const IDENTICAL_OK_DE = new Set<string>([
   "audioPipeline.normalizationGain",
   "audioPipeline.outputFormat",
   "audioPipeline.bitPerfect",
+  "audioPipeline.volumeSoftware",
   "auth.scrobbling",
 ]);
 

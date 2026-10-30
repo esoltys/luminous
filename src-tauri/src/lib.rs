@@ -655,6 +655,12 @@ fn spawn_audio_event_loop(
                             };
                             let _ = app.emit("audio-pipeline-changed", pipeline);
                         }
+                        crate::audio::AudioEvent::VolumeChanged(vol) => {
+                            p.update_external_volume(vol);
+                            let state = p.get_state().await;
+                            crate::media_session::mirror_state(&app, &state).await;
+                            let _ = app.emit("playback-state", state);
+                        }
                         // Exclusive/ASIO couldn't open; playback goes on through
                         // shared output. The UI says why.
                         crate::audio::AudioEvent::OutputFallback { requested, reason } => {

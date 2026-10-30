@@ -2232,6 +2232,9 @@ export const it = {
     directRate: "Frequenza diretta",
     systemMixer: "Mixer di sistema",
     resampled: "Ricampionato",
+    volumeMode: "Controllo volume",
+    volumeHardware: "Hardware (bit-perfect)",
+    volumeSoftware: "Software",
   },
   auth: {
     modalTitle: "Accedi a MusicBrainz",

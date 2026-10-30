@@ -2232,6 +2232,9 @@ export const de = {
     directRate: "Direkte Rate",
     systemMixer: "Systemmixer",
     resampled: "Resampling angewendet",
+    volumeMode: "Lautstärkeregelung",
+    volumeHardware: "Hardware (bitgenau)",
+    volumeSoftware: "Software",
   },
   auth: {
     modalTitle: "Bei MusicBrainz anmelden",

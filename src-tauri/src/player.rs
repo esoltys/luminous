@@ -1270,6 +1270,15 @@ impl Player {
         Ok(())
     }
 
+    /// Records an external volume change (e.g. from alsamixer or a physical DAC knob)
+    /// without re-issuing a volume command to the audio engine.
+    pub fn update_external_volume(&mut self, vol: f32) {
+        self.volume = vol.clamp(0.0, 1.0);
+        if let Ok(conn) = self._db.pool.get() {
+            app_state_set(&conn, "volume", &self.volume.to_string());
+        }
+    }
+
     /// Advance playback: first drains any "play next" `queue` entries
     /// (skipping ones that became unplayable), and only once that's empty
     /// falls back to the normal shuffle/repeat-aware playlist advance. This
