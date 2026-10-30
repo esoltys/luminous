@@ -526,27 +526,22 @@ mod imp {
             let quit = Arc::new(AtomicBool::new(false));
             let target_volume = Arc::new(AtomicU32::new(initial_vol.to_bits()));
 
-            let thread = {
-                let quit = Arc::clone(&quit);
-                let target_volume = Arc::clone(&target_volume);
-                let shared = Arc::clone(&shared);
-                std::thread::Builder::new()
-                    .name("luminous-alsa-mixer".into())
-                    .spawn(move || {
-                        run_mixer_loop(
-                            mixer,
-                            chosen_name,
-                            chosen_index,
-                            caps,
-                            saved,
-                            initial_vol,
-                            target_volume,
-                            quit,
-                            shared,
-                        );
-                    })
-                    .ok()?
+            let worker = MixerWorker {
+                mixer,
+                element_name: chosen_name,
+                element_index: chosen_index,
+                caps,
+                saved,
+                initial_vol,
+                target_volume: Arc::clone(&target_volume),
+                quit: Arc::clone(&quit),
+                shared: Arc::clone(&shared),
             };
+
+            let thread = std::thread::Builder::new()
+                .name("luminous-alsa-mixer".into())
+                .spawn(move || worker.run())
+                .ok()?;
 
             Some(Self {
                 target_volume,
@@ -604,7 +599,7 @@ mod imp {
         }
     }
 
-    fn run_mixer_loop(
+    struct MixerWorker {
         mixer: Mixer,
         element_name: String,
         element_index: u32,
@@ -614,56 +609,65 @@ mod imp {
         target_volume: Arc<AtomicU32>,
         quit: Arc<AtomicBool>,
         shared: Arc<AudioShared>,
-    ) {
-        let sid = SelemId::new(&element_name, element_index);
-        let mut last_applied_vol = initial_vol;
-        while !quit.load(Ordering::Acquire) {
-            let target_vol = f32::from_bits(target_volume.load(Ordering::Acquire));
-            if (target_vol - last_applied_vol).abs() > 0.001 {
-                if let Some(selem) = mixer.find_selem(&sid) {
-                    apply_to_selem(&selem, target_vol, caps);
-                    last_applied_vol = target_vol;
-                }
-            }
+    }
 
-            let _ = mixer.wait(Some(MIXER_POLL_TIMEOUT_MS));
-            if let Ok(count) = mixer.handle_events() {
-                if count > 0 {
-                    if let Some(selem) = mixer.find_selem(&sid) {
-                        if let Some(read_vol) = read_from_selem(&selem, caps) {
-                            if (read_vol - last_applied_vol).abs() >= EXTERNAL_VOLUME_HYSTERESIS {
-                                last_applied_vol = read_vol;
-                                target_volume.store(read_vol.to_bits(), Ordering::Release);
-                                shared.volume.store(read_vol.to_bits(), Ordering::Release);
-                                let _ = shared
-                                    .event_tx
-                                    .send(crate::AudioEvent::VolumeChanged(read_vol));
+    impl MixerWorker {
+        fn run(self) {
+            let sid = SelemId::new(&self.element_name, self.element_index);
+            let mut last_applied_vol = self.initial_vol;
+            while !self.quit.load(Ordering::Acquire) {
+                let target_vol = f32::from_bits(self.target_volume.load(Ordering::Acquire));
+                if (target_vol - last_applied_vol).abs() > 0.001 {
+                    if let Some(selem) = self.mixer.find_selem(&sid) {
+                        apply_to_selem(&selem, target_vol, self.caps);
+                        last_applied_vol = target_vol;
+                    }
+                }
+
+                let _ = self.mixer.wait(Some(MIXER_POLL_TIMEOUT_MS));
+                if let Ok(count) = self.mixer.handle_events() {
+                    if count > 0 {
+                        if let Some(selem) = self.mixer.find_selem(&sid) {
+                            if let Some(read_vol) = read_from_selem(&selem, self.caps) {
+                                if (read_vol - last_applied_vol).abs() >= EXTERNAL_VOLUME_HYSTERESIS
+                                {
+                                    last_applied_vol = read_vol;
+                                    self.target_volume
+                                        .store(read_vol.to_bits(), Ordering::Release);
+                                    self.shared
+                                        .volume
+                                        .store(read_vol.to_bits(), Ordering::Release);
+                                    let _ = self
+                                        .shared
+                                        .event_tx
+                                        .send(crate::AudioEvent::VolumeChanged(read_vol));
+                                }
                             }
                         }
                     }
                 }
             }
-        }
 
-        // Teardown: restore original level on the element
-        if let Some(selem) = mixer.find_selem(&sid) {
-            if caps.has_db_range {
-                if let Some(mb) = saved.db {
-                    let _ = selem.set_playback_db_all(mb, ::alsa::Round::Floor);
+            // Teardown: restore original level on the element
+            if let Some(selem) = self.mixer.find_selem(&sid) {
+                if self.caps.has_db_range {
+                    if let Some(mb) = self.saved.db {
+                        let _ = selem.set_playback_db_all(mb, ::alsa::Round::Floor);
+                    }
+                } else {
+                    let _ = selem.set_playback_volume_all(self.saved.raw);
                 }
-            } else {
-                let _ = selem.set_playback_volume_all(saved.raw);
+                if let Some(sw) = self.saved.switch {
+                    let _ = selem.set_playback_switch_all(sw);
+                }
             }
-            if let Some(sw) = saved.switch {
-                let _ = selem.set_playback_switch_all(sw);
-            }
+            self.shared
+                .hardware_volume_active
+                .store(false, Ordering::Release);
+            self.shared
+                .output_hardware_volume
+                .store(false, Ordering::Release);
         }
-        shared
-            .hardware_volume_active
-            .store(false, Ordering::Release);
-        shared
-            .output_hardware_volume
-            .store(false, Ordering::Release);
     }
 
     /// Opens the hardware PCM `device_id` (the first hardware device when
