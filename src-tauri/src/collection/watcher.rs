@@ -6,6 +6,7 @@
 use crate::{
     covermanager::CoverManager,
     db::Database,
+    library_paths,
     models::{BatchPhase, BatchProgress},
 };
 use anyhow::Result;
@@ -334,6 +335,29 @@ fn classify_watched_path(kind: &notify::EventKind, path: &Path) -> WatchedPathCh
     }
 }
 
+/// Whether a full scan would leave `path` out because it is in a reserved
+/// folder (`Duplicates`) of the watched folder holding it, so the watcher
+/// must not add it either.
+fn is_in_reserved_folder(path: &Path, roots: &[PathBuf]) -> bool {
+    let path_str = path.to_string_lossy();
+    roots
+        .iter()
+        .filter(|root| library_paths::is_under(&path_str, &root.to_string_lossy()))
+        .max_by_key(|root| root.as_os_str().len())
+        .is_some_and(|root| super::is_in_reserved_folder(path, root))
+}
+
+/// The watched folders, as they are now.
+fn watched_roots(conn: &rusqlite::Connection) -> Vec<PathBuf> {
+    conn.prepare("SELECT path FROM directories")
+        .and_then(|mut stmt| {
+            stmt.query_map([], |row| row.get::<_, String>(0))?
+                .collect::<rusqlite::Result<Vec<String>>>()
+        })
+        .map(|paths| paths.into_iter().map(PathBuf::from).collect())
+        .unwrap_or_default()
+}
+
 /// Whether the library already holds `path` exactly as it is on disk (same
 /// mtime and size) — an event for it then changed nothing worth re-reading.
 fn is_unchanged_on_disk(conn: &rusqlite::Connection, path: &Path) -> bool {
@@ -516,6 +540,11 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                 let mut removed_paths = std::collections::HashSet::new();
                 let mut added_paths = std::collections::HashSet::new();
                 let mut dir_paths = std::collections::HashSet::new();
+                let roots = db_for_thread
+                    .pool
+                    .get()
+                    .map(|conn| watched_roots(&conn))
+                    .unwrap_or_default();
                 for msg in batch {
                     let WatcherMsg::Event(event) = msg else {
                         continue;
@@ -534,6 +563,8 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                             WatchedPathChange::Removed => {
                                 removed_paths.insert(path);
                             }
+                            WatchedPathChange::Audio | WatchedPathChange::NewDir
+                                if is_in_reserved_folder(&path, &roots) => {}
                             WatchedPathChange::Audio => {
                                 added_paths.insert(path);
                             }
@@ -964,6 +995,36 @@ mod tests {
 
         assert!(!tracker.contains_recent_at(&stale_path, now));
         assert!(tracker.contains_recent_at(&fresh_path, now));
+    }
+
+    #[test]
+    fn test_files_in_reserved_folders_are_not_added() {
+        let music = PathBuf::from("/music");
+        let nested = PathBuf::from("/music/Rock");
+        let roots = vec![music.clone(), nested];
+
+        assert!(is_in_reserved_folder(
+            Path::new("/music/Duplicates/01.flac"),
+            &roots
+        ));
+        assert!(is_in_reserved_folder(
+            Path::new("/music/Rock/Album/Duplicates"),
+            &roots
+        ));
+        assert!(!is_in_reserved_folder(
+            Path::new("/music/Rock/Album/01.flac"),
+            &roots
+        ));
+        // A watched folder named like a reserved one is still scanned.
+        assert!(!is_in_reserved_folder(
+            Path::new("/Duplicates/Album/01.flac"),
+            &[PathBuf::from("/Duplicates")]
+        ));
+        // Outside every watched folder there is nothing to keep out.
+        assert!(!is_in_reserved_folder(
+            Path::new("/elsewhere/Duplicates/01.flac"),
+            &[music]
+        ));
     }
 
     #[test]

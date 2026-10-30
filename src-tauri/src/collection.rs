@@ -483,11 +483,7 @@ impl CollectionScanner {
         else {
             return Vec::new();
         };
-        let in_reserved = scope
-            .strip_prefix(&dir.path)
-            .map(|rest| rest.iter().any(is_reserved_dir_name))
-            .unwrap_or(false);
-        if in_reserved {
+        if is_in_reserved_folder(scope, Path::new(&dir.path)) {
             return Vec::new();
         }
         vec![(dir, scope.clone())]
@@ -1619,6 +1615,15 @@ impl CollectionScanner {
 /// folders as excluded.
 pub(crate) fn is_reserved_dir_name(name: &std::ffi::OsStr) -> bool {
     name == "Duplicates"
+}
+
+/// Whether `path` is a reserved folder of the watched folder `root`, or lies
+/// inside one. `root` itself never counts, so a watched folder that happens
+/// to be named `Duplicates` is scanned as usual.
+pub(crate) fn is_in_reserved_folder(path: &Path, root: &Path) -> bool {
+    path.components()
+        .skip(root.components().count())
+        .any(|c| is_reserved_dir_name(c.as_os_str()))
 }
 
 pub(crate) const AUDIO_EXTENSIONS: &[&str] = &[
