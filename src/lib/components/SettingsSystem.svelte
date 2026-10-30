@@ -244,13 +244,6 @@
   let directHardware = $derived(isDirectHardware(prefs.audioOutputConfig.backend));
   let noDevicesMessageKey = $derived(noDevicesKey(prefs.audioOutputConfig.backend));
 
-  // The chosen device when it isn't connected (unplugged): it stays chosen,
-  // so it's shown as disconnected rather than replaced by another device.
-  let missingDeviceId = $derived.by(() => {
-    const id = prefs.audioOutputConfig.device_id;
-    return id && !currentBackendDevices.some((d) => d.id === id) ? id : null;
-  });
-
   let selectedDeviceId = $derived.by(() => {
     const id = prefs.audioOutputConfig.device_id;
     if (id) return id;
@@ -423,8 +416,11 @@
       <label for="audio-device-select" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.audioDeviceLabel')}</label>
       <p class="text-xs text-brand-text-secondary">{i18n.t('settings.audioDeviceHint')}</p>
     </div>
-    {#if currentBackendDevices.length === 0 && !missingDeviceId && noDevicesMessageKey}
-      <span class="text-xs text-amber-400 font-medium">{i18n.t(noDevicesMessageKey)}</span>
+    {#if currentBackendDevices.length === 0 && noDevicesMessageKey}
+      <span class="flex items-center gap-1.5 text-xs text-brand-text-primary font-medium">
+        <AlertTriangle class="w-3.5 h-3.5 shrink-0" />
+        {i18n.t(noDevicesMessageKey)}
+      </span>
     {:else}
       <Select
         id="audio-device-select"
@@ -435,14 +431,13 @@
         {#if !directHardware}
           <option value="">{i18n.t('settings.audioDeviceDefault')}</option>
         {/if}
-        {#if missingDeviceId}
-          <option value={missingDeviceId}>
-            {i18n.t('settings.audioDeviceDisconnected', { name: prefs.audioDeviceName(missingDeviceId) ?? missingDeviceId })}
-          </option>
-        {/if}
         {#each currentBackendDevices as dev}
           <option value={dev.id}>
-            {dev.name}{dev.is_default ? ` (${i18n.t('settings.audioDeviceDefault')})` : ''}
+            {#if dev.connected}
+              {dev.name}{dev.is_default ? ` (${i18n.t('settings.audioDeviceDefault')})` : ''}
+            {:else}
+              {i18n.t('settings.audioDeviceDisconnected', { name: dev.name })}
+            {/if}
           </option>
         {/each}
       </Select>
@@ -451,7 +446,10 @@
 
   {#if playingShared}
     <div class="flex items-center justify-between gap-4 py-2">
-      <span class="text-xs text-amber-400 font-medium">{i18n.t('settings.audioOutputPlayingShared')}</span>
+      <span class="flex items-center gap-1.5 text-xs text-brand-text-primary font-medium">
+        <AlertTriangle class="w-3.5 h-3.5 shrink-0" />
+        {i18n.t('settings.audioOutputPlayingShared')}
+      </span>
       <Button
         onclick={() => void prefs.reapplyAudioOutput().catch(() => {})}
         variant="secondary"

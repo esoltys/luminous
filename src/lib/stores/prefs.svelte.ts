@@ -77,9 +77,6 @@ class PrefsStore {
   audioOutputDevices = $state<AudioDeviceInfo[]>([]);
   audioOutputConfig = $state<AudioOutputConfig>({ backend: "cpal", device_id: null });
   audioOutputLoading = $state<boolean>(false);
-  /** Names of every output device seen this session, so a chosen device that
-   * has been unplugged can still be shown by name. */
-  private knownDeviceNames = new Map<string, string>();
   private outputUnlistens: (() => void)[] = [];
   /** The open output last reported, to reload the device list only when it moves. */
   private lastOutputKey: string | null = null;
@@ -142,11 +139,6 @@ class PrefsStore {
     } catch (e) {
       console.error("Failed to follow audio output changes:", e);
     }
-  }
-
-  /** The name of output device `id`, if it has been seen this session. */
-  audioDeviceName(id: string): string | undefined {
-    return this.knownDeviceNames.get(id);
   }
 
   /** Persist the whole current state — fire-and-forget on the backend. */
@@ -310,7 +302,6 @@ class PrefsStore {
         invoke<AudioDeviceInfo[]>("get_audio_output_devices"),
         invoke<AudioOutputConfig>("get_audio_output_settings"),
       ]);
-      for (const d of devices) this.knownDeviceNames.set(d.id, d.name);
       this.audioOutputDevices = devices;
       this.audioOutputConfig = config;
     } catch (e) {

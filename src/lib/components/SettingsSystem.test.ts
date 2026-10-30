@@ -28,13 +28,13 @@ vi.mock("@tauri-apps/api/core", () => ({
     }
     if (cmd === "get_audio_output_devices") {
       return Promise.resolve([
-        { id: "def-1", name: "Speakers (Realtek Audio)", backend: "cpal", is_default: true },
-        { id: "usb-1", name: "USB DAC", backend: "cpal", is_default: false },
-        { id: "def-1", name: "Speakers (Realtek Audio)", backend: "wasapi_exclusive", is_default: true },
-        { id: "usb-1", name: "USB DAC", backend: "wasapi_exclusive", is_default: false },
-        { id: "asio-1", name: "FlexASIO", backend: "asio", is_default: false },
-        { id: "hw:CARD=PCH,DEV=0", name: "HDA Intel PCH — ALC289 Analog", backend: "alsa", is_default: false },
-        { id: "hw:CARD=EarPods,DEV=0", name: "EarPods — USB Audio", backend: "alsa", is_default: false },
+        { id: "def-1", name: "Speakers (Realtek Audio)", backend: "cpal", is_default: true, connected: true },
+        { id: "usb-1", name: "USB DAC", backend: "cpal", is_default: false, connected: true },
+        { id: "def-1", name: "Speakers (Realtek Audio)", backend: "wasapi_exclusive", is_default: true, connected: true },
+        { id: "usb-1", name: "USB DAC", backend: "wasapi_exclusive", is_default: false, connected: true },
+        { id: "asio-1", name: "FlexASIO", backend: "asio", is_default: false, connected: true },
+        { id: "hw:CARD=PCH,DEV=0", name: "HDA Intel PCH — ALC289 Analog", backend: "alsa", is_default: false, connected: true },
+        { id: "hw:CARD=EarPods,DEV=0", name: "EarPods — USB Audio", backend: "alsa", is_default: false, connected: true },
       ]);
     }
     if (cmd === "get_audio_output_settings") {
@@ -175,7 +175,7 @@ describe("SettingsSystem.svelte", () => {
     platform.isWindows = true;
     prefs.audioOutputConfig = { backend: "asio", device_id: "asio-1" };
     prefs.audioOutputDevices = [
-      { id: "asio-1", name: "FlexASIO", backend: "asio", is_default: false },
+      { id: "asio-1", name: "FlexASIO", backend: "asio", is_default: false, connected: true },
     ];
     const { findByRole } = render(SettingsSystem);
 
@@ -218,6 +218,24 @@ describe("SettingsSystem.svelte", () => {
     const deviceSelect = (await findByLabelText("Output Device")) as HTMLSelectElement;
     const labels = Array.from(deviceSelect.options).map((o) => o.textContent?.trim());
     expect(labels).toEqual(["HDA Intel PCH — ALC289 Analog", "EarPods — USB Audio"]);
+    expect(deviceSelect.value).toBe("hw:CARD=EarPods,DEV=0");
+  });
+
+  it("keeps an unplugged chosen device chosen and marks it disconnected", async () => {
+    platform.isLinux = true;
+    const { findByLabelText, findByRole } = render(SettingsSystem);
+    await findByRole("option", { name: "Speakers (Realtek Audio) (Default Output Device)" });
+    // The backend lists the chosen device under its last known name.
+    prefs.audioOutputDevices = [
+      { id: "hw:CARD=PCH,DEV=0", name: "HDA Intel PCH — ALC289 Analog", backend: "alsa", is_default: false, connected: true },
+      { id: "hw:CARD=EarPods,DEV=0", name: "EarPods — USB Audio", backend: "alsa", is_default: false, connected: false },
+    ];
+    prefs.audioOutputConfig = { backend: "alsa", device_id: "hw:CARD=EarPods,DEV=0" };
+    flushSync();
+
+    const deviceSelect = (await findByLabelText("Output Device")) as HTMLSelectElement;
+    const labels = Array.from(deviceSelect.options).map((o) => o.textContent?.trim());
+    expect(labels).toEqual(["HDA Intel PCH — ALC289 Analog", "EarPods — USB Audio (disconnected)"]);
     expect(deviceSelect.value).toBe("hw:CARD=EarPods,DEV=0");
   });
 

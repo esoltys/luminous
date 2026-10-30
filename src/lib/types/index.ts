@@ -526,6 +526,8 @@ export interface AudioDeviceInfo {
   name: string;
   backend: AudioBackendKind;
   is_default: boolean;
+  /** False for the chosen device while it's unplugged, listed under its last known name. */
+  connected: boolean;
 }
 
 export interface AudioOutputConfig {

@@ -670,12 +670,88 @@ pub async fn get_audio_pipeline_info(
     Ok(player.get_pipeline_info(&audio))
 }
 
-/// Returns all available audio output devices across supported backends (CPAL, ASIO).
+/// An output device as Settings lists it.
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+pub struct OutputDevice {
+    #[serde(flatten)]
+    pub info: luminous_audio::AudioDeviceInfo,
+    /// False for the chosen device while it's unplugged: it stays listed (and
+    /// chosen) under its last known name.
+    pub connected: bool,
+}
+
+/// Every connected output device across the supported backends, plus the
+/// chosen device when it isn't connected, so Settings never silently shows
+/// another device in its place.
 #[tauri::command]
-pub async fn get_audio_output_devices() -> Result<Vec<luminous_audio::AudioDeviceInfo>, String> {
-    tokio::task::spawn_blocking(luminous_audio::enumerate_output_devices)
+pub async fn get_audio_output_devices(
+    state: State<'_, AppState>,
+) -> Result<Vec<OutputDevice>, String> {
+    let connected = tokio::task::spawn_blocking(luminous_audio::enumerate_output_devices)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    let config = state.audio.lock().await.output_config();
+    let stored_name = crate::db::run_blocking(&state.db, |conn| {
+        Ok(conn
+            .query_row(
+                "SELECT value FROM app_state WHERE key = 'audio_output_device_name'",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .ok())
+    })
+    .await
+    .ok()
+    .flatten();
+
+    let (devices, name_to_store) = list_with_chosen_device(connected, &config, stored_name);
+    if let Some(name) = name_to_store {
+        let _ = crate::db::run_blocking(&state.db, move |conn| {
+            conn.execute(
+                "INSERT OR REPLACE INTO app_state (key, value) VALUES ('audio_output_device_name', ?1)",
+                rusqlite::params![name],
+            )?;
+            Ok(())
+        })
+        .await;
+    }
+    Ok(devices)
+}
+
+/// Lists `connected`, adding the device `config` chooses if it isn't among
+/// them, named `stored_name` (its name when last seen) or else its id. Also
+/// returns the chosen device's name to remember when it is connected and the
+/// remembered one differs.
+fn list_with_chosen_device(
+    connected: Vec<luminous_audio::AudioDeviceInfo>,
+    config: &luminous_audio::AudioOutputConfig,
+    stored_name: Option<String>,
+) -> (Vec<OutputDevice>, Option<String>) {
+    let chosen = config.device_id.as_deref();
+    let present = connected
+        .iter()
+        .find(|d| d.backend == config.backend && Some(d.id.as_str()) == chosen);
+    let name_to_store = present
+        .map(|d| d.name.clone())
+        .filter(|name| stored_name.as_ref() != Some(name));
+    let missing = chosen.filter(|_| present.is_none()).map(|id| OutputDevice {
+        info: luminous_audio::AudioDeviceInfo {
+            id: id.to_string(),
+            name: stored_name.unwrap_or_else(|| id.to_string()),
+            backend: config.backend,
+            is_default: false,
+        },
+        connected: false,
+    });
+    let devices = connected
+        .into_iter()
+        .map(|info| OutputDevice {
+            info,
+            connected: true,
+        })
+        .chain(missing)
+        .collect();
+    (devices, name_to_store)
 }
 
 /// Returns the current active audio output settings (backend and selected device).
@@ -758,6 +834,70 @@ pub async fn open_asio_control_panel(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn device(id: &str, name: &str) -> luminous_audio::AudioDeviceInfo {
+        luminous_audio::AudioDeviceInfo {
+            id: id.into(),
+            name: name.into(),
+            backend: luminous_audio::AudioBackendKind::Alsa,
+            is_default: false,
+        }
+    }
+
+    fn alsa_choosing(id: Option<&str>) -> luminous_audio::AudioOutputConfig {
+        luminous_audio::AudioOutputConfig {
+            backend: luminous_audio::AudioBackendKind::Alsa,
+            device_id: id.map(str::to_owned),
+        }
+    }
+
+    #[test]
+    fn an_unplugged_chosen_device_stays_listed_under_its_last_name() {
+        let pch = device("hw:CARD=PCH,DEV=0", "HDA Intel PCH");
+        let (devices, to_store) = list_with_chosen_device(
+            vec![pch.clone()],
+            &alsa_choosing(Some("hw:CARD=EarPods,DEV=0")),
+            Some("EarPods — USB Audio".into()),
+        );
+        assert_eq!(to_store, None);
+        assert_eq!(devices.len(), 2);
+        assert!(devices[0].connected);
+        assert_eq!(devices[1].info.name, "EarPods — USB Audio");
+        assert!(!devices[1].connected);
+
+        // Never seen by name: its id stands in.
+        let (devices, _) = list_with_chosen_device(
+            vec![pch],
+            &alsa_choosing(Some("hw:CARD=EarPods,DEV=0")),
+            None,
+        );
+        assert_eq!(devices[1].info.name, "hw:CARD=EarPods,DEV=0");
+    }
+
+    #[test]
+    fn a_connected_chosen_device_is_listed_once_and_its_name_remembered() {
+        let earpods = device("hw:CARD=EarPods,DEV=0", "EarPods — USB Audio");
+        let config = alsa_choosing(Some("hw:CARD=EarPods,DEV=0"));
+        let (devices, to_store) = list_with_chosen_device(vec![earpods.clone()], &config, None);
+        assert_eq!(devices.len(), 1);
+        assert!(devices[0].connected);
+        assert_eq!(to_store.as_deref(), Some("EarPods — USB Audio"));
+
+        let (_, to_store) =
+            list_with_chosen_device(vec![earpods], &config, Some("EarPods — USB Audio".into()));
+        assert_eq!(to_store, None, "already remembered");
+    }
+
+    #[test]
+    fn no_chosen_device_adds_nothing() {
+        let (devices, to_store) = list_with_chosen_device(
+            vec![device("hw:CARD=PCH,DEV=0", "PCH")],
+            &alsa_choosing(None),
+            None,
+        );
+        assert_eq!(devices.len(), 1);
+        assert_eq!(to_store, None);
+    }
 
     #[test]
     fn audio_backends_round_trip_through_their_persisted_key() {
