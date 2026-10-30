@@ -105,6 +105,9 @@ pub struct DirListing {
     pub total_bytes: Option<u64>,
     /// How many of the files are library songs.
     pub in_library_count: usize,
+    /// The folder is one the scanner never looks in, or inside one, so
+    /// scanning it would find nothing.
+    pub excluded: bool,
 }
 
 /// Every folder and server, in the order the sidebar shows them: folders,
@@ -421,7 +424,10 @@ fn list_folder(conn: &Connection, root: &Path, path: &[String]) -> Result<DirLis
             }
         })
         .collect();
-    Ok(finish(Some(dir.to_string_lossy().into_owned()), entries))
+    Ok(DirListing {
+        excluded: in_reserved,
+        ..finish(Some(dir.to_string_lossy().into_owned()), entries)
+    })
 }
 
 fn parent_key(key: &str) -> &str {
@@ -462,6 +468,7 @@ fn finish(location: Option<String>, mut entries: Vec<FileEntry>) -> DirListing {
             .filter(|e| e.status == Some(EntryStatus::InLibrary) && e.song_id.is_some())
             .count(),
         entries,
+        excluded: false,
     }
 }
 
@@ -574,6 +581,7 @@ fn list_subsonic(conn: &Connection, id: i64, path: &[String]) -> Result<DirListi
                 total_bytes: None,
                 in_library_count,
                 entries,
+                excluded: false,
             });
         }
     };
@@ -789,6 +797,8 @@ mod tests {
         );
         let reserved = list(&f, &["A", "Duplicates"]);
         assert_eq!(status_of(&reserved, "01.flac"), Some(EntryStatus::Excluded));
+        assert!(reserved.excluded);
+        assert!(!album.excluded);
     }
 
     #[cfg(windows)]

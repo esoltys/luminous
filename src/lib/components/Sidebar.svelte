@@ -14,6 +14,7 @@
   import MusicBrainzLoginModal from "./MusicBrainzLoginModal.svelte";
   import MusicBrainzProfilePopover from "./MusicBrainzProfilePopover.svelte";
   import PinnedNavList from "./PinnedNavList.svelte";
+  import SidebarFilesSection from "./files/SidebarFilesSection.svelte";
   import { untrack, onMount } from "svelte";
   import { fade } from "../utils/motion";
   import {
@@ -32,13 +33,10 @@
     QuestionIcon as HelpCircle,
     StackIcon as Layers
   } from "phosphor-svelte";
-  import { open } from "@tauri-apps/plugin-dialog";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
   import { SIDEBAR_MIN_WIDTH_PX } from "../constants";
 
   let { width = 256, resizing = false }: { width?: number; resizing?: boolean } = $props();
-
-  let showAddDirModal = $state(false);
 
   let isCollapsed = $derived(width < SIDEBAR_MIN_WIDTH_PX);
   let showUpdateBadge = $derived(updaterStore.updateAvailable || updaterStore.installStatus === "ready-to-restart");
@@ -89,21 +87,6 @@
     navigationStore.selectedAutoPlaylist = null;
   }
 
-  async function handleAddDirectory() {
-    try {
-      const selected = await open({
-        directory: true,
-        multiple: false,
-        title: i18n.t('settings.selectMusicDirectory'),
-      });
-      if (selected && typeof selected === "string") {
-        await collectionStore.addDirectory(selected);
-      }
-    } catch (err) {
-      console.error("Failed to open folder dialog:", err);
-    }
-  }
-
   function openPlaylistsSubTab(subTab: "auto" | "custom") {
     navigationStore.activeTab = "playlists";
     navigationStore.playlistsSubTab = subTab;
@@ -132,7 +115,7 @@
 
     <PinnedNavList collapsed={layoutCollapsed} />
 
-    <!-- Collection/Playlists/Lyrics/Stats stay hidden until the library has
+    <!-- Collection/Playlists/Organize/Stats stay hidden until the library has
          songs — except during the walkthrough, whose "sidebar" step
          narrates all of them, so an empty-library first-run tour would
          otherwise describe nav items the user can't see. -->
@@ -288,7 +271,7 @@
               playlistsStore.selectPlaylist(queuePl.id);
               navigationStore.viewPlaylist(queuePl.id);
             }}
-            class="w-full flex items-center justify-between px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab === 'playlists' && navigationStore.selectedPlaylistId && playlistsStore.playlists.find((p) => p.id === navigationStore.selectedPlaylistId)?.name?.toLowerCase() === 'queue' ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
+            class="w-full flex items-center justify-between px-2.5 py-1 rounded-md text-xs transition-colors {navigationStore.activeTab === 'playlists' && navigationStore.selectedPlaylistId && playlistsStore.playlists.find((p) => p.id === navigationStore.selectedPlaylistId)?.is_queue ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
           >
             <div class="flex items-center gap-2 truncate">
               <Layers class="w-3.5 h-3.5 icon-align" />
@@ -301,7 +284,12 @@
         </div>
       {/if}
     </div>
+    {/if}
 
+    <!-- Files stays on an empty library: it's where a new user adds music. -->
+    <SidebarFilesSection collapsed={layoutCollapsed} showSubItems={subItemsVisible} />
+
+    {#if !collectionStore.statsLoaded || collectionStore.stats.total_songs > 0 || walkthroughStore.isActive}
     <button
       onclick={() => { navigationStore.activeTab = "organize"; }}
       class="flex items-center gap-3 transition-colors duration-150 {navigationStore.activeTab === 'organize' ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {layoutCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"

@@ -266,6 +266,50 @@ export interface ConnectedDevice {
   profile: { nickname?: string | null };
 }
 
+/** A place music is read from or written to, in the Files view (#1841). */
+export type FileSource =
+  | { kind: "folder"; id: number }
+  | { kind: "subsonic"; id: number }
+  | { kind: "webdav"; id: number }
+  | { kind: "device"; id: string };
+
+/** A folder or server as the Files sidebar section lists it (`list_file_sources`). */
+export interface FileSourceSummary {
+  source: FileSource;
+  name: string;
+  /** Library songs from this source. */
+  songCount: number;
+  available: boolean;
+}
+
+/** What a file or folder is to the library. Word it in the UI; never show the code. */
+export type FileEntryStatus = "inLibrary" | "notScanned" | "albumArt" | "notAudio" | "excluded";
+
+export interface FileEntry {
+  name: string;
+  isDir: boolean;
+  size: number | null;
+  modified: number | null;
+  /** Upper-case extension or codec, e.g. "FLAC". */
+  fileType: string | null;
+  /** Null for ordinary folders and device files. */
+  status: FileEntryStatus | null;
+  songId: number | null;
+}
+
+/** One folder of a source (`list_source_dir`): folders first, then files. */
+export interface DirListing {
+  /** The real local path or server URL, to show; null for a Subsonic index. */
+  location: string | null;
+  entries: FileEntry[];
+  fileCount: number;
+  /** Null when the source doesn't report sizes. */
+  totalBytes: number | null;
+  inLibraryCount: number;
+  /** The folder is one the scanner never looks in, or inside one. */
+  excluded: boolean;
+}
+
 /** One thing checked to go on a device (backend `SyncSource`, #836). */
 export type SyncSource =
   | { kind: "library" }

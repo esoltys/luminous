@@ -22,7 +22,76 @@ export const uk = {
     musicbrainzLogin: "Увійти в MusicBrainz",
     musicbrainzProfile: "Профіль MusicBrainz",
     scrobblingPaused: "Скроблінг призупинено",
-    pinned: "Закріплені"
+    pinned: "Закріплені",
+    files: "Файли"
+  },
+  files: {
+    addSource: "Додати папку або сервер",
+    addMusicFolder: "Додати папку з музикою",
+    noSources: "Додайте папку з музикою або медіасервер, щоб переглядати його файли тут.",
+    folders: "Папки",
+    breadcrumb: "Шлях до папки",
+    columnName: "Ім'я",
+    columnType: "Тип",
+    columnSize: "Розмір",
+    columnInLibrary: "У бібліотеці",
+    status: {
+      inLibrary: "Так",
+      notScanned: "Ні, додано після останнього сканування",
+      albumArt: "Обкладинка",
+      notAudio: "Не аудіо",
+      excluded: "Виключено"
+    },
+    emptyFolder: "Ця папка порожня.",
+    sourceGone: "Це джерело більше недоступне.",
+    unreachable: "Не вдається підключитися до {name}.",
+    retry: "Повторити",
+    playFolder: "Відтворити папку",
+    addToDeviceSync: "Додати до синхронізації",
+    revealWindows: "Показати у Провіднику",
+    revealMac: "Показати у Finder",
+    revealLinux: "Показати у файловому менеджері",
+    folderSettings: "Налаштування папки",
+    scanFolder: "Сканувати цю папку",
+    scanning: "Сканування…",
+    summaryFiles: {
+      one: "{count} файл, {size}.",
+      few: "{count} файли, {size}.",
+      many: "{count} файлів, {size}.",
+      other: "{count} файлу, {size}."
+    },
+    summaryFilesNoSize: {
+      one: "{count} файл.",
+      few: "{count} файли.",
+      many: "{count} файлів.",
+      other: "{count} файлу."
+    },
+    summaryInLibrary: {
+      one: "У бібліотеці: {count}.",
+      few: "У бібліотеці: {count}.",
+      many: "У бібліотеці: {count}.",
+      other: "У бібліотеці: {count}."
+    },
+    songCount: {
+      one: "{count} пісня",
+      few: "{count} пісні",
+      many: "{count} пісень",
+      other: "{count} пісні"
+    },
+    kind: {
+      folder: "Папка з музикою",
+      subsonic: "Медіасервер",
+      webdav: "Сервер WebDAV",
+      device: "Пристрій"
+    },
+    nothingToPlay: "З цієї папки в бібліотеці поки нічого немає.",
+    playFailed: "Не вдалося відтворити цю папку.",
+    notInLibrary: "Цього файлу немає в бібліотеці.",
+    notInLibraryScan: "Цього файлу поки немає в бібліотеці. Відскануйте цю папку, щоб додати його.",
+    alreadySyncing: "Папка «{folder}» уже синхронізується з «{device}».",
+    addedToSync: "Папку «{folder}» додано до синхронізації з «{device}».",
+    addToSyncFailed: "Не вдалося додати цю папку до синхронізації з «{device}».",
+    scanFailed: "Не вдалося відсканувати цю папку."
   },
   topNav: {
     filterExample: "напр. rating:>=4 year:<2000 genre:jazz \"miles davis\"",
@@ -2179,7 +2248,7 @@ export const uk = {
     steps: {
       sidebar: {
         title: "Навігація бібліотекою",
-        description: "Звідси можна перейти на «Головну», до «Колекції», «Списків відтворення», «Статистики», «Налаштувань» і «Довідки»."
+        description: "Звідси можна перейти на «Головну», до «Колекції», «Списків відтворення», «Файлів», «Статистики», «Налаштувань» і «Довідки»."
       },
       topNavigation: {
         title: "Пошук і відкриття музики",

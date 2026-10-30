@@ -28,7 +28,68 @@ export const fr: DeepStringRecord<typeof en> = {
     musicbrainzLogin: "Connexion à MusicBrainz",
     musicbrainzProfile: "Profil MusicBrainz",
     scrobblingPaused: "Scrobbling en pause",
-    pinned: "Épinglés"
+    pinned: "Épinglés",
+    files: "Fichiers"
+  },
+  files: {
+    addSource: "Ajouter un dossier ou un serveur",
+    addMusicFolder: "Ajouter un dossier de musique",
+    noSources: "Ajoutez un dossier de musique ou un serveur multimédia pour parcourir ses fichiers ici.",
+    folders: "Dossiers",
+    breadcrumb: "Chemin du dossier",
+    columnName: "Nom",
+    columnType: "Format",
+    columnSize: "Taille",
+    columnInLibrary: "Dans la bibliothèque",
+    status: {
+      inLibrary: "Oui",
+      notScanned: "Non, ajouté depuis la dernière analyse",
+      albumArt: "Pochette",
+      notAudio: "Pas un fichier audio",
+      excluded: "Exclu"
+    },
+    emptyFolder: "Ce dossier est vide.",
+    sourceGone: "Cette source n'est plus disponible.",
+    unreachable: "Impossible de joindre {name}.",
+    retry: "Réessayer",
+    playFolder: "Lire le dossier",
+    addToDeviceSync: "Ajouter à la synchronisation",
+    revealWindows: "Afficher dans l'Explorateur de fichiers",
+    revealMac: "Afficher dans le Finder",
+    revealLinux: "Afficher dans le gestionnaire de fichiers",
+    folderSettings: "Paramètres du dossier",
+    scanFolder: "Analyser ce dossier",
+    scanning: "Analyse en cours…",
+    summaryFiles: {
+      one: "{count} fichier, {size}.",
+      other: "{count} fichiers, {size}."
+    },
+    summaryFilesNoSize: {
+      one: "{count} fichier.",
+      other: "{count} fichiers."
+    },
+    summaryInLibrary: {
+      one: "{count} est dans votre bibliothèque.",
+      other: "{count} sont dans votre bibliothèque."
+    },
+    songCount: {
+      one: "{count} chanson",
+      other: "{count} chansons"
+    },
+    kind: {
+      folder: "Dossier de musique",
+      subsonic: "Serveur multimédia",
+      webdav: "Serveur WebDAV",
+      device: "Appareil"
+    },
+    nothingToPlay: "Aucun fichier de ce dossier n'est encore dans votre bibliothèque.",
+    playFailed: "Impossible de lire ce dossier.",
+    notInLibrary: "Ce fichier n'est pas dans votre bibliothèque.",
+    notInLibraryScan: "Ce fichier n'est pas encore dans votre bibliothèque. Analysez ce dossier pour l'ajouter.",
+    alreadySyncing: "{folder} fait déjà partie de la synchronisation de {device}.",
+    addedToSync: "{folder} a été ajouté à la synchronisation de {device}.",
+    addToSyncFailed: "Impossible d'ajouter ce dossier à la synchronisation de {device}.",
+    scanFailed: "Impossible d'analyser ce dossier."
   },
   topNav: {
     filterExample: "p. ex. rating:>=4 year:<2000 genre:jazz \"miles davis\"",
@@ -2069,7 +2130,7 @@ export const fr: DeepStringRecord<typeof en> = {
     steps: {
       sidebar: {
         title: "Naviguez dans votre bibliothèque",
-        description: "Passez d'Accueil à Collection, Listes de lecture, Statistiques, Paramètres et Aide depuis ici."
+        description: "Passez d'Accueil à Collection, Listes de lecture, Fichiers, Statistiques, Paramètres et Aide depuis ici."
       },
       topNavigation: {
         title: "Trouvez et ouvrez de la musique",

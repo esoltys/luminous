@@ -1,8 +1,9 @@
 import { collectionStore } from "./collection.svelte";
 import { playlistsStore } from "./playlists.svelte";
 import { sameAlbum } from "$lib/utils/albumKey";
+import type { FileSource } from "../types";
 
-export type ActiveTab = "home" | "collection" | "playlists" | "settings" | "lyrics" | "stats" | "organize" | "help";
+export type ActiveTab = "home" | "collection" | "playlists" | "files" | "settings" | "lyrics" | "stats" | "organize" | "help";
 export type ActiveSubTab = "songs" | "albums" | "artists" | "genres";
 const SETTINGS_TABS = ["general", "system", "sources", "integrations", "themes", "equalizer", "about"] as const;
 export type SettingsTab = (typeof SETTINGS_TABS)[number];
@@ -41,6 +42,12 @@ export interface AutoPlaylistRef {
   updated?: number;
 }
 
+/** Where the Files view is: a folder of a source, as folder names from its root. */
+interface FilesLocation {
+  source: FileSource;
+  path: string[];
+}
+
 /** A snapshot of "where the user is" for Back/Forward navigation history. */
 interface NavigationView {
   activeTab: ActiveTab;
@@ -50,6 +57,7 @@ interface NavigationView {
   selectedAlbumName: string | null;
   selectedPlaylistId: number | null;
   selectedAutoPlaylist: AutoPlaylistRef | null;
+  filesLocation: FilesLocation | null;
 }
 
 const MAX_HISTORY = 50;
@@ -176,6 +184,25 @@ class NavigationStore {
     this.scheduleRecordHistory();
   }
 
+  private _filesLocation = $state<FilesLocation | null>(null);
+
+  /** The folder the Files view shows; null is the Files overview. */
+  get filesLocation() { return this._filesLocation; }
+  set filesLocation(val) {
+    this._filesLocation = val;
+    if (typeof window !== "undefined") {
+      if (val) localStorage.setItem("navigation_filesLocation", JSON.stringify(val));
+      else localStorage.removeItem("navigation_filesLocation");
+    }
+    this.scheduleRecordHistory();
+  }
+
+  /** Opens the Files view at a folder of `source`, or the overview without one. */
+  viewFiles(source?: FileSource, path: string[] = []) {
+    this.activeTab = "files";
+    this.filesLocation = source ? { source, path } : null;
+  }
+
   // Back/Forward navigation history. Snapshots are coalesced via a microtask
   // so that a single user action touching several fields in sequence (e.g.
   // viewArtist() setting activeTab/activeSubTab/selectedArtistName) records
@@ -197,6 +224,7 @@ class NavigationStore {
       selectedAlbumName: this._selectedAlbumName,
       selectedPlaylistId: this._selectedPlaylistId,
       selectedAutoPlaylist: this._selectedAutoPlaylist,
+      filesLocation: this._filesLocation,
     };
   }
 
@@ -230,6 +258,7 @@ class NavigationStore {
     this.selectedAlbumName = snap.selectedAlbumName;
     this.selectedPlaylistId = snap.selectedPlaylistId;
     this.selectedAutoPlaylist = snap.selectedAutoPlaylist;
+    this.filesLocation = snap.filesLocation;
     if (snap.selectedPlaylistId !== null) {
       playlistsStore.selectPlaylist(snap.selectedPlaylistId);
     }
@@ -278,6 +307,15 @@ class NavigationStore {
           this._selectedAutoPlaylist = JSON.parse(savedAutoPlaylist) as AutoPlaylistRef;
         } catch (e) {
           console.error("Failed to parse saved selectedAutoPlaylist:", e);
+        }
+      }
+
+      const savedFilesLocation = localStorage.getItem("navigation_filesLocation");
+      if (savedFilesLocation) {
+        try {
+          this._filesLocation = JSON.parse(savedFilesLocation) as FilesLocation;
+        } catch (e) {
+          console.error("Failed to parse saved filesLocation:", e);
         }
       }
     }

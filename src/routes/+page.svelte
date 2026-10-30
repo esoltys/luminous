@@ -137,6 +137,10 @@
       {#await import("../lib/components/PlaylistsCollectionView.svelte") then { default: PlaylistsCollectionView }}
         <PlaylistsCollectionView />
       {/await}
+    {:else if navigationStore.activeTab === "files"}
+      {#await import("../lib/components/files/FilesView.svelte") then { default: FilesView }}
+        <FilesView />
+      {/await}
     {:else if navigationStore.activeTab === "settings"}
       {#await import("../lib/components/SettingsView.svelte") then { default: SettingsView }}
         <SettingsView />
