@@ -131,7 +131,8 @@ fn resolve_dropped_paths(paths: Vec<String>) -> (Vec<PathBuf>, usize) {
 
 /// Resolves already-expanded file paths into `Song` rows: matches existing
 /// rows by path (normalizing slashes/case), or reads tags and upserts a fresh
-/// `OpenedFile` row — outside the library — for anything unknown. Shared by every
+/// row for anything unknown — a library song inside a watched folder, an
+/// `OpenedFile` outside the library anywhere else. Shared by every
 /// command that turns raw filesystem paths into Queue entries, so an
 /// unmanaged file dropped or opened from outside the library is always
 /// treated identically.

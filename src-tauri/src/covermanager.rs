@@ -2000,11 +2000,11 @@ impl CoverManager {
         let conn = self.db.pool.get()?;
         let sql = format!(
             "SELECT art_embedded, art_automatic, art_manual, art_unset, path,
-                    source IN ({lib})
+                    source IN ({files})
              FROM songs WHERE id = ?1",
-            lib = *crate::models::FILE_SOURCES_SQL
+            files = *crate::models::FILE_SOURCES_SQL
         );
-        let (art_embedded, art_automatic, art_manual, art_unset, path, is_local) =
+        let (art_embedded, art_automatic, art_manual, art_unset, path, on_disk) =
             conn.query_row(&sql, params![song_id], |row| {
                 Ok((
                     row.get::<_, bool>(0)?,
@@ -2017,7 +2017,7 @@ impl CoverManager {
             })?;
         drop(conn);
 
-        if !art_unset && art_manual.is_none() && art_embedded && is_local {
+        if !art_unset && art_manual.is_none() && art_embedded && on_disk {
             if let (Some(auto), Some(path)) = (art_automatic, path) {
                 if auto.starts_with("album-") && !path.contains("://") {
                     return Ok(Some(embedded_art_uri(&auto, &path)));

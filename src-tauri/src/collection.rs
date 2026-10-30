@@ -473,11 +473,7 @@ impl CollectionScanner {
         conn: &rusqlite::Connection,
         only_available: bool,
     ) -> Result<Vec<i64>> {
-        let all_roots: Vec<PathBuf> = self
-            .get_directories()?
-            .into_iter()
-            .map(|d| PathBuf::from(d.path))
-            .collect();
+        let watched = WatchedFolders::load(conn)?;
 
         let (active_webdav_song_ids, active_webdav_servers) = load_active_webdav_servers(conn);
         let subsonic_server_ids = load_subsonic_server_ids(conn);
@@ -524,13 +520,12 @@ impl CollectionScanner {
 
             let p = Path::new(&path);
 
-            // If the file is local (source 1 or 2) and not in any watched directory, it is orphaned.
-            if source.is_local() {
-                let is_watched = all_roots.iter().any(|root| p.starts_with(root));
-                if !is_watched {
-                    missing.push(id);
-                    continue;
-                }
+            // A library file (source 1 or 2) outside every watched folder is
+            // orphaned. Opened files live outside them by definition and only
+            // go missing when the file itself does.
+            if source.is_local() && watched.source_for(p) == SongSource::OpenedFile {
+                missing.push(id);
+                continue;
             }
 
             if p.exists() {
@@ -2049,11 +2044,7 @@ impl WatchedFolders {
 
     /// The source a local file at `path` belongs to: `LocalFile` inside a
     /// watched folder (matched case- and separator-insensitively on
-    /// Windows), `OpenedFile` anywhere else (#1842). Any caller that reads
-    /// and upserts a path that isn't known to come from a watched-folder
-    /// scan must set the song's source from this, since `upsert_song`
-    /// promotes an `OpenedFile` row to the library whenever the incoming
-    /// source isn't `OpenedFile`.
+    /// Windows), `OpenedFile` anywhere else (#1842).
     pub(crate) fn source_for(&self, path: &Path) -> SongSource {
         if self
             .0
@@ -2080,6 +2071,15 @@ pub(crate) fn read_and_upsert_song(
 // Database upsert
 // ---------------------------------------------------------------------------
 
+/// Inserts `song`, or refreshes the row already stored for its path (and CUE
+/// offset) from it, keeping play stats, ratings and playlist membership.
+///
+/// `song.source` is taken as the truth about library membership (#1842): any
+/// source other than `OpenedFile` promotes an existing opened-file row into the
+/// library and restamps its `added`, while an `OpenedFile` song never demotes
+/// a library row. So a caller upserting a path that didn't come from a
+/// watched-folder scan must classify it with [`WatchedFolders::source_for`]
+/// first, or it would add the file to the library.
 pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()> {
     conn.execute(
         &format!(
@@ -2798,8 +2798,9 @@ mod tests {
             .scan_all_core(app_data_dir.clone(), false, false, false, |_| {})
             .await
             .unwrap();
-        let added_ids = |s: &CollectionScanner| -> Vec<i64> {
-            s.get_recently_added_songs(10)
+        let added_ids = |scanner: &CollectionScanner| -> Vec<i64> {
+            scanner
+                .get_recently_added_songs(10)
                 .unwrap()
                 .iter()
                 .map(|s| s.id)
@@ -2882,6 +2883,33 @@ mod tests {
         assert_eq!(source, SongSource::LocalFile);
         assert!(added > 1, "upgrade must refresh `added`, got {added}");
         assert!(added_ids(&scanner).contains(&opened_id));
+    }
+
+    /// The orphan check matches watched folders the same way as opened-file
+    /// classification: a library row stored with different casing or slashes
+    /// than its folder is still in the library, not "outside every folder".
+    #[cfg(windows)]
+    #[test]
+    fn test_missing_check_matches_watched_folders_case_insensitively() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let music_dir = temp_dir.path().join("Music");
+        std::fs::create_dir_all(&music_dir).unwrap();
+        let file = music_dir.join("a.wav");
+        write_test_wav(&file);
+
+        let db = Arc::new(Database::new(temp_dir.path().to_path_buf()).unwrap());
+        let scanner = CollectionScanner::new(Arc::clone(&db));
+        scanner.add_directory(&music_dir.to_string_lossy()).unwrap();
+        let stored = file.to_string_lossy().to_uppercase().replace('\\', "/");
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO songs (path, source) VALUES (?1, ?2)",
+            params![stored, SongSource::LOCAL_FILE_ID],
+        )
+        .unwrap();
+        drop(conn);
+
+        assert_eq!(scanner.mark_missing_unavailable().unwrap(), 0);
     }
 
     /// #1842: opening an unscanned file that is already inside a watched
