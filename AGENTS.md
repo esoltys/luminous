@@ -343,8 +343,8 @@ punt either to the user.
   3. Perform a codebase search or analysis to fill out the template's sections (Description, Root Cause Analysis, Affected Components & Code Locations, Proposed Solution) accurately.
   4. Write the issue or PR body to a temporary scratch file in the workspace or the artifacts scratch directory.
   5. Pick the milestone: never file a new issue against a Closed milestone. Unless the user
-     specifies one, default to the current milestone: the lowest-numbered open milestone that
-     still has open issues (`gh api repos/esoltys/luminous/milestones -q '[.[] | select(.open_issues > 0)] | sort_by(.title | split(".") | map(tonumber)) | .[0].title'`),
+     specifies one, default to the lowest open milestone that hasn't been released (no `vX.Y.0`
+     in `gh release list`; open milestones via `gh api repos/esoltys/luminous/milestones -q '.[].title'`),
      rather than asking which milestone to use each time. **Never attach a
      milestone to a Pull Request** — milestones track issues only, and tagging or assigning a
      milestone to a PR can trigger release workflows.
