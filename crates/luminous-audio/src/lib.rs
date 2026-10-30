@@ -156,6 +156,8 @@ enum AudioCommand {
     ClearPreload,
     /// Force a rebuild of the audio output stream (e.g. backend or device changed).
     RebuildOutput,
+    /// Update output volume level on the active sink.
+    SetVolume(f32),
 }
 
 struct PlayRequest {
@@ -217,6 +219,8 @@ pub struct OutputInfo {
     pub fell_back: bool,
     /// The sample format the device receives, e.g. "24-bit integer PCM".
     pub format: String,
+    /// Whether volume control occurs in device hardware (keeping software gain at unity).
+    pub hardware_volume: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -245,6 +249,8 @@ pub enum AudioEvent {
     },
     /// The audio pipeline has changed (e.g. output device reconnected or changed format).
     PipelineChanged,
+    /// Hardware volume changed externally (e.g. via alsamixer or a physical DAC knob).
+    VolumeChanged(f32),
     /// The configured bit-perfect backend couldn't be opened, so playback
     /// continues through shared output. Sent with each output (re)build that
     /// falls back; informational only.
@@ -300,6 +306,9 @@ pub(crate) struct AudioShared {
     /// The gain `loudness_switch_at` switches to; written before it.
     pub(crate) loudness_switch_gain: AtomicU32,
     pub(crate) fade_gain: AtomicU32,
+    pub(crate) hardware_volume_active: std::sync::atomic::AtomicBool,
+    pub(crate) output_hardware_volume: std::sync::atomic::AtomicBool,
+    pub(crate) event_tx: mpsc::Sender<AudioEvent>,
 }
 
 /// `AudioShared::loudness_switch_at` value meaning no switch is scheduled.
@@ -371,6 +380,9 @@ impl AudioEngine {
             loudness_switch_at: AtomicU64::new(NO_LOUDNESS_SWITCH),
             loudness_switch_gain: AtomicU32::new(1.0f32.to_bits()),
             fade_gain: AtomicU32::new(1.0f32.to_bits()),
+            hardware_volume_active: std::sync::atomic::AtomicBool::new(false),
+            output_hardware_volume: std::sync::atomic::AtomicBool::new(false),
+            event_tx: event_tx.clone(),
         });
         let shared_clone = Arc::clone(&shared);
 
@@ -471,6 +483,7 @@ impl AudioEngine {
     pub fn set_volume(&self, vol: f32) {
         let vol = vol.clamp(0.0, 1.0);
         self.shared.volume.store(vol.to_bits(), Ordering::Relaxed);
+        let _ = self.send_cmd(AudioCommand::SetVolume(vol));
     }
 
     /// Step the per-track loudness-normalization multiplier (#77) at once,
@@ -595,6 +608,7 @@ impl AudioEngine {
             bypasses_mixer: self.shared.output_bypasses_mixer.load(Ordering::Relaxed),
             fell_back: self.shared.output_fell_back.load(Ordering::Relaxed),
             format: self.shared.output_format.read().to_string(),
+            hardware_volume: self.shared.output_hardware_volume.load(Ordering::Relaxed),
         }
     }
 
@@ -903,6 +917,9 @@ impl AudioOutput {
         shared
             .output_fell_back
             .store(self.fallback.is_some(), Ordering::Relaxed);
+        shared
+            .output_hardware_volume
+            .store(self.sink.has_hardware_volume(), Ordering::Relaxed);
         *shared.output_format.write() = self.sink.output_format();
         if let Some((requested, reason)) = self.fallback {
             let _ = event_tx.send(AudioEvent::OutputFallback { requested, reason });
@@ -1104,8 +1121,9 @@ impl OutputRenderer {
             }
         }
 
-        // 4) Master volume
-        if vol != 1.0 {
+        // 4) Master volume: bypassed when hardware volume is active (keeps samples bit-perfect)
+        let hw_vol = self.shared.hardware_volume_active.load(Ordering::Relaxed);
+        if !hw_vol && vol != 1.0 {
             for sample in output[..played].iter_mut() {
                 *sample *= vol;
             }
@@ -1634,6 +1652,12 @@ fn decode_thread(
                         shared.position.store(target_ns, Ordering::Relaxed);
                         continue;
                     }
+                    Ok(AudioCommand::SetVolume(vol)) => {
+                        if let Some(out) = output.as_ref() {
+                            out.sink.set_hardware_volume(vol);
+                        }
+                        continue;
+                    }
                     Ok(_) => continue, // Ignore other commands when stopped
                     Err(_) => break,   // Channel disconnected
                 }
@@ -1658,6 +1682,11 @@ fn decode_thread(
                     }
                     let _ = event_tx.send(AudioEvent::Stopped);
                     continue 'main;
+                }
+                Ok(AudioCommand::SetVolume(vol)) => {
+                    if let Some(out) = output.as_ref() {
+                        out.sink.set_hardware_volume(vol);
+                    }
                 }
                 // Pause/Resume/SeekTo/Preload target a track that hasn't
                 // started playing yet at this point — nothing to apply.
@@ -2215,6 +2244,10 @@ fn handle_decode_command(
             session.force_device_rebuild = true;
             CmdOutcome::Continue
         }
+        Ok(AudioCommand::SetVolume(vol)) => {
+            out.sink.set_hardware_volume(vol);
+            CmdOutcome::Continue
+        }
     }
 }
 
@@ -2749,6 +2782,9 @@ mod tests {
             loudness_switch_at: AtomicU64::new(NO_LOUDNESS_SWITCH),
             loudness_switch_gain: AtomicU32::new(1.0f32.to_bits()),
             fade_gain: AtomicU32::new(1.0f32.to_bits()),
+            hardware_volume_active: std::sync::atomic::AtomicBool::new(false),
+            output_hardware_volume: std::sync::atomic::AtomicBool::new(false),
+            event_tx: mpsc::channel().0,
         }
     }
 
@@ -2784,6 +2820,41 @@ mod tests {
             let (a, b) = equal_power_gains(step as f32 / 100.0);
             assert!((a * a + b * b - 1.0).abs() < 1e-6, "p = {step}/100");
         }
+    }
+
+    #[test]
+    fn hardware_volume_bypasses_software_gain_multiplier() {
+        let shared = test_shared();
+        shared.volume.store(0.5f32.to_bits(), Ordering::Relaxed);
+        let shared = Arc::new(shared);
+        let rb = HeapRb::<f32>::new(16);
+        let (mut prod, cons) = rb.split();
+        let _ = prod.try_push(0.8);
+        let _ = prod.try_push(0.8);
+        let _ = prod.try_push(-0.4);
+        let _ = prod.try_push(-0.4);
+
+        let mut renderer = OutputRenderer {
+            shared: Arc::clone(&shared),
+            consumer: Arc::new(Mutex::new(cons)),
+            played_samples: Arc::new(AtomicU64::new(0)),
+            mono_scratch: Vec::new(),
+            sample_rate: 44100,
+            channels: 2,
+        };
+
+        // 1) With hardware volume inactive, 0.5 software gain is applied: 0.8 * 0.5 = 0.4
+        let mut out = [0.0f32; 2];
+        renderer.render(&mut out);
+        assert!((out[0] - 0.4).abs() < 1e-6);
+        assert!((out[1] - 0.4).abs() < 1e-6);
+
+        // 2) With hardware volume active, samples pass through at unity: -0.4 * 1.0 = -0.4
+        shared.hardware_volume_active.store(true, Ordering::Relaxed);
+        let mut out2 = [0.0f32; 2];
+        renderer.render(&mut out2);
+        assert!((out2[0] - (-0.4)).abs() < 1e-6);
+        assert!((out2[1] - (-0.4)).abs() < 1e-6);
     }
 
     #[test]

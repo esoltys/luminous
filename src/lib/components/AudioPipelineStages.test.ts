@@ -26,6 +26,7 @@ function pipeline(overrides: Partial<AudioPipelineInfo> = {}): AudioPipelineInfo
     output_backend: "WASAPI Exclusive",
     output_bypasses_mixer: true,
     output_fell_back: false,
+    output_hardware_volume: true,
     ...overrides,
   };
 }
@@ -75,5 +76,30 @@ describe("AudioPipelineStages", () => {
     });
 
     expect(getByText("Bit-perfect")).toBeInTheDocument();
+  });
+
+  it("shows hardware volume control and preserves bit-perfect status", () => {
+    const { getByText } = render(AudioPipelineStages, {
+      pipeline: pipeline({
+        input_sample_rate: 44_100,
+        output_hardware_volume: true,
+      }),
+    });
+
+    expect(getByText("Volume Control")).toBeInTheDocument();
+    expect(getByText("Hardware (bit-perfect)")).toBeInTheDocument();
+    expect(getByText("Bit-perfect")).toBeInTheDocument();
+  });
+
+  it("shows software volume mode when hardware volume is not available", () => {
+    const { getByText } = render(AudioPipelineStages, {
+      pipeline: pipeline({
+        input_sample_rate: 44_100,
+        output_hardware_volume: false,
+      }),
+    });
+
+    expect(getByText("Volume Control")).toBeInTheDocument();
+    expect(getByText("Software")).toBeInTheDocument();
   });
 });

@@ -118,6 +118,7 @@ describe("RightPanel.svelte", () => {
     output_format: "32-bit float",
     output_device_name: "Default Output Device",
     output_backend: "WASAPI",
+    output_hardware_volume: false,
     output_bypasses_mixer: true,
     output_fell_back: false,
   };

@@ -818,6 +818,8 @@ pub struct AudioPipelineInfo {
     /// The configured bit-perfect output couldn't open; this is shared
     /// output standing in for it.
     pub output_fell_back: bool,
+    /// Whether volume control occurs in device hardware (keeping software gain at unity).
+    pub output_hardware_volume: bool,
 }
 
 // ---------------------------------------------------------------------------

@@ -121,6 +121,14 @@ pub trait AudioSink: Send {
 
     /// Whether the stream has experienced an unrecoverable device error.
     fn is_errored(&self) -> bool;
+
+    /// Whether volume control occurs in device hardware on this sink.
+    fn has_hardware_volume(&self) -> bool {
+        false
+    }
+
+    /// Sets the volume (0.0 to 1.0) on the sink's hardware mixer, if supported.
+    fn set_hardware_volume(&self, _volume: f32) {}
 }
 
 /// The rate a bit-perfect device is opened at before any track asks for one:

@@ -2239,7 +2239,10 @@ export const frFR: DeepStringRecord<typeof en> = {
     processed: "Traité",
     directRate: "Taux direct",
     systemMixer: "Mélangeur du système",
-    resampled: "Rééchantillonné"
+    resampled: "Rééchantillonné",
+    volumeMode: "Contrôle du volume",
+    volumeHardware: "Matériel (parfait au bit près)",
+    volumeSoftware: "Logiciel"
   },
   auth: {
     modalTitle: "Connexion à MusicBrainz",

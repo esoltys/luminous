@@ -2232,6 +2232,9 @@ export const es = {
     directRate: "Frecuencia directa",
     systemMixer: "Mezclador del sistema",
     resampled: "Remuestreado",
+    volumeMode: "Control de volumen",
+    volumeHardware: "Hardware (bit a bit)",
+    volumeSoftware: "Software",
   },
   auth: {
     modalTitle: "Iniciar sesión en MusicBrainz",

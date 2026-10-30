@@ -2232,6 +2232,9 @@ export const en = {
     directRate: "Direct rate",
     systemMixer: "System mixer",
     resampled: "Resampled",
+    volumeMode: "Volume Control",
+    volumeHardware: "Hardware (bit-perfect)",
+    volumeSoftware: "Software",
   },
   auth: {
     modalTitle: "Log In to MusicBrainz",

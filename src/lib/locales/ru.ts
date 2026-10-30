@@ -2357,7 +2357,10 @@ export const ru = {
     processed: "Обработано",
     directRate: "Исходная частота",
     systemMixer: "Системный микшер",
-    resampled: "Передискретизировано"
+    resampled: "Передискретизировано",
+    volumeMode: "Управление громкостью",
+    volumeHardware: "Аппаратное (бит-в-бит)",
+    volumeSoftware: "Программное"
   },
   auth: {
     modalTitle: "Вход в MusicBrainz",

@@ -76,6 +76,112 @@ pub(crate) fn device_label(card_name: &str, pcm_name: &str) -> String {
 }
 
 #[cfg(target_os = "linux")]
+pub(crate) use ::alsa::mixer::MilliBel;
+
+#[cfg(not(target_os = "linux"))]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) struct MilliBel(pub i64);
+
+/// An element in the simple mixer that may control playback volume.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct MixerElementInfo {
+    pub(crate) name: String,
+    pub(crate) index: u32,
+    pub(crate) has_playback_volume: bool,
+    pub(crate) has_playback_switch: bool,
+}
+
+/// Picks the best playback volume element for a PCM from the card's mixer elements.
+/// Priority order:
+/// 1) Exact (case-insensitive) match with `pcm_name`
+/// 2) "PCM"
+/// 3) "Master"
+/// 4) "Speaker"
+/// 5) "Headphone"
+/// 6) "Headset"
+/// 7) The first element with playback volume
+pub(crate) fn pick_mixer_element(elements: &[MixerElementInfo], pcm_name: &str) -> Option<usize> {
+    if !pcm_name.is_empty() {
+        if let Some(pos) = elements
+            .iter()
+            .position(|e| e.has_playback_volume && e.name.eq_ignore_ascii_case(pcm_name))
+        {
+            return Some(pos);
+        }
+    }
+    const PREFERRED_NAMES: &[&str] = &["PCM", "Master", "Speaker", "Headphone", "Headset"];
+    for &name in PREFERRED_NAMES {
+        if let Some(pos) = elements
+            .iter()
+            .position(|e| e.has_playback_volume && e.name.eq_ignore_ascii_case(name))
+        {
+            return Some(pos);
+        }
+    }
+    elements.iter().position(|e| e.has_playback_volume)
+}
+
+/// Maps a linear volume slider position `vol` in `[0.0, 1.0]` to ALSA millibels
+/// (`MilliBel`) and mute switch state.
+///
+/// Logarithmic mapping: `dB = 20 * log10(vol)`, so `mB = 2000 * log10(vol)`.
+/// Clamped between `min_mb` and `max_mb.min(0)` so 1.0 never boosts beyond 0 dB.
+/// Returns `(min_mb, true)` (muted) when `vol <= 0.0`.
+pub(crate) fn linear_to_alsa_db(vol: f32, min_mb: MilliBel, max_mb: MilliBel) -> (MilliBel, bool) {
+    if vol <= 0.0 {
+        return (min_mb, true);
+    }
+    let cap_mb = max_mb.0.min(0);
+    if vol >= 1.0 || cap_mb <= min_mb.0 {
+        return (MilliBel(cap_mb), false);
+    }
+    let mb = (2000.0 * vol.log10()).round() as i64;
+    (MilliBel(mb.clamp(min_mb.0, cap_mb)), false)
+}
+
+/// Maps an ALSA millibel value (`MilliBel`) and mute state back to linear volume `[0.0, 1.0]`.
+pub(crate) fn alsa_db_to_linear(
+    mb: MilliBel,
+    min_mb: MilliBel,
+    max_mb: MilliBel,
+    muted: bool,
+) -> f32 {
+    if muted || mb <= min_mb {
+        return 0.0;
+    }
+    let cap_mb = max_mb.0.min(0);
+    if mb.0 >= cap_mb || cap_mb <= min_mb.0 {
+        return 1.0;
+    }
+    let vol = 10.0f32.powf(mb.0 as f32 / 2000.0);
+    vol.clamp(0.0, 1.0)
+}
+
+/// Maps linear volume to raw integer volume for elements lacking dB range.
+pub(crate) fn linear_to_raw_volume(vol: f32, min_raw: i64, max_raw: i64) -> (i64, bool) {
+    if vol <= 0.0 {
+        return (min_raw, true);
+    }
+    if vol >= 1.0 || max_raw <= min_raw {
+        return (max_raw, false);
+    }
+    let raw = min_raw + ((max_raw - min_raw) as f32 * vol).round() as i64;
+    (raw.clamp(min_raw, max_raw), false)
+}
+
+/// Maps raw integer volume back to linear volume `[0.0, 1.0]`.
+pub(crate) fn raw_volume_to_linear(raw: i64, min_raw: i64, max_raw: i64, muted: bool) -> f32 {
+    if muted || raw <= min_raw || max_raw <= min_raw {
+        return 0.0;
+    }
+    if raw >= max_raw {
+        return 1.0;
+    }
+    let vol = (raw - min_raw) as f32 / (max_raw - min_raw) as f32;
+    vol.clamp(0.0, 1.0)
+}
+
+#[cfg(target_os = "linux")]
 mod imp {
     use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
     use std::sync::{mpsc, Arc};
@@ -88,8 +194,9 @@ mod imp {
     use parking_lot::{Condvar, Mutex};
 
     use super::{
-        classify_failure, device_id, device_label, is_virtual_driver, EAGAIN, EBUSY, ETIMEDOUT,
-        FALLBACK_RATES, FORMATS,
+        alsa_db_to_linear, classify_failure, device_id, device_label, is_virtual_driver,
+        linear_to_alsa_db, linear_to_raw_volume, pick_mixer_element, raw_volume_to_linear,
+        MilliBel, MixerElementInfo, EAGAIN, EBUSY, ETIMEDOUT, FALLBACK_RATES, FORMATS,
     };
     use crate::pcm::{self, PcmFormat};
     use crate::reserve_device;
@@ -97,6 +204,8 @@ mod imp {
         negotiate_format, AudioBackendKind, AudioSink, OpenError, OutputFallbackReason,
     };
     use crate::{AudioShared, OutputRenderer};
+    use ::alsa::mixer::{Mixer, Selem, SelemChannelId, SelemId};
+    use std::sync::atomic::AtomicU32;
 
     const CHANNELS: u16 = 2;
     /// How long opening may take before the build gives up (inside the
@@ -120,6 +229,8 @@ mod imp {
     pub(crate) struct HwDevice {
         pub(crate) id: String,
         pub(crate) name: String,
+        pub(crate) card_id: String,
+        pub(crate) pcm_name: String,
         /// The card's ALSA index, which names its reservation.
         pub(crate) card_index: u32,
     }
@@ -158,6 +269,8 @@ mod imp {
                 devices.push(HwDevice {
                     id: device_id(card_id, dev),
                     name: device_label(card_name, pcm_info.get_name().unwrap_or("")),
+                    card_id: card_id.to_string(),
+                    pcm_name: pcm_info.get_name().unwrap_or("").to_string(),
                     card_index,
                 });
             }
@@ -219,6 +332,7 @@ mod imp {
         format: PcmFormat,
         device_name: Option<String>,
         stream_error_flag: Arc<AtomicBool>,
+        mixer_controller: Option<AlsaMixerController>,
     }
 
     impl AudioSink for AlsaSink {
@@ -257,16 +371,298 @@ mod imp {
         fn is_errored(&self) -> bool {
             self.stream_error_flag.load(Ordering::Relaxed)
         }
+
+        fn has_hardware_volume(&self) -> bool {
+            self.mixer_controller.is_some()
+        }
+
+        fn set_hardware_volume(&self, volume: f32) {
+            if let Some(ref mixer) = self.mixer_controller {
+                mixer.set_volume(volume);
+            }
+        }
     }
 
     impl Drop for AlsaSink {
         fn drop(&mut self) {
+            drop(self.mixer_controller.take());
             self.control.quit.store(true, Ordering::Release);
             self.render_thread.unpark();
             if let Some(thread) = self.thread.take() {
                 let _ = thread.join();
             }
         }
+    }
+
+    /// Dedicated controller thread managing hardware volume via ALSA simple mixer.
+    struct AlsaMixerController {
+        target_volume: Arc<AtomicU32>,
+        quit: Arc<AtomicBool>,
+        thread: Option<JoinHandle<()>>,
+    }
+
+    impl AlsaMixerController {
+        fn open(card_id: &str, pcm_name: &str, shared: Arc<AudioShared>) -> Option<Self> {
+            let mixer_card_name = format!("hw:CARD={card_id}");
+            let mixer = match Mixer::new(&mixer_card_name, false) {
+                Ok(m) => m,
+                Err(e) => {
+                    log::info!("No ALSA mixer for {mixer_card_name}: {e}");
+                    return None;
+                }
+            };
+
+            let mut elements = Vec::new();
+            for elem in mixer.iter() {
+                if let Some(selem) = Selem::new(elem) {
+                    let id = selem.get_id();
+                    let name = id.get_name().unwrap_or("").to_string();
+                    let index = id.get_index();
+                    let has_playback_volume = selem.has_playback_volume();
+                    let has_playback_switch = selem.has_playback_switch();
+                    elements.push((
+                        MixerElementInfo {
+                            name,
+                            index,
+                            has_playback_volume,
+                            has_playback_switch,
+                        },
+                        (id.get_name().unwrap_or("").to_string(), index),
+                    ));
+                }
+            }
+
+            let infos: Vec<_> = elements.iter().map(|(info, _)| info.clone()).collect();
+            let chosen_idx = pick_mixer_element(&infos, pcm_name)?;
+            let (_, (chosen_name, chosen_index)) = elements.remove(chosen_idx);
+            let sid = SelemId::new(&chosen_name, chosen_index);
+            let selem = mixer.find_selem(&sid)?;
+
+            let (min_mb, max_mb) = selem.get_playback_db_range();
+            let has_db_range = max_mb > min_mb;
+            let (min_raw, max_raw) = selem.get_playback_volume_range();
+            let has_playback_switch = selem.has_playback_switch();
+
+            let saved_db = if has_db_range {
+                selem.get_playback_vol_db(SelemChannelId::mono()).ok()
+            } else {
+                None
+            };
+            let saved_raw = selem
+                .get_playback_volume(SelemChannelId::mono())
+                .ok()
+                .unwrap_or(min_raw);
+            let saved_switch = if has_playback_switch {
+                selem.get_playback_switch(SelemChannelId::mono()).ok()
+            } else {
+                None
+            };
+
+            let initial_vol = f32::from_bits(shared.volume.load(Ordering::Acquire));
+            apply_to_selem(
+                &selem,
+                initial_vol,
+                has_db_range,
+                min_mb,
+                max_mb,
+                min_raw,
+                max_raw,
+                has_playback_switch,
+            );
+
+            shared.hardware_volume_active.store(true, Ordering::Release);
+            shared.output_hardware_volume.store(true, Ordering::Release);
+
+            let quit = Arc::new(AtomicBool::new(false));
+            let target_volume = Arc::new(AtomicU32::new(initial_vol.to_bits()));
+
+            let thread = {
+                let quit = Arc::clone(&quit);
+                let target_volume = Arc::clone(&target_volume);
+                let shared = Arc::clone(&shared);
+                std::thread::Builder::new()
+                    .name("luminous-alsa-mixer".into())
+                    .spawn(move || {
+                        run_mixer_loop(
+                            mixer,
+                            chosen_name,
+                            chosen_index,
+                            has_db_range,
+                            min_mb,
+                            max_mb,
+                            min_raw,
+                            max_raw,
+                            has_playback_switch,
+                            saved_db,
+                            saved_raw,
+                            saved_switch,
+                            initial_vol,
+                            target_volume,
+                            quit,
+                            shared,
+                        );
+                    })
+                    .ok()?
+            };
+
+            Some(Self {
+                target_volume,
+                quit,
+                thread: Some(thread),
+            })
+        }
+
+        fn set_volume(&self, volume: f32) {
+            self.target_volume
+                .store(volume.to_bits(), Ordering::Release);
+        }
+    }
+
+    impl Drop for AlsaMixerController {
+        fn drop(&mut self) {
+            self.quit.store(true, Ordering::Release);
+            if let Some(thread) = self.thread.take() {
+                let _ = thread.join();
+            }
+        }
+    }
+
+    fn apply_to_selem(
+        selem: &Selem<'_>,
+        vol: f32,
+        has_db_range: bool,
+        min_mb: MilliBel,
+        max_mb: MilliBel,
+        min_raw: i64,
+        max_raw: i64,
+        has_playback_switch: bool,
+    ) {
+        if has_db_range {
+            let (mb, muted) = linear_to_alsa_db(vol, min_mb, max_mb);
+            let _ = selem.set_playback_db_all(mb, ::alsa::Round::Floor);
+            if has_playback_switch {
+                let _ = selem.set_playback_switch_all(if muted { 0 } else { 1 });
+            }
+        } else {
+            let (raw, muted) = linear_to_raw_volume(vol, min_raw, max_raw);
+            let _ = selem.set_playback_volume_all(raw);
+            if has_playback_switch {
+                let _ = selem.set_playback_switch_all(if muted { 0 } else { 1 });
+            }
+        }
+    }
+
+    fn read_from_selem(
+        selem: &Selem<'_>,
+        has_db_range: bool,
+        min_mb: MilliBel,
+        max_mb: MilliBel,
+        min_raw: i64,
+        max_raw: i64,
+        has_playback_switch: bool,
+    ) -> Option<f32> {
+        let muted = if has_playback_switch {
+            selem
+                .get_playback_switch(SelemChannelId::mono())
+                .ok()
+                .map(|s| s == 0)
+                .unwrap_or(false)
+        } else {
+            false
+        };
+        if has_db_range {
+            let mb = selem.get_playback_vol_db(SelemChannelId::mono()).ok()?;
+            Some(alsa_db_to_linear(mb, min_mb, max_mb, muted))
+        } else {
+            let raw = selem.get_playback_volume(SelemChannelId::mono()).ok()?;
+            Some(raw_volume_to_linear(raw, min_raw, max_raw, muted))
+        }
+    }
+
+    fn run_mixer_loop(
+        mixer: Mixer,
+        element_name: String,
+        element_index: u32,
+        has_db_range: bool,
+        min_mb: MilliBel,
+        max_mb: MilliBel,
+        min_raw: i64,
+        max_raw: i64,
+        has_playback_switch: bool,
+        saved_db: Option<MilliBel>,
+        saved_raw: i64,
+        saved_switch: Option<i32>,
+        initial_vol: f32,
+        target_volume: Arc<AtomicU32>,
+        quit: Arc<AtomicBool>,
+        shared: Arc<AudioShared>,
+    ) {
+        let sid = SelemId::new(&element_name, element_index);
+        let mut last_applied_vol = initial_vol;
+        while !quit.load(Ordering::Acquire) {
+            let target_vol = f32::from_bits(target_volume.load(Ordering::Acquire));
+            if (target_vol - last_applied_vol).abs() > 0.001 {
+                if let Some(selem) = mixer.find_selem(&sid) {
+                    apply_to_selem(
+                        &selem,
+                        target_vol,
+                        has_db_range,
+                        min_mb,
+                        max_mb,
+                        min_raw,
+                        max_raw,
+                        has_playback_switch,
+                    );
+                    last_applied_vol = target_vol;
+                }
+            }
+
+            let _ = mixer.wait(Some(50));
+            if let Ok(count) = mixer.handle_events() {
+                if count > 0 {
+                    if let Some(selem) = mixer.find_selem(&sid) {
+                        if let Some(read_vol) = read_from_selem(
+                            &selem,
+                            has_db_range,
+                            min_mb,
+                            max_mb,
+                            min_raw,
+                            max_raw,
+                            has_playback_switch,
+                        ) {
+                            if (read_vol - last_applied_vol).abs() >= 0.005 {
+                                last_applied_vol = read_vol;
+                                target_volume.store(read_vol.to_bits(), Ordering::Release);
+                                shared.volume.store(read_vol.to_bits(), Ordering::Release);
+                                let _ = shared
+                                    .event_tx
+                                    .send(crate::AudioEvent::VolumeChanged(read_vol));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Teardown: restore original level on the element
+        if let Some(selem) = mixer.find_selem(&sid) {
+            if has_db_range {
+                if let Some(mb) = saved_db {
+                    let _ = selem.set_playback_db_all(mb, ::alsa::Round::Floor);
+                }
+            } else {
+                let _ = selem.set_playback_volume_all(saved_raw);
+            }
+            if let Some(sw) = saved_switch {
+                let _ = selem.set_playback_switch_all(sw);
+            }
+        }
+        shared
+            .hardware_volume_active
+            .store(false, Ordering::Release);
+        shared
+            .output_hardware_volume
+            .store(false, Ordering::Release);
     }
 
     /// Opens the hardware PCM `device_id` (the first hardware device when
@@ -352,15 +748,23 @@ mod imp {
         };
 
         match ready_rx.recv_timeout(OPEN_TIMEOUT) {
-            Ok(Ok((sample_rate, format))) => Ok(AlsaSink {
-                control,
-                render_thread: thread.thread().clone(),
-                thread: Some(thread),
-                sample_rate,
-                format,
-                device_name: Some(device.name),
-                stream_error_flag,
-            }),
+            Ok(Ok((sample_rate, format))) => {
+                let mixer_controller = AlsaMixerController::open(
+                    &device.card_id,
+                    &device.pcm_name,
+                    Arc::clone(shared),
+                );
+                Ok(AlsaSink {
+                    control,
+                    render_thread: thread.thread().clone(),
+                    thread: Some(thread),
+                    sample_rate,
+                    format,
+                    device_name: Some(device.name),
+                    stream_error_flag,
+                    mixer_controller,
+                })
+            }
             Ok(Err(e)) => {
                 let _ = thread.join();
                 Err(e)
@@ -625,5 +1029,120 @@ mod tests {
         assert!(is_virtual_driver("Dummy"));
         assert!(!is_virtual_driver("USB-Audio"));
         assert!(!is_virtual_driver("HDA-Intel"));
+    }
+
+    #[test]
+    fn mixer_element_priority_selection() {
+        let elements = vec![
+            MixerElementInfo {
+                name: "Capture".into(),
+                index: 0,
+                has_playback_volume: false,
+                has_playback_switch: false,
+            },
+            MixerElementInfo {
+                name: "Line In".into(),
+                index: 0,
+                has_playback_volume: true,
+                has_playback_switch: true,
+            },
+            MixerElementInfo {
+                name: "Headphone".into(),
+                index: 0,
+                has_playback_volume: true,
+                has_playback_switch: true,
+            },
+            MixerElementInfo {
+                name: "Speaker".into(),
+                index: 0,
+                has_playback_volume: true,
+                has_playback_switch: true,
+            },
+            MixerElementInfo {
+                name: "Master".into(),
+                index: 0,
+                has_playback_volume: true,
+                has_playback_switch: true,
+            },
+            MixerElementInfo {
+                name: "PCM".into(),
+                index: 0,
+                has_playback_volume: true,
+                has_playback_switch: true,
+            },
+        ];
+
+        // 1) PCM name match takes highest priority
+        assert_eq!(pick_mixer_element(&elements, "Speaker"), Some(3));
+        assert_eq!(pick_mixer_element(&elements, "headphone"), Some(2));
+
+        // 2) With empty/non-matching pcm_name, preferred candidate order applies:
+        // PCM (idx 5) > Master (idx 4) > Speaker (idx 3) > Headphone (idx 2)
+        assert_eq!(pick_mixer_element(&elements, "Unknown"), Some(5));
+        assert_eq!(pick_mixer_element(&elements, ""), Some(5));
+
+        // Drop PCM -> picks Master
+        assert_eq!(pick_mixer_element(&elements[..5], ""), Some(4));
+        // Drop Master -> picks Speaker
+        assert_eq!(pick_mixer_element(&elements[..4], ""), Some(3));
+        // Drop Speaker -> picks Headphone
+        assert_eq!(pick_mixer_element(&elements[..3], ""), Some(2));
+        // Drop Headphone -> picks first playback element ("Line In", idx 1)
+        assert_eq!(pick_mixer_element(&elements[..2], ""), Some(1));
+        // Only elements without playback volume -> None
+        assert_eq!(pick_mixer_element(&elements[..1], ""), None);
+    }
+
+    #[test]
+    fn linear_and_alsa_db_roundtrip() {
+        let min_mb = MilliBel(-6000); // -60 dB
+        let max_mb = MilliBel(0); // 0 dB
+
+        // Zero volume mutes and sets minimum dB
+        let (mb, muted) = linear_to_alsa_db(0.0, min_mb, max_mb);
+        assert!(muted);
+        assert_eq!(mb, min_mb);
+        assert_eq!(alsa_db_to_linear(mb, min_mb, max_mb, muted), 0.0);
+
+        // Unity volume (1.0) maps to max (0 dB) and unmuted
+        let (mb, muted) = linear_to_alsa_db(1.0, min_mb, max_mb);
+        assert!(!muted);
+        assert_eq!(mb, MilliBel(0));
+        assert!((alsa_db_to_linear(mb, min_mb, max_mb, muted) - 1.0).abs() < 1e-4);
+
+        // 0.5 linear amplitude -> -6.02 dB (-602 mB)
+        let (mb, muted) = linear_to_alsa_db(0.5, min_mb, max_mb);
+        assert!(!muted);
+        assert_eq!(mb.0, -602);
+        let vol = alsa_db_to_linear(mb, min_mb, max_mb, muted);
+        assert!((vol - 0.5).abs() < 0.01);
+
+        // 0.1 linear amplitude -> -20 dB (-2000 mB)
+        let (mb, muted) = linear_to_alsa_db(0.1, min_mb, max_mb);
+        assert!(!muted);
+        assert_eq!(mb.0, -2000);
+        let vol = alsa_db_to_linear(mb, min_mb, max_mb, muted);
+        assert!((vol - 0.1).abs() < 0.01);
+    }
+
+    #[test]
+    fn linear_and_raw_volume_roundtrip() {
+        let min_raw = 0;
+        let max_raw = 100;
+
+        let (raw, muted) = linear_to_raw_volume(0.0, min_raw, max_raw);
+        assert!(muted);
+        assert_eq!(raw, 0);
+        assert_eq!(raw_volume_to_linear(raw, min_raw, max_raw, muted), 0.0);
+
+        let (raw, muted) = linear_to_raw_volume(1.0, min_raw, max_raw);
+        assert!(!muted);
+        assert_eq!(raw, 100);
+        assert_eq!(raw_volume_to_linear(raw, min_raw, max_raw, muted), 1.0);
+
+        let (raw, muted) = linear_to_raw_volume(0.5, min_raw, max_raw);
+        assert!(!muted);
+        assert_eq!(raw, 50);
+        assert_eq!(raw_volume_to_linear(raw, min_raw, max_raw, muted), 0.5);
     }
 }
