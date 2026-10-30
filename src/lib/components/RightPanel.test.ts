@@ -118,6 +118,8 @@ describe("RightPanel.svelte", () => {
     output_format: "32-bit float",
     output_device_name: "Default Output Device",
     output_backend: "WASAPI",
+    output_bypasses_mixer: true,
+    output_fell_back: false,
   };
 
   it("renders audio pipeline stages on Technical tab when audioPipeline is set", () => {

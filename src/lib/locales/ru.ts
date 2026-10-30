@@ -410,6 +410,8 @@ export const ru = {
     audioDeviceLabel: "Устройство вывода",
     audioDeviceHint: "Выберите звуковую карту или цифро-аналоговый преобразователь (ЦАП) для воспроизведения.",
     audioDeviceDefault: "Устройство вывода по умолчанию",
+    audioDeviceDisconnected: "{name} (отключено)",
+    audioOutputPlayingShared: "Пока воспроизведение идёт через общий звук.",
     audioAsioControlPanelBtn: "Открыть панель управления драйвера",
     audioAsioControlPanelHint: "Настройте размер аппаратного буфера и параметры синхронизации в панели драйвера.",
     audioAsioNoDevices: "Драйверы оборудования ASIO не обнаружены.",
@@ -1265,6 +1267,7 @@ export const ru = {
     outputFallbackFormatUnsupported: "Не удалось включить {mode}: устройство не принимает ни один стереоформат, который может передать Luminous. Пока воспроизведение идёт через общий звук.",
     outputFallbackUnavailable: "Не удалось включить {mode}. Пока воспроизведение идёт через общий звук.",
     outputFallbackRetry: "Повторить",
+    outputRestored: "{mode} снова работает. Проверьте громкость и нажмите «Воспроизвести».",
     tracksSkippedToast: {
       one: "Пропущена {count} недоступная композиция.",
       few: "Пропущено {count} недоступные композиции.",
@@ -2335,6 +2338,7 @@ export const ru = {
     headroom: "Запас по уровню",
     resampling: "Передискретизация",
     resamplingDirect: "Без передискретизации",
+    resamplingSystemMixer: "Нет в Luminous; системный микшер может преобразовать",
     resamplingTo: "Передискретизация до {rate}",
     volumeNormalization: "Нормализация громкости",
     normalizationDisabled: "Отключена",
@@ -2352,6 +2356,7 @@ export const ru = {
     bitPerfect: "Bit-perfect",
     processed: "Обработано",
     directRate: "Исходная частота",
+    systemMixer: "Системный микшер",
     resampled: "Передискретизировано"
   },
   auth: {

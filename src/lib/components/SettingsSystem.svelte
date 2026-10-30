@@ -1,6 +1,7 @@
 <script lang="ts">
   import { i18n } from "../stores/i18n.svelte";
   import { prefs } from "../stores/prefs.svelte";
+  import { playerStore } from "../stores/player.svelte";
   import { updaterStore, MICROSOFT_STORE_URL } from "../stores/updater.svelte";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
@@ -245,14 +246,15 @@
 
   let selectedDeviceId = $derived.by(() => {
     const id = prefs.audioOutputConfig.device_id;
+    if (id) return id;
     if (directHardware) {
-      if (id && currentBackendDevices.some((d) => d.id === id)) {
-        return id;
-      }
       return currentBackendDevices.length > 0 ? currentBackendDevices[0].id : "";
     }
-    return id ?? "";
+    return "";
   });
+
+  // The chosen bit-perfect output couldn't open and shared output stands in.
+  let playingShared = $derived(!!playerStore.audioPipeline?.output_fell_back);
 
   async function handleBackendChange(backend: AudioBackendKind) {
     const devices = prefs.audioOutputDevices.filter((d) => d.backend === backend);
@@ -415,7 +417,10 @@
       <p class="text-xs text-brand-text-secondary">{i18n.t('settings.audioDeviceHint')}</p>
     </div>
     {#if currentBackendDevices.length === 0 && noDevicesMessageKey}
-      <span class="text-xs text-amber-400 font-medium">{i18n.t(noDevicesMessageKey)}</span>
+      <span class="flex items-center gap-1.5 text-xs text-brand-text-primary font-medium">
+        <AlertTriangle class="w-3.5 h-3.5 shrink-0" />
+        {i18n.t(noDevicesMessageKey)}
+      </span>
     {:else}
       <Select
         id="audio-device-select"
@@ -428,12 +433,34 @@
         {/if}
         {#each currentBackendDevices as dev}
           <option value={dev.id}>
-            {dev.name}{dev.is_default ? ` (${i18n.t('settings.audioDeviceDefault')})` : ''}
+            {#if dev.connected}
+              {dev.name}{dev.is_default ? ` (${i18n.t('settings.audioDeviceDefault')})` : ''}
+            {:else}
+              {i18n.t('settings.audioDeviceDisconnected', { name: dev.name })}
+            {/if}
           </option>
         {/each}
       </Select>
     {/if}
   </div>
+
+  {#if playingShared}
+    <div class="flex items-center justify-between gap-4 py-2">
+      <span class="flex items-center gap-1.5 text-xs text-brand-text-primary font-medium">
+        <AlertTriangle class="w-3.5 h-3.5 shrink-0" />
+        {i18n.t('settings.audioOutputPlayingShared')}
+      </span>
+      <Button
+        onclick={() => void prefs.reapplyAudioOutput().catch(() => {})}
+        variant="secondary"
+        size="sm"
+        class="shrink-0 text-xs px-3.5 py-1.5"
+      >
+        <RefreshCw class="w-3.5 h-3.5" />
+        {i18n.t('playerBar.outputFallbackRetry')}
+      </Button>
+    </div>
+  {/if}
 
   <!-- ASIO Driver Control Panel Button -->
   {#if prefs.audioOutputConfig.backend === 'asio' && currentBackendDevices.length > 0}

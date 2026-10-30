@@ -812,6 +812,12 @@ pub struct AudioPipelineInfo {
     pub output_format: String,
     pub output_device_name: String,
     pub output_backend: String,
+    /// The output bypasses the system mixer, so samples reach the device as
+    /// sent: what lets the panel call playback bit-perfect.
+    pub output_bypasses_mixer: bool,
+    /// The configured bit-perfect output couldn't open; this is shared
+    /// output standing in for it.
+    pub output_fell_back: bool,
 }
 
 // ---------------------------------------------------------------------------

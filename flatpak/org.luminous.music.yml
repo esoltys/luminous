@@ -36,6 +36,9 @@ finish-args:
   # registers its own well-known name on the session bus.
   - --socket=session-bus
   - --own-name=org.mpris.MediaPlayer2.luminous
+  # Direct Hardware (ALSA) output reserves its card through the device
+  # reservation protocol so PipeWire releases it (#1844).
+  - --own-name=org.freedesktop.ReserveDevice1.*
 
 build-options:
   append-path: /usr/lib/sdk/rust-stable/bin:/usr/lib/sdk/node22/bin:/var/tmp/bun/bin

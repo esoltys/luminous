@@ -184,6 +184,8 @@ fn assemble_pipeline_info(
         output_format: output.format,
         output_device_name: output.device_name,
         output_backend: output.backend_name,
+        output_bypasses_mixer: output.bypasses_mixer,
+        output_fell_back: output.fell_back,
     }
 }
 
@@ -197,6 +199,8 @@ mod tests {
             channels: 2,
             device_name: "Test DAC".into(),
             backend_name: "CPAL".into(),
+            bypasses_mixer: false,
+            fell_back: false,
             format: "32-bit float PCM".into(),
         }
     }
@@ -257,7 +261,7 @@ mod tests {
         );
         assert_eq!(
             serde_json::to_string(&info).unwrap(),
-            r#"{"quality_tier":"hq","input_source":"collection","input_format":"FLAC","input_codec":"flac","input_bitrate_kbps":900,"input_sample_rate":44100,"input_bit_depth":16,"input_channels":2,"input_path":"/music/a.flac","decoder_name":"Symphonia FLAC decoder","headroom":"32-bit float PCM","resample_rate":48000,"loudness_source":"analyzed","loudness_gain_db":-3.5,"eq_enabled":false,"eq_mode":"10-band Graphic","eq_preamp_db":0.0,"eq_active_bands_count":0,"limiter":"-1.0 dBTP True Peak limiter","output_sample_rate":48000,"output_channels":2,"output_format":"32-bit float PCM","output_device_name":"Test DAC","output_backend":"CPAL"}"#
+            r#"{"quality_tier":"hq","input_source":"collection","input_format":"FLAC","input_codec":"flac","input_bitrate_kbps":900,"input_sample_rate":44100,"input_bit_depth":16,"input_channels":2,"input_path":"/music/a.flac","decoder_name":"Symphonia FLAC decoder","headroom":"32-bit float PCM","resample_rate":48000,"loudness_source":"analyzed","loudness_gain_db":-3.5,"eq_enabled":false,"eq_mode":"10-band Graphic","eq_preamp_db":0.0,"eq_active_bands_count":0,"limiter":"-1.0 dBTP True Peak limiter","output_sample_rate":48000,"output_channels":2,"output_format":"32-bit float PCM","output_device_name":"Test DAC","output_backend":"CPAL","output_bypasses_mixer":false,"output_fell_back":false}"#
         );
 
         let opus = Song {
@@ -276,7 +280,7 @@ mod tests {
         );
         assert_eq!(
             serde_json::to_string(&info).unwrap(),
-            r#"{"quality_tier":"lq","input_source":"unknown","input_format":"Opus","input_codec":"opus","input_bitrate_kbps":128,"input_sample_rate":48000,"input_bit_depth":null,"input_channels":null,"input_path":"https://x/a.opus","decoder_name":"libopus (via Symphonia)","headroom":"32-bit float PCM","resample_rate":null,"loudness_source":"disabled","loudness_gain_db":null,"eq_enabled":false,"eq_mode":"10-band Graphic","eq_preamp_db":0.0,"eq_active_bands_count":0,"limiter":"-1.0 dBTP True Peak limiter","output_sample_rate":48000,"output_channels":2,"output_format":"32-bit float PCM","output_device_name":"Test DAC","output_backend":"CPAL"}"#
+            r#"{"quality_tier":"lq","input_source":"unknown","input_format":"Opus","input_codec":"opus","input_bitrate_kbps":128,"input_sample_rate":48000,"input_bit_depth":null,"input_channels":null,"input_path":"https://x/a.opus","decoder_name":"libopus (via Symphonia)","headroom":"32-bit float PCM","resample_rate":null,"loudness_source":"disabled","loudness_gain_db":null,"eq_enabled":false,"eq_mode":"10-band Graphic","eq_preamp_db":0.0,"eq_active_bands_count":0,"limiter":"-1.0 dBTP True Peak limiter","output_sample_rate":48000,"output_channels":2,"output_format":"32-bit float PCM","output_device_name":"Test DAC","output_backend":"CPAL","output_bypasses_mixer":false,"output_fell_back":false}"#
         );
     }
 

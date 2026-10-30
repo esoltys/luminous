@@ -390,6 +390,8 @@ export const en = {
     audioDeviceLabel: "Output Device",
     audioDeviceHint: "Select the sound card or digital-to-analog converter (DAC) for playback.",
     audioDeviceDefault: "Default Output Device",
+    audioDeviceDisconnected: "{name} (disconnected)",
+    audioOutputPlayingShared: "Playing through shared audio for now.",
     audioAsioControlPanelBtn: "Open Driver Control Panel",
     audioAsioControlPanelHint: "Adjust hardware buffer sizes and device clock settings in the driver's native control panel.",
     audioAsioNoDevices: "No ASIO hardware drivers detected.",
@@ -1201,6 +1203,7 @@ export const en = {
     outputFallbackFormatUnsupported: "Couldn't start {mode}: the device accepts no stereo format Luminous can send. Playing through shared audio for now.",
     outputFallbackUnavailable: "Couldn't start {mode}. Playing through shared audio for now.",
     outputFallbackRetry: "Try Again",
+    outputRestored: "{mode} is back. Check your volume, then press Play to resume.",
     tracksSkippedToast: {
       one: "Skipped {count} unavailable track.",
       other: "Skipped {count} unavailable tracks."
@@ -2209,6 +2212,7 @@ export const en = {
     headroom: "Headroom",
     resampling: "Resampling",
     resamplingDirect: "Direct (no resampling)",
+    resamplingSystemMixer: "None in Luminous; the system mixer may convert",
     resamplingTo: "Resampled to {rate}",
     volumeNormalization: "Volume Normalization",
     normalizationDisabled: "Disabled",
@@ -2226,6 +2230,7 @@ export const en = {
     bitPerfect: "Bit-perfect",
     processed: "Processed",
     directRate: "Direct rate",
+    systemMixer: "System mixer",
     resampled: "Resampled",
   },
   auth: {

@@ -390,6 +390,8 @@ export const de = {
     audioDeviceLabel: "Ausgabegerät",
     audioDeviceHint: "Die Soundkarte oder den Digital-Analog-Wandler (DAC) für die Wiedergabe auswählen.",
     audioDeviceDefault: "Standard-Ausgabegerät",
+    audioDeviceDisconnected: "{name} (getrennt)",
+    audioOutputPlayingShared: "Wiedergabe vorerst über geteiltes Audio.",
     audioAsioControlPanelBtn: "Treiber-Bedienfeld öffnen",
     audioAsioControlPanelHint: "Hardware-Puffergrößen und Takteinstellungen im nativen Treiber-Bedienfeld anpassen.",
     audioAsioNoDevices: "Keine ASIO-Hardwaretreiber erkannt.",
@@ -1201,6 +1203,7 @@ export const de = {
     outputFallbackFormatUnsupported: "{mode} konnte nicht gestartet werden: Das Gerät akzeptiert kein Stereoformat, das Luminous senden kann. Wiedergabe vorerst über geteiltes Audio.",
     outputFallbackUnavailable: "{mode} konnte nicht gestartet werden. Wiedergabe vorerst über geteiltes Audio.",
     outputFallbackRetry: "Erneut versuchen",
+    outputRestored: "{mode} funktioniert wieder. Prüfen Sie die Lautstärke und drücken Sie dann Wiedergabe.",
     tracksSkippedToast: {
       one: "{count} nicht verfügbarer Titel übersprungen.",
       other: "{count} nicht verfügbare Titel übersprungen."
@@ -2209,6 +2212,7 @@ export const de = {
     headroom: "Aussteuerungsreserve",
     resampling: "Resampling",
     resamplingDirect: "Direkt (kein Resampling)",
+    resamplingSystemMixer: "Keins in Luminous; der Systemmixer kann umwandeln",
     resamplingTo: "Resampling auf {rate}",
     volumeNormalization: "Lautstärkenormalisierung",
     normalizationDisabled: "Deaktiviert",
@@ -2226,6 +2230,7 @@ export const de = {
     bitPerfect: "Bit-perfect",
     processed: "Verarbeitet",
     directRate: "Direkte Rate",
+    systemMixer: "Systemmixer",
     resampled: "Resampling angewendet",
   },
   auth: {

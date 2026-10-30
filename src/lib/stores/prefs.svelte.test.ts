@@ -63,8 +63,8 @@ describe("prefs.audioOutput", () => {
 
   it("refreshes audio devices and active config", async () => {
     const mockDevices = [
-      { id: "c1", name: "Realtek", backend: "cpal", is_default: true },
-      { id: "a1", name: "FlexASIO", backend: "asio", is_default: false },
+      { id: "c1", name: "Realtek", backend: "cpal", is_default: true, connected: true },
+      { id: "a1", name: "FlexASIO", backend: "asio", is_default: false, connected: true },
     ];
     const mockConfig = { backend: "asio", device_id: "a1" };
 
