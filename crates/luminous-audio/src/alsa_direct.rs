@@ -224,6 +224,31 @@ mod imp {
     /// How long a release request waits for the render thread to close the
     /// PCM before answering anyway.
     const RELEASE_TIMEOUT: Duration = Duration::from_secs(1);
+    /// Poll timeout for ALSA mixer descriptors (in ms).
+    /// Balances prompt thread shutdown / target volume responsiveness with low CPU usage.
+    const MIXER_POLL_TIMEOUT_MS: u32 = 50;
+    /// Deadband threshold for external volume synchronization.
+    /// Filters out hardware DAC step quantization to avoid ping-pong volume oscillations.
+    const EXTERNAL_VOLUME_HYSTERESIS: f32 = 0.005;
+
+    /// Hardware capabilities of the chosen playback mixer element.
+    #[derive(Copy, Clone, Debug)]
+    struct ElementCapabilities {
+        has_db_range: bool,
+        min_mb: MilliBel,
+        max_mb: MilliBel,
+        min_raw: i64,
+        max_raw: i64,
+        has_playback_switch: bool,
+    }
+
+    /// Saved mixer state to restore when the sink is closed or dropped.
+    #[derive(Copy, Clone, Debug)]
+    struct SavedMixerState {
+        db: Option<MilliBel>,
+        raw: i64,
+        switch: Option<i32>,
+    }
 
     /// A playback PCM on a hardware card.
     pub(crate) struct HwDevice {
@@ -443,32 +468,34 @@ mod imp {
             let (min_raw, max_raw) = selem.get_playback_volume_range();
             let has_playback_switch = selem.has_playback_switch();
 
-            let saved_db = if has_db_range {
-                selem.get_playback_vol_db(SelemChannelId::mono()).ok()
-            } else {
-                None
-            };
-            let saved_raw = selem
-                .get_playback_volume(SelemChannelId::mono())
-                .ok()
-                .unwrap_or(min_raw);
-            let saved_switch = if has_playback_switch {
-                selem.get_playback_switch(SelemChannelId::mono()).ok()
-            } else {
-                None
-            };
-
-            let initial_vol = f32::from_bits(shared.volume.load(Ordering::Acquire));
-            apply_to_selem(
-                &selem,
-                initial_vol,
+            let caps = ElementCapabilities {
                 has_db_range,
                 min_mb,
                 max_mb,
                 min_raw,
                 max_raw,
                 has_playback_switch,
-            );
+            };
+
+            let saved = SavedMixerState {
+                db: if has_db_range {
+                    selem.get_playback_vol_db(SelemChannelId::mono()).ok()
+                } else {
+                    None
+                },
+                raw: selem
+                    .get_playback_volume(SelemChannelId::mono())
+                    .ok()
+                    .unwrap_or(min_raw),
+                switch: if has_playback_switch {
+                    selem.get_playback_switch(SelemChannelId::mono()).ok()
+                } else {
+                    None
+                },
+            };
+
+            let initial_vol = f32::from_bits(shared.volume.load(Ordering::Acquire));
+            apply_to_selem(&selem, initial_vol, caps);
 
             shared.hardware_volume_active.store(true, Ordering::Release);
             shared.output_hardware_volume.store(true, Ordering::Release);
@@ -487,15 +514,8 @@ mod imp {
                             mixer,
                             chosen_name,
                             chosen_index,
-                            has_db_range,
-                            min_mb,
-                            max_mb,
-                            min_raw,
-                            max_raw,
-                            has_playback_switch,
-                            saved_db,
-                            saved_raw,
-                            saved_switch,
+                            caps,
+                            saved,
                             initial_vol,
                             target_volume,
                             quit,
@@ -527,41 +547,23 @@ mod imp {
         }
     }
 
-    fn apply_to_selem(
-        selem: &Selem<'_>,
-        vol: f32,
-        has_db_range: bool,
-        min_mb: MilliBel,
-        max_mb: MilliBel,
-        min_raw: i64,
-        max_raw: i64,
-        has_playback_switch: bool,
-    ) {
-        if has_db_range {
-            let (mb, muted) = linear_to_alsa_db(vol, min_mb, max_mb);
+    fn apply_to_selem(selem: &Selem<'_>, vol: f32, caps: ElementCapabilities) {
+        let muted = if caps.has_db_range {
+            let (mb, muted) = linear_to_alsa_db(vol, caps.min_mb, caps.max_mb);
             let _ = selem.set_playback_db_all(mb, ::alsa::Round::Floor);
-            if has_playback_switch {
-                let _ = selem.set_playback_switch_all(if muted { 0 } else { 1 });
-            }
+            muted
         } else {
-            let (raw, muted) = linear_to_raw_volume(vol, min_raw, max_raw);
+            let (raw, muted) = linear_to_raw_volume(vol, caps.min_raw, caps.max_raw);
             let _ = selem.set_playback_volume_all(raw);
-            if has_playback_switch {
-                let _ = selem.set_playback_switch_all(if muted { 0 } else { 1 });
-            }
+            muted
+        };
+        if caps.has_playback_switch {
+            let _ = selem.set_playback_switch_all(if muted { 0 } else { 1 });
         }
     }
 
-    fn read_from_selem(
-        selem: &Selem<'_>,
-        has_db_range: bool,
-        min_mb: MilliBel,
-        max_mb: MilliBel,
-        min_raw: i64,
-        max_raw: i64,
-        has_playback_switch: bool,
-    ) -> Option<f32> {
-        let muted = if has_playback_switch {
+    fn read_from_selem(selem: &Selem<'_>, caps: ElementCapabilities) -> Option<f32> {
+        let muted = if caps.has_playback_switch {
             selem
                 .get_playback_switch(SelemChannelId::mono())
                 .ok()
@@ -570,12 +572,12 @@ mod imp {
         } else {
             false
         };
-        if has_db_range {
+        if caps.has_db_range {
             let mb = selem.get_playback_vol_db(SelemChannelId::mono()).ok()?;
-            Some(alsa_db_to_linear(mb, min_mb, max_mb, muted))
+            Some(alsa_db_to_linear(mb, caps.min_mb, caps.max_mb, muted))
         } else {
             let raw = selem.get_playback_volume(SelemChannelId::mono()).ok()?;
-            Some(raw_volume_to_linear(raw, min_raw, max_raw, muted))
+            Some(raw_volume_to_linear(raw, caps.min_raw, caps.max_raw, muted))
         }
     }
 
@@ -583,15 +585,8 @@ mod imp {
         mixer: Mixer,
         element_name: String,
         element_index: u32,
-        has_db_range: bool,
-        min_mb: MilliBel,
-        max_mb: MilliBel,
-        min_raw: i64,
-        max_raw: i64,
-        has_playback_switch: bool,
-        saved_db: Option<MilliBel>,
-        saved_raw: i64,
-        saved_switch: Option<i32>,
+        caps: ElementCapabilities,
+        saved: SavedMixerState,
         initial_vol: f32,
         target_volume: Arc<AtomicU32>,
         quit: Arc<AtomicBool>,
@@ -603,34 +598,17 @@ mod imp {
             let target_vol = f32::from_bits(target_volume.load(Ordering::Acquire));
             if (target_vol - last_applied_vol).abs() > 0.001 {
                 if let Some(selem) = mixer.find_selem(&sid) {
-                    apply_to_selem(
-                        &selem,
-                        target_vol,
-                        has_db_range,
-                        min_mb,
-                        max_mb,
-                        min_raw,
-                        max_raw,
-                        has_playback_switch,
-                    );
+                    apply_to_selem(&selem, target_vol, caps);
                     last_applied_vol = target_vol;
                 }
             }
 
-            let _ = mixer.wait(Some(50));
+            let _ = mixer.wait(Some(MIXER_POLL_TIMEOUT_MS));
             if let Ok(count) = mixer.handle_events() {
                 if count > 0 {
                     if let Some(selem) = mixer.find_selem(&sid) {
-                        if let Some(read_vol) = read_from_selem(
-                            &selem,
-                            has_db_range,
-                            min_mb,
-                            max_mb,
-                            min_raw,
-                            max_raw,
-                            has_playback_switch,
-                        ) {
-                            if (read_vol - last_applied_vol).abs() >= 0.005 {
+                        if let Some(read_vol) = read_from_selem(&selem, caps) {
+                            if (read_vol - last_applied_vol).abs() >= EXTERNAL_VOLUME_HYSTERESIS {
                                 last_applied_vol = read_vol;
                                 target_volume.store(read_vol.to_bits(), Ordering::Release);
                                 shared.volume.store(read_vol.to_bits(), Ordering::Release);
@@ -646,14 +624,14 @@ mod imp {
 
         // Teardown: restore original level on the element
         if let Some(selem) = mixer.find_selem(&sid) {
-            if has_db_range {
-                if let Some(mb) = saved_db {
+            if caps.has_db_range {
+                if let Some(mb) = saved.db {
                     let _ = selem.set_playback_db_all(mb, ::alsa::Round::Floor);
                 }
             } else {
-                let _ = selem.set_playback_volume_all(saved_raw);
+                let _ = selem.set_playback_volume_all(saved.raw);
             }
-            if let Some(sw) = saved_switch {
+            if let Some(sw) = saved.switch {
                 let _ = selem.set_playback_switch_all(sw);
             }
         }
