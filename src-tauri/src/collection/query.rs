@@ -12,6 +12,7 @@ use crate::album_key::{album_display_sql, album_key};
 use crate::models::{
     AlbumItem, AlbumLink, AlbumProfile, ArtistProfile, ArtistSocialLink, HomeItem, LibraryStats,
     Playlist, QueuePopulationMode, Song, Tag, TopAlbumItem, LIBRARY_SOURCES_SQL,
+    LISTENED_SOURCES_SQL,
 };
 use anyhow::Result;
 use rusqlite::{params, OptionalExtension, ToSql};
@@ -1185,10 +1186,10 @@ impl CollectionScanner {
                  FROM play_history
                  GROUP BY song_id
              ) ph ON s.id = ph.song_id
-             WHERE s.source IN ({lib}) AND s.unavailable = 0
+             WHERE s.source IN ({listened}) AND s.unavailable = 0
              ORDER BY ph.last_played_at DESC
              LIMIT ?1",
-            lib = *LIBRARY_SOURCES_SQL
+            listened = *LISTENED_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
         let songs = stmt
@@ -1221,7 +1222,7 @@ impl CollectionScanner {
             "SELECT {home_item_select_cols}, ph.context_type, ph.playlist_id
              FROM play_history ph
              JOIN songs s ON s.id = ph.song_id
-             WHERE s.source IN ({lib}) AND s.unavailable = 0
+             WHERE s.source IN ({listened}) AND s.unavailable = 0
                AND NOT (
                    ph.context_type = 'playlist'
                    AND ph.playlist_id IN (
@@ -1230,7 +1231,7 @@ impl CollectionScanner {
                )
              ORDER BY ph.played_at DESC
              LIMIT ?1",
-            lib = *LIBRARY_SOURCES_SQL
+            listened = *LISTENED_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
         let rows: Vec<(Song, i64, i64, String, Option<i64>)> = stmt

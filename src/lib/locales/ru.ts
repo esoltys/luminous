@@ -222,6 +222,7 @@ export const ru = {
     columnAdded: "Дата добавления",
     columnPath: "Путь к файлу",
     columnLibrary: "Библиотека",
+    notInLibrary: "Не в библиотеке",
     columnLastPlayed: "Последнее воспроизведение",
     columnActions: "Действия",
     columnTrack: "№ композиции",

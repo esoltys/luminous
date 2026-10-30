@@ -210,6 +210,7 @@ export const en = {
     columnAdded: "Date Added",
     columnPath: "File Path",
     columnLibrary: "Library",
+    notInLibrary: "Not in library",
     columnLastPlayed: "Last Played",
     columnActions: "Actions",
     columnTrack: "Track #",

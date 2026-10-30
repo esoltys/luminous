@@ -222,6 +222,7 @@ export const uk = {
     columnAdded: "Дата додавання",
     columnPath: "Шлях до файлу",
     columnLibrary: "Бібліотека",
+    notInLibrary: "Не в бібліотеці",
     columnLastPlayed: "Останнє відтворення",
     columnActions: "Дії",
     columnTrack: "№ композиції",

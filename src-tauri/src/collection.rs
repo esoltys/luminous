@@ -473,11 +473,7 @@ impl CollectionScanner {
         conn: &rusqlite::Connection,
         only_available: bool,
     ) -> Result<Vec<i64>> {
-        let all_roots: Vec<PathBuf> = self
-            .get_directories()?
-            .into_iter()
-            .map(|d| PathBuf::from(d.path))
-            .collect();
+        let watched = WatchedFolders::load(conn)?;
 
         let (active_webdav_song_ids, active_webdav_servers) = load_active_webdav_servers(conn);
         let subsonic_server_ids = load_subsonic_server_ids(conn);
@@ -524,13 +520,12 @@ impl CollectionScanner {
 
             let p = Path::new(&path);
 
-            // If the file is local (source 1 or 2) and not in any watched directory, it is orphaned.
-            if source.is_local() {
-                let is_watched = all_roots.iter().any(|root| p.starts_with(root));
-                if !is_watched {
-                    missing.push(id);
-                    continue;
-                }
+            // A library file (source 1 or 2) outside every watched folder is
+            // orphaned. Opened files live outside them by definition and only
+            // go missing when the file itself does.
+            if source.is_local() && watched.source_for(p) == SongSource::OpenedFile {
+                missing.push(id);
+                continue;
             }
 
             if p.exists() {
@@ -990,10 +985,14 @@ impl CollectionScanner {
             .context("rescan_paths task panicked")?;
 
         let conn = self.db.pool.get()?;
+        // Targeted callers can pass any known song's path, including a file
+        // opened from outside the library — re-reading it must not add it.
+        let watched = WatchedFolders::load(&conn)?;
         let tx = conn.unchecked_transaction()?;
         for (path, result) in results {
             match result {
-                Ok(song) => {
+                Ok(mut song) => {
+                    song.source = watched.source_for(&path);
                     if let Err(e) = upsert_song(&tx, &song) {
                         log::warn!("Failed to save rescanned tags for {}: {e}", path.display());
                     }
@@ -1168,11 +1167,15 @@ impl CollectionScanner {
             // Load every known (path -> mtime) pair in one query instead of
             // issuing a SELECT per file — for large libraries this turns
             // O(files) round-trips into a single read.
+            // Opened-file rows are left out so a file the user opened before
+            // its folder was watched is re-read and upgraded to a library
+            // song, even when the file itself hasn't changed (#1842).
             let mut known_mtimes: HashMap<String, i64> = HashMap::new();
             if !force {
-                let mut stmt =
-                    conn.prepare("SELECT path, mtime FROM songs WHERE unavailable = 0")?;
-                let rows = stmt.query_map([], |row| {
+                let mut stmt = conn.prepare(
+                    "SELECT path, mtime FROM songs WHERE unavailable = 0 AND source != ?1",
+                )?;
+                let rows = stmt.query_map([SongSource::OPENED_FILE_ID], |row| {
                     Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
                 })?;
                 for row in rows.filter_map(|r| r.ok()) {
@@ -2025,6 +2028,36 @@ fn write_cue_tracks(conn: &rusqlite::Connection, job: &CueJob, songs: &[Song]) -
     Ok(())
 }
 
+/// The watched music folders, loaded once so a caller classifying many paths
+/// doesn't re-query them per path.
+pub(crate) struct WatchedFolders(Vec<PathBuf>);
+
+impl WatchedFolders {
+    pub(crate) fn load(conn: &rusqlite::Connection) -> Result<Self> {
+        let mut stmt = conn.prepare("SELECT path FROM directories")?;
+        let roots = stmt
+            .query_map([], |row| row.get::<_, String>(0))?
+            .map(|r| r.map(PathBuf::from))
+            .collect::<rusqlite::Result<_>>()?;
+        Ok(Self(roots))
+    }
+
+    /// The source a local file at `path` belongs to: `LocalFile` inside a
+    /// watched folder (matched case- and separator-insensitively on
+    /// Windows), `OpenedFile` anywhere else (#1842).
+    pub(crate) fn source_for(&self, path: &Path) -> SongSource {
+        if self
+            .0
+            .iter()
+            .any(|root| relocate::is_under_root(path, root))
+        {
+            SongSource::LocalFile
+        } else {
+            SongSource::OpenedFile
+        }
+    }
+}
+
 pub(crate) fn read_and_upsert_song(
     conn: &rusqlite::Connection,
     cover_manager: &CoverManager,
@@ -2038,6 +2071,15 @@ pub(crate) fn read_and_upsert_song(
 // Database upsert
 // ---------------------------------------------------------------------------
 
+/// Inserts `song`, or refreshes the row already stored for its path (and CUE
+/// offset) from it, keeping play stats, ratings and playlist membership.
+///
+/// `song.source` is taken as the truth about library membership (#1842): any
+/// source other than `OpenedFile` promotes an existing opened-file row into the
+/// library and restamps its `added`, while an `OpenedFile` song never demotes
+/// a library row. So a caller upserting a path that didn't come from a
+/// watched-folder scan must classify it with [`WatchedFolders::source_for`]
+/// first, or it would add the file to the library.
 pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()> {
     conn.execute(
         &format!(
@@ -2075,7 +2117,20 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
                         ELSE excluded.art_unset
                     END,
                     cue_path=excluded.cue_path,
-                    filetype=excluded.filetype, source=excluded.source,
+                    filetype=excluded.filetype,
+                    -- An opened file joins the library when a scan finds it
+                    -- (counted as newly added from then on), but a library
+                    -- row never drops back to an opened file (#1842).
+                    added=CASE
+                        WHEN songs.source = {opened} AND excluded.source != {opened}
+                        THEN strftime('%s', 'now')
+                        ELSE songs.added
+                    END,
+                    source=CASE
+                        WHEN excluded.source = {opened} AND songs.source != {opened}
+                        THEN songs.source
+                        ELSE excluded.source
+                    END,
                     replaygain_track_gain=excluded.replaygain_track_gain,
                     replaygain_album_gain=excluded.replaygain_album_gain,
                     is_vbr=excluded.is_vbr,
@@ -2094,7 +2149,9 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
                     unavailable=0",
             SONG_INSERT_COLS,
             SONG_INSERT_PLACEHOLDERS,
-            local_sources = *LOCAL_SOURCES_SQL
+            // Art comes from the file on disk for opened files too.
+            local_sources = *crate::models::FILE_SOURCES_SQL,
+            opened = SongSource::OPENED_FILE_ID
         ),
         params![
             song.source as i32,
@@ -2683,6 +2740,241 @@ mod tests {
             )
             .unwrap();
         assert_eq!(genre_after_rescan, "Synthwave; Electronic");
+    }
+
+    fn write_tagged_test_wav(path: &Path, title: &str) {
+        write_test_wav(path);
+        write_tags(
+            path,
+            &TagWriteRequest {
+                title,
+                artist: "Lorde",
+                album: "Pure Heroine",
+                ..Default::default()
+            },
+        )
+        .expect("write_tags should succeed");
+    }
+
+    fn open_paths(db: &Arc<Database>, app_data_dir: &Path, paths: Vec<PathBuf>) -> Vec<Song> {
+        let cover_manager = CoverManager::new(Arc::clone(db), app_data_dir.to_path_buf());
+        let conn = db.pool.get().unwrap();
+        crate::commands::player::resolve_songs_from_paths(&conn, &cover_manager, paths).unwrap()
+    }
+
+    fn song_source_and_added(db: &Database, id: i64) -> (SongSource, i64) {
+        db.pool
+            .get()
+            .unwrap()
+            .query_row(
+                "SELECT source, added FROM songs WHERE id = ?1",
+                params![id],
+                |r| Ok((SongSource::from(r.get::<_, i64>(0)?), r.get(1)?)),
+            )
+            .unwrap()
+    }
+
+    /// #1842: opening a device copy of a library song plays the copy from its
+    /// own row without touching the library (the library album must not jump
+    /// into Recently Added), still counts as listened, and joins the library
+    /// only once a scan finds it in a watched folder.
+    #[tokio::test]
+    async fn test_opened_file_stays_out_of_library_until_scanned() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let app_data_dir = temp_dir.path().to_path_buf();
+        let music_dir = temp_dir.path().join("music");
+        let device_dir = temp_dir.path().join("device");
+        std::fs::create_dir_all(&music_dir).unwrap();
+        std::fs::create_dir_all(&device_dir).unwrap();
+        let library_copy = music_dir.join("tennis.wav");
+        let device_copy = device_dir.join("tennis.wav");
+        write_tagged_test_wav(&library_copy, "Tennis Court");
+        write_tagged_test_wav(&device_copy, "Tennis Court");
+
+        let db = Arc::new(Database::new(app_data_dir.clone()).unwrap());
+        let scanner = CollectionScanner::new(Arc::clone(&db));
+        scanner.add_directory(&music_dir.to_string_lossy()).unwrap();
+        scanner
+            .scan_all_core(app_data_dir.clone(), false, false, false, |_| {})
+            .await
+            .unwrap();
+        let added_ids = |scanner: &CollectionScanner| -> Vec<i64> {
+            scanner
+                .get_recently_added_songs(10)
+                .unwrap()
+                .iter()
+                .map(|s| s.id)
+                .collect()
+        };
+        let library = added_ids(&scanner);
+        assert_eq!(library.len(), 1);
+        let library_id = library[0];
+
+        let opened = open_paths(&db, &app_data_dir, vec![device_copy.clone()]);
+        assert_eq!(opened.len(), 1);
+        let opened_id = opened[0].id;
+        assert_ne!(
+            opened_id, library_id,
+            "the opened copy plays from its own row"
+        );
+        assert_eq!(opened[0].source, SongSource::OpenedFile);
+        assert_eq!(added_ids(&scanner), vec![library_id]);
+        assert_eq!(scanner.get_recently_added(10).unwrap().len(), 1);
+
+        // Listening history counts what was played, library or not.
+        db.pool
+            .get()
+            .unwrap()
+            .execute(
+                "INSERT INTO play_history (context_type, song_id, played_at) VALUES ('song', ?1, 1)",
+                params![opened_id],
+            )
+            .unwrap();
+        let played: Vec<i64> = scanner
+            .get_recently_played_songs(10)
+            .unwrap()
+            .iter()
+            .map(|s| s.id)
+            .collect();
+        assert_eq!(played, vec![opened_id]);
+
+        // Re-opening finds the same row instead of inserting another.
+        let reopened = open_paths(&db, &app_data_dir, vec![device_copy.clone()]);
+        assert_eq!(reopened[0].id, opened_id);
+
+        // An opened-file upsert never downgrades a library row.
+        let cover_manager = CoverManager::new(Arc::clone(&db), app_data_dir.clone());
+        let mut downgrade = read_and_prepare_song(&cover_manager, &library_copy).unwrap();
+        downgrade.source = SongSource::OpenedFile;
+        upsert_song(&db.pool.get().unwrap(), &downgrade).unwrap();
+        assert_eq!(
+            song_source_and_added(&db, library_id).0,
+            SongSource::LocalFile
+        );
+
+        // A targeted re-read (the album view's Refresh) keeps it out too.
+        db.pool
+            .get()
+            .unwrap()
+            .execute(
+                "UPDATE songs SET added = 1 WHERE id = ?1",
+                params![opened_id],
+            )
+            .unwrap();
+        scanner
+            .rescan_paths_core(app_data_dir.clone(), vec![device_copy.clone()])
+            .await
+            .unwrap();
+        assert_eq!(
+            song_source_and_added(&db, opened_id),
+            (SongSource::OpenedFile, 1)
+        );
+
+        // Once its folder is watched, the unchanged file is upgraded in place
+        // and counts as newly added.
+        scanner
+            .add_directory(&device_dir.to_string_lossy())
+            .unwrap();
+        scanner
+            .scan_all_core(app_data_dir.clone(), false, false, false, |_| {})
+            .await
+            .unwrap();
+        let (source, added) = song_source_and_added(&db, opened_id);
+        assert_eq!(source, SongSource::LocalFile);
+        assert!(added > 1, "upgrade must refresh `added`, got {added}");
+        assert!(added_ids(&scanner).contains(&opened_id));
+    }
+
+    /// The orphan check matches watched folders the same way as opened-file
+    /// classification: a library row stored with different casing or slashes
+    /// than its folder is still in the library, not "outside every folder".
+    #[cfg(windows)]
+    #[test]
+    fn test_missing_check_matches_watched_folders_case_insensitively() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let music_dir = temp_dir.path().join("Music");
+        std::fs::create_dir_all(&music_dir).unwrap();
+        let file = music_dir.join("a.wav");
+        write_test_wav(&file);
+
+        let db = Arc::new(Database::new(temp_dir.path().to_path_buf()).unwrap());
+        let scanner = CollectionScanner::new(Arc::clone(&db));
+        scanner.add_directory(&music_dir.to_string_lossy()).unwrap();
+        let stored = file.to_string_lossy().to_uppercase().replace('\\', "/");
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO songs (path, source) VALUES (?1, ?2)",
+            params![stored, SongSource::LOCAL_FILE_ID],
+        )
+        .unwrap();
+        drop(conn);
+
+        assert_eq!(scanner.mark_missing_unavailable().unwrap(), 0);
+    }
+
+    /// #1842: opening an unscanned file that is already inside a watched
+    /// folder makes it a library song — the scan just hasn't reached it yet.
+    #[tokio::test]
+    async fn test_opening_an_unscanned_file_in_a_watched_folder_adds_it_to_the_library() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let app_data_dir = temp_dir.path().to_path_buf();
+        let music_dir = temp_dir.path().join("music");
+        std::fs::create_dir_all(&music_dir).unwrap();
+        let db = Arc::new(Database::new(app_data_dir.clone()).unwrap());
+        let scanner = CollectionScanner::new(Arc::clone(&db));
+        scanner.add_directory(&music_dir.to_string_lossy()).unwrap();
+
+        let path = music_dir.join("new.wav");
+        write_tagged_test_wav(&path, "New");
+        let opened = open_paths(&db, &app_data_dir, vec![path]);
+        assert_eq!(opened[0].source, SongSource::LocalFile);
+    }
+
+    /// #1842: a moved-file match must never repath an opened file onto a newly
+    /// scanned library file — that file would stay hidden as an opened file.
+    #[tokio::test]
+    async fn test_reconcile_never_repaths_an_opened_file() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let app_data_dir = temp_dir.path().to_path_buf();
+        let music_dir = temp_dir.path().join("music");
+        let device_dir = temp_dir.path().join("device");
+        std::fs::create_dir_all(&music_dir).unwrap();
+        std::fs::create_dir_all(&device_dir).unwrap();
+        let device_copy = device_dir.join("tennis.wav");
+        write_tagged_test_wav(&device_copy, "Tennis Court");
+
+        let db = Arc::new(Database::new(app_data_dir.clone()).unwrap());
+        let scanner = CollectionScanner::new(Arc::clone(&db));
+        scanner.add_directory(&music_dir.to_string_lossy()).unwrap();
+        let opened_id = open_paths(&db, &app_data_dir, vec![device_copy.clone()])[0].id;
+
+        // Same filename and size turn up in the library while the device
+        // copy is gone — exactly the moved-file heuristic's match key.
+        let library_copy = music_dir.join("tennis.wav");
+        std::fs::rename(&device_copy, &library_copy).unwrap();
+        scanner
+            .scan_all_core(app_data_dir.clone(), false, false, false, |_| {})
+            .await
+            .unwrap();
+
+        let opened_path: String = db
+            .pool
+            .get()
+            .unwrap()
+            .query_row(
+                "SELECT path FROM songs WHERE id = ?1",
+                params![opened_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(opened_path, device_copy.to_string_lossy());
+        let library = scanner.get_recently_added_songs(10).unwrap();
+        assert_eq!(library.len(), 1);
+        assert_ne!(library[0].id, opened_id);
+        assert_eq!(
+            library[0].path.as_deref(),
+            Some(&*library_copy.to_string_lossy())
+        );
     }
 
     #[tokio::test]
