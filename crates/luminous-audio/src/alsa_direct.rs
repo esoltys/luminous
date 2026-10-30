@@ -121,10 +121,16 @@ pub(crate) fn pick_mixer_element(elements: &[MixerElementInfo], pcm_name: &str) 
     elements.iter().position(|e| e.has_playback_volume)
 }
 
+/// Threshold below which decibel ranges are narrow enough (<= 24 dB / 2400 mB)
+/// to use linear decibel interpolation instead of the cubic/logarithmic perceptual curve.
+const MAX_LINEAR_DB_SCALE: i64 = 2400;
+
 /// Maps a linear volume slider position `vol` in `[0.0, 1.0]` to ALSA millibels
-/// (`MilliBel`) and mute switch state.
+/// (`MilliBel`) and mute switch state using the standard ALSA psychoacoustic curve
+/// (from `alsa-utils/alsamixer/volume_mapping.c`).
 ///
-/// Logarithmic mapping: `dB = 20 * log10(vol)`, so `mB = 2000 * log10(vol)`.
+/// For controls spanning > 24 dB, volume is mapped logarithmically so equal slider
+/// movements correspond to equal changes in perceived human loudness.
 /// Clamped between `min_mb` and `max_mb.min(0)` so 1.0 never boosts beyond 0 dB.
 /// Returns `(min_mb, true)` (muted) when `vol <= 0.0`.
 pub(crate) fn linear_to_alsa_db(vol: f32, min_mb: MilliBel, max_mb: MilliBel) -> (MilliBel, bool) {
@@ -135,11 +141,20 @@ pub(crate) fn linear_to_alsa_db(vol: f32, min_mb: MilliBel, max_mb: MilliBel) ->
     if vol >= 1.0 || cap_mb <= min_mb.0 {
         return (MilliBel(cap_mb), false);
     }
-    let mb = (2000.0 * vol.log10()).round() as i64;
+    let range = (cap_mb - min_mb.0) as f64;
+    if range <= MAX_LINEAR_DB_SCALE as f64 {
+        let mb = (min_mb.0 as f64 + range * vol as f64).round() as i64;
+        return (MilliBel(mb.clamp(min_mb.0, cap_mb)), false);
+    }
+
+    let min_norm = 10.0f64.powf((min_mb.0 - cap_mb) as f64 / 6000.0);
+    let vol_norm = (vol as f64 * (1.0 - min_norm) + min_norm).clamp(min_norm, 1.0);
+    let mb = (6000.0 * vol_norm.log10()).round() as i64 + cap_mb;
     (MilliBel(mb.clamp(min_mb.0, cap_mb)), false)
 }
 
-/// Maps an ALSA millibel value (`MilliBel`) and mute state back to linear volume `[0.0, 1.0]`.
+/// Maps an ALSA millibel value (`MilliBel`) and mute state back to linear volume `[0.0, 1.0]`
+/// using the inverse ALSA psychoacoustic curve.
 pub(crate) fn alsa_db_to_linear(
     mb: MilliBel,
     min_mb: MilliBel,
@@ -153,8 +168,16 @@ pub(crate) fn alsa_db_to_linear(
     if mb.0 >= cap_mb || cap_mb <= min_mb.0 {
         return 1.0;
     }
-    let vol = 10.0f32.powf(mb.0 as f32 / 2000.0);
-    vol.clamp(0.0, 1.0)
+    let range = (cap_mb - min_mb.0) as f64;
+    if range <= MAX_LINEAR_DB_SCALE as f64 {
+        let vol = (mb.0 - min_mb.0) as f64 / range;
+        return (vol as f32).clamp(0.0, 1.0);
+    }
+
+    let min_norm = 10.0f64.powf((min_mb.0 - cap_mb) as f64 / 6000.0);
+    let vol_norm = 10.0f64.powf((mb.0 - cap_mb) as f64 / 6000.0);
+    let vol = (vol_norm - min_norm) / (1.0 - min_norm);
+    (vol as f32).clamp(0.0, 1.0)
 }
 
 /// Maps linear volume to raw integer volume for elements lacking dB range.
@@ -1088,19 +1111,26 @@ mod tests {
         assert_eq!(mb, MilliBel(0));
         assert!((alsa_db_to_linear(mb, min_mb, max_mb, muted) - 1.0).abs() < 1e-4);
 
-        // 0.5 linear amplitude -> -6.02 dB (-602 mB)
+        // 0.5 slider position on a 60 dB range maps to ~-15.6 dB (-1558 mB) per ALSA perceptual curve
         let (mb, muted) = linear_to_alsa_db(0.5, min_mb, max_mb);
         assert!(!muted);
-        assert_eq!(mb.0, -602);
+        assert_eq!(mb.0, -1558);
         let vol = alsa_db_to_linear(mb, min_mb, max_mb, muted);
         assert!((vol - 0.5).abs() < 0.01);
 
-        // 0.1 linear amplitude -> -20 dB (-2000 mB)
+        // 0.1 slider position maps to ~-43.3 dB (-4327 mB)
         let (mb, muted) = linear_to_alsa_db(0.1, min_mb, max_mb);
         assert!(!muted);
-        assert_eq!(mb.0, -2000);
+        assert_eq!(mb.0, -4327);
         let vol = alsa_db_to_linear(mb, min_mb, max_mb, muted);
         assert!((vol - 0.1).abs() < 0.01);
+
+        // Narrow range (<= 24 dB) uses linear decibel interpolation
+        let narrow_min = MilliBel(-2000);
+        let narrow_max = MilliBel(0);
+        let (mb, _) = linear_to_alsa_db(0.5, narrow_min, narrow_max);
+        assert_eq!(mb.0, -1000); // exactly halfway
+        assert!((alsa_db_to_linear(mb, narrow_min, narrow_max, false) - 0.5).abs() < 0.01);
     }
 
     #[test]

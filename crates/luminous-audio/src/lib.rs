@@ -1146,11 +1146,15 @@ impl OutputRenderer {
         if played > 0 && self.shared.spectrum_enabled.load(Ordering::Relaxed) {
             let channels_u = self.channels as usize;
             self.mono_scratch.clear();
+            // When hardware volume is active, `output` remains bit-perfect at full scale,
+            // so scale the visualizer copy by `vol` so spectrum and reactive logo match listening level.
+            let vis_scale = if hw_vol { vol } else { 1.0 };
             for chunk in output[..played].chunks(channels_u) {
                 let sum: f32 = chunk.iter().sum();
                 // Reserved to buffer_capacity up front and cleared per callback.
                 // ast-grep-ignore: audio-callback-no-alloc
-                self.mono_scratch.push(sum / self.channels as f32);
+                self.mono_scratch
+                    .push((sum / self.channels as f32) * vis_scale);
             }
             // Bounded ring buffer: evicts the oldest block at max_size.
             // ast-grep-ignore: audio-callback-no-alloc
